@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { GitHubPullRequestConversationKeyTemplate } from "./webhook-trigger-conversation-key-options.js";
 import type { WebhookTriggerEventOption } from "./webhook-trigger-event-types.js";
+import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
 import {
   toCreateWebhookTriggerPayload,
   toUpdateWebhookTriggerPayload,
@@ -37,6 +38,34 @@ const SlackAppMentionTriggerId = createWebhookTriggerEventId({
   webhookSourceId: SlackWebhookSourceId,
   eventType: "slack:app_mention",
 });
+
+function isRule(value: string) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.IS,
+    value,
+  };
+}
+
+function isNotRule(value: string) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.IS_NOT,
+    value,
+  };
+}
+
+function containsTokenRule(value: string) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.CONTAINS_TOKEN,
+    value,
+  };
+}
+
+function existsRule() {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.EXISTS,
+    value: "exists",
+  };
+}
 
 const GitHubEventOptions: readonly WebhookTriggerEventOption[] = [
   createGithubIssueCommentCreatedEventOption({
@@ -165,7 +194,7 @@ const BaseFormValues: WebhookTriggerFormValues = {
   instructions: "",
   conversationKeyTemplate: "{{event.id}}",
   eventIds: [PullRequestOpenedTriggerId],
-  eventParameterValues: {},
+  eventParameterRules: {},
 };
 
 describe("toWebhookTriggerFormValues", () => {
@@ -179,7 +208,7 @@ describe("toWebhookTriggerFormValues", () => {
       instructions: "",
       conversationKeyTemplate: "",
       eventIds: [],
-      eventParameterValues: {},
+      eventParameterRules: {},
     });
   });
 
@@ -202,7 +231,7 @@ describe("toWebhookTriggerFormValues", () => {
           eventType: "pull_request",
         }),
       ],
-      eventParameterValues: {},
+      eventParameterRules: {},
     });
   });
 
@@ -250,13 +279,38 @@ describe("toWebhookTriggerFormValues", () => {
       ),
     ).toMatchObject({
       eventIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
-      eventParameterValues: {
+      eventParameterRules: {
         [PullRequestOpenedTriggerId]: {
-          repository: "mistlehq/mistle",
-          author: "octocat",
+          repository: isRule("mistlehq/mistle"),
+          author: isRule("octocat"),
         },
         [IssueCommentCreatedTriggerId]: {
-          target: "exists",
+          target: existsRule(),
+        },
+      },
+    });
+  });
+
+  it("hydrates negative equality trigger parameters out of payload filters", () => {
+    expect(
+      toWebhookTriggerFormValues(
+        {
+          ...SampleTrigger,
+          eventTypes: ["github.pull_request.opened"],
+          payloadFilter: {
+            "github.pull_request.opened": {
+              op: "neq",
+              path: ["sender", "login"],
+              value: "dependabot",
+            },
+          },
+        },
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      eventParameterRules: {
+        [PullRequestOpenedTriggerId]: {
+          author: isNotRule("dependabot"),
         },
       },
     });
@@ -281,9 +335,9 @@ describe("toWebhookTriggerFormValues", () => {
       ),
     ).toMatchObject({
       eventIds: [SlackAppMentionTriggerId],
-      eventParameterValues: {
+      eventParameterRules: {
         [SlackAppMentionTriggerId]: {
-          channel: "C12345678",
+          channel: isRule("C12345678"),
         },
       },
     });
@@ -307,9 +361,9 @@ describe("toWebhookTriggerFormValues", () => {
       ),
     ).toMatchObject({
       eventIds: [IssueCommentCreatedTriggerId],
-      eventParameterValues: {
+      eventParameterRules: {
         [IssueCommentCreatedTriggerId]: {
-          invocationToken: "@mistlebot",
+          invocationToken: containsTokenRule("@mistlebot"),
         },
       },
     });
@@ -329,7 +383,7 @@ describe("validateWebhookTriggerFormValues", () => {
           instructions: "",
           conversationKeyTemplate: "",
           eventIds: [],
-          eventParameterValues: {},
+          eventParameterRules: {},
         },
         GitHubEventOptions,
       ),
@@ -433,10 +487,10 @@ describe("validateWebhookTriggerFormValues", () => {
           ...BaseFormValues,
           conversationKeyTemplate: GitHubPullRequestConversationKeyTemplate,
           eventIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
-          eventParameterValues: {
+          eventParameterRules: {
             [IssueCommentCreatedTriggerId]: {
-              invocationToken: "pr-review",
-              target: "exists",
+              invocationToken: containsTokenRule("pr-review"),
+              target: existsRule(),
             },
           },
         },
@@ -541,10 +595,10 @@ describe("trigger payload transforms", () => {
       toCreateWebhookTriggerPayload(
         {
           ...BaseFormValues,
-          eventParameterValues: {
+          eventParameterRules: {
             [PullRequestOpenedTriggerId]: {
-              repository: "mistlehq/mistle",
-              author: "octocat",
+              repository: isRule("mistlehq/mistle"),
+              author: isRule("octocat"),
             },
           },
         },
@@ -583,6 +637,48 @@ describe("trigger payload transforms", () => {
     });
   });
 
+  it("builds negative trigger parameter filters into the payload filter", () => {
+    expect(
+      toCreateWebhookTriggerPayload(
+        {
+          ...BaseFormValues,
+          eventParameterRules: {
+            [PullRequestOpenedTriggerId]: {
+              author: isNotRule("dependabot"),
+            },
+          },
+        },
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      payloadFilter: {
+        "github.pull_request.opened": {
+          op: "neq",
+          path: ["sender", "login"],
+          value: "dependabot",
+        },
+      },
+    });
+  });
+
+  it("omits trigger parameter filters with blank values from the payload filter", () => {
+    expect(
+      toCreateWebhookTriggerPayload(
+        {
+          ...BaseFormValues,
+          eventParameterRules: {
+            [PullRequestOpenedTriggerId]: {
+              author: isNotRule(""),
+            },
+          },
+        },
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      payloadFilter: null,
+    });
+  });
+
   it("builds Slack app mention channel parameters into the payload filter", () => {
     expect(
       toCreateWebhookTriggerPayload(
@@ -590,9 +686,9 @@ describe("trigger payload transforms", () => {
           ...BaseFormValues,
           conversationKeyTemplate: "slack:channel:{{payload.event.channel}}",
           eventIds: [SlackAppMentionTriggerId],
-          eventParameterValues: {
+          eventParameterRules: {
             [SlackAppMentionTriggerId]: {
-              channel: "C12345678",
+              channel: isRule("C12345678"),
             },
           },
         },
@@ -626,9 +722,9 @@ describe("trigger payload transforms", () => {
         {
           ...BaseFormValues,
           eventIds: [IssueCommentCreatedTriggerId],
-          eventParameterValues: {
+          eventParameterRules: {
             [IssueCommentCreatedTriggerId]: {
-              target: "exists",
+              target: existsRule(),
             },
           },
         },
@@ -662,9 +758,9 @@ describe("trigger payload transforms", () => {
         {
           ...BaseFormValues,
           eventIds: [IssueCommentCreatedTriggerId],
-          eventParameterValues: {
+          eventParameterRules: {
             [IssueCommentCreatedTriggerId]: {
-              invocationToken: "@mistlebot",
+              invocationToken: containsTokenRule("@mistlebot"),
             },
           },
         },

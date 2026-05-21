@@ -33,7 +33,10 @@ import {
   resolveSelectedProfileTriggerState,
 } from "./use-webhook-trigger-editor-state.js";
 import { useWebhookTriggerEventPrerequisites } from "./use-webhook-trigger-prerequisites.js";
-import type { WebhookTriggerEventOption } from "./webhook-trigger-event-types.js";
+import type {
+  WebhookTriggerEventOption,
+  WebhookTriggerEventParameterRulesByEventType,
+} from "./webhook-trigger-event-types.js";
 import {
   toCreateWebhookTriggerPayload,
   toWebhookTriggerFormValues,
@@ -74,7 +77,7 @@ type CommonCreateTriggerFormValues = Pick<
 type CreateTriggerFormValues = CommonCreateTriggerFormValues &
   Pick<
     WebhookTriggerFormValues,
-    "conversationKeyTemplate" | "instructions" | "eventIds" | "eventParameterValues"
+    "conversationKeyTemplate" | "instructions" | "eventIds" | "eventParameterRules"
   > &
   Pick<ScheduledTriggerFormValues, "conversationMode" | "cronExpression" | "timezone">;
 
@@ -105,7 +108,7 @@ function createInitialCreateTriggerFormValues(
     instructions: webhookValues.instructions,
     conversationKeyTemplate: webhookValues.conversationKeyTemplate,
     eventIds: webhookValues.eventIds,
-    eventParameterValues: webhookValues.eventParameterValues,
+    eventParameterRules: webhookValues.eventParameterRules,
     cronExpression: scheduledValues.cronExpression,
     timezone: scheduledValues.timezone,
     conversationMode: scheduledValues.conversationMode,
@@ -144,7 +147,7 @@ function toWebhookValues(values: CreateTriggerFormValues): WebhookTriggerFormVal
     instructions: values.instructions,
     conversationKeyTemplate: values.conversationKeyTemplate,
     eventIds: values.eventIds,
-    eventParameterValues: values.eventParameterValues,
+    eventParameterRules: values.eventParameterRules,
   };
 }
 
@@ -218,7 +221,7 @@ function resolveNormalizedConversationKeyTemplate(input: {
     webhookEventOptions: input.eventOptions,
     selectedEventIds: input.values.eventIds,
     conversationKeyTemplate: input.values.conversationKeyTemplate,
-    eventParameterValues: input.values.eventParameterValues,
+    eventParameterRules: input.values.eventParameterRules,
     eventIdsError: undefined,
   });
   const conversationKeyFieldOptions = formState.conversationKeySelectionState;
@@ -245,22 +248,22 @@ function applyEventIdsChange(input: {
   values: CreateTriggerFormValues;
   eventIds: string[];
   eventOptions: readonly WebhookTriggerEventOption[];
-  eventParameterValuesByEventType?: WebhookTriggerFormValues["eventParameterValues"];
+  eventParameterRulesByEventType?: WebhookTriggerEventParameterRulesByEventType;
 }): CreateTriggerFormValues {
   const nextValues: CreateTriggerFormValues = {
     ...input.values,
     eventIds: input.eventIds,
-    eventParameterValues: Object.fromEntries(
+    eventParameterRules: Object.fromEntries(
       input.eventIds.map((triggerId) => {
         const eventOption = input.eventOptions.find((option) => option.id === triggerId);
-        const templateParameterValues =
+        const templateParameterRules =
           eventOption === undefined
             ? undefined
-            : input.eventParameterValuesByEventType?.[eventOption.eventType];
+            : input.eventParameterRulesByEventType?.[eventOption.eventType];
 
         return [
           triggerId,
-          templateParameterValues ?? input.values.eventParameterValues[triggerId] ?? {},
+          templateParameterRules ?? input.values.eventParameterRules[triggerId] ?? {},
         ];
       }),
     ),
@@ -471,10 +474,10 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
         values: currentValues,
         eventIds: templateEventIds,
         eventOptions: webhookEventOptions,
-        ...(initialTemplate.eventParameterValuesByEventType === undefined
+        ...(initialTemplate.eventParameterRulesByEventType === undefined
           ? {}
           : {
-              eventParameterValuesByEventType: initialTemplate.eventParameterValuesByEventType,
+              eventParameterRulesByEventType: initialTemplate.eventParameterRulesByEventType,
             }),
       }),
     );
@@ -668,8 +671,8 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
   }
 
   function onWebhookValueChange(
-    key: "conversationKeyTemplate" | "eventIds" | "eventParameterValues",
-    value: string | string[] | WebhookTriggerFormValues["eventParameterValues"],
+    key: "conversationKeyTemplate" | "eventIds" | "eventParameterRules",
+    value: string | string[] | WebhookTriggerFormValues["eventParameterRules"],
   ) {
     setFormValues((currentValues) => {
       if (key === "eventIds") {
@@ -685,7 +688,7 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
         [key]: value,
       };
 
-      if (key === "eventParameterValues") {
+      if (key === "eventParameterRules") {
         return {
           ...nextValues,
           conversationKeyTemplate: resolveNormalizedConversationKeyTemplate({
@@ -720,9 +723,9 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
         return remainingErrors;
       }
 
-      const { eventParameterValues: _eventParameterValues, ...remainingErrors } = currentErrors;
+      const { eventParameterRules: _eventParameterRules, ...remainingErrors } = currentErrors;
 
-      void _eventParameterValues;
+      void _eventParameterRules;
 
       return remainingErrors;
     });
@@ -881,7 +884,7 @@ export function CreateTriggerEditor(input: CreateTriggerEditorProps): React.JSX.
     webhookEventOptions: state.webhookEventOptions,
     selectedEventIds: state.formValues.eventIds,
     conversationKeyTemplate: state.formValues.conversationKeyTemplate,
-    eventParameterValues: state.formValues.eventParameterValues,
+    eventParameterRules: state.formValues.eventParameterRules,
     eventIdsError: state.fieldErrors.eventIds,
   });
 

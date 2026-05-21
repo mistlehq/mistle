@@ -8,6 +8,7 @@ import { PageFrame } from "../shared/page-frame.js";
 import type { TriggerFormShellStatusMessage } from "./trigger-form-shell.js";
 import { TriggerTypeDisplayField, TriggerTypeSelectField } from "./trigger-type-field.js";
 import type { WebhookTriggerEventPickerDisabledState } from "./webhook-trigger-event-picker-state.js";
+import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
 import { validateWebhookTriggerFormValues } from "./webhook-trigger-form-helpers.js";
 import {
   WebhookTriggerForm,
@@ -25,6 +26,21 @@ const GitHubWebhookSourceId = "iws_github_prod";
 const SlackConnectionId = "conn_slack_prod";
 const SlackWebhookSourceId = "iws_slack_prod";
 const StripeConnectionId = "conn_stripe_prod";
+
+function isRule(value: string) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.IS,
+    value,
+  };
+}
+
+function isNotRule(value: string) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.IS_NOT,
+    value,
+  };
+}
+
 const IssueCommentCreatedTriggerId = createWebhookTriggerEventId({
   webhookSourceId: GitHubWebhookSourceId,
   eventType: "github.issue_comment.created",
@@ -320,7 +336,7 @@ const EmptyCreateValues: WebhookTriggerFormValues = {
   instructions: "",
   conversationKeyTemplate: "",
   eventIds: [],
-  eventParameterValues: {},
+  eventParameterRules: {},
 };
 
 const ExistingTriggerValues: WebhookTriggerFormValues = {
@@ -338,11 +354,11 @@ const ExistingTriggerValues: WebhookTriggerFormValues = {
   instructions: "Keep the response concise and include a short risk summary.",
   conversationKeyTemplate: "{{payload.repository.full_name}}:{{payload.ref}}",
   eventIds: [PullRequestOpenedTriggerId],
-  eventParameterValues: {
+  eventParameterRules: {
     [PullRequestOpenedTriggerId]: {
-      repository: "mistlehq/platform",
-      author: "octocat",
-      baseBranch: "main",
+      repository: isRule("mistlehq/platform"),
+      author: isRule("octocat"),
+      baseBranch: isRule("main"),
     },
   },
 };
@@ -362,18 +378,29 @@ export const ExistingSlackTriggerValues: WebhookTriggerFormValues = {
   instructions: "Reply with the root cause and the next recommended action.",
   conversationKeyTemplate: "slack:channel:{{payload.event.channel}}",
   eventIds: [SlackAppMentionTriggerId],
-  eventParameterValues: {
+  eventParameterRules: {
     [SlackAppMentionTriggerId]: {
-      channel: "C_ALERTS_001",
+      channel: isRule("C_ALERTS_001"),
     },
   },
 };
 
 const ExistingSlackTriggerWithArchivedChannelValues: WebhookTriggerFormValues = {
   ...ExistingSlackTriggerValues,
-  eventParameterValues: {
+  eventParameterRules: {
     [SlackAppMentionTriggerId]: {
-      channel: "C_ARCHIVED_001",
+      channel: isRule("C_ARCHIVED_001"),
+    },
+  },
+};
+
+const ExistingTriggerWithExcludedAuthorValues: WebhookTriggerFormValues = {
+  ...ExistingTriggerValues,
+  eventParameterRules: {
+    [PullRequestOpenedTriggerId]: {
+      repository: isRule("mistlehq/platform"),
+      author: isNotRule("dependabot"),
+      baseBranch: isRule("main"),
     },
   },
 };
@@ -504,6 +531,14 @@ export const EditPageLayout: Story = {
     mode: "edit",
     onDelete: function onDelete() {},
     values: ExistingTriggerValues,
+  },
+};
+
+export const EditPageWithExcludedAuthor: Story = {
+  args: {
+    mode: "edit",
+    onDelete: function onDelete() {},
+    values: ExistingTriggerWithExcludedAuthorValues,
   },
 };
 
@@ -646,7 +681,7 @@ export const UnavailableSavedEvent: Story = {
     values: {
       ...ExistingTriggerValues,
       eventIds: [PushDeletedTriggerId],
-      eventParameterValues: {},
+      eventParameterRules: {},
     },
     webhookEventOptions: [
       ...GitHubWebhookEventOptions,
@@ -677,7 +712,7 @@ export const WrongProfileSavedEvent: Story = {
       ...ExistingTriggerValues,
       sandboxProfileId: "sbp_finance_investigator",
       eventIds: [IssueCommentCreatedTriggerId],
-      eventParameterValues: {},
+      eventParameterRules: {},
     },
     webhookEventOptions: [
       {

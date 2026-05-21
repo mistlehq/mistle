@@ -72,4 +72,29 @@ export type WebhookTriggerEventOption = {
   requirements?: IntegrationWebhookTriggerRequirements;
 };
 
-export type WebhookTriggerEventParameterValueMap = Record<string, Record<string, string>>;
+export const WebhookTriggerEventParameterRuleOperators = {
+  IS: "is",
+  IS_NOT: "is_not",
+  CONTAINS: "contains",
+  CONTAINS_TOKEN: "contains_token",
+  EXISTS: "exists",
+  NOT_EXISTS: "not_exists",
+} as const;
+
+export type WebhookTriggerEventParameterRuleOperator =
+  (typeof WebhookTriggerEventParameterRuleOperators)[keyof typeof WebhookTriggerEventParameterRuleOperators];
+
+export type WebhookTriggerEventParameterRule = {
+  operator: WebhookTriggerEventParameterRuleOperator;
+  value: string;
+};
+
+export type WebhookTriggerEventParameterRuleMap = Record<
+  string,
+  Record<string, WebhookTriggerEventParameterRule>
+>;
+
+export type WebhookTriggerEventParameterRulesByEventType = Record<
+  string,
+  Record<string, WebhookTriggerEventParameterRule>
+>;

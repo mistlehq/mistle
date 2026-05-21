@@ -4,7 +4,7 @@ import { isWebhookTriggerEventOptionUnavailable } from "./webhook-trigger-event-
 import { resolveSelectedWebhookTriggerEventOptions } from "./webhook-trigger-event-picker-state.js";
 import type {
   WebhookTriggerEventOption,
-  WebhookTriggerEventParameterValueMap,
+  WebhookTriggerEventParameterRuleMap,
 } from "./webhook-trigger-event-types.js";
 import type {
   WebhookTriggerFormOption,
@@ -47,7 +47,7 @@ export function resolveWebhookTriggerFormState(input: {
   webhookEventOptions: readonly WebhookTriggerEventOption[];
   selectedEventIds: readonly string[];
   conversationKeyTemplate: string;
-  eventParameterValues?: WebhookTriggerEventParameterValueMap;
+  eventParameterRules?: WebhookTriggerEventParameterRuleMap;
   eventIdsError: string | undefined;
 }): {
   selectedTriggerOptions: readonly WebhookTriggerEventOption[];
@@ -73,9 +73,9 @@ export function resolveWebhookTriggerFormState(input: {
   const conversationKeySelectionState = resolveConversationKeyFieldOptions({
     selectedEventOptions: selectedTriggerOptions,
     currentTemplate: input.conversationKeyTemplate,
-    ...(input.eventParameterValues === undefined
+    ...(input.eventParameterRules === undefined
       ? {}
-      : { eventParameterValues: input.eventParameterValues }),
+      : { eventParameterRules: input.eventParameterRules }),
   });
   const selectedConversationGroupingLabel = conversationKeySelectionState.options.find(
     (option) => option.template === conversationKeySelectionState.selectedTemplate,

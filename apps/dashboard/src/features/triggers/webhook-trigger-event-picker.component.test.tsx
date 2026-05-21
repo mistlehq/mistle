@@ -8,11 +8,16 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import type { WebhookTriggerEventPickerDisabledState } from "./webhook-trigger-event-picker-state.js";
-import { WebhookTriggerEventPicker } from "./webhook-trigger-event-picker.js";
+import {
+  resolveEnumSelectParameterRule,
+  WebhookTriggerEventPicker,
+} from "./webhook-trigger-event-picker.js";
 import type {
   WebhookTriggerEventOption,
-  WebhookTriggerEventParameterValueMap,
+  WebhookTriggerEventParameterRule,
+  WebhookTriggerEventParameterRuleMap,
 } from "./webhook-trigger-event-types.js";
+import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
 import { createWebhookTriggerEventId } from "./webhook-trigger-option-builders.js";
 import {
   createGithubIssueCommentCreatedEventOption,
@@ -37,6 +42,27 @@ const WebhookEventOptions: readonly WebhookTriggerEventOption[] = [
     connectionLabel: GitHubGroupedConnectionLabel,
   }),
 ];
+
+function isRule(value: string) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.IS,
+    value,
+  };
+}
+
+function containsTokenRule(value: string) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.CONTAINS_TOKEN,
+    value,
+  };
+}
+
+function existsRule() {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.EXISTS,
+    value: "exists",
+  };
+}
 
 const SlackAppMentionEventOption: WebhookTriggerEventOption = {
   id: SlackAppMentionTriggerId,
@@ -69,7 +95,7 @@ function renderTriggerPicker(input: {
   hasConnectedIntegrations: boolean;
   selectedConnectionId: string;
   selectedEventIds: readonly string[];
-  eventParameterValues: WebhookTriggerEventParameterValueMap;
+  eventParameterRules: WebhookTriggerEventParameterRuleMap;
   disabledState?: WebhookTriggerEventPickerDisabledState | null;
   eventOptions?: readonly WebhookTriggerEventOption[];
   useStatefulSelection?: boolean;
@@ -107,11 +133,11 @@ function renderTriggerPicker(input: {
         eventOptions={input.eventOptions ?? WebhookEventOptions}
         hasConnectedIntegrations={input.hasConnectedIntegrations}
         {...(input.disabledState === undefined ? {} : { disabledState: input.disabledState })}
-        onEventParameterValueChange={() => {}}
+        onEventParameterRuleChange={() => {}}
         onValueChange={setSelectedEventIds}
         selectedConnectionId={input.selectedConnectionId}
         selectedEventIds={selectedEventIds}
-        eventParameterValues={input.eventParameterValues}
+        eventParameterRules={input.eventParameterRules}
       />
     );
   }
@@ -126,11 +152,11 @@ function renderTriggerPicker(input: {
           eventOptions={input.eventOptions ?? WebhookEventOptions}
           hasConnectedIntegrations={input.hasConnectedIntegrations}
           {...(input.disabledState === undefined ? {} : { disabledState: input.disabledState })}
-          onEventParameterValueChange={() => {}}
+          onEventParameterRuleChange={() => {}}
           onValueChange={() => {}}
           selectedConnectionId={input.selectedConnectionId}
           selectedEventIds={input.selectedEventIds}
-          eventParameterValues={input.eventParameterValues}
+          eventParameterRules={input.eventParameterRules}
         />
       )}
     </QueryClientProvider>,
@@ -148,7 +174,7 @@ describe("WebhookTriggerEventPicker", () => {
           eventType: "github.issue_comment.created",
         }),
       ],
-      eventParameterValues: {},
+      eventParameterRules: {},
     });
 
     const logo = container.querySelector("img");
@@ -170,7 +196,7 @@ describe("WebhookTriggerEventPicker", () => {
           eventType: "github.push.deleted",
         }),
       ],
-      eventParameterValues: {},
+      eventParameterRules: {},
     });
 
     expect(screen.getByText("github.push.deleted")).toBeDefined();
@@ -190,7 +216,7 @@ describe("WebhookTriggerEventPicker", () => {
           eventType: "github.issue_comment.created",
         }),
       ],
-      eventParameterValues: {},
+      eventParameterRules: {},
       eventOptions: [
         createGithubIssueCommentCreatedEventOption({
           availability: "wrong_profile",
@@ -214,7 +240,7 @@ describe("WebhookTriggerEventPicker", () => {
       hasConnectedIntegrations: false,
       selectedConnectionId: "",
       selectedEventIds: [],
-      eventParameterValues: {},
+      eventParameterRules: {},
       eventOptions: [],
     });
 
@@ -233,7 +259,7 @@ describe("WebhookTriggerEventPicker", () => {
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
       selectedEventIds: [],
-      eventParameterValues: {},
+      eventParameterRules: {},
       eventOptions: [],
     });
 
@@ -259,7 +285,7 @@ describe("WebhookTriggerEventPicker", () => {
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
       selectedEventIds: WebhookEventOptions.map((option) => option.id),
-      eventParameterValues: {},
+      eventParameterRules: {},
     });
 
     const input = container.querySelector('input[placeholder="No events available"]');
@@ -276,7 +302,7 @@ describe("WebhookTriggerEventPicker", () => {
       hasConnectedIntegrations: true,
       selectedConnectionId: "",
       selectedEventIds: [],
-      eventParameterValues: {},
+      eventParameterRules: {},
       eventOptions: [],
       disabledState: {
         reason:
@@ -313,7 +339,7 @@ describe("WebhookTriggerEventPicker", () => {
       hasConnectedIntegrations: true,
       selectedConnectionId: "",
       selectedEventIds: [],
-      eventParameterValues: {},
+      eventParameterRules: {},
       eventOptions: [],
       disabledState: {
         reason: "Could not load profile bindings.",
@@ -336,7 +362,7 @@ describe("WebhookTriggerEventPicker", () => {
       hasConnectedIntegrations: true,
       selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
       selectedEventIds: [],
-      eventParameterValues: {},
+      eventParameterRules: {},
     });
 
     expect(screen.getAllByText("No events added yet.").length).toBeGreaterThan(0);
@@ -348,7 +374,7 @@ describe("WebhookTriggerEventPicker", () => {
       hasConnectedIntegrations: true,
       selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
       selectedEventIds: [],
-      eventParameterValues: {},
+      eventParameterRules: {},
     });
 
     const errorMessage = screen.getByText("Please add an event");
@@ -374,12 +400,12 @@ describe("WebhookTriggerEventPicker", () => {
           eventType: "github.pull_request.opened",
         }),
       ],
-      eventParameterValues: {
+      eventParameterRules: {
         [createWebhookTriggerEventId({
           webhookSourceId: GitHubWebhookSourceId,
           eventType: "github.pull_request.opened",
         })]: {
-          author: "octocat",
+          author: isRule("octocat"),
         },
       },
     });
@@ -418,13 +444,13 @@ describe("WebhookTriggerEventPicker", () => {
           error={undefined}
           eventOptions={[SlackAppMentionEventOption]}
           hasConnectedIntegrations={true}
-          onEventParameterValueChange={() => {}}
+          onEventParameterRuleChange={() => {}}
           onValueChange={() => {}}
           selectedConnectionId={SlackConnectionId}
           selectedEventIds={[SlackAppMentionTriggerId]}
-          eventParameterValues={{
+          eventParameterRules={{
             [SlackAppMentionTriggerId]: {
-              channel: "C12345678",
+              channel: isRule("C12345678"),
             },
           }}
         />
@@ -446,12 +472,12 @@ describe("WebhookTriggerEventPicker", () => {
           eventType: "github.pull_request.opened",
         }),
       ],
-      eventParameterValues: {
+      eventParameterRules: {
         [createWebhookTriggerEventId({
           webhookSourceId: GitHubWebhookSourceId,
           eventType: "github.pull_request.opened",
         })]: {
-          author: "retired-user",
+          author: isRule("retired-user"),
         },
       },
     });
@@ -469,12 +495,12 @@ describe("WebhookTriggerEventPicker", () => {
           eventType: "github.issue_comment.created",
         }),
       ],
-      eventParameterValues: {
+      eventParameterRules: {
         [createWebhookTriggerEventId({
           webhookSourceId: GitHubWebhookSourceId,
           eventType: "github.issue_comment.created",
         })]: {
-          target: "exists",
+          target: existsRule(),
         },
       },
     });
@@ -487,6 +513,28 @@ describe("WebhookTriggerEventPicker", () => {
     expect(parameterSelect.textContent).toContain("pull request");
   });
 
+  it("resolves enum equality parameter selections as equality rules", () => {
+    const parameter: WebhookTriggerEventParameterRule = resolveEnumSelectParameterRule({
+      parameter: {
+        id: "action",
+        label: "action",
+        kind: "enum-select",
+        matchMode: "eq",
+        payloadPath: ["action"],
+        placeholder: "Any action",
+        options: [
+          {
+            value: "opened",
+            label: "opened",
+          },
+        ],
+      },
+      value: "opened",
+    });
+
+    expect(parameter).toEqual(isRule("opened"));
+  });
+
   it("renders invocation token parameters as an optional input", () => {
     const triggerId = createWebhookTriggerEventId({
       webhookSourceId: GitHubWebhookSourceId,
@@ -496,9 +544,9 @@ describe("WebhookTriggerEventPicker", () => {
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
       selectedEventIds: [triggerId],
-      eventParameterValues: {
+      eventParameterRules: {
         [triggerId]: {
-          invocationToken: "@mistlebot",
+          invocationToken: containsTokenRule("@mistlebot"),
         },
       },
     });
@@ -516,9 +564,9 @@ describe("WebhookTriggerEventPicker", () => {
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
       selectedEventIds: [triggerId],
-      eventParameterValues: {
+      eventParameterRules: {
         [triggerId]: {
-          invocationToken: "@review-bot",
+          invocationToken: containsTokenRule("@review-bot"),
         },
       },
     });
@@ -536,9 +584,9 @@ describe("WebhookTriggerEventPicker", () => {
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
       selectedEventIds: [triggerId],
-      eventParameterValues: {
+      eventParameterRules: {
         [triggerId]: {
-          invocationToken: "",
+          invocationToken: containsTokenRule(""),
         },
       },
     });
@@ -562,7 +610,7 @@ describe("WebhookTriggerEventPicker", () => {
           eventType: "github.issue_comment.created",
         }),
       ],
-      eventParameterValues: {},
+      eventParameterRules: {},
     });
 
     const selectValue = container.querySelector('[data-slot="select-value"]');
@@ -583,7 +631,7 @@ describe("WebhookTriggerEventPicker", () => {
           eventType: "github.issue_comment.created",
         }),
       ],
-      eventParameterValues: {},
+      eventParameterRules: {},
     });
 
     const addTriggerButton = container.querySelector('button[data-slot="input-group-button"]');
@@ -602,7 +650,7 @@ describe("WebhookTriggerEventPicker", () => {
       hasConnectedIntegrations: true,
       selectedConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
       selectedEventIds: [],
-      eventParameterValues: {},
+      eventParameterRules: {},
       useStatefulSelection: true,
     });
 
@@ -639,7 +687,7 @@ describe("WebhookTriggerEventPicker", () => {
           eventType: "github.issue_comment.created",
         }),
       ],
-      eventParameterValues: {},
+      eventParameterRules: {},
       useStatefulSelection: true,
     });
 
@@ -710,10 +758,10 @@ describe("WebhookTriggerEventPicker", () => {
         webhookSourceId: GitHubWebhookSourceId,
         eventType: "github.pull_request.opened",
       });
-      const [eventParameterValues, setEventParameterValues] =
-        useState<WebhookTriggerEventParameterValueMap>({
+      const [eventParameterRules, setEventParameterRules] =
+        useState<WebhookTriggerEventParameterRuleMap>({
           [triggerId]: {
-            author: "octocat",
+            author: isRule("octocat"),
           },
         });
 
@@ -721,9 +769,9 @@ describe("WebhookTriggerEventPicker", () => {
         <>
           <button
             onClick={() => {
-              setEventParameterValues({
+              setEventParameterRules({
                 [triggerId]: {
-                  author: "hubot",
+                  author: isRule("hubot"),
                 },
               });
             }}
@@ -735,19 +783,19 @@ describe("WebhookTriggerEventPicker", () => {
             error={undefined}
             eventOptions={WebhookEventOptions}
             hasConnectedIntegrations={true}
-            onEventParameterValueChange={({ triggerId: nextTriggerId, parameterId, value }) => {
-              setEventParameterValues((currentValues) => ({
+            onEventParameterRuleChange={({ triggerId: nextTriggerId, parameterId, rule }) => {
+              setEventParameterRules((currentValues) => ({
                 ...currentValues,
                 [nextTriggerId]: {
                   ...currentValues[nextTriggerId],
-                  [parameterId]: value,
+                  [parameterId]: rule,
                 },
               }));
             }}
             onValueChange={() => {}}
             selectedConnectionId="icn_01kkk1g84mfetvga8a4b853k27"
             selectedEventIds={[triggerId]}
-            eventParameterValues={eventParameterValues}
+            eventParameterRules={eventParameterRules}
           />
         </>
       );

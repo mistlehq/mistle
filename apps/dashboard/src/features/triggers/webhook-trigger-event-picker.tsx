@@ -35,8 +35,10 @@ import {
 } from "./webhook-trigger-event-picker-state.js";
 import type {
   WebhookTriggerEventOption,
-  WebhookTriggerEventParameterValueMap,
+  WebhookTriggerEventParameterRule,
+  WebhookTriggerEventParameterRuleMap,
 } from "./webhook-trigger-event-types.js";
+import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
 
 const EventParameterRowClassName = "flex w-full items-center gap-4";
 const EventParameterLabelClassName = "text-muted-foreground shrink-0 text-sm whitespace-nowrap";
@@ -48,13 +50,13 @@ export function WebhookTriggerEventPicker(input: {
   selectedEventIds: readonly string[];
   eventOptions: readonly WebhookTriggerEventOption[];
   disabledState?: WebhookTriggerEventPickerDisabledState | null;
-  eventParameterValues: WebhookTriggerEventParameterValueMap;
+  eventParameterRules: WebhookTriggerEventParameterRuleMap;
   error: string | undefined;
   onValueChange: (value: string[]) => void;
-  onEventParameterValueChange: (input: {
+  onEventParameterRuleChange: (input: {
     triggerId: string;
     parameterId: string;
-    value: string;
+    rule: WebhookTriggerEventParameterRule;
   }) => void;
   showAddTriggerControl?: boolean;
 }): React.JSX.Element {
@@ -148,15 +150,15 @@ export function WebhookTriggerEventPicker(input: {
                   connectionId={input.selectedConnectionId}
                   eventType={option.eventType}
                   key={`${option.id}:${parameter.id}`}
-                  onValueChange={(value) => {
-                    input.onEventParameterValueChange({
+                  onRuleChange={(rule) => {
+                    input.onEventParameterRuleChange({
                       triggerId: option.id,
                       parameterId: parameter.id,
-                      value,
+                      rule,
                     });
                   }}
                   parameter={parameter}
-                  value={input.eventParameterValues[option.id]?.[parameter.id] ?? ""}
+                  rule={input.eventParameterRules[option.id]?.[parameter.id]}
                 />
               ))}
               {isWebhookTriggerEventOptionUnavailable(option) &&
@@ -278,8 +280,8 @@ function EventParameterField(input: {
   connectionId: string;
   eventType: string;
   parameter: NonNullable<WebhookTriggerEventOption["parameters"]>[number];
-  value: string;
-  onValueChange: (value: string) => void;
+  rule: WebhookTriggerEventParameterRule | undefined;
+  onRuleChange: (rule: WebhookTriggerEventParameterRule) => void;
 }): React.JSX.Element | null {
   const resourceQuery = useQuery({
     queryKey: [
@@ -307,6 +309,7 @@ function EventParameterField(input: {
       input.connectionId.trim().length > 0,
     retry: false,
   });
+  const value = input.rule?.value ?? "";
 
   if (input.parameter.kind === "string") {
     if (input.parameter.controlVariant === "invocation-token") {
@@ -334,10 +337,41 @@ function EventParameterField(input: {
           <Input
             className={EventParameterControlClassName}
             onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-              input.onValueChange(event.currentTarget.value);
+              input.onRuleChange({
+                operator: WebhookTriggerEventParameterRuleOperators.CONTAINS_TOKEN,
+                value: event.currentTarget.value,
+              });
             }}
             placeholder={input.parameter.placeholder}
-            value={input.value}
+            value={value}
+          />
+        </span>
+      );
+    }
+
+    if (isEqualityParameter(input.parameter)) {
+      return (
+        <span className={EventParameterRowClassName}>
+          <EqualityOperatorSelect
+            parameter={input.parameter}
+            value={resolveEqualityOperator(input.rule)}
+            onValueChange={(operator) => {
+              input.onRuleChange({
+                operator,
+                value,
+              });
+            }}
+          />
+          <Input
+            className={EventParameterControlClassName}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+              input.onRuleChange({
+                operator: resolveEqualityOperator(input.rule),
+                value: event.currentTarget.value,
+              });
+            }}
+            placeholder={input.parameter.placeholder ?? input.parameter.label}
+            value={value}
           />
         </span>
       );
@@ -351,45 +385,45 @@ function EventParameterField(input: {
         <Input
           className={EventParameterControlClassName}
           onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-            input.onValueChange(event.currentTarget.value);
+            input.onRuleChange({
+              operator: WebhookTriggerEventParameterRuleOperators.CONTAINS,
+              value: event.currentTarget.value,
+            });
           }}
           placeholder={input.parameter.placeholder ?? input.parameter.label}
-          value={input.value}
+          value={value}
         />
       </span>
     );
   }
 
   if (input.parameter.kind === "enum-select") {
+    const parameter = input.parameter;
     return (
       <span className={EventParameterRowClassName}>
-        <span className={EventParameterLabelClassName}>
-          {input.parameter.prefix ?? input.parameter.label}
-        </span>
+        <span className={EventParameterLabelClassName}>{parameter.prefix ?? parameter.label}</span>
         <Select
           modal={false}
           onValueChange={(value) => {
-            if (value === null) {
-              input.onValueChange("");
-              return;
-            }
-
-            input.onValueChange(value === "__any__" ? "" : value);
+            input.onRuleChange(
+              resolveEnumSelectParameterRule({
+                parameter,
+                value,
+              }),
+            );
           }}
-          value={input.value.length === 0 ? null : input.value}
+          value={value.length === 0 ? null : value}
         >
           <SelectTrigger className={EventParameterControlClassName}>
-            <SelectValue
-              placeholder={input.parameter.placeholder ?? `Any ${input.parameter.label}`}
-            >
-              {input.parameter.options.find((option) => option.value === input.value)?.label}
+            <SelectValue placeholder={parameter.placeholder ?? `Any ${parameter.label}`}>
+              {parameter.options.find((option) => option.value === value)?.label}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="__any__">
-              {input.parameter.placeholder ?? `Any ${input.parameter.label}`}
+              {parameter.placeholder ?? `Any ${parameter.label}`}
             </SelectItem>
-            {input.parameter.options.map((option) => (
+            {parameter.options.map((option) => (
               <SelectItem key={`${input.eventType}:${option.value}`} value={option.value}>
                 {option.label}
               </SelectItem>
@@ -403,21 +437,20 @@ function EventParameterField(input: {
   const resourceOptions = [...(resourceQuery.data?.items ?? [])].sort((left, right) =>
     left.displayName.localeCompare(right.displayName),
   );
-  const selectedResourceOption = resourceOptions.find((option) => option.handle === input.value);
+  const selectedResourceOption = resourceOptions.find((option) => option.handle === value);
   const normalizedResourceOptions =
-    input.value.trim().length > 0 && selectedResourceOption === undefined
+    value.trim().length > 0 && selectedResourceOption === undefined
       ? [
           ...resourceOptions,
           {
-            id: `missing:${input.value}`,
-            handle: input.value,
-            displayName: `${input.value} (Unavailable)`,
+            id: `missing:${value}`,
+            handle: value,
+            displayName: `${value} (Unavailable)`,
           },
         ]
       : resourceOptions;
   const resolvedSelectedResourceOption =
-    selectedResourceOption ??
-    normalizedResourceOptions.find((option) => option.handle === input.value);
+    selectedResourceOption ?? normalizedResourceOptions.find((option) => option.handle === value);
   const placeholder =
     input.connectionId.trim().length === 0
       ? `Select ${input.parameter.label}`
@@ -428,13 +461,114 @@ function EventParameterField(input: {
           : `Select ${input.parameter.label}`;
   return (
     <ResourceSelectParameterField
-      key={`${input.connectionId}:${input.value}:${resolvedSelectedResourceOption?.displayName ?? ""}`}
-      onValueChange={input.onValueChange}
+      key={`${input.connectionId}:${value}:${resolvedSelectedResourceOption?.displayName ?? ""}`}
+      onRuleChange={input.onRuleChange}
       parameter={input.parameter}
       placeholder={placeholder}
+      rule={input.rule}
       resourceOptions={normalizedResourceOptions}
-      value={input.value}
     />
+  );
+}
+
+export function resolveEnumSelectParameterRule(input: {
+  parameter: Extract<
+    NonNullable<WebhookTriggerEventOption["parameters"]>[number],
+    { kind: "enum-select" }
+  >;
+  value: string | null;
+}): WebhookTriggerEventParameterRule {
+  const selectedValue = input.value === null || input.value === "__any__" ? "" : input.value;
+
+  if (input.parameter.matchMode === "eq") {
+    return {
+      operator: WebhookTriggerEventParameterRuleOperators.IS,
+      value: selectedValue,
+    };
+  }
+
+  return {
+    operator:
+      selectedValue === WebhookTriggerEventParameterRuleOperators.NOT_EXISTS
+        ? WebhookTriggerEventParameterRuleOperators.NOT_EXISTS
+        : WebhookTriggerEventParameterRuleOperators.EXISTS,
+    value: selectedValue,
+  };
+}
+
+function isEqualityParameter(
+  parameter: NonNullable<WebhookTriggerEventOption["parameters"]>[number],
+): boolean {
+  return (
+    parameter.kind === "resource-select" ||
+    (parameter.kind === "string" &&
+      (parameter.matchMode === undefined || parameter.matchMode === "eq"))
+  );
+}
+
+function resolveEqualityOperator(
+  rule: WebhookTriggerEventParameterRule | undefined,
+): "is" | "is_not" {
+  return rule?.operator === WebhookTriggerEventParameterRuleOperators.IS_NOT
+    ? WebhookTriggerEventParameterRuleOperators.IS_NOT
+    : WebhookTriggerEventParameterRuleOperators.IS;
+}
+
+function formatEqualityOperatorLabel(input: {
+  parameter: NonNullable<WebhookTriggerEventOption["parameters"]>[number];
+  operator: "is" | "is_not";
+}): string {
+  const prefix = input.parameter.prefix;
+  if (input.operator === WebhookTriggerEventParameterRuleOperators.IS) {
+    return prefix ?? "is";
+  }
+
+  return prefix === undefined ? "is not" : `not ${prefix}`;
+}
+
+function EqualityOperatorSelect(input: {
+  parameter: NonNullable<WebhookTriggerEventOption["parameters"]>[number];
+  value: "is" | "is_not";
+  onValueChange: (operator: "is" | "is_not") => void;
+}): React.JSX.Element {
+  return (
+    <Select
+      modal={false}
+      onValueChange={(value) => {
+        if (
+          value !== WebhookTriggerEventParameterRuleOperators.IS &&
+          value !== WebhookTriggerEventParameterRuleOperators.IS_NOT
+        ) {
+          return;
+        }
+
+        input.onValueChange(value);
+      }}
+      value={input.value}
+    >
+      <SelectTrigger className="w-24 shrink-0">
+        <SelectValue>
+          {formatEqualityOperatorLabel({
+            parameter: input.parameter,
+            operator: input.value,
+          })}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={WebhookTriggerEventParameterRuleOperators.IS}>
+          {formatEqualityOperatorLabel({
+            parameter: input.parameter,
+            operator: WebhookTriggerEventParameterRuleOperators.IS,
+          })}
+        </SelectItem>
+        <SelectItem value={WebhookTriggerEventParameterRuleOperators.IS_NOT}>
+          {formatEqualityOperatorLabel({
+            parameter: input.parameter,
+            operator: WebhookTriggerEventParameterRuleOperators.IS_NOT,
+          })}
+        </SelectItem>
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -443,36 +577,47 @@ function ResourceSelectParameterField(input: {
     NonNullable<WebhookTriggerEventOption["parameters"]>[number],
     { kind: "resource-select" }
   >;
-  value: string;
+  rule: WebhookTriggerEventParameterRule | undefined;
   placeholder: string;
   resourceOptions: Array<{
     id: string;
     handle: string;
     displayName: string;
   }>;
-  onValueChange: (value: string) => void;
+  onRuleChange: (rule: WebhookTriggerEventParameterRule) => void;
 }): React.JSX.Element {
   const inputId = useId();
+  const value = input.rule?.value ?? "";
 
   return (
     <span className={EventParameterRowClassName}>
-      <span className={EventParameterLabelClassName}>
-        {input.parameter.prefix ?? input.parameter.label}
-      </span>
+      <EqualityOperatorSelect
+        parameter={input.parameter}
+        value={resolveEqualityOperator(input.rule)}
+        onValueChange={(operator) => {
+          input.onRuleChange({
+            operator,
+            value,
+          });
+        }}
+      />
       <SingleSelectStringComboboxField
         contentClassName="w-[min(22rem,calc(100vw-2rem))]"
         inputId={inputId}
         inputLabel={input.parameter.label}
         inputWrapperClassName={EventParameterControlClassName}
         onChange={(value) => {
-          input.onValueChange(value ?? "");
+          input.onRuleChange({
+            operator: resolveEqualityOperator(input.rule),
+            value: value ?? "",
+          });
         }}
         options={input.resourceOptions.map((option) => ({
           value: option.handle,
           label: option.displayName,
         }))}
-        placeholder={input.value.length === 0 ? `Any ${input.parameter.label}` : input.placeholder}
-        value={input.value.length === 0 ? undefined : input.value}
+        placeholder={value.length === 0 ? `Any ${input.parameter.label}` : input.placeholder}
+        value={value.length === 0 ? undefined : value}
       />
     </span>
   );

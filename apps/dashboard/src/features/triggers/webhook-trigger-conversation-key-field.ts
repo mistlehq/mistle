@@ -2,13 +2,13 @@ import { resolveCommonWebhookTriggerConversationKeyOptions } from "./webhook-tri
 import type {
   WebhookTriggerConversationKeyOption,
   WebhookTriggerEventOption,
-  WebhookTriggerEventParameterValueMap,
+  WebhookTriggerEventParameterRuleMap,
 } from "./webhook-trigger-event-types.js";
 
 export function resolveConversationKeyFieldOptions(input: {
   selectedEventOptions: readonly WebhookTriggerEventOption[];
   currentTemplate: string;
-  eventParameterValues?: WebhookTriggerEventParameterValueMap;
+  eventParameterRules?: WebhookTriggerEventParameterRuleMap;
 }): {
   options: readonly WebhookTriggerConversationKeyOption[];
   selectedTemplate: string;
@@ -16,9 +16,9 @@ export function resolveConversationKeyFieldOptions(input: {
 } {
   const options = resolveCommonWebhookTriggerConversationKeyOptions({
     selectedEventOptions: input.selectedEventOptions,
-    ...(input.eventParameterValues === undefined
+    ...(input.eventParameterRules === undefined
       ? {}
-      : { eventParameterValues: input.eventParameterValues }),
+      : { eventParameterRules: input.eventParameterRules }),
   });
   const isCurrentTemplateSupported =
     input.currentTemplate.trim().length > 0 &&

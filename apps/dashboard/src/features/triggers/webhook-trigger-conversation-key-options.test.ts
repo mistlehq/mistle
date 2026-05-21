@@ -5,6 +5,7 @@ import {
   GitHubPullRequestConversationKeyTemplate,
   resolveCommonWebhookTriggerConversationKeyOptions,
 } from "./webhook-trigger-conversation-key-options.js";
+import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
 import {
   createWebhookTriggerEventOption,
   createWebhookTriggerEventId,
@@ -79,9 +80,12 @@ describe("resolveCommonWebhookTriggerConversationKeyOptions", () => {
           id: GitHubIssueCommentCreatedTriggerId,
         }),
       ],
-      eventParameterValues: {
+      eventParameterRules: {
         [GitHubIssueCommentCreatedTriggerId]: {
-          target: "exists",
+          target: {
+            operator: WebhookTriggerEventParameterRuleOperators.EXISTS,
+            value: "exists",
+          },
         },
       },
     });
@@ -112,9 +116,12 @@ describe("resolveCommonWebhookTriggerConversationKeyOptions", () => {
           id: GitHubIssueCommentCreatedTriggerId,
         }),
       ],
-      eventParameterValues: {
+      eventParameterRules: {
         [GitHubIssueCommentCreatedTriggerId]: {
-          target: "not_exists",
+          target: {
+            operator: WebhookTriggerEventParameterRuleOperators.NOT_EXISTS,
+            value: "not_exists",
+          },
         },
       },
     });
@@ -132,7 +139,30 @@ describe("resolveCommonWebhookTriggerConversationKeyOptions", () => {
           id: GitHubIssueCommentCreatedTriggerId,
         }),
       ],
-      eventParameterValues: {},
+      eventParameterRules: {},
+    });
+
+    expect(options.map((option) => option.id)).toEqual(["repository"]);
+  });
+
+  it("does not add GitHub pull request grouping when the comment target rule is cleared", () => {
+    const options = resolveCommonWebhookTriggerConversationKeyOptions({
+      selectedEventOptions: [
+        createGithubPullRequestOpenedEventOption({
+          id: GitHubPullRequestOpenedTriggerId,
+        }),
+        createGithubIssueCommentCreatedEventOption({
+          id: GitHubIssueCommentCreatedTriggerId,
+        }),
+      ],
+      eventParameterRules: {
+        [GitHubIssueCommentCreatedTriggerId]: {
+          target: {
+            operator: WebhookTriggerEventParameterRuleOperators.EXISTS,
+            value: "",
+          },
+        },
+      },
     });
 
     expect(options.map((option) => option.id)).toEqual(["repository"]);

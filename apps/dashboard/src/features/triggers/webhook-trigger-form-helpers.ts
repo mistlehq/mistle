@@ -1,7 +1,7 @@
 import { resolveCommonWebhookTriggerConversationKeyOptions } from "./webhook-trigger-conversation-key-options.js";
 import { resolveSelectedWebhookTriggerEventIssues } from "./webhook-trigger-event-option-availability.js";
 import {
-  extractWebhookTriggerEventParameterValues,
+  extractWebhookTriggerEventParameterRules,
   mergeWebhookTriggerPayloadFilter,
 } from "./webhook-trigger-event-parameters.js";
 import { resolveSelectedWebhookTriggerEventOptions } from "./webhook-trigger-event-picker-state.js";
@@ -96,7 +96,7 @@ export function toWebhookTriggerFormValues(
       instructions: "",
       conversationKeyTemplate: "",
       eventIds: [],
-      eventParameterValues: {},
+      eventParameterRules: {},
     };
   }
 
@@ -106,7 +106,7 @@ export function toWebhookTriggerFormValues(
       eventType,
     }),
   );
-  const extractedEventParameterValues = extractWebhookTriggerEventParameterValues({
+  const extractedEventParameterRules = extractWebhookTriggerEventParameterRules({
     eventOptions,
     selectedEventIds,
     payloadFilter: trigger.payloadFilter,
@@ -121,7 +121,7 @@ export function toWebhookTriggerFormValues(
     instructions: trigger.instructions ?? "",
     conversationKeyTemplate: trigger.conversationKeyTemplate,
     eventIds: selectedEventIds,
-    eventParameterValues: extractedEventParameterValues.eventParameterValues,
+    eventParameterRules: extractedEventParameterRules.eventParameterRules,
   };
 }
 
@@ -182,7 +182,7 @@ export function validateWebhookTriggerFormValues(
       eventOptions,
       selectedEventIds: values.eventIds,
     }),
-    eventParameterValues: values.eventParameterValues,
+    eventParameterRules: values.eventParameterRules,
   });
   if (
     selectedConversationKeyOptions.length > 0 &&
@@ -203,7 +203,7 @@ function toPayloadFilterValue(input: {
   return mergeWebhookTriggerPayloadFilter({
     eventOptions: input.eventOptions,
     selectedEventIds: input.values.eventIds,
-    eventParameterValues: input.values.eventParameterValues,
+    eventParameterRules: input.values.eventParameterRules,
     advancedPayloadFilter: null,
   });
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { GitHubPullRequestConversationKeyTemplate } from "./webhook-trigger-conversation-key-options.js";
+import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
 import {
   resolveWebhookTriggerFormPresentation,
   resolveWebhookTriggerFormState,
@@ -206,9 +207,12 @@ describe("resolveWebhookTriggerFormState", () => {
       ],
       selectedEventIds: [pullRequestTriggerId, issueCommentTriggerId],
       conversationKeyTemplate: GitHubPullRequestConversationKeyTemplate,
-      eventParameterValues: {
+      eventParameterRules: {
         [issueCommentTriggerId]: {
-          target: "exists",
+          target: {
+            operator: WebhookTriggerEventParameterRuleOperators.EXISTS,
+            value: "exists",
+          },
         },
       },
       eventIdsError: undefined,

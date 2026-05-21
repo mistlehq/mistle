@@ -27,7 +27,7 @@ import {
 } from "./webhook-trigger-event-picker.js";
 import type {
   WebhookTriggerEventOption,
-  WebhookTriggerEventParameterValueMap,
+  WebhookTriggerEventParameterRuleMap,
 } from "./webhook-trigger-event-types.js";
 import {
   resolveWebhookTriggerFormPresentation,
@@ -50,7 +50,7 @@ export type { WebhookTriggerEventOptionAvailability } from "./webhook-trigger-ev
 type WebhookTriggerTypeSpecificSectionProps = {
   values: Pick<
     WebhookTriggerFormValues,
-    "conversationKeyTemplate" | "eventIds" | "eventParameterValues"
+    "conversationKeyTemplate" | "eventIds" | "eventParameterRules"
   >;
   connectionOptions: readonly WebhookTriggerFormOption[];
   webhookEventOptions: readonly WebhookTriggerEventOption[];
@@ -58,8 +58,8 @@ type WebhookTriggerTypeSpecificSectionProps = {
   fieldErrors: Pick<WebhookTriggerFormProps["fieldErrors"], "conversationKeyTemplate" | "eventIds">;
   formState: ReturnType<typeof resolveWebhookTriggerFormState>;
   onValueChange: (
-    key: "conversationKeyTemplate" | "eventIds" | "eventParameterValues",
-    value: string | string[] | WebhookTriggerEventParameterValueMap,
+    key: "conversationKeyTemplate" | "eventIds" | "eventParameterRules",
+    value: string | string[] | WebhookTriggerEventParameterRuleMap,
   ) => void;
 };
 
@@ -87,7 +87,7 @@ type WebhookTriggerFormProps = {
   triggerTypeField?: ReactNode;
   onValueChange: (
     key: WebhookTriggerFormValueKey,
-    value: string | boolean | string[] | WebhookTriggerEventParameterValueMap,
+    value: string | boolean | string[] | WebhookTriggerEventParameterRuleMap,
   ) => void;
   onSubmit: () => void;
   onDelete: (() => void) | null;
@@ -126,12 +126,12 @@ export function WebhookTriggerTypeSpecificSection(
           eventOptions={input.webhookEventOptions}
           hasConnectedIntegrations={input.connectionOptions.length > 0}
           disabledState={input.triggerPickerDisabledState}
-          onEventParameterValueChange={({ triggerId, parameterId, value }) => {
-            input.onValueChange("eventParameterValues", {
-              ...input.values.eventParameterValues,
+          onEventParameterRuleChange={({ triggerId, parameterId, rule }) => {
+            input.onValueChange("eventParameterRules", {
+              ...input.values.eventParameterRules,
               [triggerId]: {
-                ...(input.values.eventParameterValues[triggerId] ?? {}),
-                [parameterId]: value,
+                ...(input.values.eventParameterRules[triggerId] ?? {}),
+                [parameterId]: rule,
               },
             });
           }}
@@ -141,7 +141,7 @@ export function WebhookTriggerTypeSpecificSection(
           selectedConnectionId={input.formState.selectedConnectionId}
           selectedEventIds={input.values.eventIds}
           showAddTriggerControl={false}
-          eventParameterValues={input.values.eventParameterValues}
+          eventParameterRules={input.values.eventParameterRules}
         />
       </div>
 
@@ -236,7 +236,7 @@ export function WebhookTriggerForm(input: WebhookTriggerFormProps): React.JSX.El
     webhookEventOptions: input.webhookEventOptions,
     selectedEventIds: input.values.eventIds,
     conversationKeyTemplate: input.values.conversationKeyTemplate,
-    eventParameterValues: input.values.eventParameterValues,
+    eventParameterRules: input.values.eventParameterRules,
     eventIdsError: input.fieldErrors.eventIds,
   });
 

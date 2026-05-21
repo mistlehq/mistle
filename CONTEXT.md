@@ -64,6 +64,14 @@ _Avoid_: Automation
 A provider event that can be selected as the event source for a **Trigger**.
 _Avoid_: Webhook event when naming product-facing trigger-builder concepts
 
+**Trigger event parameter**:
+A provider event field that can narrow which **Trigger events** match a **Trigger**.
+_Avoid_: Filter field
+
+**Trigger event parameter rule**:
+A match rule applied to a **Trigger event parameter** when deciding whether a **Trigger event** matches a **Trigger**.
+_Avoid_: Exclusion when the rule is one match mode among several
+
 **Trigger conversation**:
 A Mistle-owned **Conversation** created or reused while handling a **Trigger** run.
 _Avoid_: Automation conversation
@@ -256,6 +264,17 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Deleting an existing **Deleted session** again is still considered a successful deletion request.
 - A **Trigger** may select one or more **Trigger events**.
 - A **Trigger** may start from a webhook event or a schedule.
+- A **Trigger event** may expose **Trigger event parameters**.
+- A **Trigger event parameter** may have one or more **Trigger event parameter rules**.
+- A **Trigger event parameter rule** may include or exclude matching provider event values.
+- A first-pass exclusion rule should be an equality negation on a **Trigger event parameter**, not a separate exclusion list.
+- Equality-based **Trigger event parameters** may use inclusion or exclusion rules whether their values are selected from provider resources or entered as text.
+- A **Trigger event parameter** without a selected or entered value has no **Trigger event parameter rule**.
+- Existing equality **Trigger event parameter rules** remain inclusion rules unless the user changes them.
+- User-facing labels for **Trigger event parameter rules** should preserve event-specific natural language while representing inclusion or exclusion consistently.
+- First-pass **Trigger event parameter** editing should allow at most one **Trigger event parameter rule** per parameter.
+- A **Trigger event parameter rule** belongs to one selected **Trigger event** even when another selected **Trigger event** exposes a similar parameter.
+- Trigger-builder form state should represent selected **Trigger event parameters** as rules rather than bare values.
 - A **Trigger** run may create or reuse one **Trigger conversation**.
 - A **Trigger conversation** is owned by Mistle, not by an agent runtime provider.
 - A **Provider conversation** is owned by an agent runtime provider.

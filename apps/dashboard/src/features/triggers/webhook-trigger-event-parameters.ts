@@ -1,7 +1,8 @@
 import type {
   WebhookTriggerEventOption,
-  WebhookTriggerEventParameterValueMap,
+  WebhookTriggerEventParameterRuleMap,
 } from "./webhook-trigger-event-types.js";
+import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
 
 type PayloadFilterNode =
   | {
@@ -9,7 +10,7 @@ type PayloadFilterNode =
       filters: PayloadFilterNode[];
     }
   | {
-      op: "eq" | "contains" | "contains_token";
+      op: "eq" | "neq" | "contains" | "contains_token";
       path: string[];
       value: string;
     }
@@ -58,13 +59,13 @@ function parseKnownPayloadFilterNode(value: unknown): PayloadFilterNode | null {
     };
   }
 
-  if (value["op"] === "eq") {
+  if (value["op"] === "eq" || value["op"] === "neq") {
     if (!isStringArray(value["path"]) || typeof value["value"] !== "string") {
       return null;
     }
 
     return {
-      op: "eq",
+      op: value["op"],
       path: value["path"],
       value: value["value"],
     };
@@ -108,9 +109,13 @@ function parseKnownPayloadFilterNode(value: unknown): PayloadFilterNode | null {
   return null;
 }
 
-function buildEqNode(input: { path: string[]; value: string }): PayloadFilterNode {
+function buildEqualityNode(input: {
+  operator: "is" | "is_not";
+  path: string[];
+  value: string;
+}): PayloadFilterNode {
   return {
-    op: "eq",
+    op: input.operator === WebhookTriggerEventParameterRuleOperators.IS_NOT ? "neq" : "eq",
     path: input.path,
     value: input.value,
   };
@@ -158,7 +163,7 @@ function mergePayloadFilterNodes(filters: readonly PayloadFilterNode[]): Payload
 function buildPayloadFilterNodeForTrigger(input: {
   eventOption: WebhookTriggerEventOption | undefined;
   triggerId: string;
-  eventParameterValues: WebhookTriggerEventParameterValueMap;
+  eventParameterRules: WebhookTriggerEventParameterRuleMap;
 }): PayloadFilterNode | null {
   const filters: PayloadFilterNode[] = [];
 
@@ -167,27 +172,34 @@ function buildPayloadFilterNodeForTrigger(input: {
   }
 
   for (const parameter of input.eventOption.parameters ?? []) {
-    const configuredValue =
-      input.eventParameterValues[input.triggerId]?.[parameter.id]?.trim() ?? "";
+    const rule = input.eventParameterRules[input.triggerId]?.[parameter.id];
+    const configuredValue = rule?.value.trim() ?? "";
     if (configuredValue.length === 0) {
       continue;
     }
 
     if (parameter.kind === "enum-select" && parameter.matchMode === "exists") {
-      if (configuredValue !== "exists" && configuredValue !== "not_exists") {
+      if (
+        rule?.operator !== WebhookTriggerEventParameterRuleOperators.EXISTS &&
+        rule?.operator !== WebhookTriggerEventParameterRuleOperators.NOT_EXISTS
+      ) {
         continue;
       }
 
       filters.push(
         buildExistsNode({
           path: [...parameter.payloadPath],
-          operator: configuredValue,
+          operator: rule.operator,
         }),
       );
       continue;
     }
 
     if (parameter.kind === "string" && parameter.matchMode === "contains") {
+      if (rule?.operator !== WebhookTriggerEventParameterRuleOperators.CONTAINS) {
+        continue;
+      }
+
       filters.push(
         buildContainsNode({
           path: [...parameter.payloadPath],
@@ -198,6 +210,10 @@ function buildPayloadFilterNodeForTrigger(input: {
     }
 
     if (parameter.kind === "string" && parameter.matchMode === "contains_token") {
+      if (rule?.operator !== WebhookTriggerEventParameterRuleOperators.CONTAINS_TOKEN) {
+        continue;
+      }
+
       filters.push(
         buildContainsTokenNode({
           path: [...parameter.payloadPath],
@@ -207,8 +223,16 @@ function buildPayloadFilterNodeForTrigger(input: {
       continue;
     }
 
+    if (
+      rule?.operator !== WebhookTriggerEventParameterRuleOperators.IS &&
+      rule?.operator !== WebhookTriggerEventParameterRuleOperators.IS_NOT
+    ) {
+      continue;
+    }
+
     filters.push(
-      buildEqNode({
+      buildEqualityNode({
+        operator: rule.operator,
         path: [...parameter.payloadPath],
         value: configuredValue,
       }),
@@ -221,7 +245,7 @@ function buildPayloadFilterNodeForTrigger(input: {
 function buildPayloadFiltersByEventType(input: {
   eventOptions: readonly WebhookTriggerEventOption[];
   selectedEventIds: readonly string[];
-  eventParameterValues: WebhookTriggerEventParameterValueMap;
+  eventParameterRules: WebhookTriggerEventParameterRuleMap;
 }): Record<string, PayloadFilterNode> {
   const filtersByEventType = new Map<string, PayloadFilterNode[]>();
 
@@ -233,7 +257,7 @@ function buildPayloadFiltersByEventType(input: {
     const triggerFilter = buildPayloadFilterNodeForTrigger({
       eventOption,
       triggerId,
-      eventParameterValues: input.eventParameterValues,
+      eventParameterRules: input.eventParameterRules,
     });
     if (eventOption === undefined || triggerFilter === null) {
       continue;
@@ -262,13 +286,13 @@ function buildPayloadFiltersByEventType(input: {
 export function mergeWebhookTriggerPayloadFilter(input: {
   eventOptions: readonly WebhookTriggerEventOption[];
   selectedEventIds: readonly string[];
-  eventParameterValues: WebhookTriggerEventParameterValueMap;
+  eventParameterRules: WebhookTriggerEventParameterRuleMap;
   advancedPayloadFilter: Record<string, unknown> | null;
 }): Record<string, unknown> | null {
   const eventParameterFiltersByEventType = buildPayloadFiltersByEventType({
     eventOptions: input.eventOptions,
     selectedEventIds: input.selectedEventIds,
-    eventParameterValues: input.eventParameterValues,
+    eventParameterRules: input.eventParameterRules,
   });
   const mergedPayloadFilter: Record<string, unknown> = {};
   const eventTypes = new Set([
@@ -301,22 +325,22 @@ export function mergeWebhookTriggerPayloadFilter(input: {
   return Object.keys(mergedPayloadFilter).length === 0 ? null : mergedPayloadFilter;
 }
 
-export function extractWebhookTriggerEventParameterValues(input: {
+export function extractWebhookTriggerEventParameterRules(input: {
   eventOptions: readonly WebhookTriggerEventOption[];
   selectedEventIds: readonly string[];
   payloadFilter: Record<string, unknown> | null;
 }): {
-  eventParameterValues: WebhookTriggerEventParameterValueMap;
+  eventParameterRules: WebhookTriggerEventParameterRuleMap;
   remainingPayloadFilter: Record<string, unknown> | null;
 } {
   if (input.payloadFilter === null) {
     return {
-      eventParameterValues: {},
+      eventParameterRules: {},
       remainingPayloadFilter: null,
     };
   }
 
-  const eventParameterValues: WebhookTriggerEventParameterValueMap = {};
+  const eventParameterRules: WebhookTriggerEventParameterRuleMap = {};
   const remainingPayloadFilter: Record<string, unknown> = {};
 
   for (const [eventType, eventPayloadFilter] of Object.entries(input.payloadFilter)) {
@@ -346,6 +370,7 @@ export function extractWebhookTriggerEventParameterValues(input: {
     for (const filter of rootFilters) {
       if (
         filter.op !== "eq" &&
+        filter.op !== "neq" &&
         filter.op !== "contains" &&
         filter.op !== "contains_token" &&
         filter.op !== "exists" &&
@@ -373,9 +398,12 @@ export function extractWebhookTriggerEventParameterValues(input: {
           ) {
             if (parameter.kind === "enum-select" && parameter.matchMode === "exists") {
               if (filter.op === "exists" || filter.op === "not_exists") {
-                eventParameterValues[triggerId] = {
-                  ...(eventParameterValues[triggerId] ?? {}),
-                  [parameter.id]: filter.op,
+                eventParameterRules[triggerId] = {
+                  ...(eventParameterRules[triggerId] ?? {}),
+                  [parameter.id]: {
+                    operator: filter.op,
+                    value: filter.op,
+                  },
                 };
                 extracted = true;
               }
@@ -387,22 +415,31 @@ export function extractWebhookTriggerEventParameterValues(input: {
               (parameter.matchMode === "contains" || parameter.matchMode === "contains_token")
             ) {
               if (filter.op === parameter.matchMode) {
-                eventParameterValues[triggerId] = {
-                  ...(eventParameterValues[triggerId] ?? {}),
-                  [parameter.id]: filter.value,
+                eventParameterRules[triggerId] = {
+                  ...(eventParameterRules[triggerId] ?? {}),
+                  [parameter.id]: {
+                    operator: filter.op,
+                    value: filter.value,
+                  },
                 };
                 extracted = true;
               }
               break;
             }
 
-            if (filter.op !== "eq") {
+            if (filter.op !== "eq" && filter.op !== "neq") {
               break;
             }
 
-            eventParameterValues[triggerId] = {
-              ...(eventParameterValues[triggerId] ?? {}),
-              [parameter.id]: filter.value,
+            eventParameterRules[triggerId] = {
+              ...(eventParameterRules[triggerId] ?? {}),
+              [parameter.id]: {
+                operator:
+                  filter.op === "neq"
+                    ? WebhookTriggerEventParameterRuleOperators.IS_NOT
+                    : WebhookTriggerEventParameterRuleOperators.IS,
+                value: filter.value,
+              },
             };
             extracted = true;
             break;
@@ -426,7 +463,7 @@ export function extractWebhookTriggerEventParameterValues(input: {
   }
 
   return {
-    eventParameterValues,
+    eventParameterRules,
     remainingPayloadFilter:
       Object.keys(remainingPayloadFilter).length === 0 ? null : remainingPayloadFilter,
   };

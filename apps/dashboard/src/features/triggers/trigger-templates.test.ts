@@ -5,6 +5,7 @@ import {
   resolveTriggerTemplateEventOptionIds,
 } from "./trigger-templates.js";
 import { GitHubPullRequestConversationKeyTemplate } from "./webhook-trigger-conversation-key-options.js";
+import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
 import { createWebhookTriggerEventId } from "./webhook-trigger-option-builders.js";
 import {
   createGithubIssueCommentCreatedEventOption,
@@ -28,10 +29,16 @@ describe("trigger templates", () => {
       "github.pull_request.opened",
       "github.issue_comment.created",
     ]);
-    expect(template.eventParameterValuesByEventType).toEqual({
+    expect(template.eventParameterRulesByEventType).toEqual({
       "github.issue_comment.created": {
-        invocationToken: "pr-review",
-        target: "exists",
+        invocationToken: {
+          operator: WebhookTriggerEventParameterRuleOperators.CONTAINS_TOKEN,
+          value: "pr-review",
+        },
+        target: {
+          operator: WebhookTriggerEventParameterRuleOperators.EXISTS,
+          value: "exists",
+        },
       },
     });
     expect(template.inputTemplate).toContain("{{payload.repository.full_name}}");

@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import type { TriggerFormShellStatusMessage } from "./trigger-form-shell.js";
 import type { WebhookTriggerEventPickerDisabledState } from "./webhook-trigger-event-picker-state.js";
-import type { WebhookTriggerEventParameterValueMap } from "./webhook-trigger-event-types.js";
+import type { WebhookTriggerEventParameterRuleMap } from "./webhook-trigger-event-types.js";
 import {
   WebhookTriggerForm,
   type WebhookTriggerFormOption,
@@ -68,7 +68,7 @@ const FormValues: WebhookTriggerFormValues = {
       eventType: "github.issue_comment.created",
     }),
   ],
-  eventParameterValues: {},
+  eventParameterRules: {},
 };
 
 const TestQueryClient = createTestQueryClient();
@@ -115,7 +115,7 @@ describe("WebhookTriggerForm", () => {
               instructions: "",
               conversationKeyTemplate: "",
               eventIds: [],
-              eventParameterValues: {},
+              eventParameterRules: {},
             }
           : FormValues,
     });
@@ -130,12 +130,7 @@ describe("WebhookTriggerForm", () => {
     primaryRepositoryOptions?: readonly WebhookTriggerFormOption[];
     onValueChange?: (
       key: keyof WebhookTriggerFormValues,
-      value:
-        | string
-        | boolean
-        | string[]
-        | WebhookTriggerEventParameterValueMap
-        | Record<string, Record<string, boolean>>,
+      value: string | boolean | string[] | WebhookTriggerEventParameterRuleMap,
     ) => void;
   }): ReturnType<typeof render> {
     return render(
@@ -389,9 +384,10 @@ describe("WebhookTriggerForm", () => {
     expect(triggerNameInput.getAttribute("aria-invalid")).toBe("true");
     expect(inputTemplateEditor.getAttribute("aria-invalid")).toBe("true");
 
-    const selectTriggers = container.querySelectorAll('[data-slot="select-trigger"]');
-    expect(selectTriggers[0]?.getAttribute("aria-invalid")).toBe("true");
-    expect(selectTriggers[1]?.getAttribute("aria-invalid")).toBe("true");
+    const invalidSelectTriggers = [
+      ...container.querySelectorAll('[data-slot="select-trigger"]'),
+    ].filter((selectTrigger) => selectTrigger.getAttribute("aria-invalid") === "true");
+    expect(invalidSelectTriggers).toHaveLength(2);
   });
 
   it("shows the required-fields summary and inline copy for generic input template errors", () => {

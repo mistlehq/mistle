@@ -184,7 +184,7 @@ async function invalidateTriggersQuery(queryClient: QueryClient): Promise<void> 
 function applyWebhookTriggerValueChange(input: {
   values: WebhookTriggerFormValues;
   key: keyof WebhookTriggerFormValues;
-  value: string | boolean | string[] | WebhookTriggerFormValues["eventParameterValues"];
+  value: string | boolean | string[] | WebhookTriggerFormValues["eventParameterRules"];
   eventOptions: readonly WebhookTriggerEventOption[];
 }): WebhookTriggerFormValues {
   const nextValues: WebhookTriggerFormValues = {
@@ -193,15 +193,15 @@ function applyWebhookTriggerValueChange(input: {
   };
 
   if (input.key === "eventIds") {
-    nextValues.eventParameterValues = Object.fromEntries(
+    nextValues.eventParameterRules = Object.fromEntries(
       nextValues.eventIds.map((triggerId) => [
         triggerId,
-        nextValues.eventParameterValues[triggerId] ?? {},
+        nextValues.eventParameterRules[triggerId] ?? {},
       ]),
     );
   }
 
-  if (input.key === "eventIds" || input.key === "eventParameterValues") {
+  if (input.key === "eventIds" || input.key === "eventParameterRules") {
     nextValues.conversationKeyTemplate = resolveNormalizedConversationKeyTemplate({
       values: nextValues,
       eventOptions: input.eventOptions,
@@ -282,7 +282,7 @@ function resolveNormalizedConversationKeyTemplate(input: {
   const conversationKeyFieldOptions = resolveConversationKeyFieldOptions({
     selectedEventOptions: selectedTriggerOptions,
     currentTemplate: input.values.conversationKeyTemplate,
-    eventParameterValues: input.values.eventParameterValues,
+    eventParameterRules: input.values.eventParameterRules,
   });
 
   if (conversationKeyFieldOptions.options.length === 0) {
@@ -349,7 +349,7 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
   onSubmit: () => void;
   onValueChange: (
     key: keyof WebhookTriggerFormValues,
-    value: string | boolean | string[] | WebhookTriggerFormValues["eventParameterValues"],
+    value: string | boolean | string[] | WebhookTriggerFormValues["eventParameterRules"],
   ) => void;
 } {
   const queryClient = useQueryClient();
@@ -595,7 +595,7 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
 
   function onValueChange(
     key: keyof WebhookTriggerFormValues,
-    value: string | boolean | string[] | WebhookTriggerFormValues["eventParameterValues"],
+    value: string | boolean | string[] | WebhookTriggerFormValues["eventParameterRules"],
   ): void {
     const nextValues = applyWebhookTriggerValueChange({
       values: formValues,

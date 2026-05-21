@@ -8,8 +8,9 @@ import type { IntegrationConnectionResources } from "../integrations/integration
 import { WebhookTriggerEventPicker } from "./webhook-trigger-event-picker.js";
 import type {
   WebhookTriggerEventOption,
-  WebhookTriggerEventParameterValueMap,
+  WebhookTriggerEventParameterRuleMap,
 } from "./webhook-trigger-event-types.js";
+import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
 import { createWebhookTriggerEventId } from "./webhook-trigger-option-builders.js";
 import { createGitHubEventOption } from "./webhook-trigger-test-fixtures.js";
 
@@ -17,6 +18,27 @@ const GitHubConnectionId = "conn_github_prod";
 const GitHubWebhookSourceId = "iws_github_prod";
 const SlackConnectionId = "conn_slack_prod";
 const SlackWebhookSourceId = "iws_slack_prod";
+
+function isRule(value: string) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.IS,
+    value,
+  };
+}
+
+function isNotRule(value: string) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.IS_NOT,
+    value,
+  };
+}
+
+function containsTokenRule(value: string) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.CONTAINS_TOKEN,
+    value,
+  };
+}
 const IssueCommentCreatedTriggerId = createWebhookTriggerEventId({
   webhookSourceId: GitHubWebhookSourceId,
   eventType: "github.issue_comment.created",
@@ -265,15 +287,13 @@ function StoryHarness(input: {
   hasConnectedIntegrations: boolean;
   selectedConnectionId: string;
   selectedEventIds: readonly string[];
-  eventParameterValues?: WebhookTriggerEventParameterValueMap;
+  eventParameterRules?: WebhookTriggerEventParameterRuleMap;
   eventOptions: readonly WebhookTriggerEventOption[];
   error?: string;
 }): React.JSX.Element {
   const [queryClient] = useState(() => createWebhookTriggerEventPickerStoryQueryClient());
   const [selectedEventIds, setSelectedEventIds] = useState([...input.selectedEventIds]);
-  const [eventParameterValues, setEventParameterValues] = useState(
-    input.eventParameterValues ?? {},
-  );
+  const [eventParameterRules, setEventParameterRules] = useState(input.eventParameterRules ?? {});
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -282,19 +302,19 @@ function StoryHarness(input: {
           error={input.error}
           eventOptions={input.eventOptions}
           hasConnectedIntegrations={input.hasConnectedIntegrations}
-          onEventParameterValueChange={({ triggerId, parameterId, value }) => {
-            setEventParameterValues((currentValues) => ({
+          onEventParameterRuleChange={({ triggerId, parameterId, rule }) => {
+            setEventParameterRules((currentValues) => ({
               ...currentValues,
               [triggerId]: {
                 ...(currentValues[triggerId] ?? {}),
-                [parameterId]: value,
+                [parameterId]: rule,
               },
             }));
           }}
           onValueChange={setSelectedEventIds}
           selectedConnectionId={input.selectedConnectionId}
           selectedEventIds={selectedEventIds}
-          eventParameterValues={eventParameterValues}
+          eventParameterRules={eventParameterRules}
         />
       </div>
     </QueryClientProvider>
@@ -319,12 +339,28 @@ export const Default: Story = {
     hasConnectedIntegrations: true,
     selectedConnectionId: GitHubConnectionId,
     selectedEventIds: [PullRequestReviewCommentCreatedTriggerId],
-    eventParameterValues: {
+    eventParameterRules: {
       [PullRequestReviewCommentCreatedTriggerId]: {
-        invocationToken: "@mistlebot",
-        commenter: "octocat",
-        baseBranch: "main",
-        repository: "mistlehq/platform",
+        invocationToken: containsTokenRule("@mistlebot"),
+        commenter: isRule("octocat"),
+        baseBranch: isRule("main"),
+        repository: isRule("mistlehq/platform"),
+      },
+    },
+    eventOptions: GitHubEventOptions,
+  },
+};
+
+export const NegativeEqualityParameters: Story = {
+  args: {
+    hasConnectedIntegrations: true,
+    selectedConnectionId: GitHubConnectionId,
+    selectedEventIds: [PullRequestOpenedTriggerId],
+    eventParameterRules: {
+      [PullRequestOpenedTriggerId]: {
+        author: isNotRule("dependabot"),
+        baseBranch: isRule("main"),
+        repository: isRule("mistlehq/platform"),
       },
     },
     eventOptions: GitHubEventOptions,
@@ -408,9 +444,9 @@ export const SlackAppMentionChannelOnly: Story = {
     hasConnectedIntegrations: true,
     selectedConnectionId: SlackConnectionId,
     selectedEventIds: [SlackAppMentionTriggerId],
-    eventParameterValues: {
+    eventParameterRules: {
       [SlackAppMentionTriggerId]: {
-        channel: "C_ALERTS_001",
+        channel: isRule("C_ALERTS_001"),
       },
     },
     eventOptions: SlackEventOptions,
@@ -422,9 +458,9 @@ export const SlackUnavailableArchivedChannelSelection: Story = {
     hasConnectedIntegrations: true,
     selectedConnectionId: SlackConnectionId,
     selectedEventIds: [SlackAppMentionTriggerId],
-    eventParameterValues: {
+    eventParameterRules: {
       [SlackAppMentionTriggerId]: {
-        channel: "C_ARCHIVED_001",
+        channel: isRule("C_ARCHIVED_001"),
       },
     },
     eventOptions: SlackEventOptions,
@@ -436,9 +472,9 @@ export const AddSecondEvent: Story = {
     hasConnectedIntegrations: true,
     selectedConnectionId: GitHubConnectionId,
     selectedEventIds: [IssueCommentCreatedTriggerId],
-    eventParameterValues: {
+    eventParameterRules: {
       [IssueCommentCreatedTriggerId]: {
-        invocationToken: "@mistlebot",
+        invocationToken: containsTokenRule("@mistlebot"),
       },
     },
     eventOptions: GitHubEventOptions,

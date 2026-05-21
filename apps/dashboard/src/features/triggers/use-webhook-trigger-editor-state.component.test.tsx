@@ -13,6 +13,7 @@ import {
   resolveSelectedProfileTriggerState,
   useLoadedWebhookTriggerEditorState,
 } from "./use-webhook-trigger-editor-state.js";
+import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
 import {
   createWebhookTriggerEventId,
   WebhookTriggerWorkspaceRootRepositoryOptionValue,
@@ -20,6 +21,20 @@ import {
 
 const LinearConnectionId = "conn_linear";
 const LinearWebhookSourceId = "iws_linear";
+
+function isRule(value: string) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.IS,
+    value,
+  };
+}
+
+function containsTokenRule(value: string) {
+  return {
+    operator: WebhookTriggerEventParameterRuleOperators.CONTAINS_TOKEN,
+    value,
+  };
+}
 
 function createInvocationTokenParameter(payloadPath: string[]) {
   return {
@@ -160,7 +175,7 @@ describe("useLoadedWebhookTriggerEditorState", () => {
             instructions: "",
             conversationKeyTemplate: "",
             eventIds: [],
-            eventParameterValues: {},
+            eventParameterRules: {},
           },
           connectionOptions: [],
           sandboxProfileOptions: [],
@@ -186,7 +201,7 @@ describe("useLoadedWebhookTriggerEditorState", () => {
       instructions: "",
       conversationKeyTemplate: "",
       eventIds: [],
-      eventParameterValues: {},
+      eventParameterRules: {},
     });
     expect(result.current.formError).toBeNull();
     expect(result.current.triggerPickerDisabledState).toEqual({
@@ -240,7 +255,7 @@ describe("useLoadedWebhookTriggerEditorState", () => {
             instructions: "",
             conversationKeyTemplate: "",
             eventIds: [],
-            eventParameterValues: {},
+            eventParameterRules: {},
           },
           connectionOptions: [],
           sandboxProfileOptions: [
@@ -331,7 +346,7 @@ describe("useLoadedWebhookTriggerEditorState", () => {
             instructions: "",
             conversationKeyTemplate: "",
             eventIds: [],
-            eventParameterValues: {},
+            eventParameterRules: {},
           },
           connectionOptions: [],
           sandboxProfileOptions: [
@@ -405,9 +420,9 @@ describe("useLoadedWebhookTriggerEditorState", () => {
             instructions: "",
             conversationKeyTemplate: "{{payload.team.id}}",
             eventIds: [triggerId],
-            eventParameterValues: {
+            eventParameterRules: {
               [triggerId]: {
-                team: "eng",
+                team: isRule("eng"),
               },
             },
           },
@@ -435,9 +450,9 @@ describe("useLoadedWebhookTriggerEditorState", () => {
     });
 
     expect(result.current.values.eventIds).toEqual([triggerId]);
-    expect(result.current.values.eventParameterValues).toEqual({
+    expect(result.current.values.eventParameterRules).toEqual({
       [triggerId]: {
-        team: "eng",
+        team: isRule("eng"),
       },
     });
   });
@@ -470,7 +485,7 @@ describe("useLoadedWebhookTriggerEditorState", () => {
             instructions: "",
             conversationKeyTemplate: "",
             eventIds: [],
-            eventParameterValues: {},
+            eventParameterRules: {},
           },
           connectionOptions: [],
           sandboxProfileOptions: [],
@@ -538,7 +553,7 @@ describe("useLoadedWebhookTriggerEditorState", () => {
             instructions: "",
             conversationKeyTemplate: "",
             eventIds: [],
-            eventParameterValues: {},
+            eventParameterRules: {},
           },
           connectionOptions: [],
           sandboxProfileOptions: [],
@@ -604,7 +619,7 @@ describe("useLoadedWebhookTriggerEditorState", () => {
             instructions: "",
             conversationKeyTemplate: "",
             eventIds: [],
-            eventParameterValues: {},
+            eventParameterRules: {},
           },
           initialSandboxProfileVersion: 1,
           connectionOptions: [],
@@ -691,7 +706,7 @@ describe("useLoadedWebhookTriggerEditorState", () => {
             instructions: "",
             conversationKeyTemplate: "",
             eventIds: [],
-            eventParameterValues: {},
+            eventParameterRules: {},
           },
           initialSandboxProfileVersion: 1,
           connectionOptions: [],
@@ -757,7 +772,7 @@ describe("useLoadedWebhookTriggerEditorState", () => {
             instructions: "",
             conversationKeyTemplate: "",
             eventIds: [],
-            eventParameterValues: {},
+            eventParameterRules: {},
           },
           connectionOptions: [],
           sandboxProfileOptions: [],
@@ -783,7 +798,7 @@ describe("useLoadedWebhookTriggerEditorState", () => {
       result.current.onValueChange("eventIds", [triggerId]);
     });
 
-    expect(result.current.values.eventParameterValues).toEqual({
+    expect(result.current.values.eventParameterRules).toEqual({
       [triggerId]: {},
     });
   });
@@ -827,7 +842,7 @@ describe("useLoadedWebhookTriggerEditorState", () => {
             instructions: "",
             conversationKeyTemplate: "",
             eventIds: [],
-            eventParameterValues: {},
+            eventParameterRules: {},
           },
           connectionOptions: [],
           sandboxProfileOptions: [],
@@ -859,10 +874,10 @@ describe("useLoadedWebhookTriggerEditorState", () => {
     });
 
     act(() => {
-      result.current.onValueChange("eventParameterValues", {
-        ...result.current.values.eventParameterValues,
+      result.current.onValueChange("eventParameterRules", {
+        ...result.current.values.eventParameterRules,
         [firstTriggerId]: {
-          invocationToken: "",
+          invocationToken: containsTokenRule(""),
         },
       });
     });
@@ -871,9 +886,9 @@ describe("useLoadedWebhookTriggerEditorState", () => {
       result.current.onValueChange("eventIds", [firstTriggerId, secondTriggerId]);
     });
 
-    expect(result.current.values.eventParameterValues).toEqual({
+    expect(result.current.values.eventParameterRules).toEqual({
       [firstTriggerId]: {
-        invocationToken: "",
+        invocationToken: containsTokenRule(""),
       },
       [secondTriggerId]: {},
     });
@@ -918,7 +933,7 @@ describe("useLoadedWebhookTriggerEditorState", () => {
             instructions: "",
             conversationKeyTemplate: "",
             eventIds: [firstTriggerId],
-            eventParameterValues: {
+            eventParameterRules: {
               [firstTriggerId]: {},
             },
           },
@@ -952,7 +967,7 @@ describe("useLoadedWebhookTriggerEditorState", () => {
       result.current.onValueChange("eventIds", [firstTriggerId, secondTriggerId]);
     });
 
-    expect(result.current.values.eventParameterValues).toEqual({
+    expect(result.current.values.eventParameterRules).toEqual({
       [firstTriggerId]: {},
       [secondTriggerId]: {},
     });
@@ -976,7 +991,7 @@ describe("useLoadedWebhookTriggerEditorState", () => {
             instructions: "",
             conversationKeyTemplate: "",
             eventIds: [],
-            eventParameterValues: {},
+            eventParameterRules: {},
           },
           connectionOptions: [],
           sandboxProfileOptions: [],
@@ -1027,7 +1042,7 @@ describe("useLoadedWebhookTriggerEditorState", () => {
             instructions: "",
             conversationKeyTemplate: "",
             eventIds: [],
-            eventParameterValues: {},
+            eventParameterRules: {},
           },
           connectionOptions: [],
           sandboxProfileOptions: [],
@@ -1100,7 +1115,7 @@ describe("useLoadedWebhookTriggerEditorState", () => {
             instructions: "",
             conversationKeyTemplate: "",
             eventIds: [triggerId],
-            eventParameterValues: {},
+            eventParameterRules: {},
           },
           connectionOptions: [],
           sandboxProfileOptions: [],

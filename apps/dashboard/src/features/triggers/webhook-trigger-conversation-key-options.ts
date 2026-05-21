@@ -2,12 +2,12 @@ import { isWebhookTriggerEventOptionUnavailable } from "./webhook-trigger-event-
 import type {
   WebhookTriggerConversationKeyOption,
   WebhookTriggerEventOption,
-  WebhookTriggerEventParameterValueMap,
+  WebhookTriggerEventParameterRuleMap,
 } from "./webhook-trigger-event-types.js";
+import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
 
 const GitHubIssueCommentCreatedEventType = "github.issue_comment.created";
 const GitHubIssueCommentTargetParameterId = "target";
-const GitHubIssueCommentPullRequestTargetValue = "exists";
 export const GitHubPullRequestConversationKeyTemplate =
   "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}";
 
@@ -20,21 +20,24 @@ const GitHubPullRequestConversationKeyOption = {
 
 function shouldAddGitHubPullRequestGrouping(input: {
   eventOption: WebhookTriggerEventOption;
-  eventParameterValues: WebhookTriggerEventParameterValueMap;
+  eventParameterRules: WebhookTriggerEventParameterRuleMap;
 }): boolean {
   if (input.eventOption.eventType !== GitHubIssueCommentCreatedEventType) {
     return false;
   }
 
+  const targetRule =
+    input.eventParameterRules[input.eventOption.id]?.[GitHubIssueCommentTargetParameterId];
+
   return (
-    input.eventParameterValues[input.eventOption.id]?.[GitHubIssueCommentTargetParameterId] ===
-    GitHubIssueCommentPullRequestTargetValue
+    targetRule?.operator === WebhookTriggerEventParameterRuleOperators.EXISTS &&
+    targetRule.value === WebhookTriggerEventParameterRuleOperators.EXISTS
   );
 }
 
 function resolveContextualConversationKeyOptions(input: {
   eventOption: WebhookTriggerEventOption;
-  eventParameterValues: WebhookTriggerEventParameterValueMap;
+  eventParameterRules: WebhookTriggerEventParameterRuleMap;
 }): readonly WebhookTriggerConversationKeyOption[] {
   const options = input.eventOption.conversationKeyOptions ?? [];
   if (
@@ -49,7 +52,7 @@ function resolveContextualConversationKeyOptions(input: {
 
 export function resolveCommonWebhookTriggerConversationKeyOptions(input: {
   selectedEventOptions: readonly WebhookTriggerEventOption[];
-  eventParameterValues?: WebhookTriggerEventParameterValueMap;
+  eventParameterRules?: WebhookTriggerEventParameterRuleMap;
 }): readonly WebhookTriggerConversationKeyOption[] {
   const availableEventOptions = input.selectedEventOptions.filter(
     (eventOption) => !isWebhookTriggerEventOptionUnavailable(eventOption),
@@ -60,20 +63,20 @@ export function resolveCommonWebhookTriggerConversationKeyOptions(input: {
   }
 
   const [firstEventOption, ...remainingEventOptions] = availableEventOptions;
-  const eventParameterValues = input.eventParameterValues ?? {};
+  const eventParameterRules = input.eventParameterRules ?? {};
   const firstConversationKeyOptions =
     firstEventOption === undefined
       ? []
       : resolveContextualConversationKeyOptions({
           eventOption: firstEventOption,
-          eventParameterValues,
+          eventParameterRules,
         });
 
   return firstConversationKeyOptions.filter((conversationKeyOption) =>
     remainingEventOptions.every((eventOption) =>
       resolveContextualConversationKeyOptions({
         eventOption,
-        eventParameterValues,
+        eventParameterRules,
       }).some(
         (candidateOption) =>
           candidateOption.id === conversationKeyOption.id &&

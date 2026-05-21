@@ -1,4 +1,4 @@
-import type { WebhookTriggerEventParameterValueMap } from "./webhook-trigger-event-types.js";
+import type { WebhookTriggerEventParameterRuleMap } from "./webhook-trigger-event-types.js";
 
 export type WebhookTriggerFormOption = {
   value: string;
@@ -18,7 +18,7 @@ export type WebhookTriggerFormValues = {
   instructions: string;
   conversationKeyTemplate: string;
   eventIds: string[];
-  eventParameterValues: WebhookTriggerEventParameterValueMap;
+  eventParameterRules: WebhookTriggerEventParameterRuleMap;
 };
 
 export type WebhookTriggerFormValueKey = keyof WebhookTriggerFormValues;

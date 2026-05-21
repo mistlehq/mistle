@@ -3,8 +3,9 @@ import { GitHubPullRequestConversationKeyTemplate } from "./webhook-trigger-conv
 import { isWebhookTriggerEventOptionUnavailable } from "./webhook-trigger-event-option-availability.js";
 import type {
   WebhookTriggerEventOption,
-  WebhookTriggerEventParameterValueMap,
+  WebhookTriggerEventParameterRulesByEventType,
 } from "./webhook-trigger-event-types.js";
+import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
 
 type WebhookTriggerTemplate = {
   id: string;
@@ -17,7 +18,7 @@ type WebhookTriggerTemplate = {
   inputTemplate: string;
   instructions: string;
   conversationKeyTemplate: string;
-  eventParameterValuesByEventType?: WebhookTriggerEventParameterValueMap;
+  eventParameterRulesByEventType?: WebhookTriggerEventParameterRulesByEventType;
 };
 
 type ScheduledTriggerTemplate = {
@@ -135,10 +136,16 @@ export const TriggerTemplates = [
       "Publish by default unless the request explicitly asks for a dry run, preview, or local-only review. Post exact changed-line findings as inline review comments with `gh api`. Put architectural, cross-file, non-diff, or unanchorable findings in the PR-level comment with file or symbol references. Post the overall result, proof checked, residual risk, judgment, and broad questions with `gh pr comment`. Post inline comments first, then the PR-level summary.",
     ].join("\n"),
     conversationKeyTemplate: GitHubPullRequestConversationKeyTemplate,
-    eventParameterValuesByEventType: {
+    eventParameterRulesByEventType: {
       "github.issue_comment.created": {
-        invocationToken: "pr-review",
-        target: "exists",
+        invocationToken: {
+          operator: WebhookTriggerEventParameterRuleOperators.CONTAINS_TOKEN,
+          value: "pr-review",
+        },
+        target: {
+          operator: WebhookTriggerEventParameterRuleOperators.EXISTS,
+          value: "exists",
+        },
       },
     },
   },
