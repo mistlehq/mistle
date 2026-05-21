@@ -594,7 +594,7 @@ fn operation_stream_opens_records_and_closes_over_the_reserved_stream() {
         let payload = std::str::from_utf8(&operation_record.payload)
             .expect("operation record payload should be utf8");
         assert!(payload.contains(r#""kind":"lifecycle""#));
-        assert!(payload.contains(r#""phase":"sandboxd""#));
+        assert!(payload.contains(r#""phase":"operation_stream""#));
         operation_record_sender
             .send(())
             .expect("gateway should signal operation record receipt");
@@ -664,10 +664,10 @@ fn operation_stream_opens_records_and_closes_over_the_reserved_stream() {
             json!({
                 "kind": "lifecycle",
                 "observedAt": "2026-05-13T00:00:00.000Z",
-                "phase": "sandboxd",
+                "phase": "operation_stream",
                 "status": "started",
                 "source": "sandboxd",
-                "message": "sandboxd init started",
+                "message": "operation stream started",
                 "attributes": {}
             })
             .to_string()

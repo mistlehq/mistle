@@ -79,9 +79,9 @@ describe("sandbox tunnel operation ingress integration", () => {
         JSON.stringify({
           kind: "lifecycle",
           observedAt: "2026-05-13T00:00:00.000Z",
-          phase: "sandboxd",
+          phase: "operation_stream",
           status: "started",
-          message: "sandboxd started",
+          message: "operation stream started",
         }),
         JSON.stringify({
           kind: "lifecycle",
@@ -143,10 +143,10 @@ describe("sandbox tunnel operation ingress integration", () => {
       expect(persistedEvents).toEqual([
         {
           attributes: {},
-          message: "sandboxd started",
+          message: "operation stream started",
           operationId: "op_gateway_operation_ingress",
           payloadBytes: null,
-          phase: "sandboxd",
+          phase: "operation_stream",
           recordKind: "lifecycle",
           sequence: 1,
           status: "started",

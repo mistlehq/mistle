@@ -160,10 +160,81 @@ fn lifecycle_operation_record_waits_for_operation_channel_capacity() {
 fn maps_egress_start_and_stop_to_distinct_lifecycle_phases() {
     assert_eq!(
         super::operation_lifecycle_phase("start_egress_proxy"),
-        "egress"
+        Some("egress")
     );
     assert_eq!(
         super::operation_lifecycle_phase("stop_egress_proxy"),
-        "teardown"
+        Some("teardown")
     );
+}
+
+#[test]
+fn maps_cleanup_phases_to_the_resource_being_cleaned_up() {
+    assert_eq!(
+        super::operation_lifecycle_phase("stop_tunnel_session_after_runtime_plan_failure"),
+        Some("operation_stream")
+    );
+    assert_eq!(
+        super::operation_lifecycle_phase("stop_egress_proxy_after_setup_failure"),
+        Some("teardown")
+    );
+}
+
+#[test]
+fn does_not_publish_top_level_sandboxd_lifecycle_operation_records() {
+    let started_record = super::operation_record_line(
+        StartupOperation::Init,
+        "2026-05-21T00:00:00Z".to_string(),
+        "sandbox_init_started",
+        &serde_json::json!({
+            "timestamp": "2026-05-21T00:00:00Z",
+            "level": "info",
+            "event": "sandbox_init_started",
+            "sandboxInstanceId": "sbi_test",
+            "operation": "init"
+        }),
+    )
+    .expect("started event should be processed");
+    assert_eq!(started_record, None);
+
+    let failed_record = super::operation_record_line(
+        StartupOperation::Init,
+        "2026-05-21T00:00:01Z".to_string(),
+        "sandbox_init_failed",
+        &serde_json::json!({
+            "timestamp": "2026-05-21T00:00:01Z",
+            "level": "error",
+            "event": "sandbox_init_failed",
+            "sandboxInstanceId": "sbi_test",
+            "operation": "init",
+            "error": "runtime plan failed"
+        }),
+    )
+    .expect("failed event should be processed");
+    assert_eq!(failed_record, None);
+}
+
+#[test]
+fn does_not_attribute_unknown_lifecycle_phases_to_sandboxd() {
+    assert_eq!(
+        super::operation_lifecycle_phase("unexpected_internal_phase"),
+        None
+    );
+
+    let operation_record = super::operation_record_line(
+        StartupOperation::Init,
+        "2026-05-21T00:00:00Z".to_string(),
+        "sandbox_init_phase_failed",
+        &serde_json::json!({
+            "timestamp": "2026-05-21T00:00:00Z",
+            "level": "error",
+            "event": "sandbox_init_phase_failed",
+            "sandboxInstanceId": "sbi_test",
+            "operation": "init",
+            "phase": "unexpected_internal_phase",
+            "error": "failed"
+        }),
+    )
+    .expect("unknown phase event should be processed");
+    assert_eq!(operation_record, None);
 }

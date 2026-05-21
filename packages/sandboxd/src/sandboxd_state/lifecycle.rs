@@ -206,7 +206,6 @@ impl SandboxdState {
         if let (Some(logger), Some(tunnel_session)) = (&diagnostics_logger, &startup_tunnel_session)
         {
             logger.attach_operation_sender(tunnel_session.operation_record_sender());
-            record_operation_phase_started(&diagnostics_logger, "sandboxd");
             record_operation_phase_completed(&diagnostics_logger, "start_tunnel_session");
         }
         if wait_for_storage_attach {
@@ -707,7 +706,6 @@ impl SandboxdState {
         })?;
         if let Some(logger) = &diagnostics_logger {
             logger.attach_operation_sender(tunnel_session.operation_record_sender());
-            record_operation_phase_started(&diagnostics_logger, "sandboxd");
             record_operation_phase_completed(&diagnostics_logger, "start_tunnel_session");
         }
         record_operation_phase_started(&diagnostics_logger, "apply_git_identity");

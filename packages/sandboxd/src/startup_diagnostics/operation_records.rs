@@ -39,31 +39,16 @@ pub(super) fn operation_record_line(
     event: &str,
     payload: &Value,
 ) -> Result<Option<String>, String> {
-    let record = if event == started_event_name(operation) {
-        json!({
-            "kind": "lifecycle",
-            "observedAt": observed_at,
-            "phase": "sandboxd",
-            "status": "started",
-            "source": "sandboxd",
-            "message": format!("sandboxd {} started", operation.as_str()),
-            "attributes": {}
-        })
-    } else if event == failed_event_name(operation) {
-        json!({
-            "kind": "lifecycle",
-            "observedAt": observed_at,
-            "phase": "sandboxd",
-            "status": "failed",
-            "source": "sandboxd",
-            "message": format!("sandboxd {} failed", operation.as_str()),
-            "attributes": lifecycle_attributes(payload)
-        })
+    let record = if event == started_event_name(operation) || event == failed_event_name(operation)
+    {
+        return Ok(None);
     } else if event == phase_started_event_name(operation) {
         let Some(phase) = payload.get("phase").and_then(Value::as_str) else {
             return Ok(None);
         };
-        let phase = operation_lifecycle_phase(phase);
+        let Some(phase) = operation_lifecycle_phase(phase) else {
+            return Ok(None);
+        };
         json!({
             "kind": "lifecycle",
             "observedAt": observed_at,
@@ -77,7 +62,9 @@ pub(super) fn operation_record_line(
         let Some(phase) = payload.get("phase").and_then(Value::as_str) else {
             return Ok(None);
         };
-        let phase = operation_lifecycle_phase(phase);
+        let Some(phase) = operation_lifecycle_phase(phase) else {
+            return Ok(None);
+        };
         json!({
             "kind": "lifecycle",
             "observedAt": observed_at,
@@ -91,7 +78,9 @@ pub(super) fn operation_record_line(
         let Some(phase) = payload.get("phase").and_then(Value::as_str) else {
             return Ok(None);
         };
-        let phase = operation_lifecycle_phase(phase);
+        let Some(phase) = operation_lifecycle_phase(phase) else {
+            return Ok(None);
+        };
         json!({
             "kind": "lifecycle",
             "observedAt": observed_at,
@@ -108,7 +97,7 @@ pub(super) fn operation_record_line(
             "phase": payload
                 .get("phase")
                 .and_then(Value::as_str)
-                .map(operation_lifecycle_phase),
+                .and_then(operation_lifecycle_phase),
             "source": "sandboxd",
             "stream": payload.get("stream").and_then(Value::as_str).unwrap_or("system"),
             "payloadBase64": payload
@@ -126,20 +115,23 @@ pub(super) fn operation_record_line(
     Ok(Some(line))
 }
 
-pub(super) fn operation_lifecycle_phase(phase: &str) -> &'static str {
+pub(super) fn operation_lifecycle_phase(phase: &str) -> Option<&'static str> {
     match phase {
-        "apply_git_identity" => "git_identity",
-        "attach_runtime_agent_endpoint" => "agent_endpoint",
-        "apply_runtime_plan" => "runtime_plan",
-        "run_setup_script" => "setup_script",
-        "start_egress_proxy" => "egress",
-        "stop_egress_proxy" => "teardown",
-        "start_runtime_adapters" => "runtime_adapters",
-        "start_runtime_processes" => "runtime_processes",
-        "start_tunnel_session" | "stop_tunnel_session" => "operation_stream",
-        "wait_storage_attach" => "storage_attach",
-        "ready" => "ready",
-        _ => "sandboxd",
+        "apply_git_identity" => Some("git_identity"),
+        "attach_runtime_agent_endpoint" => Some("agent_endpoint"),
+        "apply_runtime_plan" => Some("runtime_plan"),
+        "run_setup_script" => Some("setup_script"),
+        "start_egress_proxy" => Some("egress"),
+        "start_runtime_adapters" => Some("runtime_adapters"),
+        "start_runtime_processes" => Some("runtime_processes"),
+        "start_tunnel_session" | "stop_tunnel_session" | "attach_runtime_environment" => {
+            Some("operation_stream")
+        }
+        "wait_storage_attach" => Some("storage_attach"),
+        "ready" => Some("ready"),
+        phase if phase.starts_with("stop_tunnel_session_") => Some("operation_stream"),
+        phase if phase.starts_with("stop_egress_proxy") => Some("teardown"),
+        _ => None,
     }
 }
 

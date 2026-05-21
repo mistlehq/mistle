@@ -446,48 +446,29 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               }),
               "Initializing resumed sandbox runtime.",
             );
-            await recordWorkerSandboxLifecyclePhase(
-              operationEvents,
-              {
-                attributes: {
+            await step.run({ name: "initialize-resumed-sandbox-runtime" }, async () => {
+              await resumeSandboxRuntime(
+                {
+                  config: ctx.config,
+                  logger,
+                  processEnv: ctx.processEnv,
+                  sandboxAdapter: resolvedRuntime.sandboxAdapter,
+                  sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
+                  sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
+                },
+                {
+                  organizationId: resumableSandboxState.organizationId,
+                  operationId: run.id,
+                  operationKind: "resume",
+                  sandboxInstanceId: resumedRuntime.sandboxInstanceId,
                   providerSandboxId: resumedRuntime.providerSandboxId,
                   runtimeProvider: resumedRuntime.runtimeProvider,
+                  runtimePlan: resumableSandboxState.runtimePlan,
+                  ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
+                  ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
                 },
-                completedMessage: "Sandboxd resume initialization completed.",
-                failedMessage: "Sandboxd resume initialization failed.",
-                phase: "sandboxd",
-                startedMessage: "Sandboxd resume initialization started.",
-              },
-              async () => {
-                await step.run({ name: "initialize-resumed-sandbox-runtime" }, async () => {
-                  await resumeSandboxRuntime(
-                    {
-                      config: ctx.config,
-                      logger,
-                      processEnv: ctx.processEnv,
-                      sandboxAdapter: resolvedRuntime.sandboxAdapter,
-                      sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
-                      sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
-                    },
-                    {
-                      organizationId: resumableSandboxState.organizationId,
-                      operationId: run.id,
-                      operationKind: "resume",
-                      sandboxInstanceId: resumedRuntime.sandboxInstanceId,
-                      providerSandboxId: resumedRuntime.providerSandboxId,
-                      runtimeProvider: resumedRuntime.runtimeProvider,
-                      runtimePlan: resumableSandboxState.runtimePlan,
-                      ...(input.actingUserId === undefined
-                        ? {}
-                        : { actingUserId: input.actingUserId }),
-                      ...(input.gitIdentity === undefined
-                        ? {}
-                        : { gitIdentity: input.gitIdentity }),
-                    },
-                  );
-                });
-              },
-            );
+              );
+            });
             logger.info(
               createResumeWorkflowLogFields({
                 sandboxInstanceId: input.sandboxInstanceId,
@@ -1302,44 +1283,29 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       }
 
       try {
-        await recordWorkerSandboxLifecyclePhase(
-          operationEvents,
-          {
-            attributes: {
-              providerSandboxId: replacementProviderSandboxId,
-              runtimeProvider: replacementRuntimeProvider,
+        await step.run({ name: "initialize-replacement-sandbox-runtime" }, async () => {
+          await initializeSandboxRuntime(
+            {
+              config: ctx.config,
+              logger,
+              processEnv: ctx.processEnv,
+              sandboxAdapter: resolvedRuntime.sandboxAdapter,
+              sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
+              sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
             },
-            completedMessage: "Replacement sandboxd initialization completed.",
-            failedMessage: "Replacement sandboxd initialization failed.",
-            phase: "sandboxd",
-            startedMessage: "Replacement sandboxd initialization started.",
-          },
-          async () => {
-            await step.run({ name: "initialize-replacement-sandbox-runtime" }, async () => {
-              await initializeSandboxRuntime(
-                {
-                  config: ctx.config,
-                  logger,
-                  processEnv: ctx.processEnv,
-                  sandboxAdapter: resolvedRuntime.sandboxAdapter,
-                  sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
-                  sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
-                },
-                {
-                  organizationId: resumableSandboxState.organizationId,
-                  operationId: run.id,
-                  operationKind: "resume",
-                  sandboxInstanceId: replacementSandboxInstanceId,
-                  providerSandboxId: replacementProviderSandboxId,
-                  startupMode: "new",
-                  runtimePlan: resumableSandboxState.runtimePlan,
-                  ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
-                  ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
-                },
-              );
-            });
-          },
-        );
+            {
+              organizationId: resumableSandboxState.organizationId,
+              operationId: run.id,
+              operationKind: "resume",
+              sandboxInstanceId: replacementSandboxInstanceId,
+              providerSandboxId: replacementProviderSandboxId,
+              startupMode: "new",
+              runtimePlan: resumableSandboxState.runtimePlan,
+              ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
+              ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
+            },
+          );
+        });
       } catch (error) {
         rethrowResumeDurableStepErrorForRetry(error);
         replacementFailureHandled = true;

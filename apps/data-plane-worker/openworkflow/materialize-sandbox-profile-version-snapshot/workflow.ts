@@ -451,47 +451,30 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     });
 
     currentPhase = "init";
-    await recordWorkerSandboxLifecyclePhase(
-      operationEvents,
-      {
-        attributes: {
-          providerSandboxId: startedSandbox.providerSandboxId,
-          runtimeProvider: startedSandbox.runtimeProvider,
-          snapshotJobId: workflowInput.snapshotJobId,
-        },
-        completedMessage: "Snapshot sandboxd initialization completed.",
-        failedMessage: "Snapshot sandboxd initialization failed.",
-        phase: "sandboxd",
-        startedMessage: "Snapshot sandboxd initialization started.",
-      },
-      async () => {
-        await step.run({ name: "initialize-snapshot-sandbox-runtime" }, async () => {
-          const resolvedRuntime =
-            await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+    await step.run({ name: "initialize-snapshot-sandbox-runtime" }, async () => {
+      const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
 
-          await initializeSandboxRuntime(
-            {
-              config: ctx.config,
-              logger,
-              processEnv: ctx.processEnv,
-              sandboxAdapter: resolvedRuntime.sandboxAdapter,
-              sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
-              sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
-            },
-            {
-              organizationId: workflowInput.organizationId,
-              operationId: workflowInput.snapshotJobId,
-              operationKind: "snapshot",
-              sandboxInstanceId: workflowInput.sandboxInstanceId,
-              providerSandboxId: startedSandbox.providerSandboxId,
-              startupMode: SandboxStartupModes.NEW,
-              executionMode: SandboxExecutionModes.SNAPSHOT,
-              runtimePlan: compiledRuntimePlan,
-            },
-          );
-        });
-      },
-    );
+      await initializeSandboxRuntime(
+        {
+          config: ctx.config,
+          logger,
+          processEnv: ctx.processEnv,
+          sandboxAdapter: resolvedRuntime.sandboxAdapter,
+          sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
+          sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
+        },
+        {
+          organizationId: workflowInput.organizationId,
+          operationId: workflowInput.snapshotJobId,
+          operationKind: "snapshot",
+          sandboxInstanceId: workflowInput.sandboxInstanceId,
+          providerSandboxId: startedSandbox.providerSandboxId,
+          startupMode: SandboxStartupModes.NEW,
+          executionMode: SandboxExecutionModes.SNAPSHOT,
+          runtimePlan: compiledRuntimePlan,
+        },
+      );
+    });
 
     currentPhase = "mark_running";
     await recordWorkerSandboxLifecyclePhase(
