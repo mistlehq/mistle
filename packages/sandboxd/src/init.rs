@@ -10,12 +10,13 @@ use std::path::Path;
 
 use crate::control;
 use crate::protocol::startup::{StartupInitErrorResponse, StartupInitOkResponse, StartupInput};
+use crate::startup_payload::{StartupPayloadReadError, StartupPayloadSource, read_startup_payload};
 
 /// Describes why `sandboxd init` failed to read stdin, submit to the daemon, or
 /// write its JSON response.
 #[derive(Debug)]
 pub enum InitError {
-    ReadRequest(std::io::Error),
+    ReadRequest(StartupPayloadReadError),
     InvalidRequest(serde_json::Error),
     SubmitInit(String),
     WriteResponse(std::io::Error),
@@ -49,14 +50,14 @@ pub fn run_init<R, W>(
     writer: &mut W,
     control_socket_path: &Path,
     detach: bool,
+    payload_source: StartupPayloadSource,
 ) -> Result<(), InitError>
 where
     R: Read,
     W: Write,
 {
-    let mut raw_request = Vec::new();
-    let startup_input = match reader.read_to_end(&mut raw_request) {
-        Ok(_) => match serde_json::from_slice::<StartupInput>(&raw_request) {
+    let startup_input = match read_startup_payload(reader, payload_source) {
+        Ok(raw_request) => match serde_json::from_slice::<StartupInput>(&raw_request) {
             Ok(startup_input) => startup_input,
             Err(error) => {
                 let error = InitError::InvalidRequest(error);
@@ -137,6 +138,7 @@ mod tests {
 
     use crate::control;
     use crate::protocol::startup::{StartupInitResponse, StartupInput, StartupMode};
+    use crate::startup_payload::StartupPayloadSource;
     use crate::time::{Sleeper, ThreadSleeper};
 
     use crate::init::run_init;
@@ -161,6 +163,7 @@ mod tests {
             &mut stdout,
             &control_socket_path,
             false,
+            StartupPayloadSource::StdinUntilEof,
         )
         .expect("init should submit a valid startup input");
 
@@ -187,6 +190,50 @@ mod tests {
     }
 
     #[test]
+    fn submits_startup_input_from_exact_stdin_byte_count_without_waiting_for_eof() {
+        let test_dir = create_temp_test_dir("init_stdin_bytes");
+        let control_socket_path = test_dir.join("control.sock");
+        let gateway = start_bootstrap_gateway();
+        let request = serde_json::to_string(&valid_startup_input(&gateway.ws_url))
+            .expect("startup input should serialize");
+        let mut request_with_trailing_bytes = request.as_bytes().to_vec();
+        request_with_trailing_bytes.extend_from_slice(b"trailing bytes that are not payload");
+        let mut reader = request_with_trailing_bytes.as_slice();
+        let mut stdout = Vec::new();
+        let server = start_test_control_server(
+            &control_socket_path,
+            ThreadSleeper,
+            control::DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
+        );
+
+        run_init(
+            &mut reader,
+            &mut stdout,
+            &control_socket_path,
+            false,
+            StartupPayloadSource::StdinBytes(request.len()),
+        )
+        .expect("init should read exactly the declared payload bytes");
+
+        let response: StartupInitResponse =
+            serde_json::from_slice(&stdout).expect("init should write a valid response");
+        assert!(matches!(response, StartupInitResponse::Ok(_)));
+        assert_eq!(
+            server
+                .startup_input()
+                .expect("server should store startup input")
+                .startup_mode,
+            StartupMode::New
+        );
+
+        server.close().expect("control server should stop cleanly");
+        gateway
+            .close()
+            .expect("bootstrap gateway should stop cleanly");
+        fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
     fn writes_error_response_for_invalid_startup_input() {
         let test_dir = create_temp_test_dir("init_invalid");
         let control_socket_path = test_dir.join("control.sock");
@@ -197,6 +244,7 @@ mod tests {
             &mut stdout,
             &control_socket_path,
             false,
+            StartupPayloadSource::StdinUntilEof,
         )
         .expect_err("invalid init request should fail");
 

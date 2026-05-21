@@ -10,12 +10,13 @@ use std::path::Path;
 
 use crate::control;
 use crate::protocol::startup::{StartupInitErrorResponse, StartupInitOkResponse, StartupInput};
+use crate::startup_payload::{StartupPayloadReadError, StartupPayloadSource, read_startup_payload};
 
 /// Describes why `sandboxd resume` failed to read stdin, submit to the daemon,
 /// or write its JSON response.
 #[derive(Debug)]
 pub enum ResumeError {
-    ReadRequest(std::io::Error),
+    ReadRequest(StartupPayloadReadError),
     InvalidRequest(serde_json::Error),
     SubmitResume(String),
     WriteResponse(std::io::Error),
@@ -52,14 +53,14 @@ pub fn run_resume<R, W>(
     reader: &mut R,
     writer: &mut W,
     control_socket_path: &Path,
+    payload_source: StartupPayloadSource,
 ) -> Result<(), ResumeError>
 where
     R: Read,
     W: Write,
 {
-    let mut raw_request = Vec::new();
-    let startup_input = match reader.read_to_end(&mut raw_request) {
-        Ok(_) => match serde_json::from_slice::<StartupInput>(&raw_request) {
+    let startup_input = match read_startup_payload(reader, payload_source) {
+        Ok(raw_request) => match serde_json::from_slice::<StartupInput>(&raw_request) {
             Ok(startup_input) => startup_input,
             Err(error) => {
                 let error = ResumeError::InvalidRequest(error);
@@ -134,6 +135,7 @@ mod tests {
     use crate::control;
     use crate::protocol::startup::{StartupInitResponse, StartupInput, StartupMode};
     use crate::resume::run_resume;
+    use crate::startup_payload::StartupPayloadSource;
     use crate::time::{Sleeper, ThreadSleeper};
 
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -168,12 +170,14 @@ mod tests {
             &mut init_stdout,
             &control_socket_path,
             false,
+            StartupPayloadSource::StdinUntilEof,
         )
         .expect("init should succeed before resume");
         run_resume(
             &mut resume_request.as_bytes(),
             &mut resume_stdout,
             &control_socket_path,
+            StartupPayloadSource::StdinUntilEof,
         )
         .expect("resume should submit a valid startup input");
 
@@ -184,6 +188,69 @@ mod tests {
             response,
             StartupInitResponse::Ok(crate::protocol::startup::StartupInitOkResponse { ok: true })
         );
+        assert_eq!(
+            server
+                .startup_input()
+                .expect("server should store latest startup input")
+                .startup_mode,
+            StartupMode::Existing
+        );
+
+        server.close().expect("control server should stop cleanly");
+        gateway
+            .close()
+            .expect("bootstrap gateway should stop cleanly");
+        fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn submits_resume_request_from_exact_stdin_byte_count_without_waiting_for_eof() {
+        let test_dir = create_temp_test_dir("resume_stdin_bytes");
+        let control_socket_path = test_dir.join("control.sock");
+        let gateway = start_bootstrap_gateway();
+        let init_request = serde_json::to_string(&valid_startup_input(
+            StartupMode::New,
+            "bootstrap-token-value",
+            &gateway.ws_url,
+        ))
+        .expect("startup input should serialize");
+        let resume_request = serde_json::to_string(&valid_startup_input(
+            StartupMode::Existing,
+            "bootstrap-token-value-2",
+            &gateway.ws_url,
+        ))
+        .expect("resume input should serialize");
+        let mut resume_request_with_trailing_bytes = resume_request.as_bytes().to_vec();
+        resume_request_with_trailing_bytes
+            .extend_from_slice(b"trailing bytes that are not payload");
+        let mut resume_reader = resume_request_with_trailing_bytes.as_slice();
+        let mut init_stdout = Vec::new();
+        let mut resume_stdout = Vec::new();
+        let server = start_test_control_server(
+            &control_socket_path,
+            ThreadSleeper,
+            control::DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
+        );
+
+        crate::init::run_init(
+            &mut init_request.as_bytes(),
+            &mut init_stdout,
+            &control_socket_path,
+            false,
+            StartupPayloadSource::StdinUntilEof,
+        )
+        .expect("init should succeed before resume");
+        run_resume(
+            &mut resume_reader,
+            &mut resume_stdout,
+            &control_socket_path,
+            StartupPayloadSource::StdinBytes(resume_request.len()),
+        )
+        .expect("resume should read exactly the declared payload bytes");
+
+        let response: StartupInitResponse =
+            serde_json::from_slice(&resume_stdout).expect("resume should write a valid response");
+        assert!(matches!(response, StartupInitResponse::Ok(_)));
         assert_eq!(
             server
                 .startup_input()
@@ -217,8 +284,13 @@ mod tests {
             control::DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
         );
 
-        let error = run_resume(&mut request.as_bytes(), &mut stdout, &control_socket_path)
-            .expect_err("resume should fail before daemon init");
+        let error = run_resume(
+            &mut request.as_bytes(),
+            &mut stdout,
+            &control_socket_path,
+            StartupPayloadSource::StdinUntilEof,
+        )
+        .expect_err("resume should fail before daemon init");
 
         let response: StartupInitResponse =
             serde_json::from_slice(&stdout).expect("resume should write an error response");

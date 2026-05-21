@@ -38,6 +38,7 @@ pub mod sandboxd_state;
 pub mod security;
 pub mod sign;
 pub mod startup_diagnostics;
+pub mod startup_payload;
 pub mod supervision;
 #[doc(hidden)]
 pub mod test_support;
@@ -46,6 +47,7 @@ pub mod tunnel;
 pub mod wait_init;
 
 use crate::time::ThreadSleeper;
+use startup_payload::StartupPayloadSource;
 
 static TRACING_INIT: Once = Once::new();
 static TRACER_PROVIDER: OnceLock<SdkTracerProvider> = OnceLock::new();
@@ -73,8 +75,13 @@ fn initialize_sandboxd_tracing() {
 pub enum SandboxdCommand {
     Daemon,
     Ready,
-    Init { detach: bool },
-    Resume,
+    Init {
+        detach: bool,
+        payload_source: StartupPayloadSource,
+    },
+    Resume {
+        payload_source: StartupPayloadSource,
+    },
     Sign,
     Version,
     WaitInit,
@@ -83,6 +90,8 @@ pub enum SandboxdCommand {
 /// Describes why CLI argument parsing failed before any command-specific work ran.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseSandboxdCommandError {
+    InvalidStdinBytes(String),
+    MissingStdinBytesValue,
     UnexpectedArgument(String),
     UnknownCommand(String),
 }
@@ -90,6 +99,15 @@ pub enum ParseSandboxdCommandError {
 impl fmt::Display for ParseSandboxdCommandError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::InvalidStdinBytes(value) => {
+                write!(
+                    f,
+                    "sandboxd --stdin-bytes must be a non-negative integer: {value}"
+                )
+            }
+            Self::MissingStdinBytesValue => {
+                write!(f, "sandboxd --stdin-bytes requires a byte count")
+            }
             Self::UnexpectedArgument(argument) => {
                 write!(f, "unexpected sandboxd argument: {argument}")
             }
@@ -118,16 +136,25 @@ where
         "ready" => SandboxdCommand::Ready,
         "init" => {
             let mut detach = false;
-            for argument in parsed_args.by_ref() {
-                if argument == "--detach" {
-                    detach = true;
-                } else {
-                    return Err(ParseSandboxdCommandError::UnexpectedArgument(argument));
+            let mut payload_source = StartupPayloadSource::StdinUntilEof;
+            while let Some(argument) = parsed_args.next() {
+                match argument.as_str() {
+                    "--detach" => detach = true,
+                    "--stdin-bytes" => {
+                        payload_source = parse_stdin_bytes(parsed_args.next())?;
+                    }
+                    _ => return Err(ParseSandboxdCommandError::UnexpectedArgument(argument)),
                 }
             }
-            return Ok(SandboxdCommand::Init { detach });
+            return Ok(SandboxdCommand::Init {
+                detach,
+                payload_source,
+            });
         }
-        "resume" => SandboxdCommand::Resume,
+        "resume" => {
+            let payload_source = parse_payload_source_args(parsed_args.by_ref())?;
+            return Ok(SandboxdCommand::Resume { payload_source });
+        }
         "wait-init" => SandboxdCommand::WaitInit,
         "version" => SandboxdCommand::Version,
         _ => {
@@ -142,6 +169,34 @@ where
     }
 
     Ok(command)
+}
+
+fn parse_payload_source_args<I>(
+    parsed_args: &mut I,
+) -> Result<StartupPayloadSource, ParseSandboxdCommandError>
+where
+    I: Iterator<Item = String>,
+{
+    let mut payload_source = StartupPayloadSource::StdinUntilEof;
+    while let Some(argument) = parsed_args.next() {
+        match argument.as_str() {
+            "--stdin-bytes" => {
+                payload_source = parse_stdin_bytes(parsed_args.next())?;
+            }
+            _ => return Err(ParseSandboxdCommandError::UnexpectedArgument(argument)),
+        }
+    }
+    Ok(payload_source)
+}
+
+fn parse_stdin_bytes(
+    value: Option<String>,
+) -> Result<StartupPayloadSource, ParseSandboxdCommandError> {
+    let value = value.ok_or(ParseSandboxdCommandError::MissingStdinBytesValue)?;
+    let byte_count = value
+        .parse::<usize>()
+        .map_err(|_| ParseSandboxdCommandError::InvalidStdinBytes(value))?;
+    Ok(StartupPayloadSource::StdinBytes(byte_count))
 }
 
 /// Runs one `sandboxd` CLI invocation against the provided process I/O streams.
@@ -210,19 +265,24 @@ where
                 }
             }
         }
-        SandboxdCommand::Init { detach } => match init::run_init(
+        SandboxdCommand::Init {
+            detach,
+            payload_source,
+        } => match init::run_init(
             stdin,
             stdout,
             Path::new(control::DEFAULT_CONTROL_SOCKET_PATH),
             detach,
+            payload_source,
         ) {
             Ok(()) => 0,
             Err(_) => 1,
         },
-        SandboxdCommand::Resume => match resume::run_resume(
+        SandboxdCommand::Resume { payload_source } => match resume::run_resume(
             stdin,
             stdout,
             Path::new(control::DEFAULT_CONTROL_SOCKET_PATH),
+            payload_source,
         ) {
             Ok(()) => 0,
             Err(_) => 1,
@@ -268,6 +328,7 @@ fn sign_control_socket_path() -> PathBuf {
 mod tests {
     use crate::{
         ParseSandboxdCommandError, SandboxdCommand, is_signer_alias, parse_sandboxd_command,
+        startup_payload::StartupPayloadSource,
     };
 
     #[test]
@@ -281,14 +342,39 @@ mod tests {
     fn parses_init() {
         let command = parse_sandboxd_command(["init"]);
 
-        assert_eq!(command, Ok(SandboxdCommand::Init { detach: false }));
+        assert_eq!(
+            command,
+            Ok(SandboxdCommand::Init {
+                detach: false,
+                payload_source: StartupPayloadSource::StdinUntilEof
+            })
+        );
     }
 
     #[test]
     fn parses_detached_init() {
         let command = parse_sandboxd_command(["init", "--detach"]);
 
-        assert_eq!(command, Ok(SandboxdCommand::Init { detach: true }));
+        assert_eq!(
+            command,
+            Ok(SandboxdCommand::Init {
+                detach: true,
+                payload_source: StartupPayloadSource::StdinUntilEof
+            })
+        );
+    }
+
+    #[test]
+    fn parses_init_with_stdin_byte_count() {
+        let command = parse_sandboxd_command(["init", "--stdin-bytes", "123", "--detach"]);
+
+        assert_eq!(
+            command,
+            Ok(SandboxdCommand::Init {
+                detach: true,
+                payload_source: StartupPayloadSource::StdinBytes(123)
+            })
+        );
     }
 
     #[test]
@@ -302,7 +388,46 @@ mod tests {
     fn parses_resume() {
         let command = parse_sandboxd_command(["resume"]);
 
-        assert_eq!(command, Ok(SandboxdCommand::Resume));
+        assert_eq!(
+            command,
+            Ok(SandboxdCommand::Resume {
+                payload_source: StartupPayloadSource::StdinUntilEof
+            })
+        );
+    }
+
+    #[test]
+    fn parses_resume_with_stdin_byte_count() {
+        let command = parse_sandboxd_command(["resume", "--stdin-bytes", "456"]);
+
+        assert_eq!(
+            command,
+            Ok(SandboxdCommand::Resume {
+                payload_source: StartupPayloadSource::StdinBytes(456)
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_missing_stdin_byte_count() {
+        let command = parse_sandboxd_command(["init", "--stdin-bytes"]);
+
+        assert_eq!(
+            command,
+            Err(ParseSandboxdCommandError::MissingStdinBytesValue)
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_stdin_byte_count() {
+        let command = parse_sandboxd_command(["resume", "--stdin-bytes", "abc"]);
+
+        assert_eq!(
+            command,
+            Err(ParseSandboxdCommandError::InvalidStdinBytes(
+                "abc".to_string()
+            ))
+        );
     }
 
     #[test]
