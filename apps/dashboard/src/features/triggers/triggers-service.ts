@@ -39,6 +39,7 @@ type ListTriggersInput = Omit<ListTriggersQuery, "after" | "before"> & {
   limit: number;
   after: string | null;
   before: string | null;
+  scheduleKind?: "recurring";
   signal?: AbortSignal;
 };
 
@@ -56,6 +57,7 @@ export async function listTriggers(input: ListTriggersInput): Promise<TriggersLi
           ? {}
           : { sandboxProfileId: input.sandboxProfileId }),
         ...(input.kind === undefined ? {} : { kind: input.kind }),
+        ...(input.scheduleKind === undefined ? {} : { scheduleKind: input.scheduleKind }),
         ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
         ...(input.search === undefined ? {} : { search: input.search }),
       },
@@ -119,6 +121,29 @@ export async function listTriggersForSandboxProfile(input: {
   sandboxProfileId: string;
   signal?: AbortSignal;
 }): Promise<TriggerSandboxProfileUsage[]> {
+  const [webhookTriggers, recurringScheduleTriggers] = await Promise.all([
+    listTriggerUsagesForSandboxProfile({
+      kind: "webhook",
+      sandboxProfileId: input.sandboxProfileId,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+    }),
+    listTriggerUsagesForSandboxProfile({
+      kind: "schedule",
+      sandboxProfileId: input.sandboxProfileId,
+      scheduleKind: "recurring",
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+    }),
+  ]);
+
+  return [...webhookTriggers, ...recurringScheduleTriggers];
+}
+
+async function listTriggerUsagesForSandboxProfile(input: {
+  kind: "webhook" | "schedule";
+  sandboxProfileId: string;
+  scheduleKind?: "recurring";
+  signal?: AbortSignal;
+}): Promise<TriggerSandboxProfileUsage[]> {
   const matchingTriggers: TriggerSandboxProfileUsage[] = [];
   let after: string | null = null;
 
@@ -127,7 +152,9 @@ export async function listTriggersForSandboxProfile(input: {
       limit: 100,
       after,
       before: null,
+      kind: input.kind,
       sandboxProfileId: input.sandboxProfileId,
+      ...(input.scheduleKind === undefined ? {} : { scheduleKind: input.scheduleKind }),
       ...(input.signal === undefined ? {} : { signal: input.signal }),
     });
 

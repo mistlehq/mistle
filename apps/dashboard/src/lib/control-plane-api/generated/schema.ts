@@ -12299,6 +12299,7 @@ export interface paths {
           kind?: "webhook" | "schedule";
           limit?: number;
           sandboxProfileId?: string;
+          scheduleKind?: "recurring";
           search?: string;
         };
         header?: never;

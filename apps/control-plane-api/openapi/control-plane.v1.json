@@ -718,6 +718,15 @@
           },
           {
             "schema": {
+              "type": "string",
+              "enum": ["recurring"]
+            },
+            "required": false,
+            "name": "scheduleKind",
+            "in": "query"
+          },
+          {
+            "schema": {
               "type": "boolean"
             },
             "required": false,

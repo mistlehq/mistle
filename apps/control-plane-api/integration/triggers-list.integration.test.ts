@@ -121,7 +121,7 @@ describe.concurrent("triggers list integration", () => {
     expect(body.items.map((item) => item.target.sandboxProfileVersion)).toEqual([2, 4]);
   });
 
-  it("excludes one-off scheduled triggers from list results", async ({ env }) => {
+  it("can limit scheduled trigger list results to recurring schedules", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "triggers-list-one-off-excluded@example.com",
     });
@@ -138,7 +138,7 @@ describe.concurrent("triggers list integration", () => {
     });
 
     const response = await env.controlPlaneApi.http.fetch(
-      "/v1/triggers?sandboxProfileId=sbp_triggers_list_one_off_excluded&limit=10",
+      "/v1/triggers?kind=schedule&scheduleKind=recurring&sandboxProfileId=sbp_triggers_list_one_off_excluded&limit=10",
       {
         headers: {
           cookie: session.cookie,
