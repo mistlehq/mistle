@@ -2,10 +2,12 @@ import type {
   CompileAgentRuntimeInput,
   CompileAgentRuntimeResult,
   EgressCredentialRoute,
+  ResolvedIntegrationMcpServer,
   RuntimeClient,
   RuntimeClientSetupFile,
 } from "@mistle/integrations-core";
 
+import { renderMistleManagedSandboxContext } from "../shared/managed-instructions.js";
 import {
   isAnthropicApiRoute,
   isOpenAiApiRoute,
@@ -49,22 +51,6 @@ const MistleManagedApiKey = "mistle-managed-credential";
 const MistleManagedChatGptAccess = "mistle-managed-access";
 const MistleManagedChatGptRefresh = "mistle-managed-refresh";
 const MistleManagedChatGptExpires = 4_102_444_800_000;
-
-const OpenCodeGlobalAgentsMd = [
-  "Mistle-managed sandbox context:",
-  "",
-  "- This runtime operates behind a managed outbound proxy.",
-  "- Network tools and scripts should use the sandbox's existing proxy configuration rather than expecting direct outbound access.",
-  "- Provider credentials may be injected by the platform outside the sandboxed process environment.",
-  "- Do not assume missing API keys or auth-related environment variables inside the sandbox mean authentication is misconfigured.",
-  "- Prefer debugging request behavior and proxy-mediated access before treating missing in-process credentials as the root cause.",
-  "- Do not modify proxy-related environment variables unless explicitly instructed.",
-  "- When interacting with external systems, prefer the provider CLI available in the environment over ad hoc HTTP requests or raw `curl`.",
-  "- Use `cmddir search <pattern>` to discover relevant commands progressively before reaching for lower-level approaches.",
-  "- Examples:",
-  "  - `cmddir search '^gh$'`",
-  "  - `cmddir search '^(jira|slack)$'`",
-].join("\n");
 
 type OpenCodeConfig = {
   server: {
@@ -137,8 +123,10 @@ function renderOpenCodeManagedConfigContent(enabledProviders: readonly string[])
   return JSON.stringify(config);
 }
 
-function renderOpenCodeGlobalAgentsMd(): string {
-  return `${OpenCodeGlobalAgentsMd}\n`;
+function renderOpenCodeGlobalAgentsMd(input: {
+  mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
+}): string {
+  return `${renderMistleManagedSandboxContext({ mcpServers: input.mcpServers })}\n`;
 }
 
 function readChatGptAccountId(route: EgressCredentialRoute): string | undefined {
@@ -226,6 +214,7 @@ function renderOpenCodeAuthContent(
 
 function buildOpenCodeSetupFiles(
   authContent: string | undefined,
+  mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>,
 ): ReadonlyArray<RuntimeClientSetupFile> {
   const files: RuntimeClientSetupFile[] = [
     {
@@ -240,7 +229,7 @@ function buildOpenCodeSetupFiles(
       path: OpenCodeGlobalAgentsPath,
       mode: 384,
       writeMode: "if-absent",
-      content: renderOpenCodeGlobalAgentsMd(),
+      content: renderOpenCodeGlobalAgentsMd({ mcpServers }),
     },
   ];
 
@@ -261,6 +250,7 @@ function buildOpenCodeRuntimeClients(input: {
   openCodeCliInstallPath: string;
   authContent?: string;
   enabledProviders?: readonly string[];
+  mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
 }): ReadonlyArray<RuntimeClient> {
   return [
     {
@@ -272,7 +262,7 @@ function buildOpenCodeRuntimeClients(input: {
             : {
                 OPENCODE_CONFIG_CONTENT: renderOpenCodeManagedConfigContent(input.enabledProviders),
               },
-        files: buildOpenCodeSetupFiles(input.authContent),
+        files: buildOpenCodeSetupFiles(input.authContent, input.mcpServers),
       },
       processes: [
         {
@@ -358,6 +348,7 @@ export function compileOpenCodeRuntime(
     ],
     runtimeClients: buildOpenCodeRuntimeClients({
       openCodeCliInstallPath,
+      mcpServers: input.mcpServers,
     }),
     renderRuntimeClients: ({ egressRoutes }) => {
       const authContent = renderOpenCodeAuthContent(egressRoutes);
@@ -367,6 +358,7 @@ export function compileOpenCodeRuntime(
         openCodeCliInstallPath,
         ...(authContent === undefined ? {} : { authContent }),
         enabledProviders,
+        mcpServers: input.mcpServers,
       });
     },
     agentRuntimes: [

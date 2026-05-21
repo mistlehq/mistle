@@ -168,6 +168,20 @@ function readSetupFile(input: {
   return content;
 }
 
+function createMistleMcpServer(): ResolvedIntegrationMcpServer {
+  return {
+    source: {
+      kind: "mistle",
+    },
+    server: {
+      serverId: "mistle",
+      serverName: "mistle",
+      transport: "streamable-http",
+      url: "https://mcp.example.test/mcp",
+    },
+  };
+}
+
 function decodeJwtPayload(token: string): unknown {
   const tokenParts = token.split(".");
   if (tokenParts.length !== 3) {
@@ -281,8 +295,27 @@ describe("compilePiRuntime", () => {
     expect(readSetupFile({ runtimeClients, fileId: "pi_managed_instructions" })).toContain(
       "Provider credentials may be injected by the platform outside the sandboxed process environment.",
     );
+    expect(readSetupFile({ runtimeClients, fileId: "pi_managed_instructions" })).toContain(
+      "`MISTLE_SANDBOX_INSTANCE_ID`, `MISTLE_SANDBOX_PROFILE_ID`, and `MISTLE_SANDBOX_PROFILE_VERSION` identify this sandbox",
+    );
+    expect(readSetupFile({ runtimeClients, fileId: "pi_managed_instructions" })).not.toContain(
+      "Mistle MCP tools are available",
+    );
     expect(runtimeClients[0]?.setup.files.some((file) => file.fileId === "pi_mcp_config")).toBe(
       false,
+    );
+  });
+
+  it("mentions Mistle MCP tools in managed instructions when Mistle MCP is configured", () => {
+    const runtimeClients = renderRuntimeClients({
+      compiled: compileDefaultPiRuntime({
+        mcpServers: [createMistleMcpServer()],
+      }),
+      egressRoutes: [],
+    });
+
+    expect(readSetupFile({ runtimeClients, fileId: "pi_managed_instructions" })).toContain(
+      "Mistle MCP tools are available for interacting with Mistle resources",
     );
   });
 

@@ -2,6 +2,7 @@ import {
   type CompileAgentRuntimeInput,
   type CompileAgentRuntimeResult,
   type EgressCredentialRoute,
+  type ResolvedIntegrationMcpServer,
   type RuntimeClient,
   type RuntimeClientSetupFile,
 } from "@mistle/integrations-core";
@@ -12,6 +13,7 @@ import {
   OpenAiChatGptOriginBaseUrl,
   OpenAiChatGptResponsesApiBaseUrl,
 } from "../../openai/variants/openai-default/target-config-schema.js";
+import { renderMistleManagedSandboxContext } from "../shared/managed-instructions.js";
 import {
   isOpenAiApiRoute,
   isOpenAiChatGptSubscriptionRoute,
@@ -31,21 +33,6 @@ const ProxyModelProviderKey = "proxy";
 const ProxyModelProviderName = "OpenAI";
 const CodexConfigPath = "/etc/codex/config.toml";
 const CodexGlobalAgentsPath = "/root/.codex/AGENTS.md";
-const CodexGlobalAgentsMd = [
-  "Mistle-managed sandbox context:",
-  "",
-  "- This runtime operates behind a managed outbound proxy.",
-  "- Network tools and scripts should use the sandbox's existing proxy configuration rather than expecting direct outbound access.",
-  "- Provider credentials may be injected by the platform outside the sandboxed process environment.",
-  "- Do not assume missing API keys or auth-related environment variables inside the sandbox mean authentication is misconfigured.",
-  "- Prefer debugging request behavior and proxy-mediated access before treating missing in-process credentials as the root cause.",
-  "- Do not modify proxy-related environment variables unless explicitly instructed.",
-  "- When interacting with external systems, prefer the provider CLI available in the environment over ad hoc HTTP requests or raw `curl`.",
-  "- Use `cmddir search <pattern>` to discover relevant commands progressively before reaching for lower-level approaches.",
-  "- Examples:",
-  "  - `cmddir search '^gh$'`",
-  "  - `cmddir search '^(jira|slack)$'`",
-].join("\n");
 const CodexGitHubRepository = "openai/codex";
 const CodexGitHubAssets = {
   x86_64: {
@@ -106,8 +93,10 @@ function renderCodexConfig(input: { providerMetadata?: CodexProviderMetadata }):
   });
 }
 
-function renderCodexGlobalAgentsMd(): string {
-  return `${CodexGlobalAgentsMd}\n`;
+function renderCodexGlobalAgentsMd(input: {
+  mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
+}): string {
+  return `${renderMistleManagedSandboxContext({ mcpServers: input.mcpServers })}\n`;
 }
 
 function resolveCodexProviderMetadataFromEgressRoutes(input: {
@@ -139,6 +128,7 @@ function resolveCodexProviderMetadataFromEgressRoutes(input: {
 }
 
 function buildCodexSetupFiles(input: {
+  mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
   providerMetadata?: CodexProviderMetadata;
 }): ReadonlyArray<RuntimeClientSetupFile> {
   return [
@@ -157,19 +147,23 @@ function buildCodexSetupFiles(input: {
       path: CodexGlobalAgentsPath,
       mode: 384,
       writeMode: "if-absent",
-      content: renderCodexGlobalAgentsMd(),
+      content: renderCodexGlobalAgentsMd({ mcpServers: input.mcpServers }),
     },
   ];
 }
 
 function buildCodexSetupFilesFromEgressRoutes(input: {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
+  mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
 }): ReadonlyArray<RuntimeClientSetupFile> {
   const providerMetadata = resolveCodexProviderMetadataFromEgressRoutes({
     egressRoutes: input.egressRoutes,
   });
 
-  return buildCodexSetupFiles(providerMetadata === undefined ? {} : { providerMetadata });
+  return buildCodexSetupFiles({
+    mcpServers: input.mcpServers,
+    ...(providerMetadata === undefined ? {} : { providerMetadata }),
+  });
 }
 
 function buildCodexRuntimeClients(input: {
@@ -260,7 +254,10 @@ export function compileCodexRuntime(
     renderRuntimeClients: ({ egressRoutes }) =>
       buildCodexRuntimeClients({
         codexCliInstallPath,
-        setupFiles: buildCodexSetupFilesFromEgressRoutes({ egressRoutes }),
+        setupFiles: buildCodexSetupFilesFromEgressRoutes({
+          egressRoutes,
+          mcpServers: input.mcpServers,
+        }),
       }),
     agentRuntimes: [
       {

@@ -1,6 +1,7 @@
 import type {
   CompileAgentRuntimeResult,
   EgressCredentialRoute,
+  ResolvedIntegrationMcpServer,
   RuntimeArtifactGitHubReleaseInstallHelperInput,
   RuntimeArtifactInstallStep,
   RuntimeArtifactSpec,
@@ -41,6 +42,20 @@ function createCompiledOpenAiRoute(input: {
       kind: "integration_connection",
       connectionId: "conn_openai_org_123",
       secretType: input.secretType,
+    },
+  };
+}
+
+function createMistleMcpServer(): ResolvedIntegrationMcpServer {
+  return {
+    source: {
+      kind: "mistle",
+    },
+    server: {
+      serverId: "mistle",
+      serverName: "mistle",
+      transport: "streamable-http",
+      url: "https://mcp.example.test/mcp",
     },
   };
 }
@@ -271,6 +286,10 @@ describe("compileCodexRuntime", () => {
     expect(agentsFile.content).toContain(
       "Use `cmddir search <pattern>` to discover relevant commands progressively before reaching for lower-level approaches.",
     );
+    expect(agentsFile.content).toContain(
+      "`MISTLE_SANDBOX_INSTANCE_ID`, `MISTLE_SANDBOX_PROFILE_ID`, and `MISTLE_SANDBOX_PROFILE_VERSION` identify this sandbox",
+    );
+    expect(agentsFile.content).not.toContain("Mistle MCP tools are available");
     expect(agentsFile.content).not.toContain("User-provided additional instructions:");
     expect(compiled.agentRuntimes).toEqual([
       {
@@ -323,6 +342,41 @@ describe("compileCodexRuntime", () => {
         },
       },
     ]);
+  });
+
+  it("mentions Mistle MCP tools in managed instructions when Mistle MCP is configured", () => {
+    const compiled = compileCodexRuntime({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      runtimeId: "codex",
+      runtimeConfig: {},
+      mcpServers: [createMistleMcpServer()],
+      refs: {
+        sandboxPaths: {
+          userHomeDir: "/root",
+          workspaceDir: "/root",
+          runtimeDataDir: "/var/lib/mistle",
+          runtimeArtifactDir: "/var/lib/mistle/artifacts",
+          runtimeArtifactBinDir: "/usr/local/bin",
+        },
+        artifactBinPath: (artifactName) => `/usr/local/bin/${artifactName}`,
+      },
+    });
+    const runtimeClients = renderRuntimeClients({
+      compiled,
+      egressRoutes: [],
+    });
+    const agentsFile = runtimeClients[0]?.setup.files.find(
+      (file) => file.fileId === "codex_global_agents",
+    );
+    if (agentsFile === undefined) {
+      throw new Error("Expected compiled Codex global AGENTS.md file.");
+    }
+
+    expect(agentsFile.content).toContain(
+      "Mistle MCP tools are available for interacting with Mistle resources",
+    );
   });
 
   it("renders separate responses and ChatGPT backend bases for ChatGPT subscription mode", () => {

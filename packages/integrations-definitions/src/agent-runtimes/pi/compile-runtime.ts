@@ -7,6 +7,7 @@ import type {
   RuntimeClientSetupFile,
 } from "@mistle/integrations-core";
 
+import { renderMistleManagedSandboxContext } from "../shared/managed-instructions.js";
 import {
   isAnthropicApiRoute,
   isOpenAiApiRoute,
@@ -89,22 +90,6 @@ type PiMcpConfig = {
   };
   mcpServers: Record<string, PiMcpConfigServer>;
 };
-
-const PiManagedInstructions = [
-  "Mistle-managed sandbox context:",
-  "",
-  "- This runtime operates behind a managed outbound proxy.",
-  "- Network tools and scripts should use the sandbox's existing proxy configuration rather than expecting direct outbound access.",
-  "- Provider credentials may be injected by the platform outside the sandboxed process environment.",
-  "- Do not assume missing API keys or auth-related environment variables inside the sandbox mean authentication is misconfigured.",
-  "- Prefer debugging request behavior and proxy-mediated access before treating missing in-process credentials as the root cause.",
-  "- Do not modify proxy-related environment variables unless explicitly instructed.",
-  "- When interacting with external systems, prefer the provider CLI available in the environment over ad hoc HTTP requests or raw `curl`.",
-  "- Use `cmddir search <pattern>` to discover relevant commands progressively before reaching for lower-level approaches.",
-  "- Examples:",
-  "  - `cmddir search '^gh$'`",
-  "  - `cmddir search '^(jira|slack)$'`",
-].join("\n");
 
 function renderJson(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
@@ -298,7 +283,7 @@ function buildPiSetupFiles(input: {
       path: PiManagedInstructionsPath,
       mode: 384,
       writeMode: "overwrite",
-      content: `${PiManagedInstructions}\n`,
+      content: `${renderMistleManagedSandboxContext({ mcpServers: input.mcpServers })}\n`,
     },
   ];
 

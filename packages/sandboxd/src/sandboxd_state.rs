@@ -46,6 +46,10 @@ use crate::tunnel::session::{
     TunnelSigningResponse, derive_sandbox_instance_id,
 };
 
+const MISTLE_SANDBOX_INSTANCE_ID_ENV_NAME: &str = "MISTLE_SANDBOX_INSTANCE_ID";
+const MISTLE_SANDBOX_PROFILE_ID_ENV_NAME: &str = "MISTLE_SANDBOX_PROFILE_ID";
+const MISTLE_SANDBOX_PROFILE_VERSION_ENV_NAME: &str = "MISTLE_SANDBOX_PROFILE_VERSION";
+
 /// Describes why the initialized daemon runtime failed to start or stop.
 #[derive(Debug)]
 pub enum SandboxdStateError {
@@ -171,6 +175,9 @@ impl SandboxdState {
         );
         let sandbox_instance_id = derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)
             .map_err(|error| SandboxdStateError::StartTunnelSession(error.to_string()))?;
+        let mistle_context_env =
+            collect_mistle_context_runtime_environment(startup_input, &sandbox_instance_id)
+                .map_err(SandboxdStateError::StartRuntimeProcesses)?;
         let supervisor_handle = SandboxdSupervisorHandle::new(
             sandbox_instance_id.clone(),
             clock.clone(),
@@ -277,23 +284,26 @@ impl SandboxdState {
                 return Err(SandboxdStateError::StartRuntimeProcesses(error));
             }
         };
-        let runtime_env: BTreeMap<String, String> =
-            match merge_managed_runtime_environment(base_runtime_env, egress_proxy.as_ref()) {
-                Ok(runtime_env) => runtime_env,
-                Err(error) => {
-                    close_tunnel_session_after_failure(
-                        &mut startup_tunnel_session,
-                        &diagnostics_logger,
-                        "stop_tunnel_session_after_runtime_env_failure",
-                    );
-                    close_egress_proxy_after_failure(
-                        &mut egress_proxy,
-                        &diagnostics_logger,
-                        "stop_egress_proxy_after_runtime_env_failure",
-                    );
-                    return Err(SandboxdStateError::StartRuntimeProcesses(error));
-                }
-            };
+        let runtime_env: BTreeMap<String, String> = match merge_managed_runtime_environment(
+            base_runtime_env,
+            &mistle_context_env,
+            egress_proxy.as_ref(),
+        ) {
+            Ok(runtime_env) => runtime_env,
+            Err(error) => {
+                close_tunnel_session_after_failure(
+                    &mut startup_tunnel_session,
+                    &diagnostics_logger,
+                    "stop_tunnel_session_after_runtime_env_failure",
+                );
+                close_egress_proxy_after_failure(
+                    &mut egress_proxy,
+                    &diagnostics_logger,
+                    "stop_egress_proxy_after_runtime_env_failure",
+                );
+                return Err(SandboxdStateError::StartRuntimeProcesses(error));
+            }
+        };
 
         let Some(tunnel_session) = startup_tunnel_session.as_ref() else {
             close_egress_proxy_after_failure(
@@ -1604,8 +1614,13 @@ fn collect_runtime_environment(
 
 fn merge_managed_runtime_environment(
     mut runtime_env: BTreeMap<String, String>,
+    mistle_context_env: &BTreeMap<String, String>,
     egress_proxy: Option<&EgressProxy>,
 ) -> Result<BTreeMap<String, String>, String> {
+    for (name, value) in mistle_context_env {
+        insert_managed_runtime_environment(&mut runtime_env, name, value)?;
+    }
+
     insert_managed_runtime_environment(
         &mut runtime_env,
         GLOBAL_GIT_CONFIG_ENV_NAME,
@@ -1619,6 +1634,42 @@ fn merge_managed_runtime_environment(
     }
 
     Ok(runtime_env)
+}
+
+fn collect_mistle_context_runtime_environment(
+    startup_input: &StartupInput,
+    sandbox_instance_id: &str,
+) -> Result<BTreeMap<String, String>, String> {
+    let Some(sandbox_profile_id) = startup_input
+        .runtime_plan
+        .get("sandboxProfileId")
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+    else {
+        return Err("runtime plan sandboxProfileId is required for managed env".to_string());
+    };
+    let Some(sandbox_profile_version) = startup_input
+        .runtime_plan
+        .get("version")
+        .and_then(serde_json::Value::as_u64)
+    else {
+        return Err("runtime plan version is required for managed env".to_string());
+    };
+
+    Ok(BTreeMap::from([
+        (
+            MISTLE_SANDBOX_INSTANCE_ID_ENV_NAME.to_string(),
+            sandbox_instance_id.to_string(),
+        ),
+        (
+            MISTLE_SANDBOX_PROFILE_ID_ENV_NAME.to_string(),
+            sandbox_profile_id.to_string(),
+        ),
+        (
+            MISTLE_SANDBOX_PROFILE_VERSION_ENV_NAME.to_string(),
+            sandbox_profile_version.to_string(),
+        ),
+    ]))
 }
 
 fn insert_managed_runtime_environment(
@@ -1867,11 +1918,13 @@ mod tests {
         RuntimeClientProcessStopSignal, RuntimeExecCommand,
     };
     use crate::sandboxd_state::{
-        DEFAULT_GLOBAL_GIT_CONFIG_PATH, GLOBAL_GIT_CONFIG_ENV_NAME, SETUP_SCRIPT_WORKING_DIRECTORY,
-        SandboxdState, build_setup_script_environment, collect_runtime_environment,
-        merge_managed_runtime_environment, run_setup_script, run_setup_script_in_directory,
-        scrub_snapshot_runtime_artifacts_at_paths, spawn_codex_coordination_thread,
-        spawn_runtime_readiness_projection_thread,
+        DEFAULT_GLOBAL_GIT_CONFIG_PATH, GLOBAL_GIT_CONFIG_ENV_NAME,
+        MISTLE_SANDBOX_INSTANCE_ID_ENV_NAME, MISTLE_SANDBOX_PROFILE_ID_ENV_NAME,
+        MISTLE_SANDBOX_PROFILE_VERSION_ENV_NAME, SETUP_SCRIPT_WORKING_DIRECTORY, SandboxdState,
+        build_setup_script_environment, collect_mistle_context_runtime_environment,
+        collect_runtime_environment, merge_managed_runtime_environment, run_setup_script,
+        run_setup_script_in_directory, scrub_snapshot_runtime_artifacts_at_paths,
+        spawn_codex_coordination_thread, spawn_runtime_readiness_projection_thread,
     };
     use crate::startup_diagnostics::{StartupDiagnosticsLogger, StartupOperation};
     use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
@@ -1974,15 +2027,30 @@ mod tests {
 
     #[test]
     fn adds_default_global_git_config_to_managed_runtime_environment() {
-        let runtime_env = merge_managed_runtime_environment(BTreeMap::new(), None)
-            .expect("managed runtime env should merge");
+        let runtime_env =
+            merge_managed_runtime_environment(BTreeMap::new(), &mistle_context_env(), None)
+                .expect("managed runtime env should merge");
 
         assert_eq!(
             runtime_env,
-            BTreeMap::from([(
-                GLOBAL_GIT_CONFIG_ENV_NAME.to_string(),
-                DEFAULT_GLOBAL_GIT_CONFIG_PATH.to_string(),
-            )])
+            BTreeMap::from([
+                (
+                    GLOBAL_GIT_CONFIG_ENV_NAME.to_string(),
+                    DEFAULT_GLOBAL_GIT_CONFIG_PATH.to_string(),
+                ),
+                (
+                    MISTLE_SANDBOX_INSTANCE_ID_ENV_NAME.to_string(),
+                    "sbi_test_001".to_string(),
+                ),
+                (
+                    MISTLE_SANDBOX_PROFILE_ID_ENV_NAME.to_string(),
+                    "sbp_test_001".to_string(),
+                ),
+                (
+                    MISTLE_SANDBOX_PROFILE_VERSION_ENV_NAME.to_string(),
+                    "7".to_string(),
+                ),
+            ])
         );
     }
 
@@ -1993,6 +2061,7 @@ mod tests {
                 "PATH".to_string(),
                 "/usr/local/bin:/usr/bin:/bin".to_string(),
             )]),
+            &mistle_context_env(),
             None,
         )
         .expect("runtime plan path should be preserved");
@@ -2014,6 +2083,7 @@ mod tests {
                 GLOBAL_GIT_CONFIG_ENV_NAME.to_string(),
                 "/tmp/not-sandboxd-owned".to_string(),
             )]),
+            &mistle_context_env(),
             None,
         )
         .expect_err("managed global git config should be reserved");
@@ -2021,6 +2091,39 @@ mod tests {
         assert_eq!(
             error,
             "runtime plan artifacts define managed env 'GIT_CONFIG_GLOBAL', which sandboxd reserves"
+        );
+    }
+
+    #[test]
+    fn extracts_mistle_context_runtime_environment_from_startup_input() {
+        let startup_input = build_startup_input(
+            StartupMode::New,
+            StartupExecutionMode::Session,
+            "ws://gateway.example.test/sbi_context_env_001",
+            minimal_runtime_plan_json(),
+            None,
+        );
+
+        let runtime_env =
+            collect_mistle_context_runtime_environment(&startup_input, "sbi_context_env_001")
+                .expect("mistle context env should collect");
+
+        assert_eq!(
+            runtime_env,
+            BTreeMap::from([
+                (
+                    MISTLE_SANDBOX_INSTANCE_ID_ENV_NAME.to_string(),
+                    "sbi_context_env_001".to_string(),
+                ),
+                (
+                    MISTLE_SANDBOX_PROFILE_ID_ENV_NAME.to_string(),
+                    "sbp_test_001".to_string(),
+                ),
+                (
+                    MISTLE_SANDBOX_PROFILE_VERSION_ENV_NAME.to_string(),
+                    "1".to_string(),
+                ),
+            ])
         );
     }
 
@@ -2372,6 +2475,8 @@ mod tests {
                 StartupExecutionMode::Snapshot,
                 &bootstrap_url,
                 serde_json::json!({
+                    "sandboxProfileId": "sbp_test_001",
+                    "version": 1,
                     "image": {
                         "source": "base",
                         "imageRef": "registry.example.test/base:latest"
@@ -2499,6 +2604,8 @@ mod tests {
                 StartupExecutionMode::Snapshot,
                 &bootstrap_url,
                 serde_json::json!({
+                    "sandboxProfileId": "sbp_test_001",
+                    "version": 1,
                     "image": {
                         "source": "base",
                         "imageRef": "registry.example.test/base:latest"
@@ -2642,6 +2749,8 @@ mod tests {
                 StartupExecutionMode::Session,
                 &bootstrap_url,
                 serde_json::json!({
+                    "sandboxProfileId": "sbp_test_001",
+                    "version": 1,
                     "image": {
                         "source": "snapshot",
                         "imageRef": "registry.example.test/snapshot:latest"
@@ -3076,6 +3185,8 @@ mod tests {
 
     fn minimal_runtime_plan_json() -> serde_json::Value {
         serde_json::json!({
+            "sandboxProfileId": "sbp_test_001",
+            "version": 1,
             "image": {
                 "source": "base",
                 "imageRef": "registry.example.test/base:latest"
@@ -3086,6 +3197,23 @@ mod tests {
             "runtimeClients": [],
             "agentRuntimes": []
         })
+    }
+
+    fn mistle_context_env() -> BTreeMap<String, String> {
+        BTreeMap::from([
+            (
+                MISTLE_SANDBOX_INSTANCE_ID_ENV_NAME.to_string(),
+                "sbi_test_001".to_string(),
+            ),
+            (
+                MISTLE_SANDBOX_PROFILE_ID_ENV_NAME.to_string(),
+                "sbp_test_001".to_string(),
+            ),
+            (
+                MISTLE_SANDBOX_PROFILE_VERSION_ENV_NAME.to_string(),
+                "7".to_string(),
+            ),
+        ])
     }
 
     fn parse_startup_diagnostic_records(log_text: &str) -> Vec<serde_json::Value> {

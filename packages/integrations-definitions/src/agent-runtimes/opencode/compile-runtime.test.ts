@@ -1,6 +1,7 @@
 import type {
   CompileAgentRuntimeResult,
   EgressCredentialRoute,
+  ResolvedIntegrationMcpServer,
   RuntimeArtifactGitHubReleaseInstallHelperInput,
   RuntimeArtifactInstallStep,
   RuntimeArtifactSpec,
@@ -52,6 +53,20 @@ function createCompiledRoute(input: {
   };
 }
 
+function createMistleMcpServer(): ResolvedIntegrationMcpServer {
+  return {
+    source: {
+      kind: "mistle",
+    },
+    server: {
+      serverId: "mistle",
+      serverName: "mistle",
+      transport: "streamable-http",
+      url: "https://mcp.example.test/mcp",
+    },
+  };
+}
+
 function renderRuntimeClients(input: {
   compiled: CompileAgentRuntimeResult;
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
@@ -97,6 +112,29 @@ function compileDefaultOpenCodeRuntime(): CompileAgentRuntimeResult {
     runtimeId: "opencode",
     runtimeConfig: {},
     mcpServers: [],
+    refs: {
+      sandboxPaths: {
+        userHomeDir: "/root",
+        workspaceDir: "/root",
+        runtimeDataDir: "/var/lib/mistle",
+        runtimeArtifactDir: "/var/lib/mistle/artifacts",
+        runtimeArtifactBinDir: "/usr/local/bin",
+      },
+      artifactBinPath: (artifactName) => `/usr/local/bin/${artifactName}`,
+    },
+  });
+}
+
+function compileOpenCodeRuntimeWithMcpServers(
+  mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>,
+): CompileAgentRuntimeResult {
+  return compileOpenCodeRuntime({
+    organizationId: "org_123",
+    sandboxProfileId: "sbp_123",
+    version: 1,
+    runtimeId: "opencode",
+    runtimeConfig: {},
+    mcpServers,
     refs: {
       sandboxPaths: {
         userHomeDir: "/root",
@@ -326,6 +364,10 @@ describe("compileOpenCodeRuntime", () => {
     expect(agentsFile.content).toContain(
       "Provider credentials may be injected by the platform outside the sandboxed process environment.",
     );
+    expect(agentsFile.content).toContain(
+      "`MISTLE_SANDBOX_INSTANCE_ID`, `MISTLE_SANDBOX_PROFILE_ID`, and `MISTLE_SANDBOX_PROFILE_VERSION` identify this sandbox",
+    );
+    expect(agentsFile.content).not.toContain("Mistle MCP tools are available");
     expect(compiled.agentRuntimes).toEqual([
       {
         runtimeId: "opencode",
@@ -393,6 +435,22 @@ describe("compileOpenCodeRuntime", () => {
         },
       },
     ]);
+  });
+
+  it("mentions Mistle MCP tools in managed instructions when Mistle MCP is configured", () => {
+    const runtimeClients = readRuntimeClients(
+      compileOpenCodeRuntimeWithMcpServers([createMistleMcpServer()]),
+    );
+    const agentsFile = runtimeClients[0]?.setup.files.find(
+      (file) => file.fileId === "opencode_global_agents",
+    );
+    if (agentsFile === undefined) {
+      throw new Error("Expected compiled OpenCode global AGENTS.md file.");
+    }
+
+    expect(agentsFile.content).toContain(
+      "Mistle MCP tools are available for interacting with Mistle resources",
+    );
   });
 
   it("does not emit provider egress routes when provider access has additional headers", () => {
