@@ -49,6 +49,18 @@ describe("buildSetupAssistantCollaborationModeSettings", () => {
     expect(SetupAssistantDeveloperInstructions).toContain("include the complete final script text");
   });
 
+  it("requires setup scripts to be locally validated before saving and platform tested after saving", () => {
+    expect(SetupAssistantDeveloperInstructions).toContain(
+      "Before updating the draft profile setup script",
+    );
+    expect(SetupAssistantDeveloperInstructions).toContain("exact candidate script body");
+    expect(SetupAssistantDeveloperInstructions).toContain("after local validation");
+    expect(SetupAssistantDeveloperInstructions).toContain("profile_setup_script_test_start");
+    expect(SetupAssistantDeveloperInstructions).toContain(
+      "local validation and platform setup-script test",
+    );
+  });
+
   it("requires maintenance scripts to run from an existing snapshot", () => {
     expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
       "starts from the current usable snapshot",

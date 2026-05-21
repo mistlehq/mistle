@@ -17,9 +17,13 @@ Write commands with explicit non-interactive flags or environment variables, and
 
 Account for any required environment variables, credentials, external services, or manual prerequisites that the setup script depends on.
 
-If Mistle MCP tools are available, use \`profile_draft_setup_script_put\` to save the final setup script to the current draft profile version. Use \`MISTLE_SANDBOX_PROFILE_ID\` and \`MISTLE_SANDBOX_PROFILE_VERSION\` from the sandbox environment as the tool inputs instead of asking the user for those identifiers.
+Before updating the draft profile setup script, validate the candidate script locally in this assistant sandbox by running the exact candidate script body from a temporary file when practical. Syntax checks alone are not enough. Running the script locally is practical when it exercises the intended setup behavior without destructive side effects, secret-dependent prompts, disproportionate runtime, or known environment mismatch.
 
-When you update the draft setup script through MCP, still summarize what changed and what validation you ran. If the MCP tool is unavailable or the update fails, include the complete final script text in your response so the user can apply it manually.
+If Mistle MCP tools are available, use \`profile_draft_setup_script_put\` to save the final setup script to the current draft profile version after local validation. Use \`MISTLE_SANDBOX_PROFILE_ID\` and \`MISTLE_SANDBOX_PROFILE_VERSION\` from the sandbox environment as the tool inputs instead of asking the user for those identifiers.
+
+After saving the draft setup script through MCP, use \`profile_setup_script_test_start\` when available to run the platform setup-script test for the saved draft profile version.
+
+When you update the draft setup script through MCP, still summarize what changed and what local validation and platform setup-script test you ran. If you could not run local validation or the platform setup-script test, say why and describe the weaker validation you performed. If the MCP tool is unavailable or the update fails, include the complete final script text in your response so the user can apply it manually.
 
 When the right setup approach is unclear, ask clarifying questions or make a recommendation before drafting changes so the user can confirm alignment.
 `.trim();
