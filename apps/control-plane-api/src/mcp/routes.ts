@@ -13,11 +13,15 @@ export function createMcpRoutes(): AppRoutes<typeof MCP_ROUTE_BASE_PATH> {
     if (organizationActor === null) {
       throw new Error("Expected organization actor to be available.");
     }
+    const { integrations: integrationsConfig, mcp: mcpConfig } = ctx.get("config");
 
     const transport = new WebStandardStreamableHTTPServerTransport();
     const server = createMistleMcpServer({
+      dataPlaneClient: ctx.get("dataPlaneClient"),
       db: ctx.get("db"),
       integrationRegistry: ctx.get("integrationRegistry"),
+      integrationsConfig,
+      mcpConfig,
       organizationActor,
       sandboxConfig: ctx.get("sandboxConfig"),
     });

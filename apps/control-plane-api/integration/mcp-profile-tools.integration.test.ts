@@ -2,8 +2,20 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
-import { SandboxProfileStatuses, SandboxProfileVersionStates } from "@mistle/db/control-plane";
+import {
+  IntegrationBindingKinds,
+  IntegrationConnectionStatuses,
+  SandboxProfileStatuses,
+  SandboxProfileVersionStates,
+} from "@mistle/db/control-plane";
+import {
+  SandboxInstancePurposes,
+  SandboxInstanceSources,
+  SandboxInstanceStatuses,
+  type DataPlaneTables,
+} from "@mistle/db/data-plane";
 import { mintMcpToken } from "@mistle/gateway-tunnel-auth";
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { SandboxProvider } from "@mistle/sandbox";
 import {
   createIntegrationTest,
@@ -14,15 +26,27 @@ import { z } from "zod";
 
 import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import {
+  SandboxInstanceStatusResponseSchema,
+  SandboxOperationEventsResponseSchema,
+} from "../src/sandbox-instances/index.js";
+import {
   ListSandboxProfilesResponseSchema,
   PutSandboxProfileVersionDraftResponseSchema,
   SandboxProfileSchema,
+  StartSandboxProfileSetupScriptTestRunResponseSchema,
 } from "../src/sandbox-profiles/index.js";
 import { createApiKeyCredential, createApiKeyToken } from "./helpers/api-keys.js";
-import { sandboxProfileRow, sandboxProfileVersionRow } from "./helpers/sandbox-profiles.js";
+import { waitForQueuedStartWorkflowInput } from "./helpers/data-plane-workflows.js";
+import {
+  integrationConnectionRow,
+  integrationTargetRow,
+  sandboxProfileRow,
+  sandboxProfileVersionIntegrationBindingRow,
+  sandboxProfileVersionRow,
+} from "./helpers/sandbox-profiles.js";
 
 const it = createIntegrationTest({
-  services: ["control-plane-api"],
+  services: ["control-plane-api", "data-plane-api"],
 });
 
 const McpTokenConfig = {
@@ -43,6 +67,14 @@ const JsonRpcToolResponseSchema = z
       .loose(),
   })
   .strict();
+
+const DockerSandboxRuntimeColumns = {
+  sandboxProvider: "docker",
+  sandboxConnectionId: null,
+  sandboxVcpuCount: null,
+  sandboxMemoryMb: null,
+  sandboxStorageMb: null,
+} as const;
 
 describe.concurrent("MCP profile tools integration", () => {
   it("lists sandbox profiles with the REST response shape scoped to the API key organization", async ({
@@ -190,6 +222,184 @@ describe.concurrent("MCP profile tools integration", () => {
     expect(persistedDraft?.setupScript).toBe(setupScript);
   });
 
+  it("starts a setup script test run with the REST response shape", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-profile-setup-script-test-start@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP profile setup script tester",
+      permissions: [
+        OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
+        OrganizationPermissions.SANDBOX_SESSION_CREATE,
+      ],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_mcp_setup_script_test_start",
+        organizationId: session.organizationId,
+        displayName: "MCP Setup Script Test Start Profile",
+        createdAt: "2026-05-02T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_mcp_setup_script_test_start",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        setupScript: "echo persisted",
+        ...DockerSandboxRuntimeColumns,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "openai-mcp-setup-script-test-start",
+        variantId: "openai-default",
+        enabled: true,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_mcp_setup_script_test_start_agent",
+        organizationId: session.organizationId,
+        targetKey: "openai-mcp-setup-script-test-start",
+        displayName: "MCP setup script test agent connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      }),
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_mcp_setup_script_test_start_agent",
+          sandboxProfileId: "sbp_mcp_setup_script_test_start",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_mcp_setup_script_test_start_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+        }),
+      );
+
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "profile_setup_script_test_start",
+      arguments: {
+        profileId: "sbp_mcp_setup_script_test_start",
+        version: 1,
+        setupScript: "echo tested through mcp",
+        idempotencyKey: "mcp-setup-script-test-start-001",
+      },
+    });
+
+    expect(result.isError).toBeUndefined();
+    const startedTestRun = StartSandboxProfileSetupScriptTestRunResponseSchema.parse(
+      result.structuredContent,
+    );
+    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+      env,
+      sandboxInstanceId: startedTestRun.sandboxInstanceId,
+    });
+
+    expect(startedTestRun.status).toBe("accepted");
+    expect(queuedWorkflowInput.purpose).toBe("setup_check");
+    expect(queuedWorkflowInput.runtimePlan.setupScript).toBe("echo tested through mcp");
+    expect(queuedWorkflowInput.startedBy).toEqual({
+      kind: "api_key",
+      id: expect.any(String),
+    });
+  });
+
+  it("gets sandbox status and setup script test events with REST response shapes", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-sandbox-test-feedback@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP sandbox feedback reader",
+      permissions: [OrganizationPermissions.SANDBOX_SESSION_READ],
+    });
+
+    await insertSandboxInstance(env, {
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_mcp_feedback",
+      status: SandboxInstanceStatuses.FAILED,
+    });
+    await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxOperationEvents).values([
+      operationEventRow({
+        id: "soe_mcp_feedback_001",
+        sandboxInstanceId: "sbi_mcp_feedback",
+        operationId: "op_mcp_feedback",
+        sequence: 1,
+        phase: "setup_script",
+        status: "failed",
+        message: "setup script failed",
+      }),
+      operationEventRow({
+        id: "soe_mcp_feedback_002",
+        sandboxInstanceId: "sbi_mcp_feedback",
+        operationId: "op_mcp_feedback",
+        sequence: 2,
+        recordKind: "transcript",
+        phase: "setup_script",
+        status: null,
+        stream: "stderr",
+        message: "",
+        payloadBytes: Buffer.from("missing dependency", "utf8"),
+      }),
+    ]);
+
+    const instanceResult = await callMcpTool({
+      env,
+      token,
+      name: "sandbox_instance_get",
+      arguments: {
+        instanceId: "sbi_mcp_feedback",
+      },
+    });
+    const eventsResult = await callMcpTool({
+      env,
+      token,
+      name: "sandbox_operation_events_list",
+      arguments: {
+        instanceId: "sbi_mcp_feedback",
+        operationId: "op_mcp_feedback",
+        afterSequence: 1,
+      },
+    });
+
+    expect(instanceResult.isError).toBeUndefined();
+    expect(eventsResult.isError).toBeUndefined();
+    const sandboxInstance = SandboxInstanceStatusResponseSchema.parse(
+      instanceResult.structuredContent,
+    );
+    const operationEvents = SandboxOperationEventsResponseSchema.parse(
+      eventsResult.structuredContent,
+    );
+
+    expect(sandboxInstance).toMatchObject({
+      id: "sbi_mcp_feedback",
+      status: "failed",
+    });
+    expect(operationEvents.events.map((event) => event.id)).toEqual(["soe_mcp_feedback_002"]);
+    expect(operationEvents.events[0]).toMatchObject({
+      sandboxInstanceId: "sbi_mcp_feedback",
+      operationKind: "setup_check",
+      operationId: "op_mcp_feedback",
+      phase: "setup_script",
+      stream: "stderr",
+      payloadBase64: "bWlzc2luZyBkZXBlbmRlbmN5",
+    });
+  });
+
   it("authorizes profile tools with a gateway-injected MCP token referencing an API key", async ({
     env,
   }) => {
@@ -325,4 +535,56 @@ function parseStreamableHttpJsonRpcMessage(responseBody: string): unknown {
   }
 
   return JSON.parse(dataLine.slice("data: ".length));
+}
+
+type SandboxInstanceRow = DataPlaneTables["sandboxInstances"]["$inferInsert"];
+type SandboxOperationEventRow = DataPlaneTables["sandboxOperationEvents"]["$inferInsert"];
+
+async function insertSandboxInstance(
+  env: IntegrationTestEnvironment,
+  input: {
+    organizationId: string;
+    sandboxInstanceId: string;
+    status?: SandboxInstanceRow["status"];
+  },
+): Promise<void> {
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
+    id: input.sandboxInstanceId,
+    organizationId: input.organizationId,
+    sandboxProfileId: `sbp_${input.sandboxInstanceId}`,
+    sandboxProfileVersion: 1,
+    runtimeProvider: "docker",
+    providerSandboxId: `provider-${input.sandboxInstanceId}`,
+    status: input.status ?? SandboxInstanceStatuses.PENDING,
+    startedByKind: "api_key",
+    startedById: "apk_mcp_feedback",
+    source: SandboxInstanceSources.DASHBOARD,
+    purpose: SandboxInstancePurposes.SETUP_CHECK,
+    failureCode: input.status === SandboxInstanceStatuses.FAILED ? "SETUP_SCRIPT_FAILED" : null,
+    failureMessage:
+      input.status === SandboxInstanceStatuses.FAILED ? "Setup script exited with code 1." : null,
+  } satisfies SandboxInstanceRow);
+}
+
+function operationEventRow(
+  input: Partial<SandboxOperationEventRow> & {
+    id: string;
+    sandboxInstanceId: string;
+    operationId: string;
+    sequence: number;
+  },
+): SandboxOperationEventRow {
+  return {
+    operationKind: "setup_check",
+    recordKind: "lifecycle",
+    observedAt: "2026-05-13T00:00:00.000Z",
+    source: "sandboxd",
+    phase: "setup_script",
+    status: "started",
+    stream: null,
+    message: "setup script event",
+    payloadBytes: null,
+    attributes: {},
+    ...input,
+  };
 }

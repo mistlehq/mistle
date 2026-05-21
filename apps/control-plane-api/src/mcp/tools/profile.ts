@@ -1,11 +1,7 @@
 import { z } from "@hono/zod-openapi";
-import { ForbiddenError } from "@mistle/http/errors.js";
-import type { CallToolResult, McpServer, ToolAnnotations } from "@modelcontextprotocol/server";
+import type { McpServer, ToolAnnotations } from "@modelcontextprotocol/server";
 
-import {
-  OrganizationPermissions,
-  type OrganizationPermission,
-} from "../../auth/services/organization-policy.js";
+import { OrganizationPermissions } from "../../auth/services/organization-policy.js";
 import {
   listSandboxProfilesQuerySchema,
   listSandboxProfilesResponseSchema,
@@ -17,8 +13,8 @@ import {
 import { getProfile } from "../../sandbox-profiles/services/get-profile.js";
 import { listProfiles } from "../../sandbox-profiles/services/list-profiles.js";
 import { putProfileVersionDraft } from "../../sandbox-profiles/services/put-profile-version-draft.js";
-import type { AppOrganizationActor } from "../../types.js";
 import type { MistleMcpServerContext } from "../server.js";
+import { requireMcpToolPermission, structuredResult } from "./shared.js";
 
 const ReadOnlyToolAnnotations: ToolAnnotations = {
   readOnlyHint: true,
@@ -140,25 +136,4 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
       return structuredResult(draft);
     },
   );
-}
-
-function structuredResult(structuredContent: Record<string, unknown>): CallToolResult {
-  return {
-    content: [
-      {
-        type: "text",
-        text: JSON.stringify(structuredContent),
-      },
-    ],
-    structuredContent,
-  };
-}
-
-function requireMcpToolPermission(
-  organizationActor: AppOrganizationActor,
-  permission: OrganizationPermission,
-): void {
-  if (!organizationActor.permissions.includes(permission)) {
-    throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
-  }
 }
