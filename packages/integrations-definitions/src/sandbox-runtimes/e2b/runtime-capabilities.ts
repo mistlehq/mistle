@@ -2,7 +2,8 @@ import type { SandboxRuntimeResourceCapabilities } from "@mistle/integrations-co
 
 export const E2BSandboxRuntimeResourceCapabilities: SandboxRuntimeResourceCapabilities = {
   // Sources:
-  // - E2B billing docs list baseline public limits of 8 vCPUs and 8 GB RAM.
+  // - E2B billing docs list baseline public limits of 8 vCPUs and 8 GB RAM,
+  //   with higher limits available for paid plans.
   //   https://e2b.dev/docs/billing
   // - Mistle's current E2B template defaults are 2 vCPU and 4096 MB.
   //   packages/sandbox/src/providers/e2b/schemas.ts
@@ -14,7 +15,7 @@ export const E2BSandboxRuntimeResourceCapabilities: SandboxRuntimeResourceCapabi
   },
   memoryMb: {
     min: 1024,
-    max: 8192,
+    max: 16_384,
     step: 1024,
     default: 4096,
   },

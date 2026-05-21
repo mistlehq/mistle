@@ -658,7 +658,7 @@ function renderSandboxProfileEditor(input?: {
             },
             memoryMb: {
               min: 1024,
-              max: 8192,
+              max: 16_384,
               step: 1024,
               default: 4096,
             },
