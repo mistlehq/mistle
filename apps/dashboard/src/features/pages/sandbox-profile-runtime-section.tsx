@@ -55,6 +55,8 @@ const AgentRuntimeRegistry = Definitions.agentRuntimeRegistry;
 const MissingProviderValue = "__missing_provider__";
 const MissingConnectionValue = "__missing_connection__";
 const MissingGitSigningConnectionValue = "__missing_git_signing_connection__";
+const NoEligibleGitHubSigningConnectionLabel = "No eligible GitHub connection";
+const SelectGitHubSigningConnectionLabel = "Select GitHub connection";
 const DockerSandboxProviderId = "docker";
 
 type SandboxCredentialSource = "managed" | "organization";
@@ -939,20 +941,16 @@ function GitHubCommitSigningConnectionField(input: {
   options: readonly GitHubSigningConnectionOption[];
   readOnly: boolean;
 }): React.JSX.Element | null {
-  if (input.options.length === 0 && input.connectionId === null) {
-    return null;
-  }
-
-  const selectedOption =
-    input.connectionId === null
-      ? null
-      : (input.options.find((option) => option.integrationConnectionId === input.connectionId) ??
-        null);
+  const selectedOption = resolveGitHubCommitSigningConnectionOption(input);
+  const placeholderLabel =
+    input.options.length === 0
+      ? NoEligibleGitHubSigningConnectionLabel
+      : SelectGitHubSigningConnectionLabel;
 
   if (input.readOnly) {
     return (
       <ReadOnlyRuntimeField horizontal={input.horizontal} label="GitHub commit signing">
-        {selectedOption?.label ?? input.connectionId ?? "Organization default"}
+        {selectedOption?.label ?? input.connectionId ?? placeholderLabel}
       </ReadOnlyRuntimeField>
     );
   }
@@ -977,14 +975,14 @@ function GitHubCommitSigningConnectionField(input: {
           <SelectTrigger id="sandbox-profile-github-signing-connection">
             <SelectValue placeholder="Select GitHub connection">
               {selectedOption === null ? (
-                <span className="text-muted-foreground">Organization default</span>
+                <span className="text-muted-foreground">{placeholderLabel}</span>
               ) : (
                 selectedOption.label
               )}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={MissingGitSigningConnectionValue}>Organization default</SelectItem>
+            <SelectItem value={MissingGitSigningConnectionValue}>{placeholderLabel}</SelectItem>
             {input.connectionId !== null && selectedOption === null ? (
               <SelectItem disabled value={input.connectionId}>
                 Missing GitHub connection
@@ -1003,6 +1001,19 @@ function GitHubCommitSigningConnectionField(input: {
       </FieldContent>
     </Field>
   );
+}
+
+function resolveGitHubCommitSigningConnectionOption(input: {
+  connectionId: string | null;
+  options: readonly GitHubSigningConnectionOption[];
+}): GitHubSigningConnectionOption | null {
+  if (input.connectionId !== null) {
+    return (
+      input.options.find((option) => option.integrationConnectionId === input.connectionId) ?? null
+    );
+  }
+
+  return input.options.length === 1 ? (input.options[0] ?? null) : null;
 }
 
 function MistleMcpAccessField(input: {
