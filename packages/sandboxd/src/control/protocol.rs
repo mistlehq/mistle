@@ -41,6 +41,24 @@ pub(super) struct ControlResponse {
     pub(super) signature_base64: Option<String>,
 }
 
+impl ControlResponse {
+    pub(super) fn ok(signature_base64: Option<String>) -> Self {
+        Self {
+            ok: true,
+            error: None,
+            signature_base64,
+        }
+    }
+
+    pub(super) fn error(error: String) -> Self {
+        Self {
+            ok: false,
+            error: Some(error),
+            signature_base64: None,
+        }
+    }
+}
+
 fn default_wait_for_completion() -> bool {
     true
 }

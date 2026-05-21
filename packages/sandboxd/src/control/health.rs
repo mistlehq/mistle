@@ -6,7 +6,8 @@ use std::time::Duration;
 
 use serde::Serialize;
 
-use crate::control::{ControlError, ControlServerState, DEFAULT_HEALTH_ENDPOINT_PATH, InitPhase};
+use crate::control::state::{ControlServerState, lock_control_state};
+use crate::control::{ControlError, DEFAULT_HEALTH_ENDPOINT_PATH, InitPhase};
 #[cfg(any(test, debug_assertions))]
 use crate::control::{EGRESS_PROXY_FAULT_KILL_PATH, TEST_FAULTS_ENABLED_ENV};
 use crate::sandboxd_state::SandboxdState;
@@ -140,9 +141,7 @@ fn build_fault_injection_response(
         return Ok(build_http_json_response(403, &body));
     }
 
-    let fault_result = state
-        .lock()
-        .expect("control server state lock should not be poisoned")
+    let fault_result = lock_control_state(state)?
         .sandboxd_state
         .as_ref()
         .ok_or_else(|| "sandboxd is not initialized".to_string())
@@ -178,9 +177,7 @@ fn build_health_response(
     state: &Arc<Mutex<ControlServerState>>,
 ) -> Result<SandboxdHealthResponse, ControlError> {
     let observed_at = SystemClock.now_system_time();
-    let state = state
-        .lock()
-        .expect("control server state lock should not be poisoned");
+    let state = lock_control_state(state)?;
 
     let (daemon_phase, snapshot, init_error) = match &state.init_phase {
         InitPhase::Uninitialized => (SandboxdDaemonPhase::Uninitialized, None, None),

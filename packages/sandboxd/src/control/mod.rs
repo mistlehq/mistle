@@ -5,42 +5,39 @@
 //! control socket is the only boundary that accepts startup lifecycle requests
 //! once the daemon is running.
 
-use std::collections::BTreeMap;
 use std::fs;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::net::{SocketAddr, TcpListener};
 use std::os::unix::fs::FileTypeExt;
-use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::os::unix::net::UnixListener;
+use std::path::Path;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use crate::protocol::startup::StartupInput;
-use crate::sandboxd_state::SandboxdState;
-use crate::security;
-use crate::startup_diagnostics::{
-    StartupDiagnosticsLogger, StartupOperation, startup_diagnostics_string,
-};
-use crate::time::{Sleeper, SystemClock, ThreadSleeper};
-use crate::tunnel::session::{
-    TunnelSigningRequest, TunnelSigningResponse, derive_sandbox_instance_id,
-};
+use crate::time::Sleeper;
 
 mod client;
 mod error;
 mod health;
 mod protocol;
+mod request;
+mod state;
 
 pub use crate::control::client::{
     submit_init, submit_ready, submit_resume, submit_signing, submit_wait_init,
 };
 pub use crate::control::error::ControlError;
 use crate::control::health::run_health_server_loop;
+use crate::control::protocol::ControlResponse;
 pub use crate::control::protocol::ControlSignRequest;
-use crate::control::protocol::{ControlRequest, ControlResponse};
+use crate::control::request::handle_connection;
+use crate::control::state::{
+    ControlServerState, SharedInitThread, close_sandboxd_state, join_init_thread,
+    lock_control_state,
+};
 
 /// Default Unix socket path for the local `sandboxd` control channel.
 pub const DEFAULT_CONTROL_SOCKET_PATH: &str = "/run/mistle/sandboxd/control.sock";
@@ -54,7 +51,6 @@ pub const DEFAULT_HEALTH_ENDPOINT_PATH: &str = "/__healthz";
 pub(super) const TEST_FAULTS_ENABLED_ENV: &str = "MISTLE_SANDBOXD_ENABLE_TEST_FAULTS";
 #[cfg(any(test, debug_assertions))]
 pub(super) const EGRESS_PROXY_FAULT_KILL_PATH: &str = "/__faults/components/egress-proxy/kill";
-static SIGN_REQUEST_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Tracks whether this daemon has already accepted startup input.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -64,18 +60,6 @@ pub enum InitPhase {
     Initialized,
     Failed(String),
 }
-
-/// Tracks observable daemon state for tests and daemon lifecycle control.
-struct ControlServerState {
-    pub(super) init_phase: InitPhase,
-    startup_input: Option<StartupInput>,
-    pub(super) sandboxd_state: Option<SandboxdState>,
-    global_git_config_path: PathBuf,
-    shutdown_after_init: bool,
-}
-
-type InitThread = JoinHandle<Result<(), ControlError>>;
-type SharedInitThread = Arc<Mutex<Option<InitThread>>>;
 
 /// Owns one running control socket server thread and its observable state.
 pub struct ControlServer {
@@ -91,20 +75,17 @@ pub struct ControlServer {
 impl ControlServer {
     /// Returns the current init phase for this daemon.
     pub fn init_phase(&self) -> InitPhase {
-        self.state
-            .lock()
-            .expect("control server state lock should not be poisoned")
-            .init_phase
-            .clone()
+        match lock_control_state(&self.state) {
+            Ok(state) => state.init_phase.clone(),
+            Err(error) => InitPhase::Failed(error.to_string()),
+        }
     }
 
     /// Returns the startup input accepted by this daemon, if any.
     pub fn startup_input(&self) -> Option<StartupInput> {
-        self.state
-            .lock()
-            .expect("control server state lock should not be poisoned")
-            .startup_input
-            .clone()
+        lock_control_state(&self.state)
+            .ok()
+            .and_then(|state| state.startup_input.clone())
     }
 
     /// Returns the loopback socket address bound by the local health endpoint.
@@ -124,11 +105,11 @@ impl ControlServer {
         let thread = self
             .thread
             .take()
-            .expect("control server thread should exist");
+            .ok_or(ControlError::ServerThreadMissing)?;
         let health_thread = self
             .health_thread
             .take()
-            .expect("health server thread should exist");
+            .ok_or(ControlError::HealthServerThreadMissing)?;
         let thread_result = match thread.join() {
             Ok(result) => result,
             Err(_) => Err(ControlError::ServerPanicked),
@@ -151,7 +132,7 @@ impl ControlServer {
         let thread = self
             .thread
             .take()
-            .expect("control server thread should exist");
+            .ok_or(ControlError::ServerThreadMissing)?;
         let thread_result = match thread.join() {
             Ok(result) => result,
             Err(_) => Err(ControlError::ServerPanicked),
@@ -162,7 +143,7 @@ impl ControlServer {
         let health_thread = self
             .health_thread
             .take()
-            .expect("health server thread should exist");
+            .ok_or(ControlError::HealthServerThreadMissing)?;
         let health_thread_result = match health_thread.join() {
             Ok(result) => result,
             Err(_) => Err(ControlError::HealthServerPanicked),
@@ -205,9 +186,12 @@ where
 {
     start_control_server_with_health_endpoint(
         socket_path,
-        DEFAULT_HEALTH_ENDPOINT_ADDR
-            .parse()
-            .expect("default health endpoint address should parse"),
+        DEFAULT_HEALTH_ENDPOINT_ADDR.parse().map_err(|error| {
+            ControlError::InvalidDefaultHealthEndpoint {
+                address: DEFAULT_HEALTH_ENDPOINT_ADDR.to_string(),
+                error,
+            }
+        })?,
         sleeper,
         accept_poll_interval,
         global_git_config_path,
@@ -328,7 +312,7 @@ fn run_control_server_loop(
         if shutdown_receiver.try_recv().is_ok() {
             return Ok(());
         }
-        if should_shutdown_after_init(state) {
+        if should_shutdown_after_init(state)? {
             return Ok(());
         }
 
@@ -337,18 +321,8 @@ fn run_control_server_loop(
                 stream
                     .set_nonblocking(false)
                     .map_err(ControlError::ConfigureConnection)?;
-                let response = match handle_connection(&mut stream, state, init_thread) {
-                    Ok(signature_base64) => ControlResponse {
-                        ok: true,
-                        error: None,
-                        signature_base64,
-                    },
-                    Err(error) => ControlResponse {
-                        ok: false,
-                        error: Some(error.to_string()),
-                        signature_base64: None,
-                    },
-                };
+                let response = handle_connection(&mut stream, state, init_thread)
+                    .unwrap_or_else(|error| ControlResponse::error(error.to_string()));
                 let response_bytes =
                     serde_json::to_vec(&response).map_err(ControlError::SerializeResponse)?;
                 stream
@@ -365,352 +339,10 @@ fn run_control_server_loop(
     }
 }
 
-fn should_shutdown_after_init(state: &Arc<Mutex<ControlServerState>>) -> bool {
-    state
-        .lock()
-        .expect("control server state lock should not be poisoned")
-        .shutdown_after_init
-}
-
-fn handle_connection(
-    stream: &mut UnixStream,
+fn should_shutdown_after_init(
     state: &Arc<Mutex<ControlServerState>>,
-    init_thread: &SharedInitThread,
-) -> Result<Option<String>, ControlError> {
-    security::ensure_unix_socket_peer_matches_current_process_uid(stream)
-        .map_err(|error| ControlError::VerifyPeer(error.to_string()))?;
-
-    let mut raw_request = Vec::new();
-    stream
-        .read_to_end(&mut raw_request)
-        .map_err(ControlError::ReadRequest)?;
-    let request: ControlRequest =
-        serde_json::from_slice(&raw_request).map_err(ControlError::InvalidRequest)?;
-
-    match request {
-        ControlRequest::Ready => Ok(None),
-        ControlRequest::Init {
-            startup_input,
-            wait_for_completion,
-            wait_for_storage_attach,
-        } => {
-            begin_init(
-                startup_input,
-                state,
-                init_thread,
-                wait_for_completion,
-                wait_for_storage_attach,
-            )?;
-            Ok(None)
-        }
-        ControlRequest::Resume { startup_input } => {
-            begin_resume(startup_input, state)?;
-            Ok(None)
-        }
-        ControlRequest::WaitInit => {
-            join_init_thread(init_thread)?;
-            Ok(None)
-        }
-        ControlRequest::Sign { sign_request } => begin_sign(sign_request, state).map(Some),
-    }
-}
-
-fn begin_sign(
-    sign_request: ControlSignRequest,
-    state: &Arc<Mutex<ControlServerState>>,
-) -> Result<String, ControlError> {
-    let state_guard = state
-        .lock()
-        .expect("control server state lock should not be poisoned");
-    let startup_input = state_guard.startup_input.as_ref().ok_or_else(|| {
-        ControlError::StartupRequestRejected("sandboxd is not initialized".to_string())
-    })?;
-    let git_signing_config = startup_input
-        .git_identity
-        .as_ref()
-        .and_then(|git_identity| git_identity.signing.as_ref())
-        .ok_or_else(|| {
-            ControlError::StartupRequestRejected(
-                "sandbox does not have a configured Git signing identity".to_string(),
-            )
-        })?;
-    let tunnel_session = state_guard.sandboxd_state.as_ref().ok_or_else(|| {
-        ControlError::StartupRequestRejected(
-            "sandboxd state is missing for an initialized daemon".to_string(),
-        )
-    })?;
-
-    if git_signing_config.key_ref != sign_request.key_ref {
-        return Err(ControlError::StartupRequestRejected(
-            "requested Git signing key does not match the configured Git signing identity"
-                .to_string(),
-        ));
-    }
-
-    let sandbox_instance_id = derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)
-        .map_err(|error| ControlError::InitializeSandboxdState(error.to_string()))?;
-    let request_id = format!(
-        "sign_req_{}",
-        SIGN_REQUEST_COUNTER.fetch_add(1, Ordering::Relaxed)
-    );
-    let signing_response = tunnel_session
-        .request_signing(TunnelSigningRequest {
-            request_id: request_id.clone(),
-            organization_id: git_signing_config.organization_id.clone(),
-            sandbox_instance_id,
-            acting_user_id: git_signing_config.acting_user_id.clone(),
-            provider_family: git_signing_config.provider_family.clone(),
-            integration_connection_id: git_signing_config.integration_connection_id.clone(),
-            format: git_signing_config.format.clone(),
-            key_ref: sign_request.key_ref,
-            grant: git_signing_config.grant.clone(),
-            payload_base64: sign_request.payload_base64,
-        })
-        .map_err(|error| ControlError::ResponseError(error.to_string()))?;
-
-    match signing_response {
-        TunnelSigningResponse::Success {
-            request_id: response_request_id,
-            signature_base64,
-        } => {
-            if response_request_id != request_id {
-                return Err(ControlError::ResponseError(format!(
-                    "signing response request id '{response_request_id}' did not match '{request_id}'"
-                )));
-            }
-            Ok(signature_base64)
-        }
-        TunnelSigningResponse::Failure {
-            request_id: response_request_id,
-            code,
-            message,
-        } => Err(ControlError::ResponseError(
-            if response_request_id == request_id {
-                format!("{code}: {message}")
-            } else {
-                format!(
-                    "signing response request id '{response_request_id}' did not match '{request_id}': {code}: {message}"
-                )
-            },
-        )),
-    }
-}
-
-fn begin_init(
-    startup_input: StartupInput,
-    state: &Arc<Mutex<ControlServerState>>,
-    init_thread: &SharedInitThread,
-    wait_for_completion: bool,
-    wait_for_storage_attach: bool,
-) -> Result<(), ControlError> {
-    {
-        let mut state_guard = state
-            .lock()
-            .expect("control server state lock should not be poisoned");
-        match &state_guard.init_phase {
-            InitPhase::Uninitialized => {
-                state_guard.init_phase = InitPhase::Initializing;
-                state_guard.startup_input = Some(startup_input.clone());
-            }
-            InitPhase::Initializing => {
-                return Err(ControlError::StartupRequestRejected(
-                    "sandboxd is already initializing".to_string(),
-                ));
-            }
-            InitPhase::Initialized => {
-                return Err(ControlError::StartupRequestRejected(
-                    "sandboxd has already completed initialization".to_string(),
-                ));
-            }
-            InitPhase::Failed(error) => {
-                return Err(ControlError::StartupRequestRejected(format!(
-                    "sandboxd initialization already failed: {error}"
-                )));
-            }
-        }
-    }
-
-    let mut init_thread_guard = init_thread
-        .lock()
-        .expect("control init thread lock should not be poisoned");
-    if init_thread_guard.is_some() {
-        return Err(ControlError::StartupRequestRejected(
-            "sandboxd init worker is already running".to_string(),
-        ));
-    }
-
-    let state_for_thread = state.clone();
-    let global_git_config_path = state
-        .lock()
-        .expect("control server state lock should not be poisoned")
-        .global_git_config_path
-        .clone();
-    let diagnostics_logger = StartupDiagnosticsLogger::initialize(
-        StartupOperation::Init,
-        &startup_input.tunnel_gateway_ws_url,
-    )
-    .ok();
-    if let Some(logger) = &diagnostics_logger
-        && let Err(error) = logger.record_started()
-    {
-        eprintln!("sandboxd failed to record init diagnostics start event: {error}");
-    }
-    *init_thread_guard = Some(thread::spawn(move || {
-        let result = SandboxdState::initialize(
-            &startup_input,
-            &global_git_config_path,
-            Arc::new(SystemClock),
-            Arc::new(ThreadSleeper),
-            diagnostics_logger.clone(),
-            wait_for_storage_attach,
-        );
-
-        match result {
-            Ok(sandboxd_state) => {
-                let mut state_guard = state_for_thread
-                    .lock()
-                    .expect("control server state lock should not be poisoned");
-                state_guard.shutdown_after_init = startup_input.is_snapshot();
-                state_guard.sandboxd_state = Some(sandboxd_state);
-                state_guard.init_phase = InitPhase::Initialized;
-                Ok(())
-            }
-            Err(error) => {
-                let error_text = error.to_string();
-                if let Some(logger) = &diagnostics_logger
-                    && let Err(record_error) = logger.record_failed(BTreeMap::from([(
-                        "error".to_string(),
-                        startup_diagnostics_string(error_text.clone()),
-                    )]))
-                {
-                    eprintln!(
-                        "sandboxd failed to record init diagnostics failure event: {record_error}"
-                    );
-                }
-                state_for_thread
-                    .lock()
-                    .expect("control server state lock should not be poisoned")
-                    .init_phase = InitPhase::Failed(error_text.clone());
-                Err(ControlError::InitializeSandboxdState(error_text))
-            }
-        }
-    }));
-    drop(init_thread_guard);
-
-    if wait_for_completion {
-        join_init_thread(init_thread)?;
-    }
-    Ok(())
-}
-
-fn begin_resume(
-    startup_input: StartupInput,
-    state: &Arc<Mutex<ControlServerState>>,
-) -> Result<(), ControlError> {
-    let diagnostics_logger = StartupDiagnosticsLogger::initialize(
-        StartupOperation::Resume,
-        &startup_input.tunnel_gateway_ws_url,
-    )
-    .ok();
-    if let Some(logger) = &diagnostics_logger
-        && let Err(error) = logger.record_started()
-    {
-        eprintln!("sandboxd failed to record resume diagnostics start event: {error}");
-    }
-    let mut sandboxd_state = {
-        let mut state_guard = state
-            .lock()
-            .expect("control server state lock should not be poisoned");
-        match &state_guard.init_phase {
-            InitPhase::Uninitialized => {
-                return Err(ControlError::StartupRequestRejected(
-                    "sandboxd has not completed initialization".to_string(),
-                ));
-            }
-            InitPhase::Initializing => {
-                return Err(ControlError::StartupRequestRejected(
-                    "sandboxd is still initializing".to_string(),
-                ));
-            }
-            InitPhase::Initialized => {
-                state_guard.startup_input = Some(startup_input.clone());
-                state_guard.sandboxd_state.take().ok_or_else(|| {
-                    ControlError::ResumeSandboxdState(
-                        "sandboxd state is missing for an initialized daemon".to_string(),
-                    )
-                })?
-            }
-            InitPhase::Failed(error) => {
-                return Err(ControlError::StartupRequestRejected(format!(
-                    "sandboxd initialization already failed: {error}"
-                )));
-            }
-        }
-    };
-    let global_git_config_path = state
-        .lock()
-        .expect("control server state lock should not be poisoned")
-        .global_git_config_path
-        .clone();
-
-    let resume_result = sandboxd_state
-        .resume(
-            &startup_input,
-            &global_git_config_path,
-            diagnostics_logger.clone(),
-        )
-        .map_err(|error| {
-            let error_text = error.to_string();
-            if let Some(logger) = &diagnostics_logger
-                && let Err(record_error) = logger.record_failed(BTreeMap::from([(
-                    "error".to_string(),
-                    startup_diagnostics_string(error_text.clone()),
-                )]))
-            {
-                eprintln!(
-                    "sandboxd failed to record resume diagnostics failure event: {record_error}"
-                );
-            }
-            ControlError::ResumeSandboxdState(error_text)
-        });
-
-    state
-        .lock()
-        .expect("control server state lock should not be poisoned")
-        .sandboxd_state = Some(sandboxd_state);
-
-    resume_result
-}
-
-fn join_init_thread(init_thread: &SharedInitThread) -> Result<(), ControlError> {
-    let Some(thread) = init_thread
-        .lock()
-        .expect("control init thread lock should not be poisoned")
-        .take()
-    else {
-        return Ok(());
-    };
-
-    match thread.join() {
-        Ok(result) => result,
-        Err(_) => Err(ControlError::InitPanicked),
-    }
-}
-
-fn take_sandboxd_state(state: &Arc<Mutex<ControlServerState>>) -> Option<SandboxdState> {
-    state
-        .lock()
-        .expect("control server state lock should not be poisoned")
-        .sandboxd_state
-        .take()
-}
-
-fn close_sandboxd_state(state: &Arc<Mutex<ControlServerState>>) -> Result<(), ControlError> {
-    take_sandboxd_state(state)
-        .map(SandboxdState::close)
-        .transpose()
-        .map_err(|error| ControlError::CloseSandboxdState(error.to_string()))?;
-    Ok(())
+) -> Result<bool, ControlError> {
+    Ok(lock_control_state(state)?.shutdown_after_init)
 }
 
 fn remove_stale_socket(socket_path: &Path) -> Result<(), ControlError> {

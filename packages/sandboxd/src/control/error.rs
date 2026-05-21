@@ -31,6 +31,10 @@ pub enum ControlError {
         address: SocketAddr,
         error: std::io::Error,
     },
+    InvalidDefaultHealthEndpoint {
+        address: String,
+        error: std::net::AddrParseError,
+    },
     AcceptConnection(std::io::Error),
     AcceptHealthConnection(std::io::Error),
     ConfigureConnection(std::io::Error),
@@ -52,6 +56,10 @@ pub enum ControlError {
         error: std::io::Error,
     },
     ShutdownSend,
+    ControlStateLockPoisoned,
+    InitThreadLockPoisoned,
+    ServerThreadMissing,
+    HealthServerThreadMissing,
     ServerPanicked,
     HealthServerPanicked,
     InitPanicked,
@@ -98,6 +106,12 @@ impl fmt::Display for ControlError {
             }
             Self::BindHealthEndpoint { address, error } => {
                 write!(f, "failed to bind health endpoint {address}: {error}")
+            }
+            Self::InvalidDefaultHealthEndpoint { address, error } => {
+                write!(
+                    f,
+                    "default health endpoint address {address} is invalid: {error}"
+                )
             }
             Self::AcceptConnection(error) => {
                 write!(f, "failed to accept control socket connection: {error}")
@@ -151,6 +165,14 @@ impl fmt::Display for ControlError {
                 )
             }
             Self::ShutdownSend => write!(f, "failed to signal control socket shutdown"),
+            Self::ControlStateLockPoisoned => {
+                write!(f, "control server state lock was poisoned")
+            }
+            Self::InitThreadLockPoisoned => write!(f, "control init thread lock was poisoned"),
+            Self::ServerThreadMissing => write!(f, "control socket server thread was missing"),
+            Self::HealthServerThreadMissing => {
+                write!(f, "health endpoint server thread was missing")
+            }
             Self::ServerPanicked => write!(f, "control socket server panicked"),
             Self::HealthServerPanicked => write!(f, "health endpoint server panicked"),
             Self::InitPanicked => write!(f, "sandbox init worker panicked"),
