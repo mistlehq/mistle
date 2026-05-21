@@ -133,6 +133,12 @@ pub enum CompiledEgressRouteCredentialResolver {
         #[serde(rename = "apiKeyId")]
         api_key_id: String,
     },
+    MistleMcpSetupAssistantToken {
+        #[serde(rename = "sandboxProfileId")]
+        sandbox_profile_id: String,
+        #[serde(rename = "sandboxProfileVersion")]
+        sandbox_profile_version: u32,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -912,6 +918,44 @@ mod tests {
                 assert_eq!(api_key_id, "apk_01k00000000000000000000000");
             }
             other => panic!("expected mistle mcp token resolver, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn decodes_mistle_mcp_setup_assistant_token_credential_resolver_shape() {
+        let route = serde_json::from_value::<CompiledEgressRoute>(serde_json::json!({
+          "egressRuleId": "egress_rule_platform_mistle_mcp",
+          "bindingId": "platform-mistle-mcp",
+          "familyId": "mistle",
+          "variantId": "mistle-mcp",
+          "match": {
+            "hosts": ["mcp.mistle.test"],
+            "pathPrefixes": ["/mcp"]
+          },
+          "upstream": {
+            "baseUrl": "https://mcp.mistle.test/mcp"
+          },
+          "authInjection": {
+            "type": "bearer",
+            "target": "authorization"
+          },
+          "credentialResolver": {
+            "kind": "mistle_mcp_setup_assistant_token",
+            "sandboxProfileId": "sbp_01k00000000000000000000000",
+            "sandboxProfileVersion": 1
+          }
+        }))
+        .expect("mistle mcp setup assistant egress route should decode");
+
+        match route.credential_resolver {
+            CompiledEgressRouteCredentialResolver::MistleMcpSetupAssistantToken {
+                sandbox_profile_id,
+                sandbox_profile_version,
+            } => {
+                assert_eq!(sandbox_profile_id, "sbp_01k00000000000000000000000");
+                assert_eq!(sandbox_profile_version, 1);
+            }
+            other => panic!("expected mistle mcp setup assistant token resolver, got {other:?}"),
         }
     }
 }
