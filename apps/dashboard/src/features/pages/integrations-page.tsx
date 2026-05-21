@@ -10,7 +10,10 @@ import { IntegrationConnectionDetailView } from "../integrations/integration-con
 import { resolveFormConnectionMethodManagedWebhookSourcePostCreate } from "../integrations/integration-connection-method-metadata.js";
 import {
   resolveInstalledIntegrationConnectionNotice,
+  resolveProviderAppSetupErrorConnectionNotice,
+  resolveProviderAppSetupErrorNotice,
   type IntegrationConnectionNotice,
+  type TargetedProviderAppSetupErrorNotice,
 } from "../integrations/integration-connection-notices.js";
 import { useIntegrationWebhookSourceActions } from "../integrations/integration-webhook-source-actions.js";
 import {
@@ -87,6 +90,7 @@ function buildReauthorizationStateByConnectionId(input: {
 function clearUrlConnectionNoticeParams(searchParams: URLSearchParams): URLSearchParams {
   const nextSearchParams = new URLSearchParams(searchParams);
   nextSearchParams.delete("connectionNotice");
+  nextSearchParams.delete("providerAppSetupError");
   return nextSearchParams;
 }
 
@@ -160,6 +164,8 @@ export function IntegrationsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [urlConnectionNotice, setUrlConnectionNotice] =
     useState<IntegrationConnectionNotice | null>(null);
+  const [urlProviderAppSetupErrorNotice, setUrlProviderAppSetupErrorNotice] =
+    useState<TargetedProviderAppSetupErrorNotice | null>(null);
   useRequiredOrganizationId();
   const detailTargetKey = params["targetKey"] ?? null;
   const detailConnectionId = searchParams.get("connectionId");
@@ -223,6 +229,11 @@ export function IntegrationsPage() {
     selectedConnection: selectedDetailConnection,
   });
   const connectionNotice =
+    resolveProviderAppSetupErrorConnectionNotice({
+      detailTargetKey,
+      selectedConnection: selectedDetailConnection,
+      urlProviderAppSetupErrorNotice,
+    }) ??
     routeStateConnectionNotice ??
     (urlConnectionNotice?.connectionId === selectedDetailConnection?.id
       ? urlConnectionNotice
@@ -236,6 +247,20 @@ export function IntegrationsPage() {
         });
 
   useEffect(() => {
+    const providerAppSetupErrorNotice = resolveProviderAppSetupErrorNotice({
+      searchParams,
+    });
+    if (providerAppSetupErrorNotice !== null) {
+      if (detailTargetKey !== null) {
+        setUrlProviderAppSetupErrorNotice({
+          notice: providerAppSetupErrorNotice,
+          targetKey: detailTargetKey,
+        });
+      }
+      setSearchParams(clearUrlConnectionNoticeParams(searchParams), { replace: true });
+      return;
+    }
+
     const resolvedUrlNotice = resolveInstalledIntegrationConnectionNotice({
       connectionMethods: selectedDetailConnectionMethods,
       detailConnectionId,
@@ -250,6 +275,7 @@ export function IntegrationsPage() {
     setUrlConnectionNotice(resolvedUrlNotice);
     setSearchParams(clearUrlConnectionNoticeParams(searchParams), { replace: true });
   }, [
+    detailTargetKey,
     detailConnectionId,
     searchParams,
     selectedDetailConnection,

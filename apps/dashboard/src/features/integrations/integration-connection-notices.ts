@@ -10,6 +10,53 @@ export type IntegrationConnectionNotice = {
   variant: "alert" | "success";
 };
 
+export type ProviderAppSetupErrorNotice = {
+  message: string;
+  resetKey: string;
+  title: string;
+  variant: "alert";
+};
+
+export type TargetedProviderAppSetupErrorNotice = {
+  notice: ProviderAppSetupErrorNotice;
+  targetKey: string;
+};
+
+export function resolveProviderAppSetupErrorNotice(input: {
+  searchParams: URLSearchParams;
+}): ProviderAppSetupErrorNotice | null {
+  if (input.searchParams.get("providerAppSetupError") !== "missing-state") {
+    return null;
+  }
+
+  return {
+    message:
+      "GitHub did not return the setup state for this installation. Return to this screen and try connecting the GitHub App again.",
+    resetKey: "provider-app-setup-error:missing-state",
+    title: "GitHub App installation could not be completed",
+    variant: "alert",
+  };
+}
+
+export function resolveProviderAppSetupErrorConnectionNotice(input: {
+  detailTargetKey: string | null;
+  selectedConnection: Pick<IntegrationConnection, "id"> | undefined;
+  urlProviderAppSetupErrorNotice: TargetedProviderAppSetupErrorNotice | null;
+}): IntegrationConnectionNotice | null {
+  if (
+    input.urlProviderAppSetupErrorNotice === null ||
+    input.selectedConnection === undefined ||
+    input.urlProviderAppSetupErrorNotice.targetKey !== input.detailTargetKey
+  ) {
+    return null;
+  }
+
+  return {
+    connectionId: input.selectedConnection.id,
+    ...input.urlProviderAppSetupErrorNotice.notice,
+  };
+}
+
 export function resolveInstalledIntegrationConnectionNotice(input: {
   connectionMethods: readonly IntegrationConnectionMethod[] | undefined;
   detailConnectionId: string | null;

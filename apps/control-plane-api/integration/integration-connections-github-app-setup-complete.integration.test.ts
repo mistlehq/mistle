@@ -185,10 +185,10 @@ describe("GitHub App setup completion integration connections", () => {
     }
   });
 
-  it("rejects an active GitHub App draft installation callback when GitHub omits redirect state", async ({
+  it("redirects an active GitHub App draft installation callback error when GitHub omits redirect state", async ({
     env,
   }) => {
-    const targetKey = "github-cloud-installation-complete-without-state";
+    const targetKey = "github-cloud-installation-complete-success";
     const githubApi = await startGitHubApiServer({
       responseBody: {
         id: 22345,
@@ -227,14 +227,14 @@ describe("GitHub App setup completion integration connections", () => {
         }),
         {
           method: "GET",
+          redirect: "manual",
         },
       );
 
-      expect(completeResponse.status).toBe(400);
-      const responseBody = CompleteProviderAppSetupCallbackBadRequestResponseSchema.parse(
-        await completeResponse.json(),
+      expect(completeResponse.status).toBe(302);
+      expect(completeResponse.headers.get("location")).toContain(
+        `/integrations/${targetKey}?providerAppSetupError=missing-state`,
       );
-      expect(responseBody.code).toBe("INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT");
       expect(githubApi.requests).toEqual([]);
 
       const connection = await env.controlPlaneDb.query.integrationConnections.findFirst({

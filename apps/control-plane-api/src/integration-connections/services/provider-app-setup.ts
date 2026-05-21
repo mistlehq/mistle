@@ -55,6 +55,10 @@ type CompletedProviderAppSetup = {
   routeSegment: string;
 };
 
+export type ProviderAppSetupStatelessErrorRedirectTarget = {
+  targetKey: string;
+};
+
 type ConnectionWithTarget = Awaited<ReturnType<typeof resolveConnectionWithTargetOrThrow>>;
 
 type ResolvedProviderAppSetupCompletionContext = {
@@ -490,6 +494,49 @@ async function resolveProviderAppSetupCompletionWithoutState(input: {
     routeSegment: verifiedCandidate.routeSegment,
     setupResult: verifiedCandidate.setupResult,
   };
+}
+
+export async function resolveProviderAppSetupStatelessErrorRedirectTarget(input: {
+  callbackRouteKey: string;
+  db: ControlPlaneDatabase;
+  integrationRegistry: IntegrationRegistry;
+  queryParams: URLSearchParams;
+}): Promise<ProviderAppSetupStatelessErrorRedirectTarget | null> {
+  const resolutions = await listStatelessProviderAppSetupResolutions({
+    callbackRouteKey: input.callbackRouteKey,
+    integrationRegistry: input.integrationRegistry,
+    queryParams: input.queryParams,
+  });
+  if (resolutions.length === 0) {
+    return null;
+  }
+
+  const targetKeyByTargetKey = new Map<string, string>();
+  for (const resolution of resolutions) {
+    const targets = await input.db.query.integrationTargets.findMany({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.familyId, resolution.definition.familyId),
+          eq(table.variantId, resolution.definition.variantId),
+          eq(table.enabled, true),
+        ),
+    });
+
+    for (const target of targets) {
+      targetKeyByTargetKey.set(target.targetKey, target.targetKey);
+    }
+  }
+
+  if (targetKeyByTargetKey.size !== 1) {
+    return null;
+  }
+
+  const targetKey = [...targetKeyByTargetKey.values()][0];
+  if (targetKey === undefined) {
+    throw new Error("Provider app setup stateless redirect target disappeared.");
+  }
+
+  return { targetKey };
 }
 
 async function resolveWebhookCallbackUrl(input: {

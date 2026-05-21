@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveInstalledIntegrationConnectionNotice } from "./integration-connection-notices.js";
+import {
+  resolveInstalledIntegrationConnectionNotice,
+  resolveProviderAppSetupErrorConnectionNotice,
+  resolveProviderAppSetupErrorNotice,
+} from "./integration-connection-notices.js";
 import type { IntegrationConnectionMethod } from "./integrations-service-shared.js";
 
 const ProviderAppConnectionMethod: IntegrationConnectionMethod = {
@@ -136,6 +140,69 @@ describe("resolveInstalledIntegrationConnectionNotice", () => {
         selectedConnection: {
           connectionMethodId: "plain-form",
           id: "connection_1",
+        },
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("resolveProviderAppSetupErrorNotice", () => {
+  it("resolves the provider app setup missing state error notice", () => {
+    expect(
+      resolveProviderAppSetupErrorNotice({
+        searchParams: new URLSearchParams("providerAppSetupError=missing-state"),
+      }),
+    ).toEqual({
+      message:
+        "GitHub did not return the setup state for this installation. Return to this screen and try connecting the GitHub App again.",
+      resetKey: "provider-app-setup-error:missing-state",
+      title: "GitHub App installation could not be completed",
+      variant: "alert",
+    });
+  });
+
+  it("ignores unknown provider app setup error values", () => {
+    expect(
+      resolveProviderAppSetupErrorNotice({
+        searchParams: new URLSearchParams("providerAppSetupError=other"),
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("resolveProviderAppSetupErrorConnectionNotice", () => {
+  const ProviderAppSetupErrorNotice = {
+    message:
+      "GitHub did not return the setup state for this installation. Return to this screen and try connecting the GitHub App again.",
+    resetKey: "provider-app-setup-error:missing-state",
+    title: "GitHub App installation could not be completed",
+    variant: "alert" as const,
+  };
+
+  it("resolves the provider app setup error notice for the target that received the redirect", () => {
+    expect(
+      resolveProviderAppSetupErrorConnectionNotice({
+        detailTargetKey: "github-cloud",
+        selectedConnection: { id: "connection_1" },
+        urlProviderAppSetupErrorNotice: {
+          notice: ProviderAppSetupErrorNotice,
+          targetKey: "github-cloud",
+        },
+      }),
+    ).toEqual({
+      connectionId: "connection_1",
+      ...ProviderAppSetupErrorNotice,
+    });
+  });
+
+  it("does not show the provider app setup error notice on a different target", () => {
+    expect(
+      resolveProviderAppSetupErrorConnectionNotice({
+        detailTargetKey: "linear-cloud",
+        selectedConnection: { id: "connection_1" },
+        urlProviderAppSetupErrorNotice: {
+          notice: ProviderAppSetupErrorNotice,
+          targetKey: "github-cloud",
         },
       }),
     ).toBeNull();
