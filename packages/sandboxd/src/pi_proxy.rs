@@ -139,6 +139,7 @@ struct PiProxyState {
     active: AtomicBool,
     activity_monitor_running: AtomicBool,
     next_id: AtomicU64,
+    supervisor_handle: SandboxdSupervisorHandle,
 }
 
 struct PiRpcChild {
@@ -146,6 +147,7 @@ struct PiRpcChild {
     stdin: ChildStdin,
     receiver: Receiver<PiRpcOutput>,
     reader_thread: JoinHandle<()>,
+    cwd: Option<String>,
 }
 
 struct PiRecentSessionCandidate {
@@ -170,6 +172,23 @@ enum PiRpcOutput {
     Line(Value),
     Error(String),
     Eof,
+}
+
+fn should_replace_pi_rpc_child_for_cwd(child: &PiRpcChild, requested_cwd: Option<&str>) -> bool {
+    child.cwd.is_none() && requested_cwd.is_some()
+}
+
+fn terminate_pi_rpc_child(mut child: PiRpcChild) {
+    let _ = child.child.kill();
+    let deadline = Instant::now() + PI_RPC_SHUTDOWN_TIMEOUT;
+    while Instant::now() < deadline {
+        match child.child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) => thread::sleep(Duration::from_millis(25)),
+            Err(_) => break,
+        }
+    }
+    let _ = child.reader_thread.join();
 }
 
 #[derive(Debug, Deserialize)]
@@ -258,11 +277,14 @@ impl PiProxyState {
             let child = guard.as_mut().ok_or_else(|| {
                 PiProxyError::InvalidRequest("Pi RPC process is not running".to_string())
             })?;
-            child
-                .stdin
-                .write_all(line.as_bytes())
-                .map_err(PiProxyError::WritePi)?;
-            child.stdin.flush().map_err(PiProxyError::WritePi)?;
+            if let Err(error) = child.stdin.write_all(line.as_bytes()) {
+                self.mark_pi_rpc_process_restarting(error.to_string());
+                return Err(PiProxyError::WritePi(error));
+            }
+            if let Err(error) = child.stdin.flush() {
+                self.mark_pi_rpc_process_restarting(error.to_string());
+                return Err(PiProxyError::WritePi(error));
+            }
         }
 
         loop {
@@ -298,17 +320,20 @@ impl PiProxyState {
                         self.broadcast_pi_event(value);
                     }
                 }
-                Ok(PiRpcOutput::Error(error)) => return Err(PiProxyError::InvalidRequest(error)),
+                Ok(PiRpcOutput::Error(error)) => {
+                    self.mark_pi_rpc_process_restarting(error.clone());
+                    return Err(PiProxyError::InvalidRequest(error));
+                }
                 Ok(PiRpcOutput::Eof) => {
-                    return Err(PiProxyError::InvalidRequest(
-                        "Pi RPC process stdout closed".to_string(),
-                    ));
+                    let message = "Pi RPC process stdout closed".to_string();
+                    self.mark_pi_rpc_process_restarting(message.clone());
+                    return Err(PiProxyError::InvalidRequest(message));
                 }
                 Err(RecvTimeoutError::Timeout) => return Err(PiProxyError::PiResponseTimeout(id)),
                 Err(RecvTimeoutError::Disconnected) => {
-                    return Err(PiProxyError::InvalidRequest(
-                        "Pi RPC reader disconnected".to_string(),
-                    ));
+                    let message = "Pi RPC reader disconnected".to_string();
+                    self.mark_pi_rpc_process_restarting(message.clone());
+                    return Err(PiProxyError::InvalidRequest(message));
                 }
             }
         }
@@ -334,9 +359,18 @@ impl PiProxyState {
             .child
             .lock()
             .map_err(|_| PiProxyError::InvalidRequest("Pi child lock was poisoned".to_string()))?;
-        if guard.is_some() {
+        if guard
+            .as_ref()
+            .is_some_and(|child| !should_replace_pi_rpc_child_for_cwd(child, cwd))
+        {
             return Ok(());
         }
+        if let Some(child) = guard.take() {
+            terminate_pi_rpc_child(child);
+            self.set_active(false);
+            self.mark_pi_rpc_process_stopped();
+        }
+        self.mark_pi_rpc_process_starting();
 
         let mut command = Command::new(&self.config.pi_cli_path);
         command.arg("--mode").arg("rpc");
@@ -349,9 +383,30 @@ impl PiProxyState {
             command.env(key, value);
         }
 
-        let mut child = command.spawn().map_err(PiProxyError::SpawnPi)?;
-        let stdin = child.stdin.take().ok_or(PiProxyError::MissingPiStdin)?;
-        let stdout = child.stdout.take().ok_or(PiProxyError::MissingPiStdout)?;
+        let mut child = match command.spawn() {
+            Ok(child) => child,
+            Err(error) => {
+                self.mark_pi_rpc_process_restarting(error.to_string());
+                return Err(PiProxyError::SpawnPi(error));
+            }
+        };
+        let pid = child.id();
+        let stdin = match child.stdin.take() {
+            Some(stdin) => stdin,
+            None => {
+                self.mark_pi_rpc_process_restarting("missing Pi RPC stdin".to_string());
+                let _ = child.kill();
+                return Err(PiProxyError::MissingPiStdin);
+            }
+        };
+        let stdout = match child.stdout.take() {
+            Some(stdout) => stdout,
+            None => {
+                self.mark_pi_rpc_process_restarting("missing Pi RPC stdout".to_string());
+                let _ = child.kill();
+                return Err(PiProxyError::MissingPiStdout);
+            }
+        };
         let (sender, receiver) = mpsc::channel();
         let reader_thread = spawn_pi_stdout_reader(stdout, sender);
         *guard = Some(PiRpcChild {
@@ -359,8 +414,71 @@ impl PiProxyState {
             stdin,
             receiver,
             reader_thread,
+            cwd: cwd.map(ToString::to_string),
         });
+        self.mark_pi_rpc_process_healthy(pid);
         Ok(())
+    }
+
+    fn pi_rpc_process_details(&self, pid: Option<u32>) -> BTreeMap<String, String> {
+        let mut details =
+            BTreeMap::from([("cliPath".to_string(), self.config.pi_cli_path.clone())]);
+        if let Some(pid) = pid {
+            details.insert("pid".to_string(), pid.to_string());
+        }
+        details
+    }
+
+    fn mark_pi_rpc_process_starting(&self) {
+        if !self
+            .supervisor_handle
+            .tracks_component(SupervisedComponent::PiRpcProcess)
+        {
+            return;
+        }
+        self.supervisor_handle.replace_component_details(
+            SupervisedComponent::PiRpcProcess,
+            self.pi_rpc_process_details(None),
+        );
+        self.supervisor_handle
+            .mark_component_starting(SupervisedComponent::PiRpcProcess);
+    }
+
+    fn mark_pi_rpc_process_healthy(&self, pid: u32) {
+        if !self
+            .supervisor_handle
+            .tracks_component(SupervisedComponent::PiRpcProcess)
+        {
+            return;
+        }
+        self.supervisor_handle.replace_component_details(
+            SupervisedComponent::PiRpcProcess,
+            self.pi_rpc_process_details(Some(pid)),
+        );
+        self.supervisor_handle
+            .mark_component_healthy(SupervisedComponent::PiRpcProcess);
+    }
+
+    fn mark_pi_rpc_process_restarting(&self, error: String) {
+        if !self
+            .supervisor_handle
+            .tracks_component(SupervisedComponent::PiRpcProcess)
+        {
+            return;
+        }
+        self.supervisor_handle
+            .mark_component_restarting(SupervisedComponent::PiRpcProcess, error);
+    }
+
+    fn mark_pi_rpc_process_stopped(&self) {
+        if !self
+            .supervisor_handle
+            .tracks_component(SupervisedComponent::PiRpcProcess)
+        {
+            return;
+        }
+        self.supervisor_handle
+            .mark_component_stopped(SupervisedComponent::PiRpcProcess);
     }
 
     fn read_session_file(state_value: &Value) -> Result<&str, PiProxyError> {
@@ -520,20 +638,12 @@ impl PiProxyState {
             Ok(mut guard) => guard.take(),
             Err(_) => None,
         };
-        let Some(mut child) = child else {
+        let Some(child) = child else {
             return;
         };
-        let _ = child.child.kill();
-        let deadline = Instant::now() + PI_RPC_SHUTDOWN_TIMEOUT;
-        while Instant::now() < deadline {
-            match child.child.try_wait() {
-                Ok(Some(_)) => break,
-                Ok(None) => thread::sleep(Duration::from_millis(25)),
-                Err(_) => break,
-            }
-        }
-        let _ = child.reader_thread.join();
+        terminate_pi_rpc_child(child);
         self.set_active(false);
+        self.mark_pi_rpc_process_stopped();
     }
 
     fn update_activity_from_pi_output(&self, value: &Value) {
@@ -639,7 +749,13 @@ pub fn start_pi_proxy_with_supervisor(
         active: AtomicBool::new(false),
         activity_monitor_running: AtomicBool::new(false),
         next_id: AtomicU64::new(1),
+        supervisor_handle: supervisor_handle.clone(),
     });
+    if let Err(error) = state.ensure_child(None) {
+        supervisor_handle
+            .mark_component_restarting(SupervisedComponent::PiProxy, error.to_string());
+        return Err(error);
+    }
     let runtime_shutdown = shutdown_requested.clone();
     let runtime_state = state.clone();
     let runtime_supervisor = supervisor_handle.clone();
@@ -1115,8 +1231,9 @@ fn spawn_pi_stdout_reader(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
+    use std::net::TcpListener;
     use std::os::unix::fs::PermissionsExt;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::{Arc, Mutex};
@@ -1127,7 +1244,112 @@ mod tests {
     use tempfile::tempdir;
 
     use crate::keepalive::KeepaliveManager;
-    use crate::pi_proxy::{PiProxyConfig, PiProxyState, handle_json_rpc_request};
+    use crate::pi_proxy::{
+        PiProxyConfig, PiProxyState, handle_json_rpc_request, start_pi_proxy_with_supervisor,
+    };
+    use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
+    use crate::time::SystemClock;
+
+    fn test_supervisor_handle() -> SandboxdSupervisorHandle {
+        SandboxdSupervisorHandle::new(
+            "pi-proxy-test",
+            Arc::new(SystemClock),
+            BTreeSet::from([
+                SupervisedComponent::PiProxy,
+                SupervisedComponent::PiRpcProcess,
+            ]),
+        )
+    }
+
+    fn reserve_pi_proxy_listen_url() -> String {
+        let listener =
+            TcpListener::bind("127.0.0.1:0").expect("test listener port should be available");
+        let address = listener
+            .local_addr()
+            .expect("test listener local address should be readable");
+        drop(listener);
+        format!("ws://{address}")
+    }
+
+    #[test]
+    fn starts_pi_rpc_process_before_reporting_proxy_startup_success() {
+        let simulated_pi = SimulatedPiRpcProcess::start();
+        let supervisor_handle = test_supervisor_handle();
+        let proxy = start_pi_proxy_with_supervisor(
+            &reserve_pi_proxy_listen_url(),
+            PiProxyConfig {
+                pi_cli_path: simulated_pi.path(),
+                env: BTreeMap::new(),
+            },
+            Arc::new(Mutex::new(KeepaliveManager::default())),
+            supervisor_handle.clone(),
+        )
+        .expect("Pi proxy should start with a runnable Pi RPC process");
+
+        let rpc_process_snapshot = supervisor_handle
+            .component_snapshot(SupervisedComponent::PiRpcProcess)
+            .expect("Pi RPC process should be tracked");
+        assert_eq!(rpc_process_snapshot.state, ComponentHealthState::Healthy);
+        assert_eq!(
+            rpc_process_snapshot.details.get("cliPath"),
+            Some(&simulated_pi.path())
+        );
+        assert!(
+            rpc_process_snapshot
+                .details
+                .get("pid")
+                .is_some_and(|pid| pid.parse::<u32>().is_ok()),
+            "healthy Pi RPC process snapshot should expose its pid"
+        );
+
+        proxy.close().expect("Pi proxy should close cleanly");
+        let stopped_rpc_process_snapshot = supervisor_handle
+            .component_snapshot(SupervisedComponent::PiRpcProcess)
+            .expect("Pi RPC process should remain tracked after close");
+        assert_eq!(
+            stopped_rpc_process_snapshot.state,
+            ComponentHealthState::Stopped
+        );
+    }
+
+    #[test]
+    fn replaces_eager_no_cwd_rpc_process_with_requested_conversation_cwd() {
+        let simulated_pi = SimulatedPiRpcProcess::start();
+        let state = Arc::new(PiProxyState {
+            config: PiProxyConfig {
+                pi_cli_path: simulated_pi.path(),
+                env: BTreeMap::new(),
+            },
+            child: Mutex::new(None),
+            command_lock: Mutex::new(()),
+            event_subscribers: Mutex::new(Vec::new()),
+            keepalive_manager: Arc::new(Mutex::new(KeepaliveManager::default())),
+            active: std::sync::atomic::AtomicBool::new(false),
+            activity_monitor_running: std::sync::atomic::AtomicBool::new(false),
+            next_id: AtomicU64::new(1),
+            supervisor_handle: test_supervisor_handle(),
+        });
+
+        state
+            .ensure_child(None)
+            .expect("eager Pi RPC process should start without a cwd");
+        state
+            .ensure_child(Some(simulated_pi.cwd()))
+            .expect("requested conversation cwd should replace the eager child");
+        state
+            .send_pi_command(json!({ "type": "new_session" }))
+            .expect("new session command should be sent to Pi");
+
+        let reported_cwd = fs::read_to_string(simulated_pi.cwd_report_file())
+            .expect("simulated Pi process should report its working directory");
+        let reported_cwd =
+            fs::canonicalize(reported_cwd.trim()).expect("reported Pi cwd should canonicalize");
+        let expected_cwd =
+            fs::canonicalize(simulated_pi.cwd()).expect("expected Pi cwd should canonicalize");
+        assert_eq!(reported_cwd, expected_cwd);
+
+        state.shutdown_child();
+    }
 
     #[test]
     fn fans_out_pi_events_before_json_rpc_response_and_settles_activity() {
@@ -1145,6 +1367,7 @@ mod tests {
             active: std::sync::atomic::AtomicBool::new(false),
             activity_monitor_running: std::sync::atomic::AtomicBool::new(false),
             next_id: AtomicU64::new(1),
+            supervisor_handle: test_supervisor_handle(),
         });
 
         let create_responses = handle_json_rpc_request(
@@ -1245,6 +1468,7 @@ mod tests {
             active: std::sync::atomic::AtomicBool::new(false),
             activity_monitor_running: std::sync::atomic::AtomicBool::new(false),
             next_id: AtomicU64::new(1),
+            supervisor_handle: test_supervisor_handle(),
         });
 
         let event_receiver = state.subscribe_pi_events();
@@ -1313,6 +1537,7 @@ mod tests {
             active: std::sync::atomic::AtomicBool::new(false),
             activity_monitor_running: std::sync::atomic::AtomicBool::new(true),
             next_id: AtomicU64::new(1),
+            supervisor_handle: test_supervisor_handle(),
         });
 
         state.set_active(true);
@@ -1344,6 +1569,7 @@ mod tests {
             active: std::sync::atomic::AtomicBool::new(false),
             activity_monitor_running: std::sync::atomic::AtomicBool::new(false),
             next_id: AtomicU64::new(1),
+            supervisor_handle: test_supervisor_handle(),
         });
 
         let resume_responses = handle_json_rpc_request(
@@ -1389,6 +1615,7 @@ mod tests {
             active: std::sync::atomic::AtomicBool::new(false),
             activity_monitor_running: std::sync::atomic::AtomicBool::new(false),
             next_id: AtomicU64::new(1),
+            supervisor_handle: test_supervisor_handle(),
         });
 
         let catalog_responses = handle_json_rpc_request(
@@ -1493,6 +1720,7 @@ mod tests {
             active: std::sync::atomic::AtomicBool::new(false),
             activity_monitor_running: std::sync::atomic::AtomicBool::new(false),
             next_id: AtomicU64::new(1),
+            supervisor_handle: test_supervisor_handle(),
         });
 
         let responses = handle_json_rpc_request(
@@ -1567,6 +1795,7 @@ mod tests {
             active: std::sync::atomic::AtomicBool::new(false),
             activity_monitor_running: std::sync::atomic::AtomicBool::new(false),
             next_id: AtomicU64::new(1),
+            supervisor_handle: test_supervisor_handle(),
         });
 
         let responses = handle_json_rpc_request(
@@ -1645,6 +1874,7 @@ mod tests {
         _directory: tempfile::TempDir,
         script_path: String,
         cwd: String,
+        cwd_report_file: String,
         session_dir: String,
         session_file: String,
         session_id: String,
@@ -1670,6 +1900,7 @@ mod tests {
             fs::create_dir(&cwd).expect("workspace directory should be created");
             let session_dir = directory.path().join("sessions");
             fs::create_dir(&session_dir).expect("session directory should be created");
+            let cwd_report_file = directory.path().join("cwd-report");
             let session_file = session_dir.join("session.jsonl");
             let session_id = "simulated-session";
             write_session_file(
@@ -1690,10 +1921,12 @@ mod tests {
                 r#"#!/bin/sh
 active_marker="{}"
 no_initial_session_marker="{}"
+cwd_report_file="{}"
 while IFS= read -r line; do
   id="$(printf '%s' "$line" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"
   case "$line" in
     *'"type":"new_session"'*)
+      pwd > "$cwd_report_file"
       printf '{{"type":"response","command":"new_session","id":"%s","success":true,"data":{{}}}}\n' "$id"
       ;;
     *'"type":"get_state"'*)
@@ -1756,6 +1989,7 @@ done
 "#,
                 active_marker.display(),
                 no_initial_session_marker.display(),
+                cwd_report_file.display(),
                 session_file.display(),
                 session_id,
                 session_file.display(),
@@ -1776,6 +2010,10 @@ done
                     .expect("script path should be UTF-8")
                     .to_string(),
                 cwd: cwd.to_str().expect("cwd path should be UTF-8").to_string(),
+                cwd_report_file: cwd_report_file
+                    .to_str()
+                    .expect("cwd report file should be UTF-8")
+                    .to_string(),
                 session_dir: session_dir
                     .to_str()
                     .expect("session dir should be UTF-8")
@@ -1794,6 +2032,10 @@ done
 
         fn cwd(&self) -> &str {
             &self.cwd
+        }
+
+        fn cwd_report_file(&self) -> &str {
+            &self.cwd_report_file
         }
 
         fn session_file(&self) -> &str {

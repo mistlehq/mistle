@@ -17,6 +17,7 @@ pub enum RuntimeReadinessMode {
     CodexProxyOnly,
     Codex,
     OpenCodeProxyOnly,
+    Pi,
     PiProxyOnly,
 }
 
@@ -31,6 +32,10 @@ pub fn derive_runtime_ready(snapshot: &SandboxdHealthSnapshot, mode: RuntimeRead
         }
         RuntimeReadinessMode::OpenCodeProxyOnly => {
             component_is_healthy(snapshot, SupervisedComponent::OpenCodeProxy)
+        }
+        RuntimeReadinessMode::Pi => {
+            component_is_healthy(snapshot, SupervisedComponent::PiProxy)
+                && component_is_healthy(snapshot, SupervisedComponent::PiRpcProcess)
         }
         RuntimeReadinessMode::PiProxyOnly => {
             component_is_healthy(snapshot, SupervisedComponent::PiProxy)
@@ -252,6 +257,38 @@ mod tests {
             &snapshot,
             RuntimeReadinessMode::CodexProxyOnly,
         ));
+    }
+
+    #[test]
+    fn derives_pi_runtime_as_ready_only_when_proxy_and_rpc_process_are_healthy() {
+        let snapshot = SandboxdHealthSnapshot {
+            observed_at: SystemTime::UNIX_EPOCH,
+            components: vec![
+                component_snapshot(SupervisedComponent::PiProxy, ComponentHealthState::Healthy),
+                component_snapshot(
+                    SupervisedComponent::PiRpcProcess,
+                    ComponentHealthState::Healthy,
+                ),
+            ],
+        };
+
+        assert!(derive_runtime_ready(&snapshot, RuntimeReadinessMode::Pi));
+    }
+
+    #[test]
+    fn derives_pi_runtime_as_not_ready_when_rpc_process_is_not_healthy() {
+        let snapshot = SandboxdHealthSnapshot {
+            observed_at: SystemTime::UNIX_EPOCH,
+            components: vec![
+                component_snapshot(SupervisedComponent::PiProxy, ComponentHealthState::Healthy),
+                component_snapshot(
+                    SupervisedComponent::PiRpcProcess,
+                    ComponentHealthState::Restarting,
+                ),
+            ],
+        };
+
+        assert!(!derive_runtime_ready(&snapshot, RuntimeReadinessMode::Pi));
     }
 
     fn component_snapshot(

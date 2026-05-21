@@ -343,6 +343,7 @@ fn collect_runtime_adapter_components(
             }
             "pi" => {
                 components.insert(SupervisedComponent::PiProxy);
+                components.insert(SupervisedComponent::PiRpcProcess);
             }
             _ => {}
         }
