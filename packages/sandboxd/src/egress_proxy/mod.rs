@@ -12,55 +12,61 @@ use std::convert::Infallible;
 use std::fmt::{self, Display};
 use std::net::{SocketAddr, TcpListener as StdTcpListener};
 use std::path::Path;
-use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::mpsc::{self, TryRecvError};
-use std::task::{Context, Poll};
+use std::sync::mpsc;
 use std::thread::{self, JoinHandle};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
-use http_body_util::combinators::BoxBody;
-use http_body_util::{BodyExt, Full};
-use hyper::body::{Body, Frame, Incoming, SizeHint};
+use http_body_util::BodyExt;
+use hyper::body::{Body, Incoming};
 use hyper::client::conn::http1 as client_http1;
 use hyper::header::{HOST, HeaderName, HeaderValue};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode, Uri};
-use hyper_rustls::ConfigBuilderExt;
 use hyper_util::rt::TokioIo;
-use rustls_pki_types::pem::PemObject;
-use rustls_pki_types::{CertificateDer, PrivateKeyDer};
-use serde_json::{Map, Value};
+use serde_json::Value;
 use tokio::io::{AsyncRead, AsyncWrite, copy_bidirectional};
 use tokio::net::{TcpListener, TcpSocket, TcpStream};
 use tokio::runtime::Builder;
 use tokio::sync::oneshot;
-use tokio_rustls::TlsConnector;
-use tokio_rustls::rustls::ClientConfig;
-use tokio_rustls::rustls::pki_types::ServerName;
-use tokio_rustls::rustls::{ServerConfig, server::Acceptor as RustlsServerAcceptor};
-use tokio_rustls::{LazyConfigAcceptor, TlsAcceptor};
 use tokio_tungstenite::tungstenite::{
     Message, client::IntoClientRequest, handshake::derive_accept_key, protocol::Role,
 };
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, client_async, connect_async};
 use url::Url;
 
+use crate::egress_proxy::body::{
+    BoxError, EgressProxyRequestContext, HyperBody, InstrumentedResponseBody, box_body, empty_body,
+    text_response,
+};
 use crate::egress_proxy::ca::{
     ProxyCaConfig, ProxyCaInstallation, cleanup_proxy_ca_installation, emit_proxy_ca_lifecycle_log,
     load_or_create_persistent_proxy_ca,
 };
+#[cfg(test)]
+use crate::egress_proxy::logging::serialize_egress_proxy_log_line;
+use crate::egress_proxy::logging::{EgressProxyLogContext, emit_egress_proxy_log};
 use crate::egress_proxy::routing::{
     EgressProxyRoute, RequestTarget, RequestTargetOverride, build_gateway_egress_route,
     match_state_route, resolve_request_target,
 };
 #[cfg(test)]
 use crate::egress_proxy::routing::{build_direct_forward_uri, match_route};
+#[cfg(any(test, debug_assertions))]
+use crate::egress_proxy::supervisor::EgressProxySupervisorCommand;
+use crate::egress_proxy::supervisor::{
+    ActiveEgressProxyServer, EgressProxySupervisorConfig, bind_egress_proxy_listener,
+    bind_transparent_egress_proxy_listener, run_egress_proxy_supervisor,
+    spawn_active_egress_proxy_server, wait_for_egress_proxy_health,
+};
+use crate::egress_proxy::tls::{
+    accept_transparent_tls_stream, build_direct_tls_connector, build_tls_acceptor, tls_server_name,
+    websocket_target_url,
+};
 #[cfg(all(test, target_os = "linux"))]
 use crate::egress_proxy::transparent::socket_addr_from_sockaddr_storage;
 use crate::egress_proxy::transparent::{
@@ -73,10 +79,9 @@ use crate::egress_proxy::transparent::{
     parse_iproute2_link_scope_ipv4_route_cidrs,
 };
 use crate::protocol::startup::StartupInput;
-use crate::proxy_ca::issue_proxy_leaf_certificate;
 use crate::runtime::CompiledRuntimePlan;
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
-use crate::time::{Clock, SystemClock, format_rfc3339_timestamp};
+use crate::time::{Clock, SystemClock};
 use crate::tunnel::session::GatewayEgressTokenProvider;
 
 const RUNTIME_PROXY_CA_CERT_PATH: &str = "/run/mistle/sandboxd/egress-proxy-ca.pem";
@@ -93,9 +98,9 @@ const DEFAULT_TRANSPARENT_PROXY_PORT: u16 = 38_514;
 const TRANSPARENT_PASSTHROUGH_SOCKET_MARK: u32 = 38_514;
 const TRANSPARENT_NFTABLES_TABLE_NAME: &str = "mistle_transparent_egress";
 const STATIC_LOCAL_DESTINATION_IPV4_CIDRS: [&str; 2] = ["127.0.0.0/8", "169.254.0.0/16"];
-const EGRESS_PROXY_HEALTHCHECK_INTERVAL: Duration = Duration::from_millis(250);
-const EGRESS_PROXY_STARTUP_HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(5);
-const EGRESS_PROXY_RESTART_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];
+pub(super) const EGRESS_PROXY_HEALTHCHECK_INTERVAL: Duration = Duration::from_millis(250);
+pub(super) const EGRESS_PROXY_STARTUP_HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(5);
+pub(super) const EGRESS_PROXY_RESTART_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];
 const SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME: &str = "x-mistle-sandbox-egress-id";
 const DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME: &str = "x-mistle-egress-token";
 const DIRECT_EGRESS_HTTP_ROUTE_PATH: &str = "/_mistle/egress/http";
@@ -111,14 +116,6 @@ const MANAGED_PROXY_ENV_KEYS: [&str; 8] = [
     "SSL_CERT_DIR",
     "GIT_SSL_CAPATH",
 ];
-
-type BoxError = Box<dyn std::error::Error + Send + Sync>;
-type HyperBody = BoxBody<Bytes, BoxError>;
-#[derive(Clone, Copy)]
-struct EgressProxyLogContext<'a> {
-    pub(super) clock: &'a dyn Clock,
-    pub(super) sandbox_instance_id: &'a str,
-}
 
 #[derive(Debug)]
 pub struct EgressProxy {
@@ -153,31 +150,14 @@ struct DirectGatewayEgressClient {
 }
 
 #[derive(Clone)]
-struct EgressProxyState {
+pub(super) struct EgressProxyState {
     sandbox_instance_id: String,
     forwarding_mode: EgressProxyForwardingMode,
     routes: Arc<RwLock<Vec<EgressProxyRoute>>>,
-    proxy_ca_certificate_pem: Arc<String>,
-    proxy_ca_private_key_pem: Arc<String>,
-    clock: Arc<dyn Clock>,
+    pub(super) proxy_ca_certificate_pem: Arc<String>,
+    pub(super) proxy_ca_private_key_pem: Arc<String>,
+    pub(super) clock: Arc<dyn Clock>,
     next_request_id: Arc<AtomicU64>,
-}
-
-struct EgressProxySupervisorConfig {
-    listener_address: SocketAddr,
-    state: EgressProxyState,
-}
-
-#[cfg(any(test, debug_assertions))]
-enum EgressProxySupervisorCommand {
-    ForceCurrentServerShutdown,
-}
-
-#[derive(Debug)]
-struct ActiveEgressProxyServer {
-    shutdown_tx: Option<oneshot::Sender<()>>,
-    server_thread: Option<JoinHandle<Result<(), EgressProxyError>>>,
-    exit_receiver: mpsc::Receiver<Result<(), EgressProxyError>>,
 }
 
 enum DirectHttpUpstreamStream {
@@ -193,34 +173,8 @@ enum TransparentProxyProtocol {
     Unsupported,
 }
 
-#[derive(Clone)]
-struct EgressProxyRequestContext {
-    sandbox_instance_id: String,
-    request_id: String,
-    method: String,
-    authority: String,
-    host: String,
-    path_and_query: String,
-    route_mode: &'static str,
-    egress_rule_id: Option<String>,
-    upstream_url: String,
-    started_at_ms: u64,
-    clock: Arc<dyn Clock>,
-}
-
-struct InstrumentedResponseBody {
-    inner: HyperBody,
-    context: Arc<EgressProxyRequestContext>,
-    upstream_status: StatusCode,
-    upstream_trace_id: Option<String>,
-    chunk_count: u64,
-    forwarded_bytes: u64,
-    first_chunk_at_ms: Option<u64>,
-    ended: bool,
-}
-
 impl EgressProxyError {
-    fn new(message: impl Into<String>) -> Self {
+    pub(super) fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
         }
@@ -284,166 +238,6 @@ impl DirectGatewayEgressClient {
             .query_pairs_mut()
             .append_pair("target", &websocket_target_url(target_url)?);
         Ok(route_url.to_string())
-    }
-}
-
-impl EgressProxyRequestContext {
-    fn elapsed_ms(&self) -> u64 {
-        self.clock.now_ms().saturating_sub(self.started_at_ms)
-    }
-
-    fn common_fields(&self) -> Vec<(&'static str, Value)> {
-        let mut fields = vec![
-            ("requestId", Value::String(self.request_id.clone())),
-            ("method", Value::String(self.method.clone())),
-            ("authority", Value::String(self.authority.clone())),
-            ("host", Value::String(self.host.clone())),
-            ("pathAndQuery", Value::String(self.path_and_query.clone())),
-            ("routeMode", Value::String(self.route_mode.to_string())),
-            ("upstreamUrl", Value::String(self.upstream_url.clone())),
-            ("elapsedMs", Value::from(self.elapsed_ms())),
-        ];
-        if let Some(egress_rule_id) = &self.egress_rule_id {
-            fields.push(("egressRuleId", Value::String(egress_rule_id.clone())));
-        }
-        fields
-    }
-}
-
-impl InstrumentedResponseBody {
-    fn finalize(
-        &mut self,
-        event: &'static str,
-        outcome: &'static str,
-        error: Option<&str>,
-        extra_fields: &[(&str, Value)],
-    ) {
-        if self.ended {
-            return;
-        }
-        self.ended = true;
-        let mut fields = self.context.common_fields();
-        fields.push((
-            "upstreamStatus",
-            Value::from(u64::from(self.upstream_status.as_u16())),
-        ));
-        fields.push(("outcome", Value::String(outcome.to_string())));
-        fields.push(("chunkCount", Value::from(self.chunk_count)));
-        fields.push(("forwardedBytes", Value::from(self.forwarded_bytes)));
-        if let Some(first_chunk_at_ms) = self.first_chunk_at_ms {
-            fields.push((
-                "firstChunkLatencyMs",
-                Value::from(first_chunk_at_ms.saturating_sub(self.context.started_at_ms)),
-            ));
-        }
-        if let Some(upstream_trace_id) = &self.upstream_trace_id {
-            fields.push(("upstreamTraceId", Value::String(upstream_trace_id.clone())));
-        }
-        if let Some(error) = error {
-            fields.push(("error", Value::String(error.to_string())));
-        }
-        fields.extend(
-            extra_fields
-                .iter()
-                .map(|(name, value)| (*name, value.clone())),
-        );
-        emit_egress_proxy_log(
-            self.context.clock.as_ref(),
-            &self.context.sandbox_instance_id,
-            event,
-            &fields,
-        );
-    }
-}
-
-impl Body for InstrumentedResponseBody {
-    type Data = Bytes;
-    type Error = BoxError;
-
-    fn poll_frame(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
-        match Pin::new(&mut self.inner).poll_frame(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(Some(Ok(frame))) => {
-                if let Some(data) = frame.data_ref() {
-                    self.chunk_count = self.chunk_count.saturating_add(1);
-                    self.forwarded_bytes = self
-                        .forwarded_bytes
-                        .saturating_add(data.len().try_into().unwrap_or(u64::MAX));
-                    if self.first_chunk_at_ms.is_none() {
-                        let first_chunk_at_ms = self.context.clock.now_ms();
-                        self.first_chunk_at_ms = Some(first_chunk_at_ms);
-                        let mut fields = self.context.common_fields();
-                        fields.push((
-                            "upstreamStatus",
-                            Value::from(u64::from(self.upstream_status.as_u16())),
-                        ));
-                        fields.push((
-                            "firstChunkLatencyMs",
-                            Value::from(
-                                first_chunk_at_ms.saturating_sub(self.context.started_at_ms),
-                            ),
-                        ));
-                        if let Some(upstream_trace_id) = &self.upstream_trace_id {
-                            fields.push((
-                                "upstreamTraceId",
-                                Value::String(upstream_trace_id.clone()),
-                            ));
-                        }
-                        emit_egress_proxy_log(
-                            self.context.clock.as_ref(),
-                            &self.context.sandbox_instance_id,
-                            "egress_proxy_response_body_first_chunk",
-                            &fields,
-                        );
-                    }
-                }
-                Poll::Ready(Some(Ok(frame)))
-            }
-            Poll::Ready(Some(Err(error))) => {
-                let error_message = error.to_string();
-                self.finalize(
-                    "egress_proxy_response_body_failed",
-                    "upstream_error",
-                    Some(error_message.as_str()),
-                    &[],
-                );
-                Poll::Ready(Some(Err(error)))
-            }
-            Poll::Ready(None) => {
-                self.finalize(
-                    "egress_proxy_response_body_completed",
-                    "completed",
-                    None,
-                    &[],
-                );
-                Poll::Ready(None)
-            }
-        }
-    }
-
-    fn is_end_stream(&self) -> bool {
-        self.inner.is_end_stream()
-    }
-
-    fn size_hint(&self) -> SizeHint {
-        self.inner.size_hint()
-    }
-}
-
-impl Drop for InstrumentedResponseBody {
-    fn drop(&mut self) {
-        if self.ended {
-            return;
-        }
-        self.finalize(
-            "egress_proxy_response_body_cancelled",
-            "downstream_cancelled",
-            None,
-            &[],
-        );
     }
 }
 
@@ -857,327 +651,6 @@ impl EgressProxy {
 
 fn default_loopback_proxy_listener_address() -> SocketAddr {
     SocketAddr::from(([127, 0, 0, 1], DEFAULT_LOOPBACK_PROXY_PORT))
-}
-
-fn spawn_active_egress_proxy_server(
-    std_listener: StdTcpListener,
-    state: EgressProxyState,
-    server_runner: fn(
-        StdTcpListener,
-        oneshot::Receiver<()>,
-        EgressProxyState,
-    ) -> Result<(), EgressProxyError>,
-) -> ActiveEgressProxyServer {
-    let (shutdown_tx, shutdown_rx) = oneshot::channel();
-    let (exit_sender, exit_receiver) = mpsc::channel();
-    let server_thread = thread::spawn(move || {
-        let result = server_runner(std_listener, shutdown_rx, state);
-        let _ = exit_sender.send(result.clone());
-        result
-    });
-    ActiveEgressProxyServer {
-        shutdown_tx: Some(shutdown_tx),
-        server_thread: Some(server_thread),
-        exit_receiver,
-    }
-}
-
-impl ActiveEgressProxyServer {
-    fn request_shutdown(&mut self) {
-        if let Some(shutdown_tx) = self.shutdown_tx.take() {
-            let _ = shutdown_tx.send(());
-        }
-    }
-
-    fn try_recv_exit(&self) -> Result<Option<Result<(), EgressProxyError>>, TryRecvError> {
-        match self.exit_receiver.try_recv() {
-            Ok(result) => Ok(Some(result)),
-            Err(TryRecvError::Empty) => Ok(None),
-            Err(TryRecvError::Disconnected) => Err(TryRecvError::Disconnected),
-        }
-    }
-
-    fn join(mut self) -> Result<(), EgressProxyError> {
-        if let Some(server_thread) = self.server_thread.take() {
-            return match server_thread.join() {
-                Ok(result) => result,
-                Err(_) => Err(EgressProxyError::new("local egress proxy thread panicked")),
-            };
-        }
-        Ok(())
-    }
-
-    fn join_after_disconnected_exit_channel(&mut self) -> EgressProxyError {
-        self.shutdown_tx = None;
-        match self.server_thread.take() {
-            Some(server_thread) => match server_thread.join() {
-                Ok(Ok(())) => EgressProxyError::new(
-                    "local egress proxy exit channel disconnected unexpectedly",
-                ),
-                Ok(Err(error)) => error,
-                Err(_) => EgressProxyError::new("local egress proxy thread panicked"),
-            },
-            None => {
-                EgressProxyError::new("local egress proxy exit channel disconnected unexpectedly")
-            }
-        }
-    }
-}
-
-fn run_egress_proxy_supervisor(
-    config: EgressProxySupervisorConfig,
-    mut active_server: ActiveEgressProxyServer,
-    shutdown_requested: Arc<AtomicBool>,
-    supervisor_handle: SandboxdSupervisorHandle,
-    #[cfg(any(test, debug_assertions))] supervisor_command_receiver: mpsc::Receiver<
-        EgressProxySupervisorCommand,
-    >,
-) -> Result<(), EgressProxyError> {
-    let mut restart_attempt_index = 0_usize;
-
-    loop {
-        if shutdown_requested.load(Ordering::Relaxed) {
-            active_server.request_shutdown();
-            return active_server.join();
-        }
-
-        #[cfg(any(test, debug_assertions))]
-        match supervisor_command_receiver.try_recv() {
-            Ok(EgressProxySupervisorCommand::ForceCurrentServerShutdown) => {
-                active_server.request_shutdown();
-            }
-            Err(TryRecvError::Empty) => {}
-            Err(TryRecvError::Disconnected) => {}
-        }
-
-        let exit_result = match active_server.try_recv_exit() {
-            Ok(Some(exit_result)) => Some(exit_result),
-            Ok(None) => None,
-            Err(TryRecvError::Empty) => None,
-            Err(TryRecvError::Disconnected) => {
-                Some(Err(active_server.join_after_disconnected_exit_channel()))
-            }
-        };
-
-        if let Some(exit_result) = exit_result {
-            let exit_error = normalize_egress_proxy_exit_result(exit_result);
-            record_egress_proxy_exit_for_restart(&supervisor_handle, &exit_error);
-            active_server = match restart_egress_proxy_after_backoff(
-                &config,
-                shutdown_requested.as_ref(),
-                &supervisor_handle,
-                &mut restart_attempt_index,
-            ) {
-                Ok(active_server) => active_server,
-                Err(_) if shutdown_requested.load(Ordering::Relaxed) => return Ok(()),
-                Err(error) => return Err(error),
-            };
-            continue;
-        }
-
-        if let Err(error) = check_egress_proxy_health(config.listener_address) {
-            record_egress_proxy_healthcheck_failure(&supervisor_handle, &error);
-            active_server.request_shutdown();
-            let _ = active_server.join();
-            active_server = match restart_egress_proxy_after_backoff(
-                &config,
-                shutdown_requested.as_ref(),
-                &supervisor_handle,
-                &mut restart_attempt_index,
-            ) {
-                Ok(active_server) => active_server,
-                Err(_) if shutdown_requested.load(Ordering::Relaxed) => return Ok(()),
-                Err(error) => return Err(error),
-            };
-            continue;
-        }
-
-        supervisor_handle.record_component_healthcheck(SupervisedComponent::EgressProxy);
-        thread::sleep(EGRESS_PROXY_HEALTHCHECK_INTERVAL);
-    }
-}
-
-fn restart_egress_proxy_after_backoff(
-    config: &EgressProxySupervisorConfig,
-    shutdown_requested: &AtomicBool,
-    supervisor_handle: &SandboxdSupervisorHandle,
-    restart_attempt_index: &mut usize,
-) -> Result<ActiveEgressProxyServer, EgressProxyError> {
-    loop {
-        if shutdown_requested.load(Ordering::Relaxed) {
-            return Err(EgressProxyError::new(
-                "egress proxy supervisor shutdown requested",
-            ));
-        }
-
-        let backoff_ms = egress_proxy_restart_backoff_ms(*restart_attempt_index);
-        supervisor_handle.emit_component_restart_scheduled(
-            SupervisedComponent::EgressProxy,
-            "restart_after_failure",
-            backoff_ms,
-            &[],
-        );
-        thread::sleep(Duration::from_millis(backoff_ms));
-        if shutdown_requested.load(Ordering::Relaxed) {
-            return Err(EgressProxyError::new(
-                "egress proxy supervisor shutdown requested",
-            ));
-        }
-
-        supervisor_handle.mark_component_starting(SupervisedComponent::EgressProxy);
-        let std_listener = match bind_egress_proxy_listener(config.listener_address) {
-            Ok(std_listener) => std_listener,
-            Err(error_message) => {
-                let error = EgressProxyError::new(error_message);
-                record_egress_proxy_healthcheck_failure(supervisor_handle, &error);
-                *restart_attempt_index = restart_attempt_index.saturating_add(1);
-                continue;
-            }
-        };
-        let mut active_server =
-            spawn_active_egress_proxy_server(std_listener, config.state.clone(), run_proxy_server);
-        match wait_for_egress_proxy_health(
-            config.listener_address,
-            &mut active_server,
-            EGRESS_PROXY_STARTUP_HEALTHCHECK_TIMEOUT,
-        ) {
-            Ok(()) => {
-                supervisor_handle.mark_component_healthy(SupervisedComponent::EgressProxy);
-                *restart_attempt_index = restart_attempt_index.saturating_add(1);
-                return Ok(active_server);
-            }
-            Err(error) => {
-                record_egress_proxy_healthcheck_failure(supervisor_handle, &error);
-                active_server.request_shutdown();
-                let _ = active_server.join();
-                *restart_attempt_index = restart_attempt_index.saturating_add(1);
-            }
-        }
-    }
-}
-
-fn normalize_egress_proxy_exit_result(
-    exit_result: Result<(), EgressProxyError>,
-) -> EgressProxyError {
-    match exit_result {
-        Ok(()) => EgressProxyError::new("local egress proxy thread returned unexpectedly"),
-        Err(error) => error,
-    }
-}
-
-fn wait_for_egress_proxy_health(
-    listener_address: SocketAddr,
-    active_server: &mut ActiveEgressProxyServer,
-    timeout: Duration,
-) -> Result<(), EgressProxyError> {
-    let deadline = Instant::now() + timeout;
-    loop {
-        if let Some(exit_result) = active_server
-            .try_recv_exit()
-            .map_err(|_| EgressProxyError::new("egress proxy exit channel disconnected"))?
-        {
-            return match exit_result {
-                Ok(()) => Err(EgressProxyError::new(
-                    "local egress proxy thread returned before becoming healthy",
-                )),
-                Err(error) => Err(error),
-            };
-        }
-
-        if check_egress_proxy_health(listener_address).is_ok() {
-            return Ok(());
-        }
-
-        if Instant::now() >= deadline {
-            return Err(EgressProxyError::new(format!(
-                "egress proxy healthcheck timed out for {listener_address}"
-            )));
-        }
-
-        thread::sleep(Duration::from_millis(50));
-    }
-}
-
-fn check_egress_proxy_health(listener_address: SocketAddr) -> Result<(), EgressProxyError> {
-    std::net::TcpStream::connect_timeout(&listener_address, Duration::from_millis(200))
-        .map(|_| ())
-        .map_err(|error| EgressProxyError::new(format!("loopback tcp healthcheck failed: {error}")))
-}
-
-fn record_egress_proxy_healthcheck_failure(
-    supervisor_handle: &SandboxdSupervisorHandle,
-    error: &EgressProxyError,
-) {
-    supervisor_handle
-        .mark_component_restarting(SupervisedComponent::EgressProxy, error.to_string());
-    supervisor_handle.emit_component_healthcheck_failed(
-        SupervisedComponent::EgressProxy,
-        "loopback_tcp_failed",
-        error.to_string(),
-        "loopback_tcp",
-        &[],
-    );
-}
-
-fn record_egress_proxy_exit_for_restart(
-    supervisor_handle: &SandboxdSupervisorHandle,
-    error: &EgressProxyError,
-) {
-    let error_text = error.to_string();
-    if error_text.contains("panicked") {
-        supervisor_handle
-            .mark_component_restarting(SupervisedComponent::EgressProxy, error_text.clone());
-        supervisor_handle.emit_component_exited(
-            SupervisedComponent::EgressProxy,
-            "panic",
-            Some(&error_text),
-            &[
-                ("exitKind", Value::String("panic".to_string())),
-                ("panicBoundary", Value::String("proxy_thread".to_string())),
-            ],
-        );
-        return;
-    }
-
-    supervisor_handle
-        .mark_component_restarting(SupervisedComponent::EgressProxy, error_text.clone());
-    supervisor_handle.emit_component_exited(
-        SupervisedComponent::EgressProxy,
-        "thread_returned",
-        Some(&error_text),
-        &[("exitKind", Value::String("thread_returned".to_string()))],
-    );
-}
-
-fn egress_proxy_restart_backoff_ms(attempt_index: usize) -> u64 {
-    *EGRESS_PROXY_RESTART_BACKOFF_MS
-        .get(attempt_index)
-        .unwrap_or_else(|| {
-            EGRESS_PROXY_RESTART_BACKOFF_MS
-                .last()
-                .expect("egress proxy backoff list should not be empty")
-        })
-}
-
-fn bind_egress_proxy_listener(listener_address: SocketAddr) -> Result<StdTcpListener, String> {
-    let std_listener = StdTcpListener::bind(listener_address)
-        .map_err(|error| format!("failed to bind local egress proxy listener: {error}"))?;
-    std_listener
-        .set_nonblocking(true)
-        .map_err(|error| format!("failed to configure proxy listener: {error}"))?;
-    Ok(std_listener)
-}
-
-fn bind_transparent_egress_proxy_listener(
-    listener_address: SocketAddr,
-) -> Result<StdTcpListener, String> {
-    let std_listener = StdTcpListener::bind(listener_address).map_err(|error| {
-        format!("failed to bind transparent egress proxy listener {listener_address}: {error}")
-    })?;
-    std_listener
-        .set_nonblocking(true)
-        .map_err(|error| format!("failed to configure transparent proxy listener: {error}"))?;
-    Ok(std_listener)
 }
 
 #[derive(Clone, Copy)]
@@ -2272,11 +1745,7 @@ async fn connect_direct_http_upstream(
     match target_url.scheme() {
         "http" => Ok(DirectHttpUpstreamStream::Plain(tcp_stream)),
         "https" => {
-            let server_name = ServerName::try_from(host.to_string()).map_err(|error| {
-                EgressProxyError::new(format!(
-                    "direct upstream HTTPS target host '{host}' is not a valid TLS server name: {error}"
-                ))
-            })?;
+            let server_name = tls_server_name(host, "direct upstream HTTPS target")?;
             let tls_stream = build_direct_tls_connector()?
                 .connect(server_name, tcp_stream)
                 .await
@@ -2318,11 +1787,7 @@ async fn connect_direct_upstream_websocket(
     let upstream_stream = match target_url.scheme() {
         "ws" => MaybeTlsStream::Plain(tcp_stream),
         "wss" => {
-            let server_name = ServerName::try_from(host.to_string()).map_err(|error| {
-                EgressProxyError::new(format!(
-                    "direct upstream websocket target host '{host}' is not a valid TLS server name: {error}"
-                ))
-            })?;
+            let server_name = tls_server_name(host, "direct upstream websocket target")?;
             let tls_stream = build_direct_tls_connector()?
                 .connect(server_name, tcp_stream)
                 .await
@@ -2391,18 +1856,6 @@ async fn connect_upstream_tcp_stream(
         "failed to connect direct upstream '{host}:{port}'{}",
         last_error.map_or_else(String::new, |error| format!(": {error}"))
     )))
-}
-
-fn build_direct_tls_connector() -> Result<TlsConnector, EgressProxyError> {
-    let config = ClientConfig::builder()
-        .with_native_roots()
-        .map_err(|error| {
-            EgressProxyError::new(format!(
-                "failed to load native roots for direct upstream TLS: {error}"
-            ))
-        })?
-        .with_no_client_auth();
-    Ok(TlsConnector::from(Arc::new(config)))
 }
 
 fn origin_form_uri(uri: &Uri) -> Result<Uri, EgressProxyError> {
@@ -2513,81 +1966,6 @@ fn response_from_direct_gateway_response(
         })
 }
 
-async fn accept_transparent_tls_stream(
-    stream: tokio::net::TcpStream,
-    fallback_authority: &str,
-    state: EgressProxyState,
-) -> Result<tokio_rustls::server::TlsStream<tokio::net::TcpStream>, EgressProxyError> {
-    let lazy_acceptor = LazyConfigAcceptor::new(RustlsServerAcceptor::default(), stream);
-    let start_handshake = lazy_acceptor.await.map_err(|error| {
-        EgressProxyError::new(format!(
-            "failed to read transparent TLS client hello: {error}"
-        ))
-    })?;
-    let certificate_name = start_handshake
-        .client_hello()
-        .server_name()
-        .map_or_else(|| fallback_authority.to_string(), ToString::to_string);
-    let server_config = build_tls_server_config(
-        &certificate_name,
-        state.proxy_ca_certificate_pem.as_str(),
-        state.proxy_ca_private_key_pem.as_str(),
-        state.clock.as_ref(),
-    )?;
-    start_handshake
-        .into_stream(Arc::new(server_config))
-        .await
-        .map_err(|error| EgressProxyError::new(format!("transparent TLS MITM failed: {error}")))
-}
-
-fn build_tls_server_config(
-    authority: &str,
-    proxy_ca_certificate_pem: &str,
-    proxy_ca_private_key_pem: &str,
-    clock: &dyn Clock,
-) -> Result<ServerConfig, EgressProxyError> {
-    let issued_certificate = issue_proxy_leaf_certificate(
-        proxy_ca_certificate_pem.to_string(),
-        proxy_ca_private_key_pem.to_string(),
-        authority.to_string(),
-        clock,
-    )
-    .map_err(|error| EgressProxyError::new(error.to_string()))?;
-    let certificate_chain = load_certificate_chain(&issued_certificate.certificate_chain_pem)?;
-    let private_key = load_private_key(&issued_certificate.private_key_pem)?;
-    ServerConfig::builder()
-        .with_no_client_auth()
-        .with_single_cert(certificate_chain, private_key)
-        .map_err(|error| {
-            EgressProxyError::new(format!(
-                "failed to build local egress proxy certificate chain: {error}"
-            ))
-        })
-}
-
-fn websocket_target_url(target_url: &Uri) -> Result<String, EgressProxyError> {
-    let mut parsed_target = Url::parse(&target_url.to_string()).map_err(|error| {
-        EgressProxyError::new(format!(
-            "failed to parse websocket egress target '{target_url}': {error}"
-        ))
-    })?;
-    match parsed_target.scheme() {
-        "http" => parsed_target.set_scheme("ws").map_err(|_| {
-            EgressProxyError::new("failed to set websocket egress target scheme to ws")
-        })?,
-        "https" => parsed_target.set_scheme("wss").map_err(|_| {
-            EgressProxyError::new("failed to set websocket egress target scheme to wss")
-        })?,
-        "ws" | "wss" => {}
-        scheme => {
-            return Err(EgressProxyError::new(format!(
-                "websocket egress target must use http, https, ws, or wss scheme, got '{scheme}'"
-            )));
-        }
-    }
-    Ok(parsed_target.to_string())
-}
-
 fn box_hyper_error(error: hyper::Error) -> BoxError {
     Box::new(error)
 }
@@ -2658,112 +2036,13 @@ fn filter_outbound_response_headers(
         .collect()
 }
 
-fn build_tls_acceptor(
-    authority: &str,
-    proxy_ca_certificate_pem: &str,
-    proxy_ca_private_key_pem: &str,
-    clock: &dyn Clock,
-) -> Result<TlsAcceptor, EgressProxyError> {
-    Ok(TlsAcceptor::from(Arc::new(build_tls_server_config(
-        authority,
-        proxy_ca_certificate_pem,
-        proxy_ca_private_key_pem,
-        clock,
-    )?)))
-}
-
-fn load_certificate_chain(
-    certificate_chain_pem: &str,
-) -> Result<Vec<CertificateDer<'static>>, EgressProxyError> {
-    <(rustls_pki_types::pem::SectionKind, Vec<u8>)>::pem_slice_iter(
-        certificate_chain_pem.as_bytes(),
-    )
-    .filter_map(|section| match section {
-        Ok((rustls_pki_types::pem::SectionKind::Certificate, der)) => {
-            Some(Ok(CertificateDer::from(der)))
-        }
-        Ok(_) => None,
-        Err(error) => Some(Err(EgressProxyError::new(format!(
-            "failed to parse local egress proxy certificate chain: {error}"
-        )))),
-    })
-    .collect()
-}
-
-fn load_private_key(private_key_pem: &str) -> Result<PrivateKeyDer<'static>, EgressProxyError> {
-    PrivateKeyDer::from_pem_slice(private_key_pem.as_bytes()).map_err(|error| {
-        EgressProxyError::new(format!(
-            "failed to parse local egress proxy private key: {error}"
-        ))
-    })
-}
-
-fn infallible_to_box_error(error: Infallible) -> BoxError {
-    match error {}
-}
-
-fn box_body<B>(body: B) -> HyperBody
-where
-    B: Body<Data = Bytes> + Send + Sync + 'static,
-    B::Error: Into<BoxError>,
-{
-    body.map_err(Into::into).boxed()
-}
-
-fn empty_body() -> HyperBody {
-    box_body(Full::new(Bytes::new()).map_err(infallible_to_box_error))
-}
-
-fn emit_egress_proxy_log(
-    clock: &dyn Clock,
-    sandbox_instance_id: &str,
-    event: &str,
-    extra_fields: &[(&str, Value)],
-) {
-    if let Some(line) =
-        serialize_egress_proxy_log_line(clock, sandbox_instance_id, event, extra_fields)
-    {
-        eprintln!("{line}");
-    }
-}
-
-fn serialize_egress_proxy_log_line(
-    clock: &dyn Clock,
-    sandbox_instance_id: &str,
-    event: &str,
-    extra_fields: &[(&str, Value)],
-) -> Option<String> {
-    let observed_at = format_rfc3339_timestamp(clock.now_system_time()).ok()?;
-    let mut payload = Map::new();
-    payload.insert("event".to_string(), Value::String(event.to_string()));
-    payload.insert(
-        "sandboxInstanceId".to_string(),
-        Value::String(sandbox_instance_id.to_string()),
-    );
-    payload.insert(
-        "component".to_string(),
-        Value::String(SupervisedComponent::EgressProxy.as_str().to_string()),
-    );
-    payload.insert("observedAt".to_string(), Value::String(observed_at));
-    for (field_name, field_value) in extra_fields {
-        payload.insert((*field_name).to_string(), field_value.clone());
-    }
-    serde_json::to_string(&Value::Object(payload)).ok()
-}
-
-fn text_response(status: StatusCode, message: impl Into<String>) -> Response<HyperBody> {
-    Response::builder()
-        .status(status)
-        .header("content-type", "text/plain; charset=utf-8")
-        .body(box_body(
-            Full::new(Bytes::from(message.into())).map_err(infallible_to_box_error),
-        ))
-        .expect("text response should build")
-}
-
 #[cfg(test)]
 mod tests;
 
+mod body;
 mod ca;
+mod logging;
 mod routing;
+mod supervisor;
+mod tls;
 mod transparent;
