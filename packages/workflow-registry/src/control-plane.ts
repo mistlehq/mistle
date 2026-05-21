@@ -268,3 +268,24 @@ export const ScheduleDispatchBatchWorkflowSpec = defineWorkflowSpec<
   name: ScheduleDispatchBatchWorkflowName,
   version: ScheduleDispatchBatchWorkflowVersion,
 });
+
+export const DispatchOneOffScheduleWorkflowName = "control-plane.schedules.dispatch-one-off";
+export const DispatchOneOffScheduleWorkflowVersion = "1";
+
+export type DispatchOneOffScheduleWorkflowInput = {
+  scheduleId: string;
+};
+
+export type DispatchOneOffScheduleWorkflowOutput = {
+  scheduleId: string;
+  scheduledActionId: string | null;
+  status: "dispatched" | "failed" | "skipped";
+};
+
+export const DispatchOneOffScheduleWorkflowSpec = defineWorkflowSpec<
+  DispatchOneOffScheduleWorkflowInput,
+  DispatchOneOffScheduleWorkflowOutput
+>({
+  name: DispatchOneOffScheduleWorkflowName,
+  version: DispatchOneOffScheduleWorkflowVersion,
+});

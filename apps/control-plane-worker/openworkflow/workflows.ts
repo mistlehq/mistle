@@ -4,6 +4,7 @@ import { HandleTriggerRunWorkflow } from "./handle-trigger-run/workflow.js";
 import { ProvisionStripeCustomerWorkflow } from "./provision-stripe-customer/workflow.js";
 import { RequestDeleteSandboxProfileWorkflow } from "./request-delete-sandbox-profile/workflow.js";
 import { ScheduleDispatchBatchWorkflow } from "./schedule-dispatch/batch-workflow.js";
+import { DispatchOneOffScheduleWorkflow } from "./schedule-dispatch/one-off-workflow.js";
 import { ScheduleDispatchWorkflow } from "./schedule-dispatch/workflow.js";
 import { SendOrganizationInvitationWorkflow } from "./send-organization-invitation.js";
 import { SendVerificationOTPWorkflow } from "./send-verification-otp.js";
@@ -24,6 +25,7 @@ export const ControlPlaneWorkerWorkflows = [
   HandleIntegrationWebhookEventWorkflow,
   ProvisionStripeCustomerWorkflow,
   RequestDeleteSandboxProfileWorkflow,
+  DispatchOneOffScheduleWorkflow,
   ScheduleDispatchBatchWorkflow,
   ScheduleDispatchWorkflow,
   SendOrganizationInvitationWorkflow,
