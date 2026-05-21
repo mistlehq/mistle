@@ -11,6 +11,7 @@ describe("buildCodexCliPtyOpenInput", () => {
           type: "resume",
           threadId: "thread_123",
         },
+        ptySessionId: "cli_launch_1",
         sandboxInstanceId: "sandbox_123",
         selectedRepositoryPath: "/root/acme/repo-2",
       }),
@@ -19,7 +20,7 @@ describe("buildCodexCliPtyOpenInput", () => {
       cols: 120,
       command: "codex",
       cwd: "/root/acme/repo-2",
-      ptySessionId: "cli",
+      ptySessionId: "cli_launch_1",
       rows: 32,
       sandboxInstanceId: "sandbox_123",
     });
@@ -32,6 +33,7 @@ describe("buildCodexCliPtyOpenInput", () => {
           type: "start_new",
           shouldClearActiveThreadId: false,
         },
+        ptySessionId: "cli_launch_2",
         sandboxInstanceId: "sandbox_123",
         selectedRepositoryPath: null,
       }),
@@ -39,7 +41,7 @@ describe("buildCodexCliPtyOpenInput", () => {
       args: ["--remote", CodexAppServerListenUrl],
       cols: 120,
       command: "codex",
-      ptySessionId: "cli",
+      ptySessionId: "cli_launch_2",
       rows: 32,
       sandboxInstanceId: "sandbox_123",
     });

@@ -16,7 +16,7 @@ export function buildPiCliPtyOpenInput(
 
   return {
     sandboxInstanceId: input.sandboxInstanceId,
-    ptySessionId: "cli",
+    ptySessionId: input.ptySessionId,
     cols: launch.cols,
     rows: launch.rows,
     command: launch.command,

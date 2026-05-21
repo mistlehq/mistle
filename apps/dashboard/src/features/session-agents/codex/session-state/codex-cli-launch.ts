@@ -10,7 +10,7 @@ export function buildCodexCliPtyOpenInput(
 ): SessionRuntimeCliPtyOpenInput {
   return {
     sandboxInstanceId: input.sandboxInstanceId,
-    ptySessionId: "cli",
+    ptySessionId: input.ptySessionId,
     cols: 120,
     rows: 32,
     command: "codex",

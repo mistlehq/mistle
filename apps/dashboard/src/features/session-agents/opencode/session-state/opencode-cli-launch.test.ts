@@ -11,6 +11,7 @@ describe("buildOpenCodeCliPtyOpenInput", () => {
           type: "resume",
           threadId: "ses_123",
         },
+        ptySessionId: "cli_launch_1",
         sandboxInstanceId: "sandbox_123",
         selectedRepositoryPath: "/root/acme/repo-2",
       }),
@@ -28,7 +29,7 @@ describe("buildOpenCodeCliPtyOpenInput", () => {
       cols: 120,
       command: "opencode",
       cwd: "/root/acme/repo-2",
-      ptySessionId: "cli",
+      ptySessionId: "cli_launch_1",
       rows: 32,
       sandboxInstanceId: "sandbox_123",
     });
@@ -41,6 +42,7 @@ describe("buildOpenCodeCliPtyOpenInput", () => {
           type: "start_new",
           shouldClearActiveThreadId: false,
         },
+        ptySessionId: "cli_launch_2",
         sandboxInstanceId: "sandbox_123",
         selectedRepositoryPath: null,
       }),
@@ -48,7 +50,7 @@ describe("buildOpenCodeCliPtyOpenInput", () => {
       args: ["run", "--interactive", "--attach", OpenCodeServerListenUrl],
       cols: 120,
       command: "opencode",
-      ptySessionId: "cli",
+      ptySessionId: "cli_launch_2",
       rows: 32,
       sandboxInstanceId: "sandbox_123",
     });

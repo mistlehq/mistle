@@ -16,7 +16,7 @@ export function buildOpenCodeCliPtyOpenInput(
 
   return {
     sandboxInstanceId: input.sandboxInstanceId,
-    ptySessionId: "cli",
+    ptySessionId: input.ptySessionId,
     cols: launch.cols,
     rows: launch.rows,
     command: "opencode",

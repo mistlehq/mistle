@@ -1,9 +1,10 @@
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 import { useCallback, useEffect, useReducer, useRef, type RefObject } from "react";
 
-import type {
-  SessionCliLaunchTarget,
-  SessionRuntimeCliLaunchBuilder,
+import {
+  createSessionRuntimeCliPtySessionId,
+  type SessionCliLaunchTarget,
+  type SessionRuntimeCliLaunchBuilder,
 } from "../session-agents/session-runtime-cli-launch.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
@@ -298,6 +299,7 @@ export function useSessionMainPanelHandoff(
       await input.cliPtyState.actions.openPty(
         activeRuntime.buildCliPtyOpenInput({
           launchTarget,
+          ptySessionId: createSessionRuntimeCliPtySessionId(),
           sandboxInstanceId: input.sandboxInstanceId,
           selectedRepositoryPath,
         }),

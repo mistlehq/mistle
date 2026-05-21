@@ -16,6 +16,7 @@ export type SessionRuntimeCliPtyOpenInput = {
 
 export type SessionRuntimeCliLaunchInput = {
   launchTarget: SessionCliLaunchTarget;
+  ptySessionId: string;
   sandboxInstanceId: string;
   selectedRepositoryPath: string | null;
 };
@@ -23,3 +24,7 @@ export type SessionRuntimeCliLaunchInput = {
 export type SessionRuntimeCliLaunchBuilder = (
   input: SessionRuntimeCliLaunchInput,
 ) => SessionRuntimeCliPtyOpenInput;
+
+export function createSessionRuntimeCliPtySessionId(): string {
+  return `cli_${crypto.randomUUID()}`;
+}
