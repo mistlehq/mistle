@@ -90,7 +90,17 @@ struct StartupDiagnosticsLoggerInner {
     sandbox_instance_id: String,
     operation: StartupOperation,
     path: PathBuf,
-    operation_sender: Mutex<Option<mpsc::Sender<OperationStreamMessage>>>,
+    operation_publisher: Mutex<OperationPublisherState>,
+}
+
+struct OperationPublisherState {
+    sender: Option<mpsc::Sender<OperationStreamMessage>>,
+    pending_records: Vec<PendingOperationRecord>,
+}
+
+struct PendingOperationRecord {
+    event: String,
+    operation_record: String,
 }
 
 impl StartupDiagnosticsLogger {
@@ -130,27 +140,46 @@ impl StartupDiagnosticsLogger {
                 sandbox_instance_id,
                 operation,
                 path,
-                operation_sender: Mutex::new(None),
+                operation_publisher: Mutex::new(OperationPublisherState {
+                    sender: None,
+                    pending_records: Vec::new(),
+                }),
             }),
         })
     }
 
     pub fn attach_operation_sender(&self, sender: mpsc::Sender<OperationStreamMessage>) {
-        let mut operation_sender = self
-            .inner
-            .operation_sender
-            .lock()
-            .expect("startup diagnostics operation sender lock should not be poisoned");
-        *operation_sender = Some(sender);
+        let pending_records = {
+            let mut operation_publisher = self
+                .inner
+                .operation_publisher
+                .lock()
+                .expect("startup diagnostics operation publisher lock should not be poisoned");
+            operation_publisher.sender = Some(sender.clone());
+            std::mem::take(&mut operation_publisher.pending_records)
+        };
+
+        for pending_record in pending_records {
+            Self::send_operation_record(
+                self.inner.operation,
+                &pending_record.event,
+                sender.clone(),
+                pending_record.operation_record,
+            );
+        }
     }
 
     pub fn close_operation_stream(&self) {
-        let mut operation_sender = self
-            .inner
-            .operation_sender
-            .lock()
-            .expect("startup diagnostics operation sender lock should not be poisoned");
-        if let Some(sender) = operation_sender.take() {
+        let sender = {
+            let mut operation_publisher = self
+                .inner
+                .operation_publisher
+                .lock()
+                .expect("startup diagnostics operation publisher lock should not be poisoned");
+            operation_publisher.pending_records.clear();
+            operation_publisher.sender.take()
+        };
+        if let Some(sender) = sender {
             let (response_sender, response_receiver) = std::sync::mpsc::channel();
             if let Err(error) = sender.try_send(OperationStreamMessage::Close { response_sender }) {
                 eprintln!("sandboxd failed to request operation stream close: {error}");
@@ -322,18 +351,35 @@ impl StartupDiagnosticsLogger {
     }
 
     fn publish_operation_record(&self, event: &str, operation_record: String) {
-        let operation_sender = self
-            .inner
-            .operation_sender
-            .lock()
-            .expect("startup diagnostics operation sender lock should not be poisoned")
-            .clone();
-        let Some(sender) = operation_sender else {
-            return;
+        let sender = {
+            let mut operation_publisher = self
+                .inner
+                .operation_publisher
+                .lock()
+                .expect("startup diagnostics operation publisher lock should not be poisoned");
+            let Some(sender) = operation_publisher.sender.clone() else {
+                operation_publisher
+                    .pending_records
+                    .push(PendingOperationRecord {
+                        event: event.to_string(),
+                        operation_record,
+                    });
+                return;
+            };
+            sender
         };
 
+        Self::send_operation_record(self.inner.operation, event, sender, operation_record);
+    }
+
+    fn send_operation_record(
+        operation: StartupOperation,
+        event: &str,
+        sender: mpsc::Sender<OperationStreamMessage>,
+        operation_record: String,
+    ) {
         let operation_record = OperationStreamMessage::Record(operation_record);
-        if event == transcript_event_name(self.inner.operation) {
+        if event == transcript_event_name(operation) {
             if let Err(error) = sender.try_send(operation_record) {
                 eprintln!("sandboxd dropped operation transcript record: {error}");
             }

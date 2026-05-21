@@ -157,6 +157,68 @@ fn lifecycle_operation_record_waits_for_operation_channel_capacity() {
 }
 
 #[test]
+fn publishes_lifecycle_records_buffered_before_operation_sender_attachment() {
+    let temp_dir = std::env::temp_dir().join(format!(
+        "sandboxd-startup-diagnostics-buffered-records-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    let _ = fs::remove_dir_all(&temp_dir);
+    fs::create_dir_all(&temp_dir).expect("temp dir should be creatable");
+    let _log_dir_guard =
+        TestEnvVarGuard::set(super::TEST_LOG_DIR_ENV, temp_dir.to_string_lossy().as_ref());
+
+    let logger = StartupDiagnosticsLogger::initialize(
+        StartupOperation::Init,
+        "ws://127.0.0.1:4000/tunnel/sandbox/sbi_test",
+    )
+    .expect("logger should initialize");
+    logger
+        .record_phase_started("start_tunnel_session")
+        .expect("phase start record should append before sender attachment");
+
+    let (sender, mut receiver) = mpsc::channel(8);
+    logger.attach_operation_sender(sender);
+    logger
+        .record_phase_completed("start_tunnel_session")
+        .expect("phase completion record should append after sender attachment");
+
+    let started_record = receiver
+        .blocking_recv()
+        .expect("buffered phase start should publish after sender attachment");
+    let OperationStreamMessage::Record(started_record) = started_record else {
+        panic!("expected buffered lifecycle start record");
+    };
+    let started_record =
+        serde_json::from_str::<Value>(&started_record).expect("start record should be json");
+    assert_eq!(started_record["kind"], "lifecycle");
+    assert_eq!(started_record["phase"], "operation_stream");
+    assert_eq!(started_record["status"], "started");
+    assert_eq!(
+        started_record["attributes"]["phase"],
+        "start_tunnel_session"
+    );
+
+    let completed_record = receiver
+        .blocking_recv()
+        .expect("phase completion should publish after sender attachment");
+    let OperationStreamMessage::Record(completed_record) = completed_record else {
+        panic!("expected lifecycle completion record");
+    };
+    let completed_record =
+        serde_json::from_str::<Value>(&completed_record).expect("completion record should be json");
+    assert_eq!(completed_record["kind"], "lifecycle");
+    assert_eq!(completed_record["phase"], "operation_stream");
+    assert_eq!(completed_record["status"], "completed");
+    assert_eq!(
+        completed_record["attributes"]["phase"],
+        "start_tunnel_session"
+    );
+
+    let _ = fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
 fn maps_egress_start_and_stop_to_distinct_lifecycle_phases() {
     assert_eq!(
         super::operation_lifecycle_phase("start_egress_proxy"),
