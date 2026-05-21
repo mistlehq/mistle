@@ -49,7 +49,11 @@ If requested work requires rebuilding from the base image, explain that the setu
 
 When practical, validate a runnable script by running the exact candidate script body from a temporary file. Syntax checks alone are not enough. Running the script is practical when it exercises the intended maintenance behavior without destructive side effects, secret-dependent prompts, disproportionate runtime, or known environment mismatch.
 
-When you finish authoring or changing the script, include the complete script text in your final response and state what validation you ran. If you could not run the exact script, say why and describe the weaker validation you performed.
+If Mistle MCP tools are available, use \`profile_maintenance_script_put\` to save the final maintenance script to the current profile version after local validation. Use \`MISTLE_SANDBOX_PROFILE_ID\` and \`MISTLE_SANDBOX_PROFILE_VERSION\` from the sandbox environment as the tool inputs instead of asking the user for those identifiers.
+
+After saving the maintenance script through MCP, use \`profile_maintenance_script_test_start\` when available to run the platform maintenance-script test for the saved profile version. Pass the same final \`maintenanceScript\` body to the test tool; it does not load the saved script from the profile version automatically.
+
+When you update the maintenance script through MCP, still summarize what changed and what local validation and platform maintenance-script test you ran. If you could not run local validation or the platform maintenance-script test, say why and describe the weaker validation you performed. If the MCP tool is unavailable or the update fails, include the complete final script text in your response so the user can apply it manually.
 `.trim();
 
 export type SetupAssistantScriptKind = "maintenance" | "setup";

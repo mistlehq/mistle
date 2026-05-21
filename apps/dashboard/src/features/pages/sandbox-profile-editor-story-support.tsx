@@ -1042,9 +1042,12 @@ function SandboxProfileEditorPageStoryView(
                         ? "Could not save snapshot refresh schedule."
                         : null
                     }
+                    onApplyPendingExternalMaintenanceScript={() => {}}
                     onChangeMaintenanceScript={() => {}}
                     onDeleteSchedule={() => {}}
+                    onDismissPendingExternalMaintenanceScript={() => {}}
                     onSaveSchedule={() => {}}
+                    pendingExternalMaintenanceScript={false}
                     previewAfter={new Date("2026-04-29T00:00:00.000Z")}
                     savedMaintenanceScript={snapshotMaintenanceScript ?? ""}
                     setupAssistantControl={{

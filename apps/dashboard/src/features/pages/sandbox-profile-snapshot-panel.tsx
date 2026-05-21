@@ -634,7 +634,15 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
   const [persistedMaintenanceScript, setPersistedMaintenanceScript] = useState(
     input.maintenanceScript ?? "",
   );
+  const [pendingExternalMaintenanceScript, setPendingExternalMaintenanceScript] = useState<
+    string | null
+  >(null);
   const previousRefreshScheduleRef = useRef(input.refreshSchedule);
+  const previousMaintenanceScriptRef = useRef(input.maintenanceScript);
+  const maintenanceScriptDraftRef = useRef(maintenanceScriptDraft);
+  const persistedMaintenanceScriptRef = useRef(persistedMaintenanceScript);
+  maintenanceScriptDraftRef.current = maintenanceScriptDraft;
+  persistedMaintenanceScriptRef.current = persistedMaintenanceScript;
   const saveScheduleMutation = useMutation({
     mutationFn: async (schedule: SnapshotRefreshScheduleInput) => {
       if (schedule.cronExpression.length === 0 || schedule.timezone.length === 0) {
@@ -654,6 +662,7 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
       setMutationError(null);
       setMaintenanceScriptDraft(nextMaintenanceScript);
       setPersistedMaintenanceScript(nextMaintenanceScript);
+      setPendingExternalMaintenanceScript(null);
       await input.invalidateProfileVersions(input.profileId);
     },
     onError: (error: unknown) => {
@@ -694,11 +703,47 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
   }, [input.refreshSchedule]);
 
   useEffect(() => {
+    const previousMaintenanceScript = previousMaintenanceScriptRef.current;
+    previousMaintenanceScriptRef.current = input.maintenanceScript;
+
+    if (input.maintenanceScript === previousMaintenanceScript) {
+      return;
+    }
+
     const nextValue = input.maintenanceScript ?? "";
-    setMaintenanceScriptDraft(nextValue);
     setPersistedMaintenanceScript(nextValue);
     setMutationError(null);
+
+    if (
+      maintenanceScriptDraftRef.current === persistedMaintenanceScriptRef.current ||
+      maintenanceScriptDraftRef.current === nextValue
+    ) {
+      setMaintenanceScriptDraft(nextValue);
+      setPendingExternalMaintenanceScript(null);
+      return;
+    }
+
+    setPendingExternalMaintenanceScript(nextValue);
   }, [input.maintenanceScript]);
+
+  function handleChangeMaintenanceScript(nextValue: string): void {
+    setMaintenanceScriptDraft(nextValue);
+    setPendingExternalMaintenanceScript((currentValue) =>
+      currentValue === nextValue ? null : currentValue,
+    );
+    setMutationError(null);
+  }
+
+  function applyPendingExternalMaintenanceScript(): void {
+    if (pendingExternalMaintenanceScript === null) {
+      return;
+    }
+
+    setMaintenanceScriptDraft(pendingExternalMaintenanceScript);
+    setPersistedMaintenanceScript(pendingExternalMaintenanceScript);
+    setPendingExternalMaintenanceScript(null);
+    setMutationError(null);
+  }
 
   const maintenanceScriptHasChanges = maintenanceScriptDraft !== persistedMaintenanceScript;
   const maintenanceScriptTest = useSandboxProfileMaintenanceScriptTestRun({
@@ -717,13 +762,18 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
       maintenanceScriptHasChanges={maintenanceScriptHasChanges}
       savedMaintenanceScript={persistedMaintenanceScript}
       mutationError={mutationError}
-      onChangeMaintenanceScript={setMaintenanceScriptDraft}
+      onApplyPendingExternalMaintenanceScript={applyPendingExternalMaintenanceScript}
+      onChangeMaintenanceScript={handleChangeMaintenanceScript}
       onDeleteSchedule={() => {
         removeScheduleMutation.mutate();
+      }}
+      onDismissPendingExternalMaintenanceScript={() => {
+        setPendingExternalMaintenanceScript(null);
       }}
       onSaveSchedule={(schedule) => {
         saveScheduleMutation.mutate(schedule);
       }}
+      pendingExternalMaintenanceScript={pendingExternalMaintenanceScript !== null}
       previewAfter={new Date()}
       setupAssistantControl={input.setupAssistantControl}
       testButtonProps={maintenanceScriptTest.buttonProps}
@@ -760,9 +810,12 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
   maintenanceScriptDraft: string;
   maintenanceScriptHasChanges: boolean;
   mutationError: string | null;
+  onApplyPendingExternalMaintenanceScript: () => void;
   onChangeMaintenanceScript: (nextValue: string) => void;
   onDeleteSchedule: () => void;
+  onDismissPendingExternalMaintenanceScript: () => void;
   onSaveSchedule: (schedule: SnapshotRefreshScheduleInput) => void;
+  pendingExternalMaintenanceScript: boolean;
   previewAfter: Date;
   savedMaintenanceScript: string;
   setupAssistantControl: SnapshotMaintenanceScriptAssistantControl;
@@ -900,6 +953,28 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
               {input.mutationError}
             </Notice>
           )}
+          {input.pendingExternalMaintenanceScript ? (
+            <Notice
+              action={
+                <ButtonGroup>
+                  <Button onClick={input.onApplyPendingExternalMaintenanceScript} type="button">
+                    Apply assistant version
+                  </Button>
+                  <Button
+                    onClick={input.onDismissPendingExternalMaintenanceScript}
+                    type="button"
+                    variant="outline"
+                  >
+                    Keep editing
+                  </Button>
+                </ButtonGroup>
+              }
+              title="Maintenance script updated"
+              variant="warning"
+            >
+              The Setup Assistant saved a newer maintenance script while you have unsaved edits.
+            </Notice>
+          ) : null}
 
           {!isEditingSchedule ? (
             <SandboxProfileSectionCard>

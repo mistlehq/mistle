@@ -1,3 +1,4 @@
+import { systemScheduler, type TimerHandle } from "@mistle/time";
 import {
   Accordion,
   AccordionContent,
@@ -1344,6 +1345,9 @@ function ReadySandboxProfileEditorPage(input: {
   const [setupAssistantPanelState, setSetupAssistantPanelState] =
     useState<SetupScriptAssistantPanelState | null>(null);
   const setupAssistantPanelIsOpen = setupAssistantPanelState?.isOpen === true;
+  const maintenanceAssistantPanelIsOpen =
+    setupAssistantPanelState?.isOpen === true &&
+    setupAssistantPanelState.scriptKind === "maintenance";
   const setupScriptLoader = useSandboxProfileSetupScriptLoader({
     profileId: input.profileId,
     refetchIntervalMs: setupAssistantPanelIsOpen ? 2_000 : false,
@@ -1641,6 +1645,34 @@ function ReadySandboxProfileEditorPage(input: {
     resolveVersion: () => snapshotVersion?.version ?? null,
     scriptKind: "maintenance",
   });
+
+  useEffect(() => {
+    if (!maintenanceAssistantPanelIsOpen) {
+      return;
+    }
+
+    let cancelled = false;
+    let scheduledHandle: TimerHandle | null = null;
+    const scheduleNextRefresh = (): void => {
+      scheduledHandle = systemScheduler.schedule(() => {
+        if (cancelled) {
+          return;
+        }
+
+        void input.invalidateProfileVersions(input.profileId);
+        scheduleNextRefresh();
+      }, 2_000);
+    };
+
+    scheduleNextRefresh();
+
+    return () => {
+      cancelled = true;
+      if (scheduledHandle !== null) {
+        systemScheduler.cancel(scheduledHandle);
+      }
+    };
+  }, [input.invalidateProfileVersions, input.profileId, maintenanceAssistantPanelIsOpen]);
 
   useEffect(() => {
     if (input.publishSuccessNavigationKey !== null) {

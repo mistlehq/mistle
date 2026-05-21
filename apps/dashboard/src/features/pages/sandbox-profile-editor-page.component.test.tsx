@@ -1497,6 +1497,88 @@ describe("SandboxProfileEditorPage", () => {
     ).toBe("pnpm update\npnpm test");
   });
 
+  it("applies externally updated maintenance scripts while the maintenance assistant is open", async () => {
+    const { profileId, queryClient } = renderSandboxProfileEditor({
+      maintenanceScript: "pnpm update",
+      routeSection: "snapshot",
+      versionState: "published",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Refresh enabled" }));
+    const editor = screen.getByRole("textbox", { name: "Snapshot maintenance script" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Setup Assistant" }));
+
+    expect(
+      await screen.findByRole("button", {
+        name: "Close Setup Assistant panel",
+      }),
+    ).toBeDefined();
+
+    act(() => {
+      queryClient.setQueryData(sandboxProfileVersionsQueryKey(profileId), {
+        versions: createSandboxProfileVersionsForTest({
+          maintenanceScript: "pnpm update\npnpm test",
+          profileId,
+          version: 3,
+          versionState: "published",
+        }),
+      });
+    });
+
+    await waitFor(() => {
+      expect(readSetupScriptEditorValue(editor)).toBe("pnpm update\npnpm test");
+    });
+  });
+
+  it("keeps local maintenance script edits when the assistant saves a newer version", async () => {
+    const { profileId, queryClient } = renderSandboxProfileEditor({
+      maintenanceScript: "pnpm update",
+      routeSection: "snapshot",
+      versionState: "published",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Refresh enabled" }));
+    const editor = screen.getByRole("textbox", { name: "Snapshot maintenance script" });
+    updateSetupScriptEditor({
+      editor,
+      value: "pnpm update\npnpm lint",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Setup Assistant" }));
+
+    expect(
+      await screen.findByRole("button", {
+        name: "Close Setup Assistant panel",
+      }),
+    ).toBeDefined();
+
+    act(() => {
+      queryClient.setQueryData(sandboxProfileVersionsQueryKey(profileId), {
+        versions: createSandboxProfileVersionsForTest({
+          maintenanceScript: "pnpm update\npnpm test",
+          profileId,
+          version: 3,
+          versionState: "published",
+        }),
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Maintenance script updated")).toBeDefined();
+    });
+    expect(readSetupScriptEditorValue(editor)).toBe("pnpm update\npnpm lint");
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply assistant version" }));
+
+    await waitFor(() => {
+      expect(readSetupScriptEditorValue(editor)).toBe("pnpm update\npnpm test");
+    });
+    expect(screen.queryByText("Maintenance script updated")).toBeNull();
+  });
+
   it("shows automatic snapshot refresh as disabled when it is not configured", () => {
     renderSandboxProfileEditor({
       routeSection: "snapshot",

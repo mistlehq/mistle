@@ -86,7 +86,24 @@ describe("buildSetupAssistantCollaborationModeSettings", () => {
     expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
       "exact candidate script body",
     );
-    expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain("complete script text");
+    expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
+      "profile_maintenance_script_put",
+    );
+    expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
+      "profile_maintenance_script_test_start",
+    );
+    expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
+      "Pass the same final `maintenanceScript` body",
+    );
+    expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
+      "MISTLE_SANDBOX_PROFILE_ID",
+    );
+    expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
+      "MISTLE_SANDBOX_PROFILE_VERSION",
+    );
+    expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
+      "include the complete final script text",
+    );
   });
 });
 
