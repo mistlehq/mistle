@@ -3740,17 +3740,17 @@ describe("SandboxProfileEditorPage", () => {
     );
   });
 
-  it("hides the duplicate trigger option when no matching triggers exist", () => {
+  it("hides the duplicate trigger option when no active-version profile triggers exist", () => {
     renderDuplicateProfileDialogHarness();
 
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Duplicate" }));
 
     expect(screen.getByRole("heading", { name: "Duplicate sandbox profile" })).toBeDefined();
-    expect(screen.queryByLabelText("Also duplicate matching triggers")).toBeNull();
+    expect(screen.queryByLabelText("Duplicate triggers tied to this profile")).toBeNull();
   });
 
-  it("shows the duplicate trigger option when matching triggers exist", () => {
+  it("shows the duplicate trigger option when active-version profile triggers exist", () => {
     renderDuplicateProfileDialogHarness({
       triggerUsages: [
         {
@@ -3765,16 +3765,18 @@ describe("SandboxProfileEditorPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Duplicate" }));
 
-    expect(screen.getByLabelText("Also duplicate matching triggers")).toBeDefined();
+    expect(screen.getByLabelText("Duplicate triggers tied to this profile")).toBeDefined();
   });
 
-  it("blocks profile duplication while trigger usage context is loading", () => {
+  it("keeps the duplicate dialog closed while trigger usage context is loading", () => {
     renderDuplicateProfileDialogHarness({ triggerUsagesIsPending: true });
 
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Duplicate" }));
 
     expect(screen.getByText("Checking triggers...")).toBeDefined();
-    expect(screen.getByRole("button", { name: "Duplicate" }).hasAttribute("disabled")).toBe(true);
+    expect(
+      screen.getByText("Duplicate").closest("[role='menuitem']")?.getAttribute("aria-disabled"),
+    ).toBe("true");
+    expect(screen.queryByRole("heading", { name: "Duplicate sandbox profile" })).toBeNull();
   });
 });

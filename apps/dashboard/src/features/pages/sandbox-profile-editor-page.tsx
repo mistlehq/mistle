@@ -889,8 +889,7 @@ function LoadedSandboxProfileEditorPage(
         sandboxProfileId: input.profileId,
         signal,
       }),
-    enabled:
-      isDeleteProfileDialogOpen || (isDuplicateProfileDialogOpen && duplicateProfileIsAvailable),
+    enabled: isDeleteProfileDialogOpen || duplicateProfileIsAvailable,
     retry: false,
   });
   const createDraftMutation = useMutation({
@@ -1319,7 +1318,7 @@ function LoadedSandboxProfileEditorPage(
             )
       }
       duplicateProfileTriggerUsagesError={
-        isDuplicateProfileDialogOpen && triggerUsagesQuery.isError
+        duplicateProfileIsAvailable && triggerUsagesQuery.isError
           ? resolveApiErrorMessage({
               error: triggerUsagesQuery.error,
               fallbackMessage: "Could not load triggers.",
@@ -1327,7 +1326,7 @@ function LoadedSandboxProfileEditorPage(
           : null
       }
       duplicateProfileTriggerUsagesIsPending={
-        isDuplicateProfileDialogOpen && duplicateProfileIsAvailable && triggerUsagesQuery.isPending
+        duplicateProfileIsAvailable && triggerUsagesQuery.isPending
       }
       isDeleteProfileDialogOpen={isDeleteProfileDialogOpen}
       isDuplicateProfileDialogOpen={isDuplicateProfileDialogOpen}
@@ -1349,6 +1348,13 @@ function LoadedSandboxProfileEditorPage(
       }}
       onDuplicateProfileDialogOpenChange={(open) => {
         if (duplicateProfileMutation.isPending) {
+          return;
+        }
+        if (
+          open &&
+          (triggerUsagesQuery.isPending ||
+            (duplicateProfileIsAvailable && triggerUsagesQuery.isError))
+        ) {
           return;
         }
         setDuplicateProfileError(null);
@@ -3032,17 +3038,11 @@ function DuplicateSandboxProfileDialog(input: {
   onOpenChange: (open: boolean) => void;
   profileName: string;
   triggerUsages: readonly TriggerSandboxProfileUsage[];
-  triggerUsagesError: string | null;
-  triggerUsagesIsPending: boolean;
 }): React.JSX.Element {
   const defaultDisplayName = `${input.profileName} copy`;
   const [displayName, setDisplayName] = useState(defaultDisplayName);
   const [includeTriggers, setIncludeTriggers] = useState(false);
-  const canChooseTriggers =
-    input.isAvailable &&
-    !input.triggerUsagesIsPending &&
-    input.triggerUsagesError === null &&
-    input.triggerUsages.length > 0;
+  const canChooseTriggers = input.isAvailable && input.triggerUsages.length > 0;
 
   useEffect(() => {
     if (input.isOpen) {
@@ -3058,12 +3058,7 @@ function DuplicateSandboxProfileDialog(input: {
   }, [canChooseTriggers]);
 
   const trimmedDisplayName = displayName.trim();
-  const isBlocked =
-    input.isPending ||
-    !input.isAvailable ||
-    input.triggerUsagesIsPending ||
-    input.triggerUsagesError !== null ||
-    trimmedDisplayName.length === 0;
+  const isBlocked = input.isPending || !input.isAvailable || trimmedDisplayName.length === 0;
 
   return (
     <Dialog
@@ -3101,20 +3096,10 @@ function DuplicateSandboxProfileDialog(input: {
             </FieldContent>
           </Field>
 
-          {input.triggerUsagesIsPending ? (
-            <p className="text-muted-foreground text-sm">Checking triggers...</p>
-          ) : null}
-
-          {input.triggerUsagesError === null ? null : (
-            <Notice title="Could not check triggers" variant="alert">
-              {input.triggerUsagesError}
-            </Notice>
-          )}
-
           {canChooseTriggers ? (
             <label className="flex gap-3 rounded-md border bg-background p-3 text-sm">
               <Checkbox
-                aria-label="Also duplicate matching triggers"
+                aria-label="Duplicate triggers tied to this profile"
                 checked={includeTriggers}
                 disabled={input.isPending || !input.isAvailable}
                 onCheckedChange={(checked) => {
@@ -3122,9 +3107,9 @@ function DuplicateSandboxProfileDialog(input: {
                 }}
               />
               <span className="flex min-w-0 flex-col gap-1">
-                <span className="font-medium">Also duplicate matching triggers</span>
+                <span className="font-medium">Duplicate triggers tied to this profile</span>
                 <span className="text-muted-foreground">
-                  Copied triggers are created disabled and exclude one-off scheduled triggers.
+                  Copied triggers are created disabled. One-off scheduled triggers are not copied.
                 </span>
               </span>
             </label>
@@ -3303,6 +3288,9 @@ export function SandboxProfileEditorView(input: {
       (input.hasUnpersistedSetupScriptChanges ?? false));
   const duplicateProfileIsAvailable = input.duplicateProfileIsAvailable ?? false;
   const duplicateProfileIsPending = input.duplicateProfileIsPending ?? false;
+  const duplicateProfileTriggerUsagesIsPending =
+    input.duplicateProfileTriggerUsagesIsPending ?? false;
+  const duplicateProfileTriggerUsagesError = input.duplicateProfileTriggerUsagesError ?? null;
   const deleteProfileMenuItem = (
     <DropdownMenuItem
       onClick={() => {
@@ -3313,15 +3301,7 @@ export function SandboxProfileEditorView(input: {
       Delete profile
     </DropdownMenuItem>
   );
-  const duplicateProfileMenuItem = duplicateProfileIsAvailable ? (
-    <DropdownMenuItem
-      onClick={() => {
-        input.onDuplicateProfileDialogOpenChange?.(true);
-      }}
-    >
-      Duplicate
-    </DropdownMenuItem>
-  ) : (
+  const duplicateProfileMenuItem = !duplicateProfileIsAvailable ? (
     <DropdownMenuItem className="items-start" disabled>
       <span className="flex min-w-0 flex-col gap-1">
         <span>Duplicate</span>
@@ -3329,6 +3309,30 @@ export function SandboxProfileEditorView(input: {
           Requires the active published version to have a usable snapshot.
         </span>
       </span>
+    </DropdownMenuItem>
+  ) : duplicateProfileTriggerUsagesIsPending ? (
+    <DropdownMenuItem className="items-start" disabled>
+      <span className="flex min-w-0 flex-col gap-1">
+        <span>Duplicate</span>
+        <span className="text-muted-foreground text-xs">Checking triggers...</span>
+      </span>
+    </DropdownMenuItem>
+  ) : duplicateProfileTriggerUsagesError !== null ? (
+    <DropdownMenuItem className="items-start" disabled>
+      <span className="flex min-w-0 flex-col gap-1">
+        <span>Duplicate</span>
+        <span className="text-muted-foreground text-xs">
+          Could not check triggers for this profile.
+        </span>
+      </span>
+    </DropdownMenuItem>
+  ) : (
+    <DropdownMenuItem
+      onClick={() => {
+        input.onDuplicateProfileDialogOpenChange?.(true);
+      }}
+    >
+      Duplicate
     </DropdownMenuItem>
   );
   const profileActions =
@@ -3375,8 +3379,6 @@ export function SandboxProfileEditorView(input: {
         }}
         profileName={input.profileName ?? input.profileNameFallback}
         triggerUsages={input.duplicateProfileTriggerUsages ?? []}
-        triggerUsagesError={input.duplicateProfileTriggerUsagesError ?? null}
-        triggerUsagesIsPending={input.duplicateProfileTriggerUsagesIsPending ?? false}
       />
 
       <PageFrame

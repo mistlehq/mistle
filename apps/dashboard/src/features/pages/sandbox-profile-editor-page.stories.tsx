@@ -52,10 +52,17 @@ export const DuplicateProfileWithTriggers: Story = {
 
 export const DuplicateProfileCheckingTriggers: Story = {
   args: {
-    duplicateProfileDialogState: "open",
+    duplicateProfileDialogState: "closed",
     duplicateProfileTriggerState: "loading",
     lifecycleState: "published",
     snapshotState: "snapshot-ready",
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: "More actions" }));
+
+    await expect(canvas.getByText("Checking triggers...")).toBeVisible();
   },
 };
 
@@ -87,10 +94,17 @@ export const DuplicateProfileError: Story = {
 
 export const DuplicateProfileTriggerCheckError: Story = {
   args: {
-    duplicateProfileDialogState: "open",
+    duplicateProfileDialogState: "closed",
     duplicateProfileTriggerState: "error",
     lifecycleState: "published",
     snapshotState: "snapshot-ready",
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: "More actions" }));
+
+    await expect(canvas.getByText("Could not check triggers for this profile.")).toBeVisible();
   },
 };
 
