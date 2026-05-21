@@ -3253,14 +3253,22 @@ export function SandboxProfileEditorView(input: {
       Delete profile
     </DropdownMenuItem>
   );
-  const duplicateProfileMenuItem = (
+  const duplicateProfileMenuItem = duplicateProfileIsAvailable ? (
     <DropdownMenuItem
-      disabled={!duplicateProfileIsAvailable}
       onClick={() => {
         input.onDuplicateProfileDialogOpenChange?.(true);
       }}
     >
       Duplicate
+    </DropdownMenuItem>
+  ) : (
+    <DropdownMenuItem className="items-start" disabled>
+      <span className="flex min-w-0 flex-col gap-1">
+        <span>Duplicate</span>
+        <span className="text-muted-foreground text-xs">
+          Requires the active published version to have a usable snapshot.
+        </span>
+      </span>
     </DropdownMenuItem>
   );
   const profileActions =

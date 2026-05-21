@@ -3412,12 +3412,12 @@ describe("SandboxProfileEditorPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
 
     expect(screen.getAllByRole("menuitem").map((menuItem) => menuItem.textContent)).toEqual([
-      "Duplicate",
+      "DuplicateRequires the active published version to have a usable snapshot.",
       "Delete profile",
     ]);
-    expect(screen.getByRole("menuitem", { name: "Duplicate" }).getAttribute("aria-disabled")).toBe(
-      "true",
-    );
+    expect(
+      screen.getByText("Duplicate").closest("[role='menuitem']")?.getAttribute("aria-disabled"),
+    ).toBe("true");
   });
 
   it("keeps draft publish action enabled", () => {

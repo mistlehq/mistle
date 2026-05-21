@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, userEvent, within } from "storybook/test";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import {
@@ -42,9 +43,17 @@ export const DuplicateProfileDialog: Story = {
 export const DuplicateProfileUnavailable: Story = {
   args: {
     duplicateProfileAvailability: "unavailable",
-    duplicateProfileDialogState: "open",
     lifecycleState: "published",
     snapshotState: "snapshot-unavailable-no-previous",
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: "More actions" }));
+
+    await expect(
+      canvas.getByText("Requires the active published version to have a usable snapshot."),
+    ).toBeVisible();
   },
 };
 
