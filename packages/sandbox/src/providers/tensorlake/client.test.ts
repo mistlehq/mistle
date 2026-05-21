@@ -4,6 +4,7 @@ import {
   DaemonReadinessPollAttempts,
   DaemonReadinessPollTimeoutMs,
   TensorlakeDaemonSystemdEnvironmentVariables,
+  TensorlakeRootProcessUser,
   createTensorlakeDaemonEnv,
   createTensorlakeSandboxdControlCommand,
   createTensorlakeSandboxName,
@@ -37,28 +38,35 @@ describe("createTensorlakeStartDaemonShellCommand", () => {
     const command = createTensorlakeStartDaemonShellCommand();
 
     expect(command).toContain(
-      `sudo -E systemctl import-environment ${TensorlakeDaemonSystemdEnvironmentVariables.join(" ")}`,
+      `systemctl import-environment ${TensorlakeDaemonSystemdEnvironmentVariables.join(" ")}`,
     );
-    expect(command).toContain("sudo systemctl start sandboxd.service");
+    expect(command).toContain("systemctl start sandboxd.service");
+    expect(command).not.toContain("sudo");
     expect(command).not.toContain("systemctl import-environment &&");
     expect(command).not.toContain("TL_SSH_PROXY_PUBKEY");
   });
 });
 
 describe("createTensorlakeSandboxdControlCommand", () => {
-  it("runs sandboxd control-socket commands through sudo", () => {
+  it("runs sandboxd control-socket commands directly for root SDK processes", () => {
     expect(createTensorlakeSandboxdControlCommand({ args: ["ready"] })).toEqual({
-      command: "sudo",
-      args: ["/opt/mistle/bin/sandboxd", "ready"],
+      command: "/opt/mistle/bin/sandboxd",
+      args: ["ready"],
     });
     expect(createTensorlakeSandboxdControlCommand({ args: ["init", "--detach"] })).toEqual({
-      command: "sudo",
-      args: ["/opt/mistle/bin/sandboxd", "init", "--detach"],
+      command: "/opt/mistle/bin/sandboxd",
+      args: ["init", "--detach"],
     });
     expect(createTensorlakeSandboxdControlCommand({ args: ["wait-init"] })).toEqual({
-      command: "sudo",
-      args: ["/opt/mistle/bin/sandboxd", "wait-init"],
+      command: "/opt/mistle/bin/sandboxd",
+      args: ["wait-init"],
     });
+  });
+});
+
+describe("TensorlakeRootProcessUser", () => {
+  it("selects root for SDK process execution", () => {
+    expect(TensorlakeRootProcessUser).toBe("root");
   });
 });
 

@@ -19,21 +19,21 @@ import {
   TensorlakeClientErrorCodes,
   TensorlakeClientOperationIds,
 } from "./client-errors.js";
-import type { TensorlakeClient } from "./client.js";
+import { TensorlakeRootProcessUser, type TensorlakeClient } from "./client.js";
 
 const SandboxdEnsureTimeoutMs = 120_000;
 export const SandboxdStopDaemonTimeoutMs = 30_000;
 export const SandboxdReadOperationLogTimeoutMs = 60_000;
-const TensorlakeElevatedShellCommand = "sudo";
-const TensorlakeElevatedShellCommandArgs = ["-E", "sh", "-euc"];
+const TensorlakeRootShellCommand = "sh";
+const TensorlakeRootShellCommandArgs = ["-euc"];
 
-export function createTensorlakeElevatedShellCommand(input: { script: string }): {
+export function createTensorlakeRootShellCommand(input: { script: string }): {
   command: string;
   args: readonly string[];
 } {
   return {
-    command: TensorlakeElevatedShellCommand,
-    args: [...TensorlakeElevatedShellCommandArgs, input.script],
+    command: TensorlakeRootShellCommand,
+    args: [...TensorlakeRootShellCommandArgs, input.script],
   };
 }
 
@@ -108,19 +108,21 @@ export class TensorlakeSandboxRuntimeControl implements SandboxRuntimeControl {
             sandboxId: input.id,
             operation: TensorlakeClientOperationIds.STOP_SANDBOXD_DAEMON,
             commandDescription: "Stop sandboxd daemon",
-            ...createTensorlakeElevatedShellCommand({ script: SandboxdStopDaemonCommand }),
+            ...createTensorlakeRootShellCommand({ script: SandboxdStopDaemonCommand }),
+            user: TensorlakeRootProcessUser,
             timeoutMs: SandboxdStopDaemonTimeoutMs,
           });
           await this.#client.runCommand({
             sandboxId: input.id,
             operation: TensorlakeClientOperationIds.ENSURE_SANDBOXD,
             commandDescription: "Ensure sandboxd artifact",
-            ...createTensorlakeElevatedShellCommand({ script: SandboxdInstallCommand }),
+            ...createTensorlakeRootShellCommand({ script: SandboxdInstallCommand }),
             env: {
               [SandboxdInstallEnvVars.URL]: input.artifact.url,
               [SandboxdInstallEnvVars.SHA256]: input.artifact.sha256,
               [SandboxdInstallEnvVars.VERSION]: input.artifact.version,
             },
+            user: TensorlakeRootProcessUser,
             timeoutMs: SandboxdEnsureTimeoutMs,
           });
         } catch (error) {

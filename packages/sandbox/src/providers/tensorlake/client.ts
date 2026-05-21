@@ -7,9 +7,11 @@ import {
   type CommandResult,
   type CreateAndConnectOptions,
   type ProcessInfo,
+  type RunOptions,
   type SandboxClientOptions,
   type SandboxInfo,
   type SnapshotInfo,
+  type StartProcessOptions,
 } from "tensorlake";
 
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
@@ -41,18 +43,15 @@ import {
 import type { TensorlakeSandboxInspectResult } from "./types.js";
 
 const SandboxdCommand = "/opt/mistle/bin/sandboxd";
-const TensorlakeSandboxdControlCommand = "sudo";
-// Tensorlake currently starts SDK commands as tl-user and does not expose a
-// root/user option. sandboxd's control socket lives under /run/mistle, so every
-// client command that talks to that socket must go through sudo.
-const InitCommand = TensorlakeSandboxdControlCommand;
-const InitCommandArgs = [SandboxdCommand, "init"];
-const DetachedInitCommandArgs = [SandboxdCommand, "init", "--detach"];
-const WaitInitCommandArgs = [SandboxdCommand, "wait-init"];
-const ResumeCommand = TensorlakeSandboxdControlCommand;
-const ResumeCommandArgs = [SandboxdCommand, "resume"];
-const ReadyCommand = TensorlakeSandboxdControlCommand;
-const ReadyCommandArgs = [SandboxdCommand, "ready"];
+export const TensorlakeRootProcessUser = "root";
+const InitCommand = SandboxdCommand;
+const InitCommandArgs = ["init"];
+const DetachedInitCommandArgs = ["init", "--detach"];
+const WaitInitCommandArgs = ["wait-init"];
+const ResumeCommand = SandboxdCommand;
+const ResumeCommandArgs = ["resume"];
+const ReadyCommand = SandboxdCommand;
+const ReadyCommandArgs = ["ready"];
 const StartDaemonCommand = "sh";
 export const TensorlakeDaemonSystemdEnvironmentVariables = [
   "SANDBOX_RUNTIME_LISTEN_ADDR",
@@ -77,13 +76,13 @@ export function createTensorlakeStartDaemonShellCommand(): string {
     // TL_SSH_PROXY_PUBKEY because the value can contain control characters.
     // Keep this aligned with packages/sandboxd/systemd/sandboxd.service
     // PassEnvironment and import only the variables sandboxd actually needs.
-    // Tensorlake currently starts SDK commands as a non-root user, so the
-    // systemd manager operations need sudo. Preserve the command environment
-    // only for import-environment; the service unit decides what to pass on.
-    `sudo -E systemctl import-environment ${TensorlakeDaemonSystemdEnvironmentVariables.join(" ")}`,
-    "sudo systemctl start sandboxd.service",
-    "while sudo systemctl is-active --quiet sandboxd.service; do sleep 3600; done",
-    "sudo systemctl status sandboxd.service --no-pager",
+    // Tensorlake SDK commands default to tl-user. Callers start this shell as
+    // root through the SDK user option, so systemd manager operations do not
+    // need sudo. The service unit decides what environment to pass on.
+    `systemctl import-environment ${TensorlakeDaemonSystemdEnvironmentVariables.join(" ")}`,
+    "systemctl start sandboxd.service",
+    "while systemctl is-active --quiet sandboxd.service; do sleep 3600; done",
+    "systemctl status sandboxd.service --no-pager",
     "exit 1",
   ].join(" && ");
 }
@@ -92,8 +91,8 @@ export function createTensorlakeSandboxdControlCommand(input: {
   readonly args: readonly string[];
 }): { command: string; args: readonly string[] } {
   return {
-    command: TensorlakeSandboxdControlCommand,
-    args: [SandboxdCommand, ...input.args],
+    command: SandboxdCommand,
+    args: input.args,
   };
 }
 
@@ -121,6 +120,7 @@ export interface TensorlakeClient {
     operation: (typeof TensorlakeClientOperationIds)[keyof typeof TensorlakeClientOperationIds];
     commandDescription: string;
     env?: Record<string, string>;
+    user?: RunOptions["user"];
     workingDir?: string;
     timeoutMs?: number;
   }): Promise<{ stdout: string; stderr: string }>;
@@ -528,6 +528,7 @@ export class TensorlakeApiClient implements TensorlakeClient {
     operation: (typeof TensorlakeClientOperationIds)[keyof typeof TensorlakeClientOperationIds];
     commandDescription: string;
     env?: Record<string, string>;
+    user?: RunOptions["user"];
     workingDir?: string;
     timeoutMs?: number;
   }): Promise<{ stdout: string; stderr: string }> {
@@ -536,6 +537,7 @@ export class TensorlakeApiClient implements TensorlakeClient {
       const result = await sandbox.run(request.command, {
         ...(request.args === undefined ? {} : { args: [...request.args] }),
         ...(request.env === undefined ? {} : { env: request.env }),
+        user: request.user ?? TensorlakeRootProcessUser,
         ...(request.workingDir === undefined ? {} : { workingDir: request.workingDir }),
         ...(request.timeoutMs === undefined ? {} : { timeout: request.timeoutMs }),
       });
@@ -605,13 +607,17 @@ export class TensorlakeApiClient implements TensorlakeClient {
     const process = await input.sandbox.startProcess(StartDaemonCommand, {
       args: StartDaemonCommandArgs,
       env: createTensorlakeDaemonEnv(input.env),
+      user: TensorlakeRootProcessUser,
     });
     startedDaemon = true;
 
     try {
       for (let attempt = 1; attempt <= DaemonReadinessPollAttempts; attempt += 1) {
         pollAttempts += 1;
-        const result = await input.sandbox.run(ReadyCommand, { args: ReadyCommandArgs });
+        const result = await input.sandbox.run(ReadyCommand, {
+          args: ReadyCommandArgs,
+          user: TensorlakeRootProcessUser,
+        });
         if (result.exitCode === 0) {
           recordSandboxDaemonReady({
             alreadyReady: false,
@@ -685,7 +691,10 @@ export class TensorlakeApiClient implements TensorlakeClient {
   }
 
   async #isDaemonReady(sandbox: Sandbox): Promise<boolean> {
-    const result = await sandbox.run(ReadyCommand, { args: ReadyCommandArgs });
+    const result = await sandbox.run(ReadyCommand, {
+      args: ReadyCommandArgs,
+      user: TensorlakeRootProcessUser,
+    });
     return result.exitCode === 0;
   }
 
@@ -720,12 +729,14 @@ export class TensorlakeApiClient implements TensorlakeClient {
       args: readonly string[];
       env?: Readonly<Record<string, string>>;
       stdin?: Uint8Array<ArrayBufferLike>;
+      user?: StartProcessOptions["user"];
     },
   ): Promise<void> {
     const process = await sandbox.startProcess(input.command, {
       args: [...input.args],
       ...(input.env === undefined ? {} : { env: input.env }),
       ...(input.stdin === undefined ? {} : { stdinMode: StdinMode.PIPE }),
+      user: input.user ?? TensorlakeRootProcessUser,
     });
 
     if (input.stdin !== undefined) {
