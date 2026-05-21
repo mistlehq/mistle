@@ -30,6 +30,18 @@ export function sandboxProfileTriggerUsagesQueryKey(
   return [SANDBOX_PROFILES_QUERY_KEY_PREFIX[0], "trigger-usages", profileId];
 }
 
+export function sandboxProfileDuplicateTriggerUsagesQueryKey(input: {
+  profileId: string;
+  activeVersion: number | null;
+}): readonly ["sandbox-profiles", "duplicate-trigger-usages", string, number | null] {
+  return [
+    SANDBOX_PROFILES_QUERY_KEY_PREFIX[0],
+    "duplicate-trigger-usages",
+    input.profileId,
+    input.activeVersion,
+  ];
+}
+
 export function sandboxProfileIntegrationDirectoryQueryKey(): readonly [
   "sandbox-profiles",
   "integration-directory",

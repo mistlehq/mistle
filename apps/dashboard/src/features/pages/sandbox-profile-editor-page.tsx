@@ -60,8 +60,9 @@ import { NavigationBlockerDialog } from "../navigation/navigation-blocker-dialog
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import {
-  sandboxProfileTriggerUsagesQueryKey,
   sandboxProfileDetailQueryKey,
+  sandboxProfileDuplicateTriggerUsagesQueryKey,
+  sandboxProfileTriggerUsagesQueryKey,
   sandboxProfileVersionIntegrationBindingsQueryKey,
   sandboxProfileVersionSetupScriptQueryKey,
   sandboxProfileVersionsQueryKey,
@@ -114,6 +115,7 @@ import { SettingsSwitchField } from "../shared/settings-switch-field.js";
 import { UnavailableResourceState } from "../shared/unavailable-resource-state.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import {
+  listCopyableTriggersForSandboxProfile,
   listTriggersForSandboxProfile,
   type TriggerSandboxProfileUsage,
 } from "../triggers/triggers-service.js";
@@ -889,7 +891,26 @@ function LoadedSandboxProfileEditorPage(
         sandboxProfileId: input.profileId,
         signal,
       }),
-    enabled: isDeleteProfileDialogOpen || duplicateProfileIsAvailable,
+    enabled: isDeleteProfileDialogOpen,
+    retry: false,
+  });
+  const duplicateTriggerUsagesQuery = useQuery({
+    queryKey: sandboxProfileDuplicateTriggerUsagesQueryKey({
+      profileId: input.profileId,
+      activeVersion: input.profile.activeVersion,
+    }),
+    queryFn: async ({ signal }) => {
+      if (input.profile.activeVersion === null) {
+        return [];
+      }
+
+      return await listCopyableTriggersForSandboxProfile({
+        sandboxProfileId: input.profileId,
+        sandboxProfileVersion: input.profile.activeVersion,
+        signal,
+      });
+    },
+    enabled: duplicateProfileIsAvailable,
     retry: false,
   });
   const createDraftMutation = useMutation({
@@ -1310,23 +1331,17 @@ function LoadedSandboxProfileEditorPage(
       duplicateProfileIsAvailable={duplicateProfileIsAvailable}
       duplicateProfileError={duplicateProfileError}
       duplicateProfileIsPending={duplicateProfileMutation.isPending}
-      duplicateProfileTriggerUsages={
-        input.profile.activeVersion === null
-          ? []
-          : (triggerUsagesQuery.data ?? []).filter(
-              (trigger) => trigger.sandboxProfileVersion === input.profile.activeVersion,
-            )
-      }
+      duplicateProfileTriggerUsages={duplicateTriggerUsagesQuery.data ?? []}
       duplicateProfileTriggerUsagesError={
-        duplicateProfileIsAvailable && triggerUsagesQuery.isError
+        duplicateProfileIsAvailable && duplicateTriggerUsagesQuery.isError
           ? resolveApiErrorMessage({
-              error: triggerUsagesQuery.error,
+              error: duplicateTriggerUsagesQuery.error,
               fallbackMessage: "Could not load triggers.",
             })
           : null
       }
       duplicateProfileTriggerUsagesIsPending={
-        duplicateProfileIsAvailable && triggerUsagesQuery.isPending
+        duplicateProfileIsAvailable && duplicateTriggerUsagesQuery.isPending
       }
       isDeleteProfileDialogOpen={isDeleteProfileDialogOpen}
       isDuplicateProfileDialogOpen={isDuplicateProfileDialogOpen}
@@ -1350,7 +1365,7 @@ function LoadedSandboxProfileEditorPage(
         if (duplicateProfileMutation.isPending) {
           return;
         }
-        if (open && triggerUsagesQuery.isPending) {
+        if (open && duplicateTriggerUsagesQuery.isPending) {
           return;
         }
         setDuplicateProfileError(null);
@@ -1395,7 +1410,7 @@ function ReadySandboxProfileEditorPage(input: {
   deleteProfileTriggerUsagesIsPending: boolean;
   deleteProfileError: string | null;
   deleteProfileIsPending: boolean;
-  duplicateProfileIsAvailable?: boolean;
+  duplicateProfileIsAvailable: boolean;
   duplicateProfileError?: string | null;
   duplicateProfileIsPending?: boolean;
   duplicateProfileTriggerUsages?: readonly TriggerSandboxProfileUsage[];
@@ -1955,10 +1970,7 @@ function ReadySandboxProfileEditorPage(input: {
       deleteProfileTriggerUsagesIsPending={input.deleteProfileTriggerUsagesIsPending}
       deleteProfileError={input.deleteProfileError}
       deleteProfileIsPending={input.deleteProfileIsPending}
-      duplicateProfileIsAvailable={resolveSandboxProfileCanDuplicate({
-        profile: input.profile,
-        versions: input.versions,
-      })}
+      duplicateProfileIsAvailable={input.duplicateProfileIsAvailable}
       duplicateProfileError={input.duplicateProfileError ?? null}
       duplicateProfileIsPending={input.duplicateProfileIsPending ?? false}
       duplicateProfileTriggerUsages={input.duplicateProfileTriggerUsages ?? []}
@@ -3026,7 +3038,6 @@ function formatDraftTriggerImpactIssueMessage(
 }
 
 function DuplicateSandboxProfileDialog(input: {
-  activeVersion: number | null;
   duplicateError: string | null;
   isAvailable: boolean;
   isOpen: boolean;
@@ -3040,13 +3051,8 @@ function DuplicateSandboxProfileDialog(input: {
   const defaultDisplayName = `${input.profileName} copy`;
   const [displayName, setDisplayName] = useState(defaultDisplayName);
   const [includeTriggers, setIncludeTriggers] = useState(false);
-  const duplicateableTriggerUsages =
-    input.activeVersion === null || input.triggerUsagesError !== null
-      ? []
-      : input.triggerUsages.filter(
-          (triggerUsage) => triggerUsage.sandboxProfileVersion === input.activeVersion,
-        );
-  const canChooseTriggers = input.isAvailable && duplicateableTriggerUsages.length > 0;
+  const canChooseTriggers =
+    input.isAvailable && input.triggerUsagesError === null && input.triggerUsages.length > 0;
 
   useEffect(() => {
     if (input.isOpen) {
@@ -3366,7 +3372,6 @@ export function SandboxProfileEditorView(input: {
         profileName={input.profileName ?? input.profileNameFallback}
       />
       <DuplicateSandboxProfileDialog
-        activeVersion={input.mode.activeVersion}
         duplicateError={input.duplicateProfileError ?? null}
         isAvailable={duplicateProfileIsAvailable}
         isOpen={input.isDuplicateProfileDialogOpen ?? false}

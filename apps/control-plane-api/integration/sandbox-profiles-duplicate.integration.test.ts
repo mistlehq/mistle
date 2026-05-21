@@ -9,6 +9,7 @@ import {
   ScheduleTargetTypes,
   SandboxProfileVersionStates,
   TriggerKinds,
+  type ScheduleKind,
 } from "@mistle/db/control-plane";
 import {
   createIntegrationTest,
@@ -117,7 +118,7 @@ describe.concurrent("sandbox profiles duplicate integration", () => {
       name: "Source webhook",
       enabled: true,
     });
-    await seedRecurringTrigger(env, {
+    await seedScheduleTrigger(env, {
       organizationId: session.organizationId,
       profileId: "sbp_duplicate_source",
       profileVersion: 2,
@@ -126,7 +127,7 @@ describe.concurrent("sandbox profiles duplicate integration", () => {
       scheduleId: "sch_duplicate_schedule_source",
       name: "Source recurring schedule",
     });
-    await seedOneOffTrigger(env, {
+    await seedScheduleTrigger(env, {
       organizationId: session.organizationId,
       profileId: "sbp_duplicate_source",
       profileVersion: 2,
@@ -134,6 +135,7 @@ describe.concurrent("sandbox profiles duplicate integration", () => {
       targetId: "tgt_duplicate_one_off_source",
       scheduleId: "sch_duplicate_one_off_source",
       name: "Source one-off schedule",
+      scheduleKind: ScheduleKinds.ONE_OFF,
     });
 
     const response = await env.controlPlaneApi.http.fetch(
@@ -508,7 +510,7 @@ async function seedMistleMcpApiKey(
   });
 }
 
-async function seedRecurringTrigger(
+async function seedScheduleTrigger(
   env: IntegrationTestEnvironment,
   input: {
     organizationId: string;
@@ -518,54 +520,11 @@ async function seedRecurringTrigger(
     targetId: string;
     scheduleId: string;
     name: string;
+    scheduleKind?: ScheduleKind;
   },
 ): Promise<void> {
-  await env.controlPlaneDb.insert(env.controlPlaneTables.triggers).values({
-    id: input.triggerId,
-    organizationId: input.organizationId,
-    kind: TriggerKinds.SCHEDULE,
-    name: input.name,
-    enabled: true,
-  });
-  await env.controlPlaneDb.insert(env.controlPlaneTables.schedules).values({
-    id: input.scheduleId,
-    organizationId: input.organizationId,
-    targetType: ScheduleTargetTypes.TRIGGER_RUN,
-    kind: ScheduleKinds.RECURRING,
-    name: `${input.name} schedule`,
-    cronExpression: "*/15 * * * *",
-    timezone: "Asia/Singapore",
-    enabled: true,
-    nextScheduledAt: "2026-01-01T00:15:00.000Z",
-  });
-  await env.controlPlaneDb.insert(env.controlPlaneTables.scheduleTriggers).values({
-    scheduleId: input.scheduleId,
-    triggerId: input.triggerId,
-    inputTemplate: "Run recurring source",
-    conversationKeyTemplate: "{{schedule.id}}",
-    idempotencyKeyTemplate: "{{schedule.scheduledActionId}}",
-  });
-  await env.controlPlaneDb.insert(env.controlPlaneTables.triggerTargets).values({
-    id: input.targetId,
-    triggerId: input.triggerId,
-    sandboxProfileId: input.profileId,
-    sandboxProfileVersion: input.profileVersion,
-    primaryRepositoryId: null,
-  });
-}
+  const scheduleKind = input.scheduleKind ?? ScheduleKinds.RECURRING;
 
-async function seedOneOffTrigger(
-  env: IntegrationTestEnvironment,
-  input: {
-    organizationId: string;
-    profileId: string;
-    profileVersion: number;
-    triggerId: string;
-    targetId: string;
-    scheduleId: string;
-    name: string;
-  },
-): Promise<void> {
   await env.controlPlaneDb.insert(env.controlPlaneTables.triggers).values({
     id: input.triggerId,
     organizationId: input.organizationId,
@@ -577,16 +536,25 @@ async function seedOneOffTrigger(
     id: input.scheduleId,
     organizationId: input.organizationId,
     targetType: ScheduleTargetTypes.TRIGGER_RUN,
-    kind: ScheduleKinds.ONE_OFF,
+    kind: scheduleKind,
     name: `${input.name} schedule`,
     enabled: true,
-    startAt: "2099-01-01T00:00:00.000Z",
-    nextScheduledAt: "2099-01-01T00:00:00.000Z",
+    ...(scheduleKind === ScheduleKinds.RECURRING
+      ? {
+          cronExpression: "*/15 * * * *",
+          timezone: "Asia/Singapore",
+          nextScheduledAt: "2026-01-01T00:15:00.000Z",
+        }
+      : {
+          startAt: "2099-01-01T00:00:00.000Z",
+          nextScheduledAt: "2099-01-01T00:00:00.000Z",
+        }),
   });
   await env.controlPlaneDb.insert(env.controlPlaneTables.scheduleTriggers).values({
     scheduleId: input.scheduleId,
     triggerId: input.triggerId,
-    inputTemplate: "Run one-off source",
+    inputTemplate:
+      scheduleKind === ScheduleKinds.RECURRING ? "Run recurring source" : "Run one-off source",
     conversationKeyTemplate: "{{schedule.id}}",
     idempotencyKeyTemplate: "{{schedule.scheduledActionId}}",
   });

@@ -919,83 +919,45 @@ function getAutomaticSnapshotRefreshSection(): HTMLElement {
   return section;
 }
 
-function DeleteProfileDialogHarness(input: {
+function ProfileActionsDialogHarness(input: {
+  initialOpenDialog: "delete" | "duplicate";
   triggerUsages?: readonly TriggerSandboxProfileUsage[];
   triggerUsagesError?: string | null;
   triggerUsagesIsPending?: boolean;
 }): JSX.Element {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isDuplicateOpen, setIsDuplicateOpen] = useState(false);
+  const deleteTriggerUsages =
+    input.initialOpenDialog === "delete" ? (input.triggerUsages ?? []) : [];
+  const duplicateTriggerUsages =
+    input.initialOpenDialog === "duplicate" ? (input.triggerUsages ?? []) : [];
+  const deleteTriggerUsagesError =
+    input.initialOpenDialog === "delete" ? (input.triggerUsagesError ?? null) : null;
+  const duplicateTriggerUsagesError =
+    input.initialOpenDialog === "duplicate" ? (input.triggerUsagesError ?? null) : null;
+  const deleteTriggerUsagesIsPending =
+    input.initialOpenDialog === "delete" ? (input.triggerUsagesIsPending ?? false) : false;
+  const duplicateTriggerUsagesIsPending =
+    input.initialOpenDialog === "duplicate" ? (input.triggerUsagesIsPending ?? false) : false;
 
   return (
     <SandboxProfileEditorView
       activeSectionId="sandbox-profile"
-      deleteProfileTriggerUsages={input.triggerUsages ?? []}
-      deleteProfileTriggerUsagesError={input.triggerUsagesError ?? null}
-      deleteProfileTriggerUsagesIsPending={input.triggerUsagesIsPending ?? false}
-      deleteProfileError={null}
-      deleteProfileIsPending={false}
-      draftTriggerImpactAffectedTriggers={null}
-      draftTriggerImpactError={null}
-      onDraftTriggerImpactErrorDismiss={() => {}}
-      hasUnpersistedIntegrationChanges={false}
-      isDeleteProfileDialogOpen={isOpen}
-      mode={{
-        kind: "active",
-        version: 1,
-        activeVersion: 1,
-        hasDraft: false,
-        draftVersion: null,
-      }}
-      onConfirmDeleteProfile={() => {}}
-      onDeleteProfileDialogOpenChange={setIsOpen}
-      onDiscardChangesAndLeaveDraft={() => {}}
-      onMakeChanges={() => {}}
-      onPublish={() => {}}
-      onSaveDraft={() => {}}
-      onActiveSectionIdChange={() => {}}
-      onSaveProfileName={async () => {}}
-      onViewActive={() => {}}
-      onViewDraft={() => {}}
-      profileName="Production profile"
-      profileNameFallback="Production profile"
-      renderSectionPanel={() => <div>Section panel</div>}
-      sections={[
-        {
-          id: "sandbox-profile",
-          label: "Sandbox Profile",
-        },
-      ]}
-      versionActionError={null}
-      versionActionIsPending={false}
-    />
-  );
-}
-
-function DuplicateProfileDialogHarness(input: {
-  triggerUsages?: readonly TriggerSandboxProfileUsage[];
-  triggerUsagesError?: string | null;
-  triggerUsagesIsPending?: boolean;
-}): JSX.Element {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <SandboxProfileEditorView
-      activeSectionId="sandbox-profile"
-      deleteProfileTriggerUsages={[]}
-      deleteProfileTriggerUsagesError={null}
-      deleteProfileTriggerUsagesIsPending={false}
+      deleteProfileTriggerUsages={deleteTriggerUsages}
+      deleteProfileTriggerUsagesError={deleteTriggerUsagesError}
+      deleteProfileTriggerUsagesIsPending={deleteTriggerUsagesIsPending}
       deleteProfileError={null}
       deleteProfileIsPending={false}
       draftTriggerImpactAffectedTriggers={null}
       draftTriggerImpactError={null}
       onDraftTriggerImpactErrorDismiss={() => {}}
       duplicateProfileIsAvailable={true}
-      duplicateProfileTriggerUsages={input.triggerUsages ?? []}
-      duplicateProfileTriggerUsagesError={input.triggerUsagesError ?? null}
-      duplicateProfileTriggerUsagesIsPending={input.triggerUsagesIsPending ?? false}
+      duplicateProfileTriggerUsages={duplicateTriggerUsages}
+      duplicateProfileTriggerUsagesError={duplicateTriggerUsagesError}
+      duplicateProfileTriggerUsagesIsPending={duplicateTriggerUsagesIsPending}
       hasUnpersistedIntegrationChanges={false}
-      isDeleteProfileDialogOpen={false}
-      isDuplicateProfileDialogOpen={isOpen}
+      isDeleteProfileDialogOpen={isDeleteOpen}
+      isDuplicateProfileDialogOpen={isDuplicateOpen}
       mode={{
         kind: "active",
         version: 1,
@@ -1005,8 +967,8 @@ function DuplicateProfileDialogHarness(input: {
       }}
       onConfirmDeleteProfile={() => {}}
       onConfirmDuplicateProfile={() => {}}
-      onDeleteProfileDialogOpenChange={() => {}}
-      onDuplicateProfileDialogOpenChange={setIsOpen}
+      onDeleteProfileDialogOpenChange={setIsDeleteOpen}
+      onDuplicateProfileDialogOpenChange={setIsDuplicateOpen}
       onDiscardChangesAndLeaveDraft={() => {}}
       onMakeChanges={() => {}}
       onPublish={() => {}}
@@ -1099,7 +1061,10 @@ function renderDeleteProfileDialogHarness(input: {
 }): void {
   const router = createMemoryRouter(
     createRoutesFromElements(
-      <Route element={<DeleteProfileDialogHarness {...input} />} path="/" />,
+      <Route
+        element={<ProfileActionsDialogHarness initialOpenDialog="delete" {...input} />}
+        path="/"
+      />,
     ),
   );
 
@@ -1113,7 +1078,10 @@ function renderDuplicateProfileDialogHarness(input?: {
 }): void {
   const router = createMemoryRouter(
     createRoutesFromElements(
-      <Route element={<DuplicateProfileDialogHarness {...(input ?? {})} />} path="/" />,
+      <Route
+        element={<ProfileActionsDialogHarness initialOpenDialog="duplicate" {...(input ?? {})} />}
+        path="/"
+      />,
     ),
   );
 
@@ -3481,13 +3449,14 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.queryByRole("button", { name: "Sandbox profile actions" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
 
-    expect(screen.getAllByRole("menuitem").map((menuItem) => menuItem.textContent)).toEqual([
-      "DuplicateRequires the active published version to have a usable snapshot.",
-      "Delete profile",
-    ]);
+    expect(screen.getAllByRole("menuitem")).toHaveLength(2);
+    expect(screen.getByRole("menuitem", { name: "Delete profile" })).toBeDefined();
     expect(
       screen.getByText("Duplicate").closest("[role='menuitem']")?.getAttribute("aria-disabled"),
     ).toBe("true");
+    expect(
+      screen.getByText("Requires the active published version to have a usable snapshot."),
+    ).toBeDefined();
   });
 
   it("keeps draft publish action enabled", () => {
@@ -3766,25 +3735,6 @@ describe("SandboxProfileEditorPage", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "Duplicate" }));
 
     expect(screen.getByLabelText("Duplicate triggers tied to this profile")).toBeDefined();
-  });
-
-  it("hides the duplicate trigger option when only older-version profile triggers exist", () => {
-    renderDuplicateProfileDialogHarness({
-      triggerUsages: [
-        {
-          id: "trg_legacy",
-          kind: "webhook",
-          name: "Legacy trigger",
-          sandboxProfileVersion: 2,
-        },
-      ],
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Duplicate" }));
-
-    expect(screen.getByRole("heading", { name: "Duplicate sandbox profile" })).toBeDefined();
-    expect(screen.queryByLabelText("Duplicate triggers tied to this profile")).toBeNull();
   });
 
   it("allows duplication without trigger choices when trigger usage context fails to load", () => {

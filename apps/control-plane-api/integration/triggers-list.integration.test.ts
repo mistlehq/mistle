@@ -121,7 +121,7 @@ describe.concurrent("triggers list integration", () => {
     expect(body.items.map((item) => item.target.sandboxProfileVersion)).toEqual([2, 4]);
   });
 
-  it("can limit scheduled trigger list results to recurring schedules", async ({ env }) => {
+  it("only lists recurring scheduled trigger summaries", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "triggers-list-one-off-excluded@example.com",
     });
@@ -137,8 +137,8 @@ describe.concurrent("triggers list integration", () => {
       scheduleKind: ScheduleKinds.ONE_OFF,
     });
 
-    const response = await env.controlPlaneApi.http.fetch(
-      "/v1/triggers?kind=schedule&scheduleKind=recurring&sandboxProfileId=sbp_triggers_list_one_off_excluded&limit=10",
+    const defaultResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/triggers?kind=schedule&sandboxProfileId=sbp_triggers_list_one_off_excluded&limit=10",
       {
         headers: {
           cookie: session.cookie,
@@ -146,10 +146,10 @@ describe.concurrent("triggers list integration", () => {
       },
     );
 
-    expect(response.status).toBe(200);
-    const body = ListTriggersResponseSchema.parse(await response.json());
-    expect(body.totalResults).toBe(0);
-    expect(body.items).toEqual([]);
+    expect(defaultResponse.status).toBe(200);
+    const defaultBody = ListTriggersResponseSchema.parse(await defaultResponse.json());
+    expect(defaultBody.totalResults).toBe(0);
+    expect(defaultBody.items).toEqual([]);
   });
 
   it("applies trigger list filters before pagination and total results", async ({ env }) => {

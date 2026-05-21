@@ -61,7 +61,6 @@ function parseOptionalBooleanQueryValue(value: unknown): unknown {
 export const ListTriggersQuerySchema = createKeysetPaginationQuerySchema(PageSizeOptions).extend({
   sandboxProfileId: z.string().min(1).optional(),
   kind: z.enum([TriggerKinds.WEBHOOK, TriggerKinds.SCHEDULE]).optional(),
-  scheduleKind: z.enum([ScheduleKinds.RECURRING]).optional(),
   enabled: z.preprocess(parseOptionalBooleanQueryValue, z.boolean().optional()),
   search: z.string().trim().min(1).optional(),
 });
@@ -763,7 +762,6 @@ function buildListableTriggerWhereClause(input: {
   triggerId?: string | undefined;
   sandboxProfileId?: string | undefined;
   kind?: TriggerKind | undefined;
-  scheduleKind?: typeof ScheduleKinds.RECURRING | undefined;
   enabled?: boolean | undefined;
   search?: string | undefined;
   cursor?: z.infer<typeof CursorSchema> | undefined;
@@ -780,6 +778,7 @@ function buildListableTriggerWhereClause(input: {
         isNotNull(tables.scheduleTriggers.scheduleId),
         isNotNull(tables.schedules.id),
         eq(tables.schedules.organizationId, input.organizationId),
+        eq(tables.schedules.kind, ScheduleKinds.RECURRING),
         eq(tables.schedules.targetType, ScheduleTargetTypes.TRIGGER_RUN),
         isNull(tables.schedules.deletedAt),
       ),
@@ -788,7 +787,6 @@ function buildListableTriggerWhereClause(input: {
       ? undefined
       : eq(tables.triggerTargets.sandboxProfileId, input.sandboxProfileId),
     input.kind === undefined ? undefined : eq(tables.triggers.kind, input.kind),
-    input.scheduleKind === undefined ? undefined : eq(tables.schedules.kind, input.scheduleKind),
     input.enabled === undefined ? undefined : eq(tables.triggers.enabled, input.enabled),
     buildTriggerSearchClause({ tables, search: input.search }),
   );
@@ -828,7 +826,6 @@ async function listTriggerPageReferences(input: {
   triggerId?: string | undefined;
   sandboxProfileId?: string | undefined;
   kind?: TriggerKind | undefined;
-  scheduleKind?: typeof ScheduleKinds.RECURRING | undefined;
   enabled?: boolean | undefined;
   search?: string | undefined;
   limitPlusOne: number;
@@ -858,7 +855,6 @@ async function listTriggerPageReferences(input: {
         triggerId: input.triggerId,
         sandboxProfileId: input.sandboxProfileId,
         kind: input.kind,
-        scheduleKind: input.scheduleKind,
         enabled: input.enabled,
         search: input.search,
         cursor: input.cursor,
@@ -886,7 +882,6 @@ async function countListableTriggers(input: {
   organizationId: string;
   sandboxProfileId?: string | undefined;
   kind?: TriggerKind | undefined;
-  scheduleKind?: typeof ScheduleKinds.RECURRING | undefined;
   enabled?: boolean | undefined;
   search?: string | undefined;
 }): Promise<number> {
@@ -910,7 +905,6 @@ async function countListableTriggers(input: {
         organizationId: input.organizationId,
         sandboxProfileId: input.sandboxProfileId,
         kind: input.kind,
-        scheduleKind: input.scheduleKind,
         enabled: input.enabled,
         search: input.search,
       }),
@@ -974,7 +968,6 @@ export async function listTriggers(
           organizationId: input.organizationId,
           sandboxProfileId: input.sandboxProfileId,
           kind: input.kind,
-          scheduleKind: input.scheduleKind,
           enabled: input.enabled,
           search: input.search,
           limitPlusOne,
@@ -994,7 +987,6 @@ export async function listTriggers(
           organizationId: input.organizationId,
           sandboxProfileId: input.sandboxProfileId,
           kind: input.kind,
-          scheduleKind: input.scheduleKind,
           enabled: input.enabled,
           search: input.search,
         }),

@@ -114,12 +114,7 @@ export type SandboxProfileEditorPageStoryArgs = {
   draftTriggerImpactAffectedTriggers?: readonly SandboxProfileVersionDraftTriggerImpactTrigger[];
   duplicateProfileAvailability?: "available" | "unavailable";
   duplicateProfileDialogState?: "closed" | "open" | "error";
-  duplicateProfileTriggerState?:
-    | "none"
-    | "with-triggers"
-    | "historical-triggers"
-    | "loading"
-    | "error";
+  duplicateProfileTriggerState?: "none" | "with-triggers" | "loading" | "error";
   initialBindings?: readonly {
     id: string;
     connectionId: string;
@@ -895,6 +890,24 @@ function SandboxProfileEditorPageStoryView(
     };
   }
 
+  const copyableDuplicateProfileTriggerUsages =
+    duplicateProfileTriggerState === "with-triggers"
+      ? [
+          {
+            id: "trg_story_pr_checks",
+            kind: "webhook" as const,
+            name: "PR checks",
+            sandboxProfileVersion: mode.activeVersion ?? 1,
+          },
+          {
+            id: "trg_story_nightly",
+            kind: "schedule" as const,
+            name: "Nightly maintenance",
+            sandboxProfileVersion: mode.activeVersion ?? 1,
+          },
+        ]
+      : [];
+
   const editorView = (
     <SandboxProfileEditorView
       activeSectionId={activeSectionId}
@@ -905,36 +918,12 @@ function SandboxProfileEditorPageStoryView(
       deleteProfileIsPending={false}
       duplicateProfileError={
         input.duplicateProfileDialogState === "error"
-          ? "Sandbox profile must have a usable active version before it can be duplicated."
+          ? "Could not duplicate this sandbox profile. Please try again."
           : null
       }
       duplicateProfileIsAvailable={duplicateProfileIsAvailable}
       duplicateProfileIsPending={false}
-      duplicateProfileTriggerUsages={
-        duplicateProfileTriggerState === "with-triggers" ||
-        duplicateProfileTriggerState === "historical-triggers"
-          ? [
-              {
-                id: "trg_story_pr_checks",
-                kind: "webhook",
-                name: "PR checks",
-                sandboxProfileVersion:
-                  duplicateProfileTriggerState === "historical-triggers"
-                    ? (mode.activeVersion ?? 1) + 1
-                    : (mode.activeVersion ?? 1),
-              },
-              {
-                id: "trg_story_nightly",
-                kind: "schedule",
-                name: "Nightly maintenance",
-                sandboxProfileVersion:
-                  duplicateProfileTriggerState === "historical-triggers"
-                    ? (mode.activeVersion ?? 1) + 1
-                    : (mode.activeVersion ?? 1),
-              },
-            ]
-          : []
-      }
+      duplicateProfileTriggerUsages={copyableDuplicateProfileTriggerUsages}
       duplicateProfileTriggerUsagesError={
         duplicateProfileTriggerState === "error" ? "Could not load triggers." : null
       }

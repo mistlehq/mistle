@@ -50,15 +50,6 @@ export const DuplicateProfileWithTriggers: Story = {
   },
 };
 
-export const DuplicateProfileWithOnlyHistoricalTriggers: Story = {
-  args: {
-    duplicateProfileDialogState: "open",
-    duplicateProfileTriggerState: "historical-triggers",
-    lifecycleState: "published",
-    snapshotState: "snapshot-ready",
-  },
-};
-
 export const DuplicateProfileCheckingTriggers: Story = {
   args: {
     duplicateProfileDialogState: "closed",
@@ -68,10 +59,11 @@ export const DuplicateProfileCheckingTriggers: Story = {
   },
   play: async ({ canvasElement }): Promise<void> => {
     const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
 
     await userEvent.click(canvas.getByRole("button", { name: "More actions" }));
 
-    await expect(canvas.getByText("Checking triggers...")).toBeVisible();
+    await expect(body.getByText("Checking triggers...")).toBeVisible();
   },
 };
 
@@ -83,11 +75,12 @@ export const DuplicateProfileUnavailable: Story = {
   },
   play: async ({ canvasElement }): Promise<void> => {
     const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
 
     await userEvent.click(canvas.getByRole("button", { name: "More actions" }));
 
     await expect(
-      canvas.getByText("Requires the active published version to have a usable snapshot."),
+      body.getByText("Requires the active published version to have a usable snapshot."),
     ).toBeVisible();
   },
 };
@@ -110,13 +103,14 @@ export const DuplicateProfileTriggerCheckError: Story = {
   },
   play: async ({ canvasElement }): Promise<void> => {
     const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
 
     await userEvent.click(canvas.getByRole("button", { name: "More actions" }));
-    await userEvent.click(canvas.getByRole("menuitem", { name: "Duplicate" }));
+    await userEvent.click(body.getByRole("menuitem", { name: "Duplicate" }));
 
-    await expect(canvas.getByRole("heading", { name: "Duplicate sandbox profile" })).toBeVisible();
+    await expect(body.getByRole("heading", { name: "Duplicate sandbox profile" })).toBeVisible();
     await expect(
-      canvas.getByText(
+      body.getByText(
         "Could not check triggers for this profile. Duplicate will continue without triggers.",
       ),
     ).toBeVisible();
