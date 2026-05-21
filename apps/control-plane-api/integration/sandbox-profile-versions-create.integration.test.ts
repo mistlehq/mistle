@@ -150,6 +150,7 @@ describe.concurrent("sandbox profile versions create integration", () => {
       sandboxProfileId: "sbp_version_create_001",
       version: 3,
       state: SandboxProfileVersionStates.DRAFT,
+      publishedAt: null,
       defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
       agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
       ...EmptySandboxRuntimeConfig,

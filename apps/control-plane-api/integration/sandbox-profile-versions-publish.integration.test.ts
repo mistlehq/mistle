@@ -134,6 +134,7 @@ describe.concurrent("sandbox profile versions publish integration", () => {
         sandboxProfileId: "sbp_version_publish_001",
         version: 2,
         state: SandboxProfileVersionStates.PUBLISHED,
+        publishedAt: expect.any(String),
         defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
         ...EmptySandboxRuntimeConfig,
         gitCommitSigningIntegrationConnectionId: null,
