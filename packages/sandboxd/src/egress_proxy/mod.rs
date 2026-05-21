@@ -10,15 +10,9 @@
 use std::collections::BTreeMap;
 use std::convert::Infallible;
 use std::fmt::{self, Display};
-use std::fs::{self, DirBuilder, OpenOptions};
-use std::io::Write;
-use std::net::{IpAddr, SocketAddr, TcpListener as StdTcpListener, ToSocketAddrs};
-use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
-#[cfg(target_os = "linux")]
-use std::os::unix::io::AsRawFd;
-use std::path::{Path, PathBuf};
+use std::net::{SocketAddr, TcpListener as StdTcpListener};
+use std::path::Path;
 use std::pin::Pin;
-use std::process::Command;
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -41,7 +35,6 @@ use hyper_rustls::ConfigBuilderExt;
 use hyper_util::rt::TokioIo;
 use rustls_pki_types::pem::PemObject;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
-use serde::Deserialize;
 use serde_json::{Map, Value};
 use tokio::io::{AsyncRead, AsyncWrite, copy_bidirectional};
 use tokio::net::{TcpListener, TcpSocket, TcpStream};
@@ -58,14 +51,30 @@ use tokio_tungstenite::tungstenite::{
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, client_async, connect_async};
 use url::Url;
 
-use crate::protocol::startup::{
-    StartupInput, TransparentProxyBypassKind, TransparentProxyConfiguration,
-    TransparentProxyExclusionKind,
+use crate::egress_proxy::ca::{
+    ProxyCaConfig, ProxyCaInstallation, cleanup_proxy_ca_installation, emit_proxy_ca_lifecycle_log,
+    load_or_create_persistent_proxy_ca,
 };
-use crate::proxy_ca::{
-    GeneratedProxyCa, generate_proxy_ca, issue_proxy_leaf_certificate, validate_proxy_ca_material,
+use crate::egress_proxy::routing::{
+    EgressProxyRoute, RequestTarget, RequestTargetOverride, build_gateway_egress_route,
+    match_state_route, resolve_request_target,
 };
-use crate::runtime::{CompiledEgressRoute, CompiledRuntimePlan};
+#[cfg(test)]
+use crate::egress_proxy::routing::{build_direct_forward_uri, match_route};
+#[cfg(all(test, target_os = "linux"))]
+use crate::egress_proxy::transparent::socket_addr_from_sockaddr_storage;
+use crate::egress_proxy::transparent::{
+    TransparentPacketRules, configure_transparent_passthrough_upstream_socket,
+    recover_original_destination,
+};
+#[cfg(test)]
+use crate::egress_proxy::transparent::{
+    build_nftables_install_commands, build_nftables_rule_plan_with_local_destinations,
+    parse_iproute2_link_scope_ipv4_route_cidrs,
+};
+use crate::protocol::startup::StartupInput;
+use crate::proxy_ca::issue_proxy_leaf_certificate;
+use crate::runtime::CompiledRuntimePlan;
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
 use crate::time::{Clock, SystemClock, format_rfc3339_timestamp};
 use crate::tunnel::session::GatewayEgressTokenProvider;
@@ -106,20 +115,9 @@ const MANAGED_PROXY_ENV_KEYS: [&str; 8] = [
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 type HyperBody = BoxBody<Bytes, BoxError>;
 #[derive(Clone, Copy)]
-struct ProxyCaConfig<'a> {
-    runtime_certificate_path: &'a Path,
-    runtime_certificate_bundle_path: &'a Path,
-    persistent_certificate_path: &'a Path,
-    persistent_private_key_path: &'a Path,
-    trust_store_certificate_path: &'a Path,
-    system_certificate_bundle_path: &'a Path,
-    refresh_command: &'a Path,
-}
-
-#[derive(Clone, Copy)]
 struct EgressProxyLogContext<'a> {
-    clock: &'a dyn Clock,
-    sandbox_instance_id: &'a str,
+    pub(super) clock: &'a dyn Clock,
+    pub(super) sandbox_instance_id: &'a str,
 }
 
 #[derive(Debug)]
@@ -138,14 +136,6 @@ pub struct EgressProxy {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EgressProxyError {
     message: String,
-}
-
-#[derive(Debug, Clone)]
-struct EgressProxyRoute {
-    egress_rule_id: String,
-    hosts: Vec<String>,
-    path_prefixes: Vec<String>,
-    methods: Option<Vec<String>>,
 }
 
 #[derive(Clone)]
@@ -173,14 +163,6 @@ struct EgressProxyState {
     next_request_id: Arc<AtomicU64>,
 }
 
-#[derive(Debug)]
-struct ProxyCaInstallation {
-    runtime_certificate_path: PathBuf,
-    runtime_certificate_bundle_path: PathBuf,
-    trust_store_certificate_path: PathBuf,
-    refresh_command: PathBuf,
-}
-
 struct EgressProxySupervisorConfig {
     listener_address: SocketAddr,
     state: EgressProxyState,
@@ -196,35 +178,6 @@ struct ActiveEgressProxyServer {
     shutdown_tx: Option<oneshot::Sender<()>>,
     server_thread: Option<JoinHandle<Result<(), EgressProxyError>>>,
     exit_receiver: mpsc::Receiver<Result<(), EgressProxyError>>,
-}
-
-#[derive(Debug)]
-struct TransparentPacketRules {
-    table_name: &'static str,
-    local_destination_ipv4_cidrs: Vec<String>,
-    excluded_ipv4_cidrs: Vec<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct NftablesRulePlan {
-    table_name: &'static str,
-    listener_port: u16,
-    passthrough_mark: u32,
-    local_destination_ipv4_cidrs: Vec<String>,
-    excluded_ipv4_cidrs: Vec<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct RequestTarget {
-    authority: String,
-    host: String,
-    uri: Uri,
-}
-
-#[derive(Clone)]
-struct RequestTargetOverride {
-    scheme: &'static str,
-    default_authority: String,
 }
 
 enum DirectHttpUpstreamStream {
@@ -331,134 +284,6 @@ impl DirectGatewayEgressClient {
             .query_pairs_mut()
             .append_pair("target", &websocket_target_url(target_url)?);
         Ok(route_url.to_string())
-    }
-}
-
-impl ProxyCaInstallation {
-    fn install(
-        proxy_ca_certificate_pem: &str,
-        runtime_certificate_path: &Path,
-        runtime_certificate_bundle_path: &Path,
-        trust_store_certificate_path: &Path,
-        system_certificate_bundle_path: &Path,
-        refresh_command: &Path,
-        log_context: EgressProxyLogContext<'_>,
-    ) -> Result<Self, EgressProxyError> {
-        emit_proxy_ca_lifecycle_log(
-            log_context,
-            "egress_proxy_ca_install_started",
-            runtime_certificate_path,
-            trust_store_certificate_path,
-            refresh_command,
-            None,
-        );
-        let runtime_directory = runtime_certificate_path.parent().ok_or_else(|| {
-            EgressProxyError::new("egress proxy CA path must include a parent directory")
-        })?;
-        prepare_proxy_directory(runtime_directory)?;
-        let runtime_bundle_directory =
-            runtime_certificate_bundle_path.parent().ok_or_else(|| {
-                EgressProxyError::new("egress proxy CA bundle path must include a parent directory")
-            })?;
-        prepare_proxy_directory(runtime_bundle_directory)?;
-
-        let trust_store_directory = trust_store_certificate_path.parent().ok_or_else(|| {
-            EgressProxyError::new("egress proxy trust store path must include a parent directory")
-        })?;
-        prepare_system_trust_store_directory(trust_store_directory)?;
-        let system_certificate_bundle =
-            fs::read(system_certificate_bundle_path).map_err(|error| {
-                EgressProxyError::new(format!(
-                    "failed to read system certificate bundle '{}': {error}",
-                    system_certificate_bundle_path.display()
-                ))
-            })?;
-
-        fs::write(
-            runtime_certificate_path,
-            proxy_ca_certificate_pem.as_bytes(),
-        )
-        .map_err(|error| {
-            EgressProxyError::new(format!(
-                "failed to write local egress proxy certificate '{}': {error}",
-                runtime_certificate_path.display()
-            ))
-        })?;
-        let runtime_certificate_bundle =
-            build_combined_certificate_bundle(&system_certificate_bundle, proxy_ca_certificate_pem);
-        fs::write(runtime_certificate_bundle_path, &runtime_certificate_bundle).map_err(
-            |error| {
-                EgressProxyError::new(format!(
-                    "failed to write local egress proxy certificate bundle '{}': {error}",
-                    runtime_certificate_bundle_path.display()
-                ))
-            },
-        )?;
-        fs::write(
-            trust_store_certificate_path,
-            proxy_ca_certificate_pem.as_bytes(),
-        )
-        .map_err(|error| {
-            EgressProxyError::new(format!(
-                "failed to write local egress proxy trust store certificate '{}': {error}",
-                trust_store_certificate_path.display()
-            ))
-        })?;
-
-        let installation = Self {
-            runtime_certificate_path: runtime_certificate_path.to_path_buf(),
-            runtime_certificate_bundle_path: runtime_certificate_bundle_path.to_path_buf(),
-            trust_store_certificate_path: trust_store_certificate_path.to_path_buf(),
-            refresh_command: refresh_command.to_path_buf(),
-        };
-
-        if let Err(error) = installation.refresh_system_trust_store() {
-            let cleanup_error = installation.cleanup().err().map(|cleanup_error| {
-                format!(" cleanup after trust store refresh failure also failed: {cleanup_error}")
-            });
-            let suffix = cleanup_error.unwrap_or_default();
-            return Err(EgressProxyError::new(format!("{error}{suffix}")));
-        }
-
-        emit_proxy_ca_lifecycle_log(
-            log_context,
-            "egress_proxy_ca_install_completed",
-            runtime_certificate_path,
-            trust_store_certificate_path,
-            refresh_command,
-            None,
-        );
-
-        Ok(installation)
-    }
-
-    fn cleanup(&self) -> Result<(), EgressProxyError> {
-        match fs::remove_file(&self.runtime_certificate_path) {
-            Ok(()) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => {
-                return Err(EgressProxyError::new(format!(
-                    "failed to remove local egress proxy certificate '{}': {error}",
-                    self.runtime_certificate_path.display()
-                )));
-            }
-        }
-        match fs::remove_file(&self.runtime_certificate_bundle_path) {
-            Ok(()) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => {
-                return Err(EgressProxyError::new(format!(
-                    "failed to remove local egress proxy certificate bundle '{}': {error}",
-                    self.runtime_certificate_bundle_path.display()
-                )));
-            }
-        }
-
-        Ok(())
-    }
-
-    fn refresh_system_trust_store(&self) -> Result<(), EgressProxyError> {
-        run_update_ca_certificates(&self.refresh_command)
     }
 }
 
@@ -1034,126 +859,6 @@ fn default_loopback_proxy_listener_address() -> SocketAddr {
     SocketAddr::from(([127, 0, 0, 1], DEFAULT_LOOPBACK_PROXY_PORT))
 }
 
-fn load_or_create_persistent_proxy_ca(
-    proxy_ca_config: ProxyCaConfig<'_>,
-    clock: &dyn Clock,
-    _log_context: EgressProxyLogContext<'_>,
-) -> Result<GeneratedProxyCa, EgressProxyError> {
-    let certificate_exists = proxy_ca_config.persistent_certificate_path.exists();
-    let private_key_exists = proxy_ca_config.persistent_private_key_path.exists();
-
-    match (certificate_exists, private_key_exists) {
-        (true, true) => load_persistent_proxy_ca(proxy_ca_config),
-        (false, false) => {
-            let generated_proxy_ca = generate_proxy_ca(clock)
-                .map_err(|error| EgressProxyError::new(error.to_string()))?;
-            write_persistent_proxy_ca(proxy_ca_config, &generated_proxy_ca)?;
-            Ok(generated_proxy_ca)
-        }
-        (true, false) => Err(EgressProxyError::new(format!(
-            "persistent egress proxy CA certificate exists at '{}' but private key is missing at '{}'",
-            proxy_ca_config.persistent_certificate_path.display(),
-            proxy_ca_config.persistent_private_key_path.display()
-        ))),
-        (false, true) => Err(EgressProxyError::new(format!(
-            "persistent egress proxy CA private key exists at '{}' but certificate is missing at '{}'",
-            proxy_ca_config.persistent_private_key_path.display(),
-            proxy_ca_config.persistent_certificate_path.display()
-        ))),
-    }
-}
-
-fn load_persistent_proxy_ca(
-    proxy_ca_config: ProxyCaConfig<'_>,
-) -> Result<GeneratedProxyCa, EgressProxyError> {
-    let generated_proxy_ca =
-        GeneratedProxyCa {
-            certificate_pem: fs::read_to_string(proxy_ca_config.persistent_certificate_path)
-                .map_err(|error| {
-                    EgressProxyError::new(format!(
-                        "failed to read persistent egress proxy CA certificate '{}': {error}",
-                        proxy_ca_config.persistent_certificate_path.display()
-                    ))
-                })?,
-            private_key_pem: fs::read_to_string(proxy_ca_config.persistent_private_key_path)
-                .map_err(|error| {
-                    EgressProxyError::new(format!(
-                        "failed to read persistent egress proxy CA private key '{}': {error}",
-                        proxy_ca_config.persistent_private_key_path.display()
-                    ))
-                })?,
-        };
-    validate_proxy_ca_material(&generated_proxy_ca)
-        .map_err(|error| EgressProxyError::new(error.to_string()))?;
-    Ok(generated_proxy_ca)
-}
-
-fn write_persistent_proxy_ca(
-    proxy_ca_config: ProxyCaConfig<'_>,
-    generated_proxy_ca: &GeneratedProxyCa,
-) -> Result<(), EgressProxyError> {
-    let certificate_directory = proxy_ca_config
-        .persistent_certificate_path
-        .parent()
-        .ok_or_else(|| {
-            EgressProxyError::new("persistent egress proxy CA path must include a parent directory")
-        })?;
-    let private_key_directory = proxy_ca_config
-        .persistent_private_key_path
-        .parent()
-        .ok_or_else(|| {
-            EgressProxyError::new(
-                "persistent egress proxy CA private-key path must include a parent directory",
-            )
-        })?;
-    prepare_proxy_directory(certificate_directory)?;
-    prepare_proxy_directory(private_key_directory)?;
-    validate_proxy_ca_material(generated_proxy_ca)
-        .map_err(|error| EgressProxyError::new(error.to_string()))?;
-
-    write_new_file(
-        proxy_ca_config.persistent_certificate_path,
-        generated_proxy_ca.certificate_pem.as_bytes(),
-        0o644,
-        "persistent egress proxy CA certificate",
-    )?;
-    if let Err(error) = write_new_file(
-        proxy_ca_config.persistent_private_key_path,
-        generated_proxy_ca.private_key_pem.as_bytes(),
-        0o600,
-        "persistent egress proxy CA private key",
-    ) {
-        let _ = fs::remove_file(proxy_ca_config.persistent_certificate_path);
-        return Err(error);
-    }
-    Ok(())
-}
-
-fn write_new_file(
-    path: &Path,
-    contents: &[u8],
-    mode: u32,
-    description: &str,
-) -> Result<(), EgressProxyError> {
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(mode)
-        .open(path)
-        .map_err(|error| {
-            EgressProxyError::new(format!(
-                "failed to create {description} '{}': {error}",
-                path.display()
-            ))
-        })?;
-    file.write_all(contents).map_err(|error| {
-        EgressProxyError::new(format!(
-            "failed to write {description} '{}': {error}",
-            path.display()
-        ))
-    })
-}
-
 fn spawn_active_egress_proxy_server(
     std_listener: StdTcpListener,
     state: EgressProxyState,
@@ -1360,363 +1065,6 @@ fn normalize_egress_proxy_exit_result(
     }
 }
 
-impl TransparentPacketRules {
-    fn install(
-        configuration: &TransparentProxyConfiguration,
-        listener_port: u16,
-    ) -> Result<Self, EgressProxyError> {
-        let plan = build_nftables_rule_plan(configuration, listener_port)?;
-        cleanup_transparent_nftables_table(plan.table_name)?;
-        for command in build_nftables_install_commands(&plan) {
-            run_nft_command(&command)?;
-        }
-        Ok(Self {
-            table_name: plan.table_name,
-            local_destination_ipv4_cidrs: plan.local_destination_ipv4_cidrs,
-            excluded_ipv4_cidrs: plan.excluded_ipv4_cidrs,
-        })
-    }
-
-    fn cleanup(&self) -> Result<(), EgressProxyError> {
-        cleanup_transparent_nftables_table(self.table_name)
-    }
-}
-
-fn build_nftables_rule_plan(
-    configuration: &TransparentProxyConfiguration,
-    listener_port: u16,
-) -> Result<NftablesRulePlan, EgressProxyError> {
-    let local_destination_ipv4_cidrs = discover_local_destination_ipv4_cidrs()?;
-    build_nftables_rule_plan_with_local_destinations(
-        configuration,
-        listener_port,
-        local_destination_ipv4_cidrs,
-    )
-}
-
-fn build_nftables_rule_plan_with_local_destinations(
-    configuration: &TransparentProxyConfiguration,
-    listener_port: u16,
-    discovered_local_destination_ipv4_cidrs: Vec<String>,
-) -> Result<NftablesRulePlan, EgressProxyError> {
-    if configuration.passthrough_bypass.kind != TransparentProxyBypassKind::SocketMark {
-        return Err(EgressProxyError::new(
-            "transparent proxy packet rules require socket-mark passthrough bypass",
-        ));
-    }
-    if configuration.passthrough_bypass.mark == 0 {
-        return Err(EgressProxyError::new(
-            "transparent proxy socket-mark bypass value must be non-zero",
-        ));
-    }
-
-    let mut excluded_ipv4_cidrs = Vec::new();
-    for exclusion in &configuration.exclusions {
-        match exclusion.kind {
-            TransparentProxyExclusionKind::Cidr => {
-                if let Some(ipv4_cidr) = normalize_ipv4_cidr(&exclusion.value)? {
-                    excluded_ipv4_cidrs.push(ipv4_cidr);
-                }
-            }
-            TransparentProxyExclusionKind::Host => {
-                excluded_ipv4_cidrs.extend(resolve_host_exclusion_ipv4_cidrs(&exclusion.value)?);
-            }
-        }
-    }
-    excluded_ipv4_cidrs.sort();
-    excluded_ipv4_cidrs.dedup();
-
-    let mut local_destination_ipv4_cidrs = STATIC_LOCAL_DESTINATION_IPV4_CIDRS
-        .iter()
-        .map(|cidr| (*cidr).to_string())
-        .collect::<Vec<_>>();
-    for cidr in discovered_local_destination_ipv4_cidrs {
-        if let Some(ipv4_cidr) = normalize_ipv4_cidr(&cidr)? {
-            local_destination_ipv4_cidrs.push(ipv4_cidr);
-        }
-    }
-    local_destination_ipv4_cidrs.sort();
-    local_destination_ipv4_cidrs.dedup();
-    excluded_ipv4_cidrs.retain(|cidr| !local_destination_ipv4_cidrs.contains(cidr));
-
-    Ok(NftablesRulePlan {
-        table_name: TRANSPARENT_NFTABLES_TABLE_NAME,
-        listener_port,
-        passthrough_mark: configuration.passthrough_bypass.mark,
-        local_destination_ipv4_cidrs,
-        excluded_ipv4_cidrs,
-    })
-}
-
-fn discover_local_destination_ipv4_cidrs() -> Result<Vec<String>, EgressProxyError> {
-    let output = Command::new("ip")
-        .args(["-j", "-4", "route", "show", "table", "main", "scope", "link"])
-        .output()
-        .map_err(|error| {
-            EgressProxyError::new(format!(
-                "failed to discover transparent proxy local destination routes with iproute2: {error}"
-            ))
-        })?;
-    if !output.status.success() {
-        return Err(EgressProxyError::new(format!(
-            "failed to discover transparent proxy local destination routes: ip exited with status {}: {}",
-            output.status,
-            String::from_utf8_lossy(&output.stderr).trim()
-        )));
-    }
-    parse_iproute2_link_scope_ipv4_route_cidrs(&output.stdout)
-}
-
-#[derive(Deserialize)]
-struct Iproute2Route {
-    dst: Option<String>,
-}
-
-fn parse_iproute2_link_scope_ipv4_route_cidrs(
-    route_json: &[u8],
-) -> Result<Vec<String>, EgressProxyError> {
-    let routes: Vec<Iproute2Route> = serde_json::from_slice(route_json).map_err(|error| {
-        EgressProxyError::new(format!(
-            "failed to parse transparent proxy local destination routes from iproute2 JSON: {error}"
-        ))
-    })?;
-
-    let mut cidrs = Vec::new();
-    for route in routes {
-        let Some(destination) = route.dst else {
-            continue;
-        };
-        if destination == "default" {
-            continue;
-        }
-        cidrs.push(normalize_ipv4_route_destination(&destination)?);
-    }
-    cidrs.sort();
-    cidrs.dedup();
-    Ok(cidrs)
-}
-
-fn normalize_ipv4_route_destination(value: &str) -> Result<String, EgressProxyError> {
-    if value.contains('/') {
-        return normalize_ipv4_cidr(value)?.ok_or_else(|| {
-            EgressProxyError::new(format!(
-                "transparent proxy local destination route '{value}' is not IPv4"
-            ))
-        });
-    }
-
-    match value.parse::<IpAddr>().map_err(|error| {
-        EgressProxyError::new(format!(
-            "transparent proxy local destination route '{value}' has invalid IP address: {error}"
-        ))
-    })? {
-        IpAddr::V4(ipv4_address) => Ok(format!("{ipv4_address}/32")),
-        IpAddr::V6(_) => Err(EgressProxyError::new(format!(
-            "transparent proxy local destination route '{value}' is not IPv4"
-        ))),
-    }
-}
-
-fn normalize_ipv4_cidr(value: &str) -> Result<Option<String>, EgressProxyError> {
-    let (address, prefix) = value.split_once('/').ok_or_else(|| {
-        EgressProxyError::new(format!(
-            "transparent proxy CIDR exclusion '{value}' is missing a prefix length"
-        ))
-    })?;
-    let prefix_length = prefix.parse::<u8>().map_err(|error| {
-        EgressProxyError::new(format!(
-            "transparent proxy CIDR exclusion '{value}' has invalid prefix length: {error}"
-        ))
-    })?;
-    let ip_address = address.parse::<IpAddr>().map_err(|error| {
-        EgressProxyError::new(format!(
-            "transparent proxy CIDR exclusion '{value}' has invalid IP address: {error}"
-        ))
-    })?;
-
-    match ip_address {
-        IpAddr::V4(ipv4_address) => {
-            if prefix_length > 32 {
-                return Err(EgressProxyError::new(format!(
-                    "transparent proxy IPv4 CIDR exclusion '{value}' has prefix length greater than 32"
-                )));
-            }
-            Ok(Some(format!("{ipv4_address}/{prefix_length}")))
-        }
-        IpAddr::V6(_) => {
-            if prefix_length > 128 {
-                return Err(EgressProxyError::new(format!(
-                    "transparent proxy IPv6 CIDR exclusion '{value}' has prefix length greater than 128"
-                )));
-            }
-            Ok(None)
-        }
-    }
-}
-
-fn resolve_host_exclusion_ipv4_cidrs(host: &str) -> Result<Vec<String>, EgressProxyError> {
-    let socket_addresses = (host, 0).to_socket_addrs().map_err(|error| {
-        EgressProxyError::new(format!(
-            "failed to resolve transparent proxy host exclusion '{host}': {error}"
-        ))
-    })?;
-    let mut cidrs = socket_addresses
-        .filter_map(|socket_address| match socket_address.ip() {
-            IpAddr::V4(ipv4_address) => Some(format!("{ipv4_address}/32")),
-            IpAddr::V6(_) => None,
-        })
-        .collect::<Vec<_>>();
-    cidrs.sort();
-    cidrs.dedup();
-    if cidrs.is_empty() {
-        return Err(EgressProxyError::new(format!(
-            "transparent proxy host exclusion '{host}' did not resolve to an IPv4 address"
-        )));
-    }
-    Ok(cidrs)
-}
-
-fn build_nftables_install_commands(plan: &NftablesRulePlan) -> Vec<Vec<String>> {
-    let mut commands = vec![
-        vec![
-            "add".to_string(),
-            "table".to_string(),
-            "ip".to_string(),
-            plan.table_name.to_string(),
-        ],
-        vec![
-            "add".to_string(),
-            "chain".to_string(),
-            "ip".to_string(),
-            plan.table_name.to_string(),
-            "output".to_string(),
-            "{".to_string(),
-            "type".to_string(),
-            "nat".to_string(),
-            "hook".to_string(),
-            "output".to_string(),
-            "priority".to_string(),
-            "-100".to_string(),
-            ";".to_string(),
-            "policy".to_string(),
-            "accept".to_string(),
-            ";".to_string(),
-            "}".to_string(),
-        ],
-        vec![
-            "add".to_string(),
-            "rule".to_string(),
-            "ip".to_string(),
-            plan.table_name.to_string(),
-            "output".to_string(),
-            "meta".to_string(),
-            "mark".to_string(),
-            plan.passthrough_mark.to_string(),
-            "log".to_string(),
-            "prefix".to_string(),
-            nft_string_literal("mistle-tproxy-bypass=mark"),
-            "return".to_string(),
-        ],
-    ];
-
-    commands.extend(plan.local_destination_ipv4_cidrs.iter().map(|cidr| {
-        vec![
-            "add".to_string(),
-            "rule".to_string(),
-            "ip".to_string(),
-            plan.table_name.to_string(),
-            "output".to_string(),
-            "ip".to_string(),
-            "daddr".to_string(),
-            cidr.clone(),
-            "log".to_string(),
-            "prefix".to_string(),
-            nft_string_literal(&format!("mistle-tproxy-bypass=local:{cidr}")),
-            "return".to_string(),
-        ]
-    }));
-
-    commands.extend(plan.excluded_ipv4_cidrs.iter().map(|cidr| {
-        vec![
-            "add".to_string(),
-            "rule".to_string(),
-            "ip".to_string(),
-            plan.table_name.to_string(),
-            "output".to_string(),
-            "ip".to_string(),
-            "daddr".to_string(),
-            cidr.clone(),
-            "log".to_string(),
-            "prefix".to_string(),
-            nft_string_literal(&format!("mistle-tproxy-bypass=excluded:{cidr}")),
-            "return".to_string(),
-        ]
-    }));
-
-    commands.push(vec![
-        "add".to_string(),
-        "rule".to_string(),
-        "ip".to_string(),
-        plan.table_name.to_string(),
-        "output".to_string(),
-        "tcp".to_string(),
-        "dport".to_string(),
-        "1-65535".to_string(),
-        "redirect".to_string(),
-        "to".to_string(),
-        format!(":{}", plan.listener_port),
-    ]);
-
-    commands
-}
-
-fn nft_string_literal(value: &str) -> String {
-    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
-}
-
-fn run_nft_command(arguments: &[String]) -> Result<(), EgressProxyError> {
-    let output = Command::new("nft")
-        .args(arguments)
-        .output()
-        .map_err(|error| {
-            EgressProxyError::new(format!("failed to execute nft command: {error}"))
-        })?;
-    if output.status.success() {
-        return Ok(());
-    }
-
-    Err(EgressProxyError::new(format!(
-        "nft command failed with status {}: {}",
-        output.status,
-        String::from_utf8_lossy(&output.stderr).trim()
-    )))
-}
-
-fn cleanup_transparent_nftables_table(table_name: &str) -> Result<(), EgressProxyError> {
-    let output = Command::new("nft")
-        .args(["delete", "table", "ip", table_name])
-        .output()
-        .map_err(|error| {
-            EgressProxyError::new(format!("failed to execute nft cleanup command: {error}"))
-        })?;
-    if output.status.success() || nft_delete_table_error_is_absent(&output.stderr) {
-        return Ok(());
-    }
-
-    Err(EgressProxyError::new(format!(
-        "nft cleanup command failed with status {}: {}",
-        output.status,
-        String::from_utf8_lossy(&output.stderr).trim()
-    )))
-}
-
-fn nft_delete_table_error_is_absent(stderr: &[u8]) -> bool {
-    let stderr_text = String::from_utf8_lossy(stderr);
-    stderr_text.contains("No such file or directory")
-        || stderr_text.contains("No such table")
-        || stderr_text.contains("does not exist")
-}
-
 fn wait_for_egress_proxy_health(
     listener_address: SocketAddr,
     active_server: &mut ActiveEgressProxyServer,
@@ -1832,184 +1180,6 @@ fn bind_transparent_egress_proxy_listener(
     Ok(std_listener)
 }
 
-#[cfg(target_os = "linux")]
-fn recover_original_destination(
-    stream: &tokio::net::TcpStream,
-) -> Result<SocketAddr, EgressProxyError> {
-    let socket_fd = stream.as_raw_fd();
-    let (socket_level, socket_option) = match stream.local_addr() {
-        Ok(SocketAddr::V4(_)) => (nix::libc::SOL_IP, nix::libc::SO_ORIGINAL_DST),
-        Ok(SocketAddr::V6(_)) => (nix::libc::IPPROTO_IPV6, nix::libc::IP6T_SO_ORIGINAL_DST),
-        Err(error) => {
-            return Err(EgressProxyError::new(format!(
-                "failed to inspect transparent egress local address: {error}"
-            )));
-        }
-    };
-    let mut sockaddr = std::mem::MaybeUninit::<nix::libc::sockaddr_storage>::zeroed();
-    let mut sockaddr_length: nix::libc::socklen_t =
-        std::mem::size_of::<nix::libc::sockaddr_storage>()
-            .try_into()
-            .map_err(|_| EgressProxyError::new("sockaddr storage length does not fit socklen_t"))?;
-    let result = unsafe {
-        nix::libc::getsockopt(
-            socket_fd,
-            socket_level,
-            socket_option,
-            sockaddr.as_mut_ptr().cast(),
-            &mut sockaddr_length,
-        )
-    };
-    if result != 0 {
-        return Err(EgressProxyError::new(format!(
-            "failed to recover transparent egress original destination: {}",
-            std::io::Error::last_os_error()
-        )));
-    }
-
-    let sockaddr = unsafe { sockaddr.assume_init() };
-    socket_addr_from_sockaddr_storage(sockaddr, sockaddr_length)
-}
-
-#[cfg(not(target_os = "linux"))]
-fn recover_original_destination(
-    _stream: &tokio::net::TcpStream,
-) -> Result<SocketAddr, EgressProxyError> {
-    Err(EgressProxyError::new(
-        "transparent egress original destination lookup requires Linux SO_ORIGINAL_DST",
-    ))
-}
-
-#[cfg(target_os = "linux")]
-fn socket_addr_from_sockaddr_storage(
-    sockaddr: nix::libc::sockaddr_storage,
-    sockaddr_length: nix::libc::socklen_t,
-) -> Result<SocketAddr, EgressProxyError> {
-    match sockaddr.ss_family.into() {
-        nix::libc::AF_INET => {
-            let expected_length = std::mem::size_of::<nix::libc::sockaddr_in>();
-            if usize::try_from(sockaddr_length)
-                .ok()
-                .is_none_or(|length| length < expected_length)
-            {
-                return Err(EgressProxyError::new(
-                    "SO_ORIGINAL_DST returned a truncated IPv4 socket address",
-                ));
-            }
-            let sockaddr_in = unsafe {
-                std::ptr::addr_of!(sockaddr)
-                    .cast::<nix::libc::sockaddr_in>()
-                    .read_unaligned()
-            };
-            let address = std::net::Ipv4Addr::from(u32::from_be(sockaddr_in.sin_addr.s_addr));
-            let port = u16::from_be(sockaddr_in.sin_port);
-            Ok(SocketAddr::from((address, port)))
-        }
-        nix::libc::AF_INET6 => {
-            let expected_length = std::mem::size_of::<nix::libc::sockaddr_in6>();
-            if usize::try_from(sockaddr_length)
-                .ok()
-                .is_none_or(|length| length < expected_length)
-            {
-                return Err(EgressProxyError::new(
-                    "SO_ORIGINAL_DST returned a truncated IPv6 socket address",
-                ));
-            }
-            let sockaddr_in6 = unsafe {
-                std::ptr::addr_of!(sockaddr)
-                    .cast::<nix::libc::sockaddr_in6>()
-                    .read_unaligned()
-            };
-            let address = std::net::Ipv6Addr::from(sockaddr_in6.sin6_addr.s6_addr);
-            let port = u16::from_be(sockaddr_in6.sin6_port);
-            Ok(SocketAddr::from((address, port)))
-        }
-        family => Err(EgressProxyError::new(format!(
-            "SO_ORIGINAL_DST returned unsupported socket family {family}"
-        ))),
-    }
-}
-
-fn build_gateway_egress_route(
-    route: &CompiledEgressRoute,
-) -> Result<EgressProxyRoute, EgressProxyError> {
-    let upstream_url = url::Url::parse(&route.upstream.base_url).map_err(|error| {
-        EgressProxyError::new(format!(
-            "runtime plan egress route '{}' has invalid upstream base url '{}': {error}",
-            route.egress_rule_id, route.upstream.base_url
-        ))
-    })?;
-    if upstream_url.host_str().is_none() {
-        return Err(EgressProxyError::new(format!(
-            "runtime plan egress route '{}' upstream '{}' must include a host",
-            route.egress_rule_id, route.upstream.base_url
-        )));
-    }
-    if route.r#match.hosts.is_empty() {
-        return Err(EgressProxyError::new(format!(
-            "runtime plan egress route '{}' must include at least one match host",
-            route.egress_rule_id
-        )));
-    }
-
-    Ok(EgressProxyRoute {
-        egress_rule_id: route.egress_rule_id.clone(),
-        hosts: route
-            .r#match
-            .hosts
-            .iter()
-            .map(|host| normalize_match_host(host))
-            .collect(),
-        path_prefixes: route
-            .r#match
-            .path_prefixes
-            .clone()
-            .unwrap_or_else(|| vec!["/".to_string()]),
-        methods: route.r#match.methods.clone().map(|methods| {
-            methods
-                .into_iter()
-                .map(|method| method.to_ascii_uppercase())
-                .collect()
-        }),
-    })
-}
-
-fn prepare_proxy_directory(path: &Path) -> Result<(), EgressProxyError> {
-    DirBuilder::new()
-        .recursive(true)
-        .mode(0o700)
-        .create(path)
-        .map_err(|error| {
-            EgressProxyError::new(format!(
-                "failed to create local egress proxy directory '{}': {error}",
-                path.display()
-            ))
-        })
-}
-
-fn prepare_system_trust_store_directory(path: &Path) -> Result<(), EgressProxyError> {
-    fs::create_dir_all(path).map_err(|error| {
-        EgressProxyError::new(format!(
-            "failed to create system trust store directory '{}': {error}",
-            path.display()
-        ))
-    })
-}
-
-fn build_combined_certificate_bundle(
-    system_certificate_bundle: &[u8],
-    proxy_ca_certificate_pem: &str,
-) -> Vec<u8> {
-    let mut combined_bundle =
-        Vec::with_capacity(system_certificate_bundle.len() + proxy_ca_certificate_pem.len() + 1);
-    combined_bundle.extend_from_slice(system_certificate_bundle);
-    if !combined_bundle.ends_with(b"\n") {
-        combined_bundle.push(b'\n');
-    }
-    combined_bundle.extend_from_slice(proxy_ca_certificate_pem.as_bytes());
-    combined_bundle
-}
-
 #[derive(Clone, Copy)]
 enum DirectGatewayRouteScheme {
     Http,
@@ -2045,43 +1215,6 @@ fn resolve_direct_gateway_route_url(
         })?;
     route_url.set_path(route_path);
     Ok(route_url)
-}
-
-fn run_update_ca_certificates(command_path: &Path) -> Result<(), EgressProxyError> {
-    let output = Command::new(command_path).output().map_err(|error| {
-        EgressProxyError::new(format!(
-            "failed to run '{}' to refresh the system trust store: {error}",
-            command_path.display()
-        ))
-    })?;
-    if output.status.success() {
-        return Ok(());
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-    let mut output_parts = Vec::new();
-    if !stdout.is_empty() {
-        output_parts.push(format!("stdout={stdout}"));
-    }
-    if !stderr.is_empty() {
-        output_parts.push(format!("stderr={stderr}"));
-    }
-    let output_suffix = if output_parts.is_empty() {
-        String::new()
-    } else {
-        format!(" ({})", output_parts.join(" "))
-    };
-
-    Err(EgressProxyError::new(format!(
-        "'{}' failed while refreshing the system trust store with status {}{}",
-        command_path.display(),
-        output
-            .status
-            .code()
-            .map_or_else(|| "signal".to_string(), |code| code.to_string()),
-        output_suffix
-    )))
 }
 
 fn build_managed_proxy_env(
@@ -2396,29 +1529,6 @@ async fn connect_transparent_passthrough_upstream(
             "failed to connect transparent passthrough upstream '{original_destination}': {error}"
         ))
     })
-}
-
-#[cfg(target_os = "linux")]
-fn configure_transparent_passthrough_upstream_socket(
-    socket: &TcpSocket,
-) -> Result<(), EgressProxyError> {
-    nix::sys::socket::setsockopt(
-        socket,
-        nix::sys::socket::sockopt::Mark,
-        &TRANSPARENT_PASSTHROUGH_SOCKET_MARK,
-    )
-    .map_err(|error| {
-        EgressProxyError::new(format!(
-            "failed to mark transparent passthrough upstream socket: {error}"
-        ))
-    })
-}
-
-#[cfg(not(target_os = "linux"))]
-fn configure_transparent_passthrough_upstream_socket(
-    _socket: &TcpSocket,
-) -> Result<(), EgressProxyError> {
-    Ok(())
 }
 
 async fn handle_proxy_request(
@@ -3403,44 +2513,6 @@ fn response_from_direct_gateway_response(
         })
 }
 
-fn resolve_request_target(
-    request: &hyper::http::request::Parts,
-    target_override: Option<&RequestTargetOverride>,
-) -> Result<RequestTarget, EgressProxyError> {
-    let authority = if let Some(authority) = request.uri.authority() {
-        authority.as_str().to_string()
-    } else if let Some(host) = request.headers.get(HOST) {
-        host.to_str()
-            .map(|value| value.to_string())
-            .map_err(|error| {
-                EgressProxyError::new(format!("proxied request host header is invalid: {error}"))
-            })?
-    } else if let Some(target_override) = target_override {
-        target_override.default_authority.clone()
-    } else {
-        return Err(EgressProxyError::new("proxied request is missing a host"));
-    };
-    let scheme = target_override.map_or_else(
-        || request.uri.scheme_str().unwrap_or("http"),
-        |target_override| target_override.scheme,
-    );
-    let uri = match (
-        request.uri.scheme(),
-        request.uri.authority(),
-        target_override,
-    ) {
-        (Some(_), Some(_), None) => request.uri.clone(),
-        (Some(_), Some(_), Some(_)) => request.uri.clone(),
-        _ => build_direct_forward_uri(scheme, &authority, request.uri.path_and_query())?,
-    };
-
-    Ok(RequestTarget {
-        host: normalize_authority_host(&authority),
-        authority,
-        uri,
-    })
-}
-
 async fn accept_transparent_tls_stream(
     stream: tokio::net::TcpStream,
     fallback_authority: &str,
@@ -3493,22 +2565,6 @@ fn build_tls_server_config(
         })
 }
 
-fn build_direct_forward_uri(
-    scheme: &str,
-    authority: &str,
-    path_and_query: Option<&hyper::http::uri::PathAndQuery>,
-) -> Result<Uri, EgressProxyError> {
-    let path_and_query = path_and_query.map_or("/", |path_and_query| path_and_query.as_str());
-
-    format!("{scheme}://{authority}{path_and_query}")
-        .parse()
-        .map_err(|error| {
-            EgressProxyError::new(format!(
-                "failed to build direct forward uri for '{scheme}://{authority}{path_and_query}': {error}"
-            ))
-        })
-}
-
 fn websocket_target_url(target_url: &Uri) -> Result<String, EgressProxyError> {
     let mut parsed_target = Url::parse(&target_url.to_string()).map_err(|error| {
         EgressProxyError::new(format!(
@@ -3534,80 +2590,6 @@ fn websocket_target_url(target_url: &Uri) -> Result<String, EgressProxyError> {
 
 fn box_hyper_error(error: hyper::Error) -> BoxError {
     Box::new(error)
-}
-
-fn normalize_authority_host(authority: &str) -> String {
-    let normalized_authority = authority.trim().to_ascii_lowercase();
-    normalized_authority
-        .strip_prefix('[')
-        .and_then(|authority| authority.split_once(']'))
-        .map_or_else(
-            || {
-                normalized_authority.split_once(':').map_or_else(
-                    || normalized_authority.to_string(),
-                    |(host, _)| host.to_string(),
-                )
-            },
-            |(host, _)| host.to_string(),
-        )
-}
-
-fn match_state_route(
-    state: &EgressProxyState,
-    host: &str,
-    path: &str,
-    method: &str,
-) -> Result<Option<EgressProxyRoute>, EgressProxyError> {
-    let routes = state
-        .routes
-        .read()
-        .map_err(|_| EgressProxyError::new("egress proxy route table lock is poisoned"))?;
-    match_route(&routes, host, path, method).map(|route| route.cloned())
-}
-
-fn match_route<'a>(
-    routes: &'a [EgressProxyRoute],
-    host: &str,
-    path: &str,
-    method: &str,
-) -> Result<Option<&'a EgressProxyRoute>, EgressProxyError> {
-    let normalized_host = normalize_authority_host(host);
-    let matching_routes = routes
-        .iter()
-        .filter(|route| {
-            route
-                .hosts
-                .iter()
-                .any(|route_host| route_host == &normalized_host)
-                && route
-                    .path_prefixes
-                    .iter()
-                    .any(|path_prefix| path.starts_with(path_prefix))
-                && route
-                    .methods
-                    .as_ref()
-                    .is_none_or(|methods| methods.iter().any(|route_method| route_method == method))
-        })
-        .collect::<Vec<_>>();
-
-    match matching_routes.as_slice() {
-        [] => Ok(None),
-        [route] => Ok(Some(*route)),
-        _ => Err(EgressProxyError::new(format!(
-            "multiple sandbox egress routes matched proxied request {method} {host}{path}"
-        ))),
-    }
-}
-
-fn normalize_match_host(host: &str) -> String {
-    let normalized_host = host.trim().to_ascii_lowercase();
-    if let Some((host, _)) = normalized_host
-        .strip_prefix('[')
-        .and_then(|host| host.split_once(']'))
-    {
-        return host.to_string();
-    }
-    normalized_host
 }
 
 fn filter_outbound_request_headers(
@@ -3745,77 +2727,6 @@ fn emit_egress_proxy_log(
     }
 }
 
-fn emit_proxy_ca_lifecycle_log(
-    log_context: EgressProxyLogContext<'_>,
-    event: &str,
-    runtime_certificate_path: &Path,
-    trust_store_certificate_path: &Path,
-    refresh_command: &Path,
-    error: Option<String>,
-) {
-    let mut fields = vec![
-        (
-            "runtimeCertificatePath",
-            Value::String(runtime_certificate_path.display().to_string()),
-        ),
-        (
-            "trustStoreCertificatePath",
-            Value::String(trust_store_certificate_path.display().to_string()),
-        ),
-        (
-            "refreshCommand",
-            Value::String(refresh_command.display().to_string()),
-        ),
-    ];
-    if let Some(error) = error {
-        fields.push(("error", Value::String(error)));
-    }
-    emit_egress_proxy_log(
-        log_context.clock,
-        log_context.sandbox_instance_id,
-        event,
-        &fields,
-    );
-}
-
-fn cleanup_proxy_ca_installation(
-    installation: &ProxyCaInstallation,
-    log_context: EgressProxyLogContext<'_>,
-) -> Result<(), EgressProxyError> {
-    emit_proxy_ca_lifecycle_log(
-        log_context,
-        "egress_proxy_ca_cleanup_started",
-        &installation.runtime_certificate_path,
-        &installation.trust_store_certificate_path,
-        &installation.refresh_command,
-        None,
-    );
-    match installation.cleanup() {
-        Ok(()) => {
-            emit_proxy_ca_lifecycle_log(
-                log_context,
-                "egress_proxy_ca_cleanup_completed",
-                &installation.runtime_certificate_path,
-                &installation.trust_store_certificate_path,
-                &installation.refresh_command,
-                None,
-            );
-            Ok(())
-        }
-        Err(error) => {
-            emit_proxy_ca_lifecycle_log(
-                log_context,
-                "egress_proxy_ca_cleanup_failed",
-                &installation.runtime_certificate_path,
-                &installation.trust_store_certificate_path,
-                &installation.refresh_command,
-                Some(error.to_string()),
-            );
-            Err(error)
-        }
-    }
-}
-
 fn serialize_egress_proxy_log_line(
     clock: &dyn Clock,
     sandbox_instance_id: &str,
@@ -3852,3 +2763,7 @@ fn text_response(status: StatusCode, message: impl Into<String>) -> Response<Hyp
 
 #[cfg(test)]
 mod tests;
+
+mod ca;
+mod routing;
+mod transparent;

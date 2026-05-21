@@ -8,18 +8,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fs;
-use std::io::Write;
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
 use crate::codex_proxy::CodexProxyControlHandle;
-use crate::command::{
-    CommandFailure, CommandOutputSink, CommandOutputStream, CommandSpec,
-    DEFAULT_COMMAND_POLL_INTERVAL, run_command_with_details_and_output_sink,
-};
+use crate::command::{CommandFailure, CommandOutputSink, CommandOutputStream};
 use crate::egress_proxy::EgressProxy;
 use crate::keepalive::KeepaliveManager;
 use crate::process;
@@ -27,13 +22,22 @@ use crate::process::{CodexAppServerControlHandle, CodexAppServerObservationHandl
 use crate::protocol::startup::{
     StartupExecutionMode, StartupInput, StartupMode, StartupOperationKind,
 };
-use crate::pty::{DEFAULT_PTY_SHELL, DEFAULT_PTY_TERM};
 use crate::runtime;
 use crate::runtime::CompiledRuntimePlanImageSource;
 use crate::runtime::RuntimePlanApplyError;
 use crate::runtime::adapters::{RuntimeAdapterRegistry, RuntimeAdapters};
 use crate::runtime::readiness::{
     RuntimeReadinessManager, RuntimeReadinessMode, derive_runtime_ready,
+};
+use crate::sandboxd_state::runtime_environment::{
+    collect_mistle_context_runtime_environment, collect_runtime_environment,
+    merge_managed_runtime_environment,
+};
+use crate::sandboxd_state::setup_script::run_setup_script_with_output_sink;
+#[cfg(test)]
+use crate::sandboxd_state::setup_script::{
+    build_setup_script_environment, run_setup_script, run_setup_script_in_directory,
+    run_setup_script_in_directory_with_output_sink,
 };
 use crate::startup_diagnostics::{
     StartupDiagnosticsLogger, StartupTranscriptStream, startup_diagnostics_string,
@@ -1590,114 +1594,6 @@ fn close_egress_proxy_after_failure(
     }
 }
 
-fn collect_runtime_environment(
-    runtime_plan: &runtime::CompiledRuntimePlan,
-) -> Result<BTreeMap<String, String>, String> {
-    let mut runtime_env = BTreeMap::new();
-
-    for artifact in &runtime_plan.artifacts {
-        let Some(artifact_env) = &artifact.env else {
-            continue;
-        };
-
-        for (name, value) in artifact_env {
-            match runtime_env.get(name) {
-                Some(existing_value) if existing_value != value => {
-                    return Err(format!(
-                        "runtime plan artifacts define conflicting values for env '{name}'"
-                    ));
-                }
-                Some(_) => {}
-                None => {
-                    runtime_env.insert(name.clone(), value.clone());
-                }
-            }
-        }
-    }
-
-    Ok(runtime_env)
-}
-
-fn merge_managed_runtime_environment(
-    mut runtime_env: BTreeMap<String, String>,
-    mistle_context_env: &BTreeMap<String, String>,
-    egress_proxy: Option<&EgressProxy>,
-) -> Result<BTreeMap<String, String>, String> {
-    for (name, value) in mistle_context_env {
-        insert_managed_runtime_environment(&mut runtime_env, name, value)?;
-    }
-
-    insert_managed_runtime_environment(
-        &mut runtime_env,
-        GLOBAL_GIT_CONFIG_ENV_NAME,
-        DEFAULT_GLOBAL_GIT_CONFIG_PATH,
-    )?;
-
-    if let Some(egress_proxy) = egress_proxy {
-        for (name, value) in egress_proxy.runtime_env() {
-            insert_managed_runtime_environment(&mut runtime_env, name, value)?;
-        }
-    }
-
-    Ok(runtime_env)
-}
-
-fn collect_mistle_context_runtime_environment(
-    startup_input: &StartupInput,
-    sandbox_instance_id: &str,
-) -> Result<BTreeMap<String, String>, String> {
-    let Some(sandbox_profile_id) = startup_input
-        .runtime_plan
-        .get("sandboxProfileId")
-        .and_then(serde_json::Value::as_str)
-        .filter(|value| !value.trim().is_empty())
-    else {
-        return Err("runtime plan sandboxProfileId is required for managed env".to_string());
-    };
-    let Some(sandbox_profile_version) = startup_input
-        .runtime_plan
-        .get("version")
-        .and_then(serde_json::Value::as_u64)
-    else {
-        return Err("runtime plan version is required for managed env".to_string());
-    };
-
-    Ok(BTreeMap::from([
-        (
-            MISTLE_SANDBOX_INSTANCE_ID_ENV_NAME.to_string(),
-            sandbox_instance_id.to_string(),
-        ),
-        (
-            MISTLE_SANDBOX_PROFILE_ID_ENV_NAME.to_string(),
-            sandbox_profile_id.to_string(),
-        ),
-        (
-            MISTLE_SANDBOX_PROFILE_VERSION_ENV_NAME.to_string(),
-            sandbox_profile_version.to_string(),
-        ),
-    ]))
-}
-
-fn insert_managed_runtime_environment(
-    runtime_env: &mut BTreeMap<String, String>,
-    name: &str,
-    value: &str,
-) -> Result<(), String> {
-    match runtime_env.get(name) {
-        Some(existing_value) if existing_value != value => {
-            return Err(format!(
-                "runtime plan artifacts define managed env '{name}', which sandboxd reserves"
-            ));
-        }
-        Some(_) => {}
-        None => {
-            runtime_env.insert(name.to_string(), value.to_string());
-        }
-    }
-
-    Ok(())
-}
-
 fn scrub_snapshot_runtime_artifacts() -> Result<(), String> {
     scrub_snapshot_runtime_artifacts_at_paths(
         Path::new(SNAPSHOT_RUNTIME_ARTIFACTS_DIRECTORY),
@@ -1734,174 +1630,8 @@ fn scrub_snapshot_runtime_artifacts_at_paths(
     Ok(())
 }
 
-#[cfg(test)]
-fn run_setup_script<C, S>(
-    runtime_plan: &runtime::CompiledRuntimePlan,
-    runtime_env: &BTreeMap<String, String>,
-    clock: &C,
-    sleeper: &S,
-) -> Result<(), CommandFailure>
-where
-    C: Clock + ?Sized,
-    S: Sleeper + ?Sized,
-{
-    run_setup_script_with_output_sink(runtime_plan, runtime_env, clock, sleeper, None)
-}
-
-fn run_setup_script_with_output_sink<C, S>(
-    runtime_plan: &runtime::CompiledRuntimePlan,
-    runtime_env: &BTreeMap<String, String>,
-    clock: &C,
-    sleeper: &S,
-    output_sink: Option<Arc<dyn CommandOutputSink>>,
-) -> Result<(), CommandFailure>
-where
-    C: Clock + ?Sized,
-    S: Sleeper + ?Sized,
-{
-    run_setup_script_in_directory_with_output_sink(
-        runtime_plan,
-        runtime_env,
-        SETUP_SCRIPT_WORKING_DIRECTORY,
-        clock,
-        sleeper,
-        output_sink,
-    )
-}
-
-#[cfg(test)]
-fn run_setup_script_in_directory<C, S>(
-    runtime_plan: &runtime::CompiledRuntimePlan,
-    runtime_env: &BTreeMap<String, String>,
-    working_directory: &str,
-    clock: &C,
-    sleeper: &S,
-) -> Result<(), CommandFailure>
-where
-    C: Clock + ?Sized,
-    S: Sleeper + ?Sized,
-{
-    run_setup_script_in_directory_with_output_sink(
-        runtime_plan,
-        runtime_env,
-        working_directory,
-        clock,
-        sleeper,
-        None,
-    )
-}
-
-fn run_setup_script_in_directory_with_output_sink<C, S>(
-    runtime_plan: &runtime::CompiledRuntimePlan,
-    runtime_env: &BTreeMap<String, String>,
-    working_directory: &str,
-    clock: &C,
-    sleeper: &S,
-    output_sink: Option<Arc<dyn CommandOutputSink>>,
-) -> Result<(), CommandFailure>
-where
-    C: Clock + ?Sized,
-    S: Sleeper + ?Sized,
-{
-    let Some(setup_script) = runtime_plan.setup_script.as_ref() else {
-        return Ok(());
-    };
-    if setup_script.trim().is_empty() {
-        return Ok(());
-    }
-
-    let mut setup_script_file = tempfile::Builder::new()
-        .prefix("mistle-setup-script-")
-        .suffix(".sh")
-        .tempfile()
-        .map_err(|error| {
-            setup_script_file_failure(format!("failed to create temporary file: {error}"))
-        })?;
-    setup_script_file
-        .write_all(setup_script.as_bytes())
-        .map_err(|error| {
-            setup_script_file_failure(format!("failed to write temporary script file: {error}"))
-        })?;
-    setup_script_file.as_file_mut().flush().map_err(|error| {
-        setup_script_file_failure(format!("failed to flush temporary script file: {error}"))
-    })?;
-    fs::set_permissions(
-        setup_script_file.path(),
-        fs::Permissions::from_mode(SETUP_SCRIPT_FILE_MODE),
-    )
-    .map_err(|error| {
-        setup_script_file_failure(format!(
-            "failed to make temporary script executable: {error}"
-        ))
-    })?;
-
-    let setup_script_path = setup_script_file.into_temp_path();
-    let setup_script_path_ref: &Path = setup_script_path.as_ref();
-    let setup_script_command_path = setup_script_path_ref
-        .to_str()
-        .ok_or_else(|| {
-            setup_script_file_failure("temporary script path is not valid unicode".to_string())
-        })?
-        .to_string();
-    let shell_args = build_setup_script_command_args(setup_script, setup_script_command_path);
-    let environment = build_setup_script_environment(runtime_env);
-
-    let run_result = run_command_with_details_and_output_sink(
-        CommandSpec {
-            args: &shell_args,
-            env: Some(&environment),
-            cwd: Some(working_directory),
-            timeout_ms: None,
-        },
-        clock,
-        sleeper,
-        DEFAULT_COMMAND_POLL_INTERVAL,
-        output_sink,
-    );
-    let cleanup_result = setup_script_path.close().map_err(|error| {
-        setup_script_file_failure(format!("failed to remove temporary script file: {error}"))
-    });
-
-    match (run_result, cleanup_result) {
-        (Ok(()), Ok(())) => Ok(()),
-        (Err(error), Ok(())) => Err(error),
-        (Ok(()), Err(error)) | (Err(_), Err(error)) => Err(error),
-    }
-}
-
-fn build_setup_script_command_args(setup_script: &str, setup_script_path: String) -> Vec<String> {
-    if setup_script.as_bytes().starts_with(b"#!") {
-        return vec![setup_script_path];
-    }
-
-    vec![
-        DEFAULT_PTY_SHELL.to_string(),
-        "-l".to_string(),
-        setup_script_path,
-    ]
-}
-
-fn setup_script_file_failure(message: String) -> CommandFailure {
-    CommandFailure {
-        message,
-        exit_code: None,
-        timed_out: false,
-        output_tails: Default::default(),
-    }
-}
-
-fn build_setup_script_environment(
-    runtime_env: &BTreeMap<String, String>,
-) -> BTreeMap<String, String> {
-    let mut environment = std::env::vars().collect::<BTreeMap<_, _>>();
-    environment.insert("TERM".to_string(), DEFAULT_PTY_TERM.to_string());
-
-    for (name, value) in runtime_env {
-        environment.insert(name.clone(), value.clone());
-    }
-
-    environment
-}
+mod runtime_environment;
+mod setup_script;
 
 #[cfg(test)]
 mod tests {
@@ -3529,7 +3259,6 @@ function websocketFrame(payload) {
   const header = body.length < 126 ? Buffer.from([0x81, body.length]) : Buffer.from([0x81, 126, body.length >> 8, body.length & 0xff]);
   return Buffer.concat([header, body]);
 }
-
 function tryReadFrame(buffer) {
   if (buffer.length < 2) {
     return null;
