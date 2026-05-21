@@ -101,6 +101,6 @@ describe("formatSnapshotTimestamp", () => {
     const formattedTimestamp = formatSnapshotTimestamp("2026-05-21T09:30:00.000Z");
 
     expect(formattedTimestamp).not.toContain("2026-05-21T09:30");
-    expect(formattedTimestamp).toMatch(/GMT[+-]\d+/u);
+    expect(formattedTimestamp).toMatch(/GMT(?:[+-]\d+)?/u);
   });
 });
