@@ -17,7 +17,9 @@ export function createMcpRoutes(): AppRoutes<typeof MCP_ROUTE_BASE_PATH> {
     const transport = new WebStandardStreamableHTTPServerTransport();
     const server = createMistleMcpServer({
       db: ctx.get("db"),
+      integrationRegistry: ctx.get("integrationRegistry"),
       organizationActor,
+      sandboxConfig: ctx.get("sandboxConfig"),
     });
     await server.connect(transport);
 

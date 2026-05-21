@@ -2,8 +2,9 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
-import { SandboxProfileStatuses } from "@mistle/db/control-plane";
+import { SandboxProfileStatuses, SandboxProfileVersionStates } from "@mistle/db/control-plane";
 import { mintMcpToken } from "@mistle/gateway-tunnel-auth";
+import { SandboxProvider } from "@mistle/sandbox";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
@@ -14,9 +15,11 @@ import { z } from "zod";
 import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import {
   ListSandboxProfilesResponseSchema,
+  PutSandboxProfileVersionDraftResponseSchema,
   SandboxProfileSchema,
 } from "../src/sandbox-profiles/index.js";
 import { createApiKeyCredential, createApiKeyToken } from "./helpers/api-keys.js";
+import { sandboxProfileRow, sandboxProfileVersionRow } from "./helpers/sandbox-profiles.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api"],
@@ -128,6 +131,65 @@ describe.concurrent("MCP profile tools integration", () => {
     expect(profile.displayName).toBe("MCP Get Profile");
   });
 
+  it("updates a sandbox profile draft setup script with the REST response shape", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-profile-draft-setup-put@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP profile draft setup script writer",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_UPDATE],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_mcp_draft_setup_put",
+        organizationId: session.organizationId,
+        displayName: "MCP Draft Setup Put Profile",
+        createdAt: "2026-05-01T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_mcp_draft_setup_put",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        setupScript: "pnpm install",
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const setupScript = "pnpm install\npnpm test";
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "profile_draft_setup_script_put",
+      arguments: {
+        profileId: "sbp_mcp_draft_setup_put",
+        version: 1,
+        setupScript,
+      },
+    });
+
+    expect(result.isError).toBeUndefined();
+    const draft = PutSandboxProfileVersionDraftResponseSchema.parse(result.structuredContent);
+    expect(draft.sandboxProfileId).toBe("sbp_mcp_draft_setup_put");
+    expect(draft.version).toBe(1);
+    expect(draft.setupScript).toBe(setupScript);
+
+    const persistedDraft = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        setupScript: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, "sbp_mcp_draft_setup_put"), eq(table.version, 1)),
+    });
+    expect(persistedDraft?.setupScript).toBe(setupScript);
+  });
+
   it("authorizes profile tools with a gateway-injected MCP token referencing an API key", async ({
     env,
   }) => {
@@ -193,6 +255,33 @@ describe.concurrent("MCP profile tools integration", () => {
       token,
       name: "profile_list",
       arguments: {},
+    });
+
+    expect(result.isError).toBe(true);
+  });
+
+  it("returns a tool error when the API key lacks sandbox profile update permission", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-profile-update-forbidden@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP profile reader",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_READ],
+    });
+
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "profile_draft_setup_script_put",
+      arguments: {
+        profileId: "sbp_mcp_update_forbidden",
+        version: 1,
+        setupScript: "pnpm install",
+      },
     });
 
     expect(result.isError).toBe(true);

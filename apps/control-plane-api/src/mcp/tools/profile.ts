@@ -1,3 +1,4 @@
+import { z } from "@hono/zod-openapi";
 import { ForbiddenError } from "@mistle/http/errors.js";
 import type { CallToolResult, McpServer, ToolAnnotations } from "@modelcontextprotocol/server";
 
@@ -8,11 +9,14 @@ import {
 import {
   listSandboxProfilesQuerySchema,
   listSandboxProfilesResponseSchema,
+  putSandboxProfileVersionDraftResponseSchema,
   sandboxProfileIdParamsSchema,
+  sandboxProfileVersionParamsSchema,
   sandboxProfileSchema,
 } from "../../sandbox-profiles/schemas.js";
 import { getProfile } from "../../sandbox-profiles/services/get-profile.js";
 import { listProfiles } from "../../sandbox-profiles/services/list-profiles.js";
+import { putProfileVersionDraft } from "../../sandbox-profiles/services/put-profile-version-draft.js";
 import type { AppOrganizationActor } from "../../types.js";
 import type { MistleMcpServerContext } from "../server.js";
 
@@ -22,6 +26,19 @@ const ReadOnlyToolAnnotations: ToolAnnotations = {
   idempotentHint: true,
   openWorldHint: false,
 };
+
+const MutatingToolAnnotations: ToolAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false,
+};
+
+const profileDraftSetupScriptPutInputSchema = sandboxProfileVersionParamsSchema
+  .extend({
+    setupScript: z.string().min(1).nullable(),
+  })
+  .strict();
 
 export function registerProfileTools(server: McpServer, context: MistleMcpServerContext): void {
   server.registerTool(
@@ -85,6 +102,42 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
       );
 
       return structuredResult(profile);
+    },
+  );
+
+  server.registerTool(
+    "profile_draft_setup_script_put",
+    {
+      title: "Put sandbox profile draft setup script",
+      description: "Update the setup script for a sandbox profile draft version",
+      inputSchema: profileDraftSetupScriptPutInputSchema,
+      outputSchema: putSandboxProfileVersionDraftResponseSchema,
+      annotations: {
+        ...MutatingToolAnnotations,
+        title: "Put sandbox profile draft setup script",
+      },
+    },
+    async ({ profileId, version, setupScript }) => {
+      requireMcpToolPermission(
+        context.organizationActor,
+        OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
+      );
+
+      const draft = await putProfileVersionDraft(
+        {
+          db: context.db,
+          integrationRegistry: context.integrationRegistry,
+          sandboxConfig: context.sandboxConfig,
+        },
+        {
+          organizationId: context.organizationActor.organizationId,
+          profileId,
+          profileVersion: version,
+          setupScript,
+        },
+      );
+
+      return structuredResult(draft);
     },
   );
 }
