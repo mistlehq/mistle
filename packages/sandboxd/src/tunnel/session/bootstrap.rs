@@ -843,3 +843,91 @@ pub(in crate::tunnel::session) fn write_tunnel_close(
     let _ = tunnel_writer_sender.send(TunnelWriterMessage::Close);
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use crate::protocol::startup::{
+        StartupExecutionMode, StartupInput, StartupMode, StartupOperationKind,
+        TransparentProxyBypass, TransparentProxyBypassKind, TransparentProxyConfiguration,
+    };
+    use crate::tunnel::session::bootstrap::{
+        prioritize_ipv4_socket_addresses, resolve_tunnel_exchange_url,
+        startup_transparent_passthrough_socket_mark,
+    };
+
+    #[test]
+    fn prioritize_ipv4_socket_addresses_sorts_ipv4_before_ipv6() {
+        let addresses = vec![
+            "[2606:4700:3031::ac43:8542]:443"
+                .parse()
+                .expect("ipv6 address should parse"),
+            "104.21.133.66:443"
+                .parse()
+                .expect("ipv4 address should parse"),
+            "[2606:4700:3032::6815:8542]:443"
+                .parse()
+                .expect("second ipv6 address should parse"),
+            "172.67.133.66:443"
+                .parse()
+                .expect("second ipv4 address should parse"),
+        ];
+
+        let prioritized = prioritize_ipv4_socket_addresses(addresses);
+
+        assert!(prioritized[0].is_ipv4(), "first address should prefer ipv4");
+        assert!(
+            prioritized[1].is_ipv4(),
+            "second address should prefer ipv4"
+        );
+        assert!(
+            prioritized[2].is_ipv6(),
+            "third address should fall back to ipv6"
+        );
+        assert!(
+            prioritized[3].is_ipv6(),
+            "fourth address should fall back to ipv6"
+        );
+    }
+
+    #[test]
+    fn tunnel_exchange_url_preserves_gateway_query_parameters() {
+        let exchange_url = resolve_tunnel_exchange_url(
+            "ws://127.0.0.1:5202/tunnel/sandbox/sbi_123?x-mistle-test-environment-id=test_env_123",
+        )
+        .expect("tunnel exchange URL should be derivable");
+
+        assert_eq!(
+            exchange_url,
+            "http://127.0.0.1:5202/tunnel/sandbox/sbi_123/token-exchange?x-mistle-test-environment-id=test_env_123"
+        );
+    }
+
+    #[test]
+    fn derives_transparent_passthrough_socket_mark_for_bootstrap_tunnel() {
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            operation_kind: StartupOperationKind::Start,
+            execution_mode: StartupExecutionMode::Session,
+            bootstrap_token: "bootstrap-token".to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token".to_string(),
+            tunnel_gateway_ws_url: "wss://gateway.example.test/tunnel/sandbox/sbi_123".to_string(),
+            acting_user_id: None,
+            runtime_plan: json!({}),
+            git_identity: None,
+            transparent_proxy: Some(TransparentProxyConfiguration {
+                passthrough_bypass: TransparentProxyBypass {
+                    kind: TransparentProxyBypassKind::SocketMark,
+                    mark: 38_514,
+                },
+                exclusions: Vec::new(),
+            }),
+        };
+
+        assert_eq!(
+            startup_transparent_passthrough_socket_mark(&startup_input),
+            Some(38_514)
+        );
+    }
+}

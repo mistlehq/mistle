@@ -50,4 +50,4 @@ pub(in crate::tunnel::session) const TUNNEL_RECONNECT_BACKOFF_MS: [u64; 6] =
     [0, 250, 500, 1000, 2000, 5000];
 
 #[cfg(test)]
-mod tests;
+mod workflow_tests;

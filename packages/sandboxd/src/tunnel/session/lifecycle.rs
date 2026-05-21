@@ -349,3 +349,46 @@ fn report_dropped_bootstrap_message(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Mutex;
+
+    use crate::keepalive::KeepaliveManager;
+    use crate::tunnel::session::lifecycle::sync_pty_scope_keepalive;
+
+    #[test]
+    fn sync_pty_scope_keepalive_reads_populated_user_scopes_from_disk() {
+        let test_dir = tempfile::TempDir::new().expect("temp dir should be created");
+        let scope_paths =
+            crate::cgroups::create_user_scope(test_dir.path(), "sbi_123", "scope_123")
+                .expect("user scope should be created");
+        std::fs::write(&scope_paths.events_file, "populated 1\n")
+            .expect("scope events should be writable");
+        let keepalive_manager = Mutex::new(KeepaliveManager::default());
+
+        sync_pty_scope_keepalive(&keepalive_manager, test_dir.path(), "sbi_123")
+            .expect("populated user scope should sync");
+
+        assert!(
+            keepalive_manager
+                .lock()
+                .expect("keepalive manager lock should not be poisoned")
+                .active(),
+            "populated user scope should keep the sandbox active"
+        );
+
+        std::fs::write(&scope_paths.events_file, "populated 0\n")
+            .expect("scope events should be writable");
+        sync_pty_scope_keepalive(&keepalive_manager, test_dir.path(), "sbi_123")
+            .expect("empty user scope should sync");
+
+        assert!(
+            !keepalive_manager
+                .lock()
+                .expect("keepalive manager lock should not be poisoned")
+                .active(),
+            "empty user scope should clear sandbox keepalive"
+        );
+    }
+}

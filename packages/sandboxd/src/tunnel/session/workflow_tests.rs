@@ -5,20 +5,12 @@ use super::{
 
 use crate::tunnel::session::agent::{AgentStreamState, AgentStreamStats};
 use crate::tunnel::session::bootstrap::{
-    TunnelWriterMessage, connect_bootstrap_websocket, prioritize_ipv4_socket_addresses,
-    resolve_bootstrap_tunnel_url, resolve_tunnel_exchange_url,
-    startup_transparent_passthrough_socket_mark,
+    TunnelWriterMessage, connect_bootstrap_websocket, resolve_bootstrap_tunnel_url,
 };
-use crate::tunnel::session::file_search::{
-    file_search_query_telemetry_fields, terminate_file_search_stream,
-};
+use crate::tunnel::session::file_search::terminate_file_search_stream;
 use crate::tunnel::session::file_upload::FileUploadState;
-use crate::tunnel::session::lifecycle::{
-    snapshot_runtime_connection_state, sync_pty_scope_keepalive,
-};
-use crate::tunnel::session::operation::{
-    SANDBOX_OPERATION_STREAM_FORMAT, record_egress_token_event,
-};
+use crate::tunnel::session::lifecycle::snapshot_runtime_connection_state;
+use crate::tunnel::session::operation::SANDBOX_OPERATION_STREAM_FORMAT;
 use crate::tunnel::session::port_access::{
     PortAccessTcpStreamState, handle_ports_transport_message, mark_port_access_tcp_direction_closed,
 };
@@ -56,10 +48,7 @@ use tungstenite::{
 };
 
 use crate::keepalive::KeepaliveManager;
-use crate::protocol::startup::{
-    StartupInput, StartupMode, TransparentProxyBypass, TransparentProxyBypassKind,
-    TransparentProxyConfiguration,
-};
+use crate::protocol::startup::{StartupInput, StartupMode};
 use crate::runtime::adapters::RuntimeAdapterRegistry;
 use crate::runtime::readiness::RuntimeReadinessManager;
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
@@ -398,100 +387,6 @@ async fn file_search_stream_returns_results_from_open_cwd() {
     );
 
     terminate_file_search_stream(&mut session_state, 31);
-}
-
-#[test]
-fn file_search_query_telemetry_fields_include_latency_and_limit_signals() {
-    let fields = file_search_query_telemetry_fields(
-        31,
-        "file_search_req_1",
-        &crate::tunnel::file_search::FileSearchQueryMetrics {
-            query_length: 8,
-            requested_limit: Some(500),
-            effective_limit: 100,
-            collapsed_query_count: 2,
-            debounce_wait_ms: 101,
-            scan_wait_ms: 7,
-            search_ms: 3,
-            total_latency_ms: 111,
-            result_count: 100,
-            limited: true,
-        },
-    );
-    let field_map = fields.into_iter().collect::<BTreeMap<_, _>>();
-
-    assert_eq!(field_map["streamId"], Value::from(31));
-    assert_eq!(
-        field_map["channelKind"],
-        Value::String("fileSearch".to_string())
-    );
-    assert_eq!(
-        field_map["requestId"],
-        Value::String("file_search_req_1".to_string())
-    );
-    assert_eq!(field_map["queryLength"], Value::from(8));
-    assert_eq!(field_map["requestedLimit"], Value::from(500));
-    assert_eq!(field_map["effectiveLimit"], Value::from(100));
-    assert_eq!(field_map["collapsedQueryCount"], Value::from(2));
-    assert_eq!(field_map["debounceWaitMs"], Value::from(101));
-    assert_eq!(field_map["scanWaitMs"], Value::from(7));
-    assert_eq!(field_map["searchMs"], Value::from(3));
-    assert_eq!(field_map["latencyMs"], Value::from(111));
-    assert_eq!(field_map["resultCount"], Value::from(100));
-    assert_eq!(field_map["limited"], Value::Bool(true));
-}
-
-#[tokio::test]
-async fn egress_token_diagnostics_write_lifecycle_operation_records() {
-    let (tunnel_writer_sender, mut tunnel_writer_receiver) = tokio::sync::mpsc::unbounded_channel();
-    let mut session_state = empty_tunnel_session_state();
-    session_state.operation_stream_requested = true;
-    session_state.operation_stream_send_window = Some(StreamSendWindow::new(4096));
-
-    record_egress_token_event(
-        &tunnel_writer_sender,
-        &mut session_state,
-        &FixedClock {
-            now_ms: 1_779_206_400_000,
-        },
-        "sbi_test",
-        "egress_token_request_completed",
-        "egress_token_req_1",
-        &[
-            (
-                "expiresAt",
-                Value::String("2100-01-01T00:00:00Z".to_string()),
-            ),
-            ("ttlMs", Value::from(300_000_u64)),
-        ],
-    );
-
-    let writer_message = tunnel_writer_receiver
-        .recv()
-        .await
-        .expect("operation record frame should be queued");
-    let TunnelWriterMessage::Binary(payload) = writer_message else {
-        panic!("expected operation record to be written as a binary frame");
-    };
-    let decoded_frame =
-        decode_stream_data_frame(payload.as_ref()).expect("operation data frame should decode");
-    assert_eq!(decoded_frame.stream_id, SANDBOX_OPERATION_STREAM_ID);
-
-    let line = std::str::from_utf8(&decoded_frame.payload)
-        .expect("operation record payload should be utf8");
-    let record: Value = serde_json::from_str(line).expect("operation record should be json");
-    assert_eq!(record["kind"], "lifecycle");
-    assert_eq!(record["phase"], "egress");
-    assert_eq!(record["status"], "completed");
-    assert_eq!(record["source"], "sandboxd");
-    assert_eq!(record["message"], "Gateway egress token request completed");
-    assert_eq!(
-        record["attributes"]["event"],
-        "egress_token_request_completed"
-    );
-    assert_eq!(record["attributes"]["requestId"], "egress_token_req_1");
-    assert_eq!(record["attributes"]["sandboxInstanceId"], "sbi_test");
-    assert_eq!(record["attributes"]["ttlMs"], 300_000);
 }
 
 #[tokio::test]
@@ -1596,42 +1491,6 @@ async fn oversized_file_upload_payload_resets_and_removes_partial_file() {
         !temp_path.exists(),
         "oversized upload payloads should remove the partial file",
     );
-}
-
-#[test]
-fn sync_pty_scope_keepalive_reads_populated_user_scopes_from_disk() {
-    let test_dir = create_temp_test_dir("pty_scope_keepalive");
-    let scope_paths = crate::cgroups::create_user_scope(&test_dir, "sbi_123", "scope_123")
-        .expect("user scope should be created");
-    std::fs::write(&scope_paths.events_file, "populated 1\n")
-        .expect("scope events should be writable");
-    let keepalive_manager = Mutex::new(KeepaliveManager::default());
-
-    sync_pty_scope_keepalive(&keepalive_manager, &test_dir, "sbi_123")
-        .expect("populated user scope should sync");
-
-    assert!(
-        keepalive_manager
-            .lock()
-            .expect("keepalive manager lock should not be poisoned")
-            .active(),
-        "populated user scope should keep the sandbox active"
-    );
-
-    std::fs::write(&scope_paths.events_file, "populated 0\n")
-        .expect("scope events should be writable");
-    sync_pty_scope_keepalive(&keepalive_manager, &test_dir, "sbi_123")
-        .expect("empty user scope should sync");
-
-    assert!(
-        !keepalive_manager
-            .lock()
-            .expect("keepalive manager lock should not be poisoned")
-            .active(),
-        "empty user scope should clear sandbox keepalive"
-    );
-
-    std::fs::remove_dir_all(test_dir).expect("temp dir should be removable");
 }
 
 #[test]
@@ -3711,80 +3570,6 @@ fn start_returns_error_when_initial_bootstrap_session_never_establishes() {
     gateway_thread
         .join()
         .expect("gateway thread should exit cleanly");
-}
-
-#[test]
-fn prioritize_ipv4_socket_addresses_sorts_ipv4_before_ipv6() {
-    let addresses = vec![
-        "[2606:4700:3031::ac43:8542]:443"
-            .parse()
-            .expect("ipv6 address should parse"),
-        "104.21.133.66:443"
-            .parse()
-            .expect("ipv4 address should parse"),
-        "[2606:4700:3032::6815:8542]:443"
-            .parse()
-            .expect("second ipv6 address should parse"),
-        "172.67.133.66:443"
-            .parse()
-            .expect("second ipv4 address should parse"),
-    ];
-
-    let prioritized = prioritize_ipv4_socket_addresses(addresses);
-
-    assert!(prioritized[0].is_ipv4(), "first address should prefer ipv4");
-    assert!(
-        prioritized[1].is_ipv4(),
-        "second address should prefer ipv4"
-    );
-    assert!(
-        prioritized[2].is_ipv6(),
-        "third address should fall back to ipv6"
-    );
-    assert!(
-        prioritized[3].is_ipv6(),
-        "fourth address should fall back to ipv6"
-    );
-}
-
-#[test]
-fn tunnel_exchange_url_preserves_gateway_query_parameters() {
-    let exchange_url = resolve_tunnel_exchange_url(
-        "ws://127.0.0.1:5202/tunnel/sandbox/sbi_123?x-mistle-test-environment-id=test_env_123",
-    )
-    .expect("tunnel exchange URL should be derivable");
-
-    assert_eq!(
-        exchange_url,
-        "http://127.0.0.1:5202/tunnel/sandbox/sbi_123/token-exchange?x-mistle-test-environment-id=test_env_123"
-    );
-}
-
-#[test]
-fn derives_transparent_passthrough_socket_mark_for_bootstrap_tunnel() {
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
-        bootstrap_token: "bootstrap-token".to_string(),
-        tunnel_exchange_token: "tunnel-exchange-token".to_string(),
-        tunnel_gateway_ws_url: "wss://gateway.example.test/tunnel/sandbox/sbi_123".to_string(),
-        acting_user_id: None,
-        runtime_plan: json!({}),
-        git_identity: None,
-        transparent_proxy: Some(TransparentProxyConfiguration {
-            passthrough_bypass: TransparentProxyBypass {
-                kind: TransparentProxyBypassKind::SocketMark,
-                mark: 38_514,
-            },
-            exclusions: Vec::new(),
-        }),
-    };
-
-    assert_eq!(
-        startup_transparent_passthrough_socket_mark(&startup_input),
-        Some(38_514)
-    );
 }
 
 #[test]
@@ -6408,14 +6193,4 @@ where
     };
 
     assert_eq!(pong_payload.as_ref(), payload);
-}
-
-fn create_temp_test_dir(prefix: &str) -> PathBuf {
-    let path = PathBuf::from("/tmp").join(format!(
-        "sbd_{prefix}_{}_{}",
-        std::process::id(),
-        REQUEST_ID_COUNTER.fetch_add(1, Ordering::Relaxed),
-    ));
-    fs::create_dir_all(&path).expect("temp test dir should be creatable");
-    path
 }

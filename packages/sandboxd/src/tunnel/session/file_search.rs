@@ -355,3 +355,54 @@ fn close_file_search_worker(stream_state: FileSearchStreamState) {
         .command_sender
         .send(FileSearchWorkerCommand::Close);
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use serde_json::Value;
+
+    use crate::tunnel::file_search::FileSearchQueryMetrics;
+    use crate::tunnel::session::file_search::file_search_query_telemetry_fields;
+
+    #[test]
+    fn file_search_query_telemetry_fields_include_latency_and_limit_signals() {
+        let fields = file_search_query_telemetry_fields(
+            31,
+            "file_search_req_1",
+            &FileSearchQueryMetrics {
+                query_length: 8,
+                requested_limit: Some(500),
+                effective_limit: 100,
+                collapsed_query_count: 2,
+                debounce_wait_ms: 101,
+                scan_wait_ms: 7,
+                search_ms: 3,
+                total_latency_ms: 111,
+                result_count: 100,
+                limited: true,
+            },
+        );
+        let field_map = fields.into_iter().collect::<BTreeMap<_, _>>();
+
+        assert_eq!(field_map["streamId"], Value::from(31));
+        assert_eq!(
+            field_map["channelKind"],
+            Value::String("fileSearch".to_string())
+        );
+        assert_eq!(
+            field_map["requestId"],
+            Value::String("file_search_req_1".to_string())
+        );
+        assert_eq!(field_map["queryLength"], Value::from(8));
+        assert_eq!(field_map["requestedLimit"], Value::from(500));
+        assert_eq!(field_map["effectiveLimit"], Value::from(100));
+        assert_eq!(field_map["collapsedQueryCount"], Value::from(2));
+        assert_eq!(field_map["debounceWaitMs"], Value::from(101));
+        assert_eq!(field_map["scanWaitMs"], Value::from(7));
+        assert_eq!(field_map["searchMs"], Value::from(3));
+        assert_eq!(field_map["latencyMs"], Value::from(111));
+        assert_eq!(field_map["resultCount"], Value::from(100));
+        assert_eq!(field_map["limited"], Value::Bool(true));
+    }
+}

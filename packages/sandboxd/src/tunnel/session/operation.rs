@@ -298,3 +298,109 @@ fn egress_token_operation_record_line(
     }))
     .map(Some)
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use serde_json::Value;
+
+    use crate::time::Clock;
+    use crate::tunnel::protocol::{StreamSendWindow, decode_stream_data_frame};
+    use crate::tunnel::session::SANDBOX_OPERATION_STREAM_ID;
+    use crate::tunnel::session::agent::AgentStreamState;
+    use crate::tunnel::session::bootstrap::TunnelWriterMessage;
+    use crate::tunnel::session::file_upload::FileUploadState;
+    use crate::tunnel::session::operation::record_egress_token_event;
+    use crate::tunnel::session::port_access::PortAccessTcpStreamState;
+    use crate::tunnel::session::process::ProcessStreamState;
+    use crate::tunnel::session::state::TunnelSessionMutableState;
+    use crate::tunnel::telemetry::TelemetryRelay;
+
+    struct FixedClock {
+        now_ms: u64,
+    }
+
+    impl Clock for FixedClock {
+        fn now_ms(&self) -> u64 {
+            self.now_ms
+        }
+    }
+
+    fn empty_tunnel_session_state() -> TunnelSessionMutableState {
+        TunnelSessionMutableState {
+            agent_endpoint_url: None,
+            runtime_env: BTreeMap::new(),
+            telemetry_relay: TelemetryRelay::default(),
+            pending_signing_requests: BTreeMap::new(),
+            pending_egress_token_requests: BTreeMap::new(),
+            pending_agent_opens: BTreeMap::new(),
+            pending_exec_opens: BTreeMap::new(),
+            agent_streams: BTreeMap::<u32, AgentStreamState>::new(),
+            port_access_http_streams: BTreeMap::new(),
+            port_access_tcp_streams: BTreeMap::<u32, PortAccessTcpStreamState>::new(),
+            process_streams: ProcessStreamState::default(),
+            file_search_streams: BTreeMap::new(),
+            operation_stream_requested: false,
+            operation_stream_close_requested: false,
+            operation_stream_close_response_sender: None,
+            operation_stream_send_window: None,
+            pending_operation_records: Default::default(),
+            file_uploads: BTreeMap::<u32, FileUploadState>::new(),
+        }
+    }
+
+    #[tokio::test]
+    async fn egress_token_diagnostics_write_lifecycle_operation_records() {
+        let (tunnel_writer_sender, mut tunnel_writer_receiver) =
+            tokio::sync::mpsc::unbounded_channel();
+        let mut session_state = empty_tunnel_session_state();
+        session_state.operation_stream_requested = true;
+        session_state.operation_stream_send_window = Some(StreamSendWindow::new(4096));
+
+        record_egress_token_event(
+            &tunnel_writer_sender,
+            &mut session_state,
+            &FixedClock {
+                now_ms: 1_779_206_400_000,
+            },
+            "sbi_test",
+            "egress_token_request_completed",
+            "egress_token_req_1",
+            &[
+                (
+                    "expiresAt",
+                    Value::String("2100-01-01T00:00:00Z".to_string()),
+                ),
+                ("ttlMs", Value::from(300_000_u64)),
+            ],
+        );
+
+        let writer_message = tunnel_writer_receiver
+            .recv()
+            .await
+            .expect("operation record frame should be queued");
+        let TunnelWriterMessage::Binary(payload) = writer_message else {
+            panic!("expected operation record to be written as a binary frame");
+        };
+        let decoded_frame =
+            decode_stream_data_frame(payload.as_ref()).expect("operation data frame should decode");
+        assert_eq!(decoded_frame.stream_id, SANDBOX_OPERATION_STREAM_ID);
+
+        let line = std::str::from_utf8(&decoded_frame.payload)
+            .expect("operation record payload should be utf8");
+        let record: Value = serde_json::from_str(line).expect("operation record should be json");
+        assert_eq!(record["kind"], "lifecycle");
+        assert_eq!(record["phase"], "egress");
+        assert_eq!(record["status"], "completed");
+        assert_eq!(record["source"], "sandboxd");
+        assert_eq!(record["message"], "Gateway egress token request completed");
+        assert_eq!(
+            record["attributes"]["event"],
+            "egress_token_request_completed"
+        );
+        assert_eq!(record["attributes"]["requestId"], "egress_token_req_1");
+        assert_eq!(record["attributes"]["sandboxInstanceId"], "sbi_test");
+        assert_eq!(record["attributes"]["ttlMs"], 300_000);
+    }
+}
