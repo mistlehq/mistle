@@ -12,6 +12,7 @@ import {
 } from "../settings/api-keys/api-keys-service.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
+import { resolveRevokingApiKeyId } from "./organization-api-keys-settings-page-state.js";
 import { OrganizationApiKeysSettingsPageView } from "./organization-api-keys-settings-page-view.js";
 
 type CreatedApiKeyNotice = {
@@ -80,7 +81,7 @@ export function OrganizationApiKeysSettingsPage(): React.JSX.Element {
               })
             : null
         }
-        revokingApiKeyId={revokeMutation.variables?.apiKeyId ?? null}
+        revokingApiKeyId={resolveRevokingApiKeyId(revokeMutation)}
       />
     </PageFrame>
   );

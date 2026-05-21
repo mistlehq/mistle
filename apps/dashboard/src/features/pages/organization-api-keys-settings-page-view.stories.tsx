@@ -7,9 +7,11 @@ import {
 import type { ApiKey } from "../settings/api-keys/api-keys-service.js";
 import { OrganizationApiKeysSettingsPageView } from "./organization-api-keys-settings-page-view.js";
 
+const ProductionApiKeyId = "apk_story_prod";
+
 const StoryApiKeys = [
   {
-    id: "apk_story_prod",
+    id: ProductionApiKeyId,
     name: "Production deploy key",
     secretPrefix: "mstl_apk_ED4p8qJIc8ptYvhuD8yyOQ",
     permissions: [
@@ -90,5 +92,11 @@ export const LoadError: Story = {
 export const RevokeError: Story = {
   args: {
     revokeErrorMessage: "Could not revoke API key.",
+  },
+};
+
+export const Revoking: Story = {
+  args: {
+    revokingApiKeyId: ProductionApiKeyId,
   },
 };
