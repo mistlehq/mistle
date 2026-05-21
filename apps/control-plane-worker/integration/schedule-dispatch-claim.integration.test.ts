@@ -5,6 +5,7 @@
 import {
   TriggerKinds,
   ScheduledActionStatuses,
+  ScheduleKinds,
   ScheduleTargetTypes,
 } from "@mistle/db/control-plane";
 import {
@@ -83,6 +84,16 @@ describe("control-plane worker schedule dispatch claims", () => {
       triggerId: "atm_integration_new_schedule_claim_no_next",
       nextScheduledAt: null,
     });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.schedules).values({
+      id: "sch_integration_new_schedule_one_off",
+      organizationId: "org_integration_new_schedule_claim",
+      targetType: ScheduleTargetTypes.TRIGGER_RUN,
+      kind: ScheduleKinds.ONE_OFF,
+      name: "One-off schedule",
+      enabled: true,
+      nextScheduledAt: "2026-04-28T01:00:00.000Z",
+      oneOffWorkflowRunId: "owr_integration_new_schedule_one_off",
+    });
 
     const result = await dispatchDueSchedules(
       { db: env.controlPlaneDb },
@@ -142,6 +153,12 @@ describe("control-plane worker schedule dispatch claims", () => {
         expect.objectContaining({
           id: "sch_integration_new_schedule_no_next",
           nextScheduledAt: null,
+        }),
+        expect.objectContaining({
+          id: "sch_integration_new_schedule_one_off",
+          nextScheduledAt: "2026-04-28 01:00:00+00",
+          lastScheduledAt: null,
+          enabled: true,
         }),
       ]),
     );

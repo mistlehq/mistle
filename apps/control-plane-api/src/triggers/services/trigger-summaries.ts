@@ -1,5 +1,6 @@
 import {
   TriggerKinds,
+  ScheduleKinds,
   ScheduleTargetTypes,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
@@ -476,6 +477,13 @@ function createWebhookTriggerListPageItem(row: WebhookTriggerListPageRow): Trigg
 }
 
 function createScheduleTriggerListPageItem(row: ScheduleTriggerListPageRow): TriggerListPageItem {
+  if (row.cronExpression === null) {
+    throw new Error(`Recurring schedule trigger '${row.triggerId}' is missing cron_expression.`);
+  }
+  if (row.timezone === null) {
+    throw new Error(`Recurring schedule trigger '${row.triggerId}' is missing timezone.`);
+  }
+
   const target = createListTarget({
     sandboxProfileId: row.sandboxProfileId,
     sandboxProfileDisplayName: row.sandboxProfileDisplayName,
@@ -616,8 +624,8 @@ type ScheduleTriggerListPageRow = {
   sandboxProfileDisplayName: string | null;
   sandboxProfileVersion: number;
   primaryRepositoryId: string | null;
-  cronExpression: string;
-  timezone: string;
+  cronExpression: string | null;
+  timezone: string | null;
   nextScheduledAt: string | null;
 };
 
@@ -659,6 +667,7 @@ async function loadScheduleTriggerListPageItems(input: {
         eq(tables.triggers.organizationId, input.organizationId),
         eq(tables.triggers.kind, TriggerKinds.SCHEDULE),
         eq(tables.schedules.organizationId, input.organizationId),
+        eq(tables.schedules.kind, ScheduleKinds.RECURRING),
         eq(tables.schedules.targetType, ScheduleTargetTypes.TRIGGER_RUN),
         isNull(tables.schedules.deletedAt),
         inArray(tables.triggers.id, input.triggerIds),
@@ -687,6 +696,12 @@ async function loadScheduleTriggerListPageItems(input: {
     const triggerRow = triggerRows[0];
     if (triggerRow === undefined) {
       throw new Error(`Scheduled trigger '${triggerId}' could not be loaded for the list page.`);
+    }
+    if (triggerRow.cronExpression === null) {
+      throw new Error(`Recurring schedule trigger '${triggerId}' is missing cron_expression.`);
+    }
+    if (triggerRow.timezone === null) {
+      throw new Error(`Recurring schedule trigger '${triggerId}' is missing timezone.`);
     }
 
     rowsByTriggerId.set(triggerId, createScheduleTriggerListPageItem(triggerRow));

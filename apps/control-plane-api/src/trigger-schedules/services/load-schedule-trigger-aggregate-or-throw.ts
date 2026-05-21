@@ -1,5 +1,6 @@
 import {
   TriggerKinds,
+  ScheduleKinds,
   ScheduleTargetTypes,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
@@ -70,6 +71,7 @@ export async function loadScheduleTriggerAggregateOrThrow(
       and(
         eq(table.id, scheduleTrigger.scheduleId),
         eq(table.organizationId, input.organizationId),
+        eq(table.kind, ScheduleKinds.RECURRING),
         eq(table.targetType, ScheduleTargetTypes.TRIGGER_RUN),
       ),
   });
@@ -80,6 +82,12 @@ export async function loadScheduleTriggerAggregateOrThrow(
 
   if (schedule.deletedAt !== null) {
     throw new NotFoundError("NOT_FOUND", "Scheduled trigger was not found.");
+  }
+  if (schedule.cronExpression === null) {
+    throw new Error(`Recurring schedule '${schedule.id}' is missing cron_expression.`);
+  }
+  if (schedule.timezone === null) {
+    throw new Error(`Recurring schedule '${schedule.id}' is missing timezone.`);
   }
 
   if (targets.length !== 1 || targets[0] === undefined) {

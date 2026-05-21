@@ -2,6 +2,7 @@ import {
   getControlPlaneDatabaseSchema,
   type ControlPlaneTables,
   type ControlPlaneTransaction,
+  ScheduleKinds,
   ScheduleTargetTypes,
 } from "@mistle/db/control-plane";
 import { findNextScheduleOccurrence } from "@mistle/time";
@@ -196,6 +197,7 @@ async function createRefreshSchedule(
     .insert(tables.schedules)
     .values({
       organizationId: input.organizationId,
+      kind: ScheduleKinds.RECURRING,
       targetType: ScheduleTargetTypes.SNAPSHOT_REFRESH,
       name,
       cronExpression: input.cronExpression,
@@ -261,6 +263,7 @@ async function updateRefreshSchedule(
     .update(tables.schedules)
     .set({
       name,
+      kind: ScheduleKinds.RECURRING,
       cronExpression: input.cronExpression,
       timezone: input.timezone,
       enabled: true,
@@ -295,14 +298,21 @@ function toRefreshScheduleResponse(input: {
   schedule: {
     id: string;
     name: string;
-    cronExpression: string;
-    timezone: string;
+    cronExpression: string | null;
+    timezone: string | null;
     enabled: boolean;
     nextScheduledAt: string | null;
   };
   profileId: string;
   profileVersion: number;
 }): ProfileVersionRefreshSchedule {
+  if (input.schedule.cronExpression === null) {
+    throw new Error(`Recurring schedule '${input.schedule.id}' is missing cron_expression.`);
+  }
+  if (input.schedule.timezone === null) {
+    throw new Error(`Recurring schedule '${input.schedule.id}' is missing timezone.`);
+  }
+
   return {
     scheduleId: input.schedule.id,
     sandboxProfileId: input.profileId,

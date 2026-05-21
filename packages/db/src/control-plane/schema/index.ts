@@ -34,9 +34,11 @@ export {
 } from "./scheduled-actions.js";
 export {
   schedules,
+  ScheduleKinds,
   ScheduleTargetTypes,
   type InsertSchedule,
   type Schedule,
+  type ScheduleKind,
   type ScheduleTargetType,
 } from "./schedules.js";
 export { triggerTargets, type InsertTriggerTarget, type TriggerTarget } from "./trigger-targets.js";

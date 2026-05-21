@@ -2,6 +2,7 @@ import {
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
   ScheduledActionStatuses,
+  ScheduleKinds,
   type ScheduleTargetType,
   ScheduleTargetTypes,
   getControlPlaneDatabaseSchema,
@@ -209,6 +210,7 @@ async function claimDueScheduleRows(
     .where(
       and(
         eq(tables.schedules.enabled, true),
+        eq(tables.schedules.kind, ScheduleKinds.RECURRING),
         isNull(tables.schedules.deletedAt),
         isNotNull(tables.schedules.nextScheduledAt),
         lte(tables.schedules.nextScheduledAt, input.cutoffMinute.toISOString()),
@@ -221,6 +223,12 @@ async function claimDueScheduleRows(
   return rows.map((row) => {
     if (row.nextScheduledAt === null) {
       throw new Error(`Claimed schedule ${row.id} is missing next_scheduled_at.`);
+    }
+    if (row.cronExpression === null) {
+      throw new Error(`Claimed recurring schedule ${row.id} is missing cron_expression.`);
+    }
+    if (row.timezone === null) {
+      throw new Error(`Claimed recurring schedule ${row.id} is missing timezone.`);
     }
 
     return {

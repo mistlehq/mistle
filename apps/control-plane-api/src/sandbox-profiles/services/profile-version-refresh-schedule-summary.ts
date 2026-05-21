@@ -1,3 +1,5 @@
+import { ScheduleKinds } from "@mistle/db/control-plane";
+
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 export type ProfileVersionRefreshScheduleSummary = {
@@ -41,6 +43,7 @@ export async function loadActiveRefreshSchedulesByVersion(
           table.id,
           targets.map((target) => target.scheduleId),
         ),
+        eq(table.kind, ScheduleKinds.RECURRING),
         eq(table.enabled, true),
         isNull(table.deletedAt),
       ),
@@ -60,6 +63,12 @@ export async function loadActiveRefreshSchedulesByVersion(
           target.sandboxProfileVersion,
         )}' has multiple active refresh schedules.`,
       );
+    }
+    if (schedule.cronExpression === null) {
+      throw new Error(`Recurring schedule '${schedule.id}' is missing cron_expression.`);
+    }
+    if (schedule.timezone === null) {
+      throw new Error(`Recurring schedule '${schedule.id}' is missing timezone.`);
     }
 
     refreshSchedulesByVersion.set(target.sandboxProfileVersion, {

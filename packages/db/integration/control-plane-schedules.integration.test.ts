@@ -94,6 +94,49 @@ describe("control-plane schedules integration", () => {
           false,
         ],
       );
+      await pool.query(
+        `
+          insert into control_plane.schedules
+            (
+              id,
+              organization_id,
+              target_type,
+              kind,
+              name,
+              enabled,
+              next_scheduled_at,
+              one_off_workflow_run_id
+            )
+          values ($1, $2, $3, $4, $5, $6, $7, $8)
+        `,
+        [
+          "sch_schedule_test_one_off",
+          "org_schedule_test",
+          "trigger_run",
+          "one_off",
+          "One-off Schedule",
+          true,
+          "2026-04-28T03:00:00.000Z",
+          "owr_schedule_test_one_off",
+        ],
+      );
+
+      const scheduleKindRows = await pool.query<{
+        id: string;
+        kind: string;
+        cron_expression: string | null;
+        timezone: string | null;
+        one_off_workflow_run_id: string | null;
+      }>(
+        `
+          select id, kind, cron_expression, timezone, one_off_workflow_run_id
+          from control_plane.schedules
+          where id in ($1, $2)
+          order by id
+        `,
+        ["sch_schedule_test_disabled", "sch_schedule_test_one_off"],
+      );
+      assertScheduleKindRows(scheduleKindRows.rows);
 
       await pool.query(
         `
@@ -710,6 +753,51 @@ function assertPgCheckViolation(errorCode: string | undefined, context: string):
     throw new Error(
       `Expected ${context} to fail with Postgres check violation 23514, got '${errorCode ?? "no_error"}'.`,
     );
+  }
+}
+
+function assertScheduleKindRows(
+  rows: readonly {
+    id: string;
+    kind: string;
+    cron_expression: string | null;
+    timezone: string | null;
+    one_off_workflow_run_id: string | null;
+  }[],
+): void {
+  const rowsById = new Map(rows.map((row) => [row.id, row]));
+  const recurringRow = rowsById.get("sch_schedule_test_disabled");
+  if (recurringRow === undefined) {
+    throw new Error("Expected recurring schedule row to be returned.");
+  }
+  if (recurringRow.kind !== "recurring") {
+    throw new Error(`Expected recurring schedule kind, received '${recurringRow.kind}'.`);
+  }
+  if (recurringRow.cron_expression !== "0 9 * * *") {
+    throw new Error("Expected recurring schedule cron expression to be preserved.");
+  }
+  if (recurringRow.timezone !== "Asia/Singapore") {
+    throw new Error("Expected recurring schedule timezone to be preserved.");
+  }
+  if (recurringRow.one_off_workflow_run_id !== null) {
+    throw new Error("Expected recurring schedule one-off workflow run id to be null.");
+  }
+
+  const oneOffRow = rowsById.get("sch_schedule_test_one_off");
+  if (oneOffRow === undefined) {
+    throw new Error("Expected one-off schedule row to be returned.");
+  }
+  if (oneOffRow.kind !== "one_off") {
+    throw new Error(`Expected one-off schedule kind, received '${oneOffRow.kind}'.`);
+  }
+  if (oneOffRow.cron_expression !== null) {
+    throw new Error("Expected one-off schedule cron expression to be nullable.");
+  }
+  if (oneOffRow.timezone !== null) {
+    throw new Error("Expected one-off schedule timezone to be nullable.");
+  }
+  if (oneOffRow.one_off_workflow_run_id !== "owr_schedule_test_one_off") {
+    throw new Error("Expected one-off schedule workflow run id to be persisted.");
   }
 }
 

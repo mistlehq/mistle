@@ -1,6 +1,7 @@
 import {
   getControlPlaneDatabaseSchema,
   type ControlPlaneTransaction,
+  ScheduleKinds,
   ScheduleTargetTypes,
   type SandboxProfileVersionAgentRuntimeId,
   type SandboxProfileVersionDefaultPersistenceMode,
@@ -120,6 +121,7 @@ async function copyRefreshScheduleToPublishedVersion(
     where: (table, { and: whereAnd, eq: whereEq, isNull }) =>
       whereAnd(
         whereEq(table.id, sourceTarget.scheduleId),
+        whereEq(table.kind, ScheduleKinds.RECURRING),
         whereEq(table.enabled, true),
         isNull(table.deletedAt),
       ),
@@ -127,6 +129,12 @@ async function copyRefreshScheduleToPublishedVersion(
 
   if (sourceSchedule === undefined) {
     return null;
+  }
+  if (sourceSchedule.cronExpression === null) {
+    throw new Error(`Recurring schedule '${sourceTarget.scheduleId}' is missing cron_expression.`);
+  }
+  if (sourceSchedule.timezone === null) {
+    throw new Error(`Recurring schedule '${sourceTarget.scheduleId}' is missing timezone.`);
   }
 
   const nextOccurrence = findNextScheduleOccurrence({
@@ -179,6 +187,12 @@ async function copyRefreshScheduleToPublishedVersion(
     if (updatedSchedule === undefined) {
       throw new Error("Expected existing snapshot refresh schedule to be updated.");
     }
+    if (updatedSchedule.cronExpression === null) {
+      throw new Error("Updated snapshot refresh schedule is missing cron_expression.");
+    }
+    if (updatedSchedule.timezone === null) {
+      throw new Error("Updated snapshot refresh schedule is missing timezone.");
+    }
 
     return {
       scheduleId: updatedSchedule.id,
@@ -212,6 +226,12 @@ async function copyRefreshScheduleToPublishedVersion(
 
   if (createdSchedule === undefined) {
     throw new Error("Expected copied snapshot refresh schedule to be created.");
+  }
+  if (createdSchedule.cronExpression === null) {
+    throw new Error("Copied snapshot refresh schedule is missing cron_expression.");
+  }
+  if (createdSchedule.timezone === null) {
+    throw new Error("Copied snapshot refresh schedule is missing timezone.");
   }
 
   await tx.insert(tables.sandboxProfileSnapshotRefreshScheduleTargets).values({

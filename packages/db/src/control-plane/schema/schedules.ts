@@ -12,6 +12,13 @@ export const ScheduleTargetTypes = {
 
 export type ScheduleTargetType = (typeof ScheduleTargetTypes)[keyof typeof ScheduleTargetTypes];
 
+export const ScheduleKinds = {
+  RECURRING: "recurring",
+  ONE_OFF: "one_off",
+} as const;
+
+export type ScheduleKind = (typeof ScheduleKinds)[keyof typeof ScheduleKinds];
+
 export function defineSchedules(schema: PgSchema) {
   return schema.table(
     "schedules",
@@ -23,12 +30,14 @@ export function defineSchedules(schema: PgSchema) {
         .notNull()
         .references(() => organizations.id, { onDelete: "cascade" }),
       targetType: text("target_type").notNull().$type<ScheduleTargetType>(),
+      kind: text("kind").notNull().$type<ScheduleKind>().default(ScheduleKinds.RECURRING),
       name: text("name").notNull(),
-      cronExpression: text("cron_expression").notNull(),
-      timezone: text("timezone").notNull(),
+      cronExpression: text("cron_expression"),
+      timezone: text("timezone"),
       enabled: boolean("enabled").notNull().default(true),
       nextScheduledAt: timestamp("next_scheduled_at", { withTimezone: true, mode: "string" }),
       lastScheduledAt: timestamp("last_scheduled_at", { withTimezone: true, mode: "string" }),
+      oneOffWorkflowRunId: text("one_off_workflow_run_id"),
       startAt: timestamp("start_at", { withTimezone: true, mode: "string" }),
       endAt: timestamp("end_at", { withTimezone: true, mode: "string" }),
       deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "string" }),
