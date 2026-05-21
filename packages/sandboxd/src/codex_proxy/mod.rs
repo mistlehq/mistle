@@ -16,7 +16,7 @@ mod supervisor;
 mod types;
 
 pub use crate::codex_proxy::error::CodexProxyError;
-pub use crate::codex_proxy::message::CodexThreadStatus;
+pub use crate::codex_proxy::message::{CodexThreadStatus, RawCodexSocket};
 pub use crate::codex_proxy::monitor::CodexMonitor;
 pub use crate::codex_proxy::session_manager::{
     CodexSessionManagerHandle, spawn_codex_session_manager,
