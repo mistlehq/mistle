@@ -1,3 +1,4 @@
+import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import {
   IntegrationConnectionRedirectSessionIntents,
   IntegrationConnectionStatuses,
@@ -19,6 +20,7 @@ import {
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
 } from "../../lib/crypto.js";
+import { logger } from "../../logger.js";
 import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
 import {
   createRedirectQueryParams,
@@ -224,6 +226,10 @@ function resolveProviderState(input: {
 export async function completeOAuth2AuthorizationCodeConnection(
   ctx: {
     db: ControlPlaneDatabase;
+    dataPlaneClient: Pick<
+      DataPlaneSandboxInstancesClient,
+      "invalidateIntegrationConnectionCredentialCache"
+    >;
     integrationRegistry: IntegrationRegistry;
     integrationsConfig: {
       activeMasterEncryptionKeyVersion: number;
@@ -232,7 +238,7 @@ export async function completeOAuth2AuthorizationCodeConnection(
   },
   input: CompleteOAuth2AuthorizationCodeConnectionInput,
 ): Promise<CompletedConnection> {
-  const { db, integrationRegistry, integrationsConfig } = ctx;
+  const { db, dataPlaneClient, integrationRegistry, integrationsConfig } = ctx;
 
   const resolved = await resolveOAuth2AuthorizationCodeCapabilityTargetOrThrow(
     {
@@ -283,7 +289,7 @@ export async function completeOAuth2AuthorizationCodeConnection(
       ...(providerState === undefined ? {} : { providerState }),
     });
 
-  return db.transaction(async (tx) => {
+  const completedConnection = await db.transaction<CompletedConnection>(async (tx) => {
     const tables = getControlPlaneDatabaseSchema(tx);
 
     const usedAtTimestamp = new Date().toISOString();
@@ -704,4 +710,23 @@ export async function completeOAuth2AuthorizationCodeConnection(
       updatedAt: createdConnection.updatedAt,
     };
   });
+
+  if (completedConnection.authorizationIntent === "reauthorize") {
+    await dataPlaneClient
+      .invalidateIntegrationConnectionCredentialCache({
+        connectionId: completedConnection.id,
+      })
+      .catch((error: unknown) => {
+        logger.warn(
+          {
+            err: error,
+            connectionId: completedConnection.id,
+            reason: "oauth2_authorization_code_reauthorize",
+          },
+          "Failed to invalidate gateway credential cache",
+        );
+      });
+  }
+
+  return completedConnection;
 }

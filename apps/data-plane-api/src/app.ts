@@ -2,7 +2,10 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { readRepositoryVersion } from "@mistle/config";
 import { Scalar } from "@scalar/hono-api-reference";
 
-import { createInternalSandboxRoutes } from "./internal/index.js";
+import {
+  createInternalIntegrationConnectionRoutes,
+  createInternalSandboxRoutes,
+} from "./internal/index.js";
 import type { AppRuntimeResources } from "./resources.js";
 import type {
   AppContextBindings,
@@ -95,8 +98,13 @@ export function registerApiRouteModules(app: DataPlaneApp): void {
 
 export function registerInternalApiRouteModules(app: DataPlaneApp): void {
   const internalSandboxRoutes = createInternalSandboxRoutes();
+  const internalIntegrationConnectionRoutes = createInternalIntegrationConnectionRoutes();
 
   app.route(internalSandboxRoutes.basePath, internalSandboxRoutes.routes);
+  app.route(
+    internalIntegrationConnectionRoutes.basePath,
+    internalIntegrationConnectionRoutes.routes,
+  );
 }
 
 async function createRequestContext(input: {
@@ -135,6 +143,9 @@ async function createRequestContext(input: {
         testEnvironmentId: input.testEnvironmentId,
       }),
       openWorkflow: await input.resources.getOpenWorkflow({
+        testEnvironmentId: input.testEnvironmentId,
+      }),
+      credentialCacheInvalidator: input.resources.getCredentialCacheInvalidator({
         testEnvironmentId: input.testEnvironmentId,
       }),
       runtimeStateReader: input.resources.getRuntimeStateReader({

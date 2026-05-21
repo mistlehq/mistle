@@ -24,12 +24,14 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
   }
 
   const db = ctx.get("db");
+  const dataPlaneClient = ctx.get("dataPlaneClient");
   const integrationRegistry = ctx.get("integrationRegistry");
   const integrationsConfig = ctx.get("config").integrations;
 
   const resolvedCredential = await resolveIntegrationCredential(
     {
       db,
+      dataPlaneClient,
       integrationRegistry,
       integrationsConfig,
     },

@@ -233,6 +233,18 @@ export type ListSandboxOperationEventsInput = {
 };
 export type ListSandboxOperationEventsResponse =
   paths["/internal/sandbox/instances/:id/operation-events"]["get"]["responses"]["200"]["content"]["application/json"];
+export type InvalidateIntegrationConnectionCredentialCacheInput = {
+  connectionId: string;
+};
+const InvalidateIntegrationConnectionCredentialCacheResponseSchema = z
+  .object({
+    status: z.literal("ok"),
+    deletedEntryCount: z.number().int().min(0),
+  })
+  .strict();
+export type InvalidateIntegrationConnectionCredentialCacheResponse = z.infer<
+  typeof InvalidateIntegrationConnectionCredentialCacheResponseSchema
+>;
 
 type InternalErrorBody = z.infer<typeof InternalErrorSchema>;
 
@@ -284,6 +296,9 @@ export type DataPlaneSandboxInstancesClient = {
   listSandboxOperationEvents: (
     input: ListSandboxOperationEventsInput,
   ) => Promise<ListSandboxOperationEventsResponse>;
+  invalidateIntegrationConnectionCredentialCache: (
+    input: InvalidateIntegrationConnectionCredentialCacheInput,
+  ) => Promise<InvalidateIntegrationConnectionCredentialCacheResponse>;
 };
 
 function extractErrorMessage(input: unknown): string {
@@ -324,9 +339,10 @@ function createClientError(input: {
     | "patch"
     | "read"
     | "list"
-    | "listOperationEvents";
+    | "listOperationEvents"
+    | "invalidateCredentialCache";
 }): DataPlaneSandboxInstancesClientError {
-  const operationLabel = {
+  const operationLabel: Record<typeof input.operation, string> = {
     start: "start",
     materialize: "materialize",
     resume: "resume",
@@ -339,7 +355,8 @@ function createClientError(input: {
     read: "read",
     list: "list",
     listOperationEvents: "list operation events",
-  } as const;
+    invalidateCredentialCache: "invalidate credential cache",
+  };
 
   return new DataPlaneSandboxInstancesClientError({
     status: input.status,
@@ -981,6 +998,44 @@ export function createDataPlaneSandboxInstancesClient(
         status: response.status,
         error: errorBody,
         operation: "listOperationEvents",
+      });
+    },
+
+    async invalidateIntegrationConnectionCredentialCache(
+      invalidateInput,
+    ): Promise<InvalidateIntegrationConnectionCredentialCacheResponse> {
+      const response = await fetch(
+        new URL(
+          `/internal/integration-connections/${encodeURIComponent(invalidateInput.connectionId)}/credential-cache/invalidate`,
+          internalClient.baseUrl,
+        ),
+        {
+          method: "POST",
+          headers: createAuthedHeaders({
+            serviceToken: internalClient.serviceToken,
+            ...(internalClient.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: internalClient.testEnvironmentId }),
+            ...(internalClient.testEnvironmentIdHeader === undefined
+              ? {}
+              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
+          }),
+          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+        },
+      );
+
+      if (response.status === 200) {
+        const responseBody: unknown = await response.json();
+
+        return InvalidateIntegrationConnectionCredentialCacheResponseSchema.parse(responseBody);
+      }
+
+      const errorBody = await readResponseBody(response);
+
+      throw createClientError({
+        status: response.status,
+        error: errorBody,
+        operation: "invalidateCredentialCache",
       });
     },
   };

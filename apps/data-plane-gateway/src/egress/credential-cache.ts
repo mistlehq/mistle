@@ -50,6 +50,10 @@ export type CredentialCacheLookupResult = {
   result: "hit" | "miss" | "refresh_skew_expired";
 };
 
+export type CredentialCacheInvalidationResult = {
+  deletedEntryCount: number;
+};
+
 const CachedCredentialRecordSchema = z
   .object({
     version: z.literal(1),
@@ -75,6 +79,8 @@ const CachedCredentialRecordSchema = z
   })
   .strict();
 
+const CachedCredentialIndexSchema = z.array(z.string().min(1));
+
 type CachedCredentialRecord = z.infer<typeof CachedCredentialRecordSchema>;
 
 function serializeCredentialRecord(record: CachedCredentialRecord): string {
@@ -83,6 +89,14 @@ function serializeCredentialRecord(record: CachedCredentialRecord): string {
 
 function parseCredentialRecord(serializedRecord: string): CachedCredentialRecord {
   return CachedCredentialRecordSchema.parse(JSON.parse(serializedRecord));
+}
+
+function serializeCredentialIndex(keys: readonly string[]): string {
+  return JSON.stringify(keys);
+}
+
+function parseCredentialIndex(serializedIndex: string): string[] {
+  return CachedCredentialIndexSchema.parse(JSON.parse(serializedIndex));
 }
 
 type CredentialCacheRecord = {
@@ -134,6 +148,27 @@ function toCacheKey(input: CredentialCacheKeyInput): string {
   ].join(":")}`;
 }
 
+function toConnectionIndexKey(input: { testEnvironmentId?: string; connectionId: string }): string {
+  return `gateway-egress-credential-index:${[
+    input.testEnvironmentId ?? "",
+    "integration_connection",
+    input.connectionId,
+  ].join(":")}`;
+}
+
+function toConnectionIndexKeyForCacheKey(input: CredentialCacheKeyInput): string | undefined {
+  if (input.credentialResolverKind !== "integration_connection") {
+    return undefined;
+  }
+
+  return toConnectionIndexKey({
+    ...(input.testEnvironmentId === undefined
+      ? {}
+      : { testEnvironmentId: input.testEnvironmentId }),
+    connectionId: input.connectionId,
+  });
+}
+
 function resolveExpiryMs(input: {
   credential: CachedCredential;
   nowMs: number;
@@ -178,6 +213,7 @@ export class CredentialCache {
     const refreshBoundaryMs = entry.expiresAtMs - this.#refreshSkewMs;
     if (now >= refreshBoundaryMs) {
       await this.#cache.delete(key);
+      await this.#removeFromConnectionIndex(input, key);
       return {
         result: "refresh_skew_expired",
       };
@@ -200,6 +236,7 @@ export class CredentialCache {
 
     if (expiresAtMs <= now) {
       await this.#cache.delete(key);
+      await this.#removeFromConnectionIndex(input, key);
       return;
     }
 
@@ -211,5 +248,65 @@ export class CredentialCache {
     await this.#cache.set(key, serializeCredentialRecord({ version: 1, ...entry }), {
       ttlMs: expiresAtMs - now,
     });
+    await this.#addToConnectionIndex(input, key);
+  }
+
+  public async invalidateIntegrationConnection(input: {
+    testEnvironmentId?: string;
+    connectionId: string;
+  }): Promise<CredentialCacheInvalidationResult> {
+    const indexKey = toConnectionIndexKey(input);
+    const serializedIndex = await this.#cache.get(indexKey);
+    if (serializedIndex === null) {
+      return {
+        deletedEntryCount: 0,
+      };
+    }
+
+    const cacheKeys = new Set(parseCredentialIndex(serializedIndex));
+    await Promise.all([...cacheKeys].map(async (cacheKey) => this.#cache.delete(cacheKey)));
+    await this.#cache.delete(indexKey);
+
+    return {
+      deletedEntryCount: cacheKeys.size,
+    };
+  }
+
+  async #addToConnectionIndex(input: CredentialCacheKeyInput, cacheKey: string): Promise<void> {
+    const indexKey = toConnectionIndexKeyForCacheKey(input);
+    if (indexKey === undefined) {
+      return;
+    }
+
+    const serializedIndex = await this.#cache.get(indexKey);
+    const indexKeys = serializedIndex === null ? [] : parseCredentialIndex(serializedIndex);
+    if (indexKeys.includes(cacheKey)) {
+      return;
+    }
+
+    await this.#cache.set(indexKey, serializeCredentialIndex([...indexKeys, cacheKey].sort()));
+  }
+
+  async #removeFromConnectionIndex(
+    input: CredentialCacheKeyInput,
+    cacheKey: string,
+  ): Promise<void> {
+    const indexKey = toConnectionIndexKeyForCacheKey(input);
+    if (indexKey === undefined) {
+      return;
+    }
+
+    const serializedIndex = await this.#cache.get(indexKey);
+    if (serializedIndex === null) {
+      return;
+    }
+
+    const nextIndexKeys = parseCredentialIndex(serializedIndex).filter((key) => key !== cacheKey);
+    if (nextIndexKeys.length === 0) {
+      await this.#cache.delete(indexKey);
+      return;
+    }
+
+    await this.#cache.set(indexKey, serializeCredentialIndex(nextIndexKeys));
   }
 }

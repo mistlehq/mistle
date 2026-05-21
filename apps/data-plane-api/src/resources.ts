@@ -11,6 +11,8 @@ import {
 } from "@mistle/db/test-environment";
 import { Pool } from "pg";
 
+import type { CredentialCacheInvalidator } from "./egress/credential-cache-invalidator.js";
+import { GatewayHttpCredentialCacheInvalidator } from "./egress/gateway-http-credential-cache-invalidator.js";
 import { createDataPlaneBackend, createDataPlaneOpenWorkflow } from "./openworkflow/index.js";
 import { GatewayHttpSandboxRuntimeStateReader } from "./runtime-state/gateway-http-sandbox-runtime-state-reader.js";
 import type { SandboxRuntimeStateReader } from "./runtime-state/sandbox-runtime-state-reader.js";
@@ -23,6 +25,7 @@ export type AppRuntimeResources = {
   workflowDbPool: Pool;
   workflowBackend: Awaited<ReturnType<typeof createDataPlaneBackend>>;
   openWorkflow: ReturnType<typeof createDataPlaneOpenWorkflow>;
+  credentialCacheInvalidator: CredentialCacheInvalidator;
   runtimeStateReader: SandboxRuntimeStateReader;
   controlPlaneInternalClient: ControlPlaneInternalClient;
   testWorkflowsByEnvironmentId: ReadonlyMap<
@@ -38,6 +41,9 @@ export type AppRuntimeResources = {
     testEnvironmentId?: string;
   }) => Promise<ReturnType<typeof createDataPlaneOpenWorkflow>>;
   getWorkflowNamespaceId: (input?: { testEnvironmentId?: string }) => string;
+  getCredentialCacheInvalidator: (input?: {
+    testEnvironmentId?: string;
+  }) => CredentialCacheInvalidator;
   getRuntimeStateReader: (input?: { testEnvironmentId?: string }) => SandboxRuntimeStateReader;
   getControlPlaneInternalClient: (input?: {
     testEnvironmentId?: string;
@@ -64,7 +70,15 @@ export async function createAppResources(
     }>
   >();
   const testRuntimeStateReadersByEnvironmentId = new Map<string, SandboxRuntimeStateReader>();
+  const testCredentialCacheInvalidatorsByEnvironmentId = new Map<
+    string,
+    CredentialCacheInvalidator
+  >();
   const testControlPlaneClientsByEnvironmentId = new Map<string, ControlPlaneInternalClient>();
+  const credentialCacheInvalidator = new GatewayHttpCredentialCacheInvalidator({
+    baseUrl: runtimeConfig.app.runtimeState.gatewayBaseUrl,
+    serviceToken: runtimeConfig.app.internalAuth.serviceToken,
+  });
   const runtimeStateReader = new GatewayHttpSandboxRuntimeStateReader({
     baseUrl: runtimeConfig.app.runtimeState.gatewayBaseUrl,
     serviceToken: runtimeConfig.app.internalAuth.serviceToken,
@@ -97,6 +111,7 @@ export async function createAppResources(
     workflowDbPool,
     workflowBackend,
     openWorkflow,
+    credentialCacheInvalidator,
     runtimeStateReader,
     controlPlaneInternalClient,
     testWorkflowsByEnvironmentId,
@@ -137,6 +152,34 @@ export async function createAppResources(
       }
 
       return createDataPlaneWorkflowNamespaceId(testEnvironmentId);
+    },
+    getCredentialCacheInvalidator: (request = {}) => {
+      const testIsolation = runtimeConfig.app.__dangerouslyEnableTestIsolation;
+      if (testIsolation === undefined) {
+        return credentialCacheInvalidator;
+      }
+
+      const testEnvironmentId = request.testEnvironmentId;
+      if (testEnvironmentId === undefined || testEnvironmentId.length === 0) {
+        throw new Error(
+          "Expected test environment id for isolated data-plane credential cache invalidation request.",
+        );
+      }
+
+      const existingInvalidator =
+        testCredentialCacheInvalidatorsByEnvironmentId.get(testEnvironmentId);
+      if (existingInvalidator !== undefined) {
+        return existingInvalidator;
+      }
+
+      const invalidator = new GatewayHttpCredentialCacheInvalidator({
+        baseUrl: runtimeConfig.app.runtimeState.gatewayBaseUrl,
+        serviceToken: runtimeConfig.app.internalAuth.serviceToken,
+        testEnvironmentId,
+        testEnvironmentIdHeader: testIsolation.testEnvironmentIdHeader,
+      });
+      testCredentialCacheInvalidatorsByEnvironmentId.set(testEnvironmentId, invalidator);
+      return invalidator;
     },
     getRuntimeStateReader: (request = {}) => {
       const testIsolation = runtimeConfig.app.__dangerouslyEnableTestIsolation;

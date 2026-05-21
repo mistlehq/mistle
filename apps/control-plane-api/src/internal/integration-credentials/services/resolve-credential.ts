@@ -1,3 +1,4 @@
+import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import {
   IntegrationConnectionStatuses,
   IntegrationCredentialSecretKinds,
@@ -86,6 +87,7 @@ type ResolverContextBinding = {
 type OAuth2AuthorizationCodeManagedCredentialResolution =
   | {
       kind: "resolved";
+      refreshedCredential: boolean;
       credential: ResolvedIntegrationCredential;
     }
   | {
@@ -573,6 +575,10 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
   accessTokenSlotKey: string;
   refreshTokenSlotKey: string;
   clientSecretSlotKey: string;
+  dataPlaneClient?: Pick<
+    DataPlaneSandboxInstancesClient,
+    "invalidateIntegrationConnectionCredentialCache"
+  >;
 }): Promise<ResolvedIntegrationCredential> {
   if (input.secretType === IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN) {
     return resolvePersistedCredential({
@@ -649,6 +655,7 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
       if (accessCredential !== undefined && !isCredentialExpired(accessCredential.expiresAt)) {
         return {
           kind: "resolved",
+          refreshedCredential: false,
           credential: await decryptLinkedActiveCredential(tx, {
             organizationId: lockedConnection.organizationId,
             integrationsConfig: input.integrationsConfig,
@@ -889,6 +896,7 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
 
       return {
         kind: "resolved",
+        refreshedCredential: true,
         credential: createValueCredential({
           value: refreshedAccessToken.accessToken,
           ...(refreshedAccessToken.accessTokenExpiresAt === undefined
@@ -901,6 +909,23 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
 
   if (resolution.kind === "refresh-failed") {
     throw createOAuth2AuthorizationCodeRefreshFailedError(resolution.message);
+  }
+
+  if (resolution.refreshedCredential && input.dataPlaneClient !== undefined) {
+    await input.dataPlaneClient
+      .invalidateIntegrationConnectionCredentialCache({
+        connectionId: input.connection.id,
+      })
+      .catch((error: unknown) => {
+        logger.warn(
+          {
+            err: error,
+            connectionId: input.connection.id,
+            reason: "oauth2_authorization_code_access_token_refresh",
+          },
+          "Failed to invalidate gateway credential cache",
+        );
+      });
   }
 
   return resolution.credential;
@@ -1249,6 +1274,10 @@ async function resolvePersistedCredential(
 export async function resolveIntegrationCredential(
   ctx: {
     db: ControlPlaneDatabase | ControlPlaneTransaction;
+    dataPlaneClient?: Pick<
+      DataPlaneSandboxInstancesClient,
+      "invalidateIntegrationConnectionCredentialCache"
+    >;
     integrationRegistry: AppContext["var"]["integrationRegistry"];
     integrationsConfig: AppContext["var"]["config"]["integrations"];
   },
@@ -1475,6 +1504,7 @@ export async function resolveIntegrationCredential(
             accessTokenSlotKey: oauth2AuthorizationCodeSlotKeys.accessToken,
             refreshTokenSlotKey: oauth2AuthorizationCodeSlotKeys.refreshToken,
             clientSecretSlotKey: oauth2AuthorizationCodeSlotKeys.clientSecret,
+            ...(ctx.dataPlaneClient === undefined ? {} : { dataPlaneClient: ctx.dataPlaneClient }),
           });
           span.setAttribute("mistle.integration.credential.result_kind", resolvedCredential.kind);
 

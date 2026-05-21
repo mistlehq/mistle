@@ -28,6 +28,7 @@ import { CredentialCache } from "../egress/credential-cache.js";
 import { DirectEgressProxyService } from "../egress/direct-egress-proxy-service.js";
 import { registerDirectEgressRoutes } from "../egress/register-direct-egress-routes.js";
 import { SandboxEgressTokenService } from "../egress/sandbox-egress-token-service.js";
+import { registerCredentialCacheInvalidationRoute } from "../internal/egress/register-credential-cache-invalidation-route.js";
 import { registerSandboxBootstrapAttachmentTerminateRoute } from "../internal/runtime-state/register-sandbox-bootstrap-attachment-terminate-route.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
 import { logger } from "../logger.js";
@@ -452,6 +453,11 @@ export function createDataPlaneGatewayRuntime(
     activeBootstrapSessionStore,
     sandboxRuntimeAttachmentStore,
     relayCoordinator,
+  });
+  registerCredentialCacheInvalidationRoute({
+    app,
+    credentialCache,
+    internalAuthServiceToken: config.app.internalAuth.serviceToken,
   });
 
   registerSandboxTunnelRoute({

@@ -11,6 +11,7 @@ const routeHandler = async (
   { session }: AppSession,
 ) => {
   const db = ctx.get("db");
+  const dataPlaneClient = ctx.get("dataPlaneClient");
   const integrationRegistry = ctx.get("integrationRegistry");
   const integrationsConfig = ctx.get("config").integrations;
   const { connectionId } = ctx.req.valid("param");
@@ -19,6 +20,7 @@ const routeHandler = async (
   const updatedConnection = await updateFormConnection(
     {
       db,
+      dataPlaneClient,
       integrationRegistry,
       integrationsConfig,
     },

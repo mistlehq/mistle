@@ -211,6 +211,105 @@ describe.concurrent("direct egress proxy integration", () => {
   );
 
   it(
+    "uses rotated integration credentials after the same connection was cached",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const upstream = await startSimulatedHttpUpstream();
+      const binding = await createDatadogBinding({
+        env,
+        uniqueId: randomUUID().replaceAll("-", ""),
+      });
+      const upstreamUrl = new URL("/mcp", upstream.baseUrl);
+      await insertSandboxInstanceRow({
+        env,
+        organizationId: binding.organizationId,
+        sandboxInstanceId,
+        runtimePlan: createRuntimePlan({
+          egressRoutes: [
+            createRoute({
+              additionalCredentialHeaders: [
+                {
+                  header: "dd_application_key",
+                  credentialResolver: {
+                    kind: "integration_connection",
+                    connectionId: binding.connectionId,
+                    secretType: "api_key",
+                    slotKey: "datadog.datadog-default.api-key.application-key",
+                  },
+                },
+              ],
+              authInjection: {
+                type: "header",
+                target: "dd_api_key",
+              },
+              bindingId: binding.bindingId,
+              connectionId: binding.connectionId,
+              egressRuleId: "egress_rule_direct_datadog_rotation",
+              familyId: "datadog",
+              hosts: [upstreamUrl.hostname],
+              methods: ["POST"],
+              pathPrefixes: ["/mcp"],
+              secretType: "api_key",
+              slotKey: "datadog.datadog-default.api-key.api-key",
+              upstreamBaseUrl: upstream.baseUrl,
+              variantId: "datadog-default",
+            }),
+          ],
+        }),
+      });
+
+      try {
+        await expectDatadogProxyRequest({
+          apiKey: "datadog-api-key",
+          applicationKey: "datadog-application-key",
+          binding,
+          body: "managed-body-before-rotation",
+          env,
+          sandboxInstanceId,
+          upstream,
+          upstreamUrl,
+        });
+
+        const updateResponse = await env.controlPlaneApi.http.fetch(
+          `/v1/integration/connections/${encodeURIComponent(binding.connectionId)}/form`,
+          {
+            method: "PUT",
+            headers: {
+              "content-type": "application/json",
+              cookie: binding.cookie,
+            },
+            body: JSON.stringify({
+              displayName: "Direct egress Datadog connection rotated",
+              config: {
+                connection_method: "api-key",
+              },
+              secrets: {
+                apiKey: "rotated-datadog-api-key",
+                applicationKey: "rotated-datadog-application-key",
+              },
+            }),
+          },
+        );
+        expect(updateResponse.status).toBe(200);
+
+        await expectDatadogProxyRequest({
+          apiKey: "rotated-datadog-api-key",
+          applicationKey: "rotated-datadog-application-key",
+          binding,
+          body: "managed-body-after-rotation",
+          env,
+          sandboxInstanceId,
+          upstream,
+          upstreamUrl,
+        });
+      } finally {
+        await upstream.close();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
     "mints Mistle MCP tokens for matched managed HTTP routes before forwarding upstream",
     async ({ env }) => {
       const organizationId = "org_integration_direct_egress_mistle_mcp";
@@ -620,6 +719,7 @@ async function createDatadogBinding(input: {
   uniqueId: string;
 }): Promise<{
   bindingId: string;
+  cookie: string;
   connectionId: string;
   organizationId: string;
 }> {
@@ -659,9 +759,56 @@ async function createDatadogBinding(input: {
 
   return {
     bindingId,
+    cookie: session.cookie,
     connectionId,
     organizationId: session.organizationId,
   };
+}
+
+async function expectDatadogProxyRequest(input: {
+  apiKey: string;
+  applicationKey: string;
+  binding: {
+    connectionId: string;
+    organizationId: string;
+  };
+  body: string;
+  env: IntegrationTestEnvironment;
+  sandboxInstanceId: string;
+  upstream: SimulatedHttpUpstream;
+  upstreamUrl: URL;
+}): Promise<void> {
+  const response = await input.env.dataPlaneGateway.http.fetch(
+    `${DirectEgressHttpRoutePath}?target=${encodeURIComponent(input.upstreamUrl.toString())}`,
+    {
+      method: "POST",
+      headers: {
+        [DirectEgressTokenHeaderName]: `Bearer ${await mintDirectEgressToken({
+          organizationId: input.binding.organizationId,
+          sandboxInstanceId: input.sandboxInstanceId,
+        })}`,
+        "content-type": "text/plain",
+        "x-sandbox-header": "preserved",
+      },
+      body: input.body,
+    },
+  );
+
+  expect(response.status).toBe(202);
+  await expect(response.text()).resolves.toBe("hello from upstream");
+
+  const request = await withTimeout({
+    label: "waiting for managed direct egress upstream request",
+    promise: input.upstream.nextRequest(),
+  });
+
+  expect(request.method).toBe("POST");
+  expect(request.url).toBe("/mcp");
+  expect(request.body).toBe(input.body);
+  expect(request.headers["dd_api_key"]).toBe(input.apiKey);
+  expect(request.headers["dd_application_key"]).toBe(input.applicationKey);
+  expect(request.headers["x-sandbox-header"]).toBe("preserved");
+  expect(request.headers.authorization).toBeUndefined();
 }
 
 async function createDatadogConnection(input: {

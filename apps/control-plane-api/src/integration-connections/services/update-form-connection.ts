@@ -1,3 +1,4 @@
+import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import { type ControlPlaneDatabase, getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
@@ -8,6 +9,7 @@ import {
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
 } from "../../lib/crypto.js";
+import { logger } from "../../logger.js";
 import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,
@@ -43,6 +45,10 @@ export type UpdateFormConnectionInput = {
 export async function updateFormConnection(
   ctx: {
     db: ControlPlaneDatabase;
+    dataPlaneClient: Pick<
+      DataPlaneSandboxInstancesClient,
+      "invalidateIntegrationConnectionCredentialCache"
+    >;
     integrationRegistry: IntegrationRegistry;
     integrationsConfig: {
       masterEncryptionKeys: Record<string, string>;
@@ -50,7 +56,7 @@ export async function updateFormConnection(
   },
   input: UpdateFormConnectionInput,
 ): Promise<UpdatedConnection> {
-  const { db, integrationRegistry, integrationsConfig } = ctx;
+  const { db, dataPlaneClient, integrationRegistry, integrationsConfig } = ctx;
 
   const existingConnection = await db.query.integrationConnections.findFirst({
     where: (table, { and, eq }) =>
@@ -156,7 +162,7 @@ export async function updateFormConnection(
   });
 
   try {
-    return await db.transaction(async (tx) => {
+    const updatedConnection = await db.transaction(async (tx) => {
       const tables = getControlPlaneDatabaseSchema(tx);
 
       for (const parsedSecret of parsedSecrets) {
@@ -234,6 +240,25 @@ export async function updateFormConnection(
         updatedAt: updatedConnection.updatedAt,
       };
     });
+
+    if (parsedSecrets.length > 0) {
+      await dataPlaneClient
+        .invalidateIntegrationConnectionCredentialCache({
+          connectionId: updatedConnection.id,
+        })
+        .catch((error: unknown) => {
+          logger.warn(
+            {
+              err: error,
+              connectionId: updatedConnection.id,
+              reason: "form_connection_secret_update",
+            },
+            "Failed to invalidate gateway credential cache",
+          );
+        });
+    }
+
+    return updatedConnection;
   } finally {
     unwrappedOrganizationCredentialKey.fill(0);
   }

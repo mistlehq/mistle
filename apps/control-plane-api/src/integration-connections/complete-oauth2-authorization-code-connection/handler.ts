@@ -8,6 +8,7 @@ import { route } from "./route.js";
 
 const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0]) => {
   const config = ctx.get("config");
+  const dataPlaneClient = ctx.get("dataPlaneClient");
   const db = ctx.get("db");
   const integrationRegistry = ctx.get("integrationRegistry");
   const { targetKey } = ctx.req.valid("param");
@@ -16,6 +17,7 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
   const completedConnection = await completeOAuth2AuthorizationCodeConnection(
     {
       db,
+      dataPlaneClient,
       integrationRegistry,
       integrationsConfig: config.integrations,
     },
