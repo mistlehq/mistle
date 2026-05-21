@@ -744,6 +744,12 @@ export type IntegrationProviderAppSetupCompleteResult = IntegrationProviderAppSe
   completionRedirect: IntegrationProviderAppSetupCompletionRedirect;
 };
 
+export type IntegrationProviderAppSetupStatelessCallbackResolution = {
+  connectionConfigExternalSubjectField?: string;
+  externalSubjectId: string;
+  routeSegment: string;
+};
+
 export type IntegrationProviderAppSetupConnectionSecretResolver = (input: {
   secretKind: string;
   slotKey: string;
@@ -802,6 +808,10 @@ export type IntegrationProviderAppSetupFlowCapability<
   ): MaybePromise<
     IntegrationProviderAppSetupResult & { start: IntegrationProviderAppSetupStartResult }
   >;
+  resolveStatelessCallback?(input: {
+    callbackRouteKey: string;
+    query: URLSearchParams;
+  }): MaybePromise<IntegrationProviderAppSetupStatelessCallbackResolution | undefined>;
 };
 
 export type IntegrationProviderAppSetupCapability<

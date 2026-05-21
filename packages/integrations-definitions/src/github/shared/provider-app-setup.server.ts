@@ -43,6 +43,7 @@ type GitHubProviderAppSetupCapabilityOptions = {
       | typeof GitHubCredentialSlotKeys.GITHUB_ENTERPRISE_SERVER_APP_PRIVATE_KEY_PEM
       | typeof GitHubCredentialSlotKeys.GITHUB_ENTERPRISE_SERVER_WEBHOOK_SECRET;
   }>;
+  supportsStatelessInstallationCallbacks: boolean;
   supportsClientSecret: boolean;
 };
 
@@ -342,6 +343,25 @@ export function createGitHubProviderAppSetupCapability(
         callbackRouteKey: GitHubAppInstallationCallbackRouteKey,
         methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
         routeSegment: GitHubAppInstallationCallbackRouteKey,
+        resolveStatelessCallback(input) {
+          if (
+            !options.supportsStatelessInstallationCallbacks ||
+            input.callbackRouteKey !== GitHubAppInstallationCallbackRouteKey
+          ) {
+            return undefined;
+          }
+
+          const installationId = input.query.get("installation_id");
+          if (installationId === null || installationId.length === 0) {
+            return undefined;
+          }
+
+          return {
+            connectionConfigExternalSubjectField: "installation_id",
+            externalSubjectId: installationId,
+            routeSegment: GitHubAppInstallationCallbackRouteKey,
+          };
+        },
         async start(input) {
           const parsedConfig = parseGitHubAppInstallationConnectionConfig(input.connection.config);
           for (const secret of options.requiredInstallationSecrets) {
@@ -394,6 +414,7 @@ export const GitHubCloudProviderAppSetupCapability = createGitHubProviderAppSetu
       secretKind: "api_key",
     },
   ],
+  supportsStatelessInstallationCallbacks: true,
   supportsClientSecret: true,
 });
 
@@ -413,5 +434,6 @@ export const GitHubEnterpriseServerProviderAppSetupCapability =
         secretKind: "api_key",
       },
     ],
+    supportsStatelessInstallationCallbacks: false,
     supportsClientSecret: false,
   });

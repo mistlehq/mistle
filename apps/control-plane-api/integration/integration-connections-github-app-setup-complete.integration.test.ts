@@ -17,10 +17,18 @@ import { describe, expect } from "vitest";
 import { z } from "zod";
 
 import { CompleteProviderAppSetupCallbackBadRequestResponseSchema } from "../src/integration-callbacks/provider-app-setup/schema.js";
+import { CreateDraftFormConnectionBodySchema } from "../src/integration-connections/create-draft-form-connection/schema.js";
 import { RefreshWebhookTriggerCapabilitiesBadRequestResponseSchema } from "../src/integration-connections/refresh-webhook-trigger-capabilities/schema.js";
-import { CreatedFormIntegrationConnectionSchema } from "../src/integration-connections/schemas.js";
+import {
+  CreatedFormIntegrationConnectionSchema,
+  IntegrationConnectionSchema,
+} from "../src/integration-connections/schemas.js";
 import { StartedProviderAppSetupResponseSchema } from "../src/integration-connections/start-provider-app-setup/schema.js";
-import { createFormConnection, seedIntegrationTarget } from "./helpers/integration-connections.js";
+import {
+  createFormConnection,
+  seedIntegrationTarget,
+  updateFormConnection,
+} from "./helpers/integration-connections.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api"],
@@ -85,7 +93,9 @@ type GitHubApiServerResponseInput =
       statusCode?: number;
     });
 
-describe.concurrent("GitHub App setup completion integration connections", () => {
+// This suite shares persisted GitHub App installation state across scenarios, so keep
+// it sequential for deterministic stateless callback candidate assertions.
+describe("GitHub App setup completion integration connections", () => {
   it("verifies the GitHub installation before marking the connection installed", async ({
     env,
   }) => {
@@ -170,6 +180,222 @@ describe.concurrent("GitHub App setup completion integration connections", () =>
           where: (table, { eq }) => eq(table.state, state),
         });
       expect(redirectSession?.usedAt).not.toBeNull();
+    } finally {
+      await githubApi.stop();
+    }
+  });
+
+  it("rejects an active GitHub App draft installation callback when GitHub omits redirect state", async ({
+    env,
+  }) => {
+    const targetKey = "github-cloud-installation-complete-without-state";
+    const githubApi = await startGitHubApiServer({
+      responseBody: {
+        id: 22345,
+        app_id: 123,
+        app_slug: "mistle-github-app",
+      },
+    });
+
+    try {
+      await seedGitHubCloudTarget(env, {
+        targetKey,
+        apiBaseUrl: githubApi.baseUrl,
+      });
+      const session = await env.auth.createSession({
+        email: "integration-new-github-app-installation-complete-without-state@example.com",
+      });
+      const connectionId = await createGitHubAppDraftConnection(env, {
+        targetKey,
+        cookie: session.cookie,
+        displayName: "GitHub Prod",
+      });
+      await configureGitHubAppConnection(env, {
+        connectionId,
+        cookie: session.cookie,
+        displayName: "GitHub Prod",
+      });
+      const state = await startGitHubAppInstallation(env, {
+        cookie: session.cookie,
+        connectionId,
+      });
+
+      const completeResponse = await env.controlPlaneApi.http.fetch(
+        createGitHubAppInstallationCompletePath({
+          installationId: "22345",
+          setupAction: "install",
+        }),
+        {
+          method: "GET",
+        },
+      );
+
+      expect(completeResponse.status).toBe(400);
+      const responseBody = CompleteProviderAppSetupCallbackBadRequestResponseSchema.parse(
+        await completeResponse.json(),
+      );
+      expect(responseBody.code).toBe("INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT");
+      expect(githubApi.requests).toEqual([]);
+
+      const connection = await env.controlPlaneDb.query.integrationConnections.findFirst({
+        where: (table, { and, eq }) =>
+          and(eq(table.organizationId, session.organizationId), eq(table.id, connectionId)),
+      });
+      if (connection === undefined) {
+        throw new Error("Expected persisted GitHub App connection.");
+      }
+      expect(connection.externalSubjectId).toBeNull();
+      expect(connection.config).toEqual({
+        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        app_id: "123",
+        app_slug: "mistle-github-app",
+        client_id: "Iv1.client123",
+      });
+
+      const redirectSession =
+        await env.controlPlaneDb.query.integrationConnectionRedirectSessions.findFirst({
+          where: (table, { eq }) => eq(table.state, state),
+        });
+      expect(redirectSession?.usedAt).toBeNull();
+    } finally {
+      await githubApi.stop();
+    }
+  });
+
+  it("completes an installed GitHub App update callback when GitHub omits redirect state", async ({
+    env,
+  }) => {
+    const targetKey = "github-cloud-installation-update-without-state";
+    const githubApi = await startGitHubApiServer({
+      responseBody: {
+        id: 32345,
+        app_id: 123,
+        app_slug: "mistle-github-app",
+      },
+    });
+
+    try {
+      await seedGitHubCloudTarget(env, {
+        targetKey,
+        apiBaseUrl: githubApi.baseUrl,
+      });
+      const session = await env.auth.createSession({
+        email: "integration-github-app-installation-update-without-state@example.com",
+      });
+      const connectionId = await createGitHubAppConnection(env, {
+        targetKey,
+        cookie: session.cookie,
+        displayName: "GitHub Prod",
+        installationId: "32345",
+      });
+
+      const completeResponse = await env.controlPlaneApi.http.fetch(
+        createGitHubAppInstallationCompletePath({
+          installationId: "32345",
+          setupAction: "update",
+        }),
+        {
+          method: "GET",
+          redirect: "manual",
+        },
+      );
+
+      expect(completeResponse.status).toBe(302);
+      expect(completeResponse.headers.get("location")).toContain(
+        `/integrations/${targetKey}?connectionId=${connectionId}&connectionNotice=installed`,
+      );
+
+      const connection = await env.controlPlaneDb.query.integrationConnections.findFirst({
+        where: (table, { and, eq }) =>
+          and(eq(table.organizationId, session.organizationId), eq(table.id, connectionId)),
+      });
+      if (connection === undefined) {
+        throw new Error("Expected persisted GitHub App connection.");
+      }
+      expect(connection.externalSubjectId).toBe("32345");
+      expect(connection.config).toEqual({
+        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        app_id: "123",
+        app_slug: "mistle-github-app",
+        client_id: "Iv1.client123",
+        installation_id: "32345",
+        setup_action: "update",
+      });
+    } finally {
+      await githubApi.stop();
+    }
+  });
+
+  it("rejects a stateless GitHub App callback when multiple installed connections verify", async ({
+    env,
+  }) => {
+    const targetKey = "github-cloud-installation-stateless-ambiguous";
+    const githubApi = await startGitHubApiServer({
+      responseBody: {
+        id: 42345,
+        app_id: 123,
+        app_slug: "mistle-github-app",
+      },
+    });
+
+    try {
+      await seedGitHubCloudTarget(env, {
+        targetKey,
+        apiBaseUrl: githubApi.baseUrl,
+      });
+      const session = await env.auth.createSession({
+        email: "integration-github-app-installation-stateless-ambiguous@example.com",
+      });
+      const firstConnectionId = await createGitHubAppConnection(env, {
+        targetKey,
+        cookie: session.cookie,
+        displayName: "GitHub Prod 1",
+        installationId: "42345",
+      });
+      const secondConnectionId = await createGitHubAppConnection(env, {
+        targetKey,
+        cookie: session.cookie,
+        displayName: "GitHub Prod 2",
+        installationId: "42345",
+      });
+
+      const completeResponse = await env.controlPlaneApi.http.fetch(
+        createGitHubAppInstallationCompletePath({
+          installationId: "42345",
+          setupAction: "update",
+        }),
+        {
+          method: "GET",
+        },
+      );
+
+      expect(completeResponse.status).toBe(400);
+      const responseBody = CompleteProviderAppSetupCallbackBadRequestResponseSchema.parse(
+        await completeResponse.json(),
+      );
+      expect(responseBody.code).toBe("INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT");
+
+      const connections = await env.controlPlaneDb.query.integrationConnections.findMany({
+        where: (table, { inArray }) => inArray(table.id, [firstConnectionId, secondConnectionId]),
+        orderBy: (table, { asc }) => [asc(table.id)],
+      });
+      expect(connections.map((connection) => connection.externalSubjectId)).toEqual([null, null]);
+      expect(connections.map((connection) => connection.config)).toEqual([
+        {
+          connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          app_id: "123",
+          app_slug: "mistle-github-app",
+          client_id: "Iv1.client123",
+          installation_id: "42345",
+        },
+        {
+          connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          app_id: "123",
+          app_slug: "mistle-github-app",
+          client_id: "Iv1.client123",
+          installation_id: "42345",
+        },
+      ]);
     } finally {
       await githubApi.stop();
     }
@@ -471,6 +697,81 @@ describe.concurrent("GitHub App setup completion integration connections", () =>
       await githubApi.stop();
     }
   });
+
+  it("rejects a stateless GitHub App callback that does not match a verified connection", async ({
+    env,
+  }) => {
+    const targetKey = "github-cloud-installation-complete-stateless-unknown";
+    const githubApi = await startGitHubApiServer({
+      responseBody: {
+        id: 67890,
+        app_id: 456,
+        app_slug: "other-github-app",
+      },
+    });
+
+    try {
+      await seedGitHubCloudTarget(env, {
+        targetKey,
+        apiBaseUrl: githubApi.baseUrl,
+      });
+      const session = await env.auth.createSession({
+        email: "integration-new-github-app-installation-complete-stateless-unknown@example.com",
+      });
+      const connectionId = await createGitHubAppDraftConnection(env, {
+        targetKey,
+        cookie: session.cookie,
+        displayName: "GitHub Prod",
+      });
+      await configureGitHubAppConnection(env, {
+        connectionId,
+        cookie: session.cookie,
+        displayName: "GitHub Prod",
+      });
+      const state = await startGitHubAppInstallation(env, {
+        cookie: session.cookie,
+        connectionId,
+      });
+
+      const completeResponse = await env.controlPlaneApi.http.fetch(
+        createGitHubAppInstallationCompletePath({
+          installationId: "67890",
+        }),
+        {
+          method: "GET",
+        },
+      );
+
+      expect(completeResponse.status).toBe(400);
+      const responseBody = CompleteProviderAppSetupCallbackBadRequestResponseSchema.parse(
+        await completeResponse.json(),
+      );
+      expect(responseBody.code).toBe("INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT");
+
+      const connection = await env.controlPlaneDb.query.integrationConnections.findFirst({
+        where: (table, { and, eq }) =>
+          and(eq(table.organizationId, session.organizationId), eq(table.id, connectionId)),
+      });
+      if (connection === undefined) {
+        throw new Error("Expected persisted GitHub App connection.");
+      }
+      expect(connection.externalSubjectId).toBeNull();
+      expect(connection.config).toEqual({
+        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        app_id: "123",
+        app_slug: "mistle-github-app",
+        client_id: "Iv1.client123",
+      });
+
+      const redirectSession =
+        await env.controlPlaneDb.query.integrationConnectionRedirectSessions.findFirst({
+          where: (table, { eq }) => eq(table.state, state),
+        });
+      expect(redirectSession?.usedAt).toBeNull();
+    } finally {
+      await githubApi.stop();
+    }
+  });
 });
 
 async function seedGitHubCloudTarget(
@@ -493,6 +794,7 @@ async function createGitHubAppConnection(
   input: {
     cookie: string;
     displayName: string;
+    installationId?: string;
     targetKey: string;
   },
 ): Promise<string> {
@@ -508,6 +810,7 @@ async function createGitHubAppConnection(
         app_id: "123",
         app_slug: "mistle-github-app",
         client_id: "Iv1.client123",
+        ...(input.installationId === undefined ? {} : { installation_id: input.installationId }),
       },
       secrets: {
         appPrivateKeyPem: TestGitHubAppPrivateKeyPem,
@@ -520,6 +823,68 @@ async function createGitHubAppConnection(
   expect(response.status).toBe(201);
   const createdConnection = CreatedFormIntegrationConnectionSchema.parse(await response.json());
   return createdConnection.id;
+}
+
+async function createGitHubAppDraftConnection(
+  env: IntegrationTestEnvironment,
+  input: {
+    cookie: string;
+    displayName: string;
+    targetKey: string;
+  },
+): Promise<string> {
+  const response = await env.controlPlaneApi.http.fetch(
+    `/v1/integration/connections/${encodeURIComponent(
+      input.targetKey,
+    )}/github-app-installation/draft`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: input.cookie,
+      },
+      body: JSON.stringify(
+        CreateDraftFormConnectionBodySchema.parse({
+          displayName: input.displayName,
+        }),
+      ),
+    },
+  );
+
+  expect(response.status).toBe(201);
+  const createdConnection = IntegrationConnectionSchema.parse(await response.json());
+  return createdConnection.id;
+}
+
+async function configureGitHubAppConnection(
+  env: IntegrationTestEnvironment,
+  input: {
+    connectionId: string;
+    cookie: string;
+    displayName: string;
+  },
+): Promise<void> {
+  const response = await updateFormConnection({
+    env,
+    connectionId: input.connectionId,
+    cookie: input.cookie,
+    body: {
+      displayName: input.displayName,
+      config: {
+        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        app_id: "123",
+        app_slug: "mistle-github-app",
+        client_id: "Iv1.client123",
+      },
+      secrets: {
+        appPrivateKeyPem: TestGitHubAppPrivateKeyPem,
+        clientSecret: "github-client-secret",
+        webhookSecret: "github-webhook-secret",
+      },
+    },
+  });
+
+  expect(response.status).toBe(200);
 }
 
 async function readGitHubWebhookSourceOrThrow(
@@ -582,14 +947,16 @@ function readStateFromStartedSetup(response: StartedProviderAppSetupRedirect): s
 }
 
 function createGitHubAppInstallationCompletePath(input: {
-  state: string;
   installationId: string;
+  setupAction?: string;
+  state?: string;
 }): string {
-  const searchParams = new URLSearchParams({
-    state: input.state,
-    installation_id: input.installationId,
-    setup_action: "install",
-  });
+  const searchParams = new URLSearchParams();
+  if (input.state !== undefined) {
+    searchParams.set("state", input.state);
+  }
+  searchParams.set("installation_id", input.installationId);
+  searchParams.set("setup_action", input.setupAction ?? "install");
   return `/p/integration/callbacks/setup/github-app-installation?${searchParams.toString()}`;
 }
 
