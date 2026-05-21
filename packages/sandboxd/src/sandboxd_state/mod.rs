@@ -18,7 +18,9 @@ use crate::command::{CommandOutputSink, CommandOutputStream};
 use crate::egress_proxy::EgressProxy;
 use crate::keepalive::KeepaliveManager;
 use crate::process;
-use crate::process::{CodexAppServerControlHandle, CodexAppServerObservationHandle};
+use crate::process::{
+    CodexAppServerControlHandle, CodexAppServerObservationHandle, OpenCodeServerControlHandle,
+};
 use crate::protocol::startup::{
     StartupExecutionMode, StartupInput, StartupMode, StartupOperationKind,
 };
@@ -27,7 +29,6 @@ use crate::runtime::CompiledRuntimePlanImageSource;
 use crate::runtime::RuntimePlanApplyError;
 use crate::runtime::adapters::{RuntimeAdapterRegistry, RuntimeAdapters};
 use crate::runtime::readiness::RuntimeReadinessManager;
-use crate::sandboxd_state::codex_coordination::spawn_codex_coordination_thread;
 use crate::sandboxd_state::components::{
     collect_tracked_components, determine_runtime_readiness_mode,
 };
@@ -38,6 +39,9 @@ use crate::sandboxd_state::diagnostics::{
 };
 use crate::sandboxd_state::readiness::{
     spawn_runtime_readiness_projection_thread, sync_runtime_readiness_from_snapshot,
+};
+use crate::sandboxd_state::runtime_coordination::{
+    RuntimeCoordinationHandles, spawn_runtime_coordination_thread,
 };
 use crate::sandboxd_state::runtime_environment::{
     collect_mistle_context_runtime_environment, collect_runtime_environment,
@@ -142,9 +146,10 @@ pub struct SandboxdState {
     runtime_adapters: RuntimeAdapters,
     codex_app_server_observation_handle: Option<CodexAppServerObservationHandle>,
     codex_app_server_control_handle: Option<CodexAppServerControlHandle>,
+    opencode_server_control_handle: Option<OpenCodeServerControlHandle>,
     codex_proxy_control_handle: Option<CodexProxyControlHandle>,
-    codex_coordination_shutdown_requested: Arc<AtomicBool>,
-    codex_coordination_thread: Option<JoinHandle<()>>,
+    runtime_coordination_shutdown_requested: Arc<AtomicBool>,
+    runtime_coordination_thread: Option<JoinHandle<()>>,
     runtime_readiness_shutdown_requested: Arc<AtomicBool>,
     runtime_readiness_thread: Option<JoinHandle<()>>,
     supervisor_handle: SandboxdSupervisorHandle,
@@ -456,9 +461,10 @@ impl SandboxdState {
                 runtime_adapters: RuntimeAdapters::default(),
                 codex_app_server_observation_handle: None,
                 codex_app_server_control_handle: None,
+                opencode_server_control_handle: None,
                 codex_proxy_control_handle: None,
-                codex_coordination_shutdown_requested: Arc::new(AtomicBool::new(false)),
-                codex_coordination_thread: None,
+                runtime_coordination_shutdown_requested: Arc::new(AtomicBool::new(false)),
+                runtime_coordination_thread: None,
                 runtime_readiness_shutdown_requested: Arc::new(AtomicBool::new(false)),
                 runtime_readiness_thread: None,
                 supervisor_handle,
@@ -511,6 +517,10 @@ impl SandboxdState {
         let codex_app_server_control_handle = process_manager
             .as_ref()
             .and_then(process::RuntimeClientProcessManager::codex_app_server_control_handle)
+            .cloned();
+        let opencode_server_control_handle = process_manager
+            .as_ref()
+            .and_then(process::RuntimeClientProcessManager::opencode_server_control_handle)
             .cloned();
 
         record_operation_phase_started(&diagnostics_logger, "start_runtime_adapters");
@@ -629,21 +639,21 @@ impl SandboxdState {
         record_operation_phase_started(&diagnostics_logger, "ready");
         close_operation_stream(&diagnostics_logger);
         let tunnel_session = Some(tunnel_session);
-        let codex_coordination_shutdown_requested = Arc::new(AtomicBool::new(false));
-        let codex_coordination_thread = match (
-            codex_app_server_control_handle.clone(),
-            codex_proxy_control_handle.clone(),
-        ) {
-            (Some(codex_app_server_control_handle), Some(codex_proxy_control_handle)) => {
-                Some(spawn_codex_coordination_thread(
-                    codex_app_server_control_handle,
-                    codex_proxy_control_handle,
-                    supervisor_handle.clone(),
-                    codex_coordination_shutdown_requested.clone(),
-                ))
-            }
-            _ => None,
+        let runtime_coordination_shutdown_requested = Arc::new(AtomicBool::new(false));
+        let runtime_coordination_handles = RuntimeCoordinationHandles {
+            codex_app_server_control_handle: codex_app_server_control_handle.clone(),
+            codex_proxy_control_handle: codex_proxy_control_handle.clone(),
+            opencode_server_control_handle: opencode_server_control_handle.clone(),
         };
+        let runtime_coordination_thread = runtime_coordination_handles
+            .has_runtime_process_control()
+            .then(|| {
+                spawn_runtime_coordination_thread(
+                    runtime_coordination_handles,
+                    supervisor_handle.clone(),
+                    runtime_coordination_shutdown_requested.clone(),
+                )
+            });
 
         Ok(Self {
             execution_mode,
@@ -652,9 +662,10 @@ impl SandboxdState {
             runtime_adapters,
             codex_app_server_observation_handle,
             codex_app_server_control_handle,
+            opencode_server_control_handle,
             codex_proxy_control_handle,
-            codex_coordination_shutdown_requested,
-            codex_coordination_thread,
+            runtime_coordination_shutdown_requested,
+            runtime_coordination_thread,
             runtime_readiness_shutdown_requested,
             runtime_readiness_thread,
             supervisor_handle,
@@ -802,10 +813,10 @@ impl SandboxdState {
         if let Some(tunnel_session) = self.tunnel_session.take() {
             tunnel_session.close();
         }
-        self.codex_coordination_shutdown_requested
+        self.runtime_coordination_shutdown_requested
             .store(true, Ordering::Relaxed);
-        if let Some(codex_coordination_thread) = self.codex_coordination_thread.take() {
-            let _ = codex_coordination_thread.join();
+        if let Some(runtime_coordination_thread) = self.runtime_coordination_thread.take() {
+            let _ = runtime_coordination_thread.join();
         }
         self.runtime_readiness_shutdown_requested
             .store(true, Ordering::Relaxed);
@@ -850,6 +861,10 @@ impl SandboxdState {
 
     pub fn codex_app_server_control_handle(&self) -> Option<&CodexAppServerControlHandle> {
         self.codex_app_server_control_handle.as_ref()
+    }
+
+    pub fn opencode_server_control_handle(&self) -> Option<&OpenCodeServerControlHandle> {
+        self.opencode_server_control_handle.as_ref()
     }
 
     #[cfg(any(test, debug_assertions))]
@@ -1088,10 +1103,10 @@ fn scrub_snapshot_runtime_artifacts_at_paths(
     Ok(())
 }
 
-mod codex_coordination;
 mod components;
 mod diagnostics;
 mod readiness;
+mod runtime_coordination;
 mod runtime_environment;
 mod setup_script;
 
@@ -1118,11 +1133,12 @@ mod tests {
     use crate::sandboxd_state::{
         DEFAULT_GLOBAL_GIT_CONFIG_PATH, GLOBAL_GIT_CONFIG_ENV_NAME,
         MISTLE_SANDBOX_INSTANCE_ID_ENV_NAME, MISTLE_SANDBOX_PROFILE_ID_ENV_NAME,
-        MISTLE_SANDBOX_PROFILE_VERSION_ENV_NAME, SETUP_SCRIPT_WORKING_DIRECTORY, SandboxdState,
-        build_setup_script_environment, collect_mistle_context_runtime_environment,
-        collect_runtime_environment, merge_managed_runtime_environment, run_setup_script,
-        run_setup_script_in_directory, scrub_snapshot_runtime_artifacts_at_paths,
-        spawn_codex_coordination_thread, spawn_runtime_readiness_projection_thread,
+        MISTLE_SANDBOX_PROFILE_VERSION_ENV_NAME, RuntimeCoordinationHandles,
+        SETUP_SCRIPT_WORKING_DIRECTORY, SandboxdState, build_setup_script_environment,
+        collect_mistle_context_runtime_environment, collect_runtime_environment,
+        merge_managed_runtime_environment, run_setup_script, run_setup_script_in_directory,
+        scrub_snapshot_runtime_artifacts_at_paths, spawn_runtime_coordination_thread,
+        spawn_runtime_readiness_projection_thread,
     };
     use crate::startup_diagnostics::{StartupDiagnosticsLogger, StartupOperation};
     use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
@@ -2537,9 +2553,12 @@ mod tests {
         )
         .expect("Codex proxy should start");
         let shutdown_requested = Arc::new(AtomicBool::new(false));
-        let coordination_thread = spawn_codex_coordination_thread(
-            codex_app_server_control_handle,
-            codex_proxy.control_handle(),
+        let coordination_thread = spawn_runtime_coordination_thread(
+            RuntimeCoordinationHandles {
+                codex_app_server_control_handle: Some(codex_app_server_control_handle),
+                codex_proxy_control_handle: Some(codex_proxy.control_handle()),
+                opencode_server_control_handle: None,
+            },
             supervisor_handle.clone(),
             shutdown_requested.clone(),
         );

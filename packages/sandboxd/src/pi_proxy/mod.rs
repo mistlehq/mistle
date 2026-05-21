@@ -118,6 +118,7 @@ pub struct PiProxy {
     listen_url: String,
     shutdown_requested: Arc<AtomicBool>,
     runtime_thread: Option<JoinHandle<Result<(), PiProxyError>>>,
+    rpc_monitor_thread: Option<JoinHandle<()>>,
     state: Arc<PiProxyState>,
     supervisor_handle: SandboxdSupervisorHandle,
 }
@@ -137,6 +138,9 @@ impl PiProxy {
             },
             None => Ok(()),
         };
+        if let Some(rpc_monitor_thread) = self.rpc_monitor_thread.take() {
+            let _ = rpc_monitor_thread.join();
+        }
         self.supervisor_handle
             .mark_component_stopped(SupervisedComponent::PiProxy);
         close_result
@@ -186,6 +190,8 @@ pub fn start_pi_proxy_with_supervisor(
             .mark_component_restarting(SupervisedComponent::PiProxy, error.to_string());
         return Err(error);
     }
+    let rpc_monitor_thread =
+        rpc_process::spawn_pi_rpc_process_monitor(state.clone(), shutdown_requested.clone());
     let runtime_shutdown = shutdown_requested.clone();
     let runtime_state = state.clone();
     let runtime_supervisor = supervisor_handle.clone();
@@ -198,6 +204,7 @@ pub fn start_pi_proxy_with_supervisor(
         listen_url,
         shutdown_requested,
         runtime_thread: Some(runtime_thread),
+        rpc_monitor_thread: Some(rpc_monitor_thread),
         state,
         supervisor_handle,
     })
@@ -207,7 +214,6 @@ pub fn start_pi_proxy_with_supervisor(
 mod tests {
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
-    use std::net::TcpListener;
     use std::os::unix::fs::PermissionsExt;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::{Arc, Mutex};
@@ -237,13 +243,45 @@ mod tests {
     }
 
     fn reserve_pi_proxy_listen_url() -> String {
-        let listener =
-            TcpListener::bind("127.0.0.1:0").expect("test listener port should be available");
-        let address = listener
-            .local_addr()
-            .expect("test listener local address should be readable");
-        drop(listener);
-        format!("ws://{address}")
+        "ws://127.0.0.1:0".to_string()
+    }
+
+    fn pi_rpc_process_pid(supervisor_handle: &SandboxdSupervisorHandle) -> u32 {
+        supervisor_handle
+            .component_snapshot(SupervisedComponent::PiRpcProcess)
+            .expect("Pi RPC process should be tracked")
+            .details
+            .get("pid")
+            .expect("Pi RPC process snapshot should expose pid")
+            .parse::<u32>()
+            .expect("Pi RPC process pid should be numeric")
+    }
+
+    fn wait_for_pi_rpc_process_replacement(
+        supervisor_handle: &SandboxdSupervisorHandle,
+        original_pid: u32,
+        timeout: Duration,
+    ) {
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            let snapshot = supervisor_handle
+                .component_snapshot(SupervisedComponent::PiRpcProcess)
+                .expect("Pi RPC process should be tracked");
+            let replacement_pid = snapshot
+                .details
+                .get("pid")
+                .and_then(|pid| pid.parse::<u32>().ok());
+            if snapshot.state == ComponentHealthState::Healthy
+                && replacement_pid.is_some_and(|pid| pid != original_pid)
+            {
+                return;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "expected Pi RPC process to restart before timeout, got {snapshot:?}"
+            );
+            thread::sleep(Duration::from_millis(25));
+        }
     }
 
     #[test]
@@ -285,6 +323,45 @@ mod tests {
             stopped_rpc_process_snapshot.state,
             ComponentHealthState::Stopped
         );
+    }
+
+    #[test]
+    fn restarts_pi_rpc_process_after_exit() {
+        let simulated_pi = SimulatedPiRpcProcess::start();
+        let supervisor_handle = test_supervisor_handle();
+        let proxy = start_pi_proxy_with_supervisor(
+            &reserve_pi_proxy_listen_url(),
+            PiProxyConfig {
+                pi_cli_path: simulated_pi.path(),
+                env: BTreeMap::new(),
+            },
+            Arc::new(Mutex::new(KeepaliveManager::default())),
+            supervisor_handle.clone(),
+        )
+        .expect("Pi proxy should start with a runnable Pi RPC process");
+        let original_pid = pi_rpc_process_pid(&supervisor_handle);
+
+        {
+            let mut guard = proxy
+                .state
+                .child
+                .lock()
+                .expect("Pi child lock should not be poisoned");
+            guard
+                .as_mut()
+                .expect("Pi RPC process should be running")
+                .child
+                .kill()
+                .expect("Pi RPC process should be killable");
+        }
+
+        wait_for_pi_rpc_process_replacement(
+            &supervisor_handle,
+            original_pid,
+            Duration::from_secs(5),
+        );
+
+        proxy.close().expect("Pi proxy should close cleanly");
     }
 
     #[test]

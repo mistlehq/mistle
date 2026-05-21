@@ -70,6 +70,7 @@ pub fn start_runtime_client_process_manager_with_supervisor(
     let mut started_processes = Vec::new();
     let mut codex_app_server_observation_handle = None;
     let mut codex_app_server_control_handle = None;
+    let mut opencode_server_control_handle = None;
     let monitor_shutdown_requested = Arc::new(AtomicBool::new(false));
     let mut monitor_threads = Vec::new();
 
@@ -185,6 +186,16 @@ pub fn start_runtime_client_process_manager_with_supervisor(
         if is_opencode_server_process(process_spec)
             && supervisor_handle.tracks_component(SupervisedComponent::OpenCodeServer)
         {
+            let control_handle = OpenCodeServerControlHandle {
+                managed_process: Arc::new(ManagedOpenCodeServerProcess {
+                    spec: process_spec.clone(),
+                    child: process.child.clone(),
+                    output_capture: process.output_capture.clone(),
+                    supervisor_handle: supervisor_handle.clone(),
+                    restart_lock: Mutex::new(()),
+                    restart_in_progress: AtomicBool::new(false),
+                }),
+            };
             supervisor_handle.replace_component_details(
                 SupervisedComponent::OpenCodeServer,
                 opencode_server_details_with_status(
@@ -197,13 +208,10 @@ pub fn start_runtime_client_process_manager_with_supervisor(
             );
             supervisor_handle.mark_component_healthy(SupervisedComponent::OpenCodeServer);
             monitor_threads.push(spawn_opencode_server_monitor(
-                ManagedOpenCodeServerProcess {
-                    spec: process_spec.clone(),
-                    child: process.child.clone(),
-                    supervisor_handle: supervisor_handle.clone(),
-                },
+                control_handle.clone(),
                 monitor_shutdown_requested.clone(),
             ));
+            opencode_server_control_handle = Some(control_handle);
         }
 
         started_processes.push(process);
@@ -220,6 +228,7 @@ pub fn start_runtime_client_process_manager_with_supervisor(
         processes: started_processes,
         codex_app_server_observation_handle,
         codex_app_server_control_handle,
+        opencode_server_control_handle,
         monitor_shutdown_requested,
         monitor_threads,
         supervisor_handle,
@@ -233,6 +242,10 @@ impl RuntimeClientProcessManager {
 
     pub fn codex_app_server_control_handle(&self) -> Option<&CodexAppServerControlHandle> {
         self.codex_app_server_control_handle.as_ref()
+    }
+
+    pub fn opencode_server_control_handle(&self) -> Option<&OpenCodeServerControlHandle> {
+        self.opencode_server_control_handle.as_ref()
     }
 
     /// Stops all managed processes in reverse start order using their stop policies.

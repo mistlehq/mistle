@@ -63,6 +63,7 @@ pub struct RuntimeClientProcessManager {
     processes: Vec<RunningRuntimeClientProcess>,
     codex_app_server_observation_handle: Option<CodexAppServerObservationHandle>,
     codex_app_server_control_handle: Option<CodexAppServerControlHandle>,
+    opencode_server_control_handle: Option<OpenCodeServerControlHandle>,
     monitor_shutdown_requested: Arc<AtomicBool>,
     monitor_threads: Vec<JoinHandle<()>>,
     supervisor_handle: SandboxdSupervisorHandle,
@@ -123,6 +124,11 @@ pub struct CodexAppServerControlHandle {
     managed_process: Arc<ManagedCodexAppServerProcess>,
 }
 
+#[derive(Clone, Debug)]
+pub struct OpenCodeServerControlHandle {
+    managed_process: Arc<ManagedOpenCodeServerProcess>,
+}
+
 #[derive(Debug)]
 struct ManagedCodexAppServerProcess {
     spec: RuntimeClientProcessSpec,
@@ -138,7 +144,10 @@ struct ManagedCodexAppServerProcess {
 struct ManagedOpenCodeServerProcess {
     spec: RuntimeClientProcessSpec,
     child: Arc<Mutex<Child>>,
+    output_capture: ProcessOutputCapture,
     supervisor_handle: SandboxdSupervisorHandle,
+    restart_lock: Mutex<()>,
+    restart_in_progress: AtomicBool,
 }
 
 /// Describes why runtime client process startup, readiness, or shutdown failed.

@@ -314,6 +314,56 @@ fn codex_app_server_monitor_survives_a_failed_restart_attempt() {
 }
 
 #[test]
+fn opencode_server_control_handle_restarts_after_exit() {
+    let port = reserve_test_port();
+    let control_dir = create_test_control_dir("opencode-server-restart");
+    let exit_marker_path = control_dir.join("exit-now");
+    let process_spec = opencode_server_restart_process_spec(port, &control_dir);
+    let supervisor_handle = SandboxdSupervisorHandle::new(
+        "sandbox-123",
+        std::sync::Arc::new(SystemClock),
+        BTreeSet::from([SupervisedComponent::OpenCodeServer]),
+    );
+
+    let process_manager = start_runtime_client_process_manager_with_supervisor(
+        std::slice::from_ref(&process_spec),
+        &SystemClock,
+        &ThreadSleeper,
+        supervisor_handle.clone(),
+    )
+    .expect("process manager should start");
+    let control_handle = process_manager
+        .opencode_server_control_handle()
+        .expect("OpenCode server control handle should exist")
+        .clone();
+
+    fs::write(&exit_marker_path, "exit-now").expect("exit marker should be writable");
+    wait_for_component_snapshot(
+        &supervisor_handle,
+        SupervisedComponent::OpenCodeServer,
+        ComponentHealthState::Restarting,
+        1,
+        Duration::from_secs(5),
+    );
+
+    control_handle
+        .restart(&SystemClock, &ThreadSleeper)
+        .expect("coordinated OpenCode restart should succeed");
+    wait_for_component_snapshot(
+        &supervisor_handle,
+        SupervisedComponent::OpenCodeServer,
+        ComponentHealthState::Healthy,
+        1,
+        Duration::from_secs(5),
+    );
+
+    process_manager
+        .stop(&SystemClock, &ThreadSleeper)
+        .expect("process manager stop should succeed after OpenCode restart");
+    let _ = fs::remove_dir_all(control_dir);
+}
+
+#[test]
 fn readiness_failure_flushes_captured_child_output_before_reporting() {
     let port = reserve_test_port();
     let process_spec = codex_app_server_readiness_failure_process_spec(port);
@@ -513,6 +563,71 @@ if (failThisAttempt) {
         },
         readiness: RuntimeClientProcessReadiness::Ws {
             url: format!("ws://127.0.0.1:{port}/health"),
+            timeout_ms: 5_000,
+        },
+        stop: RuntimeClientProcessStopPolicy {
+            signal: RuntimeClientProcessStopSignal::Sigkill,
+            timeout_ms: 1_000,
+            grace_period_ms: None,
+        },
+    }
+}
+
+fn opencode_server_restart_process_spec(port: u16, control_dir: &Path) -> RuntimeClientProcessSpec {
+    let script = r#"
+const fs = require('node:fs');
+const http = require('node:http');
+const path = require('node:path');
+
+const [portArg, controlDirArg] = process.argv.slice(1);
+const port = Number(portArg);
+const controlDir = controlDirArg;
+const exitMarkerPath = path.join(controlDir, 'exit-now');
+const keepAlive = setInterval(() => {}, 1000);
+let exitWatcher = null;
+
+const server = http.createServer((_request, response) => {
+  response.writeHead(200, { 'content-length': '0' });
+  response.end();
+});
+
+function shutdown() {
+  if (exitWatcher !== null) {
+    clearInterval(exitWatcher);
+  }
+  server.close(() => {
+    clearInterval(keepAlive);
+    process.exit(0);
+  });
+}
+
+server.listen(port, '127.0.0.1', () => {
+  exitWatcher = setInterval(() => {
+    if (fs.existsSync(exitMarkerPath)) {
+      fs.rmSync(exitMarkerPath);
+      shutdown();
+    }
+  }, 50);
+});
+"#;
+
+    RuntimeClientProcessSpec {
+        process_key: "opencode-server".to_string(),
+        command: RuntimeExecCommand {
+            args: vec![
+                "node".to_string(),
+                "-e".to_string(),
+                script.to_string(),
+                port.to_string(),
+                control_dir.display().to_string(),
+            ],
+            env: Some(BTreeMap::new()),
+            cwd: None,
+            timeout_ms: None,
+        },
+        readiness: RuntimeClientProcessReadiness::Http {
+            url: format!("http://127.0.0.1:{port}/global/health"),
+            expected_status: 200,
             timeout_ms: 5_000,
         },
         stop: RuntimeClientProcessStopPolicy {
