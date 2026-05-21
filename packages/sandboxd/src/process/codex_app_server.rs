@@ -109,7 +109,7 @@ pub(super) fn run_codex_app_server_monitor(
                 continue;
             }
             let exit_description = describe_process_exit(exit_status);
-            let (exit_reason, exit_fields) = codex_app_server_exit_event_fields(exit_status);
+            let (exit_reason, exit_fields) = runtime_process_exit_event_fields(exit_status);
             update_codex_app_server_observation(
                 &control_handle.managed_process.observation_handle,
                 &control_handle.managed_process.spec,
@@ -285,7 +285,7 @@ pub(super) fn codex_app_server_details_with_status(
     details
 }
 
-pub(super) fn codex_app_server_exit_event_fields(
+pub(super) fn runtime_process_exit_event_fields(
     exit_status: std::process::ExitStatus,
 ) -> (&'static str, Vec<(&'static str, serde_json::Value)>) {
     if let Some(signal) = exit_status.signal() {

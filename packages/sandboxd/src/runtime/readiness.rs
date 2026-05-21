@@ -16,6 +16,7 @@ pub enum RuntimeReadinessMode {
     NoAgentRuntime,
     CodexProxyOnly,
     Codex,
+    OpenCode,
     OpenCodeProxyOnly,
     Pi,
     PiProxyOnly,
@@ -32,6 +33,10 @@ pub fn derive_runtime_ready(snapshot: &SandboxdHealthSnapshot, mode: RuntimeRead
         }
         RuntimeReadinessMode::OpenCodeProxyOnly => {
             component_is_healthy(snapshot, SupervisedComponent::OpenCodeProxy)
+        }
+        RuntimeReadinessMode::OpenCode => {
+            component_is_healthy(snapshot, SupervisedComponent::OpenCodeProxy)
+                && component_is_healthy(snapshot, SupervisedComponent::OpenCodeServer)
         }
         RuntimeReadinessMode::Pi => {
             component_is_healthy(snapshot, SupervisedComponent::PiProxy)
@@ -256,6 +261,50 @@ mod tests {
         assert!(!derive_runtime_ready(
             &snapshot,
             RuntimeReadinessMode::CodexProxyOnly,
+        ));
+    }
+
+    #[test]
+    fn derives_opencode_runtime_as_ready_only_when_proxy_and_server_are_healthy() {
+        let snapshot = SandboxdHealthSnapshot {
+            observed_at: SystemTime::UNIX_EPOCH,
+            components: vec![
+                component_snapshot(
+                    SupervisedComponent::OpenCodeProxy,
+                    ComponentHealthState::Healthy,
+                ),
+                component_snapshot(
+                    SupervisedComponent::OpenCodeServer,
+                    ComponentHealthState::Healthy,
+                ),
+            ],
+        };
+
+        assert!(derive_runtime_ready(
+            &snapshot,
+            RuntimeReadinessMode::OpenCode
+        ));
+    }
+
+    #[test]
+    fn derives_opencode_runtime_as_not_ready_when_server_is_not_healthy() {
+        let snapshot = SandboxdHealthSnapshot {
+            observed_at: SystemTime::UNIX_EPOCH,
+            components: vec![
+                component_snapshot(
+                    SupervisedComponent::OpenCodeProxy,
+                    ComponentHealthState::Healthy,
+                ),
+                component_snapshot(
+                    SupervisedComponent::OpenCodeServer,
+                    ComponentHealthState::Restarting,
+                ),
+            ],
+        };
+
+        assert!(!derive_runtime_ready(
+            &snapshot,
+            RuntimeReadinessMode::OpenCode
         ));
     }
 

@@ -1274,6 +1274,8 @@ fn determine_runtime_readiness_mode(
         RuntimeReadinessMode::Codex
     } else if supervisor_handle.tracks_component(SupervisedComponent::CodexProxy) {
         RuntimeReadinessMode::CodexProxyOnly
+    } else if supervisor_handle.tracks_component(SupervisedComponent::OpenCodeServer) {
+        RuntimeReadinessMode::OpenCode
     } else if supervisor_handle.tracks_component(SupervisedComponent::OpenCodeProxy) {
         RuntimeReadinessMode::OpenCodeProxyOnly
     } else if supervisor_handle.tracks_component(SupervisedComponent::PiRpcProcess) {
@@ -1461,6 +1463,7 @@ fn collect_tracked_components(
         .any(|agent_runtime| agent_runtime.runtime_id == "opencode")
     {
         tracked_components.insert(SupervisedComponent::OpenCodeProxy);
+        tracked_components.insert(SupervisedComponent::OpenCodeServer);
     }
 
     if runtime_plan

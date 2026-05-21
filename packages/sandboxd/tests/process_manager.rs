@@ -72,6 +72,7 @@ fn records_codex_app_server_exit_after_readiness() {
     assert!(
         wait_for_forwarded_lifecycle_event(
             &supervisor_handle,
+            SupervisedComponent::CodexAppServer,
             "\"event\":\"component_exited\"",
             Duration::from_secs(5),
         ),
@@ -119,6 +120,7 @@ fn records_codex_app_server_readiness_degradation_while_process_stays_alive() {
     assert!(
         wait_for_forwarded_lifecycle_event(
             &supervisor_handle,
+            SupervisedComponent::CodexAppServer,
             "\"probeKind\":\"readiness_http_readyz\"",
             Duration::from_secs(10),
         ),
@@ -132,6 +134,111 @@ fn records_codex_app_server_readiness_degradation_while_process_stays_alive() {
     let snapshot = supervisor_handle
         .component_snapshot(SupervisedComponent::CodexAppServer)
         .expect("Codex app-server should be tracked");
+    assert_eq!(snapshot.state, ComponentHealthState::Restarting);
+    assert_eq!(
+        snapshot.details.get("readinessState"),
+        Some(&"Unreachable".to_string())
+    );
+
+    process_manager
+        .stop(&SystemClock, &ThreadSleeper)
+        .expect("process manager stop should succeed");
+}
+
+#[test]
+fn records_opencode_server_exit_after_readiness() {
+    let port = reserve_test_port();
+    let process_spec = opencode_server_process_spec(port, "exit", 250);
+    let supervisor_handle = SandboxdSupervisorHandle::new(
+        "sandbox-123",
+        std::sync::Arc::new(SystemClock),
+        BTreeSet::from([SupervisedComponent::OpenCodeServer]),
+    );
+
+    let process_manager = start_runtime_client_process_manager_with_supervisor(
+        std::slice::from_ref(&process_spec),
+        &SystemClock,
+        &ThreadSleeper,
+        supervisor_handle.clone(),
+    )
+    .expect("process manager should start");
+
+    wait_for_component_snapshot(
+        &supervisor_handle,
+        SupervisedComponent::OpenCodeServer,
+        ComponentHealthState::Restarting,
+        1,
+        Duration::from_secs(5),
+    );
+
+    let snapshot = supervisor_handle
+        .component_snapshot(SupervisedComponent::OpenCodeServer)
+        .expect("OpenCode server should be tracked");
+    assert_eq!(
+        snapshot.details.get("lastExitStatus"),
+        Some(&"process exited".to_string())
+    );
+    assert_eq!(
+        snapshot.details.get("livenessState"),
+        Some(&"Exited".to_string())
+    );
+    assert!(
+        wait_for_forwarded_lifecycle_event(
+            &supervisor_handle,
+            SupervisedComponent::OpenCodeServer,
+            "\"event\":\"component_exited\"",
+            Duration::from_secs(5),
+        ),
+        "expected a forwarded component_exited lifecycle event for the OpenCode server"
+    );
+
+    process_manager
+        .stop(&SystemClock, &ThreadSleeper)
+        .expect("process manager stop should succeed after exit observation");
+}
+
+#[test]
+fn records_opencode_server_readiness_degradation_while_process_stays_alive() {
+    let port = reserve_test_port();
+    let process_spec = opencode_server_process_spec(port, "degrade", 250);
+    let supervisor_handle = SandboxdSupervisorHandle::new(
+        "sandbox-123",
+        std::sync::Arc::new(SystemClock),
+        BTreeSet::from([SupervisedComponent::OpenCodeServer]),
+    );
+
+    let process_manager = start_runtime_client_process_manager_with_supervisor(
+        &[process_spec],
+        &SystemClock,
+        &ThreadSleeper,
+        supervisor_handle.clone(),
+    )
+    .expect("process manager should start");
+
+    thread::sleep(Duration::from_secs(2));
+
+    let healthy_snapshot = supervisor_handle
+        .component_snapshot(SupervisedComponent::OpenCodeServer)
+        .expect("OpenCode server should be tracked");
+    assert_eq!(healthy_snapshot.state, ComponentHealthState::Healthy);
+    assert_eq!(
+        healthy_snapshot.details.get("readinessState"),
+        Some(&"Degraded".to_string())
+    );
+
+    assert!(
+        wait_for_forwarded_lifecycle_event(
+            &supervisor_handle,
+            SupervisedComponent::OpenCodeServer,
+            "\"probeKind\":\"readiness_http\"",
+            Duration::from_secs(10),
+        ),
+        "expected a readiness_http healthcheck failure event for the OpenCode server"
+    );
+
+    let snapshot = supervisor_handle
+        .component_snapshot(SupervisedComponent::OpenCodeServer)
+        .expect("OpenCode server should be tracked");
     assert_eq!(snapshot.state, ComponentHealthState::Restarting);
     assert_eq!(
         snapshot.details.get("readinessState"),
@@ -443,6 +550,61 @@ setInterval(() => {}, 1000);
     }
 }
 
+fn opencode_server_process_spec(port: u16, mode: &str, delay_ms: u64) -> RuntimeClientProcessSpec {
+    let script = r#"
+const http = require('node:http');
+const [portArg, mode, delayArg] = process.argv.slice(1);
+const port = Number(portArg);
+const delayMs = Number(delayArg);
+const keepAlive = setInterval(() => {}, 1000);
+const server = http.createServer((_request, response) => {
+  response.writeHead(200, { 'content-length': '0' });
+  response.end();
+});
+server.listen(port, '127.0.0.1', () => {
+  setTimeout(() => {
+    if (mode === 'exit') {
+      server.close(() => {
+        clearInterval(keepAlive);
+        process.exit(0);
+      });
+      return;
+    }
+    if (mode === 'degrade') {
+      server.close(() => {});
+    }
+  }, delayMs);
+});
+"#;
+
+    RuntimeClientProcessSpec {
+        process_key: "opencode-server".to_string(),
+        command: RuntimeExecCommand {
+            args: vec![
+                "node".to_string(),
+                "-e".to_string(),
+                script.to_string(),
+                port.to_string(),
+                mode.to_string(),
+                delay_ms.to_string(),
+            ],
+            env: Some(BTreeMap::new()),
+            cwd: None,
+            timeout_ms: None,
+        },
+        readiness: RuntimeClientProcessReadiness::Http {
+            url: format!("http://127.0.0.1:{port}/global/health"),
+            expected_status: 200,
+            timeout_ms: 5_000,
+        },
+        stop: RuntimeClientProcessStopPolicy {
+            signal: RuntimeClientProcessStopSignal::Sigkill,
+            timeout_ms: 1_000,
+            grace_period_ms: None,
+        },
+    }
+}
+
 fn reserve_test_port() -> u16 {
     let listener =
         TcpListener::bind(("127.0.0.1", 0)).expect("test listener should bind to loopback");
@@ -472,18 +634,34 @@ fn wait_for_codex_app_server_snapshot(
     expected_restart_count: u64,
     timeout: Duration,
 ) {
+    wait_for_component_snapshot(
+        supervisor_handle,
+        SupervisedComponent::CodexAppServer,
+        expected_state,
+        expected_restart_count,
+        timeout,
+    )
+}
+
+fn wait_for_component_snapshot(
+    supervisor_handle: &SandboxdSupervisorHandle,
+    component: SupervisedComponent,
+    expected_state: ComponentHealthState,
+    expected_restart_count: u64,
+    timeout: Duration,
+) {
     let deadline = Instant::now() + timeout;
     loop {
         let snapshot = supervisor_handle
-            .component_snapshot(SupervisedComponent::CodexAppServer)
-            .expect("Codex app-server should be tracked");
+            .component_snapshot(component)
+            .expect("component should be tracked");
         if snapshot.state == expected_state && snapshot.restart_count >= expected_restart_count {
             return;
         }
 
         assert!(
             Instant::now() < deadline,
-            "expected Codex app-server snapshot to reach state {expected_state:?} with restart_count >= {expected_restart_count}, got {snapshot:?}"
+            "expected {component:?} snapshot to reach state {expected_state:?} with restart_count >= {expected_restart_count}, got {snapshot:?}"
         );
         thread::sleep(Duration::from_millis(25));
     }
@@ -491,6 +669,7 @@ fn wait_for_codex_app_server_snapshot(
 
 fn wait_for_forwarded_lifecycle_event(
     supervisor_handle: &SandboxdSupervisorHandle,
+    component: SupervisedComponent,
     expected_fragment: &str,
     timeout: Duration,
 ) -> bool {
@@ -499,7 +678,7 @@ fn wait_for_forwarded_lifecycle_event(
         let lifecycle_lines = supervisor_handle.drain_forwarded_lifecycle_event_lines();
         if lifecycle_lines
             .iter()
-            .any(|line| line.contains(expected_fragment) && line.contains("\"CodexAppServer\""))
+            .any(|line| line.contains(expected_fragment) && line.contains(component.as_str()))
         {
             return true;
         }

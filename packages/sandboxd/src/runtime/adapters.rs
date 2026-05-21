@@ -557,12 +557,17 @@ fn start_codex_runtime_adapter(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
     use std::sync::{Arc, Mutex};
 
     use crate::keepalive::KeepaliveManager;
     use crate::protocol::startup::{StartupInput, StartupMode};
-    use crate::runtime::adapters::{RuntimeAdapterRegistry, RuntimeAdapterRegistryError};
+    use crate::runtime::adapters::{
+        RuntimeAdapterRegistry, RuntimeAdapterRegistryError, collect_runtime_adapter_components,
+    };
+    use crate::runtime::plan::CompiledRuntimePlan;
     use crate::runtime::readiness::RuntimeReadinessManager;
+    use crate::supervision::SupervisedComponent;
 
     #[test]
     fn rejects_unknown_runtime_ids() {
@@ -611,5 +616,74 @@ mod tests {
                 if runtime_id == "unknown-runtime"
             )),
         }
+    }
+
+    #[test]
+    fn adapter_owned_opencode_components_do_not_include_server_process() {
+        let runtime_plan: CompiledRuntimePlan = serde_json::from_value(serde_json::json!({
+            "sandboxProfileId": "sbp_123",
+            "version": 1,
+            "image": {
+                "source": "base",
+                "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
+            },
+            "egressRoutes": [],
+            "artifacts": [],
+            "runtimeClients": [
+                {
+                    "clientId": "opencode-cli",
+                    "setup": {
+                        "env": {},
+                        "files": []
+                    },
+                    "processes": [
+                        {
+                            "processKey": "opencode-server",
+                            "command": {
+                                "args": ["opencode", "serve"]
+                            },
+                            "readiness": {
+                                "type": "http",
+                                "url": "http://127.0.0.1:4096/health",
+                                "expectedStatus": 200,
+                                "timeoutMs": 5000
+                            },
+                            "stop": {
+                                "signal": "sigterm",
+                                "timeoutMs": 10000,
+                                "gracePeriodMs": 2000
+                            }
+                        }
+                    ],
+                    "endpoints": [
+                        {
+                            "endpointKey": "server",
+                            "processKey": "opencode-server",
+                            "transport": {
+                                "type": "ws",
+                                "url": "ws://127.0.0.1:0/opencode"
+                            },
+                            "connectionMode": "dedicated"
+                        }
+                    ]
+                }
+            ],
+            "workspaceSources": [],
+            "agentRuntimes": [
+                {
+                    "runtimeId": "opencode",
+                    "runtimeKey": "opencode-server",
+                    "clientId": "opencode-cli",
+                    "endpointKey": "server",
+                    "ptyLaunch": {}
+                }
+            ]
+        }))
+        .expect("runtime plan should decode");
+
+        assert_eq!(
+            collect_runtime_adapter_components(&runtime_plan),
+            BTreeSet::from([SupervisedComponent::OpenCodeProxy])
+        );
     }
 }

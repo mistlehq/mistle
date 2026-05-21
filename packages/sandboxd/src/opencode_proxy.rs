@@ -388,12 +388,20 @@ fn sync_opencode_proxy_runtime_readiness_from_snapshot(
 ) {
     let ready = derive_runtime_ready(
         &supervisor_handle.snapshot(),
-        RuntimeReadinessMode::OpenCodeProxyOnly,
+        opencode_readiness_mode(supervisor_handle),
     );
     runtime_readiness_manager
         .lock()
         .expect("runtime readiness manager lock should not be poisoned")
         .set_ready(ready);
+}
+
+fn opencode_readiness_mode(supervisor_handle: &SandboxdSupervisorHandle) -> RuntimeReadinessMode {
+    if supervisor_handle.tracks_component(SupervisedComponent::OpenCodeServer) {
+        RuntimeReadinessMode::OpenCode
+    } else {
+        RuntimeReadinessMode::OpenCodeProxyOnly
+    }
 }
 
 fn spawn_opencode_proxy_runtime_readiness_projection(
@@ -407,7 +415,7 @@ fn spawn_opencode_proxy_runtime_readiness_projection(
         while !shutdown_requested.load(Ordering::Relaxed) {
             let projected_ready = derive_runtime_ready(
                 &supervisor_handle.snapshot(),
-                RuntimeReadinessMode::OpenCodeProxyOnly,
+                opencode_readiness_mode(&supervisor_handle),
             );
             if last_projected_ready != Some(projected_ready) {
                 runtime_readiness_manager

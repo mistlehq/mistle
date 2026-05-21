@@ -21,6 +21,7 @@ mod codex_app_server;
 mod control;
 mod lifecycle;
 mod manager;
+mod opencode_server;
 mod output;
 mod readiness;
 
@@ -30,6 +31,7 @@ pub use manager::{
     flatten_runtime_client_processes, start_runtime_client_process_manager,
     start_runtime_client_process_manager_with_supervisor,
 };
+use opencode_server::*;
 use output::*;
 use readiness::*;
 
@@ -43,6 +45,8 @@ pub const DEFAULT_PROCESS_MONITOR_POLL_INTERVAL: Duration = Duration::from_milli
 pub const CODEX_APP_SERVER_POST_START_READINESS_TIMEOUT: Duration = Duration::from_millis(1_000);
 /// Number of consecutive post-start readiness failures before restarting Codex.
 pub const CODEX_APP_SERVER_POST_START_FAILURE_THRESHOLD: u8 = 3;
+/// Number of consecutive post-start readiness failures before OpenCode is marked unhealthy.
+pub const OPENCODE_SERVER_POST_START_FAILURE_THRESHOLD: u8 = 3;
 
 /// Captures one runtime client process after client-level environment merging.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -60,7 +64,7 @@ pub struct RuntimeClientProcessManager {
     codex_app_server_observation_handle: Option<CodexAppServerObservationHandle>,
     codex_app_server_control_handle: Option<CodexAppServerControlHandle>,
     monitor_shutdown_requested: Arc<AtomicBool>,
-    monitor_thread: Option<JoinHandle<()>>,
+    monitor_threads: Vec<JoinHandle<()>>,
     supervisor_handle: SandboxdSupervisorHandle,
 }
 
@@ -128,6 +132,13 @@ struct ManagedCodexAppServerProcess {
     supervisor_handle: SandboxdSupervisorHandle,
     restart_lock: Mutex<()>,
     restart_in_progress: AtomicBool,
+}
+
+#[derive(Debug)]
+struct ManagedOpenCodeServerProcess {
+    spec: RuntimeClientProcessSpec,
+    child: Arc<Mutex<Child>>,
+    supervisor_handle: SandboxdSupervisorHandle,
 }
 
 /// Describes why runtime client process startup, readiness, or shutdown failed.

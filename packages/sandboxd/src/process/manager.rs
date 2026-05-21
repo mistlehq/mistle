@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::thread::JoinHandle;
 
 use crate::process::*;
 use crate::runtime::{RuntimeClient, RuntimeExecCommand};
@@ -69,6 +70,8 @@ pub fn start_runtime_client_process_manager_with_supervisor(
     let mut started_processes = Vec::new();
     let mut codex_app_server_observation_handle = None;
     let mut codex_app_server_control_handle = None;
+    let monitor_shutdown_requested = Arc::new(AtomicBool::new(false));
+    let mut monitor_threads = Vec::new();
 
     for (process_index, process_spec) in process_specs.iter().enumerate() {
         if is_codex_app_server_process(process_spec)
@@ -95,17 +98,38 @@ pub fn start_runtime_client_process_manager_with_supervisor(
                 })),
             });
         }
-        let mut process = start_runtime_client_process(process_spec).map_err(|error| {
-            ProcessManagerError::StartProcess {
-                process_index,
-                process_key: process_spec.process_key.clone(),
-                error,
-                output_tails: Box::default(),
+        if is_opencode_server_process(process_spec)
+            && supervisor_handle.tracks_component(SupervisedComponent::OpenCodeServer)
+        {
+            supervisor_handle.replace_component_details(
+                SupervisedComponent::OpenCodeServer,
+                opencode_server_details_with_status(
+                    process_spec,
+                    None,
+                    None,
+                    "Starting",
+                    "Starting",
+                ),
+            );
+            supervisor_handle.mark_component_starting(SupervisedComponent::OpenCodeServer);
+        }
+        let mut process = match start_runtime_client_process(process_spec) {
+            Ok(process) => process,
+            Err(error) => {
+                stop_process_monitor_threads(&monitor_shutdown_requested, &mut monitor_threads);
+                let _ = stop_started_processes(&mut started_processes, clock, sleeper);
+                return Err(ProcessManagerError::StartProcess {
+                    process_index,
+                    process_key: process_spec.process_key.clone(),
+                    error,
+                    output_tails: Box::default(),
+                });
             }
-        })?;
+        };
 
         if let Err(error) = wait_for_runtime_client_process_readiness(&mut process, clock, sleeper)
         {
+            stop_process_monitor_threads(&monitor_shutdown_requested, &mut monitor_threads);
             let _ = stop_started_processes(&mut started_processes, clock, sleeper);
             let _ = stop_runtime_client_process(&mut process, clock, sleeper);
             return Err(ProcessManagerError::ReadinessCheck {
@@ -158,23 +182,46 @@ pub fn start_runtime_client_process_manager_with_supervisor(
                 });
             }
         }
+        if is_opencode_server_process(process_spec)
+            && supervisor_handle.tracks_component(SupervisedComponent::OpenCodeServer)
+        {
+            supervisor_handle.replace_component_details(
+                SupervisedComponent::OpenCodeServer,
+                opencode_server_details_with_status(
+                    process_spec,
+                    Some(process.pid()),
+                    None,
+                    "Alive",
+                    "Ready",
+                ),
+            );
+            supervisor_handle.mark_component_healthy(SupervisedComponent::OpenCodeServer);
+            monitor_threads.push(spawn_opencode_server_monitor(
+                ManagedOpenCodeServerProcess {
+                    spec: process_spec.clone(),
+                    child: process.child.clone(),
+                    supervisor_handle: supervisor_handle.clone(),
+                },
+                monitor_shutdown_requested.clone(),
+            ));
+        }
 
         started_processes.push(process);
     }
 
-    let monitor_shutdown_requested = Arc::new(AtomicBool::new(false));
-    let monitor_thread = codex_app_server_control_handle
-        .clone()
-        .map(|control_handle| {
-            spawn_codex_app_server_monitor(control_handle, monitor_shutdown_requested.clone())
-        });
+    if let Some(control_handle) = codex_app_server_control_handle.clone() {
+        monitor_threads.push(spawn_codex_app_server_monitor(
+            control_handle,
+            monitor_shutdown_requested.clone(),
+        ));
+    }
 
     Ok(RuntimeClientProcessManager {
         processes: started_processes,
         codex_app_server_observation_handle,
         codex_app_server_control_handle,
         monitor_shutdown_requested,
-        monitor_thread,
+        monitor_threads,
         supervisor_handle,
     })
 }
@@ -196,9 +243,7 @@ impl RuntimeClientProcessManager {
     ) -> Result<(), ProcessManagerError> {
         self.monitor_shutdown_requested
             .store(true, Ordering::Relaxed);
-        if let Some(monitor_thread) = self.monitor_thread.take() {
-            let _ = monitor_thread.join();
-        }
+        join_process_monitor_threads(&mut self.monitor_threads);
         stop_started_processes(&mut self.processes, clock, sleeper)
             .map_err(ProcessManagerError::StopProcesses)?;
         if self
@@ -208,6 +253,27 @@ impl RuntimeClientProcessManager {
             self.supervisor_handle
                 .mark_component_stopped(SupervisedComponent::CodexAppServer);
         }
+        if self
+            .supervisor_handle
+            .tracks_component(SupervisedComponent::OpenCodeServer)
+        {
+            self.supervisor_handle
+                .mark_component_stopped(SupervisedComponent::OpenCodeServer);
+        }
         Ok(())
+    }
+}
+
+fn stop_process_monitor_threads(
+    monitor_shutdown_requested: &AtomicBool,
+    monitor_threads: &mut Vec<JoinHandle<()>>,
+) {
+    monitor_shutdown_requested.store(true, Ordering::Relaxed);
+    join_process_monitor_threads(monitor_threads);
+}
+
+fn join_process_monitor_threads(monitor_threads: &mut Vec<JoinHandle<()>>) {
+    while let Some(monitor_thread) = monitor_threads.pop() {
+        let _ = monitor_thread.join();
     }
 }
