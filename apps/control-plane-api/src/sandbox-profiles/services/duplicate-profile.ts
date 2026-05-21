@@ -16,7 +16,7 @@ import {
 } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import { findNextScheduleOccurrence } from "@mistle/time";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
 
 import { assertPrimaryRepositoryReferenceOrThrow as assertSchedulePrimaryRepositoryReferenceOrThrow } from "../../trigger-schedules/services/validation.js";
 import { resolveNextScheduledAtOrThrow } from "../../trigger-schedules/services/validation.js";
@@ -98,6 +98,7 @@ export async function duplicateProfile(
 
     await assertVersionReferencesAreValid(tx, tables, {
       organizationId: input.organizationId,
+      now: input.now,
       versions: draftVersion === null ? [activeVersion] : [activeVersion, draftVersion],
     });
 
@@ -267,6 +268,7 @@ async function assertVersionReferencesAreValid(
   tables: ControlPlaneTables,
   input: {
     organizationId: string;
+    now: Date;
     versions: readonly SourceProfileVersion[];
   },
 ): Promise<void> {
@@ -324,6 +326,11 @@ async function assertVersionReferencesAreValid(
         and(
           eq(tables.apiKeys.id, apiKeyId),
           eq(tables.apiKeys.organizationId, input.organizationId),
+          isNull(tables.apiKeys.revokedAt),
+          or(
+            isNull(tables.apiKeys.expiresAt),
+            gt(tables.apiKeys.expiresAt, input.now.toISOString()),
+          ),
         ),
       )
       .limit(1);
@@ -331,7 +338,7 @@ async function assertVersionReferencesAreValid(
     if (apiKey[0] === undefined) {
       throw new SandboxProfilesConflictError(
         SandboxProfilesConflictCodes.INVALID_DUPLICATE_REFERENCE,
-        `Sandbox profile duplicate references missing API key '${apiKeyId}'.`,
+        `Sandbox profile duplicate references unavailable API key '${apiKeyId}'.`,
       );
     }
   }

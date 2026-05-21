@@ -2,7 +2,12 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
-import { TriggerKinds, ScheduleTargetTypes } from "@mistle/db/control-plane";
+import {
+  ScheduleKinds,
+  ScheduleTargetTypes,
+  TriggerKinds,
+  type ScheduleKind,
+} from "@mistle/db/control-plane";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
@@ -114,6 +119,37 @@ describe.concurrent("triggers list integration", () => {
       "sbp_triggers_list_filter_a",
     ]);
     expect(body.items.map((item) => item.target.sandboxProfileVersion)).toEqual([2, 4]);
+  });
+
+  it("excludes one-off scheduled triggers from list results", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "triggers-list-one-off-excluded@example.com",
+    });
+
+    await seedScheduledTrigger(env, {
+      organizationId: session.organizationId,
+      triggerId: "atm_triggers_list_one_off_excluded",
+      scheduleId: "sch_triggers_list_one_off_excluded",
+      targetId: "atg_triggers_list_one_off_excluded",
+      profileId: "sbp_triggers_list_one_off_excluded",
+      name: "One-off excluded schedule",
+      createdAt: "2026-03-05T00:00:00.000Z",
+      scheduleKind: ScheduleKinds.ONE_OFF,
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/triggers?sandboxProfileId=sbp_triggers_list_one_off_excluded&limit=10",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const body = ListTriggersResponseSchema.parse(await response.json());
+    expect(body.totalResults).toBe(0);
+    expect(body.items).toEqual([]);
   });
 
   it("applies trigger list filters before pagination and total results", async ({ env }) => {
@@ -342,9 +378,11 @@ async function seedScheduledTrigger(
     name: string;
     createdAt: string;
     primaryRepositoryId?: string | null;
+    scheduleKind?: ScheduleKind;
   },
 ): Promise<void> {
   const profileVersion = input.profileVersion ?? 1;
+  const scheduleKind = input.scheduleKind ?? ScheduleKinds.RECURRING;
 
   await env.controlPlaneDb
     .insert(env.controlPlaneTables.sandboxProfiles)
@@ -380,11 +418,21 @@ async function seedScheduledTrigger(
     id: input.scheduleId,
     organizationId: input.organizationId,
     targetType: ScheduleTargetTypes.TRIGGER_RUN,
+    kind: scheduleKind,
     name: `${input.name} trigger`,
-    cronExpression: "0 9 * * *",
-    timezone: "Asia/Singapore",
+    ...(scheduleKind === ScheduleKinds.RECURRING
+      ? {
+          cronExpression: "0 9 * * *",
+          timezone: "Asia/Singapore",
+          nextScheduledAt: "2026-03-04T01:00:00.000Z",
+        }
+      : {
+          cronExpression: null,
+          timezone: null,
+          startAt: "2099-03-04T01:00:00.000Z",
+          nextScheduledAt: "2099-03-04T01:00:00.000Z",
+        }),
     enabled: true,
-    nextScheduledAt: "2026-03-04T01:00:00.000Z",
     createdAt: input.createdAt,
     updatedAt: input.createdAt,
   });

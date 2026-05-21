@@ -778,6 +778,7 @@ function buildListableTriggerWhereClause(input: {
         isNotNull(tables.scheduleTriggers.scheduleId),
         isNotNull(tables.schedules.id),
         eq(tables.schedules.organizationId, input.organizationId),
+        eq(tables.schedules.kind, ScheduleKinds.RECURRING),
         eq(tables.schedules.targetType, ScheduleTargetTypes.TRIGGER_RUN),
         isNull(tables.schedules.deletedAt),
       ),

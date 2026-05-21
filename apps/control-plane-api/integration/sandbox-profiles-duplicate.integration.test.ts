@@ -3,6 +3,7 @@
  */
 
 import {
+  ApiKeyActorKinds,
   IntegrationBindingKinds,
   ScheduleKinds,
   ScheduleTargetTypes,
@@ -346,7 +347,94 @@ describe.concurrent("sandbox profiles duplicate integration", () => {
     expect(body.profile.displayName).toBe("Reusable profile name");
     expect(body.profile.id).not.toBe("sbp_duplicate_same_name_source");
   });
+
+  it("rejects duplication when a copied Mistle MCP API key is unavailable", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-duplicate-unavailable-api-key@example.com",
+    });
+
+    await seedMistleMcpApiKey(env, {
+      organizationId: session.organizationId,
+      apiKeyId: "apk_duplicate_revoked",
+      revokedAt: "2026-05-01T00:00:00.000Z",
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_duplicate_unavailable_api_key",
+        organizationId: session.organizationId,
+        displayName: "Unavailable API Key Source",
+        activeVersion: 1,
+        createdAt: "2026-05-21T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_duplicate_unavailable_api_key",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        mistleMcpEnabled: true,
+        mistleMcpApiKeyId: "apk_duplicate_revoked",
+      }),
+    );
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.sandboxProfileVersions)
+      .set({
+        snapshotImageProvider: "docker",
+        snapshotImageId: "sha256:duplicate-unavailable-api-key",
+      })
+      .where(
+        and(
+          eq(
+            env.controlPlaneTables.sandboxProfileVersions.sandboxProfileId,
+            "sbp_duplicate_unavailable_api_key",
+          ),
+          eq(env.controlPlaneTables.sandboxProfileVersions.version, 1),
+        ),
+      );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_duplicate_unavailable_api_key/duplicate",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "Should not duplicate",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "INVALID_DUPLICATE_REFERENCE",
+    });
+  });
 });
+
+async function seedMistleMcpApiKey(
+  env: IntegrationTestEnvironment,
+  input: {
+    organizationId: string;
+    apiKeyId: string;
+    revokedAt?: string | undefined;
+    expiresAt?: string | undefined;
+  },
+): Promise<void> {
+  await env.controlPlaneDb.insert(env.controlPlaneTables.apiKeys).values({
+    id: input.apiKeyId,
+    name: "Duplicate Mistle MCP API Key",
+    organizationId: input.organizationId,
+    secretPrefix: `prefix_${input.apiKeyId}`,
+    secretHash: "sha256-test-hash",
+    secretHashAlgorithm: "sha256-v1",
+    createdByActorKind: ApiKeyActorKinds.USER,
+    createdByActorId: "usr_duplicate_mistle_mcp",
+    ...(input.revokedAt === undefined ? {} : { revokedAt: input.revokedAt }),
+    ...(input.expiresAt === undefined ? {} : { expiresAt: input.expiresAt }),
+  });
+}
 
 async function seedRecurringTrigger(
   env: IntegrationTestEnvironment,
