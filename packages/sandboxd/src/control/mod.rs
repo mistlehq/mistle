@@ -6,10 +6,9 @@
 //! once the daemon is running.
 
 use std::collections::BTreeMap;
-use std::fmt;
 use std::fs;
 use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::{SocketAddr, TcpListener};
 use std::os::unix::fs::FileTypeExt;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
@@ -19,22 +18,29 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
-
 use crate::protocol::startup::StartupInput;
 use crate::sandboxd_state::SandboxdState;
 use crate::security;
 use crate::startup_diagnostics::{
     StartupDiagnosticsLogger, StartupOperation, startup_diagnostics_string,
 };
-use crate::supervision::{
-    ComponentHealthSnapshot, ComponentHealthState, SandboxdDaemonPhase, SandboxdHealthResponse,
-    SandboxdHealthSnapshot, SupervisedComponent,
-};
-use crate::time::{Clock, Sleeper, SystemClock, ThreadSleeper, format_rfc3339_timestamp};
+use crate::time::{Sleeper, SystemClock, ThreadSleeper};
 use crate::tunnel::session::{
     TunnelSigningRequest, TunnelSigningResponse, derive_sandbox_instance_id,
 };
+
+mod client;
+mod error;
+mod health;
+mod protocol;
+
+pub use crate::control::client::{
+    submit_init, submit_ready, submit_resume, submit_signing, submit_wait_init,
+};
+pub use crate::control::error::ControlError;
+use crate::control::health::run_health_server_loop;
+pub use crate::control::protocol::ControlSignRequest;
+use crate::control::protocol::{ControlRequest, ControlResponse};
 
 /// Default Unix socket path for the local `sandboxd` control channel.
 pub const DEFAULT_CONTROL_SOCKET_PATH: &str = "/run/mistle/sandboxd/control.sock";
@@ -45,9 +51,9 @@ pub const DEFAULT_HEALTH_ENDPOINT_ADDR: &str = "127.0.0.1:3901";
 /// Fixed path served by the daemon-local health endpoint.
 pub const DEFAULT_HEALTH_ENDPOINT_PATH: &str = "/__healthz";
 #[cfg(any(test, debug_assertions))]
-const TEST_FAULTS_ENABLED_ENV: &str = "MISTLE_SANDBOXD_ENABLE_TEST_FAULTS";
+pub(super) const TEST_FAULTS_ENABLED_ENV: &str = "MISTLE_SANDBOXD_ENABLE_TEST_FAULTS";
 #[cfg(any(test, debug_assertions))]
-const EGRESS_PROXY_FAULT_KILL_PATH: &str = "/__faults/components/egress-proxy/kill";
+pub(super) const EGRESS_PROXY_FAULT_KILL_PATH: &str = "/__faults/components/egress-proxy/kill";
 static SIGN_REQUEST_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Tracks whether this daemon has already accepted startup input.
@@ -59,208 +65,11 @@ pub enum InitPhase {
     Failed(String),
 }
 
-/// Describes why the local control socket server or client path failed.
-#[derive(Debug)]
-pub enum ControlError {
-    MissingSocketParent {
-        path: PathBuf,
-    },
-    CreateSocketDirectory {
-        path: PathBuf,
-        error: std::io::Error,
-    },
-    ReadSocketMetadata {
-        path: PathBuf,
-        error: std::io::Error,
-    },
-    ExistingSocketPathIsNotSocket {
-        path: PathBuf,
-    },
-    RemoveStaleSocket {
-        path: PathBuf,
-        error: std::io::Error,
-    },
-    BindSocket {
-        path: PathBuf,
-        error: std::io::Error,
-    },
-    BindHealthEndpoint {
-        address: SocketAddr,
-        error: std::io::Error,
-    },
-    AcceptConnection(std::io::Error),
-    AcceptHealthConnection(std::io::Error),
-    ConfigureConnection(std::io::Error),
-    ReadRequest(std::io::Error),
-    ReadHealthRequest(std::io::Error),
-    InvalidRequest(serde_json::Error),
-    InvalidResponse(serde_json::Error),
-    VerifyPeer(String),
-    StartupRequestRejected(String),
-    InitializeSandboxdState(String),
-    ResumeSandboxdState(String),
-    CloseSandboxdState(String),
-    SerializeResponse(serde_json::Error),
-    WriteResponse(std::io::Error),
-    WriteHealthResponse(std::io::Error),
-    ResponseError(String),
-    ConnectSocket {
-        path: PathBuf,
-        error: std::io::Error,
-    },
-    ShutdownSend,
-    ServerPanicked,
-    HealthServerPanicked,
-    InitPanicked,
-}
-
-impl fmt::Display for ControlError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::MissingSocketParent { path } => {
-                write!(
-                    f,
-                    "control socket path {} has no parent directory",
-                    path.display()
-                )
-            }
-            Self::CreateSocketDirectory { path, error } => write!(
-                f,
-                "failed to create control socket directory {}: {error}",
-                path.display()
-            ),
-            Self::ReadSocketMetadata { path, error } => write!(
-                f,
-                "failed to inspect control socket path {}: {error}",
-                path.display()
-            ),
-            Self::ExistingSocketPathIsNotSocket { path } => write!(
-                f,
-                "control socket path {} already exists and is not a unix socket",
-                path.display()
-            ),
-            Self::RemoveStaleSocket { path, error } => {
-                write!(
-                    f,
-                    "failed to remove stale control socket {}: {error}",
-                    path.display()
-                )
-            }
-            Self::BindSocket { path, error } => {
-                write!(
-                    f,
-                    "failed to bind control socket {}: {error}",
-                    path.display()
-                )
-            }
-            Self::BindHealthEndpoint { address, error } => {
-                write!(f, "failed to bind health endpoint {address}: {error}")
-            }
-            Self::AcceptConnection(error) => {
-                write!(f, "failed to accept control socket connection: {error}")
-            }
-            Self::AcceptHealthConnection(error) => {
-                write!(f, "failed to accept health endpoint connection: {error}")
-            }
-            Self::ConfigureConnection(error) => {
-                write!(f, "failed to configure control socket connection: {error}")
-            }
-            Self::ReadRequest(error) => write!(f, "failed to read control socket request: {error}"),
-            Self::ReadHealthRequest(error) => {
-                write!(f, "failed to read health endpoint request: {error}")
-            }
-            Self::InvalidRequest(error) => {
-                write!(f, "control socket request must be valid json: {error}")
-            }
-            Self::InvalidResponse(error) => {
-                write!(f, "control socket response must be valid json: {error}")
-            }
-            Self::VerifyPeer(error) => {
-                write!(f, "control socket peer verification failed: {error}")
-            }
-            Self::StartupRequestRejected(error) => {
-                write!(f, "sandbox startup request was rejected: {error}")
-            }
-            Self::InitializeSandboxdState(error) => {
-                write!(f, "failed to initialize sandboxd state: {error}")
-            }
-            Self::ResumeSandboxdState(error) => {
-                write!(f, "failed to resume sandboxd state: {error}")
-            }
-            Self::CloseSandboxdState(error) => {
-                write!(f, "failed to close sandboxd state: {error}")
-            }
-            Self::SerializeResponse(error) => {
-                write!(f, "failed to serialize control socket response: {error}")
-            }
-            Self::WriteResponse(error) => {
-                write!(f, "failed to write control socket response: {error}")
-            }
-            Self::WriteHealthResponse(error) => {
-                write!(f, "failed to write health endpoint response: {error}")
-            }
-            Self::ResponseError(error) => write!(f, "control socket returned an error: {error}"),
-            Self::ConnectSocket { path, error } => {
-                write!(
-                    f,
-                    "failed to connect to control socket {}: {error}",
-                    path.display()
-                )
-            }
-            Self::ShutdownSend => write!(f, "failed to signal control socket shutdown"),
-            Self::ServerPanicked => write!(f, "control socket server panicked"),
-            Self::HealthServerPanicked => write!(f, "health endpoint server panicked"),
-            Self::InitPanicked => write!(f, "sandbox init worker panicked"),
-        }
-    }
-}
-
-impl std::error::Error for ControlError {}
-
-/// Enumerates JSON requests accepted by the local control socket.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
-enum ControlRequest {
-    #[serde(rename = "ready")]
-    Ready,
-    #[serde(rename = "init")]
-    Init {
-        startup_input: StartupInput,
-        #[serde(default = "default_wait_for_completion")]
-        wait_for_completion: bool,
-        #[serde(default)]
-        wait_for_storage_attach: bool,
-    },
-    #[serde(rename = "resume")]
-    Resume { startup_input: StartupInput },
-    #[serde(rename = "waitInit")]
-    WaitInit,
-    #[serde(rename = "sign")]
-    Sign { sign_request: ControlSignRequest },
-}
-
-/// Carries one local signer request from the helper alias to the running daemon.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ControlSignRequest {
-    pub key_ref: String,
-    pub payload_base64: String,
-}
-
-/// Carries one JSON response back to a local control socket client.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ControlResponse {
-    ok: bool,
-    error: Option<String>,
-    signature_base64: Option<String>,
-}
-
 /// Tracks observable daemon state for tests and daemon lifecycle control.
 struct ControlServerState {
-    init_phase: InitPhase,
+    pub(super) init_phase: InitPhase,
     startup_input: Option<StartupInput>,
-    sandboxd_state: Option<SandboxdState>,
+    pub(super) sandboxd_state: Option<SandboxdState>,
     global_git_config_path: PathBuf,
     shutdown_after_init: bool,
 }
@@ -507,123 +316,6 @@ where
     })
 }
 
-/// Submits one startup payload to the running daemon over the local control socket.
-pub fn submit_init(
-    socket_path: &Path,
-    startup_input: &StartupInput,
-    wait_for_completion: bool,
-    wait_for_storage_attach: bool,
-) -> Result<(), ControlError> {
-    submit_startup_request(
-        socket_path,
-        ControlRequest::Init {
-            startup_input: startup_input.clone(),
-            wait_for_completion,
-            wait_for_storage_attach,
-        },
-    )
-}
-
-/// Performs one no-op round trip against the running daemon control socket.
-pub fn submit_ready(socket_path: &Path) -> Result<(), ControlError> {
-    submit_control_request(socket_path, ControlRequest::Ready).map(|_| ())
-}
-
-/// Submits one resume payload to the running daemon over the local control socket.
-pub fn submit_resume(socket_path: &Path, startup_input: &StartupInput) -> Result<(), ControlError> {
-    submit_startup_request(
-        socket_path,
-        ControlRequest::Resume {
-            startup_input: startup_input.clone(),
-        },
-    )
-}
-
-/// Waits for the in-flight daemon initialization thread to complete.
-pub fn submit_wait_init(socket_path: &Path) -> Result<(), ControlError> {
-    submit_startup_request(socket_path, ControlRequest::WaitInit)
-}
-
-/// Submits one signing request to the running daemon over the local control socket.
-pub fn submit_signing(
-    socket_path: &Path,
-    sign_request: &ControlSignRequest,
-) -> Result<String, ControlError> {
-    let mut stream =
-        UnixStream::connect(socket_path).map_err(|error| ControlError::ConnectSocket {
-            path: socket_path.to_path_buf(),
-            error,
-        })?;
-
-    let request = serde_json::to_vec(&ControlRequest::Sign {
-        sign_request: sign_request.clone(),
-    })
-    .map_err(ControlError::SerializeResponse)?;
-    stream
-        .write_all(&request)
-        .map_err(ControlError::WriteResponse)?;
-    stream
-        .shutdown(std::net::Shutdown::Write)
-        .map_err(ControlError::WriteResponse)?;
-
-    let mut raw_response = Vec::new();
-    stream
-        .read_to_end(&mut raw_response)
-        .map_err(ControlError::ReadRequest)?;
-    let response: ControlResponse =
-        serde_json::from_slice(&raw_response).map_err(ControlError::InvalidResponse)?;
-
-    if !response.ok {
-        return Err(ControlError::ResponseError(response.error.unwrap_or_else(
-            || "control socket returned ok=false without an error".to_string(),
-        )));
-    }
-
-    response.signature_base64.ok_or_else(|| {
-        ControlError::ResponseError(
-            "control socket returned ok=true without a signature payload".to_string(),
-        )
-    })
-}
-
-fn submit_startup_request(socket_path: &Path, request: ControlRequest) -> Result<(), ControlError> {
-    submit_control_request(socket_path, request).map(|_| ())
-}
-
-fn submit_control_request(
-    socket_path: &Path,
-    request: ControlRequest,
-) -> Result<Option<String>, ControlError> {
-    let mut stream =
-        UnixStream::connect(socket_path).map_err(|error| ControlError::ConnectSocket {
-            path: socket_path.to_path_buf(),
-            error,
-        })?;
-
-    let request = serde_json::to_vec(&request).map_err(ControlError::SerializeResponse)?;
-    stream
-        .write_all(&request)
-        .map_err(ControlError::WriteResponse)?;
-    stream
-        .shutdown(std::net::Shutdown::Write)
-        .map_err(ControlError::WriteResponse)?;
-
-    let mut raw_response = Vec::new();
-    stream
-        .read_to_end(&mut raw_response)
-        .map_err(ControlError::ReadRequest)?;
-    let response: ControlResponse =
-        serde_json::from_slice(&raw_response).map_err(ControlError::InvalidResponse)?;
-
-    if !response.ok {
-        return Err(ControlError::ResponseError(response.error.unwrap_or_else(
-            || "control socket returned ok=false without an error".to_string(),
-        )));
-    }
-
-    Ok(response.signature_base64)
-}
-
 fn run_control_server_loop(
     listener: UnixListener,
     state: &Arc<Mutex<ControlServerState>>,
@@ -678,164 +370,6 @@ fn should_shutdown_after_init(state: &Arc<Mutex<ControlServerState>>) -> bool {
         .lock()
         .expect("control server state lock should not be poisoned")
         .shutdown_after_init
-}
-
-fn run_health_server_loop(
-    listener: TcpListener,
-    state: &Arc<Mutex<ControlServerState>>,
-    shutdown_receiver: &mpsc::Receiver<()>,
-    sleeper: &dyn Sleeper,
-    accept_poll_interval: Duration,
-) -> Result<(), ControlError> {
-    loop {
-        if shutdown_receiver.try_recv().is_ok() {
-            return Ok(());
-        }
-
-        match listener.accept() {
-            Ok((mut stream, _)) => {
-                stream
-                    .set_nonblocking(false)
-                    .map_err(ControlError::ConfigureConnection)?;
-                handle_health_connection(&mut stream, state)?;
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                sleeper.sleep(accept_poll_interval);
-            }
-            Err(error) => return Err(ControlError::AcceptHealthConnection(error)),
-        }
-    }
-}
-
-fn handle_health_connection(
-    stream: &mut TcpStream,
-    state: &Arc<Mutex<ControlServerState>>,
-) -> Result<(), ControlError> {
-    let request_head = read_http_request_head(stream)?;
-    let mut request_lines = request_head.lines();
-    let request_line = request_lines.next().unwrap_or_default();
-    let response = match parse_http_request_line(request_line) {
-        Some(("GET", DEFAULT_HEALTH_ENDPOINT_PATH)) => build_http_json_response(
-            200,
-            &serialize_health_response(&build_health_response(state)?)
-                .map_err(ControlError::SerializeResponse)?,
-        ),
-        #[cfg(any(test, debug_assertions))]
-        Some(("POST", EGRESS_PROXY_FAULT_KILL_PATH)) => build_fault_injection_response(state)?,
-        _ => build_http_json_response(404, br#"{"error":"not_found"}"#),
-    };
-
-    stream
-        .write_all(&response)
-        .map_err(ControlError::WriteHealthResponse)
-}
-
-fn parse_http_request_line(request_line: &str) -> Option<(&str, &str)> {
-    let mut parts = request_line.split_whitespace();
-    let method = parts.next()?;
-    let path = parts.next()?;
-    let _http_version = parts.next()?;
-    Some((method, path))
-}
-
-fn read_http_request_head(stream: &mut TcpStream) -> Result<String, ControlError> {
-    let mut raw_request = Vec::new();
-    let mut buffer = [0_u8; 1024];
-
-    loop {
-        let bytes_read = stream
-            .read(&mut buffer)
-            .map_err(ControlError::ReadHealthRequest)?;
-        if bytes_read == 0 {
-            break;
-        }
-        raw_request.extend_from_slice(&buffer[..bytes_read]);
-        if raw_request.windows(4).any(|window| window == b"\r\n\r\n") {
-            break;
-        }
-        if raw_request.len() > 16 * 1024 {
-            break;
-        }
-    }
-
-    Ok(String::from_utf8_lossy(&raw_request).into_owned())
-}
-
-fn build_http_json_response(status_code: u16, body: &[u8]) -> Vec<u8> {
-    let status_text = match status_code {
-        200 => "OK",
-        403 => "Forbidden",
-        404 => "Not Found",
-        409 => "Conflict",
-        _ => "OK",
-    };
-    let mut response = Vec::new();
-    response.extend_from_slice(format!("HTTP/1.1 {status_code} {status_text}\r\n").as_bytes());
-    response.extend_from_slice(b"content-type: application/json\r\n");
-    response.extend_from_slice(format!("content-length: {}\r\n", body.len()).as_bytes());
-    response.extend_from_slice(b"connection: close\r\n\r\n");
-    response.extend_from_slice(body);
-    response
-}
-
-#[cfg(any(test, debug_assertions))]
-#[derive(Serialize)]
-struct FaultInjectionAcceptedResponse {
-    status: &'static str,
-    component: &'static str,
-    action: &'static str,
-}
-
-#[cfg(any(test, debug_assertions))]
-#[derive(Serialize)]
-struct FaultInjectionErrorResponse<'a> {
-    error: &'a str,
-}
-
-#[cfg(any(test, debug_assertions))]
-fn build_fault_injection_response(
-    state: &Arc<Mutex<ControlServerState>>,
-) -> Result<Vec<u8>, ControlError> {
-    if !test_fault_injection_enabled() {
-        let body = serde_json::to_vec(&FaultInjectionErrorResponse {
-            error: "test_fault_injection_disabled",
-        })
-        .map_err(ControlError::SerializeResponse)?;
-        return Ok(build_http_json_response(403, &body));
-    }
-
-    let fault_result = state
-        .lock()
-        .expect("control server state lock should not be poisoned")
-        .sandboxd_state
-        .as_ref()
-        .ok_or_else(|| "sandboxd is not initialized".to_string())
-        .and_then(SandboxdState::force_egress_proxy_shutdown_for_test);
-
-    match fault_result {
-        Ok(()) => {
-            let body = serde_json::to_vec(&FaultInjectionAcceptedResponse {
-                status: "accepted",
-                component: "egress_proxy",
-                action: "kill",
-            })
-            .map_err(ControlError::SerializeResponse)?;
-            Ok(build_http_json_response(200, &body))
-        }
-        Err(error) => {
-            let body = serde_json::to_vec(&FaultInjectionErrorResponse { error: &error })
-                .map_err(ControlError::SerializeResponse)?;
-            Ok(build_http_json_response(409, &body))
-        }
-    }
-}
-
-#[cfg(any(test, debug_assertions))]
-fn test_fault_injection_enabled() -> bool {
-    matches!(
-        std::env::var(TEST_FAULTS_ENABLED_ENV),
-        Ok(value) if value == "1" || value.eq_ignore_ascii_case("true")
-    )
 }
 
 fn handle_connection(
@@ -1069,10 +603,6 @@ fn begin_init(
     Ok(())
 }
 
-fn default_wait_for_completion() -> bool {
-    true
-}
-
 fn begin_resume(
     startup_input: StartupInput,
     state: &Arc<Mutex<ControlServerState>>,
@@ -1150,156 +680,6 @@ fn begin_resume(
         .sandboxd_state = Some(sandboxd_state);
 
     resume_result
-}
-
-fn build_health_response(
-    state: &Arc<Mutex<ControlServerState>>,
-) -> Result<SandboxdHealthResponse, ControlError> {
-    let observed_at = SystemClock.now_system_time();
-    let state = state
-        .lock()
-        .expect("control server state lock should not be poisoned");
-
-    let (daemon_phase, snapshot, init_error) = match &state.init_phase {
-        InitPhase::Uninitialized => (SandboxdDaemonPhase::Uninitialized, None, None),
-        InitPhase::Initializing => (SandboxdDaemonPhase::Initializing, None, None),
-        InitPhase::Initialized => (
-            SandboxdDaemonPhase::Initialized,
-            state
-                .sandboxd_state
-                .as_ref()
-                .map(SandboxdState::health_snapshot),
-            None,
-        ),
-        InitPhase::Failed(error) => (SandboxdDaemonPhase::Failed, None, Some(error.clone())),
-    };
-
-    Ok(SandboxdHealthResponse {
-        daemon_phase,
-        observed_at,
-        snapshot,
-        init_error,
-    })
-}
-
-fn serialize_health_response(
-    response: &SandboxdHealthResponse,
-) -> Result<Vec<u8>, serde_json::Error> {
-    serde_json::to_vec(&SerializableHealthResponse::from_response(response)?)
-}
-
-#[derive(Serialize)]
-struct SerializableHealthResponse {
-    daemon_phase: &'static str,
-    observed_at: String,
-    snapshot: Option<SerializableHealthSnapshot>,
-    init_error: Option<String>,
-}
-
-#[derive(Serialize)]
-struct SerializableHealthSnapshot {
-    observed_at: String,
-    components: Vec<SerializableComponentHealthSnapshot>,
-}
-
-#[derive(Serialize)]
-struct SerializableComponentHealthSnapshot {
-    component: &'static str,
-    state: &'static str,
-    restart_count: u64,
-    last_started_at: Option<String>,
-    last_failed_at: Option<String>,
-    last_healthcheck_at: Option<String>,
-    last_error: Option<String>,
-    details: std::collections::BTreeMap<String, String>,
-}
-
-impl SerializableHealthResponse {
-    fn from_response(response: &SandboxdHealthResponse) -> Result<Self, serde_json::Error> {
-        Ok(Self {
-            daemon_phase: daemon_phase_name(response.daemon_phase),
-            observed_at: serialize_timestamp(response.observed_at)?,
-            snapshot: response
-                .snapshot
-                .as_ref()
-                .map(SerializableHealthSnapshot::from_snapshot)
-                .transpose()?,
-            init_error: response.init_error.clone(),
-        })
-    }
-}
-
-impl SerializableHealthSnapshot {
-    fn from_snapshot(snapshot: &SandboxdHealthSnapshot) -> Result<Self, serde_json::Error> {
-        Ok(Self {
-            observed_at: serialize_timestamp(snapshot.observed_at)?,
-            components: snapshot
-                .components
-                .iter()
-                .map(SerializableComponentHealthSnapshot::from_snapshot)
-                .collect::<Result<Vec<_>, _>>()?,
-        })
-    }
-}
-
-impl SerializableComponentHealthSnapshot {
-    fn from_snapshot(snapshot: &ComponentHealthSnapshot) -> Result<Self, serde_json::Error> {
-        Ok(Self {
-            component: component_name(snapshot.component),
-            state: component_state_name(snapshot.state),
-            restart_count: snapshot.restart_count,
-            last_started_at: snapshot
-                .last_started_at
-                .map(serialize_timestamp)
-                .transpose()?,
-            last_failed_at: snapshot
-                .last_failed_at
-                .map(serialize_timestamp)
-                .transpose()?,
-            last_healthcheck_at: snapshot
-                .last_healthcheck_at
-                .map(serialize_timestamp)
-                .transpose()?,
-            last_error: snapshot.last_error.clone(),
-            details: snapshot.details.clone(),
-        })
-    }
-}
-
-fn serialize_timestamp(timestamp: std::time::SystemTime) -> Result<String, serde_json::Error> {
-    format_rfc3339_timestamp(timestamp)
-        .map_err(|error| serde_json::Error::io(std::io::Error::other(error.to_string())))
-}
-
-fn daemon_phase_name(phase: SandboxdDaemonPhase) -> &'static str {
-    match phase {
-        SandboxdDaemonPhase::Uninitialized => "uninitialized",
-        SandboxdDaemonPhase::Initializing => "initializing",
-        SandboxdDaemonPhase::Initialized => "initialized",
-        SandboxdDaemonPhase::Failed => "failed",
-    }
-}
-
-fn component_name(component: SupervisedComponent) -> &'static str {
-    match component {
-        SupervisedComponent::TunnelSession => "tunnel_session",
-        SupervisedComponent::EgressProxy => "egress_proxy",
-        SupervisedComponent::CodexProxy => "codex_proxy",
-        SupervisedComponent::CodexAppServer => "codex_app_server",
-        SupervisedComponent::OpenCodeProxy => "opencode_proxy",
-        SupervisedComponent::OpenCodeServer => "opencode_server",
-        SupervisedComponent::PiProxy => "pi_proxy",
-        SupervisedComponent::PiRpcProcess => "pi_rpc_process",
-    }
-}
-
-fn component_state_name(state: ComponentHealthState) -> &'static str {
-    match state {
-        ComponentHealthState::Starting => "starting",
-        ComponentHealthState::Healthy => "healthy",
-        ComponentHealthState::Restarting => "restarting",
-        ComponentHealthState::Stopped => "stopped",
-    }
 }
 
 fn join_init_thread(init_thread: &SharedInitThread) -> Result<(), ControlError> {
