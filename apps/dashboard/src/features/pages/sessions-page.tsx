@@ -22,7 +22,7 @@ import {
   TooltipTrigger,
 } from "@mistle/ui";
 import { InfoIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link as RouterLink, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -511,6 +511,7 @@ export function SessionsPage(): React.JSX.Element {
         ...(filters.triggerId === null ? {} : { triggerId: filters.triggerId }),
         signal,
       }),
+    placeholderData: keepPreviousData,
   });
   const triggerOptionsQuery = useQuery({
     queryKey: triggersListQueryKey({
@@ -615,7 +616,14 @@ export function SessionsPage(): React.JSX.Element {
     });
   }
 
+  const isSessionListTransitionPending =
+    sandboxInstancesQuery.isPending || sandboxInstancesQuery.isPlaceholderData;
+
   function goToNextPage(): void {
+    if (isSessionListTransitionPending) {
+      return;
+    }
+
     const nextPage = sandboxInstancesQuery.data?.nextPage;
     if (nextPage === null || nextPage === undefined) {
       return;
@@ -629,6 +637,10 @@ export function SessionsPage(): React.JSX.Element {
   }
 
   function goToPreviousPage(): void {
+    if (isSessionListTransitionPending) {
+      return;
+    }
+
     const previousPage = sandboxInstancesQuery.data?.previousPage;
     if (previousPage === null || previousPage === undefined) {
       return;
@@ -648,9 +660,12 @@ export function SessionsPage(): React.JSX.Element {
       })
     : null;
 
-  const isLoadingSessions = sandboxInstancesQuery.isPending;
+  const isLoadingSessions = isSessionListTransitionPending;
   const hasActiveFilters = hasActiveSessionListFilters(filters);
-  const hasNoSessions = sandboxInstancesQuery.data?.totalResults === 0 && !hasActiveFilters;
+  const hasNoSessions =
+    !sandboxInstancesQuery.isPlaceholderData &&
+    sandboxInstancesQuery.data?.totalResults === 0 &&
+    !hasActiveFilters;
   const shouldLoadLaunchableProfiles =
     !isLoadingSessions && listErrorMessage === null && hasNoSessions;
   const launchableProfilesQuery = useLaunchableSandboxProfiles({
@@ -675,8 +690,8 @@ export function SessionsPage(): React.JSX.Element {
 
   const hasNextPage = sandboxInstancesQuery.data?.nextPage != null;
   const hasPreviousPage = sandboxInstancesQuery.data?.previousPage != null;
-  const nextPageDisabled = sandboxInstancesQuery.isPending;
-  const previousPageDisabled = sandboxInstancesQuery.isPending;
+  const nextPageDisabled = isSessionListTransitionPending;
+  const previousPageDisabled = isSessionListTransitionPending;
   return (
     <PageFrame
       headerActions={

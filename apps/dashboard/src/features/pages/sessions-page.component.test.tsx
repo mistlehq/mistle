@@ -11,7 +11,10 @@ import { createTestQueryClient } from "../../test-support/query-client.js";
 import { launchableSandboxProfilesQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
-import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
+import type {
+  SandboxInstanceListItem,
+  SandboxInstancesNextPageCursor,
+} from "../sessions/sessions-types.js";
 import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
 import { PageHeaderSidebarTriggerProvider } from "../shared/page-header-sidebar-trigger-context.js";
 import { SessionsRoutes } from "../shell/app-shell-sessions-sidebar-mode.js";
@@ -51,6 +54,7 @@ function seedSessionsList(input: {
   totalResults?: number;
   after?: string | null;
   before?: string | null;
+  nextPage?: SandboxInstancesNextPageCursor | null;
   filters?: {
     search: string;
     owner: "anyone" | "me";
@@ -70,7 +74,7 @@ function seedSessionsList(input: {
     }),
     {
       items: input.items,
-      nextPage: null,
+      nextPage: input.nextPage ?? null,
       previousPage: null,
       totalResults: input.totalResults ?? input.items.length,
     },
@@ -359,6 +363,92 @@ describe("SessionsPage", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Search sessions" }), {
       target: { value: "Slack" },
     });
+
+    expect(screen.getByTestId("location-search").textContent).toBe("?limit=20&search=Slack");
+    expect(
+      queryClient.getQueryState(
+        sandboxInstancesListQueryKey({
+          limit: 20,
+          after: null,
+          before: null,
+          search: "Slack",
+          owner: "anyone",
+          startedFrom: "any",
+          triggerId: null,
+        }),
+      ),
+    ).toBeDefined();
+  });
+
+  it("keeps the current sessions list mounted while a search result request is pending", () => {
+    const queryClient = createSessionsPageQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    seedSessionsList({
+      queryClient,
+      items: [
+        buildSandboxInstanceListItemFixture({
+          id: "sbi_existing_session",
+          title: "Existing session",
+        }),
+      ],
+    });
+
+    renderSessionsPage({
+      queryClient,
+      initialEntries: ["/sessions"],
+    });
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Search sessions" }), {
+      target: { value: "Slack" },
+    });
+
+    expect(screen.getByRole("textbox", { name: "Search sessions" }).getAttribute("value")).toBe(
+      "Slack",
+    );
+    expect(screen.getByText("Existing session")).toBeDefined();
+  });
+
+  it("does not apply stale pagination cursors while a search result request is pending", () => {
+    const queryClient = createSessionsPageQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    seedSessionsList({
+      queryClient,
+      items: [buildSandboxInstanceListItemFixture({ id: "sbi_paginated_before_search" })],
+      nextPage: {
+        after: "cursor_from_unfiltered_results",
+        limit: 20,
+      },
+      totalResults: 40,
+    });
+
+    function LocationProbe(): React.JSX.Element {
+      const location = useLocation();
+      return <span data-testid="location-search">{location.search}</span>;
+    }
+
+    renderSessionsPage({
+      queryClient,
+      initialEntries: ["/sessions"],
+      routes: (
+        <>
+          <SessionsPage />
+          <LocationProbe />
+        </>
+      ),
+    });
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Search sessions" }), {
+      target: { value: "Slack" },
+    });
+
+    const nextPage = screen.getByRole("button", { name: "Go to next page" });
+    expect(nextPage.getAttribute("aria-disabled")).toBe("true");
+
+    fireEvent.click(nextPage);
 
     expect(screen.getByTestId("location-search").textContent).toBe("?limit=20&search=Slack");
   });
