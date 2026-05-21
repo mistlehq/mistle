@@ -11,9 +11,11 @@ import { getInstance } from "../../sandbox-instances/services/get-instance.js";
 import { listOperationEvents } from "../../sandbox-instances/services/list-operation-events.js";
 import {
   sandboxProfileVersionParamsSchema,
+  startSandboxProfileMaintenanceScriptTestRunBodySchema,
   startSandboxProfileSetupScriptTestRunBodySchema,
   startSandboxProfileSetupScriptTestRunResponseSchema,
 } from "../../sandbox-profiles/schemas.js";
+import { startProfileMaintenanceScriptTestRun } from "../../sandbox-profiles/services/start-profile-maintenance-script-test-run.js";
 import { startProfileSetupScriptTestRun } from "../../sandbox-profiles/services/start-profile-setup-script-test-run.js";
 import type { AppOrganizationActor } from "../../types.js";
 import type { MistleMcpServerContext } from "../server.js";
@@ -40,6 +42,11 @@ const MutatingToolAnnotations: ToolAnnotations = {
 
 const profileSetupScriptTestStartInputSchema =
   startSandboxProfileSetupScriptTestRunBodySchema.safeExtend(
+    sandboxProfileVersionParamsSchema.shape,
+  );
+
+const profileMaintenanceScriptTestStartInputSchema =
+  startSandboxProfileMaintenanceScriptTestRunBodySchema.safeExtend(
     sandboxProfileVersionParamsSchema.shape,
   );
 
@@ -98,6 +105,77 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
           profileId,
           profileVersion: version,
           setupScript,
+          ...(agentRuntimeId === undefined ? {} : { agentRuntimeId }),
+          ...(sandboxProvider === undefined
+            ? {}
+            : {
+                sandboxRuntimeConfig: {
+                  sandboxProvider,
+                  sandboxConnectionId: sandboxConnectionId ?? null,
+                  sandboxResources: sandboxResources ?? null,
+                },
+              }),
+          startedBy: resolveStartedBy(context.organizationActor),
+          source: "dashboard",
+          ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
+        },
+      );
+
+      return structuredResult(startedTestRun);
+    },
+  );
+
+  server.registerTool(
+    "profile_maintenance_script_test_start",
+    {
+      title: "Start sandbox profile maintenance script test",
+      description:
+        "Start an ephemeral sandbox from the current snapshot to test a sandbox profile maintenance script",
+      inputSchema: profileMaintenanceScriptTestStartInputSchema,
+      outputSchema: startSandboxProfileSetupScriptTestRunResponseSchema,
+      annotations: {
+        ...MutatingToolAnnotations,
+        title: "Start sandbox profile maintenance script test",
+      },
+    },
+    async ({
+      agentRuntimeId,
+      idempotencyKey,
+      maintenanceScript,
+      profileId,
+      sandboxConnectionId,
+      sandboxProvider,
+      sandboxResources,
+      version,
+    }) => {
+      requireMcpToolPermission(
+        context.organizationActor,
+        OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
+      );
+      requireMcpToolPermission(
+        context.organizationActor,
+        OrganizationPermissions.SANDBOX_SESSION_CREATE,
+      );
+      requireMcpSandboxProfileScope(context.organizationActor, {
+        profileId,
+        version,
+      });
+
+      const startedTestRun = await startProfileMaintenanceScriptTestRun(
+        {
+          dataPlaneClient: context.dataPlaneClient,
+          db: context.db,
+          defaultBaseImage: context.sandboxConfig.defaultBaseImage,
+          integrationRegistry: context.integrationRegistry,
+          integrationsConfig: context.integrationsConfig,
+          mcpConfig: context.mcpConfig,
+          sandboxConfig: context.sandboxConfig,
+        },
+        {
+          organizationId: context.organizationActor.organizationId,
+          profileId,
+          profileVersion: version,
+          maintenanceScript,
           ...(agentRuntimeId === undefined ? {} : { agentRuntimeId }),
           ...(sandboxProvider === undefined
             ? {}

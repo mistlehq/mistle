@@ -33,6 +33,7 @@ import {
   ListSandboxProfilesResponseSchema,
   PutSandboxProfileVersionDraftResponseSchema,
   SandboxProfileSchema,
+  SandboxProfileVersionMaintenanceScriptSchema,
   StartSandboxProfileSetupScriptTestRunResponseSchema,
 } from "../src/sandbox-profiles/index.js";
 import { createApiKeyCredential, createApiKeyToken } from "./helpers/api-keys.js";
@@ -222,6 +223,69 @@ describe.concurrent("MCP profile tools integration", () => {
     expect(persistedDraft?.setupScript).toBe(setupScript);
   });
 
+  it("updates a sandbox profile maintenance script with the REST response shape", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-profile-maintenance-put@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP profile maintenance script writer",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_UPDATE],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_mcp_maintenance_put",
+        organizationId: session.organizationId,
+        displayName: "MCP Maintenance Put Profile",
+        createdAt: "2026-05-02T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_mcp_maintenance_put",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        maintenanceScript: "echo old maintenance",
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const maintenanceScript = "git pull --ff-only\npnpm install";
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "profile_maintenance_script_put",
+      arguments: {
+        profileId: "sbp_mcp_maintenance_put",
+        version: 1,
+        maintenanceScript,
+      },
+    });
+
+    expect(result.isError).toBeUndefined();
+    const updatedScript = SandboxProfileVersionMaintenanceScriptSchema.parse(
+      result.structuredContent,
+    );
+    expect(updatedScript).toEqual({
+      sandboxProfileId: "sbp_mcp_maintenance_put",
+      version: 1,
+      maintenanceScript,
+    });
+
+    const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        maintenanceScript: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, "sbp_mcp_maintenance_put"), eq(table.version, 1)),
+    });
+    expect(persistedVersion?.maintenanceScript).toBe(maintenanceScript);
+  });
+
   it("starts a setup script test run with the REST response shape", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-mcp-profile-setup-script-test-start@example.com",
@@ -309,6 +373,106 @@ describe.concurrent("MCP profile tools integration", () => {
     expect(startedTestRun.status).toBe("accepted");
     expect(queuedWorkflowInput.purpose).toBe("setup_check");
     expect(queuedWorkflowInput.runtimePlan.setupScript).toBe("echo tested through mcp");
+    expect(queuedWorkflowInput.startedBy).toEqual({
+      kind: "api_key",
+      id: expect.any(String),
+    });
+  });
+
+  it("starts a maintenance script test run with the REST response shape", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-profile-maintenance-script-test-start@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP profile maintenance script tester",
+      permissions: [
+        OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
+        OrganizationPermissions.SANDBOX_SESSION_CREATE,
+      ],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_mcp_maintenance_script_test_start",
+        organizationId: session.organizationId,
+        displayName: "MCP Maintenance Script Test Start Profile",
+        activeVersion: 1,
+        createdAt: "2026-05-02T01:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values({
+      ...sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_mcp_maintenance_script_test_start",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        maintenanceScript: "echo persisted maintenance",
+        ...DockerSandboxRuntimeColumns,
+      }),
+      snapshotImageProvider: SandboxProvider.DOCKER,
+      snapshotImageId: "sha256:mcp-maintenance-script-test-start",
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "openai-mcp-maintenance-script-test-start",
+        variantId: "openai-default",
+        enabled: true,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_mcp_maintenance_script_test_start_agent",
+        organizationId: session.organizationId,
+        targetKey: "openai-mcp-maintenance-script-test-start",
+        displayName: "MCP maintenance script test agent connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      }),
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_mcp_maintenance_script_test_start_agent",
+          sandboxProfileId: "sbp_mcp_maintenance_script_test_start",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_mcp_maintenance_script_test_start_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+        }),
+      );
+
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "profile_maintenance_script_test_start",
+      arguments: {
+        profileId: "sbp_mcp_maintenance_script_test_start",
+        version: 1,
+        maintenanceScript: "echo tested maintenance through mcp",
+        idempotencyKey: "mcp-maintenance-script-test-start-001",
+      },
+    });
+
+    expect(result.isError).toBeUndefined();
+    const startedTestRun = StartSandboxProfileSetupScriptTestRunResponseSchema.parse(
+      result.structuredContent,
+    );
+    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+      env,
+      sandboxInstanceId: startedTestRun.sandboxInstanceId,
+    });
+
+    expect(startedTestRun.status).toBe("accepted");
+    expect(queuedWorkflowInput.purpose).toBe("setup_check");
+    expect(queuedWorkflowInput.image).toMatchObject({
+      kind: "snapshot",
+      imageId: "sha256:mcp-maintenance-script-test-start",
+    });
+    expect(queuedWorkflowInput.runtimePlan.setupScript).toBe("echo tested maintenance through mcp");
     expect(queuedWorkflowInput.startedBy).toEqual({
       kind: "api_key",
       id: expect.any(String),
@@ -641,10 +805,133 @@ describe.concurrent("MCP profile tools integration", () => {
     expect(queuedWorkflowInput.runtimePlan.setupScript).toBe(setupScript);
   });
 
+  it("authorizes setup assistant MCP tokens for maintenance tools scoped to the token profile version", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-maintenance-assistant-capability@example.com",
+    });
+    const profileId = "sbp_mcp_maintenance_assistant_capability";
+    const sandboxInstanceId = "sbi_mcp_maintenance_assistant_capability";
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: profileId,
+        organizationId: session.organizationId,
+        displayName: "MCP Maintenance Assistant Capability Profile",
+        activeVersion: 1,
+        createdAt: "2026-05-04T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values({
+      ...sandboxProfileVersionRow({
+        sandboxProfileId: profileId,
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        maintenanceScript: "echo persisted maintenance",
+        ...DockerSandboxRuntimeColumns,
+      }),
+      snapshotImageProvider: SandboxProvider.DOCKER,
+      snapshotImageId: "sha256:mcp-maintenance-assistant-capability",
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "openai-mcp-maintenance-assistant-capability",
+        variantId: "openai-default",
+        enabled: true,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_mcp_maintenance_assistant_capability_agent",
+        organizationId: session.organizationId,
+        targetKey: "openai-mcp-maintenance-assistant-capability",
+        displayName: "MCP maintenance assistant capability agent connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      }),
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_mcp_maintenance_assistant_capability_agent",
+          sandboxProfileId: profileId,
+          sandboxProfileVersion: 1,
+          connectionId: "icn_mcp_maintenance_assistant_capability_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+        }),
+      );
+
+    const token = await mintMcpToken({
+      config: McpTokenConfig,
+      claims: {
+        kind: "setup_assistant",
+        sub: sandboxInstanceId,
+        organizationId: session.organizationId,
+        sandboxProfileId: profileId,
+        sandboxProfileVersion: 1,
+      },
+      ttlSeconds: 300,
+    });
+
+    const maintenanceScript = "echo written by maintenance assistant";
+    const putResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_maintenance_script_put",
+      arguments: {
+        profileId,
+        version: 1,
+        maintenanceScript,
+      },
+    });
+    const testRunResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_maintenance_script_test_start",
+      arguments: {
+        profileId,
+        version: 1,
+        maintenanceScript,
+        idempotencyKey: "mcp-maintenance-assistant-capability-test-001",
+      },
+    });
+
+    expect(putResult.isError).toBeUndefined();
+    expect(testRunResult.isError).toBeUndefined();
+    const updatedScript = SandboxProfileVersionMaintenanceScriptSchema.parse(
+      putResult.structuredContent,
+    );
+    const startedTestRun = StartSandboxProfileSetupScriptTestRunResponseSchema.parse(
+      testRunResult.structuredContent,
+    );
+    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+      env,
+      sandboxInstanceId: startedTestRun.sandboxInstanceId,
+    });
+
+    expect(updatedScript.maintenanceScript).toBe(maintenanceScript);
+    expect(queuedWorkflowInput.startedBy).toEqual({
+      kind: "system",
+      id: sandboxInstanceId,
+    });
+    expect(queuedWorkflowInput.image).toMatchObject({
+      kind: "snapshot",
+      imageId: "sha256:mcp-maintenance-assistant-capability",
+    });
+    expect(queuedWorkflowInput.runtimePlan.setupScript).toBe(maintenanceScript);
+  });
+
   it("rejects setup assistant MCP tokens for another sandbox profile version", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-mcp-setup-assistant-capability-scope@example.com",
     });
+    const scopedProfileId = "sbp_mcp_setup_assistant_capability_scope";
+    const otherProfileId = "sbp_mcp_setup_assistant_capability_other";
 
     const token = await mintMcpToken({
       config: McpTokenConfig,
@@ -652,18 +939,100 @@ describe.concurrent("MCP profile tools integration", () => {
         kind: "setup_assistant",
         sub: "sbi_mcp_setup_assistant_capability_scope",
         organizationId: session.organizationId,
-        sandboxProfileId: "sbp_mcp_setup_assistant_capability_scope",
+        sandboxProfileId: scopedProfileId,
         sandboxProfileVersion: 1,
       },
       ttlSeconds: 300,
     });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values([
+      sandboxProfileRow({
+        id: scopedProfileId,
+        organizationId: session.organizationId,
+        displayName: "MCP Setup Assistant Capability Scope Profile",
+        activeVersion: 3,
+        createdAt: "2026-05-05T00:00:00.000Z",
+      }),
+      sandboxProfileRow({
+        id: otherProfileId,
+        organizationId: session.organizationId,
+        displayName: "MCP Setup Assistant Capability Other Profile",
+        createdAt: "2026-05-05T01:00:00.000Z",
+      }),
+    ]);
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+      sandboxProfileVersionRow({
+        sandboxProfileId: scopedProfileId,
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        setupScript: "echo scoped version",
+        ...DockerSandboxRuntimeColumns,
+      }),
+      sandboxProfileVersionRow({
+        sandboxProfileId: scopedProfileId,
+        version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
+        setupScript: "echo valid wrong version draft",
+        ...DockerSandboxRuntimeColumns,
+      }),
+      {
+        ...sandboxProfileVersionRow({
+          sandboxProfileId: scopedProfileId,
+          version: 3,
+          state: SandboxProfileVersionStates.PUBLISHED,
+          maintenanceScript: "echo valid wrong version maintenance",
+          ...DockerSandboxRuntimeColumns,
+        }),
+        snapshotImageProvider: SandboxProvider.DOCKER,
+        snapshotImageId: "sha256:mcp-setup-assistant-scope-wrong-version",
+      },
+      sandboxProfileVersionRow({
+        sandboxProfileId: otherProfileId,
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        setupScript: "echo valid wrong profile draft",
+        maintenanceScript: "echo valid wrong profile maintenance",
+        ...DockerSandboxRuntimeColumns,
+      }),
+    ]);
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "openai-mcp-setup-assistant-capability-scope",
+        variantId: "openai-default",
+        enabled: true,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_mcp_setup_assistant_capability_scope_agent",
+        organizationId: session.organizationId,
+        targetKey: "openai-mcp-setup-assistant-capability-scope",
+        displayName: "MCP setup assistant scope agent connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      }),
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_mcp_setup_assistant_capability_scope_agent",
+          sandboxProfileId: scopedProfileId,
+          sandboxProfileVersion: 3,
+          connectionId: "icn_mcp_setup_assistant_capability_scope_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+        }),
+      );
 
     const profileResult = await callMcpTool({
       env,
       token: token.token,
       name: "profile_draft_setup_script_put",
       arguments: {
-        profileId: "sbp_mcp_setup_assistant_capability_other",
+        profileId: otherProfileId,
         version: 1,
         setupScript: "echo wrong profile",
       },
@@ -673,14 +1042,55 @@ describe.concurrent("MCP profile tools integration", () => {
       token: token.token,
       name: "profile_draft_setup_script_put",
       arguments: {
-        profileId: "sbp_mcp_setup_assistant_capability_scope",
+        profileId: scopedProfileId,
         version: 2,
         setupScript: "echo wrong version",
+      },
+    });
+    const maintenanceProfileResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_maintenance_script_put",
+      arguments: {
+        profileId: otherProfileId,
+        version: 1,
+        maintenanceScript: "echo wrong maintenance profile",
+      },
+    });
+    const maintenanceVersionResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_maintenance_script_test_start",
+      arguments: {
+        profileId: scopedProfileId,
+        version: 3,
+        maintenanceScript: "echo wrong maintenance version",
       },
     });
 
     expect(profileResult.isError).toBe(true);
     expect(versionResult.isError).toBe(true);
+    expect(maintenanceProfileResult.isError).toBe(true);
+    expect(maintenanceVersionResult.isError).toBe(true);
+
+    const otherProfileVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        setupScript: true,
+        maintenanceScript: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, otherProfileId), eq(table.version, 1)),
+    });
+    const wrongVersionDraft = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        setupScript: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, scopedProfileId), eq(table.version, 2)),
+    });
+    expect(otherProfileVersion?.setupScript).toBe("echo valid wrong profile draft");
+    expect(otherProfileVersion?.maintenanceScript).toBe("echo valid wrong profile maintenance");
+    expect(wrongVersionDraft?.setupScript).toBe("echo valid wrong version draft");
   });
 
   it("returns a tool error when the API key lacks sandbox profile read permission", async ({

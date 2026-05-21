@@ -5,6 +5,7 @@ import { OrganizationPermissions } from "../../auth/services/organization-policy
 import {
   listSandboxProfilesQuerySchema,
   listSandboxProfilesResponseSchema,
+  sandboxProfileVersionMaintenanceScriptSchema,
   putSandboxProfileVersionDraftResponseSchema,
   sandboxProfileIdParamsSchema,
   sandboxProfileVersionParamsSchema,
@@ -13,6 +14,7 @@ import {
 import { getProfile } from "../../sandbox-profiles/services/get-profile.js";
 import { listProfiles } from "../../sandbox-profiles/services/list-profiles.js";
 import { putProfileVersionDraft } from "../../sandbox-profiles/services/put-profile-version-draft.js";
+import { putProfileVersionMaintenanceScript } from "../../sandbox-profiles/services/put-profile-version-maintenance-script.js";
 import type { MistleMcpServerContext } from "../server.js";
 import {
   requireMcpSandboxProfileScope,
@@ -37,6 +39,12 @@ const MutatingToolAnnotations: ToolAnnotations = {
 const profileDraftSetupScriptPutInputSchema = sandboxProfileVersionParamsSchema
   .extend({
     setupScript: z.string().min(1).nullable(),
+  })
+  .strict();
+
+const profileMaintenanceScriptPutInputSchema = sandboxProfileVersionParamsSchema
+  .extend({
+    maintenanceScript: z.string().min(1).nullable(),
   })
   .strict();
 
@@ -142,6 +150,44 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
       );
 
       return structuredResult(draft);
+    },
+  );
+
+  server.registerTool(
+    "profile_maintenance_script_put",
+    {
+      title: "Put sandbox profile maintenance script",
+      description: "Update the snapshot maintenance script for a sandbox profile version",
+      inputSchema: profileMaintenanceScriptPutInputSchema,
+      outputSchema: sandboxProfileVersionMaintenanceScriptSchema,
+      annotations: {
+        ...MutatingToolAnnotations,
+        title: "Put sandbox profile maintenance script",
+      },
+    },
+    async ({ profileId, version, maintenanceScript }) => {
+      requireMcpToolPermission(
+        context.organizationActor,
+        OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
+      );
+      requireMcpSandboxProfileScope(context.organizationActor, {
+        profileId,
+        version,
+      });
+
+      const updatedScript = await putProfileVersionMaintenanceScript(
+        {
+          db: context.db,
+        },
+        {
+          organizationId: context.organizationActor.organizationId,
+          profileId,
+          profileVersion: version,
+          maintenanceScript,
+        },
+      );
+
+      return structuredResult(updatedScript);
     },
   );
 }

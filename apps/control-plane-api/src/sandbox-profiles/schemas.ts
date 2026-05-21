@@ -170,6 +170,14 @@ export const sandboxProfileVersionSetupScriptSchema = z
   })
   .strict();
 
+export const sandboxProfileVersionMaintenanceScriptSchema = z
+  .object({
+    sandboxProfileId: z.string().min(1),
+    version: z.number().int().min(1),
+    maintenanceScript: z.string().min(1).nullable(),
+  })
+  .strict();
+
 export const sandboxProfileVersionPersistenceModeSchema = z
   .object({
     sandboxProfileId: z.string().min(1),
