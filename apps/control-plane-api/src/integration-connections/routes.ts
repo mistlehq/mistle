@@ -18,6 +18,7 @@ import * as listIntegrationWebhookSources from "./list-integration-webhook-sourc
 import * as refreshAllIntegrationConnectionResources from "./refresh-all-integration-connection-resources/index.js";
 import * as refreshIntegrationConnectionResources from "./refresh-integration-connection-resources/index.js";
 import * as refreshWebhookTriggerCapabilities from "./refresh-webhook-trigger-capabilities/index.js";
+import * as selectProviderAppSetupInstallation from "./select-provider-app-setup-installation/index.js";
 import * as startDeviceAuthorizationConnection from "./start-device-authorization-connection/index.js";
 import * as startOAuth2AuthorizationCodeConnection from "./start-oauth2-authorization-code-connection/index.js";
 import * as startOAuth2AuthorizationCodeReauthorization from "./start-oauth2-authorization-code-reauthorization/index.js";
@@ -104,6 +105,11 @@ export function createIntegrationConnectionsRoutes(): AppRoutes<
 
   routes.use(startProviderAppSetup.route.path, requireAuthSession);
   routes.openapi(startProviderAppSetup.route, startProviderAppSetup.handler);
+  routes.use(selectProviderAppSetupInstallation.route.path, requireAuthSession);
+  routes.openapi(
+    selectProviderAppSetupInstallation.route,
+    selectProviderAppSetupInstallation.handler,
+  );
 
   routes.use(startOAuth2AuthorizationCodeConnection.route.path, requireAuthSession);
   routes.openapi(

@@ -7,6 +7,7 @@ import {
   type CreatedIntegrationConnection,
   type DeletedIntegrationConnection,
   type IntegrationConnectionMethod,
+  type SelectedProviderAppSetupInstallation,
   type StartedProviderAppSetup,
   type StartedRedirectConnection,
   type StartedDeviceAuthorizationConnection,
@@ -14,6 +15,7 @@ import {
   CreatedFormIntegrationConnectionSchema,
   DeletedIntegrationConnectionSchema,
   IntegrationConnectionSchema,
+  SelectedProviderAppSetupInstallationSchema,
   StartedProviderAppSetupSchema,
   StartedDeviceAuthorizationConnectionSchema,
   StartedRedirectConnectionSchema,
@@ -397,6 +399,37 @@ export async function startProviderAppSetup(input: {
   } catch (error) {
     throw wrapIntegrationsApiError({
       operation: "startProviderAppSetup",
+      error,
+      fallbackMessage: input.fallbackMessage,
+    });
+  }
+}
+
+export async function selectProviderAppSetupInstallation(input: {
+  connectionId: string;
+  routeSegment: string;
+  installationId: string;
+  fallbackMessage: string;
+}): Promise<SelectedProviderAppSetupInstallation> {
+  try {
+    const response = await requestControlPlane({
+      operation: "selectProviderAppSetupInstallation",
+      method: "POST",
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/setup/${encodeURIComponent(input.routeSegment)}/select-installation`,
+      body: {
+        installationId: input.installationId,
+      },
+      fallbackMessage: input.fallbackMessage,
+    });
+
+    return readJsonWithSchema({
+      response,
+      schema: SelectedProviderAppSetupInstallationSchema,
+      operation: "selectProviderAppSetupInstallation",
+    });
+  } catch (error) {
+    throw wrapIntegrationsApiError({
+      operation: "selectProviderAppSetupInstallation",
       error,
       fallbackMessage: input.fallbackMessage,
     });

@@ -743,14 +743,16 @@ export async function startProviderAppSetup(
     invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_START_INPUT,
   });
 
-  await persistRedirectSessionOrThrow({
-    db: ctx.db,
-    organizationId: input.organizationId,
-    targetKey: connection.targetKey,
-    state: redirectState,
-    expiresAt: createRedirectSessionExpiryTimestamp(),
-    failureMessage: "Failed to persist provider app setup redirect session state.",
-  });
+  if (startedSetup.start.kind === "form-post" || startedSetup.start.kind === "redirect") {
+    await persistRedirectSessionOrThrow({
+      db: ctx.db,
+      organizationId: input.organizationId,
+      targetKey: connection.targetKey,
+      state: redirectState,
+      expiresAt: createRedirectSessionExpiryTimestamp(),
+      failureMessage: "Failed to persist provider app setup redirect session state.",
+    });
+  }
 
   if (
     parsedSecrets.length > 0 ||
@@ -774,6 +776,151 @@ export async function startProviderAppSetup(
   }
 
   return startedSetup.start;
+}
+
+export async function selectProviderAppSetupInstallation(
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+    integrationsConfig: AppContext["var"]["config"]["integrations"];
+    controlPlaneBaseUrl: string;
+  },
+  input: {
+    organizationId: string;
+    connectionId: string;
+    routeSegment: string;
+    installationId: string;
+  },
+): Promise<CompletedProviderAppSetup> {
+  const connection = await resolveConnectionWithTargetOrThrow({
+    db: ctx.db,
+    organizationId: input.organizationId,
+    connectionId: input.connectionId,
+  });
+  const definition = ctx.integrationRegistry.getDefinition({
+    familyId: connection.target.familyId,
+    variantId: connection.target.variantId,
+  });
+
+  if (definition?.providerAppSetup === undefined) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.FORM_CONNECTION_METHOD_NOT_SUPPORTED,
+      `Integration target '${connection.targetKey}' does not support provider app setup.`,
+    );
+  }
+
+  const flow = resolveSetupFlowOrThrow({
+    flows: definition.providerAppSetup.flows,
+    routeSegment: input.routeSegment,
+  });
+  if (flow.selectInstallation === undefined) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.FORM_CONNECTION_METHOD_NOT_SUPPORTED,
+      `Integration setup flow '${input.routeSegment}' does not support installation selection.`,
+    );
+  }
+
+  const connectionConfig = resolveConnectionConfigOrThrow({
+    connectionId: connection.id,
+    config: connection.config,
+  });
+  const parsedConnectionConfig = UnknownRecordSchema.parse(connectionConfig);
+  assertConnectionMethodMatchesSetupFlow({
+    config: parsedConnectionConfig,
+    methodId: flow.methodId,
+    routeSegment: input.routeSegment,
+  });
+  const parsedTargetConfig = UnknownRecordSchema.parse(
+    definition.targetConfigSchema.parse(connection.target.config),
+  );
+  const parsedTargetSecrets = StringRecordSchema.parse(
+    definition.targetSecretSchema.parse(
+      resolveIntegrationTargetSecrets({
+        integrationsConfig: ctx.integrationsConfig,
+        target: connection.target,
+      }),
+    ),
+  );
+
+  let setupResult;
+  try {
+    setupResult = await flow.selectInstallation({
+      connection: {
+        id: connection.id,
+        status: connection.status,
+        config: parsedConnectionConfig,
+      },
+      controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
+      installationId: input.installationId,
+      resolveConnectionSecret: (secretInput) =>
+        resolveConnectionSecretValue({
+          db: ctx.db,
+          integrationRegistry: ctx.integrationRegistry,
+          integrationsConfig: ctx.integrationsConfig,
+          connectionId: connection.id,
+          secretKind: secretInput.secretKind,
+          slotKey: secretInput.slotKey,
+        }),
+      target: {
+        familyId: connection.target.familyId,
+        variantId: connection.target.variantId,
+        enabled: connection.target.enabled,
+        config: parsedTargetConfig,
+        secrets: parsedTargetSecrets,
+      },
+    });
+  } catch (error) {
+    if (error instanceof BadRequestError) {
+      throw error;
+    }
+
+    if (
+      error instanceof InternalIntegrationCredentialsError &&
+      error.code === InternalIntegrationCredentialsErrorCodes.CREDENTIAL_NOT_FOUND
+    ) {
+      throw new BadRequestError(
+        IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT,
+        `Integration connection '${connection.id}' is missing required setup credentials.`,
+      );
+    }
+
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT,
+      error instanceof Error ? error.message : "Provider app setup installation selection failed.",
+    );
+  }
+
+  const formMethod = resolveFormConnectionMethodOrThrow({
+    targetKey: connection.targetKey,
+    methodId: flow.methodId,
+    connectionMethods: definition.connectionMethods,
+    invalidInputCode:
+      IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT,
+  });
+  const parsedSecrets = parseUpdateFormSecretsOrThrow({
+    method: formMethod,
+    secrets: setupResult.secrets ?? {},
+    invalidInputCode:
+      IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT,
+  });
+  const completedConnection = await persistProviderAppSetupResult({
+    db: ctx.db,
+    integrationsConfig: ctx.integrationsConfig,
+    organizationId: input.organizationId,
+    connection,
+    definition,
+    parsedSecrets,
+    ...(setupResult.connection === undefined ? {} : { connectionUpdate: setupResult.connection }),
+    ...(setupResult.webhookSource === undefined
+      ? {}
+      : { webhookSourceUpdate: setupResult.webhookSource }),
+  });
+
+  return {
+    ...completedConnection,
+    completionRedirect: setupResult.completionRedirect,
+    routeSegment: input.routeSegment,
+  };
 }
 
 export async function completeProviderAppSetup(

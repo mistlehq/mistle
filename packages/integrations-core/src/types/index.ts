@@ -714,6 +714,14 @@ export type IntegrationProviderAppSetupStartResult =
   | {
       authorizationUrl: string;
       kind: "redirect";
+    }
+  | {
+      completionRedirect: IntegrationProviderAppSetupCompletionRedirect;
+      kind: "completed";
+    }
+  | {
+      kind: "installation-selection";
+      options: IntegrationProviderAppSetupInstallationSelectionOption[];
     };
 
 export type IntegrationProviderAppSetupConnectionUpdate = {
@@ -742,6 +750,14 @@ export type IntegrationProviderAppSetupResult = {
 
 export type IntegrationProviderAppSetupCompleteResult = IntegrationProviderAppSetupResult & {
   completionRedirect: IntegrationProviderAppSetupCompletionRedirect;
+};
+
+export type IntegrationProviderAppSetupInstallationSelectionOption = {
+  accountAvatarUrl?: string;
+  accountLogin: string;
+  accountType: string;
+  installationId: string;
+  repositorySelection: string;
 };
 
 export type IntegrationProviderAppSetupStatelessCallbackResolution = {
@@ -786,6 +802,20 @@ export type IntegrationProviderAppSetupCompleteInput<
   target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
 };
 
+export type IntegrationProviderAppSetupSelectInstallationInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  connection: IntegrationConnection & {
+    config: TConnectionConfig;
+  };
+  controlPlaneBaseUrl: string;
+  installationId: string;
+  resolveConnectionSecret: IntegrationProviderAppSetupConnectionSecretResolver;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+};
+
 export type IntegrationProviderAppSetupFlowCapability<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
@@ -808,6 +838,13 @@ export type IntegrationProviderAppSetupFlowCapability<
   ): MaybePromise<
     IntegrationProviderAppSetupResult & { start: IntegrationProviderAppSetupStartResult }
   >;
+  selectInstallation?(
+    input: IntegrationProviderAppSetupSelectInstallationInput<
+      TTargetConfig,
+      TTargetSecrets,
+      TConnectionConfig
+    >,
+  ): MaybePromise<IntegrationProviderAppSetupCompleteResult>;
   resolveStatelessCallback?(input: {
     callbackRouteKey: string;
     query: URLSearchParams;

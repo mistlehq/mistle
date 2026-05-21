@@ -23,10 +23,12 @@ import type {
   IntegrationConnection,
   IntegrationTarget,
   IntegrationWebhookSource,
+  StartedProviderAppSetup,
 } from "../integrations/integrations-service.js";
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query.js";
 import { IntegrationConnectionCreatePage } from "./integration-connection-create-page.js";
+import { GitHubInstallationSelectionPanel } from "./integration-connection-provider-app-setup-pane.js";
 import { IntegrationConnectionSetupPage } from "./integration-connection-setup-page.js";
 import { IntegrationsPage } from "./integrations-page.js";
 import { createStoryConnectionMethods } from "./organization-integrations-settings-page-story-support.js";
@@ -195,6 +197,34 @@ const StoryGitHubManifestStartRequestBodySchema = z.object({
   organizationSlug: z.string().optional(),
 });
 
+const StorySelectInstallationRequestBodySchema = z.object({
+  installationId: z.string(),
+});
+
+const StoryGitHubInstallationSelectionOptions: Extract<
+  StartedProviderAppSetup,
+  { kind: "installation-selection" }
+>["options"] = [
+  {
+    accountLogin: "mistle",
+    accountType: "Organization",
+    installationId: "92345",
+    repositorySelection: "all",
+  },
+  {
+    accountLogin: "mistle-labs",
+    accountType: "Organization",
+    installationId: "92346",
+    repositorySelection: "selected",
+  },
+  {
+    accountLogin: "thomasjiang",
+    accountType: "User",
+    installationId: "92347",
+    repositorySelection: "selected",
+  },
+];
+
 function useGitHubStoryControlPlane(input: { queryClient: QueryClient }): void {
   useEffect(() => {
     const originalFetch = globalThis.fetch;
@@ -283,9 +313,60 @@ function useGitHubStoryControlPlane(input: { queryClient: QueryClient }): void {
         /^\/v1\/integration\/connections\/([^/]+)\/setup\/github-app-installation\/start$/,
       );
       if (method === "POST" && startInstallMatch !== null) {
+        const connectionId = decodeURIComponent(startInstallMatch[1] ?? "");
+        if (connectionId === "icn_github_story_selection") {
+          return createJsonResponse({
+            kind: "installation-selection",
+            options: StoryGitHubInstallationSelectionOptions,
+          });
+        }
+
         return createJsonResponse({
           kind: "redirect",
           authorizationUrl: `${storyControlPlaneApiOrigin}/storybook/github-app-install`,
+        });
+      }
+
+      const selectInstallMatch = path.match(
+        /^\/v1\/integration\/connections\/([^/]+)\/setup\/github-app-installation\/select-installation$/,
+      );
+      if (method === "POST" && selectInstallMatch !== null) {
+        const connectionId = decodeURIComponent(selectInstallMatch[1] ?? "");
+        const requestBody: unknown = await request.json();
+        const body = StorySelectInstallationRequestBodySchema.parse(requestBody);
+        const currentConnection =
+          directoryData.connections.find((connection) => connection.id === connectionId) ?? null;
+        if (currentConnection === null) {
+          return createJsonResponse(
+            { code: "CONNECTION_NOT_FOUND", message: "Connection not found." },
+            404,
+          );
+        }
+
+        const updatedConnection: IntegrationConnection = {
+          ...currentConnection,
+          config: {
+            ...currentConnection.config,
+            installation_id: body.installationId,
+          },
+          externalSubjectId: body.installationId,
+          updatedAt: "2026-04-24T00:00:00.000Z",
+        };
+
+        input.queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+          targets: directoryData.targets,
+          connections: directoryData.connections.map((connection) =>
+            connection.id === connectionId ? updatedConnection : connection,
+          ),
+        });
+
+        return createJsonResponse({
+          connectionId,
+          targetKey: currentConnection.targetKey,
+          completionRedirect: {
+            kind: "connection-detail",
+            notice: "installed",
+          },
         });
       }
 
@@ -537,6 +618,26 @@ export const ReadyToInstall: PageStory = {
   },
 };
 
+export const ExistingAppWithInstallationsToSelect: PageStory = {
+  render: function RenderStory() {
+    return (
+      <GitHubAppSetupPageStory
+        connection={{
+          ...createDraftGitHubConnection({
+            config: {
+              app_id: "12345",
+              app_slug: "mistle-github-app",
+              client_id: "Iv1.selectionstorybook",
+            },
+            configuredSecretNames: ["appPrivateKeyPem", "clientSecret", "webhookSecret"],
+          }),
+          id: "icn_github_story_selection",
+        }}
+      />
+    );
+  },
+};
+
 export const ManifestCreated: PageStory = {
   render: function RenderStory() {
     return (
@@ -558,6 +659,26 @@ export const ManifestCreated: PageStory = {
 export const InstalledRedirect: PageStory = {
   render: function RenderStory() {
     return <GitHubInstalledDetailPageStory />;
+  },
+};
+
+export const InstallationSelectionPanel: PageStory = {
+  decorators: [withDashboardCenteredStory],
+  render: function RenderStory() {
+    const [pendingInstallationId, setPendingInstallationId] = useState<string | null>(null);
+
+    return (
+      <div className="w-[560px] max-w-[calc(100vw-2rem)]">
+        <GitHubInstallationSelectionPanel
+          isPending={pendingInstallationId !== null}
+          onSelectInstallation={(installationId) => {
+            setPendingInstallationId(installationId);
+          }}
+          options={StoryGitHubInstallationSelectionOptions}
+          pendingInstallationId={pendingInstallationId}
+        />
+      </div>
+    );
   },
 };
 

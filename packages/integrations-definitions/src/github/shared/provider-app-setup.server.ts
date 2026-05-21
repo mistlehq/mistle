@@ -2,11 +2,14 @@ import {
   IntegrationConnectionMethodIds,
   type IntegrationProviderAppSetupCapability,
   type IntegrationProviderAppSetupCompleteResult,
+  type IntegrationProviderAppSetupInstallationSelectionOption,
 } from "@mistle/integrations-core";
 import { createAppAuth } from "@octokit/auth-app";
 import { request } from "@octokit/request";
+import { Octokit } from "octokit";
 import { z } from "zod";
 
+import { GitHubApiVersion } from "./api-version.js";
 import {
   buildConvertedGitHubAppConnectionConfig,
   buildConvertedGitHubAppConnectionSecrets,
@@ -73,6 +76,24 @@ const GitHubAppInstallationResponseSchema = z
   })
   .loose();
 
+const GitHubAppInstallationListItemSchema = z
+  .object({
+    account: z
+      .object({
+        avatar_url: z.string().optional(),
+        login: z.string().min(1),
+        type: z.string().min(1),
+      })
+      .loose(),
+    app_id: z.union([z.string().min(1), z.number().int().nonnegative()]),
+    app_slug: z.string().min(1),
+    id: z.union([z.string().min(1), z.number().int().nonnegative()]),
+    repository_selection: z.string().min(1),
+  })
+  .loose();
+
+const GitHubAppInstallationsResponseSchema = z.array(GitHubAppInstallationListItemSchema);
+
 async function convertGitHubAppManifest(input: {
   apiBaseUrl: string;
   code: string;
@@ -101,6 +122,90 @@ async function convertGitHubAppManifest(input: {
   return parseGitHubAppManifestConversionResponse(responseJson);
 }
 
+async function createGitHubAppAuthentication(input: {
+  apiBaseUrl: string;
+  appId: string;
+  appPrivateKeyPem: string;
+}): Promise<string> {
+  const appAuth = createAppAuth({
+    appId: input.appId,
+    privateKey: input.appPrivateKeyPem,
+    request: request.defaults({
+      baseUrl: input.apiBaseUrl,
+    }),
+  });
+  const authentication = await appAuth({ type: "app" });
+  return authentication.token;
+}
+
+function createGitHubAppOctokit(input: { apiBaseUrl: string; token: string }): Octokit {
+  return new Octokit({
+    auth: input.token,
+    baseUrl: input.apiBaseUrl,
+    request: {
+      headers: {
+        accept: "application/vnd.github+json",
+        "x-github-api-version": GitHubApiVersion,
+      },
+    },
+  });
+}
+
+async function listGitHubAppInstallations(input: {
+  apiBaseUrl: string;
+  appId: string;
+  appPrivateKeyPem: string;
+  appSlug: string;
+}): Promise<IntegrationProviderAppSetupInstallationSelectionOption[]> {
+  const authenticationToken = await createGitHubAppAuthentication({
+    apiBaseUrl: input.apiBaseUrl,
+    appId: input.appId,
+    appPrivateKeyPem: input.appPrivateKeyPem,
+  });
+
+  let responseJson: unknown;
+  try {
+    const octokit = createGitHubAppOctokit({
+      apiBaseUrl: input.apiBaseUrl,
+      token: authenticationToken,
+    });
+    responseJson = await octokit.paginate("GET /app/installations", {
+      per_page: 100,
+    });
+  } catch (error) {
+    throw new Error(
+      `GitHub App installations could not be listed: ${
+        error instanceof Error ? error.message : "GitHub API request failed."
+      }`,
+    );
+  }
+
+  const installations = GitHubAppInstallationsResponseSchema.parse(responseJson);
+  return installations.map((installation) => {
+    if (installation.app_id.toString() !== input.appId) {
+      throw new Error(
+        `GitHub App installation '${installation.id.toString()}' belongs to app '${installation.app_id.toString()}', expected '${input.appId}'.`,
+      );
+    }
+    if (installation.app_slug !== input.appSlug) {
+      throw new Error(
+        `GitHub App installation '${installation.id.toString()}' belongs to app slug '${installation.app_slug}', expected '${input.appSlug}'.`,
+      );
+    }
+
+    return {
+      ...(installation.account.avatar_url === undefined ||
+      installation.account.avatar_url.length === 0
+        ? {}
+        : { accountAvatarUrl: installation.account.avatar_url }),
+      accountLogin: installation.account.login,
+      accountType: installation.account.type,
+      installationId: installation.id.toString(),
+      repositorySelection: installation.repository_selection,
+    };
+  });
+}
+
 function parseGitHubAppInstallationId(input: { installationId: string }): number {
   const numericInstallationId = Number(input.installationId);
   if (!Number.isInteger(numericInstallationId) || numericInstallationId <= 0) {
@@ -122,14 +227,11 @@ async function verifyGitHubAppInstallation(input: {
   const numericInstallationId = parseGitHubAppInstallationId({
     installationId: input.installationId,
   });
-  const appAuth = createAppAuth({
+  const authenticationToken = await createGitHubAppAuthentication({
+    apiBaseUrl: input.apiBaseUrl,
     appId: input.appId,
-    privateKey: input.appPrivateKeyPem,
-    request: request.defaults({
-      baseUrl: input.apiBaseUrl,
-    }),
+    appPrivateKeyPem: input.appPrivateKeyPem,
   });
-  const authentication = await appAuth({ type: "app" });
 
   let responseJson: unknown;
   try {
@@ -138,7 +240,7 @@ async function verifyGitHubAppInstallation(input: {
       installation_id: numericInstallationId,
       headers: {
         accept: "application/vnd.github+json",
-        authorization: `Bearer ${authentication.token}`,
+        authorization: `Bearer ${authenticationToken}`,
         "x-github-api-version": "2022-11-28",
       },
     });
@@ -367,6 +469,66 @@ export function createGitHubProviderAppSetupCapability(
           for (const secret of options.requiredInstallationSecrets) {
             await input.resolveConnectionSecret(secret);
           }
+          if (
+            parsedConfig.installation_id !== undefined &&
+            parsedConfig.installation_id.trim().length > 0
+          ) {
+            return {
+              start: {
+                kind: "redirect",
+                authorizationUrl: buildGitHubAppInstallationUrl({
+                  appSlug: parsedConfig.app_slug,
+                  state: input.redirectState,
+                  variantId: input.target.variantId,
+                  webBaseUrl: input.target.config.webBaseUrl,
+                }),
+              },
+            };
+          }
+
+          const appPrivateKeyPem = await input.resolveConnectionSecret(options.appPrivateKeySecret);
+          const installations = await listGitHubAppInstallations({
+            apiBaseUrl: input.target.config.apiBaseUrl,
+            appId: parsedConfig.app_id,
+            appPrivateKeyPem,
+            appSlug: parsedConfig.app_slug,
+          });
+
+          if (installations.length === 1) {
+            const installation = installations[0];
+            if (installation === undefined) {
+              throw new Error("GitHub App installation disappeared.");
+            }
+
+            const installationResult = await completeGitHubAppInstallation({
+              appPrivateKeyPem,
+              connectionConfig: parsedConfig,
+              query: new URLSearchParams({
+                installation_id: installation.installationId,
+                setup_action: "select-existing-installation",
+              }),
+              targetConfig: input.target.config,
+            });
+
+            return {
+              ...(installationResult.connection === undefined
+                ? {}
+                : { connection: installationResult.connection }),
+              start: {
+                kind: "completed",
+                completionRedirect: installationResult.completionRedirect,
+              },
+            };
+          }
+
+          if (installations.length > 1) {
+            return {
+              start: {
+                kind: "installation-selection",
+                options: installations,
+              },
+            };
+          }
 
           return {
             start: {
@@ -387,6 +549,19 @@ export function createGitHubProviderAppSetupCapability(
             appPrivateKeyPem,
             connectionConfig: input.connection.config,
             query: input.query,
+            targetConfig: input.target.config,
+          });
+        },
+        async selectInstallation(input) {
+          const appPrivateKeyPem = await input.resolveConnectionSecret(options.appPrivateKeySecret);
+
+          return completeGitHubAppInstallation({
+            appPrivateKeyPem,
+            connectionConfig: input.connection.config,
+            query: new URLSearchParams({
+              installation_id: input.installationId,
+              setup_action: "select-existing-installation",
+            }),
             targetConfig: input.target.config,
           });
         },

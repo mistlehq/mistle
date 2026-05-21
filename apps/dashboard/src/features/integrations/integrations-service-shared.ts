@@ -471,7 +471,63 @@ export const StartedProviderAppSetupSchema = z.discriminatedUnion("kind", [
       authorizationUrl: z.url(),
     })
     .strict(),
+  z
+    .object({
+      kind: z.literal("completed"),
+      completionRedirect: z.discriminatedUnion("kind", [
+        z
+          .object({
+            kind: z.literal("connection-detail"),
+            notice: z.string().min(1).optional(),
+          })
+          .strict(),
+        z
+          .object({
+            kind: z.literal("setup-route"),
+            query: z.record(z.string(), z.string()).optional(),
+          })
+          .strict(),
+      ]),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("installation-selection"),
+      options: z.array(
+        z
+          .object({
+            accountAvatarUrl: z.string().min(1).optional(),
+            accountLogin: z.string().min(1),
+            accountType: z.string().min(1),
+            installationId: z.string().min(1),
+            repositorySelection: z.string().min(1),
+          })
+          .strict(),
+      ),
+    })
+    .strict(),
 ]);
+
+export const SelectedProviderAppSetupInstallationSchema = z
+  .object({
+    connectionId: z.string().min(1),
+    targetKey: z.string().min(1),
+    completionRedirect: z.discriminatedUnion("kind", [
+      z
+        .object({
+          kind: z.literal("connection-detail"),
+          notice: z.string().min(1).optional(),
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal("setup-route"),
+          query: z.record(z.string(), z.string()).optional(),
+        })
+        .strict(),
+    ]),
+  })
+  .strict();
 
 export const StartedDeviceAuthorizationConnectionSchema = z
   .object({
@@ -545,6 +601,9 @@ export type CreatedIntegrationConnection = z.infer<typeof IntegrationConnectionS
 export type DeletedIntegrationConnection = z.infer<typeof DeletedIntegrationConnectionSchema>;
 export type StartedRedirectConnection = z.infer<typeof StartedRedirectConnectionSchema>;
 export type StartedProviderAppSetup = z.infer<typeof StartedProviderAppSetupSchema>;
+export type SelectedProviderAppSetupInstallation = z.infer<
+  typeof SelectedProviderAppSetupInstallationSchema
+>;
 export type StartedDeviceAuthorizationConnection = z.infer<
   typeof StartedDeviceAuthorizationConnectionSchema
 >;

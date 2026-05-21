@@ -1938,6 +1938,127 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/integration/connections/:connectionId/setup/:routeSegment/select-installation": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          connectionId: string;
+          routeSegment: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            installationId: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Select a provider app installation and complete setup. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              completionRedirect:
+                | {
+                    /** @enum {string} */
+                    kind: "connection-detail";
+                    notice?: string;
+                  }
+                | {
+                    /** @enum {string} */
+                    kind: "setup-route";
+                    query?: {
+                      [key: string]: string;
+                    };
+                  };
+              connectionId: string;
+              targetKey: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "FORM_CONNECTION_METHOD_NOT_SUPPORTED"
+                    | "PROVIDER_APP_SETUP_CONNECTION_METHOD_NOT_SUPPORTED"
+                    | "INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration connection was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "CONNECTION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/integration/connections/:connectionId/setup/:routeSegment/start": {
     parameters: {
       query?: never;
@@ -1986,6 +2107,34 @@ export interface paths {
                   authorizationUrl: string;
                   /** @enum {string} */
                   kind: "redirect";
+                }
+              | {
+                  completionRedirect:
+                    | {
+                        /** @enum {string} */
+                        kind: "connection-detail";
+                        notice?: string;
+                      }
+                    | {
+                        /** @enum {string} */
+                        kind: "setup-route";
+                        query?: {
+                          [key: string]: string;
+                        };
+                      };
+                  /** @enum {string} */
+                  kind: "completed";
+                }
+              | {
+                  /** @enum {string} */
+                  kind: "installation-selection";
+                  options: {
+                    accountAvatarUrl?: string;
+                    accountLogin: string;
+                    accountType: string;
+                    installationId: string;
+                    repositorySelection: string;
+                  }[];
                 };
           };
         };

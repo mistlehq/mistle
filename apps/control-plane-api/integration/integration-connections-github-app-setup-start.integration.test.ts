@@ -2,7 +2,12 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
+import { once } from "node:events";
+import { createServer } from "node:http";
+import type { IncomingMessage, Server, ServerResponse } from "node:http";
+
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import { reserveAvailablePort } from "@mistle/test-harness";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
@@ -26,69 +31,140 @@ type StartedProviderAppSetupRedirect = Extract<
   { kind: "redirect" }
 >;
 
+type GitHubApiRequest = {
+  authorization?: string;
+  method: string;
+  pathname: string;
+};
+
+type StartedGitHubApiServer = {
+  baseUrl: string;
+  requests: GitHubApiRequest[];
+  stop: () => Promise<void>;
+};
+
+const TestGitHubAppPrivateKeyPem = [
+  "-----BEGIN PRIVATE KEY-----",
+  "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCfRvx+zsgAVfj+",
+  "MAxxnOv0nOREmxICbC33ade6TBzfiyki1f1XtrgowwynW6FGbLRVocYHure24e8J",
+  "sBVHKj0pG9O9pvZEA3yokO7UY6y3sc8v5g+vB3drY3ZDyv3hv0kefp+yAUn64zLQ",
+  "3o4ldL8ZO5FUF6LsJMkTvFeSjphTKUXJjuDdGrd+diTBh9D11Ity09R/zz5TGjL6",
+  "1E2SMohPo6z/t+Q8k3sTixqGS91FCn1wNQQkqnsg/Hrjgv9egDZ39Boe9SC0pVpD",
+  "fRN6tsL3fLOFvO4C8ug/HCZ4rRTfMclLwo/fSmWv+FzxGBpztFD1+L3WGYa6rnmH",
+  "CTCrNynFAgMBAAECggEABi45PeDKGoHmNFOK0WgjMNNbY+fM4lqudZy+EgeCPFDD",
+  "AyF2H/lMup+HphaJvXjvjijFotxQOjDDYjxwCu+nlBOKxcp3i7/t46r3auGbnLzc",
+  "hbw3QhW3q4Czy2F9Cg2ZPwLEsXctgXvfp4K8qyqVVXDot1sRHPmNcu5aoJWCHCyc",
+  "tB9CGHHD5onKSYFy7+zaRb1EDhLHUfiOiS1CQvXJh/U+whaC+eApg2z54HpNHx7z",
+  "B+Z0IlxBcYoryWyRQ9KOu7toMQibI6ZY/gpxmnqrxahFaw4WIljgN9cPFVAA8LBb",
+  "defEgUWe8A0ksiMX13X99wqrBJmV5e1lgnIzxp/amQKBgQDXbQbyQypN41seJayJ",
+  "tprhj8DmE4Ud/aeVzX94Z0tcDVwJw9uJtcuZ9uL4N/tPWWv4CQn/cJK2ztzHKYbK",
+  "k59ymtOColhf1Z5obvKhyODMaEZiEw4ebfAG/YHGGU6OxSiGq2maRVnEZuepTOVV",
+  "oKGbLMkIP9LOJsahMNR+iF8bLQKBgQC9RrLpNCfLQzSlWmzyVO5uF0xuj5KbiiZi",
+  "cu/WkDFFkXvi40giar+V7Eeh+q1xC7L5c5oMcsFkBYXaTiU958dEGU+cLpvYx1Jh",
+  "AELXAVNGPqz4O/IYS1Ce1DxnoiS5lt9+i8nwn3BPpTdQxLFGCiUysPRgwgv7qVN4",
+  "jYiaZYWH+QKBgD3HDFjpHfacHoM0tpf/f8bznJPeQSxqk2aIOefjZ18MjbpXKlwB",
+  "gFO00z3vf+gvcqD8pptUQx6dj/6lT/xD/VO2RrWNrN4+umCkgHwYyS6VMKnrYP8k",
+  "89JtXIvcsgSLUaXc/jm5bZa/E+wfGx1FJVMEstnkw6VOxWNwR1/J58w5AoGAL/Zd",
+  "WcjUmKZEDe6XEuVAsfcHcDDDhtSAG4xiiC1rvuQ5z2mmmsoQGE6SbFJYZv/+70VC",
+  "8QqXROA9Ze9Ncp1sGi6LxNjutwTzNA9b4J2+W1uAezq9gzh6inTfhadJxRmdMrT7",
+  "jBTq4dPM65OcFFJ30JuUoXwqizACLdc3mWBGcQkCgYEAw8yBWkDOZ9h3PDsCHVr4",
+  "zFSaWaHvK/rHhorGYKSFBzl4B2TLRlkuPoQ18L7AKzh4li2DugqOu468USWQ3JYb",
+  "ZSXkSA+SLttOaN3WmreSNIWI++Yc2kjmC40TlUlBtAwG29+xVHMykhoageXmDmAU",
+  "V6npTepI/eyvvYr21r4/XTY=",
+  "-----END PRIVATE KEY-----",
+].join("\n");
+
 describe.concurrent("GitHub App setup start integration connections", () => {
   it("creates a GitHub App installation authorization URL and persists redirect state", async ({
     env,
   }) => {
-    await seedGitHubCloudTarget(env);
-    const session = await env.auth.createSession({
-      email: "integration-new-github-app-installation-start@example.com",
-    });
-    const connectionId = await createGitHubAppConnection(env, {
-      targetKey: "github-cloud",
-      cookie: session.cookie,
-      displayName: "GitHub Prod",
-      appId: "123",
-      appSlug: "mistle-github-app",
-      clientId: "Iv1.client123",
-      includeClientSecret: true,
-    });
+    const githubApi = await startGitHubApiServer();
+    try {
+      await seedGitHubCloudTarget(env, {
+        apiBaseUrl: githubApi.baseUrl,
+      });
+      const session = await env.auth.createSession({
+        email: "integration-new-github-app-installation-start@example.com",
+      });
+      const connectionId = await createGitHubAppConnection(env, {
+        targetKey: "github-cloud",
+        cookie: session.cookie,
+        displayName: "GitHub Prod",
+        appId: "123",
+        appSlug: "mistle-github-app",
+        clientId: "Iv1.client123",
+        includeClientSecret: true,
+      });
 
-    const { authorizationUrl, state } = await startGitHubAppInstallation(env, {
-      cookie: session.cookie,
-      connectionId,
-    });
+      const { authorizationUrl, state } = await startGitHubAppInstallation(env, {
+        cookie: session.cookie,
+        connectionId,
+      });
 
-    expect(authorizationUrl.origin).toBe("https://github.com");
-    expect(authorizationUrl.pathname).toBe("/apps/mistle-github-app/installations/select_target");
-    await expectRedirectSession(env, {
-      organizationId: session.organizationId,
-      targetKey: "github-cloud",
-      state,
-    });
+      expect(authorizationUrl.origin).toBe("https://github.com");
+      expect(authorizationUrl.pathname).toBe("/apps/mistle-github-app/installations/select_target");
+      expect(githubApi.requests).toEqual([
+        {
+          authorization: expect.stringMatching(/^[Bb]earer [^.]+\.[^.]+\.[^.]+$/u),
+          method: "GET",
+          pathname: "/app/installations",
+        },
+      ]);
+      await expectRedirectSession(env, {
+        organizationId: session.organizationId,
+        targetKey: "github-cloud",
+        state,
+      });
+    } finally {
+      await githubApi.stop();
+    }
   });
 
   it("starts GitHub Enterprise Server App installation through the generic setup route", async ({
     env,
   }) => {
-    await seedGitHubEnterpriseServerTarget(env);
-    const session = await env.auth.createSession({
-      email: "integration-new-github-enterprise-app-installation-start@example.com",
-    });
-    const connectionId = await createGitHubAppConnection(env, {
-      targetKey: "github-enterprise-server",
-      cookie: session.cookie,
-      displayName: "GitHub Enterprise",
-      appId: "456",
-      appSlug: "mistle-github-enterprise-app",
-      clientId: "Iv1.enterpriseclient123",
-      includeClientSecret: false,
-    });
+    const githubApi = await startGitHubApiServer();
+    try {
+      await seedGitHubEnterpriseServerTarget(env, {
+        apiBaseUrl: `${githubApi.baseUrl}/api/v3`,
+      });
+      const session = await env.auth.createSession({
+        email: "integration-new-github-enterprise-app-installation-start@example.com",
+      });
+      const connectionId = await createGitHubAppConnection(env, {
+        targetKey: "github-enterprise-server",
+        cookie: session.cookie,
+        displayName: "GitHub Enterprise",
+        appId: "456",
+        appSlug: "mistle-github-enterprise-app",
+        clientId: "Iv1.enterpriseclient123",
+        includeClientSecret: false,
+      });
 
-    const { authorizationUrl, state } = await startGitHubAppInstallation(env, {
-      cookie: session.cookie,
-      connectionId,
-    });
+      const { authorizationUrl, state } = await startGitHubAppInstallation(env, {
+        cookie: session.cookie,
+        connectionId,
+      });
 
-    expect(authorizationUrl.origin).toBe("https://github.enterprise.example.com");
-    expect(authorizationUrl.pathname).toBe(
-      "/github-apps/mistle-github-enterprise-app/installations/select_target",
-    );
-    await expectRedirectSession(env, {
-      organizationId: session.organizationId,
-      targetKey: "github-enterprise-server",
-      state,
-    });
+      expect(authorizationUrl.origin).toBe("https://github.enterprise.example.com");
+      expect(authorizationUrl.pathname).toBe(
+        "/github-apps/mistle-github-enterprise-app/installations/select_target",
+      );
+      expect(githubApi.requests).toEqual([
+        {
+          authorization: expect.stringMatching(/^[Bb]earer [^.]+\.[^.]+\.[^.]+$/u),
+          method: "GET",
+          pathname: "/api/v3/app/installations",
+        },
+      ]);
+      await expectRedirectSession(env, {
+        organizationId: session.organizationId,
+        targetKey: "github-enterprise-server",
+        state,
+      });
+    } finally {
+      await githubApi.stop();
+    }
   });
 
   it("returns 400 when the connection does not use GitHub App installation auth", async ({
@@ -143,25 +219,31 @@ describe.concurrent("GitHub App setup start integration connections", () => {
   });
 });
 
-async function seedGitHubCloudTarget(env: IntegrationTestEnvironment): Promise<void> {
+async function seedGitHubCloudTarget(
+  env: IntegrationTestEnvironment,
+  input?: { apiBaseUrl?: string },
+): Promise<void> {
   await seedIntegrationTarget(env, {
     targetKey: "github-cloud",
     familyId: "github",
     variantId: "github-cloud",
     config: {
-      api_base_url: "https://api.github.com",
+      api_base_url: input?.apiBaseUrl ?? "https://api.github.com",
       web_base_url: "https://github.com",
     },
   });
 }
 
-async function seedGitHubEnterpriseServerTarget(env: IntegrationTestEnvironment): Promise<void> {
+async function seedGitHubEnterpriseServerTarget(
+  env: IntegrationTestEnvironment,
+  input?: { apiBaseUrl?: string },
+): Promise<void> {
   await seedIntegrationTarget(env, {
     targetKey: "github-enterprise-server",
     familyId: "github",
     variantId: "github-enterprise-server",
     config: {
-      api_base_url: "https://github.enterprise.example.com/api/v3",
+      api_base_url: input?.apiBaseUrl ?? "https://github.enterprise.example.com/api/v3",
       web_base_url: "https://github.enterprise.example.com",
     },
   });
@@ -193,7 +275,7 @@ async function createGitHubAppConnection(
         client_id: input.clientId,
       },
       secrets: {
-        appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----",
+        appPrivateKeyPem: TestGitHubAppPrivateKeyPem,
         ...(input.includeClientSecret ? { clientSecret: "github-client-secret" } : {}),
         webhookSecret: "github-webhook-secret",
       },
@@ -303,4 +385,50 @@ async function expectRedirectSession(
     Date.parse(redirectSession.createdAt),
   );
   expect(redirectSession.usedAt).toBeNull();
+}
+
+async function startGitHubApiServer(): Promise<StartedGitHubApiServer> {
+  const host = "127.0.0.1";
+  const port = await reserveAvailablePort({ host });
+  const requests: GitHubApiRequest[] = [];
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    const requestUrl = new URL(request.url ?? "/", `http://${host}:${port.toString()}`);
+    requests.push({
+      method: request.method ?? "GET",
+      pathname: requestUrl.pathname,
+      ...(typeof request.headers.authorization === "string"
+        ? { authorization: request.headers.authorization }
+        : {}),
+    });
+
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify([]));
+  });
+
+  await listen(server, { host, port });
+
+  return {
+    baseUrl: `http://${host}:${port.toString()}`,
+    requests,
+    stop: async () => close(server),
+  };
+}
+
+async function listen(server: Server, input: { host: string; port: number }): Promise<void> {
+  server.listen(input.port, input.host);
+  await once(server, "listening");
+}
+
+async function close(server: Server): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => {
+      if (error === undefined) {
+        resolve();
+        return;
+      }
+
+      reject(error);
+    });
+  });
 }

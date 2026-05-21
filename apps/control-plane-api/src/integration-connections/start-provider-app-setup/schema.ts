@@ -32,6 +32,41 @@ export const StartedProviderAppSetupResponseSchema = z.discriminatedUnion("kind"
       authorizationUrl: z.url(),
     })
     .strict(),
+  z
+    .object({
+      kind: z.literal("completed"),
+      completionRedirect: z.discriminatedUnion("kind", [
+        z
+          .object({
+            kind: z.literal("connection-detail"),
+            notice: z.string().min(1).optional(),
+          })
+          .strict(),
+        z
+          .object({
+            kind: z.literal("setup-route"),
+            query: z.record(z.string(), z.string()).optional(),
+          })
+          .strict(),
+      ]),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("installation-selection"),
+      options: z.array(
+        z
+          .object({
+            accountAvatarUrl: z.string().min(1).optional(),
+            accountLogin: z.string().min(1),
+            accountType: z.string().min(1),
+            installationId: z.string().min(1),
+            repositorySelection: z.string().min(1),
+          })
+          .strict(),
+      ),
+    })
+    .strict(),
 ]);
 
 export const StartProviderAppSetupBadRequestResponseSchema = z.union([

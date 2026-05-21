@@ -17,12 +17,17 @@ import { describe, expect } from "vitest";
 import { z } from "zod";
 
 import { CompleteProviderAppSetupCallbackBadRequestResponseSchema } from "../src/integration-callbacks/provider-app-setup/schema.js";
+import { IntegrationConnectionsBadRequestCodes } from "../src/integration-connections/constants.js";
 import { CreateDraftFormConnectionBodySchema } from "../src/integration-connections/create-draft-form-connection/schema.js";
 import { RefreshWebhookTriggerCapabilitiesBadRequestResponseSchema } from "../src/integration-connections/refresh-webhook-trigger-capabilities/schema.js";
 import {
   CreatedFormIntegrationConnectionSchema,
   IntegrationConnectionSchema,
 } from "../src/integration-connections/schemas.js";
+import {
+  SelectProviderAppSetupInstallationBadRequestResponseSchema,
+  SelectedProviderAppSetupInstallationResponseSchema,
+} from "../src/integration-connections/select-provider-app-setup-installation/schema.js";
 import { StartedProviderAppSetupResponseSchema } from "../src/integration-connections/start-provider-app-setup/schema.js";
 import {
   createFormConnection,
@@ -75,6 +80,7 @@ type GitHubApiRequest = {
   authorization?: string;
   method: string;
   pathname: string;
+  search?: string;
 };
 
 type StartedGitHubApiServer = {
@@ -86,10 +92,12 @@ type StartedGitHubApiServer = {
 type GitHubApiServerResponseInput =
   | {
       body: unknown;
+      headers?: Readonly<Record<string, string>>;
       statusCode?: number;
     }
-  | (() => {
+  | ((request: { origin: string; pathname: string; searchParams: URLSearchParams }) => {
       body: unknown;
+      headers?: Readonly<Record<string, string>>;
       statusCode?: number;
     });
 
@@ -152,7 +160,13 @@ describe("GitHub App setup completion integration connections", () => {
       );
       expect(githubApi.requests).toEqual([
         {
-          authorization: expect.stringMatching(/^Bearer [^.]+\.[^.]+\.[^.]+$/u),
+          authorization: expect.stringMatching(/^[Bb]earer [^.]+\.[^.]+\.[^.]+$/u),
+          method: "GET",
+          pathname: "/app/installations",
+          search: "?per_page=100",
+        },
+        {
+          authorization: expect.stringMatching(/^[Bb]earer [^.]+\.[^.]+\.[^.]+$/u),
           method: "GET",
           pathname: "/app/installations/12345",
         },
@@ -219,6 +233,7 @@ describe("GitHub App setup completion integration connections", () => {
         cookie: session.cookie,
         connectionId,
       });
+      githubApi.requests.length = 0;
 
       const completeResponse = await env.controlPlaneApi.http.fetch(
         createGitHubAppInstallationCompletePath({
@@ -501,17 +516,23 @@ describe("GitHub App setup completion integration connections", () => {
       });
       expect(githubApi.requests).toEqual([
         {
-          authorization: expect.stringMatching(/^Bearer [^.]+\.[^.]+\.[^.]+$/u),
+          authorization: expect.stringMatching(/^[Bb]earer [^.]+\.[^.]+\.[^.]+$/u),
+          method: "GET",
+          pathname: "/app/installations",
+          search: "?per_page=100",
+        },
+        {
+          authorization: expect.stringMatching(/^[Bb]earer [^.]+\.[^.]+\.[^.]+$/u),
           method: "GET",
           pathname: "/app/installations/12345",
         },
         {
-          authorization: expect.stringMatching(/^Bearer [^.]+\.[^.]+\.[^.]+$/u),
+          authorization: expect.stringMatching(/^[Bb]earer [^.]+\.[^.]+\.[^.]+$/u),
           method: "GET",
           pathname: "/app/installations/12345",
         },
         {
-          authorization: expect.stringMatching(/^Bearer [^.]+\.[^.]+\.[^.]+$/u),
+          authorization: expect.stringMatching(/^[Bb]earer [^.]+\.[^.]+\.[^.]+$/u),
           method: "GET",
           pathname: "/app/hook/config",
         },
@@ -608,17 +629,23 @@ describe("GitHub App setup completion integration connections", () => {
       expect(webhookSource.providerMetadata).toEqual({});
       expect(githubApi.requests).toEqual([
         {
-          authorization: expect.stringMatching(/^Bearer [^.]+\.[^.]+\.[^.]+$/u),
+          authorization: expect.stringMatching(/^[Bb]earer [^.]+\.[^.]+\.[^.]+$/u),
+          method: "GET",
+          pathname: "/app/installations",
+          search: "?per_page=100",
+        },
+        {
+          authorization: expect.stringMatching(/^[Bb]earer [^.]+\.[^.]+\.[^.]+$/u),
           method: "GET",
           pathname: "/app/installations/12345",
         },
         {
-          authorization: expect.stringMatching(/^Bearer [^.]+\.[^.]+\.[^.]+$/u),
+          authorization: expect.stringMatching(/^[Bb]earer [^.]+\.[^.]+\.[^.]+$/u),
           method: "GET",
           pathname: "/app/installations/12345",
         },
         {
-          authorization: expect.stringMatching(/^Bearer [^.]+\.[^.]+\.[^.]+$/u),
+          authorization: expect.stringMatching(/^[Bb]earer [^.]+\.[^.]+\.[^.]+$/u),
           method: "GET",
           pathname: "/app/hook/config",
         },
@@ -772,6 +799,467 @@ describe("GitHub App setup completion integration connections", () => {
       await githubApi.stop();
     }
   });
+
+  it("completes setup immediately when the saved GitHub App has exactly one installation", async ({
+    env,
+  }) => {
+    const targetKey = "github-cloud-installation-single-existing";
+    const githubApi = await startGitHubApiServer({
+      installationsResponse: {
+        body: [
+          {
+            id: 82345,
+            app_id: 123,
+            app_slug: "mistle-github-app",
+            repository_selection: "all",
+            account: {
+              login: "mistle",
+              type: "Organization",
+              avatar_url: "https://avatars.example.com/mistle.png",
+            },
+          },
+        ],
+      },
+      responseBody: {
+        id: 82345,
+        app_id: 123,
+        app_slug: "mistle-github-app",
+      },
+    });
+
+    try {
+      await seedGitHubCloudTarget(env, {
+        targetKey,
+        apiBaseUrl: githubApi.baseUrl,
+      });
+      const session = await env.auth.createSession({
+        email: "integration-github-app-single-existing-installation@example.com",
+      });
+      const connectionId = await createGitHubAppConnection(env, {
+        targetKey,
+        cookie: session.cookie,
+        displayName: "GitHub Prod",
+      });
+
+      const response = await startGitHubAppInstallationRaw(env, {
+        cookie: session.cookie,
+        connectionId,
+      });
+
+      expect(response.status).toBe(200);
+      const responseBody = StartedProviderAppSetupResponseSchema.parse(await response.json());
+      expect(responseBody).toEqual({
+        kind: "completed",
+        completionRedirect: {
+          kind: "connection-detail",
+          notice: "installed",
+        },
+      });
+      expect(githubApi.requests).toEqual([
+        {
+          authorization: expect.stringMatching(/^[Bb]earer [^.]+\.[^.]+\.[^.]+$/u),
+          method: "GET",
+          pathname: "/app/installations",
+          search: "?per_page=100",
+        },
+        {
+          authorization: expect.stringMatching(/^[Bb]earer [^.]+\.[^.]+\.[^.]+$/u),
+          method: "GET",
+          pathname: "/app/installations/82345",
+        },
+      ]);
+
+      const connection = await env.controlPlaneDb.query.integrationConnections.findFirst({
+        where: (table, { and, eq }) =>
+          and(eq(table.organizationId, session.organizationId), eq(table.id, connectionId)),
+      });
+      if (connection === undefined) {
+        throw new Error("Expected persisted GitHub App connection.");
+      }
+      expect(connection.externalSubjectId).toBe("82345");
+      expect(connection.config).toEqual({
+        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        app_id: "123",
+        app_slug: "mistle-github-app",
+        client_id: "Iv1.client123",
+        installation_id: "82345",
+        setup_action: "select-existing-installation",
+      });
+    } finally {
+      await githubApi.stop();
+    }
+  });
+
+  it("returns selectable installation options when the saved GitHub App has multiple installations", async ({
+    env,
+  }) => {
+    const targetKey = "github-cloud-installation-multiple-existing";
+    const githubApi = await startGitHubApiServer({
+      installationsResponse: {
+        body: [
+          {
+            id: 92345,
+            app_id: 123,
+            app_slug: "mistle-github-app",
+            repository_selection: "all",
+            account: {
+              login: "mistle",
+              type: "Organization",
+              avatar_url: "https://avatars.example.com/mistle.png",
+            },
+          },
+          {
+            id: 92346,
+            app_id: 123,
+            app_slug: "mistle-github-app",
+            repository_selection: "selected",
+            account: {
+              login: "mistle-labs",
+              type: "Organization",
+            },
+          },
+        ],
+      },
+      responseBody: {
+        id: 92346,
+        app_id: 123,
+        app_slug: "mistle-github-app",
+      },
+    });
+
+    try {
+      await seedGitHubCloudTarget(env, {
+        targetKey,
+        apiBaseUrl: githubApi.baseUrl,
+      });
+      const session = await env.auth.createSession({
+        email: "integration-github-app-multiple-existing-installations@example.com",
+      });
+      const connectionId = await createGitHubAppConnection(env, {
+        targetKey,
+        cookie: session.cookie,
+        displayName: "GitHub Prod",
+      });
+
+      const response = await startGitHubAppInstallationRaw(env, {
+        cookie: session.cookie,
+        connectionId,
+      });
+
+      expect(response.status).toBe(200);
+      const responseBody = StartedProviderAppSetupResponseSchema.parse(await response.json());
+      expect(responseBody).toEqual({
+        kind: "installation-selection",
+        options: [
+          {
+            accountAvatarUrl: "https://avatars.example.com/mistle.png",
+            accountLogin: "mistle",
+            accountType: "Organization",
+            installationId: "92345",
+            repositorySelection: "all",
+          },
+          {
+            accountLogin: "mistle-labs",
+            accountType: "Organization",
+            installationId: "92346",
+            repositorySelection: "selected",
+          },
+        ],
+      });
+      expect(githubApi.requests).toEqual([
+        {
+          authorization: expect.stringMatching(/^[Bb]earer [^.]+\.[^.]+\.[^.]+$/u),
+          method: "GET",
+          pathname: "/app/installations",
+          search: "?per_page=100",
+        },
+      ]);
+
+      const connection = await env.controlPlaneDb.query.integrationConnections.findFirst({
+        where: (table, { and, eq }) =>
+          and(eq(table.organizationId, session.organizationId), eq(table.id, connectionId)),
+      });
+      if (connection === undefined) {
+        throw new Error("Expected persisted GitHub App connection.");
+      }
+      expect(connection.externalSubjectId).toBeNull();
+      expect(connection.config).toEqual({
+        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        app_id: "123",
+        app_slug: "mistle-github-app",
+        client_id: "Iv1.client123",
+      });
+    } finally {
+      await githubApi.stop();
+    }
+  });
+
+  it("paginates the GitHub App installation list before returning selection options", async ({
+    env,
+  }) => {
+    const targetKey = "github-cloud-installation-paginated-existing";
+    const firstPageInstallations = Array.from({ length: 100 }, (_value, index) => ({
+      id: 110000 + index,
+      app_id: 123,
+      app_slug: "mistle-github-app",
+      repository_selection: "all",
+      account: {
+        login: `mistle-${index.toString()}`,
+        type: "Organization",
+      },
+    }));
+    const githubApi = await startGitHubApiServer({
+      installationsResponse: ({ origin, searchParams }) => ({
+        body:
+          searchParams.get("page") === "2"
+            ? [
+                {
+                  id: 110100,
+                  app_id: 123,
+                  app_slug: "mistle-github-app",
+                  repository_selection: "selected",
+                  account: {
+                    login: "mistle-final",
+                    type: "Organization",
+                  },
+                },
+              ]
+            : firstPageInstallations,
+        ...(searchParams.get("page") === "2"
+          ? {}
+          : {
+              headers: {
+                link: `<${origin}/app/installations?per_page=100&page=2>; rel="next"`,
+              },
+            }),
+      }),
+      responseBody: {
+        id: 110100,
+        app_id: 123,
+        app_slug: "mistle-github-app",
+      },
+    });
+
+    try {
+      await seedGitHubCloudTarget(env, {
+        targetKey,
+        apiBaseUrl: githubApi.baseUrl,
+      });
+      const session = await env.auth.createSession({
+        email: "integration-github-app-paginated-existing-installations@example.com",
+      });
+      const connectionId = await createGitHubAppConnection(env, {
+        targetKey,
+        cookie: session.cookie,
+        displayName: "GitHub Prod",
+      });
+
+      const response = await startGitHubAppInstallationRaw(env, {
+        cookie: session.cookie,
+        connectionId,
+      });
+
+      expect(response.status).toBe(200);
+      const responseBody = StartedProviderAppSetupResponseSchema.parse(await response.json());
+      if (responseBody.kind !== "installation-selection") {
+        throw new Error("Expected provider app setup start to return installation selection.");
+      }
+      expect(responseBody.options).toHaveLength(101);
+      expect(responseBody.options.at(100)).toEqual({
+        accountLogin: "mistle-final",
+        accountType: "Organization",
+        installationId: "110100",
+        repositorySelection: "selected",
+      });
+      expect(githubApi.requests).toEqual([
+        {
+          authorization: expect.stringMatching(/^[Bb]earer [^.]+\.[^.]+\.[^.]+$/u),
+          method: "GET",
+          pathname: "/app/installations",
+          search: "?per_page=100",
+        },
+        {
+          authorization: expect.stringMatching(/^[Bb]earer [^.]+\.[^.]+\.[^.]+$/u),
+          method: "GET",
+          pathname: "/app/installations",
+          search: "?per_page=100&page=2",
+        },
+      ]);
+    } finally {
+      await githubApi.stop();
+    }
+  });
+
+  it("verifies and persists the selected installation for a saved GitHub App", async ({ env }) => {
+    const targetKey = "github-cloud-installation-select-existing";
+    const githubApi = await startGitHubApiServer({
+      installationsResponse: {
+        body: [
+          {
+            id: 102345,
+            app_id: 123,
+            app_slug: "mistle-github-app",
+            repository_selection: "all",
+            account: {
+              login: "mistle",
+              type: "Organization",
+            },
+          },
+          {
+            id: 102346,
+            app_id: 123,
+            app_slug: "mistle-github-app",
+            repository_selection: "selected",
+            account: {
+              login: "mistle-labs",
+              type: "Organization",
+            },
+          },
+        ],
+      },
+      responseBody: {
+        id: 102346,
+        app_id: 123,
+        app_slug: "mistle-github-app",
+      },
+    });
+
+    try {
+      await seedGitHubCloudTarget(env, {
+        targetKey,
+        apiBaseUrl: githubApi.baseUrl,
+      });
+      const session = await env.auth.createSession({
+        email: "integration-github-app-select-existing-installation@example.com",
+      });
+      const connectionId = await createGitHubAppConnection(env, {
+        targetKey,
+        cookie: session.cookie,
+        displayName: "GitHub Prod",
+      });
+
+      const startResponse = await startGitHubAppInstallationRaw(env, {
+        cookie: session.cookie,
+        connectionId,
+      });
+      expect(startResponse.status).toBe(200);
+      const startResponseBody = StartedProviderAppSetupResponseSchema.parse(
+        await startResponse.json(),
+      );
+      expect(startResponseBody.kind).toBe("installation-selection");
+
+      const selectResponse = await env.controlPlaneApi.http.fetch(
+        `/v1/integration/connections/${encodeURIComponent(
+          connectionId,
+        )}/setup/github-app-installation/select-installation`,
+        {
+          method: "POST",
+          headers: {
+            cookie: session.cookie,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ installationId: "102346" }),
+        },
+      );
+
+      expect(selectResponse.status).toBe(200);
+      expect(
+        SelectedProviderAppSetupInstallationResponseSchema.parse(await selectResponse.json()),
+      ).toEqual({
+        connectionId,
+        targetKey,
+        completionRedirect: {
+          kind: "connection-detail",
+          notice: "installed",
+        },
+      });
+      expect(githubApi.requests).toEqual([
+        {
+          authorization: expect.stringMatching(/^[Bb]earer [^.]+\.[^.]+\.[^.]+$/u),
+          method: "GET",
+          pathname: "/app/installations",
+          search: "?per_page=100",
+        },
+        {
+          authorization: expect.stringMatching(/^[Bb]earer [^.]+\.[^.]+\.[^.]+$/u),
+          method: "GET",
+          pathname: "/app/installations/102346",
+        },
+      ]);
+
+      const connection = await env.controlPlaneDb.query.integrationConnections.findFirst({
+        where: (table, { and, eq }) =>
+          and(eq(table.organizationId, session.organizationId), eq(table.id, connectionId)),
+      });
+      if (connection === undefined) {
+        throw new Error("Expected persisted GitHub App connection.");
+      }
+      expect(connection.externalSubjectId).toBe("102346");
+      expect(connection.config).toEqual({
+        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        app_id: "123",
+        app_slug: "mistle-github-app",
+        client_id: "Iv1.client123",
+        installation_id: "102346",
+        setup_action: "select-existing-installation",
+      });
+    } finally {
+      await githubApi.stop();
+    }
+  });
+
+  it("rejects explicit installation selection for the GitHub App manifest setup route", async ({
+    env,
+  }) => {
+    const targetKey = "github-cloud-installation-select-manifest-route";
+    const githubApi = await startGitHubApiServer({
+      responseBody: {
+        id: 112345,
+        app_id: 123,
+        app_slug: "mistle-github-app",
+      },
+    });
+
+    try {
+      await seedGitHubCloudTarget(env, {
+        targetKey,
+        apiBaseUrl: githubApi.baseUrl,
+      });
+      const session = await env.auth.createSession({
+        email: "integration-github-app-select-manifest-route@example.com",
+      });
+      const connectionId = await createGitHubAppConnection(env, {
+        targetKey,
+        cookie: session.cookie,
+        displayName: "GitHub Prod",
+      });
+
+      const selectResponse = await env.controlPlaneApi.http.fetch(
+        `/v1/integration/connections/${encodeURIComponent(
+          connectionId,
+        )}/setup/github-app/select-installation`,
+        {
+          method: "POST",
+          headers: {
+            cookie: session.cookie,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ installationId: "112345" }),
+        },
+      );
+
+      expect(selectResponse.status).toBe(400);
+      const responseBody = SelectProviderAppSetupInstallationBadRequestResponseSchema.parse(
+        await selectResponse.json(),
+      );
+      expect(responseBody.code).toBe(
+        IntegrationConnectionsBadRequestCodes.FORM_CONNECTION_METHOD_NOT_SUPPORTED,
+      );
+      expect(githubApi.requests).toEqual([]);
+    } finally {
+      await githubApi.stop();
+    }
+  });
 });
 
 async function seedGitHubCloudTarget(
@@ -915,7 +1403,24 @@ async function startGitHubAppInstallation(
     connectionId: string;
   },
 ): Promise<string> {
-  const response = await env.controlPlaneApi.http.fetch(
+  const response = await startGitHubAppInstallationRaw(env, input);
+  expect(response.status).toBe(200);
+  const responseBody = StartedProviderAppSetupResponseSchema.parse(await response.json());
+  if (responseBody.kind !== "redirect") {
+    throw new Error("Expected provider app setup start to return a redirect.");
+  }
+
+  return readStateFromStartedSetup(responseBody);
+}
+
+async function startGitHubAppInstallationRaw(
+  env: IntegrationTestEnvironment,
+  input: {
+    cookie: string;
+    connectionId: string;
+  },
+) {
+  return env.controlPlaneApi.http.fetch(
     `/v1/integration/connections/${encodeURIComponent(
       input.connectionId,
     )}/setup/github-app-installation/start`,
@@ -926,14 +1431,6 @@ async function startGitHubAppInstallation(
       },
     },
   );
-
-  expect(response.status).toBe(200);
-  const responseBody = StartedProviderAppSetupResponseSchema.parse(await response.json());
-  if (responseBody.kind !== "redirect") {
-    throw new Error("Expected provider app setup start to return a redirect.");
-  }
-
-  return readStateFromStartedSetup(responseBody);
 }
 
 function readStateFromStartedSetup(response: StartedProviderAppSetupRedirect): string {
@@ -962,6 +1459,7 @@ function createGitHubAppInstallationCompletePath(input: {
 
 async function startGitHubApiServer(input: {
   hookConfigResponse?: GitHubApiServerResponseInput;
+  installationsResponse?: GitHubApiServerResponseInput;
   responseBody: unknown;
   statusCode?: number;
 }): Promise<StartedGitHubApiServer> {
@@ -973,21 +1471,31 @@ async function startGitHubApiServer(input: {
     requests.push({
       method: request.method ?? "GET",
       pathname: requestUrl.pathname,
+      ...(requestUrl.search.length === 0 ? {} : { search: requestUrl.search }),
       ...(typeof request.headers.authorization === "string"
         ? { authorization: request.headers.authorization }
         : {}),
     });
 
-    const responseInput =
-      requestUrl.pathname === "/app/hook/config" && input.hookConfigResponse !== undefined
-        ? resolveGitHubApiServerResponse(input.hookConfigResponse)
-        : {
-            body: input.responseBody,
-            ...(input.statusCode === undefined ? {} : { statusCode: input.statusCode }),
-          };
+    const responseInput = resolveGitHubApiRouteResponse({
+      origin: requestUrl.origin,
+      pathname: requestUrl.pathname,
+      responseBody: input.responseBody,
+      searchParams: requestUrl.searchParams,
+      ...(input.hookConfigResponse === undefined
+        ? {}
+        : { hookConfigResponse: input.hookConfigResponse }),
+      ...(input.installationsResponse === undefined
+        ? {}
+        : { installationsResponse: input.installationsResponse }),
+      ...(input.statusCode === undefined ? {} : { statusCode: input.statusCode }),
+    });
 
     response.statusCode = responseInput.statusCode ?? 200;
     response.setHeader("content-type", "application/json");
+    for (const [name, value] of Object.entries(responseInput.headers ?? {})) {
+      response.setHeader(name, value);
+    }
     response.end(JSON.stringify(responseInput.body));
   });
 
@@ -1000,11 +1508,52 @@ async function startGitHubApiServer(input: {
   };
 }
 
-function resolveGitHubApiServerResponse(input: GitHubApiServerResponseInput): {
+function resolveGitHubApiRouteResponse(input: {
+  hookConfigResponse?: GitHubApiServerResponseInput;
+  installationsResponse?: GitHubApiServerResponseInput;
+  origin: string;
+  pathname: string;
+  responseBody: unknown;
+  searchParams: URLSearchParams;
+  statusCode?: number;
+}): {
   body: unknown;
+  headers?: Readonly<Record<string, string>>;
   statusCode?: number;
 } {
-  return typeof input === "function" ? input() : input;
+  if (input.pathname === "/app/hook/config" && input.hookConfigResponse !== undefined) {
+    return resolveGitHubApiServerResponse(input.hookConfigResponse, {
+      origin: input.origin,
+      pathname: input.pathname,
+      searchParams: input.searchParams,
+    });
+  }
+
+  if (input.pathname === "/app/installations") {
+    return input.installationsResponse === undefined
+      ? { body: [] }
+      : resolveGitHubApiServerResponse(input.installationsResponse, {
+          origin: input.origin,
+          pathname: input.pathname,
+          searchParams: input.searchParams,
+        });
+  }
+
+  return {
+    body: input.responseBody,
+    ...(input.statusCode === undefined ? {} : { statusCode: input.statusCode }),
+  };
+}
+
+function resolveGitHubApiServerResponse(
+  input: GitHubApiServerResponseInput,
+  request: { origin: string; pathname: string; searchParams: URLSearchParams },
+): {
+  body: unknown;
+  headers?: Readonly<Record<string, string>>;
+  statusCode?: number;
+} {
+  return typeof input === "function" ? input(request) : input;
 }
 
 async function listen(server: Server, input: { host: string; port: number }): Promise<void> {

@@ -11,7 +11,10 @@ import type {
   IntegrationConnection,
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
-import { ProviderAppSetupPane } from "./integration-connection-provider-app-setup-pane.js";
+import {
+  GitHubInstallationSelectionPanel,
+  ProviderAppSetupPane,
+} from "./integration-connection-provider-app-setup-pane.js";
 import {
   resolveIntegrationSetupAppManifestDraftBuilderOrThrow,
   resolveIntegrationProviderAppSetupOrThrow,
@@ -377,6 +380,58 @@ describe("ProviderAppSetupPane", () => {
     });
 
     expect(installButton.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("renders selectable GitHub App installation options", () => {
+    let selectedInstallationId: string | null = null;
+    render(
+      <GitHubInstallationSelectionPanel
+        isPending={false}
+        onSelectInstallation={(installationId) => {
+          selectedInstallationId = installationId;
+        }}
+        options={[
+          {
+            accountAvatarUrl: "https://avatars.example.com/mistle.png",
+            accountLogin: "mistle",
+            accountType: "Organization",
+            installationId: "92345",
+            repositorySelection: "all",
+          },
+          {
+            accountLogin: "mistle-labs",
+            accountType: "Organization",
+            installationId: "92346",
+            repositorySelection: "selected",
+          },
+        ]}
+        pendingInstallationId={null}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { level: 2, name: "Select installation" })).toBeTruthy();
+    expect(screen.getByText("mistle")).toBeTruthy();
+    expect(
+      screen.getByText((_content, element) =>
+        Boolean(element?.textContent === "Organization · all repositories · ID 92345"),
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText("mistle-labs")).toBeTruthy();
+    expect(
+      screen.getByText((_content, element) =>
+        Boolean(element?.textContent === "Organization · selected repositories · ID 92346"),
+      ),
+    ).toBeTruthy();
+
+    const selectButtons = screen.getAllByRole("button", { name: "Select" });
+    expect(selectButtons).toHaveLength(2);
+    const secondSelectButton = selectButtons.at(1);
+    if (secondSelectButton === undefined) {
+      throw new Error("Expected second GitHub installation select button.");
+    }
+    fireEvent.click(secondSelectButton);
+
+    expect(selectedInstallationId).toBe("92346");
   });
 
   it("renders a dedicated GitHub App created screen after the manifest callback", () => {

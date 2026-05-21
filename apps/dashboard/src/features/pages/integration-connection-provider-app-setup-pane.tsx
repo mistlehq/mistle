@@ -10,6 +10,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { getDashboardConfig } from "../../config.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
+  selectProviderAppSetupInstallation,
   startProviderAppSetup,
   updateFormIntegrationConnection,
 } from "../integrations/integrations-service.js";
@@ -170,6 +171,88 @@ function completeProviderAppSetupStart(input: {
   });
 }
 
+function buildProviderAppSetupCompletionUrl(input: {
+  connectionId: string;
+  completionRedirect: Extract<StartedProviderAppSetup, { kind: "completed" }>["completionRedirect"];
+  routeSegment: string;
+  targetKey: string;
+}): string {
+  if (input.completionRedirect.kind === "setup-route") {
+    const queryParams = new URLSearchParams(input.completionRedirect.query);
+    const query = queryParams.size === 0 ? "" : `?${queryParams.toString()}`;
+    return `/integrations/${encodeURIComponent(input.targetKey)}/${encodeURIComponent(input.connectionId)}/${encodeURIComponent(input.routeSegment)}/setup${query}`;
+  }
+
+  const queryParams = new URLSearchParams();
+  queryParams.set("connectionId", input.connectionId);
+  if (input.completionRedirect.notice !== undefined) {
+    queryParams.set("connectionNotice", input.completionRedirect.notice);
+  }
+
+  return `/integrations/${encodeURIComponent(input.targetKey)}?${queryParams.toString()}`;
+}
+
+export function GitHubInstallationSelectionPanel(input: {
+  isPending: boolean;
+  onSelectInstallation: (installationId: string) => void;
+  options: Extract<StartedProviderAppSetup, { kind: "installation-selection" }>["options"];
+  pendingInstallationId: string | null;
+}): React.JSX.Element {
+  return (
+    <div className="border-border bg-background flex flex-col gap-3 rounded-md border p-4">
+      <SectionHeader
+        description="Choose which existing GitHub App installation to connect."
+        title="Select installation"
+      />
+      <div className="flex flex-col gap-2">
+        {input.options.map((option) => (
+          <div
+            className="border-border flex items-center justify-between gap-4 rounded-md border p-3"
+            key={option.installationId}
+          >
+            <div className="min-w-0 flex items-center gap-3">
+              {option.accountAvatarUrl === undefined ? (
+                <div
+                  aria-hidden
+                  className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
+                >
+                  {option.accountLogin.slice(0, 1).toUpperCase()}
+                </div>
+              ) : (
+                <img
+                  alt=""
+                  className="size-9 shrink-0 rounded-full"
+                  src={option.accountAvatarUrl}
+                />
+              )}
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium">{option.accountLogin}</div>
+                <div className="text-muted-foreground truncate text-xs">
+                  {option.accountType} · {option.repositorySelection} repositories · ID{" "}
+                  {option.installationId}
+                </div>
+              </div>
+            </div>
+            <Button
+              aria-busy={input.isPending && input.pendingInstallationId === option.installationId}
+              disabled={input.isPending}
+              onClick={() => {
+                input.onSelectInstallation(option.installationId);
+              }}
+              type="button"
+              variant="outline"
+            >
+              {input.isPending && input.pendingInstallationId === option.installationId
+                ? "Connecting..."
+                : "Select"}
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PostManifestInstallationScreen(input: {
   actionErrorMessage: string | null;
   installLabel: string;
@@ -233,6 +316,11 @@ export function ProviderAppSetupPane(input: {
   const [isRedirectingToExistingAppStartAction, setIsRedirectingToExistingAppStartAction] =
     useState(false);
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
+  const [installationSelection, setInstallationSelection] = useState<Extract<
+    StartedProviderAppSetup,
+    { kind: "installation-selection" }
+  > | null>(null);
+  const [pendingInstallationId, setPendingInstallationId] = useState<string | null>(null);
   const [existingAppDraft, setExistingAppDraft] = useState(() =>
     createInitialProviderAppSetupDraft({
       connection: input.connection,
@@ -301,6 +389,21 @@ export function ProviderAppSetupPane(input: {
       return updatedConnection;
     },
   });
+  const selectInstallationMutation = useMutation({
+    mutationFn: async (installationId: string) => {
+      const startAction = input.providerAppSetup.existingApp.startAction;
+      if (startAction === undefined) {
+        throw new Error("Provider app setup does not define an existing app start action.");
+      }
+
+      return selectProviderAppSetupInstallation({
+        connectionId: input.connection.id,
+        routeSegment: startAction.routeSegment,
+        installationId,
+        fallbackMessage: startAction.startErrorMessage,
+      });
+    },
+  });
 
   async function createProviderApp(): Promise<void> {
     setActionErrorMessage(null);
@@ -324,6 +427,7 @@ export function ProviderAppSetupPane(input: {
 
   async function startExistingAppAction(): Promise<void> {
     const startAction = input.providerAppSetup.existingApp.startAction;
+    setInstallationSelection(null);
     const savedConnection = await saveExistingAppSetup();
     if (savedConnection === null) {
       return;
@@ -336,6 +440,26 @@ export function ProviderAppSetupPane(input: {
 
     try {
       const started = await startExistingAppActionMutation.mutateAsync();
+      if (started.kind === "completed") {
+        await queryClient.invalidateQueries({
+          queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
+        });
+        void navigate(
+          buildProviderAppSetupCompletionUrl({
+            connectionId: input.connection.id,
+            completionRedirect: started.completionRedirect,
+            routeSegment: startAction.routeSegment,
+            targetKey: input.connection.targetKey,
+          }),
+        );
+        return;
+      }
+
+      if (started.kind === "installation-selection") {
+        setInstallationSelection(started);
+        return;
+      }
+
       setIsRedirectingToExistingAppStartAction(true);
       completeProviderAppSetupStart({
         expectedResultKind: startAction.expectedResultKind,
@@ -350,6 +474,39 @@ export function ProviderAppSetupPane(input: {
           fallbackMessage: startAction.startErrorMessage,
         }),
       );
+    }
+  }
+
+  async function selectInstallation(installationId: string): Promise<void> {
+    const startAction = input.providerAppSetup.existingApp.startAction;
+    if (startAction === undefined) {
+      throw new Error("Provider app setup does not define an existing app start action.");
+    }
+
+    setActionErrorMessage(null);
+    setPendingInstallationId(installationId);
+    try {
+      const selectedInstallation = await selectInstallationMutation.mutateAsync(installationId);
+      await queryClient.invalidateQueries({
+        queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
+      });
+      void navigate(
+        buildProviderAppSetupCompletionUrl({
+          connectionId: selectedInstallation.connectionId,
+          completionRedirect: selectedInstallation.completionRedirect,
+          routeSegment: startAction.routeSegment,
+          targetKey: selectedInstallation.targetKey,
+        }),
+      );
+    } catch (error) {
+      setActionErrorMessage(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: startAction.startErrorMessage,
+        }),
+      );
+    } finally {
+      setPendingInstallationId(null);
     }
   }
 
@@ -470,29 +627,42 @@ export function ProviderAppSetupPane(input: {
         actionErrorMessage={actionErrorMessage}
         description={input.providerAppSetup.description}
         existingAppContent={
-          <ExistingAppSetupFieldsPanel
-            configFields={buildProviderAppSetupConfigFieldInputs({
-              draft: existingAppDraft,
-              providerAppSetup: input.providerAppSetup,
-              routeSegment: input.routeSegment,
-            })}
-            description={input.providerAppSetup.existingApp.description}
-            isSaving={saveExistingAppSetupMutation.isPending}
-            onUpdateFieldDraft={(fieldKey, nextValue) => {
-              setActionErrorMessage(null);
-              setExistingAppDraft((currentDraft) => ({
-                ...currentDraft,
-                [fieldKey]: nextValue,
-              }));
-            }}
-            secretFields={buildProviderAppSetupSecretFieldInputs({
-              configuredSecretFieldKeys,
-              draft: existingAppDraft,
-              providerAppSetup: input.providerAppSetup,
-              routeSegment: input.routeSegment,
-            })}
-            title={input.providerAppSetup.existingApp.title}
-          />
+          <>
+            <ExistingAppSetupFieldsPanel
+              configFields={buildProviderAppSetupConfigFieldInputs({
+                draft: existingAppDraft,
+                providerAppSetup: input.providerAppSetup,
+                routeSegment: input.routeSegment,
+              })}
+              description={input.providerAppSetup.existingApp.description}
+              isSaving={saveExistingAppSetupMutation.isPending}
+              onUpdateFieldDraft={(fieldKey, nextValue) => {
+                setActionErrorMessage(null);
+                setInstallationSelection(null);
+                setExistingAppDraft((currentDraft) => ({
+                  ...currentDraft,
+                  [fieldKey]: nextValue,
+                }));
+              }}
+              secretFields={buildProviderAppSetupSecretFieldInputs({
+                configuredSecretFieldKeys,
+                draft: existingAppDraft,
+                providerAppSetup: input.providerAppSetup,
+                routeSegment: input.routeSegment,
+              })}
+              title={input.providerAppSetup.existingApp.title}
+            />
+            {installationSelection === null ? null : (
+              <GitHubInstallationSelectionPanel
+                isPending={selectInstallationMutation.isPending}
+                onSelectInstallation={(installationId) => {
+                  void selectInstallation(installationId);
+                }}
+                options={installationSelection.options}
+                pendingInstallationId={pendingInstallationId}
+              />
+            )}
+          </>
         }
         footer={
           <>
