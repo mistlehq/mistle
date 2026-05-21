@@ -8,6 +8,10 @@ This context defines the product language used for sandbox profiles, snapshots, 
 A versioned sandbox profile configuration that can be published and used to prepare sandbox sessions.
 _Avoid_: Profile revision
 
+**Sandbox profile duplicate**:
+A **Sandbox profile** created as a copy of another **Sandbox profile**'s saved configuration and latest usable **Snapshot**.
+_Avoid_: Profile clone, duplicated snapshot
+
 **Referenced sandbox profile version**:
 The **Sandbox profile version** an object is configured to use or was created from.
 _Avoid_: Current version, latest version
@@ -63,6 +67,10 @@ _Avoid_: Hard-deleted session, erased session
 **Trigger**:
 A configured event or schedule that starts an agent response.
 _Avoid_: Automation
+
+**Duplicated trigger**:
+A disabled **Trigger** created as a configuration copy for a **Sandbox profile duplicate**.
+_Avoid_: Cloned automation, enabled copy
 
 **Trigger event**:
 A provider event that can be selected as the event source for a **Trigger**.
@@ -239,6 +247,14 @@ _Avoid_: Schema mismatch prompt, refresh modal
 ## Relationships
 
 - A **Sandbox profile version** may have one usable **Snapshot**.
+- A **Sandbox profile duplicate** requires the copied source configuration to have a usable **Snapshot**.
+- A **Sandbox profile duplicate** may carry active **Automatic snapshot refresh** execution state.
+- A **Sandbox profile duplicate** with copied **Automatic snapshot refresh** uses fresh schedule timing rather than replaying stale source schedule work.
+- A **Sandbox profile duplicate** is runnable from the source profile's active published configuration.
+- A **Sandbox profile duplicate** may also carry the source profile's **Latest saved draft** as a separate draft **Sandbox profile version**.
+- A **Sandbox profile duplicate** has its own display name rather than becoming a new **Sandbox profile version** of the source profile.
+- A **Sandbox profile duplicate** should preserve the source profile's configuration references unless a reference is no longer valid.
+- A **Sandbox profile duplicate** does not carry source **Snapshot** job history.
 - A session, trigger, or other profile-backed object may have a **Referenced sandbox profile version** that differs from the profile's latest published **Sandbox profile version**.
 - A **Setup script** prepares a **Snapshot** from a **Base image**.
 - **Setup Assistant** starts from a **Latest saved draft** unless the user saves current edits first.
@@ -259,6 +275,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Validation should run the exact candidate **Snapshot maintenance script** body, not manually equivalent commands.
 - Running a **Snapshot maintenance script** is practical when it exercises the intended maintenance behavior without destructive side effects, secret-dependent prompts, disproportionate runtime, or known environment mismatch.
 - **Automatic snapshot refresh** uses the latest saved **Snapshot maintenance script** at execution time when one is present; otherwise it uses the **Setup script**.
+- A **Duplicated trigger** does not start agent responses until explicitly enabled.
 - Unsaved **Snapshot maintenance script** edits do not affect **Automatic snapshot refresh**.
 - Saving **Automatic snapshot refresh** also saves **Snapshot maintenance script** edits.
 - Disabling **Automatic snapshot refresh** does not delete the saved **Snapshot maintenance script**.
@@ -295,6 +312,10 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - First-pass **Trigger event parameter** editing should allow at most one **Trigger event parameter rule** per parameter.
 - A **Trigger event parameter rule** belongs to one selected **Trigger event** even when another selected **Trigger event** exposes a similar parameter.
 - Trigger-builder form state should represent selected **Trigger event parameters** as rules rather than bare values.
+- A **Duplicated trigger** is copied only when its **Referenced sandbox profile version** matches the source profile's active published configuration.
+- A **Duplicated trigger** excludes one-off scheduled **Trigger** configuration.
+- A **Duplicated trigger** must still be valid against current provider and integration capabilities.
+- A disabled recurring **Duplicated trigger** has no due schedule work until explicitly enabled.
 - A **Trigger** run may create or reuse one **Trigger conversation**.
 - A **Trigger conversation** is owned by Mistle, not by an agent runtime provider.
 - A **Provider conversation** is owned by an agent runtime provider.

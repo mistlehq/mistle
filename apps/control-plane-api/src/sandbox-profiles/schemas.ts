@@ -416,6 +416,22 @@ export const createSandboxProfileBodySchema = z
   })
   .strict();
 
+export const duplicateSandboxProfileBodySchema = z
+  .object({
+    displayName: z.string().min(1),
+    includeTriggers: z.boolean().optional(),
+  })
+  .strict();
+
+export const duplicateSandboxProfileResponseSchema = z
+  .object({
+    profile: sandboxProfileSchema,
+    activeVersion: z.number().int().min(1),
+    draftVersion: z.number().int().min(1).nullable(),
+    duplicatedTriggerCount: z.number().int().min(0),
+  })
+  .strict();
+
 export const updateSandboxProfileBodySchema = z
   .object({
     displayName: z.string().min(1).optional(),

@@ -8,6 +8,8 @@ import type {
   CreateSandboxProfileInput,
   DeleteSandboxProfileResult,
   DeleteSandboxProfileVersionRefreshScheduleResult,
+  DuplicateSandboxProfileInput,
+  DuplicateSandboxProfileResult,
   LaunchableSandboxProfilesResult,
   PutSandboxProfileVersionDraftInput,
   PutSandboxProfileVersionDraftResult,
@@ -274,6 +276,48 @@ export async function createSandboxProfile(input: {
         operation: "createSandboxProfile",
         error,
         fallbackMessage: "Could not create sandbox profile.",
+      }),
+    );
+  }
+}
+
+export async function duplicateSandboxProfile(input: {
+  payload: DuplicateSandboxProfileInput;
+}): Promise<DuplicateSandboxProfileResult> {
+  try {
+    const client = getControlPlaneApiClient();
+    const { data } = await client.POST("/v1/sandbox/profiles/{profileId}/duplicate", {
+      credentials: "include",
+      params: {
+        path: {
+          profileId: input.payload.profileId,
+        },
+      },
+      body: {
+        displayName: input.payload.displayName,
+        ...(input.payload.includeTriggers === undefined
+          ? {}
+          : { includeTriggers: input.payload.includeTriggers }),
+      },
+    });
+
+    if (data === undefined) {
+      throw new SandboxProfilesApiError({
+        operation: "duplicateSandboxProfile",
+        status: 500,
+        body: null,
+        message: "Duplicate sandbox profile response was empty.",
+        code: null,
+      });
+    }
+
+    return data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "duplicateSandboxProfile",
+        error,
+        fallbackMessage: "Could not duplicate sandbox profile.",
       }),
     );
   }

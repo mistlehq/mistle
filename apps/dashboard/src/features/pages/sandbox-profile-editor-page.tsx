@@ -8,6 +8,7 @@ import {
   ButtonGroup,
   Card,
   CardContent,
+  Checkbox,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -70,6 +71,7 @@ import {
   createSandboxProfileVersionDraft,
   deleteSandboxProfile,
   discardSandboxProfileVersionDraft,
+  duplicateSandboxProfile,
   getSandboxProfile,
   getSandboxProfileVersionDraftTriggerImpact,
   getSandboxProfileVersionPublishability,
@@ -354,6 +356,20 @@ function createSandboxProfileSnapshotsPath(profileId: string): string {
 
 function createSandboxProfileTriggersPath(profileId: string): string {
   return `/sandbox-profiles/${profileId}/triggers`;
+}
+
+function resolveSandboxProfileCanDuplicate(input: {
+  profile: SandboxProfile;
+  versions: readonly SandboxProfileVersion[];
+}): boolean {
+  if (input.profile.activeVersion === null) {
+    return false;
+  }
+
+  return (
+    input.versions.find((version) => version.version === input.profile.activeVersion)?.usable ===
+    true
+  );
 }
 
 function pathnameMatchesPathOrChild(input: { basePath: string; pathname: string }): boolean {
@@ -858,7 +874,9 @@ function LoadedSandboxProfileEditorPage(
   const queryClient = useQueryClient();
   const [versionActionError, setVersionActionError] = useState<string | null>(null);
   const [isDeleteProfileDialogOpen, setIsDeleteProfileDialogOpen] = useState(false);
+  const [isDuplicateProfileDialogOpen, setIsDuplicateProfileDialogOpen] = useState(false);
   const [deleteProfileError, setDeleteProfileError] = useState<string | null>(null);
+  const [duplicateProfileError, setDuplicateProfileError] = useState<string | null>(null);
   const [draftEditorResetKey, setDraftEditorResetKey] = useState(0);
   const triggerUsagesQuery = useQuery({
     queryKey: sandboxProfileTriggerUsagesQueryKey(input.profileId),
@@ -1138,6 +1156,35 @@ function LoadedSandboxProfileEditorPage(
       );
     },
   });
+  const duplicateProfileMutation = useMutation({
+    mutationFn: async (payload: { displayName: string; includeTriggers: boolean }) =>
+      duplicateSandboxProfile({
+        payload: {
+          profileId: input.profileId,
+          displayName: payload.displayName,
+          includeTriggers: payload.includeTriggers,
+        },
+      }),
+    onSuccess: async (result) => {
+      setDuplicateProfileError(null);
+      setIsDuplicateProfileDialogOpen(false);
+      await input.invalidateSandboxProfiles();
+      void input.navigate(
+        createSandboxProfileEditorPath({
+          profileId: result.profile.id,
+          view: "published",
+        }),
+      );
+    },
+    onError: (error: unknown) => {
+      setDuplicateProfileError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not duplicate sandbox profile.",
+        }),
+      );
+    },
+  });
   const onPublishSuccessNavigationConsumed = useCallback(() => {
     input.onPublishSuccessNavigationConsumed();
   }, [input.onPublishSuccessNavigationConsumed]);
@@ -1256,7 +1303,14 @@ function LoadedSandboxProfileEditorPage(
       }
       deleteProfileError={deleteProfileError}
       deleteProfileIsPending={deleteProfileMutation.isPending}
+      duplicateProfileIsAvailable={resolveSandboxProfileCanDuplicate({
+        profile: input.profile,
+        versions: input.versions,
+      })}
+      duplicateProfileError={duplicateProfileError}
+      duplicateProfileIsPending={duplicateProfileMutation.isPending}
       isDeleteProfileDialogOpen={isDeleteProfileDialogOpen}
+      isDuplicateProfileDialogOpen={isDuplicateProfileDialogOpen}
       onConfirmDeleteProfile={() => {
         if (triggerUsagesQuery.isPending || triggerUsagesQuery.isError) {
           return;
@@ -1270,13 +1324,24 @@ function LoadedSandboxProfileEditorPage(
         setDeleteProfileError(null);
         setIsDeleteProfileDialogOpen(open);
       }}
+      onConfirmDuplicateProfile={(request) => {
+        duplicateProfileMutation.mutate(request);
+      }}
+      onDuplicateProfileDialogOpenChange={(open) => {
+        if (duplicateProfileMutation.isPending) {
+          return;
+        }
+        setDuplicateProfileError(null);
+        setIsDuplicateProfileDialogOpen(open);
+      }}
       versionActionError={versionActionError}
       versionActionIsPending={
         publishMutation.isPending ||
         createDraftMutation.isPending ||
         discardDraftMutation.isPending ||
         refreshSnapshotMutation.isPending ||
-        retryPublishSnapshotMutation.isPending
+        retryPublishSnapshotMutation.isPending ||
+        duplicateProfileMutation.isPending
       }
       invalidateSandboxProfiles={input.invalidateSandboxProfiles}
       invalidateProfileDetail={input.invalidateProfileDetail}
@@ -1308,13 +1373,19 @@ function ReadySandboxProfileEditorPage(input: {
   deleteProfileTriggerUsagesIsPending: boolean;
   deleteProfileError: string | null;
   deleteProfileIsPending: boolean;
+  duplicateProfileIsAvailable?: boolean;
+  duplicateProfileError?: string | null;
+  duplicateProfileIsPending?: boolean;
   isDeleteProfileDialogOpen: boolean;
+  isDuplicateProfileDialogOpen?: boolean;
   onPublish: (version: number) => Promise<void>;
   onRefreshSnapshot: (input: { version: number; refreshKind: "setup" | "maintenance" }) => void;
   onRetryPublishSnapshot: (version: number) => void;
   onDiscardChangesAndLeaveDraft: (input: { draftVersion: number }) => void;
   onConfirmDeleteProfile: () => void;
   onDeleteProfileDialogOpenChange: (open: boolean) => void;
+  onConfirmDuplicateProfile?: (input: { displayName: string; includeTriggers: boolean }) => void;
+  onDuplicateProfileDialogOpenChange?: (open: boolean) => void;
   onMakeChanges: () => void;
   onViewActive: () => void;
   onViewDraft: () => void;
@@ -1859,9 +1930,21 @@ function ReadySandboxProfileEditorPage(input: {
       deleteProfileTriggerUsagesIsPending={input.deleteProfileTriggerUsagesIsPending}
       deleteProfileError={input.deleteProfileError}
       deleteProfileIsPending={input.deleteProfileIsPending}
+      duplicateProfileIsAvailable={resolveSandboxProfileCanDuplicate({
+        profile: input.profile,
+        versions: input.versions,
+      })}
+      duplicateProfileError={input.duplicateProfileError ?? null}
+      duplicateProfileIsPending={input.duplicateProfileIsPending ?? false}
       onMakeChanges={input.onMakeChanges}
       onConfirmDeleteProfile={input.onConfirmDeleteProfile}
       onDeleteProfileDialogOpenChange={input.onDeleteProfileDialogOpenChange}
+      onConfirmDuplicateProfile={(request) => {
+        input.onConfirmDuplicateProfile?.(request);
+      }}
+      onDuplicateProfileDialogOpenChange={(open) => {
+        input.onDuplicateProfileDialogOpenChange?.(open);
+      }}
       onDiscardChangesAndLeaveDraft={input.onDiscardChangesAndLeaveDraft}
       onPublish={(version) => {
         void handlePublish(version);
@@ -1911,6 +1994,7 @@ function ReadySandboxProfileEditorPage(input: {
       versionActionError={input.versionActionError}
       versionActionIsPending={input.versionActionIsPending}
       isDeleteProfileDialogOpen={input.isDeleteProfileDialogOpen}
+      isDuplicateProfileDialogOpen={input.isDuplicateProfileDialogOpen ?? false}
       renderSectionPanel={(sectionId) => (
         <SandboxProfileEditorSectionPanels
           activeSectionId={sectionId}
@@ -2913,6 +2997,118 @@ function formatDraftTriggerImpactIssueMessage(
   }
 }
 
+function DuplicateSandboxProfileDialog(input: {
+  duplicateError: string | null;
+  isAvailable: boolean;
+  isOpen: boolean;
+  isPending: boolean;
+  onConfirm: (request: { displayName: string; includeTriggers: boolean }) => void;
+  onOpenChange: (open: boolean) => void;
+  profileName: string;
+}): React.JSX.Element {
+  const defaultDisplayName = `${input.profileName} copy`;
+  const [displayName, setDisplayName] = useState(defaultDisplayName);
+  const [includeTriggers, setIncludeTriggers] = useState(false);
+
+  useEffect(() => {
+    if (input.isOpen) {
+      setDisplayName(defaultDisplayName);
+      setIncludeTriggers(false);
+    }
+  }, [defaultDisplayName, input.isOpen]);
+
+  const trimmedDisplayName = displayName.trim();
+  const isBlocked = input.isPending || !input.isAvailable || trimmedDisplayName.length === 0;
+
+  return (
+    <Dialog
+      isBusy={input.isPending}
+      isDismissible={!input.isPending}
+      onOpenChange={input.onOpenChange}
+      open={input.isOpen}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Duplicate sandbox profile</DialogTitle>
+          <DialogDescription>
+            Creates a new profile from the active published version, including its latest snapshot.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {!input.isAvailable ? (
+            <Notice variant="alert">
+              Duplicate requires the active published version to have a usable snapshot.
+            </Notice>
+          ) : null}
+
+          <Field>
+            <FieldLabel htmlFor="duplicate-sandbox-profile-name">Name</FieldLabel>
+            <FieldContent>
+              <Input
+                disabled={input.isPending}
+                id="duplicate-sandbox-profile-name"
+                onChange={(event) => {
+                  setDisplayName(event.currentTarget.value);
+                }}
+                value={displayName}
+              />
+            </FieldContent>
+          </Field>
+
+          <label className="flex gap-3 rounded-md border bg-background p-3 text-sm">
+            <Checkbox
+              aria-label="Also duplicate matching triggers"
+              checked={includeTriggers}
+              disabled={input.isPending || !input.isAvailable}
+              onCheckedChange={(checked) => {
+                setIncludeTriggers(checked === true);
+              }}
+            />
+            <span className="flex min-w-0 flex-col gap-1">
+              <span className="font-medium">Also duplicate matching triggers</span>
+              <span className="text-muted-foreground">
+                Copied triggers are created disabled and exclude one-off scheduled triggers.
+              </span>
+            </span>
+          </label>
+
+          {input.duplicateError === null ? null : (
+            <Notice title="Duplicate failed" variant="alert">
+              {input.duplicateError}
+            </Notice>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button
+            disabled={input.isPending}
+            onClick={() => {
+              input.onOpenChange(false);
+            }}
+            type="button"
+            variant="outline"
+          >
+            Cancel
+          </Button>
+          <Button
+            disabled={isBlocked}
+            onClick={() => {
+              input.onConfirm({
+                displayName: trimmedDisplayName,
+                includeTriggers,
+              });
+            }}
+            type="button"
+          >
+            {input.isPending ? "Duplicating..." : "Duplicate"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function DeleteSandboxProfileDialog(input: {
   triggerUsages: readonly WebhookTriggerSandboxProfileUsage[];
   triggerUsagesError: string | null;
@@ -3002,6 +3198,9 @@ export function SandboxProfileEditorView(input: {
   deleteProfileTriggerUsagesIsPending: boolean;
   deleteProfileError: string | null;
   deleteProfileIsPending: boolean;
+  duplicateProfileIsAvailable?: boolean;
+  duplicateProfileError?: string | null;
+  duplicateProfileIsPending?: boolean;
   draftSaveError?: string | null;
   versionActionError: string | null;
   versionActionIsPending: boolean;
@@ -3013,12 +3212,15 @@ export function SandboxProfileEditorView(input: {
   publishRequestIsPending?: boolean;
   saveDraftRequestIsPending?: boolean;
   isDeleteProfileDialogOpen: boolean;
+  isDuplicateProfileDialogOpen?: boolean;
   shouldBlockUnpersistedChangesNavigation?: BlockerFunction;
   onPublish: (version: number) => void;
   onSaveDraft: () => void;
   onConfirmDeleteProfile: () => void;
+  onConfirmDuplicateProfile?: (input: { displayName: string; includeTriggers: boolean }) => void;
   onDiscardChangesAndLeaveDraft: (input: { draftVersion: number }) => void;
   onDeleteProfileDialogOpenChange: (open: boolean) => void;
+  onDuplicateProfileDialogOpenChange?: (open: boolean) => void;
   onMakeChanges: () => void;
   onViewActive: () => void;
   onViewDraft: () => void;
@@ -3039,6 +3241,8 @@ export function SandboxProfileEditorView(input: {
       (input.hasUnpersistedRuntimeChanges ?? false) ||
       (input.hasUnpersistedIntegrationChanges ?? false) ||
       (input.hasUnpersistedSetupScriptChanges ?? false));
+  const duplicateProfileIsAvailable = input.duplicateProfileIsAvailable ?? false;
+  const duplicateProfileIsPending = input.duplicateProfileIsPending ?? false;
   const deleteProfileMenuItem = (
     <DropdownMenuItem
       onClick={() => {
@@ -3049,10 +3253,23 @@ export function SandboxProfileEditorView(input: {
       Delete profile
     </DropdownMenuItem>
   );
+  const duplicateProfileMenuItem = (
+    <DropdownMenuItem
+      disabled={!duplicateProfileIsAvailable}
+      onClick={() => {
+        input.onDuplicateProfileDialogOpenChange?.(true);
+      }}
+    >
+      Duplicate
+    </DropdownMenuItem>
+  );
   const profileActions =
     input.versionActions ??
     (input.deleteProfileIsPending ? null : (
-      <MoreActionsMenu triggerLabel="More actions">{deleteProfileMenuItem}</MoreActionsMenu>
+      <MoreActionsMenu triggerLabel="More actions">
+        {duplicateProfileMenuItem}
+        {deleteProfileMenuItem}
+      </MoreActionsMenu>
     ));
 
   return (
@@ -3075,6 +3292,19 @@ export function SandboxProfileEditorView(input: {
         isPending={input.deleteProfileIsPending}
         onConfirm={input.onConfirmDeleteProfile}
         onOpenChange={input.onDeleteProfileDialogOpenChange}
+        profileName={input.profileName ?? input.profileNameFallback}
+      />
+      <DuplicateSandboxProfileDialog
+        duplicateError={input.duplicateProfileError ?? null}
+        isAvailable={duplicateProfileIsAvailable}
+        isOpen={input.isDuplicateProfileDialogOpen ?? false}
+        isPending={duplicateProfileIsPending}
+        onConfirm={(request) => {
+          input.onConfirmDuplicateProfile?.(request);
+        }}
+        onOpenChange={(open) => {
+          input.onDuplicateProfileDialogOpenChange?.(open);
+        }}
         profileName={input.profileName ?? input.profileNameFallback}
       />
 

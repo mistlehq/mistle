@@ -22,6 +22,8 @@ export {
   putSandboxProfileVersionDraftBodySchema as PutSandboxProfileVersionDraftBodySchema,
   putSandboxProfileVersionDraftResponseSchema as PutSandboxProfileVersionDraftResponseSchema,
   createSandboxProfileBodySchema as CreateSandboxProfileBodySchema,
+  duplicateSandboxProfileBodySchema as DuplicateSandboxProfileBodySchema,
+  duplicateSandboxProfileResponseSchema as DuplicateSandboxProfileResponseSchema,
   updateSandboxProfileBodySchema as UpdateSandboxProfileBodySchema,
   sandboxProfileIdParamsSchema as SandboxProfileIdParamsSchema,
   sandboxProfileVersionParamsSchema as SandboxProfileVersionParamsSchema,
@@ -40,6 +42,7 @@ export {
 export { route as listSandboxProfilesRoute } from "./list-sandbox-profiles/route.js";
 export { route as listLaunchableSandboxProfilesRoute } from "./list-launchable-sandbox-profiles/route.js";
 export { route as createSandboxProfileRoute } from "./create-sandbox-profile/route.js";
+export { route as duplicateSandboxProfileRoute } from "./duplicate-sandbox-profile/route.js";
 export { route as createSandboxProfileVersionRoute } from "./create-sandbox-profile-version/route.js";
 export { route as getSandboxProfileRoute } from "./get-sandbox-profile/route.js";
 export { route as updateSandboxProfileRoute } from "./update-sandbox-profile/route.js";
@@ -74,6 +77,11 @@ export {
   conflictResponseSchema as CreateSandboxProfileVersionConflictResponseSchema,
   notFoundResponseSchema as CreateSandboxProfileVersionNotFoundResponseSchema,
 } from "./create-sandbox-profile-version/schema.js";
+export {
+  badRequestResponseSchema as DuplicateSandboxProfileBadRequestResponseSchema,
+  conflictResponseSchema as DuplicateSandboxProfileConflictResponseSchema,
+  notFoundResponseSchema as DuplicateSandboxProfileNotFoundResponseSchema,
+} from "./duplicate-sandbox-profile/schema.js";
 export { notFoundResponseSchema as GetSandboxProfileVersionPublishabilityNotFoundResponseSchema } from "./get-sandbox-profile-version-publishability/schema.js";
 export { notFoundResponseSchema as GetSandboxProfileVersionDraftTriggerImpactNotFoundResponseSchema } from "./get-sandbox-profile-version-draft-trigger-impact/schema.js";
 export {

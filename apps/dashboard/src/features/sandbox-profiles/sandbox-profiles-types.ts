@@ -10,6 +10,10 @@ type ListSandboxProfileVersionsResponse =
   paths["/v1/sandbox/profiles/{profileId}/versions"]["get"]["responses"][200]["content"]["application/json"];
 type CreateSandboxProfileRequest =
   paths["/v1/sandbox/profiles"]["post"]["requestBody"]["content"]["application/json"];
+type DuplicateSandboxProfileRequest =
+  paths["/v1/sandbox/profiles/{profileId}/duplicate"]["post"]["requestBody"]["content"]["application/json"];
+type DuplicateSandboxProfileResponse =
+  paths["/v1/sandbox/profiles/{profileId}/duplicate"]["post"]["responses"][201]["content"]["application/json"];
 type UpdateSandboxProfileRequest =
   paths["/v1/sandbox/profiles/{profileId}"]["patch"]["requestBody"]["content"]["application/json"];
 type DeleteSandboxProfileResponse =
@@ -39,6 +43,10 @@ export type LaunchableSandboxProfilesResult = ListLaunchableSandboxProfilesRespo
 export type KeysetPageCursor = NonNullable<SandboxProfilesListResult["nextPage"]>;
 export type KeysetPreviousPageCursor = NonNullable<SandboxProfilesListResult["previousPage"]>;
 export type CreateSandboxProfileInput = CreateSandboxProfileRequest;
+export type DuplicateSandboxProfileInput = DuplicateSandboxProfileRequest & {
+  profileId: string;
+};
+export type DuplicateSandboxProfileResult = DuplicateSandboxProfileResponse;
 export type DeleteSandboxProfileResult = DeleteSandboxProfileResponse;
 export type UpdateSandboxProfileInput = UpdateSandboxProfileRequest & {
   profileId: string;

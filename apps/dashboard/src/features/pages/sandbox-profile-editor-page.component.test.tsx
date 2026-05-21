@@ -3412,8 +3412,12 @@ describe("SandboxProfileEditorPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
 
     expect(screen.getAllByRole("menuitem").map((menuItem) => menuItem.textContent)).toEqual([
+      "Duplicate",
       "Delete profile",
     ]);
+    expect(screen.getByRole("menuitem", { name: "Duplicate" }).getAttribute("aria-disabled")).toBe(
+      "true",
+    );
   });
 
   it("keeps draft publish action enabled", () => {

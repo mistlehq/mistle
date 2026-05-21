@@ -9276,6 +9276,154 @@ export interface paths {
     };
     trace?: never;
   };
+  "/v1/sandbox/profiles/{profileId}/duplicate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          profileId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            displayName: string;
+            includeTriggers?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Duplicate a sandbox profile from its active usable snapshot. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              activeVersion: number;
+              draftVersion: number | null;
+              duplicatedTriggerCount: number;
+              profile: {
+                activeVersion: number | null;
+                createdAt: string;
+                displayName: string;
+                id: string;
+                organizationId: string;
+                /** @enum {string} */
+                status: "active" | "inactive";
+                updatedAt: string;
+              };
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_REFRESH_SCHEDULE"
+                    | "INVALID_SCHEDULE"
+                    | "INVALID_PRIMARY_REPOSITORY"
+                    | "INVALID_WEBHOOK_SOURCE_REFERENCE"
+                    | "INVALID_WEBHOOK_TRIGGER_REQUIREMENTS"
+                    | "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE"
+                    | "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile cannot be duplicated. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code:
+                | "DUPLICATE_DISPLAY_NAME"
+                | "INVALID_DUPLICATE_REFERENCE"
+                | "PROFILE_VERSION_NOT_USABLE";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/sandbox/profiles/{profileId}/instances": {
     parameters: {
       query?: never;
