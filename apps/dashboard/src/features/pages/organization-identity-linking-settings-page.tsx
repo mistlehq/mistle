@@ -10,6 +10,7 @@ import {
   formatIdentityLinkEligibleConnectionLabel,
   formatIdentityLinkProviderMemberStatus,
   formatIdentityLinkProviderPrincipalSummary,
+  type IdentityLinkEligibleConnection,
   listEligibleIdentityLinkConnections,
   resolveReturnedIdentityLinkConnectionSelection,
 } from "../settings/identity-linking/organization-identity-linking-model.js";
@@ -423,6 +424,11 @@ export function buildProviderRow(input: {
     providerFamily: input.row.provider.providerFamily,
     organizationProviderConfigId: input.row.config?.organizationProviderConfigId ?? null,
     displayName: input.row.provider.displayName,
+    configurationLabel: resolveRowConfigurationLabel({
+      connectionOptions,
+      selectedConnectionId,
+      row: input.row,
+    }),
     logoKey: input.row.provider.logoKey,
     connectionOptions: connectionOptions.map((connection) => ({
       id: connection.id,
@@ -454,6 +460,35 @@ export function buildProviderRow(input: {
         updatedAt: link.updatedAt,
       })) ?? [],
   };
+}
+
+function resolveRowConfigurationLabel(input: {
+  row: ProviderConfigRow;
+  connectionOptions: readonly {
+    id: string;
+    targetKey: string;
+    displayName: string;
+    connectionMethodId?: string;
+    connectionMethodLabel?: string;
+  }[];
+  selectedConnectionId: string | null;
+}): string | null {
+  if (input.selectedConnectionId === null) {
+    return input.row.config === null ? "New configuration" : null;
+  }
+
+  const selectedConnection =
+    input.connectionOptions.find((connection) => connection.id === input.selectedConnectionId) ??
+    null;
+  if (selectedConnection === null) {
+    return input.row.config === null
+      ? "New configuration"
+      : formatIdentityLinkEligibleConnectionLabel(
+          toIdentityLinkEligibleConnection(input.row.config.selectedConnection),
+        );
+  }
+
+  return formatIdentityLinkEligibleConnectionLabel(selectedConnection);
 }
 
 function findProviderConfigRowOrThrow(input: {
@@ -525,7 +560,7 @@ function resolveRowDisplayedConnectionId(input: {
 function listUnusedEligibleIdentityLinkConnections(input: {
   provider: OrganizationIdentityLinkProvider;
   currentConfig: OrganizationIdentityLinkProviderConfig | null;
-}): ReturnType<typeof listEligibleIdentityLinkConnections> {
+}): IdentityLinkEligibleConnection[] {
   const configuredConnectionIds = new Set(
     input.provider.configs
       .filter(
@@ -535,9 +570,39 @@ function listUnusedEligibleIdentityLinkConnections(input: {
       .map((config) => config.integrationConnectionId),
   );
 
-  return listEligibleIdentityLinkConnections({
+  const eligibleConnections = listEligibleIdentityLinkConnections({
     provider: input.provider,
   }).filter((connection) => !configuredConnectionIds.has(connection.id));
+
+  if (
+    input.currentConfig === null ||
+    eligibleConnections.some(
+      (connection) => connection.id === input.currentConfig?.selectedConnection.id,
+    )
+  ) {
+    return eligibleConnections;
+  }
+
+  return [
+    toIdentityLinkEligibleConnection(input.currentConfig.selectedConnection),
+    ...eligibleConnections,
+  ];
+}
+
+function toIdentityLinkEligibleConnection(
+  connection: OrganizationIdentityLinkProviderConfig["selectedConnection"],
+): IdentityLinkEligibleConnection {
+  return {
+    id: connection.id,
+    targetKey: connection.targetKey,
+    displayName: connection.displayName,
+    ...(connection.connectionMethodId === undefined
+      ? {}
+      : { connectionMethodId: connection.connectionMethodId }),
+    ...(connection.connectionMethodLabel === undefined
+      ? {}
+      : { connectionMethodLabel: connection.connectionMethodLabel }),
+  };
 }
 
 function restoreSelectedConnectionDraft(input: {
@@ -573,10 +638,7 @@ function resolveSelectedConnectionId(input: {
     return input.draftSelectedConnectionId;
   }
 
-  if (
-    input.selectedConnectionId !== null &&
-    input.eligibleConnections.some((connection) => connection.id === input.selectedConnectionId)
-  ) {
+  if (input.selectedConnectionId !== null) {
     return input.selectedConnectionId;
   }
 

@@ -14,6 +14,16 @@ function createGitHubLinkedAccount(overrides?: Partial<LinkedAccount>): LinkedAc
     providerFamily: "github",
     organizationProviderConfigId: "ilp_github",
     integrationConnectionId: "icn_github",
+    selectedConnection: {
+      id: "icn_github",
+      targetKey: "github-cloud",
+      displayName: "mistle",
+      status: "active",
+      connectionMethodId: "github-app-installation",
+      connectionMethodLabel: "GitHub App installation",
+      createdAt: "2026-04-18T00:00:00.000Z",
+      updatedAt: "2026-04-18T00:00:00.000Z",
+    },
     displayName: "GitHub",
     logoKey: "github",
     configurationStatus: "active",
@@ -46,6 +56,16 @@ function createSlackLinkedAccount(overrides?: Partial<LinkedAccount>): LinkedAcc
     providerFamily: "slack",
     organizationProviderConfigId: "ilp_slack",
     integrationConnectionId: "icn_slack",
+    selectedConnection: {
+      id: "icn_slack",
+      targetKey: "slack-default",
+      displayName: "Mistle Engineering",
+      status: "active",
+      connectionMethodId: "slack-app",
+      connectionMethodLabel: "Slack app",
+      createdAt: "2026-04-18T00:00:00.000Z",
+      updatedAt: "2026-04-18T00:00:00.000Z",
+    },
     displayName: "Slack",
     logoKey: "slack",
     configurationStatus: "active",
@@ -104,6 +124,7 @@ describe("linked-accounts-model", () => {
       organizationProviderConfigId: "ilp_github",
       providerFamily: "github",
       displayName: "GitHub",
+      configurationLabel: "mistle · GitHub App installation",
       logoKey: "github",
       statusLabel: "Linked",
       statusTone: "active",
@@ -131,6 +152,7 @@ describe("linked-accounts-model", () => {
       organizationProviderConfigId: "ilp_github",
       providerFamily: "github",
       displayName: "GitHub",
+      configurationLabel: "mistle · GitHub App installation",
       logoKey: "github",
       statusLabel: "Not linked",
       statusTone: "warning",
@@ -176,6 +198,7 @@ describe("linked-accounts-model", () => {
       organizationProviderConfigId: "ilp_github",
       providerFamily: "github",
       displayName: "GitHub",
+      configurationLabel: "mistle · GitHub App installation",
       logoKey: "github",
       statusLabel: "Disabled",
       statusTone: "disabled",
@@ -249,6 +272,67 @@ describe("linked-accounts-model", () => {
         }),
       ]),
     ).toEqual([]);
+  });
+
+  it("builds distinct labels for multiple Slack linked accounts", () => {
+    expect(
+      resolveLinkedAccountCardViewModels([
+        createSlackLinkedAccount({
+          organizationProviderConfigId: "ilp_slack_engineering",
+          integrationConnectionId: "icn_slack_engineering",
+          selectedConnection: {
+            id: "icn_slack_engineering",
+            targetKey: "slack-default",
+            displayName: "Mistle Engineering",
+            status: "active",
+            connectionMethodId: "slack-app",
+            connectionMethodLabel: "Slack app",
+            createdAt: "2026-04-18T00:00:00.000Z",
+            updatedAt: "2026-04-18T00:00:00.000Z",
+          },
+        }),
+        createSlackLinkedAccount({
+          organizationProviderConfigId: "ilp_slack_support",
+          integrationConnectionId: "icn_slack_support",
+          selectedConnection: {
+            id: "icn_slack_support",
+            targetKey: "slack-default",
+            displayName: "Mistle Support",
+            status: "active",
+            connectionMethodId: "slack-app",
+            connectionMethodLabel: "Slack app",
+            createdAt: "2026-04-18T00:00:00.000Z",
+            updatedAt: "2026-04-18T00:00:00.000Z",
+          },
+          principal: {
+            id: "uep_slack_support",
+            status: "active",
+            providerSubjectId: "T_SUPPORT:U12345",
+            profile: {
+              workspaceName: "Mistle Support",
+              displayName: "Mistle Slack User",
+            },
+            linkedAt: "2026-04-19T10:15:00.000Z",
+            updatedAt: "2026-04-19T10:15:00.000Z",
+          },
+        }),
+      ]).map((card) => ({
+        organizationProviderConfigId: card.organizationProviderConfigId,
+        configurationLabel: card.configurationLabel,
+        accountLabel: card.accountLabel,
+      })),
+    ).toEqual([
+      {
+        organizationProviderConfigId: "ilp_slack_engineering",
+        configurationLabel: "Mistle Engineering · Slack app",
+        accountLabel: "Mistle Slack User",
+      },
+      {
+        organizationProviderConfigId: "ilp_slack_support",
+        configurationLabel: "Mistle Support · Slack app",
+        accountLabel: "Mistle Slack User",
+      },
+    ]);
   });
 
   it("resolves a success callback notice", () => {

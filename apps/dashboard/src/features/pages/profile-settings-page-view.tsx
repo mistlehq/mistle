@@ -421,6 +421,11 @@ function LinkedAccountCard(input: {
                 {input.linkedAccountCard.statusLabel}
               </LinkedAccountStatusBadge>
             </div>
+            {input.linkedAccountCard.configurationLabel === undefined ? null : (
+              <p className="text-xs text-muted-foreground">
+                {input.linkedAccountCard.configurationLabel}
+              </p>
+            )}
             <p className="text-sm">{input.linkedAccountCard.accountLabel}</p>
           </div>
         </div>

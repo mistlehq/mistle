@@ -1,4 +1,5 @@
 import type { LinkedAccount } from "./linked-accounts-service.js";
+import { formatIdentityLinkEligibleConnectionLabel } from "./organization-identity-linking-model.js";
 
 export type LinkedAccountStatusTone = "active" | "warning" | "disabled";
 
@@ -29,6 +30,7 @@ export type LinkedAccountCardViewModel = {
   organizationProviderConfigId: string;
   providerFamily: string;
   displayName: string;
+  configurationLabel: string;
   logoKey: string;
   statusLabel: string;
   statusTone: LinkedAccountStatusTone;
@@ -86,6 +88,7 @@ export function resolveLinkedAccountCardViewModel(
       organizationProviderConfigId: linkedAccount.organizationProviderConfigId,
       providerFamily: linkedAccount.providerFamily,
       displayName: linkedAccount.displayName,
+      configurationLabel: resolveLinkedAccountConfigurationLabel(linkedAccount),
       logoKey: linkedAccount.logoKey,
       statusLabel: "Disabled",
       statusTone: "disabled",
@@ -106,6 +109,7 @@ export function resolveLinkedAccountCardViewModel(
       organizationProviderConfigId: linkedAccount.organizationProviderConfigId,
       providerFamily: linkedAccount.providerFamily,
       displayName: linkedAccount.displayName,
+      configurationLabel: resolveLinkedAccountConfigurationLabel(linkedAccount),
       logoKey: linkedAccount.logoKey,
       statusLabel: "Not linked",
       statusTone: "warning",
@@ -123,6 +127,7 @@ export function resolveLinkedAccountCardViewModel(
       organizationProviderConfigId: linkedAccount.organizationProviderConfigId,
       providerFamily: linkedAccount.providerFamily,
       displayName: linkedAccount.displayName,
+      configurationLabel: resolveLinkedAccountConfigurationLabel(linkedAccount),
       logoKey: linkedAccount.logoKey,
       statusLabel: "Relink required",
       statusTone: "warning",
@@ -139,6 +144,7 @@ export function resolveLinkedAccountCardViewModel(
     organizationProviderConfigId: linkedAccount.organizationProviderConfigId,
     providerFamily: linkedAccount.providerFamily,
     displayName: linkedAccount.displayName,
+    configurationLabel: resolveLinkedAccountConfigurationLabel(linkedAccount),
     logoKey: linkedAccount.logoKey,
     statusLabel: "Linked",
     statusTone: "active",
@@ -149,6 +155,20 @@ export function resolveLinkedAccountCardViewModel(
     primaryActionLabel: null,
     secondaryActionLabel: "Unlink",
   };
+}
+
+function resolveLinkedAccountConfigurationLabel(linkedAccount: LinkedAccount): string {
+  return formatIdentityLinkEligibleConnectionLabel({
+    id: linkedAccount.selectedConnection.id,
+    targetKey: linkedAccount.selectedConnection.targetKey,
+    displayName: linkedAccount.selectedConnection.displayName,
+    ...(linkedAccount.selectedConnection.connectionMethodId === undefined
+      ? {}
+      : { connectionMethodId: linkedAccount.selectedConnection.connectionMethodId }),
+    ...(linkedAccount.selectedConnection.connectionMethodLabel === undefined
+      ? {}
+      : { connectionMethodLabel: linkedAccount.selectedConnection.connectionMethodLabel }),
+  });
 }
 
 function resolveLinkedAccountCommitSigningViewModel(

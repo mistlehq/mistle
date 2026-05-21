@@ -34,11 +34,25 @@ export const LinkedAccountCommitSigningSchema = z
   })
   .strict();
 
+export const LinkedAccountConnectionSummarySchema = z
+  .object({
+    id: z.string().min(1),
+    targetKey: z.string().min(1),
+    displayName: z.string().min(1),
+    status: z.enum(["active", "error", "revoked"]),
+    connectionMethodId: z.string().min(1).optional(),
+    connectionMethodLabel: z.string().min(1).optional(),
+    createdAt: z.string().min(1),
+    updatedAt: z.string().min(1),
+  })
+  .strict();
+
 export const LinkedAccountSchema = z
   .object({
     providerFamily: z.string().min(1),
     organizationProviderConfigId: z.string().min(1),
     integrationConnectionId: z.string().min(1),
+    selectedConnection: LinkedAccountConnectionSummarySchema,
     displayName: z.string().min(1),
     logoKey: z.string().min(1),
     configurationStatus: z.enum(["active", "disabled"]),

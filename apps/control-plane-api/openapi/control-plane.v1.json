@@ -11090,6 +11090,52 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "selectedConnection": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "targetKey": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "displayName": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": ["active", "error", "revoked"]
+                              },
+                              "connectionMethodId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "connectionMethodLabel": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "updatedAt": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "targetKey",
+                              "displayName",
+                              "status",
+                              "createdAt",
+                              "updatedAt"
+                            ],
+                            "additionalProperties": false
+                          },
                           "displayName": {
                             "type": "string",
                             "minLength": 1
@@ -11207,6 +11253,7 @@
                           "providerFamily",
                           "organizationProviderConfigId",
                           "integrationConnectionId",
+                          "selectedConnection",
                           "displayName",
                           "logoKey",
                           "configurationStatus",

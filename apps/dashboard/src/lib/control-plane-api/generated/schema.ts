@@ -4074,6 +4074,17 @@ export interface paths {
                   updatedAt: string;
                 } | null;
                 providerFamily: string;
+                selectedConnection: {
+                  connectionMethodId?: string;
+                  connectionMethodLabel?: string;
+                  createdAt: string;
+                  displayName: string;
+                  id: string;
+                  /** @enum {string} */
+                  status: "active" | "error" | "revoked";
+                  targetKey: string;
+                  updatedAt: string;
+                };
               }[];
             };
           };

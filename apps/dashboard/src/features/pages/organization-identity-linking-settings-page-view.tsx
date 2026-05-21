@@ -31,6 +31,7 @@ export type OrganizationIdentityLinkingProviderRow = {
   providerFamily: string;
   organizationProviderConfigId: string | null;
   displayName: string;
+  configurationLabel?: string | null;
   logoKey: string;
   connectionOptions: readonly {
     id: string;
@@ -164,6 +165,11 @@ function IdentityLinkingProviderRowView(input: {
           />
           <div className="min-w-0">
             <div className="truncate text-sm font-medium">{provider.displayName}</div>
+            {provider.configurationLabel === null ? null : (
+              <div className="truncate text-xs text-muted-foreground">
+                {provider.configurationLabel}
+              </div>
+            )}
           </div>
         </div>
       </ResponsiveFieldListCell>

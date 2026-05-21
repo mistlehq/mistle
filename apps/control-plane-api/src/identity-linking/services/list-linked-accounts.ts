@@ -16,6 +16,7 @@ import {
 } from "../github-signing.js";
 import {
   IdentityLinkProviderConfigurationStatus,
+  type IdentityLinkProviderConnectionSummary,
   listOrganizationIdentityLinkProviders,
 } from "./list-organization-identity-link-providers.js";
 
@@ -95,6 +96,7 @@ export type LinkedAccount = {
   providerFamily: string;
   organizationProviderConfigId: string;
   integrationConnectionId: string;
+  selectedConnection: IdentityLinkProviderConnectionSummary;
   displayName: string;
   logoKey: string;
   configurationStatus: Exclude<
@@ -292,6 +294,7 @@ export async function listLinkedAccounts(
       providerFamily: providerConfig.providerFamily,
       organizationProviderConfigId: providerConfig.config.organizationProviderConfigId,
       integrationConnectionId: providerConfig.config.integrationConnectionId,
+      selectedConnection: providerConfig.config.selectedConnection,
       displayName: providerConfig.displayName,
       logoKey: providerConfig.logoKey,
       configurationStatus: providerConfig.config.configurationStatus,

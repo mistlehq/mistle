@@ -18,6 +18,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
             providerFamily: "github",
             organizationProviderConfigId: "ilp_github",
             displayName: "GitHub",
+            configurationLabel: "Engineering GitHub · GitHub App installation",
             logoKey: "github",
             connectionOptions: [
               {
@@ -47,6 +48,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
             providerFamily: "linear",
             organizationProviderConfigId: null,
             displayName: "Linear",
+            configurationLabel: "New configuration",
             logoKey: "linear",
             connectionOptions: [],
             selectedConnectionId: null,
@@ -62,6 +64,9 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
     );
 
     expect(screen.getByText("GitHub")).toBeTruthy();
+    expect(
+      screen.getAllByText("Engineering GitHub · GitHub App installation").length,
+    ).toBeGreaterThan(0);
     expect(screen.getByRole("combobox", { name: "GitHub connection" })).toBeTruthy();
     expect(screen.getByText("No eligible active connections")).toBeTruthy();
     expect(screen.getByRole("switch", { name: "Enable GitHub identity linking" })).toBeTruthy();
@@ -89,6 +94,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
             providerFamily: "slack",
             organizationProviderConfigId: null,
             displayName: "Slack",
+            configurationLabel: "Slack Workspace",
             logoKey: "slack",
             connectionOptions: [
               {
@@ -115,6 +121,64 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
     });
   });
 
+  it("renders multiple same-family provider rows with distinct configuration labels", () => {
+    render(
+      <OrganizationIdentityLinkingSettingsPageView
+        loadErrorMessage={null}
+        onEnabledChange={async () => {}}
+        onProviderConnectionChange={async () => {}}
+        providers={[
+          {
+            rowKey: "ilp_slack_engineering",
+            providerFamily: "slack",
+            organizationProviderConfigId: "ilp_slack_engineering",
+            displayName: "Slack",
+            configurationLabel: "Mistle Engineering · Slack app",
+            logoKey: "slack",
+            connectionOptions: [
+              {
+                id: "icn_slack_engineering",
+                label: "Mistle Engineering · Slack app",
+              },
+            ],
+            selectedConnectionId: "icn_slack_engineering",
+            connectionPending: false,
+            enablePending: false,
+            enabled: true,
+            linkedUsersCount: 1,
+            memberLinksErrorMessage: null,
+            memberLinks: [],
+          },
+          {
+            rowKey: "ilp_slack_support",
+            providerFamily: "slack",
+            organizationProviderConfigId: "ilp_slack_support",
+            displayName: "Slack",
+            configurationLabel: "Mistle Support · Slack app",
+            logoKey: "slack",
+            connectionOptions: [
+              {
+                id: "icn_slack_support",
+                label: "Mistle Support · Slack app",
+              },
+            ],
+            selectedConnectionId: "icn_slack_support",
+            connectionPending: false,
+            enablePending: false,
+            enabled: true,
+            linkedUsersCount: 0,
+            memberLinksErrorMessage: null,
+            memberLinks: [],
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getAllByText("Slack")).toHaveLength(2);
+    expect(screen.getAllByText("Mistle Engineering · Slack app").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Mistle Support · Slack app").length).toBeGreaterThan(0);
+  });
+
   it("renders provider-scoped linked-user errors in the dialog", () => {
     render(
       <OrganizationIdentityLinkingSettingsPageView
@@ -127,6 +191,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
             providerFamily: "github",
             organizationProviderConfigId: "ilp_github",
             displayName: "GitHub",
+            configurationLabel: null,
             logoKey: "github",
             connectionOptions: [],
             selectedConnectionId: null,
@@ -158,6 +223,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
             providerFamily: "github",
             organizationProviderConfigId: "ilp_github",
             displayName: "GitHub",
+            configurationLabel: null,
             logoKey: "github",
             connectionOptions: [],
             selectedConnectionId: null,
@@ -191,6 +257,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
             providerFamily: "slack",
             organizationProviderConfigId: "ilp_slack",
             displayName: "Slack",
+            configurationLabel: null,
             logoKey: "slack",
             connectionOptions: [],
             selectedConnectionId: null,

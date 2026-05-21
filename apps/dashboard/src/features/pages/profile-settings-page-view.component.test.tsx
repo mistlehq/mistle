@@ -48,6 +48,7 @@ function createGitHubLinkedCard(overrides: Partial<LinkedAccountCard> = {}): Lin
     organizationProviderConfigId: "ilp_component_github",
     providerFamily: "github",
     displayName: "GitHub",
+    configurationLabel: "mistle · GitHub App installation",
     logoKey: "github",
     statusLabel: "Linked",
     statusTone: "active",
@@ -73,6 +74,25 @@ function createGitHubSigningNotConfiguredCard(
     },
     ...overrides,
   });
+}
+
+function createSlackLinkedCard(overrides: Partial<LinkedAccountCard> = {}): LinkedAccountCard {
+  return {
+    organizationProviderConfigId: "ilp_component_slack",
+    providerFamily: "slack",
+    displayName: "Slack",
+    configurationLabel: "Mistle Engineering · Slack app",
+    logoKey: "slack",
+    statusLabel: "Linked",
+    statusTone: "active",
+    accountLabel: "Mistle Slack User",
+    helperMessage: null,
+    emailPreference: null,
+    commitSigning: null,
+    primaryActionLabel: null,
+    secondaryActionLabel: "Unlink",
+    ...overrides,
+  };
 }
 
 describe("ProfileSettingsPageView", () => {
@@ -209,6 +229,7 @@ describe("ProfileSettingsPageView", () => {
             organizationProviderConfigId: "ilp_component_github",
             providerFamily: "github",
             displayName: "GitHub",
+            configurationLabel: "mistle · GitHub App installation",
             logoKey: "github",
             statusLabel: "Not linked",
             statusTone: "warning",
@@ -317,6 +338,7 @@ describe("ProfileSettingsPageView", () => {
             organizationProviderConfigId: "ilp_component_github",
             providerFamily: "github",
             displayName: "GitHub",
+            configurationLabel: "mistle · GitHub App installation",
             logoKey: "github",
             statusLabel: "Linked",
             statusTone: "active",
@@ -336,6 +358,7 @@ describe("ProfileSettingsPageView", () => {
             organizationProviderConfigId: "ilp_component_slack",
             providerFamily: "slack",
             displayName: "Slack",
+            configurationLabel: "Mistle Engineering · Slack app",
             logoKey: "slack",
             statusLabel: "Not linked",
             statusTone: "warning",
@@ -352,60 +375,80 @@ describe("ProfileSettingsPageView", () => {
 
     expect(screen.getByText("GitHub")).toBeTruthy();
     expect(screen.getByText("Slack")).toBeTruthy();
+    expect(screen.getByText("mistle · GitHub App installation")).toBeTruthy();
+    expect(screen.getByText("Mistle Engineering · Slack app")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Unlink" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Link account" })).toBeTruthy();
   });
 
-  it("only shows linked-account pending state for the provider with an in-flight action", () => {
+  it("renders multiple Slack linked-account cards with distinguishable configuration labels", () => {
     render(
       <ProfileSettingsPageView
         {...baseProps}
         linkedAccountCards={[
-          {
-            organizationProviderConfigId: "ilp_component_github",
-            providerFamily: "github",
-            displayName: "GitHub",
-            logoKey: "github",
-            statusLabel: "Not linked",
-            statusTone: "warning",
-            accountLabel: "No linked account yet",
-            helperMessage: null,
-            emailPreference: null,
-            commitSigning: null,
-            primaryActionLabel: "Link account",
-            secondaryActionLabel: null,
-          },
-          {
-            organizationProviderConfigId: "ilp_component_slack",
-            providerFamily: "slack",
-            displayName: "Slack",
-            logoKey: "slack",
-            statusLabel: "Not linked",
-            statusTone: "warning",
-            accountLabel: "No linked account yet",
-            helperMessage: null,
-            emailPreference: null,
-            commitSigning: null,
-            primaryActionLabel: "Link account",
-            secondaryActionLabel: null,
-          },
+          createSlackLinkedCard({
+            organizationProviderConfigId: "ilp_component_slack_engineering",
+            configurationLabel: "Mistle Engineering · Slack app",
+            accountLabel: "Engineering User",
+          }),
+          createSlackLinkedCard({
+            organizationProviderConfigId: "ilp_component_slack_support",
+            configurationLabel: "Mistle Support · Slack app",
+            accountLabel: "Support User",
+          }),
         ]}
-        pendingLinkedAccountConfigIds={["ilp_component_github"]}
       />,
     );
 
-    const githubCard = screen.getByText("GitHub").closest(".rounded");
-    const slackCard = screen.getByText("Slack").closest(".rounded");
+    expect(screen.getAllByText("Slack")).toHaveLength(2);
+    expect(screen.getByText("Mistle Engineering · Slack app")).toBeTruthy();
+    expect(screen.getByText("Mistle Support · Slack app")).toBeTruthy();
+    expect(screen.getByText("Engineering User")).toBeTruthy();
+    expect(screen.getByText("Support User")).toBeTruthy();
+  });
 
-    if (!(githubCard instanceof HTMLElement) || !(slackCard instanceof HTMLElement)) {
+  it("only shows linked-account pending state for the config with an in-flight action", () => {
+    render(
+      <ProfileSettingsPageView
+        {...baseProps}
+        linkedAccountCards={[
+          createSlackLinkedCard({
+            organizationProviderConfigId: "ilp_component_slack_engineering",
+            configurationLabel: "Mistle Engineering · Slack app",
+            statusLabel: "Not linked",
+            statusTone: "warning",
+            accountLabel: "No linked account yet",
+            primaryActionLabel: "Link account",
+            secondaryActionLabel: null,
+          }),
+          createSlackLinkedCard({
+            organizationProviderConfigId: "ilp_component_slack_support",
+            configurationLabel: "Mistle Support · Slack app",
+            statusLabel: "Not linked",
+            statusTone: "warning",
+            accountLabel: "No linked account yet",
+            primaryActionLabel: "Link account",
+            secondaryActionLabel: null,
+          }),
+        ]}
+        pendingLinkedAccountConfigIds={["ilp_component_slack_engineering"]}
+      />,
+    );
+
+    const engineeringCard = screen.getByText("Mistle Engineering · Slack app").closest(".rounded");
+    const supportCard = screen.getByText("Mistle Support · Slack app").closest(".rounded");
+
+    if (!(engineeringCard instanceof HTMLElement) || !(supportCard instanceof HTMLElement)) {
       throw new Error("Expected linked account cards to render.");
     }
 
     expect(
-      within(githubCard).getByRole("button", { name: "Link account" }).hasAttribute("disabled"),
+      within(engineeringCard)
+        .getByRole("button", { name: "Link account" })
+        .hasAttribute("disabled"),
     ).toBe(true);
     expect(
-      within(slackCard).getByRole("button", { name: "Link account" }).hasAttribute("disabled"),
+      within(supportCard).getByRole("button", { name: "Link account" }).hasAttribute("disabled"),
     ).toBe(false);
   });
 
@@ -421,6 +464,7 @@ describe("ProfileSettingsPageView", () => {
             organizationProviderConfigId: "ilp_component_github",
             providerFamily: "github",
             displayName: "GitHub",
+            configurationLabel: "mistle · GitHub App installation",
             logoKey: "github",
             statusLabel: "Relink required",
             statusTone: "warning",
@@ -459,6 +503,7 @@ describe("ProfileSettingsPageView", () => {
             organizationProviderConfigId: "ilp_component_github",
             providerFamily: "github",
             displayName: "GitHub",
+            configurationLabel: "mistle · GitHub App installation",
             logoKey: "github",
             statusLabel: "Disabled",
             statusTone: "disabled",
@@ -491,6 +536,7 @@ describe("ProfileSettingsPageView", () => {
             organizationProviderConfigId: "ilp_component_github",
             providerFamily: "github",
             displayName: "GitHub",
+            configurationLabel: "mistle · GitHub App installation",
             logoKey: "github",
             statusLabel: "Linked",
             statusTone: "active",
@@ -542,6 +588,7 @@ describe("ProfileSettingsPageView", () => {
             organizationProviderConfigId: "ilp_component_github",
             providerFamily: "github",
             displayName: "GitHub",
+            configurationLabel: "mistle · GitHub App installation",
             logoKey: "github",
             statusLabel: "Linked",
             statusTone: "active",

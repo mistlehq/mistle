@@ -108,6 +108,11 @@ describe.concurrent("me linked accounts list and start integration", () => {
       displayName: "GitHub",
       logoKey: "github",
       configurationStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      selectedConnection: {
+        id: "icn_me_linked_accounts_github_identity",
+        displayName: "GitHub Identity",
+        connectionMethodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      },
       principal: {
         id: "uep_me_linked_accounts_github",
         status: UserExternalPrincipalStatuses.ACTIVE,
@@ -130,6 +135,11 @@ describe.concurrent("me linked accounts list and start integration", () => {
       displayName: "Slack",
       logoKey: "slack",
       configurationStatus: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
+      selectedConnection: {
+        id: "icn_me_linked_accounts_slack_identity",
+        displayName: "Slack Identity",
+        connectionMethodId: SlackConnectionMethodIds.SLACK_APP,
+      },
       principal: null,
       credential: null,
       commitSigning: null,
@@ -215,15 +225,18 @@ describe.concurrent("me linked accounts list and start integration", () => {
     expect(
       payload.linkedAccounts.map((linkedAccount) => ({
         organizationProviderConfigId: linkedAccount.organizationProviderConfigId,
+        selectedConnectionDisplayName: linkedAccount.selectedConnection.displayName,
         providerSubjectId: linkedAccount.principal?.providerSubjectId,
       })),
     ).toEqual([
       {
         organizationProviderConfigId: "ilp_me_linked_accounts_slack_workspace_a",
+        selectedConnectionDisplayName: "Slack Workspace A",
         providerSubjectId: "T_WORKSPACE_A:U_SHARED",
       },
       {
         organizationProviderConfigId: "ilp_me_linked_accounts_slack_workspace_b",
+        selectedConnectionDisplayName: "Slack Workspace B",
         providerSubjectId: "T_WORKSPACE_B:U_SHARED",
       },
     ]);

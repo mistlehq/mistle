@@ -147,8 +147,60 @@ describe("buildProviderRow", () => {
     expect(providerRow.rowKey).toBe("ilp_github_saved");
     expect(providerRow.organizationProviderConfigId).toBe("ilp_github_saved");
     expect(providerRow.selectedConnectionId).toBe("icn_github_new");
+    expect(providerRow.configurationLabel).toBe("GitHub New · GitHub App installation");
     expect(providerRow.enabled).toBe(false);
     expect(providerRow.linkedUsersCount).toBe(1);
+  });
+
+  it("keeps a configured row labeled with its saved connection when that connection is no longer eligible", () => {
+    const providerRow = buildProviderRow({
+      configuringRowKey: null,
+      statusUpdatingRowKey: null,
+      row: {
+        rowKey: "ilp_github_saved",
+        provider: createProvider({
+          eligibleConnections: [
+            createConnection({
+              id: "icn_github_unused",
+              displayName: "GitHub Unused",
+            }),
+          ],
+          configs: [
+            createConfig({
+              organizationProviderConfigId: "ilp_github_saved",
+              integrationConnectionId: "icn_github_saved",
+              selectedConnection: createConnection({
+                id: "icn_github_saved",
+                displayName: "GitHub Saved",
+              }),
+            }),
+          ],
+        }),
+        config: createConfig({
+          organizationProviderConfigId: "ilp_github_saved",
+          integrationConnectionId: "icn_github_saved",
+          selectedConnection: createConnection({
+            id: "icn_github_saved",
+            displayName: "GitHub Saved",
+          }),
+        }),
+      },
+      providerLinksQuery: null,
+      selectedConnectionIdByRowKey: {},
+    });
+
+    expect(providerRow.selectedConnectionId).toBe("icn_github_saved");
+    expect(providerRow.configurationLabel).toBe("GitHub Saved · GitHub App installation");
+    expect(providerRow.connectionOptions).toEqual([
+      {
+        id: "icn_github_saved",
+        label: "GitHub Saved · GitHub App installation",
+      },
+      {
+        id: "icn_github_unused",
+        label: "GitHub Unused · GitHub App installation",
+      },
+    ]);
   });
 
   it("keeps the currently displayed fallback connection for a draft config row", () => {
@@ -193,6 +245,7 @@ describe("buildProviderRow", () => {
 
     expect(providerRow.organizationProviderConfigId).toBeNull();
     expect(providerRow.selectedConnectionId).toBe("icn_slack_first");
+    expect(providerRow.configurationLabel).toBe("Slack First · Slack bot token");
     expect(providerRow.linkedUsersCount).toBeNull();
   });
 });
