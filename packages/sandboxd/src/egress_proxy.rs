@@ -37,10 +37,7 @@ use hyper::header::{HOST, HeaderName, HeaderValue};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode, Uri};
-use hyper_rustls::{ConfigBuilderExt, HttpsConnector, HttpsConnectorBuilder};
-use hyper_util::client::legacy::Client;
-use hyper_util::client::legacy::connect::HttpConnector;
-use hyper_util::rt::TokioExecutor;
+use hyper_rustls::ConfigBuilderExt;
 use hyper_util::rt::TokioIo;
 use rustls_pki_types::pem::PemObject;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
@@ -108,7 +105,6 @@ const MANAGED_PROXY_ENV_KEYS: [&str; 8] = [
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 type HyperBody = BoxBody<Bytes, BoxError>;
-type DirectGatewayHttpClient = Client<HttpsConnector<HttpConnector>, HyperBody>;
 #[derive(Clone, Copy)]
 struct ProxyCaConfig<'a> {
     runtime_certificate_path: &'a Path,
@@ -163,7 +159,6 @@ enum EgressProxyForwardingMode {
 struct DirectGatewayEgressClient {
     http_route_url: Url,
     websocket_route_url: Url,
-    http_client: DirectGatewayHttpClient,
     token_provider: GatewayEgressTokenProvider,
 }
 
@@ -303,7 +298,6 @@ impl DirectGatewayEgressClient {
                 DIRECT_EGRESS_WEBSOCKET_ROUTE_PATH,
                 DirectGatewayRouteScheme::WebSocket,
             )?,
-            http_client: build_direct_gateway_http_client()?,
             token_provider,
         })
     }
@@ -2053,22 +2047,6 @@ fn resolve_direct_gateway_route_url(
     Ok(route_url)
 }
 
-fn build_direct_gateway_http_client() -> Result<DirectGatewayHttpClient, EgressProxyError> {
-    let mut http_connector = HttpConnector::new();
-    http_connector.enforce_http(false);
-    let https_connector = HttpsConnectorBuilder::new()
-        .with_native_roots()
-        .map_err(|error| {
-            EgressProxyError::new(format!(
-                "failed to load native roots for direct gateway egress: {error}"
-            ))
-        })?
-        .https_or_http()
-        .enable_http1()
-        .wrap_connector(http_connector);
-    Ok(Client::builder(TokioExecutor::new()).build(https_connector))
-}
-
 fn run_update_ca_certificates(command_path: &Path) -> Result<(), EgressProxyError> {
     let output = Command::new(command_path).output().map_err(|error| {
         EgressProxyError::new(format!(
@@ -2967,7 +2945,7 @@ async fn forward_request_through_direct_gateway(
     let direct_uri = client.direct_http_url(&request_target.uri)?;
     let mut request_builder = Request::builder()
         .method(request_method)
-        .uri(direct_uri)
+        .uri(direct_uri.clone())
         .header(
             DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME,
             format!("Bearer {token}"),
@@ -2982,7 +2960,8 @@ async fn forward_request_through_direct_gateway(
                 "failed to build direct gateway egress request: {error}"
             ))
         })?;
-    let gateway_response = match client.http_client.request(direct_request).await {
+    let gateway_response = match send_direct_gateway_http_request(direct_request, &direct_uri).await
+    {
         Ok(response) => response,
         Err(error) => {
             let mut fields = request_context.common_fields();
@@ -3001,6 +2980,28 @@ async fn forward_request_through_direct_gateway(
     };
 
     response_from_direct_gateway_response(gateway_response, request_context)
+}
+
+async fn send_direct_gateway_http_request(
+    request: Request<HyperBody>,
+    direct_uri: &Uri,
+) -> Result<Response<Incoming>, EgressProxyError> {
+    let (mut parts, body) = request.into_parts();
+    parts.uri = origin_form_uri(direct_uri)?;
+    parts
+        .headers
+        .insert(HOST, direct_gateway_host_header(direct_uri)?);
+
+    match connect_direct_http_upstream(direct_uri, true).await? {
+        DirectHttpUpstreamStream::Plain(stream) => {
+            send_direct_upstream_http_request_over_io(stream, Request::from_parts(parts, body))
+                .await
+        }
+        DirectHttpUpstreamStream::Tls(stream) => {
+            send_direct_upstream_http_request_over_io(*stream, Request::from_parts(parts, body))
+                .await
+        }
+    }
 }
 
 async fn tunnel_direct_gateway_upgrade(
@@ -3303,6 +3304,19 @@ fn origin_form_uri(uri: &Uri) -> Result<Uri, EgressProxyError> {
                 "failed to build direct upstream origin-form URI: {error}"
             ))
         })
+}
+
+fn direct_gateway_host_header(uri: &Uri) -> Result<HeaderValue, EgressProxyError> {
+    let authority = uri.authority().ok_or_else(|| {
+        EgressProxyError::new(format!(
+            "direct gateway egress URL '{uri}' is missing an authority"
+        ))
+    })?;
+    HeaderValue::from_str(authority.as_str()).map_err(|error| {
+        EgressProxyError::new(format!(
+            "failed to build direct gateway host header for '{authority}': {error}"
+        ))
+    })
 }
 
 fn response_from_direct_upstream_response(
@@ -3859,8 +3873,8 @@ mod tests {
         DIRECT_EGRESS_HTTP_ROUTE_PATH, DIRECT_EGRESS_WEBSOCKET_ROUTE_PATH,
         DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME, DirectGatewayEgressClient, EgressProxy,
         EgressProxyForwardingMode, EgressProxyRoute, ProxyCaConfig, RequestTargetOverride,
-        TransparentProxyProtocol, build_direct_forward_uri, build_direct_gateway_http_client,
-        build_gateway_egress_route, build_managed_proxy_env, classify_transparent_proxy_first_byte,
+        TransparentProxyProtocol, build_direct_forward_uri, build_gateway_egress_route,
+        build_managed_proxy_env, classify_transparent_proxy_first_byte,
         filter_direct_gateway_request_headers, match_route, resolve_direct_gateway_route_url,
         resolve_request_target, serialize_egress_proxy_log_line, websocket_target_url,
     };
@@ -5095,8 +5109,6 @@ mod tests {
                     DirectGatewayRouteScheme::WebSocket,
                 )
                 .expect("direct gateway websocket route URL should resolve"),
-                http_client: build_direct_gateway_http_client()
-                    .expect("direct gateway HTTP client should build"),
                 token_provider: GatewayEgressTokenProvider::new("sandbox-123"),
             }),
         }
