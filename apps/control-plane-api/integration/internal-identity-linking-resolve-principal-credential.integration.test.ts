@@ -42,7 +42,7 @@ describe.concurrent("internal identity-linking principal credential resolution",
     const session = await env.auth.createSession({
       email: "integration-new-internal-identity-linking-resolve-active@example.com",
     });
-    await seedGitHubPrincipalCredential(env, {
+    const connectionId = await seedGitHubPrincipalCredential(env, {
       accessToken: "ghu_active_token",
       accessTokenExpiresAt: "2030-01-01T00:00:00.000Z",
       credentialId: "upc_internal_identity_linking_resolve_active",
@@ -58,12 +58,58 @@ describe.concurrent("internal identity-linking principal credential resolution",
       organizationId: session.organizationId,
       actingUserId: session.userId,
       providerFamily: "github",
+      integrationConnectionId: connectionId,
     });
 
     expect(response.status).toBe(200);
     expect(ResolvePrincipalCredentialResponseSchema.parse(await response.json())).toMatchObject({
       kind: "value",
       value: "ghu_active_token",
+      expiresAt: "2030-01-01T00:00:00.000Z",
+    });
+  });
+
+  it("resolves the linked-principal credential for the selected identity-link connection", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-internal-identity-linking-resolve-selected@example.com",
+    });
+    const firstConnectionId = await seedGitHubPrincipalCredential(env, {
+      accessToken: "ghu_first_connection_token",
+      accessTokenExpiresAt: "2030-01-01T00:00:00.000Z",
+      credentialId: "upc_internal_identity_linking_resolve_selected_first",
+      providerConfigId: "ilp_internal_identity_linking_resolve_selected_first",
+      principalId: "uep_internal_identity_linking_resolve_selected_first",
+      refreshToken: "ghr_first_connection_refresh_token",
+      refreshTokenExpiresAt: "2030-06-01T00:00:00.000Z",
+      session,
+      targetKey: "github-internal-identity-linking-resolve-selected-first",
+    });
+    const secondConnectionId = await seedGitHubPrincipalCredential(env, {
+      accessToken: "ghu_second_connection_token",
+      accessTokenExpiresAt: "2030-01-01T00:00:00.000Z",
+      credentialId: "upc_internal_identity_linking_resolve_selected_second",
+      providerConfigId: "ilp_internal_identity_linking_resolve_selected_second",
+      principalId: "uep_internal_identity_linking_resolve_selected_second",
+      refreshToken: "ghr_second_connection_refresh_token",
+      refreshTokenExpiresAt: "2030-06-01T00:00:00.000Z",
+      session,
+      targetKey: "github-internal-identity-linking-resolve-selected-second",
+    });
+
+    const response = await resolvePrincipalCredential(env, {
+      organizationId: session.organizationId,
+      actingUserId: session.userId,
+      providerFamily: "github",
+      integrationConnectionId: secondConnectionId,
+    });
+
+    expect(firstConnectionId).not.toBe(secondConnectionId);
+    expect(response.status).toBe(200);
+    expect(ResolvePrincipalCredentialResponseSchema.parse(await response.json())).toMatchObject({
+      kind: "value",
+      value: "ghu_second_connection_token",
       expiresAt: "2030-01-01T00:00:00.000Z",
     });
   });
@@ -84,7 +130,7 @@ describe.concurrent("internal identity-linking principal credential resolution",
     });
 
     try {
-      await seedGitHubPrincipalCredential(env, {
+      const connectionId = await seedGitHubPrincipalCredential(env, {
         accessToken: "ghu_expired_token",
         accessTokenExpiresAt: "2020-01-01T00:00:00.000Z",
         apiBaseUrl: simulatedGitHub.baseUrl,
@@ -102,6 +148,7 @@ describe.concurrent("internal identity-linking principal credential resolution",
         organizationId: session.organizationId,
         actingUserId: session.userId,
         providerFamily: "github",
+        integrationConnectionId: connectionId,
       });
 
       expect(response.status).toBe(200);
@@ -170,7 +217,7 @@ describe.concurrent("internal identity-linking principal credential resolution",
     });
 
     try {
-      await seedGitHubPrincipalCredential(env, {
+      const connectionId = await seedGitHubPrincipalCredential(env, {
         accessToken: "ghu_expired_token",
         accessTokenExpiresAt: "2020-01-01T00:00:00.000Z",
         apiBaseUrl: simulatedGitHub.baseUrl,
@@ -188,6 +235,7 @@ describe.concurrent("internal identity-linking principal credential resolution",
         organizationId: session.organizationId,
         actingUserId: session.userId,
         providerFamily: "github",
+        integrationConnectionId: connectionId,
       });
 
       expect(response.status).toBe(400);
@@ -225,7 +273,7 @@ async function seedGitHubPrincipalCredential(
     apiBaseUrl?: string;
     webBaseUrl?: string;
   },
-): Promise<void> {
+): Promise<string> {
   await upsertGitHubIdentityTarget(env, {
     targetKey: input.targetKey,
     ...(input.apiBaseUrl === undefined ? {} : { apiBaseUrl: input.apiBaseUrl }),
@@ -277,6 +325,8 @@ async function seedGitHubPrincipalCredential(
     secretKind: UserExternalPrincipalCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
     plaintext: input.refreshToken,
   });
+
+  return connectionId;
 }
 
 async function resolvePrincipalCredential(
@@ -285,6 +335,7 @@ async function resolvePrincipalCredential(
     organizationId: string;
     actingUserId: string;
     providerFamily: string;
+    integrationConnectionId: string;
   },
 ) {
   return await env.controlPlaneApi.http.fetch(

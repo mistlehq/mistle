@@ -286,6 +286,10 @@
                               "type": "string",
                               "minLength": 1
                             },
+                            "integrationConnectionId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
                             "credentialKind": {
                               "type": "string",
                               "minLength": 1
@@ -301,6 +305,7 @@
                           "required": [
                             "kind",
                             "providerFamily",
+                            "integrationConnectionId",
                             "actingUserRequired",
                             "resolutionMode"
                           ],
@@ -368,6 +373,10 @@
                         "type": "string",
                         "minLength": 1
                       },
+                      "integrationConnectionId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
                       "credentialKind": {
                         "type": "string",
                         "minLength": 1
@@ -380,7 +389,13 @@
                         "enum": ["required", "preferred"]
                       }
                     },
-                    "required": ["kind", "providerFamily", "actingUserRequired", "resolutionMode"],
+                    "required": [
+                      "kind",
+                      "providerFamily",
+                      "integrationConnectionId",
+                      "actingUserRequired",
+                      "resolutionMode"
+                    ],
                     "additionalProperties": false
                   },
                   {

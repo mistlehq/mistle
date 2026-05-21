@@ -120,6 +120,7 @@ export function resolveGitHubUserAttributedEgressCredentialResolver(
   return {
     kind: "linked_principal",
     providerFamily: GitHubFamilyId,
+    integrationConnectionId: input.defaultCredentialResolver.connectionId,
     credentialKind: GitHubLinkedUserCredentialKind,
     actingUserRequired: true,
     resolutionMode: "preferred",

@@ -113,6 +113,7 @@ describe("resolveGitHubUserAttributedEgressCredentialResolver", () => {
     ).toEqual({
       kind: "linked_principal",
       providerFamily: GitHubFamilyId,
+      integrationConnectionId: "icn_123",
       credentialKind: "github_app_user_access_token",
       actingUserRequired: true,
       resolutionMode: "preferred",
@@ -137,6 +138,7 @@ describe("resolveGitHubUserAttributedEgressCredentialResolver", () => {
     ).toEqual({
       kind: "linked_principal",
       providerFamily: GitHubFamilyId,
+      integrationConnectionId: "icn_123",
       credentialKind: "github_app_user_access_token",
       actingUserRequired: true,
       resolutionMode: "preferred",
@@ -158,6 +160,7 @@ describe("resolveGitHubUserAttributedEgressCredentialResolver", () => {
         defaultCredentialResolver: {
           kind: "linked_principal",
           providerFamily: GitHubFamilyId,
+          integrationConnectionId: "icn_123",
           credentialKind: "github_app_user_access_token",
           actingUserRequired: true,
           resolutionMode: "required",
@@ -166,6 +169,7 @@ describe("resolveGitHubUserAttributedEgressCredentialResolver", () => {
     ).toEqual({
       kind: "linked_principal",
       providerFamily: GitHubFamilyId,
+      integrationConnectionId: "icn_123",
       credentialKind: "github_app_user_access_token",
       actingUserRequired: true,
       resolutionMode: "required",

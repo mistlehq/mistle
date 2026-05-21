@@ -124,6 +124,7 @@ describe("createSandboxStartupInput", () => {
             credentialResolver: {
               kind: "linked_principal",
               providerFamily: "github",
+              integrationConnectionId: "icn_github",
               actingUserRequired: true,
               resolutionMode: "required",
             },

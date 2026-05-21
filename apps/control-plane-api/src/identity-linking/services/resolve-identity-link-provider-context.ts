@@ -56,6 +56,9 @@ export async function resolveIdentityLinkProviderContextOrThrow(
           ...(input.organizationProviderConfigId === undefined
             ? []
             : [eq(table.id, input.organizationProviderConfigId)]),
+          ...(input.integrationConnectionId === undefined
+            ? []
+            : [eq(table.integrationConnectionId, input.integrationConnectionId)]),
         ),
     });
 

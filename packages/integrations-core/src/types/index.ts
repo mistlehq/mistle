@@ -1559,6 +1559,7 @@ export type LinkedPrincipalEgressCredentialResolutionMode = "required" | "prefer
 export type LinkedPrincipalEgressCredentialResolverRef = {
   kind: "linked_principal";
   providerFamily: string;
+  integrationConnectionId: string;
   credentialKind?: string;
   actingUserRequired: boolean;
   resolutionMode: LinkedPrincipalEgressCredentialResolutionMode;

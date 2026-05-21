@@ -535,12 +535,21 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "integrationConnectionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
                   "credentialKind": {
                     "type": "string",
                     "minLength": 1
                   }
                 },
-                "required": ["organizationId", "actingUserId", "providerFamily"],
+                "required": [
+                  "organizationId",
+                  "actingUserId",
+                  "providerFamily",
+                  "integrationConnectionId"
+                ],
                 "additionalProperties": false
               }
             }
@@ -2284,6 +2293,10 @@
                                               "type": "string",
                                               "minLength": 1
                                             },
+                                            "integrationConnectionId": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
                                             "credentialKind": {
                                               "type": "string",
                                               "minLength": 1
@@ -2299,6 +2312,7 @@
                                           "required": [
                                             "kind",
                                             "providerFamily",
+                                            "integrationConnectionId",
                                             "actingUserRequired",
                                             "resolutionMode"
                                           ],
@@ -2366,6 +2380,10 @@
                                         "type": "string",
                                         "minLength": 1
                                       },
+                                      "integrationConnectionId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
                                       "credentialKind": {
                                         "type": "string",
                                         "minLength": 1
@@ -2381,6 +2399,7 @@
                                     "required": [
                                       "kind",
                                       "providerFamily",
+                                      "integrationConnectionId",
                                       "actingUserRequired",
                                       "resolutionMode"
                                     ],

@@ -4,6 +4,10 @@ import { defineConfig } from "vitest/config";
 
 const WorkspaceAliases = [
   {
+    find: /^@mistle\/cache$/,
+    replacement: fileURLToPath(new URL("../../packages/cache/src/index.ts", import.meta.url)),
+  },
+  {
     find: /^@mistle\/config$/,
     replacement: fileURLToPath(new URL("../../packages/config/src/index.ts", import.meta.url)),
   },

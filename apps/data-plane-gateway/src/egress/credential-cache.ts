@@ -17,6 +17,7 @@ export type CredentialCacheKeyInput =
       credentialResolverKind: "linked_principal";
       organizationId: string;
       providerFamily: string;
+      integrationConnectionId: string;
       actingUserRequired: boolean;
       actingUserId?: string;
       credentialKind?: string;
@@ -126,6 +127,7 @@ function toCacheKey(input: CredentialCacheKeyInput): string {
     input.credentialResolverKind,
     input.organizationId,
     input.providerFamily,
+    input.integrationConnectionId,
     String(input.actingUserRequired),
     input.actingUserId ?? "",
     input.credentialKind ?? "",

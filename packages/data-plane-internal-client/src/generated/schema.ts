@@ -324,6 +324,7 @@ export interface paths {
                     | {
                         actingUserRequired: boolean;
                         credentialKind?: string;
+                        integrationConnectionId: string;
                         /** @enum {string} */
                         kind: "linked_principal";
                         providerFamily: string;
@@ -381,6 +382,7 @@ export interface paths {
                   | {
                       actingUserRequired: boolean;
                       credentialKind?: string;
+                      integrationConnectionId: string;
                       /** @enum {string} */
                       kind: "linked_principal";
                       providerFamily: string;
@@ -781,6 +783,7 @@ export interface paths {
                       | {
                           actingUserRequired: boolean;
                           credentialKind?: string;
+                          integrationConnectionId: string;
                           /** @enum {string} */
                           kind: "linked_principal";
                           providerFamily: string;
@@ -838,6 +841,7 @@ export interface paths {
                     | {
                         actingUserRequired: boolean;
                         credentialKind?: string;
+                        integrationConnectionId: string;
                         /** @enum {string} */
                         kind: "linked_principal";
                         providerFamily: string;

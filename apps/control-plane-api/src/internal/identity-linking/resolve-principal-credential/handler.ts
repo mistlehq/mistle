@@ -37,6 +37,7 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
       organizationId: parsedInput.data.organizationId,
       actingUserId: parsedInput.data.actingUserId,
       providerFamily: parsedInput.data.providerFamily,
+      integrationConnectionId: parsedInput.data.integrationConnectionId,
       ...(parsedInput.data.credentialKind === undefined
         ? {}
         : { credentialKind: parsedInput.data.credentialKind }),

@@ -68,6 +68,7 @@ const RuntimePlanSchema = z.object({
         z.object({
           kind: z.literal("linked_principal"),
           providerFamily: z.string().min(1),
+          integrationConnectionId: z.string().min(1),
           actingUserRequired: z.boolean(),
           resolutionMode: z.enum(["required", "preferred"]),
           credentialKind: z.string().min(1).optional(),
@@ -557,6 +558,7 @@ describe("encodeSandboxStartupInput", () => {
             credentialResolver: {
               kind: "linked_principal",
               providerFamily: "github",
+              integrationConnectionId: "icn_github",
               actingUserRequired: true,
               resolutionMode: "required",
               credentialKind: "github_app_user_access_token",
@@ -570,6 +572,7 @@ describe("encodeSandboxStartupInput", () => {
     expect(decoded.runtimePlan.egressRoutes[0]?.credentialResolver).toEqual({
       kind: "linked_principal",
       providerFamily: "github",
+      integrationConnectionId: "icn_github",
       actingUserRequired: true,
       resolutionMode: "required",
       credentialKind: "github_app_user_access_token",

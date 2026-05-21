@@ -125,6 +125,7 @@ describe("provider egress route helpers", () => {
           credentialResolver: {
             kind: "linked_principal",
             providerFamily: "openai",
+            integrationConnectionId: "icn_openai",
             actingUserRequired: true,
             resolutionMode: "required",
           },

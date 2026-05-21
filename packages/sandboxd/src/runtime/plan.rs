@@ -120,6 +120,8 @@ pub enum CompiledEgressRouteCredentialResolver {
     LinkedPrincipal {
         #[serde(rename = "providerFamily")]
         provider_family: String,
+        #[serde(rename = "integrationConnectionId")]
+        integration_connection_id: String,
         #[serde(rename = "credentialKind")]
         credential_kind: Option<String>,
         #[serde(rename = "actingUserRequired")]
@@ -848,6 +850,7 @@ mod tests {
           "credentialResolver": {
             "kind": "linked_principal",
             "providerFamily": "github",
+            "integrationConnectionId": "conn_github",
             "credentialKind": "github_app_user_access_token",
             "actingUserRequired": true,
             "resolutionMode": "preferred"
@@ -858,11 +861,13 @@ mod tests {
         match route.credential_resolver {
             CompiledEgressRouteCredentialResolver::LinkedPrincipal {
                 provider_family,
+                integration_connection_id,
                 credential_kind,
                 acting_user_required,
                 resolution_mode,
             } => {
                 assert_eq!(provider_family, "github");
+                assert_eq!(integration_connection_id, "conn_github");
                 assert_eq!(
                     credential_kind,
                     Some("github_app_user_access_token".to_string())

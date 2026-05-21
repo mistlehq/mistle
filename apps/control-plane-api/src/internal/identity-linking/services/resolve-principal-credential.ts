@@ -3,6 +3,7 @@ import {
   UserExternalPrincipalCredentialStatuses,
   UserExternalPrincipalStatuses,
   type ControlPlaneDatabase,
+  OrganizationIdentityLinkProviderConfigStatus,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import type {
@@ -30,6 +31,7 @@ type ResolvePrincipalCredentialInput = {
   organizationId: string;
   actingUserId: string;
   providerFamily: string;
+  integrationConnectionId: string;
   credentialKind?: string;
 };
 
@@ -358,6 +360,8 @@ export async function resolvePrincipalCredential(
   const providerContext = await resolveIdentityLinkProviderContextOrThrow(ctx, {
     organizationId: input.organizationId,
     providerFamily: input.providerFamily,
+    integrationConnectionId: input.integrationConnectionId,
+    requiredConfigStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
   });
   const identityLinkingRuntime = await resolveIdentityLinkingRuntimeContextOrThrow({
     db: ctx.db,
