@@ -9,6 +9,7 @@ use tokio_tungstenite::{accept_async, connect_async};
 use tracing::{field, info};
 use tungstenite::Message;
 
+use crate::codex_proxy::message::is_connection_termination_error;
 use crate::codex_proxy::proxy_session::activity::{
     ActiveCompactionState, ActiveTurnState, ClientForwardContext, PendingCompactionRequest,
     TurnRequestKind, finalize_active_turns_for_transport_outcome,
@@ -32,7 +33,7 @@ use crate::codex_proxy::types::{
 };
 use crate::codex_proxy::{
     CodexProxyError, CodexSessionManagerError, CodexSessionManagerHandle,
-    MISTLE_AGENT_CLIENT_TITLE, RetainReason, is_connection_termination_error,
+    MISTLE_AGENT_CLIENT_TITLE, RetainReason,
 };
 const SET_DELIVERY_CONTEXT_METHOD: &str = "mistle/setDeliveryContext";
 const THREAD_COMPACT_START_METHOD: &str = "thread/compact/start";

@@ -7,15 +7,17 @@ use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
 use tokio_tungstenite::connect_async;
 
+use crate::codex_proxy::message::{
+    RawCodexSocket, parse_thread_loaded_list_response, parse_thread_read_response,
+    parse_thread_status_changed_message, send_json_message, wait_for_response,
+};
 use crate::codex_proxy::types::{
     CodexSessionManagerCommand, CodexSessionManagerError, CodexSessionManagerHealthState,
     CodexSessionManagerState, RetainReason, ThreadSubscriptionState,
 };
 use crate::codex_proxy::{
     CODEX_INITIALIZE_CLIENT_NAME, CodexMonitor, CodexProxyError, CodexThreadStatus,
-    DEFAULT_CODEX_MONITOR_RECONNECT_INTERVAL, RawCodexSocket, parse_thread_loaded_list_response,
-    parse_thread_read_response, parse_thread_status_changed_message, send_json_message,
-    wait_for_response,
+    DEFAULT_CODEX_MONITOR_RECONNECT_INTERVAL,
 };
 use crate::keepalive::KeepaliveManager;
 use crate::time::{Clock, SystemClock, format_rfc3339_timestamp};
