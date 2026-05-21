@@ -282,7 +282,7 @@ async function assertVersionReferencesAreValid(
     if (version.gitCommitSigningIntegrationConnectionId !== null) {
       connectionIds.add(version.gitCommitSigningIntegrationConnectionId);
     }
-    if (version.mistleMcpApiKeyId !== null) {
+    if (version.mistleMcpEnabled && version.mistleMcpApiKeyId !== null) {
       apiKeyIds.add(version.mistleMcpApiKeyId);
     }
 

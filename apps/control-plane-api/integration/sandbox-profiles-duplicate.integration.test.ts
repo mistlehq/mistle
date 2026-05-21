@@ -411,6 +411,78 @@ describe.concurrent("sandbox profiles duplicate integration", () => {
       code: "INVALID_DUPLICATE_REFERENCE",
     });
   });
+
+  it("duplicates disabled Mistle MCP config with an unavailable remembered API key", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-duplicate-disabled-mcp-key@example.com",
+    });
+
+    await seedMistleMcpApiKey(env, {
+      organizationId: session.organizationId,
+      apiKeyId: "apk_duplicate_disabled_revoked",
+      revokedAt: "2026-05-01T00:00:00.000Z",
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_duplicate_disabled_mcp_key",
+        organizationId: session.organizationId,
+        displayName: "Disabled MCP Key Source",
+        activeVersion: 1,
+        createdAt: "2026-05-21T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_duplicate_disabled_mcp_key",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        mistleMcpEnabled: false,
+        mistleMcpApiKeyId: "apk_duplicate_disabled_revoked",
+      }),
+    );
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.sandboxProfileVersions)
+      .set({
+        snapshotImageProvider: "docker",
+        snapshotImageId: "sha256:duplicate-disabled-mcp-key",
+      })
+      .where(
+        and(
+          eq(
+            env.controlPlaneTables.sandboxProfileVersions.sandboxProfileId,
+            "sbp_duplicate_disabled_mcp_key",
+          ),
+          eq(env.controlPlaneTables.sandboxProfileVersions.version, 1),
+        ),
+      );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_duplicate_disabled_mcp_key/duplicate",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "Disabled MCP Key Copy",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(201);
+    const body = DuplicateSandboxProfileResponseSchema.parse(await response.json());
+    const duplicatedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, body.profile.id), eq(table.version, 1)),
+    });
+    expect(duplicatedVersion).toMatchObject({
+      mistleMcpEnabled: false,
+      mistleMcpApiKeyId: "apk_duplicate_disabled_revoked",
+    });
+  });
 });
 
 async function seedMistleMcpApiKey(
