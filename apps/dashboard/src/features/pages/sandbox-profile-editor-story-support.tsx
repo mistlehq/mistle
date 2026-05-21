@@ -114,6 +114,7 @@ export type SandboxProfileEditorPageStoryArgs = {
   draftTriggerImpactAffectedTriggers?: readonly SandboxProfileVersionDraftTriggerImpactTrigger[];
   duplicateProfileAvailability?: "available" | "unavailable";
   duplicateProfileDialogState?: "closed" | "open" | "error";
+  duplicateProfileTriggerState?: "none" | "with-triggers" | "loading" | "error";
   initialBindings?: readonly {
     id: string;
     connectionId: string;
@@ -822,6 +823,7 @@ function SandboxProfileEditorPageStoryView(
     input.duplicateProfileAvailability === undefined
       ? mode.activeVersion !== null && snapshotStatus === "snapshot-ready"
       : input.duplicateProfileAvailability === "available";
+  const duplicateProfileTriggerState = input.duplicateProfileTriggerState ?? "none";
   const setupScriptTestStatus =
     input.setupScriptTestStatus ?? (setupScriptDraft.trim().length === 0 ? "blank" : "idle");
   const storyConnections = [
@@ -903,6 +905,28 @@ function SandboxProfileEditorPageStoryView(
       }
       duplicateProfileIsAvailable={duplicateProfileIsAvailable}
       duplicateProfileIsPending={false}
+      duplicateProfileTriggerUsages={
+        duplicateProfileTriggerState === "with-triggers"
+          ? [
+              {
+                id: "trg_story_pr_checks",
+                kind: "webhook",
+                name: "PR checks",
+                sandboxProfileVersion: mode.activeVersion ?? 1,
+              },
+              {
+                id: "trg_story_nightly",
+                kind: "schedule",
+                name: "Nightly maintenance",
+                sandboxProfileVersion: mode.activeVersion ?? 1,
+              },
+            ]
+          : []
+      }
+      duplicateProfileTriggerUsagesError={
+        duplicateProfileTriggerState === "error" ? "Could not load triggers." : null
+      }
+      duplicateProfileTriggerUsagesIsPending={duplicateProfileTriggerState === "loading"}
       draftTriggerImpactError={input.draftTriggerImpactError ?? null}
       draftTriggerImpactAffectedTriggers={input.draftTriggerImpactAffectedTriggers ?? null}
       onDraftTriggerImpactErrorDismiss={() => {}}

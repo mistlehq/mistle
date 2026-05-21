@@ -41,6 +41,7 @@ import type {
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { organizationSandboxStorageSettingsQueryKey } from "../settings/organization/sandbox-storage-service.js";
 import { triggersListQueryKey } from "../triggers/triggers-query-keys.js";
+import type { TriggerSandboxProfileUsage } from "../triggers/triggers-service.js";
 import type { TriggersListResult } from "../triggers/triggers-types.js";
 import {
   WEBHOOK_TRIGGER_INTEGRATION_DIRECTORY_QUERY_KEY,
@@ -919,10 +920,7 @@ function getAutomaticSnapshotRefreshSection(): HTMLElement {
 }
 
 function DeleteProfileDialogHarness(input: {
-  triggerUsages?: readonly {
-    id: string;
-    name: string;
-  }[];
+  triggerUsages?: readonly TriggerSandboxProfileUsage[];
   triggerUsagesError?: string | null;
   triggerUsagesIsPending?: boolean;
 }): JSX.Element {
@@ -950,6 +948,65 @@ function DeleteProfileDialogHarness(input: {
       }}
       onConfirmDeleteProfile={() => {}}
       onDeleteProfileDialogOpenChange={setIsOpen}
+      onDiscardChangesAndLeaveDraft={() => {}}
+      onMakeChanges={() => {}}
+      onPublish={() => {}}
+      onSaveDraft={() => {}}
+      onActiveSectionIdChange={() => {}}
+      onSaveProfileName={async () => {}}
+      onViewActive={() => {}}
+      onViewDraft={() => {}}
+      profileName="Production profile"
+      profileNameFallback="Production profile"
+      renderSectionPanel={() => <div>Section panel</div>}
+      sections={[
+        {
+          id: "sandbox-profile",
+          label: "Sandbox Profile",
+        },
+      ]}
+      versionActionError={null}
+      versionActionIsPending={false}
+    />
+  );
+}
+
+function DuplicateProfileDialogHarness(input: {
+  triggerUsages?: readonly TriggerSandboxProfileUsage[];
+  triggerUsagesError?: string | null;
+  triggerUsagesIsPending?: boolean;
+}): JSX.Element {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <SandboxProfileEditorView
+      activeSectionId="sandbox-profile"
+      deleteProfileTriggerUsages={[]}
+      deleteProfileTriggerUsagesError={null}
+      deleteProfileTriggerUsagesIsPending={false}
+      deleteProfileError={null}
+      deleteProfileIsPending={false}
+      draftTriggerImpactAffectedTriggers={null}
+      draftTriggerImpactError={null}
+      onDraftTriggerImpactErrorDismiss={() => {}}
+      duplicateProfileIsAvailable={true}
+      duplicateProfileTriggerUsages={input.triggerUsages ?? []}
+      duplicateProfileTriggerUsagesError={input.triggerUsagesError ?? null}
+      duplicateProfileTriggerUsagesIsPending={input.triggerUsagesIsPending ?? false}
+      hasUnpersistedIntegrationChanges={false}
+      isDeleteProfileDialogOpen={false}
+      isDuplicateProfileDialogOpen={isOpen}
+      mode={{
+        kind: "active",
+        version: 1,
+        activeVersion: 1,
+        hasDraft: false,
+        draftVersion: null,
+      }}
+      onConfirmDeleteProfile={() => {}}
+      onConfirmDuplicateProfile={() => {}}
+      onDeleteProfileDialogOpenChange={() => {}}
+      onDuplicateProfileDialogOpenChange={setIsOpen}
       onDiscardChangesAndLeaveDraft={() => {}}
       onMakeChanges={() => {}}
       onPublish={() => {}}
@@ -1036,16 +1093,27 @@ function DraftActionsHarness(input: {
 }
 
 function renderDeleteProfileDialogHarness(input: {
-  triggerUsages?: readonly {
-    id: string;
-    name: string;
-  }[];
+  triggerUsages?: readonly TriggerSandboxProfileUsage[];
   triggerUsagesError?: string | null;
   triggerUsagesIsPending?: boolean;
 }): void {
   const router = createMemoryRouter(
     createRoutesFromElements(
       <Route element={<DeleteProfileDialogHarness {...input} />} path="/" />,
+    ),
+  );
+
+  render(<RouterProvider router={router} />);
+}
+
+function renderDuplicateProfileDialogHarness(input?: {
+  triggerUsages?: readonly TriggerSandboxProfileUsage[];
+  triggerUsagesError?: string | null;
+  triggerUsagesIsPending?: boolean;
+}): void {
+  const router = createMemoryRouter(
+    createRoutesFromElements(
+      <Route element={<DuplicateProfileDialogHarness {...(input ?? {})} />} path="/" />,
     ),
   );
 
@@ -3633,11 +3701,15 @@ describe("SandboxProfileEditorPage", () => {
       triggerUsages: [
         {
           id: "atm_triage",
+          kind: "webhook",
           name: "Repository triage",
+          sandboxProfileVersion: 1,
         },
         {
           id: "atm_release",
+          kind: "schedule",
           name: "Release notes",
+          sandboxProfileVersion: 1,
         },
       ],
     });
@@ -3666,5 +3738,43 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByRole("button", { name: "Delete profile" }).hasAttribute("disabled")).toBe(
       true,
     );
+  });
+
+  it("hides the duplicate trigger option when no matching triggers exist", () => {
+    renderDuplicateProfileDialogHarness();
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Duplicate" }));
+
+    expect(screen.getByRole("heading", { name: "Duplicate sandbox profile" })).toBeDefined();
+    expect(screen.queryByLabelText("Also duplicate matching triggers")).toBeNull();
+  });
+
+  it("shows the duplicate trigger option when matching triggers exist", () => {
+    renderDuplicateProfileDialogHarness({
+      triggerUsages: [
+        {
+          id: "trg_pr_checks",
+          kind: "webhook",
+          name: "PR checks",
+          sandboxProfileVersion: 1,
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Duplicate" }));
+
+    expect(screen.getByLabelText("Also duplicate matching triggers")).toBeDefined();
+  });
+
+  it("blocks profile duplication while trigger usage context is loading", () => {
+    renderDuplicateProfileDialogHarness({ triggerUsagesIsPending: true });
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Duplicate" }));
+
+    expect(screen.getByText("Checking triggers...")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Duplicate" }).hasAttribute("disabled")).toBe(true);
   });
 });

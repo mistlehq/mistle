@@ -32,9 +32,28 @@ export const Published: Story = {
   },
 };
 
-export const DuplicateProfileDialog: Story = {
+export const DuplicateProfileWithoutTriggers: Story = {
   args: {
     duplicateProfileDialogState: "open",
+    duplicateProfileTriggerState: "none",
+    lifecycleState: "published",
+    snapshotState: "snapshot-ready",
+  },
+};
+
+export const DuplicateProfileWithTriggers: Story = {
+  args: {
+    duplicateProfileDialogState: "open",
+    duplicateProfileTriggerState: "with-triggers",
+    lifecycleState: "published",
+    snapshotState: "snapshot-ready",
+  },
+};
+
+export const DuplicateProfileCheckingTriggers: Story = {
+  args: {
+    duplicateProfileDialogState: "open",
+    duplicateProfileTriggerState: "loading",
     lifecycleState: "published",
     snapshotState: "snapshot-ready",
   },
@@ -60,6 +79,16 @@ export const DuplicateProfileUnavailable: Story = {
 export const DuplicateProfileError: Story = {
   args: {
     duplicateProfileDialogState: "error",
+    duplicateProfileTriggerState: "with-triggers",
+    lifecycleState: "published",
+    snapshotState: "snapshot-ready",
+  },
+};
+
+export const DuplicateProfileTriggerCheckError: Story = {
+  args: {
+    duplicateProfileDialogState: "open",
+    duplicateProfileTriggerState: "error",
     lifecycleState: "published",
     snapshotState: "snapshot-ready",
   },

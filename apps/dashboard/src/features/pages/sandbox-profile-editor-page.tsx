@@ -114,8 +114,8 @@ import { SettingsSwitchField } from "../shared/settings-switch-field.js";
 import { UnavailableResourceState } from "../shared/unavailable-resource-state.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import {
-  listWebhookTriggersForSandboxProfile,
-  type WebhookTriggerSandboxProfileUsage,
+  listTriggersForSandboxProfile,
+  type TriggerSandboxProfileUsage,
 } from "../triggers/triggers-service.js";
 import {
   createSandboxBaseSetupScriptContextFromGeneratedInventory,
@@ -878,14 +878,19 @@ function LoadedSandboxProfileEditorPage(
   const [deleteProfileError, setDeleteProfileError] = useState<string | null>(null);
   const [duplicateProfileError, setDuplicateProfileError] = useState<string | null>(null);
   const [draftEditorResetKey, setDraftEditorResetKey] = useState(0);
+  const duplicateProfileIsAvailable = resolveSandboxProfileCanDuplicate({
+    profile: input.profile,
+    versions: input.versions,
+  });
   const triggerUsagesQuery = useQuery({
     queryKey: sandboxProfileTriggerUsagesQueryKey(input.profileId),
     queryFn: async ({ signal }) =>
-      listWebhookTriggersForSandboxProfile({
+      listTriggersForSandboxProfile({
         sandboxProfileId: input.profileId,
         signal,
       }),
-    enabled: isDeleteProfileDialogOpen,
+    enabled:
+      isDeleteProfileDialogOpen || (isDuplicateProfileDialogOpen && duplicateProfileIsAvailable),
     retry: false,
   });
   const createDraftMutation = useMutation({
@@ -1303,12 +1308,27 @@ function LoadedSandboxProfileEditorPage(
       }
       deleteProfileError={deleteProfileError}
       deleteProfileIsPending={deleteProfileMutation.isPending}
-      duplicateProfileIsAvailable={resolveSandboxProfileCanDuplicate({
-        profile: input.profile,
-        versions: input.versions,
-      })}
+      duplicateProfileIsAvailable={duplicateProfileIsAvailable}
       duplicateProfileError={duplicateProfileError}
       duplicateProfileIsPending={duplicateProfileMutation.isPending}
+      duplicateProfileTriggerUsages={
+        input.profile.activeVersion === null
+          ? []
+          : (triggerUsagesQuery.data ?? []).filter(
+              (trigger) => trigger.sandboxProfileVersion === input.profile.activeVersion,
+            )
+      }
+      duplicateProfileTriggerUsagesError={
+        isDuplicateProfileDialogOpen && triggerUsagesQuery.isError
+          ? resolveApiErrorMessage({
+              error: triggerUsagesQuery.error,
+              fallbackMessage: "Could not load triggers.",
+            })
+          : null
+      }
+      duplicateProfileTriggerUsagesIsPending={
+        isDuplicateProfileDialogOpen && duplicateProfileIsAvailable && triggerUsagesQuery.isPending
+      }
       isDeleteProfileDialogOpen={isDeleteProfileDialogOpen}
       isDuplicateProfileDialogOpen={isDuplicateProfileDialogOpen}
       onConfirmDeleteProfile={() => {
@@ -1368,7 +1388,7 @@ function ReadySandboxProfileEditorPage(input: {
   routeView: SandboxProfileRouteView;
   versionActionError: string | null;
   versionActionIsPending: boolean;
-  deleteProfileTriggerUsages: readonly WebhookTriggerSandboxProfileUsage[];
+  deleteProfileTriggerUsages: readonly TriggerSandboxProfileUsage[];
   deleteProfileTriggerUsagesError: string | null;
   deleteProfileTriggerUsagesIsPending: boolean;
   deleteProfileError: string | null;
@@ -1376,6 +1396,9 @@ function ReadySandboxProfileEditorPage(input: {
   duplicateProfileIsAvailable?: boolean;
   duplicateProfileError?: string | null;
   duplicateProfileIsPending?: boolean;
+  duplicateProfileTriggerUsages?: readonly TriggerSandboxProfileUsage[];
+  duplicateProfileTriggerUsagesError?: string | null;
+  duplicateProfileTriggerUsagesIsPending?: boolean;
   isDeleteProfileDialogOpen: boolean;
   isDuplicateProfileDialogOpen?: boolean;
   onPublish: (version: number) => Promise<void>;
@@ -1936,6 +1959,9 @@ function ReadySandboxProfileEditorPage(input: {
       })}
       duplicateProfileError={input.duplicateProfileError ?? null}
       duplicateProfileIsPending={input.duplicateProfileIsPending ?? false}
+      duplicateProfileTriggerUsages={input.duplicateProfileTriggerUsages ?? []}
+      duplicateProfileTriggerUsagesError={input.duplicateProfileTriggerUsagesError ?? null}
+      duplicateProfileTriggerUsagesIsPending={input.duplicateProfileTriggerUsagesIsPending ?? false}
       onMakeChanges={input.onMakeChanges}
       onConfirmDeleteProfile={input.onConfirmDeleteProfile}
       onDeleteProfileDialogOpenChange={input.onDeleteProfileDialogOpenChange}
@@ -3005,10 +3031,18 @@ function DuplicateSandboxProfileDialog(input: {
   onConfirm: (request: { displayName: string; includeTriggers: boolean }) => void;
   onOpenChange: (open: boolean) => void;
   profileName: string;
+  triggerUsages: readonly TriggerSandboxProfileUsage[];
+  triggerUsagesError: string | null;
+  triggerUsagesIsPending: boolean;
 }): React.JSX.Element {
   const defaultDisplayName = `${input.profileName} copy`;
   const [displayName, setDisplayName] = useState(defaultDisplayName);
   const [includeTriggers, setIncludeTriggers] = useState(false);
+  const canChooseTriggers =
+    input.isAvailable &&
+    !input.triggerUsagesIsPending &&
+    input.triggerUsagesError === null &&
+    input.triggerUsages.length > 0;
 
   useEffect(() => {
     if (input.isOpen) {
@@ -3017,8 +3051,19 @@ function DuplicateSandboxProfileDialog(input: {
     }
   }, [defaultDisplayName, input.isOpen]);
 
+  useEffect(() => {
+    if (!canChooseTriggers) {
+      setIncludeTriggers(false);
+    }
+  }, [canChooseTriggers]);
+
   const trimmedDisplayName = displayName.trim();
-  const isBlocked = input.isPending || !input.isAvailable || trimmedDisplayName.length === 0;
+  const isBlocked =
+    input.isPending ||
+    !input.isAvailable ||
+    input.triggerUsagesIsPending ||
+    input.triggerUsagesError !== null ||
+    trimmedDisplayName.length === 0;
 
   return (
     <Dialog
@@ -3056,22 +3101,34 @@ function DuplicateSandboxProfileDialog(input: {
             </FieldContent>
           </Field>
 
-          <label className="flex gap-3 rounded-md border bg-background p-3 text-sm">
-            <Checkbox
-              aria-label="Also duplicate matching triggers"
-              checked={includeTriggers}
-              disabled={input.isPending || !input.isAvailable}
-              onCheckedChange={(checked) => {
-                setIncludeTriggers(checked === true);
-              }}
-            />
-            <span className="flex min-w-0 flex-col gap-1">
-              <span className="font-medium">Also duplicate matching triggers</span>
-              <span className="text-muted-foreground">
-                Copied triggers are created disabled and exclude one-off scheduled triggers.
+          {input.triggerUsagesIsPending ? (
+            <p className="text-muted-foreground text-sm">Checking triggers...</p>
+          ) : null}
+
+          {input.triggerUsagesError === null ? null : (
+            <Notice title="Could not check triggers" variant="alert">
+              {input.triggerUsagesError}
+            </Notice>
+          )}
+
+          {canChooseTriggers ? (
+            <label className="flex gap-3 rounded-md border bg-background p-3 text-sm">
+              <Checkbox
+                aria-label="Also duplicate matching triggers"
+                checked={includeTriggers}
+                disabled={input.isPending || !input.isAvailable}
+                onCheckedChange={(checked) => {
+                  setIncludeTriggers(checked === true);
+                }}
+              />
+              <span className="flex min-w-0 flex-col gap-1">
+                <span className="font-medium">Also duplicate matching triggers</span>
+                <span className="text-muted-foreground">
+                  Copied triggers are created disabled and exclude one-off scheduled triggers.
+                </span>
               </span>
-            </span>
-          </label>
+            </label>
+          ) : null}
 
           {input.duplicateError === null ? null : (
             <Notice title="Duplicate failed" variant="alert">
@@ -3096,7 +3153,7 @@ function DuplicateSandboxProfileDialog(input: {
             onClick={() => {
               input.onConfirm({
                 displayName: trimmedDisplayName,
-                includeTriggers,
+                includeTriggers: canChooseTriggers && includeTriggers,
               });
             }}
             type="button"
@@ -3110,7 +3167,7 @@ function DuplicateSandboxProfileDialog(input: {
 }
 
 function DeleteSandboxProfileDialog(input: {
-  triggerUsages: readonly WebhookTriggerSandboxProfileUsage[];
+  triggerUsages: readonly TriggerSandboxProfileUsage[];
   triggerUsagesError: string | null;
   triggerUsagesIsPending: boolean;
   deleteError: string | null;
@@ -3193,7 +3250,7 @@ export function SandboxProfileEditorView(input: {
   profileNameFallback: string;
   onSaveProfileName: (nextValue: string) => Promise<void>;
   mode: SandboxProfileEditorVersionMode;
-  deleteProfileTriggerUsages: readonly WebhookTriggerSandboxProfileUsage[];
+  deleteProfileTriggerUsages: readonly TriggerSandboxProfileUsage[];
   deleteProfileTriggerUsagesError: string | null;
   deleteProfileTriggerUsagesIsPending: boolean;
   deleteProfileError: string | null;
@@ -3201,6 +3258,9 @@ export function SandboxProfileEditorView(input: {
   duplicateProfileIsAvailable?: boolean;
   duplicateProfileError?: string | null;
   duplicateProfileIsPending?: boolean;
+  duplicateProfileTriggerUsages?: readonly TriggerSandboxProfileUsage[];
+  duplicateProfileTriggerUsagesError?: string | null;
+  duplicateProfileTriggerUsagesIsPending?: boolean;
   draftSaveError?: string | null;
   versionActionError: string | null;
   versionActionIsPending: boolean;
@@ -3314,6 +3374,9 @@ export function SandboxProfileEditorView(input: {
           input.onDuplicateProfileDialogOpenChange?.(open);
         }}
         profileName={input.profileName ?? input.profileNameFallback}
+        triggerUsages={input.duplicateProfileTriggerUsages ?? []}
+        triggerUsagesError={input.duplicateProfileTriggerUsagesError ?? null}
+        triggerUsagesIsPending={input.duplicateProfileTriggerUsagesIsPending ?? false}
       />
 
       <PageFrame

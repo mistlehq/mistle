@@ -108,16 +108,18 @@ export async function getTrigger(input: {
   }
 }
 
-export type WebhookTriggerSandboxProfileUsage = {
+export type TriggerSandboxProfileUsage = {
   id: string;
+  kind: TriggerListItem["kind"];
   name: string;
+  sandboxProfileVersion: number;
 };
 
-export async function listWebhookTriggersForSandboxProfile(input: {
+export async function listTriggersForSandboxProfile(input: {
   sandboxProfileId: string;
   signal?: AbortSignal;
-}): Promise<WebhookTriggerSandboxProfileUsage[]> {
-  const matchingTriggers: WebhookTriggerSandboxProfileUsage[] = [];
+}): Promise<TriggerSandboxProfileUsage[]> {
+  const matchingTriggers: TriggerSandboxProfileUsage[] = [];
   let after: string | null = null;
 
   do {
@@ -125,7 +127,6 @@ export async function listWebhookTriggersForSandboxProfile(input: {
       limit: 100,
       after,
       before: null,
-      kind: "webhook",
       sandboxProfileId: input.sandboxProfileId,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
     });
@@ -133,7 +134,9 @@ export async function listWebhookTriggersForSandboxProfile(input: {
     for (const trigger of page.items) {
       matchingTriggers.push({
         id: trigger.id,
+        kind: trigger.kind,
         name: trigger.name,
+        sandboxProfileVersion: trigger.target.sandboxProfileVersion,
       });
     }
 
