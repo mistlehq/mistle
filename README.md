@@ -48,42 +48,10 @@ rm -rf ~/.mistle/local/down.sh
 
 Remember to delete the necessary Docker volumes, as well as images that were pulled.
 
-## Install the Mistle CLI
-
-You can install the latest released `mistle` CLI with:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/mistlehq/mistle/main/scripts/install-mistle-cli.sh | sh
-```
-
-The installer:
-
-- Detects your operating system and CPU architecture.
-- Downloads the matching `mistle` CLI release artifact from GitHub Releases.
-- Verifies the release artifact checksum.
-- Installs the binary to `~/.local/bin/mistle` by default.
-
-To install a specific release version:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/mistlehq/mistle/main/scripts/install-mistle-cli.sh | MISTLE_VERSION=0.17.0 sh
-```
-
-Set `MISTLE_INSTALL_DIR` to choose a different install directory:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/mistlehq/mistle/main/scripts/install-mistle-cli.sh | MISTLE_INSTALL_DIR="${HOME}/bin" sh
-```
-
-After installing, update the CLI to the latest release with:
-
-```bash
-mistle update
-```
-
 ## Other notes
 
 - Mistle is still early, so do expect bugs.
+- The Mistle CLI is early and not yet ready for general usage. Refer to [docs/cli.md](./docs/cli.md) for current CLI notes.
 - We are currently not accepting contributions yet. Please open an issue for bug reports, feature requests, and discussion.
 - Bug reports, feature requests, etc. are still welcome though! Please feel free to open an issue.
 
