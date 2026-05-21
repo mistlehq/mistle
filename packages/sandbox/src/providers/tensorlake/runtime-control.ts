@@ -22,6 +22,18 @@ import type { TensorlakeClient } from "./client.js";
 
 const SandboxdEnsureTimeoutMs = 120_000;
 const SandboxdStopDaemonTimeoutMs = 15_000;
+const TensorlakeElevatedShellCommand = "sudo";
+const TensorlakeElevatedShellCommandArgs = ["-E", "sh", "-euc"];
+
+export function createTensorlakeElevatedShellCommand(input: { script: string }): {
+  command: string;
+  args: readonly string[];
+} {
+  return {
+    command: TensorlakeElevatedShellCommand,
+    args: [...TensorlakeElevatedShellCommandArgs, input.script],
+  };
+}
 
 function requireSandboxId(id: string): void {
   if (id.trim().length === 0) {
@@ -84,16 +96,14 @@ export class TensorlakeSandboxRuntimeControl implements SandboxRuntimeControl {
         sandboxId: input.id,
         operation: TensorlakeClientOperationIds.STOP_SANDBOXD_DAEMON,
         commandDescription: "Stop sandboxd daemon",
-        command: "sh",
-        args: ["-euc", SandboxdStopDaemonCommand],
+        ...createTensorlakeElevatedShellCommand({ script: SandboxdStopDaemonCommand }),
         timeoutMs: SandboxdStopDaemonTimeoutMs,
       });
       await this.#client.runCommand({
         sandboxId: input.id,
         operation: TensorlakeClientOperationIds.ENSURE_SANDBOXD,
         commandDescription: "Ensure sandboxd artifact",
-        command: "sh",
-        args: ["-euc", SandboxdInstallCommand],
+        ...createTensorlakeElevatedShellCommand({ script: SandboxdInstallCommand }),
         env: {
           [SandboxdInstallEnvVars.URL]: input.artifact.url,
           [SandboxdInstallEnvVars.SHA256]: input.artifact.sha256,
