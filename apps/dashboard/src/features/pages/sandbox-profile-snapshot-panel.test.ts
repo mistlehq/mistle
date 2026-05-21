@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
 import {
+  formatSnapshotTimestamp,
   resolveRetainedSnapshotOperationState,
   resolveSnapshotPanelState,
   type SnapshotPanelState,
@@ -92,5 +93,14 @@ describe("resolveSnapshotPanelState", () => {
       operationId: null,
       sandboxInstanceId: null,
     });
+  });
+});
+
+describe("formatSnapshotTimestamp", () => {
+  it("formats the latest snapshot timestamp with the local timezone offset", () => {
+    const formattedTimestamp = formatSnapshotTimestamp("2026-05-21T09:30:00.000Z");
+
+    expect(formattedTimestamp).not.toContain("2026-05-21T09:30");
+    expect(formattedTimestamp).toMatch(/GMT[+-]\d+/u);
   });
 });

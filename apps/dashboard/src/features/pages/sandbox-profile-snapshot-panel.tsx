@@ -143,6 +143,14 @@ function formatSnapshotRefreshNextScheduledAt(input: {
   })}`;
 }
 
+export function formatSnapshotTimestamp(isoDateTime: string): string {
+  const timezone = readBrowserTimeZone();
+  return `${formatDateTime(isoDateTime, timezone)} ${formatTimeZoneOffset({
+    isoDateTime,
+    timeZone: timezone,
+  })}`;
+}
+
 export function resolveSnapshotPanelState(
   version: SandboxProfileVersion | null,
   activeVersion: number | null,
@@ -576,7 +584,11 @@ function formatPublishSnapshotFailureMessage(input: {
 
 function resolveSnapshotStatusSummaryDescription(state: SnapshotStatusState): string {
   if (state.kind === "ready" || state.kind === "refresh-error") {
-    return `Latest snapshot: ${state.latestSnapshotCreatedAt ?? "N/A"}`;
+    return `Latest snapshot: ${
+      state.latestSnapshotCreatedAt === null
+        ? "N/A"
+        : formatSnapshotTimestamp(state.latestSnapshotCreatedAt)
+    }`;
   }
 
   const fallbackVersion =
