@@ -17,6 +17,10 @@ Write commands with explicit non-interactive flags or environment variables, and
 
 Account for any required environment variables, credentials, external services, or manual prerequisites that the setup script depends on.
 
+If Mistle MCP tools are available, use \`profile_draft_setup_script_put\` to save the final setup script to the current draft profile version. Use \`MISTLE_SANDBOX_PROFILE_ID\` and \`MISTLE_SANDBOX_PROFILE_VERSION\` from the sandbox environment as the tool inputs instead of asking the user for those identifiers.
+
+When you update the draft setup script through MCP, still summarize what changed and what validation you ran. If the MCP tool is unavailable or the update fails, include the complete final script text in your response so the user can apply it manually.
+
 When the right setup approach is unclear, ask clarifying questions or make a recommendation before drafting changes so the user can confirm alignment.
 `.trim();
 

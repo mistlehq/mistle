@@ -42,6 +42,13 @@ describe("buildSetupAssistantCollaborationModeSettings", () => {
     );
   });
 
+  it("directs setup assistant to save final setup scripts through Mistle MCP when available", () => {
+    expect(SetupAssistantDeveloperInstructions).toContain("profile_draft_setup_script_put");
+    expect(SetupAssistantDeveloperInstructions).toContain("MISTLE_SANDBOX_PROFILE_ID");
+    expect(SetupAssistantDeveloperInstructions).toContain("MISTLE_SANDBOX_PROFILE_VERSION");
+    expect(SetupAssistantDeveloperInstructions).toContain("include the complete final script text");
+  });
+
   it("requires maintenance scripts to run from an existing snapshot", () => {
     expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
       "starts from the current usable snapshot",
