@@ -28,6 +28,7 @@ type ListProfileVersionsOutput = {
     sandboxProfileId: string;
     version: number;
     state: SandboxProfileVersionState;
+    publishedAt: string | null;
     defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
     gitCommitSigningIntegrationConnectionId: string | null;
@@ -79,6 +80,7 @@ export async function listProfileVersions(
       sandboxProfileId: true,
       version: true,
       state: true,
+      publishedAt: true,
       defaultPersistenceMode: true,
       agentRuntimeId: true,
       gitCommitSigningIntegrationConnectionId: true,
@@ -136,6 +138,7 @@ export async function listProfileVersions(
         sandboxProfileId: version.sandboxProfileId,
         version: version.version,
         state: version.state,
+        publishedAt: version.publishedAt,
         defaultPersistenceMode: version.defaultPersistenceMode,
         agentRuntimeId: version.agentRuntimeId,
         gitCommitSigningIntegrationConnectionId: version.gitCommitSigningIntegrationConnectionId,

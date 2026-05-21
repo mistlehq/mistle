@@ -198,7 +198,9 @@ export function resolveSnapshotPanelState(
   return {
     kind: "ready",
     latestSnapshotCreatedAt:
-      latestSnapshotJob?.state === "succeeded" ? latestSnapshotJob.finishedAt : null,
+      latestSnapshotJob?.state === "succeeded"
+        ? (latestSnapshotJob.finishedAt ?? version.publishedAt)
+        : version.publishedAt,
     operationId: latestSnapshotJob?.state === "succeeded" ? latestSnapshotJob.id : null,
     sandboxInstanceId:
       latestSnapshotJob?.state === "succeeded" ? latestSnapshotJob.sandboxInstanceId : null,

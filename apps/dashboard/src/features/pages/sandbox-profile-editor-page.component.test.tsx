@@ -111,6 +111,7 @@ function createSandboxProfileVersionFixture(input: {
     sandboxProfileId: input.sandboxProfileId,
     version: input.version,
     state: input.state,
+    publishedAt: input.state === "published" ? "2026-05-01T00:00:00.000Z" : null,
     agentRuntimeId: input.agentRuntimeId ?? "codex",
     gitCommitSigningIntegrationConnectionId: null,
     mistleMcpEnabled: false,
@@ -1515,7 +1516,8 @@ describe("SandboxProfileEditorPage", () => {
     expect(
       screen.queryByText("This snapshot will be used for new sessions and triggers."),
     ).toBeNull();
-    expect(screen.getByText("Latest snapshot: N/A")).toBeDefined();
+    expect(screen.queryByText("Latest snapshot: N/A")).toBeNull();
+    expect(screen.getByText(/^Latest snapshot:/u)).toBeDefined();
     expect(screen.getByRole("button", { name: "Refresh snapshot (setup script)" })).toBeDefined();
     expect(screen.queryByRole("button", { name: "Refresh snapshot (maintenance)" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Snapshot refresh actions" })).toBeNull();

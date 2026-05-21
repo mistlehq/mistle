@@ -20374,6 +20374,10 @@
                       "type": "string",
                       "enum": ["draft", "published"]
                     },
+                    "publishedAt": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
                     "defaultPersistenceMode": {
                       "type": "string",
                       "enum": ["ephemeral", "persistent"]
@@ -20523,6 +20527,7 @@
                     "sandboxProfileId",
                     "version",
                     "state",
+                    "publishedAt",
                     "defaultPersistenceMode",
                     "agentRuntimeId",
                     "gitCommitSigningIntegrationConnectionId",
@@ -20703,6 +20708,10 @@
                             "type": "string",
                             "enum": ["draft", "published"]
                           },
+                          "publishedAt": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          },
                           "defaultPersistenceMode": {
                             "type": "string",
                             "enum": ["ephemeral", "persistent"]
@@ -20852,6 +20861,7 @@
                           "sandboxProfileId",
                           "version",
                           "state",
+                          "publishedAt",
                           "defaultPersistenceMode",
                           "agentRuntimeId",
                           "gitCommitSigningIntegrationConnectionId",
@@ -23475,6 +23485,10 @@
                           "type": "string",
                           "enum": ["draft", "published"]
                         },
+                        "publishedAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
                         "defaultPersistenceMode": {
                           "type": "string",
                           "enum": ["ephemeral", "persistent"]
@@ -23624,6 +23638,7 @@
                         "sandboxProfileId",
                         "version",
                         "state",
+                        "publishedAt",
                         "defaultPersistenceMode",
                         "agentRuntimeId",
                         "gitCommitSigningIntegrationConnectionId",
@@ -23891,6 +23906,10 @@
                           "type": "string",
                           "enum": ["draft", "published"]
                         },
+                        "publishedAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
                         "defaultPersistenceMode": {
                           "type": "string",
                           "enum": ["ephemeral", "persistent"]
@@ -24040,6 +24059,7 @@
                         "sandboxProfileId",
                         "version",
                         "state",
+                        "publishedAt",
                         "defaultPersistenceMode",
                         "agentRuntimeId",
                         "gitCommitSigningIntegrationConnectionId",
@@ -24290,6 +24310,10 @@
                           "type": "string",
                           "enum": ["draft", "published"]
                         },
+                        "publishedAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
                         "defaultPersistenceMode": {
                           "type": "string",
                           "enum": ["ephemeral", "persistent"]
@@ -24439,6 +24463,7 @@
                         "sandboxProfileId",
                         "version",
                         "state",
+                        "publishedAt",
                         "defaultPersistenceMode",
                         "agentRuntimeId",
                         "gitCommitSigningIntegrationConnectionId",

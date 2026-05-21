@@ -56,6 +56,7 @@ type RefreshProfileVersionSnapshotOutput = {
     sandboxProfileId: string;
     version: number;
     state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
+    publishedAt: string | null;
     defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
     gitCommitSigningIntegrationConnectionId: string | null;
@@ -172,6 +173,7 @@ async function queueProfileVersionSnapshot(
           sandboxProfileId: tables.sandboxProfileVersions.sandboxProfileId,
           version: tables.sandboxProfileVersions.version,
           state: tables.sandboxProfileVersions.state,
+          publishedAt: tables.sandboxProfileVersions.publishedAt,
           defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
           agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
           gitCommitSigningIntegrationConnectionId:
@@ -313,6 +315,7 @@ async function queueProfileVersionSnapshot(
           sandboxProfileId: resolvedSandboxProfileId,
           version: resolvedSandboxProfileVersion,
           state: sandboxProfileVersion.state,
+          publishedAt: sandboxProfileVersion.publishedAt,
           defaultPersistenceMode: resolvedDefaultPersistenceMode,
           agentRuntimeId: resolvedAgentRuntimeId,
           gitCommitSigningIntegrationConnectionId: resolvedGitCommitSigningIntegrationConnectionId,

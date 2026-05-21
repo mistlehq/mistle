@@ -152,6 +152,7 @@ function createVersion(
     sandboxProfileId: "sbp_runtime_section_test",
     version: 1,
     state: "draft",
+    publishedAt: null,
     agentRuntimeId: input.agentRuntimeId ?? "codex",
     gitCommitSigningIntegrationConnectionId: null,
     mistleMcpEnabled: input.mistleMcpEnabled ?? false,

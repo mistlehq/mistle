@@ -143,6 +143,7 @@ export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVers
     sandboxProfileId: true,
     version: true,
     state: true,
+    publishedAt: true,
     defaultPersistenceMode: true,
     agentRuntimeId: true,
     gitCommitSigningIntegrationConnectionId: true,

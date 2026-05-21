@@ -503,6 +503,7 @@ const SandboxProfileVersionSchema = z
     sandboxProvider: z.string().min(1).nullable(),
     sandboxResources: SandboxProfileVersionResourcesSchema.nullable(),
     state: z.enum(["draft", "published"]),
+    publishedAt: z.string().min(1).nullable(),
     usable: z.boolean(),
     version: z.number().int().min(1),
   })

@@ -29,6 +29,7 @@ type CreateProfileVersionDraftOutput = {
   sandboxProfileId: string;
   version: number;
   state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
+  publishedAt: string | null;
   defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
   agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
   gitCommitSigningIntegrationConnectionId: string | null;
@@ -151,6 +152,7 @@ export async function createProfileVersionDraft(
           sandboxProfileId: tables.sandboxProfileVersions.sandboxProfileId,
           version: tables.sandboxProfileVersions.version,
           state: tables.sandboxProfileVersions.state,
+          publishedAt: tables.sandboxProfileVersions.publishedAt,
           defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
           agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
           gitCommitSigningIntegrationConnectionId:
@@ -186,6 +188,7 @@ export async function createProfileVersionDraft(
         sandboxProfileId: createdDraftVersion.sandboxProfileId,
         version: createdDraftVersion.version,
         state: createdDraftVersion.state,
+        publishedAt: createdDraftVersion.publishedAt,
         defaultPersistenceMode: createdDraftVersion.defaultPersistenceMode,
         agentRuntimeId: createdDraftVersion.agentRuntimeId,
         gitCommitSigningIntegrationConnectionId:

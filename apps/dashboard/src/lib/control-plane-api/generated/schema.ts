@@ -9622,6 +9622,7 @@ export interface paths {
                 maintenanceScript: string | null;
                 mistleMcpApiKeyId: string | null;
                 mistleMcpEnabled: boolean;
+                publishedAt: string | null;
                 refreshSchedule: {
                   cronExpression: string;
                   enabled: boolean;
@@ -9750,6 +9751,7 @@ export interface paths {
               maintenanceScript: string | null;
               mistleMcpApiKeyId: string | null;
               mistleMcpEnabled: boolean;
+              publishedAt: string | null;
               refreshSchedule: {
                 cronExpression: string;
                 enabled: boolean;
@@ -10788,6 +10790,7 @@ export interface paths {
                 maintenanceScript: string | null;
                 mistleMcpApiKeyId: string | null;
                 mistleMcpEnabled: boolean;
+                publishedAt: string | null;
                 refreshSchedule: {
                   cronExpression: string;
                   enabled: boolean;
@@ -11088,6 +11091,7 @@ export interface paths {
                 maintenanceScript: string | null;
                 mistleMcpApiKeyId: string | null;
                 mistleMcpEnabled: boolean;
+                publishedAt: string | null;
                 refreshSchedule: {
                   cronExpression: string;
                   enabled: boolean;
@@ -11469,6 +11473,7 @@ export interface paths {
                 maintenanceScript: string | null;
                 mistleMcpApiKeyId: string | null;
                 mistleMcpEnabled: boolean;
+                publishedAt: string | null;
                 refreshSchedule: {
                   cronExpression: string;
                   enabled: boolean;

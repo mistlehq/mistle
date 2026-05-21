@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
 import {
   resolveRetainedSnapshotOperationState,
+  resolveSnapshotPanelState,
   type SnapshotPanelState,
 } from "./sandbox-profile-snapshot-panel.js";
 
@@ -55,6 +57,40 @@ describe("resolveRetainedSnapshotOperationState", () => {
     ).toEqual({
       operationId: "ssj_snapshot_001",
       sandboxInstanceId: "sbi_snapshot_001",
+    });
+  });
+});
+
+describe("resolveSnapshotPanelState", () => {
+  it("uses the version publish time when a usable copied snapshot has no snapshot job history", () => {
+    const state = resolveSnapshotPanelState(
+      {
+        sandboxProfileId: "sbp_copied_snapshot",
+        version: 1,
+        state: "published",
+        publishedAt: "2026-05-21T09:30:00.000Z",
+        defaultPersistenceMode: "ephemeral",
+        agentRuntimeId: "codex",
+        gitCommitSigningIntegrationConnectionId: null,
+        mistleMcpEnabled: false,
+        mistleMcpApiKeyId: null,
+        sandboxProvider: "docker",
+        sandboxConnectionId: null,
+        sandboxResources: null,
+        maintenanceScript: null,
+        isActive: true,
+        usable: true,
+        refreshSchedule: null,
+        latestSnapshotJob: null,
+      } satisfies SandboxProfileVersion,
+      1,
+    );
+
+    expect(state).toEqual({
+      kind: "ready",
+      latestSnapshotCreatedAt: "2026-05-21T09:30:00.000Z",
+      operationId: null,
+      sandboxInstanceId: null,
     });
   });
 });

@@ -436,6 +436,7 @@ function createRuntimeStoryVersion(input: {
     sandboxProfileId: "sandbox-profile-story",
     version: input.version,
     state: "draft",
+    publishedAt: null,
     agentRuntimeId: input.agentRuntimeId,
     gitCommitSigningIntegrationConnectionId: null,
     mistleMcpEnabled: input.mistleMcpEnabled,
