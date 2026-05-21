@@ -900,7 +900,7 @@ function SandboxProfileEditorPageStoryView(
       deleteProfileIsPending={false}
       duplicateProfileError={
         input.duplicateProfileDialogState === "error"
-          ? "A sandbox profile with this name already exists."
+          ? "Sandbox profile must have a usable active version before it can be duplicated."
           : null
       }
       duplicateProfileIsAvailable={duplicateProfileIsAvailable}

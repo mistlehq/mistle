@@ -20309,11 +20309,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": [
-                        "DUPLICATE_DISPLAY_NAME",
-                        "INVALID_DUPLICATE_REFERENCE",
-                        "PROFILE_VERSION_NOT_USABLE"
-                      ]
+                      "enum": ["INVALID_DUPLICATE_REFERENCE", "PROFILE_VERSION_NOT_USABLE"]
                     },
                     "message": {
                       "type": "string",

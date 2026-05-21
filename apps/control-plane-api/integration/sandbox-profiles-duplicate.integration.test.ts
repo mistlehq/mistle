@@ -289,6 +289,63 @@ describe.concurrent("sandbox profiles duplicate integration", () => {
       code: "PROFILE_VERSION_NOT_USABLE",
     });
   });
+
+  it("allows duplicated profiles to reuse the source display name", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-duplicate-same-name@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_duplicate_same_name_source",
+        organizationId: session.organizationId,
+        displayName: "Reusable profile name",
+        activeVersion: 1,
+        createdAt: "2026-05-21T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_duplicate_same_name_source",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+      }),
+    );
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.sandboxProfileVersions)
+      .set({
+        snapshotImageProvider: "docker",
+        snapshotImageId: "sha256:duplicate-same-name",
+      })
+      .where(
+        and(
+          eq(
+            env.controlPlaneTables.sandboxProfileVersions.sandboxProfileId,
+            "sbp_duplicate_same_name_source",
+          ),
+          eq(env.controlPlaneTables.sandboxProfileVersions.version, 1),
+        ),
+      );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_duplicate_same_name_source/duplicate",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "Reusable profile name",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(201);
+    const body = DuplicateSandboxProfileResponseSchema.parse(await response.json());
+    expect(body.profile.displayName).toBe("Reusable profile name");
+    expect(body.profile.id).not.toBe("sbp_duplicate_same_name_source");
+  });
 });
 
 async function seedRecurringTrigger(

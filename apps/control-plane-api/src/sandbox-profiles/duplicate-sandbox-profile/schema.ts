@@ -34,7 +34,6 @@ export const notFoundResponseSchema = createCodeMessageErrorSchema(
 
 export const conflictResponseSchema = createCodeMessageErrorSchema(
   z.enum([
-    SandboxProfilesConflictCodes.DUPLICATE_DISPLAY_NAME,
     SandboxProfilesConflictCodes.INVALID_DUPLICATE_REFERENCE,
     SandboxProfilesConflictCodes.PROFILE_VERSION_NOT_USABLE,
   ]),

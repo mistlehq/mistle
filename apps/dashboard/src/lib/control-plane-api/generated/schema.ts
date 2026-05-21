@@ -9399,10 +9399,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code:
-                | "DUPLICATE_DISPLAY_NAME"
-                | "INVALID_DUPLICATE_REFERENCE"
-                | "PROFILE_VERSION_NOT_USABLE";
+              code: "INVALID_DUPLICATE_REFERENCE" | "PROFILE_VERSION_NOT_USABLE";
               message: string;
             };
           };

@@ -96,7 +96,6 @@ export async function duplicateProfile(
       sourceProfileId: input.sourceProfileId,
     });
 
-    await assertDuplicateDisplayNameIsAvailable(tx, input);
     await assertVersionReferencesAreValid(tx, tables, {
       organizationId: input.organizationId,
       versions: draftVersion === null ? [activeVersion] : [activeVersion, draftVersion],
@@ -261,29 +260,6 @@ async function loadSourceDraftVersion(
     })) ?? null;
 
   return draftVersion;
-}
-
-async function assertDuplicateDisplayNameIsAvailable(
-  tx: ControlPlaneTransaction,
-  input: Pick<DuplicateProfileInput, "organizationId" | "displayName">,
-): Promise<void> {
-  const existingProfile = await tx.query.sandboxProfiles.findFirst({
-    columns: {
-      id: true,
-    },
-    where: (table, { and: whereAnd, eq: whereEq }) =>
-      whereAnd(
-        whereEq(table.organizationId, input.organizationId),
-        whereEq(table.displayName, input.displayName),
-      ),
-  });
-
-  if (existingProfile !== undefined) {
-    throw new SandboxProfilesConflictError(
-      SandboxProfilesConflictCodes.DUPLICATE_DISPLAY_NAME,
-      `Sandbox profile '${input.displayName}' already exists.`,
-    );
-  }
 }
 
 async function assertVersionReferencesAreValid(
