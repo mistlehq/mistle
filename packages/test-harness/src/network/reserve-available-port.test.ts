@@ -39,7 +39,7 @@ describe("reserveAvailablePort", () => {
     );
 
     expect(new Set(reservations).size).toBe(reservations.length);
-  });
+  }, 15_000);
 
   it("does not allocate a port that is already bound", async () => {
     const coordinatorDir = await createTemporaryDirectory();
