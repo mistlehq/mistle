@@ -1,5 +1,9 @@
 import type { SandboxProfileVersionAgentRuntimeId } from "@mistle/db/control-plane";
-import type { CompiledRuntimePlan, ResolvedSandboxImage } from "@mistle/integrations-core";
+import type {
+  CompiledRuntimePlan,
+  EgressCredentialResolverRef,
+  ResolvedSandboxImage,
+} from "@mistle/integrations-core";
 import { createDefinitionsBundle } from "@mistle/integrations-definitions/server";
 
 import { resolveIntegrationTargetSecrets } from "../lib/integration-target-secrets.js";
@@ -23,6 +27,7 @@ type CompileProfileVersionRuntimePlanInput = {
   profileVersion: number;
   agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
   snapshotPreparationScriptKind?: "setup" | "maintenance";
+  mistleMcpCredentialResolver?: EgressCredentialResolverRef;
   image: ResolvedSandboxImage;
 };
 
@@ -113,6 +118,9 @@ export async function compileProfileVersionRuntimePlan(
       ...(input.snapshotPreparationScriptKind === undefined
         ? {}
         : { snapshotPreparationScriptKind: input.snapshotPreparationScriptKind }),
+      ...(input.mistleMcpCredentialResolver === undefined
+        ? {}
+        : { mistleMcpCredentialResolver: input.mistleMcpCredentialResolver }),
       image: input.image,
     });
   } catch (error) {

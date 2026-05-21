@@ -24,10 +24,11 @@ function toSecretKey(secret: string): ReturnType<typeof createSecretKey> {
 }
 
 describe("MCP token", () => {
-  it("mints and verifies a short-lived MCP capability token for a sandbox instance", async () => {
+  it("mints and verifies a short-lived API key MCP token for a sandbox instance", async () => {
     const minted = await mintMcpToken({
       config: TokenConfig,
       claims: {
+        kind: "api_key",
         sub: "sbi_123",
         organizationId: "org_123",
         apiKeyId: "apk_123",
@@ -41,9 +42,38 @@ describe("MCP token", () => {
         token: minted.token,
       }),
     ).resolves.toEqual({
+      kind: "api_key",
       sub: "sbi_123",
       organizationId: "org_123",
       apiKeyId: "apk_123",
+      expiresAt: minted.expiresAt,
+    });
+  });
+
+  it("mints and verifies a short-lived setup assistant MCP token for a sandbox instance", async () => {
+    const minted = await mintMcpToken({
+      config: TokenConfig,
+      claims: {
+        kind: "setup_assistant",
+        sub: "sbi_123",
+        organizationId: "org_123",
+        sandboxProfileId: "sbp_123",
+        sandboxProfileVersion: 1,
+      },
+      ttlSeconds: 300,
+    });
+
+    await expect(
+      verifyMcpToken({
+        config: TokenConfig,
+        token: minted.token,
+      }),
+    ).resolves.toEqual({
+      kind: "setup_assistant",
+      sub: "sbi_123",
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      sandboxProfileVersion: 1,
       expiresAt: minted.expiresAt,
     });
   });
@@ -52,6 +82,7 @@ describe("MCP token", () => {
     const minted = await mintMcpToken({
       config: TokenConfig,
       claims: {
+        kind: "api_key",
         sub: "sbi_123",
         organizationId: "org_123",
         apiKeyId: "apk_123",
@@ -77,6 +108,7 @@ describe("MCP token", () => {
       mintMcpToken({
         config: TokenConfig,
         claims: {
+          kind: "api_key",
           sub: "sbi_123",
           organizationId: "org_123",
           apiKeyId: " ",
@@ -91,6 +123,7 @@ describe("MCP token", () => {
   it("rejects verifying a token without an API key id claim", async () => {
     const nowEpochSeconds = Math.floor(Date.now() / 1000);
     const token = await new SignJWT({
+      kind: "api_key",
       organizationId: "org_123",
     })
       .setProtectedHeader({ alg: "HS256" })
@@ -112,11 +145,30 @@ describe("MCP token", () => {
     } satisfies Partial<McpTokenError>);
   });
 
+  it("rejects minting a setup assistant token without a positive profile version claim", async () => {
+    await expect(
+      mintMcpToken({
+        config: TokenConfig,
+        claims: {
+          kind: "setup_assistant",
+          sub: "sbi_123",
+          organizationId: "org_123",
+          sandboxProfileId: "sbp_123",
+          sandboxProfileVersion: 0,
+        },
+        ttlSeconds: 300,
+      }),
+    ).rejects.toMatchObject({
+      code: McpTokenErrorCode.SANDBOX_PROFILE_VERSION_REQUIRED,
+    } satisfies Partial<McpTokenError>);
+  });
+
   it("rejects invalid token TTLs before signing", async () => {
     await expect(
       mintMcpToken({
         config: TokenConfig,
         claims: {
+          kind: "api_key",
           sub: "sbi_123",
           organizationId: "org_123",
           apiKeyId: "apk_123",

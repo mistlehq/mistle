@@ -39,6 +39,9 @@ const routeHandler = async (
           organizationId: session.activeOrganizationId,
           profileId,
           profileVersion: version,
+          mistleMcpCredentialResolver: {
+            kind: "setup_assistant",
+          },
           startedBy,
           source: "dashboard",
           ...(body.idempotencyKey === undefined ? {} : { idempotencyKey: body.idempotencyKey }),
@@ -48,6 +51,9 @@ const routeHandler = async (
           profileId,
           profileVersion: version,
           purpose: SandboxInstancePurposes.SETUP_ASSISTANT,
+          mistleMcpCredentialResolver: {
+            kind: "setup_assistant",
+          },
           startedBy,
           source: "dashboard",
           ...(body.idempotencyKey === undefined ? {} : { idempotencyKey: body.idempotencyKey }),

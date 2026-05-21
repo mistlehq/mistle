@@ -2337,6 +2337,29 @@
                                           },
                                           "required": ["kind", "apiKeyId"],
                                           "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["mistle_mcp_setup_assistant_token"]
+                                            },
+                                            "sandboxProfileId": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "sandboxProfileVersion": {
+                                              "type": "integer",
+                                              "exclusiveMinimum": 0
+                                            }
+                                          },
+                                          "required": [
+                                            "kind",
+                                            "sandboxProfileId",
+                                            "sandboxProfileVersion"
+                                          ],
+                                          "additionalProperties": false
                                         }
                                       ]
                                     }
@@ -2423,6 +2446,29 @@
                                       }
                                     },
                                     "required": ["kind", "apiKeyId"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["mistle_mcp_setup_assistant_token"]
+                                      },
+                                      "sandboxProfileId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "sandboxProfileVersion": {
+                                        "type": "integer",
+                                        "exclusiveMinimum": 0
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "sandboxProfileId",
+                                      "sandboxProfileVersion"
+                                    ],
                                     "additionalProperties": false
                                   }
                                 ]

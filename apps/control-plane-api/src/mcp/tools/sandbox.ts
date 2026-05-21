@@ -17,7 +17,12 @@ import {
 import { startProfileSetupScriptTestRun } from "../../sandbox-profiles/services/start-profile-setup-script-test-run.js";
 import type { AppOrganizationActor } from "../../types.js";
 import type { MistleMcpServerContext } from "../server.js";
-import { requireMcpToolPermission, structuredResult } from "./shared.js";
+import {
+  requireMcpSandboxInstanceProfileScope,
+  requireMcpSandboxProfileScope,
+  requireMcpToolPermission,
+  structuredResult,
+} from "./shared.js";
 
 const ReadOnlyToolAnnotations: ToolAnnotations = {
   readOnlyHint: true,
@@ -73,6 +78,10 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
         context.organizationActor,
         OrganizationPermissions.SANDBOX_SESSION_CREATE,
       );
+      requireMcpSandboxProfileScope(context.organizationActor, {
+        profileId,
+        version,
+      });
 
       const startedTestRun = await startProfileSetupScriptTestRun(
         {
@@ -137,6 +146,10 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
           instanceId,
         },
       );
+      requireMcpSandboxInstanceProfileScope(context.organizationActor, {
+        sandboxProfileId: sandboxInstance.sandboxProfileId,
+        sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+      });
 
       return structuredResult(sandboxInstance);
     },
@@ -160,6 +173,21 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
         OrganizationPermissions.SANDBOX_SESSION_READ,
       );
 
+      const sandboxInstance = await getInstance(
+        {
+          dataPlaneClient: context.dataPlaneClient,
+          db: context.db,
+        },
+        {
+          organizationId: context.organizationActor.organizationId,
+          instanceId,
+        },
+      );
+      requireMcpSandboxInstanceProfileScope(context.organizationActor, {
+        sandboxProfileId: sandboxInstance.sandboxProfileId,
+        sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+      });
+
       const operationEvents = await listOperationEvents(
         {
           dataPlaneClient: context.dataPlaneClient,
@@ -179,13 +207,20 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
 }
 
 function resolveStartedBy(organizationActor: AppOrganizationActor): {
-  kind: "api_key" | "user";
+  kind: "api_key" | "system" | "user";
   id: string;
 } {
   if (organizationActor.kind === "api_key") {
     return {
       kind: "api_key",
       id: organizationActor.apiKeyId,
+    };
+  }
+
+  if (organizationActor.kind === "mcp_capability") {
+    return {
+      kind: "system",
+      id: organizationActor.capability.sandboxInstanceId,
     };
   }
 

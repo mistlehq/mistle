@@ -55,6 +55,15 @@ async function resolveOrganizationActor(input: {
     };
   }
 
+  if (input.authContext.kind === "mcp_capability") {
+    return {
+      kind: "mcp_capability",
+      organizationId: input.authContext.organizationId,
+      capability: input.authContext.capability,
+      permissions: input.authContext.permissions,
+    };
+  }
+
   const authorization = await requireActiveOrganizationAccess({
     db: input.db,
     actorUserId: input.authContext.session.user.id,

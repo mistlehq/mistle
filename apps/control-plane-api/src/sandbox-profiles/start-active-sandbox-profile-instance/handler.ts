@@ -30,9 +30,18 @@ const routeHandler = async (
       organizationId: organizationActor.organizationId,
       profileId,
       startedBy: {
-        kind: organizationActor.kind === "user" ? "user" : "api_key",
+        kind:
+          organizationActor.kind === "user"
+            ? "user"
+            : organizationActor.kind === "api_key"
+              ? "api_key"
+              : "system",
         id:
-          organizationActor.kind === "user" ? organizationActor.userId : organizationActor.apiKeyId,
+          organizationActor.kind === "user"
+            ? organizationActor.userId
+            : organizationActor.kind === "api_key"
+              ? organizationActor.apiKeyId
+              : organizationActor.capability.sandboxInstanceId,
       },
       ...(organizationActor.kind === "user"
         ? {

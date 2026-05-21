@@ -325,6 +325,26 @@
                           },
                           "required": ["kind", "apiKeyId"],
                           "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "mistle_mcp_setup_assistant_token"
+                            },
+                            "sandboxProfileId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "sandboxProfileVersion": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": ["kind", "sandboxProfileId", "sandboxProfileVersion"],
+                          "additionalProperties": false
                         }
                       ]
                     }
@@ -411,6 +431,26 @@
                       }
                     },
                     "required": ["kind", "apiKeyId"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "mistle_mcp_setup_assistant_token"
+                      },
+                      "sandboxProfileId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "sandboxProfileVersion": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": ["kind", "sandboxProfileId", "sandboxProfileVersion"],
                     "additionalProperties": false
                   }
                 ]

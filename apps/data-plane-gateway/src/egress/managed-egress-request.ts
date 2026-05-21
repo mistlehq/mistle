@@ -53,6 +53,13 @@ type CredentialResolverInput =
       organizationId: string;
       sandboxInstanceId: string;
       apiKeyId: string;
+    }
+  | {
+      credentialResolverKind: "mistle_mcp_setup_assistant_token";
+      organizationId: string;
+      sandboxInstanceId: string;
+      sandboxProfileId: string;
+      sandboxProfileVersion: number;
     };
 type CredentialResolverRef =
   | {
@@ -74,6 +81,11 @@ type CredentialResolverRef =
   | {
       kind: "mistle_mcp_token";
       apiKeyId: string;
+    }
+  | {
+      kind: "mistle_mcp_setup_assistant_token";
+      sandboxProfileId: string;
+      sandboxProfileVersion: number;
     };
 
 export class GatewayManagedEgressUnsupportedRouteError extends Error {
@@ -462,6 +474,14 @@ function toCredentialResolverRef(input: {
     };
   }
 
+  if (input.resolver.kind === "mistle_mcp_setup_assistant_token") {
+    return {
+      kind: "mistle_mcp_setup_assistant_token",
+      sandboxProfileId: input.resolver.sandboxProfileId,
+      sandboxProfileVersion: input.resolver.sandboxProfileVersion,
+    };
+  }
+
   return {
     kind: "linked_principal",
     providerFamily: input.resolver.providerFamily,
@@ -500,6 +520,16 @@ function toCredentialResolverInputFromRef(input: {
       organizationId: input.organizationId,
       sandboxInstanceId: input.sandboxInstanceId,
       apiKeyId: input.credentialResolver.apiKeyId,
+    };
+  }
+
+  if (input.credentialResolver.kind === "mistle_mcp_setup_assistant_token") {
+    return {
+      credentialResolverKind: "mistle_mcp_setup_assistant_token",
+      organizationId: input.organizationId,
+      sandboxInstanceId: input.sandboxInstanceId,
+      sandboxProfileId: input.credentialResolver.sandboxProfileId,
+      sandboxProfileVersion: input.credentialResolver.sandboxProfileVersion,
     };
   }
 
@@ -543,6 +573,14 @@ function normalizeSelectedCredentialResolver(
     return {
       kind: "mistle_mcp_token",
       apiKeyId: credentialResolver.apiKeyId,
+    };
+  }
+
+  if (credentialResolver.kind === "mistle_mcp_setup_assistant_token") {
+    return {
+      kind: "mistle_mcp_setup_assistant_token",
+      sandboxProfileId: credentialResolver.sandboxProfileId,
+      sandboxProfileVersion: credentialResolver.sandboxProfileVersion,
     };
   }
 
@@ -666,6 +704,20 @@ function createCredentialCacheKey(input: {
     };
   }
 
+  if (input.resolver.credentialResolverKind === "mistle_mcp_setup_assistant_token") {
+    return {
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
+      bindingId: input.bindingId,
+      credentialResolverKind: "mistle_mcp_setup_assistant_token",
+      organizationId: input.resolver.organizationId,
+      sandboxInstanceId: input.resolver.sandboxInstanceId,
+      sandboxProfileId: input.resolver.sandboxProfileId,
+      sandboxProfileVersion: input.resolver.sandboxProfileVersion,
+    };
+  }
+
   return {
     ...(input.testEnvironmentId === undefined
       ? {}
@@ -726,9 +778,28 @@ async function resolveCredentialWithCache(input: {
   } else if (input.resolver.credentialResolverKind === "mistle_mcp_token") {
     const mintedToken = await mintMcpToken({
       claims: {
+        kind: "api_key",
         sub: input.resolver.sandboxInstanceId,
         organizationId: input.resolver.organizationId,
         apiKeyId: input.resolver.apiKeyId,
+      },
+      config: input.mcpTokenConfig,
+      ttlSeconds: MistleMcpTokenTtlSeconds,
+    });
+
+    resolvedCredential = {
+      kind: "value",
+      value: mintedToken.token,
+      expiresAt: mintedToken.expiresAt.toISOString(),
+    };
+  } else if (input.resolver.credentialResolverKind === "mistle_mcp_setup_assistant_token") {
+    const mintedToken = await mintMcpToken({
+      claims: {
+        kind: "setup_assistant",
+        sub: input.resolver.sandboxInstanceId,
+        organizationId: input.resolver.organizationId,
+        sandboxProfileId: input.resolver.sandboxProfileId,
+        sandboxProfileVersion: input.resolver.sandboxProfileVersion,
       },
       config: input.mcpTokenConfig,
       ttlSeconds: MistleMcpTokenTtlSeconds,

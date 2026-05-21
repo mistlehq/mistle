@@ -38,6 +38,9 @@ type StartProfileSetupSandboxInput = {
   agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
   setupScript?: string;
   snapshotPreparationScriptKind?: "setup" | "maintenance";
+  mistleMcpCredentialResolver?: {
+    kind: "setup_assistant";
+  };
   image?: {
     kind: "base" | "snapshot";
     imageId: string;
@@ -182,6 +185,15 @@ export async function startProfileSetupSandbox(
       ...(input.snapshotPreparationScriptKind === undefined
         ? {}
         : { snapshotPreparationScriptKind: input.snapshotPreparationScriptKind }),
+      ...(input.mistleMcpCredentialResolver === undefined
+        ? {}
+        : {
+            mistleMcpCredentialResolver: {
+              kind: "mistle_mcp_setup_assistant_token",
+              sandboxProfileId: input.profileId,
+              sandboxProfileVersion: input.profileVersion,
+            },
+          }),
       image: {
         source: input.image?.kind ?? "base",
         imageRef: input.image?.imageId ?? defaultBaseImage,

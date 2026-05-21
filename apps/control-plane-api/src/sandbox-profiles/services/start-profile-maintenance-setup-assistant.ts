@@ -17,6 +17,9 @@ type StartProfileMaintenanceSetupAssistantInput = {
   organizationId: string;
   profileId: string;
   profileVersion: number;
+  mistleMcpCredentialResolver?: {
+    kind: "setup_assistant";
+  };
   idempotencyKey?: string;
   startedBy: {
     kind: "user";
@@ -43,6 +46,9 @@ export async function startProfileMaintenanceSetupAssistant(
     profileVersion: input.profileVersion,
     purpose: SandboxInstancePurposes.SETUP_ASSISTANT,
     snapshotPreparationScriptKind: "maintenance",
+    ...(input.mistleMcpCredentialResolver === undefined
+      ? {}
+      : { mistleMcpCredentialResolver: input.mistleMcpCredentialResolver }),
     image: {
       kind: "snapshot",
       imageId: snapshotImageId,

@@ -47,6 +47,13 @@ const EgressCredentialResolverSchema = z.discriminatedUnion("kind", [
       apiKeyId: z.string().min(1),
     })
     .strict(),
+  z
+    .object({
+      kind: z.literal("mistle_mcp_setup_assistant_token"),
+      sandboxProfileId: z.string().min(1),
+      sandboxProfileVersion: z.number().int().positive(),
+    })
+    .strict(),
 ]);
 
 const EgressCredentialRouteSchema = z
@@ -546,6 +553,14 @@ function normalizeCredentialResolver(
     };
   }
 
+  if (resolver.kind === "mistle_mcp_setup_assistant_token") {
+    return {
+      kind: "mistle_mcp_setup_assistant_token",
+      sandboxProfileId: resolver.sandboxProfileId,
+      sandboxProfileVersion: resolver.sandboxProfileVersion,
+    };
+  }
+
   return {
     kind: "linked_principal",
     providerFamily: resolver.providerFamily,
@@ -582,6 +597,17 @@ function compareCredentialResolvers(
 
   if (left.kind === "mistle_mcp_token" && right.kind === "mistle_mcp_token") {
     return left.apiKeyId.localeCompare(right.apiKeyId);
+  }
+
+  if (
+    left.kind === "mistle_mcp_setup_assistant_token" &&
+    right.kind === "mistle_mcp_setup_assistant_token"
+  ) {
+    if (left.sandboxProfileId !== right.sandboxProfileId) {
+      return left.sandboxProfileId.localeCompare(right.sandboxProfileId);
+    }
+
+    return left.sandboxProfileVersion - right.sandboxProfileVersion;
   }
 
   if (left.kind !== "linked_principal" || right.kind !== "linked_principal") {

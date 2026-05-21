@@ -11,11 +11,22 @@ export type McpTokenConfig = {
   tokenAudience: string;
 };
 
-export type McpTokenClaims = {
+export type ApiKeyMcpTokenClaims = {
+  kind: "api_key";
   sub: string;
   organizationId: string;
   apiKeyId: string;
 };
+
+export type SetupAssistantMcpTokenClaims = {
+  kind: "setup_assistant";
+  sub: string;
+  organizationId: string;
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+};
+
+export type McpTokenClaims = ApiKeyMcpTokenClaims | SetupAssistantMcpTokenClaims;
 
 export type VerifiedMcpToken = McpTokenClaims & {
   expiresAt: Date;
@@ -23,9 +34,12 @@ export type VerifiedMcpToken = McpTokenClaims & {
 
 export const McpTokenErrorCode = {
   TOKEN_REQUIRED: "TOKEN_REQUIRED",
+  TOKEN_KIND_REQUIRED: "TOKEN_KIND_REQUIRED",
   SANDBOX_INSTANCE_ID_REQUIRED: "SANDBOX_INSTANCE_ID_REQUIRED",
   ORGANIZATION_ID_REQUIRED: "ORGANIZATION_ID_REQUIRED",
   API_KEY_ID_REQUIRED: "API_KEY_ID_REQUIRED",
+  SANDBOX_PROFILE_ID_REQUIRED: "SANDBOX_PROFILE_ID_REQUIRED",
+  SANDBOX_PROFILE_VERSION_REQUIRED: "SANDBOX_PROFILE_VERSION_REQUIRED",
   INVALID_TTL_SECONDS: "INVALID_TTL_SECONDS",
   TOKEN_EXPIRED: "TOKEN_EXPIRED",
   TOKEN_INVALID_ISSUER: "TOKEN_INVALID_ISSUER",
@@ -80,7 +94,22 @@ function mapClaimValidationErrorCode(
   return McpTokenErrorCode.TOKEN_INVALID_CLAIMS;
 }
 
-function normalizeClaims(claims: McpTokenClaims): McpTokenClaims {
+function normalizeClaims(claims: {
+  kind?: string;
+  sub?: string;
+  organizationId?: string;
+  apiKeyId?: string;
+  sandboxProfileId?: string;
+  sandboxProfileVersion?: unknown;
+}): McpTokenClaims {
+  const normalizedKind = toNonEmptyString(claims.kind);
+  if (normalizedKind === undefined) {
+    throw new McpTokenError({
+      code: McpTokenErrorCode.TOKEN_KIND_REQUIRED,
+      message: "MCP token kind claim is required.",
+    });
+  }
+
   const normalizedSandboxInstanceId = toNonEmptyString(claims.sub);
   if (normalizedSandboxInstanceId === undefined) {
     throw new McpTokenError({
@@ -97,18 +126,55 @@ function normalizeClaims(claims: McpTokenClaims): McpTokenClaims {
     });
   }
 
-  const normalizedApiKeyId = toNonEmptyString(claims.apiKeyId);
-  if (normalizedApiKeyId === undefined) {
+  if (normalizedKind === "api_key") {
+    const normalizedApiKeyId = toNonEmptyString(claims.apiKeyId);
+    if (normalizedApiKeyId === undefined) {
+      throw new McpTokenError({
+        code: McpTokenErrorCode.API_KEY_ID_REQUIRED,
+        message: "MCP token apiKeyId claim is required.",
+      });
+    }
+
+    return {
+      kind: "api_key",
+      sub: normalizedSandboxInstanceId,
+      organizationId: normalizedOrganizationId,
+      apiKeyId: normalizedApiKeyId,
+    };
+  }
+
+  if (normalizedKind !== "setup_assistant") {
     throw new McpTokenError({
-      code: McpTokenErrorCode.API_KEY_ID_REQUIRED,
-      message: "MCP token apiKeyId claim is required.",
+      code: McpTokenErrorCode.TOKEN_INVALID_CLAIMS,
+      message: "MCP token kind claim is invalid.",
+    });
+  }
+
+  const normalizedSandboxProfileId = toNonEmptyString(claims.sandboxProfileId);
+  if (normalizedSandboxProfileId === undefined) {
+    throw new McpTokenError({
+      code: McpTokenErrorCode.SANDBOX_PROFILE_ID_REQUIRED,
+      message: "MCP token sandboxProfileId claim is required.",
+    });
+  }
+
+  if (
+    typeof claims.sandboxProfileVersion !== "number" ||
+    !Number.isInteger(claims.sandboxProfileVersion) ||
+    claims.sandboxProfileVersion < 1
+  ) {
+    throw new McpTokenError({
+      code: McpTokenErrorCode.SANDBOX_PROFILE_VERSION_REQUIRED,
+      message: "MCP token sandboxProfileVersion claim must be a positive integer.",
     });
   }
 
   return {
+    kind: "setup_assistant",
     sub: normalizedSandboxInstanceId,
     organizationId: normalizedOrganizationId,
-    apiKeyId: normalizedApiKeyId,
+    sandboxProfileId: normalizedSandboxProfileId,
+    sandboxProfileVersion: claims.sandboxProfileVersion,
   };
 }
 
@@ -130,10 +196,7 @@ export async function mintMcpToken(input: {
   const expiresAtEpochSeconds = nowEpochSeconds + input.ttlSeconds;
 
   try {
-    const token = await new SignJWT({
-      organizationId: normalizedClaims.organizationId,
-      apiKeyId: normalizedClaims.apiKeyId,
-    })
+    const token = await new SignJWT(createJwtPayload(normalizedClaims))
       .setProtectedHeader({ alg: "HS256" })
       .setSubject(normalizedClaims.sub)
       .setIssuer(input.config.tokenIssuer)
@@ -160,6 +223,23 @@ export async function mintMcpToken(input: {
   }
 }
 
+function createJwtPayload(claims: McpTokenClaims): Record<string, string | number> {
+  if (claims.kind === "api_key") {
+    return {
+      kind: claims.kind,
+      organizationId: claims.organizationId,
+      apiKeyId: claims.apiKeyId,
+    };
+  }
+
+  return {
+    kind: claims.kind,
+    organizationId: claims.organizationId,
+    sandboxProfileId: claims.sandboxProfileId,
+    sandboxProfileVersion: claims.sandboxProfileVersion,
+  };
+}
+
 export async function verifyMcpToken(input: {
   config: McpTokenConfig;
   token: string;
@@ -184,6 +264,8 @@ export async function verifyMcpToken(input: {
     );
 
     const normalizedClaims = normalizeClaims({
+      kind:
+        typeof verificationResult.payload.kind === "string" ? verificationResult.payload.kind : "",
       sub: typeof verificationResult.payload.sub === "string" ? verificationResult.payload.sub : "",
       organizationId:
         typeof verificationResult.payload.organizationId === "string"
@@ -193,6 +275,11 @@ export async function verifyMcpToken(input: {
         typeof verificationResult.payload.apiKeyId === "string"
           ? verificationResult.payload.apiKeyId
           : "",
+      sandboxProfileId:
+        typeof verificationResult.payload.sandboxProfileId === "string"
+          ? verificationResult.payload.sandboxProfileId
+          : "",
+      sandboxProfileVersion: verificationResult.payload.sandboxProfileVersion,
     });
     const expiresAtEpochSeconds = verificationResult.payload.exp;
 

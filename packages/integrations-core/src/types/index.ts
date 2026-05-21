@@ -1570,10 +1570,17 @@ export type MistleMcpTokenEgressCredentialResolverRef = {
   apiKeyId: string;
 };
 
+export type MistleMcpSetupAssistantTokenEgressCredentialResolverRef = {
+  kind: "mistle_mcp_setup_assistant_token";
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+};
+
 export type EgressCredentialResolverRef =
   | IntegrationConnectionEgressCredentialResolverRef
   | LinkedPrincipalEgressCredentialResolverRef
-  | MistleMcpTokenEgressCredentialResolverRef;
+  | MistleMcpTokenEgressCredentialResolverRef
+  | MistleMcpSetupAssistantTokenEgressCredentialResolverRef;
 
 export type IntegrationEgressCredentialResolverSelectionInput = {
   organizationId: string;

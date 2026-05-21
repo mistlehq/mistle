@@ -67,6 +67,17 @@ export type AppAuthContext =
         organizationId: string;
       };
       permissions: readonly OrganizationPermission[];
+    }
+  | {
+      kind: "mcp_capability";
+      organizationId: string;
+      capability: {
+        kind: "setup_assistant";
+        sandboxInstanceId: string;
+        sandboxProfileId: string;
+        sandboxProfileVersion: number;
+      };
+      permissions: readonly OrganizationPermission[];
     };
 
 export type AppOrganizationActor =
@@ -82,6 +93,17 @@ export type AppOrganizationActor =
       apiKeyId: string;
       name: string;
       organizationId: string;
+      permissions: readonly OrganizationPermission[];
+    }
+  | {
+      kind: "mcp_capability";
+      organizationId: string;
+      capability: {
+        kind: "setup_assistant";
+        sandboxInstanceId: string;
+        sandboxProfileId: string;
+        sandboxProfileVersion: number;
+      };
       permissions: readonly OrganizationPermission[];
     };
 

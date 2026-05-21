@@ -76,6 +76,16 @@ describe.concurrent("sandbox profile Setup Assistant integration", () => {
     expect(queuedWorkflowInput.image).toMatchObject({
       kind: "base",
     });
+    expect(queuedWorkflowInput.runtimePlan.egressRoutes).toContainEqual(
+      expect.objectContaining({
+        egressRuleId: "egress_rule_platform_mistle_mcp",
+        credentialResolver: {
+          kind: "mistle_mcp_setup_assistant_token",
+          sandboxProfileId: "sbp_setup_assistant_001",
+          sandboxProfileVersion: 1,
+        },
+      }),
+    );
   });
 
   it("starts a maintenance setup assistant from the usable snapshot", async ({ env }) => {
@@ -184,7 +194,16 @@ describe.concurrent("sandbox profile Setup Assistant integration", () => {
         runtimeId: "codex",
       },
     ]);
-    expect(queuedWorkflowInput.runtimePlan.egressRoutes).toEqual([]);
+    expect(queuedWorkflowInput.runtimePlan.egressRoutes).toContainEqual(
+      expect.objectContaining({
+        egressRuleId: "egress_rule_platform_mistle_mcp",
+        credentialResolver: {
+          kind: "mistle_mcp_setup_assistant_token",
+          sandboxProfileId: "sbp_setup_assistant_missing_agent",
+          sandboxProfileVersion: 1,
+        },
+      }),
+    );
   });
 });
 

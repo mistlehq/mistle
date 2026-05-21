@@ -400,6 +400,87 @@ describe.concurrent("MCP profile tools integration", () => {
     });
   });
 
+  it("authorizes setup assistant MCP tokens to read sandbox feedback for the scoped profile version", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-setup-assistant-feedback@example.com",
+    });
+    const token = await mintMcpToken({
+      config: McpTokenConfig,
+      claims: {
+        kind: "setup_assistant",
+        sub: "sbi_mcp_setup_assistant_feedback",
+        organizationId: session.organizationId,
+        sandboxProfileId: "sbp_mcp_setup_assistant_feedback",
+        sandboxProfileVersion: 1,
+      },
+      ttlSeconds: 300,
+    });
+
+    await insertSandboxInstance(env, {
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_mcp_setup_assistant_feedback_test",
+      sandboxProfileId: "sbp_mcp_setup_assistant_feedback",
+      sandboxProfileVersion: 1,
+      status: SandboxInstanceStatuses.FAILED,
+    });
+    await insertSandboxInstance(env, {
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_mcp_setup_assistant_feedback_other",
+      sandboxProfileId: "sbp_mcp_setup_assistant_feedback_other",
+      sandboxProfileVersion: 1,
+      status: SandboxInstanceStatuses.FAILED,
+    });
+    await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxOperationEvents).values(
+      operationEventRow({
+        id: "soe_mcp_setup_assistant_feedback_001",
+        sandboxInstanceId: "sbi_mcp_setup_assistant_feedback_test",
+        operationId: "op_mcp_setup_assistant_feedback",
+        sequence: 1,
+        phase: "setup_script",
+        status: "failed",
+        message: "setup script failed",
+      }),
+    );
+
+    const instanceResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "sandbox_instance_get",
+      arguments: {
+        instanceId: "sbi_mcp_setup_assistant_feedback_test",
+      },
+    });
+    const eventsResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "sandbox_operation_events_list",
+      arguments: {
+        instanceId: "sbi_mcp_setup_assistant_feedback_test",
+        operationId: "op_mcp_setup_assistant_feedback",
+      },
+    });
+    const otherInstanceResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "sandbox_instance_get",
+      arguments: {
+        instanceId: "sbi_mcp_setup_assistant_feedback_other",
+      },
+    });
+
+    expect(instanceResult.isError).toBeUndefined();
+    expect(eventsResult.isError).toBeUndefined();
+    expect(otherInstanceResult.isError).toBe(true);
+    const operationEvents = SandboxOperationEventsResponseSchema.parse(
+      eventsResult.structuredContent,
+    );
+    expect(operationEvents.events.map((event) => event.id)).toEqual([
+      "soe_mcp_setup_assistant_feedback_001",
+    ]);
+  });
+
   it("authorizes profile tools with a gateway-injected MCP token referencing an API key", async ({
     env,
   }) => {
@@ -425,6 +506,7 @@ describe.concurrent("MCP profile tools integration", () => {
     const mcpToken = await mintMcpToken({
       config: McpTokenConfig,
       claims: {
+        kind: "api_key",
         sub: "sbi_mcp_token_list",
         organizationId: session.organizationId,
         apiKeyId: apiKeyCredential.apiKey.id,
@@ -445,6 +527,160 @@ describe.concurrent("MCP profile tools integration", () => {
     const profileList = ListSandboxProfilesResponseSchema.parse(result.structuredContent);
     expect(profileList.totalResults).toBe(1);
     expect(profileList.items.map((profile) => profile.id)).toEqual(["sbp_mcp_token_list"]);
+  });
+
+  it("authorizes setup assistant MCP tokens for setup tools scoped to the token profile version", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-setup-assistant-capability@example.com",
+    });
+    const profileId = "sbp_mcp_setup_assistant_capability";
+    const sandboxInstanceId = "sbi_mcp_setup_assistant_capability";
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: profileId,
+        organizationId: session.organizationId,
+        displayName: "MCP Setup Assistant Capability Profile",
+        createdAt: "2026-05-03T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: profileId,
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        setupScript: "echo persisted",
+        ...DockerSandboxRuntimeColumns,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "openai-mcp-setup-assistant-capability",
+        variantId: "openai-default",
+        enabled: true,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_mcp_setup_assistant_capability_agent",
+        organizationId: session.organizationId,
+        targetKey: "openai-mcp-setup-assistant-capability",
+        displayName: "MCP setup assistant capability agent connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      }),
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_mcp_setup_assistant_capability_agent",
+          sandboxProfileId: profileId,
+          sandboxProfileVersion: 1,
+          connectionId: "icn_mcp_setup_assistant_capability_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+        }),
+      );
+
+    const token = await mintMcpToken({
+      config: McpTokenConfig,
+      claims: {
+        kind: "setup_assistant",
+        sub: sandboxInstanceId,
+        organizationId: session.organizationId,
+        sandboxProfileId: profileId,
+        sandboxProfileVersion: 1,
+      },
+      ttlSeconds: 300,
+    });
+
+    const setupScript = "echo written by setup assistant";
+    const putResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_draft_setup_script_put",
+      arguments: {
+        profileId,
+        version: 1,
+        setupScript,
+      },
+    });
+    const testRunResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_setup_script_test_start",
+      arguments: {
+        profileId,
+        version: 1,
+        setupScript,
+        idempotencyKey: "mcp-setup-assistant-capability-test-001",
+      },
+    });
+
+    expect(putResult.isError).toBeUndefined();
+    expect(testRunResult.isError).toBeUndefined();
+    const draft = PutSandboxProfileVersionDraftResponseSchema.parse(putResult.structuredContent);
+    const startedTestRun = StartSandboxProfileSetupScriptTestRunResponseSchema.parse(
+      testRunResult.structuredContent,
+    );
+    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+      env,
+      sandboxInstanceId: startedTestRun.sandboxInstanceId,
+    });
+
+    expect(draft.setupScript).toBe(setupScript);
+    expect(queuedWorkflowInput.startedBy).toEqual({
+      kind: "system",
+      id: sandboxInstanceId,
+    });
+    expect(queuedWorkflowInput.runtimePlan.setupScript).toBe(setupScript);
+  });
+
+  it("rejects setup assistant MCP tokens for another sandbox profile version", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-setup-assistant-capability-scope@example.com",
+    });
+
+    const token = await mintMcpToken({
+      config: McpTokenConfig,
+      claims: {
+        kind: "setup_assistant",
+        sub: "sbi_mcp_setup_assistant_capability_scope",
+        organizationId: session.organizationId,
+        sandboxProfileId: "sbp_mcp_setup_assistant_capability_scope",
+        sandboxProfileVersion: 1,
+      },
+      ttlSeconds: 300,
+    });
+
+    const profileResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_draft_setup_script_put",
+      arguments: {
+        profileId: "sbp_mcp_setup_assistant_capability_other",
+        version: 1,
+        setupScript: "echo wrong profile",
+      },
+    });
+    const versionResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_draft_setup_script_put",
+      arguments: {
+        profileId: "sbp_mcp_setup_assistant_capability_scope",
+        version: 2,
+        setupScript: "echo wrong version",
+      },
+    });
+
+    expect(profileResult.isError).toBe(true);
+    expect(versionResult.isError).toBe(true);
   });
 
   it("returns a tool error when the API key lacks sandbox profile read permission", async ({
@@ -545,14 +781,16 @@ async function insertSandboxInstance(
   input: {
     organizationId: string;
     sandboxInstanceId: string;
+    sandboxProfileId?: string;
+    sandboxProfileVersion?: number;
     status?: SandboxInstanceRow["status"];
   },
 ): Promise<void> {
   await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
     id: input.sandboxInstanceId,
     organizationId: input.organizationId,
-    sandboxProfileId: `sbp_${input.sandboxInstanceId}`,
-    sandboxProfileVersion: 1,
+    sandboxProfileId: input.sandboxProfileId ?? `sbp_${input.sandboxInstanceId}`,
+    sandboxProfileVersion: input.sandboxProfileVersion ?? 1,
     runtimeProvider: "docker",
     providerSandboxId: `provider-${input.sandboxInstanceId}`,
     status: input.status ?? SandboxInstanceStatuses.PENDING,

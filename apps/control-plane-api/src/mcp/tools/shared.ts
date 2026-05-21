@@ -24,3 +24,41 @@ export function requireMcpToolPermission(
     throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
   }
 }
+
+export function requireMcpSandboxProfileScope(
+  organizationActor: AppOrganizationActor,
+  input: {
+    profileId: string;
+    version: number;
+  },
+): void {
+  if (organizationActor.kind !== "mcp_capability") {
+    return;
+  }
+
+  if (
+    organizationActor.capability.sandboxProfileId !== input.profileId ||
+    organizationActor.capability.sandboxProfileVersion !== input.version
+  ) {
+    throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
+  }
+}
+
+export function requireMcpSandboxInstanceProfileScope(
+  organizationActor: AppOrganizationActor,
+  input: {
+    sandboxProfileId: string | undefined;
+    sandboxProfileVersion: number | undefined;
+  },
+): void {
+  if (organizationActor.kind !== "mcp_capability") {
+    return;
+  }
+
+  if (
+    input.sandboxProfileId !== organizationActor.capability.sandboxProfileId ||
+    input.sandboxProfileVersion !== organizationActor.capability.sandboxProfileVersion
+  ) {
+    throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
+  }
+}

@@ -9,6 +9,7 @@ import {
   compileRuntimePlan,
   type CompiledRuntimePlan,
   type EgressCredentialRoute,
+  type EgressCredentialResolverRef,
   type IntegrationDefinitionsBundle,
   type ResolvedIntegrationMcpServer,
   type ResolvedSandboxImage,
@@ -92,6 +93,7 @@ export type CompileSandboxRuntimePlanInput = {
   profileVersion: number;
   agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
   snapshotPreparationScriptKind?: "setup" | "maintenance";
+  mistleMcpCredentialResolver?: EgressCredentialResolverRef;
   image: ResolvedSandboxImage;
 };
 
@@ -105,18 +107,10 @@ function normalizeSnapshotPreparationScript(script: string | null): string | und
 
 function resolveMistleMcpServers(input: {
   enabled: boolean;
-  apiKeyId: string | null;
   url: string;
 }): ReadonlyArray<ResolvedIntegrationMcpServer> {
   if (!input.enabled) {
     return [];
-  }
-
-  if (input.apiKeyId === null) {
-    throw new SandboxRuntimePlanCompilerError({
-      code: SandboxRuntimePlanCompilerErrorCodes.INVALID_AGENT_RUNTIME_CONFIG,
-      message: "Mistle MCP is enabled but no API key is configured.",
-    });
   }
 
   return [
@@ -144,17 +138,17 @@ function normalizeMcpPathPrefix(pathname: string): string {
 
 function resolveMistleMcpEgressRoutes(input: {
   enabled: boolean;
-  apiKeyId: string | null;
+  credentialResolver: EgressCredentialResolverRef | null;
   url: string;
 }): ReadonlyArray<EgressCredentialRoute> {
   if (!input.enabled) {
     return [];
   }
 
-  if (input.apiKeyId === null) {
+  if (input.credentialResolver === null) {
     throw new SandboxRuntimePlanCompilerError({
       code: SandboxRuntimePlanCompilerErrorCodes.INVALID_AGENT_RUNTIME_CONFIG,
-      message: "Mistle MCP is enabled but no API key is configured.",
+      message: "Mistle MCP is enabled but no credential resolver is configured.",
     });
   }
 
@@ -183,12 +177,35 @@ function resolveMistleMcpEgressRoutes(input: {
         type: "bearer",
         target: "authorization",
       },
-      credentialResolver: {
-        kind: "mistle_mcp_token",
-        apiKeyId: input.apiKeyId,
-      },
+      credentialResolver: input.credentialResolver,
     },
   ];
+}
+
+function resolveProfileMistleMcpCredentialResolver(input: {
+  enabled: boolean;
+  apiKeyId: string | null;
+  override: EgressCredentialResolverRef | undefined;
+}): EgressCredentialResolverRef | null {
+  if (input.override !== undefined) {
+    return input.override;
+  }
+
+  if (!input.enabled) {
+    return null;
+  }
+
+  if (input.apiKeyId === null) {
+    throw new SandboxRuntimePlanCompilerError({
+      code: SandboxRuntimePlanCompilerErrorCodes.INVALID_AGENT_RUNTIME_CONFIG,
+      message: "Mistle MCP is enabled but no API key is configured.",
+    });
+  }
+
+  return {
+    kind: "mistle_mcp_token",
+    apiKeyId: input.apiKeyId,
+  };
 }
 
 function mapCompilerErrorCodeToSandboxRuntimePlanCompilerErrorCode(
@@ -415,6 +432,12 @@ export async function compileSandboxRuntimePlan(
   });
 
   try {
+    const mistleMcpCredentialResolver = resolveProfileMistleMcpCredentialResolver({
+      enabled: sandboxProfileVersion.mistleMcpEnabled,
+      apiKeyId: sandboxProfileVersion.mistleMcpApiKeyId,
+      override: input.mistleMcpCredentialResolver,
+    });
+    const mistleMcpEnabled = mistleMcpCredentialResolver !== null;
     const runtimePlan = compileRuntimePlan({
       organizationId: input.organizationId,
       sandboxProfileId: input.profileId,
@@ -424,13 +447,12 @@ export async function compileSandboxRuntimePlan(
       bindings: compileBindings,
       definitions: input.integrationDefinitions,
       egressRoutes: resolveMistleMcpEgressRoutes({
-        enabled: sandboxProfileVersion.mistleMcpEnabled,
-        apiKeyId: sandboxProfileVersion.mistleMcpApiKeyId,
+        enabled: mistleMcpEnabled,
+        credentialResolver: mistleMcpCredentialResolver,
         url: input.mcpConfig.url,
       }),
       mcpServers: resolveMistleMcpServers({
-        enabled: sandboxProfileVersion.mistleMcpEnabled,
-        apiKeyId: sandboxProfileVersion.mistleMcpApiKeyId,
+        enabled: mistleMcpEnabled,
         url: input.mcpConfig.url,
       }),
     });

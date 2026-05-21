@@ -14,7 +14,11 @@ import { getProfile } from "../../sandbox-profiles/services/get-profile.js";
 import { listProfiles } from "../../sandbox-profiles/services/list-profiles.js";
 import { putProfileVersionDraft } from "../../sandbox-profiles/services/put-profile-version-draft.js";
 import type { MistleMcpServerContext } from "../server.js";
-import { requireMcpToolPermission, structuredResult } from "./shared.js";
+import {
+  requireMcpSandboxProfileScope,
+  requireMcpToolPermission,
+  structuredResult,
+} from "./shared.js";
 
 const ReadOnlyToolAnnotations: ToolAnnotations = {
   readOnlyHint: true,
@@ -118,6 +122,10 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
         context.organizationActor,
         OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
       );
+      requireMcpSandboxProfileScope(context.organizationActor, {
+        profileId,
+        version,
+      });
 
       const draft = await putProfileVersionDraft(
         {

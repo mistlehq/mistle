@@ -285,9 +285,100 @@ describe.concurrent("direct egress proxy integration", () => {
           },
           token: authorizationHeader.slice("Bearer ".length),
         });
+        expect(verifiedToken.kind).toBe("api_key");
         expect(verifiedToken.sub).toBe(sandboxInstanceId);
         expect(verifiedToken.organizationId).toBe(organizationId);
+        if (verifiedToken.kind !== "api_key") {
+          throw new Error("Expected an API key MCP token.");
+        }
         expect(verifiedToken.apiKeyId).toBe(apiKeyId);
+      } finally {
+        await upstream.close();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "mints setup assistant Mistle MCP tokens for matched managed HTTP routes before forwarding upstream",
+    async ({ env }) => {
+      const organizationId = "org_integration_direct_egress_mistle_mcp_setup_assistant";
+      const sandboxInstanceId = typeid("sbi").toString();
+      const sandboxProfileId = "sbp_direct_egress_mistle_mcp_setup_assistant";
+      const upstream = await startSimulatedHttpUpstream();
+      const upstreamUrl = new URL("/mcp", upstream.baseUrl);
+      await insertSandboxInstanceRow({
+        env,
+        organizationId,
+        sandboxInstanceId,
+        runtimePlan: createRuntimePlan({
+          egressRoutes: [
+            createRoute({
+              authInjection: {
+                type: "bearer",
+                target: "authorization",
+              },
+              bindingId: "platform-mistle-mcp",
+              credentialResolver: {
+                kind: "mistle_mcp_setup_assistant_token",
+                sandboxProfileId,
+                sandboxProfileVersion: 1,
+              },
+              egressRuleId: "egress_rule_platform_mistle_mcp",
+              familyId: "mistle",
+              hosts: [upstreamUrl.hostname],
+              methods: ["POST"],
+              pathPrefixes: ["/mcp"],
+              upstreamBaseUrl: upstream.baseUrl,
+              variantId: "mistle-mcp",
+            }),
+          ],
+        }),
+      });
+
+      try {
+        const response = await env.dataPlaneGateway.http.fetch(
+          `${DirectEgressHttpRoutePath}?target=${encodeURIComponent(upstreamUrl.toString())}`,
+          {
+            method: "POST",
+            headers: {
+              [DirectEgressTokenHeaderName]: `Bearer ${await mintDirectEgressToken({
+                organizationId,
+                sandboxInstanceId,
+              })}`,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+          },
+        );
+
+        expect(response.status).toBe(202);
+        const request = await withTimeout({
+          label: "waiting for managed setup assistant Mistle MCP upstream request",
+          promise: upstream.nextRequest(),
+        });
+        const authorizationHeader = request.headers.authorization;
+        expect(authorizationHeader).toMatch(/^Bearer /u);
+        if (typeof authorizationHeader !== "string") {
+          throw new Error("Expected Mistle MCP authorization header to be a string.");
+        }
+
+        const verifiedToken = await verifyMcpToken({
+          config: {
+            tokenSecret: McpTokenSecret,
+            tokenIssuer: McpTokenIssuer,
+            tokenAudience: McpTokenAudience,
+          },
+          token: authorizationHeader.slice("Bearer ".length),
+        });
+        expect(verifiedToken.kind).toBe("setup_assistant");
+        expect(verifiedToken.sub).toBe(sandboxInstanceId);
+        expect(verifiedToken.organizationId).toBe(organizationId);
+        if (verifiedToken.kind !== "setup_assistant") {
+          throw new Error("Expected a setup assistant MCP token.");
+        }
+        expect(verifiedToken.sandboxProfileId).toBe(sandboxProfileId);
+        expect(verifiedToken.sandboxProfileVersion).toBe(1);
       } finally {
         await upstream.close();
       }

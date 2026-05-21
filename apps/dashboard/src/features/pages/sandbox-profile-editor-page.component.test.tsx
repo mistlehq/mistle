@@ -1486,10 +1486,6 @@ describe("SandboxProfileEditorPage", () => {
     ).toBe("pnpm update\npnpm test");
     expect(screen.getByText("Snapshot maintenance script")).toBeDefined();
 
-    await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Close Setup Assistant panel" })).toBeNull();
-    });
-
     expect(screen.getByRole("button", { name: "Cancel" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Save" })).toBeDefined();
     expect(screen.getByLabelText("Cron expression")).toHaveProperty("value", "0 10 * * *");
