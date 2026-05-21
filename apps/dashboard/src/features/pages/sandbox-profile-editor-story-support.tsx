@@ -112,6 +112,8 @@ export type SandboxProfileEditorPageStoryArgs = {
   draftSaveErrorMessage?: string;
   draftTriggerImpactError?: string;
   draftTriggerImpactAffectedTriggers?: readonly SandboxProfileVersionDraftTriggerImpactTrigger[];
+  duplicateProfileAvailability?: "available" | "unavailable";
+  duplicateProfileDialogState?: "closed" | "open" | "error";
   initialBindings?: readonly {
     id: string;
     connectionId: string;
@@ -775,6 +777,9 @@ function SandboxProfileEditorPageStoryView(
     input.setupAssistantStartDialogState !== undefined,
   );
   const [setupAssistantPanelScript, setSetupAssistantPanelScript] = useState(setupScriptDraft);
+  const [duplicateProfileDialogOpen, setDuplicateProfileDialogOpen] = useState(
+    input.duplicateProfileDialogState === "open" || input.duplicateProfileDialogState === "error",
+  );
 
   async function handleProfileNameSave(nextValue: string): Promise<void> {
     setProfileName(nextValue);
@@ -812,6 +817,10 @@ function SandboxProfileEditorPageStoryView(
   const hasSnapshotMaintenanceScript = (snapshotMaintenanceScript?.trim().length ?? 0) > 0;
   const canRunSnapshotMaintenance =
     snapshotPanelState.kind === "ready" && hasSnapshotMaintenanceScript;
+  const duplicateProfileIsAvailable =
+    input.duplicateProfileAvailability === undefined
+      ? mode.activeVersion !== null && snapshotStatus === "snapshot-ready"
+      : input.duplicateProfileAvailability === "available";
   const setupScriptTestStatus =
     input.setupScriptTestStatus ?? (setupScriptDraft.trim().length === 0 ? "blank" : "idle");
   const storyConnections = [
@@ -886,14 +895,24 @@ function SandboxProfileEditorPageStoryView(
       deleteProfileTriggerUsagesIsPending={false}
       deleteProfileError={null}
       deleteProfileIsPending={false}
+      duplicateProfileError={
+        input.duplicateProfileDialogState === "error"
+          ? "A sandbox profile with this name already exists."
+          : null
+      }
+      duplicateProfileIsAvailable={duplicateProfileIsAvailable}
+      duplicateProfileIsPending={false}
       draftTriggerImpactError={input.draftTriggerImpactError ?? null}
       draftTriggerImpactAffectedTriggers={input.draftTriggerImpactAffectedTriggers ?? null}
       onDraftTriggerImpactErrorDismiss={() => {}}
       hasUnpersistedSetupScriptChanges={setupScriptDraft !== persistedSetupScript}
       isDeleteProfileDialogOpen={false}
+      isDuplicateProfileDialogOpen={duplicateProfileDialogOpen}
       mode={mode}
       onConfirmDeleteProfile={() => {}}
+      onConfirmDuplicateProfile={() => {}}
       onDeleteProfileDialogOpenChange={() => {}}
+      onDuplicateProfileDialogOpenChange={setDuplicateProfileDialogOpen}
       onMakeChanges={() => {}}
       onDiscardChangesAndLeaveDraft={() => {}}
       onPublish={() => {}}

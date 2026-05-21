@@ -31,6 +31,31 @@ export const Published: Story = {
   },
 };
 
+export const DuplicateProfileDialog: Story = {
+  args: {
+    duplicateProfileDialogState: "open",
+    lifecycleState: "published",
+    snapshotState: "snapshot-ready",
+  },
+};
+
+export const DuplicateProfileUnavailable: Story = {
+  args: {
+    duplicateProfileAvailability: "unavailable",
+    duplicateProfileDialogState: "open",
+    lifecycleState: "published",
+    snapshotState: "snapshot-unavailable-no-previous",
+  },
+};
+
+export const DuplicateProfileError: Story = {
+  args: {
+    duplicateProfileDialogState: "error",
+    lifecycleState: "published",
+    snapshotState: "snapshot-ready",
+  },
+};
+
 export const PublishedOrganizationE2BRuntime: Story = {
   args: {
     lifecycleState: "published",
