@@ -24,6 +24,7 @@ import {
   type SandboxStopRequest,
   type SandboxTransparentProxyConfiguration,
 } from "../../types.js";
+import { withSandboxProviderOperationTelemetry } from "../telemetry.js";
 import { E2BClientError, E2BClientErrorCodes, E2BClientOperationIds } from "./client-errors.js";
 import type { E2BClient } from "./client.js";
 import { createE2BAttachStorageCommand, createE2BCleanupStorageCommand } from "./storage.js";
@@ -142,16 +143,22 @@ export class E2BSandboxAdapter implements SandboxAdapter {
   async resume(request: SandboxResumeRequestV1): Promise<SandboxHandle> {
     requireSandboxId(request.id);
 
-    try {
-      const sandbox = await this.#client.resumeSandbox({ sandboxId: request.id });
-      return createSandboxHandle(sandbox.sandboxId);
-    } catch (error) {
-      if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
-        throw toSandboxNotFoundError(request.id, error);
-      }
+    return await withSandboxProviderOperationTelemetry({
+      provider: "e2b",
+      operation: "resume_sandbox",
+      fn: async () => {
+        try {
+          const sandbox = await this.#client.resumeSandbox({ sandboxId: request.id });
+          return createSandboxHandle(sandbox.sandboxId);
+        } catch (error) {
+          if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
+            throw toSandboxNotFoundError(request.id, error);
+          }
 
-      throw error;
-    }
+          throw error;
+        }
+      },
+    });
   }
 
   async captureSnapshot(request: SandboxCaptureSnapshotRequest): Promise<SandboxImageHandle> {

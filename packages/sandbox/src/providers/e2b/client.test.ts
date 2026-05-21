@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 
 import { E2BClientError, E2BClientErrorCodes, E2BClientOperationIds } from "./client-errors.js";
 import {
+  DaemonReadinessPollAttempts,
+  DaemonReadinessPollTimeoutMs,
   E2BDaemonSystemdEnvironmentVariables,
   createE2BDaemonCommandOptions,
   createE2BStartDaemonShellCommand,
@@ -55,6 +57,13 @@ describe("createE2BStartDaemonShellCommand", () => {
       `systemctl import-environment ${E2BDaemonSystemdEnvironmentVariables.join(" ")}`,
     );
     expect(command).not.toContain("systemctl import-environment &&");
+  });
+});
+
+describe("daemon readiness polling", () => {
+  it("allows sandboxd up to one minute to expose the control socket", () => {
+    expect(DaemonReadinessPollAttempts).toBe(600);
+    expect(DaemonReadinessPollTimeoutMs).toBe(60_000);
   });
 });
 

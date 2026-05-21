@@ -1019,6 +1019,9 @@ importers:
       '@mistle/time':
         specifier: workspace:*
         version: link:../time
+      '@opentelemetry/api':
+        specifier: ^1.9.1
+        version: 1.9.1
       dockerode:
         specifier: ^5.0.0
         version: 5.0.0

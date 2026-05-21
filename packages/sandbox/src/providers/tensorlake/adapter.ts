@@ -25,6 +25,7 @@ import {
   type SandboxTransparentProxyConfiguration,
 } from "../../types.js";
 import { createE2BAttachStorageCommand, createE2BCleanupStorageCommand } from "../e2b/storage.js";
+import { withSandboxProviderOperationTelemetry } from "../telemetry.js";
 import {
   TensorlakeClientError,
   TensorlakeClientErrorCodes,
@@ -146,18 +147,24 @@ export class TensorlakeSandboxAdapter implements SandboxAdapter {
   async resume(request: SandboxResumeRequestV1): Promise<SandboxHandle> {
     requireSandboxId(request.id);
 
-    try {
-      const sandbox = await this.#client.resumeSandbox({ sandboxId: request.id });
-      return createSandboxHandle(sandbox.sandboxId);
-    } catch (error) {
-      if (
-        error instanceof TensorlakeClientError &&
-        error.code === TensorlakeClientErrorCodes.NOT_FOUND
-      ) {
-        throw toSandboxNotFoundError(request.id, error);
-      }
-      throw error;
-    }
+    return await withSandboxProviderOperationTelemetry({
+      provider: "tensorlake",
+      operation: TensorlakeClientOperationIds.RESUME_SANDBOX,
+      fn: async () => {
+        try {
+          const sandbox = await this.#client.resumeSandbox({ sandboxId: request.id });
+          return createSandboxHandle(sandbox.sandboxId);
+        } catch (error) {
+          if (
+            error instanceof TensorlakeClientError &&
+            error.code === TensorlakeClientErrorCodes.NOT_FOUND
+          ) {
+            throw toSandboxNotFoundError(request.id, error);
+          }
+          throw error;
+        }
+      },
+    });
   }
 
   async captureSnapshot(request: SandboxCaptureSnapshotRequest) {

@@ -15,6 +15,7 @@ import { z } from "zod";
 
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
 import { SandboxInspectDispositions, SandboxInspectStates } from "../../types.js";
+import { recordSandboxDaemonReady, sandboxTelemetryErrorCode } from "../telemetry.js";
 import {
   E2BClientError,
   E2BClientErrorCodes,
@@ -66,7 +67,9 @@ export const E2BDaemonSystemdEnvironmentVariables = [
 const StartDaemonCommand = createE2BStartDaemonShellCommand();
 const ReadyCommand = "/opt/mistle/bin/sandboxd ready";
 const DaemonReadinessPollIntervalMs = 100;
-const DaemonReadinessPollAttempts = 100;
+export const DaemonReadinessPollAttempts = 600;
+export const DaemonReadinessPollTimeoutMs =
+  DaemonReadinessPollIntervalMs * DaemonReadinessPollAttempts;
 // E2B treats `timeoutMs: 0` as "disable request lifetime timeout".
 const E2BCommandTimeoutDisabledMs = 0;
 const E2BCreateSandboxMinIntervalMs = 1_500;
@@ -782,7 +785,18 @@ export class E2BApiClient implements E2BClient {
     sandbox: Sandbox,
     env: Readonly<Record<string, string>> | undefined,
   ): Promise<void> {
+    const startedAtMs = systemClock.nowMs();
+    let pollAttempts = 0;
+    let startedDaemon = false;
     if (await this.#isDaemonReady(sandbox)) {
+      recordSandboxDaemonReady({
+        alreadyReady: true,
+        durationMs: systemClock.nowMs() - startedAtMs,
+        outcome: "success",
+        pollAttempts,
+        provider: "e2b",
+        startedDaemon,
+      });
       return;
     }
 
@@ -790,6 +804,7 @@ export class E2BApiClient implements E2BClient {
       const handle = await sandbox.commands.run(StartDaemonCommand, {
         ...createE2BDaemonCommandOptions(env),
       });
+      startedDaemon = true;
       const exitPromise = handle
         .wait()
         .then(() => {
@@ -814,12 +829,21 @@ export class E2BApiClient implements E2BClient {
 
       try {
         for (let attempt = 0; attempt < DaemonReadinessPollAttempts; attempt += 1) {
+          pollAttempts += 1;
           const readinessResult = await Promise.race([
             this.#checkDaemonReady(sandbox),
             exitPromise,
           ]);
 
           if (readinessResult) {
+            recordSandboxDaemonReady({
+              alreadyReady: false,
+              durationMs: systemClock.nowMs() - startedAtMs,
+              outcome: "success",
+              pollAttempts,
+              provider: "e2b",
+              startedDaemon,
+            });
             return;
           }
 
@@ -830,15 +854,43 @@ export class E2BApiClient implements E2BClient {
       }
     } catch (error) {
       if (error instanceof E2BClientError) {
+        recordSandboxDaemonReady({
+          alreadyReady: false,
+          durationMs: systemClock.nowMs() - startedAtMs,
+          errorCode: error.code,
+          outcome: error.message.includes("exited before becoming ready")
+            ? "daemon_exited"
+            : "provider_error",
+          pollAttempts,
+          provider: "e2b",
+          startedDaemon,
+        });
         throw error;
       }
 
+      recordSandboxDaemonReady({
+        alreadyReady: false,
+        durationMs: systemClock.nowMs() - startedAtMs,
+        errorCode: sandboxTelemetryErrorCode(error),
+        outcome: "provider_error",
+        pollAttempts,
+        provider: "e2b",
+        startedDaemon,
+      });
       throw mapE2BClientError(E2BClientOperationIds.ENSURE_DAEMON_READY, error);
     }
 
+    recordSandboxDaemonReady({
+      alreadyReady: false,
+      durationMs: systemClock.nowMs() - startedAtMs,
+      outcome: "timeout",
+      pollAttempts,
+      provider: "e2b",
+      startedDaemon,
+    });
     throw createUnknownClientError({
       operation: E2BClientOperationIds.ENSURE_DAEMON_READY,
-      message: `sandbox daemon did not become ready within ${String(DaemonReadinessPollIntervalMs * DaemonReadinessPollAttempts)}ms`,
+      message: `sandbox daemon did not become ready within ${String(DaemonReadinessPollTimeoutMs)}ms`,
       cause: new Error("sandbox daemon readiness timed out"),
     });
   }

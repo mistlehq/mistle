@@ -1,6 +1,7 @@
 import type { MistleLogger } from "@mistle/logging";
 import { SandboxProvider, type SandboxAdapter, type SandboxRuntimeControl } from "@mistle/sandbox";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
+import { trace, type Attributes } from "@opentelemetry/api";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import type { SandboxdArtifactResolver } from "../core/sandboxd-artifact-resolver.js";
@@ -11,6 +12,21 @@ import {
   encodeSandboxStartupInput,
 } from "./sandbox-startup-input.js";
 import { createSandboxRuntimeEnv } from "./start-sandbox.js";
+
+function addResumeRuntimeEvent(input: {
+  event: string;
+  providerSandboxId: string;
+  runtimeProvider: SandboxProvider;
+  sandboxInstanceId: string;
+  attributes?: Attributes;
+}): void {
+  trace.getActiveSpan()?.addEvent(input.event, {
+    "mistle.sandbox.instance_id": input.sandboxInstanceId,
+    "mistle.sandbox.provider_sandbox_id": input.providerSandboxId,
+    "mistle.sandbox.runtime_provider": input.runtimeProvider,
+    ...(input.attributes ?? {}),
+  });
+}
 
 export function isSandboxdAlreadyInitializedForResume(error: unknown): boolean {
   return (
@@ -54,10 +70,28 @@ export async function resumeSandboxRuntime(
   });
   const sandboxdArtifact = await ctx.sandboxdArtifactResolver?.resolve();
   if (sandboxdArtifact !== undefined) {
+    addResumeRuntimeEvent({
+      event: "sandbox_resume_runtime.ensure_sandboxd.started",
+      providerSandboxId: input.providerSandboxId,
+      runtimeProvider: input.runtimeProvider,
+      sandboxInstanceId: input.sandboxInstanceId,
+      attributes: {
+        "mistle.sandbox.sandboxd.version": sandboxdArtifact.version,
+      },
+    });
     await ctx.sandboxRuntimeControl.ensureSandboxd({
       id: input.providerSandboxId,
       artifact: sandboxdArtifact,
       env: runtimeEnv,
+    });
+    addResumeRuntimeEvent({
+      event: "sandbox_resume_runtime.ensure_sandboxd.completed",
+      providerSandboxId: input.providerSandboxId,
+      runtimeProvider: input.runtimeProvider,
+      sandboxInstanceId: input.sandboxInstanceId,
+      attributes: {
+        "mistle.sandbox.sandboxd.version": sandboxdArtifact.version,
+      },
     });
     ctx.logger.info(
       {
@@ -70,9 +104,24 @@ export async function resumeSandboxRuntime(
     );
   }
 
+  addResumeRuntimeEvent({
+    event: "sandbox_resume_runtime.read_sandboxd_version.started",
+    providerSandboxId: input.providerSandboxId,
+    runtimeProvider: input.runtimeProvider,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
   const sandboxdVersion = await ctx.sandboxRuntimeControl.readSandboxdVersion({
     id: input.providerSandboxId,
     env: runtimeEnv,
+  });
+  addResumeRuntimeEvent({
+    event: "sandbox_resume_runtime.read_sandboxd_version.completed",
+    providerSandboxId: input.providerSandboxId,
+    runtimeProvider: input.runtimeProvider,
+    sandboxInstanceId: input.sandboxInstanceId,
+    attributes: {
+      "mistle.sandbox.sandboxd.version": sandboxdVersion,
+    },
   });
   ctx.logger.info(
     {
@@ -105,7 +154,19 @@ export async function resumeSandboxRuntime(
   };
 
   try {
+    addResumeRuntimeEvent({
+      event: "sandbox_resume_runtime.begin_init.started",
+      providerSandboxId: input.providerSandboxId,
+      runtimeProvider: input.runtimeProvider,
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
     await ctx.sandboxRuntimeControl.beginInit(runtimeControlRequest);
+    addResumeRuntimeEvent({
+      event: "sandbox_resume_runtime.begin_init.completed",
+      providerSandboxId: input.providerSandboxId,
+      runtimeProvider: input.runtimeProvider,
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
     ctx.logger.info(
       {
         providerSandboxId: input.providerSandboxId,
@@ -114,9 +175,21 @@ export async function resumeSandboxRuntime(
       },
       "Submitted sandboxd initialization for resumed provider runtime.",
     );
+    addResumeRuntimeEvent({
+      event: "sandbox_resume_runtime.wait_init.started",
+      providerSandboxId: input.providerSandboxId,
+      runtimeProvider: input.runtimeProvider,
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
     await ctx.sandboxRuntimeControl.waitInit({
       id: input.providerSandboxId,
       env: runtimeEnv,
+    });
+    addResumeRuntimeEvent({
+      event: "sandbox_resume_runtime.wait_init.completed",
+      providerSandboxId: input.providerSandboxId,
+      runtimeProvider: input.runtimeProvider,
+      sandboxInstanceId: input.sandboxInstanceId,
     });
     return;
   } catch (error) {
@@ -129,9 +202,24 @@ export async function resumeSandboxRuntime(
         },
         "Sandboxd initialization was already in progress before runtime resume.",
       );
+      addResumeRuntimeEvent({
+        event: "sandbox_resume_runtime.wait_init.already_in_progress",
+        providerSandboxId: input.providerSandboxId,
+        runtimeProvider: input.runtimeProvider,
+        sandboxInstanceId: input.sandboxInstanceId,
+      });
       await ctx.sandboxRuntimeControl.waitInit({
         id: input.providerSandboxId,
         env: runtimeEnv,
+      });
+      addResumeRuntimeEvent({
+        event: "sandbox_resume_runtime.wait_init.completed",
+        providerSandboxId: input.providerSandboxId,
+        runtimeProvider: input.runtimeProvider,
+        sandboxInstanceId: input.sandboxInstanceId,
+        attributes: {
+          "mistle.sandbox.resume.wait_init_source": "already_in_progress",
+        },
       });
       return;
     }
@@ -150,5 +238,17 @@ export async function resumeSandboxRuntime(
     );
   }
 
+  addResumeRuntimeEvent({
+    event: "sandbox_resume_runtime.resume.started",
+    providerSandboxId: input.providerSandboxId,
+    runtimeProvider: input.runtimeProvider,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
   await ctx.sandboxRuntimeControl.resume(runtimeControlRequest);
+  addResumeRuntimeEvent({
+    event: "sandbox_resume_runtime.resume.completed",
+    providerSandboxId: input.providerSandboxId,
+    runtimeProvider: input.runtimeProvider,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
 }

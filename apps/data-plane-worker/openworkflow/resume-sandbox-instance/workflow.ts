@@ -835,6 +835,15 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               }),
               "Sandbox resume workflow completed successfully.",
             );
+            await emitSandboxStartupDiagnostics({
+              logger,
+              sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
+              providerSandboxId: resumedRuntime.providerSandboxId,
+              sandboxInstanceId: resumedRuntime.sandboxInstanceId,
+              runtimeProvider: resumedRuntime.runtimeProvider,
+              operation: "resume",
+              persistenceMode: resumableSandboxState.persistenceMode,
+            });
           } catch (error) {
             rethrowResumeDurableStepErrorForRetry(error);
             existingResumeFailureHandled = true;

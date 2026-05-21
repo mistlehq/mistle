@@ -1,4 +1,4 @@
-import { systemSleeper } from "@mistle/time";
+import { systemClock, systemSleeper } from "@mistle/time";
 import {
   Sandbox,
   SandboxClient,
@@ -19,6 +19,7 @@ import {
   SandboxInspectStates,
   SandboxProvider,
 } from "../../types.js";
+import { recordSandboxDaemonReady, sandboxTelemetryErrorCode } from "../telemetry.js";
 import { createTensorlakeSdkImageBuildContext } from "./base-image-builder.js";
 import {
   TensorlakeClientOperationIds,
@@ -63,7 +64,9 @@ export const TensorlakeDaemonSystemdEnvironmentVariables = [
 const StartDaemonCommandArgs = ["-lc", createTensorlakeStartDaemonShellCommand()];
 const DaemonPath = "/opt/mistle/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin";
 const DaemonReadinessPollIntervalMs = 100;
-const DaemonReadinessPollAttempts = 100;
+export const DaemonReadinessPollAttempts = 600;
+export const DaemonReadinessPollTimeoutMs =
+  DaemonReadinessPollIntervalMs * DaemonReadinessPollAttempts;
 const StartupCommandPollIntervalMs = 250;
 const StartupCommandPollAttempts = 1200;
 
@@ -583,7 +586,19 @@ export class TensorlakeApiClient implements TensorlakeClient {
       | typeof TensorlakeClientOperationIds.INIT
       | typeof TensorlakeClientOperationIds.RESUME;
   }): Promise<void> {
+    const startedAtMs = systemClock.nowMs();
+    let pollAttempts = 0;
+    let startedDaemon = false;
+    let recordedFailure = false;
     if (await this.#isDaemonReady(input.sandbox)) {
+      recordSandboxDaemonReady({
+        alreadyReady: true,
+        durationMs: systemClock.nowMs() - startedAtMs,
+        outcome: "success",
+        pollAttempts,
+        provider: "tensorlake",
+        startedDaemon,
+      });
       return;
     }
 
@@ -591,33 +606,82 @@ export class TensorlakeApiClient implements TensorlakeClient {
       args: StartDaemonCommandArgs,
       env: createTensorlakeDaemonEnv(input.env),
     });
+    startedDaemon = true;
 
-    for (let attempt = 1; attempt <= DaemonReadinessPollAttempts; attempt += 1) {
-      const result = await input.sandbox.run(ReadyCommand, { args: ReadyCommandArgs });
-      if (result.exitCode === 0) {
-        return;
+    try {
+      for (let attempt = 1; attempt <= DaemonReadinessPollAttempts; attempt += 1) {
+        pollAttempts += 1;
+        const result = await input.sandbox.run(ReadyCommand, { args: ReadyCommandArgs });
+        if (result.exitCode === 0) {
+          recordSandboxDaemonReady({
+            alreadyReady: false,
+            durationMs: systemClock.nowMs() - startedAtMs,
+            outcome: "success",
+            pollAttempts,
+            provider: "tensorlake",
+            startedDaemon,
+          });
+          return;
+        }
+
+        const processInfo = await input.sandbox.getProcess(process.pid);
+        if (processInfo.status !== "running") {
+          const output = await this.#readProcessOutput(input.sandbox, processInfo);
+          const error = new TensorlakeCommandExitError({
+            operation: input.operation,
+            commandDescription: "Tensorlake sandboxd daemon",
+            exitCode: processInfo.exitCode ?? 1,
+            stdout: output.stdout,
+            stderr: output.stderr,
+          });
+          recordSandboxDaemonReady({
+            alreadyReady: false,
+            durationMs: systemClock.nowMs() - startedAtMs,
+            errorCode: sandboxTelemetryErrorCode(error),
+            outcome: "daemon_exited",
+            pollAttempts,
+            provider: "tensorlake",
+            startedDaemon,
+          });
+          recordedFailure = true;
+          throw error;
+        }
+
+        await systemSleeper.sleep(DaemonReadinessPollIntervalMs);
       }
 
       const processInfo = await input.sandbox.getProcess(process.pid);
-      if (processInfo.status !== "running") {
-        const output = await this.#readProcessOutput(input.sandbox, processInfo);
-        throw new TensorlakeCommandExitError({
-          operation: input.operation,
-          commandDescription: "Tensorlake sandboxd daemon",
-          exitCode: processInfo.exitCode ?? 1,
-          stdout: output.stdout,
-          stderr: output.stderr,
-        });
+      const output = await this.#readProcessOutput(input.sandbox, processInfo);
+      recordSandboxDaemonReady({
+        alreadyReady: false,
+        durationMs: systemClock.nowMs() - startedAtMs,
+        outcome: "timeout",
+        pollAttempts,
+        provider: "tensorlake",
+        startedDaemon,
+      });
+      recordedFailure = true;
+      throw new Error(
+        `Tensorlake sandboxd daemon did not become ready.${formatProcessOutput(output)}`,
+      );
+    } catch (error) {
+      if (error instanceof TensorlakeCommandExitError) {
+        throw error;
       }
 
-      await systemSleeper.sleep(DaemonReadinessPollIntervalMs);
+      if (!recordedFailure) {
+        recordSandboxDaemonReady({
+          alreadyReady: false,
+          durationMs: systemClock.nowMs() - startedAtMs,
+          errorCode: sandboxTelemetryErrorCode(error),
+          outcome: "provider_error",
+          pollAttempts,
+          provider: "tensorlake",
+          startedDaemon,
+        });
+      }
+      throw error;
     }
-
-    const processInfo = await input.sandbox.getProcess(process.pid);
-    const output = await this.#readProcessOutput(input.sandbox, processInfo);
-    throw new Error(
-      `Tensorlake sandboxd daemon did not become ready.${formatProcessOutput(output)}`,
-    );
   }
 
   async #isDaemonReady(sandbox: Sandbox): Promise<boolean> {

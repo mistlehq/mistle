@@ -1,12 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DaemonReadinessPollAttempts,
+  DaemonReadinessPollTimeoutMs,
   TensorlakeDaemonSystemdEnvironmentVariables,
   createTensorlakeDaemonEnv,
   createTensorlakeSandboxdControlCommand,
   createTensorlakeSandboxName,
   createTensorlakeStartDaemonShellCommand,
 } from "./client.js";
+
+describe("daemon readiness polling", () => {
+  it("allows sandboxd up to one minute to expose the control socket", () => {
+    expect(DaemonReadinessPollAttempts).toBe(600);
+    expect(DaemonReadinessPollTimeoutMs).toBe(60_000);
+  });
+});
 
 describe("createTensorlakeDaemonEnv", () => {
   it("preserves the image command path for daemon child processes", () => {

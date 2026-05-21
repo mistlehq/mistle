@@ -5,7 +5,7 @@ import {
   SandboxdStopDaemonTimeoutMs,
 } from "./runtime-control.js";
 
-describe("Tensorlake sandbox runtime control timeouts", () => {
+describe("E2B sandbox runtime control timeouts", () => {
   it("uses expanded diagnostic and daemon-stop timeouts during resume investigation", () => {
     expect(SandboxdReadOperationLogTimeoutMs).toBe(60_000);
     expect(SandboxdStopDaemonTimeoutMs).toBe(30_000);
