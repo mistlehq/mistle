@@ -1350,11 +1350,7 @@ function LoadedSandboxProfileEditorPage(
         if (duplicateProfileMutation.isPending) {
           return;
         }
-        if (
-          open &&
-          (triggerUsagesQuery.isPending ||
-            (duplicateProfileIsAvailable && triggerUsagesQuery.isError))
-        ) {
+        if (open && triggerUsagesQuery.isPending) {
           return;
         }
         setDuplicateProfileError(null);
@@ -3030,6 +3026,7 @@ function formatDraftTriggerImpactIssueMessage(
 }
 
 function DuplicateSandboxProfileDialog(input: {
+  activeVersion: number | null;
   duplicateError: string | null;
   isAvailable: boolean;
   isOpen: boolean;
@@ -3037,12 +3034,19 @@ function DuplicateSandboxProfileDialog(input: {
   onConfirm: (request: { displayName: string; includeTriggers: boolean }) => void;
   onOpenChange: (open: boolean) => void;
   profileName: string;
+  triggerUsagesError: string | null;
   triggerUsages: readonly TriggerSandboxProfileUsage[];
 }): React.JSX.Element {
   const defaultDisplayName = `${input.profileName} copy`;
   const [displayName, setDisplayName] = useState(defaultDisplayName);
   const [includeTriggers, setIncludeTriggers] = useState(false);
-  const canChooseTriggers = input.isAvailable && input.triggerUsages.length > 0;
+  const duplicateableTriggerUsages =
+    input.activeVersion === null || input.triggerUsagesError !== null
+      ? []
+      : input.triggerUsages.filter(
+          (triggerUsage) => triggerUsage.sandboxProfileVersion === input.activeVersion,
+        );
+  const canChooseTriggers = input.isAvailable && duplicateableTriggerUsages.length > 0;
 
   useEffect(() => {
     if (input.isOpen) {
@@ -3079,6 +3083,11 @@ function DuplicateSandboxProfileDialog(input: {
           {!input.isAvailable ? (
             <Notice variant="alert">
               Duplicate requires the active published version to have a usable snapshot.
+            </Notice>
+          ) : null}
+          {input.isAvailable && input.triggerUsagesError !== null ? (
+            <Notice variant="alert">
+              Could not check triggers for this profile. Duplicate will continue without triggers.
             </Notice>
           ) : null}
 
@@ -3290,7 +3299,6 @@ export function SandboxProfileEditorView(input: {
   const duplicateProfileIsPending = input.duplicateProfileIsPending ?? false;
   const duplicateProfileTriggerUsagesIsPending =
     input.duplicateProfileTriggerUsagesIsPending ?? false;
-  const duplicateProfileTriggerUsagesError = input.duplicateProfileTriggerUsagesError ?? null;
   const deleteProfileMenuItem = (
     <DropdownMenuItem
       onClick={() => {
@@ -3315,15 +3323,6 @@ export function SandboxProfileEditorView(input: {
       <span className="flex min-w-0 flex-col gap-1">
         <span>Duplicate</span>
         <span className="text-muted-foreground text-xs">Checking triggers...</span>
-      </span>
-    </DropdownMenuItem>
-  ) : duplicateProfileTriggerUsagesError !== null ? (
-    <DropdownMenuItem className="items-start" disabled>
-      <span className="flex min-w-0 flex-col gap-1">
-        <span>Duplicate</span>
-        <span className="text-muted-foreground text-xs">
-          Could not check triggers for this profile.
-        </span>
       </span>
     </DropdownMenuItem>
   ) : (
@@ -3367,6 +3366,7 @@ export function SandboxProfileEditorView(input: {
         profileName={input.profileName ?? input.profileNameFallback}
       />
       <DuplicateSandboxProfileDialog
+        activeVersion={input.mode.activeVersion}
         duplicateError={input.duplicateProfileError ?? null}
         isAvailable={duplicateProfileIsAvailable}
         isOpen={input.isDuplicateProfileDialogOpen ?? false}
@@ -3378,6 +3378,7 @@ export function SandboxProfileEditorView(input: {
           input.onDuplicateProfileDialogOpenChange?.(open);
         }}
         profileName={input.profileName ?? input.profileNameFallback}
+        triggerUsagesError={input.duplicateProfileTriggerUsagesError ?? null}
         triggerUsages={input.duplicateProfileTriggerUsages ?? []}
       />
 

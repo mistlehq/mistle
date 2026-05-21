@@ -3768,6 +3768,40 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByLabelText("Duplicate triggers tied to this profile")).toBeDefined();
   });
 
+  it("hides the duplicate trigger option when only older-version profile triggers exist", () => {
+    renderDuplicateProfileDialogHarness({
+      triggerUsages: [
+        {
+          id: "trg_legacy",
+          kind: "webhook",
+          name: "Legacy trigger",
+          sandboxProfileVersion: 2,
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Duplicate" }));
+
+    expect(screen.getByRole("heading", { name: "Duplicate sandbox profile" })).toBeDefined();
+    expect(screen.queryByLabelText("Duplicate triggers tied to this profile")).toBeNull();
+  });
+
+  it("allows duplication without trigger choices when trigger usage context fails to load", () => {
+    renderDuplicateProfileDialogHarness({ triggerUsagesError: "Could not load triggers." });
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Duplicate" }));
+
+    expect(screen.getByRole("heading", { name: "Duplicate sandbox profile" })).toBeDefined();
+    expect(
+      screen.getByText(
+        "Could not check triggers for this profile. Duplicate will continue without triggers.",
+      ),
+    ).toBeDefined();
+    expect(screen.queryByLabelText("Duplicate triggers tied to this profile")).toBeNull();
+  });
+
   it("keeps the duplicate dialog closed while trigger usage context is loading", () => {
     renderDuplicateProfileDialogHarness({ triggerUsagesIsPending: true });
 

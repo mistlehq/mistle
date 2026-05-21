@@ -50,6 +50,15 @@ export const DuplicateProfileWithTriggers: Story = {
   },
 };
 
+export const DuplicateProfileWithOnlyHistoricalTriggers: Story = {
+  args: {
+    duplicateProfileDialogState: "open",
+    duplicateProfileTriggerState: "historical-triggers",
+    lifecycleState: "published",
+    snapshotState: "snapshot-ready",
+  },
+};
+
 export const DuplicateProfileCheckingTriggers: Story = {
   args: {
     duplicateProfileDialogState: "closed",
@@ -103,8 +112,14 @@ export const DuplicateProfileTriggerCheckError: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.click(canvas.getByRole("button", { name: "More actions" }));
+    await userEvent.click(canvas.getByRole("menuitem", { name: "Duplicate" }));
 
-    await expect(canvas.getByText("Could not check triggers for this profile.")).toBeVisible();
+    await expect(canvas.getByRole("heading", { name: "Duplicate sandbox profile" })).toBeVisible();
+    await expect(
+      canvas.getByText(
+        "Could not check triggers for this profile. Duplicate will continue without triggers.",
+      ),
+    ).toBeVisible();
   },
 };
 

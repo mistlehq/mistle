@@ -114,7 +114,12 @@ export type SandboxProfileEditorPageStoryArgs = {
   draftTriggerImpactAffectedTriggers?: readonly SandboxProfileVersionDraftTriggerImpactTrigger[];
   duplicateProfileAvailability?: "available" | "unavailable";
   duplicateProfileDialogState?: "closed" | "open" | "error";
-  duplicateProfileTriggerState?: "none" | "with-triggers" | "loading" | "error";
+  duplicateProfileTriggerState?:
+    | "none"
+    | "with-triggers"
+    | "historical-triggers"
+    | "loading"
+    | "error";
   initialBindings?: readonly {
     id: string;
     connectionId: string;
@@ -906,19 +911,26 @@ function SandboxProfileEditorPageStoryView(
       duplicateProfileIsAvailable={duplicateProfileIsAvailable}
       duplicateProfileIsPending={false}
       duplicateProfileTriggerUsages={
-        duplicateProfileTriggerState === "with-triggers"
+        duplicateProfileTriggerState === "with-triggers" ||
+        duplicateProfileTriggerState === "historical-triggers"
           ? [
               {
                 id: "trg_story_pr_checks",
                 kind: "webhook",
                 name: "PR checks",
-                sandboxProfileVersion: mode.activeVersion ?? 1,
+                sandboxProfileVersion:
+                  duplicateProfileTriggerState === "historical-triggers"
+                    ? (mode.activeVersion ?? 1) + 1
+                    : (mode.activeVersion ?? 1),
               },
               {
                 id: "trg_story_nightly",
                 kind: "schedule",
                 name: "Nightly maintenance",
-                sandboxProfileVersion: mode.activeVersion ?? 1,
+                sandboxProfileVersion:
+                  duplicateProfileTriggerState === "historical-triggers"
+                    ? (mode.activeVersion ?? 1) + 1
+                    : (mode.activeVersion ?? 1),
               },
             ]
           : []
