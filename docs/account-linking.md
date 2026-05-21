@@ -2,7 +2,9 @@
 
 Account linking lets users connect their Mistle account to their identity in a supported integration provider, such as Slack or GitHub.
 
-Organizations can enable supported integrations as OAuth account-linking providers. Once linked, Mistle can map provider activity back to the correct Mistle user, so actions, workflow runs, and agent work are attributed to the right person.
+Organizations can enable supported integrations as OAuth account-linking providers. Each enabled provider configuration points at one integration connection, so the same provider family can be configured more than once when the underlying provider has separate workspaces or apps. For example, one Slack app can be installed in an engineering workspace while another Slack app is installed in a support workspace.
+
+Once linked, Mistle can map provider activity back to the correct Mistle user, so actions, workflow runs, and agent work are attributed to the right person. Resolution is scoped to the configured integration connection, not only the provider family. A Slack webhook from one workspace must resolve only linked principals for that workspace's provider configuration, even if another workspace has the same Slack user ID.
 
 ## Example Flow
 

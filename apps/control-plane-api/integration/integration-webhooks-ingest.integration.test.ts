@@ -4,9 +4,16 @@
 
 import { createHmac, generateKeyPairSync } from "node:crypto";
 
+import {
+  MemberRoles,
+  OrganizationIdentityLinkProviderConfigStatus,
+  UserExternalPrincipalKeyStatuses,
+  UserExternalPrincipalStatuses,
+} from "@mistle/db/control-plane";
 import { SlackConnectionMethodIds } from "@mistle/integrations-definitions";
 import {
   createIntegrationTest,
+  type IntegrationAuthenticatedSession,
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
 import { HandleIntegrationWebhookEventWorkflowSpec } from "@mistle/workflow-registry/control-plane";
@@ -240,7 +247,139 @@ describe.concurrent("integration webhooks ingest integration", () => {
       }),
     ).resolves.toEqual([]);
   });
+
+  it("resolves Slack webhook actors through the matching provider config connection", async ({
+    env,
+  }) => {
+    await seedSlackTarget(env);
+    const ownerSession = await env.auth.createSession({
+      email: "integration-new-webhooks-ingest-slack-actor-owner@example.com",
+    });
+    const memberSession = await env.auth.createSession({
+      email: "integration-new-webhooks-ingest-slack-actor-member@example.com",
+    });
+    await addMemberToOrganization(env, {
+      organizationId: ownerSession.organizationId,
+      userId: memberSession.userId,
+      role: MemberRoles.MEMBER,
+    });
+
+    const connectionA = await createSlackWebhookConnection({
+      env,
+      session: ownerSession,
+      email: "integration-new-webhooks-ingest-slack-actor-owner@example.com",
+      signingSecret: "slack-signing-secret-a",
+    });
+    const connectionB = await createSlackWebhookConnection({
+      env,
+      session: ownerSession,
+      email: "integration-new-webhooks-ingest-slack-actor-owner@example.com",
+      signingSecret: "slack-signing-secret-b",
+    });
+    await seedSlackIdentityLinkConfig(env, {
+      configId: "ilp_webhook_actor_slack_a",
+      connectionId: connectionA.connectionId,
+      organizationId: ownerSession.organizationId,
+      userId: ownerSession.userId,
+    });
+    await seedSlackIdentityLinkConfig(env, {
+      configId: "ilp_webhook_actor_slack_b",
+      connectionId: connectionB.connectionId,
+      organizationId: ownerSession.organizationId,
+      userId: ownerSession.userId,
+    });
+    await seedSlackLinkedPrincipal(env, {
+      principalId: "uep_webhook_actor_slack_a",
+      organizationId: ownerSession.organizationId,
+      userId: ownerSession.userId,
+      providerConfigId: "ilp_webhook_actor_slack_a",
+      connectionId: connectionA.connectionId,
+      workspaceId: "T_WORKSPACE_A",
+      userKey: "U_SHARED",
+    });
+    await seedSlackLinkedPrincipal(env, {
+      principalId: "uep_webhook_actor_slack_b",
+      organizationId: ownerSession.organizationId,
+      userId: memberSession.userId,
+      providerConfigId: "ilp_webhook_actor_slack_b",
+      connectionId: connectionB.connectionId,
+      workspaceId: "T_WORKSPACE_B",
+      userKey: "U_SHARED",
+    });
+
+    await expect(
+      postSlackEvent({
+        env,
+        endpointKey: connectionA.endpointKey,
+        signingSecret: "slack-signing-secret-a",
+        externalEventId: "Ev_webhook_actor_slack_a",
+        workspaceId: "T_WORKSPACE_A",
+        userKey: "U_SHARED",
+      }),
+    ).resolves.toHaveProperty("status", 202);
+    await expect(
+      postSlackEvent({
+        env,
+        endpointKey: connectionB.endpointKey,
+        signingSecret: "slack-signing-secret-b",
+        externalEventId: "Ev_webhook_actor_slack_b",
+        workspaceId: "T_WORKSPACE_B",
+        userKey: "U_SHARED",
+      }),
+    ).resolves.toHaveProperty("status", 202);
+    await expect(
+      postSlackEvent({
+        env,
+        endpointKey: connectionA.endpointKey,
+        signingSecret: "slack-signing-secret-a",
+        externalEventId: "Ev_webhook_actor_slack_wrong_workspace",
+        workspaceId: "T_WORKSPACE_B",
+        userKey: "U_SHARED",
+      }),
+    ).resolves.toHaveProperty("status", 202);
+
+    await expect(readSlackWebhookResolution(env, "Ev_webhook_actor_slack_a")).resolves.toEqual({
+      integrationConnectionId: connectionA.connectionId,
+      resolvedPrincipalId: "uep_webhook_actor_slack_a",
+      resolvedUserId: ownerSession.userId,
+    });
+    await expect(readSlackWebhookResolution(env, "Ev_webhook_actor_slack_b")).resolves.toEqual({
+      integrationConnectionId: connectionB.connectionId,
+      resolvedPrincipalId: "uep_webhook_actor_slack_b",
+      resolvedUserId: memberSession.userId,
+    });
+    await expect(
+      readSlackWebhookResolution(env, "Ev_webhook_actor_slack_wrong_workspace"),
+    ).resolves.toEqual({
+      integrationConnectionId: connectionA.connectionId,
+      resolvedPrincipalId: null,
+      resolvedUserId: null,
+    });
+  });
 });
+
+function createSlackEventPayload(input: {
+  externalEventId: string;
+  workspaceId: string;
+  userKey: string;
+}): string {
+  return JSON.stringify({
+    token: "verification-token",
+    team_id: input.workspaceId,
+    api_app_id: SlackAppId,
+    event: {
+      type: "message",
+      user: input.userKey,
+      text: "Hello from Slack",
+      channel: "C12345",
+      event_ts: "1760000000.000100",
+      ts: "1760000000.000100",
+    },
+    type: "event_callback",
+    event_id: input.externalEventId,
+    event_time: 1_760_000_000,
+  });
+}
 
 function createSlackUrlVerificationPayload(input: { challenge: string }): string {
   return JSON.stringify({
@@ -258,6 +397,39 @@ async function postSlackUrlVerification(input: {
 }) {
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const payload = createSlackUrlVerificationPayload({ challenge: input.challenge });
+
+  return input.env.controlPlaneApi.http.fetch(
+    `/p/integration/webhooks/slack-default/${input.endpointKey}`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-slack-request-timestamp": timestamp,
+        "x-slack-signature": signSlackWebhookPayload({
+          secret: input.signingSecret,
+          payload,
+          timestamp,
+        }),
+      },
+      body: payload,
+    },
+  );
+}
+
+async function postSlackEvent(input: {
+  env: IntegrationTestEnvironment;
+  endpointKey: string;
+  signingSecret: string;
+  externalEventId: string;
+  workspaceId: string;
+  userKey: string;
+}) {
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const payload = createSlackEventPayload({
+    externalEventId: input.externalEventId,
+    workspaceId: input.workspaceId,
+    userKey: input.userKey,
+  });
 
   return input.env.controlPlaneApi.http.fetch(
     `/p/integration/webhooks/slack-default/${input.endpointKey}`,
@@ -418,10 +590,13 @@ async function createSlackWebhookConnection(input: {
   env: IntegrationTestEnvironment;
   email: string;
   signingSecret: string;
-}): Promise<{ endpointKey: string }> {
-  const session = await input.env.auth.createSession({
-    email: input.email,
-  });
+  session?: IntegrationAuthenticatedSession;
+}): Promise<{ connectionId: string; endpointKey: string; organizationId: string }> {
+  const session =
+    input.session ??
+    (await input.env.auth.createSession({
+      email: input.email,
+    }));
   const response = await createFormConnection({
     env: input.env,
     targetKey: "slack-default",
@@ -452,7 +627,123 @@ async function createSlackWebhookConnection(input: {
   }
 
   return {
+    connectionId: connection.id,
     endpointKey: webhookSource.endpointKey,
+    organizationId: session.organizationId,
+  };
+}
+
+async function addMemberToOrganization(
+  env: IntegrationTestEnvironment,
+  input: {
+    organizationId: string;
+    userId: string;
+    role: (typeof MemberRoles)[keyof typeof MemberRoles];
+  },
+): Promise<void> {
+  await env.controlPlaneDb.insert(env.controlPlaneTables.members).values({
+    organizationId: input.organizationId,
+    userId: input.userId,
+    role: input.role,
+  });
+
+  await env.controlPlaneDb
+    .update(env.controlPlaneTables.sessions)
+    .set({
+      activeOrganizationId: input.organizationId,
+    })
+    .where(eq(env.controlPlaneTables.sessions.userId, input.userId));
+}
+
+async function seedSlackIdentityLinkConfig(
+  env: IntegrationTestEnvironment,
+  input: {
+    configId: string;
+    connectionId: string;
+    organizationId: string;
+    userId: string;
+  },
+): Promise<void> {
+  await env.controlPlaneDb
+    .insert(env.controlPlaneTables.organizationIdentityLinkProviderConfigs)
+    .values({
+      id: input.configId,
+      organizationId: input.organizationId,
+      providerFamily: "slack",
+      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      integrationTargetKey: "slack-default",
+      integrationConnectionId: input.connectionId,
+      createdByUserId: input.userId,
+      updatedByUserId: input.userId,
+    });
+}
+
+async function seedSlackLinkedPrincipal(
+  env: IntegrationTestEnvironment,
+  input: {
+    principalId: string;
+    organizationId: string;
+    userId: string;
+    providerConfigId: string;
+    connectionId: string;
+    workspaceId: string;
+    userKey: string;
+  },
+): Promise<void> {
+  await env.controlPlaneDb.insert(env.controlPlaneTables.userExternalPrincipals).values({
+    id: input.principalId,
+    organizationId: input.organizationId,
+    userId: input.userId,
+    providerFamily: "slack",
+    providerSubjectId: `${input.workspaceId}:${input.userKey}`,
+    organizationProviderConfigId: input.providerConfigId,
+    integrationConnectionId: input.connectionId,
+    status: UserExternalPrincipalStatuses.ACTIVE,
+    profile: {
+      workspaceId: input.workspaceId,
+      displayName: "Shared Slack User",
+    },
+  });
+  await env.controlPlaneDb.insert(env.controlPlaneTables.userExternalPrincipalKeys).values([
+    {
+      organizationId: input.organizationId,
+      principalId: input.principalId,
+      providerFamily: "slack",
+      keyType: "workspace_id",
+      keyValue: input.workspaceId,
+      status: UserExternalPrincipalKeyStatuses.ACTIVE,
+    },
+    {
+      organizationId: input.organizationId,
+      principalId: input.principalId,
+      providerFamily: "slack",
+      keyType: "user_id",
+      keyValue: input.userKey,
+      status: UserExternalPrincipalKeyStatuses.ACTIVE,
+    },
+  ]);
+}
+
+async function readSlackWebhookResolution(
+  env: IntegrationTestEnvironment,
+  externalEventId: string,
+): Promise<{
+  integrationConnectionId: string;
+  resolvedPrincipalId: string | null;
+  resolvedUserId: string | null;
+}> {
+  const event = await env.controlPlaneDb.query.integrationWebhookEvents.findFirst({
+    where: (table, { and, eq }) =>
+      and(eq(table.targetKey, "slack-default"), eq(table.externalEventId, externalEventId)),
+  });
+  if (event === undefined) {
+    throw new Error(`Expected Slack webhook event '${externalEventId}' to be stored.`);
+  }
+
+  return {
+    integrationConnectionId: event.integrationConnectionId,
+    resolvedPrincipalId: event.resolvedPrincipalId,
+    resolvedUserId: event.resolvedUserId,
   };
 }
 
