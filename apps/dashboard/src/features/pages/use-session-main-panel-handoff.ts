@@ -131,6 +131,14 @@ export function resolveCliRestoreContext(input: {
   launchTarget: SessionCliLaunchTarget;
   preserveLaunchContext: boolean;
 }): CliRestoreContext {
+  if (input.launchTarget.type === "start_new" && input.launchTarget.shouldClearActiveThreadId) {
+    return {
+      runtimeConversationId: null,
+      providerConversationId: null,
+      initialCwd: input.launchDirectory,
+    };
+  }
+
   return {
     runtimeConversationId:
       input.preserveLaunchContext && input.launchTarget.type === "resume"

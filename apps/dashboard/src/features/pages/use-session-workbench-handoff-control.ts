@@ -171,11 +171,13 @@ export function useSessionWorkbenchHandoffControl(input: {
     () =>
       buildPiHandoffRuntime({
         chat: input.piSessionState.chat,
+        handoff: input.piSessionState.handoff,
         lifecycle: piLifecycleForHandoff,
         sessionSnapshot: input.piSessionState.lifecycle.sessionSnapshot,
       }),
     [
       input.piSessionState.chat.confirmChatRestoredAfterReconnect,
+      input.piSessionState.handoff,
       input.piSessionState.lifecycle.sessionSnapshot,
       piLifecycleForHandoff,
     ],

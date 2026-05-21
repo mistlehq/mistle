@@ -44,6 +44,25 @@ describe("resolveCliRestoreContext", () => {
     });
   });
 
+  it("keeps runtimes with file-based CLI launch targets on fallback restore authority", () => {
+    expect(
+      resolveCliRestoreContext({
+        fallbackConversationId: "pi-conversation-id",
+        fallbackProviderConversationId: null,
+        launchDirectory: "/root/acme/repo-2",
+        launchTarget: {
+          type: "resume",
+          threadId: "/root/.pi/agent/sessions/session.jsonl",
+        },
+        preserveLaunchContext: false,
+      }),
+    ).toEqual({
+      runtimeConversationId: "pi-conversation-id",
+      providerConversationId: null,
+      initialCwd: null,
+    });
+  });
+
   it("uses the fallback conversation id for start-new handoffs", () => {
     expect(
       resolveCliRestoreContext({
@@ -59,6 +78,25 @@ describe("resolveCliRestoreContext", () => {
     ).toEqual({
       runtimeConversationId: "thread_fallback",
       providerConversationId: "thread_provider",
+      initialCwd: "/root/acme/repo-2",
+    });
+  });
+
+  it("clears restore authority when a non-resumable conversation launches a new CLI session", () => {
+    expect(
+      resolveCliRestoreContext({
+        fallbackConversationId: "pi-empty-conversation",
+        fallbackProviderConversationId: "pi-empty-provider-conversation",
+        launchDirectory: "/root/acme/repo-2",
+        launchTarget: {
+          type: "start_new",
+          shouldClearActiveThreadId: true,
+        },
+        preserveLaunchContext: false,
+      }),
+    ).toEqual({
+      runtimeConversationId: null,
+      providerConversationId: null,
       initialCwd: "/root/acme/repo-2",
     });
   });

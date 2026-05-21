@@ -136,6 +136,10 @@ _Avoid_: OpenCode thread, sandbox session
 A Pi **Runtime conversation**.
 _Avoid_: Pi thread, Codex thread
 
+**Pi CLI launch target**:
+The native Pi session file path used to open Pi's TUI for a **Pi conversation** that Pi can resume.
+_Avoid_: Pi conversation identity, chat restore id
+
 **Pi image content**:
 An image carried as first-class content in a **Pi conversation** message.
 _Avoid_: Pi image attachment, Pi uploaded image
@@ -267,6 +271,8 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Seeding a **Sandbox session title** should not require renaming the selected **Pi conversation**.
 - A **Pi conversation** should remain the selected chat object when the user switches between chat and the Pi CLI.
 - A **Pi conversation** is identified in Mistle by the provider session file Pi uses to resume that conversation.
+- A **Pi CLI launch target** is the native Pi session file path used to open Pi's TUI; it is not the **Pi conversation** identity used by Mistle chat restore.
+- An empty **Pi conversation** is not resumable in the Pi CLI until Pi has materialized conversation content.
 - A listed **Pi conversation** should come from Pi session file metadata rather than from switching the active Pi runtime into that conversation.
 - A **Session workbench** URL may identify a **Pi conversation** without making the conversation a separate session.
 - A **Pi conversation** in the chat pane should expose visible conversation state rather than acting only as a hidden command bridge.

@@ -14,7 +14,13 @@ import { systemScheduler } from "@mistle/time";
 import { useCallback, useEffect, useReducer, useRef, useState, type Dispatch } from "react";
 
 import type { SessionComposerBootstrapResult } from "../../../pages/session-composer/session-composer-runtime-contracts.js";
+import type { SessionCliLaunchTarget } from "../../session-runtime-cli-launch.js";
 import { createInitialPiChatState, reducePiChatState, type PiChatState } from "./pi-chat-state.js";
+import {
+  isPiSessionActivelyWorking,
+  resolvePiCliLaunchTarget,
+  resolveStablePiCliLaunchTarget,
+} from "./pi-cli-launch-authority.js";
 import {
   buildReadyPiComposerBootstrap,
   buildUnavailablePiComposerBootstrap,
@@ -98,6 +104,9 @@ export type UsePiSessionStateResult = {
   };
   lifecycle: PiSessionLifecycleState;
   conversations: PiConversationNavigatorState;
+  handoff: {
+    resolveCliLaunchTarget: () => Promise<SessionCliLaunchTarget>;
+  };
   sessionMessage: {
     clearSessionErrorMessage: () => void;
     reportSessionErrorMessage: (message: string) => void;
@@ -268,11 +277,7 @@ async function loadConnectedPiComposerBootstrap(input: {
 }
 
 function resolvePiChatStatusFromSessionState(sessionState: PiSessionState): "busy" | "idle" {
-  return sessionState.isStreaming ||
-    sessionState.isCompacting ||
-    sessionState.pendingMessageCount > 0
-    ? "busy"
-    : "idle";
+  return isPiSessionActivelyWorking(sessionState) ? "busy" : "idle";
 }
 
 export function usePiSessionState(input: {
@@ -956,6 +961,33 @@ export function usePiSessionState(input: {
     [activateConversation, availableConversations, refreshConversationList, sessionSnapshot],
   );
 
+  const resolveCliLaunchTarget = useCallback(async (): Promise<SessionCliLaunchTarget> => {
+    const client = clientRef.current;
+    const activeSessionFile = sessionSnapshot?.activeSessionFile ?? null;
+    if (client === null || activeSessionFile === null) {
+      return resolvePiCliLaunchTarget({
+        activeSessionFile,
+        hasActiveWork: false,
+        messageCount: null,
+      });
+    }
+
+    const sessionState = await client.getState({
+      sessionFile: activeSessionFile,
+    });
+    const launchTarget = resolveStablePiCliLaunchTarget({
+      activeSessionFile,
+      currentActiveSessionFile: sessionSnapshotRef.current?.activeSessionFile ?? null,
+      hasActiveWork: isPiSessionActivelyWorking(sessionState),
+      messageCount: sessionState.messageCount,
+    });
+    if (launchTarget === null) {
+      throw new Error("The active Pi conversation changed while preparing the TUI.");
+    }
+
+    return launchTarget;
+  }, [sessionSnapshot?.activeSessionFile]);
+
   const recoverSession = useCallback(
     (recoverInput: { sandboxInstanceId: string; targetConversationId: string | null }): void => {
       connectSession(recoverInput);
@@ -1007,6 +1039,9 @@ export function usePiSessionState(input: {
       refreshConversationList,
       resumeConversation,
       startNewConversation,
+    },
+    handoff: {
+      resolveCliLaunchTarget,
     },
     sessionMessage: {
       clearSessionErrorMessage,

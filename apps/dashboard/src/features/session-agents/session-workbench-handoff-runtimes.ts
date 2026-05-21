@@ -319,6 +319,7 @@ export function buildOpenCodeHandoffRuntime(input: {
 
 export function buildPiHandoffRuntime(input: {
   chat: UsePiSessionStateResult["chat"];
+  handoff: UsePiSessionStateResult["handoff"];
   lifecycle: SessionMainPanelHandoffLifecycle;
   sessionSnapshot: UsePiSessionStateResult["lifecycle"]["sessionSnapshot"];
 }): SessionMainPanelHandoffRuntime {
@@ -332,20 +333,6 @@ export function buildPiHandoffRuntime(input: {
     resetServerRequests: () => {},
     restoreConversationId: input.sessionSnapshot?.activeConversationId ?? null,
     restoreProviderConversationId: input.sessionSnapshot?.providerConversationId ?? null,
-    resolveCliLaunchTarget: async () => {
-      const activeSessionFile = input.sessionSnapshot?.activeSessionFile ?? null;
-
-      if (activeSessionFile === null) {
-        return {
-          type: "start_new",
-          shouldClearActiveThreadId: false,
-        };
-      }
-
-      return {
-        type: "resume",
-        threadId: activeSessionFile,
-      };
-    },
+    resolveCliLaunchTarget: input.handoff.resolveCliLaunchTarget,
   };
 }
