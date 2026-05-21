@@ -26,4 +26,5 @@ config/config.production.toml
 dev/.generated/
 deploy/compose/local/.generated/
 packages/sandboxd/.generated/
+packages/emails/.rendered/
 .local/

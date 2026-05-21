@@ -36,15 +36,15 @@
     "test": "vitest run",
     "test:integration": "vitest run -c vitest.integration.config.ts",
     "test:all": "pnpm test && pnpm test:integration",
-    "preview": "node ./scripts/jsx-email-cli-compat.mjs preview ./preview",
+    "preview": "email preview ./preview",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@jsx-email/plugin-inline": "^1.0.1",
-    "@jsx-email/plugin-minify": "^1.0.2",
-    "@jsx-email/plugin-pretty": "^1.0.0",
-    "jsx-email": "^2.8.4",
+    "@jsx-email/plugin-inline": "^2.0.0",
+    "@jsx-email/plugin-minify": "^2.0.0",
+    "@jsx-email/plugin-pretty": "^2.0.0",
+    "jsx-email": "^3.2.0",
     "nodemailer": "^8.0.5",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"

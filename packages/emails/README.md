@@ -106,11 +106,6 @@ To add a new template:
 `templateName`, and `previewProps`. This package keeps runtime template builders
 under `src/templates`, so preview-only entry files live under `preview/`.
 
-This repo currently runs on Node 25, while `jsx-email` still calls the removed
-recursive `rmdir` API in its preview CLI. The preview scripts use a local
-compatibility wrapper under `scripts/jsx-email-cli-compat.mjs` so previewing
-works without patching `node_modules`.
-
 Use this command from the repo root:
 
 - `pnpm emails:preview`
