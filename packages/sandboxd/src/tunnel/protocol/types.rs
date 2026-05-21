@@ -607,6 +607,8 @@ pub struct SigningRequest {
     pub sandbox_instance_id: String,
     pub acting_user_id: String,
     pub provider_family: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub integration_connection_id: Option<String>,
     pub format: String,
     pub key_ref: String,
     pub grant: String,

@@ -725,6 +725,10 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "integrationConnectionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
                   "format": {
                     "type": "string",
                     "enum": ["ssh"]
@@ -751,6 +755,7 @@
                   "sandboxInstanceId",
                   "actingUserId",
                   "providerFamily",
+                  "integrationConnectionId",
                   "format",
                   "keyRef",
                   "grant",

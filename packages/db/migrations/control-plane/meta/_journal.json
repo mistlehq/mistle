@@ -253,6 +253,13 @@
       "when": 1779335325656,
       "tag": "0035_add-schedule-kind",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1779345615022,
+      "tag": "0036_add-sandbox-profile-git-signing-selector",
+      "breakpoints": true
     }
   ]
 }

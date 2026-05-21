@@ -18,6 +18,7 @@ export const SignCommitPayloadRequestSchema = z
     sandboxInstanceId: z.string().min(1),
     actingUserId: z.string().min(1),
     providerFamily: z.string().min(1),
+    integrationConnectionId: z.string().min(1),
     format: z.literal("ssh"),
     keyRef: z.string().min(1).refine(isValidKeyRef, {
       message: "keyRef must be a non-empty key::<public-key> reference.",

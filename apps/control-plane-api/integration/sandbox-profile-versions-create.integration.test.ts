@@ -32,6 +32,7 @@ const it = createIntegrationTest({
 });
 
 const EmptySandboxRuntimeConfig = {
+  gitCommitSigningIntegrationConnectionId: null,
   mistleMcpEnabled: false,
   mistleMcpApiKeyId: null,
   sandboxConnectionId: null,
@@ -99,6 +100,7 @@ describe.concurrent("sandbox profile versions create integration", () => {
         setupScript: "echo latest-version-two",
         agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
         defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
+        gitCommitSigningIntegrationConnectionId: "icn_version_create_latest_git",
       }),
     ]);
     await env.controlPlaneDb
@@ -151,6 +153,7 @@ describe.concurrent("sandbox profile versions create integration", () => {
       defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
       agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
       ...EmptySandboxRuntimeConfig,
+      gitCommitSigningIntegrationConnectionId: "icn_version_create_latest_git",
       isActive: false,
       usable: false,
       maintenanceScript: null,
@@ -170,6 +173,9 @@ describe.concurrent("sandbox profile versions create integration", () => {
     );
     expect(persistedDraftVersion?.agentRuntimeId).toBe(
       SandboxProfileVersionAgentRuntimeIds.OPENCODE,
+    );
+    expect(persistedDraftVersion?.gitCommitSigningIntegrationConnectionId).toBe(
+      "icn_version_create_latest_git",
     );
 
     const persistedDraftBindings =

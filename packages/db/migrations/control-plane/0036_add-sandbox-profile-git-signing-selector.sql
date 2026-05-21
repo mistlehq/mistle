@@ -1,0 +1,2 @@
+ALTER TABLE "control_plane"."sandbox_profile_versions" ADD COLUMN "git_commit_signing_integration_connection_id" text;--> statement-breakpoint
+ALTER TABLE "control_plane"."sandbox_profile_versions" ADD CONSTRAINT "sandbox_profile_versions_git_signing_connection_id_fkey" FOREIGN KEY ("git_commit_signing_integration_connection_id") REFERENCES "control_plane"."integration_connections"("id") ON DELETE restrict ON UPDATE no action;

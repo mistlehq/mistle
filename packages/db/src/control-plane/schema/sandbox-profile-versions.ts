@@ -71,6 +71,7 @@ export function defineSandboxProfileVersions(schema: PgSchema) {
         .notNull()
         .$type<SandboxProfileVersionAgentRuntimeId>()
         .default(SandboxProfileVersionAgentRuntimeIds.CODEX),
+      gitCommitSigningIntegrationConnectionId: text("git_commit_signing_integration_connection_id"),
       mistleMcpEnabled: boolean("mistle_mcp_enabled").notNull().default(false),
       mistleMcpApiKeyId: text("mistle_mcp_api_key_id"),
     },
@@ -87,6 +88,11 @@ export function defineSandboxProfileVersions(schema: PgSchema) {
         name: "sandbox_profile_versions_mistle_mcp_api_key_id_fkey",
         columns: [table.mistleMcpApiKeyId],
         foreignColumns: [apiKeys.id],
+      }).onDelete("restrict"),
+      foreignKey({
+        name: "sandbox_profile_versions_git_signing_connection_id_fkey",
+        columns: [table.gitCommitSigningIntegrationConnectionId],
+        foreignColumns: [integrationConnections.id],
       }).onDelete("restrict"),
       check(
         "sandbox_profile_versions_snapshot_image_handle_check",

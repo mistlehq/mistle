@@ -93,6 +93,14 @@ export async function mintSigningGrant(input: {
     });
   }
 
+  const normalizedIntegrationConnectionId = toNonEmptyString(input.claims.integrationConnectionId);
+  if (normalizedIntegrationConnectionId === undefined) {
+    throw new SigningGrantError({
+      code: SigningGrantErrorCode.INTEGRATION_CONNECTION_ID_REQUIRED,
+      message: "Signing grant integrationConnectionId claim is required.",
+    });
+  }
+
   const normalizedFormat = toSigningGrantFormat(input.claims.format);
   if (normalizedFormat === undefined) {
     throw new SigningGrantError({
@@ -123,6 +131,7 @@ export async function mintSigningGrant(input: {
       organizationId: normalizedOrganizationId,
       actingUserId: normalizedActingUserId,
       providerFamily: normalizedProviderFamily,
+      integrationConnectionId: normalizedIntegrationConnectionId,
       format: normalizedFormat,
       keyRef: normalizedKeyRef,
     })
@@ -160,6 +169,7 @@ export async function verifySigningGrant(input: {
   let payloadOrganizationId: string | undefined;
   let payloadActingUserId: string | undefined;
   let payloadProviderFamily: string | undefined;
+  let payloadIntegrationConnectionId: string | undefined;
   let payloadFormat: SigningGrantFormat | undefined;
   let payloadKeyRef: string | undefined;
 
@@ -184,6 +194,9 @@ export async function verifySigningGrant(input: {
     }
     if (typeof verificationResult.payload.providerFamily === "string") {
       payloadProviderFamily = verificationResult.payload.providerFamily;
+    }
+    if (typeof verificationResult.payload.integrationConnectionId === "string") {
+      payloadIntegrationConnectionId = verificationResult.payload.integrationConnectionId;
     }
     payloadFormat = toSigningGrantFormat(verificationResult.payload.format);
     if (typeof verificationResult.payload.keyRef === "string") {
@@ -261,6 +274,14 @@ export async function verifySigningGrant(input: {
     });
   }
 
+  const normalizedIntegrationConnectionId = toNonEmptyString(payloadIntegrationConnectionId);
+  if (normalizedIntegrationConnectionId === undefined) {
+    throw new SigningGrantError({
+      code: SigningGrantErrorCode.INTEGRATION_CONNECTION_ID_REQUIRED,
+      message: "Signing grant integrationConnectionId claim is required.",
+    });
+  }
+
   if (payloadFormat === undefined) {
     throw new SigningGrantError({
       code: SigningGrantErrorCode.FORMAT_REQUIRED,
@@ -282,6 +303,7 @@ export async function verifySigningGrant(input: {
     organizationId: normalizedOrganizationId,
     actingUserId: normalizedActingUserId,
     providerFamily: normalizedProviderFamily,
+    integrationConnectionId: normalizedIntegrationConnectionId,
     format: payloadFormat,
     keyRef: normalizedKeyRef,
   };

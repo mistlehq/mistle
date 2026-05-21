@@ -88,7 +88,7 @@ pub(in crate::tunnel::session) enum TunnelSessionRequest {
         response_sender: std::sync::mpsc::Sender<Result<(), TunnelSessionError>>,
     },
     Signing {
-        request: TunnelSigningRequest,
+        request: Box<TunnelSigningRequest>,
         response_sender: std::sync::mpsc::Sender<Result<TunnelSigningResponse, TunnelSessionError>>,
     },
     EgressToken {

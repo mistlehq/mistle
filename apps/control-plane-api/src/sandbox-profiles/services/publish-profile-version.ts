@@ -45,6 +45,7 @@ type PublishProfileVersionOutput = {
     state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
     defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+    gitCommitSigningIntegrationConnectionId: string | null;
     mistleMcpEnabled: boolean;
     mistleMcpApiKeyId: string | null;
     sandboxProvider: string | null;
@@ -367,6 +368,8 @@ export async function publishProfileVersion(
         state: tables.sandboxProfileVersions.state,
         defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
         agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
+        gitCommitSigningIntegrationConnectionId:
+          tables.sandboxProfileVersions.gitCommitSigningIntegrationConnectionId,
         mistleMcpEnabled: tables.sandboxProfileVersions.mistleMcpEnabled,
         mistleMcpApiKeyId: tables.sandboxProfileVersions.mistleMcpApiKeyId,
         sandboxProvider: tables.sandboxProfileVersions.sandboxProvider,
@@ -433,6 +436,8 @@ export async function publishProfileVersion(
         state: publishedVersion.state,
         defaultPersistenceMode: publishedVersion.defaultPersistenceMode,
         agentRuntimeId: publishedVersion.agentRuntimeId,
+        gitCommitSigningIntegrationConnectionId:
+          publishedVersion.gitCommitSigningIntegrationConnectionId,
         mistleMcpEnabled: publishedVersion.mistleMcpEnabled,
         mistleMcpApiKeyId: publishedVersion.mistleMcpApiKeyId,
         maintenanceScript: publishedVersion.maintenanceScript,

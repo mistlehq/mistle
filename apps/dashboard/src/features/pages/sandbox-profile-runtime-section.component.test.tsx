@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -9,7 +9,10 @@ import type {
   SandboxProfileVersion,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { ApiKey } from "../settings/api-keys/api-keys-service.js";
-import { SandboxProfileRuntimeSection } from "./sandbox-profile-runtime-section.js";
+import {
+  SandboxProfileRuntimeSection,
+  type SandboxProfileRuntimeDraftState,
+} from "./sandbox-profile-runtime-section.js";
 
 afterEach(() => {
   cleanup();
@@ -150,6 +153,7 @@ function createVersion(
     version: 1,
     state: "draft",
     agentRuntimeId: input.agentRuntimeId ?? "codex",
+    gitCommitSigningIntegrationConnectionId: null,
     mistleMcpEnabled: input.mistleMcpEnabled ?? false,
     mistleMcpApiKeyId: input.mistleMcpApiKeyId ?? null,
     defaultPersistenceMode: "ephemeral",
@@ -249,6 +253,57 @@ describe("SandboxProfileRuntimeSection", () => {
 
     expect(toggle.getAttribute("aria-checked")).toBe("true");
     expect(screen.getByRole("combobox", { name: "Mistle API key" })).toBeTruthy();
+  });
+
+  it("includes the selected GitHub commit signing connection in runtime draft changes", async () => {
+    const runtimeDraftStates: SandboxProfileRuntimeDraftState[] = [];
+
+    render(
+      <SandboxProfileRuntimeSection
+        apiKeys={[]}
+        availableConnections={[]}
+        availableTargets={[]}
+        disabled={false}
+        gitHubSigningConnectionOptions={[
+          {
+            integrationConnectionId: "icn_github_engineering",
+            label: "Engineering GitHub",
+          },
+          {
+            integrationConnectionId: "icn_github_support",
+            label: "Support GitHub",
+          },
+        ]}
+        isDraft={true}
+        onDraftStateChange={(state) => {
+          runtimeDraftStates.push(state);
+        }}
+        providers={[DockerProvider]}
+        version={createVersion({
+          sandboxProvider: "docker",
+          sandboxConnectionId: null,
+          sandboxResources: null,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("combobox", { name: "GitHub commit signing" }));
+    const supportGitHubOption = screen.getByRole("option", { name: "Support GitHub" });
+    fireEvent.pointerDown(supportGitHubOption, { button: 0 });
+    fireEvent.click(supportGitHubOption);
+    fireEvent.keyDown(supportGitHubOption, { key: "Enter" });
+
+    await waitFor(() => {
+      const runtimeDraftState = runtimeDraftStates.at(-1);
+      const buildDraftChanges = runtimeDraftState?.buildDraftChanges;
+      if (buildDraftChanges === undefined) {
+        throw new Error("Expected runtime draft changes builder.");
+      }
+
+      expect(buildDraftChanges()).toMatchObject({
+        gitCommitSigningIntegrationConnectionId: "icn_github_support",
+      });
+    });
   });
 
   it("disables Mistle API key selection when no API keys exist", () => {

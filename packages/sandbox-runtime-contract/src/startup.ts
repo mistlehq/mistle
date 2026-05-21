@@ -53,6 +53,7 @@ export const SandboxdGitIdentitySchema = z
         keyRef: z.string().min(1),
         organizationId: z.string().min(1),
         providerFamily: z.string().min(1),
+        integrationConnectionId: z.string().min(1),
         actingUserId: z.string().min(1),
         grant: z.string().min(1),
       })

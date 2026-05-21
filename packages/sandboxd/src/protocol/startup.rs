@@ -43,6 +43,7 @@ pub struct GitSigningConfig {
     pub key_ref: String,
     pub organization_id: String,
     pub provider_family: String,
+    pub integration_connection_id: Option<String>,
     pub acting_user_id: String,
     pub grant: String,
 }
@@ -195,5 +196,51 @@ mod tests {
         assert_eq!(startup_input.execution_mode, StartupExecutionMode::Snapshot);
         assert_eq!(startup_input.operation_kind, StartupOperationKind::Snapshot);
         assert!(startup_input.is_snapshot());
+    }
+
+    #[test]
+    fn parses_git_signing_config_without_integration_connection_id() {
+        let startup_input: StartupInput = serde_json::from_value(serde_json::json!({
+            "startupMode": "new",
+            "operationKind": "start",
+            "bootstrapToken": "bootstrap-token",
+            "tunnelExchangeToken": "exchange-token",
+            "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox/sbi_123",
+            "runtimePlan": {
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": "registry.example.test/base:latest"
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            },
+            "gitIdentity": {
+                "name": "Mistle User",
+                "email": "mistle-user@example.com",
+                "signing": {
+                    "format": "ssh",
+                    "program": "/opt/mistle/bin/mistle-ssh-sign",
+                    "keyRef": "key::ssh-ed25519 AAAA",
+                    "organizationId": "org_123",
+                    "providerFamily": "github",
+                    "actingUserId": "usr_123",
+                    "grant": "grant-token"
+                }
+            }
+        }))
+        .expect("startup input should deserialize");
+
+        assert_eq!(
+            startup_input
+                .git_identity
+                .and_then(|identity| identity.signing)
+                .and_then(|signing| signing.integration_connection_id),
+            None
+        );
     }
 }

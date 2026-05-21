@@ -15,6 +15,8 @@ export const badRequestResponseSchema = z
       SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONFIG_REFERENCE,
       SandboxProfilesBadRequestCodes.INVALID_SANDBOX_RUNTIME_CONFIG,
       SandboxProfilesBadRequestCodes.INVALID_MISTLE_MCP_CONFIG,
+      SandboxProfilesBadRequestCodes.GIT_SIGNING_CONFIGURATION_REQUIRED,
+      SandboxProfilesBadRequestCodes.INVALID_GIT_SIGNING_CONFIG,
     ]),
     message: z.string().min(1),
     details: z

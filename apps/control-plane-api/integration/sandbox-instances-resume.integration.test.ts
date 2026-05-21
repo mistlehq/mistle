@@ -2,6 +2,7 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
+import { SandboxProfileStatuses, SandboxProfileVersionStates } from "@mistle/db/control-plane";
 import { SandboxInstancePersistenceModes, SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import {
   createIntegrationTest,
@@ -276,10 +277,33 @@ async function insertSandboxInstance(
     failureMessage?: string;
   },
 ): Promise<void> {
+  const sandboxProfileId = resumeSandboxProfileId(input.sandboxInstanceId);
+
+  await env.controlPlaneDb
+    .insert(env.controlPlaneTables.sandboxProfiles)
+    .values({
+      id: sandboxProfileId,
+      organizationId: input.organizationId,
+      displayName: "Resume integration profile",
+      status: SandboxProfileStatuses.ACTIVE,
+    })
+    .onConflictDoNothing({
+      target: env.controlPlaneTables.sandboxProfiles.id,
+    });
+  await env.controlPlaneDb
+    .insert(env.controlPlaneTables.sandboxProfileVersions)
+    .values({
+      sandboxProfileId,
+      version: 1,
+      state: SandboxProfileVersionStates.PUBLISHED,
+      gitCommitSigningIntegrationConnectionId: null,
+    })
+    .onConflictDoNothing();
+
   await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
     id: input.sandboxInstanceId,
     organizationId: input.organizationId,
-    sandboxProfileId: "sbp_resume_integration",
+    sandboxProfileId,
     title: null,
     sandboxProfileVersion: 1,
     runtimeProvider: "docker",
@@ -300,11 +324,13 @@ async function insertRuntimePlan(
     sandboxInstanceId: string;
   },
 ): Promise<void> {
+  const sandboxProfileId = resumeSandboxProfileId(input.sandboxInstanceId);
+
   await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstanceRuntimePlans).values({
     sandboxInstanceId: input.sandboxInstanceId,
     revision: 1,
     compiledRuntimePlan: {
-      sandboxProfileId: "sbp_resume_integration",
+      sandboxProfileId,
       version: 1,
       image: {
         source: "base",
@@ -316,9 +342,13 @@ async function insertRuntimePlan(
       workspaceSources: [],
       agentRuntimes: [],
     },
-    compiledFromProfileId: "sbp_resume_integration",
+    compiledFromProfileId: sandboxProfileId,
     compiledFromProfileVersion: 1,
   });
+}
+
+function resumeSandboxProfileId(sandboxInstanceId: string): string {
+  return `sbp_${sandboxInstanceId}`;
 }
 
 async function countQueuedResumeWorkflows(

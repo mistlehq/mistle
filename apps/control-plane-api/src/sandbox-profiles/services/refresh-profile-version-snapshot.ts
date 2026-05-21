@@ -58,6 +58,7 @@ type RefreshProfileVersionSnapshotOutput = {
     state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
     defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+    gitCommitSigningIntegrationConnectionId: string | null;
     mistleMcpEnabled: boolean;
     mistleMcpApiKeyId: string | null;
     sandboxProvider: string | null;
@@ -173,6 +174,8 @@ async function queueProfileVersionSnapshot(
           state: tables.sandboxProfileVersions.state,
           defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
           agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
+          gitCommitSigningIntegrationConnectionId:
+            tables.sandboxProfileVersions.gitCommitSigningIntegrationConnectionId,
           mistleMcpEnabled: tables.sandboxProfileVersions.mistleMcpEnabled,
           mistleMcpApiKeyId: tables.sandboxProfileVersions.mistleMcpApiKeyId,
           snapshotImageProvider: tables.sandboxProfileVersions.snapshotImageProvider,
@@ -217,6 +220,8 @@ async function queueProfileVersionSnapshot(
       const resolvedSandboxProfileVersion = sandboxProfileVersion.version;
       const resolvedDefaultPersistenceMode = sandboxProfileVersion.defaultPersistenceMode;
       const resolvedAgentRuntimeId = sandboxProfileVersion.agentRuntimeId;
+      const resolvedGitCommitSigningIntegrationConnectionId =
+        sandboxProfileVersion.gitCommitSigningIntegrationConnectionId;
       const resolvedMistleMcpEnabled = sandboxProfileVersion.mistleMcpEnabled;
       const resolvedMistleMcpApiKeyId = sandboxProfileVersion.mistleMcpApiKeyId;
       const resolvedSandboxProvider = sandboxProfileVersion.sandboxProvider;
@@ -310,6 +315,7 @@ async function queueProfileVersionSnapshot(
           state: sandboxProfileVersion.state,
           defaultPersistenceMode: resolvedDefaultPersistenceMode,
           agentRuntimeId: resolvedAgentRuntimeId,
+          gitCommitSigningIntegrationConnectionId: resolvedGitCommitSigningIntegrationConnectionId,
           mistleMcpEnabled: resolvedMistleMcpEnabled,
           mistleMcpApiKeyId: resolvedMistleMcpApiKeyId,
           maintenanceScript: sandboxProfileVersion.maintenanceScript,

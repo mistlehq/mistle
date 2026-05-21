@@ -27,6 +27,7 @@ export async function createSigningGrant(input: {
       organizationId: signing.organizationId,
       actingUserId: signing.actingUserId,
       providerFamily: signing.providerFamily,
+      integrationConnectionId: signing.integrationConnectionId,
       format: signing.format,
       keyRef: signing.keyRef,
     },

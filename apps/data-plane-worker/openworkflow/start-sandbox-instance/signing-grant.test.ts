@@ -75,6 +75,7 @@ describe("createSigningGrant", () => {
           keyRef: "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE",
           organizationId: "org_123",
           providerFamily: "github",
+          integrationConnectionId: "icn_github",
           actingUserId: "usr_123",
         },
       },
@@ -95,6 +96,7 @@ describe("createSigningGrant", () => {
       organizationId: "org_123",
       actingUserId: "usr_123",
       providerFamily: "github",
+      integrationConnectionId: "icn_github",
       format: "ssh",
       keyRef: "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE",
     });

@@ -501,6 +501,7 @@ const SigningRequestSchema = z.object({
   sandboxInstanceId: NonEmptyStringSchema,
   actingUserId: NonEmptyStringSchema,
   providerFamily: NonEmptyStringSchema,
+  integrationConnectionId: NonEmptyStringSchema,
   format: SigningFormatSchema,
   keyRef: NonEmptyStringSchema,
   grant: NonEmptyStringSchema,

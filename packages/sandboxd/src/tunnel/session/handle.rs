@@ -230,7 +230,7 @@ impl TunnelSession {
         let (response_sender, response_receiver) = std::sync::mpsc::channel();
         self.request_sender
             .send(TunnelSessionRequest::Signing {
-                request,
+                request: Box::new(request),
                 response_sender,
             })
             .map_err(|error| TunnelSessionError::Signing(error.to_string()))?;

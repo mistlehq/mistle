@@ -61,6 +61,7 @@ export type SandboxWorkflowGitIdentityInput = {
     keyRef: string;
     organizationId: string;
     providerFamily: string;
+    integrationConnectionId: string;
     actingUserId: string;
   };
 };

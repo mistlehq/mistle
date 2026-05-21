@@ -31,6 +31,7 @@ type CreateProfileVersionDraftOutput = {
   state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
   defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
   agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+  gitCommitSigningIntegrationConnectionId: string | null;
   mistleMcpEnabled: boolean;
   mistleMcpApiKeyId: string | null;
   sandboxProvider: string | null;
@@ -91,6 +92,7 @@ export async function createProfileVersionDraft(
           maintenanceScript: true,
           defaultPersistenceMode: true,
           agentRuntimeId: true,
+          gitCommitSigningIntegrationConnectionId: true,
           mistleMcpEnabled: true,
           mistleMcpApiKeyId: true,
           sandboxProvider: true,
@@ -135,6 +137,8 @@ export async function createProfileVersionDraft(
           maintenanceScript: latestVersion.maintenanceScript,
           defaultPersistenceMode: latestVersion.defaultPersistenceMode,
           agentRuntimeId: latestVersion.agentRuntimeId,
+          gitCommitSigningIntegrationConnectionId:
+            latestVersion.gitCommitSigningIntegrationConnectionId,
           mistleMcpEnabled: latestVersion.mistleMcpEnabled,
           mistleMcpApiKeyId: latestVersion.mistleMcpApiKeyId,
           sandboxProvider: latestVersion.sandboxProvider,
@@ -149,6 +153,8 @@ export async function createProfileVersionDraft(
           state: tables.sandboxProfileVersions.state,
           defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
           agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
+          gitCommitSigningIntegrationConnectionId:
+            tables.sandboxProfileVersions.gitCommitSigningIntegrationConnectionId,
           mistleMcpEnabled: tables.sandboxProfileVersions.mistleMcpEnabled,
           mistleMcpApiKeyId: tables.sandboxProfileVersions.mistleMcpApiKeyId,
           sandboxProvider: tables.sandboxProfileVersions.sandboxProvider,
@@ -182,6 +188,8 @@ export async function createProfileVersionDraft(
         state: createdDraftVersion.state,
         defaultPersistenceMode: createdDraftVersion.defaultPersistenceMode,
         agentRuntimeId: createdDraftVersion.agentRuntimeId,
+        gitCommitSigningIntegrationConnectionId:
+          createdDraftVersion.gitCommitSigningIntegrationConnectionId,
         mistleMcpEnabled: createdDraftVersion.mistleMcpEnabled,
         mistleMcpApiKeyId: createdDraftVersion.mistleMcpApiKeyId,
         ...mapProfileVersionRuntimeConfig(createdDraftVersion),

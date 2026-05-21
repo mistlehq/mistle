@@ -111,6 +111,7 @@ function createSandboxProfileVersionFixture(input: {
     version: input.version,
     state: input.state,
     agentRuntimeId: input.agentRuntimeId ?? "codex",
+    gitCommitSigningIntegrationConnectionId: null,
     mistleMcpEnabled: false,
     mistleMcpApiKeyId: null,
     defaultPersistenceMode: input.defaultPersistenceMode ?? "ephemeral",

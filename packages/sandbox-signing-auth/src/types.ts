@@ -12,6 +12,7 @@ export type SigningGrantClaims = {
   organizationId: string;
   actingUserId: string;
   providerFamily: string;
+  integrationConnectionId: string;
   format: SigningGrantFormat;
   keyRef: string;
 };

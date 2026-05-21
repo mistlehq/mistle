@@ -78,6 +78,10 @@ async function readPersistedRuntimePlan(input: {
 }
 
 type PersistedRuntimePlan = Awaited<ReturnType<typeof readPersistedRuntimePlan>>;
+type SandboxInstanceInspectionResponse = Omit<
+  NonNullable<GetSandboxInstanceResponse>,
+  "sandboxProfileId" | "sandboxProfileVersion"
+>;
 
 async function readLatestStartupOperation(input: {
   db: DataPlaneDatabase;
@@ -338,7 +342,7 @@ async function markStoppedSandboxInstanceFailed(
 async function inspectStartingSandboxInstance(
   ctx: GetSandboxInstanceContext,
   sandboxInstance: InspectableSandboxInstance,
-): Promise<NonNullable<GetSandboxInstanceResponse>> {
+): Promise<SandboxInstanceInspectionResponse> {
   if (
     sandboxInstance.providerSandboxId === null &&
     sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT
@@ -474,7 +478,7 @@ function readPendingSandboxInstance(sandboxInstance: {
   failureCode: string | null;
   failureMessage: string | null;
   runtimePlan: PersistedRuntimePlan;
-}): NonNullable<GetSandboxInstanceResponse> {
+}): SandboxInstanceInspectionResponse {
   return {
     id: sandboxInstance.id,
     title: sandboxInstance.title,
@@ -490,7 +494,7 @@ function readPendingSandboxInstance(sandboxInstance: {
 async function inspectStoppedSandboxInstance(
   ctx: GetSandboxInstanceContext,
   sandboxInstance: InspectableSandboxInstance,
-): Promise<NonNullable<GetSandboxInstanceResponse>> {
+): Promise<SandboxInstanceInspectionResponse> {
   if (
     sandboxInstance.providerSandboxId === null &&
     sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT
@@ -604,7 +608,7 @@ async function inspectStoppedSandboxInstance(
 async function inspectRunningSandboxInstance(
   ctx: GetSandboxInstanceContext,
   sandboxInstance: InspectableSandboxInstance,
-): Promise<NonNullable<GetSandboxInstanceResponse>> {
+): Promise<SandboxInstanceInspectionResponse> {
   if (sandboxInstance.providerSandboxId === null) {
     throw new Error(
       `Expected running sandbox instance '${sandboxInstance.id}' to have a providerSandboxId.`,
@@ -766,6 +770,8 @@ export async function getSandboxInstance(
     columns: {
       id: true,
       organizationId: true,
+      sandboxProfileId: true,
+      sandboxProfileVersion: true,
       title: true,
       persistenceMode: true,
       runtimeProvider: true,
@@ -801,7 +807,7 @@ export async function getSandboxInstance(
 
   assertRuntimeSandboxProvider(sandboxInstance.runtimeProvider);
 
-  let response: NonNullable<GetSandboxInstanceResponse>;
+  let response: SandboxInstanceInspectionResponse;
   switch (sandboxInstance.status) {
     case SandboxInstanceStatuses.FAILED: {
       response = {
@@ -848,6 +854,8 @@ export async function getSandboxInstance(
 
   return {
     ...response,
+    sandboxProfileId: sandboxInstance.sandboxProfileId,
+    sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
     startupOperation: await readLatestStartupOperation({
       db: ctx.db,
       sandboxInstanceId: sandboxInstance.id,

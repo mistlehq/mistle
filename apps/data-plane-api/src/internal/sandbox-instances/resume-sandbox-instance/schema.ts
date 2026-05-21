@@ -16,6 +16,7 @@ export const ResumeSandboxInstanceInputSchema = z
             keyRef: z.string().min(1),
             organizationId: z.string().min(1),
             providerFamily: z.string().min(1),
+            integrationConnectionId: z.string().min(1),
             actingUserId: z.string().min(1),
           })
           .strict()

@@ -96,6 +96,10 @@ import {
   type ApiKeysPage,
 } from "../settings/api-keys/api-keys-service.js";
 import {
+  listOrganizationIdentityLinkProviders,
+  organizationIdentityLinkProvidersQueryKey,
+} from "../settings/identity-linking/organization-identity-linking-service.js";
+import {
   getOrganizationSandboxStorageSettings,
   organizationSandboxStorageSettingsQueryKey,
 } from "../settings/organization/sandbox-storage-service.js";
@@ -1696,6 +1700,8 @@ function ReadySandboxProfileEditorPage(input: {
           ? {}
           : {
               agentRuntimeId: runtimeChanges.agentRuntimeId,
+              gitCommitSigningIntegrationConnectionId:
+                runtimeChanges.gitCommitSigningIntegrationConnectionId,
               mistleMcpEnabled: runtimeChanges.mistleMcpEnabled,
               mistleMcpApiKeyId: runtimeChanges.mistleMcpApiKeyId,
               sandboxProvider: runtimeChanges.sandboxProvider,
@@ -1732,6 +1738,8 @@ function ReadySandboxProfileEditorPage(input: {
 
         runtimeDraftState.applySavedRuntimeConfig?.({
           agentRuntimeId: savedDraft.agentRuntimeId,
+          gitCommitSigningIntegrationConnectionId:
+            savedDraft.gitCommitSigningIntegrationConnectionId,
           mistleMcpEnabled: savedDraft.mistleMcpEnabled,
           mistleMcpApiKeyId: savedDraft.mistleMcpApiKeyId,
           sandboxProvider: savedDraft.sandboxProvider,
@@ -2576,6 +2584,11 @@ function LoadedSandboxProfileRuntimeSection(input: {
     queryFn: async ({ signal }) => listApiKeys({ signal }),
     retry: false,
   });
+  const identityLinkProvidersQuery = useQuery({
+    queryKey: organizationIdentityLinkProvidersQueryKey(activeOrganizationId),
+    queryFn: async ({ signal }) => listOrganizationIdentityLinkProviders({ signal }),
+    retry: false,
+  });
   const createApiKeyMutation = useMutation({
     mutationFn: createApiKey,
     onSuccess: (createdApiKey) => {
@@ -2621,23 +2634,48 @@ function LoadedSandboxProfileRuntimeSection(input: {
         fallbackMessage: "Could not load API keys.",
       })
     : null;
+  const identityLinkProvidersLoadErrorMessage = identityLinkProvidersQuery.isError
+    ? resolveApiErrorMessage({
+        error: identityLinkProvidersQuery.error,
+        fallbackMessage: "Could not load identity-linking providers.",
+      })
+    : null;
   const apiKeys = apiKeysQuery.isSuccess ? apiKeysQuery.data.items : [];
+  const gitHubSigningConnectionOptions =
+    identityLinkProvidersQuery.data
+      ?.find((provider) => provider.providerFamily === "github")
+      ?.configs.filter(
+        (config) =>
+          config.configurationStatus === "active" && config.selectedConnection.status === "active",
+      )
+      .map((config) => ({
+        integrationConnectionId: config.integrationConnectionId,
+        label: config.selectedConnection.displayName,
+      })) ?? [];
 
   return (
-    <SandboxProfileRuntimeSection
-      apiKeys={apiKeys}
-      apiKeysAreLoading={apiKeysQuery.isPending}
-      apiKeysLoadErrorMessage={apiKeysLoadErrorMessage}
-      availableConnections={input.availableConnections}
-      availableTargets={input.availableTargets}
-      disabled={input.disabled}
-      isDraft={input.isDraft}
-      onCreateApiKey={(createInput) => createApiKeyMutation.mutateAsync(createInput)}
-      onDraftStateChange={input.onDraftStateChange}
-      providers={sandboxProvidersQuery.data.items}
-      version={input.version}
-      {...(input.sectionChrome === undefined ? {} : { sectionChrome: input.sectionChrome })}
-    />
+    <div className="grid gap-3">
+      {identityLinkProvidersLoadErrorMessage === null ? null : (
+        <Notice title="Could not load GitHub signing connections" variant="alert">
+          {identityLinkProvidersLoadErrorMessage}
+        </Notice>
+      )}
+      <SandboxProfileRuntimeSection
+        apiKeys={apiKeys}
+        apiKeysAreLoading={apiKeysQuery.isPending}
+        apiKeysLoadErrorMessage={apiKeysLoadErrorMessage}
+        availableConnections={input.availableConnections}
+        availableTargets={input.availableTargets}
+        disabled={input.disabled}
+        gitHubSigningConnectionOptions={gitHubSigningConnectionOptions}
+        isDraft={input.isDraft}
+        onCreateApiKey={(createInput) => createApiKeyMutation.mutateAsync(createInput)}
+        onDraftStateChange={input.onDraftStateChange}
+        providers={sandboxProvidersQuery.data.items}
+        version={input.version}
+        {...(input.sectionChrome === undefined ? {} : { sectionChrome: input.sectionChrome })}
+      />
+    </div>
   );
 }
 

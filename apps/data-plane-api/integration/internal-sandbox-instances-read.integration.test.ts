@@ -75,6 +75,8 @@ it("returns pending sandbox instances before provider provisioning begins", asyn
     failureCode: null,
     failureMessage: null,
     runtimePlan: null,
+    sandboxProfileId: "sbp_integration_new_pending",
+    sandboxProfileVersion: 1,
     startupOperation: null,
   });
 });
@@ -176,6 +178,8 @@ it("returns setup-check-purpose sandbox instances by id", async ({ env }) => {
     failureCode: null,
     failureMessage: null,
     runtimePlan: null,
+    sandboxProfileId: "sbp_integration_new_get_setup_check",
+    sandboxProfileVersion: 1,
     startupOperation: null,
   });
 });

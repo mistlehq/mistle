@@ -26,6 +26,7 @@ const it = createIntegrationTest({
 
 const EmptySandboxRuntimeConfig = {
   agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CODEX,
+  gitCommitSigningIntegrationConnectionId: null,
   mistleMcpEnabled: false,
   mistleMcpApiKeyId: null,
   sandboxConnectionId: null,

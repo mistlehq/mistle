@@ -5,10 +5,12 @@
 import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
+  OrganizationIdentityLinkProviderConfigStatus,
   SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import {
   E2BSandboxRuntimeFamilyId,
   E2BSandboxRuntimeVariantId,
@@ -24,6 +26,11 @@ import {
   PutSandboxProfileVersionDraftResponseSchema,
 } from "../src/sandbox-profiles/index.js";
 import { createApiKeyCredential, createApiKeyToken } from "./helpers/api-keys.js";
+import {
+  seedIdentityConnection,
+  seedIdentityProviderConfig,
+  upsertGitHubIdentityTarget,
+} from "./helpers/identity-linking.js";
 import {
   integrationConnectionRow,
   integrationTargetRow,
@@ -49,6 +56,7 @@ const itManagedE2BDeployment = createIntegrationTest({
 });
 
 const EmptySandboxRuntimeConfig = {
+  gitCommitSigningIntegrationConnectionId: null,
   mistleMcpEnabled: false,
   mistleMcpApiKeyId: null,
   sandboxConnectionId: null,
@@ -233,6 +241,163 @@ describe.concurrent("sandbox profile version draft put integration", () => {
     );
     expect(responseBody.code).toBe("INVALID_SANDBOX_RUNTIME_CONFIG");
     expect(responseBody.message).toBe("Sandbox provider 'unknown-provider' is not supported.");
+  });
+
+  it("updates the GitHub commit signing connection selector", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-draft-put-git-signing-selector@example.com",
+    });
+
+    await upsertGitHubIdentityTarget(env, {
+      targetKey: "github-draft-put-signing-selector",
+    });
+    await seedIdentityConnection(env, {
+      connectionId: "icn_draft_put_git_signing_selector",
+      displayName: "GitHub Signing Selector",
+      methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      organizationId: session.organizationId,
+      targetKey: "github-draft-put-signing-selector",
+    });
+    await seedIdentityProviderConfig(env, {
+      configId: "ilp_draft_put_git_signing_selector",
+      connectionId: "icn_draft_put_git_signing_selector",
+      organizationId: session.organizationId,
+      providerFamily: "github",
+      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      targetKey: "github-draft-put-signing-selector",
+      userId: session.userId,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_draft_put_git_signing_selector",
+        organizationId: session.organizationId,
+        displayName: "Draft Put Git Signing Selector Profile",
+        createdAt: "2026-05-08T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_draft_put_git_signing_selector",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_draft_put_git_signing_selector/versions/1/draft",
+      {
+        method: "PUT",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          gitCommitSigningIntegrationConnectionId: "icn_draft_put_git_signing_selector",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = PutSandboxProfileVersionDraftResponseSchema.parse(await response.json());
+    expect(responseBody.gitCommitSigningIntegrationConnectionId).toBe(
+      "icn_draft_put_git_signing_selector",
+    );
+
+    const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        gitCommitSigningIntegrationConnectionId: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, "sbp_draft_put_git_signing_selector"), eq(table.version, 1)),
+    });
+    expect(persistedVersion).toEqual({
+      gitCommitSigningIntegrationConnectionId: "icn_draft_put_git_signing_selector",
+    });
+  });
+
+  it("requires a GitHub commit signing selector when multiple active GitHub configs are eligible", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-draft-put-git-signing-ambiguous@example.com",
+    });
+
+    await upsertGitHubIdentityTarget(env, {
+      targetKey: "github-draft-put-signing-ambiguous",
+    });
+    await seedIdentityConnection(env, {
+      connectionId: "icn_draft_put_git_signing_ambiguous_a",
+      displayName: "GitHub Signing Ambiguous A",
+      methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      organizationId: session.organizationId,
+      targetKey: "github-draft-put-signing-ambiguous",
+    });
+    await seedIdentityConnection(env, {
+      connectionId: "icn_draft_put_git_signing_ambiguous_b",
+      displayName: "GitHub Signing Ambiguous B",
+      methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      organizationId: session.organizationId,
+      targetKey: "github-draft-put-signing-ambiguous",
+    });
+    await seedIdentityProviderConfig(env, {
+      configId: "ilp_draft_put_git_signing_ambiguous_a",
+      connectionId: "icn_draft_put_git_signing_ambiguous_a",
+      organizationId: session.organizationId,
+      providerFamily: "github",
+      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      targetKey: "github-draft-put-signing-ambiguous",
+      userId: session.userId,
+    });
+    await seedIdentityProviderConfig(env, {
+      configId: "ilp_draft_put_git_signing_ambiguous_b",
+      connectionId: "icn_draft_put_git_signing_ambiguous_b",
+      organizationId: session.organizationId,
+      providerFamily: "github",
+      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      targetKey: "github-draft-put-signing-ambiguous",
+      userId: session.userId,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_draft_put_git_signing_ambiguous",
+        organizationId: session.organizationId,
+        displayName: "Draft Put Git Signing Ambiguous Profile",
+        createdAt: "2026-05-08T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_draft_put_git_signing_ambiguous",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_draft_put_git_signing_ambiguous/versions/1/draft",
+      {
+        method: "PUT",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          setupScript: "echo ambiguous",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const responseBody = PutSandboxProfileVersionDraftBadRequestResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody).toEqual({
+      code: "GIT_SIGNING_CONFIGURATION_REQUIRED",
+      message:
+        "Select a GitHub identity-linking connection for commit signing before saving this draft.",
+    });
   });
 
   it("updates a draft with an API key that has update permission", async ({ env }) => {

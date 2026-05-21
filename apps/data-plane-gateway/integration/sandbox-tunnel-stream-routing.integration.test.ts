@@ -78,6 +78,7 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
     "returns signed results for valid bootstrap signing requests",
     async ({ env }) => {
       const sandboxInstanceId = typeid("sbi").toString();
+      const integrationConnectionId = "icn_gateway_signing_success_integration_new";
       const session = await env.auth.createSession({
         email: "data-plane-gateway-signing-success-integration-new@example.com",
       });
@@ -85,7 +86,7 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
       await seedGitHubSigningContext(env, {
         session,
         targetKey: "github-gateway-signing-success-integration-new",
-        connectionId: "icn_gateway_signing_success_integration_new",
+        connectionId: integrationConnectionId,
         providerConfigId: "ilp_gateway_signing_success_integration_new",
         principalId: "uep_gateway_signing_success_integration_new",
         credentialId: "upc_gateway_signing_success_integration_new",
@@ -102,6 +103,7 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
           organizationId: session.organizationId,
           actingUserId: session.userId,
           providerFamily: "github",
+          integrationConnectionId,
           format: "ssh",
           keyRef: `key::${TestPublicKey}`,
         },
@@ -123,6 +125,7 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
             sandboxInstanceId,
             actingUserId: session.userId,
             providerFamily: "github",
+            integrationConnectionId,
             format: "ssh",
             keyRef: `key::${TestPublicKey}`,
             grant: signingGrant,
@@ -390,6 +393,7 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
             sandboxInstanceId,
             actingUserId: "usr_integration_new_guardrail",
             providerFamily: "github",
+            integrationConnectionId: "icn_github",
             format: "ssh",
             keyRef: "key::ssh-ed25519 AAAA",
             grant: "grant-token",

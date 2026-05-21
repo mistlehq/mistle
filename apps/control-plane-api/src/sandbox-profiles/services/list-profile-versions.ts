@@ -30,6 +30,7 @@ type ListProfileVersionsOutput = {
     state: SandboxProfileVersionState;
     defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+    gitCommitSigningIntegrationConnectionId: string | null;
     mistleMcpEnabled: boolean;
     mistleMcpApiKeyId: string | null;
     sandboxProvider: string | null;
@@ -80,6 +81,7 @@ export async function listProfileVersions(
       state: true,
       defaultPersistenceMode: true,
       agentRuntimeId: true,
+      gitCommitSigningIntegrationConnectionId: true,
       mistleMcpEnabled: true,
       mistleMcpApiKeyId: true,
       snapshotImageProvider: true,
@@ -136,6 +138,7 @@ export async function listProfileVersions(
         state: version.state,
         defaultPersistenceMode: version.defaultPersistenceMode,
         agentRuntimeId: version.agentRuntimeId,
+        gitCommitSigningIntegrationConnectionId: version.gitCommitSigningIntegrationConnectionId,
         mistleMcpEnabled: version.mistleMcpEnabled,
         mistleMcpApiKeyId: version.mistleMcpApiKeyId,
         maintenanceScript: version.maintenanceScript,

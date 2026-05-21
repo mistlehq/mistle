@@ -50,6 +50,7 @@ export type SandboxProfilesService = {
     state: SandboxProfileVersionState;
     defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+    gitCommitSigningIntegrationConnectionId: string | null;
     mistleMcpEnabled: boolean;
     mistleMcpApiKeyId: string | null;
     sandboxProvider: string | null;
@@ -73,6 +74,7 @@ export type SandboxProfilesService = {
       state: SandboxProfileVersionState;
       defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
       agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+      gitCommitSigningIntegrationConnectionId: string | null;
       mistleMcpEnabled: boolean;
       mistleMcpApiKeyId: string | null;
       sandboxProvider: string | null;
@@ -134,6 +136,7 @@ export type SandboxProfilesService = {
       state: SandboxProfileVersionState;
       defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
       agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+      gitCommitSigningIntegrationConnectionId: string | null;
       mistleMcpEnabled: boolean;
       mistleMcpApiKeyId: string | null;
       sandboxProvider: string | null;

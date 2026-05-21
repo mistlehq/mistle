@@ -394,6 +394,7 @@ describe.concurrent("internal sandbox runtime integration", () => {
         keyRef: "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestSigningKey mistle-user@example.com",
         organizationId: session.organizationId,
         providerFamily: "github",
+        integrationConnectionId: "icn_internal_start_git_identity_provider",
         actingUserId: session.userId,
       },
     });

@@ -435,6 +435,7 @@ function createRuntimeStoryVersion(input: {
     version: input.version,
     state: "draft",
     agentRuntimeId: input.agentRuntimeId,
+    gitCommitSigningIntegrationConnectionId: null,
     mistleMcpEnabled: input.mistleMcpEnabled,
     mistleMcpApiKeyId: input.mistleMcpApiKeyId,
     defaultPersistenceMode: "ephemeral",

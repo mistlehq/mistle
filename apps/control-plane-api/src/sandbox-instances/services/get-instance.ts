@@ -116,6 +116,8 @@ export async function getInstance(
 
   return {
     id: sandboxInstance.id,
+    sandboxProfileId: sandboxInstance.sandboxProfileId,
+    sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
     title: sandboxInstance.title,
     status: sandboxInstance.status,
     connectable: sandboxInstance.connectable,

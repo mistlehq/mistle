@@ -17330,6 +17330,14 @@
                       "type": "string",
                       "minLength": 1
                     },
+                    "sandboxProfileId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
                     "title": {
                       "type": ["string", "null"],
                       "minLength": 1
@@ -17404,6 +17412,8 @@
                   },
                   "required": [
                     "id",
+                    "sandboxProfileId",
+                    "sandboxProfileVersion",
                     "title",
                     "status",
                     "connectable",
@@ -18265,6 +18275,14 @@
                       "type": "string",
                       "minLength": 1
                     },
+                    "sandboxProfileId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
                     "title": {
                       "type": ["string", "null"],
                       "minLength": 1
@@ -18339,6 +18357,8 @@
                   },
                   "required": [
                     "id",
+                    "sandboxProfileId",
+                    "sandboxProfileVersion",
                     "title",
                     "status",
                     "connectable",
@@ -19968,6 +19988,10 @@
                       "type": "string",
                       "enum": ["codex", "opencode", "pi"]
                     },
+                    "gitCommitSigningIntegrationConnectionId": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
                     "mistleMcpEnabled": {
                       "type": "boolean"
                     },
@@ -20107,6 +20131,7 @@
                     "state",
                     "defaultPersistenceMode",
                     "agentRuntimeId",
+                    "gitCommitSigningIntegrationConnectionId",
                     "mistleMcpEnabled",
                     "mistleMcpApiKeyId",
                     "sandboxProvider",
@@ -20292,6 +20317,10 @@
                             "type": "string",
                             "enum": ["codex", "opencode", "pi"]
                           },
+                          "gitCommitSigningIntegrationConnectionId": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          },
                           "mistleMcpEnabled": {
                             "type": "boolean"
                           },
@@ -20431,6 +20460,7 @@
                           "state",
                           "defaultPersistenceMode",
                           "agentRuntimeId",
+                          "gitCommitSigningIntegrationConnectionId",
                           "mistleMcpEnabled",
                           "mistleMcpApiKeyId",
                           "sandboxProvider",
@@ -22037,6 +22067,10 @@
                     "type": "string",
                     "enum": ["codex", "opencode", "pi"]
                   },
+                  "gitCommitSigningIntegrationConnectionId": {
+                    "type": ["string", "null"],
+                    "minLength": 1
+                  },
                   "mistleMcpEnabled": {
                     "type": "boolean"
                   },
@@ -22141,6 +22175,10 @@
                       "type": "string",
                       "enum": ["codex", "opencode", "pi"]
                     },
+                    "gitCommitSigningIntegrationConnectionId": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
                     "mistleMcpEnabled": {
                       "type": "boolean"
                     },
@@ -22238,6 +22276,7 @@
                     "setupScript",
                     "defaultPersistenceMode",
                     "agentRuntimeId",
+                    "gitCommitSigningIntegrationConnectionId",
                     "mistleMcpEnabled",
                     "mistleMcpApiKeyId",
                     "sandboxProvider",
@@ -22281,7 +22320,9 @@
                             "INVALID_BINDING_CONNECTION_REFERENCE",
                             "INVALID_BINDING_CONFIG_REFERENCE",
                             "INVALID_SANDBOX_RUNTIME_CONFIG",
-                            "INVALID_MISTLE_MCP_CONFIG"
+                            "INVALID_MISTLE_MCP_CONFIG",
+                            "GIT_SIGNING_CONFIGURATION_REQUIRED",
+                            "INVALID_GIT_SIGNING_CONFIG"
                           ]
                         },
                         "message": {
@@ -23048,6 +23089,10 @@
                           "type": "string",
                           "enum": ["codex", "opencode", "pi"]
                         },
+                        "gitCommitSigningIntegrationConnectionId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
                         "mistleMcpEnabled": {
                           "type": "boolean"
                         },
@@ -23187,6 +23232,7 @@
                         "state",
                         "defaultPersistenceMode",
                         "agentRuntimeId",
+                        "gitCommitSigningIntegrationConnectionId",
                         "mistleMcpEnabled",
                         "mistleMcpApiKeyId",
                         "sandboxProvider",
@@ -23459,6 +23505,10 @@
                           "type": "string",
                           "enum": ["codex", "opencode", "pi"]
                         },
+                        "gitCommitSigningIntegrationConnectionId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
                         "mistleMcpEnabled": {
                           "type": "boolean"
                         },
@@ -23598,6 +23648,7 @@
                         "state",
                         "defaultPersistenceMode",
                         "agentRuntimeId",
+                        "gitCommitSigningIntegrationConnectionId",
                         "mistleMcpEnabled",
                         "mistleMcpApiKeyId",
                         "sandboxProvider",
@@ -23853,6 +23904,10 @@
                           "type": "string",
                           "enum": ["codex", "opencode", "pi"]
                         },
+                        "gitCommitSigningIntegrationConnectionId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
                         "mistleMcpEnabled": {
                           "type": "boolean"
                         },
@@ -23992,6 +24047,7 @@
                         "state",
                         "defaultPersistenceMode",
                         "agentRuntimeId",
+                        "gitCommitSigningIntegrationConnectionId",
                         "mistleMcpEnabled",
                         "mistleMcpApiKeyId",
                         "sandboxProvider",

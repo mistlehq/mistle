@@ -70,6 +70,7 @@ describe.concurrent("internal identity-linking commit signing", () => {
       actingUserId: session.userId,
       organizationId: session.organizationId,
       sandboxInstanceId: "sbi_internal_sign_commit_success",
+      integrationConnectionId: "icn_internal_sign_commit_success",
       keyRef: `key::${TestPublicKey}`,
     });
 
@@ -78,6 +79,71 @@ describe.concurrent("internal identity-linking commit signing", () => {
       sandboxInstanceId: "sbi_internal_sign_commit_success",
       actingUserId: session.userId,
       providerFamily: "github",
+      integrationConnectionId: "icn_internal_sign_commit_success",
+      format: "ssh",
+      keyRef: `key::${TestPublicKey}`,
+      grant: signingGrant,
+      payload: "c2lnbi1tZQ==",
+      encoding: "base64",
+    });
+
+    expect(response.status).toBe(200);
+    expect(SignCommitPayloadResponseSchema.parse(await response.json())).toEqual({
+      format: "ssh",
+      signatureEncoding: "pem",
+      signature: expect.stringMatching(
+        /^-----BEGIN SSH SIGNATURE-----\n[\s\S]+-----END SSH SIGNATURE-----\n$/u,
+      ),
+    });
+  });
+
+  it("uses the selected GitHub connection when multiple active GitHub configs exist", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-internal-sign-commit-selected-config@example.com",
+    });
+    await seedGitHubIdentityProvider(env, {
+      connectionId: "icn_internal_sign_commit_decoy",
+      organizationId: session.organizationId,
+      providerConfigId: "ilp_internal_sign_commit_decoy",
+      targetKey: "github-internal-sign-commit-decoy",
+      userId: session.userId,
+    });
+    await seedGitHubLinkedPrincipal(env, {
+      organizationId: session.organizationId,
+      userId: session.userId,
+      principalId: "uep_internal_sign_commit_decoy",
+      providerConfigId: "ilp_internal_sign_commit_decoy",
+      connectionId: "icn_internal_sign_commit_decoy",
+      providerSubjectId: randomUUID(),
+      profile: {
+        login: "mistle-decoy-user",
+        preferredEmail: "mistle-decoy-user@example.com",
+      },
+    });
+    await seedGitHubSigningContext(env, {
+      credentialId: "upc_internal_sign_commit_selected",
+      connectionId: "icn_internal_sign_commit_selected",
+      principalId: "uep_internal_sign_commit_selected",
+      providerConfigId: "ilp_internal_sign_commit_selected",
+      session,
+      targetKey: "github-internal-sign-commit-selected",
+    });
+    const signingGrant = await createSigningGrant({
+      actingUserId: session.userId,
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_internal_sign_commit_selected",
+      integrationConnectionId: "icn_internal_sign_commit_selected",
+      keyRef: `key::${TestPublicKey}`,
+    });
+
+    const response = await signCommitPayload(env, {
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_internal_sign_commit_selected",
+      actingUserId: session.userId,
+      providerFamily: "github",
+      integrationConnectionId: "icn_internal_sign_commit_selected",
       format: "ssh",
       keyRef: `key::${TestPublicKey}`,
       grant: signingGrant,
@@ -110,6 +176,7 @@ describe.concurrent("internal identity-linking commit signing", () => {
       actingUserId: session.userId,
       organizationId: session.organizationId,
       sandboxInstanceId: "sbi_internal_sign_commit_missing_principal",
+      integrationConnectionId: "icn_internal_sign_commit_missing_principal",
       keyRef: `key::${TestPublicKey}`,
     });
 
@@ -118,6 +185,7 @@ describe.concurrent("internal identity-linking commit signing", () => {
       sandboxInstanceId: "sbi_internal_sign_commit_missing_principal",
       actingUserId: session.userId,
       providerFamily: "github",
+      integrationConnectionId: "icn_internal_sign_commit_missing_principal",
       format: "ssh",
       keyRef: `key::${TestPublicKey}`,
       grant: signingGrant,
@@ -151,6 +219,7 @@ describe.concurrent("internal identity-linking commit signing", () => {
       actingUserId: session.userId,
       organizationId: session.organizationId,
       sandboxInstanceId: "sbi_internal_sign_commit_key_mismatch",
+      integrationConnectionId: "icn_internal_sign_commit_key_mismatch",
       keyRef: mismatchedKeyRef,
     });
 
@@ -159,6 +228,7 @@ describe.concurrent("internal identity-linking commit signing", () => {
       sandboxInstanceId: "sbi_internal_sign_commit_key_mismatch",
       actingUserId: session.userId,
       providerFamily: "github",
+      integrationConnectionId: "icn_internal_sign_commit_key_mismatch",
       format: "ssh",
       keyRef: mismatchedKeyRef,
       grant: signingGrant,
@@ -258,6 +328,7 @@ async function createSigningGrant(input: {
   organizationId: string;
   actingUserId: string;
   sandboxInstanceId: string;
+  integrationConnectionId: string;
   keyRef: string;
 }): Promise<string> {
   return await mintSigningGrant({
@@ -268,6 +339,7 @@ async function createSigningGrant(input: {
       organizationId: input.organizationId,
       actingUserId: input.actingUserId,
       providerFamily: "github",
+      integrationConnectionId: input.integrationConnectionId,
       format: "ssh",
       keyRef: input.keyRef,
     },
@@ -282,6 +354,7 @@ async function signCommitPayload(
     sandboxInstanceId: string;
     actingUserId: string;
     providerFamily: string;
+    integrationConnectionId: string;
     format: "ssh";
     keyRef: string;
     grant: string;

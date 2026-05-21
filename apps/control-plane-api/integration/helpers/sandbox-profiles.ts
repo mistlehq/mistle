@@ -35,6 +35,7 @@ export function sandboxProfileVersionRow(input: {
   setupScript?: string | null;
   maintenanceScript?: string | null;
   agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
+  gitCommitSigningIntegrationConnectionId?: string | null;
   defaultPersistenceMode?: SandboxProfileVersionDefaultPersistenceMode;
   sandboxProvider?: string | null;
   sandboxConnectionId?: string | null;
@@ -59,6 +60,9 @@ export function sandboxProfileVersionRow(input: {
       ? {}
       : { maintenanceScript: input.maintenanceScript }),
     ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
+    ...(input.gitCommitSigningIntegrationConnectionId === undefined
+      ? {}
+      : { gitCommitSigningIntegrationConnectionId: input.gitCommitSigningIntegrationConnectionId }),
     defaultPersistenceMode:
       input.defaultPersistenceMode ?? SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
     ...(input.sandboxProvider === undefined ? {} : { sandboxProvider: input.sandboxProvider }),

@@ -52,6 +52,7 @@ export type StartSandboxInstanceInput = {
       keyRef: string;
       organizationId: string;
       providerFamily: string;
+      integrationConnectionId: string;
       actingUserId: string;
     };
   };
@@ -87,6 +88,7 @@ export type ResumeSandboxInstanceInput = {
       keyRef: string;
       organizationId: string;
       providerFamily: string;
+      integrationConnectionId: string;
       actingUserId: string;
     };
   };
@@ -199,6 +201,8 @@ export type GetSandboxInstanceInput = {
 const GetSandboxInstanceResponseSchema = z
   .object({
     id: z.string().min(1),
+    sandboxProfileId: z.string().min(1),
+    sandboxProfileVersion: z.number().int().min(1),
     title: z.string().min(1).nullable(),
     status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
     connectable: z.boolean(),

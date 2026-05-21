@@ -373,10 +373,19 @@ fn parses_valid_ports_http_transport_messages() {
 #[test]
 fn parses_valid_signing_control_messages() {
     let request = parse_signing_control_message(
-        r#"{"type":"signing.request","requestId":"sign_req_123","organizationId":"org_123","sandboxInstanceId":"sbi_123","actingUserId":"usr_123","providerFamily":"github","format":"ssh","keyRef":"key::ssh-ed25519 AAAA","grant":"grant-token","payload":"c2lnbi1tZQ==","encoding":"base64"}"#,
+        r#"{"type":"signing.request","requestId":"sign_req_123","organizationId":"org_123","sandboxInstanceId":"sbi_123","actingUserId":"usr_123","providerFamily":"github","integrationConnectionId":"icn_github","format":"ssh","keyRef":"key::ssh-ed25519 AAAA","grant":"grant-token","payload":"c2lnbi1tZQ==","encoding":"base64"}"#,
     )
     .expect("signing.request should parse");
     assert!(matches!(request, Some(SigningControlMessage::Request(_))));
+
+    let request_without_connection_id = parse_signing_control_message(
+        r#"{"type":"signing.request","requestId":"sign_req_123","organizationId":"org_123","sandboxInstanceId":"sbi_123","actingUserId":"usr_123","providerFamily":"github","format":"ssh","keyRef":"key::ssh-ed25519 AAAA","grant":"grant-token","payload":"c2lnbi1tZQ==","encoding":"base64"}"#,
+    )
+    .expect("signing.request without integrationConnectionId should parse");
+    assert!(matches!(
+        request_without_connection_id,
+        Some(SigningControlMessage::Request(_))
+    ));
 
     let result = parse_signing_control_message(
         r#"{"type":"signing.result","requestId":"sign_req_123","ok":false,"code":"signing_backend_not_implemented","message":"Git signing backend is not implemented yet."}"#,
@@ -514,6 +523,24 @@ fn serializes_stream_responses() {
             sandbox_instance_id: "sbi_123".to_string(),
             acting_user_id: "usr_123".to_string(),
             provider_family: "github".to_string(),
+            integration_connection_id: Some("icn_github".to_string()),
+            format: "ssh".to_string(),
+            key_ref: "key::ssh-ed25519 AAAA".to_string(),
+            grant: "grant-token".to_string(),
+            payload: "c2lnbi1tZQ==".to_string(),
+            encoding: "base64".to_string(),
+        }),
+        r#"{"type":"signing.request","requestId":"sign_req_123","organizationId":"org_123","sandboxInstanceId":"sbi_123","actingUserId":"usr_123","providerFamily":"github","integrationConnectionId":"icn_github","format":"ssh","keyRef":"key::ssh-ed25519 AAAA","grant":"grant-token","payload":"c2lnbi1tZQ==","encoding":"base64"}"#
+    );
+    assert_eq!(
+        signing_request(&SigningRequest {
+            message_type: "signing.request".to_string(),
+            request_id: "sign_req_123".to_string(),
+            organization_id: "org_123".to_string(),
+            sandbox_instance_id: "sbi_123".to_string(),
+            acting_user_id: "usr_123".to_string(),
+            provider_family: "github".to_string(),
+            integration_connection_id: None,
             format: "ssh".to_string(),
             key_ref: "key::ssh-ed25519 AAAA".to_string(),
             grant: "grant-token".to_string(),

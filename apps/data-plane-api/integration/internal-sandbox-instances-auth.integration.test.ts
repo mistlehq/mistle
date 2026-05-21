@@ -55,6 +55,8 @@ describe.concurrent("internal sandbox instances auth integration", () => {
       failureMessage: null,
       id: sandboxInstanceId,
       runtimePlan: null,
+      sandboxProfileId: "sbp_dp_api_auth_valid",
+      sandboxProfileVersion: 1,
       startupOperation: null,
       status: "pending",
       title: null,

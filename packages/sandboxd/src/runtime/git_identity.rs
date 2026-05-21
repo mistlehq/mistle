@@ -255,6 +255,7 @@ mod tests {
                     key_ref: "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE".to_string(),
                     organization_id: "org_123".to_string(),
                     provider_family: "github".to_string(),
+                    integration_connection_id: Some("icn_github".to_string()),
                     acting_user_id: "usr_123".to_string(),
                     grant: "grant-token".to_string(),
                 }),

@@ -135,6 +135,7 @@ export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVers
   publishedAt: z.string().min(1).nullable(),
   version: z.number().int().min(1),
   agentRuntimeId: sandboxProfileVersionAgentRuntimeIdSchema,
+  gitCommitSigningIntegrationConnectionId: z.string().min(1).nullable(),
   sandboxProvider: z.string().min(1).nullable(),
   sandboxConnectionId: z.string().min(1).nullable(),
 })
@@ -144,6 +145,7 @@ export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVers
     state: true,
     defaultPersistenceMode: true,
     agentRuntimeId: true,
+    gitCommitSigningIntegrationConnectionId: true,
     mistleMcpEnabled: true,
     mistleMcpApiKeyId: true,
     sandboxProvider: true,
@@ -327,6 +329,7 @@ export const putSandboxProfileVersionDraftBodySchema = z
     setupScript: z.string().min(1).nullable().optional(),
     defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema.optional(),
     agentRuntimeId: sandboxProfileVersionAgentRuntimeIdSchema.optional(),
+    gitCommitSigningIntegrationConnectionId: z.string().min(1).nullable().optional(),
     mistleMcpEnabled: z.boolean().optional(),
     mistleMcpApiKeyId: z.string().min(1).nullable().optional(),
     sandboxProvider: z.string().min(1).optional(),
@@ -340,6 +343,7 @@ export const putSandboxProfileVersionDraftBodySchema = z
       value.setupScript !== undefined ||
       value.defaultPersistenceMode !== undefined ||
       value.agentRuntimeId !== undefined ||
+      value.gitCommitSigningIntegrationConnectionId !== undefined ||
       value.mistleMcpEnabled !== undefined ||
       value.mistleMcpApiKeyId !== undefined ||
       value.sandboxProvider !== undefined ||
@@ -358,6 +362,7 @@ export const putSandboxProfileVersionDraftResponseSchema = z
     setupScript: z.string().nullable(),
     defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema,
     agentRuntimeId: sandboxProfileVersionAgentRuntimeIdSchema,
+    gitCommitSigningIntegrationConnectionId: z.string().min(1).nullable(),
     mistleMcpEnabled: z.boolean(),
     mistleMcpApiKeyId: z.string().min(1).nullable(),
     sandboxProvider: z.string().min(1).nullable(),

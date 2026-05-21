@@ -27,6 +27,7 @@ type SignCommitPayloadInput = {
   sandboxInstanceId: string;
   actingUserId: string;
   providerFamily: string;
+  integrationConnectionId: string;
   format: string;
   keyRef: string;
   grant: string;
@@ -117,11 +118,13 @@ export async function signCommitPayload(
           ? "actingUserId"
           : verifiedGrant.providerFamily !== input.providerFamily
             ? "providerFamily"
-            : verifiedGrant.format !== input.format
-              ? "format"
-              : verifiedGrant.keyRef !== input.keyRef
-                ? "keyRef"
-                : undefined;
+            : verifiedGrant.integrationConnectionId !== input.integrationConnectionId
+              ? "integrationConnectionId"
+              : verifiedGrant.format !== input.format
+                ? "format"
+                : verifiedGrant.keyRef !== input.keyRef
+                  ? "keyRef"
+                  : undefined;
 
   if (claimMismatch !== undefined) {
     throw new InternalIdentityLinkingError(
@@ -141,6 +144,7 @@ export async function signCommitPayload(
       and(
         eq(table.organizationId, input.organizationId),
         eq(table.providerFamily, input.providerFamily),
+        eq(table.integrationConnectionId, input.integrationConnectionId),
         eq(table.status, OrganizationIdentityLinkProviderConfigStatus.ACTIVE),
       ),
   });

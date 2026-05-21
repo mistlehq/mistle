@@ -262,6 +262,7 @@ const SandboxStartupInputSchema = z.object({
           keyRef: z.string().min(1),
           organizationId: z.string().min(1),
           providerFamily: z.string().min(1),
+          integrationConnectionId: z.string().min(1),
           actingUserId: z.string().min(1),
           grant: z.string().min(1),
         })
@@ -441,6 +442,7 @@ describe("encodeSandboxStartupInput", () => {
           keyRef: "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE",
           organizationId: "org_123",
           providerFamily: "github",
+          integrationConnectionId: "icn_github",
           actingUserId: "usr_123",
           grant: "grant-token-value",
         },
@@ -457,6 +459,7 @@ describe("encodeSandboxStartupInput", () => {
         keyRef: "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE",
         organizationId: "org_123",
         providerFamily: "github",
+        integrationConnectionId: "icn_github",
         actingUserId: "usr_123",
         grant: "grant-token-value",
       },

@@ -7635,6 +7635,8 @@ export interface paths {
                 launchCwd: string | null;
                 primaryRepositoryRoot: string | null;
               } | null;
+              sandboxProfileId: string;
+              sandboxProfileVersion: number;
               startupOperation: {
                 operationId: string;
                 /** @enum {string} */
@@ -8350,6 +8352,8 @@ export interface paths {
                 launchCwd: string | null;
                 primaryRepositoryRoot: string | null;
               } | null;
+              sandboxProfileId: string;
+              sandboxProfileVersion: number;
               startupOperation: {
                 operationId: string;
                 /** @enum {string} */
@@ -9441,6 +9445,7 @@ export interface paths {
                 agentRuntimeId: "codex" | "opencode" | "pi";
                 /** @enum {string} */
                 defaultPersistenceMode: "ephemeral" | "persistent";
+                gitCommitSigningIntegrationConnectionId: string | null;
                 isActive: boolean;
                 latestSnapshotJob: {
                   createdAt: string;
@@ -9568,6 +9573,7 @@ export interface paths {
               agentRuntimeId: "codex" | "opencode" | "pi";
               /** @enum {string} */
               defaultPersistenceMode: "ephemeral" | "persistent";
+              gitCommitSigningIntegrationConnectionId: string | null;
               isActive: boolean;
               latestSnapshotJob: {
                 createdAt: string;
@@ -9833,6 +9839,7 @@ export interface paths {
             agentRuntimeId?: "codex" | "opencode" | "pi";
             /** @enum {string} */
             defaultPersistenceMode?: "ephemeral" | "persistent";
+            gitCommitSigningIntegrationConnectionId?: string | null;
             integrationBindings?: {
               bindings: {
                 clientRef?: string;
@@ -9870,6 +9877,7 @@ export interface paths {
               agentRuntimeId: "codex" | "opencode" | "pi";
               /** @enum {string} */
               defaultPersistenceMode: "ephemeral" | "persistent";
+              gitCommitSigningIntegrationConnectionId: string | null;
               integrationBindings: {
                 bindings: {
                   config: {
@@ -9919,7 +9927,9 @@ export interface paths {
                     | "INVALID_BINDING_CONNECTION_REFERENCE"
                     | "INVALID_BINDING_CONFIG_REFERENCE"
                     | "INVALID_SANDBOX_RUNTIME_CONFIG"
-                    | "INVALID_MISTLE_MCP_CONFIG";
+                    | "INVALID_MISTLE_MCP_CONFIG"
+                    | "GIT_SIGNING_CONFIGURATION_REQUIRED"
+                    | "INVALID_GIT_SIGNING_CONFIG";
                   details?: {
                     issues: {
                       bindingIdOrDraftIndex: string;
@@ -10601,6 +10611,7 @@ export interface paths {
                 agentRuntimeId: "codex" | "opencode" | "pi";
                 /** @enum {string} */
                 defaultPersistenceMode: "ephemeral" | "persistent";
+                gitCommitSigningIntegrationConnectionId: string | null;
                 isActive: boolean;
                 latestSnapshotJob: {
                   createdAt: string;
@@ -10900,6 +10911,7 @@ export interface paths {
                 agentRuntimeId: "codex" | "opencode" | "pi";
                 /** @enum {string} */
                 defaultPersistenceMode: "ephemeral" | "persistent";
+                gitCommitSigningIntegrationConnectionId: string | null;
                 isActive: boolean;
                 latestSnapshotJob: {
                   createdAt: string;
@@ -11280,6 +11292,7 @@ export interface paths {
                 agentRuntimeId: "codex" | "opencode" | "pi";
                 /** @enum {string} */
                 defaultPersistenceMode: "ephemeral" | "persistent";
+                gitCommitSigningIntegrationConnectionId: string | null;
                 isActive: boolean;
                 latestSnapshotJob: {
                   createdAt: string;

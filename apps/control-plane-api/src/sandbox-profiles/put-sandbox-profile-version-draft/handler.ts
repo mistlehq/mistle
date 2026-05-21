@@ -37,6 +37,11 @@ const routeHandler = async (
           ? {}
           : { defaultPersistenceMode: body.defaultPersistenceMode }),
         ...(body.agentRuntimeId === undefined ? {} : { agentRuntimeId: body.agentRuntimeId }),
+        ...(body.gitCommitSigningIntegrationConnectionId === undefined
+          ? {}
+          : {
+              gitCommitSigningIntegrationConnectionId: body.gitCommitSigningIntegrationConnectionId,
+            }),
         ...(body.mistleMcpEnabled === undefined ? {} : { mistleMcpEnabled: body.mistleMcpEnabled }),
         ...(body.mistleMcpApiKeyId === undefined
           ? {}
@@ -102,7 +107,9 @@ const routeHandler = async (
     if (error instanceof SandboxProfilesBadRequestError) {
       if (
         error.code !== SandboxProfilesBadRequestCodes.INVALID_SANDBOX_RUNTIME_CONFIG &&
-        error.code !== SandboxProfilesBadRequestCodes.INVALID_MISTLE_MCP_CONFIG
+        error.code !== SandboxProfilesBadRequestCodes.INVALID_MISTLE_MCP_CONFIG &&
+        error.code !== SandboxProfilesBadRequestCodes.GIT_SIGNING_CONFIGURATION_REQUIRED &&
+        error.code !== SandboxProfilesBadRequestCodes.INVALID_GIT_SIGNING_CONFIG
       ) {
         throw error;
       }

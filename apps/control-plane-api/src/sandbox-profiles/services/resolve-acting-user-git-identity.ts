@@ -1,4 +1,5 @@
 import {
+  IntegrationConnectionStatuses,
   OrganizationIdentityLinkProviderConfigStatus,
   UserExternalPrincipalCredentialSecretKinds,
   UserExternalPrincipalCredentialStatuses,
@@ -6,7 +7,7 @@ import {
   type ControlPlaneDatabase,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -40,6 +41,7 @@ export type SandboxGitIdentity = {
     keyRef: string;
     organizationId: string;
     providerFamily: string;
+    integrationConnectionId: string;
     actingUserId: string;
   };
 };
@@ -60,6 +62,7 @@ export async function resolveActingUserGitIdentity(
   input: {
     organizationId: string;
     actingUser?: SandboxActingUser;
+    gitCommitSigningIntegrationConnectionId?: string | null;
   },
 ): Promise<SandboxGitIdentity | undefined> {
   const tables = getControlPlaneDatabaseSchema(db);
@@ -69,25 +72,18 @@ export async function resolveActingUserGitIdentity(
     return undefined;
   }
 
-  const githubProviderConfig = await db.query.organizationIdentityLinkProviderConfigs.findFirst({
-    columns: {
-      id: true,
-      policy: true,
-    },
-    where: (table, { and, eq }) =>
-      and(
-        eq(table.organizationId, input.organizationId),
-        eq(table.providerFamily, GitHubProviderFamily),
-        eq(table.status, OrganizationIdentityLinkProviderConfigStatus.ACTIVE),
-      ),
+  const githubProviderConfig = await resolveGitHubSigningProviderConfig(db, {
+    organizationId: input.organizationId,
+    integrationConnectionId: input.gitCommitSigningIntegrationConnectionId ?? null,
   });
 
-  if (githubProviderConfig === undefined) {
+  if (githubProviderConfig === null) {
     return undefined;
   }
 
   const gitCommitSigningPolicy = resolveGitCommitSigningPolicy({
     policy: githubProviderConfig.policy ?? null,
+    gitCommitSigningIntegrationConnectionId: githubProviderConfig.integrationConnectionId,
   });
   const gitCommitSigningMode = gitCommitSigningPolicy.mode;
 
@@ -281,7 +277,135 @@ export async function resolveActingUserGitIdentity(
       keyRef: `key::${publicKey}`,
       organizationId: input.organizationId,
       providerFamily: GitHubProviderFamily,
+      integrationConnectionId: githubProviderConfig.integrationConnectionId,
       actingUserId: actingUser.userId,
     },
   };
+}
+
+async function resolveGitHubSigningProviderConfig(
+  db: ControlPlaneDatabase,
+  input: {
+    organizationId: string;
+    integrationConnectionId: string | null;
+  },
+): Promise<{
+  id: string;
+  integrationConnectionId: string;
+  policy: unknown;
+} | null> {
+  if (input.integrationConnectionId !== null) {
+    const integrationConnectionId = input.integrationConnectionId;
+    const [selectedConfig, selectedConnection] = await Promise.all([
+      db.query.organizationIdentityLinkProviderConfigs.findFirst({
+        columns: {
+          id: true,
+          integrationConnectionId: true,
+          policy: true,
+        },
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.organizationId, input.organizationId),
+            eq(table.providerFamily, GitHubProviderFamily),
+            eq(table.integrationConnectionId, integrationConnectionId),
+            eq(table.status, OrganizationIdentityLinkProviderConfigStatus.ACTIVE),
+          ),
+      }),
+      db.query.integrationConnections.findFirst({
+        columns: {
+          id: true,
+        },
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.organizationId, input.organizationId),
+            eq(table.id, integrationConnectionId),
+            eq(table.status, IntegrationConnectionStatuses.ACTIVE),
+          ),
+      }),
+    ]);
+
+    if (selectedConfig === undefined || selectedConnection === undefined) {
+      throw new SandboxProfilesBadRequestError(
+        SandboxProfilesBadRequestCodes.INVALID_GIT_SIGNING_CONFIG,
+        "Selected GitHub commit-signing connection is not an active identity-linking configuration.",
+      );
+    }
+
+    return selectedConfig;
+  }
+
+  const githubProviderConfigs = await db.query.organizationIdentityLinkProviderConfigs.findMany({
+    columns: {
+      id: true,
+      integrationConnectionId: true,
+      policy: true,
+    },
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.organizationId, input.organizationId),
+        eq(table.providerFamily, GitHubProviderFamily),
+        eq(table.status, OrganizationIdentityLinkProviderConfigStatus.ACTIVE),
+      ),
+  });
+
+  if (githubProviderConfigs.length === 0) {
+    return null;
+  }
+
+  if (githubProviderConfigs.length > 1) {
+    throw new SandboxProfilesBadRequestError(
+      SandboxProfilesBadRequestCodes.GIT_SIGNING_CONFIGURATION_REQUIRED,
+      "Select a GitHub identity-linking connection for commit signing before starting this sandbox.",
+    );
+  }
+
+  const activeConnectionIds = await listActiveConnectionIds(db, {
+    organizationId: input.organizationId,
+    integrationConnectionIds: githubProviderConfigs.map((config) => config.integrationConnectionId),
+  });
+  const signingEligibleConfigs = githubProviderConfigs.filter(
+    (config) =>
+      activeConnectionIds.has(config.integrationConnectionId) &&
+      resolveGitCommitSigningPolicy({
+        policy: config.policy ?? null,
+        gitCommitSigningIntegrationConnectionId: config.integrationConnectionId,
+      }).mode !== "disabled",
+  );
+
+  if (signingEligibleConfigs.length === 0) {
+    return null;
+  }
+
+  const selectedConfig = signingEligibleConfigs[0];
+  if (selectedConfig === undefined) {
+    throw new Error("Expected GitHub signing provider config candidate.");
+  }
+
+  return selectedConfig;
+}
+
+async function listActiveConnectionIds(
+  db: ControlPlaneDatabase,
+  input: {
+    organizationId: string;
+    integrationConnectionIds: string[];
+  },
+): Promise<Set<string>> {
+  if (input.integrationConnectionIds.length === 0) {
+    return new Set();
+  }
+
+  const activeConnections = await db.query.integrationConnections.findMany({
+    columns: {
+      id: true,
+    },
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.organizationId, input.organizationId),
+        eq(table.status, IntegrationConnectionStatuses.ACTIVE),
+        inArray(table.id, input.integrationConnectionIds),
+      ),
+  });
+
+  return new Set(activeConnections.map((connection) => connection.id));
 }

@@ -31,7 +31,7 @@ pub(in crate::tunnel::session) fn handle_tunnel_session_request(
         } => continue_with(handle_signing_session_request(
             tunnel_writer_sender,
             session_state,
-            request,
+            *request,
             response_sender,
         )),
         TunnelSessionRequest::EgressToken {

@@ -253,6 +253,8 @@ describe.concurrent("sandbox instances get integration", () => {
       failureCode: null,
       failureMessage: null,
       runtimeContext: null,
+      sandboxProfileId: "sbp_cp_get",
+      sandboxProfileVersion: 1,
       startupOperation: null,
       triggerConversation: null,
     });

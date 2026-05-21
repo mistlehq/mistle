@@ -472,6 +472,7 @@ mod tests {
                         key_ref: format!("key::{TEST_PUBLIC_KEY}"),
                         organization_id: "org_123".to_string(),
                         provider_family: "github".to_string(),
+                        integration_connection_id: Some("icn_github".to_string()),
                         acting_user_id: "usr_123".to_string(),
                         grant: "grant-token".to_string(),
                     })

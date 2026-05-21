@@ -16,6 +16,7 @@ import {
   SandboxInstancesNotFoundCodes,
   SandboxInstancesNotFoundError,
 } from "../../../sandbox-instances/errors.js";
+import { readProfileVersionGitCommitSigningIntegrationConnectionId } from "../../../sandbox-profiles/services/profile-version-git-signing-selector.js";
 import { resolveActingUserGitIdentity } from "../../../sandbox-profiles/services/resolve-acting-user-git-identity.js";
 import { withSandboxRuntimeSpan } from "../telemetry.js";
 
@@ -252,11 +253,10 @@ export async function mintConnectionToken(
           const gitIdentity =
             input.actingUserId === undefined
               ? undefined
-              : await resolveActingUserGitIdentity(db, {
+              : await resolveActingUserGitIdentityForSandboxInstance(db, {
+                  actingUserId: input.actingUserId,
                   organizationId: input.organizationId,
-                  actingUser: {
-                    userId: input.actingUserId,
-                  },
+                  sandboxInstance,
                 });
 
           await dataPlaneClient.resumeSandboxInstance({
@@ -363,4 +363,27 @@ export async function mintConnectionToken(
       }
     },
   );
+}
+
+async function resolveActingUserGitIdentityForSandboxInstance(
+  db: ControlPlaneDatabase,
+  input: {
+    organizationId: string;
+    actingUserId: string;
+    sandboxInstance: Pick<ExistingSandboxInstance, "sandboxProfileId" | "sandboxProfileVersion">;
+  },
+) {
+  const gitCommitSigningIntegrationConnectionId =
+    await readProfileVersionGitCommitSigningIntegrationConnectionId(db, {
+      profileId: input.sandboxInstance.sandboxProfileId,
+      profileVersion: input.sandboxInstance.sandboxProfileVersion,
+    });
+
+  return await resolveActingUserGitIdentity(db, {
+    organizationId: input.organizationId,
+    gitCommitSigningIntegrationConnectionId,
+    actingUser: {
+      userId: input.actingUserId,
+    },
+  });
 }

@@ -665,6 +665,15 @@ pub(super) fn validate_signing_request(
             "signing.request providerFamily is required",
         ));
     }
+    if message
+        .integration_connection_id
+        .as_ref()
+        .is_some_and(|integration_connection_id| integration_connection_id.trim().is_empty())
+    {
+        return Err(TunnelProtocolError::new(
+            "signing.request integrationConnectionId cannot be empty when provided",
+        ));
+    }
     if message.format.trim().is_empty() {
         return Err(TunnelProtocolError::new(
             "signing.request format is required",

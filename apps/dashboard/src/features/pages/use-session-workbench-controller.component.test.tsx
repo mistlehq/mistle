@@ -101,6 +101,8 @@ describe("useSessionWorkbenchController", () => {
     const queryClient = createControllerQueryClient();
     const sandboxStatus: SandboxInstanceStatusResult = {
       id: "sbi_opencode",
+      sandboxProfileId: "sbp_opencode",
+      sandboxProfileVersion: 1,
       title: null,
       status: "starting",
       connectable: false,
@@ -742,6 +744,8 @@ describe("useSessionWorkbenchController", () => {
     const sandboxStatus: SandboxInstanceStatusResult = {
       title: null,
       id: sandboxInstanceId,
+      sandboxProfileId: "sbp_connectable",
+      sandboxProfileVersion: 1,
       status: "running",
       connectable: true,
       failureCode: null,

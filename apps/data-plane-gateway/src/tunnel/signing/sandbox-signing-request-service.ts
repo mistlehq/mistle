@@ -86,11 +86,13 @@ export class SandboxSigningRequestService {
           ? "actingUserId"
           : verifiedGrant.providerFamily !== input.request.providerFamily
             ? "providerFamily"
-            : verifiedGrant.format !== input.request.format
-              ? "format"
-              : verifiedGrant.keyRef !== input.request.keyRef
-                ? "keyRef"
-                : undefined;
+            : verifiedGrant.integrationConnectionId !== input.request.integrationConnectionId
+              ? "integrationConnectionId"
+              : verifiedGrant.format !== input.request.format
+                ? "format"
+                : verifiedGrant.keyRef !== input.request.keyRef
+                  ? "keyRef"
+                  : undefined;
 
     if (claimMismatch !== undefined) {
       return createFailureResult({
@@ -107,6 +109,7 @@ export class SandboxSigningRequestService {
           sandboxInstanceId: input.request.sandboxInstanceId,
           actingUserId: input.request.actingUserId,
           providerFamily: input.request.providerFamily,
+          integrationConnectionId: input.request.integrationConnectionId,
           format: input.request.format,
           keyRef: input.request.keyRef,
           grant: input.request.grant,

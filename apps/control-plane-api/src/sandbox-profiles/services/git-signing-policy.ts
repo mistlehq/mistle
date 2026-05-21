@@ -13,14 +13,19 @@ export const GitIdentityLinkProviderPolicySchema = z
 export type GitCommitSigningMode = z.infer<typeof GitCommitSigningModeSchema>;
 export type GitCommitSigningFormat = z.infer<typeof GitCommitSigningFormatSchema>;
 
-export function resolveGitCommitSigningPolicy(input: { policy: Record<string, unknown> | null }): {
+export function resolveGitCommitSigningPolicy(input: {
+  policy: unknown;
+  gitCommitSigningIntegrationConnectionId?: string | null;
+}): {
   mode: GitCommitSigningMode;
   format: GitCommitSigningFormat;
+  integrationConnectionId: string | null;
 } {
   if (input.policy === null) {
     return {
       mode: "allowed",
       format: "ssh",
+      integrationConnectionId: input.gitCommitSigningIntegrationConnectionId ?? null,
     };
   }
 
@@ -28,5 +33,6 @@ export function resolveGitCommitSigningPolicy(input: { policy: Record<string, un
   return {
     mode: parsedPolicy.gitCommitSigningMode ?? "allowed",
     format: parsedPolicy.gitCommitSigningFormat ?? "ssh",
+    integrationConnectionId: input.gitCommitSigningIntegrationConnectionId ?? null,
   };
 }

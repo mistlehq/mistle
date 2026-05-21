@@ -68,6 +68,8 @@ export type SandboxInstanceTriggerConversation = {
 
 export type SandboxInstanceStatus = {
   id: string;
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
   title: string | null;
   status: NonNullable<GetSandboxInstanceResponse>["status"];
   connectable: boolean;

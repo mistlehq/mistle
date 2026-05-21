@@ -1,13 +1,16 @@
 import {
   getControlPlaneDatabaseSchema,
+  IntegrationConnectionStatuses,
+  OrganizationIdentityLinkProviderConfigStatus,
   type IntegrationBindingKind,
   type ControlPlaneTransaction,
   type SandboxProfileVersionAgentRuntimeId,
   type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
+import { GitHubProviderFamily } from "../../identity-linking/github-signing.js";
 import {
   SandboxProfilesBadRequestCodes,
   SandboxProfilesBadRequestError,
@@ -16,6 +19,7 @@ import {
   SandboxProfilesNotFoundCodes,
   SandboxProfilesNotFoundError,
 } from "../errors.js";
+import { resolveGitCommitSigningPolicy } from "./git-signing-policy.js";
 import { lockProfileVersionForUpdateOrThrow } from "./lock-profile-version-for-update.js";
 import {
   replaceProfileVersionIntegrationBindings,
@@ -35,6 +39,7 @@ type PutProfileVersionDraftInput = {
   setupScript?: string | null;
   defaultPersistenceMode?: SandboxProfileVersionDefaultPersistenceMode;
   agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
+  gitCommitSigningIntegrationConnectionId?: string | null;
   mistleMcpEnabled?: boolean;
   mistleMcpApiKeyId?: string | null;
   sandboxProvider?: string;
@@ -57,6 +62,7 @@ type PutProfileVersionDraftOutput = {
   setupScript: string | null;
   defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
   agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+  gitCommitSigningIntegrationConnectionId: string | null;
   mistleMcpEnabled: boolean;
   mistleMcpApiKeyId: string | null;
   sandboxProvider: string | null;
@@ -170,11 +176,20 @@ export async function putProfileVersionDraft(
       enabled: nextMistleMcpEnabled,
       organizationId: input.organizationId,
     });
+    const nextGitCommitSigningIntegrationConnectionId =
+      input.gitCommitSigningIntegrationConnectionId === undefined
+        ? lockedVersion.gitCommitSigningIntegrationConnectionId
+        : input.gitCommitSigningIntegrationConnectionId;
+    await validateGitCommitSigningDraftConfig(tx, {
+      integrationConnectionId: nextGitCommitSigningIntegrationConnectionId,
+      organizationId: input.organizationId,
+    });
 
     const hasVersionFieldUpdate =
       input.setupScript !== undefined ||
       input.defaultPersistenceMode !== undefined ||
       input.agentRuntimeId !== undefined ||
+      input.gitCommitSigningIntegrationConnectionId !== undefined ||
       input.mistleMcpEnabled !== undefined ||
       input.mistleMcpApiKeyId !== undefined ||
       input.sandboxProvider !== undefined ||
@@ -190,6 +205,12 @@ export async function putProfileVersionDraft(
             ? {}
             : { defaultPersistenceMode: input.defaultPersistenceMode }),
           ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
+          ...(input.gitCommitSigningIntegrationConnectionId === undefined
+            ? {}
+            : {
+                gitCommitSigningIntegrationConnectionId:
+                  input.gitCommitSigningIntegrationConnectionId,
+              }),
           ...(input.mistleMcpEnabled === undefined
             ? {}
             : { mistleMcpEnabled: input.mistleMcpEnabled }),
@@ -228,6 +249,8 @@ export async function putProfileVersionDraft(
           setupScript: tables.sandboxProfileVersions.setupScript,
           defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
           agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
+          gitCommitSigningIntegrationConnectionId:
+            tables.sandboxProfileVersions.gitCommitSigningIntegrationConnectionId,
           mistleMcpEnabled: tables.sandboxProfileVersions.mistleMcpEnabled,
           mistleMcpApiKeyId: tables.sandboxProfileVersions.mistleMcpApiKeyId,
         });
@@ -266,6 +289,7 @@ export async function putProfileVersionDraft(
         setupScript: true,
         defaultPersistenceMode: true,
         agentRuntimeId: true,
+        gitCommitSigningIntegrationConnectionId: true,
         mistleMcpEnabled: true,
         mistleMcpApiKeyId: true,
         sandboxProvider: true,
@@ -294,12 +318,94 @@ export async function putProfileVersionDraft(
       setupScript: persistedVersion.setupScript,
       defaultPersistenceMode: persistedVersion.defaultPersistenceMode,
       agentRuntimeId: persistedVersion.agentRuntimeId,
+      gitCommitSigningIntegrationConnectionId:
+        persistedVersion.gitCommitSigningIntegrationConnectionId,
       mistleMcpEnabled: persistedVersion.mistleMcpEnabled,
       mistleMcpApiKeyId: persistedVersion.mistleMcpApiKeyId,
       ...mapProfileVersionRuntimeConfig(persistedVersion),
       integrationBindings,
     };
   });
+}
+
+async function validateGitCommitSigningDraftConfig(
+  db: ControlPlaneTransaction,
+  input: {
+    organizationId: string;
+    integrationConnectionId: string | null;
+  },
+): Promise<void> {
+  const gitHubConfigs = await db.query.organizationIdentityLinkProviderConfigs.findMany({
+    columns: {
+      integrationConnectionId: true,
+      policy: true,
+    },
+    where: (table, { and: whereAnd, eq: whereEq }) =>
+      whereAnd(
+        whereEq(table.organizationId, input.organizationId),
+        whereEq(table.providerFamily, GitHubProviderFamily),
+        whereEq(table.status, OrganizationIdentityLinkProviderConfigStatus.ACTIVE),
+      ),
+  });
+  const activeConnectionIds = await listActiveConnectionIds(db, {
+    organizationId: input.organizationId,
+    integrationConnectionIds: gitHubConfigs.map((config) => config.integrationConnectionId),
+  });
+  const signingEligibleConfigs = gitHubConfigs.filter(
+    (config) =>
+      activeConnectionIds.has(config.integrationConnectionId) &&
+      resolveGitCommitSigningPolicy({
+        policy: config.policy ?? null,
+        gitCommitSigningIntegrationConnectionId: config.integrationConnectionId,
+      }).mode !== "disabled",
+  );
+
+  if (input.integrationConnectionId === null) {
+    if (gitHubConfigs.length > 1) {
+      throw new SandboxProfilesBadRequestError(
+        SandboxProfilesBadRequestCodes.GIT_SIGNING_CONFIGURATION_REQUIRED,
+        "Select a GitHub identity-linking connection for commit signing before saving this draft.",
+      );
+    }
+
+    return;
+  }
+
+  const selectedConfig = signingEligibleConfigs.find(
+    (config) => config.integrationConnectionId === input.integrationConnectionId,
+  );
+  if (selectedConfig === undefined) {
+    throw new SandboxProfilesBadRequestError(
+      SandboxProfilesBadRequestCodes.INVALID_GIT_SIGNING_CONFIG,
+      "Selected GitHub commit-signing connection is not an active identity-linking configuration.",
+    );
+  }
+}
+
+async function listActiveConnectionIds(
+  db: ControlPlaneTransaction,
+  input: {
+    organizationId: string;
+    integrationConnectionIds: string[];
+  },
+): Promise<Set<string>> {
+  if (input.integrationConnectionIds.length === 0) {
+    return new Set();
+  }
+
+  const activeConnections = await db.query.integrationConnections.findMany({
+    columns: {
+      id: true,
+    },
+    where: (table, { and: whereAnd, eq: whereEq }) =>
+      whereAnd(
+        whereEq(table.organizationId, input.organizationId),
+        whereEq(table.status, IntegrationConnectionStatuses.ACTIVE),
+        inArray(table.id, input.integrationConnectionIds),
+      ),
+  });
+
+  return new Set(activeConnections.map((connection) => connection.id));
 }
 
 async function validateMistleMcpDraftConfig(

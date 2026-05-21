@@ -136,6 +136,7 @@ export interface paths {
                 actingUserId: string;
                 /** @enum {string} */
                 format: "ssh";
+                integrationConnectionId: string;
                 keyRef: string;
                 organizationId: string;
                 program: string;
@@ -963,6 +964,8 @@ export interface paths {
                   sourceKind: "git-clone";
                 }[];
               } | null;
+              sandboxProfileId: string;
+              sandboxProfileVersion: number;
               startupOperation: {
                 operationId: string;
                 /** @enum {string} */
@@ -1557,6 +1560,7 @@ export interface paths {
                 actingUserId: string;
                 /** @enum {string} */
                 format: "ssh";
+                integrationConnectionId: string;
                 keyRef: string;
                 organizationId: string;
                 program: string;

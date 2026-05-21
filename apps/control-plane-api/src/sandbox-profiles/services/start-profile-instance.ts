@@ -68,6 +68,7 @@ type StartActiveProfileInstanceInput = Omit<StartProfileInstanceInput, "profileV
 type ResolvedLaunchImage = {
   versionState: SandboxProfileVersionState;
   defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
+  gitCommitSigningIntegrationConnectionId: string | null;
   compileImage: ResolvedSandboxImage;
   workflowImage: StartSandboxInstanceWorkflowImageInput;
   sandboxRuntime: SandboxRuntimeProviderInput;
@@ -179,6 +180,8 @@ async function resolveLaunchImage(
       defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
       snapshotImageProvider: tables.sandboxProfileVersions.snapshotImageProvider,
       snapshotImageId: tables.sandboxProfileVersions.snapshotImageId,
+      gitCommitSigningIntegrationConnectionId:
+        tables.sandboxProfileVersions.gitCommitSigningIntegrationConnectionId,
       sandboxProvider: tables.sandboxProfileVersions.sandboxProvider,
       sandboxConnectionId: tables.sandboxProfileVersions.sandboxConnectionId,
       sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
@@ -255,6 +258,8 @@ async function resolveLaunchImage(
     return {
       versionState: sandboxProfileVersion.state,
       defaultPersistenceMode: sandboxProfileVersion.defaultPersistenceMode,
+      gitCommitSigningIntegrationConnectionId:
+        sandboxProfileVersion.gitCommitSigningIntegrationConnectionId,
       compileImage: {
         source: "snapshot",
         imageRef: sandboxProfileVersion.snapshotImageId,
@@ -271,6 +276,8 @@ async function resolveLaunchImage(
   return {
     versionState: sandboxProfileVersion.state,
     defaultPersistenceMode: sandboxProfileVersion.defaultPersistenceMode,
+    gitCommitSigningIntegrationConnectionId:
+      sandboxProfileVersion.gitCommitSigningIntegrationConnectionId,
     compileImage: {
       source: "base",
       imageRef: defaultBaseImage,
@@ -347,6 +354,7 @@ export async function startProfileInstance(
   );
   const gitIdentity = await resolveActingUserGitIdentity(db, {
     organizationId: serviceInput.organizationId,
+    gitCommitSigningIntegrationConnectionId: launchImage.gitCommitSigningIntegrationConnectionId,
     ...(serviceInput.actingUser === undefined ? {} : { actingUser: serviceInput.actingUser }),
   });
   const storagePersistenceMode = await resolveSandboxStoragePersistenceMode({

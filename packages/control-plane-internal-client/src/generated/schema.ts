@@ -136,6 +136,7 @@ export interface paths {
             /** @enum {string} */
             format: "ssh";
             grant: string;
+            integrationConnectionId: string;
             keyRef: string;
             organizationId: string;
             payload: string;

@@ -1,6 +1,7 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 
+import { readProfileVersionGitCommitSigningIntegrationConnectionId } from "../../sandbox-profiles/services/profile-version-git-signing-selector.js";
 import {
   resolveActingUserGitIdentity,
   type SandboxActingUser,
@@ -50,8 +51,14 @@ export async function resumeInstance(
     throw createResumeFailedError(sandboxInstance);
   }
 
+  const gitCommitSigningIntegrationConnectionId =
+    await readProfileVersionGitCommitSigningIntegrationConnectionId(db, {
+      profileId: sandboxInstance.sandboxProfileId,
+      profileVersion: sandboxInstance.sandboxProfileVersion,
+    });
   const gitIdentity = await resolveActingUserGitIdentity(db, {
     organizationId: input.organizationId,
+    gitCommitSigningIntegrationConnectionId,
     ...(input.actingUser === undefined ? {} : { actingUser: input.actingUser }),
   });
 
