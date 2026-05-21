@@ -3,14 +3,18 @@ import {
   IntegrationConnectionStatuses,
   IntegrationBindingKinds,
   ScheduledActionStatuses,
+  ScheduleKinds,
   ScheduleTargetTypes,
 } from "@mistle/db/control-plane";
+import { createControlPlaneWorkflowNamespaceId } from "@mistle/db/test-environment";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
-import { eq } from "drizzle-orm";
+import { DispatchOneOffScheduleWorkflowName } from "@mistle/workflow-registry/control-plane";
+import { eq, sql } from "drizzle-orm";
 import { describe, expect } from "vitest";
+import { z } from "zod";
 
 import { ScheduleActionFailureCodes } from "../src/trigger-schedules/constants.js";
 import { CreateTriggerScheduleBadRequestResponseSchema } from "../src/trigger-schedules/create-trigger-schedule/index.js";
@@ -20,9 +24,32 @@ import { TriggerScheduleSchema } from "../src/trigger-schedules/schemas.js";
 type ControlPlaneApiIntegrationFixture = Readonly<{
   authSession: IntegrationTestEnvironment["auth"]["createSession"];
   db: IntegrationTestEnvironment["controlPlaneDb"];
+  envId: string;
   request: IntegrationTestEnvironment["controlPlaneApi"]["http"]["fetch"];
   tables: IntegrationTestEnvironment["controlPlaneTables"];
 }>;
+
+type PersistedOneOffWorkflowRun = Readonly<{
+  id: string;
+  status: string;
+  input: {
+    scheduleId: string;
+  };
+  availableAt: string | null;
+}>;
+
+const PersistedOneOffWorkflowRunRowSchema = z
+  .object({
+    id: z.string(),
+    status: z.string(),
+    input: z
+      .object({
+        scheduleId: z.string(),
+      })
+      .strict(),
+    available_at: z.string().nullable(),
+  })
+  .strict();
 
 const integrationIt = createIntegrationTest({
   services: ["control-plane-api"],
@@ -37,6 +64,7 @@ function it(
       fixture: {
         authSession: env.auth.createSession,
         db: env.controlPlaneDb,
+        envId: env.id,
         request: env.controlPlaneApi.http.fetch,
         tables: env.controlPlaneTables,
       },
@@ -175,6 +203,187 @@ describe("trigger schedules CRUD integration", () => {
     expect(response.status).toBe(201);
     const body = TriggerScheduleSchema.parse(await response.json());
     expect(body.target.sandboxProfileVersion).toBe(2);
+  });
+
+  it("creates enabled one-off schedules with a future workflow run", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "trigger-schedules-one-off-create@example.com",
+    });
+
+    await insertSandboxProfileWithVersion(fixture, {
+      organizationId: authenticatedSession.organizationId,
+      profileId: "sbp_schedule_one_off_create_001",
+      version: 1,
+    });
+
+    const response = await fixture.request("/v1/triggers/schedules", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        name: "One-off launch",
+        schedule: {
+          kind: "one_off",
+          name: "One-off schedule",
+          startAt: "2099-05-01T01:00:00.000Z",
+        },
+        inputTemplate: "Run once",
+        target: {
+          sandboxProfileId: "sbp_schedule_one_off_create_001",
+        },
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    const body = TriggerScheduleSchema.parse(await response.json());
+    expect(body.schedule.kind).toBe(ScheduleKinds.ONE_OFF);
+    expect(body.schedule.cronExpression).toBeNull();
+    expect(body.schedule.timezone).toBeNull();
+    expect(body.schedule.startAt).toBe("2099-05-01T01:00:00.000Z");
+    expect(body.schedule.nextScheduledAt).toBe("2099-05-01T01:00:00.000Z");
+
+    const persistedSchedule = await fixture.db.query.schedules.findFirst({
+      where: (table, { eq }) => eq(table.id, body.schedule.id),
+    });
+    expect(persistedSchedule?.kind).toBe(ScheduleKinds.ONE_OFF);
+    expect(persistedSchedule?.oneOffWorkflowRunId).not.toBeNull();
+
+    const workflowRun = await readOneOffWorkflowRun(fixture, body.schedule.id);
+    expect(workflowRun.id).toBe(persistedSchedule?.oneOffWorkflowRunId);
+    expect(workflowRun.status).toBe("pending");
+    expect(workflowRun.input).toEqual({
+      scheduleId: body.schedule.id,
+    });
+    expect(normalizePersistedTimestamp(workflowRun.availableAt)).toBe("2099-05-01T01:00:00.000Z");
+  });
+
+  it("does not enqueue disabled one-off schedules until they are enabled", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "trigger-schedules-one-off-enable@example.com",
+    });
+
+    await insertSandboxProfileWithVersion(fixture, {
+      organizationId: authenticatedSession.organizationId,
+      profileId: "sbp_schedule_one_off_enable_001",
+      version: 1,
+    });
+
+    const createResponse = await fixture.request("/v1/triggers/schedules", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        name: "Disabled one-off launch",
+        enabled: false,
+        schedule: {
+          kind: "one_off",
+          startAt: "2099-05-02T01:00:00.000Z",
+        },
+        inputTemplate: "Run once after enabling",
+        target: {
+          sandboxProfileId: "sbp_schedule_one_off_enable_001",
+        },
+      }),
+    });
+
+    expect(createResponse.status).toBe(201);
+    const created = TriggerScheduleSchema.parse(await createResponse.json());
+    expect(created.schedule.nextScheduledAt).toBeNull();
+    expect(await countOneOffWorkflowRuns(fixture, created.schedule.id)).toBe(0);
+
+    const enableResponse = await fixture.request(`/v1/triggers/schedules/${created.id}`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        enabled: true,
+      }),
+    });
+
+    expect(enableResponse.status).toBe(200);
+    const enabled = TriggerScheduleSchema.parse(await enableResponse.json());
+    expect(enabled.schedule.nextScheduledAt).toBe("2099-05-02T01:00:00.000Z");
+    const workflowRun = await readOneOffWorkflowRun(fixture, enabled.schedule.id);
+    expect(workflowRun.status).toBe("pending");
+    expect(normalizePersistedTimestamp(workflowRun.availableAt)).toBe("2099-05-02T01:00:00.000Z");
+  });
+
+  it("cancels a pending one-off workflow when disabling the schedule", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "trigger-schedules-one-off-disable@example.com",
+    });
+
+    await insertSandboxProfileWithVersion(fixture, {
+      organizationId: authenticatedSession.organizationId,
+      profileId: "sbp_schedule_one_off_disable_001",
+      version: 1,
+    });
+    const created = await createOneOffScheduleTrigger(fixture, authenticatedSession.cookie, {
+      profileId: "sbp_schedule_one_off_disable_001",
+      startAt: "2099-05-03T01:00:00.000Z",
+    });
+    const queuedWorkflowRun = await readOneOffWorkflowRun(fixture, created.schedule.id);
+
+    const disableResponse = await fixture.request(`/v1/triggers/schedules/${created.id}`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        enabled: false,
+      }),
+    });
+
+    expect(disableResponse.status).toBe(200);
+    const disabled = TriggerScheduleSchema.parse(await disableResponse.json());
+    expect(disabled.schedule.nextScheduledAt).toBeNull();
+
+    const canceledWorkflowRun = await readOneOffWorkflowRun(fixture, created.schedule.id);
+    expect(canceledWorkflowRun.id).toBe(queuedWorkflowRun.id);
+    expect(canceledWorkflowRun.status).toBe("canceled");
+  });
+
+  it("cancels a pending one-off workflow when deleting the schedule", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "trigger-schedules-one-off-delete@example.com",
+    });
+
+    await insertSandboxProfileWithVersion(fixture, {
+      organizationId: authenticatedSession.organizationId,
+      profileId: "sbp_schedule_one_off_delete_001",
+      version: 1,
+    });
+    const created = await createOneOffScheduleTrigger(fixture, authenticatedSession.cookie, {
+      profileId: "sbp_schedule_one_off_delete_001",
+      startAt: "2099-05-04T01:00:00.000Z",
+    });
+    const queuedWorkflowRun = await readOneOffWorkflowRun(fixture, created.schedule.id);
+
+    const deleteResponse = await fixture.request(`/v1/triggers/schedules/${created.id}`, {
+      method: "DELETE",
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+
+    expect(deleteResponse.status).toBe(200);
+
+    const persistedSchedule = await fixture.db.query.schedules.findFirst({
+      where: (table, { eq }) => eq(table.id, created.schedule.id),
+    });
+    expect(persistedSchedule?.deletedAt).not.toBeNull();
+    expect(persistedSchedule?.nextScheduledAt).toBeNull();
+
+    const canceledWorkflowRun = await readOneOffWorkflowRun(fixture, created.schedule.id);
+    expect(canceledWorkflowRun.id).toBe(queuedWorkflowRun.id);
+    expect(canceledWorkflowRun.status).toBe("canceled");
   });
 
   it("updates schedule timing from request time and keeps template-only updates from moving the cursor", async ({
@@ -678,6 +887,100 @@ async function createScheduleTrigger(
 
   expect(response.status).toBe(201);
   return TriggerScheduleSchema.parse(await response.json());
+}
+
+async function createOneOffScheduleTrigger(
+  fixture: ControlPlaneApiIntegrationFixture,
+  cookie: string,
+  input: {
+    profileId: string;
+    startAt: string;
+  },
+) {
+  const response = await fixture.request("/v1/triggers/schedules", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      cookie,
+    },
+    body: JSON.stringify({
+      name: "One-off scheduled trigger",
+      schedule: {
+        kind: "one_off",
+        startAt: input.startAt,
+      },
+      inputTemplate: "Run one-off scheduled trigger",
+      target: {
+        sandboxProfileId: input.profileId,
+      },
+    }),
+  });
+
+  expect(response.status).toBe(201);
+  return TriggerScheduleSchema.parse(await response.json());
+}
+
+async function readOneOffWorkflowRun(
+  fixture: ControlPlaneApiIntegrationFixture,
+  scheduleId: string,
+): Promise<PersistedOneOffWorkflowRun> {
+  const workflowRuns = await listOneOffWorkflowRuns(fixture, scheduleId);
+  expect(workflowRuns).toHaveLength(1);
+  const workflowRun = workflowRuns[0];
+  if (workflowRun === undefined) {
+    throw new Error("Expected one-off workflow run.");
+  }
+
+  return workflowRun;
+}
+
+async function countOneOffWorkflowRuns(
+  fixture: ControlPlaneApiIntegrationFixture,
+  scheduleId: string,
+): Promise<number> {
+  return (await listOneOffWorkflowRuns(fixture, scheduleId)).length;
+}
+
+async function listOneOffWorkflowRuns(
+  fixture: ControlPlaneApiIntegrationFixture,
+  scheduleId: string,
+): Promise<ReadonlyArray<PersistedOneOffWorkflowRun>> {
+  const namespaceId = createControlPlaneWorkflowNamespaceId(fixture.envId);
+  const result = await fixture.db.execute(sql<{
+    id: string;
+    status: string;
+    input: unknown;
+    available_at: string | null;
+  }>`
+    select
+      id,
+      status,
+      input,
+      available_at
+    from control_plane_openworkflow.workflow_runs
+    where namespace_id = ${namespaceId}
+      and workflow_name = ${DispatchOneOffScheduleWorkflowName}
+      and input @> ${JSON.stringify({ scheduleId })}::jsonb
+    order by created_at asc
+  `);
+
+  return result.rows.map((row) => {
+    const parsed = PersistedOneOffWorkflowRunRowSchema.parse(row);
+    return {
+      id: parsed.id,
+      status: parsed.status,
+      input: parsed.input,
+      availableAt: parsed.available_at,
+    };
+  });
+}
+
+function normalizePersistedTimestamp(value: string | null): string | null {
+  if (value === null) {
+    return null;
+  }
+
+  return new Date(value).toISOString();
 }
 
 async function insertSandboxProfileWithVersion(

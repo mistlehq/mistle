@@ -5,6 +5,7 @@ import { systemClock } from "@mistle/time";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
 import { TriggerScheduleKinds } from "../constants.js";
+import { toTriggerScheduleResponse } from "../services/trigger-schedule-response.js";
 import { updateTriggerSchedule } from "../services/update-trigger-schedule.js";
 import { route } from "./route.js";
 
@@ -13,12 +14,14 @@ const routeHandler = async (
   { session }: AppSession,
 ) => {
   const db = ctx.get("db");
+  const openWorkflow = ctx.get("openWorkflow");
   const { triggerId } = ctx.req.valid("param");
   const body = ctx.req.valid("json");
 
   const triggerSchedule = await updateTriggerSchedule(
     {
       db,
+      openWorkflow,
     },
     {
       ...body,
@@ -30,7 +33,7 @@ const routeHandler = async (
 
   return ctx.json(
     {
-      ...triggerSchedule,
+      ...toTriggerScheduleResponse(triggerSchedule),
       kind: TriggerScheduleKinds.SCHEDULE,
     },
     200,

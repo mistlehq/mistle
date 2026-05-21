@@ -2,15 +2,22 @@ import {
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
   ScheduledActionStatuses,
+  ScheduleKinds,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
+import { BadRequestError } from "@mistle/http/errors.js";
 import { and, eq, sql } from "drizzle-orm";
+import type { OpenWorkflow } from "openworkflow";
 
-import { ScheduleActionFailureCodes } from "../constants.js";
+import { ScheduleActionFailureCodes, TriggerSchedulesBadRequestCodes } from "../constants.js";
 import {
   type TriggerScheduleAggregate,
   loadScheduleTriggerAggregateOrThrow,
 } from "./load-schedule-trigger-aggregate-or-throw.js";
+import {
+  cancelPendingOneOffScheduleWorkflow,
+  enqueueOneOffScheduleWorkflow,
+} from "./one-off-schedule-workflow.js";
 import {
   assertPrimaryRepositoryReferenceOrThrow,
   resolveNextScheduledAtOrThrow,
@@ -24,9 +31,15 @@ export type UpdateScheduleTriggerInput = {
   enabled?: boolean | undefined;
   schedule?:
     | {
+        kind?: "recurring" | undefined;
         name?: string | undefined;
         cronExpression?: string | undefined;
         timezone?: string | undefined;
+      }
+    | {
+        kind: "one_off";
+        name?: string | undefined;
+        startAt?: string | undefined;
       }
     | undefined;
   inputTemplate?: string | undefined;
@@ -43,7 +56,10 @@ export type UpdateScheduleTriggerInput = {
 };
 
 export async function updateTriggerSchedule(
-  ctx: { db: ControlPlaneDatabase },
+  ctx: {
+    db: ControlPlaneDatabase;
+    openWorkflow: Pick<OpenWorkflow, "cancelWorkflowRun" | "runWorkflow">;
+  },
   input: UpdateScheduleTriggerInput,
 ) {
   const existingTrigger = await loadScheduleTriggerAggregateOrThrow(
@@ -53,6 +69,7 @@ export async function updateTriggerSchedule(
       triggerId: input.triggerId,
     },
   );
+  assertScheduleUpdateKindMatches(existingTrigger, input);
 
   const sandboxProfileId =
     input.target?.sandboxProfileId ?? existingTrigger.target.sandboxProfileId;
@@ -88,7 +105,9 @@ export async function updateTriggerSchedule(
     },
   );
 
-  return ctx.db.transaction(async (tx) => {
+  const oneOffWorkflowChange = resolveOneOffWorkflowChange(input, existingTrigger);
+
+  const updatedTrigger = await ctx.db.transaction(async (tx) => {
     await updateTriggerBaseRow(tx, input);
     await updateScheduleRow(tx, input, existingTrigger);
     await updateScheduleTriggerConfigRow(tx, input);
@@ -112,7 +131,7 @@ export async function updateTriggerSchedule(
       });
     }
 
-    return loadScheduleTriggerAggregateOrThrow(
+    return await loadScheduleTriggerAggregateOrThrow(
       { db: tx },
       {
         organizationId: input.organizationId,
@@ -120,6 +139,47 @@ export async function updateTriggerSchedule(
       },
     );
   });
+
+  if (oneOffWorkflowChange.cancelExisting) {
+    await cancelPendingOneOffScheduleWorkflow(
+      {
+        openWorkflow: ctx.openWorkflow,
+      },
+      {
+        scheduleId: existingTrigger.schedule.id,
+        workflowRunId: existingTrigger.schedule.oneOffWorkflowRunId,
+        wasPendingExecution: isPendingOneOffExecution(existingTrigger),
+      },
+    );
+  }
+
+  if (
+    updatedTrigger.schedule.kind === ScheduleKinds.ONE_OFF &&
+    updatedTrigger.schedule.enabled &&
+    updatedTrigger.schedule.nextScheduledAt !== null &&
+    oneOffWorkflowChange.enqueueNext
+  ) {
+    await enqueueOneOffScheduleWorkflow(
+      {
+        db: ctx.db,
+        openWorkflow: ctx.openWorkflow,
+      },
+      {
+        scheduleId: updatedTrigger.schedule.id,
+        availableAt: new Date(updatedTrigger.schedule.nextScheduledAt),
+      },
+    );
+
+    return await loadScheduleTriggerAggregateOrThrow(
+      { db: ctx.db },
+      {
+        organizationId: input.organizationId,
+        triggerId: input.triggerId,
+      },
+    );
+  }
+
+  return updatedTrigger;
 }
 
 async function updateTriggerBaseRow(
@@ -152,20 +212,10 @@ async function updateScheduleRow(
   existingTrigger: TriggerScheduleAggregate,
 ): Promise<void> {
   const nextEnabled = input.enabled ?? existingTrigger.enabled;
-  const nextCronExpression =
-    input.schedule?.cronExpression ?? existingTrigger.schedule.cronExpression;
-  const nextTimezone = input.schedule?.timezone ?? existingTrigger.schedule.timezone;
-  const scheduleTimingChanged =
-    input.schedule?.cronExpression !== undefined || input.schedule?.timezone !== undefined;
+  const nextScheduleTiming = resolveUpdateScheduleTiming(input, existingTrigger, nextEnabled);
+  const scheduleTimingChanged = didScheduleTimingChange(input);
   const enabledChanged = input.enabled !== undefined && input.enabled !== existingTrigger.enabled;
-  const recomputedNextScheduledAt =
-    scheduleTimingChanged || (nextEnabled && enabledChanged)
-      ? resolveNextScheduledAtOrThrow({
-          cronExpression: nextCronExpression,
-          timezone: nextTimezone,
-          now: input.now,
-        })
-      : undefined;
+  const recomputedNextScheduledAt = scheduleTimingChanged || enabledChanged;
   const tables = getControlPlaneDatabaseSchema(tx);
   const nextValues: Partial<typeof tables.schedules.$inferInsert> = {};
 
@@ -173,12 +223,28 @@ async function updateScheduleRow(
     nextValues.name = input.schedule.name;
   }
 
-  if (input.schedule?.cronExpression !== undefined) {
+  if (
+    input.schedule !== undefined &&
+    input.schedule.kind !== "one_off" &&
+    input.schedule.cronExpression !== undefined
+  ) {
     nextValues.cronExpression = input.schedule.cronExpression;
   }
 
-  if (input.schedule?.timezone !== undefined) {
+  if (
+    input.schedule !== undefined &&
+    input.schedule.kind !== "one_off" &&
+    input.schedule.timezone !== undefined
+  ) {
     nextValues.timezone = input.schedule.timezone;
+  }
+
+  if (
+    input.schedule !== undefined &&
+    input.schedule.kind === "one_off" &&
+    input.schedule.startAt !== undefined
+  ) {
+    nextValues.startAt = nextScheduleTiming.startAt;
   }
 
   if (input.enabled !== undefined) {
@@ -187,8 +253,8 @@ async function updateScheduleRow(
 
   if (!nextEnabled) {
     nextValues.nextScheduledAt = null;
-  } else if (recomputedNextScheduledAt !== undefined) {
-    nextValues.nextScheduledAt = recomputedNextScheduledAt;
+  } else if (recomputedNextScheduledAt) {
+    nextValues.nextScheduledAt = nextScheduleTiming.nextScheduledAt;
   }
 
   if (Object.keys(nextValues).length === 0) {
@@ -202,6 +268,138 @@ async function updateScheduleRow(
       updatedAt: sql`now()`,
     })
     .where(eq(tables.schedules.id, existingTrigger.schedule.id));
+}
+
+function assertScheduleUpdateKindMatches(
+  existingTrigger: TriggerScheduleAggregate,
+  input: UpdateScheduleTriggerInput,
+): void {
+  if (input.schedule === undefined) {
+    return;
+  }
+
+  const requestedKind = input.schedule.kind ?? ScheduleKinds.RECURRING;
+  if (requestedKind === existingTrigger.schedule.kind) {
+    return;
+  }
+
+  throw new BadRequestError(
+    TriggerSchedulesBadRequestCodes.INVALID_SCHEDULE,
+    "Schedule kind cannot be changed.",
+  );
+}
+
+function resolveUpdateScheduleTiming(
+  input: UpdateScheduleTriggerInput,
+  existingTrigger: TriggerScheduleAggregate,
+  nextEnabled: boolean,
+): {
+  nextScheduledAt: string | null;
+  startAt: string | null;
+} {
+  if (existingTrigger.schedule.kind === ScheduleKinds.ONE_OFF) {
+    const startAt =
+      input.schedule?.kind === "one_off" && input.schedule.startAt !== undefined
+        ? resolveStartAtOrThrow(input.schedule.startAt).toISOString()
+        : existingTrigger.schedule.startAt;
+    if (startAt === null) {
+      throw new Error(`One-off schedule '${existingTrigger.schedule.id}' is missing start_at.`);
+    }
+
+    return {
+      nextScheduledAt: nextEnabled ? startAt : null,
+      startAt,
+    };
+  }
+
+  const nextCronExpression =
+    input.schedule !== undefined &&
+    input.schedule.kind !== "one_off" &&
+    input.schedule.cronExpression !== undefined
+      ? input.schedule.cronExpression
+      : existingTrigger.schedule.cronExpression;
+  const nextTimezone =
+    input.schedule !== undefined &&
+    input.schedule.kind !== "one_off" &&
+    input.schedule.timezone !== undefined
+      ? input.schedule.timezone
+      : existingTrigger.schedule.timezone;
+  if (nextCronExpression === null) {
+    throw new Error(
+      `Recurring schedule '${existingTrigger.schedule.id}' is missing cron_expression.`,
+    );
+  }
+  if (nextTimezone === null) {
+    throw new Error(`Recurring schedule '${existingTrigger.schedule.id}' is missing timezone.`);
+  }
+
+  return {
+    nextScheduledAt: nextEnabled
+      ? resolveNextScheduledAtOrThrow({
+          cronExpression: nextCronExpression,
+          timezone: nextTimezone,
+          now: input.now,
+        })
+      : null,
+    startAt: null,
+  };
+}
+
+function didScheduleTimingChange(input: UpdateScheduleTriggerInput): boolean {
+  if (input.schedule === undefined) {
+    return false;
+  }
+
+  if (input.schedule.kind === "one_off") {
+    return input.schedule.startAt !== undefined;
+  }
+
+  return input.schedule.cronExpression !== undefined || input.schedule.timezone !== undefined;
+}
+
+function resolveOneOffWorkflowChange(
+  input: UpdateScheduleTriggerInput,
+  existingTrigger: TriggerScheduleAggregate,
+): {
+  cancelExisting: boolean;
+  enqueueNext: boolean;
+} {
+  if (existingTrigger.schedule.kind !== ScheduleKinds.ONE_OFF) {
+    return {
+      cancelExisting: false,
+      enqueueNext: false,
+    };
+  }
+
+  const timingChanged = didScheduleTimingChange(input);
+  const disableRequested = input.enabled === false;
+  const enableRequested = input.enabled === true && !existingTrigger.schedule.enabled;
+
+  return {
+    cancelExisting:
+      isPendingOneOffExecution(existingTrigger) && (timingChanged || disableRequested),
+    enqueueNext: timingChanged || enableRequested,
+  };
+}
+
+function isPendingOneOffExecution(existingTrigger: TriggerScheduleAggregate): boolean {
+  return (
+    existingTrigger.schedule.kind === ScheduleKinds.ONE_OFF &&
+    existingTrigger.schedule.enabled &&
+    existingTrigger.schedule.nextScheduledAt !== null
+  );
+}
+
+function resolveStartAtOrThrow(value: string): Date {
+  const startAt = new Date(value);
+  if (Number.isNaN(startAt.getTime())) {
+    throw new BadRequestError(
+      TriggerSchedulesBadRequestCodes.INVALID_SCHEDULE,
+      `Invalid one-off schedule startAt '${value}'.`,
+    );
+  }
+
+  return startAt;
 }
 
 async function updateScheduleTriggerConfigRow(

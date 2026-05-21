@@ -5,6 +5,7 @@ import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
 import { TriggerScheduleKinds } from "../constants.js";
 import { loadScheduleTriggerAggregateOrThrow } from "../services/load-schedule-trigger-aggregate-or-throw.js";
+import { toTriggerScheduleResponse } from "../services/trigger-schedule-response.js";
 import { route } from "./route.js";
 
 const routeHandler = async (
@@ -24,7 +25,7 @@ const routeHandler = async (
 
   return ctx.json(
     {
-      ...triggerSchedule,
+      ...toTriggerScheduleResponse(triggerSchedule),
       kind: TriggerScheduleKinds.SCHEDULE,
     },
     200,

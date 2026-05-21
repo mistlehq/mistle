@@ -12,12 +12,14 @@ export const TriggerScheduleTargetSchema = z
 export const TriggerScheduleScheduleSchema = z
   .object({
     id: z.string().min(1),
+    kind: z.enum(["recurring", "one_off"]),
     name: z.string().min(1),
-    cronExpression: z.string().min(1),
-    timezone: z.string().min(1),
+    cronExpression: z.string().min(1).nullable(),
+    timezone: z.string().min(1).nullable(),
     enabled: z.boolean(),
     nextScheduledAt: z.string().min(1).nullable(),
     lastScheduledAt: z.string().min(1).nullable(),
+    startAt: z.string().min(1).nullable(),
   })
   .strict();
 

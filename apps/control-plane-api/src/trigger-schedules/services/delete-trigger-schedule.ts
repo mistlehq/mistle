@@ -1,8 +1,14 @@
-import { type ControlPlaneDatabase, getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
+import {
+  ScheduleKinds,
+  type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
+} from "@mistle/db/control-plane";
 import { eq, sql } from "drizzle-orm";
+import type { OpenWorkflow } from "openworkflow";
 
 import { ScheduleActionFailureCodes } from "../constants.js";
 import { loadScheduleTriggerAggregateOrThrow } from "./load-schedule-trigger-aggregate-or-throw.js";
+import { cancelPendingOneOffScheduleWorkflow } from "./one-off-schedule-workflow.js";
 import { failPendingScheduledActions } from "./update-trigger-schedule.js";
 
 export type DeleteScheduleTriggerInput = {
@@ -11,7 +17,10 @@ export type DeleteScheduleTriggerInput = {
 };
 
 export async function deleteTriggerSchedule(
-  ctx: { db: ControlPlaneDatabase },
+  ctx: {
+    db: ControlPlaneDatabase;
+    openWorkflow: Pick<OpenWorkflow, "cancelWorkflowRun">;
+  },
   input: DeleteScheduleTriggerInput,
 ) {
   const existingTrigger = await loadScheduleTriggerAggregateOrThrow(
@@ -48,4 +57,21 @@ export async function deleteTriggerSchedule(
       failureMessage: "Schedule was deleted before the action was dispatched.",
     });
   });
+
+  if (
+    existingTrigger.schedule.kind === ScheduleKinds.ONE_OFF &&
+    existingTrigger.schedule.enabled &&
+    existingTrigger.schedule.nextScheduledAt !== null
+  ) {
+    await cancelPendingOneOffScheduleWorkflow(
+      {
+        openWorkflow: ctx.openWorkflow,
+      },
+      {
+        scheduleId: existingTrigger.schedule.id,
+        workflowRunId: existingTrigger.schedule.oneOffWorkflowRunId,
+        wasPendingExecution: true,
+      },
+    );
+  }
 }

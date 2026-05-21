@@ -1,6 +1,7 @@
 import {
   TriggerKinds,
   ScheduleKinds,
+  type ScheduleKind,
   ScheduleTargetTypes,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
@@ -15,12 +16,15 @@ export type TriggerScheduleAggregate = {
   updatedAt: string;
   schedule: {
     id: string;
+    kind: ScheduleKind;
     name: string;
-    cronExpression: string;
-    timezone: string;
+    cronExpression: string | null;
+    timezone: string | null;
     enabled: boolean;
     nextScheduledAt: string | null;
     lastScheduledAt: string | null;
+    startAt: string | null;
+    oneOffWorkflowRunId: string | null;
   };
   inputTemplate: string;
   conversationKeyTemplate: string;
@@ -71,7 +75,6 @@ export async function loadScheduleTriggerAggregateOrThrow(
       and(
         eq(table.id, scheduleTrigger.scheduleId),
         eq(table.organizationId, input.organizationId),
-        eq(table.kind, ScheduleKinds.RECURRING),
         eq(table.targetType, ScheduleTargetTypes.TRIGGER_RUN),
       ),
   });
@@ -83,11 +86,14 @@ export async function loadScheduleTriggerAggregateOrThrow(
   if (schedule.deletedAt !== null) {
     throw new NotFoundError("NOT_FOUND", "Scheduled trigger was not found.");
   }
-  if (schedule.cronExpression === null) {
+  if (schedule.kind === ScheduleKinds.RECURRING && schedule.cronExpression === null) {
     throw new Error(`Recurring schedule '${schedule.id}' is missing cron_expression.`);
   }
-  if (schedule.timezone === null) {
+  if (schedule.kind === ScheduleKinds.RECURRING && schedule.timezone === null) {
     throw new Error(`Recurring schedule '${schedule.id}' is missing timezone.`);
+  }
+  if (schedule.kind === ScheduleKinds.ONE_OFF && schedule.startAt === null) {
+    throw new Error(`One-off schedule '${schedule.id}' is missing start_at.`);
   }
 
   if (targets.length !== 1 || targets[0] === undefined) {
@@ -104,12 +110,15 @@ export async function loadScheduleTriggerAggregateOrThrow(
     updatedAt: trigger.updatedAt,
     schedule: {
       id: schedule.id,
+      kind: schedule.kind,
       name: schedule.name,
       cronExpression: schedule.cronExpression,
       timezone: schedule.timezone,
       enabled: schedule.enabled,
       nextScheduledAt: schedule.nextScheduledAt,
       lastScheduledAt: schedule.lastScheduledAt,
+      startAt: schedule.startAt,
+      oneOffWorkflowRunId: schedule.oneOffWorkflowRunId,
     },
     inputTemplate: scheduleTrigger.inputTemplate,
     conversationKeyTemplate: scheduleTrigger.conversationKeyTemplate,

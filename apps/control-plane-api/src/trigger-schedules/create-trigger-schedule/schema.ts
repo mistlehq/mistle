@@ -6,17 +6,28 @@ import {
 
 import { TriggerSchedulesBadRequestCodes } from "../constants.js";
 
+const RecurringScheduleInputSchema = z
+  .object({
+    kind: z.literal("recurring").optional(),
+    name: z.string().min(1).optional(),
+    cronExpression: z.string().min(1),
+    timezone: z.string().min(1),
+  })
+  .strict();
+
+const OneOffScheduleInputSchema = z
+  .object({
+    kind: z.literal("one_off"),
+    name: z.string().min(1).optional(),
+    startAt: z.iso.datetime({ offset: true }),
+  })
+  .strict();
+
 export const CreateTriggerScheduleBodySchema = z
   .object({
     name: z.string().min(1),
     enabled: z.boolean().optional(),
-    schedule: z
-      .object({
-        name: z.string().min(1).optional(),
-        cronExpression: z.string().min(1),
-        timezone: z.string().min(1),
-      })
-      .strict(),
+    schedule: z.union([OneOffScheduleInputSchema, RecurringScheduleInputSchema]),
     inputTemplate: z.string().min(1),
     conversationKeyTemplate: z.string().min(1).optional(),
     idempotencyKeyTemplate: z.string().min(1).nullable().optional(),

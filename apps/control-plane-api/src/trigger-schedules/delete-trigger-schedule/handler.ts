@@ -11,10 +11,11 @@ const routeHandler = async (
   { session }: AppSession,
 ) => {
   const db = ctx.get("db");
+  const openWorkflow = ctx.get("openWorkflow");
   const { triggerId } = ctx.req.valid("param");
 
   await deleteTriggerSchedule(
-    { db },
+    { db, openWorkflow },
     {
       triggerId,
       organizationId: session.activeOrganizationId,

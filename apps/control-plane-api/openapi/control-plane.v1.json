@@ -1297,23 +1297,50 @@
                     "type": "boolean"
                   },
                   "schedule": {
-                    "type": "object",
-                    "properties": {
-                      "name": {
-                        "type": "string",
-                        "minLength": 1
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["one_off"]
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "startAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": ["kind", "startAt"],
+                        "additionalProperties": false
                       },
-                      "cronExpression": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "timezone": {
-                        "type": "string",
-                        "minLength": 1
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["recurring"]
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "cronExpression": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "timezone": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": ["cronExpression", "timezone"],
+                        "additionalProperties": false
                       }
-                    },
-                    "required": ["cronExpression", "timezone"],
-                    "additionalProperties": false
+                    ]
                   },
                   "inputTemplate": {
                     "type": "string",
@@ -1383,16 +1410,20 @@
                           "type": "string",
                           "minLength": 1
                         },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["recurring", "one_off"]
+                        },
                         "name": {
                           "type": "string",
                           "minLength": 1
                         },
                         "cronExpression": {
-                          "type": "string",
+                          "type": ["string", "null"],
                           "minLength": 1
                         },
                         "timezone": {
-                          "type": "string",
+                          "type": ["string", "null"],
                           "minLength": 1
                         },
                         "enabled": {
@@ -1405,16 +1436,22 @@
                         "lastScheduledAt": {
                           "type": ["string", "null"],
                           "minLength": 1
+                        },
+                        "startAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
                         }
                       },
                       "required": [
                         "id",
+                        "kind",
                         "name",
                         "cronExpression",
                         "timezone",
                         "enabled",
                         "nextScheduledAt",
-                        "lastScheduledAt"
+                        "lastScheduledAt",
+                        "startAt"
                       ],
                       "additionalProperties": false
                     },
@@ -1623,16 +1660,20 @@
                           "type": "string",
                           "minLength": 1
                         },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["recurring", "one_off"]
+                        },
                         "name": {
                           "type": "string",
                           "minLength": 1
                         },
                         "cronExpression": {
-                          "type": "string",
+                          "type": ["string", "null"],
                           "minLength": 1
                         },
                         "timezone": {
-                          "type": "string",
+                          "type": ["string", "null"],
                           "minLength": 1
                         },
                         "enabled": {
@@ -1645,16 +1686,22 @@
                         "lastScheduledAt": {
                           "type": ["string", "null"],
                           "minLength": 1
+                        },
+                        "startAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
                         }
                       },
                       "required": [
                         "id",
+                        "kind",
                         "name",
                         "cronExpression",
                         "timezone",
                         "enabled",
                         "nextScheduledAt",
-                        "lastScheduledAt"
+                        "lastScheduledAt",
+                        "startAt"
                       ],
                       "additionalProperties": false
                     },
@@ -1844,22 +1891,49 @@
                     "type": "boolean"
                   },
                   "schedule": {
-                    "type": "object",
-                    "properties": {
-                      "name": {
-                        "type": "string",
-                        "minLength": 1
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["one_off"]
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "startAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": ["kind"],
+                        "additionalProperties": false
                       },
-                      "cronExpression": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "timezone": {
-                        "type": "string",
-                        "minLength": 1
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["recurring"]
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "cronExpression": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "timezone": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "additionalProperties": false
                       }
-                    },
-                    "additionalProperties": false
+                    ]
                   },
                   "inputTemplate": {
                     "type": "string",
@@ -1927,16 +2001,20 @@
                           "type": "string",
                           "minLength": 1
                         },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["recurring", "one_off"]
+                        },
                         "name": {
                           "type": "string",
                           "minLength": 1
                         },
                         "cronExpression": {
-                          "type": "string",
+                          "type": ["string", "null"],
                           "minLength": 1
                         },
                         "timezone": {
-                          "type": "string",
+                          "type": ["string", "null"],
                           "minLength": 1
                         },
                         "enabled": {
@@ -1949,16 +2027,22 @@
                         "lastScheduledAt": {
                           "type": ["string", "null"],
                           "minLength": 1
+                        },
+                        "startAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
                         }
                       },
                       "required": [
                         "id",
+                        "kind",
                         "name",
                         "cronExpression",
                         "timezone",
                         "enabled",
                         "nextScheduledAt",
-                        "lastScheduledAt"
+                        "lastScheduledAt",
+                        "startAt"
                       ],
                       "additionalProperties": false
                     },

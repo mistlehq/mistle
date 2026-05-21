@@ -6,26 +6,41 @@ import {
 
 import { TriggerSchedulesBadRequestCodes } from "../constants.js";
 
+const UpdateRecurringScheduleInputSchema = z
+  .object({
+    kind: z.literal("recurring").optional(),
+    name: z.string().min(1).optional(),
+    cronExpression: z.string().min(1).optional(),
+    timezone: z.string().min(1).optional(),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      value.name !== undefined ||
+      value.cronExpression !== undefined ||
+      value.timezone !== undefined,
+    {
+      message: "At least one recurring schedule field must be provided.",
+    },
+  );
+
+const UpdateOneOffScheduleInputSchema = z
+  .object({
+    kind: z.literal("one_off"),
+    name: z.string().min(1).optional(),
+    startAt: z.iso.datetime({ offset: true }).optional(),
+  })
+  .strict()
+  .refine((value) => value.name !== undefined || value.startAt !== undefined, {
+    message: "At least one one-off schedule field must be provided.",
+  });
+
 export const UpdateTriggerScheduleBodySchema = z
   .object({
     name: z.string().min(1).optional(),
     enabled: z.boolean().optional(),
     schedule: z
-      .object({
-        name: z.string().min(1).optional(),
-        cronExpression: z.string().min(1).optional(),
-        timezone: z.string().min(1).optional(),
-      })
-      .strict()
-      .refine(
-        (value) =>
-          value.name !== undefined ||
-          value.cronExpression !== undefined ||
-          value.timezone !== undefined,
-        {
-          message: "At least one schedule field must be provided.",
-        },
-      )
+      .union([UpdateOneOffScheduleInputSchema, UpdateRecurringScheduleInputSchema])
       .optional(),
     inputTemplate: z.string().min(1).optional(),
     conversationKeyTemplate: z.string().min(1).optional(),

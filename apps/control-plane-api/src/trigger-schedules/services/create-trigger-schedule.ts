@@ -2,11 +2,16 @@ import {
   TriggerKinds,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
+  ScheduleKinds,
   ScheduleTargetTypes,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
+import { BadRequestError } from "@mistle/http/errors.js";
+import type { OpenWorkflow } from "openworkflow";
 
+import { TriggerSchedulesBadRequestCodes } from "../constants.js";
 import { loadScheduleTriggerAggregateOrThrow } from "./load-schedule-trigger-aggregate-or-throw.js";
+import { enqueueOneOffScheduleWorkflow } from "./one-off-schedule-workflow.js";
 import {
   assertPrimaryRepositoryReferenceOrThrow,
   resolveNextScheduledAtOrThrow,
@@ -20,11 +25,18 @@ export type CreateScheduleTriggerInput = {
   organizationId: string;
   name: string;
   enabled?: boolean | undefined;
-  schedule: {
-    cronExpression: string;
-    timezone: string;
-    name?: string | undefined;
-  };
+  schedule:
+    | {
+        kind?: "recurring" | undefined;
+        cronExpression: string;
+        timezone: string;
+        name?: string | undefined;
+      }
+    | {
+        kind: "one_off";
+        startAt: string;
+        name?: string | undefined;
+      };
   inputTemplate: string;
   conversationKeyTemplate?: string | undefined;
   idempotencyKeyTemplate?: string | null | undefined;
@@ -41,7 +53,9 @@ type CreateScheduleTriggerPersistenceInput = Omit<
   "enabled" | "now" | "target"
 > & {
   enabled: boolean;
+  kind: "recurring" | "one_off";
   nextScheduledAt: string | null;
+  startAt: string | null;
   target: {
     sandboxProfileId: string;
     sandboxProfileVersion: number;
@@ -56,7 +70,7 @@ export function resolveCreateScheduleTriggerIdempotencyKeyTemplate(
 }
 
 export async function createTriggerSchedule(
-  ctx: { db: ControlPlaneDatabase },
+  ctx: { db: ControlPlaneDatabase; openWorkflow: Pick<OpenWorkflow, "runWorkflow"> },
   input: CreateScheduleTriggerInput,
 ) {
   const sandboxProfileVersion = await resolveSandboxProfileVersionOrThrow(
@@ -78,17 +92,15 @@ export async function createTriggerSchedule(
   );
 
   const enabled = input.enabled ?? true;
-  const resolvedNextScheduledAt = resolveNextScheduledAtOrThrow({
-    cronExpression: input.schedule.cronExpression,
-    timezone: input.schedule.timezone,
-    now: input.now,
-  });
+  const scheduleTiming = resolveCreateScheduleTiming(input);
 
-  return ctx.db.transaction(async (tx) => {
+  const trigger = await ctx.db.transaction(async (tx) => {
     const trigger = await createTriggerAggregate(tx, {
       ...input,
       enabled,
-      nextScheduledAt: enabled ? resolvedNextScheduledAt : null,
+      kind: scheduleTiming.kind,
+      nextScheduledAt: enabled ? scheduleTiming.nextScheduledAt : null,
+      startAt: scheduleTiming.startAt,
       target: {
         sandboxProfileId: input.target.sandboxProfileId,
         sandboxProfileVersion,
@@ -96,7 +108,7 @@ export async function createTriggerSchedule(
       },
     });
 
-    return loadScheduleTriggerAggregateOrThrow(
+    return await loadScheduleTriggerAggregateOrThrow(
       { db: tx },
       {
         organizationId: input.organizationId,
@@ -104,6 +116,33 @@ export async function createTriggerSchedule(
       },
     );
   });
+
+  if (
+    trigger.schedule.kind === ScheduleKinds.ONE_OFF &&
+    trigger.schedule.enabled &&
+    trigger.schedule.nextScheduledAt !== null
+  ) {
+    await enqueueOneOffScheduleWorkflow(
+      {
+        db: ctx.db,
+        openWorkflow: ctx.openWorkflow,
+      },
+      {
+        scheduleId: trigger.schedule.id,
+        availableAt: new Date(trigger.schedule.nextScheduledAt),
+      },
+    );
+
+    return await loadScheduleTriggerAggregateOrThrow(
+      { db: ctx.db },
+      {
+        organizationId: input.organizationId,
+        triggerId: trigger.id,
+      },
+    );
+  }
+
+  return trigger;
 }
 
 async function createTriggerAggregate(
@@ -134,11 +173,13 @@ async function createTriggerAggregate(
     .values({
       organizationId: input.organizationId,
       targetType: ScheduleTargetTypes.TRIGGER_RUN,
+      kind: input.kind,
       name: input.schedule.name ?? input.name,
-      cronExpression: input.schedule.cronExpression,
-      timezone: input.schedule.timezone,
+      cronExpression: input.schedule.kind === "one_off" ? null : input.schedule.cronExpression,
+      timezone: input.schedule.kind === "one_off" ? null : input.schedule.timezone,
       enabled: input.enabled,
       nextScheduledAt: input.nextScheduledAt,
+      startAt: input.startAt,
     })
     .returning({
       id: tables.schedules.id,
@@ -168,4 +209,41 @@ async function createTriggerAggregate(
   });
 
   return insertedTrigger;
+}
+
+function resolveCreateScheduleTiming(input: CreateScheduleTriggerInput): {
+  kind: "recurring" | "one_off";
+  nextScheduledAt: string | null;
+  startAt: string | null;
+} {
+  if (input.schedule.kind === "one_off") {
+    const startAt = resolveStartAtOrThrow(input.schedule.startAt).toISOString();
+    return {
+      kind: "one_off",
+      nextScheduledAt: startAt,
+      startAt,
+    };
+  }
+
+  return {
+    kind: "recurring",
+    nextScheduledAt: resolveNextScheduledAtOrThrow({
+      cronExpression: input.schedule.cronExpression,
+      timezone: input.schedule.timezone,
+      now: input.now,
+    }),
+    startAt: null,
+  };
+}
+
+function resolveStartAtOrThrow(value: string): Date {
+  const startAt = new Date(value);
+  if (Number.isNaN(startAt.getTime())) {
+    throw new BadRequestError(
+      TriggerSchedulesBadRequestCodes.INVALID_SCHEDULE,
+      `Invalid one-off schedule startAt '${value}'.`,
+    );
+  }
+
+  return startAt;
 }

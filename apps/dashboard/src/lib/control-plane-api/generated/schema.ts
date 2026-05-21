@@ -12401,11 +12401,21 @@ export interface paths {
             idempotencyKeyTemplate?: string | null;
             inputTemplate: string;
             name: string;
-            schedule: {
-              cronExpression: string;
-              name?: string;
-              timezone: string;
-            };
+            schedule:
+              | {
+                  /** @enum {string} */
+                  kind: "one_off";
+                  name?: string;
+                  /** Format: date-time */
+                  startAt: string;
+                }
+              | {
+                  cronExpression: string;
+                  /** @enum {string} */
+                  kind?: "recurring";
+                  name?: string;
+                  timezone: string;
+                };
             target: {
               primaryRepositoryId?: string | null;
               sandboxProfileId: string;
@@ -12432,13 +12442,16 @@ export interface paths {
               kind: "schedule";
               name: string;
               schedule: {
-                cronExpression: string;
+                cronExpression: string | null;
                 enabled: boolean;
                 id: string;
+                /** @enum {string} */
+                kind: "recurring" | "one_off";
                 lastScheduledAt: string | null;
                 name: string;
                 nextScheduledAt: string | null;
-                timezone: string;
+                startAt: string | null;
+                timezone: string | null;
               };
               target: {
                 id: string;
@@ -12542,13 +12555,16 @@ export interface paths {
               kind: "schedule";
               name: string;
               schedule: {
-                cronExpression: string;
+                cronExpression: string | null;
                 enabled: boolean;
                 id: string;
+                /** @enum {string} */
+                kind: "recurring" | "one_off";
                 lastScheduledAt: string | null;
                 name: string;
                 nextScheduledAt: string | null;
-                timezone: string;
+                startAt: string | null;
+                timezone: string | null;
               };
               target: {
                 id: string;
@@ -12711,11 +12727,21 @@ export interface paths {
             idempotencyKeyTemplate?: string | null;
             inputTemplate?: string;
             name?: string;
-            schedule?: {
-              cronExpression?: string;
-              name?: string;
-              timezone?: string;
-            };
+            schedule?:
+              | {
+                  /** @enum {string} */
+                  kind: "one_off";
+                  name?: string;
+                  /** Format: date-time */
+                  startAt?: string;
+                }
+              | {
+                  cronExpression?: string;
+                  /** @enum {string} */
+                  kind?: "recurring";
+                  name?: string;
+                  timezone?: string;
+                };
             target?: {
               primaryRepositoryId?: string | null;
               sandboxProfileId?: string;
@@ -12742,13 +12768,16 @@ export interface paths {
               kind: "schedule";
               name: string;
               schedule: {
-                cronExpression: string;
+                cronExpression: string | null;
                 enabled: boolean;
                 id: string;
+                /** @enum {string} */
+                kind: "recurring" | "one_off";
                 lastScheduledAt: string | null;
                 name: string;
                 nextScheduledAt: string | null;
-                timezone: string;
+                startAt: string | null;
+                timezone: string | null;
               };
               target: {
                 id: string;
