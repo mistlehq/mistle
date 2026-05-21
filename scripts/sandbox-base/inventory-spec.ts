@@ -142,6 +142,14 @@ export const SandboxBaseInventorySpec = {
     },
     {
       category: SandboxBaseToolCategories.CLI_UTILITIES,
+      command: "fdfind",
+      displayName: "fd",
+      dockerfileAssertions: [aptPackage("fd-find", SandboxBaseCommonStage)],
+      versionCommand: ["fdfind", "--version"],
+      versionParser: parseTrailingVersion,
+    },
+    {
+      category: SandboxBaseToolCategories.CLI_UTILITIES,
       command: "git",
       displayName: "Git",
       dockerfileAssertions: [aptPackage("git", SandboxBaseCommonStage)],

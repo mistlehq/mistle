@@ -16,6 +16,7 @@ RUN apt-get update \
     coreutils \
     curl \
     dbus \
+    fd-find \
     findutils \
     gawk \
     git \

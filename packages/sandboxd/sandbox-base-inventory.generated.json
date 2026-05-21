@@ -33,7 +33,7 @@
       },
       "command": "archil",
       "displayName": "Archil",
-      "version": "v0.8.10-1778086505"
+      "version": "v0.8.11-1779127948"
     },
     {
       "category": {
@@ -79,6 +79,15 @@
       "command": "find",
       "displayName": "find",
       "version": "4.9.0"
+    },
+    {
+      "category": {
+        "id": "cli-utilities",
+        "title": "CLI utilities"
+      },
+      "command": "fdfind",
+      "displayName": "fd",
+      "version": "9.0.0"
     },
     {
       "category": {
