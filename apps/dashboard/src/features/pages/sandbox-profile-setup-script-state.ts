@@ -5,7 +5,11 @@ import { sandboxProfileVersionSetupScriptQueryKey } from "../sandbox-profiles/sa
 import { getSandboxProfileVersionSetupScript } from "../sandbox-profiles/sandbox-profiles-service.js";
 import { getErrorMessage } from "../shared/auto-save-behavior.js";
 
-export function useSandboxProfileSetupScriptLoader(input: { profileId: string; version: number }): {
+export function useSandboxProfileSetupScriptLoader(input: {
+  profileId: string;
+  refetchIntervalMs?: false | number;
+  version: number;
+}): {
   setupScriptQuery: {
     isError: boolean;
     error: unknown;
@@ -24,6 +28,7 @@ export function useSandboxProfileSetupScriptLoader(input: { profileId: string; v
         version: input.version,
         signal,
       }),
+    refetchInterval: input.refetchIntervalMs ?? false,
     retry: false,
   });
 
@@ -47,16 +52,22 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
   hasUnsavedChanges: boolean;
   savedValue: string;
   applyDraftSaveError: (error: unknown) => void;
+  applyPendingExternalUpdate: () => void;
   applySavedSetupScript: (setupScript: string | null) => void;
   buildDraftChanges: () => string | null;
+  dismissPendingExternalUpdate: () => void;
+  pendingExternalUpdate: boolean;
   onChange: (nextValue: string) => void;
 } {
   const [draftValue, setDraftValue] = useState(input.setupScript ?? "");
   const [persistedValue, setPersistedValue] = useState(input.setupScript ?? "");
+  const [pendingExternalValue, setPendingExternalValue] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const previousSetupScriptRef = useRef(input.setupScript);
   const draftValueRef = useRef(draftValue);
+  const persistedValueRef = useRef(persistedValue);
   draftValueRef.current = draftValue;
+  persistedValueRef.current = persistedValue;
 
   useEffect(() => {
     const previousSetupScript = previousSetupScriptRef.current;
@@ -66,9 +77,20 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
       return;
     }
 
-    setDraftValue(input.setupScript ?? "");
-    setPersistedValue(input.setupScript ?? "");
+    const nextValue = input.setupScript ?? "";
+    setPersistedValue(nextValue);
     setErrorMessage(null);
+
+    if (
+      draftValueRef.current === persistedValueRef.current ||
+      draftValueRef.current === nextValue
+    ) {
+      setDraftValue(nextValue);
+      setPendingExternalValue(null);
+      return;
+    }
+
+    setPendingExternalValue(nextValue);
   }, [input.setupScript]);
 
   function clearFeedback(): void {
@@ -81,6 +103,7 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
 
   function onChange(nextValue: string): void {
     setDraftValue(nextValue);
+    setPendingExternalValue((currentValue) => (currentValue === nextValue ? null : currentValue));
     clearFeedback();
   }
 
@@ -92,7 +115,23 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
   const applySavedSetupScript = useCallback((setupScript: string | null): void => {
     setDraftValue(setupScript ?? "");
     setPersistedValue(setupScript ?? "");
+    setPendingExternalValue(null);
     setErrorMessage(null);
+  }, []);
+
+  const applyPendingExternalUpdate = useCallback((): void => {
+    if (pendingExternalValue === null) {
+      return;
+    }
+
+    setDraftValue(pendingExternalValue);
+    setPersistedValue(pendingExternalValue);
+    setPendingExternalValue(null);
+    setErrorMessage(null);
+  }, [pendingExternalValue]);
+
+  const dismissPendingExternalUpdate = useCallback((): void => {
+    setPendingExternalValue(null);
   }, []);
 
   const applyDraftSaveError = useCallback((error: unknown): void => {
@@ -103,10 +142,13 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
     draftValue,
     errorMessage,
     hasUnsavedChanges: draftValue !== persistedValue,
+    pendingExternalUpdate: pendingExternalValue !== null,
     savedValue: persistedValue,
     applyDraftSaveError,
+    applyPendingExternalUpdate,
     applySavedSetupScript,
     buildDraftChanges,
+    dismissPendingExternalUpdate,
     onChange,
   };
 }

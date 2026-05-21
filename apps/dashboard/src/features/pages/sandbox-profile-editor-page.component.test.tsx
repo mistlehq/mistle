@@ -841,6 +841,7 @@ function renderSandboxProfileEditor(input?: {
 
   return {
     profileId,
+    queryClient,
     router,
   };
 }
@@ -2051,6 +2052,73 @@ describe("SandboxProfileEditorPage", () => {
     expect(restoredEditorText).toContain("pnpm install");
     expect(restoredEditorText).toContain("pnpm test");
     expect(restoredEditorText).not.toContain("pnpm dev:bootstrap");
+  });
+
+  it("applies externally updated setup scripts while the editor is clean", async () => {
+    const { profileId, queryClient } = renderSandboxProfileEditor({
+      routeSection: "sandbox-profile",
+      setupScript: "pnpm install",
+      versionState: "draft",
+    });
+    const editor = screen.getByRole("textbox", { name: "Setup script" });
+
+    act(() => {
+      queryClient.setQueryData(
+        sandboxProfileVersionSetupScriptQueryKey({
+          profileId,
+          version: 3,
+        }),
+        {
+          sandboxProfileId: profileId,
+          version: 3,
+          setupScript: "pnpm install\npnpm test",
+        },
+      );
+    });
+
+    await waitFor(() => {
+      expect(readSetupScriptEditorValue(editor)).toBe("pnpm install\npnpm test");
+    });
+    expect(screen.queryByText("Setup script updated")).toBeNull();
+  });
+
+  it("keeps local setup script edits when the assistant saves a newer version", async () => {
+    const { profileId, queryClient } = renderSandboxProfileEditor({
+      routeSection: "sandbox-profile",
+      setupScript: "pnpm install",
+      versionState: "draft",
+    });
+    const editor = screen.getByRole("textbox", { name: "Setup script" });
+    updateSetupScriptEditor({
+      editor,
+      value: "pnpm install\npnpm dev",
+    });
+
+    act(() => {
+      queryClient.setQueryData(
+        sandboxProfileVersionSetupScriptQueryKey({
+          profileId,
+          version: 3,
+        }),
+        {
+          sandboxProfileId: profileId,
+          version: 3,
+          setupScript: "pnpm install\npnpm test",
+        },
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Setup script updated")).toBeDefined();
+    });
+    expect(readSetupScriptEditorValue(editor)).toBe("pnpm install\npnpm dev");
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply assistant version" }));
+
+    await waitFor(() => {
+      expect(readSetupScriptEditorValue(editor)).toBe("pnpm install\npnpm test");
+    });
+    expect(screen.queryByText("Setup script updated")).toBeNull();
   });
 
   it("blocks true page exits while draft setup script edits are unpersisted", async () => {

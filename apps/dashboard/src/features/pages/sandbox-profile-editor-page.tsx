@@ -1313,10 +1313,6 @@ function ReadySandboxProfileEditorPage(input: {
     profileId: input.profileId,
     version: input.mode.version,
   });
-  const setupScriptLoader = useSandboxProfileSetupScriptLoader({
-    profileId: input.profileId,
-    version: input.mode.version,
-  });
   const [integrationDraftState, setIntegrationDraftState] = useState(
     createIdleSandboxProfileDraftSectionState,
   );
@@ -1343,6 +1339,12 @@ function ReadySandboxProfileEditorPage(input: {
   );
   const [setupAssistantPanelState, setSetupAssistantPanelState] =
     useState<SetupScriptAssistantPanelState | null>(null);
+  const setupAssistantPanelIsOpen = setupAssistantPanelState?.isOpen === true;
+  const setupScriptLoader = useSandboxProfileSetupScriptLoader({
+    profileId: input.profileId,
+    refetchIntervalMs: setupAssistantPanelIsOpen ? 2_000 : false,
+    version: input.mode.version,
+  });
   const [setupAssistantCloseDialogState, setSetupAssistantCloseDialogState] =
     useState<SetupAssistantCloseDialogState>(null);
   const [setupAssistantStartDialogState, setSetupAssistantStartDialogState] =
@@ -1573,7 +1575,6 @@ function ReadySandboxProfileEditorPage(input: {
       : startSetupAssistantMutation.isPending
         ? "Setup Assistant is starting."
         : null;
-  const setupAssistantPanelIsOpen = setupAssistantPanelState?.isOpen === true;
   function createSetupAssistantControl(inputValue: {
     defaultTitle: string;
     disabledReason: string | null;
@@ -3443,6 +3444,30 @@ function ReadySandboxProfileSetupScriptSection(input: {
       )}
       <SandboxProfileSetupScriptPanel
         errorMessage={setupScriptState.errorMessage}
+        notice={
+          setupScriptState.pendingExternalUpdate ? (
+            <Notice
+              action={
+                <ButtonGroup>
+                  <Button onClick={setupScriptState.applyPendingExternalUpdate} type="button">
+                    Apply assistant version
+                  </Button>
+                  <Button
+                    onClick={setupScriptState.dismissPendingExternalUpdate}
+                    type="button"
+                    variant="outline"
+                  >
+                    Keep editing
+                  </Button>
+                </ButtonGroup>
+              }
+              title="Setup script updated"
+              variant="warning"
+            >
+              The Setup Assistant saved a newer setup script while you have unsaved edits.
+            </Notice>
+          ) : null
+        }
         onChange={setupScriptState.onChange}
         setupAssistant={{
           disabled: input.setupAssistantControl.disabled,
@@ -3495,6 +3520,7 @@ export function SandboxProfileSetupScriptPanel(input: {
   value: string;
   disabled?: boolean;
   errorMessage?: string | null;
+  notice?: ReactNode;
   onChange?: (nextValue: string) => void;
   repositoryHandles?: readonly string[];
   setupAssistant?: {
@@ -3517,6 +3543,7 @@ export function SandboxProfileSetupScriptPanel(input: {
       disabled={input.disabled}
       errorMessage={input.errorMessage}
       fieldLabel="Setup script"
+      notice={input.notice}
       onChange={input.onChange}
       placeholderText={SetupScriptPlaceholder}
       setupAssistant={input.setupAssistant}
