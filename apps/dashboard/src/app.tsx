@@ -47,7 +47,7 @@ import { RequireAuth } from "./features/shell/require-auth.js";
 import { RouteErrorBoundary } from "./features/shell/route-error-boundary.js";
 
 export function App(): React.JSX.Element {
-  return <RouterProvider router={appRouter} />;
+  return <RouterProvider router={getAppRouter()} />;
 }
 
 export const APP_ROUTES = createRoutesFromElements(
@@ -208,7 +208,12 @@ export const APP_ROUTES = createRoutesFromElements(
   </>,
 );
 
-const appRouter = createBrowserRouter(APP_ROUTES);
+let appRouter: ReturnType<typeof createBrowserRouter> | null = null;
+
+function getAppRouter(): ReturnType<typeof createBrowserRouter> {
+  appRouter ??= createBrowserRouter(APP_ROUTES);
+  return appRouter;
+}
 
 function RouteOutlet(): React.JSX.Element {
   return <Outlet />;
