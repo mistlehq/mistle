@@ -1,3 +1,9 @@
+//! Retention and replay loop for active Codex threads.
+//!
+//! Retained threads are periodically reconciled against the raw Codex app-server
+//! so `sandboxd` can keep background work alive after the websocket client goes
+//! away and eventually release subscriptions when work is terminal.
+
 use std::sync::{Arc, Mutex};
 
 use tokio::sync::watch;

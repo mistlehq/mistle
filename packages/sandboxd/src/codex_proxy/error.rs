@@ -1,3 +1,8 @@
+//! Error variants for Codex proxy startup, relay, monitor, and session-manager work.
+//!
+//! The public proxy API exposes this single error type while private modules
+//! keep their transport, retention, and thread-update details local.
+
 use std::fmt;
 
 use tungstenite::Error as WebSocketError;

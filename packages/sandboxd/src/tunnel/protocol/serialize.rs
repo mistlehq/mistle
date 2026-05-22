@@ -1,3 +1,8 @@
+//! JSON control-message serialization for the tunnel protocol.
+//!
+//! Session code uses these helpers to build outbound protocol messages with
+//! consistent field names and reset-code formatting.
+
 use super::*;
 
 /// Builds one `stream.open.ok` response payload.

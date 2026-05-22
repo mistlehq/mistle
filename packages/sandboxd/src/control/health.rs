@@ -1,3 +1,9 @@
+//! Loopback health endpoint for the local control server.
+//!
+//! The endpoint projects the same initialization state that the Unix socket
+//! mutates, so container health checks can observe readiness without sending
+//! control protocol requests.
+
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::mpsc;

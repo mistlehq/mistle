@@ -1,3 +1,9 @@
+//! JSON-RPC request handling for the Pi websocket proxy.
+//!
+//! This module validates websocket messages, maps supported RPC methods onto
+//! session/process operations, and keeps method-specific response formatting out
+//! of the socket loop.
+
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};

@@ -1,3 +1,9 @@
+//! Control handles for runtime client process components.
+//!
+//! These methods expose restart, stop, readiness, and health operations without
+//! leaking the process module's child/thread bookkeeping to higher-level
+//! sandbox state code.
+
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 

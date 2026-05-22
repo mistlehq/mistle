@@ -1,3 +1,9 @@
+//! Request dispatch for the daemon-local control socket.
+//!
+//! The socket server accepts one request per connection. Most requests complete
+//! inline, while initialization may hand work to a background thread so the
+//! daemon remains responsive to readiness, wait, and signing traffic.
+
 use std::collections::BTreeMap;
 use std::io::Read;
 use std::os::unix::net::UnixStream;
@@ -196,6 +202,8 @@ fn begin_init(
     {
         eprintln!("sandboxd failed to record init diagnostics start event: {error}");
     }
+    // Initialization owns the long-running sandbox state transition; running it
+    // off the socket accept loop keeps local health and wait requests available.
     *init_thread_guard = Some(thread::spawn(move || {
         let result = SandboxdState::initialize(
             &startup_input,

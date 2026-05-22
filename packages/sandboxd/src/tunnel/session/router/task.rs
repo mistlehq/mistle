@@ -1,3 +1,9 @@
+//! Runtime-side tasks spawned by the tunnel session router.
+//!
+//! These tasks bridge websocket or process IO back into router events and writer
+//! messages so gateway transport writes stay serialized through the tunnel
+//! writer channel.
+
 use super::*;
 
 pub(super) fn spawn_agent_stream_task(

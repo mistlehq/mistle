@@ -1,3 +1,9 @@
+//! Command execution for installed runtime artifacts.
+//!
+//! Install specs may declare commands that run from the prepared workspace; this
+//! module translates those declarations into the shared command runner and
+//! diagnostics stream.
+
 use std::collections::BTreeMap;
 use std::sync::Arc;
 

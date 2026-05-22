@@ -1,3 +1,9 @@
+//! Async websocket listener for the OpenCode proxy.
+//!
+//! The supervisor owns the thread boundary; this module accepts client sockets,
+//! delegates envelope handling to the relay, and wires readiness/activity state
+//! into the shared proxy handle.
+
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};

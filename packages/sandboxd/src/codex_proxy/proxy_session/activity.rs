@@ -1,3 +1,9 @@
+//! Turn, compaction, and delivery telemetry for one Codex proxy session.
+//!
+//! The relay module owns transport ordering; this module owns the state machine
+//! that interprets client requests and server notifications into lifecycle
+//! events without exposing that bookkeeping outside the session.
+
 use std::collections::BTreeMap;
 use std::time::Instant;
 

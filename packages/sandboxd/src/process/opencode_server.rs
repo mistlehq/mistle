@@ -1,3 +1,9 @@
+//! OpenCode server process health projection.
+//!
+//! This module monitors the raw OpenCode process readiness endpoint and marks
+//! repeated failures for coordinated restart; restart execution lives in the
+//! runtime coordination and process-control path.
+
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};

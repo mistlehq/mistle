@@ -1,3 +1,8 @@
+//! Runtime-client process start/stop lifecycle helpers.
+//!
+//! This module owns environment merging, child spawn, readiness waiting, and
+//! shutdown signal policy for generic runtime processes.
+
 use std::collections::BTreeMap;
 use std::process::{Child, Command, Stdio};
 

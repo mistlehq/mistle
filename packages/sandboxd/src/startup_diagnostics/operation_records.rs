@@ -1,3 +1,8 @@
+//! Asynchronous operation-record delivery for startup diagnostics.
+//!
+//! Initialization paths enqueue lifecycle records here so network delivery can
+//! retry briefly without blocking the main startup flow indefinitely.
+
 use std::time::Instant;
 
 use serde_json::{Map, Value, json};

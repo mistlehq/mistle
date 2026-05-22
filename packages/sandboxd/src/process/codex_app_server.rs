@@ -1,3 +1,9 @@
+//! Codex app-server process health supervision.
+//!
+//! Codex can become unavailable after startup without the child exiting, so this
+//! module monitors the app-server readiness endpoint and marks the component for
+//! coordinated restart after repeated failures.
+
 use std::collections::BTreeMap;
 use std::os::unix::process::ExitStatusExt;
 use std::process::Child;

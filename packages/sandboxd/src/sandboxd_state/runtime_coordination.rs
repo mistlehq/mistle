@@ -1,3 +1,9 @@
+//! Cross-component coordination after runtime processes are running.
+//!
+//! Some runtime adapters need process-health information or restart signals from
+//! another component. This module wires those relationships without making the
+//! individual component handles depend on each other directly.
+
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, JoinHandle};

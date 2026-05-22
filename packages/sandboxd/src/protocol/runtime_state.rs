@@ -1,3 +1,8 @@
+//! Runtime attachment and state messages sent by the sandbox runtime.
+//!
+//! These DTOs describe the sandbox instance and runtime-client state visible to
+//! the surrounding Mistle control/data-plane services.
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

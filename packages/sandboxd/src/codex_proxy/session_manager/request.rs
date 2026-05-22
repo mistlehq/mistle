@@ -1,3 +1,8 @@
+//! Raw Codex JSON-RPC request helpers used by the session manager.
+//!
+//! These helpers keep request ids, response validation, and Codex method names
+//! close to the only code that issues background thread-management calls.
+
 use serde_json::{Value, json};
 use tokio::sync::watch;
 

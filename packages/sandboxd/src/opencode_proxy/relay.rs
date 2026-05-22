@@ -1,3 +1,9 @@
+//! Websocket request-envelope relay for the OpenCode HTTP server.
+//!
+//! Mistle clients speak a websocket protocol, while OpenCode serves HTTP routes
+//! and SSE streams. This module translates client envelopes into raw HTTP
+//! requests and serializes responses back over the websocket.
+
 use std::collections::BTreeMap;
 
 use bytes::Bytes;

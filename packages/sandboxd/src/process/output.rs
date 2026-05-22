@@ -1,3 +1,8 @@
+//! Bounded stdout/stderr capture for runtime client processes.
+//!
+//! Process start and health errors include recent output so callers get useful
+//! diagnostics without retaining unbounded child logs in memory.
+
 use std::collections::VecDeque;
 use std::io::Read;
 use std::thread::{self, JoinHandle};

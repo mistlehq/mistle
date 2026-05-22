@@ -1,3 +1,8 @@
+//! Serialized keepalive protocol shared with the control/data plane.
+//!
+//! The daemon emits this shape to describe whether sandbox activity should keep
+//! the instance alive and when the next heartbeat is expected.
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

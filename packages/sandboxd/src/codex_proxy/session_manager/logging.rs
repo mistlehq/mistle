@@ -1,3 +1,9 @@
+//! Structured session-manager log emitters.
+//!
+//! Logs are kept behind helper functions so the command, retention, and update
+//! paths can report the same field names without spreading JSON construction
+//! across the session manager.
+
 use serde_json::{Map, Value};
 
 use crate::codex_proxy::CodexThreadStatus;

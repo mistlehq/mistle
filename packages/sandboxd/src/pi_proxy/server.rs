@@ -1,3 +1,9 @@
+//! Blocking websocket listener for the Pi proxy component.
+//!
+//! The listener accepts local websocket clients, runs one session per
+//! connection, and reports readiness through the same component surface as the
+//! other runtime adapters.
+
 use std::net::{SocketAddr, TcpListener};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};

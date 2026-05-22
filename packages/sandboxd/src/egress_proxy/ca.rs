@@ -1,3 +1,9 @@
+//! Certificate-authority material for sandbox-local HTTPS interception.
+//!
+//! The proxy loads or creates persistent CA files for a sandbox, installs the
+//! runtime and trust-store certificate copies, and exposes in-memory key
+//! material to TLS helpers.
+
 use std::fs::{self, DirBuilder, OpenOptions};
 use std::io::Write;
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};

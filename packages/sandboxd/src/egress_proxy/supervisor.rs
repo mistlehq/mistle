@@ -1,3 +1,10 @@
+//! Thread supervisor for the sandbox-local egress proxy.
+//!
+//! The supervisor owns listener binding, runtime threads, readiness projection,
+//! shutdown signaling, and health snapshots for the managed forward-proxy
+//! listener. Transparent-proxy startup health is handled by the outer proxy
+//! module.
+
 use std::net::{SocketAddr, TcpListener as StdTcpListener};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};

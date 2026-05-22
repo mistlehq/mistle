@@ -1,3 +1,9 @@
+//! Direct data-plane gateway client for approved egress requests.
+//!
+//! Route matching decides whether a request can leave the sandbox; this module
+//! builds the data-plane direct-egress URLs and websocket targets used once a
+//! route has selected gateway forwarding.
+
 use std::sync::Arc;
 
 use hyper::Uri;

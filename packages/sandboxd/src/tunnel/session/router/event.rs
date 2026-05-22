@@ -1,3 +1,8 @@
+//! Internal event handling for the tunnel session router.
+//!
+//! Runtime tasks and stream handlers send these events back to the router so one
+//! loop can serialize writes and mutate shared session state.
+
 use super::*;
 
 pub(in crate::tunnel::session) async fn handle_tunnel_session_event(

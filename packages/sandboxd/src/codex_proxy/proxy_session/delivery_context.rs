@@ -1,3 +1,8 @@
+//! Parsing helpers for Mistle delivery metadata sent through the Codex proxy.
+//!
+//! Delivery context is carried as JSON-RPC payload data from trusted Mistle
+//! clients and then attached to turn telemetry spans and retained-thread logs.
+
 use std::io::ErrorKind;
 use std::sync::OnceLock;
 

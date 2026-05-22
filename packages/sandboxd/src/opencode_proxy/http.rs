@@ -1,3 +1,9 @@
+//! HTTP client helpers for talking to the raw OpenCode server.
+//!
+//! The websocket adapter builds protocol-neutral requests; this module owns the
+//! Hyper client setup, URL construction, and response body collection for the
+//! local OpenCode HTTP origin.
+
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::{Method, Request, Uri};

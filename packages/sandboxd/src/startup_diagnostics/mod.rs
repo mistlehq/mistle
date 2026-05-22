@@ -1,3 +1,8 @@
+//! Startup diagnostics logging for long-running sandbox initialization.
+//!
+//! Diagnostics records are emitted alongside transcripts so control clients and
+//! operators can inspect where initialization is spending time or failing.
+
 use std::collections::BTreeMap;
 use std::fs::{self, OpenOptions};
 use std::io::Write;

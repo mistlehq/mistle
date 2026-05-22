@@ -1,3 +1,9 @@
+//! JSON protocol exchanged over the daemon-local control socket.
+//!
+//! The protocol intentionally stays small: helper commands send one request,
+//! the daemon handles it synchronously at the socket boundary, and the response
+//! carries either success data or a user-facing error string.
+
 use serde::{Deserialize, Serialize};
 
 use crate::protocol::startup::StartupInput;

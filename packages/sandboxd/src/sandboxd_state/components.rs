@@ -1,3 +1,9 @@
+//! Component selection helpers for daemon-wide health and readiness.
+//!
+//! Startup state combines generic process supervision with runtime-specific
+//! proxy components; this module decides which component drives readiness for
+//! each runtime client.
+
 use std::collections::BTreeSet;
 
 use crate::runtime;

@@ -1,3 +1,9 @@
+//! Client helpers for the local `sandboxd` control socket.
+//!
+//! These functions are used by one-shot helper commands to submit lifecycle and
+//! signing requests to the already-running daemon without exposing the socket
+//! framing details outside the control module.
+
 use std::io::{Read, Write};
 use std::os::unix::net::UnixStream;
 use std::path::Path;

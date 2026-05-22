@@ -1,3 +1,9 @@
+//! Lifecycle and stdio transport for the raw Pi RPC child process.
+//!
+//! Pi speaks newline-delimited JSON over stdio. This module starts the child,
+//! owns the reader thread, forwards parsed events, and performs readiness and
+//! shutdown checks for that process.
+
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader};
 use std::process::{Child, ChildStdin, Command, Stdio};

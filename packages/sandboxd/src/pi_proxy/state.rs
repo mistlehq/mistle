@@ -1,3 +1,8 @@
+//! Shared mutable state for the Pi proxy runtime.
+//!
+//! The state serializes commands to the stdio RPC child, fans out Pi events to
+//! websocket clients, and projects agent activity into sandbox keepalive.
+
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};

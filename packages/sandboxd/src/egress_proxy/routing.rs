@@ -1,3 +1,9 @@
+//! Request-target resolution and compiled route matching for egress proxying.
+//!
+//! The server asks this module to normalize each HTTP request into a target and
+//! select the matching runtime-plan egress route before any upstream connection
+//! is opened.
+
 use hyper::Uri;
 use hyper::header::HOST;
 

@@ -1,3 +1,8 @@
+//! Binary stream-frame encoding and decoding for tunnel websocket transport.
+//!
+//! The tunnel sends data as compact binary frames while control messages remain
+//! JSON text frames.
+
 use super::*;
 
 /// Encodes one outbound stream data frame for websocket binary transport.

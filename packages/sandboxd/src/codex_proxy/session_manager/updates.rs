@@ -1,3 +1,9 @@
+//! Thread status update handling for the Codex session manager.
+//!
+//! This module normalizes raw monitor notifications and retained-thread replay
+//! results into subscription-state updates, auto-release decisions, and
+//! keepalive activity.
+
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 

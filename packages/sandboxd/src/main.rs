@@ -1,3 +1,8 @@
+//! Binary entrypoint for the `sandboxd` command.
+//!
+//! Runtime behavior lives in the library crate so tests and helper commands can
+//! exercise the same argument handling without spawning the binary.
+
 fn main() {
     let mut stdin = std::io::stdin();
     let mut stdout = std::io::stdout();

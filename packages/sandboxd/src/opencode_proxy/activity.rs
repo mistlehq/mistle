@@ -1,3 +1,9 @@
+//! Activity tracking for OpenCode request and event-stream traffic.
+//!
+//! OpenCode exposes HTTP and SSE rather than a long-lived agent websocket, so
+//! this module derives the keepalive signal from in-flight requests and stream
+//! events observed by the proxy.
+
 use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};

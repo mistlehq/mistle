@@ -1,3 +1,8 @@
+//! Readiness projection for the OpenCode proxy component.
+//!
+//! The proxy is only healthy when its websocket listener is serving and the raw
+//! OpenCode process readiness check has not crossed the unhealthy threshold.
+
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};

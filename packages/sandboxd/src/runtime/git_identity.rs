@@ -1,3 +1,8 @@
+//! Git identity configuration applied during sandbox initialization.
+//!
+//! Startup input carries user and signing identity data; this module writes the
+//! sandbox-global Git config entries that runtime processes inherit.
+
 use std::fs;
 use std::path::Path;
 use std::process::Command;

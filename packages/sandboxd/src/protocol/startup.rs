@@ -1,3 +1,9 @@
+//! Startup input protocol accepted by `sandboxd init` and resume flows.
+//!
+//! The control socket persists this data as the daemon's initialization source
+//! of truth; downstream modules derive runtime plans, environment, identities,
+//! and tunnel configuration from it.
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

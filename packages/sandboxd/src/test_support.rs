@@ -1,3 +1,8 @@
+//! Shared test helpers for sandboxd unit and integration-style tests.
+//!
+//! These helpers serialize process-wide environment mutation and expose local
+//! fixture paths used by tests that exercise startup/runtime behavior.
+
 use std::ffi::OsString;
 use std::fs;
 use std::path::PathBuf;

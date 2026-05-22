@@ -1,3 +1,9 @@
+//! Snapshot cleanup for runtime-only sandbox artifacts.
+//!
+//! Snapshot builds must not persist transient daemon sockets, runtime logs,
+//! readiness state, or the trust-store copy of the egress proxy CA. This module
+//! centralizes the scrub list used after snapshot initialization.
+
 use std::fs;
 use std::path::Path;
 

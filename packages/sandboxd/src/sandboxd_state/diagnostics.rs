@@ -1,3 +1,8 @@
+//! Startup diagnostics mapping for sandbox initialization.
+//!
+//! Lifecycle code reports rich Rust errors; this module converts those failures
+//! into stable diagnostic operation records and transcript entries.
+
 use std::collections::BTreeMap;
 
 use crate::command::CommandFailure;

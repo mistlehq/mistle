@@ -1,3 +1,8 @@
+//! Filesystem paths for startup diagnostics logs.
+//!
+//! Production writes to the fixed daemon log locations, while tests can set an
+//! explicit directory override to keep diagnostics artifacts isolated.
+
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 

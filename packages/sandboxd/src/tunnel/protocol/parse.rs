@@ -1,3 +1,8 @@
+//! JSON control-message parsing for the tunnel protocol.
+//!
+//! This module converts inbound websocket text payloads into typed control
+//! messages before router code mutates session state.
+
 use super::*;
 
 /// Parses one inbound stream control frame from a websocket text payload.

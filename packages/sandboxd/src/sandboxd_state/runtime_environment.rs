@@ -1,3 +1,9 @@
+//! Environment construction for runtime client processes.
+//!
+//! This module combines startup input, compiled runtime-plan values, egress
+//! proxy settings, and sandbox identity variables into the environment passed to
+//! supervised child processes.
+
 use std::collections::BTreeMap;
 
 use crate::egress_proxy::EgressProxy;

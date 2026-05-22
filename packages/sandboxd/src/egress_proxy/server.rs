@@ -1,3 +1,9 @@
+//! Local egress proxy runtime and forwarding pipeline.
+//!
+//! This module owns listener runtimes plus HTTP CONNECT, transparent proxy,
+//! direct upstream, and direct-gateway forwarding. Route matching, CA, TLS, and
+//! logging details stay in sibling modules.
+
 use std::convert::Infallible;
 use std::net::{SocketAddr, TcpListener as StdTcpListener};
 use std::sync::Arc;

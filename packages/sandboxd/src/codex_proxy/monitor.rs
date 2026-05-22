@@ -1,3 +1,9 @@
+//! Active-thread projection for the raw Codex app-server monitor connection.
+//!
+//! The monitor follows Codex thread status notifications and reduces them to
+//! the small keepalive signal that `sandboxd` needs: whether any Codex thread is
+//! still active after client disconnects.
+
 use std::collections::BTreeSet;
 
 use crate::codex_proxy::message::CodexThreadStatus;

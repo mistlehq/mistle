@@ -1,3 +1,9 @@
+//! Command handlers for retained Codex thread subscriptions.
+//!
+//! The session manager accepts small commands from proxy sessions; this module
+//! performs the raw Codex JSON-RPC work needed to release, resume, and replay
+//! retained thread activity.
+
 use std::sync::{Arc, Mutex};
 
 use tokio::sync::{oneshot, watch};

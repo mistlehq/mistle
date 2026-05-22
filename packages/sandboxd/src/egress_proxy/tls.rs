@@ -1,3 +1,9 @@
+//! TLS helpers for intercepted and direct egress proxy connections.
+//!
+//! The server delegates certificate generation, TLS accept/connect setup, and
+//! websocket target URL construction here so forwarding logic can stay focused
+//! on protocol flow.
+
 use std::sync::Arc;
 
 use hyper::Uri;

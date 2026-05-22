@@ -1,3 +1,9 @@
+//! Error type shared by the local control socket server and client helpers.
+//!
+//! Keeping all control-plane failures in one enum gives callers a stable
+//! boundary while preserving enough detail for daemon logs and helper command
+//! errors.
+
 use std::fmt;
 use std::net::SocketAddr;
 use std::path::PathBuf;

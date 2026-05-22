@@ -1,3 +1,8 @@
+//! File-upload type classification for tunnel attachment uploads.
+//!
+//! Upload handling uses this module to inspect file bytes and reject mismatches
+//! between declared and detected MIME types before attachments are accepted.
+
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;

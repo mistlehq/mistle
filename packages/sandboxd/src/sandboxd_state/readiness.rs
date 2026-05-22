@@ -1,3 +1,8 @@
+//! Aggregate readiness worker for initialized sandbox daemon state.
+//!
+//! The worker polls component snapshots through the supervisor and updates the
+//! runtime readiness manager used by health checks.
+
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};

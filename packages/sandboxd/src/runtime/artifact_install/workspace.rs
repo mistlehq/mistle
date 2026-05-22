@@ -1,3 +1,8 @@
+//! Temporary workspace management for runtime artifact installs.
+//!
+//! Artifacts are staged outside their final install location so failed downloads
+//! or extraction errors do not leave partially prepared runtime directories.
+
 use std::fs;
 use std::path::{Path, PathBuf};
 

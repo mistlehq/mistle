@@ -1,3 +1,9 @@
+//! Per-client Pi websocket session handling.
+//!
+//! Sessions translate client JSON-RPC messages, read local session files needed
+//! by Pi methods, and coordinate activity accounting around calls sent to the
+//! shared Pi RPC process.
+
 use std::collections::BTreeMap;
 use std::fs::{File, read_dir};
 use std::io::Read;

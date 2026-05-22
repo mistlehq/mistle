@@ -1,3 +1,9 @@
+//! One client-to-Codex websocket relay session.
+//!
+//! This module preserves JSON-RPC request/response ordering while coordinating
+//! turn telemetry, compaction tracking, delivery context, and retained-thread
+//! handoff through the Codex session manager.
+
 use std::collections::{BTreeMap, VecDeque};
 use std::time::Instant;
 

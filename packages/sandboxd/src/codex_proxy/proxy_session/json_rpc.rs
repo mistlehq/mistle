@@ -1,3 +1,9 @@
+//! JSON-RPC parsing helpers used by the Codex websocket relay.
+//!
+//! The relay needs stable request keys and payload decoding without coupling
+//! transport code to every Codex method shape, so this module keeps the generic
+//! JSON-RPC pieces small and reusable.
+
 use std::io::ErrorKind;
 
 use serde_json::Value;

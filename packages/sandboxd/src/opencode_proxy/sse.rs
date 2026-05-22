@@ -1,3 +1,9 @@
+//! SSE response streaming for OpenCode websocket clients.
+//!
+//! The relay uses this module when an OpenCode route returns an event stream,
+//! forwarding parsed events over the websocket while updating activity state for
+//! long-running agent work.
+
 use http_body_util::BodyExt;
 use serde::Serialize;
 use serde_json::Value;

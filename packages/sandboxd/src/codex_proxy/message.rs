@@ -1,3 +1,9 @@
+//! Raw Codex websocket JSON-RPC framing and notification parsing helpers.
+//!
+//! Proxy sessions, monitor connections, and retained-thread flows share these
+//! helpers so method matching, termination detection, and thread status parsing
+//! stay consistent across Codex transport paths.
+
 use std::io::ErrorKind;
 
 use futures_util::{SinkExt, StreamExt};

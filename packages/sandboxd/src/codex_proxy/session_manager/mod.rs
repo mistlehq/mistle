@@ -1,3 +1,9 @@
+//! Background manager for Codex threads that must survive client disconnects.
+//!
+//! The manager owns one raw Codex monitor socket, retained thread subscription
+//! state, keepalive projection, and the command channel used by proxy sessions
+//! to retain or release active work.
+
 mod command;
 mod logging;
 mod request;

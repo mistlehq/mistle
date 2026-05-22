@@ -1,3 +1,9 @@
+//! Setup-script execution during sandbox initialization.
+//!
+//! Startup may include shell setup work that runs before runtime processes. This
+//! module writes the script, executes it through the shared command runner, and
+//! streams diagnostics output.
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;

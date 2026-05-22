@@ -1,3 +1,8 @@
+//! Low-level readiness probes for supervised runtime client processes.
+//!
+//! Higher-level lifecycle code decides when to retry and how to report
+//! failures; this module only performs one TCP, HTTP, or websocket probe.
+
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::time::Duration;

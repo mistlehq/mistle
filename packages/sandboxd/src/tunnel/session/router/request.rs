@@ -1,3 +1,8 @@
+//! Handling for local requests sent into a tunnel session.
+//!
+//! Other sandboxd components use these request messages to open runtime streams,
+//! perform signing, and coordinate work through the tunnel router.
+
 use super::*;
 
 pub(in crate::tunnel::session) fn handle_tunnel_session_request(

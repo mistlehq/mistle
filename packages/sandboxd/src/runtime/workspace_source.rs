@@ -1,3 +1,8 @@
+//! Workspace-source materialization for runtime clients.
+//!
+//! Runtime plans can source workspace content from repositories; this module
+//! applies git-clone workspace sources before runtime processes are started.
+
 use std::collections::BTreeMap;
 use std::fs::DirBuilder;
 use std::os::unix::fs::DirBuilderExt;

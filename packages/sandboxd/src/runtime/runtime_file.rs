@@ -1,3 +1,9 @@
+//! File materialization for runtime client setup files.
+//!
+//! Setup-file specs may create or append files before processes start. This
+//! module owns directory permissions, write modes, and error messages for those
+//! filesystem operations.
+
 use std::fs::{DirBuilder, OpenOptions};
 use std::io::Write;
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};

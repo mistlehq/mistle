@@ -1,3 +1,9 @@
+//! Shared mutable state for the local control server.
+//!
+//! This module owns the lock helpers for daemon initialization state and the
+//! optional initialization worker, so request handling and health projection use
+//! one error path for poisoned locks.
+
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::JoinHandle;
@@ -6,7 +12,7 @@ use crate::control::{ControlError, InitPhase};
 use crate::protocol::startup::StartupInput;
 use crate::sandboxd_state::SandboxdState;
 
-/// Tracks whether this daemon has already accepted startup input.
+/// Tracks accepted startup input, live sandbox state, init phase, and snapshot shutdown behavior.
 pub(super) struct ControlServerState {
     pub(super) init_phase: InitPhase,
     pub(super) startup_input: Option<StartupInput>,

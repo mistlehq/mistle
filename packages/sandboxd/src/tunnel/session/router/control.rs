@@ -1,3 +1,8 @@
+//! Handling for inbound tunnel control messages.
+//!
+//! Control messages open, close, and acknowledge streams. This module updates
+//! session state and emits router events without owning the main event loop.
+
 use super::*;
 
 pub(in crate::tunnel::session) async fn handle_tunnel_control_message(

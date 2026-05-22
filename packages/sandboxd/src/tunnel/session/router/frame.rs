@@ -1,3 +1,8 @@
+//! Handling for inbound tunnel binary data frames.
+//!
+//! Binary frames carry stream payload bytes. This module applies flow-control
+//! accounting and forwards data to the correct runtime-side stream.
+
 use super::*;
 
 pub(in crate::tunnel::session) fn handle_tunnel_binary_frame(

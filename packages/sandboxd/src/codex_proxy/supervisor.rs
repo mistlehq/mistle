@@ -1,3 +1,9 @@
+//! Thread supervisor for the Codex proxy runtime.
+//!
+//! The supervisor keeps the public handle small: start the proxy, observe
+//! readiness, request shutdown, and expose activity/readiness snapshots to the
+//! broader daemon health model.
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};

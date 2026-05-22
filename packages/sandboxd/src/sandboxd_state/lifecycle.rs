@@ -1,3 +1,9 @@
+//! Top-level sandbox daemon lifecycle.
+//!
+//! This module coordinates runtime-plan application, workspace setup, egress and
+//! runtime component startup, keepalive wiring, readiness projection, and
+//! shutdown for one initialized sandbox daemon.
+
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;

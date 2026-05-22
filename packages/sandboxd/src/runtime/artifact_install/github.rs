@@ -1,3 +1,8 @@
+//! GitHub release asset downloads for runtime artifact installs.
+//!
+//! This module owns GitHub API requests, archive asset selection, TLS/proxy
+//! client configuration, and download error mapping for runtime artifacts.
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;

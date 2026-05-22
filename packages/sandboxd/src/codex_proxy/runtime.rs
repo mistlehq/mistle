@@ -1,3 +1,9 @@
+//! Async runtime entrypoint for the Codex websocket proxy listener.
+//!
+//! The supervisor starts this module on a dedicated thread. It owns the listener
+//! loop and session-manager task, while each accepted connection is delegated to
+//! the proxy-session relay.
+
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 

@@ -1,3 +1,9 @@
+//! Retry wrapper for runtime artifact installation steps.
+//!
+//! Download and extraction can fail because of transient network or filesystem
+//! conditions. This module keeps the retry timing policy separate from the
+//! individual artifact operations.
+
 use std::fs::File;
 use std::path::Path;
 use std::time::Duration;

@@ -1,3 +1,8 @@
+//! Tunnel protocol constants, DTOs, and error types.
+//!
+//! Parsing, serialization, and validation are split into sibling modules; this
+//! file contains the shared protocol vocabulary they operate on.
+
 use super::*;
 
 pub const DEFAULT_STREAM_WINDOW_BYTES: usize = 16 * 1024 * 1024;

@@ -1,3 +1,9 @@
+//! Runtime artifact installation pipeline.
+//!
+//! The pipeline prepares an install workspace, downloads and verifies artifacts,
+//! extracts them, and runs any declared install commands before runtime clients
+//! start.
+
 use std::collections::BTreeMap;
 use std::sync::Arc;
 

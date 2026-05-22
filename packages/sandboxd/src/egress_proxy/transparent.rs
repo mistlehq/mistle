@@ -1,3 +1,9 @@
+//! Platform helpers for transparent egress proxying.
+//!
+//! Linux builds recover the original destination and configure passthrough
+//! upstream sockets; other targets fail explicitly because transparent routing
+//! depends on Linux socket behavior.
+
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 #[cfg(target_os = "linux")]
 use std::os::unix::io::AsRawFd;

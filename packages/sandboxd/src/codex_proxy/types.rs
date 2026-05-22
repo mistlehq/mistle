@@ -1,3 +1,9 @@
+//! Shared Codex proxy domain types.
+//!
+//! These structs and enums are the narrow data contract between the relay,
+//! activity tracker, and session manager. Method-specific parsing and runtime
+//! behavior stay in their owning modules.
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Instant;
 

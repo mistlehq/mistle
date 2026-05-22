@@ -1,3 +1,9 @@
+//! Archive verification and extraction for runtime artifact installs.
+//!
+//! GitHub downloads enter the sandbox as compressed tarballs. This module owns
+//! checksum validation, path safety checks, extraction, and executable bit
+//! preservation before install commands run.
+
 use std::fs::{self, File};
 use std::io::Read;
 use std::os::unix::fs::PermissionsExt;

@@ -1,3 +1,9 @@
+//! Manager for the runtime client processes declared by the compiled plan.
+//!
+//! The manager flattens runtime clients into concrete process specs, starts
+//! them through the shared lifecycle helpers, and installs per-runtime
+//! component supervisors where a process needs ongoing health management.
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};

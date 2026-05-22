@@ -52,7 +52,7 @@ pub(super) const TEST_FAULTS_ENABLED_ENV: &str = "MISTLE_SANDBOXD_ENABLE_TEST_FA
 #[cfg(any(test, debug_assertions))]
 pub(super) const EGRESS_PROXY_FAULT_KILL_PATH: &str = "/__faults/components/egress-proxy/kill";
 
-/// Tracks whether this daemon has already accepted startup input.
+/// Tracks the daemon initialization phase exposed through control and health paths.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InitPhase {
     Uninitialized,

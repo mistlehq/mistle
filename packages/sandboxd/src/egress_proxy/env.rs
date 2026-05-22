@@ -1,3 +1,8 @@
+//! Environment variable wiring for managed proxy processes.
+//!
+//! Runtime clients inherit these values so common tools use the sandbox-local
+//! proxy and trust its CA without each process module knowing proxy internals.
+
 use std::collections::BTreeMap;
 use std::path::Path;
 

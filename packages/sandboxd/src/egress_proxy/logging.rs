@@ -1,3 +1,9 @@
+//! Structured JSONL logging for the local egress proxy.
+//!
+//! The forwarding code reports route decisions, byte counts, and failures here
+//! so the emitted event shape is consistent across HTTP, HTTPS, websocket, and
+//! transparent proxy paths.
+
 use serde_json::{Map, Value};
 
 use crate::supervision::SupervisedComponent;

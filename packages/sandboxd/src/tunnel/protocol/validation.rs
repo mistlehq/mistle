@@ -1,3 +1,8 @@
+//! Validation rules for tunnel protocol DTOs.
+//!
+//! Validation stays separate from parsing so tests and constructors can reuse
+//! the same protocol constraints without going through JSON.
+
 use super::*;
 
 pub(super) fn validate_stream_id(stream_id: u32) -> Result<(), TunnelProtocolError> {

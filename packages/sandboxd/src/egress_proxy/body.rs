@@ -1,3 +1,9 @@
+//! HTTP body helpers for the egress proxy forwarding pipeline.
+//!
+//! The server works with boxed Hyper bodies so direct upstream, gateway,
+//! transparent, and error responses can share one response type while still
+//! emitting byte-count logging from streamed responses.
+
 use std::convert::Infallible;
 use std::pin::Pin;
 use std::sync::Arc;
