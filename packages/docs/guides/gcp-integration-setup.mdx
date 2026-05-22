@@ -1,0 +1,103 @@
+---
+title: Google Cloud
+description: Connect Google Cloud MCP servers to Mistle
+icon: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9Ii0yNTAgLTI1MCAyMTY2IDE4NDIiPgogIDxwYXRoIGZpbGw9IiNlYTQzMzUiIGQ9Ik0xMDU3LjEgMzY5LjJoNTAuOGwxNDQuOC0xNDQuOCA3LjEtNjEuNUM5OTAuMy03NSA1NzkgNTAuNyAzNDEuMSAzMjAuMmMtNjYuMSA3NC44LTExNCAxNjMuOS0xNDAuMiAyNjAuMyAxNi4xLTYuNiAzNC03LjcgNTAuOC0zbDI4OS42LTQ3LjhzMTQuNy0yNC40IDIyLjQtMjIuOWMxMjguOC0xNDEuNSAzNDUuNi0xNTggNDk0LjQtMzcuNnoiLz4KICA8cGF0aCBmaWxsPSIjNDI4NWY0IiBkPSJNMTQ1OSA0ODAuNWMtMzMuMy0xMjIuNi0xMDEuNi0yMzIuOC0xOTYuNi0zMTdsLTIwMy4yIDIwMy4yYzg1LjggNzAuMSAxMzQuNyAxNzUuOCAxMzIuNiAyODYuNnYzNi4xYzk5LjkgMCAxODAuOSA4MSAxODAuOSAxODAuOXMtODEgMTgwLjktMTgwLjkgMTgwLjlIODMwbC0zNi4xIDM2LjZ2MjE3bDM2LjEgMzYuMWgzNjEuOGMyNTkuOCAyIDQ3Mi4xLTIwNyA0NzQuMS00NjYuOCAxLjItMTU3LjgtNzYuNS0zMDUuNC0yMDYuOS0zOTMuNnoiLz4KICA8cGF0aCBmaWxsPSIjMzRhODUzIiBkPSJNNDY3LjcgMTMzOC42aDM2MS44VjEwNDlINDY3LjdjLTI1LjggMC01MS4yLTUuNi03NC43LTE2LjNsLTUwLjggMTUuOC0xNDUuOCAxNDQuOC0xMi43IDUwLjhjODEuNyA2MS44IDE4MS41IDk1IDI4NCA5NC41eiIvPgogIDxwYXRoIGZpbGw9IiNmYmJjMDUiIGQ9Ik00NjcuNyAzOTkuMkMyMDcuOCA0MDAuNy0xLjUgNjEyLjYgMCA4NzIuNWMuOSAxNDUuMSA2OC42IDI4MS43IDE4My43IDM3MC4xbDIwOS44LTIwOS44Yy05MS00MS4xLTEzMS41LTE0OC4zLTkwLjQtMjM5LjNzMTQ4LjMtMTMxLjUgMjM5LjMtOTAuNGM0MC4xIDE4LjEgNzIuMiA1MC4zIDkwLjQgOTAuNGwyMDkuOC0yMDkuOGMtODkuMi0xMTYuOC0yMjgtMTg1LjEtMzc0LjktMTg0LjV6Ii8+Cjwvc3ZnPgo=
+---
+
+## Overview
+
+Connect to Google Cloud by authorizing Mistle with a Google OAuth client that you create in Google Cloud.
+
+Mistle uses the OAuth authorization code flow to obtain Google access tokens, then uses those tokens to call Google-hosted MCP servers selected in a sandbox profile. The connected Google user remains subject to Google Cloud IAM. OAuth lets Mistle request a token; IAM decides what that token can do in each Google Cloud project and resource.
+
+## OAuth And IAM
+
+Google Cloud access has two independent parts:
+
+1. **OAuth client and scopes** - identify the application and allow Mistle to obtain Google tokens. Mistle currently requests the `https://www.googleapis.com/auth/cloud-platform` scope so selected Google Cloud MCP servers can use Google Cloud APIs.
+2. **IAM grants** - authorize the Google principal that completes OAuth. Grant IAM roles to that user, or to a Google group that contains that user, on the Google Cloud projects and resources the agent should access.
+
+The Google OAuth client can live in one Google Cloud project, while IAM access can be granted in other resource projects. The user who clicks **Connect Google Cloud** must have the required IAM roles wherever the selected MCP tools will operate.
+
+## Create A Google OAuth Client
+
+Create a Web application OAuth client in Google Auth Platform.
+
+1. In Mistle, open **Integrations** and choose **Google Cloud**. Mistle uses Google OAuth for this connection.
+2. Copy the **callback URL** shown by Mistle.
+3. In Google Cloud, open **Google Auth Platform > Clients**.
+4. Create an OAuth client with **Application type** set to **Web application**.
+5. Add the Mistle callback URL to **Authorized redirect URIs**.
+6. Create the client and copy its **Client ID** and **Client secret**.
+7. Return to Mistle, enter the client ID and client secret, and click **Connect Google Cloud**.
+8. Complete the Google consent flow with the Google account that should back the connection.
+
+If your Google Auth Platform app is in testing mode, add the authorizing Google account as a test user before connecting.
+
+## Configure IAM
+
+Grant `roles/mcp.toolUser` to every Google principal that will call Google-hosted MCP tools through Mistle. Then add the product-specific IAM roles for the MCP servers selected in the sandbox profile.
+
+```bash
+gcloud projects add-iam-policy-binding PROJECT_ID \
+  --member="user:USER_EMAIL" \
+  --role="roles/mcp.toolUser"
+```
+
+Replace `PROJECT_ID` with the Google Cloud project and `USER_EMAIL` with the Google account that authorizes the Mistle connection. To grant access through a Google group, use `--member="group:GROUP_EMAIL"` for a group that contains the authorizing user.
+
+Run the same command once for each additional role you grant:
+
+```bash
+gcloud projects add-iam-policy-binding PROJECT_ID \
+  --member="user:USER_EMAIL" \
+  --role="ROLE"
+```
+
+If the required APIs are not already enabled, an administrator may also need `roles/serviceusage.serviceUsageAdmin` to enable them:
+
+```bash
+gcloud services enable \
+  cloudresourcemanager.googleapis.com \
+  container.googleapis.com \
+  logging.googleapis.com \
+  run.googleapis.com \
+  storage.googleapis.com
+```
+
+### MCP IAM Reference
+
+| MCP server               | Read-only IAM to start with                           | When to grant more                                                                                                                                                                                                                                        |
+| ------------------------ | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| All Google Cloud MCPs    | `roles/mcp.toolUser` on the project                   | Required for MCP tool calls. This does not replace product-specific service permissions.                                                                                                                                                                  |
+| Cloud Resource Manager   | `roles/browser` on the project, folder, or org        | `roles/mcp.toolUser` already includes basic project get/list permissions. Use broader Resource Manager roles only when agents need folder, organization, IAM policy, or project-management actions.                                                       |
+| Cloud Storage            | `roles/storage.objectViewer` on the project or bucket | Use `roles/storage.objectUser`, `roles/storage.objectAdmin`, or `roles/storage.admin` for write/admin work.                                                                                                                                               |
+| Cloud Logging            | `roles/logging.viewer` on the project or log view     | Use `roles/logging.privateLogViewer` for Data Access audit logs, or `roles/logging.admin` for config work.                                                                                                                                                |
+| Cloud Run                | `roles/run.viewer` on the project, service, or job    | Deploy-capable access needs Cloud Run permissions plus deployment prerequisites such as Service Account User on the runtime identity and Artifact Registry access to the image source. Follow Google's Cloud Run IAM and deployment docs for write paths. |
+| Google Kubernetes Engine | `roles/container.clusterViewer` on the project        | Use stronger Kubernetes Engine roles only when agents should create or modify clusters or workloads.                                                                                                                                                      |
+
+## Connect MCP Servers To A Sandbox Profile
+
+After the Google Cloud connection is active:
+
+1. Open the sandbox profile that should use Google Cloud.
+2. Add the Google Cloud integration connection to the profile.
+3. In **Resources & Tools**, select the Google Cloud MCP servers that agents may use.
+4. Publish the profile version.
+
+Only selected MCP servers are exposed to sessions using that published profile.
+
+## Official References
+
+- [Google Cloud MCP servers: Manage MCP servers](https://docs.cloud.google.com/mcp/manage-mcp-servers)
+- [Google Cloud MCP servers: Supported products](https://docs.cloud.google.com/mcp/supported-products)
+- [Google Cloud MCP servers roles and permissions](https://docs.cloud.google.com/iam/docs/roles-permissions/mcp)
+- [Google Auth Platform: Manage OAuth clients](https://support.google.com/cloud/answer/6158849)
+- [OAuth 2.0 for Web Server Applications](https://developers.google.com/identity/protocols/oauth2/web-server)
+- [Cloud Storage IAM roles](https://docs.cloud.google.com/storage/docs/access-control/iam-roles)
+- [Cloud Logging access control](https://docs.cloud.google.com/logging/docs/access-control)
+- [Cloud Run IAM roles](https://docs.cloud.google.com/run/docs/reference/iam/roles)
+- [Deploying services to Cloud Run](https://docs.cloud.google.com/run/docs/deploying)
+- [Use the GKE remote MCP server](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/use-gke-mcp)
+- [Resource Manager roles and permissions](https://docs.cloud.google.com/iam/docs/roles-permissions/resourcemanager)
+- [Browser role permissions](https://cloud.google.com/iam/docs/roles-permissions/browser)

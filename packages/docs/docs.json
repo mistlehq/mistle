@@ -38,6 +38,7 @@
               "guides/aws-integration-setup",
               "guides/anthropic-integration-setup",
               "guides/datadog-integration-setup",
+              "guides/gcp-integration-setup",
               "guides/github-integration-setup",
               "guides/jira-integration-setup",
               "guides/linear-integration-setup",
