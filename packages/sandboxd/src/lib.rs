@@ -3,8 +3,9 @@
 //! The default entrypoint runs the daemon behind the local Unix control socket.
 //! The supported lifecycle subcommands, `ready`, `init`, `resume`, and
 //! `wait-init`, are thin local clients that submit requests to the running
-//! daemon and exit. The `version` subcommand prints the binary version used by
-//! release artifact validation and runtime updates.
+//! daemon and exit. The `egress-proxy` subcommand runs the proxy child process.
+//! The `version` subcommand prints the binary version used by release artifact
+//! validation and runtime updates.
 
 use std::fmt;
 use std::io;
@@ -71,9 +72,12 @@ fn initialize_sandboxd_tracing() {
 }
 
 /// Enumerates the top-level `sandboxd` subcommands the CLI currently supports.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SandboxdCommand {
     Daemon,
+    EgressProxy {
+        config_path: PathBuf,
+    },
     Ready,
     Init {
         detach: bool,
@@ -91,6 +95,7 @@ pub enum SandboxdCommand {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseSandboxdCommandError {
     InvalidStdinBytes(String),
+    MissingEgressProxyConfigPath,
     MissingStdinBytesValue,
     UnexpectedArgument(String),
     UnknownCommand(String),
@@ -108,12 +113,15 @@ impl fmt::Display for ParseSandboxdCommandError {
             Self::MissingStdinBytesValue => {
                 write!(f, "sandboxd --stdin-bytes requires a byte count")
             }
+            Self::MissingEgressProxyConfigPath => {
+                write!(f, "sandboxd egress-proxy --config requires a config path")
+            }
             Self::UnexpectedArgument(argument) => {
                 write!(f, "unexpected sandboxd argument: {argument}")
             }
             Self::UnknownCommand(command) => write!(
                 f,
-                "unknown sandboxd subcommand '{command}' (expected 'ready', 'init', 'resume', 'wait-init', or 'version')"
+                "unknown sandboxd subcommand '{command}' (expected 'ready', 'init', 'resume', 'wait-init', 'egress-proxy', or 'version')"
             ),
         }
     }
@@ -133,6 +141,10 @@ where
     };
 
     let command = match command.as_str() {
+        "egress-proxy" => {
+            let config_path = parse_egress_proxy_args(parsed_args.by_ref())?;
+            return Ok(SandboxdCommand::EgressProxy { config_path });
+        }
         "ready" => SandboxdCommand::Ready,
         "init" => {
             let mut detach = false;
@@ -169,6 +181,25 @@ where
     }
 
     Ok(command)
+}
+
+fn parse_egress_proxy_args<I>(parsed_args: &mut I) -> Result<PathBuf, ParseSandboxdCommandError>
+where
+    I: Iterator<Item = String>,
+{
+    let mut config_path = None;
+    while let Some(argument) = parsed_args.next() {
+        match argument.as_str() {
+            "--config" => {
+                config_path =
+                    Some(PathBuf::from(parsed_args.next().ok_or(
+                        ParseSandboxdCommandError::MissingEgressProxyConfigPath,
+                    )?));
+            }
+            _ => return Err(ParseSandboxdCommandError::UnexpectedArgument(argument)),
+        }
+    }
+    config_path.ok_or(ParseSandboxdCommandError::MissingEgressProxyConfigPath)
 }
 
 fn parse_payload_source_args<I>(
@@ -249,6 +280,15 @@ where
             };
 
             match server.wait() {
+                Ok(()) => 0,
+                Err(error) => {
+                    let _ = writeln!(stderr, "{error}");
+                    1
+                }
+            }
+        }
+        SandboxdCommand::EgressProxy { config_path } => {
+            match egress_proxy::run_egress_proxy_child(&config_path) {
                 Ok(()) => 0,
                 Err(error) => {
                     let _ = writeln!(stderr, "{error}");
@@ -382,6 +422,38 @@ mod tests {
         let command = parse_sandboxd_command(["ready"]);
 
         assert_eq!(command, Ok(SandboxdCommand::Ready));
+    }
+
+    #[test]
+    fn parses_egress_proxy_with_config_path() {
+        let command = parse_sandboxd_command(["egress-proxy", "--config", "/tmp/proxy.json"]);
+
+        assert_eq!(
+            command,
+            Ok(SandboxdCommand::EgressProxy {
+                config_path: "/tmp/proxy.json".into()
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_egress_proxy_without_config_path() {
+        let command = parse_sandboxd_command(["egress-proxy"]);
+
+        assert_eq!(
+            command,
+            Err(ParseSandboxdCommandError::MissingEgressProxyConfigPath)
+        );
+    }
+
+    #[test]
+    fn rejects_egress_proxy_config_without_value() {
+        let command = parse_sandboxd_command(["egress-proxy", "--config"]);
+
+        assert_eq!(
+            command,
+            Err(ParseSandboxdCommandError::MissingEgressProxyConfigPath)
+        );
     }
 
     #[test]

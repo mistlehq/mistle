@@ -10,6 +10,7 @@ use hyper::Uri;
 use url::Url;
 
 use crate::egress_proxy::tls::websocket_target_url;
+use crate::egress_proxy::token_bridge::EgressTokenBridgeClient;
 use crate::egress_proxy::{
     DIRECT_EGRESS_HTTP_ROUTE_PATH, DIRECT_EGRESS_WEBSOCKET_ROUTE_PATH, EgressProxyError,
 };
@@ -26,7 +27,13 @@ pub(super) enum EgressProxyForwardingMode {
 pub(super) struct DirectGatewayEgressClient {
     pub(super) http_route_url: Url,
     pub(super) websocket_route_url: Url,
-    pub(super) token_provider: GatewayEgressTokenProvider,
+    pub(super) token_provider: DirectGatewayEgressTokenProvider,
+}
+
+#[derive(Clone)]
+pub(super) enum DirectGatewayEgressTokenProvider {
+    Local(GatewayEgressTokenProvider),
+    Bridge(EgressTokenBridgeClient),
 }
 
 #[derive(Clone, Copy)]
@@ -51,7 +58,26 @@ impl DirectGatewayEgressClient {
                 DIRECT_EGRESS_WEBSOCKET_ROUTE_PATH,
                 DirectGatewayRouteScheme::WebSocket,
             )?,
-            token_provider,
+            token_provider: DirectGatewayEgressTokenProvider::Local(token_provider),
+        })
+    }
+
+    pub(super) fn from_child_token_bridge(
+        tunnel_gateway_ws_url: &str,
+        token_bridge: EgressTokenBridgeClient,
+    ) -> Result<Self, EgressProxyError> {
+        Ok(Self {
+            http_route_url: resolve_direct_gateway_route_url(
+                tunnel_gateway_ws_url,
+                DIRECT_EGRESS_HTTP_ROUTE_PATH,
+                DirectGatewayRouteScheme::Http,
+            )?,
+            websocket_route_url: resolve_direct_gateway_route_url(
+                tunnel_gateway_ws_url,
+                DIRECT_EGRESS_WEBSOCKET_ROUTE_PATH,
+                DirectGatewayRouteScheme::WebSocket,
+            )?,
+            token_provider: DirectGatewayEgressTokenProvider::Bridge(token_bridge),
         })
     }
 
@@ -87,6 +113,17 @@ impl DirectGatewayEgressClient {
             .query_pairs_mut()
             .append_pair("target", &websocket_target_url(target_url)?);
         Ok(route_url.to_string())
+    }
+}
+
+impl DirectGatewayEgressTokenProvider {
+    fn token(&self) -> Result<crate::tunnel::session::TunnelEgressToken, EgressProxyError> {
+        match self {
+            Self::Local(provider) => provider
+                .token()
+                .map_err(|error| EgressProxyError::new(error.to_string())),
+            Self::Bridge(provider) => provider.token(),
+        }
     }
 }
 

@@ -21,10 +21,10 @@ use crate::egress_proxy::socket_addr_from_sockaddr_storage;
 use crate::egress_proxy::start_transparent_local_destination_reconciler_for_table;
 use crate::egress_proxy::{
     DIRECT_EGRESS_HTTP_ROUTE_PATH, DIRECT_EGRESS_WEBSOCKET_ROUTE_PATH,
-    DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME, DirectGatewayEgressClient, EgressProxy,
-    EgressProxyForwardingMode, EgressProxyRoute, ProxyCaConfig, RequestTargetOverride,
-    TransparentProxyProtocol, build_direct_forward_uri, build_gateway_egress_route,
-    build_managed_proxy_env, classify_transparent_proxy_first_byte,
+    DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME, DirectGatewayEgressClient,
+    DirectGatewayEgressTokenProvider, EgressProxy, EgressProxyForwardingMode, EgressProxyRoute,
+    ProxyCaConfig, RequestTargetOverride, TransparentProxyProtocol, build_direct_forward_uri,
+    build_gateway_egress_route, build_managed_proxy_env, classify_transparent_proxy_first_byte,
     filter_direct_gateway_request_headers, match_route, resolve_direct_gateway_route_url,
     resolve_request_target, serialize_egress_proxy_log_line, websocket_target_url,
 };
@@ -1368,7 +1368,9 @@ fn test_forwarding_mode() -> EgressProxyForwardingMode {
                 DirectGatewayRouteScheme::WebSocket,
             )
             .expect("direct gateway websocket route URL should resolve"),
-            token_provider: GatewayEgressTokenProvider::new("sandbox-123"),
+            token_provider: DirectGatewayEgressTokenProvider::Local(
+                GatewayEgressTokenProvider::new("sandbox-123"),
+            ),
         }),
     }
 }

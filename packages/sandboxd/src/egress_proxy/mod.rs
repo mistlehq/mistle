@@ -10,10 +10,11 @@
 use std::collections::BTreeMap;
 use std::fmt::{self, Display};
 use std::net::SocketAddr;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+#[cfg(any(test, debug_assertions))]
 use std::sync::mpsc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -25,6 +26,8 @@ use crate::egress_proxy::ca::{
     load_or_create_persistent_proxy_ca,
 };
 use crate::egress_proxy::env::{MANAGED_PROXY_ENV_KEYS, build_managed_proxy_env};
+#[cfg(test)]
+use crate::egress_proxy::gateway::DirectGatewayEgressTokenProvider;
 use crate::egress_proxy::gateway::{DirectGatewayEgressClient, EgressProxyForwardingMode};
 #[cfg(test)]
 use crate::egress_proxy::gateway::{DirectGatewayRouteScheme, resolve_direct_gateway_route_url};
@@ -37,17 +40,25 @@ use crate::egress_proxy::routing::{
     RequestTargetOverride, build_direct_forward_uri, match_route, resolve_request_target,
 };
 #[cfg(test)]
+use crate::egress_proxy::server::run_proxy_server;
+use crate::egress_proxy::server::run_transparent_proxy_server;
+#[cfg(test)]
 use crate::egress_proxy::server::{
     TransparentProxyProtocol, classify_transparent_proxy_first_byte,
     filter_direct_gateway_request_headers,
 };
-use crate::egress_proxy::server::{run_proxy_server, run_transparent_proxy_server};
+use crate::egress_proxy::supervisor::EgressProxyProcessSupervisorConfig;
 #[cfg(any(test, debug_assertions))]
 use crate::egress_proxy::supervisor::EgressProxySupervisorCommand;
 use crate::egress_proxy::supervisor::{
-    ActiveEgressProxyServer, EgressProxySupervisorConfig, bind_egress_proxy_listener,
-    bind_transparent_egress_proxy_listener, run_egress_proxy_supervisor,
-    spawn_active_egress_proxy_server, wait_for_egress_proxy_health,
+    ActiveEgressProxyChildProcess, ActiveEgressProxyServer, bind_transparent_egress_proxy_listener,
+    run_egress_proxy_process_supervisor, spawn_active_egress_proxy_child_process,
+    spawn_active_egress_proxy_server, wait_for_egress_proxy_child_health,
+    wait_for_egress_proxy_health,
+};
+#[cfg(test)]
+use crate::egress_proxy::supervisor::{
+    EgressProxySupervisorConfig, bind_egress_proxy_listener, run_egress_proxy_supervisor,
 };
 #[cfg(test)]
 use crate::egress_proxy::tls::websocket_target_url;
@@ -75,6 +86,8 @@ const RUNTIME_PROXY_CA_TRUST_STORE_PATH: &str =
     "/usr/local/share/ca-certificates/mistle-egress-proxy-ca.crt";
 const SYSTEM_CA_CERT_BUNDLE_PATH: &str = "/etc/ssl/certs/ca-certificates.crt";
 const UPDATE_CA_CERTIFICATES_COMMAND: &str = "update-ca-certificates";
+#[cfg(all(debug_assertions, not(test)))]
+const EGRESS_PROXY_CHILD_BINARY_PATH_ENV: &str = "MISTLE_SANDBOXD_EGRESS_PROXY_CHILD_PATH";
 const DEFAULT_LOOPBACK_PROXY_PORT: u16 = 38_513;
 const DEFAULT_TRANSPARENT_PROXY_PORT: u16 = 38_514;
 #[cfg(target_os = "linux")]
@@ -108,6 +121,32 @@ pub struct EgressProxyError {
 }
 
 #[derive(Clone)]
+#[cfg_attr(test, allow(dead_code))]
+enum EgressProxyLoopbackRuntime {
+    #[cfg(test)]
+    InProcess,
+    ChildProcess {
+        binary_path: PathBuf,
+        tunnel_gateway_ws_url: String,
+        token_provider: GatewayEgressTokenProvider,
+    },
+}
+
+enum ActiveLoopbackEgressProxy {
+    #[cfg(test)]
+    InProcess(ActiveEgressProxyServer),
+    ChildProcess(ActiveEgressProxyChildProcess),
+}
+
+struct EgressProxyStartOptions<'a> {
+    loopback_runtime: EgressProxyLoopbackRuntime,
+    listener_address: SocketAddr,
+    proxy_ca_config: ProxyCaConfig<'a>,
+    clock: Arc<dyn Clock>,
+    supervisor_handle: SandboxdSupervisorHandle,
+}
+
+#[derive(Clone)]
 pub(super) struct EgressProxyState {
     sandbox_instance_id: String,
     forwarding_mode: EgressProxyForwardingMode,
@@ -126,6 +165,29 @@ impl EgressProxyError {
     }
 }
 
+pub fn run_egress_proxy_child(config_path: &Path) -> Result<(), EgressProxyError> {
+    child::run_egress_proxy_child(config_path)
+}
+
+#[cfg(not(test))]
+fn resolve_egress_proxy_child_binary_path() -> Result<PathBuf, EgressProxyError> {
+    #[cfg(debug_assertions)]
+    if let Some(path) = std::env::var_os(EGRESS_PROXY_CHILD_BINARY_PATH_ENV) {
+        if path.as_os_str().is_empty() {
+            return Err(EgressProxyError::new(format!(
+                "{EGRESS_PROXY_CHILD_BINARY_PATH_ENV} cannot be empty"
+            )));
+        }
+        return Ok(PathBuf::from(path));
+    }
+
+    std::env::current_exe().map_err(|error| {
+        EgressProxyError::new(format!(
+            "failed to resolve sandboxd binary for egress proxy child: {error}"
+        ))
+    })
+}
+
 impl Display for EgressProxyError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.message)
@@ -133,6 +195,58 @@ impl Display for EgressProxyError {
 }
 
 impl std::error::Error for EgressProxyError {}
+
+impl ActiveLoopbackEgressProxy {
+    fn request_shutdown(&mut self) {
+        match self {
+            #[cfg(test)]
+            Self::InProcess(active_server) => active_server.request_shutdown(),
+            Self::ChildProcess(active_child) => active_child.request_shutdown(),
+        }
+    }
+
+    fn join(self) -> Result<(), EgressProxyError> {
+        match self {
+            #[cfg(test)]
+            Self::InProcess(active_server) => active_server.join(),
+            Self::ChildProcess(active_child) => active_child.join(),
+        }
+    }
+}
+
+fn start_active_loopback_proxy(
+    loopback_runtime: &EgressProxyLoopbackRuntime,
+    listener_address: SocketAddr,
+    state: EgressProxyState,
+    sandbox_instance_id: &str,
+) -> Result<ActiveLoopbackEgressProxy, EgressProxyError> {
+    match loopback_runtime {
+        #[cfg(test)]
+        EgressProxyLoopbackRuntime::InProcess => {
+            let std_listener =
+                bind_egress_proxy_listener(listener_address).map_err(EgressProxyError::new)?;
+            Ok(ActiveLoopbackEgressProxy::InProcess(
+                spawn_active_egress_proxy_server(std_listener, state, run_proxy_server),
+            ))
+        }
+        EgressProxyLoopbackRuntime::ChildProcess {
+            binary_path,
+            tunnel_gateway_ws_url,
+            token_provider,
+        } => {
+            let config = EgressProxyProcessSupervisorConfig {
+                child_binary_path: binary_path.clone(),
+                listener_address,
+                sandbox_instance_id: sandbox_instance_id.to_string(),
+                tunnel_gateway_ws_url: tunnel_gateway_ws_url.clone(),
+                token_provider: token_provider.clone(),
+                state,
+            };
+            spawn_active_egress_proxy_child_process(&config)
+                .map(ActiveLoopbackEgressProxy::ChildProcess)
+        }
+    }
+}
 
 impl EgressProxy {
     pub fn start(
@@ -153,28 +267,40 @@ impl EgressProxy {
         let forwarding_mode = EgressProxyForwardingMode::DirectGateway {
             client: Arc::new(DirectGatewayEgressClient::from_bootstrap_tunnel_url(
                 &startup_input.tunnel_gateway_ws_url,
-                token_provider,
+                token_provider.clone(),
             )?),
         };
-        Self::start_with_options(
+        #[cfg(test)]
+        let loopback_runtime = EgressProxyLoopbackRuntime::InProcess;
+        #[cfg(not(test))]
+        let loopback_runtime = EgressProxyLoopbackRuntime::ChildProcess {
+            binary_path: resolve_egress_proxy_child_binary_path()?,
+            tunnel_gateway_ws_url: startup_input.tunnel_gateway_ws_url.clone(),
+            token_provider,
+        };
+        Self::start_with_loopback_runtime(
             runtime_plan,
             startup_input,
             forwarding_mode,
-            default_loopback_proxy_listener_address(),
-            ProxyCaConfig {
-                runtime_certificate_path: Path::new(RUNTIME_PROXY_CA_CERT_PATH),
-                runtime_certificate_bundle_path: Path::new(RUNTIME_PROXY_CA_BUNDLE_PATH),
-                persistent_certificate_path: Path::new(PERSISTENT_PROXY_CA_CERT_PATH),
-                persistent_private_key_path: Path::new(PERSISTENT_PROXY_CA_KEY_PATH),
-                trust_store_certificate_path: Path::new(RUNTIME_PROXY_CA_TRUST_STORE_PATH),
-                system_certificate_bundle_path: Path::new(SYSTEM_CA_CERT_BUNDLE_PATH),
-                refresh_command: Path::new(UPDATE_CA_CERTIFICATES_COMMAND),
+            EgressProxyStartOptions {
+                loopback_runtime,
+                listener_address: default_loopback_proxy_listener_address(),
+                proxy_ca_config: ProxyCaConfig {
+                    runtime_certificate_path: Path::new(RUNTIME_PROXY_CA_CERT_PATH),
+                    runtime_certificate_bundle_path: Path::new(RUNTIME_PROXY_CA_BUNDLE_PATH),
+                    persistent_certificate_path: Path::new(PERSISTENT_PROXY_CA_CERT_PATH),
+                    persistent_private_key_path: Path::new(PERSISTENT_PROXY_CA_KEY_PATH),
+                    trust_store_certificate_path: Path::new(RUNTIME_PROXY_CA_TRUST_STORE_PATH),
+                    system_certificate_bundle_path: Path::new(SYSTEM_CA_CERT_BUNDLE_PATH),
+                    refresh_command: Path::new(UPDATE_CA_CERTIFICATES_COMMAND),
+                },
+                clock,
+                supervisor_handle,
             },
-            clock,
-            supervisor_handle,
         )
     }
 
+    #[cfg(test)]
     fn start_with_options(
         runtime_plan: &CompiledRuntimePlan,
         startup_input: &StartupInput,
@@ -184,9 +310,36 @@ impl EgressProxy {
         clock: Arc<dyn Clock>,
         supervisor_handle: SandboxdSupervisorHandle,
     ) -> Result<Option<Self>, EgressProxyError> {
+        Self::start_with_loopback_runtime(
+            runtime_plan,
+            startup_input,
+            forwarding_mode,
+            EgressProxyStartOptions {
+                loopback_runtime: EgressProxyLoopbackRuntime::InProcess,
+                listener_address,
+                proxy_ca_config,
+                clock,
+                supervisor_handle,
+            },
+        )
+    }
+
+    fn start_with_loopback_runtime(
+        runtime_plan: &CompiledRuntimePlan,
+        startup_input: &StartupInput,
+        forwarding_mode: EgressProxyForwardingMode,
+        options: EgressProxyStartOptions<'_>,
+    ) -> Result<Option<Self>, EgressProxyError> {
         if runtime_plan.egress_routes.is_empty() && startup_input.transparent_proxy.is_none() {
             return Ok(None);
         }
+        let EgressProxyStartOptions {
+            loopback_runtime,
+            listener_address,
+            proxy_ca_config,
+            clock,
+            supervisor_handle,
+        } = options;
         let log_clock = clock.clone();
         let log_context = EgressProxyLogContext {
             clock: log_clock.as_ref(),
@@ -224,30 +377,19 @@ impl EgressProxy {
             }
         };
 
-        let std_listener = match bind_egress_proxy_listener(listener_address) {
-            Ok(std_listener) => std_listener,
-            Err(error) => {
-                let cleanup_suffix =
-                    cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
-                        .err()
-                        .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
-                        .unwrap_or_default();
-                return Err(EgressProxyError::new(format!("{error}{cleanup_suffix}")));
-            }
-        };
-        let listener_address = match std_listener.local_addr() {
-            Ok(listener_address) => listener_address,
-            Err(error) => {
-                let cleanup_suffix =
-                    cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
-                        .err()
-                        .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
-                        .unwrap_or_default();
-                return Err(EgressProxyError::new(format!(
-                    "failed to inspect local egress proxy address: {error}{cleanup_suffix}"
-                )));
-            }
-        };
+        if matches!(
+            loopback_runtime,
+            EgressProxyLoopbackRuntime::ChildProcess { .. }
+        ) && listener_address.port() == 0
+        {
+            let cleanup_suffix = cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
+                .err()
+                .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
+                .unwrap_or_default();
+            return Err(EgressProxyError::new(format!(
+                "egress proxy child process requires a stable listener port{cleanup_suffix}"
+            )));
+        }
         supervisor_handle.replace_component_details(
             SupervisedComponent::EgressProxy,
             BTreeMap::from([
@@ -289,21 +431,51 @@ impl EgressProxy {
             };
 
         supervisor_handle.mark_component_starting(SupervisedComponent::EgressProxy);
-        let mut active_server =
-            spawn_active_egress_proxy_server(std_listener, state.clone(), run_proxy_server);
-        if let Err(error) = wait_for_egress_proxy_health(
+        let mut active_loopback = match start_active_loopback_proxy(
+            &loopback_runtime,
             listener_address,
-            &mut active_server,
-            EGRESS_PROXY_STARTUP_HEALTHCHECK_TIMEOUT,
+            state.clone(),
+            supervisor_handle.sandbox_instance_id(),
         ) {
-            active_server.request_shutdown();
-            let _ = active_server.join();
-            let cleanup_suffix = cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
-                .err()
-                .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
-                .unwrap_or_default();
-            return Err(EgressProxyError::new(format!("{error}{cleanup_suffix}")));
-        }
+            Ok(mut active_loopback) => {
+                let health_result = match &mut active_loopback {
+                    #[cfg(test)]
+                    ActiveLoopbackEgressProxy::InProcess(active_server) => {
+                        wait_for_egress_proxy_health(
+                            listener_address,
+                            active_server,
+                            EGRESS_PROXY_STARTUP_HEALTHCHECK_TIMEOUT,
+                        )
+                    }
+                    ActiveLoopbackEgressProxy::ChildProcess(active_child) => {
+                        wait_for_egress_proxy_child_health(
+                            listener_address,
+                            active_child,
+                            EGRESS_PROXY_STARTUP_HEALTHCHECK_TIMEOUT,
+                        )
+                    }
+                };
+                if let Err(error) = health_result {
+                    active_loopback.request_shutdown();
+                    let _ = active_loopback.join();
+                    let cleanup_suffix =
+                        cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
+                            .err()
+                            .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
+                            .unwrap_or_default();
+                    return Err(EgressProxyError::new(format!("{error}{cleanup_suffix}")));
+                }
+                active_loopback
+            }
+            Err(error) => {
+                let cleanup_suffix =
+                    cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
+                        .err()
+                        .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
+                        .unwrap_or_default();
+                return Err(EgressProxyError::new(format!("{error}{cleanup_suffix}")));
+            }
+        };
         supervisor_handle.mark_component_healthy(SupervisedComponent::EgressProxy);
 
         let mut transparent_server = match transparent_listener_address {
@@ -312,8 +484,8 @@ impl EgressProxy {
                     match bind_transparent_egress_proxy_listener(transparent_listener_address) {
                         Ok(transparent_listener) => transparent_listener,
                         Err(error) => {
-                            active_server.request_shutdown();
-                            let _ = active_server.join();
+                            active_loopback.request_shutdown();
+                            let _ = active_loopback.join();
                             let cleanup_suffix =
                                 cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
                                     .err()
@@ -327,8 +499,8 @@ impl EgressProxy {
                 let transparent_listener_address = match transparent_listener.local_addr() {
                     Ok(transparent_listener_address) => transparent_listener_address,
                     Err(error) => {
-                        active_server.request_shutdown();
-                        let _ = active_server.join();
+                        active_loopback.request_shutdown();
+                        let _ = active_loopback.join();
                         let cleanup_suffix =
                             cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
                                 .err()
@@ -353,8 +525,8 @@ impl EgressProxy {
                 ) {
                     transparent_server.request_shutdown();
                     let _ = transparent_server.join();
-                    active_server.request_shutdown();
-                    let _ = active_server.join();
+                    active_loopback.request_shutdown();
+                    let _ = active_loopback.join();
                     let cleanup_suffix =
                         cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
                             .err()
@@ -425,8 +597,8 @@ impl EgressProxy {
                                 server.request_shutdown();
                                 let _ = server.join();
                             }
-                            active_server.request_shutdown();
-                            let _ = active_server.join();
+                            active_loopback.request_shutdown();
+                            let _ = active_loopback.join();
                             let cleanup_suffix =
                                 cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
                                     .err()
@@ -447,22 +619,59 @@ impl EgressProxy {
         let shutdown_requested = Arc::new(AtomicBool::new(false));
         #[cfg(any(test, debug_assertions))]
         let (supervisor_command_sender, supervisor_command_receiver) = mpsc::channel();
+        #[cfg(any(test, debug_assertions))]
+        let supervisor_command_sender_for_proxy = Some(supervisor_command_sender);
         let supervisor_thread = thread::spawn({
             let shutdown_requested = shutdown_requested.clone();
             let supervisor_handle = supervisor_handle.clone();
-            let config = EgressProxySupervisorConfig {
-                listener_address,
-                state,
-            };
-            move || {
-                run_egress_proxy_supervisor(
-                    config,
-                    active_server,
-                    shutdown_requested,
-                    supervisor_handle,
-                    #[cfg(any(test, debug_assertions))]
-                    supervisor_command_receiver,
-                )
+            move || match (loopback_runtime, active_loopback) {
+                #[cfg(test)]
+                (
+                    EgressProxyLoopbackRuntime::InProcess,
+                    ActiveLoopbackEgressProxy::InProcess(active_server),
+                ) => {
+                    let config = EgressProxySupervisorConfig {
+                        listener_address,
+                        state,
+                    };
+                    run_egress_proxy_supervisor(
+                        config,
+                        active_server,
+                        shutdown_requested,
+                        supervisor_handle,
+                        #[cfg(any(test, debug_assertions))]
+                        supervisor_command_receiver,
+                    )
+                }
+                (
+                    EgressProxyLoopbackRuntime::ChildProcess {
+                        binary_path,
+                        tunnel_gateway_ws_url,
+                        token_provider,
+                    },
+                    ActiveLoopbackEgressProxy::ChildProcess(active_child),
+                ) => {
+                    let config = EgressProxyProcessSupervisorConfig {
+                        child_binary_path: binary_path,
+                        listener_address,
+                        sandbox_instance_id: supervisor_handle.sandbox_instance_id().to_string(),
+                        tunnel_gateway_ws_url,
+                        token_provider,
+                        state,
+                    };
+                    run_egress_proxy_process_supervisor(
+                        config,
+                        active_child,
+                        shutdown_requested,
+                        supervisor_handle,
+                        #[cfg(any(test, debug_assertions))]
+                        supervisor_command_receiver,
+                    )
+                }
+                #[cfg(test)]
+                _ => Err(EgressProxyError::new(
+                    "egress proxy loopback runtime changed during startup",
+                )),
             }
         });
 
@@ -472,7 +681,7 @@ impl EgressProxy {
             supervisor_thread: Some(supervisor_thread),
             transparent_server,
             #[cfg(any(test, debug_assertions))]
-            supervisor_command_sender: Some(supervisor_command_sender),
+            supervisor_command_sender: supervisor_command_sender_for_proxy,
             proxy_ca_installation,
             transparent_packet_rules,
             supervisor_handle,
@@ -576,6 +785,7 @@ mod tests;
 
 mod body;
 mod ca;
+mod child;
 mod env;
 mod gateway;
 mod logging;
@@ -583,4 +793,5 @@ mod routing;
 mod server;
 mod supervisor;
 mod tls;
+mod token_bridge;
 mod transparent;
