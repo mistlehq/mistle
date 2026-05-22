@@ -12,16 +12,16 @@ type HomePageFrameProps = {
 
 export function HomePageFrame(props: HomePageFrameProps): React.JSX.Element {
   const showGetStartedTitle = props.onboardingState !== "completed";
-  const showHeaderTitle = props.showMistleCloudBetaNotice || showGetStartedTitle;
+  const showHeaderContent = props.showMistleCloudBetaNotice || showGetStartedTitle;
 
   return (
     <PageFrame
       width="normal"
       {...(props.onboardingState === "completed" ? { className: "bg-muted/30" } : {})}
-      {...(showHeaderTitle
+      {...(showHeaderContent
         ? {
             titleSlot: (
-              <HomePageHeaderTitle
+              <HomePageHeaderContent
                 showGetStartedTitle={showGetStartedTitle}
                 showMistleCloudBetaNotice={props.showMistleCloudBetaNotice}
               />
@@ -34,7 +34,7 @@ export function HomePageFrame(props: HomePageFrameProps): React.JSX.Element {
   );
 }
 
-function HomePageHeaderTitle(input: {
+function HomePageHeaderContent(input: {
   showGetStartedTitle: boolean;
   showMistleCloudBetaNotice: boolean;
 }): React.JSX.Element {
