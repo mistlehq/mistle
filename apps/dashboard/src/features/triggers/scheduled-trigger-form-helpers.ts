@@ -85,6 +85,10 @@ export function toScheduledTriggerFormValues(
     };
   }
 
+  if (trigger.schedule.kind !== "recurring") {
+    throw new Error("Only recurring scheduled triggers can be edited in this form.");
+  }
+
   return {
     name: trigger.name,
     sandboxProfileId: trigger.target.sandboxProfileId,

@@ -133,6 +133,20 @@ export function EditScheduledTriggerEditor(input: {
     });
   }
 
+  if (triggerQuery.data.schedule.kind !== "recurring") {
+    return renderTriggerEditorFrameContent({
+      content: renderScheduledTriggerEditorError({
+        title: "Could not edit trigger",
+        description: "Only recurring scheduled triggers can be edited in this form.",
+        onBack: () => {
+          void input.navigate(input.backPath ?? "/triggers");
+        },
+      }),
+      renderFrame: input.renderFrame,
+      state: "editor",
+    });
+  }
+
   return renderTriggerEditorFrameContent({
     content: (
       <LoadedScheduledTriggerEditor

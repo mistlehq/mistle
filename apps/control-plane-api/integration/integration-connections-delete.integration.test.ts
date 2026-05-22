@@ -151,15 +151,17 @@ describe.concurrent("integration connections delete integration", () => {
       email: "integration-new-connections-delete-revocation-failure@example.com",
     });
     const connectionId = "icn_integration_new_delete_revocation_failure";
+    const targetKey = "revocation_failure_connections_delete";
 
     try {
       await seedRevocationFailureTarget(env, {
         revocationUrl: simulatedProvider.revocationUrl,
+        targetKey,
       });
       await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
         id: connectionId,
         organizationId: session.organizationId,
-        targetKey: "revocation_failure_connections_delete",
+        targetKey,
         displayName: "Revocation failure",
         status: IntegrationConnectionStatuses.ACTIVE,
         config: {
@@ -193,15 +195,17 @@ describe.concurrent("integration connections delete integration", () => {
       email: "integration-new-connections-delete-revocation-after-rollback@example.com",
     });
     const connectionId = "icn_integration_new_delete_revocation_after_rollback";
+    const targetKey = "revocation_failure_connections_delete_after_rollback";
 
     try {
       await seedRevocationFailureTarget(env, {
         revocationUrl: simulatedProvider.revocationUrl,
+        targetKey,
       });
       await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
         id: connectionId,
         organizationId: session.organizationId,
-        targetKey: "revocation_failure_connections_delete",
+        targetKey,
         displayName: "Revocation after rollback",
         status: IntegrationConnectionStatuses.ACTIVE,
         config: {
@@ -212,7 +216,7 @@ describe.concurrent("integration connections delete integration", () => {
         id: "iws_integration_new_delete_revocation_after_rollback",
         organizationId: session.organizationId,
         integrationConnectionId: connectionId,
-        targetKey: "revocation_failure_connections_delete",
+        targetKey,
         endpointKey: "ep_integration_new_delete_revocation_after_rollback",
         status: "active",
       });
@@ -490,12 +494,13 @@ async function seedRevocationFailureTarget(
   env: IntegrationTestEnvironment,
   input: {
     revocationUrl: string;
+    targetKey: string;
   },
 ): Promise<void> {
   await env.controlPlaneDb
     .insert(env.controlPlaneTables.integrationTargets)
     .values({
-      targetKey: "revocation_failure_connections_delete",
+      targetKey: input.targetKey,
       familyId: "revocation-failure",
       variantId: "revocation-failure",
       enabled: true,

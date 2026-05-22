@@ -94,12 +94,14 @@ function createScheduledTriggerDetail(): ScheduledTrigger {
     enabled: true,
     schedule: {
       id: "ats_schedule_test",
+      kind: "recurring",
       name: "Daily schedule",
       cronExpression: "0 9 * * 1-5",
       timezone: "Asia/Singapore",
       enabled: true,
       nextScheduledAt: "2026-05-18T01:00:00.000Z",
       lastScheduledAt: null,
+      startAt: null,
     },
     inputTemplate: "Review open work.",
     conversationKeyTemplate: ScheduledTriggerSameConversationKeyTemplate,
@@ -142,12 +144,10 @@ function createWebhookTriggerDetail(): WebhookTrigger {
 function seedScheduledTriggerEditor(
   queryClient: ReturnType<typeof createTestQueryClient>,
   triggerSummary: TriggerListItem,
+  triggerDetail: ScheduledTrigger = createScheduledTriggerDetail(),
 ): void {
   queryClient.setQueryData(triggerDetailQueryKey(triggerSummary.id), triggerSummary);
-  queryClient.setQueryData(
-    scheduledTriggerDetailQueryKey(triggerSummary.id),
-    createScheduledTriggerDetail(),
-  );
+  queryClient.setQueryData(scheduledTriggerDetailQueryKey(triggerSummary.id), triggerDetail);
   queryClient.setQueryData(TRIGGER_SANDBOX_PROFILES_QUERY_KEY, [
     {
       id: SandboxProfileId,
@@ -383,6 +383,30 @@ describe("TriggerEditorPage", () => {
     expect(screen.getByText("Trigger source")).toBeDefined();
     expect(screen.getAllByText("Schedule").length).toBeGreaterThan(0);
     expect(screen.getByText("Schedule Profile v1")).toBeDefined();
+  });
+
+  it("shows an explicit unsupported state for one-off scheduled triggers", async () => {
+    const queryClient = createEditorQueryClient();
+    const triggerDetail = createScheduledTriggerDetail();
+    seedScheduledTriggerEditor(queryClient, createScheduleTriggerSummary(), {
+      ...triggerDetail,
+      schedule: {
+        ...triggerDetail.schedule,
+        kind: "one_off",
+        cronExpression: null,
+        timezone: null,
+        nextScheduledAt: "2026-05-18T01:00:00.000Z",
+        startAt: "2026-05-18T01:00:00.000Z",
+      },
+    });
+
+    renderTriggerEditorPage({ queryClient, triggerId: ScheduleTriggerId });
+
+    expect(await screen.findByText("Could not edit trigger")).toBeDefined();
+    expect(
+      screen.getByText("Only recurring scheduled triggers can be edited in this form."),
+    ).toBeDefined();
+    expect(screen.queryByDisplayValue("0 9 * * 1-5")).toBeNull();
   });
 
   it("uses the loaded trigger summary to render the webhook trigger editor", async () => {

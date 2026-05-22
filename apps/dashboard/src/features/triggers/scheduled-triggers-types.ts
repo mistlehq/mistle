@@ -16,17 +16,28 @@ const ScheduledTriggerTargetSchema = z
   })
   .strict();
 
-const ScheduledTriggerScheduleSchema = z
-  .object({
-    id: z.string().min(1),
-    name: z.string().min(1),
+const ScheduledTriggerScheduleBaseSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  enabled: z.boolean(),
+  nextScheduledAt: z.string().min(1).nullable(),
+  lastScheduledAt: z.string().min(1).nullable(),
+});
+
+const ScheduledTriggerScheduleSchema = z.discriminatedUnion("kind", [
+  ScheduledTriggerScheduleBaseSchema.extend({
+    kind: z.literal("recurring"),
     cronExpression: z.string().min(1),
     timezone: z.string().min(1),
-    enabled: z.boolean(),
-    nextScheduledAt: z.string().min(1).nullable(),
-    lastScheduledAt: z.string().min(1).nullable(),
-  })
-  .strict();
+    startAt: z.null(),
+  }).strict(),
+  ScheduledTriggerScheduleBaseSchema.extend({
+    kind: z.literal("one_off"),
+    cronExpression: z.null(),
+    timezone: z.null(),
+    startAt: z.string().min(1),
+  }).strict(),
+]);
 
 export const ScheduledTriggerSchema = z
   .object({
