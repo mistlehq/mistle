@@ -26,7 +26,7 @@ export function AuthScreenView(props: AuthScreenViewProps): React.JSX.Element {
   return (
     <AuthPageShell
       maxWidthClass={AuthPageWidths.SM}
-      title={props.title ?? (props.authStep === "email" ? "Log in with email" : null)}
+      title={props.title ?? (props.authStep === "email" ? "Sign in or create an account" : null)}
     >
       {props.authStep === "email" ? (
         <EmailStage

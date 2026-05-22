@@ -185,7 +185,6 @@ export function AuthScreen(): React.JSX.Element {
 
   const authScreenViewOptionalProps = {
     ...(emailStageAfterForm === undefined ? {} : { emailStageAfterForm }),
-    ...(authStep === "email" && hasGoogleAuthMethod ? { title: "Log in" } : {}),
   };
 
   return (

@@ -70,7 +70,6 @@ export const GoogleEnabled: Story = {
         <GoogleSignInButton isPending={false} onClick={async () => {}} />
       </div>
     ),
-    title: "Log in",
   },
 };
 
@@ -82,7 +81,6 @@ export const GoogleRedirecting: Story = {
         <GoogleSignInButton isPending={true} onClick={async () => {}} />
       </div>
     ),
-    title: "Log in",
   },
 };
 
@@ -95,7 +93,6 @@ export const GoogleCallbackError: Story = {
         <GoogleSignInButton isPending={false} onClick={async () => {}} />
       </div>
     ),
-    title: "Log in",
   },
 };
 
