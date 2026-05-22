@@ -11,16 +11,23 @@ type HomePageFrameProps = {
 };
 
 export function HomePageFrame(props: HomePageFrameProps): React.JSX.Element {
+  const showGetStartedTitle = props.onboardingState !== "completed";
+  const showHeaderTitle = props.showMistleCloudBetaNotice || showGetStartedTitle;
+
   return (
     <PageFrame
       width="normal"
       {...(props.onboardingState === "completed" ? { className: "bg-muted/30" } : {})}
-      titleSlot={
-        <HomePageHeaderTitle
-          showGetStartedTitle={props.onboardingState !== "completed"}
-          showMistleCloudBetaNotice={props.showMistleCloudBetaNotice}
-        />
-      }
+      {...(showHeaderTitle
+        ? {
+            titleSlot: (
+              <HomePageHeaderTitle
+                showGetStartedTitle={showGetStartedTitle}
+                showMistleCloudBetaNotice={props.showMistleCloudBetaNotice}
+              />
+            ),
+          }
+        : {})}
     >
       {props.children}
     </PageFrame>

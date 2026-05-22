@@ -42,10 +42,10 @@ describe("HomePageFrame", () => {
     expect(container.firstElementChild?.className).toContain("bg-muted/30");
   });
 
-  it("does not render the beta notice when it is disabled", () => {
+  it("renders the onboarding title without the beta notice when the notice is disabled", () => {
     render(
       <HomePageFrame onboardingState="add_integrations" showMistleCloudBetaNotice={false}>
-        <div>Completed home content</div>
+        <div>Home content</div>
       </HomePageFrame>,
     );
 
@@ -53,6 +53,21 @@ describe("HomePageFrame", () => {
       screen.queryByText("Mistle Cloud is in beta - Usage is free, subject to usage limits"),
     ).toBeNull();
     expect(screen.getByRole("heading", { name: "Get started" })).toBeDefined();
+    expect(screen.getByText("Home content")).toBeDefined();
+  });
+
+  it("omits the header shell for completed home when the beta notice is disabled", () => {
+    const { container } = render(
+      <HomePageFrame onboardingState="completed" showMistleCloudBetaNotice={false}>
+        <div>Completed home content</div>
+      </HomePageFrame>,
+    );
+
+    expect(
+      screen.queryByText("Mistle Cloud is in beta - Usage is free, subject to usage limits"),
+    ).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Get started" })).toBeNull();
+    expect(container.querySelector('[data-slot="page-frame-header-shell"]')).toBeNull();
     expect(screen.getByText("Completed home content")).toBeDefined();
   });
 });
