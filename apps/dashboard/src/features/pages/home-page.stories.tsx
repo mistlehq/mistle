@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import { PageFrame } from "../shared/page-frame.js";
+import { HomeOnboardingHeaderTitle } from "./home-onboarding-header-title.js";
 import { HomePageStoryModels } from "./home-page-view-model.js";
 import { HomePageView } from "./home-page-view.js";
 import { NewSessionForm } from "./new-session-form.js";
@@ -19,7 +20,9 @@ function HomePageStoryFrame(args: ComponentProps<typeof HomePageView>): React.JS
     <PageFrame
       width="normal"
       {...(args.onboarding.state === "completed" ? { className: "bg-muted/30" } : {})}
-      {...(args.onboarding.state === "completed" ? {} : { title: "Get started" })}
+      titleSlot={
+        <HomeOnboardingHeaderTitle showGetStartedTitle={args.onboarding.state !== "completed"} />
+      }
     >
       <HomePageView {...args} />
     </PageFrame>
