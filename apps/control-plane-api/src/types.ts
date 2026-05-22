@@ -1,3 +1,5 @@
+import type { IncomingMessage, ServerResponse } from "node:http";
+
 import type { ServerType } from "@hono/node-server";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import { AppIds, type loadConfig } from "@mistle/config";
@@ -132,11 +134,17 @@ export type StartServerInput = {
   app: ControlPlaneApp;
   host: string;
   port: number;
+  nodeRequestHandlers?: readonly NodeRequestHandler[];
 };
 
 export type StartedServer = {
   server: ServerType;
   close: () => Promise<void>;
+};
+
+export type NodeRequestHandler = {
+  matches: (request: IncomingMessage) => boolean;
+  handle: (request: IncomingMessage, response: ServerResponse) => Promise<void> | void;
 };
 
 export type ControlPlaneApiRuntime = {
