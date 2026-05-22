@@ -50,7 +50,7 @@ describe("settings model", () => {
     expect(SETTINGS_NAV_GROUPS.find((group) => group.label === "Developer")).toBeUndefined();
   });
 
-  it("shows sandbox storage settings only for owners and admins", () => {
+  it("does not show sandbox storage settings while it is temporarily hidden", () => {
     const ownerOrganizationGroup = resolveSettingsNavGroups({ organizationRole: "owner" }).find(
       (group) => group.label === "Organization",
     );
@@ -61,10 +61,10 @@ describe("settings model", () => {
       (group) => group.label === "Organization",
     );
 
-    expect(ownerOrganizationGroup?.items.map((item) => item.to)).toContain(
+    expect(ownerOrganizationGroup?.items.map((item) => item.to)).not.toContain(
       "/settings/organization/sandboxes",
     );
-    expect(adminOrganizationGroup?.items.map((item) => item.to)).toContain(
+    expect(adminOrganizationGroup?.items.map((item) => item.to)).not.toContain(
       "/settings/organization/sandboxes",
     );
     expect(memberOrganizationGroup?.items.map((item) => item.to)).not.toContain(

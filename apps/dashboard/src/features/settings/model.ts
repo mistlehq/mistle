@@ -1,6 +1,6 @@
 import {
   CreditCardIcon,
-  HardDrivesIcon,
+  // HardDrivesIcon,
   KeyIcon,
   LinkSimpleIcon,
   SlidersHorizontalIcon,
@@ -52,17 +52,17 @@ export function resolveSettingsNavGroups(input: {
               },
             ]
           : []),
-        ...(shouldRenderSandboxStorageSettingsNavItem({
-          organizationRole: input.organizationRole,
-        })
-          ? [
-              {
-                to: "/settings/organization/sandboxes",
-                label: "Sandboxes",
-                icon: SandboxStorageNavIcon,
-              },
-            ]
-          : []),
+        // ...(shouldRenderSandboxStorageSettingsNavItem({
+        //   organizationRole: input.organizationRole,
+        // })
+        //   ? [
+        //       {
+        //         to: "/settings/organization/sandboxes",
+        //         label: "Sandboxes",
+        //         icon: SandboxStorageNavIcon,
+        //       },
+        //     ]
+        //   : []),
         ...(canViewOrganizationBillingSettings({
           organizationRole: input.organizationRole,
           stripeBillingEnabled: input.stripeBillingEnabled ?? false,
@@ -118,12 +118,12 @@ function MembersNavIcon(props: { className?: string; "aria-hidden"?: boolean }):
   return createElement(UsersIcon, props);
 }
 
-function SandboxStorageNavIcon(props: {
-  className?: string;
-  "aria-hidden"?: boolean;
-}): React.JSX.Element {
-  return createElement(HardDrivesIcon, props);
-}
+// function SandboxStorageNavIcon(props: {
+//   className?: string;
+//   "aria-hidden"?: boolean;
+// }): React.JSX.Element {
+//   return createElement(HardDrivesIcon, props);
+// }
 
 function IdentityLinkingNavIcon(props: {
   className?: string;
@@ -140,11 +140,11 @@ function ApiKeysNavIcon(props: { className?: string; "aria-hidden"?: boolean }):
   return createElement(KeyIcon, props);
 }
 
-function shouldRenderSandboxStorageSettingsNavItem(input: {
-  organizationRole: OrganizationRole | null;
-}): boolean {
-  return input.organizationRole === "owner" || input.organizationRole === "admin";
-}
+// function shouldRenderSandboxStorageSettingsNavItem(input: {
+//   organizationRole: OrganizationRole | null;
+// }): boolean {
+//   return input.organizationRole === "owner" || input.organizationRole === "admin";
+// }
 
 function shouldRenderIdentityLinkingSettingsNavItem(input: {
   organizationRole: OrganizationRole | null;
