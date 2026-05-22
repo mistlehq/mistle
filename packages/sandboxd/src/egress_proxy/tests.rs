@@ -30,7 +30,7 @@ use crate::egress_proxy::{
 };
 use crate::egress_proxy::{
     TRANSPARENT_NFTABLES_TABLE_NAME, build_nftables_install_commands,
-    build_nftables_local_destination_set_replace_commands,
+    build_nftables_local_destination_set_replace_script,
     build_nftables_rule_plan_with_local_destinations, parse_iproute2_link_scope_ipv4_route_cidrs,
 };
 use crate::protocol::startup::{StartupInput, StartupMode};
@@ -494,7 +494,7 @@ fn installs_local_destination_bypasses_as_interval_set_before_redirect() {
 
 #[test]
 fn builds_local_destination_set_replacement_for_reconciliation() {
-    let commands = build_nftables_local_destination_set_replace_commands(
+    let script = build_nftables_local_destination_set_replace_script(
         TRANSPARENT_NFTABLES_TABLE_NAME,
         &[
             "127.0.0.0/8".to_string(),
@@ -504,30 +504,10 @@ fn builds_local_destination_set_replacement_for_reconciliation() {
     );
 
     assert_eq!(
-        commands,
-        vec![
-            vec![
-                "flush".to_string(),
-                "set".to_string(),
-                "ip".to_string(),
-                TRANSPARENT_NFTABLES_TABLE_NAME.to_string(),
-                "local_destinations".to_string(),
-            ],
-            vec![
-                "add".to_string(),
-                "element".to_string(),
-                "ip".to_string(),
-                TRANSPARENT_NFTABLES_TABLE_NAME.to_string(),
-                "local_destinations".to_string(),
-                "{".to_string(),
-                "127.0.0.0/8".to_string(),
-                ",".to_string(),
-                "169.254.0.0/16".to_string(),
-                ",".to_string(),
-                "172.18.0.0/16".to_string(),
-                "}".to_string(),
-            ],
-        ]
+        script,
+        format!(
+            "flush set ip {TRANSPARENT_NFTABLES_TABLE_NAME} local_destinations\nadd element ip {TRANSPARENT_NFTABLES_TABLE_NAME} local_destinations {{ 127.0.0.0/8 , 169.254.0.0/16 , 172.18.0.0/16 }}\n"
+        )
     );
 }
 

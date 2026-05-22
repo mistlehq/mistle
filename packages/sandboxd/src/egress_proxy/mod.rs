@@ -58,7 +58,7 @@ use crate::egress_proxy::transparent::socket_addr_from_sockaddr_storage;
 use crate::egress_proxy::transparent::start_transparent_local_destination_reconciler_for_table;
 #[cfg(test)]
 use crate::egress_proxy::transparent::{
-    build_nftables_install_commands, build_nftables_local_destination_set_replace_commands,
+    build_nftables_install_commands, build_nftables_local_destination_set_replace_script,
     build_nftables_rule_plan_with_local_destinations, parse_iproute2_link_scope_ipv4_route_cidrs,
 };
 use crate::protocol::startup::StartupInput;

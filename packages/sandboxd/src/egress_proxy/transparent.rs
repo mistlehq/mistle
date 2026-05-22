@@ -6,6 +6,8 @@
 
 #[cfg(target_os = "linux")]
 use std::collections::BTreeSet;
+#[cfg(target_os = "linux")]
+use std::io::Write;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs};
 #[cfg(target_os = "linux")]
 use std::os::unix::io::AsRawFd;
@@ -664,11 +666,11 @@ fn build_nftables_local_destination_set_add_command(
 }
 
 #[cfg(any(test, target_os = "linux"))]
-pub(super) fn build_nftables_local_destination_set_replace_commands(
+pub(super) fn build_nftables_local_destination_set_replace_script(
     table_name: &str,
     cidrs: &[String],
-) -> Vec<Vec<String>> {
-    vec![
+) -> String {
+    let commands = [
         vec![
             "flush".to_string(),
             "set".to_string(),
@@ -677,7 +679,13 @@ pub(super) fn build_nftables_local_destination_set_replace_commands(
             LOCAL_DESTINATION_SET_NAME.to_string(),
         ],
         build_nftables_local_destination_set_add_command(table_name, cidrs),
-    ]
+    ];
+    commands
+        .iter()
+        .map(|command| command.join(" "))
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n"
 }
 
 #[cfg(all(target_os = "linux", test))]
@@ -903,21 +911,20 @@ fn reconcile_local_destination_set(
         last_local_destination_ipv4_cidrs,
         &local_destination_ipv4_cidrs,
     );
-    for command in build_nftables_local_destination_set_replace_commands(
+    let replace_script = build_nftables_local_destination_set_replace_script(
         table_name,
         &local_destination_ipv4_cidrs,
-    ) {
-        if let Err(error) = run_nft_command(&command) {
-            emit_reconcile_failed_log(
-                log_context,
-                table_name,
-                trigger,
-                event_count,
-                started_at.elapsed(),
-                &error,
-            );
-            return Err(error);
-        }
+    );
+    if let Err(error) = run_nft_script(&replace_script) {
+        emit_reconcile_failed_log(
+            log_context,
+            table_name,
+            trigger,
+            event_count,
+            started_at.elapsed(),
+            &error,
+        );
+        return Err(error);
     }
     *last_local_destination_ipv4_cidrs = local_destination_ipv4_cidrs.clone();
     emit_transparent_reconciler_log(
@@ -1038,6 +1045,64 @@ fn run_nft_command(arguments: &[String]) -> Result<(), EgressProxyError> {
 
     Err(EgressProxyError::new(format!(
         "nft command failed with status {}: {}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr).trim()
+    )))
+}
+
+#[cfg(target_os = "linux")]
+fn run_nft_script(script: &str) -> Result<(), EgressProxyError> {
+    let mut child = Command::new("nft")
+        .args(["-f", "-"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|error| {
+            EgressProxyError::new(format!("failed to execute nft batch command: {error}"))
+        })?;
+    let write_result = match child.stdin.take() {
+        Some(mut stdin) => {
+            let result = stdin.write_all(script.as_bytes()).map_err(|error| {
+                EgressProxyError::new(format!("failed to write nft batch command stdin: {error}"))
+            });
+            drop(stdin);
+            result
+        }
+        None => Err(EgressProxyError::new(
+            "failed to open nft batch command stdin",
+        )),
+    };
+
+    let output = match child.wait_with_output() {
+        Ok(output) => output,
+        Err(error) => {
+            return Err(match &write_result {
+                Ok(()) => {
+                    EgressProxyError::new(format!("failed to wait for nft batch command: {error}"))
+                }
+                Err(write_error) => EgressProxyError::new(format!(
+                    "{write_error}; additionally failed to wait for nft batch command: {error}"
+                )),
+            });
+        }
+    };
+    if let Err(write_error) = write_result {
+        if output.status.success() {
+            return Err(write_error);
+        }
+        return Err(EgressProxyError::new(format!(
+            "{write_error}; nft batch command exited with status {}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        )));
+    }
+    if output.status.success() {
+        return Ok(());
+    }
+
+    Err(EgressProxyError::new(format!(
+        "nft batch command failed with status {}: {}",
         output.status,
         String::from_utf8_lossy(&output.stderr).trim()
     )))
