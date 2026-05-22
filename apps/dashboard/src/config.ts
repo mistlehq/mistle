@@ -2,7 +2,6 @@
 
 type DashboardEnv = {
   readonly VITE_CONTROL_PLANE_API_ORIGIN?: string;
-  readonly VITE_MISTLE_CLOUD_BETA_NOTICE_ENABLED?: string;
   readonly VITE_MISTLE_RELEASE_VERSION?: string;
   readonly VITE_POSTHOG_ENABLED?: string;
   readonly VITE_POSTHOG_PROJECT_API_KEY?: string;
@@ -23,7 +22,6 @@ export type DashboardConfig = {
   controlPlaneApiOrigin: string;
   releaseVersion: string;
   authBasePath: "/v1/auth";
-  mistleCloudBetaNoticeEnabled: boolean;
   posthog: DashboardPostHogConfig;
 };
 
@@ -109,10 +107,6 @@ export function buildDashboardConfig(env: DashboardEnv): DashboardConfig {
     ),
     releaseVersion,
     authBasePath: "/v1/auth",
-    mistleCloudBetaNoticeEnabled: parseOptionalBoolean(
-      env.VITE_MISTLE_CLOUD_BETA_NOTICE_ENABLED,
-      "VITE_MISTLE_CLOUD_BETA_NOTICE_ENABLED",
-    ),
     posthog: parseDashboardPostHogConfig(env),
   };
 }
@@ -122,7 +116,6 @@ let cachedDashboardConfig: DashboardConfig | undefined;
 function readDashboardEnvironment(): DashboardEnv {
   return {
     VITE_CONTROL_PLANE_API_ORIGIN: import.meta.env.VITE_CONTROL_PLANE_API_ORIGIN,
-    VITE_MISTLE_CLOUD_BETA_NOTICE_ENABLED: import.meta.env.VITE_MISTLE_CLOUD_BETA_NOTICE_ENABLED,
     VITE_MISTLE_RELEASE_VERSION: import.meta.env.VITE_MISTLE_RELEASE_VERSION,
     VITE_POSTHOG_ENABLED: import.meta.env.VITE_POSTHOG_ENABLED,
     VITE_POSTHOG_PROJECT_API_KEY: import.meta.env.VITE_POSTHOG_PROJECT_API_KEY,

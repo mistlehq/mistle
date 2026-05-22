@@ -13,7 +13,6 @@ function clearDashboardPostHogEnv(): void {
   Reflect.deleteProperty(import.meta.env, "VITE_POSTHOG_ENABLED");
   Reflect.deleteProperty(import.meta.env, "VITE_POSTHOG_PROJECT_API_KEY");
   Reflect.deleteProperty(import.meta.env, "VITE_POSTHOG_HOST");
-  Reflect.deleteProperty(import.meta.env, "VITE_MISTLE_CLOUD_BETA_NOTICE_ENABLED");
 }
 
 afterEach(() => {
@@ -32,7 +31,6 @@ describe("dashboard config", () => {
 
     expect(config.controlPlaneApiOrigin).toBe("http://localhost:3000");
     expect(config.releaseVersion).toBe("0.18.1");
-    expect(config.mistleCloudBetaNoticeEnabled).toBe(false);
     expect(config.posthog).toEqual({ enabled: false });
   });
 
@@ -81,26 +79,6 @@ describe("dashboard config", () => {
     setDashboardControlPlaneApiOrigin("http://localhost:8080");
 
     expect(getDashboardConfig().controlPlaneApiOrigin).toBe("http://localhost:8080");
-  });
-
-  it("loads the Mistle Cloud beta notice flag from build-time env", () => {
-    const config = buildDashboardConfig({
-      VITE_CONTROL_PLANE_API_ORIGIN: "http://localhost:3000",
-      VITE_MISTLE_RELEASE_VERSION: "0.18.1",
-      VITE_MISTLE_CLOUD_BETA_NOTICE_ENABLED: "true",
-    });
-
-    expect(config.mistleCloudBetaNoticeEnabled).toBe(true);
-  });
-
-  it("rejects invalid Mistle Cloud beta notice flag values", () => {
-    expect(() =>
-      buildDashboardConfig({
-        VITE_CONTROL_PLANE_API_ORIGIN: "http://localhost:3000",
-        VITE_MISTLE_RELEASE_VERSION: "0.18.1",
-        VITE_MISTLE_CLOUD_BETA_NOTICE_ENABLED: "yes",
-      }),
-    ).toThrow('VITE_MISTLE_CLOUD_BETA_NOTICE_ENABLED must be either "true" or "false".');
   });
 
   it("keeps PostHog disabled when no PostHog env is provided", () => {

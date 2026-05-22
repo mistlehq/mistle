@@ -71,7 +71,6 @@ afterEach(() => {
 
 function createDashboardConfigFile(input?: {
   dashboardOrigin?: string;
-  mistleCloudBetaNoticeEnabled?: boolean;
   postHogConfigLines?: readonly string[];
 }): string {
   const directory = createTempDirectory();
@@ -83,9 +82,6 @@ function createDashboardConfigFile(input?: {
     [
       "[services.dashboard]",
       `control_plane_api_origin = "${dashboardOrigin}"`,
-      ...(input?.mistleCloudBetaNoticeEnabled === undefined
-        ? []
-        : [`mistle_cloud_beta_notice_enabled = ${input.mistleCloudBetaNoticeEnabled}`]),
       ...(input?.postHogConfigLines ?? []),
     ]
       .filter((line) => line.length > 0)
@@ -122,7 +118,6 @@ describe("loadDashboardBuildConfig", () => {
     });
 
     expect(config.controlPlaneApiOrigin).toBe("https://api.example.test");
-    expect(config.mistleCloudBetaNoticeEnabled).toBe(false);
     expect(config.posthog).toEqual({ enabled: false });
   });
 
@@ -138,38 +133,6 @@ describe("loadDashboardBuildConfig", () => {
 
     expect(config.controlPlaneApiOrigin).toBe("same-origin");
     expect(config.posthog).toEqual({ enabled: false });
-  });
-
-  it("loads the Mistle Cloud beta notice flag from dashboard config", () => {
-    const config = loadDashboardBuildConfigForTest({
-      configPath: createDashboardConfigFile({ mistleCloudBetaNoticeEnabled: true }),
-    });
-
-    expect(config.mistleCloudBetaNoticeEnabled).toBe(true);
-  });
-
-  it("lets env override the dashboard config Mistle Cloud beta notice flag", () => {
-    const config = loadDashboardBuildConfigForTest({
-      env: {
-        MISTLE_SERVICES_DASHBOARD_MISTLE_CLOUD_BETA_NOTICE_ENABLED: "false",
-      },
-      configPath: createDashboardConfigFile({ mistleCloudBetaNoticeEnabled: true }),
-    });
-
-    expect(config.mistleCloudBetaNoticeEnabled).toBe(false);
-  });
-
-  it("rejects invalid Mistle Cloud beta notice env values", () => {
-    expect(() =>
-      loadDashboardBuildConfigForTest({
-        env: {
-          MISTLE_SERVICES_DASHBOARD_MISTLE_CLOUD_BETA_NOTICE_ENABLED: "yes",
-        },
-        configPath: createDashboardConfigFile(),
-      }),
-    ).toThrow(
-      "Invalid MISTLE_SERVICES_DASHBOARD_MISTLE_CLOUD_BETA_NOTICE_ENABLED. Expected 'true' or 'false'.",
-    );
   });
 
   it("fails when explicit dashboard origin is not an absolute URL origin or same-origin", () => {

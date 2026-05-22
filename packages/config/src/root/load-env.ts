@@ -271,11 +271,6 @@ const RootEnvDescriptors = [
     path: ["services", "dashboard", "control_plane_api_origin"],
   },
   {
-    envVar: "MISTLE_SERVICES_DASHBOARD_MISTLE_CLOUD_BETA_NOTICE_ENABLED",
-    path: ["services", "dashboard", "mistle_cloud_beta_notice_enabled"],
-    parse: parseBooleanEnv,
-  },
-  {
     envVar: "MISTLE_SERVICES_DASHBOARD_POSTHOG_ENABLED",
     path: ["services", "dashboard", "posthog", "enabled"],
     parse: parseBooleanEnv,

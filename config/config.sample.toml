@@ -25,8 +25,6 @@ control_plane_api_origin = "https://api.mistle.example"
 # Managed-cloud operator settings. Self-hosted deployments should leave these
 # commented out.
 #
-#mistle_cloud_beta_notice_enabled = true
-#
 #[services.dashboard.posthog]
 #enabled = true
 #project_api_key = "replace-with-posthog-project-api-key"

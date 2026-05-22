@@ -36,7 +36,6 @@ function main(): void {
       ...process.env,
       VITE_CONTROL_PLANE_API_ORIGIN: config.controlPlaneApiOrigin,
       VITE_MISTLE_RELEASE_VERSION: releaseVersion,
-      VITE_MISTLE_CLOUD_BETA_NOTICE_ENABLED: config.mistleCloudBetaNoticeEnabled ? "true" : "false",
       VITE_POSTHOG_ENABLED: config.posthog.enabled ? "true" : "false",
       ...(config.posthog.enabled
         ? {

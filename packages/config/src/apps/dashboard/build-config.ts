@@ -36,7 +36,6 @@ const DashboardBuildConfigSchema = z.object({
   services: z.object({
     dashboard: z.object({
       control_plane_api_origin: z.string().min(1),
-      mistle_cloud_beta_notice_enabled: z.boolean().optional(),
       posthog: DashboardPostHogBuildConfigSchema.optional(),
     }),
   }),
@@ -54,7 +53,6 @@ export type DashboardPostHogBuildConfig =
 
 export type DashboardBuildConfig = {
   controlPlaneApiOrigin: string;
-  mistleCloudBetaNoticeEnabled: boolean;
   posthog: DashboardPostHogBuildConfig;
 };
 
@@ -191,15 +189,6 @@ function readDashboardControlPlaneApiOriginEnv(environment: NodeJS.ProcessEnv): 
   return readNonEmptyEnvValue(environment, "MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN");
 }
 
-function readDashboardMistleCloudBetaNoticeEnabledEnv(
-  environment: NodeJS.ProcessEnv,
-): boolean | undefined {
-  return readBooleanEnvValue(
-    environment,
-    "MISTLE_SERVICES_DASHBOARD_MISTLE_CLOUD_BETA_NOTICE_ENABLED",
-  );
-}
-
 function resolveParsedConfig(input: {
   environment: NodeJS.ProcessEnv;
   dashboardBuildEnvironment: DashboardBuildEnvironment;
@@ -248,10 +237,6 @@ export function loadDashboardBuildConfig(
 
   return {
     controlPlaneApiOrigin,
-    mistleCloudBetaNoticeEnabled:
-      readDashboardMistleCloudBetaNoticeEnabledEnv(environment) ??
-      parsedConfig?.services.dashboard.mistle_cloud_beta_notice_enabled ??
-      false,
     posthog: resolveDashboardPostHogBuildConfig({
       environment,
       configuredPostHog: parsedConfig?.services.dashboard.posthog,
