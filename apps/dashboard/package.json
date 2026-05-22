@@ -45,7 +45,7 @@
     "@uiw/react-codemirror": "4.25.9",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
-    "better-auth": "1.5.6",
+    "better-auth": "1.6.11",
     "dockview": "^6.0.3",
     "openapi-fetch": "^0.17.0",
     "posthog-js": "^1.373.4",
