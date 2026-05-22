@@ -2,6 +2,7 @@ import { Notice } from "@mistle/ui";
 import * as React from "react";
 import { useNavigate } from "react-router";
 
+import { getDashboardConfig } from "../../config.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useHomeSummary } from "../home/use-home-summary.js";
 import { PageFrame } from "../shared/page-frame.js";
@@ -13,6 +14,7 @@ import { NewSessionForm } from "./new-session-form.js";
 export function HomePage(): React.JSX.Element {
   const navigate = useNavigate();
   const homeSummaryQuery = useHomeSummary();
+  const dashboardConfig = getDashboardConfig();
 
   if (homeSummaryQuery.isError) {
     return (
@@ -38,7 +40,10 @@ export function HomePage(): React.JSX.Element {
   const onboarding = createHomeOnboardingViewModel(homeSummaryQuery.data.onboarding);
 
   return (
-    <HomePageFrame onboardingState={onboarding.state}>
+    <HomePageFrame
+      onboardingState={onboarding.state}
+      showMistleCloudBetaNotice={dashboardConfig.mistleCloudBetaNoticeEnabled}
+    >
       <HomePageView
         createSessionForm={<NewSessionForm />}
         onboarding={onboarding}

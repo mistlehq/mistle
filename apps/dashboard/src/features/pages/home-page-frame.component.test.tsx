@@ -8,7 +8,7 @@ import { HomePageFrame } from "./home-page-frame.js";
 describe("HomePageFrame", () => {
   it("renders the beta notice before the onboarding title", () => {
     render(
-      <HomePageFrame onboardingState="add_integrations">
+      <HomePageFrame onboardingState="add_integrations" showMistleCloudBetaNotice>
         <div>Home content</div>
       </HomePageFrame>,
     );
@@ -29,7 +29,7 @@ describe("HomePageFrame", () => {
 
   it("renders the completed home beta notice without the onboarding title", () => {
     const { container } = render(
-      <HomePageFrame onboardingState="completed">
+      <HomePageFrame onboardingState="completed" showMistleCloudBetaNotice>
         <div>Completed home content</div>
       </HomePageFrame>,
     );
@@ -40,5 +40,19 @@ describe("HomePageFrame", () => {
     expect(screen.queryByRole("heading", { name: "Get started" })).toBeNull();
     expect(screen.getByText("Completed home content")).toBeDefined();
     expect(container.firstElementChild?.className).toContain("bg-muted/30");
+  });
+
+  it("does not render the beta notice when it is disabled", () => {
+    render(
+      <HomePageFrame onboardingState="add_integrations" showMistleCloudBetaNotice={false}>
+        <div>Completed home content</div>
+      </HomePageFrame>,
+    );
+
+    expect(
+      screen.queryByText("Mistle Cloud is in beta - Usage is free, subject to usage limits"),
+    ).toBeNull();
+    expect(screen.getByRole("heading", { name: "Get started" })).toBeDefined();
+    expect(screen.getByText("Completed home content")).toBeDefined();
   });
 });

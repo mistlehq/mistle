@@ -16,7 +16,7 @@ import {
 
 function HomePageStoryFrame(args: ComponentProps<typeof HomePageView>): React.JSX.Element {
   return (
-    <HomePageFrame onboardingState={args.onboarding.state}>
+    <HomePageFrame onboardingState={args.onboarding.state} showMistleCloudBetaNotice>
       <HomePageView {...args} />
     </HomePageFrame>
   );

@@ -32,6 +32,7 @@ function createRootConfig(input: {
       dashboard: {
         public_url: "https://app.example.com",
         control_plane_api_origin: "https://api.example.com",
+        mistle_cloud_beta_notice_enabled: false,
         posthog: {
           enabled: false,
         },

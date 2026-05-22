@@ -275,6 +275,7 @@ export const ConfigSchema = z
           .object({
             public_url: UrlSchema,
             control_plane_api_origin: UrlSchema,
+            mistle_cloud_beta_notice_enabled: z.boolean().default(false),
             posthog: DashboardPostHogConfigSchema,
           })
           .strict(),
