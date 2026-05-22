@@ -11,6 +11,6 @@ This roadmap describes areas we are exploring and investing in, not committed re
 
 ## Continual Work
 
-- **Coding harnesses:** Pi.
+- **Coding harnesses:** Improve support for Codex, OpenCode and Pi
 - **Integrations:** Expand supported integrations.
 - **Sandbox providers:** Expand supported providers.
