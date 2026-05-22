@@ -4,6 +4,8 @@ use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener as StdTcpListener};
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
+#[cfg(target_os = "linux")]
+use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::Receiver;
@@ -15,6 +17,8 @@ use hyper::header::HeaderValue;
 use crate::egress_proxy::DirectGatewayRouteScheme;
 #[cfg(target_os = "linux")]
 use crate::egress_proxy::socket_addr_from_sockaddr_storage;
+#[cfg(target_os = "linux")]
+use crate::egress_proxy::start_transparent_local_destination_reconciler_for_table;
 use crate::egress_proxy::{
     DIRECT_EGRESS_HTTP_ROUTE_PATH, DIRECT_EGRESS_WEBSOCKET_ROUTE_PATH,
     DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME, DirectGatewayEgressClient, EgressProxy,
@@ -26,6 +30,7 @@ use crate::egress_proxy::{
 };
 use crate::egress_proxy::{
     TRANSPARENT_NFTABLES_TABLE_NAME, build_nftables_install_commands,
+    build_nftables_local_destination_set_replace_commands,
     build_nftables_rule_plan_with_local_destinations, parse_iproute2_link_scope_ipv4_route_cidrs,
 };
 use crate::protocol::startup::{StartupInput, StartupMode};
@@ -326,128 +331,261 @@ fn bypasses_nat_rewritten_bridge_destinations_before_redirect() {
             "172.17.0.0/16"
         ]
     );
+    assert!(commands.contains(&vec![
+        "add".to_string(),
+        "element".to_string(),
+        "ip".to_string(),
+        "mistle_transparent_egress".to_string(),
+        "local_destinations".to_string(),
+        "{".to_string(),
+        "10.88.0.0/16".to_string(),
+        ",".to_string(),
+        "127.0.0.0/8".to_string(),
+        ",".to_string(),
+        "169.254.0.0/16".to_string(),
+        ",".to_string(),
+        "172.17.0.0/16".to_string(),
+        "}".to_string(),
+    ]));
+    assert!(commands.contains(&vec![
+        "add".to_string(),
+        "rule".to_string(),
+        "ip".to_string(),
+        "mistle_transparent_egress".to_string(),
+        "output".to_string(),
+        "ip".to_string(),
+        "daddr".to_string(),
+        "@local_destinations".to_string(),
+        "log".to_string(),
+        "prefix".to_string(),
+        "\"mistle-tproxy-bypass=local\"".to_string(),
+        "return".to_string(),
+    ]));
+    assert!(commands.contains(&vec![
+        "add".to_string(),
+        "rule".to_string(),
+        "ip".to_string(),
+        "mistle_transparent_egress".to_string(),
+        "output".to_string(),
+        "ip".to_string(),
+        "daddr".to_string(),
+        "192.0.2.0/24".to_string(),
+        "log".to_string(),
+        "prefix".to_string(),
+        "\"mistle-tproxy-bypass=excluded:192.0.2.0/24\"".to_string(),
+        "return".to_string(),
+    ]));
+    assert_eq!(
+        commands
+            .last()
+            .expect("redirect command should be installed last"),
+        &vec![
+            "add".to_string(),
+            "rule".to_string(),
+            "ip".to_string(),
+            "mistle_transparent_egress".to_string(),
+            "output".to_string(),
+            "tcp".to_string(),
+            "dport".to_string(),
+            "1-65535".to_string(),
+            "redirect".to_string(),
+            "to".to_string(),
+            ":38514".to_string(),
+        ]
+    );
+}
+
+#[test]
+fn drops_local_destination_cidrs_covered_by_broader_interval_set_entries() {
+    let configuration = TransparentProxyConfiguration {
+        passthrough_bypass: TransparentProxyBypass {
+            kind: TransparentProxyBypassKind::SocketMark,
+            mark: 38_514,
+        },
+        exclusions: Vec::new(),
+    };
+
+    let plan = build_nftables_rule_plan_with_local_destinations(
+        &configuration,
+        38_514,
+        vec![
+            "127.0.0.1/32".to_string(),
+            "169.254.169.254/32".to_string(),
+            "172.18.0.1/16".to_string(),
+            "172.18.4.0/24".to_string(),
+        ],
+    )
+    .expect("transparent nftables plan should build");
+
+    assert_eq!(
+        plan.local_destination_ipv4_cidrs,
+        vec!["127.0.0.0/8", "169.254.0.0/16", "172.18.0.0/16"]
+    );
+}
+
+#[test]
+fn installs_local_destination_bypasses_as_interval_set_before_redirect() {
+    let configuration = TransparentProxyConfiguration {
+        passthrough_bypass: TransparentProxyBypass {
+            kind: TransparentProxyBypassKind::SocketMark,
+            mark: 38_514,
+        },
+        exclusions: vec![TransparentProxyExclusion {
+            kind: TransparentProxyExclusionKind::Cidr,
+            value: "192.0.2.0/24".to_string(),
+            reason: "provider control traffic must stay direct".to_string(),
+        }],
+    };
+
+    let plan = build_nftables_rule_plan_with_local_destinations(
+        &configuration,
+        38_514,
+        vec!["172.18.0.0/16".to_string(), "172.19.0.0/16".to_string()],
+    )
+    .expect("transparent nftables plan should build");
+    let commands = build_nftables_install_commands(&plan);
+
+    assert!(commands.contains(&vec![
+        "add".to_string(),
+        "set".to_string(),
+        "ip".to_string(),
+        TRANSPARENT_NFTABLES_TABLE_NAME.to_string(),
+        "local_destinations".to_string(),
+        "{".to_string(),
+        "type".to_string(),
+        "ipv4_addr".to_string(),
+        ";".to_string(),
+        "flags".to_string(),
+        "interval".to_string(),
+        ";".to_string(),
+        "}".to_string(),
+    ]));
+    assert!(commands.contains(&vec![
+        "add".to_string(),
+        "element".to_string(),
+        "ip".to_string(),
+        TRANSPARENT_NFTABLES_TABLE_NAME.to_string(),
+        "local_destinations".to_string(),
+        "{".to_string(),
+        "127.0.0.0/8".to_string(),
+        ",".to_string(),
+        "169.254.0.0/16".to_string(),
+        ",".to_string(),
+        "172.18.0.0/16".to_string(),
+        ",".to_string(),
+        "172.19.0.0/16".to_string(),
+        "}".to_string(),
+    ]));
+    assert!(commands.contains(&vec![
+        "add".to_string(),
+        "rule".to_string(),
+        "ip".to_string(),
+        TRANSPARENT_NFTABLES_TABLE_NAME.to_string(),
+        "output".to_string(),
+        "ip".to_string(),
+        "daddr".to_string(),
+        "@local_destinations".to_string(),
+        "log".to_string(),
+        "prefix".to_string(),
+        "\"mistle-tproxy-bypass=local\"".to_string(),
+        "return".to_string(),
+    ]));
+}
+
+#[test]
+fn builds_local_destination_set_replacement_for_reconciliation() {
+    let commands = build_nftables_local_destination_set_replace_commands(
+        TRANSPARENT_NFTABLES_TABLE_NAME,
+        &[
+            "127.0.0.0/8".to_string(),
+            "169.254.0.0/16".to_string(),
+            "172.18.0.0/16".to_string(),
+        ],
+    );
+
     assert_eq!(
         commands,
         vec![
-            vec!["add", "table", "ip", "mistle_transparent_egress"],
             vec![
-                "add",
-                "chain",
-                "ip",
-                "mistle_transparent_egress",
-                "output",
-                "{",
-                "type",
-                "nat",
-                "hook",
-                "output",
-                "priority",
-                "-100",
-                ";",
-                "policy",
-                "accept",
-                ";",
-                "}",
+                "flush".to_string(),
+                "set".to_string(),
+                "ip".to_string(),
+                TRANSPARENT_NFTABLES_TABLE_NAME.to_string(),
+                "local_destinations".to_string(),
             ],
             vec![
-                "add",
-                "rule",
-                "ip",
-                "mistle_transparent_egress",
-                "output",
-                "meta",
-                "mark",
-                "38514",
-                "log",
-                "prefix",
-                "\"mistle-tproxy-bypass=mark\"",
-                "return",
-            ],
-            vec![
-                "add",
-                "rule",
-                "ip",
-                "mistle_transparent_egress",
-                "output",
-                "ip",
-                "daddr",
-                "10.88.0.0/16",
-                "log",
-                "prefix",
-                "\"mistle-tproxy-bypass=local:10.88.0.0/16\"",
-                "return",
-            ],
-            vec![
-                "add",
-                "rule",
-                "ip",
-                "mistle_transparent_egress",
-                "output",
-                "ip",
-                "daddr",
-                "127.0.0.0/8",
-                "log",
-                "prefix",
-                "\"mistle-tproxy-bypass=local:127.0.0.0/8\"",
-                "return",
-            ],
-            vec![
-                "add",
-                "rule",
-                "ip",
-                "mistle_transparent_egress",
-                "output",
-                "ip",
-                "daddr",
-                "169.254.0.0/16",
-                "log",
-                "prefix",
-                "\"mistle-tproxy-bypass=local:169.254.0.0/16\"",
-                "return",
-            ],
-            vec![
-                "add",
-                "rule",
-                "ip",
-                "mistle_transparent_egress",
-                "output",
-                "ip",
-                "daddr",
-                "172.17.0.0/16",
-                "log",
-                "prefix",
-                "\"mistle-tproxy-bypass=local:172.17.0.0/16\"",
-                "return",
-            ],
-            vec![
-                "add",
-                "rule",
-                "ip",
-                "mistle_transparent_egress",
-                "output",
-                "ip",
-                "daddr",
-                "192.0.2.0/24",
-                "log",
-                "prefix",
-                "\"mistle-tproxy-bypass=excluded:192.0.2.0/24\"",
-                "return",
-            ],
-            vec![
-                "add",
-                "rule",
-                "ip",
-                "mistle_transparent_egress",
-                "output",
-                "tcp",
-                "dport",
-                "1-65535",
-                "redirect",
-                "to",
-                ":38514",
+                "add".to_string(),
+                "element".to_string(),
+                "ip".to_string(),
+                TRANSPARENT_NFTABLES_TABLE_NAME.to_string(),
+                "local_destinations".to_string(),
+                "{".to_string(),
+                "127.0.0.0/8".to_string(),
+                ",".to_string(),
+                "169.254.0.0/16".to_string(),
+                ",".to_string(),
+                "172.18.0.0/16".to_string(),
+                "}".to_string(),
             ],
         ]
     );
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn reconciles_local_destination_set_after_link_scope_route_changes() {
+    if std::env::var("MISTLE_SANDBOXD_NETLINK_RECONCILER_TEST").as_deref() != Ok("1") {
+        return;
+    }
+
+    let table_name = format!(
+        "mistle_spike_{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after UNIX epoch")
+            .as_nanos()
+    );
+    let link_name = "mistlebr0";
+    let test_route = "172.30.251.0/24";
+    let _cleanup = NetlinkReconcilerKernelTestCleanup {
+        table_name: table_name.clone(),
+        link_name: link_name.to_string(),
+    };
+    run_ip_command(&["link", "delete", link_name]);
+    run_nft_command(&["delete", "table", "ip", &table_name]);
+
+    let configuration = TransparentProxyConfiguration {
+        passthrough_bypass: TransparentProxyBypass {
+            kind: TransparentProxyBypassKind::SocketMark,
+            mark: 38_514,
+        },
+        exclusions: Vec::new(),
+    };
+    let reconciler = start_transparent_local_destination_reconciler_for_table(
+        &configuration,
+        38_514,
+        &table_name,
+        Duration::from_secs(60),
+    )
+    .expect("transparent local destination reconciler should start");
+
+    run_ip_command_must_succeed(&["link", "add", "name", link_name, "type", "bridge"]);
+    run_ip_command_must_succeed(&["addr", "add", "172.30.251.1/24", "dev", link_name]);
+    run_ip_command_must_succeed(&["link", "set", link_name, "up"]);
+
+    wait_until(Duration::from_secs(5), || {
+        nft_local_destination_set_contains(&table_name, test_route)
+    });
+
+    run_ip_command_must_succeed(&["link", "delete", link_name]);
+
+    wait_until(Duration::from_secs(5), || {
+        !nft_local_destination_set_contains(&table_name, test_route)
+    });
+
+    reconciler
+        .shutdown()
+        .expect("transparent local destination reconciler should shut down");
 }
 
 #[test]
@@ -1355,6 +1493,72 @@ fn wait_for_egress_snapshot(
         assert!(
             Instant::now() < deadline,
             "expected egress proxy snapshot to reach state {expected_state:?} with restart_count >= {expected_restart_count}, got {snapshot:?}"
+        );
+        thread::sleep(Duration::from_millis(25));
+    }
+}
+
+#[cfg(target_os = "linux")]
+struct NetlinkReconcilerKernelTestCleanup {
+    table_name: String,
+    link_name: String,
+}
+
+#[cfg(target_os = "linux")]
+impl Drop for NetlinkReconcilerKernelTestCleanup {
+    fn drop(&mut self) {
+        run_ip_command(&["link", "delete", &self.link_name]);
+        run_nft_command(&["delete", "table", "ip", &self.table_name]);
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn run_ip_command(arguments: &[&str]) {
+    let _ = Command::new("ip").args(arguments).output();
+}
+
+#[cfg(target_os = "linux")]
+fn run_ip_command_must_succeed(arguments: &[&str]) {
+    let output = Command::new("ip")
+        .args(arguments)
+        .output()
+        .expect("ip should be executable");
+    assert!(
+        output.status.success(),
+        "ip {} failed with status {}: {}",
+        arguments.join(" "),
+        output.status,
+        String::from_utf8_lossy(&output.stderr).trim()
+    );
+}
+
+#[cfg(target_os = "linux")]
+fn run_nft_command(arguments: &[&str]) {
+    let _ = Command::new("nft").args(arguments).output();
+}
+
+#[cfg(target_os = "linux")]
+fn nft_local_destination_set_contains(table_name: &str, cidr: &str) -> bool {
+    let output = Command::new("nft")
+        .args(["list", "set", "ip", table_name, "local_destinations"])
+        .output()
+        .expect("nft should be executable");
+    if !output.status.success() {
+        return false;
+    }
+    String::from_utf8_lossy(&output.stdout).contains(cidr)
+}
+
+#[cfg(target_os = "linux")]
+fn wait_until(timeout: Duration, condition: impl Fn() -> bool) {
+    let deadline = Instant::now() + timeout;
+    loop {
+        if condition() {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "condition did not become true before timeout"
         );
         thread::sleep(Duration::from_millis(25));
     }

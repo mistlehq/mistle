@@ -54,10 +54,12 @@ use crate::egress_proxy::tls::websocket_target_url;
 use crate::egress_proxy::transparent::TransparentPacketRules;
 #[cfg(all(test, target_os = "linux"))]
 use crate::egress_proxy::transparent::socket_addr_from_sockaddr_storage;
+#[cfg(all(test, target_os = "linux"))]
+use crate::egress_proxy::transparent::start_transparent_local_destination_reconciler_for_table;
 #[cfg(test)]
 use crate::egress_proxy::transparent::{
-    build_nftables_install_commands, build_nftables_rule_plan_with_local_destinations,
-    parse_iproute2_link_scope_ipv4_route_cidrs,
+    build_nftables_install_commands, build_nftables_local_destination_set_replace_commands,
+    build_nftables_rule_plan_with_local_destinations, parse_iproute2_link_scope_ipv4_route_cidrs,
 };
 use crate::protocol::startup::StartupInput;
 use crate::runtime::CompiledRuntimePlan;
@@ -380,6 +382,7 @@ impl EgressProxy {
                     match TransparentPacketRules::install(
                         configuration,
                         DEFAULT_TRANSPARENT_PROXY_PORT,
+                        log_context,
                     ) {
                         Ok(packet_rules) => {
                             emit_egress_proxy_log(

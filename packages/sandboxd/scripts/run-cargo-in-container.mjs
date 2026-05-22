@@ -11,6 +11,7 @@ const dockerfilePath = path.join(packageRootPath, "Dockerfile.test");
 const defaultImageTag = createDefaultImageTag(dockerfilePath);
 const imageTag = process.env.MISTLE_SANDBOXD_TEST_IMAGE ?? defaultImageTag;
 const buildPolicy = process.env.MISTLE_SANDBOXD_TEST_RUNNER_BUILD_POLICY ?? "if-missing";
+const netAdminEnabled = process.env.MISTLE_SANDBOXD_TEST_RUNNER_NET_ADMIN === "1";
 const cargoArguments = process.argv.slice(2);
 const localCacheRootPath = path.join(repositoryRootPath, ".local", "sandboxd-test");
 const cargoHomeHostPath = path.join(localCacheRootPath, "cargo-home");
@@ -53,6 +54,7 @@ if (shouldBuildImage({ imageTag, buildPolicy })) {
 const dockerRunArguments = [
   "run",
   "--rm",
+  ...createCapabilityArguments(),
   ...createUserArguments(),
   ...createEnvironmentArguments({
     CI: process.env.CI,
@@ -136,11 +138,23 @@ function dockerImageExists(imageTag) {
 }
 
 function createUserArguments() {
+  if (netAdminEnabled) {
+    return [];
+  }
+
   if (typeof process.getuid !== "function" || typeof process.getgid !== "function") {
     return [];
   }
 
   return ["--user", `${String(process.getuid())}:${String(process.getgid())}`];
+}
+
+function createCapabilityArguments() {
+  if (!netAdminEnabled) {
+    return [];
+  }
+
+  return ["--cap-add", "NET_ADMIN"];
 }
 
 function createGitMountArguments() {
