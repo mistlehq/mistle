@@ -93,6 +93,13 @@ fn child_process_forwards_unmatched_plain_http_requests_directly() {
 #[cfg(target_os = "linux")]
 #[test]
 fn process_supervisor_restarts_child_after_the_active_proxy_exits() {
+    if !nix::unistd::geteuid().is_root() {
+        eprintln!(
+            "skipping egress proxy child supervisor restart test because production CA paths require root"
+        );
+        return;
+    }
+
     let temp_dir = tempfile::Builder::new()
         .prefix("egress-child-supervisor-")
         .tempdir_in("/tmp")

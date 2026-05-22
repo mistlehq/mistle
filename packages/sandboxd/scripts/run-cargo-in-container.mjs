@@ -26,6 +26,7 @@ const cargoTargetDirectoryPath = path.join(
   "sandboxd-test",
   "target-debian-container",
 );
+const cargoTargetDirectoryOverride = process.env.MISTLE_SANDBOXD_TEST_CARGO_TARGET_DIR;
 
 if (cargoArguments.length === 0) {
   throw new Error("Expected cargo arguments, e.g. `test --locked`.");
@@ -59,7 +60,7 @@ const dockerRunArguments = [
   ...createEnvironmentArguments({
     CI: process.env.CI,
     CARGO_HOME: "/cargo-home",
-    CARGO_TARGET_DIR: cargoTargetDirectoryPath,
+    CARGO_TARGET_DIR: cargoTargetDirectoryOverride ?? cargoTargetDirectoryPath,
     HOME: "/tmp/mistle-home",
     PATH: "/usr/local/cargo/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
     RUSTUP_HOME: "/usr/local/rustup",
