@@ -29,6 +29,11 @@
       "config": {}
     },
     {
+      "targetKey": "gcp-mcp",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "tensorlake-default",
       "enabled": true,
       "config": {}

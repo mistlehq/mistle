@@ -36,6 +36,10 @@ describe("integrations-definitions server", () => {
       familyId: "datadog",
       variantId: "datadog-default",
     });
+    const gcpDefinition = registry.getDefinition({
+      familyId: "gcp",
+      variantId: "gcp-mcp",
+    });
     const jiraDefinition = registry.getDefinition({
       familyId: "jira",
       variantId: "jira-default",
@@ -138,6 +142,9 @@ describe("integrations-definitions server", () => {
     expect(datadogDefinition?.webhookHandler).toBeUndefined();
     expect(datadogDefinition?.webhookSource).toBeUndefined();
     expect(datadogDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(gcpDefinition?.oauth2AuthorizationCode).toBeDefined();
+    expect(gcpDefinition?.webhookHandler).toBeUndefined();
+    expect(gcpDefinition?.webhookSource).toBeUndefined();
     expect(planetscaleDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(planetscaleDefinition?.webhookHandler).toBeUndefined();
     expect(planetscaleDefinition?.webhookSource).toBeUndefined();
@@ -193,7 +200,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(15);
+    expect(definitions).toHaveLength(16);
   });
 
   it("builds the server definitions bundle with an agent runtime registry", () => {

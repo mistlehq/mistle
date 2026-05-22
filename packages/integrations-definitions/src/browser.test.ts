@@ -5,6 +5,7 @@ import {
   createBrowserDefinitionsBundle,
   DatadogBrowserDefinition,
   E2BSandboxRuntimeBrowserDefinition,
+  GcpBrowserDefinition,
   GitHubCloudBrowserDefinition,
   JiraBrowserDefinition,
   SentryBrowserDefinition,
@@ -59,6 +60,10 @@ describe("browser definitions", () => {
     expect(DatadogBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
     expect(DatadogBrowserDefinition.webhookHandler).toBeUndefined();
     expect(DatadogBrowserDefinition.webhookSource).toBeUndefined();
+  });
+
+  it("keeps GCP browser definitions free of server-only OAuth handlers", () => {
+    expect(GcpBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
   });
 
   it("keeps slack browser definitions free of server-only webhook hooks", () => {

@@ -1,12 +1,20 @@
 import {
+  IntegrationCredentialSecretKinds,
   OrganizationIdentityLinkProviderConfigStatus,
   type ControlPlaneDatabase,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { ConflictError, NotFoundError } from "@mistle/http/errors.js";
-import { IntegrationWebhookSourceLifecycles } from "@mistle/integrations-core";
+import {
+  IntegrationConnectionMethodIds,
+  IntegrationWebhookSourceLifecycles,
+  createOAuth2AuthorizationCodeCredentialSlotKeys,
+} from "@mistle/integrations-core";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
+import { resolveConnectionSecretOrThrow } from "../../identity-linking/services/resolve-connection-secret.js";
+import { resolveIntegrationTargetSecrets } from "../../lib/integration-target-secrets.js";
+import { logger } from "../../logger.js";
 import type { AppContext } from "../../types.js";
 import {
   IntegrationConnectionsConflictCodes,
@@ -23,6 +31,18 @@ import {
 export type DeleteIntegrationConnectionInput = {
   organizationId: string;
   connectionId: string;
+};
+
+type RevocationCredentialValues = {
+  accessToken?: string;
+  refreshToken?: string;
+  clientSecret?: string;
+};
+
+type PendingConnectionAuthorizationRevocation = {
+  connectionId: string;
+  targetKey: string;
+  revoke: () => Promise<void>;
 };
 
 async function lockAffectedSandboxProfilesForUpdate(input: {
@@ -143,6 +163,182 @@ async function assertConnectionDeletionGuardsOrThrow(input: {
   }
 }
 
+async function resolveOptionalConnectionSecret(input: {
+  db: ControlPlaneDatabase;
+  organizationId: string;
+  connectionId: string;
+  slotKey: string;
+  secretKind: (typeof IntegrationCredentialSecretKinds)[keyof typeof IntegrationCredentialSecretKinds];
+  integrationsConfig: {
+    masterEncryptionKeys: Record<string, string>;
+  };
+}): Promise<string | undefined> {
+  const linkedCredential = await input.db.query.integrationConnectionCredentials.findFirst({
+    columns: {
+      credentialId: true,
+    },
+    where: (table, { and: whereAnd, eq: whereEq }) =>
+      whereAnd(
+        whereEq(table.connectionId, input.connectionId),
+        whereEq(table.slotKey, input.slotKey),
+      ),
+  });
+
+  if (linkedCredential === undefined) {
+    return undefined;
+  }
+
+  return resolveConnectionSecretOrThrow(input);
+}
+
+async function resolveOAuth2AuthorizationCodeRevocationCredentials(input: {
+  db: ControlPlaneDatabase;
+  organizationId: string;
+  connection: Awaited<ReturnType<typeof resolveConnectionWithTargetOrThrow>>;
+  integrationsConfig: AppContext["var"]["config"]["integrations"];
+}): Promise<RevocationCredentialValues> {
+  const connectionConfig = resolveConnectionConfigOrThrow({
+    connectionId: input.connection.id,
+    config: input.connection.config,
+  });
+
+  if (
+    connectionConfig["connection_method"] !==
+    IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE
+  ) {
+    return {};
+  }
+
+  const slotKeys = createOAuth2AuthorizationCodeCredentialSlotKeys({
+    familyId: input.connection.target.familyId,
+    variantId: input.connection.target.variantId,
+  });
+  const [accessToken, refreshToken, clientSecret] = await Promise.all([
+    resolveOptionalConnectionSecret({
+      db: input.db,
+      organizationId: input.organizationId,
+      connectionId: input.connection.id,
+      slotKey: slotKeys.accessToken,
+      secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+      integrationsConfig: input.integrationsConfig,
+    }),
+    resolveOptionalConnectionSecret({
+      db: input.db,
+      organizationId: input.organizationId,
+      connectionId: input.connection.id,
+      slotKey: slotKeys.refreshToken,
+      secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
+      integrationsConfig: input.integrationsConfig,
+    }),
+    resolveOptionalConnectionSecret({
+      db: input.db,
+      organizationId: input.organizationId,
+      connectionId: input.connection.id,
+      slotKey: slotKeys.clientSecret,
+      secretKind: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+      integrationsConfig: input.integrationsConfig,
+    }),
+  ]);
+
+  return {
+    ...(accessToken === undefined ? {} : { accessToken }),
+    ...(refreshToken === undefined ? {} : { refreshToken }),
+    ...(clientSecret === undefined ? {} : { clientSecret }),
+  };
+}
+
+async function prepareConnectionAuthorizationRevocation(input: {
+  db: ControlPlaneDatabase;
+  integrationRegistry: AppContext["var"]["integrationRegistry"];
+  integrationsConfig: AppContext["var"]["config"]["integrations"];
+  organizationId: string;
+  connection: Awaited<ReturnType<typeof resolveConnectionWithTargetOrThrow>>;
+}): Promise<PendingConnectionAuthorizationRevocation | undefined> {
+  const definition = input.integrationRegistry.getDefinition({
+    familyId: input.connection.target.familyId,
+    variantId: input.connection.target.variantId,
+  });
+  const authorizationRevocation = definition?.authorizationRevocation;
+  if (definition === undefined || authorizationRevocation === undefined) {
+    return undefined;
+  }
+
+  try {
+    const connectionConfig = resolveConnectionConfigOrThrow({
+      connectionId: input.connection.id,
+      config: input.connection.config,
+    });
+    const target = {
+      familyId: input.connection.target.familyId,
+      variantId: input.connection.target.variantId,
+      enabled: input.connection.target.enabled,
+      config: definition.targetConfigSchema.parse(input.connection.target.config),
+      secrets: definition.targetSecretSchema.parse(
+        resolveIntegrationTargetSecrets({
+          integrationsConfig: input.integrationsConfig,
+          target: input.connection.target,
+        }),
+      ),
+    };
+    const connection = {
+      id: input.connection.id,
+      status: input.connection.status,
+      config: connectionConfig,
+    };
+    const credentials = await resolveOAuth2AuthorizationCodeRevocationCredentials({
+      db: input.db,
+      organizationId: input.organizationId,
+      connection: input.connection,
+      integrationsConfig: input.integrationsConfig,
+    });
+
+    return {
+      connectionId: input.connection.id,
+      targetKey: input.connection.targetKey,
+      revoke: async () => {
+        await authorizationRevocation.revokeConnectionAuthorization({
+          organizationId: input.organizationId,
+          targetKey: input.connection.targetKey,
+          target,
+          connection,
+          credentials,
+        });
+      },
+    };
+  } catch (error) {
+    logger.warn(
+      {
+        err: error,
+        connectionId: input.connection.id,
+        targetKey: input.connection.targetKey,
+      },
+      "Failed to prepare integration connection authorization revocation",
+    );
+    return undefined;
+  }
+}
+
+async function revokeConnectionAuthorizationBestEffort(
+  pendingRevocation: PendingConnectionAuthorizationRevocation | undefined,
+): Promise<void> {
+  if (pendingRevocation === undefined) {
+    return;
+  }
+
+  try {
+    await pendingRevocation.revoke();
+  } catch (error) {
+    logger.warn(
+      {
+        err: error,
+        connectionId: pendingRevocation.connectionId,
+        targetKey: pendingRevocation.targetKey,
+      },
+      "Failed to revoke integration connection authorization",
+    );
+  }
+}
+
 export async function deleteIntegrationConnection(
   ctx: {
     db: ControlPlaneDatabase;
@@ -152,7 +348,7 @@ export async function deleteIntegrationConnection(
   },
   input: DeleteIntegrationConnectionInput,
 ): Promise<void> {
-  await ctx.db.transaction(async (tx) => {
+  const pendingRevocation = await ctx.db.transaction(async (tx) => {
     const tables = getControlPlaneDatabaseSchema(tx);
 
     await assertConnectionDeletionGuardsOrThrow({
@@ -165,6 +361,13 @@ export async function deleteIntegrationConnection(
       db: tx,
       organizationId: input.organizationId,
       connectionId: input.connectionId,
+    });
+    const revocation = await prepareConnectionAuthorizationRevocation({
+      db: tx,
+      integrationRegistry: ctx.integrationRegistry,
+      integrationsConfig: ctx.integrationsConfig,
+      organizationId: input.organizationId,
+      connection,
     });
     const webhookSourcesForRegistrationCleanup = await tx.query.integrationWebhookSources.findMany({
       where: (table, { eq: whereEq }) => whereEq(table.integrationConnectionId, connection.id),
@@ -303,5 +506,9 @@ export async function deleteIntegrationConnection(
           eq(tables.integrationConnections.id, input.connectionId),
         ),
       );
+
+    return revocation;
   });
+
+  await revokeConnectionAuthorizationBestEffort(pendingRevocation);
 }

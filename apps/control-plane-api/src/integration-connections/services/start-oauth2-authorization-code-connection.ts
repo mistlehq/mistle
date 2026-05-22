@@ -1,15 +1,18 @@
 import { createHash } from "node:crypto";
 
 import {
+  IntegrationCredentialSecretKinds,
   IntegrationConnectionRedirectSessionIntents,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import {
+  createOAuth2AuthorizationCodeCredentialSlotKeys,
   IntegrationConnectionMethodIds,
   type IntegrationRegistry,
 } from "@mistle/integrations-core";
 
+import { resolveConnectionSecretOrThrow } from "../../identity-linking/services/resolve-connection-secret.js";
 import {
   encryptRedirectSessionSecretUtf8,
   resolveMasterEncryptionKeyMaterial,
@@ -121,6 +124,63 @@ function removeFrameworkConnectionConfigFields(
   }
 
   return result;
+}
+
+async function resolveOAuth2ClientSecretForReauthorization(input: {
+  db: ControlPlaneDatabase;
+  organizationId: string;
+  connectionId: string;
+  familyId: string;
+  variantId: string;
+  integrationsConfig: {
+    masterEncryptionKeys: Record<string, string>;
+  };
+}): Promise<string | undefined> {
+  const slotKeys = createOAuth2AuthorizationCodeCredentialSlotKeys({
+    familyId: input.familyId,
+    variantId: input.variantId,
+  });
+  const linkedCredential = await input.db.query.integrationConnectionCredentials.findFirst({
+    columns: {
+      credentialId: true,
+    },
+    where: (table, { and, eq }) =>
+      and(eq(table.connectionId, input.connectionId), eq(table.slotKey, slotKeys.clientSecret)),
+  });
+
+  if (linkedCredential === undefined) {
+    return undefined;
+  }
+
+  return resolveConnectionSecretOrThrow({
+    db: input.db,
+    organizationId: input.organizationId,
+    connectionId: input.connectionId,
+    slotKey: slotKeys.clientSecret,
+    secretKind: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+    integrationsConfig: input.integrationsConfig,
+  });
+}
+
+function createReauthorizationConnectionConfig(input: {
+  storedConfig: Record<string, unknown> | null;
+  clientSecret: string | undefined;
+}): Record<string, unknown> {
+  const connectionConfig = removeFrameworkConnectionConfigFields(input.storedConfig);
+  if (input.clientSecret === undefined) {
+    return connectionConfig;
+  }
+
+  const clientId = input.storedConfig?.["client_id"];
+  if (typeof clientId !== "string" || clientId.length === 0) {
+    throw new Error("OAuth 2.0 reauthorization with a stored client secret requires `client_id`.");
+  }
+
+  return {
+    ...connectionConfig,
+    client_id: clientId,
+    client_secret: input.clientSecret,
+  };
 }
 
 function createPkceChallenge(verifier: string): string {
@@ -304,11 +364,25 @@ export async function startOAuth2AuthorizationCodeConnectionReauthorization(
       `Integration target '${existingConnection.targetKey}' does not support OAuth 2.0 (Authorization Code) reauthorization.`,
     );
   }
+  const clientSecret =
+    resolved.connectionMethodStartConfigSchema === undefined
+      ? undefined
+      : await resolveOAuth2ClientSecretForReauthorization({
+          db: ctx.db,
+          organizationId: input.organizationId,
+          connectionId: existingConnection.id,
+          familyId: resolved.target.familyId,
+          variantId: resolved.target.variantId,
+          integrationsConfig: ctx.integrationsConfig,
+        });
 
   return startOAuth2AuthorizationCodeRedirect(ctx, {
     organizationId: input.organizationId,
     targetKey: existingConnection.targetKey,
-    connectionConfig: removeFrameworkConnectionConfigFields(existingConnection.config),
+    connectionConfig: createReauthorizationConnectionConfig({
+      storedConfig: existingConnection.config,
+      clientSecret,
+    }),
     controlPlaneBaseUrl: input.controlPlaneBaseUrl,
     state: createRedirectState(),
     intent: "reauthorize",

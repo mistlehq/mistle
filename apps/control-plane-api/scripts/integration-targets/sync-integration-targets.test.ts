@@ -38,6 +38,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "gcp-mcp",
+        familyId: "gcp",
+        variantId: "gcp-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "github-cloud",
         familyId: "github",
         variantId: "github-cloud",

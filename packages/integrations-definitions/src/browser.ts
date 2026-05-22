@@ -7,6 +7,7 @@ import {
 import { AnthropicDefinition } from "./anthropic/index.js";
 import { AwsBaseDefinition } from "./aws/variants/aws-cli-default/base-definition.js";
 import { DatadogDefinition } from "./datadog/index.js";
+import { GcpMcpBaseDefinition } from "./gcp/variants/gcp-mcp/base-definition.js";
 import { GitHubCloudBaseDefinition } from "./github/variants/github-cloud/base-definition.js";
 import { GitHubEnterpriseServerBaseDefinition } from "./github/variants/github-enterprise-server/base-definition.js";
 import { JiraBaseDefinition } from "./jira/variants/jira-default/base-definition.js";
@@ -25,6 +26,7 @@ import { SlackBaseDefinition } from "./slack/variants/slack-default/base-definit
 export const AnthropicBrowserDefinition = AnthropicDefinition;
 export const AwsBrowserDefinition = AwsBaseDefinition;
 export const DatadogBrowserDefinition = DatadogDefinition;
+export const GcpBrowserDefinition = GcpMcpBaseDefinition;
 export const GitHubCloudBrowserDefinition = GitHubCloudBaseDefinition;
 export const GitHubEnterpriseServerBrowserDefinition = GitHubEnterpriseServerBaseDefinition;
 export const JiraBrowserDefinition = JiraBaseDefinition;
@@ -41,6 +43,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   AnthropicBrowserDefinition,
   AwsBrowserDefinition,
   DatadogBrowserDefinition,
+  GcpBrowserDefinition,
   JiraBrowserDefinition,
   GitHubCloudBrowserDefinition,
   GitHubEnterpriseServerBrowserDefinition,
@@ -75,6 +78,7 @@ export function createBrowserDefinitionsBundle(): IntegrationDefinitionsBundle {
 export * from "./anthropic/index.js";
 export * from "./agent-runtimes/provider-selection.js";
 export * from "./datadog/index.js";
+export * from "./gcp/browser.js";
 export * from "./github/browser.js";
 export * from "./jira/browser.js";
 export * from "./opencode/index.js";

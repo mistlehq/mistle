@@ -494,6 +494,7 @@ export type IntegrationResolvedTarget<
 export type IntegrationConnectionMethodCreateUi = {
   submitLabel: string;
   helperText: string;
+  showCallbackUrl?: boolean | undefined;
 };
 
 export type IntegrationConnectionMethodReauthorizeUi = {
@@ -1426,6 +1427,38 @@ export type IntegrationOAuth2ClientCredentialsCapability<
       TConnectionConfig
     >,
   ): MaybePromise<IntegrationOAuth2ClientCredentialsExchangeResult>;
+};
+
+export type IntegrationConnectionAuthorizationRevocationInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  organizationId: string;
+  targetKey: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  connection: IntegrationConnection & {
+    config: TConnectionConfig;
+  };
+  credentials: {
+    accessToken?: string;
+    refreshToken?: string;
+    clientSecret?: string;
+  };
+};
+
+export type IntegrationConnectionAuthorizationRevocationCapability<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  revokeConnectionAuthorization(
+    input: IntegrationConnectionAuthorizationRevocationInput<
+      TTargetConfig,
+      TTargetSecrets,
+      TConnectionConfig
+    >,
+  ): MaybePromise<void>;
 };
 
 export type IntegrationWebhookHeaders = Readonly<Record<string, string>>;
@@ -2402,6 +2435,11 @@ export type IntegrationDefinition<
     TConnectionConfig
   >;
   oauth2ClientCredentials?: IntegrationOAuth2ClientCredentialsCapability<
+    ParsedSchemaOutput<TTargetConfigSchema>,
+    ParsedSchemaOutput<TTargetSecretsSchema>,
+    TConnectionConfig
+  >;
+  authorizationRevocation?: IntegrationConnectionAuthorizationRevocationCapability<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TTargetSecretsSchema>,
     TConnectionConfig

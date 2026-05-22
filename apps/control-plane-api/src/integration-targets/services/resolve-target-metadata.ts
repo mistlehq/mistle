@@ -135,6 +135,7 @@ export type ResolvedIntegrationTargetMetadata = {
           create: {
             submitLabel: string;
             helperText: string;
+            showCallbackUrl?: boolean | undefined;
           };
           reauthorize?: {
             actionLabel: string;

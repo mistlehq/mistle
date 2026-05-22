@@ -19,6 +19,7 @@ import type { IChangeEvent } from "@rjsf/core";
 import type { RJSFSchema } from "@rjsf/utils";
 import validator from "@rjsf/validator-ajv8";
 
+import { getDashboardConfig } from "../../config.js";
 import { ConfiguredSecretField, type SavingFieldState } from "../forms/configured-secret-field.js";
 import { SchemaFormWithoutSubmit } from "../forms/schema-form.js";
 import type { ConnectionMethodFormUiModel } from "../pages/use-integration-connection-editor-state-helpers.js";
@@ -111,12 +112,42 @@ function resolveCreateSubmitLabel(method: IntegrationConnectionMethod | null): s
   return "Add connection";
 }
 
-function renderAuthCreateHelper(method: IntegrationConnectionMethod | null) {
-  if (method?.kind !== "redirect") {
+function buildOAuth2AuthorizationCodeRedirectUrl(input: { targetKey: string }): string {
+  return new URL(
+    `/p/integration/callbacks/${encodeURIComponent(input.targetKey)}/oauth2-authorization-code`,
+    getDashboardConfig().controlPlaneApiOrigin,
+  ).toString();
+}
+
+function renderAuthCreateHelper(input: {
+  editor: Extract<IntegrationConnectionEditorState, { mode: "create" }>;
+  method: IntegrationConnectionMethod | null;
+}) {
+  if (input.method?.kind !== "redirect") {
     return null;
   }
 
-  return <Notice>{method.ui.create.helperText}</Notice>;
+  if (input.method.ui.create.showCallbackUrl !== true) {
+    return <Notice>{input.method.ui.create.helperText}</Notice>;
+  }
+
+  return (
+    <Notice>
+      <div className="flex flex-col gap-3">
+        <p className="text-muted-foreground text-sm">
+          Add this callback URL to your OAuth client's redirect URIs.
+        </p>
+        <CopyableValue
+          copyAriaLabel="Copy authorized redirect URI"
+          copyTitle="Copy authorized redirect URI"
+          variant="inline"
+          value={buildOAuth2AuthorizationCodeRedirectUrl({
+            targetKey: input.editor.targetKey,
+          })}
+        />
+      </div>
+    </Notice>
+  );
 }
 
 export function formatDeviceAuthorizationExpiry(input: { expiresAt: string; now: Date }): string {
@@ -265,6 +296,13 @@ function renderConnectionEditorFields(props: IntegrationConnectionEditorProps) {
         </Field>
       ) : null}
 
+      {!isUpdateMode
+        ? renderAuthCreateHelper({
+            editor,
+            method: selectedMethod,
+          })
+        : null}
+
       {showsConfigForm && props.configForm.mode === "form" ? (
         <SchemaFormWithoutSubmit
           formData={props.configValue}
@@ -325,9 +363,7 @@ function renderConnectionEditorFields(props: IntegrationConnectionEditorProps) {
         </>
       ) : props.configForm.mode === "unsupported" ? (
         <p className="text-destructive text-sm">{props.configForm.message}</p>
-      ) : !isUpdateMode ? (
-        renderAuthCreateHelper(selectedMethod)
-      ) : (
+      ) : !isUpdateMode ? null : (
         <p className="text-muted-foreground text-sm">Save to update this connection.</p>
       )}
     </>

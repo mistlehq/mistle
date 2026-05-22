@@ -21,6 +21,10 @@ describe("integrations-definitions index", () => {
       familyId: "datadog",
       variantId: "datadog-default",
     });
+    const gcpDefinition = registry.getDefinition({
+      familyId: "gcp",
+      variantId: "gcp-mcp",
+    });
     const jiraDefinition = registry.getDefinition({
       familyId: "jira",
       variantId: "jira-default",
@@ -122,6 +126,27 @@ describe("integrations-definitions index", () => {
       ],
     });
     expect(datadogDefinition?.mcp).toBeDefined();
+    expect(gcpDefinition).toMatchObject({
+      familyId: "gcp",
+      variantId: "gcp-mcp",
+      kind: "connector",
+      displayName: "Google Cloud",
+      connectionMethods: [
+        {
+          id: "oauth2-authorization-code",
+          label: "Google OAuth",
+          kind: "redirect",
+          ui: {
+            create: {
+              submitLabel: "Connect Google Cloud",
+              helperText: "Authorize Google Cloud access with your Google OAuth client.",
+              showCallbackUrl: true,
+            },
+          },
+        },
+      ],
+    });
+    expect(gcpDefinition?.oauth2AuthorizationCode).toBeUndefined();
     expect(jiraDefinition).toMatchObject({
       familyId: "jira",
       variantId: "jira-default",
@@ -568,13 +593,14 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(15);
+    expect(definitions).toHaveLength(16);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
       "anthropic::anthropic-default",
       "aws::aws-cli-default",
       "datadog::datadog-default",
+      "gcp::gcp-mcp",
       "jira::jira-default",
       "github::github-cloud",
       "github::github-enterprise-server",

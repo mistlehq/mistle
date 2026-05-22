@@ -567,7 +567,66 @@ describe("IntegrationConnectionEditorPage", () => {
     fireEvent.click(regionSelect);
     expect(screen.getByRole("option", { name: "US" })).toBeTruthy();
     expect(screen.getByRole("option", { name: "EU" })).toBeTruthy();
+    expect(screen.getByText("Authorize SigNoz hosted MCP access.")).toBeTruthy();
+    expect(
+      screen.queryByText("Add this callback URL to your OAuth client's redirect URIs."),
+    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "Copy authorized redirect URI" })).toBeNull();
     expect(screen.getByRole("button", { name: "Connect SigNoz" })).toBeTruthy();
+  });
+
+  it("renders the OAuth callback URL for redirect methods that require user-managed OAuth clients", () => {
+    const editor: Extract<IntegrationConnectionEditorState, { mode: "create" }> = {
+      methods: [
+        {
+          id: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+          label: "Google OAuth",
+          kind: "redirect",
+          ui: {
+            create: {
+              submitLabel: "Connect Google Cloud",
+              helperText: "Authorize Google Cloud access.",
+              showCallbackUrl: true,
+            },
+          },
+        },
+      ],
+      mode: "create",
+      targetConfig: {},
+      targetDisplayName: "Google Cloud",
+      targetFamilyId: "gcp",
+      targetKey: "gcp-mcp",
+      targetVariantId: "gcp-mcp",
+    };
+
+    renderEditorPage({
+      configForm: {
+        mode: "form",
+        schema: {
+          type: "object",
+          properties: {},
+        },
+        uiSchema: {},
+        value: {},
+        visiblePropertyKeys: [],
+      },
+      connectionDisplayNamePlaceholder: "Google Cloud connection",
+      editor,
+      methodId: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+    });
+
+    expect(screen.queryByText("Authorize Google Cloud access.")).toBeNull();
+    expect(
+      screen.getByText("Add this callback URL to your OAuth client's redirect URIs."),
+    ).toBeTruthy();
+    expect(screen.queryByText("Authorized redirect URI")).toBeNull();
+    expect(
+      screen.getByText(
+        "http://localhost:3000/p/integration/callbacks/gcp-mcp/oauth2-authorization-code",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy authorized redirect URI" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Connect Google Cloud" })).toBeTruthy();
   });
 
   it("does not render persisted redirect config fields when no start config schema is declared", () => {
@@ -602,6 +661,19 @@ describe("IntegrationConnectionEditorPage", () => {
     ).toEqual({
       mode: "none",
     });
+
+    renderEditorPage({
+      connectionDisplayNamePlaceholder: "PlanetScale connection",
+      editor,
+      methodId: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+    });
+
+    expect(screen.getByText("Authorize PlanetScale hosted MCP access.")).toBeTruthy();
+    expect(
+      screen.queryByText(
+        "http://localhost:3000/p/integration/callbacks/planetscale-mcp/oauth2-authorization-code",
+      ),
+    ).toBeNull();
   });
 
   it("does not render device-authorization pending instructions before authorization starts", () => {

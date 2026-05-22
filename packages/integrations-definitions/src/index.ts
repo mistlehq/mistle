@@ -7,6 +7,7 @@ import {
 import { AnthropicDefinition } from "./anthropic/index.js";
 import { AwsDefinition } from "./aws/browser.js";
 import { DatadogDefinition } from "./datadog/index.js";
+import { GcpDefinition } from "./gcp/browser.js";
 import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./github/browser.js";
 import { JiraDefinition } from "./jira/browser.js";
 import { LinearDefinition } from "./linear/index.js";
@@ -25,6 +26,7 @@ import { SlackDefinition } from "./slack/browser.js";
 export * from "./anthropic/index.js";
 export * from "./aws/browser.js";
 export * from "./datadog/index.js";
+export * from "./gcp/browser.js";
 export * from "./jira/browser.js";
 export * from "./jira-shared.js";
 export * from "./github/browser.js";
@@ -45,6 +47,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   AnthropicDefinition,
   AwsDefinition,
   DatadogDefinition,
+  GcpDefinition,
   JiraDefinition,
   GitHubCloudDefinition,
   GitHubEnterpriseServerDefinition,

@@ -12,6 +12,7 @@ import { AwsDefinition } from "./aws/server.js";
 import { DatadogDefinition } from "./datadog/index.js";
 import { resolveDefinitionEgressCredentialResolver } from "./egress-credential-resolver.server.js";
 import { resolveDefinitionEgressRequestMiddleware } from "./egress-request-middleware.server.js";
+import { GcpDefinition } from "./gcp/server.js";
 import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./github/index.js";
 import { JiraDefinition } from "./jira/index.js";
 import { LinearDefinition } from "./linear/index.js";
@@ -33,6 +34,7 @@ export * from "./datadog/index.js";
 export * from "./egress-credential-resolver.server.js";
 export * from "./egress-request-middleware.server.js";
 export * from "./egress-telemetry.server.js";
+export * from "./gcp/server.js";
 export * from "./jira/index.js";
 export * from "./github/index.js";
 export * from "./github/shared/identity-linking.server.js";
@@ -54,6 +56,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   AnthropicDefinition,
   AwsDefinition,
   DatadogDefinition,
+  GcpDefinition,
   JiraDefinition,
   GitHubCloudDefinition,
   GitHubEnterpriseServerDefinition,

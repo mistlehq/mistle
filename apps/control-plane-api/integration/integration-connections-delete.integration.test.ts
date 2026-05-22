@@ -2,6 +2,8 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+
 import {
   TriggerKinds,
   IntegrationBindingKinds,
@@ -12,11 +14,21 @@ import {
   SandboxProfileVersionStates,
   type SandboxProfileVersionState,
 } from "@mistle/db/control-plane";
+import {
+  IntegrationConnectionMethodIds,
+  IntegrationKinds,
+  IntegrationRegistry,
+  IntegrationWebhookSourceLifecycles,
+  type IntegrationDefinition,
+} from "@mistle/integrations-core";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
+import { z } from "zod";
 
 import { ListIntegrationConnectionsResponseSchema } from "../src/integration-connections/list-integration-connections/schema.js";
+import { deleteIntegrationConnection } from "../src/integration-connections/services/delete-integration-connection.js";
+import { IntegrationIntegrationsConfig } from "./helpers/integration-connections.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api"],
@@ -131,6 +143,100 @@ describe.concurrent("integration connections delete integration", () => {
     expect(deleteInactivePublishedResponse.status).toBe(200);
     await expectBindingMissing(env, "ibd_integration_new_delete_inactive_published_binding");
     await expectConnectionMissing(env, "icn_integration_new_delete_inactive_published_binding");
+  });
+
+  it("deletes the connection when provider authorization revocation fails", async ({ env }) => {
+    const simulatedProvider = await startSimulatedRevocationFailureProvider();
+    const session = await env.auth.createSession({
+      email: "integration-new-connections-delete-revocation-failure@example.com",
+    });
+    const connectionId = "icn_integration_new_delete_revocation_failure";
+
+    try {
+      await seedRevocationFailureTarget(env, {
+        revocationUrl: simulatedProvider.revocationUrl,
+      });
+      await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
+        id: connectionId,
+        organizationId: session.organizationId,
+        targetKey: "revocation_failure_connections_delete",
+        displayName: "Revocation failure",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+        },
+      });
+
+      await deleteIntegrationConnection(
+        {
+          db: env.controlPlaneDb,
+          integrationRegistry: createRevocationFailureIntegrationRegistry(),
+          integrationsConfig: IntegrationIntegrationsConfig,
+          controlPlaneBaseUrl: env.controlPlaneApi.hostBaseUrl,
+        },
+        {
+          organizationId: session.organizationId,
+          connectionId,
+        },
+      );
+
+      expect(simulatedProvider.requests).toEqual(["POST /revoke"]);
+      await expectConnectionMissing(env, connectionId);
+    } finally {
+      await simulatedProvider.stop();
+    }
+  });
+
+  it("does not revoke provider authorization when local deletion rolls back", async ({ env }) => {
+    const simulatedProvider = await startSimulatedRevocationFailureProvider();
+    const session = await env.auth.createSession({
+      email: "integration-new-connections-delete-revocation-after-rollback@example.com",
+    });
+    const connectionId = "icn_integration_new_delete_revocation_after_rollback";
+
+    try {
+      await seedRevocationFailureTarget(env, {
+        revocationUrl: simulatedProvider.revocationUrl,
+      });
+      await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
+        id: connectionId,
+        organizationId: session.organizationId,
+        targetKey: "revocation_failure_connections_delete",
+        displayName: "Revocation after rollback",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+        },
+      });
+      await env.controlPlaneDb.insert(env.controlPlaneTables.integrationWebhookSources).values({
+        id: "iws_integration_new_delete_revocation_after_rollback",
+        organizationId: session.organizationId,
+        integrationConnectionId: connectionId,
+        targetKey: "revocation_failure_connections_delete",
+        endpointKey: "ep_integration_new_delete_revocation_after_rollback",
+        status: "active",
+      });
+
+      await expect(
+        deleteIntegrationConnection(
+          {
+            db: env.controlPlaneDb,
+            integrationRegistry: createRevocationFailureIntegrationRegistry(),
+            integrationsConfig: IntegrationIntegrationsConfig,
+            controlPlaneBaseUrl: env.controlPlaneApi.hostBaseUrl,
+          },
+          {
+            organizationId: session.organizationId,
+            connectionId,
+          },
+        ),
+      ).rejects.toThrow("Simulated provider webhook deletion failure.");
+
+      expect(simulatedProvider.requests).toEqual([]);
+      await expectConnectionPresent(env, connectionId);
+    } finally {
+      await simulatedProvider.stop();
+    }
   });
 
   it("blocks deletion while an active sandbox profile version uses the connection", async ({
@@ -274,6 +380,141 @@ describe.concurrent("integration connections delete integration", () => {
 });
 
 type IntegrationConnectionsPage = ReturnType<typeof ListIntegrationConnectionsResponseSchema.parse>;
+
+type SimulatedRevocationFailureProvider = {
+  revocationUrl: string;
+  requests: string[];
+  stop: () => Promise<void>;
+};
+
+const RevocationFailureTargetConfigSchema = z
+  .object({
+    revocation_url: z.url(),
+  })
+  .strict();
+const EmptyRevocationFailureConfigSchema = z.object({}).strict();
+
+const RevocationFailureIntegrationDefinition: IntegrationDefinition<
+  typeof RevocationFailureTargetConfigSchema,
+  typeof EmptyRevocationFailureConfigSchema,
+  typeof EmptyRevocationFailureConfigSchema,
+  Record<string, unknown>
+> = {
+  familyId: "revocation-failure",
+  variantId: "revocation-failure",
+  kind: IntegrationKinds.CONNECTOR,
+  displayName: "Revocation Failure",
+  logoKey: "generic",
+  targetConfigSchema: RevocationFailureTargetConfigSchema,
+  targetSecretSchema: EmptyRevocationFailureConfigSchema,
+  bindingConfigSchema: EmptyRevocationFailureConfigSchema,
+  connectionMethods: [
+    {
+      id: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+      label: "OAuth",
+      kind: "redirect",
+      configSchema: z
+        .object({
+          connection_method: z.literal(IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE),
+        })
+        .strict(),
+      ui: {
+        create: {
+          submitLabel: "Connect",
+          helperText: "Authorize access.",
+        },
+      },
+    },
+  ],
+  authorizationRevocation: {
+    async revokeConnectionAuthorization(input) {
+      await fetch(input.target.config.revocation_url, {
+        method: "POST",
+      });
+      throw new Error("Simulated provider revocation failure.");
+    },
+  },
+  webhookSource: {
+    lifecycle: IntegrationWebhookSourceLifecycles.MANAGED,
+    describeSource(input) {
+      return {
+        displayName: input.source.displayName ?? "Webhook",
+        callbackUrl: `${input.controlPlaneBaseUrl}/integration-webhooks/${input.source.endpointKey}`,
+        providerMetadata: input.source.providerMetadata,
+      };
+    },
+    deleteRegistration() {
+      throw new Error("Simulated provider webhook deletion failure.");
+    },
+  },
+  compileBinding() {
+    return {
+      egressRoutes: [],
+      artifacts: [],
+      runtimeClients: [],
+    };
+  },
+};
+
+function createRevocationFailureIntegrationRegistry(): IntegrationRegistry {
+  const registry = new IntegrationRegistry();
+  registry.register(RevocationFailureIntegrationDefinition);
+  return registry;
+}
+
+async function startSimulatedRevocationFailureProvider(): Promise<SimulatedRevocationFailureProvider> {
+  const requests: string[] = [];
+  const server = createServer(async (request: IncomingMessage, response: ServerResponse) => {
+    await readRequestBody(request);
+    const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
+    requests.push(`${request.method ?? "GET"} ${requestUrl.pathname}`);
+
+    response.statusCode = 500;
+    response.end("revocation failed");
+  });
+
+  await listen(server);
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("Expected simulated revocation provider to listen on a TCP port.");
+  }
+
+  return {
+    revocationUrl: `http://127.0.0.1:${address.port.toString()}/revoke`,
+    requests,
+    stop: () => close(server),
+  };
+}
+
+async function seedRevocationFailureTarget(
+  env: IntegrationTestEnvironment,
+  input: {
+    revocationUrl: string;
+  },
+): Promise<void> {
+  await env.controlPlaneDb
+    .insert(env.controlPlaneTables.integrationTargets)
+    .values({
+      targetKey: "revocation_failure_connections_delete",
+      familyId: "revocation-failure",
+      variantId: "revocation-failure",
+      enabled: true,
+      config: {
+        revocation_url: input.revocationUrl,
+      },
+    })
+    .onConflictDoUpdate({
+      target: env.controlPlaneTables.integrationTargets.targetKey,
+      set: {
+        familyId: "revocation-failure",
+        variantId: "revocation-failure",
+        enabled: true,
+        config: {
+          revocation_url: input.revocationUrl,
+        },
+      },
+    });
+}
 
 async function seedTarget(env: IntegrationTestEnvironment): Promise<void> {
   await env.controlPlaneDb
@@ -567,4 +808,42 @@ async function expectWebhookSourceMissing(
       where: (table, { eq }) => eq(table.id, sourceId),
     }),
   ).toBeUndefined();
+}
+
+async function listen(server: Server): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+}
+
+async function close(server: Server): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
+  });
+}
+
+async function readRequestBody(request: IncomingMessage): Promise<string> {
+  request.setEncoding("utf8");
+  let body = "";
+
+  for await (const chunk of request) {
+    if (typeof chunk !== "string") {
+      throw new Error("Expected simulated revocation request body to be decoded as UTF-8.");
+    }
+
+    body += chunk;
+  }
+
+  return body;
 }
