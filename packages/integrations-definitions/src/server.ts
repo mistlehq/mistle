@@ -47,6 +47,7 @@ export * from "./slack/index.js";
 export * from "./forms/index.js";
 export * from "./agent-runtimes/provider-selection.js";
 export * from "./registry/agent-runtimes.js";
+export * from "./shared/remote-mcp-server-catalog/index.js";
 export * from "./shared/webhook-callback-url.server.js";
 
 const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [

@@ -80,4 +80,5 @@ export * from "./jira/browser.js";
 export * from "./opencode/index.js";
 export * from "./sandbox-runtimes/index.js";
 export * from "./sentry/browser.js";
+export * from "./shared/remote-mcp-server-catalog/index.js";
 export * from "./slack/browser.js";
