@@ -849,6 +849,7 @@ export function SandboxProfileBindingConfigEditor(input: {
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
   layout?: "vertical" | "horizontal";
+  disabled?: boolean | undefined;
   formContext?: SchemaFormContext | undefined;
   onIntegrationBindingRowChange: (
     clientId: string,
@@ -869,7 +870,12 @@ export function SandboxProfileBindingConfigEditor(input: {
         </Notice>
         <div>
           <Button
+            disabled={input.disabled === true}
             onClick={() => {
+              if (input.disabled === true) {
+                return;
+              }
+
               input.onIntegrationBindingRowChange(input.row.clientId, {
                 config: configUiModel.defaultConfig ?? {},
               });
@@ -896,7 +902,12 @@ export function SandboxProfileBindingConfigEditor(input: {
         layout: input.layout ?? "vertical",
       }}
       noHtml5Validate
+      disabled={input.disabled === true}
       onChange={(event: IChangeEvent<JsonObject, RJSFSchema>) => {
+        if (input.disabled === true) {
+          return;
+        }
+
         const nextFormData = resolveRecord(event.formData);
         const nextConfig = resolveNextConfigFromChange({
           row: input.row,

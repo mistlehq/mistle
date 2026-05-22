@@ -57,7 +57,11 @@ describe("GcpDefinition", () => {
           id: "ibd_123",
           kind: "connector",
           config: {
-            mcpServers: [GcpMcpServerIds.CLOUD_STORAGE],
+            mcpServers: [
+              GcpMcpServerIds.CLOUD_LOGGING,
+              GcpMcpServerIds.CLOUD_RUN,
+              GcpMcpServerIds.GKE,
+            ],
           },
         },
         refs: {
@@ -75,11 +79,25 @@ describe("GcpDefinition", () => {
       }),
     ).toEqual([
       {
-        serverId: GcpMcpServerIds.CLOUD_STORAGE,
-        serverName: GcpMcpServerIds.CLOUD_STORAGE,
+        serverId: GcpMcpServerIds.CLOUD_LOGGING,
+        serverName: GcpMcpServerIds.CLOUD_LOGGING,
         transport: "streamable-http",
-        url: "https://storage.googleapis.com/storage/mcp",
-        description: "Google Cloud Storage MCP",
+        url: "https://logging.googleapis.com/mcp",
+        description: "Google Cloud Logging MCP",
+      },
+      {
+        serverId: GcpMcpServerIds.CLOUD_RUN,
+        serverName: GcpMcpServerIds.CLOUD_RUN,
+        transport: "streamable-http",
+        url: "https://run.googleapis.com/mcp",
+        description: "Google Cloud Run MCP",
+      },
+      {
+        serverId: GcpMcpServerIds.GKE,
+        serverName: GcpMcpServerIds.GKE,
+        transport: "streamable-http",
+        url: "https://container.googleapis.com/mcp",
+        description: "Google Kubernetes Engine MCP",
       },
     ]);
   });

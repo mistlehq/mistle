@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -16,12 +16,18 @@ function renderBindingEditor(input: {
   row: SandboxProfileBindingEditorRow;
   connections: readonly IntegrationConnectionSummary[];
   targets: readonly IntegrationTargetSummary[];
+  disabled?: boolean | undefined;
+  onIntegrationBindingRowChange?: (
+    clientId: string,
+    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
+  ) => void;
 }): ReturnType<typeof render> {
   return render(
     <SandboxProfileBindingConfigEditor
       availableConnections={input.connections}
       availableTargets={input.targets}
-      onIntegrationBindingRowChange={() => {}}
+      disabled={input.disabled}
+      onIntegrationBindingRowChange={input.onIntegrationBindingRowChange ?? (() => {})}
       row={input.row}
     />,
   );
@@ -488,12 +494,7 @@ describe("SandboxProfileBindingConfigEditor", () => {
 
     expect(screen.getByText("Jira CLI")).toBeDefined();
     expect(screen.queryByText("jira-cli")).toBeNull();
-    const jiraCliCheckbox = screen
-      .getAllByRole("checkbox")
-      .find((checkbox) => checkbox.getAttribute("aria-label") === "Jira CLI");
-    if (jiraCliCheckbox === undefined) {
-      throw new Error("Expected Jira CLI checkbox.");
-    }
+    const jiraCliCheckbox = screen.getByRole("checkbox", { name: "Jira CLI" });
     expect(jiraCliCheckbox.getAttribute("aria-checked")).toBe("true");
   });
 
@@ -586,12 +587,63 @@ describe("SandboxProfileBindingConfigEditor", () => {
 
     expect(screen.getByText("Linear MCP")).toBeDefined();
     expect(screen.queryByText("linear-mcp")).toBeNull();
-    const linearMcpCheckbox = screen
-      .getAllByRole("checkbox")
-      .find((checkbox) => checkbox.getAttribute("aria-label") === "Linear MCP");
-    if (linearMcpCheckbox === undefined) {
-      throw new Error("Expected Linear MCP checkbox.");
-    }
+    const linearMcpCheckbox = screen.getByRole("checkbox", { name: "Linear MCP" });
     expect(linearMcpCheckbox.getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("does not reset unsupported config while disabled", () => {
+    const target: IntegrationTargetSummary = {
+      targetKey: "target-jira",
+      displayName: "Jira",
+      familyId: "jira",
+      variantId: "jira-default",
+      config: {},
+      targetHealth: {
+        configStatus: "valid",
+      },
+    };
+    const connection: IntegrationConnectionSummary = {
+      id: "connection-jira",
+      displayName: "Jira Production",
+      targetKey: target.targetKey,
+      status: "active",
+      config: {
+        connection_method: "jira-personal-api-token",
+        site_url: "https://mistle.atlassian.net",
+        email: "user@example.com",
+      },
+    };
+    const row: SandboxProfileBindingEditorRow = {
+      clientId: "row-jira",
+      connectionId: connection.id,
+      kind: "connector",
+      config: {
+        unsupported: true,
+      },
+    };
+    const rowChanges: Array<{
+      clientId: string;
+      changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>;
+    }> = [];
+
+    renderBindingEditor({
+      row,
+      connections: [connection],
+      targets: [target],
+      disabled: true,
+      onIntegrationBindingRowChange: (clientId, changes) => {
+        rowChanges.push({ clientId, changes });
+      },
+    });
+
+    const resetButton = screen.getByRole("button", { name: "Reset config" });
+    if (!(resetButton instanceof HTMLButtonElement)) {
+      throw new Error("Expected Reset config to render as a button.");
+    }
+    expect(resetButton.disabled).toBe(true);
+
+    fireEvent.click(resetButton);
+
+    expect(rowChanges).toEqual([]);
   });
 });

@@ -13,10 +13,22 @@ describe("GcpBindingConfigSchema", () => {
   it("accepts supported Google Cloud MCP server ids", () => {
     expect(
       GcpBindingConfigSchema.parse({
-        mcpServers: [GcpMcpServerIds.CLOUD_STORAGE, GcpMcpServerIds.CLOUD_RESOURCE_MANAGER],
+        mcpServers: [
+          GcpMcpServerIds.CLOUD_LOGGING,
+          GcpMcpServerIds.CLOUD_RUN,
+          GcpMcpServerIds.CLOUD_STORAGE,
+          GcpMcpServerIds.CLOUD_RESOURCE_MANAGER,
+          GcpMcpServerIds.GKE,
+        ],
       }),
     ).toEqual({
-      mcpServers: [GcpMcpServerIds.CLOUD_STORAGE, GcpMcpServerIds.CLOUD_RESOURCE_MANAGER],
+      mcpServers: [
+        GcpMcpServerIds.CLOUD_LOGGING,
+        GcpMcpServerIds.CLOUD_RUN,
+        GcpMcpServerIds.CLOUD_STORAGE,
+        GcpMcpServerIds.CLOUD_RESOURCE_MANAGER,
+        GcpMcpServerIds.GKE,
+      ],
     });
   });
 

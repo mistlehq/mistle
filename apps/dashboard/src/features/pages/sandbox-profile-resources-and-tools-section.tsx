@@ -19,6 +19,7 @@ import type {
 import {
   resolveBindingConfigSummaryItems,
   resolveBindingToolToggleModel,
+  SandboxProfileBindingConfigEditor,
 } from "./sandbox-profile-binding-config-editor.js";
 
 const SearchDebounceMs = 300;
@@ -425,7 +426,20 @@ export function SandboxProfileBindingResourcesAndToolsCell(input: {
         )
       ) : null}
 
-      {summaryItems.length === 0 ? null : (
+      {input.row.kind !== "git" && input.readOnly !== true ? (
+        <SandboxProfileBindingConfigEditor
+          availableConnections={input.availableConnections}
+          availableTargets={input.availableTargets}
+          disabled={input.disabled}
+          formContext={{
+            labelTone: "detail",
+          }}
+          onIntegrationBindingRowChange={input.onRowChange}
+          row={input.row}
+        />
+      ) : null}
+
+      {(input.row.kind === "git" || input.readOnly === true) && summaryItems.length > 0 ? (
         <div className="grid grid-cols-1 gap-2">
           {summaryItems.map((item) => (
             <div className="flex min-w-0 flex-col gap-1" key={item.label}>
@@ -434,17 +448,19 @@ export function SandboxProfileBindingResourcesAndToolsCell(input: {
             </div>
           ))}
         </div>
-      )}
+      ) : null}
 
-      <BindingToolsControl
-        availableConnections={input.availableConnections}
-        availableTargets={input.availableTargets}
-        disabled={input.disabled}
-        showLabel={input.showGroupLabels}
-        readOnly={input.readOnly}
-        onRowChange={input.onRowChange}
-        row={input.row}
-      />
+      {input.row.kind === "git" || input.readOnly === true ? (
+        <BindingToolsControl
+          availableConnections={input.availableConnections}
+          availableTargets={input.availableTargets}
+          disabled={input.disabled}
+          showLabel={input.showGroupLabels}
+          readOnly={input.readOnly}
+          onRowChange={input.onRowChange}
+          row={input.row}
+        />
+      ) : null}
     </div>
   );
 }

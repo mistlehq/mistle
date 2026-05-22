@@ -20,6 +20,10 @@ import {
   StoryOpenAiTarget,
   StorySlackConnection,
 } from "./integrations-editor-section-story-support.js";
+import type {
+  IntegrationConnectionSummary,
+  IntegrationTargetSummary,
+} from "./sandbox-profile-binding-config-editor.js";
 import { SandboxProfileIntegrationsSetupSection } from "./sandbox-profile-integrations-setup-section.js";
 
 type SandboxProfileIntegrationsSetupSectionProps = ComponentProps<
@@ -122,6 +126,69 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     expect(runtime.getByText("Primary OpenAI Workspace")).toBeDefined();
     expect(runtime.getByText("GitHub - GitHub Production")).toBeDefined();
     expect(runtime.getByText("Jira Production")).toBeDefined();
+  });
+
+  it("renders editable connector binding config controls in resources and tools", () => {
+    const rowChanges: Array<{
+      clientId: string;
+      config: Record<string, unknown> | undefined;
+    }> = [];
+
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [StoryGcpConnection],
+          availableTargets: [StoryGcpTarget],
+          integrationRows: [
+            {
+              clientId: "gcp-row",
+              connectionId: StoryGcpConnection.id,
+              kind: "connector",
+              config: {},
+            },
+          ],
+          onIntegrationBindingRowChange: (clientId, changes) => {
+            rowChanges.push({
+              clientId,
+              config: changes.config,
+            });
+          },
+        }}
+      />,
+    );
+
+    expect(screen.queryByText("GOOGLE CLOUD MCP SERVERS")).toBeNull();
+    const loggingCheckbox = screen.getByRole("checkbox", {
+      name: "Cloud Logging",
+    });
+    const cloudRunCheckbox = screen.getByRole("checkbox", { name: "Cloud Run" });
+    const gkeCheckbox = screen.getByRole("checkbox", {
+      name: "Google Kubernetes Engine",
+    });
+
+    fireEvent.click(loggingCheckbox);
+    expect(rowChanges).toContainEqual({
+      clientId: "gcp-row",
+      config: {
+        mcpServers: ["cloud_logging"],
+      },
+    });
+
+    fireEvent.click(cloudRunCheckbox);
+    expect(rowChanges).toContainEqual({
+      clientId: "gcp-row",
+      config: {
+        mcpServers: ["cloud_logging", "cloud_run"],
+      },
+    });
+
+    fireEvent.click(gkeCheckbox);
+    expect(rowChanges).toContainEqual({
+      clientId: "gcp-row",
+      config: {
+        mcpServers: ["cloud_logging", "cloud_run", "gke"],
+      },
+    });
   });
 
   it("limits Codex proxied model providers to OpenAI and removes OpenCode-only agent bindings", async () => {
@@ -446,6 +513,29 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     expect(screen.queryByText("Save failed")).toBeNull();
   });
 });
+
+const StoryGcpTarget: IntegrationTargetSummary = {
+  targetKey: "target-gcp",
+  displayName: "Google Cloud",
+  logoKey: "gcp",
+  familyId: "gcp",
+  variantId: "gcp-mcp",
+  config: {},
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+const StoryGcpConnection: IntegrationConnectionSummary = {
+  id: "connection-gcp",
+  displayName: "GCP Production",
+  targetKey: StoryGcpTarget.targetKey,
+  status: "active",
+  config: {
+    connection_method: "oauth2-authorization-code",
+    client_id: "google-client.apps.googleusercontent.com",
+  },
+};
 
 function TestSandboxProfileIntegrationsSetupSection(input: {
   overrides: Partial<SandboxProfileIntegrationsSetupSectionProps>;

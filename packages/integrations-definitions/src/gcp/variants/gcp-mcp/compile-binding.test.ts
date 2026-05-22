@@ -54,19 +54,67 @@ function createCompileInput(input: {
   };
 }
 
-function requireRoute(
-  routes: ReturnType<typeof compileGcpBinding>["egressRoutes"],
-  index: number,
-): ReturnType<typeof compileGcpBinding>["egressRoutes"][number] {
-  const route = routes[index];
-  if (route === undefined) {
-    throw new Error(`Expected route at index ${String(index)}.`);
-  }
-
-  return route;
-}
-
 describe("compileGcpBinding", () => {
+  it("builds the expected Cloud Logging MCP route", () => {
+    const compiled = compileGcpBinding(
+      createCompileInput({
+        mcpServers: [GcpMcpServerIds.CLOUD_LOGGING],
+      }),
+    );
+
+    expect(compiled.egressRoutes).toEqual([
+      {
+        match: {
+          hosts: ["logging.googleapis.com"],
+          pathPrefixes: ["/mcp"],
+        },
+        upstream: {
+          baseUrl: "https://logging.googleapis.com/mcp",
+        },
+        authInjection: {
+          type: "bearer",
+          target: "authorization",
+        },
+        credentialResolver: {
+          kind: "integration_connection",
+          connectionId: "icn_gcp",
+          secretType: "oauth2_access_token",
+          slotKey: GcpCredentialSlotKeys.accessToken,
+        },
+      },
+    ]);
+  });
+
+  it("builds the expected Cloud Run MCP route", () => {
+    const compiled = compileGcpBinding(
+      createCompileInput({
+        mcpServers: [GcpMcpServerIds.CLOUD_RUN],
+      }),
+    );
+
+    expect(compiled.egressRoutes).toEqual([
+      {
+        match: {
+          hosts: ["run.googleapis.com"],
+          pathPrefixes: ["/mcp"],
+        },
+        upstream: {
+          baseUrl: "https://run.googleapis.com/mcp",
+        },
+        authInjection: {
+          type: "bearer",
+          target: "authorization",
+        },
+        credentialResolver: {
+          kind: "integration_connection",
+          connectionId: "icn_gcp",
+          secretType: "oauth2_access_token",
+          slotKey: GcpCredentialSlotKeys.accessToken,
+        },
+      },
+    ]);
+  });
+
   it("builds the expected Cloud Storage MCP route", () => {
     const compiled = compileGcpBinding(
       createCompileInput({
@@ -129,34 +177,73 @@ describe("compileGcpBinding", () => {
     ]);
   });
 
-  it("builds non-overlapping routes for all selected Google Cloud MCP servers", () => {
+  it("builds the expected GKE MCP route", () => {
     const compiled = compileGcpBinding(
       createCompileInput({
-        mcpServers: [GcpMcpServerIds.CLOUD_STORAGE, GcpMcpServerIds.CLOUD_RESOURCE_MANAGER],
+        mcpServers: [GcpMcpServerIds.GKE],
       }),
     );
 
-    expect(compiled.egressRoutes).toHaveLength(2);
-    const storageRoute: EgressCredentialRoute = {
-      egressRuleId: "egress_rule_gcp_storage",
-      bindingId: "ibd_123",
-      familyId: "gcp",
-      variantId: "gcp-mcp",
-      ...requireRoute(compiled.egressRoutes, 0),
-    };
-    const resourceManagerRoute: EgressCredentialRoute = {
-      egressRuleId: "egress_rule_gcp_resource_manager",
-      bindingId: "ibd_123",
-      familyId: "gcp",
-      variantId: "gcp-mcp",
-      ...requireRoute(compiled.egressRoutes, 1),
-    };
+    expect(compiled.egressRoutes).toEqual([
+      {
+        match: {
+          hosts: ["container.googleapis.com"],
+          pathPrefixes: ["/mcp"],
+        },
+        upstream: {
+          baseUrl: "https://container.googleapis.com/mcp",
+        },
+        authInjection: {
+          type: "bearer",
+          target: "authorization",
+        },
+        credentialResolver: {
+          kind: "integration_connection",
+          connectionId: "icn_gcp",
+          secretType: "oauth2_access_token",
+          slotKey: GcpCredentialSlotKeys.accessToken,
+        },
+      },
+    ]);
+  });
 
-    expect(
-      routesOverlap({
-        left: storageRoute,
-        right: resourceManagerRoute,
+  it("builds non-overlapping routes for all selected Google Cloud MCP servers", () => {
+    const compiled = compileGcpBinding(
+      createCompileInput({
+        mcpServers: [
+          GcpMcpServerIds.CLOUD_LOGGING,
+          GcpMcpServerIds.CLOUD_RUN,
+          GcpMcpServerIds.CLOUD_STORAGE,
+          GcpMcpServerIds.CLOUD_RESOURCE_MANAGER,
+          GcpMcpServerIds.GKE,
+        ],
       }),
-    ).toBe(false);
+    );
+
+    expect(compiled.egressRoutes).toHaveLength(5);
+    const routes = compiled.egressRoutes.map(
+      (route, index): EgressCredentialRoute => ({
+        egressRuleId: `egress_rule_gcp_${String(index)}`,
+        bindingId: "ibd_123",
+        familyId: "gcp",
+        variantId: "gcp-mcp",
+        ...route,
+      }),
+    );
+
+    for (const [leftIndex, left] of routes.entries()) {
+      for (const [rightIndex, right] of routes.entries()) {
+        if (leftIndex >= rightIndex) {
+          continue;
+        }
+
+        expect(
+          routesOverlap({
+            left,
+            right,
+          }),
+        ).toBe(false);
+      }
+    }
   });
 });

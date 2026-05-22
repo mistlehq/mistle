@@ -737,7 +737,6 @@ function CheckboxesWidget(
               >
                 <Checkbox
                   aria-describedby={describedBy}
-                  aria-label={optionLabel}
                   autoFocus={autofocus && index === 0}
                   checked={checked}
                   disabled={disabled || itemDisabled || readonly}
