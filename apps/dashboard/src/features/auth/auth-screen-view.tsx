@@ -19,14 +19,13 @@ type AuthScreenViewProps = {
   onUseDifferentEmail: () => void;
   onVerifyOtp: (event: React.SyntheticEvent<HTMLFormElement>) => Promise<void>;
   otp: string;
-  title?: string | null;
 };
 
 export function AuthScreenView(props: AuthScreenViewProps): React.JSX.Element {
   return (
     <AuthPageShell
       maxWidthClass={AuthPageWidths.SM}
-      title={props.title ?? (props.authStep === "email" ? "Sign in or create an account" : null)}
+      title={props.authStep === "email" ? "Sign in or create an account" : null}
     >
       {props.authStep === "email" ? (
         <EmailStage

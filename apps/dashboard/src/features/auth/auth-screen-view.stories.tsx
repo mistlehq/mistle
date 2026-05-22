@@ -46,6 +46,15 @@ function InteractiveOtpStory(args: Story["args"]): React.JSX.Element {
   return <AuthScreenView {...resolvedArgs} onOtpChange={setOtp} otp={otp} />;
 }
 
+function GoogleAuthAfterForm(input: { isPending: boolean }): React.JSX.Element {
+  return (
+    <div className="gap-4 pt-1 flex flex-col">
+      <InlineDividerLabel label="Or" />
+      <GoogleSignInButton isPending={input.isPending} onClick={async () => {}} />
+    </div>
+  );
+}
+
 export const EmailEntry: Story = {
   args: {
     email: "",
@@ -64,35 +73,20 @@ export const SendingOtp: Story = {
 
 export const GoogleEnabled: Story = {
   args: {
-    emailStageAfterForm: (
-      <div className="gap-4 pt-1 flex flex-col">
-        <InlineDividerLabel label="Or" />
-        <GoogleSignInButton isPending={false} onClick={async () => {}} />
-      </div>
-    ),
+    emailStageAfterForm: <GoogleAuthAfterForm isPending={false} />,
   },
 };
 
 export const GoogleRedirecting: Story = {
   args: {
-    emailStageAfterForm: (
-      <div className="gap-4 pt-1 flex flex-col">
-        <InlineDividerLabel label="Or" />
-        <GoogleSignInButton isPending={true} onClick={async () => {}} />
-      </div>
-    ),
+    emailStageAfterForm: <GoogleAuthAfterForm isPending={true} />,
   },
 };
 
 export const GoogleCallbackError: Story = {
   args: {
     authError: "Google sign-in was cancelled.",
-    emailStageAfterForm: (
-      <div className="gap-4 pt-1 flex flex-col">
-        <InlineDividerLabel label="Or" />
-        <GoogleSignInButton isPending={false} onClick={async () => {}} />
-      </div>
-    ),
+    emailStageAfterForm: <GoogleAuthAfterForm isPending={false} />,
   },
 };
 

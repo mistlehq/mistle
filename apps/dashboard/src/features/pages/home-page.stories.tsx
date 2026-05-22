@@ -4,8 +4,7 @@ import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
-import { PageFrame } from "../shared/page-frame.js";
-import { HomeOnboardingHeaderTitle } from "./home-onboarding-header-title.js";
+import { HomePageFrame } from "./home-page-frame.js";
 import { HomePageStoryModels } from "./home-page-view-model.js";
 import { HomePageView } from "./home-page-view.js";
 import { NewSessionForm } from "./new-session-form.js";
@@ -17,15 +16,9 @@ import {
 
 function HomePageStoryFrame(args: ComponentProps<typeof HomePageView>): React.JSX.Element {
   return (
-    <PageFrame
-      width="normal"
-      {...(args.onboarding.state === "completed" ? { className: "bg-muted/30" } : {})}
-      titleSlot={
-        <HomeOnboardingHeaderTitle showGetStartedTitle={args.onboarding.state !== "completed"} />
-      }
-    >
+    <HomePageFrame onboardingState={args.onboarding.state}>
       <HomePageView {...args} />
-    </PageFrame>
+    </HomePageFrame>
   );
 }
 

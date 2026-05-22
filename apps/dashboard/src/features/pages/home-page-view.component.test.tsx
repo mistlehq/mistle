@@ -49,7 +49,7 @@ describe("HomePageView", () => {
     expect(navigatedHref).toBe("/integrations");
   });
 
-  it("shows recent sessions and the session creation form after onboarding is complete", () => {
+  it("renders completed home content top-aligned with page-scale section headings", () => {
     let navigatedHref: string | null = null;
 
     const { container } = render(

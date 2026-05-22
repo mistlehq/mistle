@@ -3,11 +3,15 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { HomeOnboardingHeaderTitle } from "./home-onboarding-header-title.js";
+import { HomePageFrame } from "./home-page-frame.js";
 
-describe("HomeOnboardingHeaderTitle", () => {
+describe("HomePageFrame", () => {
   it("renders the beta notice before the onboarding title", () => {
-    render(<HomeOnboardingHeaderTitle showGetStartedTitle={true} />);
+    render(
+      <HomePageFrame onboardingState="add_integrations">
+        <div>Home content</div>
+      </HomePageFrame>,
+    );
 
     const noticeTitle = screen.getByText(
       "Mistle Cloud is in beta - Usage is free, subject to usage limits",
@@ -20,14 +24,21 @@ describe("HomeOnboardingHeaderTitle", () => {
         "The free tier includes up to 2 concurrent sandboxes, with runtime and instance-size limits. During beta, some limits may be higher while we tune capacity.",
       ),
     ).toBeDefined();
+    expect(screen.getByText("Home content")).toBeDefined();
   });
 
-  it("can render the beta notice without the onboarding title", () => {
-    render(<HomeOnboardingHeaderTitle showGetStartedTitle={false} />);
+  it("renders the completed home beta notice without the onboarding title", () => {
+    const { container } = render(
+      <HomePageFrame onboardingState="completed">
+        <div>Completed home content</div>
+      </HomePageFrame>,
+    );
 
     expect(
       screen.getByText("Mistle Cloud is in beta - Usage is free, subject to usage limits"),
     ).toBeDefined();
     expect(screen.queryByRole("heading", { name: "Get started" })).toBeNull();
+    expect(screen.getByText("Completed home content")).toBeDefined();
+    expect(container.firstElementChild?.className).toContain("bg-muted/30");
   });
 });

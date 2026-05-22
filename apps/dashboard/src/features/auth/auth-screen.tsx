@@ -183,14 +183,11 @@ export function AuthScreen(): React.JSX.Element {
     </div>
   ) : undefined;
 
-  const authScreenViewOptionalProps = {
-    ...(emailStageAfterForm === undefined ? {} : { emailStageAfterForm }),
-  };
-
   return (
     <AuthScreenView
       authError={authError}
       authStep={authStep}
+      emailStageAfterForm={emailStageAfterForm}
       email={email}
       footerError={sessionQuery.isError ? sessionQuery.error.message : null}
       isSendingOtp={isSendingOtp}
@@ -201,7 +198,6 @@ export function AuthScreen(): React.JSX.Element {
       onUseDifferentEmail={handleUseDifferentEmail}
       onVerifyOtp={handleVerifyOtp}
       otp={otp}
-      {...authScreenViewOptionalProps}
     />
   );
 }
