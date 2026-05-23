@@ -307,6 +307,7 @@ fn daemon_phase_name(phase: SandboxdDaemonPhase) -> &'static str {
 
 fn component_name(component: SupervisedComponent) -> &'static str {
     match component {
+        SupervisedComponent::Sandboxd => "sandboxd",
         SupervisedComponent::TunnelSession => "tunnel_session",
         SupervisedComponent::EgressProxy => "egress_proxy",
         SupervisedComponent::CodexProxy => "codex_proxy",

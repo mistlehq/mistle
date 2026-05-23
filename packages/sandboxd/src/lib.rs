@@ -24,6 +24,7 @@ pub mod cgroups;
 pub mod codex_proxy;
 pub mod command;
 pub mod control;
+pub mod daemon_liveness;
 pub mod egress_proxy;
 pub mod init;
 pub mod keepalive;

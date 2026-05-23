@@ -20,6 +20,7 @@ const MAX_FORWARDED_LIFECYCLE_EVENT_LINES: usize = 128;
 /// Stable identifier for one supervised long-lived sandboxd component.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SupervisedComponent {
+    Sandboxd,
     TunnelSession,
     EgressProxy,
     CodexProxy,
@@ -33,6 +34,7 @@ pub enum SupervisedComponent {
 impl SupervisedComponent {
     pub fn as_str(self) -> &'static str {
         match self {
+            Self::Sandboxd => "Sandboxd",
             Self::TunnelSession => "TunnelSession",
             Self::EgressProxy => "EgressProxy",
             Self::CodexProxy => "CodexProxy",
@@ -98,6 +100,8 @@ pub enum LifecycleEventName {
     ComponentExited,
     ComponentRestartScheduled,
     ComponentRestartSucceeded,
+    DaemonLivenessLagDetected,
+    DaemonLivenessRecovered,
 }
 
 impl LifecycleEventName {
@@ -109,6 +113,8 @@ impl LifecycleEventName {
             Self::ComponentExited => "component_exited",
             Self::ComponentRestartScheduled => "component_restart_scheduled",
             Self::ComponentRestartSucceeded => "component_restart_succeeded",
+            Self::DaemonLivenessLagDetected => "daemon_liveness_lag_detected",
+            Self::DaemonLivenessRecovered => "daemon_liveness_recovered",
         }
     }
 }
@@ -484,6 +490,88 @@ impl SandboxdSupervisorHandle {
         state.forwarded_lifecycle_lines.drain(..).collect()
     }
 
+    /// Records the latest daemon-level liveness/resource sample without emitting an event.
+    pub fn record_daemon_liveness_sample(&self, details: BTreeMap<String, String>) {
+        self.update_component(SupervisedComponent::Sandboxd, |snapshot, observed_at| {
+            if snapshot.state != ComponentHealthState::Restarting {
+                snapshot.state = ComponentHealthState::Healthy;
+                snapshot.last_error = None;
+            }
+            snapshot.last_healthcheck_at = Some(observed_at);
+            snapshot.details = details;
+        });
+    }
+
+    /// Emits one edge-triggered daemon liveness lag event.
+    pub fn record_daemon_liveness_lag_detected(
+        &self,
+        details: BTreeMap<String, String>,
+        lag_ms: u64,
+        threshold_ms: u64,
+    ) {
+        let error = format!(
+            "sandboxd liveness sampler was delayed by {lag_ms}ms, above {threshold_ms}ms threshold"
+        );
+        let Some(((), snapshot, _previous_state, observed_at)) =
+            self.update_component(SupervisedComponent::Sandboxd, |snapshot, observed_at| {
+                snapshot.state = ComponentHealthState::Restarting;
+                snapshot.last_failed_at = Some(observed_at);
+                snapshot.last_healthcheck_at = Some(observed_at);
+                snapshot.last_error = Some(error.clone());
+                snapshot.details = details;
+            })
+        else {
+            return;
+        };
+
+        self.emit_lifecycle_event_from_snapshot(
+            &snapshot,
+            LifecycleEventEmission {
+                observed_at,
+                event: LifecycleEventName::DaemonLivenessLagDetected,
+                reason: Some("sampler_tick_lag"),
+                error: Some(&error),
+                extra_fields: &[
+                    ("lagMs", Value::from(lag_ms)),
+                    ("thresholdMs", Value::from(threshold_ms)),
+                ],
+            },
+        );
+    }
+
+    /// Emits one edge-triggered daemon liveness recovery event.
+    pub fn record_daemon_liveness_recovered(
+        &self,
+        details: BTreeMap<String, String>,
+        lag_ms: u64,
+        threshold_ms: u64,
+    ) {
+        let Some(((), snapshot, _previous_state, observed_at)) =
+            self.update_component(SupervisedComponent::Sandboxd, |snapshot, observed_at| {
+                snapshot.state = ComponentHealthState::Healthy;
+                snapshot.last_healthcheck_at = Some(observed_at);
+                snapshot.last_error = None;
+                snapshot.details = details;
+            })
+        else {
+            return;
+        };
+
+        self.emit_lifecycle_event_from_snapshot(
+            &snapshot,
+            LifecycleEventEmission {
+                observed_at,
+                event: LifecycleEventName::DaemonLivenessRecovered,
+                reason: Some("sampler_tick_recovered"),
+                error: None,
+                extra_fields: &[
+                    ("lagMs", Value::from(lag_ms)),
+                    ("thresholdMs", Value::from(threshold_ms)),
+                ],
+            },
+        );
+    }
+
     fn update_component<T>(
         &self,
         component: SupervisedComponent,
@@ -623,6 +711,30 @@ fn snapshot_detail_field_names_for_event(
 ) -> &'static [&'static str] {
     match (component, event) {
         (
+            SupervisedComponent::Sandboxd,
+            LifecycleEventName::DaemonLivenessLagDetected
+            | LifecycleEventName::DaemonLivenessRecovered,
+        ) => &[
+            "samplerIntervalMs",
+            "lagThresholdMs",
+            "lastLagMs",
+            "maxLagMs",
+            "pid",
+            "rssBytes",
+            "threadCount",
+            "fdCount",
+            "cgroupMemoryCurrentBytes",
+            "cgroupMemoryOomEvents",
+            "cgroupMemoryOomKillEvents",
+            "resourceProbeError",
+        ],
+        (SupervisedComponent::Sandboxd, _) => &[],
+        (
+            _,
+            LifecycleEventName::DaemonLivenessLagDetected
+            | LifecycleEventName::DaemonLivenessRecovered,
+        ) => &[],
+        (
             SupervisedComponent::TunnelSession,
             LifecycleEventName::ComponentStarting
             | LifecycleEventName::ComponentStarted
@@ -733,7 +845,10 @@ pub fn encode_forwarded_lifecycle_event_log_line(raw_line: &str) -> Result<Strin
         "component_starting" | "component_started" | "component_restart_succeeded" => {
             LifecycleEventLevel::Info
         }
-        "component_healthcheck_failed" | "component_restart_scheduled" => LifecycleEventLevel::Warn,
+        "component_healthcheck_failed"
+        | "component_restart_scheduled"
+        | "daemon_liveness_lag_detected" => LifecycleEventLevel::Warn,
+        "daemon_liveness_recovered" => LifecycleEventLevel::Info,
         "component_exited" => LifecycleEventLevel::Error,
         other => {
             return Err(format!(
@@ -895,6 +1010,71 @@ mod tests {
                 ("listenAddr".to_string(), "ws://127.0.0.1:4500".to_string()),
                 ("rawTarget".to_string(), "ws://127.0.0.1:4501".to_string()),
             ])
+        );
+    }
+
+    #[test]
+    fn records_daemon_liveness_edges_without_clearing_active_lag() {
+        let clock = Arc::new(MutableClock::new(1_000));
+        let handle = SandboxdSupervisorHandle::new(
+            "sandbox-123",
+            clock.clone(),
+            BTreeSet::from([SupervisedComponent::Sandboxd]),
+        );
+
+        handle.record_daemon_liveness_lag_detected(
+            BTreeMap::from([
+                ("lastLagMs".to_string(), "40000".to_string()),
+                ("maxLagMs".to_string(), "40000".to_string()),
+            ]),
+            40_000,
+            30_000,
+        );
+        handle.record_daemon_liveness_sample(BTreeMap::from([
+            ("lastLagMs".to_string(), "45000".to_string()),
+            ("maxLagMs".to_string(), "45000".to_string()),
+        ]));
+
+        let lagging_snapshot = handle
+            .component_snapshot(SupervisedComponent::Sandboxd)
+            .expect("sandboxd component should be tracked");
+        assert_eq!(lagging_snapshot.state, ComponentHealthState::Restarting);
+        assert_eq!(
+            lagging_snapshot.last_error.as_deref(),
+            Some("sandboxd liveness sampler was delayed by 40000ms, above 30000ms threshold")
+        );
+        assert_eq!(
+            lagging_snapshot
+                .details
+                .get("lastLagMs")
+                .map(String::as_str),
+            Some("45000")
+        );
+
+        handle.record_daemon_liveness_recovered(
+            BTreeMap::from([
+                ("lastLagMs".to_string(), "5".to_string()),
+                ("maxLagMs".to_string(), "45000".to_string()),
+            ]),
+            5,
+            30_000,
+        );
+
+        let recovered_snapshot = handle
+            .component_snapshot(SupervisedComponent::Sandboxd)
+            .expect("sandboxd component should remain tracked");
+        assert_eq!(recovered_snapshot.state, ComponentHealthState::Healthy);
+        assert_eq!(recovered_snapshot.last_error, None);
+
+        let lifecycle_lines = handle.drain_forwarded_lifecycle_event_lines();
+        assert_eq!(lifecycle_lines.len(), 2);
+        assert!(
+            lifecycle_lines[0].contains("\"event\":\"daemon_liveness_lag_detected\""),
+            "lag detection should emit a lifecycle line"
+        );
+        assert!(
+            lifecycle_lines[1].contains("\"event\":\"daemon_liveness_recovered\""),
+            "recovery should emit a lifecycle line"
         );
     }
 
