@@ -59,6 +59,7 @@ export type OpenCodeListSessionsInput = {
 export type OpenCodeCreateSessionInput = {
   agent?: string;
   directory?: string;
+  idempotency?: AgentConversationIdempotencyMetadata;
   model?: {
     id: string;
     providerID: string;
@@ -225,7 +226,15 @@ export function createOpenCodeSessionClient(
       activeSubscriptions.clear();
     },
     async createSession(createInput = {}) {
-      const result = await sdkClient.session.create(createInput, {
+      const { idempotency, ...sessionCreateInput } = createInput;
+      const result = await sdkClient.session.create(sessionCreateInput, {
+        ...(idempotency === undefined
+          ? {}
+          : {
+              headers: {
+                [OpenCodeProxyIdempotencyHeader]: JSON.stringify(idempotency),
+              },
+            }),
         throwOnError: true,
       });
       return result.data;

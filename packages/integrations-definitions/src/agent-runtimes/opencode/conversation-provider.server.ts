@@ -12,6 +12,7 @@ import { z } from "zod";
 
 import {
   createOpenCodeSessionClient,
+  type OpenCodeCreateSessionInput,
   type OpenCodeSendPromptInput,
   type OpenCodeSessionClient,
   type OpenCodeSessionStatus,
@@ -276,11 +277,12 @@ export function createOpenCodeConversationProvider(): AgentConversationProvider 
     },
     createConversation: async (input) => {
       const { client } = getOpenCodeConnection(input.connection);
-      const createInput: {
-        directory?: string;
-      } = {};
+      const createInput: OpenCodeCreateSessionInput = {};
       if (input.cwd !== undefined) {
         createInput.directory = input.cwd;
+      }
+      if (input.idempotency !== undefined) {
+        createInput.idempotency = input.idempotency;
       }
       const session = await client.createSession(createInput);
 

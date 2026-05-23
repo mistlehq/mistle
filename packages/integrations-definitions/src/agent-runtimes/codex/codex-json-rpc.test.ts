@@ -530,6 +530,42 @@ describe("openai codex json-rpc client", () => {
     });
   });
 
+  it("serializes idempotency metadata on JSON-RPC requests", async () => {
+    const server = await startJsonRpcTestServer("stay_open");
+    openServers.add(server);
+
+    const sessionClient = await connectSessionClient({
+      connectionUrl: server.url,
+      runtime: createNodeSandboxSessionRuntime(),
+    });
+
+    const rpcClient = new CodexJsonRpcClient(sessionClient);
+    const request = rpcClient.call(
+      "thread/list",
+      { limit: 1 },
+      {
+        idempotency: {
+          key: "delivery_task_123:submit-payload",
+          operation: "submitPayload",
+          requestFingerprint: "sha256:abc123",
+        },
+      },
+    );
+
+    expect(JSON.parse(await server.threadListRequest)).toMatchObject({
+      method: "thread/list",
+      idempotency: {
+        key: "delivery_task_123:submit-payload",
+        operation: "submitPayload",
+        requestFingerprint: "sha256:abc123",
+      },
+    });
+    await expect(request).resolves.toMatchObject({
+      items: [],
+      nextCursor: null,
+    });
+  });
+
   it("rejects pending requests when the active stream is reset", async () => {
     const server = await startJsonRpcTestServer("manual_thread_list");
     openServers.add(server);

@@ -610,6 +610,39 @@ describe("createOpenCodeSessionClient", () => {
     });
   });
 
+  it("sends create session idempotency metadata on the OpenCode proxy envelope", async () => {
+    const server = await startOpenCodeProxyTransportServer();
+    const client = await createConnectedClient(server);
+
+    const createPromise = client.createSession({
+      directory: "/workspace/repo",
+      idempotency: {
+        key: "delivery_task_123:create-conversation",
+        operation: "createConversation",
+        requestFingerprint: "sha256:def456",
+      },
+    });
+    const request = await server.nextRequest();
+    server.sendJsonResponse({
+      request,
+      body: createSessionResponse("ses_test", "Created session"),
+    });
+
+    await expect(createPromise).resolves.toMatchObject({
+      id: "ses_test",
+      title: "Created session",
+    });
+    expect(request.request).toMatchObject({
+      method: "POST",
+      path: "/session?directory=%2Fworkspace%2Frepo",
+      idempotency: {
+        key: "delivery_task_123:create-conversation",
+        operation: "createConversation",
+        requestFingerprint: "sha256:def456",
+      },
+    });
+  });
+
   it("responds to OpenCode session permission requests", async () => {
     const server = await startOpenCodeProxyTransportServer();
     const client = await createConnectedClient(server);

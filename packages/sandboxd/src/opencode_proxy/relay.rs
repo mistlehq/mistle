@@ -24,9 +24,9 @@ use crate::opencode_proxy::http::{
     OpenCodeHttpClient, build_opencode_target_uri, read_response_body,
 };
 use crate::opencode_proxy::idempotency::{
-    OpenCodeProxyIdempotency, OpenCodeSubmitIdempotencyAction, SharedIdempotencyStore,
+    OpenCodeIdempotencyAction, OpenCodeProxyIdempotency, SharedIdempotencyStore,
     StoredOpenCodeProxyResponse, complete_submit_idempotency, delete_started_submit_idempotency,
-    prepare_submit_idempotency,
+    prepare_opencode_idempotency,
 };
 use crate::opencode_proxy::sse::relay_sse_response;
 
@@ -137,7 +137,7 @@ async fn handle_opencode_proxy_request(
     sender: mpsc::UnboundedSender<Message>,
     idempotency_store: Option<SharedIdempotencyStore>,
 ) -> Result<(), OpenCodeProxyError> {
-    let idempotency_action = prepare_submit_idempotency(
+    let idempotency_action = prepare_opencode_idempotency(
         crate::opencode_proxy::idempotency::PrepareSubmitIdempotencyInput {
             body: request.body.as_mut(),
             idempotency: request.idempotency.as_ref(),
@@ -147,9 +147,9 @@ async fn handle_opencode_proxy_request(
         },
     );
     let started_idempotency = match idempotency_action {
-        OpenCodeSubmitIdempotencyAction::Disabled => None,
-        OpenCodeSubmitIdempotencyAction::Forward(started) => Some(started),
-        OpenCodeSubmitIdempotencyAction::Replay(response) => {
+        OpenCodeIdempotencyAction::Disabled => None,
+        OpenCodeIdempotencyAction::Forward(started) => Some(started),
+        OpenCodeIdempotencyAction::Replay(response) => {
             send_json_message(
                 &sender,
                 &OpenCodeProxyResponse {
@@ -162,7 +162,7 @@ async fn handle_opencode_proxy_request(
             )?;
             return Ok(());
         }
-        OpenCodeSubmitIdempotencyAction::Reject { status, message } => {
+        OpenCodeIdempotencyAction::Reject { status, message } => {
             send_error_response(&sender, request.id, status, message)?;
             return Ok(());
         }
@@ -235,6 +235,39 @@ async fn handle_opencode_proxy_request(
         .get("content-type")
         .is_some_and(|content_type| content_type.starts_with("text/event-stream"));
     if is_sse {
+        if let (Some(store), Some(started)) = (idempotency_store.as_ref(), started_idempotency) {
+            let stored_response = StoredOpenCodeProxyResponse {
+                status: 502,
+                headers: BTreeMap::from([(CONTENT_TYPE.to_string(), "application/json".to_string())]),
+                body: json!({
+                    "error": "OpenCode idempotent requests cannot replay text/event-stream responses."
+                })
+                .to_string(),
+            };
+            if let Err(error) = complete_submit_idempotency(store, started, stored_response.clone())
+            {
+                send_error_response(
+                    &sender,
+                    request.id,
+                    500,
+                    format!(
+                        "OpenCode SSE response could not be persisted for idempotent replay: {error}"
+                    ),
+                )?;
+                return Ok(());
+            }
+            send_json_message(
+                &sender,
+                &OpenCodeProxyResponse {
+                    id: request.id,
+                    message_type: OpenCodeProxyResponseType::Response,
+                    status: stored_response.status,
+                    headers: stored_response.headers,
+                    body: stored_response.body,
+                },
+            )?;
+            return Ok(());
+        }
         send_json_message(
             &sender,
             &OpenCodeProxyResponse {
@@ -249,7 +282,32 @@ async fn handle_opencode_proxy_request(
         return Ok(());
     }
 
-    let body = read_response_body(response.into_body()).await?;
+    let body = match read_response_body(response.into_body()).await {
+        Ok(body) => body,
+        Err(error) => {
+            if let (Some(store), Some(started)) =
+                (idempotency_store.as_ref(), started_idempotency.as_ref())
+                && let Err(delete_error) = delete_started_submit_idempotency(store, started)
+            {
+                send_error_response(
+                    &sender,
+                    request.id,
+                    500,
+                    format!(
+                        "OpenCode upstream response body failed, and the idempotency record could not be released for retry: {delete_error}"
+                    ),
+                )?;
+                return Ok(());
+            }
+            send_error_response(
+                &sender,
+                request.id,
+                502,
+                format!("OpenCode upstream response body failed: {error}"),
+            )?;
+            return Ok(());
+        }
+    };
     if let (Some(store), Some(started)) = (idempotency_store.as_ref(), started_idempotency)
         && let Err(error) = complete_submit_idempotency(
             store,

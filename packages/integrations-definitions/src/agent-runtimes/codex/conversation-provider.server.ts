@@ -2,6 +2,7 @@ import type {
   AgentConversationCollaborationModeSettings,
   AgentConversationConnectInput,
   AgentConversationConnection,
+  AgentConversationIdempotencyMetadata,
   AgentConversationInspectResult,
   AgentConversationProvider,
 } from "@mistle/integrations-core";
@@ -295,9 +296,15 @@ function isProviderExecutionMissingError(error: unknown): boolean {
 
 async function sendJsonRpcRequest(
   rpcClient: CodexJsonRpcClient,
-  input: { method: string; params?: unknown },
+  input: {
+    method: string;
+    params?: unknown;
+    idempotency?: AgentConversationIdempotencyMetadata | undefined;
+  },
 ): Promise<unknown> {
-  const requestHandle = rpcClient.callWithHandle(input.method, input.params);
+  const requestHandle = rpcClient.callWithHandle(input.method, input.params, {
+    idempotency: input.idempotency,
+  });
   return await withRequestTimeout(input.method, requestHandle).catch((error: unknown) => {
     if (error instanceof CodexJsonRpcRequestError) {
       const errorMessage = readJsonRpcErrorMessage(error);

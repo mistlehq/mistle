@@ -76,9 +76,8 @@ function resolveProviderCreateConversationRetryPolicy(input: {
   switch (input.runtimeId) {
     case "codex":
     case "pi":
-      return IdempotentProviderDeliveryStepRetryPolicy;
     case "opencode":
-      return SingleAttemptDeliveryStepRetryPolicy;
+      return IdempotentProviderDeliveryStepRetryPolicy;
     default:
       return SingleAttemptDeliveryStepRetryPolicy;
   }

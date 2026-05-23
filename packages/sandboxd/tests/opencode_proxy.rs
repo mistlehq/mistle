@@ -77,7 +77,7 @@ fn replays_completed_idempotent_prompt_submission_without_reposting_to_opencode(
         .expect("idempotency store should load");
     let simulated_server = SimulatedOpenCodeServer::start(|request| {
         assert_eq!(request.method, "POST");
-        assert_eq!(request.path, "/session/session_123/message");
+        assert_eq!(request.path, "/session/session_123/prompt_async");
         assert!(
             request.body.contains("\"messageID\":\"msg_mistle_"),
             "proxy should inject deterministic OpenCode messageID"
@@ -120,13 +120,68 @@ fn replays_completed_idempotent_prompt_submission_without_reposting_to_opencode(
 }
 
 #[test]
+fn replays_completed_idempotent_session_creation_without_reposting_to_opencode() {
+    let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
+    let store = IdempotencyStore::load_all(temp_dir.path().join("idempotency"))
+        .expect("idempotency store should load");
+    let simulated_server = SimulatedOpenCodeServer::start(|request| {
+        assert_eq!(request.method, "POST");
+        assert_eq!(request.path, "/session");
+        assert!(
+            request.body.contains("\"directory\":\"/workspace\""),
+            "proxy should forward the OpenCode session create body"
+        );
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 42\r\n\r\n{\"id\":\"session_created\",\"title\":\"Created\"}"
+            .to_string()
+    });
+
+    let proxy = start_opencode_proxy_with_idempotency_store(
+        "ws://127.0.0.1:0/opencode",
+        &simulated_server.base_url,
+        keepalive_manager(),
+        runtime_readiness_manager(),
+        store,
+    )
+    .expect("OpenCode proxy should start");
+
+    let (mut client, _) = connect(proxy.listen_url()).expect("proxy websocket should connect");
+    let fingerprint = create_conversation_fingerprint("/workspace");
+    send_idempotent_create_session_request(&mut client, "first", fingerprint.value());
+    let first_response = read_json_text_message(&mut client);
+    assert_eq!(first_response["id"], json!("first"));
+    assert_eq!(first_response["type"], json!("response"));
+    assert_eq!(first_response["status"], json!(200));
+    assert_eq!(
+        first_response["body"],
+        json!("{\"id\":\"session_created\",\"title\":\"Created\"}")
+    );
+
+    simulated_server.wait_for_request_count(1);
+
+    send_idempotent_create_session_request(&mut client, "second", fingerprint.value());
+    let second_response = read_json_text_message(&mut client);
+    assert_eq!(second_response["id"], json!("second"));
+    assert_eq!(second_response["type"], json!("response"));
+    assert_eq!(second_response["status"], json!(200));
+    assert_eq!(
+        second_response["body"],
+        json!("{\"id\":\"session_created\",\"title\":\"Created\"}")
+    );
+    simulated_server.assert_no_additional_request();
+
+    client.close(None).expect("websocket should close cleanly");
+    proxy.close().expect("OpenCode proxy should close cleanly");
+    simulated_server.close();
+}
+
+#[test]
 fn rejects_reused_idempotency_key_with_different_fingerprint() {
     let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
     let store = IdempotencyStore::load_all(temp_dir.path().join("idempotency"))
         .expect("idempotency store should load");
     let simulated_server = SimulatedOpenCodeServer::start(|request| {
         assert_eq!(request.method, "POST");
-        assert_eq!(request.path, "/session/session_123/message");
+        assert_eq!(request.path, "/session/session_123/prompt_async");
         "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 11\r\n\r\n{\"ok\":true}"
             .to_string()
     });
@@ -222,7 +277,7 @@ fn releases_started_idempotency_record_when_upstream_fails_before_response() {
         .expect("idempotency store should load");
     let simulated_server = SimulatedOpenCodeServer::start(|request| {
         assert_eq!(request.method, "POST");
-        assert_eq!(request.path, "/session/session_123/message");
+        assert_eq!(request.path, "/session/session_123/prompt_async");
         String::new()
     });
 
@@ -250,6 +305,103 @@ fn releases_started_idempotency_record_when_upstream_fails_before_response() {
     assert_eq!(second_response["type"], json!("response"));
     assert_eq!(second_response["status"], json!(502));
     simulated_server.wait_for_request_count(1);
+
+    client.close(None).expect("websocket should close cleanly");
+    proxy.close().expect("OpenCode proxy should close cleanly");
+    simulated_server.close();
+}
+
+#[test]
+fn releases_started_idempotency_record_when_upstream_response_body_fails() {
+    let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
+    let store = IdempotencyStore::load_all(temp_dir.path().join("idempotency"))
+        .expect("idempotency store should load");
+    let simulated_server = SimulatedOpenCodeServer::start(|request| {
+        assert_eq!(request.method, "POST");
+        assert_eq!(request.path, "/session/session_123/prompt_async");
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 128\r\n\r\n{\"ok\":"
+            .to_string()
+    });
+
+    let proxy = start_opencode_proxy_with_idempotency_store(
+        "ws://127.0.0.1:0/opencode",
+        &simulated_server.base_url,
+        keepalive_manager(),
+        runtime_readiness_manager(),
+        store,
+    )
+    .expect("OpenCode proxy should start");
+
+    let (mut client, _) = connect(proxy.listen_url()).expect("proxy websocket should connect");
+    let fingerprint = submit_payload_fingerprint("hello");
+    send_idempotent_prompt_request(&mut client, "first", fingerprint.value());
+    let first_response = read_json_text_message(&mut client);
+    assert_eq!(first_response["id"], json!("first"));
+    assert_eq!(first_response["type"], json!("response"));
+    assert_eq!(first_response["status"], json!(502));
+    assert!(
+        first_response["body"]
+            .as_str()
+            .expect("body-read failure body should be a string")
+            .contains("upstream response body failed")
+    );
+    simulated_server.wait_for_request_count(1);
+
+    send_idempotent_prompt_request(&mut client, "second", fingerprint.value());
+    let second_response = read_json_text_message(&mut client);
+    assert_eq!(second_response["id"], json!("second"));
+    assert_eq!(second_response["type"], json!("response"));
+    assert_eq!(second_response["status"], json!(502));
+    simulated_server.wait_for_request_count(1);
+
+    client.close(None).expect("websocket should close cleanly");
+    proxy.close().expect("OpenCode proxy should close cleanly");
+    simulated_server.close();
+}
+
+#[test]
+fn completes_idempotency_record_when_upstream_returns_sse_response() {
+    let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
+    let store = IdempotencyStore::load_all(temp_dir.path().join("idempotency"))
+        .expect("idempotency store should load");
+    let simulated_server = SimulatedOpenCodeServer::start(|request| {
+        assert_eq!(request.method, "POST");
+        assert_eq!(request.path, "/session/session_123/prompt_async");
+        "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n\r\nevent: message\ndata: {\"type\":\"started\"}\n\n"
+            .to_string()
+    });
+
+    let proxy = start_opencode_proxy_with_idempotency_store(
+        "ws://127.0.0.1:0/opencode",
+        &simulated_server.base_url,
+        keepalive_manager(),
+        runtime_readiness_manager(),
+        store,
+    )
+    .expect("OpenCode proxy should start");
+
+    let (mut client, _) = connect(proxy.listen_url()).expect("proxy websocket should connect");
+    let fingerprint = submit_payload_fingerprint("hello");
+    send_idempotent_prompt_request(&mut client, "first", fingerprint.value());
+    let first_response = read_json_text_message(&mut client);
+    assert_eq!(first_response["id"], json!("first"));
+    assert_eq!(first_response["type"], json!("response"));
+    assert_eq!(first_response["status"], json!(502));
+    assert!(
+        first_response["body"]
+            .as_str()
+            .expect("SSE idempotency body should be a string")
+            .contains("cannot replay text/event-stream responses")
+    );
+    simulated_server.wait_for_request_count(1);
+
+    send_idempotent_prompt_request(&mut client, "second", fingerprint.value());
+    let second_response = read_json_text_message(&mut client);
+    assert_eq!(second_response["id"], json!("second"));
+    assert_eq!(second_response["type"], json!("response"));
+    assert_eq!(second_response["status"], json!(502));
+    assert_eq!(second_response["body"], first_response["body"]);
+    simulated_server.assert_no_additional_request();
 
     client.close(None).expect("websocket should close cleanly");
     proxy.close().expect("OpenCode proxy should close cleanly");
@@ -1081,7 +1233,7 @@ fn send_idempotent_prompt_request<S>(
             json!({
                 "id": request_id,
                 "method": "POST",
-                "path": "/session/session_123/message",
+                "path": "/session/session_123/prompt_async",
                 "body": {
                     "parts": [
                         {
@@ -1100,6 +1252,45 @@ fn send_idempotent_prompt_request<S>(
             .into(),
         ))
         .expect("websocket request should send");
+}
+
+fn send_idempotent_create_session_request<S>(
+    client: &mut WebSocket<S>,
+    request_id: &str,
+    request_fingerprint: &str,
+) where
+    S: Read + Write,
+{
+    client
+        .send(Message::Text(
+            json!({
+                "id": request_id,
+                "method": "POST",
+                "path": "/session",
+                "body": {
+                    "directory": "/workspace"
+                },
+                "idempotency": {
+                    "key": "create-key",
+                    "operation": "createConversation",
+                    "requestFingerprint": request_fingerprint
+                }
+            })
+            .to_string()
+            .into(),
+        ))
+        .expect("websocket request should send");
+}
+
+fn create_conversation_fingerprint(directory: &str) -> RequestFingerprint {
+    let mut fields = BTreeMap::new();
+    fields.insert("workingDirectory".to_string(), json!(directory));
+    RequestFingerprint::from_fields(
+        AgentRuntimeId::OpenCode,
+        IdempotencyOperation::CreateConversation,
+        fields,
+    )
+    .expect("fingerprint should encode")
 }
 
 fn submit_payload_fingerprint(input_text: &str) -> RequestFingerprint {

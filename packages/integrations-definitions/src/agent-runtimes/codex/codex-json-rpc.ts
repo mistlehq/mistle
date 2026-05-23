@@ -1,3 +1,4 @@
+import type { AgentConversationIdempotencyMetadata } from "@mistle/integrations-core";
 import {
   AgentStreamClient,
   SandboxSessionSendGuarantees,
@@ -25,6 +26,10 @@ type PendingRequest = {
 export type CodexJsonRpcCallHandle = {
   promise: Promise<unknown>;
   cancel: (error?: Error) => void;
+};
+
+export type CodexJsonRpcCallOptions = {
+  idempotency?: AgentConversationIdempotencyMetadata | undefined;
 };
 
 type NotificationListener = (notification: CodexJsonRpcNotification) => void;
@@ -105,11 +110,19 @@ export class CodexJsonRpcClient {
     return initializeResult;
   }
 
-  async call(method: string, params?: unknown): Promise<unknown> {
-    return await this.callWithHandle(method, params).promise;
+  async call(
+    method: string,
+    params?: unknown,
+    options?: CodexJsonRpcCallOptions,
+  ): Promise<unknown> {
+    return await this.callWithHandle(method, params, options).promise;
   }
 
-  callWithHandle(method: string, params?: unknown): CodexJsonRpcCallHandle {
+  callWithHandle(
+    method: string,
+    params?: unknown,
+    options?: CodexJsonRpcCallOptions,
+  ): CodexJsonRpcCallHandle {
     const id = this.#nextId;
     this.#nextId += 1;
 
@@ -126,6 +139,7 @@ export class CodexJsonRpcClient {
           id,
           method,
           ...(params === undefined ? {} : { params }),
+          ...(options?.idempotency === undefined ? {} : { idempotency: options.idempotency }),
         })
         .catch((error: unknown) => {
           this.#rejectPendingRequest(id, error instanceof Error ? error : new Error(String(error)));
