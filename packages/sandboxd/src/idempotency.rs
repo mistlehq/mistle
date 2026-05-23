@@ -11,10 +11,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
+pub mod store;
+
 pub const CURRENT_IDEMPOTENCY_RECORD_VERSION: u8 = 1;
 pub const CURRENT_REQUEST_FINGERPRINT_VERSION: u8 = 1;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AgentRuntimeId {
     Codex,
@@ -23,7 +25,7 @@ pub enum AgentRuntimeId {
     Pi,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum IdempotencyOperation {
     CreateConversation,
