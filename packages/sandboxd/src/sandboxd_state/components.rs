@@ -33,7 +33,10 @@ pub(super) fn determine_runtime_readiness_mode(
 pub(super) fn collect_tracked_components(
     runtime_plan: &runtime::CompiledRuntimePlan,
 ) -> BTreeSet<SupervisedComponent> {
-    let mut tracked_components = BTreeSet::from([SupervisedComponent::TunnelSession]);
+    let mut tracked_components = BTreeSet::from([
+        SupervisedComponent::Sandboxd,
+        SupervisedComponent::TunnelSession,
+    ]);
 
     if !runtime_plan.egress_routes.is_empty() {
         tracked_components.insert(SupervisedComponent::EgressProxy);

@@ -13,6 +13,7 @@ use std::thread::JoinHandle;
 
 use crate::codex_proxy::CodexProxyControlHandle;
 use crate::command::{CommandOutputSink, CommandOutputStream};
+use crate::daemon_liveness::DaemonLivenessMonitor;
 use crate::egress_proxy::EgressProxy;
 use crate::keepalive::KeepaliveManager;
 use crate::process;
@@ -143,6 +144,7 @@ pub struct SandboxdState {
     runtime_coordination_thread: Option<JoinHandle<()>>,
     runtime_readiness_shutdown_requested: Arc<AtomicBool>,
     runtime_readiness_thread: Option<JoinHandle<()>>,
+    daemon_liveness_monitor: Option<DaemonLivenessMonitor>,
     supervisor_handle: SandboxdSupervisorHandle,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
@@ -457,6 +459,7 @@ impl SandboxdState {
                 runtime_coordination_thread: None,
                 runtime_readiness_shutdown_requested: Arc::new(AtomicBool::new(false)),
                 runtime_readiness_thread: None,
+                daemon_liveness_monitor: None,
                 supervisor_handle,
                 keepalive_manager: Arc::new(Mutex::new(KeepaliveManager::default())),
                 runtime_readiness_manager: Arc::new(Mutex::new(RuntimeReadinessManager::default())),
@@ -644,6 +647,10 @@ impl SandboxdState {
                     runtime_coordination_shutdown_requested.clone(),
                 )
             });
+        let daemon_liveness_monitor = Some(DaemonLivenessMonitor::start(
+            supervisor_handle.clone(),
+            clock.clone(),
+        ));
 
         Ok(Self {
             execution_mode,
@@ -658,6 +665,7 @@ impl SandboxdState {
             runtime_coordination_thread,
             runtime_readiness_shutdown_requested,
             runtime_readiness_thread,
+            daemon_liveness_monitor,
             supervisor_handle,
             keepalive_manager,
             runtime_readiness_manager,
@@ -801,6 +809,11 @@ impl SandboxdState {
     pub fn close(mut self) -> Result<(), SandboxdStateError> {
         if let Some(tunnel_session) = self.tunnel_session.take() {
             tunnel_session.close();
+        }
+        if let Some(daemon_liveness_monitor) = self.daemon_liveness_monitor.take()
+            && let Err(error) = daemon_liveness_monitor.close()
+        {
+            eprintln!("sandboxd failed to close daemon liveness monitor: {error}");
         }
         self.runtime_coordination_shutdown_requested
             .store(true, Ordering::Relaxed);
