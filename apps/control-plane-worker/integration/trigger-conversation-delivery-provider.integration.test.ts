@@ -171,6 +171,9 @@ describe.concurrent("control-plane worker conversation delivery provider boundar
         "initialized",
         "mistle/setDeliveryContext",
         "thread/read",
+        "initialize",
+        "initialized",
+        "mistle/setDeliveryContext",
         "model/list",
         "turn/start",
       ]);

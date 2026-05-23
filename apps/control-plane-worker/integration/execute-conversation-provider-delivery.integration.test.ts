@@ -100,6 +100,9 @@ describe("executeConversationProviderDelivery", () => {
         "initialized",
         "mistle/setDeliveryContext",
         "thread/read",
+        "initialize",
+        "initialized",
+        "mistle/setDeliveryContext",
         "model/list",
         "turn/start",
       ]);
@@ -154,6 +157,9 @@ describe("executeConversationProviderDelivery", () => {
         "initialized",
         "mistle/setDeliveryContext",
         "thread/read",
+        "initialize",
+        "initialized",
+        "mistle/setDeliveryContext",
         "model/list",
         "turn/start",
       ]);
@@ -215,7 +221,14 @@ describe("executeConversationProviderDelivery", () => {
         "mistle/setDeliveryContext",
         "model/list",
         "thread/start",
+        "initialize",
+        "initialized",
+        "mistle/setDeliveryContext",
         "thread/read",
+        "initialize",
+        "initialized",
+        "mistle/setDeliveryContext",
+        "model/list",
         "turn/start",
       ]);
     } finally {
@@ -256,6 +269,9 @@ describe("executeConversationProviderDelivery", () => {
         "thread/read",
         "thread/resume",
         "thread/read",
+        "initialize",
+        "initialized",
+        "mistle/setDeliveryContext",
         "model/list",
         "turn/start",
       ]);
@@ -299,6 +315,9 @@ describe("executeConversationProviderDelivery", () => {
         "initialized",
         "mistle/setDeliveryContext",
         "thread/read",
+        "initialize",
+        "initialized",
+        "mistle/setDeliveryContext",
         "model/list",
         "turn/start",
       ]);

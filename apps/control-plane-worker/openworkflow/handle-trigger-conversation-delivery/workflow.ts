@@ -14,8 +14,19 @@ import {
 } from "../shared/trigger-run.js";
 import { acquireTriggerConnection } from "./acquire-trigger-connection.js";
 import { claimOrResumeTriggerConversationDeliveryTask } from "./claim-or-resume-trigger-conversation-delivery-task.js";
-import { deliverConversationTriggerPayload } from "./deliver-conversation-trigger-payload.js";
+import {
+  beginConversationTriggerPayloadDelivery,
+  createConversationProviderDeliveryInput,
+  loadOrCreateTriggerConversationDeliveryRoute,
+  persistConversationProviderDeliveryResult,
+  seedDeliveredSandboxInstanceTitle,
+} from "./deliver-conversation-trigger-payload.js";
 import { ensureConversationDeliverySandbox } from "./ensure-conversation-delivery-sandbox.js";
+import {
+  createConversationProviderDeliveryConversation,
+  inspectAndResumeConversationProviderDeliveryConversation,
+  submitConversationProviderDeliveryPayload,
+} from "./execute-conversation-provider-delivery.js";
 import { finalizeTriggerConversationDeliveryTask } from "./finalize-trigger-conversation-delivery-task.js";
 import { idleTriggerConversationDeliveryProcessorIfEmpty } from "./idle-trigger-conversation-delivery-processor-if-empty.js";
 import { resolveTriggerConversationDeliveryRoute } from "./resolve-trigger-conversation-delivery-route.js";
@@ -36,7 +47,13 @@ export const DurableTriggerConversationDeliveryStepPrefixes = {
   RESOLVE_ROUTE: "resolve-automation-conversation-delivery-route",
   ENSURE_SANDBOX: "ensure-automation-sandbox",
   ACQUIRE_CONNECTION: "acquire-automation-connection",
-  DELIVER_PAYLOAD: "deliver-automation-payload",
+  BEGIN_PAYLOAD_DELIVERY: "begin-automation-payload-delivery",
+  LOAD_OR_CREATE_ROUTE: "load-or-create-automation-conversation-route",
+  CREATE_PROVIDER_CONVERSATION: "create-automation-provider-conversation",
+  INSPECT_RESUME_PROVIDER_CONVERSATION: "inspect-resume-automation-provider-conversation",
+  SUBMIT_PROVIDER_PAYLOAD: "submit-automation-provider-payload",
+  PERSIST_PROVIDER_DELIVERY: "persist-automation-provider-delivery",
+  SEED_SANDBOX_TITLE: "seed-automation-sandbox-title",
   MARK_RUN_COMPLETED: "mark-automation-run-completed",
   MARK_RUN_FAILED: "mark-automation-run-failed",
 } as const;
@@ -288,7 +305,7 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
         await step.run(
           {
             name: getConversationDeliveryStepName({
-              prefix: DurableTriggerConversationDeliveryStepPrefixes.DELIVER_PAYLOAD,
+              prefix: DurableTriggerConversationDeliveryStepPrefixes.BEGIN_PAYLOAD_DELIVERY,
               taskId: activeTask.taskId,
             }),
             retryPolicy: {
@@ -296,19 +313,180 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
             },
           },
           async () =>
-            deliverConversationTriggerPayload(
+            beginConversationTriggerPayloadDelivery(
               {
-                controlPlaneInternalClient,
                 db,
-                dataPlaneClient,
               },
               {
                 taskId: activeTask.taskId,
                 generation: input.generation,
+              },
+            ),
+        );
+
+        const loadedRoute = await step.run(
+          {
+            name: getConversationDeliveryStepName({
+              prefix: DurableTriggerConversationDeliveryStepPrefixes.LOAD_OR_CREATE_ROUTE,
+              taskId: activeTask.taskId,
+            }),
+            retryPolicy: {
+              maximumAttempts: 1,
+            },
+          },
+          async () =>
+            loadOrCreateTriggerConversationDeliveryRoute(
+              {
+                db,
+              },
+              {
+                taskId: activeTask.taskId,
                 preparedTriggerRun,
                 resolvedTriggerConversationRoute,
                 ensuredTriggerSandbox,
-                acquiredTriggerConnection,
+                workflowRunId,
+              },
+            ),
+        );
+
+        const providerDeliveryInput = createConversationProviderDeliveryInput({
+          taskId: activeTask.taskId,
+          preparedTriggerRun,
+          resolvedTriggerConversationRoute,
+          ensuredTriggerSandbox,
+          acquiredTriggerConnection,
+          activeRoute: loadedRoute.activeRoute,
+        });
+
+        const createdProviderConversation = await step.run(
+          {
+            name: getConversationDeliveryStepName({
+              prefix: DurableTriggerConversationDeliveryStepPrefixes.CREATE_PROVIDER_CONVERSATION,
+              taskId: activeTask.taskId,
+            }),
+            retryPolicy: {
+              maximumAttempts: 1,
+            },
+          },
+          async () => createConversationProviderDeliveryConversation(providerDeliveryInput),
+        );
+
+        const inspectedProviderConversation = await step.run(
+          {
+            name: getConversationDeliveryStepName({
+              prefix:
+                DurableTriggerConversationDeliveryStepPrefixes.INSPECT_RESUME_PROVIDER_CONVERSATION,
+              taskId: activeTask.taskId,
+            }),
+            retryPolicy: {
+              maximumAttempts: 1,
+            },
+          },
+          async () =>
+            inspectAndResumeConversationProviderDeliveryConversation({
+              deliveryInput: providerDeliveryInput,
+              providerConversationId: createdProviderConversation.providerConversationId,
+            }),
+        );
+
+        const submittedProviderPayload = await step.run(
+          {
+            name: getConversationDeliveryStepName({
+              prefix: DurableTriggerConversationDeliveryStepPrefixes.SUBMIT_PROVIDER_PAYLOAD,
+              taskId: activeTask.taskId,
+            }),
+            retryPolicy: {
+              maximumAttempts: 1,
+            },
+          },
+          async () =>
+            withTriggerConversationDeliverySpan(
+              {
+                name: "trigger_conversation_delivery.provider.submit",
+                telemetryContext: {
+                  triggerRunId: preparedTriggerRun.triggerRunId,
+                  conversationId: preparedTriggerRun.conversationId,
+                  deliveryTaskId: activeTask.taskId,
+                  routeId: loadedRoute.activeRoute.id,
+                  sandboxInstanceId: ensuredTriggerSandbox.sandboxInstanceId,
+                  webhookEventId: preparedTriggerRun.webhookEventId,
+                  workflowRunId,
+                },
+              },
+              async (span) => {
+                span.setAttribute("mistle.route.binding_action", loadedRoute.routeBindingAction);
+                const result = await submitConversationProviderDeliveryPayload({
+                  deliveryInput: providerDeliveryInput,
+                  inspectTriggerConversation: inspectedProviderConversation,
+                  providerConversationId: createdProviderConversation.providerConversationId,
+                });
+                span.setAttributes({
+                  "mistle.provider.conversation_id":
+                    createdProviderConversation.providerConversationId,
+                  ...(result.providerExecutionId === null
+                    ? {}
+                    : { "mistle.provider.execution_id": result.providerExecutionId }),
+                });
+                return result;
+              },
+            ),
+        );
+
+        const deliveryResult = {
+          providerConversationId: createdProviderConversation.providerConversationId,
+          providerExecutionId: submittedProviderPayload.providerExecutionId,
+          providerState:
+            submittedProviderPayload.providerState ?? createdProviderConversation.providerState,
+        };
+
+        await step.run(
+          {
+            name: getConversationDeliveryStepName({
+              prefix: DurableTriggerConversationDeliveryStepPrefixes.PERSIST_PROVIDER_DELIVERY,
+              taskId: activeTask.taskId,
+            }),
+            retryPolicy: {
+              maximumAttempts: 1,
+            },
+          },
+          async () =>
+            persistConversationProviderDeliveryResult(
+              {
+                db,
+              },
+              {
+                preparedTriggerRun,
+                ensuredTriggerSandbox,
+                activeRoute: loadedRoute.activeRoute,
+                routeBindingAction: loadedRoute.routeBindingAction,
+                deliveryResult,
+              },
+            ),
+        );
+
+        await step.run(
+          {
+            name: getConversationDeliveryStepName({
+              prefix: DurableTriggerConversationDeliveryStepPrefixes.SEED_SANDBOX_TITLE,
+              taskId: activeTask.taskId,
+            }),
+            retryPolicy: {
+              maximumAttempts: 1,
+            },
+          },
+          async () =>
+            seedDeliveredSandboxInstanceTitle(
+              {
+                controlPlaneInternalClient,
+                dataPlaneClient,
+              },
+              {
+                taskId: activeTask.taskId,
+                preparedTriggerRun,
+                resolvedTriggerConversationRoute,
+                ensuredTriggerSandbox,
+                activeRoute: loadedRoute.activeRoute,
+                deliveryResult,
                 workflowRunId,
               },
             ),
