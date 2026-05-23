@@ -1,7 +1,7 @@
 use std::fmt;
 use std::path::PathBuf;
 
-use crate::idempotency::{IdempotencyOperation, IdempotencyRecordError};
+use crate::idempotency::{AgentRuntimeId, IdempotencyOperation, IdempotencyRecordError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IdempotencyStoreError {
@@ -41,10 +41,12 @@ pub enum IdempotencyStoreError {
         supported_version: u8,
     },
     DuplicateRecord {
+        runtime_id: AgentRuntimeId,
         operation: IdempotencyOperation,
         key: String,
     },
     MissingRecord {
+        runtime_id: AgentRuntimeId,
         operation: IdempotencyOperation,
         key: String,
     },
@@ -69,6 +71,10 @@ pub enum IdempotencyStoreError {
         final_path: PathBuf,
         error: String,
     },
+    DeleteRecord {
+        path: PathBuf,
+        error: String,
+    },
     RemoveTempRecord {
         path: PathBuf,
         error: String,
@@ -78,6 +84,9 @@ pub enum IdempotencyStoreError {
         error: String,
     },
     Record(IdempotencyRecordError),
+    LockPoisoned {
+        error: String,
+    },
 }
 
 impl fmt::Display for IdempotencyStoreError {
@@ -154,16 +163,24 @@ impl fmt::Display for IdempotencyStoreError {
                     path.display()
                 )
             }
-            Self::DuplicateRecord { operation, key } => {
+            Self::DuplicateRecord {
+                runtime_id,
+                operation,
+                key,
+            } => {
                 write!(
                     f,
-                    "duplicate idempotency record for operation {operation:?} and key '{key}'"
+                    "duplicate idempotency record for runtime {runtime_id:?}, operation {operation:?}, and key '{key}'"
                 )
             }
-            Self::MissingRecord { operation, key } => {
+            Self::MissingRecord {
+                runtime_id,
+                operation,
+                key,
+            } => {
                 write!(
                     f,
-                    "missing idempotency record for operation {operation:?} and key '{key}'"
+                    "missing idempotency record for runtime {runtime_id:?}, operation {operation:?}, and key '{key}'"
                 )
             }
             Self::EncodeRecord { key, error } => {
@@ -205,6 +222,13 @@ impl fmt::Display for IdempotencyStoreError {
                     final_path.display()
                 )
             }
+            Self::DeleteRecord { path, error } => {
+                write!(
+                    f,
+                    "failed to delete idempotency record '{}': {error}",
+                    path.display()
+                )
+            }
             Self::RemoveTempRecord { path, error } => {
                 write!(
                     f,
@@ -220,6 +244,9 @@ impl fmt::Display for IdempotencyStoreError {
                 )
             }
             Self::Record(error) => write!(f, "{error}"),
+            Self::LockPoisoned { error } => {
+                write!(f, "idempotency store lock is poisoned: {error}")
+            }
         }
     }
 }

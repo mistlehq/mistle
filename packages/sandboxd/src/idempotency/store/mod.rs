@@ -8,13 +8,14 @@ mod files;
 pub use error::IdempotencyStoreError;
 
 use crate::idempotency::{
-    AcceptIdempotencyOperation, CURRENT_IDEMPOTENCY_RECORD_VERSION, CompleteIdempotencyOperation,
-    IdempotencyOperation, IdempotencyRecord, StartIdempotencyOperation,
+    AcceptIdempotencyOperation, AgentRuntimeId, CURRENT_IDEMPOTENCY_RECORD_VERSION,
+    CompleteIdempotencyOperation, IdempotencyOperation, IdempotencyRecord,
+    StartIdempotencyOperation,
 };
 
 use files::{
-    is_store_temp_record_path, prepare_store_directory, record_file_name, remove_temp_record,
-    write_record_atomically,
+    delete_record, is_store_temp_record_path, prepare_store_directory, record_file_name,
+    remove_temp_record, write_record_atomically,
 };
 
 pub const DEFAULT_IDEMPOTENCY_STORE_DIR: &str = "/var/lib/mistle/sandboxd/idempotency";
@@ -68,6 +69,7 @@ impl IdempotencyStore {
             let key = IdempotencyStoreKey::from_record(&record);
             if records.insert(key.clone(), record).is_some() {
                 return Err(IdempotencyStoreError::DuplicateRecord {
+                    runtime_id: key.runtime_id,
                     operation: key.operation,
                     key: key.key,
                 });
@@ -82,6 +84,7 @@ impl IdempotencyStore {
         input: StartIdempotencyOperation,
     ) -> Result<IdempotencyRecord, IdempotencyStoreError> {
         let key = IdempotencyStoreKey {
+            runtime_id: input.runtime_id.clone(),
             operation: input.operation.clone(),
             key: input.key.clone(),
         };
@@ -98,11 +101,12 @@ impl IdempotencyStore {
 
     pub fn mark_accepted(
         &mut self,
+        runtime_id: AgentRuntimeId,
         operation: IdempotencyOperation,
         key: &str,
         input: AcceptIdempotencyOperation,
     ) -> Result<IdempotencyRecord, IdempotencyStoreError> {
-        let existing = self.get_existing_record(operation, key)?;
+        let existing = self.get_existing_record(runtime_id, operation, key)?;
         let record = existing
             .mark_accepted(input)
             .map_err(IdempotencyStoreError::Record)?;
@@ -111,36 +115,74 @@ impl IdempotencyStore {
 
     pub fn mark_completed(
         &mut self,
+        runtime_id: AgentRuntimeId,
         operation: IdempotencyOperation,
         key: &str,
         input: CompleteIdempotencyOperation,
     ) -> Result<IdempotencyRecord, IdempotencyStoreError> {
-        let existing = self.get_existing_record(operation, key)?;
+        let existing = self.get_existing_record(runtime_id, operation, key)?;
         let record = existing
             .mark_completed(input)
             .map_err(IdempotencyStoreError::Record)?;
         self.write_and_index_record(record)
     }
 
+    pub fn delete_started(
+        &mut self,
+        runtime_id: AgentRuntimeId,
+        operation: IdempotencyOperation,
+        key: &str,
+        request_fingerprint: &crate::idempotency::RequestFingerprint,
+    ) -> Result<(), IdempotencyStoreError> {
+        let record = self.get_existing_record(runtime_id.clone(), operation.clone(), key)?;
+        record
+            .classify_repeated_request(request_fingerprint)
+            .map_err(IdempotencyStoreError::Record)?;
+        if record.status != crate::idempotency::IdempotencyRecordStatus::Started {
+            return Err(IdempotencyStoreError::Record(
+                crate::idempotency::IdempotencyRecordError::InvalidTransition {
+                    from: record.status,
+                    to: crate::idempotency::IdempotencyRecordStatus::Started,
+                },
+            ));
+        }
+        let path = self.record_path(&runtime_id, &operation, key);
+        delete_record(&self.root, &path)?;
+        self.records.remove(&IdempotencyStoreKey {
+            runtime_id,
+            operation,
+            key: key.to_string(),
+        });
+        Ok(())
+    }
+
     pub fn get_by_key(
         &self,
+        runtime_id: AgentRuntimeId,
         operation: IdempotencyOperation,
         key: &str,
     ) -> Result<&IdempotencyRecord, IdempotencyStoreError> {
         let store_key = IdempotencyStoreKey {
+            runtime_id,
             operation,
             key: key.to_string(),
         };
         self.records
             .get(&store_key)
             .ok_or(IdempotencyStoreError::MissingRecord {
+                runtime_id: store_key.runtime_id,
                 operation: store_key.operation,
                 key: store_key.key,
             })
     }
 
-    pub fn record_path(&self, operation: &IdempotencyOperation, key: &str) -> PathBuf {
-        self.root.join(record_file_name(operation, key))
+    pub fn record_path(
+        &self,
+        runtime_id: &AgentRuntimeId,
+        operation: &IdempotencyOperation,
+        key: &str,
+    ) -> PathBuf {
+        self.root.join(record_file_name(runtime_id, operation, key))
     }
 
     pub fn root(&self) -> &Path {
@@ -149,17 +191,18 @@ impl IdempotencyStore {
 
     fn get_existing_record(
         &self,
+        runtime_id: AgentRuntimeId,
         operation: IdempotencyOperation,
         key: &str,
     ) -> Result<IdempotencyRecord, IdempotencyStoreError> {
-        self.get_by_key(operation, key).cloned()
+        self.get_by_key(runtime_id, operation, key).cloned()
     }
 
     fn write_and_index_record(
         &mut self,
         record: IdempotencyRecord,
     ) -> Result<IdempotencyRecord, IdempotencyStoreError> {
-        let path = self.record_path(&record.operation, &record.key);
+        let path = self.record_path(&record.runtime_id, &record.operation, &record.key);
         write_record_atomically(&self.root, &path, &record)?;
         self.records
             .insert(IdempotencyStoreKey::from_record(&record), record.clone());
@@ -169,6 +212,7 @@ impl IdempotencyStore {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct IdempotencyStoreKey {
+    runtime_id: AgentRuntimeId,
     operation: IdempotencyOperation,
     key: String,
 }
@@ -176,6 +220,7 @@ struct IdempotencyStoreKey {
 impl IdempotencyStoreKey {
     fn from_record(record: &IdempotencyRecord) -> Self {
         Self {
+            runtime_id: record.runtime_id.clone(),
             operation: record.operation.clone(),
             key: record.key.clone(),
         }
@@ -217,7 +262,11 @@ fn validate_record_path(
     path: &Path,
     record: &IdempotencyRecord,
 ) -> Result<(), IdempotencyStoreError> {
-    let expected_path = root.join(record_file_name(&record.operation, &record.key));
+    let expected_path = root.join(record_file_name(
+        &record.runtime_id,
+        &record.operation,
+        &record.key,
+    ));
     if path == expected_path {
         return Ok(());
     }

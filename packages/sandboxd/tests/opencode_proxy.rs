@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -9,8 +10,15 @@ use serde_json::{Value, json};
 use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{Message, WebSocket, connect};
 
+use sandboxd::idempotency::store::IdempotencyStore;
+use sandboxd::idempotency::{
+    AgentRuntimeId, IdempotencyOperation, RequestFingerprint, StartIdempotencyOperation,
+};
 use sandboxd::keepalive::KeepaliveManager;
-use sandboxd::opencode_proxy::{derive_opencode_raw_server_url, start_opencode_proxy};
+use sandboxd::opencode_proxy::{
+    derive_opencode_raw_server_url, start_opencode_proxy,
+    start_opencode_proxy_with_idempotency_store,
+};
 use sandboxd::runtime::readiness::RuntimeReadinessManager;
 use sandboxd::time::{Sleeper, ThreadSleeper};
 
@@ -60,6 +68,192 @@ fn relays_http_requests_over_the_websocket_runtime_endpoint() {
     client.close(None).expect("websocket should close cleanly");
     proxy.close().expect("OpenCode proxy should close cleanly");
     simulated_server.join();
+}
+
+#[test]
+fn replays_completed_idempotent_prompt_submission_without_reposting_to_opencode() {
+    let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
+    let store = IdempotencyStore::load_all(temp_dir.path().join("idempotency"))
+        .expect("idempotency store should load");
+    let simulated_server = SimulatedOpenCodeServer::start(|request| {
+        assert_eq!(request.method, "POST");
+        assert_eq!(request.path, "/session/session_123/message");
+        assert!(
+            request.body.contains("\"messageID\":\"msg_mistle_"),
+            "proxy should inject deterministic OpenCode messageID"
+        );
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 11\r\n\r\n{\"ok\":true}"
+            .to_string()
+    });
+
+    let proxy = start_opencode_proxy_with_idempotency_store(
+        "ws://127.0.0.1:0/opencode",
+        &simulated_server.base_url,
+        keepalive_manager(),
+        runtime_readiness_manager(),
+        store,
+    )
+    .expect("OpenCode proxy should start");
+
+    let (mut client, _) = connect(proxy.listen_url()).expect("proxy websocket should connect");
+    let fingerprint = submit_payload_fingerprint("hello");
+    send_idempotent_prompt_request(&mut client, "first", fingerprint.value());
+    let first_response = read_json_text_message(&mut client);
+    assert_eq!(first_response["id"], json!("first"));
+    assert_eq!(first_response["type"], json!("response"));
+    assert_eq!(first_response["status"], json!(200));
+    assert_eq!(first_response["body"], json!("{\"ok\":true}"));
+
+    simulated_server.wait_for_request_count(1);
+
+    send_idempotent_prompt_request(&mut client, "second", fingerprint.value());
+    let second_response = read_json_text_message(&mut client);
+    assert_eq!(second_response["id"], json!("second"));
+    assert_eq!(second_response["type"], json!("response"));
+    assert_eq!(second_response["status"], json!(200));
+    assert_eq!(second_response["body"], json!("{\"ok\":true}"));
+    simulated_server.assert_no_additional_request();
+
+    client.close(None).expect("websocket should close cleanly");
+    proxy.close().expect("OpenCode proxy should close cleanly");
+    simulated_server.close();
+}
+
+#[test]
+fn rejects_reused_idempotency_key_with_different_fingerprint() {
+    let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
+    let store = IdempotencyStore::load_all(temp_dir.path().join("idempotency"))
+        .expect("idempotency store should load");
+    let simulated_server = SimulatedOpenCodeServer::start(|request| {
+        assert_eq!(request.method, "POST");
+        assert_eq!(request.path, "/session/session_123/message");
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 11\r\n\r\n{\"ok\":true}"
+            .to_string()
+    });
+
+    let proxy = start_opencode_proxy_with_idempotency_store(
+        "ws://127.0.0.1:0/opencode",
+        &simulated_server.base_url,
+        keepalive_manager(),
+        runtime_readiness_manager(),
+        store,
+    )
+    .expect("OpenCode proxy should start");
+
+    let (mut client, _) = connect(proxy.listen_url()).expect("proxy websocket should connect");
+    let first_fingerprint = submit_payload_fingerprint("hello");
+    send_idempotent_prompt_request(&mut client, "first", first_fingerprint.value());
+    let first_response = read_json_text_message(&mut client);
+    assert_eq!(first_response["status"], json!(200));
+    simulated_server.wait_for_request_count(1);
+
+    let conflicting_fingerprint = submit_payload_fingerprint("different");
+    send_idempotent_prompt_request(&mut client, "conflict", conflicting_fingerprint.value());
+    let conflict_response = read_json_text_message(&mut client);
+    assert_eq!(conflict_response["id"], json!("conflict"));
+    assert_eq!(conflict_response["type"], json!("response"));
+    assert_eq!(conflict_response["status"], json!(409));
+    assert!(
+        conflict_response["body"]
+            .as_str()
+            .expect("conflict body should be a string")
+            .contains("different request fingerprint")
+    );
+    simulated_server.assert_no_additional_request();
+
+    client.close(None).expect("websocket should close cleanly");
+    proxy.close().expect("OpenCode proxy should close cleanly");
+    simulated_server.close();
+}
+
+#[test]
+fn rejects_unresolved_started_idempotency_record_without_reposting_to_opencode() {
+    let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
+    let mut store = IdempotencyStore::load_all(temp_dir.path().join("idempotency"))
+        .expect("idempotency store should load");
+    let fingerprint = submit_payload_fingerprint("hello");
+    store
+        .start_operation(StartIdempotencyOperation {
+            key: "delivery-key".to_string(),
+            runtime_id: AgentRuntimeId::OpenCode,
+            operation: IdempotencyOperation::SubmitPayload,
+            request_fingerprint: fingerprint.clone(),
+            now: "2026-05-23T00:00:00Z".to_string(),
+        })
+        .expect("started idempotency record should persist");
+    let simulated_server = SimulatedOpenCodeServer::start(|request| {
+        assert_eq!(request.method, "POST");
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 11\r\n\r\n{\"ok\":true}"
+            .to_string()
+    });
+
+    let proxy = start_opencode_proxy_with_idempotency_store(
+        "ws://127.0.0.1:0/opencode",
+        &simulated_server.base_url,
+        keepalive_manager(),
+        runtime_readiness_manager(),
+        store,
+    )
+    .expect("OpenCode proxy should start");
+
+    let (mut client, _) = connect(proxy.listen_url()).expect("proxy websocket should connect");
+    send_idempotent_prompt_request(&mut client, "started", fingerprint.value());
+    let response = read_json_text_message(&mut client);
+    assert_eq!(response["id"], json!("started"));
+    assert_eq!(response["type"], json!("response"));
+    assert_eq!(response["status"], json!(409));
+    assert!(
+        response["body"]
+            .as_str()
+            .expect("started body should be a string")
+            .contains("unresolved status")
+    );
+    simulated_server.assert_no_additional_request();
+
+    client.close(None).expect("websocket should close cleanly");
+    proxy.close().expect("OpenCode proxy should close cleanly");
+    simulated_server.close();
+}
+
+#[test]
+fn releases_started_idempotency_record_when_upstream_fails_before_response() {
+    let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
+    let store = IdempotencyStore::load_all(temp_dir.path().join("idempotency"))
+        .expect("idempotency store should load");
+    let simulated_server = SimulatedOpenCodeServer::start(|request| {
+        assert_eq!(request.method, "POST");
+        assert_eq!(request.path, "/session/session_123/message");
+        String::new()
+    });
+
+    let proxy = start_opencode_proxy_with_idempotency_store(
+        "ws://127.0.0.1:0/opencode",
+        &simulated_server.base_url,
+        keepalive_manager(),
+        runtime_readiness_manager(),
+        store,
+    )
+    .expect("OpenCode proxy should start");
+
+    let (mut client, _) = connect(proxy.listen_url()).expect("proxy websocket should connect");
+    let fingerprint = submit_payload_fingerprint("hello");
+    send_idempotent_prompt_request(&mut client, "first", fingerprint.value());
+    let first_response = read_json_text_message(&mut client);
+    assert_eq!(first_response["id"], json!("first"));
+    assert_eq!(first_response["type"], json!("response"));
+    assert_eq!(first_response["status"], json!(502));
+    simulated_server.wait_for_request_count(1);
+
+    send_idempotent_prompt_request(&mut client, "second", fingerprint.value());
+    let second_response = read_json_text_message(&mut client);
+    assert_eq!(second_response["id"], json!("second"));
+    assert_eq!(second_response["type"], json!("response"));
+    assert_eq!(second_response["status"], json!(502));
+    simulated_server.wait_for_request_count(1);
+
+    client.close(None).expect("websocket should close cleanly");
+    proxy.close().expect("OpenCode proxy should close cleanly");
+    simulated_server.close();
 }
 
 #[test]
@@ -580,10 +774,33 @@ impl SimulatedOpenCodeServer {
         }
     }
 
-    fn join(mut self) {
-        self.request_receiver
-            .recv_timeout(Duration::from_secs(5))
-            .expect("simulated server should receive proxied request");
+    fn join(self) {
+        self.wait_for_request_count(1);
+        self.close();
+    }
+
+    fn wait_for_request_count(&self, expected_count: usize) {
+        for _ in 0..expected_count {
+            self.request_receiver
+                .recv_timeout(Duration::from_secs(5))
+                .expect("simulated server should receive proxied request");
+        }
+    }
+
+    fn assert_no_additional_request(&self) {
+        match self
+            .request_receiver
+            .recv_timeout(Duration::from_millis(150))
+        {
+            Ok(()) => panic!("simulated server should not receive another proxied request"),
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                panic!("simulated server request channel should stay open")
+            }
+        }
+    }
+
+    fn close(mut self) {
         self.shutdown_requested.store(true, Ordering::Relaxed);
         let _ = TcpStream::connect(
             self.base_url
@@ -850,6 +1067,50 @@ where
         panic!("expected websocket text message");
     };
     serde_json::from_str(payload.as_str()).expect("websocket payload should be json")
+}
+
+fn send_idempotent_prompt_request<S>(
+    client: &mut WebSocket<S>,
+    request_id: &str,
+    request_fingerprint: &str,
+) where
+    S: Read + Write,
+{
+    client
+        .send(Message::Text(
+            json!({
+                "id": request_id,
+                "method": "POST",
+                "path": "/session/session_123/message",
+                "body": {
+                    "parts": [
+                        {
+                            "type": "text",
+                            "text": "hello"
+                        }
+                    ]
+                },
+                "idempotency": {
+                    "key": "delivery-key",
+                    "operation": "submitPayload",
+                    "requestFingerprint": request_fingerprint
+                }
+            })
+            .to_string()
+            .into(),
+        ))
+        .expect("websocket request should send");
+}
+
+fn submit_payload_fingerprint(input_text: &str) -> RequestFingerprint {
+    let mut fields = BTreeMap::new();
+    fields.insert("inputText".to_string(), json!(input_text));
+    RequestFingerprint::from_fields(
+        AgentRuntimeId::OpenCode,
+        IdempotencyOperation::SubmitPayload,
+        fields,
+    )
+    .expect("fingerprint should encode")
 }
 
 fn runtime_readiness_manager() -> Arc<Mutex<RuntimeReadinessManager>> {

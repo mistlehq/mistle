@@ -28,14 +28,22 @@ fn start_operation_persists_record_and_load_all_rehydrates_index() {
     assert_eq!(started.status, IdempotencyRecordStatus::Started);
     assert!(
         store
-            .record_path(&IdempotencyOperation::SubmitPayload, "delivery_key")
+            .record_path(
+                &AgentRuntimeId::Codex,
+                &IdempotencyOperation::SubmitPayload,
+                "delivery_key"
+            )
             .exists(),
         "started record should be persisted"
     );
 
     let reloaded = IdempotencyStore::load_all(&root).expect("store should reload");
     let record = reloaded
-        .get_by_key(IdempotencyOperation::SubmitPayload, "delivery_key")
+        .get_by_key(
+            AgentRuntimeId::Codex,
+            IdempotencyOperation::SubmitPayload,
+            "delivery_key",
+        )
         .expect("record should exist after reload");
 
     assert_eq!(record.key, "delivery_key");
@@ -106,6 +114,116 @@ fn repeated_start_with_different_fingerprint_fails_with_conflict() {
 }
 
 #[test]
+fn same_operation_and_key_are_scoped_by_runtime_id() {
+    let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
+    let root = temp_dir.path().join("idempotency");
+    let mut store = IdempotencyStore::load_all(&root).expect("store should load");
+
+    let codex_record = store
+        .start_operation(StartIdempotencyOperation {
+            key: "shared_key".to_string(),
+            runtime_id: AgentRuntimeId::Codex,
+            operation: IdempotencyOperation::SubmitPayload,
+            request_fingerprint: submit_fingerprint("codex"),
+            now: "2026-05-23T00:00:00Z".to_string(),
+        })
+        .expect("codex operation should start");
+    let opencode_record = store
+        .start_operation(StartIdempotencyOperation {
+            key: "shared_key".to_string(),
+            runtime_id: AgentRuntimeId::OpenCode,
+            operation: IdempotencyOperation::SubmitPayload,
+            request_fingerprint: opencode_submit_fingerprint("opencode"),
+            now: "2026-05-23T00:00:01Z".to_string(),
+        })
+        .expect("opencode operation should start");
+
+    assert_ne!(
+        store.record_path(
+            &AgentRuntimeId::Codex,
+            &IdempotencyOperation::SubmitPayload,
+            "shared_key"
+        ),
+        store.record_path(
+            &AgentRuntimeId::OpenCode,
+            &IdempotencyOperation::SubmitPayload,
+            "shared_key"
+        )
+    );
+    assert_eq!(codex_record.runtime_id, AgentRuntimeId::Codex);
+    assert_eq!(opencode_record.runtime_id, AgentRuntimeId::OpenCode);
+    assert_eq!(
+        store
+            .get_by_key(
+                AgentRuntimeId::Codex,
+                IdempotencyOperation::SubmitPayload,
+                "shared_key"
+            )
+            .expect("codex record should exist")
+            .request_fingerprint,
+        submit_fingerprint("codex")
+    );
+    assert_eq!(
+        store
+            .get_by_key(
+                AgentRuntimeId::OpenCode,
+                IdempotencyOperation::SubmitPayload,
+                "shared_key"
+            )
+            .expect("opencode record should exist")
+            .request_fingerprint,
+        opencode_submit_fingerprint("opencode")
+    );
+}
+
+#[test]
+fn delete_started_removes_only_matching_started_record() {
+    let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
+    let root = temp_dir.path().join("idempotency");
+    let mut store = IdempotencyStore::load_all(&root).expect("store should load");
+    let fingerprint = submit_fingerprint("hello");
+
+    store
+        .start_operation(StartIdempotencyOperation {
+            key: "delivery_key".to_string(),
+            runtime_id: AgentRuntimeId::Codex,
+            operation: IdempotencyOperation::SubmitPayload,
+            request_fingerprint: fingerprint.clone(),
+            now: "2026-05-23T00:00:00Z".to_string(),
+        })
+        .expect("operation should start");
+    store
+        .delete_started(
+            AgentRuntimeId::Codex,
+            IdempotencyOperation::SubmitPayload,
+            "delivery_key",
+            &fingerprint,
+        )
+        .expect("started record should be deleted");
+
+    assert!(
+        store
+            .get_by_key(
+                AgentRuntimeId::Codex,
+                IdempotencyOperation::SubmitPayload,
+                "delivery_key"
+            )
+            .is_err(),
+        "deleted started record should not remain indexed"
+    );
+    assert!(
+        !store
+            .record_path(
+                &AgentRuntimeId::Codex,
+                &IdempotencyOperation::SubmitPayload,
+                "delivery_key"
+            )
+            .exists(),
+        "deleted started record should be removed from disk"
+    );
+}
+
+#[test]
 fn accepted_and_completed_updates_are_persisted_across_reload() {
     let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
     let root = temp_dir.path().join("idempotency");
@@ -123,6 +241,7 @@ fn accepted_and_completed_updates_are_persisted_across_reload() {
         .expect("operation should start");
     store
         .mark_accepted(
+            AgentRuntimeId::Codex,
             IdempotencyOperation::SubmitPayload,
             "delivery_key",
             AcceptIdempotencyOperation {
@@ -136,6 +255,7 @@ fn accepted_and_completed_updates_are_persisted_across_reload() {
         .expect("record should accept");
     store
         .mark_completed(
+            AgentRuntimeId::Codex,
             IdempotencyOperation::SubmitPayload,
             "delivery_key",
             CompleteIdempotencyOperation {
@@ -151,7 +271,11 @@ fn accepted_and_completed_updates_are_persisted_across_reload() {
 
     let reloaded = IdempotencyStore::load_all(&root).expect("store should reload");
     let record = reloaded
-        .get_by_key(IdempotencyOperation::SubmitPayload, "delivery_key")
+        .get_by_key(
+            AgentRuntimeId::Codex,
+            IdempotencyOperation::SubmitPayload,
+            "delivery_key",
+        )
         .expect("record should exist after reload");
 
     assert_eq!(record.status, IdempotencyRecordStatus::Completed);
@@ -171,6 +295,7 @@ fn mark_accepted_requires_existing_record() {
 
     let error = store
         .mark_accepted(
+            AgentRuntimeId::Codex,
             IdempotencyOperation::SubmitPayload,
             "missing_key",
             AcceptIdempotencyOperation {
@@ -186,6 +311,7 @@ fn mark_accepted_requires_existing_record() {
     assert_eq!(
         error,
         IdempotencyStoreError::MissingRecord {
+            runtime_id: AgentRuntimeId::Codex,
             operation: IdempotencyOperation::SubmitPayload,
             key: "missing_key".to_string(),
         }
@@ -220,7 +346,11 @@ fn load_all_removes_interrupted_atomic_write_temp_files() {
             now: "2026-05-23T00:00:00Z".to_string(),
         })
         .expect("operation should start");
-    let record_path = store.record_path(&IdempotencyOperation::SubmitPayload, "delivery_key");
+    let record_path = store.record_path(
+        &AgentRuntimeId::Codex,
+        &IdempotencyOperation::SubmitPayload,
+        "delivery_key",
+    );
     let record_file_name = record_path
         .file_name()
         .and_then(|file_name| file_name.to_str())
@@ -239,7 +369,11 @@ fn load_all_removes_interrupted_atomic_write_temp_files() {
     );
     assert!(
         reloaded
-            .get_by_key(IdempotencyOperation::SubmitPayload, "delivery_key")
+            .get_by_key(
+                AgentRuntimeId::Codex,
+                IdempotencyOperation::SubmitPayload,
+                "delivery_key"
+            )
             .is_ok(),
         "valid record should still load"
     );
@@ -276,7 +410,11 @@ fn load_all_rejects_unsupported_record_versions() {
             now: "2026-05-23T00:00:00Z".to_string(),
         })
         .expect("operation should start");
-    let record_path = store.record_path(&IdempotencyOperation::SubmitPayload, "delivery_key");
+    let record_path = store.record_path(
+        &AgentRuntimeId::Codex,
+        &IdempotencyOperation::SubmitPayload,
+        "delivery_key",
+    );
     let mut record_json: serde_json::Value =
         serde_json::from_slice(&fs::read(&record_path).expect("record file should be readable"))
             .expect("record file should decode to json");
@@ -333,6 +471,17 @@ fn submit_fingerprint(input_text: &str) -> RequestFingerprint {
     fields.insert("logicalOperationKind".to_string(), json!("submitPayload"));
     RequestFingerprint::from_fields(
         AgentRuntimeId::Codex,
+        IdempotencyOperation::SubmitPayload,
+        fields,
+    )
+    .expect("fingerprint should encode")
+}
+
+fn opencode_submit_fingerprint(input_text: &str) -> RequestFingerprint {
+    let mut fields = BTreeMap::new();
+    fields.insert("inputText".to_string(), json!(input_text));
+    RequestFingerprint::from_fields(
+        AgentRuntimeId::OpenCode,
         IdempotencyOperation::SubmitPayload,
         fields,
     )

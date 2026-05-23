@@ -17,6 +17,7 @@ use crate::keepalive::KeepaliveManager;
 use crate::opencode_proxy::OpenCodeProxyError;
 use crate::opencode_proxy::activity::run_opencode_activity_monitor;
 use crate::opencode_proxy::http::build_opencode_http_client;
+use crate::opencode_proxy::idempotency::SharedIdempotencyStore;
 use crate::opencode_proxy::relay::relay_opencode_proxy_connection;
 
 const OPENCODE_PROXY_HEALTHCHECK_INTERVAL: Duration = Duration::from_millis(50);
@@ -28,6 +29,7 @@ pub(super) async fn run_opencode_proxy_runtime(
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     shutdown_requested: Arc<AtomicBool>,
     startup_result_sender: std::sync::mpsc::Sender<Result<String, OpenCodeProxyError>>,
+    idempotency_store: Option<SharedIdempotencyStore>,
 ) -> Result<(), OpenCodeProxyError> {
     let listener = TcpListener::bind(listener_address).await.map_err(|error| {
         OpenCodeProxyError::BindListener {
@@ -59,8 +61,9 @@ pub(super) async fn run_opencode_proxy_runtime(
                 let (stream, _) = accepted.map_err(OpenCodeProxyError::AcceptClient)?;
                 let raw_server_url = raw_server_url.clone();
                 let client = client.clone();
+                let idempotency_store = idempotency_store.clone();
                 session_tasks.spawn(async move {
-                    relay_opencode_proxy_connection(stream, raw_server_url, client).await
+                    relay_opencode_proxy_connection(stream, raw_server_url, client, idempotency_store).await
                 });
             }
             joined = session_tasks.join_next(), if !session_tasks.is_empty() => {

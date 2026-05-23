@@ -23,6 +23,11 @@ use crate::opencode_proxy::OpenCodeProxyError;
 use crate::opencode_proxy::http::{
     OpenCodeHttpClient, build_opencode_target_uri, read_response_body,
 };
+use crate::opencode_proxy::idempotency::{
+    OpenCodeProxyIdempotency, OpenCodeSubmitIdempotencyAction, SharedIdempotencyStore,
+    StoredOpenCodeProxyResponse, complete_submit_idempotency, delete_started_submit_idempotency,
+    prepare_submit_idempotency,
+};
 use crate::opencode_proxy::sse::relay_sse_response;
 
 #[derive(Debug, Deserialize)]
@@ -33,6 +38,7 @@ struct OpenCodeProxyRequest {
     path: String,
     headers: Option<BTreeMap<String, String>>,
     body: Option<Value>,
+    idempotency: Option<OpenCodeProxyIdempotency>,
 }
 
 #[derive(Debug, Serialize)]
@@ -58,6 +64,7 @@ pub(super) async fn relay_opencode_proxy_connection(
     stream: TcpStream,
     raw_server_url: String,
     client: OpenCodeHttpClient,
+    idempotency_store: Option<SharedIdempotencyStore>,
 ) -> Result<(), OpenCodeProxyError> {
     let websocket = accept_async(stream)
         .await
@@ -86,8 +93,16 @@ pub(super) async fn relay_opencode_proxy_connection(
                     let raw_server_url = raw_server_url.clone();
                     let client = client.clone();
                     let sender = sender.clone();
+                    let idempotency_store = idempotency_store.clone();
                     request_tasks.spawn(async move {
-                        handle_opencode_proxy_request(request, raw_server_url, client, sender).await
+                        handle_opencode_proxy_request(
+                            request,
+                            raw_server_url,
+                            client,
+                            sender,
+                            idempotency_store,
+                        )
+                        .await
                     });
                 }
             }
@@ -116,11 +131,43 @@ pub(super) async fn relay_opencode_proxy_connection(
 }
 
 async fn handle_opencode_proxy_request(
-    request: OpenCodeProxyRequest,
+    mut request: OpenCodeProxyRequest,
     raw_server_url: String,
     client: OpenCodeHttpClient,
     sender: mpsc::UnboundedSender<Message>,
+    idempotency_store: Option<SharedIdempotencyStore>,
 ) -> Result<(), OpenCodeProxyError> {
+    let idempotency_action = prepare_submit_idempotency(
+        crate::opencode_proxy::idempotency::PrepareSubmitIdempotencyInput {
+            body: request.body.as_mut(),
+            idempotency: request.idempotency.as_ref(),
+            method: &request.method,
+            path: &request.path,
+            store: idempotency_store.as_ref(),
+        },
+    );
+    let started_idempotency = match idempotency_action {
+        OpenCodeSubmitIdempotencyAction::Disabled => None,
+        OpenCodeSubmitIdempotencyAction::Forward(started) => Some(started),
+        OpenCodeSubmitIdempotencyAction::Replay(response) => {
+            send_json_message(
+                &sender,
+                &OpenCodeProxyResponse {
+                    id: request.id,
+                    message_type: OpenCodeProxyResponseType::Response,
+                    status: response.status,
+                    headers: response.headers,
+                    body: response.body,
+                },
+            )?;
+            return Ok(());
+        }
+        OpenCodeSubmitIdempotencyAction::Reject { status, message } => {
+            send_error_response(&sender, request.id, status, message)?;
+            return Ok(());
+        }
+    };
+
     let target_uri = build_opencode_target_uri(&raw_server_url, &request.path)?;
     let method = Method::from_bytes(request.method.as_bytes())
         .map_err(|_| OpenCodeProxyError::InvalidHttpMethod(request.method.clone()))?;
@@ -150,21 +197,25 @@ async fn handle_opencode_proxy_request(
     let response = match client.request(upstream_request).await {
         Ok(response) => response,
         Err(error) => {
-            send_json_message(
+            if let (Some(store), Some(started)) =
+                (idempotency_store.as_ref(), started_idempotency.as_ref())
+                && let Err(delete_error) = delete_started_submit_idempotency(store, started)
+            {
+                send_error_response(
+                    &sender,
+                    request.id,
+                    500,
+                    format!(
+                        "OpenCode upstream request failed before a response, and the idempotency record could not be released for retry: {delete_error}"
+                    ),
+                )?;
+                return Ok(());
+            }
+            send_error_response(
                 &sender,
-                &OpenCodeProxyResponse {
-                    id: request.id,
-                    message_type: OpenCodeProxyResponseType::Response,
-                    status: 502,
-                    headers: BTreeMap::from([(
-                        CONTENT_TYPE.to_string(),
-                        "application/json".to_string(),
-                    )]),
-                    body: json!({
-                        "error": format!("OpenCode upstream request failed: {error}")
-                    })
-                    .to_string(),
-                },
+                request.id,
+                502,
+                format!("OpenCode upstream request failed: {error}"),
             )?;
             return Ok(());
         }
@@ -199,6 +250,25 @@ async fn handle_opencode_proxy_request(
     }
 
     let body = read_response_body(response.into_body()).await?;
+    if let (Some(store), Some(started)) = (idempotency_store.as_ref(), started_idempotency)
+        && let Err(error) = complete_submit_idempotency(
+            store,
+            started,
+            StoredOpenCodeProxyResponse {
+                status,
+                headers: headers.clone(),
+                body: body.clone(),
+            },
+        )
+    {
+        send_error_response(
+            &sender,
+            request.id,
+            500,
+            format!("OpenCode response could not be persisted for idempotent replay: {error}"),
+        )?;
+        return Ok(());
+    }
     send_json_message(
         &sender,
         &OpenCodeProxyResponse {
@@ -207,6 +277,24 @@ async fn handle_opencode_proxy_request(
             status,
             headers,
             body,
+        },
+    )
+}
+
+fn send_error_response(
+    sender: &mpsc::UnboundedSender<Message>,
+    id: Value,
+    status: u16,
+    message: String,
+) -> Result<(), OpenCodeProxyError> {
+    send_json_message(
+        sender,
+        &OpenCodeProxyResponse {
+            id,
+            message_type: OpenCodeProxyResponseType::Response,
+            status,
+            headers: BTreeMap::from([(CONTENT_TYPE.to_string(), "application/json".to_string())]),
+            body: json!({ "error": message }).to_string(),
         },
     )
 }

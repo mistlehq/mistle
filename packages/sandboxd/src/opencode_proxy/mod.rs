@@ -6,6 +6,7 @@
 
 mod activity;
 mod http;
+mod idempotency;
 mod readiness;
 mod relay;
 mod server;
@@ -22,8 +23,10 @@ use tokio::runtime::Builder;
 use tungstenite::Error as WebSocketError;
 use url::Url;
 
+use crate::idempotency::store::IdempotencyStore;
 use crate::keepalive::KeepaliveManager;
 use crate::opencode_proxy::http::derive_opencode_raw_server_url_from_readiness_url;
+use crate::opencode_proxy::idempotency::SharedIdempotencyStore;
 use crate::opencode_proxy::readiness::{
     LocalRuntimeReadinessProjection, spawn_opencode_proxy_runtime_readiness_projection,
     sync_opencode_proxy_runtime_readiness_from_snapshot,
@@ -205,12 +208,36 @@ pub fn start_opencode_proxy(
         BTreeSet::from([SupervisedComponent::OpenCodeProxy]),
     );
 
-    start_opencode_proxy_with_supervisor(
+    start_opencode_proxy_inner(
         proxy_listen_url,
         raw_server_url,
         keepalive_manager,
         runtime_readiness_manager,
         supervisor_handle,
+        None,
+    )
+}
+
+pub fn start_opencode_proxy_with_idempotency_store(
+    proxy_listen_url: &str,
+    raw_server_url: &str,
+    keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
+    idempotency_store: IdempotencyStore,
+) -> Result<OpenCodeProxy, OpenCodeProxyError> {
+    let supervisor_handle = SandboxdSupervisorHandle::new(
+        "sandboxd-opencode-proxy",
+        Arc::new(SystemClock),
+        BTreeSet::from([SupervisedComponent::OpenCodeProxy]),
+    );
+
+    start_opencode_proxy_inner(
+        proxy_listen_url,
+        raw_server_url,
+        keepalive_manager,
+        runtime_readiness_manager,
+        supervisor_handle,
+        Some(Arc::new(Mutex::new(idempotency_store))),
     )
 }
 
@@ -221,6 +248,27 @@ pub fn start_opencode_proxy_with_supervisor(
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     supervisor_handle: SandboxdSupervisorHandle,
+) -> Result<OpenCodeProxy, OpenCodeProxyError> {
+    let idempotency_store = IdempotencyStore::load_default()
+        .map_err(|error| OpenCodeProxyError::ConfigureRuntime(error.to_string()))?;
+
+    start_opencode_proxy_inner(
+        proxy_listen_url,
+        raw_server_url,
+        keepalive_manager,
+        runtime_readiness_manager,
+        supervisor_handle,
+        Some(Arc::new(Mutex::new(idempotency_store))),
+    )
+}
+
+fn start_opencode_proxy_inner(
+    proxy_listen_url: &str,
+    raw_server_url: &str,
+    keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
+    supervisor_handle: SandboxdSupervisorHandle,
+    idempotency_store: Option<SharedIdempotencyStore>,
 ) -> Result<OpenCodeProxy, OpenCodeProxyError> {
     let listen_url = Url::parse(proxy_listen_url)
         .map_err(|error| OpenCodeProxyError::ParseListenUrl(error.to_string()))?;
@@ -254,6 +302,7 @@ pub fn start_opencode_proxy_with_supervisor(
         let shutdown_requested = shutdown_requested.clone();
         let raw_server_url = raw_server_url.to_string();
         let proxy_listen_url = proxy_listen_url.to_string();
+        let idempotency_store = idempotency_store.clone();
         move || {
             let runtime = Builder::new_current_thread()
                 .enable_all()
@@ -266,6 +315,7 @@ pub fn start_opencode_proxy_with_supervisor(
                 keepalive_manager,
                 shutdown_requested,
                 startup_sender,
+                idempotency_store,
             ))
         }
     });

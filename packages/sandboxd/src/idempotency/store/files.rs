@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use sha2::{Digest, Sha256};
 
-use crate::idempotency::{IdempotencyOperation, IdempotencyRecord};
+use crate::idempotency::{AgentRuntimeId, IdempotencyOperation, IdempotencyRecord};
 
 use super::IdempotencyStoreError;
 
@@ -41,6 +41,14 @@ pub(super) fn remove_temp_record(root: &Path, path: &Path) -> Result<(), Idempot
     sync_directory(root)
 }
 
+pub(super) fn delete_record(root: &Path, path: &Path) -> Result<(), IdempotencyStoreError> {
+    fs::remove_file(path).map_err(|error| IdempotencyStoreError::DeleteRecord {
+        path: path.to_path_buf(),
+        error: error.to_string(),
+    })?;
+    sync_directory(root)
+}
+
 pub(super) fn write_record_atomically(
     root: &Path,
     final_path: &Path,
@@ -52,7 +60,7 @@ pub(super) fn write_record_atomically(
             key: record.key.clone(),
             error: error.to_string(),
         })?;
-    let temp_path = temporary_record_path(root, &record.operation, &record.key);
+    let temp_path = temporary_record_path(root, &record.runtime_id, &record.operation, &record.key);
     write_temp_record(&temp_path, &contents)
         .and_then(|()| rename_temp_record(&temp_path, final_path))
         .and_then(|()| sync_directory(root))
@@ -64,8 +72,12 @@ pub(super) fn is_store_temp_record_path(path: &Path) -> bool {
         .is_some_and(is_store_temp_record_file_name)
 }
 
-pub(super) fn record_file_name(operation: &IdempotencyOperation, key: &str) -> String {
-    format!("{}.json", record_file_stem(operation, key))
+pub(super) fn record_file_name(
+    runtime_id: &AgentRuntimeId,
+    operation: &IdempotencyOperation,
+    key: &str,
+) -> String {
+    format!("{}.json", record_file_stem(runtime_id, operation, key))
 }
 
 fn write_temp_record(path: &Path, contents: &[u8]) -> Result<(), IdempotencyStoreError> {
@@ -111,11 +123,16 @@ fn sync_directory(path: &Path) -> Result<(), IdempotencyStoreError> {
         })
 }
 
-fn temporary_record_path(root: &Path, operation: &IdempotencyOperation, key: &str) -> PathBuf {
+fn temporary_record_path(
+    root: &Path,
+    runtime_id: &AgentRuntimeId,
+    operation: &IdempotencyOperation,
+    key: &str,
+) -> PathBuf {
     let counter = TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
     root.join(format!(
         ".{}.{}.tmp",
-        record_file_stem(operation, key),
+        record_file_stem(runtime_id, operation, key),
         counter
     ))
 }
@@ -137,9 +154,14 @@ fn is_store_temp_record_file_name(file_name: &str) -> bool {
 }
 
 fn is_record_file_stem(stem: &str) -> bool {
-    stem.strip_prefix("create-conversation-")
-        .or_else(|| stem.strip_prefix("submit-payload-"))
-        .is_some_and(is_lower_hex_sha256)
+    let Some((runtime, rest)) = stem.split_once('-') else {
+        return false;
+    };
+    matches!(runtime, "codex" | "opencode" | "pi")
+        && rest
+            .strip_prefix("create-conversation-")
+            .or_else(|| rest.strip_prefix("submit-payload-"))
+            .is_some_and(is_lower_hex_sha256)
 }
 
 fn is_lower_hex_sha256(value: &str) -> bool {
@@ -149,12 +171,25 @@ fn is_lower_hex_sha256(value: &str) -> bool {
             .all(|character| character.is_ascii_hexdigit() && !character.is_ascii_uppercase())
 }
 
-fn record_file_stem(operation: &IdempotencyOperation, key: &str) -> String {
+fn record_file_stem(
+    runtime_id: &AgentRuntimeId,
+    operation: &IdempotencyOperation,
+    key: &str,
+) -> String {
     format!(
-        "{}-{}",
+        "{}-{}-{}",
+        runtime_file_prefix(runtime_id),
         operation_file_prefix(operation),
         hex_lower(&Sha256::digest(key.as_bytes()))
     )
+}
+
+fn runtime_file_prefix(runtime_id: &AgentRuntimeId) -> &'static str {
+    match runtime_id {
+        AgentRuntimeId::Codex => "codex",
+        AgentRuntimeId::OpenCode => "opencode",
+        AgentRuntimeId::Pi => "pi",
+    }
 }
 
 fn operation_file_prefix(operation: &IdempotencyOperation) -> &'static str {
