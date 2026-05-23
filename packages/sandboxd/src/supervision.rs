@@ -394,6 +394,13 @@ impl SandboxdSupervisorHandle {
         });
     }
 
+    /// Removes one component-specific detail key when it no longer describes the component.
+    pub fn remove_component_detail(&self, component: SupervisedComponent, key: &str) {
+        self.update_component(component, |snapshot, _observed_at| {
+            snapshot.details.remove(key);
+        });
+    }
+
     /// Clears all component-specific detail keys for one tracked component.
     pub fn clear_component_details(&self, component: SupervisedComponent) {
         self.update_component(component, |snapshot, _observed_at| {

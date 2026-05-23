@@ -205,19 +205,14 @@ impl ActiveLoopbackEgressProxy {
         }
     }
 
-    fn request_shutdown(&mut self) {
+    fn shutdown(self) -> Result<(), EgressProxyError> {
         match self {
             #[cfg(test)]
-            Self::InProcess(active_server) => active_server.request_shutdown(),
-            Self::ChildProcess(active_child) => active_child.request_shutdown(),
-        }
-    }
-
-    fn join(self) -> Result<(), EgressProxyError> {
-        match self {
-            #[cfg(test)]
-            Self::InProcess(active_server) => active_server.join(),
-            Self::ChildProcess(active_child) => active_child.join(),
+            Self::InProcess(mut active_server) => {
+                active_server.request_shutdown();
+                active_server.join()
+            }
+            Self::ChildProcess(active_child) => active_child.shutdown(),
         }
     }
 }
@@ -461,7 +456,7 @@ impl EgressProxy {
             };
 
         supervisor_handle.mark_component_starting(SupervisedComponent::EgressProxy);
-        let mut active_loopback = match start_active_loopback_proxy(
+        let active_loopback = match start_active_loopback_proxy(
             &loopback_runtime,
             listener_address,
             state.clone(),
@@ -486,8 +481,7 @@ impl EgressProxy {
                     }
                 };
                 if let Err(error) = health_result {
-                    active_loopback.request_shutdown();
-                    let _ = active_loopback.join();
+                    let _ = active_loopback.shutdown();
                     let cleanup_suffix =
                         cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
                             .err()
@@ -522,8 +516,7 @@ impl EgressProxy {
                     match bind_transparent_egress_proxy_listener(transparent_listener_address) {
                         Ok(transparent_listener) => transparent_listener,
                         Err(error) => {
-                            active_loopback.request_shutdown();
-                            let _ = active_loopback.join();
+                            let _ = active_loopback.shutdown();
                             let cleanup_suffix =
                                 cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
                                     .err()
@@ -537,8 +530,7 @@ impl EgressProxy {
                 let transparent_listener_address = match transparent_listener.local_addr() {
                     Ok(transparent_listener_address) => transparent_listener_address,
                     Err(error) => {
-                        active_loopback.request_shutdown();
-                        let _ = active_loopback.join();
+                        let _ = active_loopback.shutdown();
                         let cleanup_suffix =
                             cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
                                 .err()
@@ -563,8 +555,7 @@ impl EgressProxy {
                 ) {
                     transparent_server.request_shutdown();
                     let _ = transparent_server.join();
-                    active_loopback.request_shutdown();
-                    let _ = active_loopback.join();
+                    let _ = active_loopback.shutdown();
                     let cleanup_suffix =
                         cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
                             .err()
@@ -635,8 +626,7 @@ impl EgressProxy {
                                 server.request_shutdown();
                                 let _ = server.join();
                             }
-                            active_loopback.request_shutdown();
-                            let _ = active_loopback.join();
+                            let _ = active_loopback.shutdown();
                             let cleanup_suffix =
                                 cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
                                     .err()

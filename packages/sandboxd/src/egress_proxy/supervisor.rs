@@ -178,24 +178,6 @@ impl ActiveEgressProxyChildProcess {
         }
     }
 
-    pub(super) fn join(mut self) -> Result<(), EgressProxyError> {
-        let _config_path = self.config_file.path();
-        let status = self.child.wait().map_err(|error| {
-            EgressProxyError::new(format!(
-                "failed to wait for local egress proxy child: {error}"
-            ))
-        })?;
-        if let Some(token_bridge) = self.token_bridge.take() {
-            token_bridge.close()?;
-        }
-        if status.success() {
-            return Ok(());
-        }
-        Err(EgressProxyError::new(format!(
-            "local egress proxy child exited with {status}"
-        )))
-    }
-
     pub(super) fn shutdown(mut self) -> Result<(), EgressProxyError> {
         let _config_path = self.config_file.path();
         if matches!(self.child.try_wait(), Ok(None)) {
@@ -626,6 +608,7 @@ fn restart_egress_proxy_process_after_backoff(
         }
 
         let backoff_ms = egress_proxy_restart_backoff_ms(*restart_attempt_index);
+        clear_egress_proxy_process_child_pid_for_restart(supervisor_handle);
         supervisor_handle.emit_component_restart_scheduled(
             SupervisedComponent::EgressProxy,
             "restart_after_failure",
@@ -858,6 +841,7 @@ fn record_egress_proxy_process_exit_for_restart(
     child_exit: &EgressProxyChildExit,
 ) {
     let error_text = child_exit.message();
+    clear_egress_proxy_process_child_pid_for_restart(supervisor_handle);
     supervisor_handle
         .mark_component_restarting(SupervisedComponent::EgressProxy, error_text.clone());
     supervisor_handle.emit_component_exited(
@@ -866,6 +850,10 @@ fn record_egress_proxy_process_exit_for_restart(
         Some(&error_text),
         &child_exit.details(),
     );
+}
+
+fn clear_egress_proxy_process_child_pid_for_restart(supervisor_handle: &SandboxdSupervisorHandle) {
+    supervisor_handle.remove_component_detail(SupervisedComponent::EgressProxy, "childPid");
 }
 
 fn egress_proxy_restart_backoff_ms(attempt_index: usize) -> u64 {
@@ -900,4 +888,123 @@ pub(super) fn bind_transparent_egress_proxy_listener(
         .set_nonblocking(true)
         .map_err(|error| format!("failed to configure transparent proxy listener: {error}"))?;
     Ok(std_listener)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{BTreeMap, BTreeSet};
+    use std::process::{Command, Stdio};
+    use std::sync::Arc;
+
+    use serde_json::Value;
+
+    use crate::egress_proxy::supervisor::{
+        ActiveEgressProxyChildProcess, EgressProxyChildExit, EgressProxyChildExitKind,
+        clear_egress_proxy_process_child_pid_for_restart,
+        record_egress_proxy_process_exit_for_restart,
+    };
+    use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
+    use crate::time::testing::MutableClock;
+
+    #[test]
+    fn child_shutdown_escalates_when_the_process_ignores_sigterm() {
+        let child = Command::new("sh")
+            .arg("-c")
+            .arg("trap '' TERM; while true; do sleep 1; done")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("test child should spawn");
+        let active_child = ActiveEgressProxyChildProcess {
+            child,
+            token_bridge: None,
+            config_file: tempfile::NamedTempFile::new()
+                .expect("test config file should be creatable"),
+        };
+
+        active_child
+            .shutdown()
+            .expect("child shutdown should escalate and reap the process");
+    }
+
+    #[test]
+    fn process_exit_clears_snapshot_child_pid_before_restart_lifecycle_events() {
+        let supervisor_handle = supervisor_handle_with_child_pid();
+
+        let child_exit = EgressProxyChildExit {
+            pid: 1234,
+            kind: EgressProxyChildExitKind::Signal(15),
+            status_text: "signal: 15 (SIGTERM)".to_string(),
+        };
+        record_egress_proxy_process_exit_for_restart(&supervisor_handle, &child_exit);
+        let snapshot = supervisor_handle
+            .component_snapshot(SupervisedComponent::EgressProxy)
+            .expect("egress proxy should be tracked");
+        assert!(!snapshot.details.contains_key("childPid"));
+
+        let exit_line = supervisor_handle
+            .drain_forwarded_lifecycle_event_lines()
+            .pop()
+            .expect("component exit should be forwarded");
+        let exit_event: Value = serde_json::from_str(&exit_line).expect("event should decode");
+        assert_eq!(exit_event["event"], "component_exited");
+        assert_eq!(exit_event["childPid"], 1234);
+
+        supervisor_handle.emit_component_restart_scheduled(
+            SupervisedComponent::EgressProxy,
+            "restart_after_failure",
+            0,
+            &[],
+        );
+        let restart_line = supervisor_handle
+            .drain_forwarded_lifecycle_event_lines()
+            .pop()
+            .expect("restart schedule should be forwarded");
+        let restart_event: Value =
+            serde_json::from_str(&restart_line).expect("event should decode");
+        assert_eq!(restart_event["event"], "component_restart_scheduled");
+        assert!(restart_event.get("childPid").is_none());
+    }
+
+    #[test]
+    fn healthcheck_restart_scheduling_clears_snapshot_child_pid_without_exit_event() {
+        let supervisor_handle = supervisor_handle_with_child_pid();
+
+        clear_egress_proxy_process_child_pid_for_restart(&supervisor_handle);
+        supervisor_handle.emit_component_restart_scheduled(
+            SupervisedComponent::EgressProxy,
+            "restart_after_failure",
+            0,
+            &[],
+        );
+
+        let restart_line = supervisor_handle
+            .drain_forwarded_lifecycle_event_lines()
+            .pop()
+            .expect("restart schedule should be forwarded");
+        let restart_event: Value =
+            serde_json::from_str(&restart_line).expect("event should decode");
+        assert_eq!(restart_event["event"], "component_restart_scheduled");
+        assert!(restart_event.get("childPid").is_none());
+    }
+
+    fn supervisor_handle_with_child_pid() -> SandboxdSupervisorHandle {
+        let clock = Arc::new(MutableClock::new(1_000));
+        let supervisor_handle = SandboxdSupervisorHandle::new(
+            "sandbox-123",
+            clock,
+            BTreeSet::from([SupervisedComponent::EgressProxy]),
+        );
+        supervisor_handle.replace_component_details(
+            SupervisedComponent::EgressProxy,
+            BTreeMap::from([
+                ("listenAddr".to_string(), "127.0.0.1:38513".to_string()),
+                ("stablePort".to_string(), "38513".to_string()),
+                ("runtimeMode".to_string(), "child_process".to_string()),
+                ("childPid".to_string(), "1234".to_string()),
+            ]),
+        );
+        supervisor_handle
+    }
 }
