@@ -22,7 +22,9 @@ import {
   TooltipTrigger,
 } from "@mistle/ui";
 import { InfoIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
+import { useDebouncer } from "@tanstack/react-pacer";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { Link as RouterLink, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -35,6 +37,7 @@ import { deleteSandboxInstance, listSandboxInstances } from "../sessions/session
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
 import { CollectionEmptyState } from "../shared/collection-empty-state.js";
 import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
+import { NoLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
 import { PageFrame } from "../shared/page-frame.js";
 import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
@@ -51,6 +54,7 @@ import {
 
 const SANDBOX_INSTANCE_LIST_LIMIT = 20;
 const SANDBOX_INSTANCE_LIST_MAX_LIMIT = 100;
+const SESSION_SEARCH_DEBOUNCE_MS = 300;
 const SESSION_FILTER_TRIGGER_LIST_LIMIT = 100;
 const SessionTitleTooltipSideOffset = 8;
 
@@ -368,19 +372,14 @@ function resolveUpdatedLabel(input: {
 
 function SessionsListToolbar(input: {
   filters: SessionListFilters;
+  searchValue: string;
   triggerOptions: readonly TriggerListItem[];
   onFiltersChange: (nextFilters: SessionListFilters) => void;
+  onSearchChange: (nextSearch: string) => void;
   onClearFilters: () => void;
 }): React.JSX.Element {
   const startedFromValue = input.filters.triggerId ?? input.filters.startedFrom;
   const hasActiveFilters = hasActiveSessionListFilters(input.filters);
-
-  function updateSearch(nextSearch: string): void {
-    input.onFiltersChange({
-      ...input.filters,
-      search: nextSearch,
-    });
-  }
 
   function updateOwner(nextOwner: string | null): void {
     if (nextOwner === null) {
@@ -433,9 +432,9 @@ function SessionsListToolbar(input: {
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
       <ToolbarSearchInput
         ariaLabel="Search sessions"
-        onValueChange={updateSearch}
+        onValueChange={input.onSearchChange}
         placeholder="Search sessions"
-        value={input.filters.search}
+        value={input.searchValue}
       />
 
       <Select onValueChange={updateOwner} value={input.filters.owner}>
@@ -489,6 +488,65 @@ export function SessionsPage(): React.JSX.Element {
   const { after: sandboxInstancesAfter, before: sandboxInstancesBefore } =
     readKeysetPaginationCursors(searchParams);
   const filters = readSessionListFilters(searchParams);
+  const [searchInputValue, setSearchInputValue] = useState(filters.search);
+
+  function updateFilters(nextFilters: SessionListFilters): void {
+    const nextSearchParams = new URLSearchParams(searchParams);
+
+    nextSearchParams.set("limit", String(sandboxInstanceListLimit));
+    nextSearchParams.delete("after");
+    nextSearchParams.delete("before");
+
+    if (nextFilters.search.trim().length === 0) {
+      nextSearchParams.delete("search");
+    } else {
+      nextSearchParams.set("search", nextFilters.search.trim());
+    }
+
+    if (nextFilters.owner === "anyone") {
+      nextSearchParams.delete("owner");
+    } else {
+      nextSearchParams.set("owner", nextFilters.owner);
+    }
+
+    if (nextFilters.startedFrom === "any") {
+      nextSearchParams.delete("startedFrom");
+    } else {
+      nextSearchParams.set("startedFrom", nextFilters.startedFrom);
+    }
+
+    if (nextFilters.triggerId === null) {
+      nextSearchParams.delete("triggerId");
+    } else {
+      nextSearchParams.set("startedFrom", "trigger");
+      nextSearchParams.set("triggerId", nextFilters.triggerId);
+    }
+
+    setSearchParams(nextSearchParams, { replace: true });
+  }
+
+  const searchDebouncer = useDebouncer(
+    (nextSearch: string) => {
+      const normalizedSearch = nextSearch.trim();
+      setSearchInputValue(normalizedSearch);
+      if (normalizedSearch === filters.search) {
+        return;
+      }
+      updateFilters({
+        ...filters,
+        search: normalizedSearch,
+      });
+    },
+    {
+      wait: SESSION_SEARCH_DEBOUNCE_MS,
+    },
+    (state) => ({ isPending: state.isPending }),
+  );
+
+  useEffect(() => {
+    setSearchInputValue(filters.search);
+    searchDebouncer.cancel();
+  }, [filters.search, filters.owner, filters.startedFrom, filters.triggerId]);
 
   const sandboxInstancesQuery = useQuery({
     queryKey: sandboxInstancesListQueryKey({
@@ -512,6 +570,7 @@ export function SessionsPage(): React.JSX.Element {
         signal,
       }),
     placeholderData: keepPreviousData,
+    meta: NoLoadingIndicatorMeta,
   });
   const triggerOptionsQuery = useQuery({
     queryKey: triggersListQueryKey({
@@ -572,42 +631,9 @@ export function SessionsPage(): React.JSX.Element {
     setSearchParams(nextSearchParams);
   }
 
-  function updateFilters(nextFilters: SessionListFilters): void {
-    const nextSearchParams = new URLSearchParams(searchParams);
-
-    nextSearchParams.set("limit", String(sandboxInstanceListLimit));
-    nextSearchParams.delete("after");
-    nextSearchParams.delete("before");
-
-    if (nextFilters.search.trim().length === 0) {
-      nextSearchParams.delete("search");
-    } else {
-      nextSearchParams.set("search", nextFilters.search.trim());
-    }
-
-    if (nextFilters.owner === "anyone") {
-      nextSearchParams.delete("owner");
-    } else {
-      nextSearchParams.set("owner", nextFilters.owner);
-    }
-
-    if (nextFilters.startedFrom === "any") {
-      nextSearchParams.delete("startedFrom");
-    } else {
-      nextSearchParams.set("startedFrom", nextFilters.startedFrom);
-    }
-
-    if (nextFilters.triggerId === null) {
-      nextSearchParams.delete("triggerId");
-    } else {
-      nextSearchParams.set("startedFrom", "trigger");
-      nextSearchParams.set("triggerId", nextFilters.triggerId);
-    }
-
-    setSearchParams(nextSearchParams);
-  }
-
   function clearFilters(): void {
+    searchDebouncer.cancel();
+    setSearchInputValue("");
     updateFilters({
       search: "",
       owner: "anyone",
@@ -617,7 +643,9 @@ export function SessionsPage(): React.JSX.Element {
   }
 
   const isSessionListTransitionPending =
-    sandboxInstancesQuery.isPending || sandboxInstancesQuery.isPlaceholderData;
+    sandboxInstancesQuery.isPending ||
+    sandboxInstancesQuery.isPlaceholderData ||
+    searchDebouncer.state.isPending;
 
   function goToNextPage(): void {
     if (isSessionListTransitionPending) {
@@ -731,8 +759,17 @@ export function SessionsPage(): React.JSX.Element {
           <>
             <SessionsListToolbar
               filters={filters}
+              searchValue={searchInputValue}
               onClearFilters={clearFilters}
-              onFiltersChange={updateFilters}
+              onFiltersChange={(nextFilters) => {
+                searchDebouncer.cancel();
+                setSearchInputValue(filters.search);
+                updateFilters(nextFilters);
+              }}
+              onSearchChange={(nextSearch) => {
+                setSearchInputValue(nextSearch);
+                searchDebouncer.maybeExecute(nextSearch);
+              }}
               triggerOptions={triggerOptionsQuery.data?.items ?? []}
             />
 

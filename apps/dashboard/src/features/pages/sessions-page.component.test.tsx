@@ -1,9 +1,17 @@
 // @vitest-environment jsdom
 
+import { systemSleeper } from "@mistle/time";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigationType,
+  useSearchParams,
+} from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
@@ -16,6 +24,7 @@ import type {
   SandboxInstancesNextPageCursor,
 } from "../sessions/sessions-types.js";
 import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
+import { NoLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
 import { PageHeaderSidebarTriggerProvider } from "../shared/page-header-sidebar-trigger-context.js";
 import { SessionsRoutes } from "../shell/app-shell-sessions-sidebar-mode.js";
 import { triggersListQueryKey } from "../triggers/triggers-query-keys.js";
@@ -106,6 +115,31 @@ function seedSessionFilterTriggers(input: {
       previousPage: null,
       totalResults: input.items.length,
     } satisfies TriggersListResult,
+  );
+}
+
+function LocationProbe(): React.JSX.Element {
+  const location = useLocation();
+  const navigationType = useNavigationType();
+  return (
+    <>
+      <span data-testid="location-search">{location.search}</span>
+      <span data-testid="navigation-type">{navigationType}</span>
+    </>
+  );
+}
+
+function OwnerFilterProbe(): React.JSX.Element {
+  const [, setSearchParams] = useSearchParams();
+  return (
+    <button
+      onClick={() => {
+        setSearchParams(new URLSearchParams("limit=20&owner=me"), { replace: true });
+      }}
+      type="button"
+    >
+      Apply owner filter
+    </button>
   );
 }
 
@@ -333,7 +367,7 @@ describe("SessionsPage", () => {
     expect(screen.queryByRole("heading", { name: "Start your first session" })).toBeNull();
   });
 
-  it("stores session search changes in the URL and clears pagination cursors", () => {
+  it("debounces session search changes before storing them in the URL and clearing pagination cursors", async () => {
     const queryClient = createSessionsPageQueryClient({
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,
@@ -343,11 +377,6 @@ describe("SessionsPage", () => {
       items: [buildSandboxInstanceListItemFixture({ id: "sbi_filter_url" })],
       after: "cursor_1",
     });
-
-    function LocationProbe(): React.JSX.Element {
-      const location = useLocation();
-      return <span data-testid="location-search">{location.search}</span>;
-    }
 
     renderSessionsPage({
       queryClient,
@@ -364,23 +393,35 @@ describe("SessionsPage", () => {
       target: { value: "Slack" },
     });
 
-    expect(screen.getByTestId("location-search").textContent).toBe("?limit=20&search=Slack");
-    expect(
-      queryClient.getQueryState(
-        sandboxInstancesListQueryKey({
-          limit: 20,
-          after: null,
-          before: null,
-          search: "Slack",
-          owner: "anyone",
-          startedFrom: "any",
-          triggerId: null,
-        }),
-      ),
-    ).toBeDefined();
+    expect(screen.getByRole("textbox", { name: "Search sessions" }).getAttribute("value")).toBe(
+      "Slack",
+    );
+    expect(screen.getByTestId("location-search").textContent).toBe("?after=cursor_1");
+
+    await systemSleeper.sleep(150);
+
+    expect(screen.getByTestId("location-search").textContent).toBe("?after=cursor_1");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location-search").textContent).toBe("?limit=20&search=Slack");
+      expect(screen.getByTestId("navigation-type").textContent).toBe("REPLACE");
+      expect(
+        queryClient.getQueryState(
+          sandboxInstancesListQueryKey({
+            limit: 20,
+            after: null,
+            before: null,
+            search: "Slack",
+            owner: "anyone",
+            startedFrom: "any",
+            triggerId: null,
+          }),
+        ),
+      ).toBeDefined();
+    });
   });
 
-  it("keeps the current sessions list mounted while a search result request is pending", () => {
+  it("keeps the current sessions list mounted while a search result request is pending", async () => {
     const queryClient = createSessionsPageQueryClient({
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,
@@ -398,6 +439,12 @@ describe("SessionsPage", () => {
     renderSessionsPage({
       queryClient,
       initialEntries: ["/sessions"],
+      routes: (
+        <>
+          <SessionsPage />
+          <LocationProbe />
+        </>
+      ),
     });
 
     fireEvent.change(screen.getByRole("textbox", { name: "Search sessions" }), {
@@ -407,10 +454,249 @@ describe("SessionsPage", () => {
     expect(screen.getByRole("textbox", { name: "Search sessions" }).getAttribute("value")).toBe(
       "Slack",
     );
+    await waitFor(() => {
+      expect(screen.getByTestId("location-search").textContent).toBe("?limit=20&search=Slack");
+    });
     expect(screen.getByText("Existing session")).toBeDefined();
   });
 
-  it("does not apply stale pagination cursors while a search result request is pending", () => {
+  it("cancels a pending debounced search when filters are cleared", async () => {
+    const queryClient = createSessionsPageQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    seedSessionsList({
+      queryClient,
+      items: [buildSandboxInstanceListItemFixture({ id: "sbi_clear_pending_search" })],
+      filters: {
+        search: "PlanetScale",
+        owner: "me",
+        startedFrom: "any",
+        triggerId: null,
+      },
+    });
+
+    renderSessionsPage({
+      queryClient,
+      initialEntries: ["/sessions?search=PlanetScale&owner=me"],
+      routes: (
+        <>
+          <SessionsPage />
+          <LocationProbe />
+        </>
+      ),
+    });
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Search sessions" }), {
+      target: { value: "Slack" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+
+    expect(screen.getByRole("textbox", { name: "Search sessions" }).getAttribute("value")).toBe("");
+    expect(screen.getByTestId("location-search").textContent).toBe("?limit=20");
+
+    await systemSleeper.sleep(350);
+
+    expect(screen.getByTestId("location-search").textContent).toBe("?limit=20");
+    expect(
+      queryClient.getQueryState(
+        sandboxInstancesListQueryKey({
+          limit: 20,
+          after: null,
+          before: null,
+          search: "Slack",
+          owner: "me",
+          startedFrom: "any",
+          triggerId: null,
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
+  it("cancels a pending debounced search when another filter changes", async () => {
+    const queryClient = createSessionsPageQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    seedSessionsList({
+      queryClient,
+      items: [buildSandboxInstanceListItemFixture({ id: "sbi_cancel_search_on_owner_filter" })],
+    });
+
+    renderSessionsPage({
+      queryClient,
+      initialEntries: ["/sessions"],
+      routes: (
+        <>
+          <SessionsPage />
+          <LocationProbe />
+          <OwnerFilterProbe />
+        </>
+      ),
+    });
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Search sessions" }), {
+      target: { value: "Slack" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Apply owner filter" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("textbox", { name: "Search sessions" }).getAttribute("value")).toBe(
+        "",
+      );
+      expect(screen.getByTestId("location-search").textContent).toBe("?limit=20&owner=me");
+      expect(screen.getByTestId("navigation-type").textContent).toBe("REPLACE");
+    });
+
+    await systemSleeper.sleep(350);
+
+    expect(screen.getByTestId("location-search").textContent).toBe("?limit=20&owner=me");
+    expect(
+      queryClient.getQueryState(
+        sandboxInstancesListQueryKey({
+          limit: 20,
+          after: null,
+          before: null,
+          search: "Slack",
+          owner: "me",
+          startedFrom: "any",
+          triggerId: null,
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
+  it("opts search result requests out of the shell top loading bar", async () => {
+    const queryClient = createSessionsPageQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    seedSessionsList({
+      queryClient,
+      items: [
+        buildSandboxInstanceListItemFixture({
+          id: "sbi_shell_loader_existing_session",
+          title: "Existing session",
+        }),
+      ],
+    });
+
+    renderSessionsPage({
+      queryClient,
+      initialEntries: ["/sessions"],
+    });
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Search sessions" }), {
+      target: { value: "Slack" },
+    });
+
+    expect(screen.getByText("Existing session")).toBeDefined();
+    await waitFor(() => {
+      const searchQuery = queryClient.getQueryCache().find({
+        queryKey: sandboxInstancesListQueryKey({
+          limit: 20,
+          after: null,
+          before: null,
+          search: "Slack",
+          owner: "anyone",
+          startedFrom: "any",
+          triggerId: null,
+        }),
+      });
+
+      expect(searchQuery?.options.meta).toEqual(NoLoadingIndicatorMeta);
+    });
+  });
+
+  it("uses push navigation for pagination", () => {
+    const queryClient = createSessionsPageQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    seedSessionsList({
+      queryClient,
+      items: [buildSandboxInstanceListItemFixture({ id: "sbi_paginate_forward" })],
+      nextPage: {
+        after: "cursor_next_page",
+        limit: 20,
+      },
+      totalResults: 40,
+    });
+
+    renderSessionsPage({
+      queryClient,
+      initialEntries: ["/sessions"],
+      routes: (
+        <>
+          <SessionsPage />
+          <LocationProbe />
+        </>
+      ),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Go to next page" }));
+
+    expect(screen.getByTestId("location-search").textContent).toBe(
+      "?limit=20&after=cursor_next_page",
+    );
+    expect(screen.getByTestId("navigation-type").textContent).toBe("PUSH");
+  });
+
+  it("disables pagination while a normalized no-op search edit is debouncing", async () => {
+    const queryClient = createSessionsPageQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    seedSessionsList({
+      queryClient,
+      items: [buildSandboxInstanceListItemFixture({ id: "sbi_pending_trimmed_search" })],
+      after: "cursor_from_slack_results",
+      filters: {
+        search: "Slack",
+        owner: "anyone",
+        startedFrom: "any",
+        triggerId: null,
+      },
+      nextPage: {
+        after: "cursor_from_slack_results",
+        limit: 20,
+      },
+      totalResults: 40,
+    });
+
+    renderSessionsPage({
+      queryClient,
+      initialEntries: ["/sessions?search=Slack&after=cursor_from_slack_results"],
+      routes: (
+        <>
+          <SessionsPage />
+          <LocationProbe />
+        </>
+      ),
+    });
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Search sessions" }), {
+      target: { value: "Slack " },
+    });
+
+    const nextPage = screen.getByRole("button", { name: "Go to next page" });
+    expect(nextPage.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(nextPage);
+    expect(screen.getByTestId("location-search").textContent).toBe(
+      "?search=Slack&after=cursor_from_slack_results",
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("textbox", { name: "Search sessions" }).getAttribute("value")).toBe(
+        "Slack",
+      );
+    });
+    expect(screen.getByTestId("location-search").textContent).toBe(
+      "?search=Slack&after=cursor_from_slack_results",
+    );
+  });
+
+  it("does not apply stale pagination cursors while a search result request is pending", async () => {
     const queryClient = createSessionsPageQueryClient({
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,
@@ -424,11 +710,6 @@ describe("SessionsPage", () => {
       },
       totalResults: 40,
     });
-
-    function LocationProbe(): React.JSX.Element {
-      const location = useLocation();
-      return <span data-testid="location-search">{location.search}</span>;
-    }
 
     renderSessionsPage({
       queryClient,
@@ -447,6 +728,15 @@ describe("SessionsPage", () => {
 
     const nextPage = screen.getByRole("button", { name: "Go to next page" });
     expect(nextPage.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(nextPage);
+    expect(screen.getByTestId("location-search").textContent).toBe("");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location-search").textContent).toBe("?limit=20&search=Slack");
+      expect(
+        screen.getByRole("button", { name: "Go to next page" }).getAttribute("aria-disabled"),
+      ).toBe("true");
+    });
 
     fireEvent.click(nextPage);
 
