@@ -17,6 +17,7 @@ import { createOpenCodeSessionClient } from "./client.js";
 type OpenCodeProxyRequest = {
   body?: unknown;
   id: string;
+  idempotency?: unknown;
   method: string;
   path: string;
 };
@@ -132,6 +133,9 @@ function parseOpenCodeProxyRequest(frame: StreamDataFrame): ObservedOpenCodeProx
   };
   if ("body" in payload) {
     request.body = payload.body;
+  }
+  if ("idempotency" in payload) {
+    request.idempotency = payload.idempotency;
   }
 
   return {
@@ -560,6 +564,49 @@ describe("createOpenCodeSessionClient", () => {
     expect(abortRequest.request).toMatchObject({
       method: "POST",
       path: "/session/ses_test/abort",
+    });
+  });
+
+  it("sends prompt idempotency metadata on the OpenCode proxy envelope", async () => {
+    const server = await startOpenCodeProxyTransportServer();
+    const client = await createConnectedClient(server);
+
+    const promptPromise = client.sendPrompt({
+      sessionId: "ses_test",
+      idempotency: {
+        key: "delivery_task_123:submit-payload",
+        operation: "submitPayload",
+        requestFingerprint: "sha256:abc123",
+      },
+      parts: [
+        {
+          text: "Implement this",
+          type: "text",
+        },
+      ],
+    });
+    const request = await server.nextRequest();
+    server.sendNoContentResponse({
+      request,
+    });
+
+    await expect(promptPromise).resolves.toBeUndefined();
+    expect(request.request).toMatchObject({
+      method: "POST",
+      path: "/session/ses_test/prompt_async",
+      idempotency: {
+        key: "delivery_task_123:submit-payload",
+        operation: "submitPayload",
+        requestFingerprint: "sha256:abc123",
+      },
+      body: {
+        parts: [
+          {
+            text: "Implement this",
+            type: "text",
+          },
+        ],
+      },
     });
   });
 

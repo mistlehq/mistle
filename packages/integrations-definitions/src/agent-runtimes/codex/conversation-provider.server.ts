@@ -818,6 +818,7 @@ export function createOpenAiConversationProvider(): AgentConversationProvider {
       try {
         createResult = await input.connection.request({
           method: CodexMethodNames.THREAD_START,
+          idempotency: input.idempotency,
           params: {
             model: modelSelection.model,
             ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
@@ -879,6 +880,7 @@ export function createOpenAiConversationProvider(): AgentConversationProvider {
       try {
         startResult = await input.connection.request({
           method: CodexMethodNames.TURN_START,
+          idempotency: input.idempotency,
           params: resolveCodexTurnStartParams({
             ...input,
             model: modelSelection.model,
@@ -917,6 +919,7 @@ export function createOpenAiConversationProvider(): AgentConversationProvider {
       try {
         steerResult = await input.connection.request({
           method: CodexMethodNames.TURN_STEER,
+          idempotency: input.idempotency,
           params: {
             threadId: input.providerConversationId,
             input: toCodexTextInputItems(input.inputText),

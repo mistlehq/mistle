@@ -1,3 +1,4 @@
+import type { AgentConversationIdempotencyMetadata } from "@mistle/integrations-core";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import type {
   AgentPartInput,
@@ -18,7 +19,7 @@ import type {
 } from "@opencode-ai/sdk/v2";
 import { createOpencodeClient } from "@opencode-ai/sdk/v2/client";
 
-import { createOpenCodeProxyFetch } from "./proxy-fetch.js";
+import { OpenCodeProxyIdempotencyHeader, createOpenCodeProxyFetch } from "./proxy-fetch.js";
 
 export type OpenCodeHealth = GlobalHealthResponse;
 export type OpenCodeProviderSummary = Provider;
@@ -74,6 +75,7 @@ export type OpenCodeSendPromptInput = {
   agent?: string;
   directory?: string;
   format?: OutputFormat;
+  idempotency?: AgentConversationIdempotencyMetadata;
   messageId?: string;
   model?: {
     modelID: string;
@@ -366,6 +368,13 @@ export function createOpenCodeSessionClient(
           ...(promptInput.workspace !== undefined ? { workspace: promptInput.workspace } : {}),
         },
         {
+          ...(promptInput.idempotency === undefined
+            ? {}
+            : {
+                headers: {
+                  [OpenCodeProxyIdempotencyHeader]: JSON.stringify(promptInput.idempotency),
+                },
+              }),
           throwOnError: true,
         },
       );

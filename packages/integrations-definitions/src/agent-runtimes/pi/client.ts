@@ -1,3 +1,4 @@
+import type { AgentConversationIdempotencyMetadata } from "@mistle/integrations-core";
 import { AgentStreamClient, type SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { z } from "zod";
 
@@ -93,7 +94,10 @@ export type PiEventSubscription = {
 export type PiSessionClient = {
   close(): void;
   connect(): Promise<void>;
-  createConversation(input: { cwd?: string }): Promise<{
+  createConversation(input: {
+    cwd?: string;
+    idempotency?: AgentConversationIdempotencyMetadata;
+  }): Promise<{
     providerConversationId: string;
     sessionFile: string;
   }>;
@@ -115,9 +119,21 @@ export type PiSessionClient = {
   setModel(input: { modelId: string; provider: string; sessionFile: string }): Promise<void>;
   setThinkingLevel(input: { level: PiThinkingLevel; sessionFile: string }): Promise<void>;
   setSessionName(input: { name: string; sessionFile: string }): Promise<void>;
-  prompt(input: { message: string; sessionFile: string }): Promise<void>;
-  steer(input: { message: string; sessionFile: string }): Promise<void>;
-  followUp(input: { message: string; sessionFile: string }): Promise<void>;
+  prompt(input: {
+    message: string;
+    sessionFile: string;
+    idempotency?: AgentConversationIdempotencyMetadata;
+  }): Promise<void>;
+  steer(input: {
+    message: string;
+    sessionFile: string;
+    idempotency?: AgentConversationIdempotencyMetadata;
+  }): Promise<void>;
+  followUp(input: {
+    message: string;
+    sessionFile: string;
+    idempotency?: AgentConversationIdempotencyMetadata;
+  }): Promise<void>;
   abort(input: { sessionFile: string }): Promise<void>;
   subscribeEvents(input: { onEvent: (event: PiEvent) => void }): PiEventSubscription;
 };
@@ -189,7 +205,11 @@ export function createPiSessionClient(input: PiSessionClientInput): PiSessionCli
     pending.resolve(event.response.result);
   });
 
-  async function request(input: { method: string; params?: unknown }): Promise<unknown> {
+  async function request(input: {
+    method: string;
+    params?: unknown;
+    idempotency?: AgentConversationIdempotencyMetadata | undefined;
+  }): Promise<unknown> {
     const id = `pi_${String(nextRequestId)}`;
     nextRequestId += 1;
     const responsePromise = new Promise<unknown>((resolve, reject) => {
@@ -201,6 +221,7 @@ export function createPiSessionClient(input: PiSessionClientInput): PiSessionCli
         id,
         method: input.method,
         ...(input.params === undefined ? {} : { params: input.params }),
+        ...(input.idempotency === undefined ? {} : { idempotency: input.idempotency }),
       });
     } catch (error) {
       pendingRequests.delete(id);
@@ -229,7 +250,8 @@ export function createPiSessionClient(input: PiSessionClientInput): PiSessionCli
     async createConversation(createInput) {
       const result = await request({
         method: "pi/createConversation",
-        params: createInput,
+        params: createInput.idempotency === undefined ? createInput : { cwd: createInput.cwd },
+        idempotency: createInput.idempotency,
       });
       const created = PiProviderConversationResultSchema.parse(result);
       return {
@@ -317,19 +339,31 @@ export function createPiSessionClient(input: PiSessionClientInput): PiSessionCli
     async prompt(promptInput) {
       await request({
         method: "pi/prompt",
-        params: promptInput,
+        params: {
+          sessionFile: promptInput.sessionFile,
+          message: promptInput.message,
+        },
+        idempotency: promptInput.idempotency,
       });
     },
     async steer(steerInput) {
       await request({
         method: "pi/steer",
-        params: steerInput,
+        params: {
+          sessionFile: steerInput.sessionFile,
+          message: steerInput.message,
+        },
+        idempotency: steerInput.idempotency,
       });
     },
     async followUp(followUpInput) {
       await request({
         method: "pi/followUp",
-        params: followUpInput,
+        params: {
+          sessionFile: followUpInput.sessionFile,
+          message: followUpInput.message,
+        },
+        idempotency: followUpInput.idempotency,
       });
     },
     async abort(abortInput) {

@@ -1,5 +1,6 @@
 import type {
   AgentConversationCollaborationModeSettings,
+  AgentConversationIdempotencyMetadata,
   AgentConversationProvider,
 } from "@mistle/integrations-core";
 import { resolveAgentConversationProvider } from "@mistle/integrations-definitions/agent-runtimes/server";
@@ -37,7 +38,11 @@ export type ProviderConnectInput = {
 };
 
 export type ProviderConnection = {
-  request: (input: { method: string; params?: unknown }) => Promise<unknown>;
+  request: (input: {
+    method: string;
+    params?: unknown;
+    idempotency?: AgentConversationIdempotencyMetadata | undefined;
+  }) => Promise<unknown>;
   notify?: (input: { method: string; params?: unknown }) => Promise<void>;
   close: () => Promise<void>;
 };
@@ -51,6 +56,7 @@ export type ProviderCreateConversationInput = {
   connection: ProviderConnection;
   cwd?: string;
   options?: Record<string, unknown>;
+  idempotency?: AgentConversationIdempotencyMetadata | undefined;
 };
 
 export type ProviderGenerateConversationTitleInput = {
@@ -70,6 +76,7 @@ export type ProviderStartExecutionInput = {
   providerConversationId: string;
   inputText: string;
   collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
+  idempotency?: AgentConversationIdempotencyMetadata | undefined;
 };
 
 export type ProviderSteerExecutionInput = {
@@ -77,6 +84,7 @@ export type ProviderSteerExecutionInput = {
   providerConversationId: string;
   providerExecutionId: string;
   inputText: string;
+  idempotency?: AgentConversationIdempotencyMetadata | undefined;
 };
 
 export type ProviderRecoverLateSteerInput = {
@@ -84,6 +92,7 @@ export type ProviderRecoverLateSteerInput = {
   providerConversationId: string;
   providerExecutionId: string;
   inputText: string;
+  idempotency?: AgentConversationIdempotencyMetadata | undefined;
 };
 
 export type ProviderInterruptExecutionInput = {

@@ -1,5 +1,10 @@
+import type { AgentConversationIdempotencyMetadata } from "@mistle/integrations-core";
 import { extractActiveW3cTraceCarrier } from "@mistle/telemetry/trace-context.js";
 
+import {
+  createConversationIdempotencyMetadata,
+  submitPayloadIdempotencyMetadata,
+} from "./delivery-idempotency.js";
 import { getConversationProviderAdapter } from "./provider-adapter.js";
 import {
   TriggerConversationExecutionActions,
@@ -53,6 +58,7 @@ async function steerConversationExecution(input: {
   providerConversationId: string | null;
   providerExecutionId: string | null;
   inputText: string;
+  idempotency: AgentConversationIdempotencyMetadata;
 }) {
   if (input.providerConversationId === null) {
     throw new ConversationDeliveryExecutionError(
@@ -70,6 +76,7 @@ async function steerConversationExecution(input: {
     providerConversationId: input.providerConversationId,
     providerExecutionId: input.providerExecutionId,
     inputText: input.inputText,
+    idempotency: input.idempotency,
   });
 }
 
@@ -80,6 +87,7 @@ async function recoverLateSteerExecution(input: {
   providerConversationId: string;
   providerExecutionId: string;
   inputText: string;
+  idempotency: AgentConversationIdempotencyMetadata;
   collaborationModeSettings?: ExecuteConversationProviderDeliveryInput["collaborationModeSettings"];
 }) {
   if (input.adapter.recoverLateSteer !== undefined) {
@@ -88,6 +96,7 @@ async function recoverLateSteerExecution(input: {
       providerConversationId: input.providerConversationId,
       providerExecutionId: input.providerExecutionId,
       inputText: input.inputText,
+      idempotency: input.idempotency,
     });
   }
 
@@ -106,6 +115,7 @@ async function recoverLateSteerExecution(input: {
         providerConversationId: input.providerConversationId,
         inputText: input.inputText,
         collaborationModeSettings: input.collaborationModeSettings,
+        idempotency: input.idempotency,
       });
     case TriggerConversationSteerRecoveryActions.FAIL_MISSING_CONVERSATION:
       throw new ConversationDeliveryExecutionError(
@@ -152,6 +162,7 @@ export async function executeConversationProviderDelivery(
       const createdConversation = await adapter.createTriggerConversation({
         connection,
         cwd: input.workingDirectory,
+        idempotency: createConversationIdempotencyMetadata(input),
       });
       providerConversationId = createdConversation.providerConversationId;
       createdConversationState = createdConversation.providerState;
@@ -176,6 +187,10 @@ export async function executeConversationProviderDelivery(
       providerExecutionId: input.providerExecutionId,
       adapter,
     });
+    const submitIdempotency = submitPayloadIdempotencyMetadata({
+      deliveryInput: input,
+      providerConversationId,
+    });
 
     let executionUpdate;
     switch (executionAction) {
@@ -185,6 +200,7 @@ export async function executeConversationProviderDelivery(
           providerConversationId,
           inputText: input.inputText,
           collaborationModeSettings: input.collaborationModeSettings,
+          idempotency: submitIdempotency,
         });
         break;
       case TriggerConversationExecutionActions.STEER:
@@ -203,6 +219,7 @@ export async function executeConversationProviderDelivery(
             providerConversationId,
             providerExecutionId: input.providerExecutionId,
             inputText: input.inputText,
+            idempotency: submitIdempotency,
           });
         } catch (error) {
           if (!isRecoverableLateSteerError({ error })) {
@@ -216,6 +233,7 @@ export async function executeConversationProviderDelivery(
             providerConversationId,
             providerExecutionId: input.providerExecutionId,
             inputText: input.inputText,
+            idempotency: submitIdempotency,
             collaborationModeSettings: input.collaborationModeSettings,
           });
         }

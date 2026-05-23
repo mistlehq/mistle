@@ -3,6 +3,7 @@ import type { AgentConversationInspectResult } from "./types.js";
 export type AgentConversationRequest = {
   method: string;
   params?: unknown;
+  idempotency?: AgentConversationIdempotencyMetadata | undefined;
 };
 
 export type AgentConversationNotification = {
@@ -25,6 +26,7 @@ export type AgentConversationCreateInput = {
   connection: AgentConversationConnection;
   cwd?: string;
   options?: Readonly<Record<string, unknown>>;
+  idempotency?: AgentConversationIdempotencyMetadata | undefined;
 };
 
 export type AgentConversationCreateResult = {
@@ -67,11 +69,20 @@ export type AgentConversationCollaborationModeSettings = {
   developerInstructions: string | null;
 };
 
+export type AgentConversationIdempotencyOperation = "createConversation" | "submitPayload";
+
+export type AgentConversationIdempotencyMetadata = {
+  key: string;
+  operation: AgentConversationIdempotencyOperation;
+  requestFingerprint: string;
+};
+
 export type AgentConversationStartExecutionInput = {
   connection: AgentConversationConnection;
   providerConversationId: string;
   inputText: string;
   collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
+  idempotency?: AgentConversationIdempotencyMetadata | undefined;
 };
 
 export type AgentConversationStartExecutionResult = {
@@ -84,6 +95,7 @@ export type AgentConversationSteerExecutionInput = {
   providerConversationId: string;
   providerExecutionId: string;
   inputText: string;
+  idempotency?: AgentConversationIdempotencyMetadata | undefined;
 };
 
 export type AgentConversationSteerExecutionResult = {
@@ -96,6 +108,7 @@ export type AgentConversationRecoverLateSteerInput = {
   providerConversationId: string;
   providerExecutionId: string;
   inputText: string;
+  idempotency?: AgentConversationIdempotencyMetadata | undefined;
 };
 
 export type AgentConversationRecoverLateSteerResult = {

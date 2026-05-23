@@ -1,6 +1,7 @@
 import type {
   AgentConversationCollaborationModeSettings,
   AgentConversationConnection,
+  AgentConversationIdempotencyMetadata,
   AgentConversationProvider,
   AgentConversationStatus,
 } from "@mistle/integrations-core";
@@ -114,6 +115,7 @@ function createOpenCodeProviderExecutionId(providerConversationId: string): stri
 function createOpenCodePromptInput(input: {
   collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
   deliveryContextNotificationParams?: OpenCodeDeliveryContextNotificationParams | undefined;
+  idempotency?: AgentConversationIdempotencyMetadata | undefined;
   inputText: string;
   providerConversationId: string;
 }): OpenCodeSendPromptInput {
@@ -131,6 +133,7 @@ function createOpenCodePromptInput(input: {
       },
     ],
     ...(system === undefined ? {} : { system }),
+    ...(input.idempotency === undefined ? {} : { idempotency: input.idempotency }),
   };
 }
 
@@ -300,6 +303,7 @@ export function createOpenCodeConversationProvider(): AgentConversationProvider 
         createOpenCodePromptInput({
           collaborationModeSettings: input.collaborationModeSettings,
           deliveryContextNotificationParams,
+          idempotency: input.idempotency,
           inputText: input.inputText,
           providerConversationId: input.providerConversationId,
         }),
@@ -320,6 +324,7 @@ export function createOpenCodeConversationProvider(): AgentConversationProvider 
       await client.sendPrompt(
         createOpenCodePromptInput({
           deliveryContextNotificationParams,
+          idempotency: input.idempotency,
           inputText: input.inputText,
           providerConversationId: input.providerConversationId,
         }),

@@ -194,9 +194,15 @@ export function createPiConversationProvider(): AgentConversationProvider {
     generateConversationTitle: generatePiConversationTitle,
     createConversation: async (input) => {
       const piConnection = getPiConnection(input.connection);
-      const createdConversation = await (input.cwd === undefined
-        ? piConnection.client.createConversation({})
-        : piConnection.client.createConversation({ cwd: input.cwd }));
+      const createInput =
+        input.cwd === undefined
+          ? input.idempotency === undefined
+            ? {}
+            : { idempotency: input.idempotency }
+          : input.idempotency === undefined
+            ? { cwd: input.cwd }
+            : { cwd: input.cwd, idempotency: input.idempotency };
+      const createdConversation = await piConnection.client.createConversation(createInput);
       piConnection.sessionFilesByConversationId.set(
         createdConversation.providerConversationId,
         createdConversation.sessionFile,
@@ -226,6 +232,7 @@ export function createPiConversationProvider(): AgentConversationProvider {
           deliveryContextNotificationParams: piConnection.deliveryContextNotificationParams,
           inputText: input.inputText,
         }),
+        ...(input.idempotency === undefined ? {} : { idempotency: input.idempotency }),
       });
 
       return {
@@ -244,6 +251,7 @@ export function createPiConversationProvider(): AgentConversationProvider {
           deliveryContextNotificationParams: piConnection.deliveryContextNotificationParams,
           inputText: input.inputText,
         }),
+        ...(input.idempotency === undefined ? {} : { idempotency: input.idempotency }),
       });
 
       return {
@@ -268,6 +276,7 @@ export function createPiConversationProvider(): AgentConversationProvider {
         await piConnection.client.steer({
           sessionFile,
           message,
+          ...(input.idempotency === undefined ? {} : { idempotency: input.idempotency }),
         });
 
         return {
@@ -278,6 +287,7 @@ export function createPiConversationProvider(): AgentConversationProvider {
       await piConnection.client.followUp({
         sessionFile,
         message,
+        ...(input.idempotency === undefined ? {} : { idempotency: input.idempotency }),
       });
 
       return {

@@ -1,3 +1,4 @@
+import type { AgentConversationIdempotencyMetadata } from "@mistle/integrations-core";
 import type {
   SandboxSessionStream,
   SandboxSessionStreamEvent,
@@ -5,12 +6,15 @@ import type {
 } from "@mistle/sandbox-session-client";
 import { PayloadKindWebSocketText, type StreamDataFrame } from "@mistle/sandbox-session-protocol";
 
+export const OpenCodeProxyIdempotencyHeader = "x-mistle-idempotency";
+
 type OpenCodeProxyRequest = {
   id: string;
   method: string;
   path: string;
   headers?: Record<string, string>;
   body?: unknown;
+  idempotency?: AgentConversationIdempotencyMetadata;
 };
 
 type OpenCodeProxyResponseFrame = {
@@ -119,9 +123,40 @@ function getRequestPath(request: Request): string {
   return `${url.pathname}${url.search}`;
 }
 
+function readIdempotencyMetadata(value: string): AgentConversationIdempotencyMetadata {
+  const parsedValue: unknown = JSON.parse(value);
+  if (!isRecord(parsedValue)) {
+    throw new Error("OpenCode proxy idempotency metadata must be a JSON object.");
+  }
+  if (typeof parsedValue.key !== "string") {
+    throw new Error("OpenCode proxy idempotency metadata must include string key.");
+  }
+  if (parsedValue.operation !== "createConversation" && parsedValue.operation !== "submitPayload") {
+    throw new Error(
+      "OpenCode proxy idempotency metadata operation must be createConversation or submitPayload.",
+    );
+  }
+  if (typeof parsedValue.requestFingerprint !== "string") {
+    throw new Error("OpenCode proxy idempotency metadata must include string requestFingerprint.");
+  }
+  return {
+    key: parsedValue.key,
+    operation: parsedValue.operation,
+    requestFingerprint: parsedValue.requestFingerprint,
+  };
+}
+
+function getRequestIdempotency(request: Request): AgentConversationIdempotencyMetadata | undefined {
+  const headerValue = request.headers.get(OpenCodeProxyIdempotencyHeader);
+  return headerValue === null ? undefined : readIdempotencyMetadata(headerValue);
+}
+
 function getRequestHeaders(request: Request): Record<string, string> | undefined {
   const headers: Record<string, string> = {};
   request.headers.forEach((value, key) => {
+    if (key.toLowerCase() === OpenCodeProxyIdempotencyHeader) {
+      return;
+    }
     headers[key] = value;
   });
   return Object.keys(headers).length === 0 ? undefined : headers;
@@ -157,6 +192,10 @@ function createProxyRequest(input: {
   };
   if (headers !== undefined) {
     proxyRequest.headers = headers;
+  }
+  const idempotency = getRequestIdempotency(input.request);
+  if (idempotency !== undefined) {
+    proxyRequest.idempotency = idempotency;
   }
   if (input.body !== undefined) {
     proxyRequest.body = input.body;
