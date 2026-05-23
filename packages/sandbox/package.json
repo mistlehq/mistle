@@ -37,7 +37,7 @@
     "@opentelemetry/api": "^1.9.1",
     "dockerode": "^5.0.0",
     "e2b": "^2.19.0",
-    "tensorlake": "0.5.14",
+    "tensorlake": "0.5.17",
     "zod": "^4.4.3"
   },
   "devDependencies": {

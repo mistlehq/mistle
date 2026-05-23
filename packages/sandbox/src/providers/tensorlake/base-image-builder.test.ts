@@ -47,7 +47,7 @@ describe("TensorlakeBaseImageBuilder", () => {
     expect(dockerfileText).toContain("FROM tensorlake/ubuntu-systemd");
     expect(dockerfileText).toContain("apt-get install -y --no-install-recommends");
     expect(dockerfileText).toContain("kmod");
-    expect(dockerfileText).toContain("linux-modules-$(uname -r)");
+    expect(dockerfileText).not.toContain("linux-modules-$(uname -r)");
     expect(dockerfileText).toContain("sudo");
     expect(dockerfileText).toContain("systemd");
     expect(dockerfileText).toContain("systemd-sysv");

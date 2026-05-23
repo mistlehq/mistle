@@ -35,7 +35,7 @@ function installSandboxBaseCommon(image: Image): Image {
     .run(
       [
         "apt-get update",
-        "apt-get install -y --no-install-recommends bash ca-certificates coreutils curl dbus findutils file fuse gawk git grep iproute2 jq kmod less libatomic1 linux-modules-$(uname -r) lsof nftables procps psmisc ripgrep rsync sed sudo systemd systemd-sysv tar unzip zip",
+        "apt-get install -y --no-install-recommends bash ca-certificates coreutils curl dbus findutils file fuse gawk git grep iproute2 jq kmod less libatomic1 lsof nftables procps psmisc ripgrep rsync sed sudo systemd systemd-sysv tar unzip zip",
         "rm -rf /var/lib/apt/lists/*",
       ].join(" && "),
     )
