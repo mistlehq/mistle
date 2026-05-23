@@ -11,9 +11,12 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
+use crate::idempotency::store::IdempotencyStore;
 use crate::keepalive::KeepaliveManager;
+use crate::pi_proxy::idempotency::SharedIdempotencyStore;
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
 
+mod idempotency;
 mod json_rpc;
 mod rpc_process;
 mod server;
@@ -153,6 +156,40 @@ pub fn start_pi_proxy_with_supervisor(
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     supervisor_handle: SandboxdSupervisorHandle,
 ) -> Result<PiProxy, PiProxyError> {
+    let idempotency_store = IdempotencyStore::load_default()
+        .map_err(|error| PiProxyError::InvalidRequest(error.to_string()))?;
+    start_pi_proxy_inner(
+        listen_url,
+        config,
+        keepalive_manager,
+        supervisor_handle,
+        Some(Arc::new(Mutex::new(idempotency_store))),
+    )
+}
+
+pub fn start_pi_proxy_with_idempotency_store(
+    listen_url: &str,
+    config: PiProxyConfig,
+    keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    supervisor_handle: SandboxdSupervisorHandle,
+    idempotency_store: IdempotencyStore,
+) -> Result<PiProxy, PiProxyError> {
+    start_pi_proxy_inner(
+        listen_url,
+        config,
+        keepalive_manager,
+        supervisor_handle,
+        Some(Arc::new(Mutex::new(idempotency_store))),
+    )
+}
+
+fn start_pi_proxy_inner(
+    listen_url: &str,
+    config: PiProxyConfig,
+    keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    supervisor_handle: SandboxdSupervisorHandle,
+    idempotency_store: Option<SharedIdempotencyStore>,
+) -> Result<PiProxy, PiProxyError> {
     if config.pi_cli_path.trim().is_empty() {
         return Err(PiProxyError::MissingPiCliPath);
     }
@@ -183,6 +220,7 @@ pub fn start_pi_proxy_with_supervisor(
         active: AtomicBool::new(false),
         activity_monitor_running: AtomicBool::new(false),
         next_id: AtomicU64::new(1),
+        idempotency_store,
         supervisor_handle: supervisor_handle.clone(),
     });
     if let Err(error) = state.ensure_child(None) {
@@ -223,10 +261,12 @@ mod tests {
     use serde_json::{Value, json};
     use tempfile::tempdir;
 
+    use crate::idempotency::store::IdempotencyStore;
+    use crate::idempotency::{AgentRuntimeId, IdempotencyOperation, RequestFingerprint};
     use crate::keepalive::KeepaliveManager;
     use crate::pi_proxy::{
         PiProxyConfig, PiProxyState, json_rpc::handle_json_rpc_request,
-        start_pi_proxy_with_supervisor,
+        start_pi_proxy_with_idempotency_store,
     };
     use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
     use crate::time::SystemClock;
@@ -288,7 +328,11 @@ mod tests {
     fn starts_pi_rpc_process_before_reporting_proxy_startup_success() {
         let simulated_pi = SimulatedPiRpcProcess::start();
         let supervisor_handle = test_supervisor_handle();
-        let proxy = start_pi_proxy_with_supervisor(
+        let idempotency_store_dir = tempdir().expect("idempotency store dir should be created");
+        let idempotency_store =
+            IdempotencyStore::load_all(idempotency_store_dir.path().join("idempotency"))
+                .expect("idempotency store should load");
+        let proxy = start_pi_proxy_with_idempotency_store(
             &reserve_pi_proxy_listen_url(),
             PiProxyConfig {
                 pi_cli_path: simulated_pi.path(),
@@ -296,6 +340,7 @@ mod tests {
             },
             Arc::new(Mutex::new(KeepaliveManager::default())),
             supervisor_handle.clone(),
+            idempotency_store,
         )
         .expect("Pi proxy should start with a runnable Pi RPC process");
 
@@ -329,7 +374,11 @@ mod tests {
     fn restarts_pi_rpc_process_after_exit() {
         let simulated_pi = SimulatedPiRpcProcess::start();
         let supervisor_handle = test_supervisor_handle();
-        let proxy = start_pi_proxy_with_supervisor(
+        let idempotency_store_dir = tempdir().expect("idempotency store dir should be created");
+        let idempotency_store =
+            IdempotencyStore::load_all(idempotency_store_dir.path().join("idempotency"))
+                .expect("idempotency store should load");
+        let proxy = start_pi_proxy_with_idempotency_store(
             &reserve_pi_proxy_listen_url(),
             PiProxyConfig {
                 pi_cli_path: simulated_pi.path(),
@@ -337,6 +386,7 @@ mod tests {
             },
             Arc::new(Mutex::new(KeepaliveManager::default())),
             supervisor_handle.clone(),
+            idempotency_store,
         )
         .expect("Pi proxy should start with a runnable Pi RPC process");
         let original_pid = pi_rpc_process_pid(&supervisor_handle);
@@ -379,6 +429,7 @@ mod tests {
             active: std::sync::atomic::AtomicBool::new(false),
             activity_monitor_running: std::sync::atomic::AtomicBool::new(false),
             next_id: AtomicU64::new(1),
+            idempotency_store: None,
             supervisor_handle: test_supervisor_handle(),
         });
 
@@ -419,6 +470,7 @@ mod tests {
             active: std::sync::atomic::AtomicBool::new(false),
             activity_monitor_running: std::sync::atomic::AtomicBool::new(false),
             next_id: AtomicU64::new(1),
+            idempotency_store: None,
             supervisor_handle: test_supervisor_handle(),
         });
 
@@ -505,6 +557,279 @@ mod tests {
     }
 
     #[test]
+    fn replays_completed_idempotent_pi_create_without_requiring_live_child() {
+        let simulated_pi = SimulatedPiRpcProcess::start();
+        let temp_dir = tempdir().expect("temp dir should be created");
+        let state = Arc::new(PiProxyState {
+            config: PiProxyConfig {
+                pi_cli_path: simulated_pi.path(),
+                env: BTreeMap::new(),
+            },
+            child: Mutex::new(None),
+            command_lock: Mutex::new(()),
+            event_subscribers: Mutex::new(Vec::new()),
+            keepalive_manager: Arc::new(Mutex::new(KeepaliveManager::default())),
+            active: std::sync::atomic::AtomicBool::new(false),
+            activity_monitor_running: std::sync::atomic::AtomicBool::new(false),
+            next_id: AtomicU64::new(1),
+            idempotency_store: Some(Arc::new(Mutex::new(
+                IdempotencyStore::load_all(temp_dir.path().join("idempotency"))
+                    .expect("idempotency store should load"),
+            ))),
+            supervisor_handle: test_supervisor_handle(),
+        });
+        let fingerprint = pi_fingerprint(IdempotencyOperation::CreateConversation, "create");
+        let first_response = parse_json_rpc_message(
+            handle_json_rpc_request(
+                &state,
+                &json!({
+                    "jsonrpc": "2.0",
+                    "id": "create-1",
+                    "method": "pi/createConversation",
+                    "params": { "cwd": simulated_pi.cwd() },
+                    "idempotency": {
+                        "key": "create-key",
+                        "operation": "createConversation",
+                        "requestFingerprint": fingerprint.value()
+                    }
+                })
+                .to_string(),
+            )
+            .last()
+            .expect("create should produce response"),
+        );
+        assert_eq!(
+            first_response["result"]["providerConversationId"],
+            json!(simulated_pi.session_id())
+        );
+
+        state.shutdown_child();
+
+        let replay_response = parse_json_rpc_message(
+            handle_json_rpc_request(
+                &state,
+                &json!({
+                    "jsonrpc": "2.0",
+                    "id": "create-2",
+                    "method": "pi/createConversation",
+                    "params": { "cwd": simulated_pi.cwd() },
+                    "idempotency": {
+                        "key": "create-key",
+                        "operation": "createConversation",
+                        "requestFingerprint": fingerprint.value()
+                    }
+                })
+                .to_string(),
+            )
+            .last()
+            .expect("replay should produce response"),
+        );
+        assert_eq!(replay_response["id"], json!("create-2"));
+        assert_eq!(
+            replay_response["result"]["providerConversationId"],
+            json!(simulated_pi.session_id())
+        );
+    }
+
+    #[test]
+    fn rejects_pi_idempotency_key_reused_with_different_fingerprint() {
+        let simulated_pi = SimulatedPiRpcProcess::start();
+        let temp_dir = tempdir().expect("temp dir should be created");
+        let state = Arc::new(PiProxyState {
+            config: PiProxyConfig {
+                pi_cli_path: simulated_pi.path(),
+                env: BTreeMap::new(),
+            },
+            child: Mutex::new(None),
+            command_lock: Mutex::new(()),
+            event_subscribers: Mutex::new(Vec::new()),
+            keepalive_manager: Arc::new(Mutex::new(KeepaliveManager::default())),
+            active: std::sync::atomic::AtomicBool::new(false),
+            activity_monitor_running: std::sync::atomic::AtomicBool::new(false),
+            next_id: AtomicU64::new(1),
+            idempotency_store: Some(Arc::new(Mutex::new(
+                IdempotencyStore::load_all(temp_dir.path().join("idempotency"))
+                    .expect("idempotency store should load"),
+            ))),
+            supervisor_handle: test_supervisor_handle(),
+        });
+        let first_fingerprint = pi_fingerprint(IdempotencyOperation::CreateConversation, "create");
+        let _ = handle_json_rpc_request(
+            &state,
+            &json!({
+                "jsonrpc": "2.0",
+                "id": "create-1",
+                "method": "pi/createConversation",
+                "params": { "cwd": simulated_pi.cwd() },
+                "idempotency": {
+                    "key": "create-key",
+                    "operation": "createConversation",
+                    "requestFingerprint": first_fingerprint.value()
+                }
+            })
+            .to_string(),
+        );
+
+        state.shutdown_child();
+
+        let conflicting_fingerprint =
+            pi_fingerprint(IdempotencyOperation::CreateConversation, "different");
+        let conflict_response = parse_json_rpc_message(
+            handle_json_rpc_request(
+                &state,
+                &json!({
+                    "jsonrpc": "2.0",
+                    "id": "create-2",
+                    "method": "pi/createConversation",
+                    "params": { "cwd": simulated_pi.cwd() },
+                    "idempotency": {
+                        "key": "create-key",
+                        "operation": "createConversation",
+                        "requestFingerprint": conflicting_fingerprint.value()
+                    }
+                })
+                .to_string(),
+            )
+            .last()
+            .expect("conflict should produce response"),
+        );
+        assert!(
+            conflict_response["error"]["message"]
+                .as_str()
+                .expect("conflict message should be a string")
+                .contains("different request fingerprint")
+        );
+    }
+
+    #[test]
+    fn malformed_pi_idempotency_envelope_preserves_json_rpc_id() {
+        let simulated_pi = SimulatedPiRpcProcess::start();
+        let state = Arc::new(PiProxyState {
+            config: PiProxyConfig {
+                pi_cli_path: simulated_pi.path(),
+                env: BTreeMap::new(),
+            },
+            child: Mutex::new(None),
+            command_lock: Mutex::new(()),
+            event_subscribers: Mutex::new(Vec::new()),
+            keepalive_manager: Arc::new(Mutex::new(KeepaliveManager::default())),
+            active: std::sync::atomic::AtomicBool::new(false),
+            activity_monitor_running: std::sync::atomic::AtomicBool::new(false),
+            next_id: AtomicU64::new(1),
+            idempotency_store: None,
+            supervisor_handle: test_supervisor_handle(),
+        });
+
+        let response = parse_json_rpc_message(
+            handle_json_rpc_request(
+                &state,
+                &json!({
+                    "jsonrpc": "2.0",
+                    "id": "prompt-1",
+                    "method": "pi/prompt",
+                    "params": {
+                        "sessionFile": simulated_pi.session_file(),
+                        "message": "hello"
+                    },
+                    "idempotency": {
+                        "operation": "bad"
+                    }
+                })
+                .to_string(),
+            )
+            .last()
+            .expect("malformed idempotency should produce response"),
+        );
+
+        assert_eq!(response["id"], json!("prompt-1"));
+        assert_eq!(response["error"]["code"], json!(-32_001));
+        assert!(
+            response["error"]["message"]
+                .as_str()
+                .expect("error message should be a string")
+                .contains("Pi idempotency envelope is invalid")
+        );
+    }
+
+    #[test]
+    fn replays_completed_idempotent_pi_prompt_without_requiring_live_child() {
+        let simulated_pi = SimulatedPiRpcProcess::start();
+        let temp_dir = tempdir().expect("temp dir should be created");
+        let state = Arc::new(PiProxyState {
+            config: PiProxyConfig {
+                pi_cli_path: simulated_pi.path(),
+                env: BTreeMap::new(),
+            },
+            child: Mutex::new(None),
+            command_lock: Mutex::new(()),
+            event_subscribers: Mutex::new(Vec::new()),
+            keepalive_manager: Arc::new(Mutex::new(KeepaliveManager::default())),
+            active: std::sync::atomic::AtomicBool::new(false),
+            activity_monitor_running: std::sync::atomic::AtomicBool::new(false),
+            next_id: AtomicU64::new(1),
+            idempotency_store: Some(Arc::new(Mutex::new(
+                IdempotencyStore::load_all(temp_dir.path().join("idempotency"))
+                    .expect("idempotency store should load"),
+            ))),
+            supervisor_handle: test_supervisor_handle(),
+        });
+        let fingerprint = pi_fingerprint(IdempotencyOperation::SubmitPayload, "prompt");
+
+        let first_responses = handle_json_rpc_request(
+            &state,
+            &json!({
+                "jsonrpc": "2.0",
+                "id": "prompt-1",
+                "method": "pi/prompt",
+                "params": {
+                    "sessionFile": simulated_pi.session_file(),
+                    "message": "hello"
+                },
+                "idempotency": {
+                    "key": "prompt-key",
+                    "operation": "submitPayload",
+                    "requestFingerprint": fingerprint.value()
+                }
+            })
+            .to_string(),
+        );
+        let first_response = parse_json_rpc_message(
+            first_responses
+                .last()
+                .expect("prompt should produce response"),
+        );
+        assert_eq!(first_response["id"], json!("prompt-1"));
+        assert_eq!(first_response["result"], json!({ "accepted": true }));
+
+        state.shutdown_child();
+
+        let replay_response = parse_json_rpc_message(
+            handle_json_rpc_request(
+                &state,
+                &json!({
+                    "jsonrpc": "2.0",
+                    "id": "prompt-2",
+                    "method": "pi/prompt",
+                    "params": {
+                        "sessionFile": simulated_pi.session_file(),
+                        "message": "hello"
+                    },
+                    "idempotency": {
+                        "key": "prompt-key",
+                        "operation": "submitPayload",
+                        "requestFingerprint": fingerprint.value()
+                    }
+                })
+                .to_string(),
+            )
+            .last()
+            .expect("prompt replay should produce response"),
+        );
+        assert_eq!(replay_response["id"], json!("prompt-2"));
+        assert_eq!(replay_response["result"], json!({ "accepted": true }));
+    }
+
+    #[test]
     fn resume_active_pi_conversation_starts_activity_monitor() {
         let simulated_pi = SimulatedPiRpcProcess::start_active_session();
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -520,6 +845,7 @@ mod tests {
             active: std::sync::atomic::AtomicBool::new(false),
             activity_monitor_running: std::sync::atomic::AtomicBool::new(false),
             next_id: AtomicU64::new(1),
+            idempotency_store: None,
             supervisor_handle: test_supervisor_handle(),
         });
 
@@ -589,6 +915,7 @@ mod tests {
             active: std::sync::atomic::AtomicBool::new(false),
             activity_monitor_running: std::sync::atomic::AtomicBool::new(true),
             next_id: AtomicU64::new(1),
+            idempotency_store: None,
             supervisor_handle: test_supervisor_handle(),
         });
 
@@ -621,6 +948,7 @@ mod tests {
             active: std::sync::atomic::AtomicBool::new(false),
             activity_monitor_running: std::sync::atomic::AtomicBool::new(false),
             next_id: AtomicU64::new(1),
+            idempotency_store: None,
             supervisor_handle: test_supervisor_handle(),
         });
 
@@ -667,6 +995,7 @@ mod tests {
             active: std::sync::atomic::AtomicBool::new(false),
             activity_monitor_running: std::sync::atomic::AtomicBool::new(false),
             next_id: AtomicU64::new(1),
+            idempotency_store: None,
             supervisor_handle: test_supervisor_handle(),
         });
 
@@ -772,6 +1101,7 @@ mod tests {
             active: std::sync::atomic::AtomicBool::new(false),
             activity_monitor_running: std::sync::atomic::AtomicBool::new(false),
             next_id: AtomicU64::new(1),
+            idempotency_store: None,
             supervisor_handle: test_supervisor_handle(),
         });
 
@@ -847,6 +1177,7 @@ mod tests {
             active: std::sync::atomic::AtomicBool::new(false),
             activity_monitor_running: std::sync::atomic::AtomicBool::new(false),
             next_id: AtomicU64::new(1),
+            idempotency_store: None,
             supervisor_handle: test_supervisor_handle(),
         });
 
@@ -894,6 +1225,13 @@ mod tests {
 
     fn parse_json_rpc_message(message: &str) -> Value {
         serde_json::from_str(message).expect("JSON-RPC message should be valid JSON")
+    }
+
+    fn pi_fingerprint(operation: IdempotencyOperation, scenario: &str) -> RequestFingerprint {
+        let mut fields = BTreeMap::new();
+        fields.insert("scenario".to_string(), json!(scenario));
+        RequestFingerprint::from_fields(AgentRuntimeId::Pi, operation, fields)
+            .expect("fingerprint should encode")
     }
 
     fn write_session_file(path: &std::path::Path, id: &str, cwd: &str) {

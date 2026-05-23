@@ -9,6 +9,10 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+use crate::pi_proxy::idempotency::{
+    PiIdempotencyAction, PiProxyIdempotency, StartedPiOperation, StoredPiProxyResponse,
+    complete_pi_idempotency, prepare_pi_idempotency,
+};
 use crate::pi_proxy::{PiProxyError, PiProxyState, session};
 
 #[derive(Debug, Deserialize)]
@@ -40,8 +44,8 @@ struct JsonRpcSuccessResponse {
 }
 
 pub(super) fn handle_json_rpc_request(state: &Arc<PiProxyState>, payload: &str) -> Vec<String> {
-    let request = match serde_json::from_str::<JsonRpcRequest>(payload) {
-        Ok(request) => request,
+    let request_payload = match serde_json::from_str::<Value>(payload) {
+        Ok(payload) => payload,
         Err(error) => {
             return vec![render_json_rpc_error(
                 Value::Null,
@@ -50,6 +54,49 @@ pub(super) fn handle_json_rpc_request(state: &Arc<PiProxyState>, payload: &str) 
             )];
         }
     };
+    let request = match serde_json::from_value::<JsonRpcRequest>(request_payload.clone()) {
+        Ok(request) => request,
+        Err(error) => {
+            return vec![render_json_rpc_error(
+                request_payload.get("id").cloned().unwrap_or(Value::Null),
+                -32_700,
+                format!("Invalid JSON-RPC request: {error}"),
+            )];
+        }
+    };
+    let idempotency = match request_payload.get("idempotency") {
+        Some(value) => match serde_json::from_value::<PiProxyIdempotency>(value.clone()) {
+            Ok(idempotency) => Some(idempotency),
+            Err(error) => {
+                return vec![render_json_rpc_error(
+                    request.id,
+                    -32_001,
+                    format!("Pi idempotency envelope is invalid: {error}"),
+                )];
+            }
+        },
+        None => None,
+    };
+    let idempotency_action = prepare_pi_idempotency(
+        idempotency.as_ref(),
+        request.method.as_str(),
+        state.idempotency_store.as_ref(),
+    );
+    let started_idempotency = match idempotency_action {
+        PiIdempotencyAction::Disabled => None,
+        PiIdempotencyAction::Forward(started) => Some(started),
+        PiIdempotencyAction::Replay(response) => {
+            let mut payload = response.payload;
+            if let Some(object) = payload.as_object_mut() {
+                object.insert("id".to_string(), request.id);
+            }
+            return vec![payload.to_string()];
+        }
+        PiIdempotencyAction::Reject { message } => {
+            return vec![render_json_rpc_error(request.id, -32_001, message)];
+        }
+    };
+
     let mut captured_events = Vec::new();
     let result = match handle_pi_method(state, &request, &mut captured_events) {
         Ok(result) => JsonRpcSuccessResponse {
@@ -58,19 +105,44 @@ pub(super) fn handle_json_rpc_request(state: &Arc<PiProxyState>, payload: &str) 
             result,
         },
         Err(error) => {
-            return vec![render_json_rpc_error(
-                request.id,
-                -32_000,
-                error.to_string(),
-            )];
+            let response = json!({
+                "jsonrpc": "2.0",
+                "id": request.id,
+                "error": {
+                    "code": -32_000,
+                    "message": error.to_string()
+                }
+            });
+            if let Err(error) =
+                complete_idempotency_if_started(state, started_idempotency, response.clone())
+            {
+                return vec![render_json_rpc_error(
+                    Value::Null,
+                    -32_000,
+                    error.to_string(),
+                )];
+            }
+            return vec![response.to_string()];
         }
     };
     let mut responses: Vec<String> = captured_events
         .into_iter()
         .map(render_pi_event_json_rpc_notification)
         .collect();
-    match serde_json::to_string(&result) {
-        Ok(response) => responses.push(response),
+    match serde_json::to_value(&result) {
+        Ok(response) => {
+            if let Err(error) =
+                complete_idempotency_if_started(state, started_idempotency, response.clone())
+            {
+                responses.push(render_json_rpc_error(
+                    Value::Null,
+                    -32_000,
+                    error.to_string(),
+                ));
+                return responses;
+            }
+            responses.push(response.to_string());
+        }
         Err(error) => responses.push(render_json_rpc_error(
             Value::Null,
             -32_000,
@@ -78,6 +150,31 @@ pub(super) fn handle_json_rpc_request(state: &Arc<PiProxyState>, payload: &str) 
         )),
     }
     responses
+}
+
+fn complete_idempotency_if_started(
+    state: &Arc<PiProxyState>,
+    started: Option<StartedPiOperation>,
+    response: Value,
+) -> Result<(), PiProxyError> {
+    let (Some(started), Some(store)) = (started, state.idempotency_store.as_ref()) else {
+        return Ok(());
+    };
+    let provider_conversation_id = match started.method() {
+        "pi/createConversation" => response["result"]["providerConversationId"]
+            .as_str()
+            .map(ToString::to_string),
+        "pi/prompt" | "pi/steer" | "pi/followUp" => response["result"]["sessionFile"]
+            .as_str()
+            .map(ToString::to_string),
+        _ => None,
+    };
+    complete_pi_idempotency(
+        store,
+        started,
+        StoredPiProxyResponse { payload: response },
+        provider_conversation_id,
+    )
 }
 
 pub(super) fn render_pi_event_json_rpc_notification(event: Value) -> String {

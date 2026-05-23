@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 
 use crate::keepalive::KeepaliveManager;
+use crate::pi_proxy::idempotency::SharedIdempotencyStore;
 use crate::pi_proxy::json_rpc::render_pi_event_json_rpc_notification;
 use crate::pi_proxy::rpc_process::{PiRpcChild, PiRpcOutput};
 use crate::pi_proxy::{PiProxyConfig, PiProxyError};
@@ -29,6 +30,7 @@ pub(super) struct PiProxyState {
     pub(super) active: AtomicBool,
     pub(super) activity_monitor_running: AtomicBool,
     pub(super) next_id: AtomicU64,
+    pub(super) idempotency_store: Option<SharedIdempotencyStore>,
     pub(super) supervisor_handle: SandboxdSupervisorHandle,
 }
 
