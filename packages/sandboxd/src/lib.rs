@@ -26,6 +26,7 @@ pub mod command;
 pub mod control;
 pub mod daemon_liveness;
 pub mod egress_proxy;
+pub mod idempotency;
 pub mod init;
 pub mod keepalive;
 pub mod opencode_proxy;
