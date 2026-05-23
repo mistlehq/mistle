@@ -72,6 +72,7 @@ import {
   SandboxProfileEditorShell,
   SandboxProfileEditorView,
   SandboxProfileSetupScriptPanel,
+  resolveSandboxProfileEditorRefetchInterval,
   resolveSelectedSandboxProfileAgentRuntimeId,
 } from "./sandbox-profile-editor-page.js";
 
@@ -2439,6 +2440,82 @@ describe("SandboxProfileEditorPage", () => {
         }),
       ]),
     ).toBe(true);
+  });
+
+  it("does not poll profile editor queries when profile detail is unavailable despite cached snapshot work", () => {
+    expect(
+      resolveSandboxProfileEditorRefetchInterval({
+        profileError: new HttpApiError({
+          operation: "getSandboxProfile",
+          status: 404,
+          body: null,
+          message: "Could not load sandbox profile.",
+        }),
+        profileVersionsError: null,
+        versions: [
+          createSandboxProfileVersionFixture({
+            sandboxProfileId: "sbp_test",
+            version: 1,
+            state: "published",
+            isActive: true,
+            usable: true,
+            latestSnapshotJob: createRunningSnapshotJobFixture({
+              id: "ssj_refresh_materialization",
+              trigger: "manual_refresh",
+            }),
+          }),
+        ],
+      }),
+    ).toBe(false);
+  });
+
+  it("does not poll profile editor queries when profile versions are unavailable despite cached snapshot work", () => {
+    expect(
+      resolveSandboxProfileEditorRefetchInterval({
+        profileError: null,
+        profileVersionsError: new HttpApiError({
+          operation: "listSandboxProfileVersions",
+          status: 404,
+          body: null,
+          message: "Could not load sandbox profile versions.",
+        }),
+        versions: [
+          createSandboxProfileVersionFixture({
+            sandboxProfileId: "sbp_test",
+            version: 1,
+            state: "published",
+            isActive: false,
+            usable: false,
+            latestSnapshotJob: createRunningSnapshotJobFixture({
+              id: "ssj_pending_initial_materialization",
+              trigger: "publish",
+            }),
+          }),
+        ],
+      }),
+    ).toBe(false);
+  });
+
+  it("polls profile editor queries while snapshot work is in progress and primary reads are available", () => {
+    expect(
+      resolveSandboxProfileEditorRefetchInterval({
+        profileError: null,
+        profileVersionsError: null,
+        versions: [
+          createSandboxProfileVersionFixture({
+            sandboxProfileId: "sbp_test",
+            version: 1,
+            state: "published",
+            isActive: true,
+            usable: true,
+            latestSnapshotJob: createRunningSnapshotJobFixture({
+              id: "ssj_refresh_materialization",
+              trigger: "manual_refresh",
+            }),
+          }),
+        ],
+      }),
+    ).toBe(3_000);
   });
 
   it("redirects the draft route to published when the draft is gone but a published version exists", () => {
