@@ -5,9 +5,10 @@
 //! listener. Transparent-proxy startup health is handled by the outer proxy
 //! module.
 
-use std::io::Write;
+use std::io::{self, Write};
 use std::net::{SocketAddr, TcpListener as StdTcpListener};
-use std::os::fd::AsRawFd;
+use std::os::fd::{AsRawFd, RawFd};
+use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
@@ -19,7 +20,6 @@ use std::time::{Duration, Instant};
 use serde_json::Value;
 use tokio::sync::oneshot;
 
-use crate::bootstrap::clear_close_on_exec;
 use crate::egress_proxy::routing::EgressProxyRoute;
 #[cfg(test)]
 use crate::egress_proxy::run_proxy_server;
@@ -196,13 +196,18 @@ pub(super) fn spawn_active_egress_proxy_child_process(
     config: &EgressProxyProcessSupervisorConfig,
 ) -> Result<ActiveEgressProxyChildProcess, EgressProxyError> {
     let (parent_token_stream, child_token_stream) = create_token_bridge_pair()?;
-    clear_close_on_exec(child_token_stream.as_raw_fd())
-        .map_err(|error| EgressProxyError::new(error.to_string()))?;
+    set_close_on_exec_before_spawn(child_token_stream.as_raw_fd())?;
     let prepared_proxy_ca = prepare_proxy_ca_runtime(&GeneratedProxyCa {
         certificate_pem: config.state.proxy_ca_certificate_pem.as_ref().clone(),
         private_key_pem: config.state.proxy_ca_private_key_pem.as_ref().clone(),
     })
     .map_err(|error| EgressProxyError::new(error.to_string()))?;
+    let proxy_ca_certificate_fd = prepared_proxy_ca
+        .certificate_fd()
+        .map_err(|error| EgressProxyError::new(error.to_string()))?;
+    let proxy_ca_private_key_fd = prepared_proxy_ca
+        .private_key_fd()
+        .map_err(|error| EgressProxyError::new(error.to_string()))?;
 
     let routes = config
         .state
@@ -227,33 +232,50 @@ pub(super) fn spawn_active_egress_proxy_child_process(
             "tunnelGatewayWsUrl": config.tunnel_gateway_ws_url,
             "tokenBridgeFd": child_token_stream.as_raw_fd(),
             "routes": serialize_child_routes(&routes),
-            "proxyCaCertificateFd": prepared_proxy_ca.certificate_fd().map_err(|error| EgressProxyError::new(error.to_string()))?,
-            "proxyCaPrivateKeyFd": prepared_proxy_ca.private_key_fd().map_err(|error| EgressProxyError::new(error.to_string()))?
+            "proxyCaCertificateFd": proxy_ca_certificate_fd,
+            "proxyCaPrivateKeyFd": proxy_ca_private_key_fd
         }),
     )
-    .map_err(|error| EgressProxyError::new(format!("failed to write egress proxy child config: {error}")))?;
+    .map_err(|error| {
+        EgressProxyError::new(format!(
+            "failed to write egress proxy child config: {error}"
+        ))
+    })?;
     config_file.flush().map_err(|error| {
         EgressProxyError::new(format!(
             "failed to flush egress proxy child config: {error}"
         ))
     })?;
 
+    let child_inherited_fds = [
+        child_token_stream.as_raw_fd(),
+        proxy_ca_certificate_fd,
+        proxy_ca_private_key_fd,
+    ];
     let token_bridge =
         EgressTokenBridgeServer::start(parent_token_stream, config.token_provider.clone())?;
-    let child = Command::new(&config.child_binary_path)
+    let mut child_command = Command::new(&config.child_binary_path);
+    child_command
         .arg("egress-proxy")
         .arg("--config")
         .arg(config_file.path())
         .stdin(Stdio::null())
         .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .map_err(|error| {
-            EgressProxyError::new(format!(
-                "failed to spawn local egress proxy child '{}': {error}",
-                config.child_binary_path.display()
-            ))
-        })?;
+        .stderr(Stdio::inherit());
+    unsafe {
+        child_command.pre_exec(move || {
+            for fd in child_inherited_fds {
+                clear_close_on_exec_before_child_exec(fd)?;
+            }
+            Ok(())
+        });
+    }
+    let child = child_command.spawn().map_err(|error| {
+        EgressProxyError::new(format!(
+            "failed to spawn local egress proxy child '{}': {error}",
+            config.child_binary_path.display()
+        ))
+    })?;
     drop(child_token_stream);
     drop(prepared_proxy_ca);
 
@@ -276,6 +298,38 @@ fn serialize_child_routes(routes: &[EgressProxyRoute]) -> Vec<serde_json::Value>
             })
         })
         .collect()
+}
+
+fn set_close_on_exec_before_spawn(fd: RawFd) -> Result<(), EgressProxyError> {
+    update_close_on_exec(fd, true).map_err(|error| {
+        EgressProxyError::new(format!("failed to set close-on-exec for fd {fd}: {error}"))
+    })
+}
+
+fn clear_close_on_exec_before_child_exec(fd: RawFd) -> io::Result<()> {
+    update_close_on_exec(fd, false)
+}
+
+fn update_close_on_exec(fd: RawFd, close_on_exec: bool) -> io::Result<()> {
+    if fd < 0 {
+        return Err(io::Error::from_raw_os_error(nix::libc::EINVAL));
+    }
+
+    let current_flags = unsafe { nix::libc::fcntl(fd, nix::libc::F_GETFD) };
+    if current_flags < 0 {
+        return Err(io::Error::last_os_error());
+    }
+
+    let updated_flags = if close_on_exec {
+        current_flags | nix::libc::FD_CLOEXEC
+    } else {
+        current_flags & !nix::libc::FD_CLOEXEC
+    };
+    if unsafe { nix::libc::fcntl(fd, nix::libc::F_SETFD, updated_flags) } < 0 {
+        return Err(io::Error::last_os_error());
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

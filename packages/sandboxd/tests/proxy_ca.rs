@@ -115,8 +115,8 @@ fn prepares_proxy_ca_runtime_with_pipe_backed_fds() {
     .expect("expected certificate fd flags read to succeed");
     let flags = FdFlag::from_bits_truncate(flags_bits);
     assert!(
-        !flags.contains(FdFlag::FD_CLOEXEC),
-        "expected certificate fd to clear close-on-exec"
+        flags.contains(FdFlag::FD_CLOEXEC),
+        "expected certificate fd to remain close-on-exec until the child pre-exec handoff"
     );
 }
 

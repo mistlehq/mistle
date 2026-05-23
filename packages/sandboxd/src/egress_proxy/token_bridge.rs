@@ -16,6 +16,8 @@ use serde::{Deserialize, Serialize};
 use crate::egress_proxy::EgressProxyError;
 use crate::tunnel::session::{GatewayEgressTokenProvider, TunnelEgressToken};
 
+const EGRESS_TOKEN_BRIDGE_MAX_FRAME_BYTES: usize = 64 * 1024;
+
 #[derive(Clone)]
 pub(super) struct EgressTokenBridgeClient {
     stream: Arc<Mutex<UnixStream>>,
@@ -209,7 +211,12 @@ fn read_json_line<T: for<'de> Deserialize<'de>>(
                 ));
             }
             Ok(_) if byte[0] == b'\n' => break,
-            Ok(_) => line.push(byte[0]),
+            Ok(_) if line.len() < EGRESS_TOKEN_BRIDGE_MAX_FRAME_BYTES => line.push(byte[0]),
+            Ok(_) => {
+                return Err(EgressProxyError::new(format!(
+                    "egress token bridge frame exceeds {EGRESS_TOKEN_BRIDGE_MAX_FRAME_BYTES} bytes"
+                )));
+            }
             Err(error) => {
                 return Err(EgressProxyError::new(format!(
                     "failed to read token bridge stream: {error}"
@@ -221,4 +228,68 @@ fn read_json_line<T: for<'de> Deserialize<'de>>(
     serde_json::from_slice(&line).map_err(|error| {
         EgressProxyError::new(format!("failed to parse token bridge json: {error}"))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Write;
+    use std::os::unix::net::UnixStream;
+    use std::thread;
+
+    use crate::egress_proxy::token_bridge::{
+        EGRESS_TOKEN_BRIDGE_MAX_FRAME_BYTES, EgressTokenBridgeRequest, read_json_line,
+    };
+
+    #[test]
+    fn read_json_line_rejects_frames_that_exceed_the_protocol_limit() {
+        let (mut writer, mut reader) =
+            UnixStream::pair().expect("token bridge pair should be created");
+        let writer_thread = thread::spawn(move || {
+            writer
+                .write_all(&vec![b'x'; EGRESS_TOKEN_BRIDGE_MAX_FRAME_BYTES + 1])
+                .expect("oversized token bridge frame should write");
+        });
+
+        let error = read_json_line::<EgressTokenBridgeRequest>(&mut reader)
+            .expect_err("oversized token bridge frame should be rejected");
+        writer_thread
+            .join()
+            .expect("oversized frame writer should finish");
+
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "egress token bridge frame exceeds {EGRESS_TOKEN_BRIDGE_MAX_FRAME_BYTES} bytes"
+            )
+        );
+    }
+
+    #[test]
+    fn read_json_line_accepts_frames_at_the_protocol_limit() {
+        let (mut writer, mut reader) =
+            UnixStream::pair().expect("token bridge pair should be created");
+        let frame_prefix = "{\"type\":\"egressToken.request\",\"request_id\":\"";
+        let frame_suffix = "\"}\n";
+        let request_id = "x".repeat(
+            EGRESS_TOKEN_BRIDGE_MAX_FRAME_BYTES - frame_prefix.len() - frame_suffix.len() + 1,
+        );
+        let frame = format!("{frame_prefix}{request_id}{frame_suffix}");
+        assert_eq!(frame.len(), EGRESS_TOKEN_BRIDGE_MAX_FRAME_BYTES + 1);
+        let writer_thread = thread::spawn(move || {
+            writer
+                .write_all(frame.as_bytes())
+                .expect("limit-sized token bridge frame should write");
+        });
+
+        let request = read_json_line::<EgressTokenBridgeRequest>(&mut reader)
+            .expect("limit-sized token bridge frame should parse");
+        writer_thread
+            .join()
+            .expect("limit-sized frame writer should finish");
+
+        assert!(matches!(
+            request,
+            EgressTokenBridgeRequest::Request { request_id: parsed_request_id } if parsed_request_id == request_id
+        ));
+    }
 }

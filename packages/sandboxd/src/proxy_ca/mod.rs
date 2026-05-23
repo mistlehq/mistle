@@ -251,7 +251,7 @@ pub fn issue_proxy_leaf_certificate(
     })
 }
 
-/// Materializes one PEM payload onto an inherited read fd.
+/// Materializes one PEM payload onto a read fd that can be inherited by a child.
 fn prepare_proxy_ca_fd_payload(name: &str, payload: &str) -> Result<OwnedFd, ProxyCaError> {
     if payload.trim().is_empty() {
         return Err(ProxyCaError::new(format!("{name} must not be empty")));
@@ -260,8 +260,8 @@ fn prepare_proxy_ca_fd_payload(name: &str, payload: &str) -> Result<OwnedFd, Pro
     let (read_fd, write_fd) = pipe()
         .map_err(|error| ProxyCaError::new(format!("failed to create {name} pipe: {error}")))?;
 
-    // Keep the proxy CA material on inherited descriptors so the future runtime
-    // handoff can pass it across exec without persisting secrets to disk.
+    // Keep the proxy CA material on descriptors so the future runtime handoff can
+    // pass it across exec without persisting secrets to disk.
     let mut remaining_payload = payload.as_bytes();
     while !remaining_payload.is_empty() {
         match write(&write_fd, remaining_payload) {
@@ -282,21 +282,25 @@ fn prepare_proxy_ca_fd_payload(name: &str, payload: &str) -> Result<OwnedFd, Pro
     }
 
     drop(write_fd);
-
-    let flags_bits = fcntl(&read_fd, FcntlArg::F_GETFD)
-        .map_err(|error| ProxyCaError::new(format!("failed to read {name} fd flags: {error}")))?;
-    let flags = FdFlag::from_bits_truncate(flags_bits);
-    let updated_flags = flags & !FdFlag::FD_CLOEXEC;
-    fcntl(&read_fd, FcntlArg::F_SETFD(updated_flags)).map_err(|error| {
-        ProxyCaError::new(format!(
-            "failed to clear close-on-exec for {name} fd: {error}"
-        ))
-    })?;
+    set_close_on_exec(&read_fd, name)?;
 
     Ok(read_fd)
 }
 
-/// Prepares the generated CA material for runtime exec handoff via inherited fds.
+fn set_close_on_exec(fd: &OwnedFd, name: &str) -> Result<(), ProxyCaError> {
+    let flags_bits = fcntl(fd, FcntlArg::F_GETFD)
+        .map_err(|error| ProxyCaError::new(format!("failed to read {name} fd flags: {error}")))?;
+    let flags = FdFlag::from_bits_truncate(flags_bits);
+    fcntl(fd, FcntlArg::F_SETFD(flags | FdFlag::FD_CLOEXEC)).map_err(|error| {
+        ProxyCaError::new(format!(
+            "failed to set close-on-exec for {name} fd: {error}"
+        ))
+    })?;
+
+    Ok(())
+}
+
+/// Prepares the generated CA material for runtime exec handoff via fds.
 pub fn prepare_proxy_ca_runtime(
     generated_proxy_ca: &GeneratedProxyCa,
 ) -> Result<PreparedProxyCaRuntime, ProxyCaError> {
