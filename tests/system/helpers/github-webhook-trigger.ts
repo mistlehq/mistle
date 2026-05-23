@@ -90,8 +90,26 @@ const WebhookTriggerResponseSchema = z.looseObject({
   id: z.string().min(1),
 });
 
-const StartRedirectConnectionResponseSchema = z.looseObject({
-  authorizationUrl: z.url(),
+const StartGitHubAppInstallationResponseSchema = z.discriminatedUnion("kind", [
+  z.looseObject({
+    kind: z.literal("redirect"),
+    authorizationUrl: z.url(),
+  }),
+  z.looseObject({
+    kind: z.literal("completed"),
+  }),
+  z.looseObject({
+    kind: z.literal("installation-selection"),
+    options: z.array(
+      z.looseObject({
+        installationId: z.string().min(1),
+      }),
+    ),
+  }),
+]);
+
+const SelectedGitHubAppInstallationResponseSchema = z.looseObject({
+  connectionId: z.string().min(1),
 });
 
 const RefreshIntegrationConnectionResourcesResponseSchema = z
@@ -1443,45 +1461,81 @@ async function completeGitHubInstallation(input: {
   githubConnectionId: string;
   githubInstallationId: string;
 }): Promise<void> {
-  const githubOauthStart = await requestJsonOrThrow({
+  const githubInstallationStart = await requestJsonOrThrow({
     request: input.fixture.request,
     path: `/v1/integration/connections/${encodeURIComponent(input.githubConnectionId)}/setup/github-app-installation/start`,
     expectedStatus: 200,
     description: "GitHub App installation start",
-    schema: StartRedirectConnectionResponseSchema,
+    schema: StartGitHubAppInstallationResponseSchema,
     init: {
       method: "POST",
       headers: {
+        "content-type": "application/json",
         cookie: input.session.cookie,
       },
+      body: JSON.stringify({}),
     },
   });
-  const githubOauthState = new URL(githubOauthStart.authorizationUrl).searchParams.get("state");
-  if (githubOauthState === null || githubOauthState.length === 0) {
-    throw new Error("Expected GitHub App installation start response to include a state.");
+
+  if (githubInstallationStart.kind === "redirect") {
+    const githubOauthState = new URL(githubInstallationStart.authorizationUrl).searchParams.get(
+      "state",
+    );
+    if (githubOauthState === null || githubOauthState.length === 0) {
+      throw new Error("Expected GitHub App installation start response to include a state.");
+    }
+
+    const githubAppInstallationCompleteResponse = await input.fixture.request(
+      createGitHubAppInstallationCompletePath({
+        query: {
+          state: githubOauthState,
+          installation_id: input.githubInstallationId,
+          setup_action: "install",
+        },
+      }),
+      {
+        method: "GET",
+        headers: {
+          cookie: input.session.cookie,
+        },
+        redirect: "manual",
+      },
+    );
+    if (githubAppInstallationCompleteResponse.status !== 302) {
+      const errorBody = await githubAppInstallationCompleteResponse.text().catch(() => "");
+      throw new Error(
+        `GitHub App installation completion expected status 302, got ${String(githubAppInstallationCompleteResponse.status)}. Response body: ${errorBody}`,
+      );
+    }
   }
 
-  const githubAppInstallationCompleteResponse = await input.fixture.request(
-    createGitHubAppInstallationCompletePath({
-      query: {
-        state: githubOauthState,
-        installation_id: input.githubInstallationId,
-        setup_action: "install",
-      },
-    }),
-    {
-      method: "GET",
-      headers: {
-        cookie: input.session.cookie,
-      },
-      redirect: "manual",
-    },
-  );
-  if (githubAppInstallationCompleteResponse.status !== 302) {
-    const errorBody = await githubAppInstallationCompleteResponse.text().catch(() => "");
-    throw new Error(
-      `GitHub App installation completion expected status 302, got ${String(githubAppInstallationCompleteResponse.status)}. Response body: ${errorBody}`,
+  if (githubInstallationStart.kind === "installation-selection") {
+    const selectedInstallation = githubInstallationStart.options.find(
+      (option) => option.installationId === input.githubInstallationId,
     );
+    if (selectedInstallation === undefined) {
+      throw new Error(
+        `GitHub App installation start did not include expected installation '${input.githubInstallationId}' in the installation selection response.`,
+      );
+    }
+
+    await requestJsonOrThrow({
+      request: input.fixture.request,
+      path: `/v1/integration/connections/${encodeURIComponent(input.githubConnectionId)}/setup/github-app-installation/select-installation`,
+      expectedStatus: 200,
+      description: "GitHub App installation selection",
+      schema: SelectedGitHubAppInstallationResponseSchema,
+      init: {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: input.session.cookie,
+        },
+        body: JSON.stringify({
+          installationId: input.githubInstallationId,
+        }),
+      },
+    });
   }
 
   await waitForCondition({
