@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::mpsc;
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::{Map, Value};
 
@@ -131,20 +131,18 @@ fn run_liveness_sampler(
     config: DaemonLivenessConfig,
     shutdown_receiver: mpsc::Receiver<()>,
 ) -> Result<(), String> {
-    let interval_ms = duration_millis(config.sample_interval);
     let threshold_ms = duration_millis(config.lag_threshold);
-    let mut expected_wake_ms = clock.now_ms().saturating_add(interval_ms);
     let mut state = DaemonLivenessState::default();
 
     loop {
+        let sleep_started_at = Instant::now();
         match shutdown_receiver.recv_timeout(config.sample_interval) {
             Ok(()) | Err(mpsc::RecvTimeoutError::Disconnected) => break,
             Err(mpsc::RecvTimeoutError::Timeout) => {}
         }
 
         let now_ms = clock.now_ms();
-        let lag_ms = now_ms.saturating_sub(expected_wake_ms);
-        expected_wake_ms = now_ms.saturating_add(interval_ms);
+        let lag_ms = elapsed_lag_ms(sleep_started_at.elapsed(), config.sample_interval);
 
         let mut sample = collect_liveness_sample(&config, now_ms, lag_ms, threshold_ms);
         let action = state.evaluate(&mut sample);
@@ -158,14 +156,15 @@ fn run_liveness_sampler(
                     sample.lag_ms,
                     sample.threshold_ms,
                 );
-                append_liveness_journal_event(
-                    &config.journal_path,
+                record_liveness_journal_edge(
+                    &supervisor_handle,
+                    config.journal_path.as_path(),
                     clock.as_ref(),
                     supervisor_handle.sandbox_instance_id(),
                     "warn",
                     "daemon_liveness_lag_detected",
                     &sample,
-                )?;
+                );
             }
             DaemonLivenessAction::Recovered => {
                 supervisor_handle.record_daemon_liveness_recovered(
@@ -173,19 +172,52 @@ fn run_liveness_sampler(
                     sample.lag_ms,
                     sample.threshold_ms,
                 );
-                append_liveness_journal_event(
-                    &config.journal_path,
+                record_liveness_journal_edge(
+                    &supervisor_handle,
+                    config.journal_path.as_path(),
                     clock.as_ref(),
                     supervisor_handle.sandbox_instance_id(),
                     "info",
                     "daemon_liveness_recovered",
                     &sample,
-                )?;
+                );
             }
         }
     }
 
     Ok(())
+}
+
+fn record_liveness_journal_edge(
+    supervisor_handle: &SandboxdSupervisorHandle,
+    journal_path: &Path,
+    clock: &dyn Clock,
+    sandbox_instance_id: &str,
+    level: &str,
+    event: &str,
+    sample: &DaemonLivenessSample,
+) {
+    match append_liveness_journal_event(
+        journal_path,
+        clock,
+        sandbox_instance_id,
+        level,
+        event,
+        sample,
+    ) {
+        Ok(()) => supervisor_handle.remove_component_detail(
+            crate::supervision::SupervisedComponent::Sandboxd,
+            "lastJournalError",
+        ),
+        Err(error) => {
+            eprintln!("sandboxd failed to append liveness journal event '{event}': {error}");
+            supervisor_handle.set_component_detail(
+                crate::supervision::SupervisedComponent::Sandboxd,
+                "lastJournalError",
+                error,
+            );
+        }
+    }
 }
 
 fn collect_liveness_sample(
@@ -463,6 +495,10 @@ fn duration_millis(duration: Duration) -> u64 {
     duration.as_millis().try_into().unwrap_or(u64::MAX)
 }
 
+fn elapsed_lag_ms(elapsed: Duration, expected_interval: Duration) -> u64 {
+    duration_millis(elapsed.saturating_sub(expected_interval))
+}
+
 fn liveness_journal_path() -> PathBuf {
     std::env::var_os(LIVENESS_JOURNAL_PATH_ENV)
         .map(PathBuf::from)
@@ -471,13 +507,18 @@ fn liveness_journal_path() -> PathBuf {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
     use std::path::PathBuf;
+    use std::sync::Arc;
+    use std::time::Duration;
 
     use crate::daemon_liveness::{
         DaemonLivenessAction, DaemonLivenessConfig, DaemonLivenessSample, DaemonLivenessState,
-        append_liveness_journal_event, collect_liveness_sample, parse_cgroup_v2_path,
-        parse_memory_events, parse_process_status,
+        append_liveness_journal_event, collect_liveness_sample, elapsed_lag_ms,
+        parse_cgroup_v2_path, parse_memory_events, parse_process_status,
+        record_liveness_journal_edge,
     };
+    use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
     use crate::time::testing::MutableClock;
 
     #[test]
@@ -580,6 +621,48 @@ mod tests {
         assert_eq!(record["event"], "daemon_liveness_lag_detected");
         assert_eq!(record["sandboxInstanceId"], "sbi_123");
         assert_eq!(record["lagMs"], 40_000);
+    }
+
+    #[test]
+    fn scheduler_lag_uses_elapsed_monotonic_time() {
+        assert_eq!(
+            elapsed_lag_ms(Duration::from_millis(10_005), Duration::from_secs(10)),
+            5
+        );
+        assert_eq!(
+            elapsed_lag_ms(Duration::from_millis(9_995), Duration::from_secs(10)),
+            0
+        );
+    }
+
+    #[test]
+    fn journal_append_errors_are_recorded_without_failing_the_edge() {
+        let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
+        let clock = Arc::new(MutableClock::new(104));
+        let supervisor_handle = SandboxdSupervisorHandle::new(
+            "sbi_123",
+            clock.clone(),
+            BTreeSet::from([SupervisedComponent::Sandboxd]),
+        );
+        let sample = sample_with_lag(40_000);
+
+        record_liveness_journal_edge(
+            &supervisor_handle,
+            temp_dir.path(),
+            clock.as_ref(),
+            "sbi_123",
+            "warn",
+            "daemon_liveness_lag_detected",
+            &sample,
+        );
+
+        let snapshot = supervisor_handle
+            .component_snapshot(SupervisedComponent::Sandboxd)
+            .expect("sandboxd component should be tracked");
+        assert!(
+            snapshot.details.contains_key("lastJournalError"),
+            "journal write failure should remain visible in health details"
+        );
     }
 
     fn sample_with_lag(lag_ms: u64) -> DaemonLivenessSample {
