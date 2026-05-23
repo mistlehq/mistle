@@ -21,6 +21,10 @@ import {
   persistConversationProviderDeliveryResult,
   seedDeliveredSandboxInstanceTitle,
 } from "./deliver-conversation-trigger-payload.js";
+import {
+  createConversationIdempotencyMetadata,
+  submitPayloadIdempotencyMetadata,
+} from "./delivery-idempotency.js";
 import { ensureConversationDeliverySandbox } from "./ensure-conversation-delivery-sandbox.js";
 import {
   createConversationProviderDeliveryConversation,
@@ -57,6 +61,28 @@ export const DurableTriggerConversationDeliveryStepPrefixes = {
   MARK_RUN_COMPLETED: "mark-automation-run-completed",
   MARK_RUN_FAILED: "mark-automation-run-failed",
 } as const;
+
+const SingleAttemptDeliveryStepRetryPolicy = {
+  maximumAttempts: 1,
+} as const;
+
+const IdempotentProviderDeliveryStepRetryPolicy = {
+  maximumAttempts: 3,
+} as const;
+
+function resolveProviderCreateConversationRetryPolicy(input: {
+  runtimeId: string;
+}): typeof IdempotentProviderDeliveryStepRetryPolicy | typeof SingleAttemptDeliveryStepRetryPolicy {
+  switch (input.runtimeId) {
+    case "codex":
+    case "pi":
+      return IdempotentProviderDeliveryStepRetryPolicy;
+    case "opencode":
+      return SingleAttemptDeliveryStepRetryPolicy;
+    default:
+      return SingleAttemptDeliveryStepRetryPolicy;
+  }
+}
 
 export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlaneWorkflow(
   HandleTriggerConversationDeliveryWorkflowSpec,
@@ -308,9 +334,7 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
               prefix: DurableTriggerConversationDeliveryStepPrefixes.BEGIN_PAYLOAD_DELIVERY,
               taskId: activeTask.taskId,
             }),
-            retryPolicy: {
-              maximumAttempts: 1,
-            },
+            retryPolicy: SingleAttemptDeliveryStepRetryPolicy,
           },
           async () =>
             beginConversationTriggerPayloadDelivery(
@@ -330,9 +354,7 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
               prefix: DurableTriggerConversationDeliveryStepPrefixes.LOAD_OR_CREATE_ROUTE,
               taskId: activeTask.taskId,
             }),
-            retryPolicy: {
-              maximumAttempts: 1,
-            },
+            retryPolicy: SingleAttemptDeliveryStepRetryPolicy,
           },
           async () =>
             loadOrCreateTriggerConversationDeliveryRoute(
@@ -357,6 +379,8 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
           acquiredTriggerConnection,
           activeRoute: loadedRoute.activeRoute,
         });
+        const createConversationIdempotency =
+          createConversationIdempotencyMetadata(providerDeliveryInput);
 
         const createdProviderConversation = await step.run(
           {
@@ -364,11 +388,37 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
               prefix: DurableTriggerConversationDeliveryStepPrefixes.CREATE_PROVIDER_CONVERSATION,
               taskId: activeTask.taskId,
             }),
-            retryPolicy: {
-              maximumAttempts: 1,
-            },
+            retryPolicy: resolveProviderCreateConversationRetryPolicy({
+              runtimeId: resolvedTriggerConversationRoute.runtimeId,
+            }),
           },
-          async () => createConversationProviderDeliveryConversation(providerDeliveryInput),
+          async () =>
+            withTriggerConversationDeliverySpan(
+              {
+                name: "trigger_conversation_delivery.provider.create_conversation",
+                telemetryContext: {
+                  triggerRunId: preparedTriggerRun.triggerRunId,
+                  conversationId: preparedTriggerRun.conversationId,
+                  deliveryTaskId: activeTask.taskId,
+                  routeId: loadedRoute.activeRoute.id,
+                  sandboxInstanceId: ensuredTriggerSandbox.sandboxInstanceId,
+                  webhookEventId: preparedTriggerRun.webhookEventId,
+                  workflowRunId,
+                },
+              },
+              async (span) => {
+                span.setAttributes({
+                  "mistle.provider.idempotency_key": createConversationIdempotency.key,
+                  "mistle.provider.idempotency_operation": createConversationIdempotency.operation,
+                  "mistle.provider.idempotency_request_fingerprint":
+                    createConversationIdempotency.requestFingerprint,
+                });
+                const result =
+                  await createConversationProviderDeliveryConversation(providerDeliveryInput);
+                span.setAttribute("mistle.provider.conversation_id", result.providerConversationId);
+                return result;
+              },
+            ),
         );
 
         const inspectedProviderConversation = await step.run(
@@ -378,9 +428,7 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
                 DurableTriggerConversationDeliveryStepPrefixes.INSPECT_RESUME_PROVIDER_CONVERSATION,
               taskId: activeTask.taskId,
             }),
-            retryPolicy: {
-              maximumAttempts: 1,
-            },
+            retryPolicy: SingleAttemptDeliveryStepRetryPolicy,
           },
           async () =>
             inspectAndResumeConversationProviderDeliveryConversation({
@@ -395,9 +443,7 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
               prefix: DurableTriggerConversationDeliveryStepPrefixes.SUBMIT_PROVIDER_PAYLOAD,
               taskId: activeTask.taskId,
             }),
-            retryPolicy: {
-              maximumAttempts: 1,
-            },
+            retryPolicy: IdempotentProviderDeliveryStepRetryPolicy,
           },
           async () =>
             withTriggerConversationDeliverySpan(
@@ -414,7 +460,17 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
                 },
               },
               async (span) => {
+                const submitPayloadIdempotency = submitPayloadIdempotencyMetadata({
+                  deliveryInput: providerDeliveryInput,
+                  providerConversationId: createdProviderConversation.providerConversationId,
+                });
                 span.setAttribute("mistle.route.binding_action", loadedRoute.routeBindingAction);
+                span.setAttributes({
+                  "mistle.provider.idempotency_key": submitPayloadIdempotency.key,
+                  "mistle.provider.idempotency_operation": submitPayloadIdempotency.operation,
+                  "mistle.provider.idempotency_request_fingerprint":
+                    submitPayloadIdempotency.requestFingerprint,
+                });
                 const result = await submitConversationProviderDeliveryPayload({
                   deliveryInput: providerDeliveryInput,
                   inspectTriggerConversation: inspectedProviderConversation,
@@ -445,9 +501,7 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
               prefix: DurableTriggerConversationDeliveryStepPrefixes.PERSIST_PROVIDER_DELIVERY,
               taskId: activeTask.taskId,
             }),
-            retryPolicy: {
-              maximumAttempts: 1,
-            },
+            retryPolicy: SingleAttemptDeliveryStepRetryPolicy,
           },
           async () =>
             persistConversationProviderDeliveryResult(
@@ -470,9 +524,7 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
               prefix: DurableTriggerConversationDeliveryStepPrefixes.SEED_SANDBOX_TITLE,
               taskId: activeTask.taskId,
             }),
-            retryPolicy: {
-              maximumAttempts: 1,
-            },
+            retryPolicy: SingleAttemptDeliveryStepRetryPolicy,
           },
           async () =>
             seedDeliveredSandboxInstanceTitle(
