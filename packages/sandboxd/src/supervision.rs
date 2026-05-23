@@ -16,6 +16,7 @@ use crate::time::Clock;
 use crate::time::format_rfc3339_timestamp;
 
 const MAX_FORWARDED_LIFECYCLE_EVENT_LINES: usize = 128;
+pub(crate) const DAEMON_LIVENESS_JOURNAL_ERROR_DETAIL: &str = "lastJournalError";
 
 /// Stable identifier for one supervised long-lived sandboxd component.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -498,7 +499,7 @@ impl SandboxdSupervisorHandle {
                 snapshot.last_error = None;
             }
             snapshot.last_healthcheck_at = Some(observed_at);
-            snapshot.details = details;
+            replace_daemon_liveness_details(snapshot, details);
         });
     }
 
@@ -518,7 +519,7 @@ impl SandboxdSupervisorHandle {
                 snapshot.last_failed_at = Some(observed_at);
                 snapshot.last_healthcheck_at = Some(observed_at);
                 snapshot.last_error = Some(error.clone());
-                snapshot.details = details;
+                replace_daemon_liveness_details(snapshot, details);
             })
         else {
             return;
@@ -551,7 +552,7 @@ impl SandboxdSupervisorHandle {
                 snapshot.state = ComponentHealthState::Healthy;
                 snapshot.last_healthcheck_at = Some(observed_at);
                 snapshot.last_error = None;
-                snapshot.details = details;
+                replace_daemon_liveness_details(snapshot, details);
             })
         else {
             return;
@@ -648,6 +649,19 @@ impl SandboxdSupervisorHandle {
         }
         state.forwarded_lifecycle_lines.push_back(line);
     }
+}
+
+fn replace_daemon_liveness_details(
+    snapshot: &mut ComponentHealthSnapshot,
+    mut details: BTreeMap<String, String>,
+) {
+    if let Some(error) = snapshot.details.get(DAEMON_LIVENESS_JOURNAL_ERROR_DETAIL) {
+        details.insert(
+            DAEMON_LIVENESS_JOURNAL_ERROR_DETAIL.to_string(),
+            error.clone(),
+        );
+    }
+    snapshot.details = details;
 }
 
 fn serialize_lifecycle_event_line(
@@ -887,8 +901,8 @@ mod tests {
     use serde_json::Value;
 
     use crate::supervision::{
-        ComponentHealthState, MAX_FORWARDED_LIFECYCLE_EVENT_LINES, SandboxdSupervisorHandle,
-        SupervisedComponent,
+        ComponentHealthState, DAEMON_LIVENESS_JOURNAL_ERROR_DETAIL,
+        MAX_FORWARDED_LIFECYCLE_EVENT_LINES, SandboxdSupervisorHandle, SupervisedComponent,
     };
     use crate::time::Clock;
     use crate::time::testing::MutableClock;
@@ -1075,6 +1089,77 @@ mod tests {
         assert!(
             lifecycle_lines[1].contains("\"event\":\"daemon_liveness_recovered\""),
             "recovery should emit a lifecycle line"
+        );
+    }
+
+    #[test]
+    fn preserves_daemon_liveness_journal_error_across_detail_replacement() {
+        let clock = Arc::new(MutableClock::new(1_000));
+        let handle = SandboxdSupervisorHandle::new(
+            "sandbox-123",
+            clock.clone(),
+            BTreeSet::from([SupervisedComponent::Sandboxd]),
+        );
+        handle.set_component_detail(
+            SupervisedComponent::Sandboxd,
+            DAEMON_LIVENESS_JOURNAL_ERROR_DETAIL,
+            "failed to write journal",
+        );
+
+        handle.record_daemon_liveness_sample(BTreeMap::from([(
+            "lastLagMs".to_string(),
+            "10".to_string(),
+        )]));
+        assert_eq!(
+            handle
+                .component_snapshot(SupervisedComponent::Sandboxd)
+                .expect("sandboxd component should be tracked")
+                .details
+                .get(DAEMON_LIVENESS_JOURNAL_ERROR_DETAIL)
+                .map(String::as_str),
+            Some("failed to write journal")
+        );
+
+        handle.record_daemon_liveness_lag_detected(
+            BTreeMap::from([("lastLagMs".to_string(), "40000".to_string())]),
+            40_000,
+            30_000,
+        );
+        assert_eq!(
+            handle
+                .component_snapshot(SupervisedComponent::Sandboxd)
+                .expect("sandboxd component should be tracked")
+                .details
+                .get(DAEMON_LIVENESS_JOURNAL_ERROR_DETAIL)
+                .map(String::as_str),
+            Some("failed to write journal")
+        );
+
+        handle.record_daemon_liveness_recovered(
+            BTreeMap::from([("lastLagMs".to_string(), "5".to_string())]),
+            5,
+            30_000,
+        );
+        assert_eq!(
+            handle
+                .component_snapshot(SupervisedComponent::Sandboxd)
+                .expect("sandboxd component should be tracked")
+                .details
+                .get(DAEMON_LIVENESS_JOURNAL_ERROR_DETAIL)
+                .map(String::as_str),
+            Some("failed to write journal")
+        );
+
+        handle.remove_component_detail(
+            SupervisedComponent::Sandboxd,
+            DAEMON_LIVENESS_JOURNAL_ERROR_DETAIL,
+        );
+        assert!(
+            !handle
+                .component_snapshot(SupervisedComponent::Sandboxd)
+                .expect("sandboxd component should be tracked")
+                .details
+                .contains_key(DAEMON_LIVENESS_JOURNAL_ERROR_DETAIL)
         );
     }
 

@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Map, Value};
 
-use crate::supervision::SandboxdSupervisorHandle;
+use crate::supervision::{DAEMON_LIVENESS_JOURNAL_ERROR_DETAIL, SandboxdSupervisorHandle};
 use crate::time::{Clock, format_rfc3339_timestamp};
 
 pub const DEFAULT_LIVENESS_JOURNAL_PATH: &str = "/run/mistle/sandboxd/liveness.log";
@@ -207,13 +207,13 @@ fn record_liveness_journal_edge(
     ) {
         Ok(()) => supervisor_handle.remove_component_detail(
             crate::supervision::SupervisedComponent::Sandboxd,
-            "lastJournalError",
+            DAEMON_LIVENESS_JOURNAL_ERROR_DETAIL,
         ),
         Err(error) => {
             eprintln!("sandboxd failed to append liveness journal event '{event}': {error}");
             supervisor_handle.set_component_detail(
                 crate::supervision::SupervisedComponent::Sandboxd,
-                "lastJournalError",
+                DAEMON_LIVENESS_JOURNAL_ERROR_DETAIL,
                 error,
             );
         }
@@ -518,7 +518,9 @@ mod tests {
         parse_cgroup_v2_path, parse_memory_events, parse_process_status,
         record_liveness_journal_edge,
     };
-    use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
+    use crate::supervision::{
+        DAEMON_LIVENESS_JOURNAL_ERROR_DETAIL, SandboxdSupervisorHandle, SupervisedComponent,
+    };
     use crate::time::testing::MutableClock;
 
     #[test]
@@ -660,7 +662,9 @@ mod tests {
             .component_snapshot(SupervisedComponent::Sandboxd)
             .expect("sandboxd component should be tracked");
         assert!(
-            snapshot.details.contains_key("lastJournalError"),
+            snapshot
+                .details
+                .contains_key(DAEMON_LIVENESS_JOURNAL_ERROR_DETAIL),
             "journal write failure should remain visible in health details"
         );
     }
