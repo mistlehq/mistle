@@ -376,7 +376,7 @@ dependencies = [
 
 [[package]]
 name = "mstl-cli"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "bpaf",
  "futures-util",
@@ -391,7 +391,7 @@ dependencies = [
 
 [[package]]
 name = "mstl-core"
-version = "0.19.0"
+version = "0.20.0"
 dependencies = [
  "serde",
  "serde_json",
