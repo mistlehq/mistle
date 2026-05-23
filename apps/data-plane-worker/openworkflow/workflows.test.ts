@@ -1,4 +1,5 @@
 import {
+  DeleteSandboxInstanceWorkflowSpec,
   MaterializeSandboxProfileVersionSnapshotWorkflowSpec,
   HandleSandboxInstanceDeadlineWorkflowSpec,
   ReconcileSandboxInstanceWorkflowSpec,
@@ -36,6 +37,12 @@ describe("data-plane worker openworkflow entrypoints", () => {
   it("preserves the stop sandbox instance workflow identity", () => {
     expect(readWorkflowSpec(StopSandboxInstanceWorkflowSpec.name)).toMatchObject(
       StopSandboxInstanceWorkflowSpec,
+    );
+  });
+
+  it("preserves the delete sandbox instance workflow identity", () => {
+    expect(readWorkflowSpec(DeleteSandboxInstanceWorkflowSpec.name)).toMatchObject(
+      DeleteSandboxInstanceWorkflowSpec,
     );
   });
 

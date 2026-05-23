@@ -17,7 +17,7 @@ import { OrganizationPermissions } from "../src/auth/services/organization-polic
 import { deleteSandboxInstanceResponseSchema } from "../src/sandbox-instances/delete-sandbox-instance/schema.js";
 import { SandboxInstancesNotFoundResponseSchema } from "../src/sandbox-instances/index.js";
 import { createApiKeyToken } from "./helpers/api-keys.js";
-import { waitForQueuedUserStopWorkflowRun } from "./helpers/data-plane-workflows.js";
+import { waitForQueuedDeleteWorkflowRun } from "./helpers/data-plane-workflows.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api"],
@@ -56,14 +56,13 @@ describe.concurrent("sandbox instances delete integration", () => {
       workflowRunId: expect.any(String),
     });
 
-    const workflowRun = await waitForQueuedUserStopWorkflowRun({
+    const workflowRun = await waitForQueuedDeleteWorkflowRun({
       env,
       sandboxInstanceId: "sbi_cp_delete_running_001",
     });
     expect(workflowRun.id).toBe(body.workflowRunId);
     expect(workflowRun.input).toEqual({
       sandboxInstanceId: "sbi_cp_delete_running_001",
-      stopReason: "user",
     });
 
     const deletedSandboxInstance = await env.dataPlaneDb.query.sandboxInstances.findFirst({
@@ -217,7 +216,16 @@ describe.concurrent("sandbox instances delete integration", () => {
     expect(body).toEqual({
       status: "deleted",
       sandboxInstanceId: "sbi_cp_delete_api_key_001",
-      workflowRunId: null,
+      workflowRunId: expect.any(String),
+    });
+
+    const workflowRun = await waitForQueuedDeleteWorkflowRun({
+      env,
+      sandboxInstanceId: "sbi_cp_delete_api_key_001",
+    });
+    expect(workflowRun.id).toBe(body.workflowRunId);
+    expect(workflowRun.input).toEqual({
+      sandboxInstanceId: "sbi_cp_delete_api_key_001",
     });
 
     const deletedSandboxInstance = await env.dataPlaneDb.query.sandboxInstances.findFirst({

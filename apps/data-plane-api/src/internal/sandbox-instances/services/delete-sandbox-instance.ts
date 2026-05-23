@@ -1,11 +1,10 @@
 import {
   SandboxInstancePurposes,
-  SandboxInstanceStatuses,
   type DataPlaneDatabase,
   type DataPlaneTables,
 } from "@mistle/db/data-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
-import { StopSandboxInstanceWorkflowSpec } from "@mistle/workflow-registry/data-plane";
+import { DeleteSandboxInstanceWorkflowSpec } from "@mistle/workflow-registry/data-plane";
 import { and, eq, isNull, sql } from "drizzle-orm";
 
 import type { AppRuntimeResources } from "../../../resources.js";
@@ -24,11 +23,11 @@ type DeleteSandboxInstanceInput = {
 
 export const DeleteSandboxInstanceNotFoundErrorCode = "NOT_FOUND";
 
-function createDeleteSessionStopIdempotencyKey(input: DeleteSandboxInstanceInput): string {
+function createDeleteSessionDestroyIdempotencyKey(input: DeleteSandboxInstanceInput): string {
   return JSON.stringify({
     version: 1,
     sandboxInstanceId: input.sandboxInstanceId,
-    action: "delete_session_stop",
+    action: "delete_session_destroy",
     organizationId: input.organizationId,
   });
 }
@@ -41,7 +40,6 @@ export async function deleteSandboxInstance(
     columns: {
       id: true,
       deletedAt: true,
-      status: true,
     },
     where: (table, { and: whereAnd, eq: whereEq }) =>
       whereAnd(
@@ -66,19 +64,15 @@ export async function deleteSandboxInstance(
     };
   }
 
-  const workflowRunHandle =
-    sandboxInstance.status === SandboxInstanceStatuses.RUNNING
-      ? await ctx.openWorkflow.runWorkflow(
-          StopSandboxInstanceWorkflowSpec,
-          {
-            sandboxInstanceId: input.sandboxInstanceId,
-            stopReason: "user",
-          },
-          {
-            idempotencyKey: createDeleteSessionStopIdempotencyKey(input),
-          },
-        )
-      : null;
+  const workflowRunHandle = await ctx.openWorkflow.runWorkflow(
+    DeleteSandboxInstanceWorkflowSpec,
+    {
+      sandboxInstanceId: input.sandboxInstanceId,
+    },
+    {
+      idempotencyKey: createDeleteSessionDestroyIdempotencyKey(input),
+    },
+  );
 
   const updatedRows = await ctx.db
     .update(ctx.tables.sandboxInstances)

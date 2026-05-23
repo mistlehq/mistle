@@ -12,6 +12,7 @@ export const MaterializeWorkflowName = "data-plane.sandbox-profile-version-snaps
 export const StartWorkflowName = "data-plane.sandbox-instances.start";
 export const ResumeWorkflowName = "data-plane.sandbox-instances.resume";
 export const StopWorkflowName = "data-plane.sandbox-instances.stop";
+export const DeleteWorkflowName = "data-plane.sandbox-instances.delete";
 
 const MaterializeWorkflowRunInputSchema = z.looseObject({
   snapshotJobId: z.string().min(1),
@@ -97,6 +98,17 @@ const UserStopWorkflowRunSchema = z
       .object({
         sandboxInstanceId: z.string().min(1),
         stopReason: z.literal("user"),
+      })
+      .strict(),
+  })
+  .strict();
+
+const DeleteWorkflowRunSchema = z
+  .object({
+    id: z.string().min(1),
+    input: z
+      .object({
+        sandboxInstanceId: z.string().min(1),
       })
       .strict(),
   })
@@ -215,5 +227,34 @@ export async function waitForQueuedUserStopWorkflowRun(input: {
 
   throw new Error(
     `Timed out waiting for queued user stop workflow for sandbox '${input.sandboxInstanceId}'.`,
+  );
+}
+
+export async function waitForQueuedDeleteWorkflowRun(input: {
+  env: IntegrationTestEnvironment;
+  sandboxInstanceId: string;
+}) {
+  const deadline = systemClock.nowMs() + WorkflowRunPersistTimeoutMs;
+
+  while (systemClock.nowMs() < deadline) {
+    const result = await input.env.dataPlaneDb.execute(sql<{ id: string; input: unknown }>`
+      select id, input
+      from data_plane_openworkflow.workflow_runs
+      where
+        workflow_name = ${DeleteWorkflowName}
+        and input->>'sandboxInstanceId' = ${input.sandboxInstanceId}
+      order by created_at asc
+      limit 1
+    `);
+    const row = result.rows[0];
+    if (row !== undefined) {
+      return DeleteWorkflowRunSchema.parse(row);
+    }
+
+    await systemSleeper.sleep(WorkflowRunPersistPollIntervalMs);
+  }
+
+  throw new Error(
+    `Timed out waiting for queued delete workflow for sandbox '${input.sandboxInstanceId}'.`,
   );
 }

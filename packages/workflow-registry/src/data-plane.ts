@@ -14,6 +14,8 @@ export const ResumeSandboxInstanceWorkflowName = "data-plane.sandbox-instances.r
 export const ResumeSandboxInstanceWorkflowVersion = "1";
 export const StopSandboxInstanceWorkflowName = "data-plane.sandbox-instances.stop";
 export const StopSandboxInstanceWorkflowVersion = "1";
+export const DeleteSandboxInstanceWorkflowName = "data-plane.sandbox-instances.delete";
+export const DeleteSandboxInstanceWorkflowVersion = "1";
 export const ReconcileSandboxInstanceWorkflowName = "data-plane.sandbox-instances.reconcile";
 export const ReconcileSandboxInstanceWorkflowVersion = "1";
 export const HandleSandboxInstanceDeadlineWorkflowName =
@@ -170,6 +172,24 @@ export const StopSandboxInstanceWorkflowSpec = defineWorkflowSpec<
 >({
   name: StopSandboxInstanceWorkflowName,
   version: StopSandboxInstanceWorkflowVersion,
+});
+
+export type DeleteSandboxInstanceWorkflowInput = {
+  sandboxInstanceId: string;
+};
+
+export type DeleteSandboxInstanceWorkflowOutput = {
+  sandboxInstanceId: string;
+  executed: boolean;
+  outcome: "destroyed" | "no_provider_sandbox";
+};
+
+export const DeleteSandboxInstanceWorkflowSpec = defineWorkflowSpec<
+  DeleteSandboxInstanceWorkflowInput,
+  DeleteSandboxInstanceWorkflowOutput
+>({
+  name: DeleteSandboxInstanceWorkflowName,
+  version: DeleteSandboxInstanceWorkflowVersion,
 });
 
 export type ReconcileSandboxInstanceWorkflowInput = {

@@ -1,3 +1,4 @@
+import { DeleteSandboxInstanceWorkflow } from "./delete-sandbox-instance/workflow.js";
 import { MaterializeSandboxProfileVersionSnapshotWorkflow } from "./materialize-sandbox-profile-version-snapshot/workflow.js";
 import { ReconcileSandboxInstanceWorkflow } from "./reconcile-sandbox-instance/workflow.js";
 import { ResumeSandboxInstanceWorkflow } from "./resume-sandbox-instance/workflow.js";
@@ -20,4 +21,5 @@ export const DataPlaneWorkerWorkflows = [
   HandleSandboxInstanceDeadlineWorkflow,
   StartSandboxInstanceWorkflow,
   StopSandboxInstanceWorkflow,
+  DeleteSandboxInstanceWorkflow,
 ];

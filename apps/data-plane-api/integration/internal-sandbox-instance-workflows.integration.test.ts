@@ -24,6 +24,7 @@ import {
 } from "@mistle/test-harness/integration";
 import { systemClock, systemSleeper } from "@mistle/time";
 import {
+  DeleteSandboxInstanceWorkflowName,
   ReconcileSandboxInstanceWorkflowName,
   StopSandboxInstanceWorkflowName,
 } from "@mistle/workflow-registry/data-plane";
@@ -75,11 +76,11 @@ const UserStopWorkflowIdempotencyKeySchema = z
   })
   .strict();
 
-const DeleteSessionStopWorkflowIdempotencyKeySchema = z
+const DeleteSessionDestroyWorkflowIdempotencyKeySchema = z
   .object({
     version: z.literal(1),
     sandboxInstanceId: z.string().min(1),
-    action: z.literal("delete_session_stop"),
+    action: z.literal("delete_session_destroy"),
     organizationId: z.string().min(1),
   })
   .strict();
@@ -306,7 +307,7 @@ describe.concurrent("internal sandbox instance workflow queue integration", () =
     });
   });
 
-  it("deletes a running session and queues shutdown before hiding it from reads", async ({
+  it("deletes a running session and queues provider destruction before hiding it from reads", async ({
     env,
   }) => {
     await insertRunningSandboxInstance(env, {
@@ -356,7 +357,7 @@ describe.concurrent("internal sandbox instance workflow queue integration", () =
     const workflowRuns = await waitForQueuedWorkflowRuns({
       env,
       sandboxInstanceId: "sbi_dp_api_workflow_delete_running_session",
-      workflowName: StopSandboxInstanceWorkflowName,
+      workflowName: DeleteSandboxInstanceWorkflowName,
     });
 
     expect(workflowRuns).toHaveLength(1);
@@ -364,18 +365,54 @@ describe.concurrent("internal sandbox instance workflow queue integration", () =
       id: firstResponse.workflowRunId,
       input: {
         sandboxInstanceId: "sbi_dp_api_workflow_delete_running_session",
-        stopReason: "user",
       },
     });
     expect(
-      DeleteSessionStopWorkflowIdempotencyKeySchema.parse(
+      DeleteSessionDestroyWorkflowIdempotencyKeySchema.parse(
         JSON.parse(workflowRuns[0]?.idempotency_key ?? ""),
       ),
     ).toEqual({
       version: 1,
       sandboxInstanceId: "sbi_dp_api_workflow_delete_running_session",
-      action: "delete_session_stop",
+      action: "delete_session_destroy",
       organizationId: "org_dp_api_workflow_delete_running_session",
+    });
+  });
+
+  it("deletes a stopped session and still queues provider destruction", async ({ env }) => {
+    await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values(
+      sandboxInstanceRow({
+        id: "sbi_dp_api_workflow_delete_stopped_session",
+        organizationId: "org_dp_api_workflow_delete_stopped_session",
+        sandboxProfileId: "sbp_dp_api_workflow_delete_stopped_session",
+        status: SandboxInstanceStatuses.STOPPED,
+        purpose: SandboxInstancePurposes.SESSION,
+      }),
+    );
+
+    const response = await clientFor(env).deleteSandboxInstance({
+      organizationId: "org_dp_api_workflow_delete_stopped_session",
+      sandboxInstanceId: "sbi_dp_api_workflow_delete_stopped_session",
+    });
+
+    expect(response).toEqual({
+      status: "deleted",
+      sandboxInstanceId: "sbi_dp_api_workflow_delete_stopped_session",
+      workflowRunId: expect.any(String),
+    });
+
+    const workflowRuns = await waitForQueuedWorkflowRuns({
+      env,
+      sandboxInstanceId: "sbi_dp_api_workflow_delete_stopped_session",
+      workflowName: DeleteSandboxInstanceWorkflowName,
+    });
+
+    expect(workflowRuns).toHaveLength(1);
+    expect(workflowRuns[0]).toMatchObject({
+      id: response.workflowRunId,
+      input: {
+        sandboxInstanceId: "sbi_dp_api_workflow_delete_stopped_session",
+      },
     });
   });
 
