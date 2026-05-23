@@ -15,6 +15,10 @@ use tokio_tungstenite::{accept_async, connect_async};
 use tracing::{field, info};
 use tungstenite::Message;
 
+use crate::codex_proxy::idempotency::{
+    CodexIdempotencyAction, SharedIdempotencyStore, StartedCodexOperation,
+    StoredCodexProxyResponse, complete_codex_idempotency, prepare_codex_idempotency,
+};
 use crate::codex_proxy::message::is_connection_termination_error;
 use crate::codex_proxy::proxy_session::activity::{
     ActiveCompactionState, ActiveTurnState, ClientForwardContext, PendingCompactionRequest,
@@ -49,6 +53,7 @@ const TURN_INTERRUPT_METHOD: &str = "turn/interrupt";
 const RETENTION_FAILURE_ERROR_CODE: i64 = -32000;
 const RETENTION_FAILURE_ERROR_MESSAGE: &str =
     "sandboxd failed to retain Codex thread subscription for background execution";
+const IDEMPOTENCY_ERROR_CODE: i64 = -32001;
 
 mod activity;
 mod delivery_context;
@@ -69,11 +74,82 @@ struct MatchedRetentionTarget {
     delivery_context: Option<DeliveryContext>,
 }
 
+async fn prepare_client_message_idempotency(
+    message: Message,
+    idempotency_store: &Option<SharedIdempotencyStore>,
+    pending_idempotency: &mut BTreeMap<String, StartedCodexOperation>,
+    client_socket: &mut tokio_tungstenite::WebSocketStream<TcpStream>,
+) -> Result<Option<Message>, CodexProxyError> {
+    let Message::Text(text) = message else {
+        return Ok(Some(message));
+    };
+    let mut payload: Value =
+        serde_json::from_str(text.as_str()).map_err(CodexProxyError::InvalidJson)?;
+    let request_id = payload.get("id").cloned();
+    let request_key = request_id.as_ref().and_then(json_rpc_id_key);
+    if payload.get("idempotency").is_some() && request_key.is_none() {
+        send_json_rpc_error(
+            client_socket,
+            request_id.unwrap_or(Value::Null),
+            "Codex idempotency requires a JSON-RPC request id.".to_string(),
+        )
+        .await?;
+        return Ok(None);
+    }
+    let action = prepare_codex_idempotency(&mut payload, idempotency_store.as_ref());
+    match action {
+        CodexIdempotencyAction::Disabled => Ok(Some(Message::Text(payload.to_string().into()))),
+        CodexIdempotencyAction::Forward(started) => {
+            if let Some(request_key) = request_key {
+                pending_idempotency.insert(request_key, started);
+            }
+            Ok(Some(Message::Text(payload.to_string().into())))
+        }
+        CodexIdempotencyAction::Replay(response) => {
+            let mut replay_payload = response.payload;
+            if let (Some(object), Some(request_id)) = (replay_payload.as_object_mut(), request_id) {
+                object.insert("id".to_string(), request_id);
+            }
+            client_socket
+                .send(Message::Text(replay_payload.to_string().into()))
+                .await
+                .map_err(CodexProxyError::WriteSocket)?;
+            Ok(None)
+        }
+        CodexIdempotencyAction::Reject { message } => {
+            send_json_rpc_error(client_socket, request_id.unwrap_or(Value::Null), message).await?;
+            Ok(None)
+        }
+    }
+}
+
+async fn send_json_rpc_error(
+    client_socket: &mut tokio_tungstenite::WebSocketStream<TcpStream>,
+    request_id: Value,
+    message: String,
+) -> Result<(), CodexProxyError> {
+    client_socket
+        .send(Message::Text(
+            json!({
+                "id": request_id,
+                "error": {
+                    "code": IDEMPOTENCY_ERROR_CODE,
+                    "message": message
+                }
+            })
+            .to_string()
+            .into(),
+        ))
+        .await
+        .map_err(CodexProxyError::WriteSocket)
+}
+
 pub async fn relay_codex_proxy_connection(
     client_stream: TcpStream,
     raw_app_server_url: &str,
     session_manager_handle: CodexSessionManagerHandle,
     mut shutdown_receiver: watch::Receiver<bool>,
+    idempotency_store: Option<SharedIdempotencyStore>,
 ) -> Result<(), CodexProxyError> {
     let mut client_socket = accept_async(client_stream)
         .await
@@ -91,6 +167,8 @@ pub async fn relay_codex_proxy_connection(
     let mut active_turns = BTreeMap::<String, ActiveTurnState>::new();
     let mut pending_compaction_requests = BTreeMap::<String, PendingCompactionRequest>::new();
     let mut active_compactions = BTreeMap::<String, ActiveCompactionState>::new();
+    let mut pending_idempotency = BTreeMap::<String, StartedCodexOperation>::new();
+    let mut buffered_idempotency = BTreeMap::<String, StartedCodexOperation>::new();
     let mut buffered_success_responses = VecDeque::<BufferedSuccessResponse>::new();
     let mut next_response_sequence = 0_u64;
 
@@ -146,8 +224,20 @@ pub async fn relay_codex_proxy_connection(
                             return Ok(());
                         }
 
+                        let prepared_message = match prepare_client_message_idempotency(
+                            message,
+                            &idempotency_store,
+                            &mut pending_idempotency,
+                            &mut client_socket,
+                        )
+                        .await?
+                        {
+                            Some(message) => message,
+                            None => continue,
+                        };
+
                         if should_forward_client_message(
-                            &message,
+                            &prepared_message,
                             &mut client_kind,
                             &mut current_delivery_context,
                             &mut ClientForwardContext {
@@ -157,7 +247,7 @@ pub async fn relay_codex_proxy_connection(
                                 pending_compaction_requests: &mut pending_compaction_requests,
                                 pending_requests: &mut pending_requests,
                             },
-                        )? && let Err(error) = raw_socket.send(message).await {
+                        )? && let Err(error) = raw_socket.send(prepared_message).await {
                             finalize_active_turns_for_transport_outcome(
                                 &mut active_turns,
                                 "reset",
@@ -240,6 +330,14 @@ pub async fn relay_codex_proxy_connection(
                             &mut active_compactions,
                         )?;
 
+                        complete_immediate_idempotency(
+                            &message,
+                            &client_kind,
+                            &idempotency_store,
+                            &mut pending_requests,
+                            &mut pending_idempotency,
+                        )?;
+
                         if let Some(retention_target) =
                             matched_retention_target(
                                 &message,
@@ -248,6 +346,12 @@ pub async fn relay_codex_proxy_connection(
                                 &mut pending_compaction_requests,
                             )?
                         {
+                            if let Some(started) =
+                                pending_idempotency.remove(retention_target.request_key.as_str())
+                            {
+                                buffered_idempotency
+                                    .insert(retention_target.request_key.clone(), started);
+                            }
                             if let Some(delivery_context) = retention_target.delivery_context.clone()
                             {
                                 thread_delivery_contexts
@@ -382,8 +486,13 @@ pub async fn relay_codex_proxy_connection(
             }
         }
 
-        flush_buffered_success_responses(&mut client_socket, &mut buffered_success_responses)
-            .await?;
+        flush_buffered_success_responses(
+            &mut client_socket,
+            &mut buffered_success_responses,
+            &idempotency_store,
+            &mut buffered_idempotency,
+        )
+        .await?;
     }
 }
 
@@ -690,36 +799,131 @@ fn record_retention_result(
 async fn flush_buffered_success_responses(
     client_socket: &mut tokio_tungstenite::WebSocketStream<TcpStream>,
     buffered_success_responses: &mut VecDeque<BufferedSuccessResponse>,
+    idempotency_store: &Option<SharedIdempotencyStore>,
+    buffered_idempotency: &mut BTreeMap<String, StartedCodexOperation>,
 ) -> Result<(), CodexProxyError> {
     for buffered_success_response in
         take_ready_buffered_success_responses(buffered_success_responses)
     {
-        match buffered_success_response
+        let request_key = json_rpc_id_key(&buffered_success_response.request_id);
+        let message = match buffered_success_response
             .subscription_retention_result
             .expect("buffered success response should have a retention result")
         {
-            Ok(()) => client_socket
-                .send(buffered_success_response.payload)
-                .await
-                .map_err(CodexProxyError::WriteSocket)?,
-            Err(_) => client_socket
-                .send(Message::Text(
-                    json!({
-                        "id": buffered_success_response.request_id,
-                        "error": {
-                            "code": RETENTION_FAILURE_ERROR_CODE,
-                            "message": RETENTION_FAILURE_ERROR_MESSAGE
-                        }
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .await
-                .map_err(CodexProxyError::WriteSocket)?,
+            Ok(()) => buffered_success_response.payload,
+            Err(_) => Message::Text(
+                json!({
+                    "id": buffered_success_response.request_id,
+                    "error": {
+                        "code": RETENTION_FAILURE_ERROR_CODE,
+                        "message": RETENTION_FAILURE_ERROR_MESSAGE
+                    }
+                })
+                .to_string()
+                .into(),
+            ),
+        };
+        if let Some(request_key) = request_key
+            && let Some(started) = buffered_idempotency.remove(request_key.as_str())
+        {
+            complete_response_idempotency(&message, idempotency_store, started)?;
         }
+        client_socket
+            .send(message)
+            .await
+            .map_err(CodexProxyError::WriteSocket)?;
     }
 
     Ok(())
+}
+
+fn complete_immediate_idempotency(
+    message: &Message,
+    client_kind: &ProxyClientKind,
+    idempotency_store: &Option<SharedIdempotencyStore>,
+    pending_requests: &mut BTreeMap<String, PendingClientRequest>,
+    pending_idempotency: &mut BTreeMap<String, StartedCodexOperation>,
+) -> Result<(), CodexProxyError> {
+    let Some(value) = parse_json_value_from_message(message)? else {
+        return Ok(());
+    };
+    let Some(response_id) = value.get("id").cloned() else {
+        return Ok(());
+    };
+    let Some(request_key) = json_rpc_id_key(&response_id) else {
+        return Ok(());
+    };
+    let Some(pending_request) = pending_requests.get(request_key.as_str()) else {
+        return Ok(());
+    };
+    if pending_request.method != "thread/start"
+        && value.get("error").is_none()
+        && *client_kind == ProxyClientKind::MistleAgentClient
+    {
+        return Ok(());
+    }
+    let Some(started) = pending_idempotency.remove(request_key.as_str()) else {
+        return Ok(());
+    };
+    complete_response_idempotency(message, idempotency_store, started)
+}
+
+fn complete_response_idempotency(
+    message: &Message,
+    idempotency_store: &Option<SharedIdempotencyStore>,
+    started: StartedCodexOperation,
+) -> Result<(), CodexProxyError> {
+    let Some(store) = idempotency_store.as_ref() else {
+        return Err(CodexProxyError::ConfigureRuntime(
+            "Codex idempotency store is not configured.".to_string(),
+        ));
+    };
+    let Some(payload) = parse_json_value_from_message(message)? else {
+        return Ok(());
+    };
+    let (provider_conversation_id, provider_execution_id) =
+        provider_ids_for_completed_codex_response(started.method(), &payload);
+    complete_codex_idempotency(
+        store,
+        started,
+        StoredCodexProxyResponse { payload },
+        provider_conversation_id,
+        provider_execution_id,
+    )
+}
+
+fn provider_ids_for_completed_codex_response(
+    method: &str,
+    payload: &Value,
+) -> (Option<String>, Option<String>) {
+    if payload.get("error").is_some() {
+        return (None, None);
+    }
+    match method {
+        "thread/start" => (
+            payload["result"]["thread"]["id"]
+                .as_str()
+                .map(ToString::to_string),
+            None,
+        ),
+        "turn/start" => (
+            payload["result"]["turn"]["threadId"]
+                .as_str()
+                .map(ToString::to_string),
+            payload["result"]["turn"]["id"]
+                .as_str()
+                .map(ToString::to_string),
+        ),
+        "turn/steer" => (
+            payload["result"]["threadId"]
+                .as_str()
+                .map(ToString::to_string),
+            payload["result"]["turnId"]
+                .as_str()
+                .map(ToString::to_string),
+        ),
+        _ => (None, None),
+    }
 }
 
 fn take_ready_buffered_success_responses(

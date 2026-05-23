@@ -21,8 +21,10 @@ use url::Url;
 use crate::codex_proxy::error::{
     CodexProxyError, clone_codex_proxy_error, normalize_codex_proxy_exit_result,
 };
+use crate::codex_proxy::idempotency::SharedIdempotencyStore;
 use crate::codex_proxy::runtime::{CodexProxyStartup, run_codex_proxy_runtime};
 use crate::codex_proxy::types::CodexSessionManagerHealthState;
+use crate::idempotency::store::IdempotencyStore;
 use crate::keepalive::KeepaliveManager;
 use crate::runtime::readiness::{
     RuntimeReadinessManager, RuntimeReadinessMode, derive_runtime_ready,
@@ -80,6 +82,7 @@ struct CodexProxySupervisorConfig {
     listen_url: String,
     raw_app_server_url: String,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    idempotency_store: Option<SharedIdempotencyStore>,
 }
 
 #[derive(Clone, Debug)]
@@ -153,12 +156,36 @@ pub fn start_codex_proxy(
         BTreeSet::from([SupervisedComponent::CodexProxy]),
     );
 
-    start_codex_proxy_with_supervisor(
+    start_codex_proxy_inner(
         proxy_listen_url,
         raw_app_server_url,
         keepalive_manager,
         runtime_readiness_manager,
         supervisor_handle,
+        None,
+    )
+}
+
+pub fn start_codex_proxy_with_idempotency_store(
+    proxy_listen_url: &str,
+    raw_app_server_url: &str,
+    keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
+    idempotency_store: IdempotencyStore,
+) -> Result<CodexProxy, CodexProxyError> {
+    let supervisor_handle = SandboxdSupervisorHandle::new(
+        "sandboxd-codex-proxy",
+        Arc::new(SystemClock),
+        BTreeSet::from([SupervisedComponent::CodexProxy]),
+    );
+
+    start_codex_proxy_inner(
+        proxy_listen_url,
+        raw_app_server_url,
+        keepalive_manager,
+        runtime_readiness_manager,
+        supervisor_handle,
+        Some(Arc::new(Mutex::new(idempotency_store))),
     )
 }
 
@@ -169,6 +196,27 @@ pub fn start_codex_proxy_with_supervisor(
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     supervisor_handle: SandboxdSupervisorHandle,
+) -> Result<CodexProxy, CodexProxyError> {
+    let idempotency_store = IdempotencyStore::load_default()
+        .map_err(|error| CodexProxyError::ConfigureRuntime(error.to_string()))?;
+
+    start_codex_proxy_inner(
+        proxy_listen_url,
+        raw_app_server_url,
+        keepalive_manager,
+        runtime_readiness_manager,
+        supervisor_handle,
+        Some(Arc::new(Mutex::new(idempotency_store))),
+    )
+}
+
+fn start_codex_proxy_inner(
+    proxy_listen_url: &str,
+    raw_app_server_url: &str,
+    keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
+    supervisor_handle: SandboxdSupervisorHandle,
+    idempotency_store: Option<SharedIdempotencyStore>,
 ) -> Result<CodexProxy, CodexProxyError> {
     let listen_url = Url::parse(proxy_listen_url)
         .map_err(|error| CodexProxyError::ParseListenUrl(error.to_string()))?;
@@ -212,6 +260,7 @@ pub fn start_codex_proxy_with_supervisor(
         listen_url: proxy_listen_url.to_string(),
         raw_app_server_url: raw_app_server_url.to_string(),
         keepalive_manager,
+        idempotency_store,
     };
     let mut active_runtime = spawn_active_codex_proxy_runtime(&config)?;
     if let Err(error) =
@@ -399,6 +448,7 @@ fn spawn_active_codex_proxy_runtime(
         .map_err(|error| CodexProxyError::ParseListenUrl(error.to_string()))?;
     let raw_app_server_url = config.raw_app_server_url.clone();
     let keepalive_manager = config.keepalive_manager.clone();
+    let idempotency_store = config.idempotency_store.clone();
     let runtime_thread = thread::spawn(move || {
         let result = Builder::new_multi_thread()
             .worker_threads(2)
@@ -414,6 +464,7 @@ fn spawn_active_codex_proxy_runtime(
                         keepalive_manager,
                         shutdown_receiver,
                         startup_result_sender,
+                        idempotency_store,
                     )
                     .await
                 })

@@ -7,6 +7,7 @@
 //! scoped to focused private modules.
 
 mod error;
+mod idempotency;
 mod message;
 mod monitor;
 mod proxy_session;
@@ -22,7 +23,8 @@ pub use crate::codex_proxy::session_manager::{
     CodexSessionManagerHandle, spawn_codex_session_manager,
 };
 pub use crate::codex_proxy::supervisor::{
-    CodexProxy, CodexProxyControlHandle, start_codex_proxy, start_codex_proxy_with_supervisor,
+    CodexProxy, CodexProxyControlHandle, start_codex_proxy,
+    start_codex_proxy_with_idempotency_store, start_codex_proxy_with_supervisor,
 };
 pub use crate::codex_proxy::types::{
     BufferedSuccessResponse, CodexSessionManagerCommand, CodexSessionManagerError,

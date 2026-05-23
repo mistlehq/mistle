@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
@@ -11,8 +12,10 @@ use tungstenite::{Message, WebSocket, accept, connect};
 
 use sandboxd::codex_proxy::{
     CODEX_INITIALIZE_CLIENT_NAME, CodexSessionManagerError, RetainReason,
-    spawn_codex_session_manager, start_codex_proxy,
+    spawn_codex_session_manager, start_codex_proxy, start_codex_proxy_with_idempotency_store,
 };
+use sandboxd::idempotency::store::IdempotencyStore;
+use sandboxd::idempotency::{AgentRuntimeId, IdempotencyOperation, RequestFingerprint};
 use sandboxd::keepalive::KeepaliveManager;
 use sandboxd::runtime::readiness::RuntimeReadinessManager;
 use sandboxd::time::{Duration, Sleeper, ThreadSleeper};
@@ -1406,6 +1409,524 @@ fn non_trigger_turn_start_remains_passthrough() {
         .expect("raw server thread should exit cleanly");
 }
 
+#[test]
+fn replays_completed_idempotent_thread_start_without_forwarding_again() {
+    let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
+    let raw_port = raw_listener
+        .local_addr()
+        .expect("raw listener should expose an address")
+        .port();
+    let raw_url = format!("ws://127.0.0.1:{raw_port}/raw");
+
+    let (server_ready_sender, server_ready_receiver) = mpsc::channel();
+    let (server_shutdown_sender, server_shutdown_receiver) = mpsc::channel();
+    let raw_server_thread = thread::spawn(move || {
+        server_ready_sender
+            .send(())
+            .expect("raw server ready signal should send");
+
+        let (manager_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the manager connection");
+        let mut manager_socket = accept(manager_stream).expect("manager handshake should succeed");
+        respond_to_manager_bootstrap(&mut manager_socket, Vec::new());
+
+        let (client_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the proxied client connection");
+        let mut client_socket =
+            accept(client_stream).expect("proxied client handshake should succeed");
+
+        let thread_start_request = read_json_text_message(&mut client_socket);
+        assert_eq!(thread_start_request["method"], json!("thread/start"));
+        assert_eq!(thread_start_request.get("idempotency"), None);
+        client_socket
+            .send(Message::Text(
+                json!({
+                    "id": thread_start_request["id"],
+                    "result": {
+                        "thread": {
+                            "id": "thr_idempotent",
+                            "cwd": "/workspace"
+                        }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("thread/start response should send");
+
+        set_plain_websocket_read_timeout(&mut client_socket, Duration::from_millis(150));
+        match client_socket.read() {
+            Err(tungstenite::Error::Io(error))
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) => {}
+            Ok(Message::Close(_))
+            | Err(tungstenite::Error::Protocol(
+                tungstenite::error::ProtocolError::ResetWithoutClosingHandshake,
+            ))
+            | Err(tungstenite::Error::ConnectionClosed)
+            | Err(tungstenite::Error::AlreadyClosed) => {}
+            other => panic!("raw Codex should not receive a duplicate thread/start: {other:?}"),
+        }
+        server_shutdown_receiver
+            .recv()
+            .expect("test should signal raw server shutdown");
+    });
+
+    server_ready_receiver
+        .recv()
+        .expect("raw server should report readiness");
+
+    let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
+    let store = IdempotencyStore::load_all(temp_dir.path().join("idempotency"))
+        .expect("idempotency store should load");
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+    let proxy = start_codex_proxy_with_idempotency_store(
+        "ws://127.0.0.1:0/codex",
+        &raw_url,
+        keepalive_manager,
+        runtime_readiness_manager,
+        store,
+    )
+    .expect("Codex proxy should start");
+
+    let (mut proxy_client, _) = connect_to_proxy_with_retry(proxy.listen_url());
+    let fingerprint = codex_fingerprint(IdempotencyOperation::CreateConversation, "thread/start");
+    send_idempotent_codex_request(
+        &mut proxy_client,
+        10_001,
+        "thread/start",
+        json!({ "cwd": "/workspace" }),
+        "create-key",
+        "createConversation",
+        fingerprint.value(),
+    );
+    let first_response = read_json_text_message(&mut proxy_client);
+    assert_eq!(first_response["id"], json!(10_001));
+    assert_eq!(
+        first_response["result"]["thread"]["id"],
+        json!("thr_idempotent")
+    );
+
+    send_idempotent_codex_request(
+        &mut proxy_client,
+        10_002,
+        "thread/start",
+        json!({ "cwd": "/workspace" }),
+        "create-key",
+        "createConversation",
+        fingerprint.value(),
+    );
+    let replay_response = read_json_text_message(&mut proxy_client);
+    assert_eq!(replay_response["id"], json!(10_002));
+    assert_eq!(
+        replay_response["result"]["thread"]["id"],
+        json!("thr_idempotent")
+    );
+
+    server_shutdown_sender
+        .send(())
+        .expect("raw server shutdown signal should send");
+    proxy_client
+        .close(None)
+        .expect("proxy client should close cleanly");
+    proxy.close().expect("Codex proxy should close cleanly");
+    raw_server_thread
+        .join()
+        .expect("raw server thread should exit cleanly");
+}
+
+#[test]
+fn rejects_codex_idempotency_key_reused_with_different_fingerprint() {
+    let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
+    let raw_port = raw_listener
+        .local_addr()
+        .expect("raw listener should expose an address")
+        .port();
+    let raw_url = format!("ws://127.0.0.1:{raw_port}/raw");
+
+    let (server_ready_sender, server_ready_receiver) = mpsc::channel();
+    let (server_shutdown_sender, server_shutdown_receiver) = mpsc::channel();
+    let raw_server_thread = thread::spawn(move || {
+        server_ready_sender
+            .send(())
+            .expect("raw server ready signal should send");
+
+        let (manager_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the manager connection");
+        let mut manager_socket = accept(manager_stream).expect("manager handshake should succeed");
+        respond_to_manager_bootstrap(&mut manager_socket, Vec::new());
+
+        let (client_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the proxied client connection");
+        let mut client_socket =
+            accept(client_stream).expect("proxied client handshake should succeed");
+        let thread_start_request = read_json_text_message(&mut client_socket);
+        client_socket
+            .send(Message::Text(
+                json!({
+                    "id": thread_start_request["id"],
+                    "result": {
+                        "thread": {
+                            "id": "thr_idempotent",
+                            "cwd": "/workspace"
+                        }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("thread/start response should send");
+
+        set_plain_websocket_read_timeout(&mut client_socket, Duration::from_millis(150));
+        match client_socket.read() {
+            Err(tungstenite::Error::Io(error))
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) => {}
+            Ok(Message::Close(_))
+            | Err(tungstenite::Error::Protocol(
+                tungstenite::error::ProtocolError::ResetWithoutClosingHandshake,
+            ))
+            | Err(tungstenite::Error::ConnectionClosed)
+            | Err(tungstenite::Error::AlreadyClosed) => {}
+            other => panic!("raw Codex should not receive a conflicting retry: {other:?}"),
+        }
+        server_shutdown_receiver
+            .recv()
+            .expect("test should signal raw server shutdown");
+    });
+
+    server_ready_receiver
+        .recv()
+        .expect("raw server should report readiness");
+
+    let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
+    let store = IdempotencyStore::load_all(temp_dir.path().join("idempotency"))
+        .expect("idempotency store should load");
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+    let proxy = start_codex_proxy_with_idempotency_store(
+        "ws://127.0.0.1:0/codex",
+        &raw_url,
+        keepalive_manager,
+        runtime_readiness_manager,
+        store,
+    )
+    .expect("Codex proxy should start");
+
+    let (mut proxy_client, _) = connect_to_proxy_with_retry(proxy.listen_url());
+    let first_fingerprint =
+        codex_fingerprint(IdempotencyOperation::CreateConversation, "thread/start");
+    send_idempotent_codex_request(
+        &mut proxy_client,
+        10_101,
+        "thread/start",
+        json!({ "cwd": "/workspace" }),
+        "create-key",
+        "createConversation",
+        first_fingerprint.value(),
+    );
+    assert_eq!(
+        read_json_text_message(&mut proxy_client)["id"],
+        json!(10_101)
+    );
+
+    let conflicting_fingerprint = codex_fingerprint(
+        IdempotencyOperation::CreateConversation,
+        "thread/start-conflict",
+    );
+    send_idempotent_codex_request(
+        &mut proxy_client,
+        10_102,
+        "thread/start",
+        json!({ "cwd": "/workspace" }),
+        "create-key",
+        "createConversation",
+        conflicting_fingerprint.value(),
+    );
+    let conflict_response = read_json_text_message(&mut proxy_client);
+    assert_eq!(conflict_response["id"], json!(10_102));
+    assert!(
+        conflict_response["error"]["message"]
+            .as_str()
+            .expect("conflict message should be a string")
+            .contains("different request fingerprint")
+    );
+
+    server_shutdown_sender
+        .send(())
+        .expect("raw server shutdown signal should send");
+    proxy_client
+        .close(None)
+        .expect("proxy client should close cleanly");
+    proxy.close().expect("Codex proxy should close cleanly");
+    raw_server_thread
+        .join()
+        .expect("raw server thread should exit cleanly");
+}
+
+#[test]
+fn idempotent_codex_request_without_usable_id_does_not_start_record() {
+    let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
+    let raw_port = raw_listener
+        .local_addr()
+        .expect("raw listener should expose an address")
+        .port();
+    let raw_url = format!("ws://127.0.0.1:{raw_port}/raw");
+
+    let (server_ready_sender, server_ready_receiver) = mpsc::channel();
+    let (server_shutdown_sender, server_shutdown_receiver) = mpsc::channel();
+    let raw_server_thread = thread::spawn(move || {
+        server_ready_sender
+            .send(())
+            .expect("raw server ready signal should send");
+
+        let (manager_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the manager connection");
+        let mut manager_socket = accept(manager_stream).expect("manager handshake should succeed");
+        respond_to_manager_bootstrap(&mut manager_socket, Vec::new());
+
+        let (client_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the proxied client connection");
+        let mut client_socket =
+            accept(client_stream).expect("proxied client handshake should succeed");
+        let thread_start_request = read_json_text_message(&mut client_socket);
+        assert_eq!(thread_start_request["method"], json!("thread/start"));
+        assert_eq!(thread_start_request["id"], json!(10_202));
+        client_socket
+            .send(Message::Text(
+                json!({
+                    "id": thread_start_request["id"],
+                    "result": {
+                        "thread": {
+                            "id": "thr_after_valid_id",
+                            "cwd": "/workspace"
+                        }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("thread/start response should send");
+
+        server_shutdown_receiver
+            .recv()
+            .expect("test should signal raw server shutdown");
+    });
+
+    server_ready_receiver
+        .recv()
+        .expect("raw server should report readiness");
+
+    let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
+    let store = IdempotencyStore::load_all(temp_dir.path().join("idempotency"))
+        .expect("idempotency store should load");
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+    let proxy = start_codex_proxy_with_idempotency_store(
+        "ws://127.0.0.1:0/codex",
+        &raw_url,
+        keepalive_manager,
+        runtime_readiness_manager,
+        store,
+    )
+    .expect("Codex proxy should start");
+
+    let (mut proxy_client, _) = connect_to_proxy_with_retry(proxy.listen_url());
+    let fingerprint = codex_fingerprint(IdempotencyOperation::CreateConversation, "thread/start");
+    proxy_client
+        .send(Message::Text(
+            json!({
+                "id": null,
+                "method": "thread/start",
+                "params": { "cwd": "/workspace" },
+                "idempotency": {
+                    "key": "create-key",
+                    "operation": "createConversation",
+                    "requestFingerprint": fingerprint.value()
+                }
+            })
+            .to_string()
+            .into(),
+        ))
+        .expect("invalid idempotent Codex request should send");
+    let invalid_id_response = read_json_text_message(&mut proxy_client);
+    assert_eq!(invalid_id_response["id"], Value::Null);
+    assert!(
+        invalid_id_response["error"]["message"]
+            .as_str()
+            .expect("invalid id message should be a string")
+            .contains("requires a JSON-RPC request id")
+    );
+
+    send_idempotent_codex_request(
+        &mut proxy_client,
+        10_202,
+        "thread/start",
+        json!({ "cwd": "/workspace" }),
+        "create-key",
+        "createConversation",
+        fingerprint.value(),
+    );
+    let response = read_json_text_message(&mut proxy_client);
+    assert_eq!(response["id"], json!(10_202));
+    assert_eq!(
+        response["result"]["thread"]["id"],
+        json!("thr_after_valid_id")
+    );
+
+    server_shutdown_sender
+        .send(())
+        .expect("raw server shutdown signal should send");
+    proxy_client
+        .close(None)
+        .expect("proxy client should close cleanly");
+    proxy.close().expect("Codex proxy should close cleanly");
+    raw_server_thread
+        .join()
+        .expect("raw server thread should exit cleanly");
+}
+
+#[test]
+fn replays_completed_non_retained_idempotent_turn_start_without_forwarding_again() {
+    let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
+    let raw_port = raw_listener
+        .local_addr()
+        .expect("raw listener should expose an address")
+        .port();
+    let raw_url = format!("ws://127.0.0.1:{raw_port}/raw");
+
+    let (server_ready_sender, server_ready_receiver) = mpsc::channel();
+    let (server_shutdown_sender, server_shutdown_receiver) = mpsc::channel();
+    let raw_server_thread = thread::spawn(move || {
+        server_ready_sender
+            .send(())
+            .expect("raw server ready signal should send");
+
+        let (manager_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the manager connection");
+        let mut manager_socket = accept(manager_stream).expect("manager handshake should succeed");
+        respond_to_manager_bootstrap(&mut manager_socket, Vec::new());
+
+        let (client_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the proxied client connection");
+        let mut client_socket =
+            accept(client_stream).expect("proxied client handshake should succeed");
+        let turn_start_request = read_json_text_message(&mut client_socket);
+        assert_eq!(turn_start_request["method"], json!("turn/start"));
+        assert_eq!(turn_start_request.get("idempotency"), None);
+        client_socket
+            .send(Message::Text(
+                json!({
+                    "id": turn_start_request["id"],
+                    "result": {
+                        "turn": {
+                            "id": "turn_non_retained",
+                            "threadId": "thr_non_retained"
+                        }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("turn/start response should send");
+
+        set_plain_websocket_read_timeout(&mut client_socket, Duration::from_millis(150));
+        match client_socket.read() {
+            Err(tungstenite::Error::Io(error))
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) => {}
+            Ok(Message::Close(_))
+            | Err(tungstenite::Error::Protocol(
+                tungstenite::error::ProtocolError::ResetWithoutClosingHandshake,
+            ))
+            | Err(tungstenite::Error::ConnectionClosed)
+            | Err(tungstenite::Error::AlreadyClosed) => {}
+            other => panic!("raw Codex should not receive a duplicate turn/start: {other:?}"),
+        }
+        server_shutdown_receiver
+            .recv()
+            .expect("test should signal raw server shutdown");
+    });
+
+    server_ready_receiver
+        .recv()
+        .expect("raw server should report readiness");
+
+    let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
+    let store = IdempotencyStore::load_all(temp_dir.path().join("idempotency"))
+        .expect("idempotency store should load");
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+    let proxy = start_codex_proxy_with_idempotency_store(
+        "ws://127.0.0.1:0/codex",
+        &raw_url,
+        keepalive_manager,
+        runtime_readiness_manager,
+        store,
+    )
+    .expect("Codex proxy should start");
+
+    let (mut proxy_client, _) = connect_to_proxy_with_retry(proxy.listen_url());
+    let fingerprint = codex_fingerprint(IdempotencyOperation::SubmitPayload, "turn/start");
+    send_idempotent_codex_request(
+        &mut proxy_client,
+        10_301,
+        "turn/start",
+        json!({ "threadId": "thr_non_retained", "prompt": "hello" }),
+        "submit-key",
+        "submitPayload",
+        fingerprint.value(),
+    );
+    let first_response = read_json_text_message(&mut proxy_client);
+    assert_eq!(first_response["id"], json!(10_301));
+    assert_eq!(
+        first_response["result"]["turn"]["id"],
+        json!("turn_non_retained")
+    );
+
+    send_idempotent_codex_request(
+        &mut proxy_client,
+        10_302,
+        "turn/start",
+        json!({ "threadId": "thr_non_retained", "prompt": "hello" }),
+        "submit-key",
+        "submitPayload",
+        fingerprint.value(),
+    );
+    let replay_response = read_json_text_message(&mut proxy_client);
+    assert_eq!(replay_response["id"], json!(10_302));
+    assert_eq!(
+        replay_response["result"]["turn"]["id"],
+        json!("turn_non_retained")
+    );
+
+    server_shutdown_sender
+        .send(())
+        .expect("raw server shutdown signal should send");
+    proxy_client
+        .close(None)
+        .expect("proxy client should close cleanly");
+    proxy.close().expect("Codex proxy should close cleanly");
+    raw_server_thread
+        .join()
+        .expect("raw server thread should exit cleanly");
+}
+
 fn build_runtime() -> Runtime {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -1557,6 +2078,40 @@ fn send_initialize_request(
             .into(),
         ))
         .expect("initialize request should send");
+}
+
+fn send_idempotent_codex_request(
+    proxy_client: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    request_id: u64,
+    method: &str,
+    params: Value,
+    idempotency_key: &str,
+    operation: &str,
+    request_fingerprint: &str,
+) {
+    proxy_client
+        .send(Message::Text(
+            json!({
+                "id": request_id,
+                "method": method,
+                "params": params,
+                "idempotency": {
+                    "key": idempotency_key,
+                    "operation": operation,
+                    "requestFingerprint": request_fingerprint
+                }
+            })
+            .to_string()
+            .into(),
+        ))
+        .expect("idempotent Codex request should send");
+}
+
+fn codex_fingerprint(operation: IdempotencyOperation, scenario: &str) -> RequestFingerprint {
+    let mut fields = BTreeMap::new();
+    fields.insert("scenario".to_string(), json!(scenario));
+    RequestFingerprint::from_fields(AgentRuntimeId::Codex, operation, fields)
+        .expect("fingerprint should encode")
 }
 
 fn set_plain_websocket_read_timeout(socket: &mut WebSocket<TcpStream>, timeout: Duration) {

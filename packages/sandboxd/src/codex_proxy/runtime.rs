@@ -13,6 +13,7 @@ use tokio::task::JoinSet;
 use url::Url;
 
 use crate::codex_proxy::error::CodexProxyError;
+use crate::codex_proxy::idempotency::SharedIdempotencyStore;
 use crate::codex_proxy::proxy_session::relay_codex_proxy_connection;
 use crate::codex_proxy::session_manager;
 use crate::codex_proxy::types::CodexSessionManagerHealthState;
@@ -30,6 +31,7 @@ pub(crate) async fn run_codex_proxy_runtime(
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     mut shutdown_receiver: watch::Receiver<bool>,
     startup_result_sender: mpsc::Sender<Result<CodexProxyStartup, CodexProxyError>>,
+    idempotency_store: Option<SharedIdempotencyStore>,
 ) -> Result<(), CodexProxyError> {
     let listener = TcpListener::bind(listener_address).await.map_err(|error| {
         CodexProxyError::BindListener {
@@ -86,12 +88,14 @@ pub(crate) async fn run_codex_proxy_runtime(
                 let task_raw_url = raw_app_server_url.to_string();
                 let task_handle = session_manager_handle.clone();
                 let task_shutdown = shutdown_receiver.clone();
+                let idempotency_store = idempotency_store.clone();
                 session_tasks.spawn(async move {
                     relay_codex_proxy_connection(
                         stream,
                         &task_raw_url,
                         task_handle,
                         task_shutdown,
+                        idempotency_store,
                     )
                     .await
                 });
