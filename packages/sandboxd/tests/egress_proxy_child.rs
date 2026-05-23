@@ -140,6 +140,12 @@ fn process_supervisor_restarts_child_after_the_active_proxy_exits() {
         .expect("egress proxy listenAddr detail should exist")
         .parse()
         .expect("egress proxy listenAddr should parse");
+    assert_eq!(initial_component["details"]["runtimeMode"], "child_process");
+    assert_eq!(
+        initial_component["details"]["childBinary"],
+        env!("CARGO_BIN_EXE_sandboxd")
+    );
+    let initial_child_pid = component_child_pid(&initial_component);
 
     let initial_response = send_proxy_http_request(
         proxy_addr,
@@ -164,6 +170,12 @@ fn process_supervisor_restarts_child_after_the_active_proxy_exits() {
 
     let restarted_component = wait_for_egress_proxy_restart_count(server.health_endpoint_addr(), 1);
     assert_eq!(restarted_component["state"], "healthy");
+    assert_eq!(
+        restarted_component["details"]["runtimeMode"],
+        "child_process"
+    );
+    let restarted_child_pid = component_child_pid(&restarted_component);
+    assert_ne!(restarted_child_pid, initial_child_pid);
     let restarted_upstream = start_single_request_http_server();
     let restarted_response = send_proxy_http_request(
         proxy_addr,
@@ -435,6 +447,17 @@ fn wait_for_egress_proxy_restart_count(
         }
         ThreadSleeper.sleep(sandboxd::time::Duration::from_millis(50));
     }
+}
+
+#[cfg(target_os = "linux")]
+fn component_child_pid(component: &serde_json::Value) -> u32 {
+    let child_pid = component["details"]["childPid"]
+        .as_str()
+        .expect("egress proxy childPid detail should exist")
+        .parse::<u32>()
+        .expect("egress proxy childPid should parse");
+    assert!(child_pid > 0);
+    child_pid
 }
 
 #[cfg(target_os = "linux")]
