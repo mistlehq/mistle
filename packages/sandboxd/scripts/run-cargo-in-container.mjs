@@ -26,7 +26,6 @@ const cargoTargetDirectoryPath = path.join(
   "sandboxd-test",
   "target-debian-container",
 );
-const cargoTargetDirectoryOverride = process.env.MISTLE_SANDBOXD_TEST_CARGO_TARGET_DIR;
 
 if (cargoArguments.length === 0) {
   throw new Error("Expected cargo arguments, e.g. `test --locked`.");
@@ -56,16 +55,17 @@ const dockerRunArguments = [
   "run",
   "--rm",
   ...createCapabilityArguments(),
-  ...createUserArguments(),
   ...createEnvironmentArguments({
     CI: process.env.CI,
     CARGO_HOME: "/cargo-home",
-    CARGO_TARGET_DIR: cargoTargetDirectoryOverride ?? cargoTargetDirectoryPath,
+    CARGO_TARGET_DIR: cargoTargetDirectoryPath,
     HOME: "/tmp/mistle-home",
+    ...readMistleEnvironmentVariables(),
+    MISTLE_SANDBOXD_TEST_HOST_GID: hostGid(),
+    MISTLE_SANDBOXD_TEST_HOST_UID: hostUid(),
     PATH: "/usr/local/cargo/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
     RUSTUP_HOME: "/usr/local/rustup",
     TMPDIR: path.join(repositoryMountPath, ".local", "sandboxd-test", "tmp"),
-    ...readMistleEnvironmentVariables(),
   }),
   "--volume",
   `${repositoryRootPath}:${repositoryMountPath}`,
@@ -138,18 +138,6 @@ function dockerImageExists(imageTag) {
   }
 }
 
-function createUserArguments() {
-  if (netAdminEnabled) {
-    return [];
-  }
-
-  if (typeof process.getuid !== "function" || typeof process.getgid !== "function") {
-    return [];
-  }
-
-  return ["--user", `${String(process.getuid())}:${String(process.getgid())}`];
-}
-
 function createCapabilityArguments() {
   if (!netAdminEnabled) {
     return [];
@@ -195,7 +183,41 @@ function readMistleEnvironmentVariables() {
 
 function createCargoCommand() {
   const quotedArguments = cargoArguments.map((argument) => shellQuote(argument)).join(" ");
-  return `mkdir -p /tmp/mistle-home && cargo ${quotedArguments}`;
+  return [
+    "mkdir -p /tmp/mistle-home",
+    `cargo ${quotedArguments}`,
+    "status=$?",
+    "restore_status=0",
+    createRestoreOwnershipCommand(),
+    'if [ "$status" -eq 0 ]; then exit "$restore_status"; fi',
+    "exit $status",
+  ].join("; ");
+}
+
+function createRestoreOwnershipCommand() {
+  const cacheRootPath = path.join(repositoryMountPath, ".local", "sandboxd-test");
+  const quotedCacheRootPath = shellQuote(cacheRootPath);
+  return [
+    'if [ -n "$MISTLE_SANDBOXD_TEST_HOST_UID" ] && [ -n "$MISTLE_SANDBOXD_TEST_HOST_GID" ]; then',
+    `chown -R "$MISTLE_SANDBOXD_TEST_HOST_UID:$MISTLE_SANDBOXD_TEST_HOST_GID" ${quotedCacheRootPath} || restore_status=$?;`,
+    "fi",
+  ].join(" ");
+}
+
+function hostUid() {
+  if (typeof process.getuid !== "function") {
+    return undefined;
+  }
+
+  return String(process.getuid());
+}
+
+function hostGid() {
+  if (typeof process.getgid !== "function") {
+    return undefined;
+  }
+
+  return String(process.getgid());
 }
 
 function shellQuote(value) {
