@@ -632,7 +632,13 @@ fn snapshot_detail_field_names_for_event(
             | LifecycleEventName::ComponentExited
             | LifecycleEventName::ComponentRestartScheduled
             | LifecycleEventName::ComponentRestartSucceeded,
-        ) => &["listenAddr", "stablePort"],
+        ) => &[
+            "listenAddr",
+            "stablePort",
+            "runtimeMode",
+            "childBinary",
+            "childPid",
+        ],
         (
             SupervisedComponent::CodexProxy,
             LifecycleEventName::ComponentStarting
@@ -898,6 +904,12 @@ mod tests {
             BTreeMap::from([
                 ("listenAddr".to_string(), "127.0.0.1:38513".to_string()),
                 ("stablePort".to_string(), "38513".to_string()),
+                ("runtimeMode".to_string(), "child_process".to_string()),
+                (
+                    "childBinary".to_string(),
+                    "/usr/local/bin/sandboxd".to_string(),
+                ),
+                ("childPid".to_string(), "1234".to_string()),
             ]),
         );
 
@@ -950,6 +962,12 @@ mod tests {
                 "component_restart_succeeded".to_string(),
             ]
         );
+        let first_event: Value =
+            serde_json::from_str(lines.first().expect("lifecycle line should exist"))
+                .expect("event line should be json");
+        assert_eq!(first_event["runtimeMode"], "child_process");
+        assert_eq!(first_event["childBinary"], "/usr/local/bin/sandboxd");
+        assert_eq!(first_event["childPid"], "1234");
     }
 
     #[test]

@@ -197,6 +197,14 @@ impl Display for EgressProxyError {
 impl std::error::Error for EgressProxyError {}
 
 impl ActiveLoopbackEgressProxy {
+    fn child_pid(&self) -> Option<u32> {
+        match self {
+            #[cfg(test)]
+            Self::InProcess(_) => None,
+            Self::ChildProcess(active_child) => Some(active_child.pid()),
+        }
+    }
+
     fn request_shutdown(&mut self) {
         match self {
             #[cfg(test)]
@@ -212,6 +220,34 @@ impl ActiveLoopbackEgressProxy {
             Self::ChildProcess(active_child) => active_child.join(),
         }
     }
+}
+
+fn egress_proxy_component_details(
+    listener_address: SocketAddr,
+    loopback_runtime: &EgressProxyLoopbackRuntime,
+    child_pid: Option<u32>,
+) -> BTreeMap<String, String> {
+    let mut details = BTreeMap::from([
+        ("listenAddr".to_string(), listener_address.to_string()),
+        (
+            "stablePort".to_string(),
+            listener_address.port().to_string(),
+        ),
+    ]);
+    match loopback_runtime {
+        #[cfg(test)]
+        EgressProxyLoopbackRuntime::InProcess => {
+            details.insert("runtimeMode".to_string(), "in_process".to_string());
+        }
+        EgressProxyLoopbackRuntime::ChildProcess { binary_path, .. } => {
+            details.insert("runtimeMode".to_string(), "child_process".to_string());
+            details.insert("childBinary".to_string(), binary_path.display().to_string());
+            if let Some(child_pid) = child_pid {
+                details.insert("childPid".to_string(), child_pid.to_string());
+            }
+        }
+    }
+    details
 }
 
 fn start_active_loopback_proxy(
@@ -392,13 +428,7 @@ impl EgressProxy {
         }
         supervisor_handle.replace_component_details(
             SupervisedComponent::EgressProxy,
-            BTreeMap::from([
-                ("listenAddr".to_string(), listener_address.to_string()),
-                (
-                    "stablePort".to_string(),
-                    listener_address.port().to_string(),
-                ),
-            ]),
+            egress_proxy_component_details(listener_address, &loopback_runtime, None),
         );
 
         let routes = Arc::new(RwLock::new(routes));
@@ -465,6 +495,14 @@ impl EgressProxy {
                             .unwrap_or_default();
                     return Err(EgressProxyError::new(format!("{error}{cleanup_suffix}")));
                 }
+                supervisor_handle.replace_component_details(
+                    SupervisedComponent::EgressProxy,
+                    egress_proxy_component_details(
+                        listener_address,
+                        &loopback_runtime,
+                        active_loopback.child_pid(),
+                    ),
+                );
                 active_loopback
             }
             Err(error) => {

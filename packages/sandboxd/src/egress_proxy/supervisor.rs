@@ -9,14 +9,18 @@ use std::io::{self, Write};
 use std::net::{SocketAddr, TcpListener as StdTcpListener};
 use std::os::fd::{AsRawFd, RawFd};
 use std::os::unix::process::CommandExt;
+use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, TryRecvError};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
+use nix::errno::Errno;
+use nix::sys::signal::{Signal, kill as send_signal};
+use nix::unistd::Pid;
 use serde_json::Value;
 use tokio::sync::oneshot;
 
@@ -31,6 +35,9 @@ use crate::egress_proxy::{
 use crate::proxy_ca::{GeneratedProxyCa, prepare_proxy_ca_runtime};
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
 use crate::tunnel::session::GatewayEgressTokenProvider;
+
+const EGRESS_PROXY_CHILD_SHUTDOWN_GRACE_PERIOD: Duration = Duration::from_secs(2);
+const EGRESS_PROXY_CHILD_SHUTDOWN_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
 #[cfg(test)]
 pub(super) struct EgressProxySupervisorConfig {
@@ -63,6 +70,21 @@ pub(super) struct ActiveEgressProxyChildProcess {
     child: Child,
     token_bridge: Option<EgressTokenBridgeServer>,
     config_file: tempfile::NamedTempFile,
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct EgressProxyChildExit {
+    pid: u32,
+    kind: EgressProxyChildExitKind,
+    status_text: String,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum EgressProxyChildExitKind {
+    Success,
+    ExitCode(i32),
+    Signal(i32),
+    UnknownFailure,
 }
 
 pub(super) fn spawn_active_egress_proxy_server(
@@ -132,22 +154,22 @@ impl ActiveEgressProxyServer {
 }
 
 impl ActiveEgressProxyChildProcess {
+    pub(super) fn pid(&self) -> u32 {
+        self.child.id()
+    }
+
     pub(super) fn request_shutdown(&mut self) {
-        if matches!(self.child.try_wait(), Ok(None)) {
-            let _ = self.child.kill();
+        if let Err(error) = self.send_shutdown_signal(Signal::SIGTERM) {
+            eprintln!("{error}");
         }
     }
 
-    fn try_recv_exit(&mut self) -> Result<Option<Result<(), EgressProxyError>>, EgressProxyError> {
+    fn try_recv_exit(&mut self) -> Result<Option<EgressProxyChildExit>, EgressProxyError> {
         match self.child.try_wait() {
             Ok(Some(status)) => {
+                let child_exit = EgressProxyChildExit::from_status(self.child.id(), status);
                 self.close_token_bridge()?;
-                if status.success() {
-                    return Ok(Some(Ok(())));
-                }
-                Ok(Some(Err(EgressProxyError::new(format!(
-                    "local egress proxy child exited with {status}"
-                )))))
+                Ok(Some(child_exit))
             }
             Ok(None) => Ok(None),
             Err(error) => Err(EgressProxyError::new(format!(
@@ -174,8 +196,14 @@ impl ActiveEgressProxyChildProcess {
         )))
     }
 
-    pub(super) fn join_after_requested_shutdown(mut self) -> Result<(), EgressProxyError> {
+    pub(super) fn shutdown(mut self) -> Result<(), EgressProxyError> {
         let _config_path = self.config_file.path();
+        if matches!(self.child.try_wait(), Ok(None)) {
+            self.send_shutdown_signal(Signal::SIGTERM)?;
+            if !self.wait_until_exit(EGRESS_PROXY_CHILD_SHUTDOWN_GRACE_PERIOD)? {
+                self.send_shutdown_signal(Signal::SIGKILL)?;
+            }
+        }
         self.child.wait().map_err(|error| {
             EgressProxyError::new(format!(
                 "failed to wait for local egress proxy child after shutdown: {error}"
@@ -184,11 +212,125 @@ impl ActiveEgressProxyChildProcess {
         self.close_token_bridge()
     }
 
+    fn wait_until_exit(&mut self, timeout: Duration) -> Result<bool, EgressProxyError> {
+        let deadline = Instant::now() + timeout;
+        loop {
+            match self.child.try_wait() {
+                Ok(Some(_)) => return Ok(true),
+                Ok(None) if Instant::now() >= deadline => return Ok(false),
+                Ok(None) => thread::sleep(EGRESS_PROXY_CHILD_SHUTDOWN_POLL_INTERVAL),
+                Err(error) => {
+                    return Err(EgressProxyError::new(format!(
+                        "failed to poll local egress proxy child during shutdown: {error}"
+                    )));
+                }
+            }
+        }
+    }
+
+    fn send_shutdown_signal(&mut self, signal: Signal) -> Result<(), EgressProxyError> {
+        let pid = i32::try_from(self.child.id()).map_err(|_| {
+            EgressProxyError::new("local egress proxy child pid exceeded i32 range")
+        })?;
+        match send_signal(Pid::from_raw(pid), signal) {
+            Ok(()) | Err(Errno::ESRCH) => Ok(()),
+            Err(error) => Err(EgressProxyError::new(format!(
+                "failed to signal local egress proxy child pid={pid} signal={signal}: {error}"
+            ))),
+        }
+    }
+
     fn close_token_bridge(&mut self) -> Result<(), EgressProxyError> {
         if let Some(token_bridge) = self.token_bridge.take() {
             token_bridge.close()?;
         }
         Ok(())
+    }
+}
+
+impl EgressProxyChildExit {
+    fn from_status(pid: u32, status: ExitStatus) -> Self {
+        let kind = if status.success() {
+            EgressProxyChildExitKind::Success
+        } else if let Some(code) = status.code() {
+            EgressProxyChildExitKind::ExitCode(code)
+        } else if let Some(signal) = status.signal() {
+            EgressProxyChildExitKind::Signal(signal)
+        } else {
+            EgressProxyChildExitKind::UnknownFailure
+        };
+        Self {
+            pid,
+            kind,
+            status_text: status.to_string(),
+        }
+    }
+
+    fn error(&self) -> EgressProxyError {
+        EgressProxyError::new(self.message())
+    }
+
+    fn message(&self) -> String {
+        match self.kind {
+            EgressProxyChildExitKind::Success => {
+                format!(
+                    "local egress proxy child pid={} returned unexpectedly",
+                    self.pid
+                )
+            }
+            EgressProxyChildExitKind::ExitCode(code) => {
+                format!(
+                    "local egress proxy child pid={} exited with code {code}",
+                    self.pid
+                )
+            }
+            EgressProxyChildExitKind::Signal(signal) => {
+                format!(
+                    "local egress proxy child pid={} exited from signal {signal}",
+                    self.pid
+                )
+            }
+            EgressProxyChildExitKind::UnknownFailure => {
+                format!(
+                    "local egress proxy child pid={} exited with {}",
+                    self.pid, self.status_text
+                )
+            }
+        }
+    }
+
+    fn reason(&self) -> &'static str {
+        match self.kind {
+            EgressProxyChildExitKind::Success => "process_returned",
+            EgressProxyChildExitKind::ExitCode(_) => "process_exit_code",
+            EgressProxyChildExitKind::Signal(_) => "process_signal",
+            EgressProxyChildExitKind::UnknownFailure => "process_exited",
+        }
+    }
+
+    fn details(&self) -> Vec<(&'static str, Value)> {
+        let mut details = vec![
+            ("childPid", Value::from(u64::from(self.pid))),
+            ("exitStatus", Value::String(self.status_text.clone())),
+        ];
+        match self.kind {
+            EgressProxyChildExitKind::Success => {
+                details.push(("exitKind", Value::String("success".to_string())));
+                details.push(("exitCode", Value::from(0)));
+            }
+            EgressProxyChildExitKind::ExitCode(code) => {
+                details.push(("exitKind", Value::String("exit_code".to_string())));
+                details.push(("exitCode", Value::from(code)));
+            }
+            EgressProxyChildExitKind::Signal(signal) => {
+                details.push(("exitKind", Value::String("signal".to_string())));
+                details.push(("signal", Value::from(signal)));
+            }
+            EgressProxyChildExitKind::UnknownFailure => {
+                details.push(("exitKind", Value::String("unknown_failure".to_string())));
+            }
+        }
+        details
     }
 }
 
@@ -420,7 +562,7 @@ pub(super) fn run_egress_proxy_process_supervisor(
     loop {
         if shutdown_requested.load(Ordering::Relaxed) {
             active_child.request_shutdown();
-            return active_child.join_after_requested_shutdown();
+            return active_child.shutdown();
         }
 
         #[cfg(any(test, debug_assertions))]
@@ -434,8 +576,7 @@ pub(super) fn run_egress_proxy_process_supervisor(
 
         let exit_result = active_child.try_recv_exit()?;
         if let Some(exit_result) = exit_result {
-            let exit_error = normalize_egress_proxy_exit_result(exit_result);
-            record_egress_proxy_process_exit_for_restart(&supervisor_handle, &exit_error);
+            record_egress_proxy_process_exit_for_restart(&supervisor_handle, &exit_result);
             active_child = match restart_egress_proxy_process_after_backoff(
                 &config,
                 shutdown_requested.as_ref(),
@@ -452,7 +593,7 @@ pub(super) fn run_egress_proxy_process_supervisor(
         if let Err(error) = check_egress_proxy_health(config.listener_address) {
             record_egress_proxy_healthcheck_failure(&supervisor_handle, &error);
             active_child.request_shutdown();
-            let _ = active_child.join_after_requested_shutdown();
+            let _ = active_child.shutdown();
             active_child = match restart_egress_proxy_process_after_backoff(
                 &config,
                 shutdown_requested.as_ref(),
@@ -507,6 +648,11 @@ fn restart_egress_proxy_process_after_backoff(
                 continue;
             }
         };
+        supervisor_handle.set_component_detail(
+            SupervisedComponent::EgressProxy,
+            "childPid",
+            active_child.pid().to_string(),
+        );
         match wait_for_egress_proxy_child_health(
             config.listener_address,
             &mut active_child,
@@ -520,7 +666,7 @@ fn restart_egress_proxy_process_after_backoff(
             Err(error) => {
                 record_egress_proxy_healthcheck_failure(supervisor_handle, &error);
                 active_child.request_shutdown();
-                let _ = active_child.join_after_requested_shutdown();
+                let _ = active_child.shutdown();
                 *restart_attempt_index = restart_attempt_index.saturating_add(1);
             }
         }
@@ -535,12 +681,7 @@ pub(super) fn wait_for_egress_proxy_child_health(
     let deadline = Instant::now() + timeout;
     loop {
         if let Some(exit_result) = active_child.try_recv_exit()? {
-            return match exit_result {
-                Ok(()) => Err(EgressProxyError::new(
-                    "local egress proxy child returned before becoming healthy",
-                )),
-                Err(error) => Err(error),
-            };
+            return Err(exit_result.error());
         }
 
         if check_egress_proxy_health(listener_address).is_ok() {
@@ -617,6 +758,7 @@ fn restart_egress_proxy_after_backoff(
     }
 }
 
+#[cfg(test)]
 fn normalize_egress_proxy_exit_result(
     exit_result: Result<(), EgressProxyError>,
 ) -> EgressProxyError {
@@ -713,27 +855,28 @@ fn record_egress_proxy_exit_for_restart(
 
 fn record_egress_proxy_process_exit_for_restart(
     supervisor_handle: &SandboxdSupervisorHandle,
-    error: &EgressProxyError,
+    child_exit: &EgressProxyChildExit,
 ) {
-    let error_text = error.to_string();
+    let error_text = child_exit.message();
     supervisor_handle
         .mark_component_restarting(SupervisedComponent::EgressProxy, error_text.clone());
     supervisor_handle.emit_component_exited(
         SupervisedComponent::EgressProxy,
-        "process_exited",
+        child_exit.reason(),
         Some(&error_text),
-        &[("exitKind", Value::String("process_exited".to_string()))],
+        &child_exit.details(),
     );
 }
 
 fn egress_proxy_restart_backoff_ms(attempt_index: usize) -> u64 {
-    *EGRESS_PROXY_RESTART_BACKOFF_MS
-        .get(attempt_index)
-        .unwrap_or_else(|| {
-            EGRESS_PROXY_RESTART_BACKOFF_MS
-                .last()
-                .expect("egress proxy backoff list should not be empty")
-        })
+    if let Some(backoff_ms) = EGRESS_PROXY_RESTART_BACKOFF_MS.get(attempt_index) {
+        return *backoff_ms;
+    }
+
+    match EGRESS_PROXY_RESTART_BACKOFF_MS.last() {
+        Some(backoff_ms) => *backoff_ms,
+        None => 0,
+    }
 }
 
 pub(super) fn bind_egress_proxy_listener(
