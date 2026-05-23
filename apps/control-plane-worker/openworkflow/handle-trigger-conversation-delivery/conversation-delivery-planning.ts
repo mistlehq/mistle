@@ -1,6 +1,7 @@
 export const TriggerConversationDeliverySandboxActions = {
   REUSE_EXISTING: "reuse_existing",
   START_NEW: "start_new",
+  RECOVER_FAILED: "recover_failed",
   FAIL: "fail",
 } as const;
 
@@ -21,6 +22,9 @@ export function resolveTriggerConversationDeliverySandboxAction(input: {
     input.sandboxStatus === "stopped"
   ) {
     return TriggerConversationDeliverySandboxActions.REUSE_EXISTING;
+  }
+  if (input.sandboxStatus === "failed") {
+    return TriggerConversationDeliverySandboxActions.RECOVER_FAILED;
   }
 
   return TriggerConversationDeliverySandboxActions.FAIL;

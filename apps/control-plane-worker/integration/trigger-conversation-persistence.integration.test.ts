@@ -21,6 +21,7 @@ import { activateTriggerConversationRoute } from "../openworkflow/shared/activat
 import { claimTriggerConversation } from "../openworkflow/shared/claim-conversation.js";
 import { createTriggerConversationRoute } from "../openworkflow/shared/create-conversation-route.js";
 import { rebindTriggerConversationSandbox } from "../openworkflow/shared/rebind-conversation-sandbox.js";
+import { recoverTriggerConversationSandbox } from "../openworkflow/shared/recover-conversation-sandbox.js";
 import { replaceTriggerConversationBinding } from "../openworkflow/shared/replace-conversation-binding.js";
 import { updateTriggerConversationExecution } from "../openworkflow/shared/update-conversation-execution.js";
 
@@ -223,6 +224,33 @@ describe.concurrent("control-plane worker conversation persistence", () => {
     expect(reboundRoute.providerConversationId).toBe("thread_rebind_1");
   });
 
+  it("recovers a route onto a new sandbox and clears provider binding state", async ({ env }) => {
+    const route = await createActiveRoute({
+      env,
+      suffix: createSuffix("recover"),
+      conversationKey: "key-recover",
+      sandboxInstanceId: "sbi_recover_1",
+      providerConversationId: "thread_recover_1",
+      providerExecutionId: "turn_recover_1",
+      providerState: {
+        cursor: "stale",
+      },
+    });
+
+    const recoveredRoute = await recoverTriggerConversationSandbox(
+      { db: env.controlPlaneDb },
+      {
+        routeId: route.id,
+        sandboxInstanceId: "sbi_recover_2",
+      },
+    );
+
+    expect(recoveredRoute.sandboxInstanceId).toBe("sbi_recover_2");
+    expect(recoveredRoute.providerConversationId).toBeNull();
+    expect(recoveredRoute.providerExecutionId).toBeNull();
+    expect(recoveredRoute.providerState).toBeNull();
+  });
+
   it("replaces a route binding with new sandbox and provider identifiers", async ({ env }) => {
     const route = await createActiveRoute({
       env,
@@ -381,6 +409,7 @@ async function createActiveRoute(input: {
   sandboxInstanceId: string;
   providerConversationId: string;
   providerExecutionId: string;
+  providerState?: unknown;
 }) {
   const { route } = await createActiveConversationRoute({
     ...input,

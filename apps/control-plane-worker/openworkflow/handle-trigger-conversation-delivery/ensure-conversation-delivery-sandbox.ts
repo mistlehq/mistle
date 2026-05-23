@@ -1,9 +1,11 @@
 import type { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 
+import { recoverTriggerConversationSandbox } from "../shared/recover-conversation-sandbox.js";
 import type { EnsuredTriggerSandbox, PreparedTriggerRun } from "../shared/trigger-run-types.js";
 import { ensureTriggerSandbox } from "../shared/trigger-run.js";
 import {
+  type ConversationDeliverySandboxAction,
   TriggerConversationDeliverySandboxActions,
   resolveTriggerConversationDeliverySandboxAction,
 } from "./conversation-delivery-planning.js";
@@ -39,13 +41,14 @@ export async function ensureConversationDeliverySandbox(
       },
     },
     async (span) => {
+      let sandboxAction: ConversationDeliverySandboxAction | null = null;
       if (input.resolvedTriggerConversationRoute.sandboxInstanceId !== null) {
         const existingSandbox = await ctx.controlPlaneInternalClient.getSandboxInstance({
           organizationId: input.preparedTriggerRun.organizationId,
           instanceId: input.resolvedTriggerConversationRoute.sandboxInstanceId,
         });
 
-        const sandboxAction = resolveTriggerConversationDeliverySandboxAction({
+        sandboxAction = resolveTriggerConversationDeliverySandboxAction({
           sandboxInstanceId: input.resolvedTriggerConversationRoute.sandboxInstanceId,
           sandboxStatus: existingSandbox.status,
         });
@@ -101,6 +104,39 @@ export async function ensureConversationDeliverySandbox(
         },
       );
       span.setAttribute("mistle.sandbox.instance_id", ensuredSandbox.sandboxInstanceId);
+
+      if (
+        sandboxAction === TriggerConversationDeliverySandboxActions.RECOVER_FAILED &&
+        input.resolvedTriggerConversationRoute.routeId !== null &&
+        input.resolvedTriggerConversationRoute.sandboxInstanceId !== null
+      ) {
+        await recoverTriggerConversationSandbox(
+          {
+            db: ctx.db,
+          },
+          {
+            routeId: input.resolvedTriggerConversationRoute.routeId,
+            sandboxInstanceId: ensuredSandbox.sandboxInstanceId,
+          },
+        );
+        logTriggerConversationDeliveryEvent({
+          eventName: "sandbox.recovered",
+          message: "Rebound trigger conversation route from failed sandbox to replacement sandbox",
+          telemetryContext: {
+            triggerRunId: input.preparedTriggerRun.triggerRunId,
+            conversationId: input.preparedTriggerRun.conversationId,
+            deliveryTaskId: input.deliveryTaskId,
+            routeId: input.resolvedTriggerConversationRoute.routeId,
+            sandboxInstanceId: ensuredSandbox.sandboxInstanceId,
+            webhookEventId: input.preparedTriggerRun.webhookEventId,
+            workflowRunId: input.workflowRunId,
+          },
+          attributes: {
+            "mistle.sandbox.previous_instance_id":
+              input.resolvedTriggerConversationRoute.sandboxInstanceId,
+          },
+        });
+      }
 
       return ensuredSandbox;
     },

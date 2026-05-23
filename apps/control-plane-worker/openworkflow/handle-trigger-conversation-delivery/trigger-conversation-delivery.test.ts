@@ -61,13 +61,13 @@ describe("conversation delivery plans", () => {
       ).toBe(TriggerConversationDeliverySandboxActions.REUSE_EXISTING);
     });
 
-    it("fails closed when a persisted sandbox has failed", () => {
+    it("recovers with a replacement sandbox when a persisted sandbox has failed", () => {
       expect(
         resolveTriggerConversationDeliverySandboxAction({
           sandboxInstanceId: "sbi_123",
           sandboxStatus: "failed",
         }),
-      ).toBe(TriggerConversationDeliverySandboxActions.FAIL);
+      ).toBe(TriggerConversationDeliverySandboxActions.RECOVER_FAILED);
     });
   });
 
