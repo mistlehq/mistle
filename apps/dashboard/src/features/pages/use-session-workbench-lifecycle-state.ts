@@ -2,6 +2,7 @@ import { systemScheduler } from "@mistle/time";
 import { type QueryClient, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { stopUnavailableResourceRefetchInterval } from "../api/http-api-error.js";
 import {
   resolveSessionConnectionReadiness,
   shouldAutoConnectSession,
@@ -72,6 +73,19 @@ export type SessionLifecycleForWorkbench = {
 
 export function resolveSandboxStatusRefetchInterval(
   input: SessionWorkbenchSandboxStatusSnapshot & {
+    error: unknown;
+    isAutoResumingStoppedSandbox: boolean;
+  },
+): false | number {
+  const refetchInterval = resolveAvailableSandboxStatusRefetchInterval(input);
+  return stopUnavailableResourceRefetchInterval({
+    error: input.error,
+    refetchInterval,
+  });
+}
+
+function resolveAvailableSandboxStatusRefetchInterval(
+  input: SessionWorkbenchSandboxStatusSnapshot & {
     isAutoResumingStoppedSandbox: boolean;
   },
 ): false | number {
@@ -141,6 +155,7 @@ export function useSessionWorkbenchLifecycleState(input: {
       return resolveSandboxStatusRefetchInterval({
         triggerConversation: query.state.data?.triggerConversation ?? null,
         connectable: query.state.data?.connectable ?? null,
+        error: query.state.error,
         isAutoResumingStoppedSandbox,
         status: query.state.data?.status ?? null,
       });

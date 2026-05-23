@@ -795,6 +795,7 @@ describe("useSessionWorkbenchController", () => {
       resolveSandboxStatusRefetchInterval({
         triggerConversation: null,
         connectable: true,
+        error: null,
         isAutoResumingStoppedSandbox: false,
         status: "running",
       }),

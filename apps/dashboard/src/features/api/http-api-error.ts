@@ -107,6 +107,17 @@ export function isUnavailableResourceError(value: unknown): boolean {
   return readHttpErrorStatus(value) === 404;
 }
 
+export function stopUnavailableResourceRefetchInterval(input: {
+  error: unknown;
+  refetchInterval: false | number;
+}): false | number {
+  if (isUnavailableResourceError(input.error)) {
+    return false;
+  }
+
+  return input.refetchInterval;
+}
+
 export type HttpApiErrorInput = {
   operation: string;
   status: number;

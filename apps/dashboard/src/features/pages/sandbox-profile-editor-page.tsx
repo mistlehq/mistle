@@ -54,7 +54,10 @@ import {
 } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { isUnavailableResourceError } from "../api/http-api-error.js";
+import {
+  isUnavailableResourceError,
+  stopUnavailableResourceRefetchInterval,
+} from "../api/http-api-error.js";
 import { useAppPageBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { NavigationBlockerDialog } from "../navigation/navigation-blocker-dialog.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
@@ -646,7 +649,11 @@ export function SandboxProfileEditorShell(): React.JSX.Element {
   const profileQuery = useQuery({
     queryKey: profileDetailKey,
     queryFn: async ({ signal }) => getSandboxProfile({ profileId, signal }),
-    refetchInterval: shouldPollCachedSnapshotJobs,
+    refetchInterval: (query) =>
+      stopUnavailableResourceRefetchInterval({
+        error: query.state.error,
+        refetchInterval: shouldPollCachedSnapshotJobs(),
+      }),
     retry: false,
   });
   const profileVersionsQuery = useQuery({
@@ -656,7 +663,11 @@ export function SandboxProfileEditorShell(): React.JSX.Element {
         profileId,
         signal,
       }),
-    refetchInterval: shouldPollCachedSnapshotJobs,
+    refetchInterval: (query) =>
+      stopUnavailableResourceRefetchInterval({
+        error: query.state.error,
+        refetchInterval: shouldPollCachedSnapshotJobs(),
+      }),
     retry: false,
   });
 
