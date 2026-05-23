@@ -3,9 +3,11 @@ import {
   type DataPlaneTables,
   type SandboxInstanceDeadlineKind,
 } from "@mistle/db/data-plane";
+import { SpanStatusCode, trace } from "@mistle/telemetry";
 import { HandleSandboxInstanceDeadlineWorkflowSpec } from "@mistle/workflow-registry/data-plane";
 import { sql } from "drizzle-orm";
 
+import { logger } from "../../../logger.js";
 import type { AppRuntimeResources } from "../../../resources.js";
 
 type PutSandboxInstanceDeadlineContext = {
@@ -186,25 +188,88 @@ export async function putSandboxInstanceDeadline(
     return nextGeneration;
   });
 
-  const workflowRunHandle = await ctx.openWorkflow.runWorkflow(
-    HandleSandboxInstanceDeadlineWorkflowSpec,
+  const workflowInput = {
+    sandboxInstanceId: input.sandboxInstanceId,
+    kind: input.kind,
+    ownerLeaseId: input.ownerLeaseId,
+    dueAt: input.dueAt,
+    generation,
+  };
+  const workflowIdempotencyKey = createDeadlineWorkflowIdempotencyKey(workflowInput);
+  const activeSpan = trace.getActiveSpan();
+  activeSpan?.addEvent("sandbox_instance_deadline.workflow_enqueue_started", {
+    "mistle.sandbox.instance_id": input.sandboxInstanceId,
+    "mistle.sandbox.deadline.kind": input.kind,
+    "mistle.sandbox.deadline.owner_lease_id": input.ownerLeaseId,
+    "mistle.sandbox.deadline.due_at": input.dueAt,
+    "mistle.sandbox.deadline.generation": generation,
+    "mistle.workflow.name": HandleSandboxInstanceDeadlineWorkflowSpec.name,
+    "mistle.workflow.idempotency_key": workflowIdempotencyKey,
+  });
+
+  let workflowRunHandle: Awaited<ReturnType<typeof ctx.openWorkflow.runWorkflow>>;
+  try {
+    workflowRunHandle = await ctx.openWorkflow.runWorkflow(
+      HandleSandboxInstanceDeadlineWorkflowSpec,
+      workflowInput,
+      {
+        availableAt: new Date(input.dueAt),
+        idempotencyKey: workflowIdempotencyKey,
+      },
+    );
+  } catch (error) {
+    activeSpan?.recordException(error instanceof Error ? error : String(error));
+    activeSpan?.setStatus({
+      code: SpanStatusCode.ERROR,
+      message: "Failed to enqueue sandbox instance deadline workflow.",
+    });
+    activeSpan?.addEvent("sandbox_instance_deadline.workflow_enqueue_failed", {
+      "mistle.sandbox.instance_id": input.sandboxInstanceId,
+      "mistle.sandbox.deadline.kind": input.kind,
+      "mistle.sandbox.deadline.owner_lease_id": input.ownerLeaseId,
+      "mistle.sandbox.deadline.due_at": input.dueAt,
+      "mistle.sandbox.deadline.generation": generation,
+      "mistle.workflow.name": HandleSandboxInstanceDeadlineWorkflowSpec.name,
+      "mistle.workflow.idempotency_key": workflowIdempotencyKey,
+    });
+    logger.error(
+      {
+        err: error,
+        sandboxInstanceId: input.sandboxInstanceId,
+        kind: input.kind,
+        ownerLeaseId: input.ownerLeaseId,
+        dueAt: input.dueAt,
+        generation,
+        workflow: HandleSandboxInstanceDeadlineWorkflowSpec.name,
+        workflowIdempotencyKey,
+      },
+      "Failed to enqueue sandbox instance deadline workflow after deadline write.",
+    );
+    throw error;
+  }
+
+  activeSpan?.addEvent("sandbox_instance_deadline.workflow_enqueue_completed", {
+    "mistle.sandbox.instance_id": input.sandboxInstanceId,
+    "mistle.sandbox.deadline.kind": input.kind,
+    "mistle.sandbox.deadline.owner_lease_id": input.ownerLeaseId,
+    "mistle.sandbox.deadline.due_at": input.dueAt,
+    "mistle.sandbox.deadline.generation": generation,
+    "mistle.workflow.name": HandleSandboxInstanceDeadlineWorkflowSpec.name,
+    "mistle.workflow.idempotency_key": workflowIdempotencyKey,
+    "mistle.workflow.run_id": workflowRunHandle.workflowRun.id,
+  });
+  logger.info(
     {
       sandboxInstanceId: input.sandboxInstanceId,
       kind: input.kind,
       ownerLeaseId: input.ownerLeaseId,
       dueAt: input.dueAt,
       generation,
+      workflow: HandleSandboxInstanceDeadlineWorkflowSpec.name,
+      workflowIdempotencyKey,
+      workflowRunId: workflowRunHandle.workflowRun.id,
     },
-    {
-      availableAt: new Date(input.dueAt),
-      idempotencyKey: createDeadlineWorkflowIdempotencyKey({
-        sandboxInstanceId: input.sandboxInstanceId,
-        kind: input.kind,
-        ownerLeaseId: input.ownerLeaseId,
-        dueAt: input.dueAt,
-        generation,
-      }),
-    },
+    "Enqueued sandbox instance deadline workflow.",
   );
 
   return {

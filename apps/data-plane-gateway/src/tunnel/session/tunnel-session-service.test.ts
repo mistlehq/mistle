@@ -99,29 +99,6 @@ function waitForWebSocketMessage(socket: WebSocket): Promise<ReceivedWebSocketMe
   });
 }
 
-function waitForWebSocketClose(socket: WebSocket): Promise<{ code: number; reason: string }> {
-  return new Promise((resolve, reject) => {
-    const onClose = (code: number, reason: Buffer): void => {
-      cleanup();
-      resolve({
-        code,
-        reason: reason.toString("utf8"),
-      });
-    };
-    const onError = (error: Error): void => {
-      cleanup();
-      reject(error);
-    };
-    const cleanup = (): void => {
-      socket.off("close", onClose);
-      socket.off("error", onError);
-    };
-
-    socket.once("close", onClose);
-    socket.once("error", onError);
-  });
-}
-
 function toWsReadyState(input: number): 0 | 1 | 2 | 3 {
   if (input === 0 || input === 1 || input === 2 || input === 3) {
     return input;
@@ -441,7 +418,7 @@ describe("TunnelSessionService", () => {
     expect(renewedAttachment?.ownerLeaseId).toBe(OwnerLeaseId);
   });
 
-  it("closes only the bootstrap peer when presence deadline persistence fails", async () => {
+  it("keeps the bootstrap peer open when initial idle deadline persistence fails", async () => {
     const clock = createMutableClock(1_000);
     const scheduler = createManualScheduler(clock);
     const relayCoordinator = new TunnelRelayCoordinator(
@@ -465,7 +442,114 @@ describe("TunnelSessionService", () => {
         new LocalGatewayForwardingServerAdapter(tunnelSessionRegistry),
       ),
     );
-    let idlePutCount = 0;
+    const service = new TunnelSessionService(
+      GatewayNodeId,
+      interactiveStreamRouter,
+      relayCoordinator,
+      tunnelSessionRegistry,
+      new InMemorySandboxPresenceStore(clock),
+      attachmentStore,
+      new SandboxInstanceDeadlineService(
+        {
+          async putSandboxInstanceDeadline(input) {
+            if (input.kind === "idle") {
+              throw new Error("Synthetic idle deadline failure.");
+            }
+
+            return {
+              status: "accepted",
+              sandboxInstanceId: input.sandboxInstanceId,
+              kind: input.kind,
+              generation: 1,
+              workflowRunId: "owfr_test",
+            } satisfies PutSandboxInstanceDeadlineAcceptedResponse;
+          },
+          async deleteSandboxInstanceDeadline(input) {
+            return {
+              status: "ok",
+              sandboxInstanceId: input.sandboxInstanceId,
+              kind: input.kind,
+            };
+          },
+        },
+        clock,
+        DefaultDataPlaneGatewayLifecycleDurations,
+      ),
+      new SandboxDeadlineLifecycleCoordinator(),
+      clock,
+      scheduler,
+    );
+
+    const bootstrapPair = await createWebSocketPair();
+    openPairs.add(bootstrapPair);
+
+    let fatalErrorMessage: string | undefined;
+    const attachedPeer = service.attachBootstrapPeer({
+      leaseId: OwnerLeaseId,
+      onFatalError: (failure) => {
+        fatalErrorMessage = failure.statusMessage;
+      },
+      onLeaseLost: () => {
+        throw new Error("Bootstrap lease should not be lost in this test.");
+      },
+      onTransportUnhealthy: () => {
+        throw new Error("Bootstrap transport should remain healthy in this test.");
+      },
+      ownerLeaseTtlMs: 60_000,
+      relaySessionId: BootstrapSessionId,
+      sandboxInstanceId: SandboxInstanceId,
+      socket: bootstrapPair.peerSocket,
+    });
+
+    let attachment = await attachmentStore.getAttachment({
+      sandboxInstanceId: SandboxInstanceId,
+      nowMs: clock.nowMs(),
+    });
+    for (
+      let attempt = 0;
+      (attachment?.ownerLeaseId !== OwnerLeaseId ||
+        attachedPeer.leaseHeartbeatHandle === undefined) &&
+      attempt < 10;
+      attempt += 1
+    ) {
+      await Promise.resolve();
+      attachment = await attachmentStore.getAttachment({
+        sandboxInstanceId: SandboxInstanceId,
+        nowMs: clock.nowMs(),
+      });
+    }
+
+    expect(fatalErrorMessage).toBeUndefined();
+    expect(attachment?.ownerLeaseId).toBe(OwnerLeaseId);
+    expect(attachedPeer.leaseHeartbeatHandle).toBeDefined();
+    expect(bootstrapPair.clientSocket.readyState).toBe(WebSocket.OPEN);
+  });
+
+  it("keeps the bootstrap peer open when presence deadline persistence fails", async () => {
+    const clock = createMutableClock(1_000);
+    const scheduler = createManualScheduler(clock);
+    const relayCoordinator = new TunnelRelayCoordinator(
+      GatewayNodeId,
+      new InMemoryLocalPeerRegistryAdapter(),
+      new InMemoryRelayTransportAdapter(GatewayNodeId),
+    );
+    const tunnelSessionRegistry = new TunnelSessionRegistry(
+      new InMemoryTunnelSessionRegistryAdapter(),
+    );
+    const attachmentStore = new InMemorySandboxRuntimeAttachmentStore(clock);
+    const interactiveStreamRouter = new InteractiveStreamRouter(
+      GatewayNodeId,
+      new AttachmentBackedSandboxOwnerResolver(
+        GatewayNodeId,
+        createAttachmentBackedActiveBootstrapSessionStore(attachmentStore),
+        clock,
+      ),
+      new LocalGatewayForwardingClientAdapter(
+        GatewayNodeId,
+        new LocalGatewayForwardingServerAdapter(tunnelSessionRegistry),
+      ),
+    );
+    let idlePutAttempts = 0;
 
     const service = new TunnelSessionService(
       GatewayNodeId,
@@ -477,11 +561,11 @@ describe("TunnelSessionService", () => {
       new SandboxInstanceDeadlineService(
         {
           async putSandboxInstanceDeadline(input) {
-            if (input.kind === "idle" && idlePutCount >= 1) {
-              throw new Error("Synthetic idle deadline failure.");
-            }
             if (input.kind === "idle") {
-              idlePutCount += 1;
+              idlePutAttempts += 1;
+              if (idlePutAttempts >= 2) {
+                throw new Error("Synthetic idle deadline failure.");
+              }
             }
 
             return {
@@ -535,7 +619,7 @@ describe("TunnelSessionService", () => {
     });
     for (
       let attempt = 0;
-      (activeAttachment?.ownerLeaseId !== OwnerLeaseId || idlePutCount !== 1) && attempt < 10;
+      (activeAttachment?.ownerLeaseId !== OwnerLeaseId || idlePutAttempts !== 1) && attempt < 10;
       attempt += 1
     ) {
       await Promise.resolve();
@@ -545,7 +629,7 @@ describe("TunnelSessionService", () => {
       });
     }
     expect(activeAttachment?.ownerLeaseId).toBe(OwnerLeaseId);
-    expect(idlePutCount).toBe(1);
+    expect(idlePutAttempts).toBe(1);
 
     let connectionFatalErrorMessage: string | undefined;
     service.attachConnectionPeer({
@@ -560,11 +644,13 @@ describe("TunnelSessionService", () => {
       socket: connectionPair.peerSocket,
     });
 
-    await expect(waitForWebSocketClose(bootstrapPair.clientSocket)).resolves.toEqual({
-      code: 1011,
-      reason: "Failed to persist sandbox presence lease.",
-    });
+    for (let attempt = 0; idlePutAttempts < 2 && attempt < 10; attempt += 1) {
+      await Promise.resolve();
+    }
+    expect(idlePutAttempts).toBe(2);
+
     expect(connectionFatalErrorMessage).toBeUndefined();
+    expect(bootstrapPair.clientSocket.readyState).toBe(WebSocket.OPEN);
     expect(connectionPair.clientSocket.readyState).toBe(WebSocket.OPEN);
 
     await service.detachBootstrapPeer({

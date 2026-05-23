@@ -21,6 +21,7 @@ import { NodeSDK, resources } from "@opentelemetry/sdk-node";
 import { parseOtlpResourceAttributes } from "./otlp-config.js";
 
 export { SeverityNumber } from "@opentelemetry/api-logs";
+export { SpanStatusCode, trace } from "@opentelemetry/api";
 export type { LogRecord } from "@opentelemetry/api-logs";
 
 const TELEMETRY_STATE_SYMBOL = Symbol.for("@mistle/telemetry/state");
@@ -286,6 +287,32 @@ function emitHttpRequestLog(input: {
   }
 }
 
+function emitHttpRequestLogAfterServerResponseFinished(input: {
+  span: Span;
+  requestMetadata: HttpRequestMetadata;
+  response: ServerResponse;
+}): void {
+  if (input.response.writableEnded || input.response.destroyed) {
+    emitHttpRequestLog(input);
+    return;
+  }
+
+  let emitted = false;
+  const emitOnce = (): void => {
+    if (emitted) {
+      return;
+    }
+
+    emitted = true;
+    input.response.off("finish", emitOnce);
+    input.response.off("close", emitOnce);
+    emitHttpRequestLog(input);
+  };
+
+  input.response.once("finish", emitOnce);
+  input.response.once("close", emitOnce);
+}
+
 function configureDefaultNodeInstrumentations(env: NodeJS.ProcessEnv): void {
   const configuredInstrumentations =
     env[OTEL_NODE_ENABLED_INSTRUMENTATIONS_ENV] ??
@@ -490,6 +517,15 @@ export function initializeTelemetry(input: InitializeTelemetryInput): TelemetryH
             }
 
             HttpRequestMetadataBySpan.delete(span);
+            if (requestMetadata.kind === "server" && response instanceof ServerResponse) {
+              emitHttpRequestLogAfterServerResponseFinished({
+                span,
+                requestMetadata,
+                response,
+              });
+              return;
+            }
+
             emitHttpRequestLog({
               span,
               requestMetadata,

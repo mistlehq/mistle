@@ -298,26 +298,37 @@ export class TunnelSessionService {
     presenceLeaseRenewalHandle = this.startPresenceLeaseRenewal({
       leaseId: input.relaySessionId,
       onLeaseTouched: async () => {
-        await this.sandboxDeadlineLifecycleCoordinator.enqueue({
-          sandboxInstanceId: input.sandboxInstanceId,
-          operation: async () => {
-            const activeSession = await this.sandboxRuntimeAttachmentStore.getAttachment({
-              sandboxInstanceId: input.sandboxInstanceId,
-              nowMs: this.clock.nowMs(),
-            });
-            if (activeSession === null) {
-              return;
-            }
+        await this.sandboxDeadlineLifecycleCoordinator
+          .enqueue({
+            sandboxInstanceId: input.sandboxInstanceId,
+            operation: async () => {
+              const activeSession = await this.sandboxRuntimeAttachmentStore.getAttachment({
+                sandboxInstanceId: input.sandboxInstanceId,
+                nowMs: this.clock.nowMs(),
+              });
+              if (activeSession === null) {
+                return;
+              }
 
-            await this.sandboxInstanceDeadlineService.touchIdleDeadline({
-              sandboxInstanceId: input.sandboxInstanceId,
-              ownerLeaseId: activeSession.ownerLeaseId,
-              ...(input.testEnvironmentId === undefined
-                ? {}
-                : { testEnvironmentId: input.testEnvironmentId }),
-            });
-          },
-        });
+              await this.sandboxInstanceDeadlineService.touchIdleDeadline({
+                sandboxInstanceId: input.sandboxInstanceId,
+                ownerLeaseId: activeSession.ownerLeaseId,
+                ...(input.testEnvironmentId === undefined
+                  ? {}
+                  : { testEnvironmentId: input.testEnvironmentId }),
+              });
+            },
+          })
+          .catch((error: unknown) => {
+            logger.warn(
+              {
+                err: error,
+                sandboxInstanceId: input.sandboxInstanceId,
+                relaySessionId: input.relaySessionId,
+              },
+              "Failed to refresh sandbox idle deadline after connection presence renewal",
+            );
+          });
       },
       onTouchFailed: (error) => {
         logger.error(
@@ -522,22 +533,34 @@ export class TunnelSessionService {
         sandboxInstanceId: input.sandboxInstanceId,
       });
 
-      await this.sandboxDeadlineLifecycleCoordinator.enqueue({
-        sandboxInstanceId: input.sandboxInstanceId,
-        operation: async () => {
-          if (!this.relayCoordinator.isCurrentPeer(input.relayTarget)) {
-            return;
-          }
+      await this.sandboxDeadlineLifecycleCoordinator
+        .enqueue({
+          sandboxInstanceId: input.sandboxInstanceId,
+          operation: async () => {
+            if (!this.relayCoordinator.isCurrentPeer(input.relayTarget)) {
+              return;
+            }
 
-          await this.sandboxInstanceDeadlineService.handleBootstrapAttach({
-            sandboxInstanceId: input.sandboxInstanceId,
-            ownerLeaseId: input.leaseId,
-            ...(input.testEnvironmentId === undefined
-              ? {}
-              : { testEnvironmentId: input.testEnvironmentId }),
-          });
-        },
-      });
+            await this.sandboxInstanceDeadlineService.handleBootstrapAttach({
+              sandboxInstanceId: input.sandboxInstanceId,
+              ownerLeaseId: input.leaseId,
+              ...(input.testEnvironmentId === undefined
+                ? {}
+                : { testEnvironmentId: input.testEnvironmentId }),
+            });
+          },
+        })
+        .catch((error: unknown) => {
+          logger.warn(
+            {
+              err: error,
+              sandboxInstanceId: input.sandboxInstanceId,
+              ownerLeaseId: input.leaseId,
+              relaySessionId: input.relaySessionId,
+            },
+            "Failed to refresh sandbox idle deadline after bootstrap attachment",
+          );
+        });
 
       input.attachedPeer.leaseHeartbeatHandle = this.startRuntimeAttachmentRenewal({
         attachedAtMs: input.attachedAtMs,
