@@ -48,10 +48,6 @@
               "guides/signoz-integration-setup",
               "guides/slack-integration-setup"
             ]
-          },
-          {
-            "group": "Experimental",
-            "pages": ["guides/persistent-sandboxes"]
           }
         ]
       },

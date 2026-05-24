@@ -35,10 +35,9 @@ A usable profile usually needs more than a name and base image. Before publishin
 4. Select the model provider, Git connection, and connector integrations the profile should expose to sessions.
 5. Add repository or workspace configuration when the agent should work in source code.
 6. Write and test the setup script.
-7. Choose whether sessions from this profile should use persistent sandboxes.
-8. Publish the profile version.
-9. Wait for the snapshot to become ready.
-10. Start a session from the published profile.
+7. Publish the profile version.
+8. Wait for the snapshot to become ready.
+9. Start a session from the published profile.
 
 <Frame>
   <img
@@ -127,14 +126,6 @@ When a profile version is published, Mistle can prepare a snapshot for that vers
 
 Read [Snapshots](/guides/snapshots) for the snapshot lifecycle.
 
-## Persistent Sandboxes
-
-Draft profile versions can opt into persistent sandboxes when organization persistence is enabled.
-
-Use persistent sandboxes when sessions from a profile should retain selected workspace state across compute stops, resumes, or provider expiry. This is experimental and should be used deliberately.
-
-Read [Persistent Sandboxes](/guides/persistent-sandboxes) for setup steps, limits, and how persistence differs from snapshots.
-
 ## Triggers On A Profile
 
 Open the **Triggers** tab on a sandbox profile to see triggers that use that profile. From there you can create a new trigger preselected for the profile, or select an existing event or scheduled trigger to edit it without leaving the profile.
@@ -149,6 +140,5 @@ Open the **Triggers** tab on a sandbox profile to see triggers that use that pro
 ## Next Steps
 
 - Read [Snapshots](/guides/snapshots) to understand prepared profile images.
-- Read [Persistent Sandboxes](/guides/persistent-sandboxes) to understand experimental per-session state persistence.
 - Read [Sessions](/guides/sessions) to see how users start work from a profile.
 - Read [Self-Hosted Configuration](/guides/self-hosted-configuration) for deployment-level sandbox settings.
