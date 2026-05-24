@@ -11,12 +11,15 @@ Connect to Linear by providing a personal API key for the user account that shou
 ## Create A Linear API Key
 
 Create a Linear personal API key for the user account that should back the Mistle connection.
+Use a workspace admin account when you want Mistle to automatically register Linear webhooks for
+triggers.
 
 According to Linear's docs:
 
 - admins can control whether members are allowed to create their own API keys
 - existing API keys can be viewed and revoked from `Settings > Administration > API`
 - admins and permitted members can create personal API keys from `Settings > Account > Security & Access`
+- creating or managing webhooks requires a workspace admin API key or an OAuth app with admin scope
 
 When creating the key, Linear lets you choose either full access or restricted permissions, and you can limit the key to specific teams.
 
@@ -30,7 +33,16 @@ Enter:
 | ------- | -------------- |
 | API key | Linear API key |
 
+## Webhook Coverage
+
+Mistle currently registers Linear webhooks for **all public teams** in the workspace. Linear
+private teams are not included in that workspace-wide public-team webhook scope.
+
+To receive events from a Linear private team, Linear requires a team-scoped webhook for that
+specific team. Mistle does not yet expose private-team webhook selection in the dashboard.
+
 ## Official References
 
 - [Linear API and Webhooks](https://linear.app/docs/api-and-webhooks)
+- [Linear Private Teams](https://linear.app/docs/private-teams)
 - [Linear Security & Access](https://linear.app/docs/security-and-access)

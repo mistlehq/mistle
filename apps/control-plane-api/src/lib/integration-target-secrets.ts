@@ -1,13 +1,14 @@
 import type { IntegrationTarget } from "@mistle/db/control-plane";
 
-import type { AppContext } from "../types.js";
 import {
   decryptIntegrationTargetSecrets,
   resolveMasterEncryptionKeyMaterial,
   type IntegrationTargetSecrets,
 } from "./crypto.js";
 
-type IntegrationsConfig = AppContext["var"]["config"]["integrations"];
+type IntegrationsConfig = {
+  masterEncryptionKeys: Record<string, string>;
+};
 
 export function resolveIntegrationTargetSecrets(input: {
   integrationsConfig: IntegrationsConfig;

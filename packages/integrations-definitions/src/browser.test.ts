@@ -8,6 +8,7 @@ import {
   GcpBrowserDefinition,
   GitHubCloudBrowserDefinition,
   JiraBrowserDefinition,
+  LinearBrowserDefinition,
   SentryBrowserDefinition,
   SignozBrowserDefinition,
   SlackBrowserDefinition,
@@ -72,6 +73,18 @@ describe("browser definitions", () => {
     expect(SlackBrowserDefinition.identityLinking).toEqual({
       eligibleConnectionMethodIds: ["slack-bot-token"],
     });
+  });
+
+  it("keeps linear browser definitions free of server-only webhook hooks", () => {
+    expect(LinearBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(LinearBrowserDefinition.webhookSource).toBeUndefined();
+    expect(LinearBrowserDefinition.supportedWebhookEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventType: "linear.issue.created",
+        }),
+      ]),
+    );
   });
 
   it("keeps signoz browser definitions free of server-only OAuth handlers", () => {

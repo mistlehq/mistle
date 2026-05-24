@@ -16,6 +16,7 @@ describe("webhook trigger requirements", () => {
       "jira::jira-default",
       "github::github-cloud",
       "github::github-enterprise-server",
+      "linear::linear-default",
       "slack::slack-default",
     ]);
 
@@ -107,7 +108,82 @@ describe("webhook trigger requirements", () => {
       ],
     });
   });
+
+  it("maps Linear trigger requirements to managed webhook resource types and admin access", () => {
+    const linearDefinition = requireDefinition("linear", "linear-default");
+
+    expect(
+      linearDefinition.supportedWebhookEvents?.map((eventDefinition) => eventDefinition.eventType),
+    ).toEqual([
+      "linear.issue.created",
+      "linear.issue.updated",
+      "linear.issue.removed",
+      "linear.comment.created",
+      "linear.comment.updated",
+      "linear.comment.removed",
+      "linear.issue_label.created",
+      "linear.issue_label.updated",
+      "linear.issue_label.removed",
+      "linear.project.created",
+      "linear.project.updated",
+      "linear.project.removed",
+      "linear.cycle.created",
+      "linear.cycle.updated",
+      "linear.cycle.removed",
+      "linear.reaction.created",
+      "linear.reaction.updated",
+      "linear.reaction.removed",
+    ]);
+
+    expectLinearEventRequirements(linearDefinition, "Issue", [
+      "linear.issue.created",
+      "linear.issue.updated",
+      "linear.issue.removed",
+    ]);
+    expectLinearEventRequirements(linearDefinition, "Comment", [
+      "linear.comment.created",
+      "linear.comment.updated",
+      "linear.comment.removed",
+    ]);
+    expectLinearEventRequirements(linearDefinition, "IssueLabel", [
+      "linear.issue_label.created",
+      "linear.issue_label.updated",
+      "linear.issue_label.removed",
+    ]);
+    expectLinearEventRequirements(linearDefinition, "Project", [
+      "linear.project.created",
+      "linear.project.updated",
+      "linear.project.removed",
+    ]);
+    expectLinearEventRequirements(linearDefinition, "Cycle", [
+      "linear.cycle.created",
+      "linear.cycle.updated",
+      "linear.cycle.removed",
+    ]);
+    expectLinearEventRequirements(linearDefinition, "Reaction", [
+      "linear.reaction.created",
+      "linear.reaction.updated",
+      "linear.reaction.removed",
+    ]);
+  });
 });
+
+function expectLinearEventRequirements(
+  definition: AnyIntegrationDefinition,
+  providerEventType: string,
+  eventTypes: readonly string[],
+): void {
+  for (const eventType of eventTypes) {
+    expect(requireEvent(definition, eventType).requirements).toEqual({
+      anyOf: [
+        {
+          event: providerEventType,
+          permissions: [{ permission: "workspace-admin" }],
+        },
+      ],
+    });
+  }
+}
 
 function requireDefinition(familyId: string, variantId: string): AnyIntegrationDefinition {
   const definition = listIntegrationDefinitions().find(

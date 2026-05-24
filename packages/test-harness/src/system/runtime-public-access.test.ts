@@ -6,6 +6,7 @@ import {
   createRuntimePublicAccessRouteHealthUrl,
   createRuntimePublicAccessRouteStatePath,
   createRuntimePublicAccessRouteUpgradeProbeUrl,
+  createRuntimePublicAccessServiceBaseUrl,
   isRuntimePublicAccessUpgradeProbeReadyStatus,
   normalizeRuntimePublicAccessHostnames,
   readRuntimePublicAccessEnvironmentIdFromPath,
@@ -73,6 +74,15 @@ describe("createRuntimePublicAccessProxyScript", () => {
     expect(script).toContain("await loadRoutes();");
     expect(script).toContain("await persistRoutes();");
   });
+
+  it("strips path-carried environment ids before forwarding to the target service", () => {
+    const script = createRuntimePublicAccessProxyScript();
+
+    expect(script).toContain("function stripEnvironmentPathPrefix(requestUrl)");
+    expect(script).toContain(
+      'const targetUrl = new URL(stripEnvironmentPathPrefix(request.url ?? "/"), target.localBaseUrl);',
+    );
+  });
 });
 
 describe("normalizeRuntimePublicAccessHostnames", () => {
@@ -116,6 +126,17 @@ describe("createRuntimePublicAccessRouteUpgradeProbeUrl", () => {
     ).toBe(
       "wss://gateway.example.com/tunnel/sandbox/sbi_runtime_public_access_probe?x-mistle-test-environment-id=test_env_123",
     );
+  });
+});
+
+describe("createRuntimePublicAccessServiceBaseUrl", () => {
+  it("builds path-routed public base URLs for provider callbacks", () => {
+    expect(
+      createRuntimePublicAccessServiceBaseUrl({
+        environmentId: "test/env 123",
+        publicHostname: "control.example.com",
+      }),
+    ).toBe("https://control.example.com/__test-environments/test%2Fenv%20123");
   });
 });
 

@@ -531,6 +531,24 @@ describe("integrations-definitions index", () => {
       ],
     });
     expect(linearDefinition?.mcp).toBeDefined();
+    expect(linearDefinition?.webhookSource).toBeUndefined();
+    expect(linearDefinition?.webhookHandler).toBeUndefined();
+    expect(linearDefinition?.supportedWebhookEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventType: "linear.issue.created",
+          providerEventType: "Issue",
+          displayName: "Issue created",
+          category: "Issues",
+        }),
+        expect.objectContaining({
+          eventType: "linear.comment.created",
+          providerEventType: "Comment",
+          displayName: "Comment created",
+          category: "Comments",
+        }),
+      ]),
+    );
     expect(slackDefinition).toMatchObject({
       familyId: "slack",
       variantId: "slack-default",

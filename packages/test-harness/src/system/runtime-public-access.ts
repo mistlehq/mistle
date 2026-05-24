@@ -822,6 +822,14 @@ export function createRuntimePublicAccessRouteUpgradeProbeUrl(input: {
   return url;
 }
 
+export function createRuntimePublicAccessServiceBaseUrl(input: {
+  environmentId: string;
+  publicHostname: string;
+}): string {
+  const encodedEnvironmentId = encodeURIComponent(input.environmentId);
+  return `https://${input.publicHostname}/__test-environments/${encodedEnvironmentId}`;
+}
+
 export function readRuntimePublicAccessEnvironmentIdFromPath(
   requestPath: string,
 ): string | undefined {
@@ -1022,7 +1030,7 @@ async function handleRequest(request, response) {
     return;
   }
 
-  const targetUrl = new URL(request.url ?? "/", target.localBaseUrl);
+  const targetUrl = new URL(stripEnvironmentPathPrefix(request.url ?? "/"), target.localBaseUrl);
   const proxyRequest = http.request(targetUrl, {
     method: request.method,
     headers: {
@@ -1070,7 +1078,7 @@ async function handleUpgradeRequest(request, socket, head) {
     return;
   }
 
-  const targetUrl = new URL(request.url ?? "/", target.localBaseUrl);
+  const targetUrl = new URL(stripEnvironmentPathPrefix(request.url ?? "/"), target.localBaseUrl);
   connectUpgradeTarget({
     host: targetUrl.hostname,
     port: Number(targetUrl.port),
@@ -1432,6 +1440,21 @@ function readEnvironmentIdFromPath(requestPath) {
     return undefined;
   }
   return decodeURIComponent(pathWithoutPrefix.slice(0, separatorIndex));
+}
+
+function stripEnvironmentPathPrefix(requestUrl) {
+  const parsedUrl = new URL(requestUrl, "http://runtime-public-access.local");
+  const prefix = "/__test-environments/";
+  if (!parsedUrl.pathname.startsWith(prefix)) {
+    return requestUrl;
+  }
+  const pathWithoutPrefix = parsedUrl.pathname.slice(prefix.length);
+  const separatorIndex = pathWithoutPrefix.indexOf("/");
+  if (separatorIndex <= 0) {
+    return requestUrl;
+  }
+  const targetPath = pathWithoutPrefix.slice(separatorIndex);
+  return targetPath + parsedUrl.search;
 }
 
 function createRouteKey(hostname, environmentId) {

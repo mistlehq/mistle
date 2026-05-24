@@ -4,6 +4,7 @@ import { expect } from "vitest";
 
 import {
   decryptCredentialUtf8,
+  encryptCredentialUtf8,
   encryptDeviceAuthorizationProviderStateUtf8,
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
@@ -189,6 +190,70 @@ export async function expectImplicitWebhookSource(input: {
   }
 
   expect(webhookSource.endpointKey.length).toBeGreaterThan(0);
+}
+
+export async function seedConnectionCredential(input: {
+  env: IntegrationTestEnvironment;
+  organizationId: string;
+  connectionId: string;
+  slotKey: string;
+  secretKind: IntegrationCredentialSecretKind;
+  intendedFamilyId?: string;
+  plaintext: string;
+}): Promise<void> {
+  const organizationCredentialKey =
+    await input.env.controlPlaneDb.query.organizationCredentialKeys.findFirst({
+      where: (table, { and, eq }) =>
+        and(eq(table.organizationId, input.organizationId), eq(table.version, 1)),
+    });
+
+  if (organizationCredentialKey === undefined) {
+    throw new Error(`Expected organization credential key for '${input.organizationId}'.`);
+  }
+
+  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+    masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+    masterEncryptionKeys: IntegrationMasterEncryptionKeys,
+  });
+  const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
+    wrappedCiphertext: organizationCredentialKey.ciphertext,
+    masterEncryptionKeyMaterial,
+  });
+
+  try {
+    const encryptedCredential = encryptCredentialUtf8({
+      plaintext: input.plaintext,
+      organizationCredentialKey: unwrappedOrganizationCredentialKey,
+    });
+
+    const credentials = await input.env.controlPlaneDb
+      .insert(input.env.controlPlaneTables.integrationCredentials)
+      .values({
+        organizationId: input.organizationId,
+        secretKind: input.secretKind,
+        organizationCredentialKeyVersion: organizationCredentialKey.version,
+        intendedFamilyId: input.intendedFamilyId,
+        nonce: encryptedCredential.nonce,
+        ciphertext: encryptedCredential.ciphertext,
+      })
+      .returning({
+        id: input.env.controlPlaneTables.integrationCredentials.id,
+      });
+    const credential = credentials[0];
+    if (credential === undefined) {
+      throw new Error("Expected inserted integration credential.");
+    }
+
+    await input.env.controlPlaneDb
+      .insert(input.env.controlPlaneTables.integrationConnectionCredentials)
+      .values({
+        connectionId: input.connectionId,
+        credentialId: credential.id,
+        slotKey: input.slotKey,
+      });
+  } finally {
+    unwrappedOrganizationCredentialKey.fill(0);
+  }
 }
 
 export function encryptDeviceAuthorizationProviderStateForTest(input: {

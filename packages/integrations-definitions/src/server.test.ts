@@ -60,6 +60,10 @@ describe("integrations-definitions server", () => {
       familyId: "github",
       variantId: "github-enterprise-server",
     });
+    const linearDefinition = registry.getDefinition({
+      familyId: "linear",
+      variantId: "linear-default",
+    });
     const openCodeGoDefinition = registry.getDefinition({
       familyId: "opencode",
       variantId: "opencode-go",
@@ -106,6 +110,10 @@ describe("integrations-definitions server", () => {
     expect(githubEnterpriseServerDefinition?.webhookHandler).toBeDefined();
     expect(githubEnterpriseServerDefinition?.webhookSource).toMatchObject({
       lifecycle: "implicit",
+    });
+    expect(linearDefinition?.webhookHandler).toBeDefined();
+    expect(linearDefinition?.webhookSource).toMatchObject({
+      lifecycle: "managed",
     });
     expect(anthropicDefinition?.kind).toBe("agent");
     expect(openCodeGoDefinition?.kind).toBe("agent");

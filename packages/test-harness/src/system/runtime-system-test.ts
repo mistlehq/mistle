@@ -4,6 +4,7 @@
  */
 
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -23,8 +24,10 @@ import { createIntegrationTest, type IntegrationTestEnvironment } from "../integ
 import { ServiceIds, type ServiceId } from "../integration/services/service-ids.js";
 import { IntegrationConfigPathInContainer } from "./integration-config-paths.js";
 import { resolveHostPathFromContainerPath } from "./provision-system-integration-targets.js";
-import type { RuntimePublicAccessTunnel } from "./runtime-public-access.js";
-import { startRuntimeCloudflaredTunnel } from "./runtime-public-access.js";
+import {
+  startRuntimeCloudflaredTunnel,
+  type RuntimePublicAccessTunnel,
+} from "./runtime-public-access.js";
 import {
   getSystemTestSandboxBaseImageRef,
   readSystemTestCoordinatorDirectoryPath,
@@ -545,14 +548,33 @@ async function syncControlPlaneIntegrationTargets(input: {
     args: ["--filter", "@mistle/control-plane-api", "integration-targets:sync"],
     cwd: DefaultBuildContextHostPath,
     env: {
-      MISTLE_CONFIG_PATH: resolveHostPathFromContainerPath({
-        buildContextHostPath: DefaultBuildContextHostPath,
-        containerPath: input.configPathInContainer,
+      ...createOptionalHostConfigPathEnv({
+        configPathInContainer: input.configPathInContainer,
+      }),
+      MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION: "1",
+      MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON: JSON.stringify({
+        "1": "integration-new-master-key-testing",
       }),
       MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL: input.environment.controlPlaneDatabase.pooledUrl,
       MISTLE_CONTROL_PLANE_SCHEMA_NAME: input.environment.controlPlaneDatabase.schemaName,
     },
   });
+}
+
+function createOptionalHostConfigPathEnv(input: {
+  configPathInContainer: string;
+}): Record<string, string> {
+  const hostConfigPath = resolveHostPathFromContainerPath({
+    buildContextHostPath: DefaultBuildContextHostPath,
+    containerPath: input.configPathInContainer,
+  });
+  if (!existsSync(hostConfigPath)) {
+    return {};
+  }
+
+  return {
+    MISTLE_CONFIG_PATH: hostConfigPath,
+  };
 }
 
 export function resolveRuntimeSystemIntegrationConfigPathInContainer(

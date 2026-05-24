@@ -65,6 +65,12 @@ const IntegrationVitestProjects = [
     appServicePrewarm: "control-plane",
   },
   {
+    projectName: "@mistle/integrations-definitions",
+    packageName: "@mistle/integrations-definitions",
+    packageDir: "packages/integrations-definitions",
+    appServicePrewarm: "none",
+  },
+  {
     projectName: "@mistle/data-plane-api",
     packageName: "@mistle/data-plane-api",
     packageDir: "apps/data-plane-api",

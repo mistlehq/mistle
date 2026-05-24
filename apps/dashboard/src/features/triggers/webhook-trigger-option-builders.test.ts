@@ -497,6 +497,85 @@ describe("buildWebhookTriggerEventOptions", () => {
       }),
     ).toEqual([]);
   });
+
+  it("matches Linear trigger events against provider resource type capabilities", () => {
+    expect(
+      buildWebhookTriggerEventOptions({
+        connections: [
+          {
+            id: LinearConnectionId,
+            targetKey: "linear-default",
+            displayName: "Linear Workspace",
+            status: "active",
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+        ],
+        webhookSources: [
+          {
+            id: LinearWebhookSourceId,
+            targetKey: "linear-default",
+            integrationConnectionId: LinearConnectionId,
+            displayName: "Linear webhook",
+            endpointKey: "ep_linear",
+            status: "active",
+            providerMetadata: {
+              [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+                events: ["Issue"],
+                permissions: [{ permission: "workspace-admin" }],
+              },
+            },
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+        ],
+        targets: [
+          {
+            targetKey: "linear-default",
+            familyId: "linear",
+            variantId: "linear-default",
+            kind: "connector",
+            enabled: true,
+            config: {},
+            displayName: "Linear",
+            description: "Linear",
+            supportedWebhookEvents: [
+              {
+                eventType: "linear.issue.created",
+                providerEventType: "Issue",
+                displayName: "Issue created",
+                requirements: {
+                  anyOf: [
+                    {
+                      event: "Issue",
+                      permissions: [{ permission: "workspace-admin" }],
+                    },
+                  ],
+                },
+              },
+              {
+                eventType: "linear.comment.created",
+                providerEventType: "Comment",
+                displayName: "Comment created",
+                requirements: {
+                  anyOf: [
+                    {
+                      event: "Comment",
+                      permissions: [{ permission: "workspace-admin" }],
+                    },
+                  ],
+                },
+              },
+            ],
+            targetHealth: {
+              configStatus: "valid",
+            },
+          },
+        ],
+        selectedEventIds: [],
+      }).map((option) => option.eventType),
+    ).toEqual(["linear.issue.created"]);
+  });
 });
 
 function buildSlackMessageEventTypes(input: {

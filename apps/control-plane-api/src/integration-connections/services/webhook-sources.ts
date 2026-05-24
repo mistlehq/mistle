@@ -854,19 +854,20 @@ export async function refreshIntegrationWebhookSourceTriggerCapabilities(
     );
   }
 
-  if (webhookSourceCapability.lifecycle !== IntegrationWebhookSourceLifecycles.IMPLICIT) {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.WEBHOOK_SOURCE_NOT_SUPPORTED,
-      `Integration target '${connection.targetKey}' does not support connection-level webhook trigger capability refresh.`,
-    );
-  }
-
-  const source = await ensureImplicitConnectionWebhookSource({
-    db: ctx.db,
-    organizationId: input.organizationId,
-    connectionId: connection.id,
-    targetKey: connection.targetKey,
-  });
+  const source =
+    webhookSourceCapability.lifecycle === IntegrationWebhookSourceLifecycles.IMPLICIT
+      ? await ensureImplicitConnectionWebhookSource({
+          db: ctx.db,
+          organizationId: input.organizationId,
+          connectionId: connection.id,
+          targetKey: connection.targetKey,
+        })
+      : await resolveManagedConnectionWebhookSourceForRefresh({
+          db: ctx.db,
+          organizationId: input.organizationId,
+          connectionId: connection.id,
+          targetKey: connection.targetKey,
+        });
   const connectionSecrets = await resolveConnectionSecretsOrThrow({
     db: ctx.db,
     integrationRegistry: ctx.integrationRegistry,
@@ -954,6 +955,45 @@ export async function refreshIntegrationWebhookSourceTriggerCapabilities(
   });
 
   return toWebhookSourceListItem({ source: updatedSource, descriptor });
+}
+
+async function resolveManagedConnectionWebhookSourceForRefresh(input: {
+  db: ControlPlaneDatabase;
+  organizationId: string;
+  connectionId: string;
+  targetKey: string;
+}): Promise<IntegrationWebhookSource> {
+  const sources = await input.db.query.integrationWebhookSources.findMany({
+    where: (table, { and: whereAnd, eq: whereEq }) =>
+      whereAnd(
+        whereEq(table.organizationId, input.organizationId),
+        whereEq(table.integrationConnectionId, input.connectionId),
+        whereEq(table.targetKey, input.targetKey),
+        whereEq(table.status, IntegrationWebhookSourceStatuses.ACTIVE),
+      ),
+    orderBy: (table, { asc }) => [asc(table.createdAt), asc(table.id)],
+  });
+
+  if (sources.length === 0) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_WEBHOOK_SOURCE_INPUT,
+      `Integration connection '${input.connectionId}' has no active managed webhook source to refresh.`,
+    );
+  }
+
+  if (sources.length > 1) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_WEBHOOK_SOURCE_INPUT,
+      `Integration connection '${input.connectionId}' has multiple active managed webhook sources; refresh a specific source before syncing trigger capabilities.`,
+    );
+  }
+
+  const source = sources[0];
+  if (source === undefined) {
+    throw new Error("Expected managed webhook source.");
+  }
+
+  return source;
 }
 
 export async function deleteIntegrationWebhookSource(
