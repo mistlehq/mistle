@@ -25,6 +25,7 @@ export type SimulatedCodexRuntimeServer = {
 
 export type SimulatedCodexRuntimeServerOptions = {
   expectedThreadStartCwd?: string;
+  rejectReusedRequestUrl?: boolean;
 };
 
 export type DeliveryContextMessage = {
@@ -257,8 +258,21 @@ export async function startSimulatedCodexRuntimeServer(
 
   let activeStreamId: number | null = null;
   const methodSequence: string[] = [];
+  const seenRequestUrls = new Set<string>();
 
-  wsServer.on("connection", (socket: WebSocket) => {
+  wsServer.on("connection", (socket: WebSocket, request) => {
+    if (options.rejectReusedRequestUrl === true) {
+      const requestUrl = request.url;
+      if (requestUrl === undefined) {
+        throw new Error("Expected websocket request url.");
+      }
+      if (seenRequestUrls.has(requestUrl)) {
+        socket.close(1008, "simulated connection URL replay");
+        return;
+      }
+      seenRequestUrls.add(requestUrl);
+    }
+
     let didHandleOpen = false;
     let threadReadCount = 0;
 

@@ -306,27 +306,6 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
             ),
         );
 
-        const acquiredTriggerConnection = await step.run(
-          {
-            name: getConversationDeliveryStepName({
-              prefix: DurableTriggerConversationDeliveryStepPrefixes.ACQUIRE_CONNECTION,
-              taskId: activeTask.taskId,
-            }),
-          },
-          async () =>
-            acquireTriggerConnection(
-              {
-                controlPlaneInternalClient,
-              },
-              {
-                preparedTriggerRun,
-                ensuredTriggerSandbox,
-                deliveryTaskId: activeTask.taskId,
-                workflowRunId,
-              },
-            ),
-        );
-
         await step.run(
           {
             name: getConversationDeliveryStepName({
@@ -370,16 +349,28 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
             ),
         );
 
-        const providerDeliveryInput = createConversationProviderDeliveryInput({
-          taskId: activeTask.taskId,
-          preparedTriggerRun,
-          resolvedTriggerConversationRoute,
-          ensuredTriggerSandbox,
-          acquiredTriggerConnection,
-          activeRoute: loadedRoute.activeRoute,
-        });
-        const createConversationIdempotency =
-          createConversationIdempotencyMetadata(providerDeliveryInput);
+        const createProviderDeliveryInput = async () => {
+          const acquiredTriggerConnection = await acquireTriggerConnection(
+            {
+              controlPlaneInternalClient,
+            },
+            {
+              preparedTriggerRun,
+              ensuredTriggerSandbox,
+              deliveryTaskId: activeTask.taskId,
+              workflowRunId,
+            },
+          );
+
+          return createConversationProviderDeliveryInput({
+            taskId: activeTask.taskId,
+            preparedTriggerRun,
+            resolvedTriggerConversationRoute,
+            ensuredTriggerSandbox,
+            acquiredTriggerConnection,
+            activeRoute: loadedRoute.activeRoute,
+          });
+        };
 
         const createdProviderConversation = await step.run(
           {
@@ -406,6 +397,9 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
                 },
               },
               async (span) => {
+                const providerDeliveryInput = await createProviderDeliveryInput();
+                const createConversationIdempotency =
+                  createConversationIdempotencyMetadata(providerDeliveryInput);
                 span.setAttributes({
                   "mistle.provider.idempotency_key": createConversationIdempotency.key,
                   "mistle.provider.idempotency_operation": createConversationIdempotency.operation,
@@ -431,7 +425,7 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
           },
           async () =>
             inspectAndResumeConversationProviderDeliveryConversation({
-              deliveryInput: providerDeliveryInput,
+              deliveryInput: await createProviderDeliveryInput(),
               providerConversationId: createdProviderConversation.providerConversationId,
             }),
         );
@@ -459,6 +453,7 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
                 },
               },
               async (span) => {
+                const providerDeliveryInput = await createProviderDeliveryInput();
                 const submitPayloadIdempotency = submitPayloadIdempotencyMetadata({
                   deliveryInput: providerDeliveryInput,
                   providerConversationId: createdProviderConversation.providerConversationId,

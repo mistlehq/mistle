@@ -5,9 +5,13 @@ import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-ho
 import { afterAll, beforeAll, describe, expect } from "vitest";
 
 import {
+  createConversationProviderDeliveryConversation,
   executeConversationProviderDelivery,
+  inspectAndResumeConversationProviderDeliveryConversation,
   resolveDeliveryContextNotificationParams,
+  submitConversationProviderDeliveryPayload,
 } from "../openworkflow/handle-trigger-conversation-delivery/execute-conversation-provider-delivery.js";
+import type { ExecuteConversationProviderDeliveryInput } from "../openworkflow/handle-trigger-conversation-delivery/types.js";
 import { startSimulatedCodexRuntimeServer } from "../test-support/simulated-codex-runtime-server.js";
 
 const ParentSpanContext = {
@@ -236,6 +240,113 @@ describe("executeConversationProviderDelivery", () => {
     }
   });
 
+  it("requires fresh connection URLs across split Codex provider delivery steps", async () => {
+    const server = await startSimulatedCodexRuntimeServer("create_conversation", {
+      expectedThreadStartCwd: "/root/mistlehq/platform",
+      rejectReusedRequestUrl: true,
+    });
+
+    try {
+      const activeContext = trace.setSpan(
+        context.active(),
+        trace.wrapSpanContext(ParentSpanContext),
+      );
+      const baseInput = createDeliveryInput({
+        connectionUrl: createStepConnectionUrl({
+          baseUrl: server.url,
+          step: "create",
+        }),
+      });
+
+      const result = await context.with(activeContext, async () => {
+        const createdConversation = await createConversationProviderDeliveryConversation(baseInput);
+        const inspectedConversation =
+          await inspectAndResumeConversationProviderDeliveryConversation({
+            deliveryInput: {
+              ...baseInput,
+              connectionUrl: createStepConnectionUrl({
+                baseUrl: server.url,
+                step: "inspect",
+              }),
+            },
+            providerConversationId: createdConversation.providerConversationId,
+          });
+        const submittedPayload = await submitConversationProviderDeliveryPayload({
+          deliveryInput: {
+            ...baseInput,
+            connectionUrl: createStepConnectionUrl({
+              baseUrl: server.url,
+              step: "submit",
+            }),
+          },
+          inspectTriggerConversation: inspectedConversation,
+          providerConversationId: createdConversation.providerConversationId,
+        });
+
+        return {
+          providerConversationId: createdConversation.providerConversationId,
+          providerExecutionId: submittedPayload.providerExecutionId,
+        };
+      });
+
+      expect(result).toEqual({
+        providerConversationId: "thread_123",
+        providerExecutionId: "turn_123",
+      });
+      expect(await server.methodSequence).toEqual([
+        "initialize",
+        "initialized",
+        "mistle/setDeliveryContext",
+        "model/list",
+        "thread/start",
+        "initialize",
+        "initialized",
+        "mistle/setDeliveryContext",
+        "thread/read",
+        "initialize",
+        "initialized",
+        "mistle/setDeliveryContext",
+        "model/list",
+        "turn/start",
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("fails split Codex provider delivery steps when a connection URL is replayed", async () => {
+    const server = await startSimulatedCodexRuntimeServer("create_conversation", {
+      expectedThreadStartCwd: "/root/mistlehq/platform",
+      rejectReusedRequestUrl: true,
+    });
+
+    try {
+      const activeContext = trace.setSpan(
+        context.active(),
+        trace.wrapSpanContext(ParentSpanContext),
+      );
+      const input = createDeliveryInput({
+        connectionUrl: createStepConnectionUrl({
+          baseUrl: server.url,
+          step: "replayed",
+        }),
+      });
+
+      await context.with(activeContext, async () => {
+        const createdConversation = await createConversationProviderDeliveryConversation(input);
+
+        await expect(
+          inspectAndResumeConversationProviderDeliveryConversation({
+            deliveryInput: input,
+            providerConversationId: createdConversation.providerConversationId,
+          }),
+        ).rejects.toThrow("Sandbox session transport is not connected.");
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it("sends delivery context before resuming a not-loaded Codex conversation", async () => {
     const server = await startSimulatedCodexRuntimeServer("resume_not_loaded_conversation");
 
@@ -341,3 +452,31 @@ describe("executeConversationProviderDelivery", () => {
     );
   });
 });
+
+function createStepConnectionUrl(input: { baseUrl: string; step: string }): string {
+  const url = new URL(input.baseUrl);
+  url.searchParams.set("step", input.step);
+  return url.toString();
+}
+
+function createDeliveryInput(input: {
+  connectionUrl: string;
+}): ExecuteConversationProviderDeliveryInput {
+  return {
+    conversationId: "acv_123",
+    runtimeId: "codex",
+    connectionUrl: input.connectionUrl,
+    inputText: "Handle the webhook payload.",
+    workingDirectory: "/root/mistlehq/platform",
+    deliveryContext: {
+      source: "webhook",
+      webhookEventId: "iwe_123",
+      deliveryTaskId: "cdt_123",
+      triggerRunId: "aru_123",
+      conversationId: "acv_123",
+      sandboxInstanceId: "sbi_123",
+    },
+    providerConversationId: null,
+    providerExecutionId: null,
+  };
+}
