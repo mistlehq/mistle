@@ -42,16 +42,39 @@ pub struct GatewayEgressTokenProvider {
     cached_token: Arc<Mutex<Option<CachedEgressToken>>>,
     next_request_id: Arc<AtomicU64>,
     sandbox_instance_id: String,
+    acting_user_id: Arc<Mutex<Option<String>>>,
 }
 
 impl GatewayEgressTokenProvider {
-    pub fn new(sandbox_instance_id: impl Into<String>) -> Self {
+    pub fn new(sandbox_instance_id: impl Into<String>, acting_user_id: Option<String>) -> Self {
         Self {
             request_sender: Arc::new(RwLock::new(None)),
             cached_token: Arc::new(Mutex::new(None)),
             next_request_id: Arc::new(AtomicU64::new(1)),
             sandbox_instance_id: sandbox_instance_id.into(),
+            acting_user_id: Arc::new(Mutex::new(acting_user_id)),
         }
+    }
+
+    pub fn set_acting_user_id(
+        &self,
+        acting_user_id: Option<String>,
+    ) -> Result<(), TunnelSessionError> {
+        let mut current_acting_user_id = self
+            .acting_user_id
+            .lock()
+            .map_err(|error| TunnelSessionError::EgressToken(error.to_string()))?;
+        if *current_acting_user_id == acting_user_id {
+            return Ok(());
+        }
+
+        *current_acting_user_id = acting_user_id;
+        let mut cached_token = self
+            .cached_token
+            .lock()
+            .map_err(|error| TunnelSessionError::EgressToken(error.to_string()))?;
+        *cached_token = None;
+        Ok(())
     }
 
     pub(in crate::tunnel::session) fn attach(
@@ -87,9 +110,15 @@ impl GatewayEgressTokenProvider {
             self.next_request_id.fetch_add(1, Ordering::Relaxed)
         );
         let (response_sender, response_receiver) = std::sync::mpsc::channel();
+        let acting_user_id = self
+            .acting_user_id
+            .lock()
+            .map_err(|error| TunnelSessionError::EgressToken(error.to_string()))?
+            .clone();
         request_sender
             .send(TunnelSessionRequest::EgressToken {
                 request_id: request_id.clone(),
+                acting_user_id,
                 response_sender,
             })
             .map_err(|error| TunnelSessionError::EgressToken(error.to_string()))?;
@@ -173,6 +202,7 @@ pub(super) fn handle_egress_token_session_request(
     clock: &dyn Clock,
     sandbox_instance_id: &str,
     request_id: String,
+    acting_user_id: Option<String>,
     response_sender: std::sync::mpsc::Sender<Result<TunnelEgressToken, TunnelSessionError>>,
 ) -> Result<(), TunnelSessionError> {
     if request_id.trim().is_empty() {
@@ -207,6 +237,7 @@ pub(super) fn handle_egress_token_session_request(
     let payload = egress_token_request(&EgressTokenRequest {
         message_type: "egress.token.request".to_string(),
         request_id: request_id.clone(),
+        acting_user_id,
     });
 
     match write_tunnel_text(tunnel_writer_sender, payload) {

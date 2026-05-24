@@ -87,6 +87,54 @@ describe("sandbox egress token control integration", () => {
     },
     TestTimeoutMs,
   );
+
+  it(
+    "preserves acting-user context from an egress token request",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        env,
+        organizationId: "org_gateway_egress_token_acting_user",
+        sandboxInstanceId,
+      });
+      const bootstrapSocket = await connectBootstrapSocket({
+        env,
+        sandboxInstanceId,
+      });
+
+      await sendWebSocketMessage(
+        bootstrapSocket,
+        JSON.stringify({
+          type: "egress.token.request",
+          requestId: "egress_token_req_acting_user",
+          actingUserId: "usr_gateway_egress_token",
+        }),
+      );
+
+      const response = await waitForWebSocketMessage(bootstrapSocket);
+      expect(response.isBinary).toBe(false);
+      const parsedPayload = parseEgressTokenResponse(JSON.parse(String(response.data)));
+      const verified = await verifyEgressToken({
+        config: {
+          tokenSecret: EgressTokenSecret,
+          tokenIssuer: EgressTokenIssuer,
+          tokenAudience: EgressTokenAudience,
+        },
+        token: parsedPayload.token,
+      });
+
+      expect(verified).toEqual({
+        sub: sandboxInstanceId,
+        organizationId: "org_gateway_egress_token_acting_user",
+        bootstrapSessionId: expect.any(String),
+        actingUserId: "usr_gateway_egress_token",
+        expiresAt: new Date(parsedPayload.expiresAt),
+      });
+
+      await closeWebSocket(bootstrapSocket);
+    },
+    TestTimeoutMs,
+  );
 });
 
 function parseEgressTokenResponse(value: unknown): {

@@ -41,6 +41,7 @@ pub(in crate::tunnel::session) fn handle_tunnel_session_request(
         )),
         TunnelSessionRequest::EgressToken {
             request_id,
+            acting_user_id,
             response_sender,
         } => continue_with(handle_egress_token_session_request(
             tunnel_writer_sender,
@@ -48,6 +49,7 @@ pub(in crate::tunnel::session) fn handle_tunnel_session_request(
             runtime.clock.as_ref(),
             runtime.sandbox_instance_id.as_str(),
             request_id,
+            acting_user_id,
             response_sender,
         )),
         TunnelSessionRequest::OperationRecord { line } => {

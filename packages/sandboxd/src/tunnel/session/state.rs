@@ -93,6 +93,7 @@ pub(in crate::tunnel::session) enum TunnelSessionRequest {
     },
     EgressToken {
         request_id: String,
+        acting_user_id: Option<String>,
         response_sender: std::sync::mpsc::Sender<Result<TunnelEgressToken, TunnelSessionError>>,
     },
     OperationRecord {

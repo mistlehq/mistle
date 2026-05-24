@@ -652,6 +652,8 @@ pub struct EgressTokenRequest {
     #[serde(rename = "type")]
     pub message_type: String,
     pub request_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub acting_user_id: Option<String>,
 }
 
 /// Successful `egress.token.response` payload sent by the gateway.

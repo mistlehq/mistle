@@ -1369,7 +1369,7 @@ fn test_forwarding_mode() -> EgressProxyForwardingMode {
             )
             .expect("direct gateway websocket route URL should resolve"),
             token_provider: DirectGatewayEgressTokenProvider::Local(
-                GatewayEgressTokenProvider::new("sandbox-123"),
+                GatewayEgressTokenProvider::new("sandbox-123", None),
             ),
         }),
     }

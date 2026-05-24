@@ -5,7 +5,11 @@
 import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
-import { IntegrationBindingKinds } from "@mistle/db/control-plane";
+import {
+  IntegrationBindingKinds,
+  OrganizationIdentityLinkProviderConfigStatus,
+  UserExternalPrincipalCredentialSecretKinds,
+} from "@mistle/db/control-plane";
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { mintEgressToken, verifyMcpToken } from "@mistle/gateway-tunnel-auth";
 import type { CompiledRuntimePlan } from "@mistle/sandbox-runtime-contract";
@@ -19,6 +23,14 @@ import { typeid } from "typeid-js";
 import { describe, expect } from "vitest";
 import WebSocket, { WebSocketServer } from "ws";
 
+import {
+  createGitHubIdentityConnection,
+  insertPrincipalCredentialSecret,
+  seedGitHubLinkedPrincipal,
+  seedIdentityProviderConfig,
+  seedPrincipalCredential,
+  upsertGitHubIdentityTarget,
+} from "../../control-plane-api/integration/helpers/identity-linking.js";
 import {
   DirectEgressHttpRoutePath,
   DirectEgressTokenHeaderName,
@@ -116,6 +128,238 @@ describe.concurrent("direct egress proxy integration", () => {
           method: "POST",
           url: "/packages/mistle.tgz?checksum=123",
         });
+      } finally {
+        await upstream.close();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "uses the linked GitHub user credential for direct egress pull request creation",
+    async ({ env }) => {
+      const uniqueId = randomUUID().replaceAll("-", "");
+      const session = await env.auth.createSession({
+        email: `direct-egress-github-pr-${uniqueId}@example.com`,
+      });
+      const sandboxInstanceId = typeid("sbi").toString();
+      const upstream = await startSimulatedHttpUpstream();
+      const upstreamUrl = new URL("/repos/mistlehq/mistle/pulls", upstream.baseUrl);
+      const targetKey = `github_direct_egress_pr_${uniqueId}`;
+      const providerConfigId = `ilp_direct_egress_pr_${uniqueId}`;
+      const principalId = `uep_direct_egress_pr_${uniqueId}`;
+      const credentialId = `uec_direct_egress_pr_${uniqueId}`;
+      await upsertGitHubIdentityTarget(env, {
+        targetKey,
+        apiBaseUrl: upstream.baseUrl,
+        webBaseUrl: "https://github.com",
+      });
+      const connectionId = await createGitHubIdentityConnection(env, {
+        displayName: "Direct egress GitHub App",
+        session,
+        targetKey,
+      });
+      await seedIdentityProviderConfig(env, {
+        configId: providerConfigId,
+        connectionId,
+        organizationId: session.organizationId,
+        providerFamily: "github",
+        status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+        targetKey,
+        userId: session.userId,
+      });
+      await seedGitHubLinkedPrincipal(env, {
+        organizationId: session.organizationId,
+        userId: session.userId,
+        principalId,
+        providerConfigId,
+        connectionId,
+      });
+      await seedPrincipalCredential(env, {
+        credentialId,
+        organizationId: session.organizationId,
+        principalId,
+        providerFamily: "github",
+        credentialKind: "github_app_user_access_token",
+      });
+      await insertPrincipalCredentialSecret(env, {
+        organizationId: session.organizationId,
+        credentialId,
+        secretKind: UserExternalPrincipalCredentialSecretKinds.PROVIDER_USER_TOKEN,
+        plaintext: "github-linked-user-token",
+      });
+      await insertSandboxInstanceRow({
+        env,
+        organizationId: session.organizationId,
+        sandboxInstanceId,
+        runtimePlan: createRuntimePlan({
+          egressRoutes: [
+            createRoute({
+              authInjection: {
+                type: "bearer",
+                target: "authorization",
+              },
+              bindingId: `ibd_direct_egress_pr_${uniqueId}`,
+              connectionId,
+              egressRuleId: `egress_rule_direct_github_pr_${uniqueId}`,
+              familyId: "github",
+              hosts: [upstreamUrl.hostname],
+              methods: ["POST"],
+              pathPrefixes: ["/repos/mistlehq/mistle/pulls"],
+              secretType: "github_app_installation_token",
+              upstreamBaseUrl: upstream.baseUrl,
+              variantId: "github-cloud",
+            }),
+          ],
+        }),
+      });
+
+      try {
+        const response = await env.dataPlaneGateway.http.fetch(
+          `${DirectEgressHttpRoutePath}?target=${encodeURIComponent(upstreamUrl.toString())}`,
+          {
+            method: "POST",
+            headers: {
+              [DirectEgressTokenHeaderName]: `Bearer ${await mintDirectEgressToken({
+                organizationId: session.organizationId,
+                sandboxInstanceId,
+                actingUserId: session.userId,
+              })}`,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              title: "Test PR",
+              head: "feature",
+              base: "main",
+            }),
+          },
+        );
+
+        expect(response.status).toBe(202);
+        const request = await withTimeout({
+          label: "waiting for managed GitHub pull request upstream request",
+          promise: upstream.nextRequest(),
+        });
+        expect(request.method).toBe("POST");
+        expect(request.url).toBe("/repos/mistlehq/mistle/pulls");
+        expect(request.headers.authorization).toBe("Bearer github-linked-user-token");
+      } finally {
+        await upstream.close();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "allows static linked-principal direct egress routes when acting-user context is present",
+    async ({ env }) => {
+      const uniqueId = randomUUID().replaceAll("-", "");
+      const session = await env.auth.createSession({
+        email: `direct-egress-static-linked-${uniqueId}@example.com`,
+      });
+      const sandboxInstanceId = typeid("sbi").toString();
+      const upstream = await startSimulatedHttpUpstream();
+      const upstreamUrl = new URL("/static-linked-principal", upstream.baseUrl);
+      const targetKey = `github_static_linked_${uniqueId}`;
+      const providerConfigId = `ilp_static_linked_${uniqueId}`;
+      const principalId = `uep_static_linked_${uniqueId}`;
+      const credentialId = `uec_static_linked_${uniqueId}`;
+      await upsertGitHubIdentityTarget(env, {
+        targetKey,
+        apiBaseUrl: upstream.baseUrl,
+        webBaseUrl: "https://github.com",
+      });
+      const connectionId = await createGitHubIdentityConnection(env, {
+        displayName: "Static linked-principal GitHub App",
+        session,
+        targetKey,
+      });
+      await seedIdentityProviderConfig(env, {
+        configId: providerConfigId,
+        connectionId,
+        organizationId: session.organizationId,
+        providerFamily: "github",
+        status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+        targetKey,
+        userId: session.userId,
+      });
+      await seedGitHubLinkedPrincipal(env, {
+        organizationId: session.organizationId,
+        userId: session.userId,
+        principalId,
+        providerConfigId,
+        connectionId,
+      });
+      await seedPrincipalCredential(env, {
+        credentialId,
+        organizationId: session.organizationId,
+        principalId,
+        providerFamily: "github",
+        credentialKind: "github_app_user_access_token",
+      });
+      await insertPrincipalCredentialSecret(env, {
+        organizationId: session.organizationId,
+        credentialId,
+        secretKind: UserExternalPrincipalCredentialSecretKinds.PROVIDER_USER_TOKEN,
+        plaintext: "static-linked-user-token",
+      });
+      await insertSandboxInstanceRow({
+        env,
+        organizationId: session.organizationId,
+        sandboxInstanceId,
+        runtimePlan: createRuntimePlan({
+          egressRoutes: [
+            createRoute({
+              authInjection: {
+                type: "bearer",
+                target: "authorization",
+              },
+              bindingId: `ibd_static_linked_${uniqueId}`,
+              connectionId,
+              credentialResolver: {
+                kind: "linked_principal",
+                providerFamily: "github",
+                integrationConnectionId: connectionId,
+                credentialKind: "github_app_user_access_token",
+                actingUserRequired: true,
+                resolutionMode: "required",
+              },
+              egressRuleId: `egress_rule_static_linked_${uniqueId}`,
+              familyId: "github",
+              hosts: [upstreamUrl.hostname],
+              methods: ["POST"],
+              pathPrefixes: ["/static-linked-principal"],
+              upstreamBaseUrl: upstream.baseUrl,
+              variantId: "github-cloud",
+            }),
+          ],
+        }),
+      });
+
+      try {
+        const response = await env.dataPlaneGateway.http.fetch(
+          `${DirectEgressHttpRoutePath}?target=${encodeURIComponent(upstreamUrl.toString())}`,
+          {
+            method: "POST",
+            headers: {
+              [DirectEgressTokenHeaderName]: `Bearer ${await mintDirectEgressToken({
+                organizationId: session.organizationId,
+                sandboxInstanceId,
+                actingUserId: session.userId,
+              })}`,
+            },
+            body: "static linked principal",
+          },
+        );
+
+        expect(response.status).toBe(202);
+        const request = await withTimeout({
+          label: "waiting for static linked-principal upstream request",
+          promise: upstream.nextRequest(),
+        });
+        expect(request.method).toBe("POST");
+        expect(request.url).toBe("/static-linked-principal");
+        expect(request.headers.authorization).toBe("Bearer static-linked-user-token");
       } finally {
         await upstream.close();
       }
@@ -971,20 +1215,23 @@ function readConnectionId(responseBody: unknown): string {
 }
 
 async function mintDirectEgressToken(input: {
+  actingUserId?: string;
   organizationId: string;
   sandboxInstanceId: string;
 }): Promise<string> {
+  const claims = {
+    sub: input.sandboxInstanceId,
+    organizationId: input.organizationId,
+    bootstrapSessionId: "bst_direct_egress_integration",
+    ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
+  };
   const minted = await mintEgressToken({
     config: {
       tokenSecret: EgressTokenSecret,
       tokenIssuer: EgressTokenIssuer,
       tokenAudience: EgressTokenAudience,
     },
-    claims: {
-      sub: input.sandboxInstanceId,
-      organizationId: input.organizationId,
-      bootstrapSessionId: "bst_direct_egress_integration",
-    },
+    claims,
     ttlSeconds: 120,
   });
 

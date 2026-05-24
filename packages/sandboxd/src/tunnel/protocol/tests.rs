@@ -553,6 +553,7 @@ fn serializes_stream_responses() {
         egress_token_request(&EgressTokenRequest {
             message_type: "egress.token.request".to_string(),
             request_id: "egress_token_req_123".to_string(),
+            acting_user_id: None,
         }),
         r#"{"type":"egress.token.request","requestId":"egress_token_req_123"}"#
     );

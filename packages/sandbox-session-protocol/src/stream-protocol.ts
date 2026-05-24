@@ -286,6 +286,7 @@ const PortsTransportMessageSchema = z.union([
 const EgressTokenRequestSchema = z.object({
   type: z.literal("egress.token.request"),
   requestId: NonEmptyStringSchema,
+  actingUserId: NonEmptyStringSchema.optional(),
 });
 
 const EgressTokenResponseSchema = z.object({

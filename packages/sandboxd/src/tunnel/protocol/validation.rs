@@ -770,6 +770,13 @@ pub(super) fn validate_egress_token_request(
             "egress.token.request requestId is required",
         ));
     }
+    if let Some(acting_user_id) = &message.acting_user_id
+        && acting_user_id.trim().is_empty()
+    {
+        return Err(TunnelProtocolError::new(
+            "egress.token.request actingUserId must not be empty when present",
+        ));
+    }
     Ok(())
 }
 

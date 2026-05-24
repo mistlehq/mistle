@@ -195,8 +195,10 @@ impl SandboxdState {
             clock.clone(),
             collect_tracked_components(&runtime_plan),
         );
-        let gateway_egress_token_provider =
-            Some(GatewayEgressTokenProvider::new(sandbox_instance_id));
+        let gateway_egress_token_provider = Some(GatewayEgressTokenProvider::new(
+            sandbox_instance_id,
+            startup_input.acting_user_id.clone(),
+        ));
         let execution_mode = startup_input.execution_mode;
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
         let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
@@ -743,6 +745,9 @@ impl SandboxdState {
         }
         record_operation_phase_completed(&diagnostics_logger, "apply_git_identity");
         if let Some(provider) = &self.gateway_egress_token_provider {
+            provider
+                .set_acting_user_id(startup_input.acting_user_id.clone())
+                .map_err(|error| SandboxdStateError::StartTunnelSession(error.to_string()))?;
             tunnel_session.attach_gateway_egress_token_provider(provider);
         }
         if let Err(error) = attach_runtime_environment_to_tunnel(

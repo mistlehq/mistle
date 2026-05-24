@@ -136,6 +136,7 @@ export class DirectEgressProxyService {
     const token = await this.verifyBearerToken(input.authorizationHeader);
     const targetUrl = parseDirectEgressTarget(input.target);
     const request = toDirectEgressRequest({
+      ...(token.actingUserId === undefined ? {} : { actingUserId: token.actingUserId }),
       headers: input.headers,
       method: input.method,
       targetUrl,
@@ -191,6 +192,7 @@ export class DirectEgressProxyService {
     }
     if (classification.kind === "matched") {
       const authorizationFailure = authorizeMatchedManagedRoute({
+        request,
         route: classification.route,
       });
       if (authorizationFailure !== undefined) {
@@ -376,11 +378,13 @@ export class DirectEgressProxyService {
 }
 
 function authorizeMatchedManagedRoute(input: {
+  request: DirectEgressRequest;
   route: Extract<GatewayEgressRouteClassification, { kind: "matched" }>["route"];
 }): { message: string } | undefined {
   if (
     input.route.credentialResolver.kind === "linked_principal" &&
-    input.route.credentialResolver.actingUserRequired
+    input.route.credentialResolver.actingUserRequired &&
+    input.request.actingUserId === undefined
   ) {
     return {
       message: `Managed egress route '${input.route.egressRuleId}' requires acting-user context, but direct gateway egress did not receive one.`,
@@ -392,7 +396,10 @@ function authorizeMatchedManagedRoute(input: {
       header.credentialResolver.kind === "linked_principal" &&
       header.credentialResolver.actingUserRequired,
   );
-  if (actingUserRequiredAdditionalHeader !== undefined) {
+  if (
+    actingUserRequiredAdditionalHeader !== undefined &&
+    input.request.actingUserId === undefined
+  ) {
     return {
       message: `Managed egress route '${input.route.egressRuleId}' additional credential header '${actingUserRequiredAdditionalHeader.header}' requires acting-user context, but direct gateway egress did not receive one.`,
     };
@@ -433,11 +440,13 @@ function parseDirectEgressTarget(target: string | null): URL {
 }
 
 function toDirectEgressRequest(input: {
+  actingUserId?: string;
   headers: Headers;
   method: string;
   targetUrl: URL;
 }): DirectEgressRequest {
   return {
+    ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
     authority: input.targetUrl.host,
     headers: toRepeatedRequestHeaders(input.headers),
     method: input.method,

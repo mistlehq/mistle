@@ -39,6 +39,33 @@ describe("egress token", () => {
     });
   });
 
+  it("preserves acting-user context when present", async () => {
+    const claims = {
+      sub: "sbi_123",
+      organizationId: "org_123",
+      bootstrapSessionId: "relay_123",
+      actingUserId: "usr_123",
+    };
+    const minted = await mintEgressToken({
+      config: TokenConfig,
+      claims,
+      ttlSeconds: 300,
+    });
+
+    await expect(
+      verifyEgressToken({
+        config: TokenConfig,
+        token: minted.token,
+      }),
+    ).resolves.toEqual({
+      sub: "sbi_123",
+      organizationId: "org_123",
+      bootstrapSessionId: "relay_123",
+      actingUserId: "usr_123",
+      expiresAt: minted.expiresAt,
+    });
+  });
+
   it("rejects tokens with the wrong audience", async () => {
     const minted = await mintEgressToken({
       config: TokenConfig,

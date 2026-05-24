@@ -45,6 +45,9 @@ export class SandboxEgressTokenService {
           sub: input.sandboxInstanceId,
           organizationId: sandboxInstance.organizationId,
           bootstrapSessionId: input.sourceBootstrapSessionId,
+          ...(input.request.actingUserId === undefined
+            ? {}
+            : { actingUserId: input.request.actingUserId }),
         },
         ttlSeconds: EgressTokenTtlSeconds,
       });

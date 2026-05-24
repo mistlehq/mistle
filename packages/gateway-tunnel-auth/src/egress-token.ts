@@ -15,6 +15,7 @@ export type EgressTokenClaims = {
   sub: string;
   organizationId: string;
   bootstrapSessionId: string;
+  actingUserId?: string;
 };
 
 export type VerifiedEgressToken = EgressTokenClaims & {
@@ -108,6 +109,7 @@ export async function mintEgressToken(input: {
       message: "Egress token bootstrapSessionId claim is required.",
     });
   }
+  const normalizedActingUserId = toNonEmptyString(input.claims.actingUserId);
 
   if (!Number.isInteger(input.ttlSeconds) || input.ttlSeconds < 1) {
     throw new EgressTokenError({
@@ -123,6 +125,7 @@ export async function mintEgressToken(input: {
     const token = await new SignJWT({
       organizationId: normalizedOrganizationId,
       bootstrapSessionId: normalizedBootstrapSessionId,
+      ...(normalizedActingUserId === undefined ? {} : { actingUserId: normalizedActingUserId }),
     })
       .setProtectedHeader({ alg: "HS256" })
       .setSubject(normalizedSandboxInstanceId)
@@ -180,6 +183,10 @@ export async function verifyEgressToken(input: {
       typeof verificationResult.payload.bootstrapSessionId === "string"
         ? toNonEmptyString(verificationResult.payload.bootstrapSessionId)
         : undefined;
+    const normalizedActingUserId =
+      typeof verificationResult.payload.actingUserId === "string"
+        ? toNonEmptyString(verificationResult.payload.actingUserId)
+        : undefined;
     const expiresAtEpochSeconds = verificationResult.payload.exp;
 
     if (normalizedSandboxInstanceId === undefined) {
@@ -211,6 +218,7 @@ export async function verifyEgressToken(input: {
       sub: normalizedSandboxInstanceId,
       organizationId: normalizedOrganizationId,
       bootstrapSessionId: normalizedBootstrapSessionId,
+      ...(normalizedActingUserId === undefined ? {} : { actingUserId: normalizedActingUserId }),
       expiresAt: new Date(expiresAtEpochSeconds * 1000),
     };
   } catch (error) {

@@ -82,7 +82,7 @@ fn build_child_proxy_state(
         )?,
         None => DirectGatewayEgressClient::from_bootstrap_tunnel_url(
             &config.tunnel_gateway_ws_url,
-            GatewayEgressTokenProvider::new(config.sandbox_instance_id.clone()),
+            GatewayEgressTokenProvider::new(config.sandbox_instance_id.clone(), None),
         )?,
     };
     let forwarding_mode = EgressProxyForwardingMode::DirectGateway {
