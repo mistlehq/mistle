@@ -10,6 +10,7 @@ import { createTestQueryClient } from "../../test-support/query-client.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query.js";
 import { AUTH_METHODS_QUERY_KEY } from "./auth-methods-query.js";
 import {
+  resolveAllowedControlPlaneRedirectOrigins,
   resolvePostLoginPath,
   resolveRequestedPostLoginPath,
   resolveSerializedPostLoginPath,
@@ -98,6 +99,22 @@ describe("resolveSerializedPostLoginPath", () => {
     );
   });
 
+  it("allows serialized external redirects to the configured control-plane origin", () => {
+    expect(
+      resolveSerializedPostLoginPath("http://localhost:5100/oauth/authorize?client_id=mistle-cli", {
+        allowedExternalOrigins: ["http://localhost:5100"],
+      }),
+    ).toBe("http://localhost:5100/oauth/authorize?client_id=mistle-cli");
+  });
+
+  it("rejects serialized external redirects to untrusted origins", () => {
+    expect(
+      resolveSerializedPostLoginPath("https://evil.example/oauth/authorize", {
+        allowedExternalOrigins: ["http://localhost:5100"],
+      }),
+    ).toBe("/");
+  });
+
   it("falls back to root for missing redirectTo", () => {
     expect(resolveSerializedPostLoginPath(null)).toBe("/");
   });
@@ -109,6 +126,21 @@ describe("resolveSerializedPostLoginPath", () => {
     "/auth/login/callback?redirectTo=%2Fsessions",
   ])("falls back to root for auth infrastructure redirect %s", (redirectTo) => {
     expect(resolveSerializedPostLoginPath(redirectTo)).toBe("/");
+  });
+});
+
+describe("resolveAllowedControlPlaneRedirectOrigins", () => {
+  it("allows equivalent localhost and IPv4 loopback origins for local control-plane redirects", () => {
+    expect(resolveAllowedControlPlaneRedirectOrigins("http://localhost:5100")).toEqual([
+      "http://localhost:5100",
+      "http://127.0.0.1:5100",
+    ]);
+  });
+
+  it("keeps non-loopback control-plane origins exact", () => {
+    expect(resolveAllowedControlPlaneRedirectOrigins("https://api.mistle.dev")).toEqual([
+      "https://api.mistle.dev",
+    ]);
   });
 });
 
@@ -124,6 +156,34 @@ describe("resolveRequestedPostLoginPath", () => {
         redirectTo: "/agents",
       }),
     ).toBe("/agents");
+  });
+
+  it("passes allowed external origins through serialized redirectTo resolution", () => {
+    expect(
+      resolveRequestedPostLoginPath({
+        state: {
+          from: {
+            pathname: "/sessions",
+          },
+        },
+        redirectTo: "http://localhost:5100/oauth/authorize?client_id=mistle-cli",
+        allowedExternalOrigins: ["http://localhost:5100"],
+      }),
+    ).toBe("http://localhost:5100/oauth/authorize?client_id=mistle-cli");
+  });
+
+  it("allows a 127.0.0.1 OAuth redirect when local dashboard config uses localhost", () => {
+    expect(
+      resolveRequestedPostLoginPath({
+        state: {
+          from: {
+            pathname: "/sessions",
+          },
+        },
+        redirectTo: "http://127.0.0.1:5100/oauth/authorize?client_id=mistle-cli",
+        allowedExternalOrigins: resolveAllowedControlPlaneRedirectOrigins("http://localhost:5100"),
+      }),
+    ).toBe("http://127.0.0.1:5100/oauth/authorize?client_id=mistle-cli");
   });
 
   it("falls back to router state when redirectTo is absent", () => {

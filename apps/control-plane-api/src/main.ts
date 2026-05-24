@@ -2,6 +2,7 @@ import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-intern
 
 import { createApp } from "./app.js";
 import type { ControlPlaneAuthConfig } from "./auth/index.js";
+import { ensureStaticOAuthClients } from "./oauth/index.js";
 import { createAppResources, stopAppResources } from "./resources.js";
 import { startServer } from "./server.js";
 import type {
@@ -26,6 +27,7 @@ export async function createControlPlaneApiRuntime(
     const appContext = await resources.getAppContext({
       authConfig,
     });
+    await ensureStaticOAuthClients({ db: appContext.db });
 
     app = createApp({
       config,
@@ -41,16 +43,21 @@ export async function createControlPlaneApiRuntime(
       ptyTransportConfig: config.ptyTransport,
       openWorkflow: appContext.openWorkflow,
       auth: appContext.auth,
-      resolveTestContext: async ({ testEnvironmentId }) => ({
-        ...(await resources.getAppContext({
+      resolveTestContext: async ({ testEnvironmentId }) => {
+        const testAppContext = await resources.getAppContext({
           authConfig,
           testEnvironmentId,
-        })),
-        dataPlaneClient: createDataPlaneClient({
-          config,
-          testEnvironmentId,
-        }),
-      }),
+        });
+        await ensureStaticOAuthClients({ db: testAppContext.db });
+
+        return {
+          ...testAppContext,
+          dataPlaneClient: createDataPlaneClient({
+            config,
+            testEnvironmentId,
+          }),
+        };
+      },
     });
   } catch (error) {
     await stopAppResources(resources);

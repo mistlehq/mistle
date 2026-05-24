@@ -47,6 +47,22 @@ async function buildCurrentActorResponse(input: {
     throw new Error("MCP capability auth is only supported by MCP routes.");
   }
 
+  if (input.authContext.kind === "oauth") {
+    return {
+      authentication: {
+        kind: "oauth",
+      },
+      actor: {
+        kind: "user",
+        id: input.authContext.oauth.userId,
+      },
+      organization: {
+        id: input.authContext.oauth.organizationId,
+      },
+      permissions: [...input.authContext.permissions],
+    };
+  }
+
   const authorization = await requireActiveOrganizationAccess({
     db: input.ctx.get("db"),
     actorUserId: input.authContext.session.user.id,

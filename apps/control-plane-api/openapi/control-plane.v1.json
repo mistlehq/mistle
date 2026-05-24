@@ -10977,6 +10977,17 @@
                           },
                           "required": ["kind", "apiKey"],
                           "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": ["oauth"]
+                            }
+                          },
+                          "required": ["kind"],
+                          "additionalProperties": false
                         }
                       ]
                     },

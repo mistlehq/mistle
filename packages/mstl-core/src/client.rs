@@ -363,6 +363,7 @@ pub enum CurrentActorAuthentication {
         #[serde(rename = "apiKey")]
         api_key: CurrentActorApiKey,
     },
+    OAuth,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -375,6 +376,7 @@ pub struct CurrentActorApiKey {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum CurrentActorIdentity {
     ApiKey { id: String, name: String },
+    User { id: String },
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]

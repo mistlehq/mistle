@@ -21,6 +21,11 @@ export const CurrentActorResponseSchema = z
             .strict(),
         })
         .strict(),
+      z
+        .object({
+          kind: z.literal("oauth"),
+        })
+        .strict(),
     ]),
     actor: z.discriminatedUnion("kind", [
       z

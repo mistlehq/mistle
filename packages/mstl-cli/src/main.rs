@@ -1,8 +1,10 @@
+mod auth_file;
 mod codex;
 mod command_metadata;
 mod config;
 mod error;
 mod format;
+mod login;
 mod profile;
 mod sandbox;
 mod update;
@@ -14,10 +16,11 @@ use std::path::PathBuf;
 use bpaf::{OptionParser, Parser, construct, long, positional, pure};
 
 use crate::command_metadata::{
-    CODEX, CODEX_ARG, PROFILE, PROFILE_GET, PROFILE_ID, PROFILE_LIST, PROFILE_VERSION,
-    PROFILE_VERSION_LIST, PROFILE_VERSION_SETUP_SCRIPT, PROFILE_VERSION_SETUP_SCRIPT_SET,
-    PROFILE_VERSION_VALUE, ROOT, SANDBOX, SANDBOX_CREATE, SANDBOX_GET, SANDBOX_ID, SANDBOX_LIST,
-    SANDBOX_LIST_AFTER, SANDBOX_LIST_LIMIT, SETUP_SCRIPT_FILE, UPDATE, WHOAMI,
+    CODEX, CODEX_ARG, LOGIN, LOGOUT, PROFILE, PROFILE_GET, PROFILE_ID, PROFILE_LIST,
+    PROFILE_VERSION, PROFILE_VERSION_LIST, PROFILE_VERSION_SETUP_SCRIPT,
+    PROFILE_VERSION_SETUP_SCRIPT_SET, PROFILE_VERSION_VALUE, ROOT, SANDBOX, SANDBOX_CREATE,
+    SANDBOX_GET, SANDBOX_ID, SANDBOX_LIST, SANDBOX_LIST_AFTER, SANDBOX_LIST_LIMIT,
+    SETUP_SCRIPT_FILE, UPDATE, WHOAMI,
 };
 
 #[tokio::main]
@@ -31,6 +34,8 @@ async fn main() {
 
 #[derive(Debug, Clone)]
 enum CliCommand {
+    Login,
+    Logout,
     Whoami,
     Update,
     ProfileList,
@@ -67,6 +72,16 @@ fn options() -> OptionParser<CliCommand> {
         .to_options()
         .descr(WHOAMI.description)
         .command(WHOAMI.name);
+
+    let login = pure(CliCommand::Login)
+        .to_options()
+        .descr(LOGIN.description)
+        .command(LOGIN.name);
+
+    let logout = pure(CliCommand::Logout)
+        .to_options()
+        .descr(LOGOUT.description)
+        .command(LOGOUT.name);
 
     let update = pure(CliCommand::Update)
         .to_options()
@@ -219,7 +234,7 @@ fn options() -> OptionParser<CliCommand> {
     .descr(CODEX.description)
     .command(CODEX.name);
 
-    construct!([whoami, update, profile, sandbox, codex])
+    construct!([login, logout, whoami, update, profile, sandbox, codex])
         .to_options()
         .descr(ROOT.description)
         .version(env!("CARGO_PKG_VERSION"))
@@ -231,6 +246,8 @@ where
     E: Write,
 {
     match command {
+        CliCommand::Login => login::run_login(stdout, stderr),
+        CliCommand::Logout => login::run_logout(stdout, stderr),
         CliCommand::Whoami => whoami::run(stdout, stderr),
         CliCommand::Update => update::run(stdout, stderr),
         CliCommand::ProfileList => profile::run_list(stdout, stderr),

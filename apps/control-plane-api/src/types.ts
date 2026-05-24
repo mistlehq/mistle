@@ -71,6 +71,15 @@ export type AppAuthContext =
       permissions: readonly OrganizationPermission[];
     }
   | {
+      kind: "oauth";
+      oauth: {
+        grantId: string;
+        userId: string;
+        organizationId: string;
+      };
+      permissions: readonly OrganizationPermission[];
+    }
+  | {
       kind: "mcp_capability";
       organizationId: string;
       capability: {
@@ -94,6 +103,13 @@ export type AppOrganizationActor =
       kind: "api_key";
       apiKeyId: string;
       name: string;
+      organizationId: string;
+      permissions: readonly OrganizationPermission[];
+    }
+  | {
+      kind: "oauth";
+      grantId: string;
+      userId: string;
       organizationId: string;
       permissions: readonly OrganizationPermission[];
     }

@@ -17,6 +17,15 @@ import { defineIntegrationWebhookEvents } from "./integration-webhook-events.js"
 import { defineIntegrationWebhookSources } from "./integration-webhook-sources.js";
 import { defineInvitations } from "./invitations.js";
 import { defineMembers } from "./members.js";
+import { defineOAuthAccessTokens } from "./oauth-access-tokens.js";
+import { defineOAuthClientGrantTypes } from "./oauth-client-grant-types.js";
+import { defineOAuthClientRedirectUris } from "./oauth-client-redirect-uris.js";
+import { defineOAuthClientScopes } from "./oauth-client-scopes.js";
+import { defineOAuthClients } from "./oauth-clients.js";
+import { defineOAuthGrantScopes } from "./oauth-grant-scopes.js";
+import { defineOAuthGrants } from "./oauth-grants.js";
+import { defineOAuthRefreshTokens } from "./oauth-refresh-tokens.js";
+import { defineOAuthServerStates } from "./oauth-server-states.js";
 import { defineOrganizationBillingCustomers } from "./organization-billing-customers.js";
 import { defineOrganizationCredentialKeys } from "./organization-credential-keys.js";
 import { defineOrganizationIdentityLinkProviderConfigs } from "./organization-identity-link-provider-configs.js";
@@ -89,6 +98,15 @@ export function createControlPlaneDbSchema(schemaName: string) {
   const organizationSandboxStorageSettings = defineOrganizationSandboxStorageSettings(schema);
   const organizations = defineOrganizations(schema);
   const portAccessLinks = definePortAccessLinks(schema);
+  const oauthClients = defineOAuthClients(schema);
+  const oauthClientGrantTypes = defineOAuthClientGrantTypes(schema);
+  const oauthClientRedirectUris = defineOAuthClientRedirectUris(schema);
+  const oauthClientScopes = defineOAuthClientScopes(schema);
+  const oauthGrants = defineOAuthGrants(schema);
+  const oauthGrantScopes = defineOAuthGrantScopes(schema);
+  const oauthAccessTokens = defineOAuthAccessTokens(schema);
+  const oauthRefreshTokens = defineOAuthRefreshTokens(schema);
+  const oauthServerStates = defineOAuthServerStates(schema);
   const sandboxProfileSnapshotRefreshScheduleTargets =
     defineSandboxProfileSnapshotRefreshScheduleTargets(schema);
   const sandboxProfileVersionIntegrationBindings =
@@ -151,6 +169,15 @@ export function createControlPlaneDbSchema(schemaName: string) {
     organizationSandboxStorageSettings,
     organizations,
     portAccessLinks,
+    oauthClientGrantTypes,
+    oauthClientRedirectUris,
+    oauthClients,
+    oauthClientScopes,
+    oauthAccessTokens,
+    oauthGrantScopes,
+    oauthGrants,
+    oauthRefreshTokens,
+    oauthServerStates,
     sandboxProfileSnapshotRefreshScheduleTargets,
     sandboxProfileVersionIntegrationBindings,
     sandboxProfileVersionSnapshotJobs,

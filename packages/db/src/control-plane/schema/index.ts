@@ -135,6 +135,55 @@ export type {
   OrganizationIdentityLinkProviderConfig,
 } from "./organization-identity-link-provider-configs.js";
 export {
+  oauthClientGrantTypes,
+  OAuthGrantTypes,
+  type InsertOAuthClientGrantType,
+  type OAuthClientGrantType,
+  type OAuthGrantType,
+} from "./oauth-client-grant-types.js";
+export {
+  oauthClientRedirectUris,
+  type InsertOAuthClientRedirectUri,
+  type OAuthClientRedirectUri,
+} from "./oauth-client-redirect-uris.js";
+export {
+  oauthClientScopes,
+  type InsertOAuthClientScope,
+  type OAuthClientScope,
+} from "./oauth-client-scopes.js";
+export {
+  oauthClients,
+  OAuthApplicationTypes,
+  OAuthClientRegistrationKinds,
+  OAuthClientTypes,
+  type InsertOAuthClient,
+  type OAuthApplicationType,
+  type OAuthClient,
+  type OAuthClientRegistrationKind,
+  type OAuthClientType,
+} from "./oauth-clients.js";
+export {
+  oauthAccessTokens,
+  type InsertOAuthAccessToken,
+  type OAuthAccessToken,
+} from "./oauth-access-tokens.js";
+export {
+  oauthGrantScopes,
+  type InsertOAuthGrantScope,
+  type OAuthGrantScope,
+} from "./oauth-grant-scopes.js";
+export { oauthGrants, type InsertOAuthGrant, type OAuthGrant } from "./oauth-grants.js";
+export {
+  oauthRefreshTokens,
+  type InsertOAuthRefreshToken,
+  type OAuthRefreshToken,
+} from "./oauth-refresh-tokens.js";
+export {
+  oauthServerStates,
+  type InsertOAuthServerState,
+  type OAuthServerState,
+} from "./oauth-server-states.js";
+export {
   integrationConnectionRedirectSessions,
   IntegrationConnectionRedirectSessionIntents,
   type InsertIntegrationConnectionRedirectSession,

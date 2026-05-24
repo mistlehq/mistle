@@ -42,6 +42,9 @@ where
         CurrentActorAuthentication::ApiKey { api_key } => {
             writeln!(stdout, "api key: {} ({})", api_key.name, api_key.id)?;
         }
+        CurrentActorAuthentication::OAuth => {
+            writeln!(stdout, "oauth: Mistle CLI")?;
+        }
     }
 
     writeln!(stdout, "organization: {}", actor.organization.id)

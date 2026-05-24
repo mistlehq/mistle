@@ -4235,6 +4235,10 @@ export interface paths {
                     };
                     /** @enum {string} */
                     kind: "api_key";
+                  }
+                | {
+                    /** @enum {string} */
+                    kind: "oauth";
                   };
               organization: {
                 id: string;

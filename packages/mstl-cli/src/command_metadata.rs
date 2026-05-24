@@ -18,6 +18,16 @@ pub const WHOAMI: CommandMetadata = CommandMetadata {
     description: "Print the current Mistle identity",
 };
 
+pub const LOGIN: CommandMetadata = CommandMetadata {
+    name: "login",
+    description: "Log in to Mistle with a browser",
+};
+
+pub const LOGOUT: CommandMetadata = CommandMetadata {
+    name: "logout",
+    description: "Remove the local Mistle login",
+};
+
 pub const UPDATE: CommandMetadata = CommandMetadata {
     name: "update",
     description: "Update the Mistle CLI",

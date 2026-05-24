@@ -2,16 +2,24 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
+import { getDashboardConfig } from "../../config.js";
 import { fetchSession, SESSION_QUERY_KEY } from "../shell/session-query.js";
 import { AuthLoginCallbackPageView } from "./auth-login-callback-page-view.js";
-import { resolveSerializedPostLoginPath } from "./auth-redirect.js";
+import {
+  resolveAllowedControlPlaneRedirectOrigins,
+  resolveSerializedPostLoginPath,
+} from "./auth-redirect.js";
 
 export function AuthLoginCallbackPage(): React.JSX.Element {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [callbackError, setCallbackError] = useState<string | null>(null);
-  const redirectTo = resolveSerializedPostLoginPath(searchParams.get("redirectTo"));
+  const redirectTo = resolveSerializedPostLoginPath(searchParams.get("redirectTo"), {
+    allowedExternalOrigins: resolveAllowedControlPlaneRedirectOrigins(
+      getDashboardConfig().controlPlaneApiOrigin,
+    ),
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -34,6 +42,11 @@ export function AuthLoginCallbackPage(): React.JSX.Element {
 
         if (session === null) {
           setCallbackError("Sign-in did not complete.");
+          return;
+        }
+
+        if (isAbsoluteHttpUrl(redirectTo)) {
+          globalThis.location.assign(redirectTo);
           return;
         }
 
@@ -65,4 +78,13 @@ export function AuthLoginCallbackPage(): React.JSX.Element {
       }}
     />
   );
+}
+
+function isAbsoluteHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
 }

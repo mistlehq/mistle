@@ -64,6 +64,16 @@ async function resolveOrganizationActor(input: {
     };
   }
 
+  if (input.authContext.kind === "oauth") {
+    return {
+      kind: "oauth",
+      grantId: input.authContext.oauth.grantId,
+      userId: input.authContext.oauth.userId,
+      organizationId: input.authContext.oauth.organizationId,
+      permissions: input.authContext.permissions,
+    };
+  }
+
   const authorization = await requireActiveOrganizationAccess({
     db: input.db,
     actorUserId: input.authContext.session.user.id,

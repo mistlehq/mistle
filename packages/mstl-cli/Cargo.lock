@@ -378,8 +378,10 @@ dependencies = [
 name = "mstl-cli"
 version = "0.24.0"
 dependencies = [
+ "base64",
  "bpaf",
  "futures-util",
+ "getrandom 0.3.4",
  "mstl-core",
  "serde",
  "serde_json",
@@ -387,6 +389,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "ureq",
+ "url",
 ]
 
 [[package]]

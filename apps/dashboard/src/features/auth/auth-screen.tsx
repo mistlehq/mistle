@@ -1,8 +1,9 @@
 import { Spinner } from "@mistle/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router";
 
+import { getDashboardConfig } from "../../config.js";
 import { authClient } from "../../lib/auth/client.js";
 import { InlineDividerLabel } from "../shared/inline-divider-label.js";
 import { SESSION_QUERY_KEY, useSessionQuery } from "../shell/session-query.js";
@@ -15,7 +16,10 @@ import {
 import { useAuthMethodsQuery } from "./auth-methods-query.js";
 import { AuthMethodIds, hasEnabledAuthMethod, resolveEnabledAuthMethods } from "./auth-methods.js";
 import { AuthPageShell, AuthPageWidths } from "./auth-page-shell.js";
-import { resolveRequestedPostLoginPath } from "./auth-redirect.js";
+import {
+  resolveAllowedControlPlaneRedirectOrigins,
+  resolveRequestedPostLoginPath,
+} from "./auth-redirect.js";
 import { AuthScreenView } from "./auth-screen-view.js";
 import { ErrorNotice } from "./error-notice.js";
 import { GoogleSignInButton } from "./google-sign-in-button.js";
@@ -37,10 +41,15 @@ export function AuthScreen(): React.JSX.Element {
   const [isSigningInWithGoogle, setIsSigningInWithGoogle] = useState(false);
   const [authError, setAuthError] = useState<string | null>(initialAuthError);
   const isSignedIn = (sessionQuery.data ?? null) !== null;
-  const postLoginPath = resolveRequestedPostLoginPath({
-    state: location.state,
-    redirectTo: searchParams.get("redirectTo"),
-  });
+  const [postLoginPath] = useState(() =>
+    resolveRequestedPostLoginPath({
+      state: location.state,
+      redirectTo: searchParams.get("redirectTo"),
+      allowedExternalOrigins: resolveAllowedControlPlaneRedirectOrigins(
+        getDashboardConfig().controlPlaneApiOrigin,
+      ),
+    }),
+  );
 
   async function handleSendOtp(event: React.SyntheticEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -150,6 +159,10 @@ export function AuthScreen(): React.JSX.Element {
   }
 
   if (isSignedIn) {
+    if (isAbsoluteHttpUrl(postLoginPath)) {
+      return <ExternalRedirect to={postLoginPath} />;
+    }
+
     return <Navigate replace to={postLoginPath} />;
   }
 
@@ -200,4 +213,27 @@ export function AuthScreen(): React.JSX.Element {
       otp={otp}
     />
   );
+}
+
+function ExternalRedirect(input: { to: string }): React.JSX.Element {
+  useEffect(() => {
+    globalThis.location.assign(input.to);
+  }, [input.to]);
+
+  return (
+    <AuthPageShell maxWidthClass={AuthPageWidths.SM} title={null}>
+      <div className="justify-center py-2 flex">
+        <Spinner className="text-muted-foreground size-6" />
+      </div>
+    </AuthPageShell>
+  );
+}
+
+function isAbsoluteHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
 }

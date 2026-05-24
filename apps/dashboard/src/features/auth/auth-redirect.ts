@@ -30,6 +30,45 @@ function resolveSafePostLoginPath(input: {
   return `${pathname}${search}${hash}`;
 }
 
+function resolveSafeExternalPostLoginUrl(input: {
+  redirectTo: string;
+  allowedExternalOrigins: readonly string[];
+}): string | null {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(input.redirectTo);
+  } catch {
+    return null;
+  }
+
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+    return null;
+  }
+
+  if (!input.allowedExternalOrigins.includes(parsedUrl.origin)) {
+    return null;
+  }
+
+  return parsedUrl.toString();
+}
+
+export function resolveAllowedControlPlaneRedirectOrigins(
+  configuredOrigin: string,
+): readonly string[] {
+  const parsedOrigin = new URL(configuredOrigin);
+  const origins = new Set<string>([parsedOrigin.origin]);
+  if (parsedOrigin.hostname === "localhost" || parsedOrigin.hostname === "127.0.0.1") {
+    origins.add(
+      `${parsedOrigin.protocol}//localhost${parsedOrigin.port === "" ? "" : `:${parsedOrigin.port}`}`,
+    );
+    origins.add(
+      `${parsedOrigin.protocol}//127.0.0.1${parsedOrigin.port === "" ? "" : `:${parsedOrigin.port}`}`,
+    );
+  }
+
+  return [...origins];
+}
+
 export function resolvePostLoginPath(state: unknown): string {
   if (!isObjectRecord(state)) {
     return "/";
@@ -47,9 +86,27 @@ export function resolvePostLoginPath(state: unknown): string {
   });
 }
 
-export function resolveSerializedPostLoginPath(redirectTo: string | null | undefined): string {
+export function resolveSerializedPostLoginPath(
+  redirectTo: string | null | undefined,
+  options: { allowedExternalOrigins?: readonly string[] } = {},
+): string {
   if (redirectTo === null || redirectTo === undefined) {
     return "/";
+  }
+
+  const externalUrl = resolveSafeExternalPostLoginUrl({
+    redirectTo,
+    allowedExternalOrigins: options.allowedExternalOrigins ?? [],
+  });
+  if (externalUrl !== null) {
+    return externalUrl;
+  }
+
+  try {
+    new URL(redirectTo);
+    return "/";
+  } catch {
+    // Continue with relative application path parsing below.
   }
 
   let parsedUrl: URL;
@@ -69,9 +126,15 @@ export function resolveSerializedPostLoginPath(redirectTo: string | null | undef
 export function resolveRequestedPostLoginPath(input: {
   state: unknown;
   redirectTo: string | null | undefined;
+  allowedExternalOrigins?: readonly string[];
 }): string {
   if (typeof input.redirectTo === "string" && input.redirectTo.length > 0) {
-    return resolveSerializedPostLoginPath(input.redirectTo);
+    return resolveSerializedPostLoginPath(
+      input.redirectTo,
+      input.allowedExternalOrigins === undefined
+        ? {}
+        : { allowedExternalOrigins: input.allowedExternalOrigins },
+    );
   }
 
   return resolvePostLoginPath(input.state);

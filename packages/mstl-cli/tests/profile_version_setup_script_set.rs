@@ -37,44 +37,7 @@ fn profile_version_setup_script_set_requires_api_key_env_var() {
     assert_eq!(String::from_utf8_lossy(&output.stdout), "");
     assert_eq!(
         String::from_utf8_lossy(&output.stderr),
-        "Missing required environment variable: MISTLE_API_KEY\n"
-    );
-}
-
-#[test]
-fn profile_version_setup_script_set_requires_control_plane_public_url_env_var() {
-    let script_file = write_setup_script_file(
-        "profile_version_setup_script_set_requires_control_plane_public_url_env_var",
-        "#!/usr/bin/env bash\npnpm install\n",
-    );
-
-    let output = Command::new(env!("CARGO_BIN_EXE_mistle"))
-        .args([
-            "profile",
-            "version",
-            "setup-script",
-            "set",
-            "--profile",
-            "sbp_test",
-            "--version",
-            "1",
-            "--file",
-            script_file
-                .to_str()
-                .expect("script path should be valid UTF-8"),
-        ])
-        .env(API_KEY_ENV_VAR, "mstl_test_key")
-        .env_remove(CONTROL_PLANE_API_PUBLIC_URL_ENV_VAR)
-        .output()
-        .expect("mistle binary should run");
-
-    fs::remove_file(script_file).expect("script file should be removed");
-
-    assert!(!output.status.success());
-    assert_eq!(String::from_utf8_lossy(&output.stdout), "");
-    assert_eq!(
-        String::from_utf8_lossy(&output.stderr),
-        "Missing required environment variable: MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL\n"
+        "missing Mistle authentication; run `mistle login` or set MISTLE_API_KEY\n"
     );
 }
 
