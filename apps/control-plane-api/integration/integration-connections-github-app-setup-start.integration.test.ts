@@ -25,6 +25,10 @@ const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
 
+const GitHubCloudStartTargetKey = "github-cloud-start-setup";
+const GitHubEnterpriseStartTargetKey = "github-enterprise-server-start-setup";
+const GitHubCloudUnsupportedTargetKey = "github-cloud-start-unsupported";
+
 type StartedProviderAppSetupResponse = z.infer<typeof StartedProviderAppSetupResponseSchema>;
 type StartedProviderAppSetupRedirect = Extract<
   StartedProviderAppSetupResponse,
@@ -81,13 +85,14 @@ describe.concurrent("GitHub App setup start integration connections", () => {
     const githubApi = await startGitHubApiServer();
     try {
       await seedGitHubCloudTarget(env, {
+        targetKey: GitHubCloudStartTargetKey,
         apiBaseUrl: githubApi.baseUrl,
       });
       const session = await env.auth.createSession({
         email: "integration-new-github-app-installation-start@example.com",
       });
       const connectionId = await createGitHubAppConnection(env, {
-        targetKey: "github-cloud",
+        targetKey: GitHubCloudStartTargetKey,
         cookie: session.cookie,
         displayName: "GitHub Prod",
         appId: "123",
@@ -112,7 +117,7 @@ describe.concurrent("GitHub App setup start integration connections", () => {
       ]);
       await expectRedirectSession(env, {
         organizationId: session.organizationId,
-        targetKey: "github-cloud",
+        targetKey: GitHubCloudStartTargetKey,
         state,
       });
     } finally {
@@ -126,13 +131,14 @@ describe.concurrent("GitHub App setup start integration connections", () => {
     const githubApi = await startGitHubApiServer();
     try {
       await seedGitHubEnterpriseServerTarget(env, {
+        targetKey: GitHubEnterpriseStartTargetKey,
         apiBaseUrl: `${githubApi.baseUrl}/api/v3`,
       });
       const session = await env.auth.createSession({
         email: "integration-new-github-enterprise-app-installation-start@example.com",
       });
       const connectionId = await createGitHubAppConnection(env, {
-        targetKey: "github-enterprise-server",
+        targetKey: GitHubEnterpriseStartTargetKey,
         cookie: session.cookie,
         displayName: "GitHub Enterprise",
         appId: "456",
@@ -159,7 +165,7 @@ describe.concurrent("GitHub App setup start integration connections", () => {
       ]);
       await expectRedirectSession(env, {
         organizationId: session.organizationId,
-        targetKey: "github-enterprise-server",
+        targetKey: GitHubEnterpriseStartTargetKey,
         state,
       });
     } finally {
@@ -170,11 +176,15 @@ describe.concurrent("GitHub App setup start integration connections", () => {
   it("returns 400 when the connection does not use GitHub App installation auth", async ({
     env,
   }) => {
-    await seedGitHubCloudTarget(env);
+    await seedGitHubCloudTarget(env, {
+      targetKey: GitHubCloudUnsupportedTargetKey,
+      apiBaseUrl: "https://api.github.com",
+    });
     const session = await env.auth.createSession({
       email: "integration-new-github-app-installation-unsupported-connection@example.com",
     });
     const connectionId = await createGitHubApiKeyConnection(env, {
+      targetKey: GitHubCloudUnsupportedTargetKey,
       cookie: session.cookie,
       displayName: "GitHub API key",
     });
@@ -221,14 +231,14 @@ describe.concurrent("GitHub App setup start integration connections", () => {
 
 async function seedGitHubCloudTarget(
   env: IntegrationTestEnvironment,
-  input?: { apiBaseUrl?: string },
+  input: { targetKey: string; apiBaseUrl: string },
 ): Promise<void> {
   await seedIntegrationTarget(env, {
-    targetKey: "github-cloud",
+    targetKey: input.targetKey,
     familyId: "github",
     variantId: "github-cloud",
     config: {
-      api_base_url: input?.apiBaseUrl ?? "https://api.github.com",
+      api_base_url: input.apiBaseUrl,
       web_base_url: "https://github.com",
     },
   });
@@ -236,14 +246,14 @@ async function seedGitHubCloudTarget(
 
 async function seedGitHubEnterpriseServerTarget(
   env: IntegrationTestEnvironment,
-  input?: { apiBaseUrl?: string },
+  input: { targetKey: string; apiBaseUrl: string },
 ): Promise<void> {
   await seedIntegrationTarget(env, {
-    targetKey: "github-enterprise-server",
+    targetKey: input.targetKey,
     familyId: "github",
     variantId: "github-enterprise-server",
     config: {
-      api_base_url: input?.apiBaseUrl ?? "https://github.enterprise.example.com/api/v3",
+      api_base_url: input.apiBaseUrl,
       web_base_url: "https://github.enterprise.example.com",
     },
   });
@@ -290,13 +300,14 @@ async function createGitHubAppConnection(
 async function createGitHubApiKeyConnection(
   env: IntegrationTestEnvironment,
   input: {
+    targetKey: string;
     cookie: string;
     displayName: string;
   },
 ): Promise<string> {
   const response = await createFormConnection({
     env,
-    targetKey: "github-cloud",
+    targetKey: input.targetKey,
     cookie: input.cookie,
     body: {
       displayName: input.displayName,
