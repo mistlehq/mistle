@@ -22,6 +22,7 @@ import { defineOrganizationCredentialKeys } from "./organization-credential-keys
 import { defineOrganizationIdentityLinkProviderConfigs } from "./organization-identity-link-provider-configs.js";
 import { defineOrganizationSandboxStorageSettings } from "./organization-sandbox-storage-settings.js";
 import { defineOrganizations } from "./organizations.js";
+import { definePortAccessLinks } from "./port-access-links.js";
 import { defineSandboxProfileSnapshotRefreshScheduleTargets } from "./sandbox-profile-snapshot-refresh-schedule-targets.js";
 import { defineSandboxProfileVersionIntegrationBindings } from "./sandbox-profile-version-integration-bindings.js";
 import { defineSandboxProfileVersionSnapshotJobs } from "./sandbox-profile-version-snapshot-jobs.js";
@@ -87,6 +88,7 @@ export function createControlPlaneDbSchema(schemaName: string) {
     defineOrganizationIdentityLinkProviderConfigs(schema);
   const organizationSandboxStorageSettings = defineOrganizationSandboxStorageSettings(schema);
   const organizations = defineOrganizations(schema);
+  const portAccessLinks = definePortAccessLinks(schema);
   const sandboxProfileSnapshotRefreshScheduleTargets =
     defineSandboxProfileSnapshotRefreshScheduleTargets(schema);
   const sandboxProfileVersionIntegrationBindings =
@@ -148,6 +150,7 @@ export function createControlPlaneDbSchema(schemaName: string) {
     organizationIdentityLinkProviderConfigs,
     organizationSandboxStorageSettings,
     organizations,
+    portAccessLinks,
     sandboxProfileSnapshotRefreshScheduleTargets,
     sandboxProfileVersionIntegrationBindings,
     sandboxProfileVersionSnapshotJobs,

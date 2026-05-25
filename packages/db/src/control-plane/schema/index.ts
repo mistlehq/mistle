@@ -201,6 +201,13 @@ export {
   type SandboxStorageConfigSource,
 } from "./organization-sandbox-storage-settings.js";
 export { organizations } from "./organizations.js";
+export {
+  portAccessLinks,
+  PortAccessLinkCreatedByKinds,
+  type PortAccessLinkCreatedByKind,
+  type InsertPortAccessLink,
+  type PortAccessLink,
+} from "./port-access-links.js";
 export { sandboxProfiles, SandboxProfileStatuses } from "./sandbox-profiles.js";
 export type {
   InsertSandboxProfile,
