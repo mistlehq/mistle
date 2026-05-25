@@ -6,11 +6,14 @@ import {
   listSandboxProfilesQuerySchema,
   listSandboxProfilesResponseSchema,
   sandboxProfileVersionMaintenanceScriptSchema,
+  sandboxProfileVersionSetupScriptSchema,
   putSandboxProfileVersionDraftResponseSchema,
   sandboxProfileIdParamsSchema,
   sandboxProfileVersionParamsSchema,
   sandboxProfileSchema,
 } from "../../sandbox-profiles/schemas.js";
+import { getProfileVersionMaintenanceScript } from "../../sandbox-profiles/services/get-profile-version-maintenance-script.js";
+import { getProfileVersionSetupScript } from "../../sandbox-profiles/services/get-profile-version-setup-script.js";
 import { getProfile } from "../../sandbox-profiles/services/get-profile.js";
 import { listProfiles } from "../../sandbox-profiles/services/list-profiles.js";
 import { putProfileVersionDraft } from "../../sandbox-profiles/services/put-profile-version-draft.js";
@@ -139,6 +142,43 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
   );
 
   server.registerTool(
+    "profile_setup_script_get",
+    {
+      title: "Get sandbox profile setup script",
+      description: "Get the setup script for a sandbox profile version",
+      inputSchema: sandboxProfileVersionParamsSchema,
+      outputSchema: sandboxProfileVersionSetupScriptSchema,
+      annotations: {
+        ...ReadOnlyToolAnnotations,
+        title: "Get sandbox profile setup script",
+      },
+    },
+    async ({ profileId, version }) => {
+      requireMcpToolPermission(
+        context.organizationActor,
+        OrganizationPermissions.SANDBOX_PROFILE_READ,
+      );
+      requireMcpSandboxProfileScope(context.organizationActor, {
+        profileId,
+        version,
+      });
+
+      const setupScript = await getProfileVersionSetupScript(
+        {
+          db: context.db,
+        },
+        {
+          organizationId: context.organizationActor.organizationId,
+          profileId,
+          profileVersion: version,
+        },
+      );
+
+      return structuredResult(setupScript);
+    },
+  );
+
+  server.registerTool(
     "profile_draft_setup_script_put",
     {
       title: "Put sandbox profile draft setup script",
@@ -175,6 +215,43 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
       );
 
       return structuredResult(draft);
+    },
+  );
+
+  server.registerTool(
+    "profile_maintenance_script_get",
+    {
+      title: "Get sandbox profile maintenance script",
+      description: "Get the snapshot maintenance script for a sandbox profile version",
+      inputSchema: sandboxProfileVersionParamsSchema,
+      outputSchema: sandboxProfileVersionMaintenanceScriptSchema,
+      annotations: {
+        ...ReadOnlyToolAnnotations,
+        title: "Get sandbox profile maintenance script",
+      },
+    },
+    async ({ profileId, version }) => {
+      requireMcpToolPermission(
+        context.organizationActor,
+        OrganizationPermissions.SANDBOX_PROFILE_READ,
+      );
+      requireMcpSandboxProfileScope(context.organizationActor, {
+        profileId,
+        version,
+      });
+
+      const maintenanceScript = await getProfileVersionMaintenanceScript(
+        {
+          db: context.db,
+        },
+        {
+          organizationId: context.organizationActor.organizationId,
+          profileId,
+          profileVersion: version,
+        },
+      );
+
+      return structuredResult(maintenanceScript);
     },
   );
 

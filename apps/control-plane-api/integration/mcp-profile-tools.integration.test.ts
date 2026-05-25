@@ -34,6 +34,7 @@ import {
   PutSandboxProfileVersionDraftResponseSchema,
   SandboxProfileSchema,
   SandboxProfileVersionMaintenanceScriptSchema,
+  SandboxProfileVersionSetupScriptSchema,
   StartSandboxProfileSetupScriptTestRunResponseSchema,
 } from "../src/sandbox-profiles/index.js";
 import { createApiKeyCredential, createApiKeyToken } from "./helpers/api-keys.js";
@@ -162,6 +163,75 @@ describe.concurrent("MCP profile tools integration", () => {
     expect(profile.id).toBe("sbp_mcp_get");
     expect(profile.organizationId).toBe(session.organizationId);
     expect(profile.displayName).toBe("MCP Get Profile");
+  });
+
+  it("gets sandbox profile setup and maintenance scripts with REST response shapes", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-profile-script-get@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP profile script reader",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_READ],
+    });
+    const setupScript = "pnpm install\npnpm build";
+    const maintenanceScript = "git pull --ff-only\npnpm install";
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_mcp_script_get",
+        organizationId: session.organizationId,
+        displayName: "MCP Script Get Profile",
+        createdAt: "2026-05-07T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_mcp_script_get",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        setupScript,
+        maintenanceScript,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const setupResult = await callMcpTool({
+      env,
+      token,
+      name: "profile_setup_script_get",
+      arguments: {
+        profileId: "sbp_mcp_script_get",
+        version: 1,
+      },
+    });
+    const maintenanceResult = await callMcpTool({
+      env,
+      token,
+      name: "profile_maintenance_script_get",
+      arguments: {
+        profileId: "sbp_mcp_script_get",
+        version: 1,
+      },
+    });
+
+    expect(setupResult.isError).toBeUndefined();
+    expect(maintenanceResult.isError).toBeUndefined();
+    expect(SandboxProfileVersionSetupScriptSchema.parse(setupResult.structuredContent)).toEqual({
+      sandboxProfileId: "sbp_mcp_script_get",
+      version: 1,
+      setupScript,
+    });
+    expect(
+      SandboxProfileVersionMaintenanceScriptSchema.parse(maintenanceResult.structuredContent),
+    ).toEqual({
+      sandboxProfileId: "sbp_mcp_script_get",
+      version: 1,
+      maintenanceScript,
+    });
   });
 
   it("updates a sandbox profile draft setup script with the REST response shape", async ({
@@ -840,6 +910,25 @@ describe.concurrent("MCP profile tools integration", () => {
       }),
     ]);
 
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+      sandboxProfileVersionRow({
+        sandboxProfileId: scopedProfileId,
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        setupScript: "echo scoped setup",
+        maintenanceScript: "echo scoped maintenance",
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+      sandboxProfileVersionRow({
+        sandboxProfileId: scopedProfileId,
+        version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
+        setupScript: "echo other version setup",
+        maintenanceScript: "echo other version maintenance",
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    ]);
+
     const scopedGetResult = await callMcpTool({
       env,
       token: token.token,
@@ -864,15 +953,63 @@ describe.concurrent("MCP profile tools integration", () => {
         limit: 10,
       },
     });
+    const setupScriptResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_setup_script_get",
+      arguments: {
+        profileId: scopedProfileId,
+        version: 1,
+      },
+    });
+    const maintenanceScriptResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_maintenance_script_get",
+      arguments: {
+        profileId: scopedProfileId,
+        version: 1,
+      },
+    });
+    const otherVersionSetupScriptResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_setup_script_get",
+      arguments: {
+        profileId: scopedProfileId,
+        version: 2,
+      },
+    });
+    const otherProfileMaintenanceScriptResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_maintenance_script_get",
+      arguments: {
+        profileId: otherProfileId,
+        version: 1,
+      },
+    });
 
     expect(scopedGetResult.isError).toBeUndefined();
     expect(otherGetResult.isError).toBe(true);
     expect(listResult.isError).toBeUndefined();
+    expect(setupScriptResult.isError).toBeUndefined();
+    expect(maintenanceScriptResult.isError).toBeUndefined();
+    expect(otherVersionSetupScriptResult.isError).toBe(true);
+    expect(otherProfileMaintenanceScriptResult.isError).toBe(true);
     const scopedProfile = SandboxProfileSchema.parse(scopedGetResult.structuredContent);
     const profileList = ListSandboxProfilesResponseSchema.parse(listResult.structuredContent);
+    const scopedSetupScript = SandboxProfileVersionSetupScriptSchema.parse(
+      setupScriptResult.structuredContent,
+    );
+    const scopedMaintenanceScript = SandboxProfileVersionMaintenanceScriptSchema.parse(
+      maintenanceScriptResult.structuredContent,
+    );
     expect(scopedProfile.id).toBe(scopedProfileId);
     expect(profileList.totalResults).toBe(1);
     expect(profileList.items.map((profile) => profile.id)).toEqual([scopedProfileId]);
+    expect(scopedSetupScript.setupScript).toBe("echo scoped setup");
+    expect(scopedMaintenanceScript.maintenanceScript).toBe("echo scoped maintenance");
   });
 
   it("authorizes setup assistant MCP tokens for maintenance tools scoped to the token profile version", async ({
