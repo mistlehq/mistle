@@ -214,6 +214,10 @@ const ControlPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDesc
     path: ["workflow", "concurrency"],
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY",
   },
+  {
+    path: ["workflow", "databasePoolMax"],
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_POOL_MAX",
+  },
   { path: ["email", "fromAddress"], envVar: "MISTLE_EMAIL_SMTP_FROM_ADDRESS" },
   { path: ["email", "fromName"], envVar: "MISTLE_EMAIL_SMTP_FROM_NAME" },
   { path: ["email", "smtpHost"], envVar: "MISTLE_EMAIL_SMTP_HOST" },
@@ -311,6 +315,10 @@ const DataPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
   {
     path: ["workflow", "concurrency"],
     envVar: "MISTLE_SERVICES_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY",
+  },
+  {
+    path: ["workflow", "databasePoolMax"],
+    envVar: "MISTLE_SERVICES_DATA_PLANE_WORKER_WORKFLOW_DATABASE_POOL_MAX",
   },
   {
     path: ["runtimeState", "gatewayBaseUrl"],

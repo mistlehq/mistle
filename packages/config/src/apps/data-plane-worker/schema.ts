@@ -26,6 +26,7 @@ export const DataPlaneWorkerWorkflowConfigSchema = z
     namespaceId: z.string().min(1),
     runMigrations: z.boolean(),
     concurrency: z.number().int().min(1),
+    databasePoolMax: z.number().int().min(1),
   })
   .strict();
 

@@ -277,9 +277,11 @@ function buildCommonBaseConfig(env: NodeJS.ProcessEnv): ConfigRecord {
       },
       control_plane_worker: {
         workflow_concurrency: 4,
+        workflow_database_pool_max: 4,
       },
       data_plane_worker: {
         workflow_concurrency: 4,
+        workflow_database_pool_max: 4,
       },
     },
     workflow: {

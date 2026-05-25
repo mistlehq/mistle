@@ -587,6 +587,11 @@ const ControlPlaneWorkerEnvDescriptors = [
     path: ["workflow", "concurrency"],
     parse: parseNumberEnv,
   },
+  {
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_POOL_MAX",
+    path: ["workflow", "databasePoolMax"],
+    parse: parseNumberEnv,
+  },
   { envVar: "MISTLE_EMAIL_SMTP_FROM_ADDRESS", path: ["email", "fromAddress"] },
   { envVar: "MISTLE_EMAIL_SMTP_FROM_NAME", path: ["email", "fromName"] },
   { envVar: "MISTLE_EMAIL_SMTP_HOST", path: ["email", "smtpHost"] },
@@ -707,6 +712,11 @@ const DataPlaneWorkerEnvDescriptors = [
   {
     envVar: "MISTLE_SERVICES_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY",
     path: ["workflow", "concurrency"],
+    parse: parseNumberEnv,
+  },
+  {
+    envVar: "MISTLE_SERVICES_DATA_PLANE_WORKER_WORKFLOW_DATABASE_POOL_MAX",
+    path: ["workflow", "databasePoolMax"],
     parse: parseNumberEnv,
   },
   {

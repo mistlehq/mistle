@@ -212,6 +212,7 @@ function createWorkerConfig(): DataPlaneWorkerConfig {
       namespaceId: "integration-new-worker-resolve-storage",
       runMigrations: false,
       concurrency: 1,
+      databasePoolMax: 2,
     },
     runtimeState: {
       gatewayBaseUrl: "http://127.0.0.1:5202",

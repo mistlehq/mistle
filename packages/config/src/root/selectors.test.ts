@@ -82,9 +82,11 @@ function createRootConfig(input: {
       },
       control_plane_worker: {
         workflow_concurrency: 4,
+        workflow_database_pool_max: 6,
       },
       data_plane_worker: {
         workflow_concurrency: 5,
+        workflow_database_pool_max: 7,
       },
     },
     workflow: {

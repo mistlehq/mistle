@@ -84,9 +84,11 @@ sandbox_ws_internal_url = "ws://data-plane-gateway:8084/tunnel/sandbox"
 
 [services.control_plane_worker]
 workflow_concurrency = 4
+workflow_database_pool_max = 4
 
 [services.data_plane_worker]
 workflow_concurrency = 4
+workflow_database_pool_max = 4
 
 [workflow.control_plane]
 namespace_id = "production"

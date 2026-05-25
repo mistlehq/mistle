@@ -84,6 +84,7 @@ function buildControlPlaneWorkerServiceEnv(): NodeJS.ProcessEnv {
     MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: "postgresql://control-direct.example/mistle",
     MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: "staging",
     MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY: "4",
+    MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_POOL_MAX: "5",
     MISTLE_EMAIL_SMTP_FROM_ADDRESS: "no-reply@example.com",
     MISTLE_EMAIL_SMTP_FROM_NAME: "Mistle",
     MISTLE_EMAIL_SMTP_HOST: "smtp.example.com",

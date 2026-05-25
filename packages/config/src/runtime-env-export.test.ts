@@ -123,6 +123,10 @@ describe("exportServiceConfigToEnv", () => {
       value: 4,
     });
     expectEntry(entries, {
+      name: "MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_POOL_MAX",
+      value: 4,
+    });
+    expectEntry(entries, {
       name: "MISTLE_EMAIL_SMTP_PASSWORD",
       value: "replace-with-smtp-password",
     });
@@ -215,6 +219,10 @@ describe("exportServiceConfigToEnv", () => {
 
     expectEntry(entries, {
       name: "MISTLE_SERVICES_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY",
+      value: 4,
+    });
+    expectEntry(entries, {
+      name: "MISTLE_SERVICES_DATA_PLANE_WORKER_WORKFLOW_DATABASE_POOL_MAX",
       value: 4,
     });
     expectEntry(entries, {

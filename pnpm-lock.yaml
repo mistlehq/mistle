@@ -301,6 +301,9 @@ importers:
       pg:
         specifier: ^8.20.0
         version: 8.20.0
+      postgres:
+        specifier: ^3.4.9
+        version: 3.4.9
       stripe:
         specifier: ^20.4.1
         version: 20.4.1(@types/node@25.8.0)
@@ -725,6 +728,9 @@ importers:
       pg:
         specifier: ^8.20.0
         version: 8.20.0
+      postgres:
+        specifier: ^3.4.9
+        version: 3.4.9
       typeid-js:
         specifier: ^1.2.0
         version: 1.2.0

@@ -408,8 +408,18 @@ const RootEnvDescriptors = [
     parse: parseNumberEnv,
   },
   {
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_POOL_MAX",
+    path: ["services", "control_plane_worker", "workflow_database_pool_max"],
+    parse: parseNumberEnv,
+  },
+  {
     envVar: "MISTLE_SERVICES_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY",
     path: ["services", "data_plane_worker", "workflow_concurrency"],
+    parse: parseNumberEnv,
+  },
+  {
+    envVar: "MISTLE_SERVICES_DATA_PLANE_WORKER_WORKFLOW_DATABASE_POOL_MAX",
+    path: ["services", "data_plane_worker", "workflow_database_pool_max"],
     parse: parseNumberEnv,
   },
   {

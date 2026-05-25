@@ -82,7 +82,9 @@ describe("loadRootConfigFromEnv", () => {
       MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL:
         "ws://data-plane-gateway:8084/tunnel/sandbox",
       MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY: "4",
+      MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_POOL_MAX: "6",
       MISTLE_SERVICES_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY: "5",
+      MISTLE_SERVICES_DATA_PLANE_WORKER_WORKFLOW_DATABASE_POOL_MAX: "7",
       MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: "control",
       MISTLE_WORKFLOW_DATA_PLANE_NAMESPACE_ID: "data",
       MISTLE_SANDBOX_DEFAULT_BASE_IMAGE: "registry.example.com/sandbox:latest",
@@ -261,9 +263,11 @@ describe("loadRootConfigFromEnv", () => {
         },
         control_plane_worker: {
           workflow_concurrency: 4,
+          workflow_database_pool_max: 6,
         },
         data_plane_worker: {
           workflow_concurrency: 5,
+          workflow_database_pool_max: 7,
         },
       },
       workflow: {

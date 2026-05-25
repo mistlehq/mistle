@@ -305,11 +305,13 @@ export const ConfigSchema = z
         control_plane_worker: z
           .object({
             workflow_concurrency: z.number().int().min(1),
+            workflow_database_pool_max: z.number().int().min(1),
           })
           .strict(),
         data_plane_worker: z
           .object({
             workflow_concurrency: z.number().int().min(1),
+            workflow_database_pool_max: z.number().int().min(1),
           })
           .strict(),
       })

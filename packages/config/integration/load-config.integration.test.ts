@@ -272,6 +272,7 @@ const controlPlaneWorkerEnvConfig = {
     namespaceId: "development",
     runMigrations: false,
     concurrency: 1,
+    databasePoolMax: 2,
   },
   email: {
     fromAddress: "no-reply@mistle.local",
@@ -302,6 +303,7 @@ const controlPlaneWorkerBaseFixtureConfig = {
     ...controlPlaneWorkerEnvConfig.workflow,
     namespaceId: "fixture",
     concurrency: 2,
+    databasePoolMax: 3,
   },
   dataPlaneApi: {
     baseUrl: "http://127.0.0.1:5300",
@@ -423,6 +425,7 @@ const dataPlaneWorkerEnvConfig = {
     namespaceId: "development",
     runMigrations: false,
     concurrency: 1,
+    databasePoolMax: 2,
   },
   runtimeState: {
     gatewayBaseUrl: "http://127.0.0.1:5003",
@@ -470,6 +473,7 @@ const dataPlaneWorkerBaseFixtureConfig = {
     ...dataPlaneWorkerEnvConfig.workflow,
     namespaceId: "fixture",
     concurrency: 2,
+    databasePoolMax: 3,
   },
   runtimeState: {
     gatewayBaseUrl: "http://127.0.0.1:5302",
@@ -488,6 +492,7 @@ const dataPlaneWorkerDockerFixtureConfig = {
     namespaceId: "fixture-docker",
     runMigrations: false,
     concurrency: 3,
+    databasePoolMax: 4,
   },
   runtimeState: {
     gatewayBaseUrl: "http://127.0.0.1:5003",

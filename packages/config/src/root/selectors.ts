@@ -325,6 +325,7 @@ export function selectControlPlaneWorkerConfig(config: Config): ControlPlaneWork
       namespaceId: config.workflow.control_plane.namespace_id,
       runMigrations: false,
       concurrency: config.services.control_plane_worker.workflow_concurrency,
+      databasePoolMax: config.services.control_plane_worker.workflow_database_pool_max,
     },
     email: {
       fromAddress: config.email.smtp.from_address,
@@ -485,6 +486,7 @@ export function selectDataPlaneWorkerConfig(config: Config): DataPlaneWorkerConf
       namespaceId: config.workflow.data_plane.namespace_id,
       runMigrations: false,
       concurrency: config.services.data_plane_worker.workflow_concurrency,
+      databasePoolMax: config.services.data_plane_worker.workflow_database_pool_max,
     },
     runtimeState: {
       gatewayBaseUrl: config.services.data_plane_gateway.internal_url,

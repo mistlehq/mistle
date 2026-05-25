@@ -33,6 +33,7 @@ function createWorkerConfig(input: {
       namespaceId: "development",
       runMigrations: true,
       concurrency: 1,
+      databasePoolMax: 2,
     },
     runtimeState: {
       gatewayBaseUrl: "http://127.0.0.1:5202",
@@ -149,6 +150,7 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
           namespaceId: "development",
           runMigrations: true,
           concurrency: 1,
+          databasePoolMax: 2,
         },
         runtimeState: {
           gatewayBaseUrl: "http://127.0.0.1:5202",

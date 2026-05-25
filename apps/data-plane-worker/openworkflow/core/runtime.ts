@@ -37,6 +37,7 @@ export function getOpenWorkflowRuntime(): Promise<OpenWorkflowRuntime> {
           url: loadedConfig.app.workflow.databaseUrl,
           namespaceId: loadedConfig.app.workflow.namespaceId,
           runMigrations: loadedConfig.app.workflow.runMigrations,
+          databasePoolMax: loadedConfig.app.workflow.databasePoolMax,
         }),
       };
     })
