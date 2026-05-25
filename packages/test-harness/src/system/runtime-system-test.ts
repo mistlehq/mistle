@@ -22,6 +22,7 @@ import { createDockerSandboxProviderInfra } from "../environment/service-catalog
 import type { TestEnvironment, TestInfraRequirement } from "../environment/types.js";
 import { createIntegrationTest, type IntegrationTestEnvironment } from "../integration/index.js";
 import { ServiceIds, type ServiceId } from "../integration/services/service-ids.js";
+import { formatIntegrationDuration, writeIntegrationTimingLine } from "../integration/timing.js";
 import { IntegrationConfigPathInContainer } from "./integration-config-paths.js";
 import { resolveHostPathFromContainerPath } from "./provision-system-integration-targets.js";
 import {
@@ -102,6 +103,10 @@ const DefaultSystemServices: readonly SystemTestServiceSelection[] = [
 
 const DefaultSystemExtraInfra: readonly SystemTestExtraInfraId[] = ["mailpit", "otlp", "seaweedfs"];
 const DockerSocketPath = "/var/run/docker.sock";
+const RuntimeSystemTiming = {
+  force: true,
+  label: "system-runtime",
+};
 const PublicAccessHostnameEnvVars = new Map<ServiceId, string>([
   [ServiceIds.CONTROL_PLANE_API, "CONTROL_PLANE_API_TUNNEL_HOSTNAME"],
   [ServiceIds.DATA_PLANE_GATEWAY, "DATA_PLANE_API_TUNNEL_HOSTNAME"],
@@ -123,43 +128,94 @@ export function createSystemTest(input: CreateSystemTestInput = {}) {
           },
         }),
     __internalInfra: createInternalInfra(input),
+    __timing: RuntimeSystemTiming,
     __serviceOptions: async () => createRuntimeSystemServiceOptions(input),
     __afterStart: async ({ environment, integrationEnvironment }) => {
-      await syncControlPlaneIntegrationTargets({
-        environment: integrationEnvironment,
-        configPathInContainer: resolveRuntimeSystemIntegrationConfigPathInContainer(input),
-      });
+      const setupTimings = new Map<string, number>();
+      await measureRuntimeSystemPhase(setupTimings, "sync-integration-targets", async () =>
+        syncControlPlaneIntegrationTargets({
+          environment: integrationEnvironment,
+          configPathInContainer: resolveRuntimeSystemIntegrationConfigPathInContainer(input),
+        }),
+      );
       const cleanupTasks: CleanupTask[] = [];
-      const dockerProviderSandboxCleanup = await createDockerProviderSandboxCleanup({
-        input,
-        environment: integrationEnvironment,
-      });
+      const cleanupTimings = new Map<string, number>();
+      const dockerProviderSandboxCleanup = await measureRuntimeSystemPhase(
+        setupTimings,
+        "prepare-docker-provider-cleanup",
+        async () =>
+          createDockerProviderSandboxCleanup({
+            input,
+            environment: integrationEnvironment,
+          }),
+      );
       if (dockerProviderSandboxCleanup !== undefined) {
-        cleanupTasks.push(dockerProviderSandboxCleanup);
+        cleanupTasks.push(
+          createMeasuredRuntimeSystemCleanupTask({
+            label: "docker-provider-sandboxes",
+            timings: cleanupTimings,
+            task: dockerProviderSandboxCleanup,
+          }),
+        );
       }
-      const e2bProviderSandboxCleanup = await createE2BProviderSandboxCleanup({
-        input,
-        environment: integrationEnvironment,
-      });
+      const e2bProviderSandboxCleanup = await measureRuntimeSystemPhase(
+        setupTimings,
+        "prepare-e2b-provider-cleanup",
+        async () =>
+          createE2BProviderSandboxCleanup({
+            input,
+            environment: integrationEnvironment,
+          }),
+      );
       if (e2bProviderSandboxCleanup !== undefined) {
-        cleanupTasks.push(e2bProviderSandboxCleanup);
+        cleanupTasks.push(
+          createMeasuredRuntimeSystemCleanupTask({
+            label: "e2b-provider-sandboxes",
+            timings: cleanupTimings,
+            task: e2bProviderSandboxCleanup,
+          }),
+        );
       }
-      publicAccessTunnel = await startPublicAccess({
-        input,
-        environment,
-      });
+      publicAccessTunnel = await measureRuntimeSystemPhase(
+        setupTimings,
+        "start-public-access",
+        async () =>
+          startPublicAccess({
+            input,
+            environment,
+          }),
+      );
       if (publicAccessTunnel !== undefined) {
-        cleanupTasks.push(publicAccessTunnel.stop);
+        cleanupTasks.push(
+          createMeasuredRuntimeSystemCleanupTask({
+            label: "public-access",
+            timings: cleanupTimings,
+            task: publicAccessTunnel.stop,
+          }),
+        );
       }
+      writeRuntimeSystemTimingSummary({
+        environmentId: environment.id,
+        phase: "after-start",
+        timings: setupTimings,
+      });
       if (cleanupTasks.length === 0) {
         return undefined;
       }
 
       return async () => {
-        await runCleanupTasks({
-          tasks: cleanupTasks,
-          context: "runtime system test cleanup",
-        });
+        try {
+          await runCleanupTasks({
+            tasks: cleanupTasks,
+            context: "runtime system test cleanup",
+          });
+        } finally {
+          writeRuntimeSystemTimingSummary({
+            environmentId: environment.id,
+            phase: "cleanup",
+            timings: cleanupTimings,
+          });
+        }
       };
     },
   });
@@ -174,6 +230,44 @@ export function createSystemTest(input: CreateSystemTestInput = {}) {
       },
     ],
   });
+}
+
+async function measureRuntimeSystemPhase<T>(
+  timings: Map<string, number>,
+  label: string,
+  callback: () => Promise<T>,
+): Promise<T> {
+  const startedAt = Date.now();
+  try {
+    return await callback();
+  } finally {
+    timings.set(label, Date.now() - startedAt);
+  }
+}
+
+function createMeasuredRuntimeSystemCleanupTask(input: {
+  label: string;
+  timings: Map<string, number>;
+  task: CleanupTask;
+}): CleanupTask {
+  return async () => {
+    await measureRuntimeSystemPhase(input.timings, input.label, input.task);
+  };
+}
+
+function writeRuntimeSystemTimingSummary(input: {
+  environmentId: string;
+  phase: "after-start" | "cleanup";
+  timings: ReadonlyMap<string, number>;
+}): void {
+  const parts = Array.from(input.timings.entries()).map(
+    ([label, durationMs]) => `${label}=${formatIntegrationDuration(durationMs)}`,
+  );
+
+  writeIntegrationTimingLine(
+    `[system] env ${input.environmentId} ${input.phase} phases: ${parts.join(", ")}.`,
+    RuntimeSystemTiming,
+  );
 }
 
 function createInternalInfra(input: CreateSystemTestInput): readonly TestInfraRequirement[] {

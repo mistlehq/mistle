@@ -62,6 +62,7 @@ function writeEnvironmentTimingSummary(input: {
   environmentId: string;
   phase: "setup" | "cleanup";
   timings: ReadonlyMap<string, number>;
+  force?: boolean;
 }): void {
   const parts = Array.from(input.timings.entries()).map(
     ([label, durationMs]) => `${label}=${formatDuration(durationMs)}`,
@@ -69,6 +70,7 @@ function writeEnvironmentTimingSummary(input: {
 
   writeIntegrationTimingLine(
     `[integration] env ${input.environmentId} ${input.phase} phases: ${parts.join(", ")}.`,
+    input.force === undefined ? {} : { force: input.force },
   );
 }
 
@@ -550,13 +552,14 @@ export async function startTestEnvironment<
     throw new Error("Test environment id must be non-empty.");
   }
 
-  writeIntegrationTimingEvent("startTestEnvironment begin", `env=${environmentId}`);
+  writeIntegrationTimingEvent("startTestEnvironment begin", `env=${environmentId}`, input.timing);
   const requestedServices = measureSync(setupTimings, "resolve-services", () =>
     resolveTestServiceRequests(input),
   );
   writeIntegrationTimingEvent(
     "startTestEnvironment resolved services",
     `env=${environmentId} services=${formatServiceRequests(requestedServices)}`,
+    input.timing,
   );
   const plan = measureSync(setupTimings, "plan", () =>
     createTestEnvironmentPlan({
@@ -567,6 +570,7 @@ export async function startTestEnvironment<
   writeIntegrationTimingEvent(
     "startTestEnvironment planned",
     `env=${environmentId} infra=${formatIds(plan.infraRequirements)} layers=${String(plan.serviceLayers.length)}`,
+    input.timing,
   );
   // Provision infrastructure by kind before any service starts. Provisioners get
   // batched requirements so they can share physical containers and isolate
@@ -610,8 +614,9 @@ export async function startTestEnvironment<
     environmentId,
     phase: "setup",
     timings: setupTimings,
+    ...(input.timing?.force === undefined ? {} : { force: input.timing.force }),
   });
-  writeIntegrationTimingEvent("startTestEnvironment ready", `env=${environmentId}`);
+  writeIntegrationTimingEvent("startTestEnvironment ready", `env=${environmentId}`, input.timing);
 
   let cleanupPromise: Promise<void> | undefined;
 
@@ -646,8 +651,13 @@ export async function startTestEnvironment<
       environmentId,
       phase: "cleanup",
       timings: cleanupTimings,
+      ...(input.timing?.force === undefined ? {} : { force: input.timing.force }),
     });
-    writeIntegrationTimingEvent("startTestEnvironment stopped", `env=${environmentId}`);
+    writeIntegrationTimingEvent(
+      "startTestEnvironment stopped",
+      `env=${environmentId}`,
+      input.timing,
+    );
   };
   const unregisterProcessCleanupTask = registerProcessCleanupTask(stopInternal);
 

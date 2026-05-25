@@ -118,6 +118,7 @@ const PtyRoundTripTimeoutMs = 30_000;
 const PtyCommandDefaultTimeoutMs = 60_000;
 const WebSocketConnectTimeoutMs = 30_000;
 const TestContextId = "system";
+const LegacySystemTimingStartedAtMs = Date.now();
 const PROJECT_ROOT_HOST_PATH = fileURLToPath(new URL("../..", import.meta.url));
 const execFileAsync = promisify(execFile);
 const TerminalControlSequencePattern = new RegExp(
@@ -216,6 +217,16 @@ type PendingPtyFrameWaiter = {
   timeoutSignal: AbortSignal;
   onTimeout: () => void;
 };
+
+function formatLegacySystemTimingDuration(milliseconds: number): string {
+  return `${(milliseconds / 1000).toFixed(2)}s`;
+}
+
+function writeLegacySystemTimingLine(message: string): void {
+  process.stderr.write(
+    `[system] t=+${formatLegacySystemTimingDuration(Date.now() - LegacySystemTimingStartedAtMs)} ${message}.\n`,
+  );
+}
 
 type PtyFramePump = {
   queue: QueuedPtyFrame[];
@@ -937,6 +948,7 @@ async function readSandboxContainerDiagnostics(input: { networkName: string }): 
 export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
   fixture: [
     async ({}, use) => {
+      const setupStartedAt = Date.now();
       const systemTestContext = await readSystemTestContext();
       const controlPlaneApiBaseUrl = systemTestContext.controlPlaneApiBaseUrl;
       const controlPlaneApiClient = createControlPlaneApiClient(controlPlaneApiBaseUrl);
@@ -1654,84 +1666,95 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
           );
         }
       };
+      writeLegacySystemTimingLine(
+        `legacy fixture setup completed in ${formatLegacySystemTimingDuration(Date.now() - setupStartedAt)} provider=${systemTestContext.sandboxProvider}`,
+      );
       try {
-        await use({
-          sandboxProvider: systemTestContext.sandboxProvider,
-          controlPlaneApiBaseUrl: systemTestContext.controlPlaneApiBaseUrl,
-          controlPlaneApiContainerId: systemTestContext.controlPlaneApiContainerId,
-          controlPlaneWorkerBaseUrl: systemTestContext.controlPlaneWorkerBaseUrl,
-          controlPlaneWorkerContainerId: systemTestContext.controlPlaneWorkerContainerId,
-          dataPlaneApiBaseUrl: systemTestContext.dataPlaneApiBaseUrl,
-          dataPlaneApiContainerId: systemTestContext.dataPlaneApiContainerId,
-          dataPlaneWorkerBaseUrl: systemTestContext.dataPlaneWorkerBaseUrl,
-          dataPlaneWorkerContainerId: systemTestContext.dataPlaneWorkerContainerId,
-          get dataPlaneGatewayBaseUrl(): string {
-            return currentDataPlaneGatewayBaseUrl;
-          },
-          dataPlaneGatewayContainerId: systemTestContext.dataPlaneGatewayContainerId,
-          controlPlaneDatabaseUrl: systemTestContext.controlPlaneDatabaseUrl,
-          internalAuthServiceToken: systemTestContext.internalAuthServiceToken,
-          otlpTraceCaptureFilePath: systemTestContext.otlpTraceCaptureFilePath,
-          dataPlaneGatewayIdleTimeoutMs: systemTestContext.dataPlaneGatewayIdleTimeoutMs,
-          dataPlaneGatewayBootstrapDisconnectGraceMs:
-            systemTestContext.dataPlaneGatewayBootstrapDisconnectGraceMs,
-          controlPlaneApiClient,
-          db,
-          request,
-          sendSignInOtp,
-          waitForSignInOtp,
-          signInWithOtp,
-          readRequestCookie,
-          createOrganization,
-          authSession,
-          enableManagedPersistentSandboxes,
-          startSandboxAndWaitReady,
-          runSandboxPtyCommand,
-          openPtyAndAssertRoundTrip,
-          restartContainer: async (containerId, options) => {
-            await runDockerLifecycleCommand({
-              action: "restart",
-              containerId,
-              ...(options?.timeoutSeconds === undefined
-                ? {}
-                : { timeoutSeconds: options.timeoutSeconds }),
-            });
-            if (containerId === systemTestContext.dataPlaneGatewayContainerId) {
-              currentDataPlaneGatewayBaseUrl = await resolveContainerHostBaseUrl({
+        const testStartedAt = Date.now();
+        try {
+          await use({
+            sandboxProvider: systemTestContext.sandboxProvider,
+            controlPlaneApiBaseUrl: systemTestContext.controlPlaneApiBaseUrl,
+            controlPlaneApiContainerId: systemTestContext.controlPlaneApiContainerId,
+            controlPlaneWorkerBaseUrl: systemTestContext.controlPlaneWorkerBaseUrl,
+            controlPlaneWorkerContainerId: systemTestContext.controlPlaneWorkerContainerId,
+            dataPlaneApiBaseUrl: systemTestContext.dataPlaneApiBaseUrl,
+            dataPlaneApiContainerId: systemTestContext.dataPlaneApiContainerId,
+            dataPlaneWorkerBaseUrl: systemTestContext.dataPlaneWorkerBaseUrl,
+            dataPlaneWorkerContainerId: systemTestContext.dataPlaneWorkerContainerId,
+            get dataPlaneGatewayBaseUrl(): string {
+              return currentDataPlaneGatewayBaseUrl;
+            },
+            dataPlaneGatewayContainerId: systemTestContext.dataPlaneGatewayContainerId,
+            controlPlaneDatabaseUrl: systemTestContext.controlPlaneDatabaseUrl,
+            internalAuthServiceToken: systemTestContext.internalAuthServiceToken,
+            otlpTraceCaptureFilePath: systemTestContext.otlpTraceCaptureFilePath,
+            dataPlaneGatewayIdleTimeoutMs: systemTestContext.dataPlaneGatewayIdleTimeoutMs,
+            dataPlaneGatewayBootstrapDisconnectGraceMs:
+              systemTestContext.dataPlaneGatewayBootstrapDisconnectGraceMs,
+            controlPlaneApiClient,
+            db,
+            request,
+            sendSignInOtp,
+            waitForSignInOtp,
+            signInWithOtp,
+            readRequestCookie,
+            createOrganization,
+            authSession,
+            enableManagedPersistentSandboxes,
+            startSandboxAndWaitReady,
+            runSandboxPtyCommand,
+            openPtyAndAssertRoundTrip,
+            restartContainer: async (containerId, options) => {
+              await runDockerLifecycleCommand({
+                action: "restart",
                 containerId,
-                containerPort: 5202,
-                currentBaseUrl: currentDataPlaneGatewayBaseUrl,
+                ...(options?.timeoutSeconds === undefined
+                  ? {}
+                  : { timeoutSeconds: options.timeoutSeconds }),
               });
-            }
-          },
-          stopContainer: async (containerId) => {
-            await runDockerLifecycleCommand({
-              action: "stop",
-              containerId,
-            });
-          },
-          startContainer: async (containerId) => {
-            await runDockerLifecycleCommand({
-              action: "start",
-              containerId,
-            });
-            if (containerId === systemTestContext.dataPlaneGatewayContainerId) {
-              currentDataPlaneGatewayBaseUrl = await resolveContainerHostBaseUrl({
+              if (containerId === systemTestContext.dataPlaneGatewayContainerId) {
+                currentDataPlaneGatewayBaseUrl = await resolveContainerHostBaseUrl({
+                  containerId,
+                  containerPort: 5202,
+                  currentBaseUrl: currentDataPlaneGatewayBaseUrl,
+                });
+              }
+            },
+            stopContainer: async (containerId) => {
+              await runDockerLifecycleCommand({
+                action: "stop",
                 containerId,
-                containerPort: 5202,
-                currentBaseUrl: currentDataPlaneGatewayBaseUrl,
               });
-            }
-          },
-          waitForSandboxStatus,
-          waitForSandboxConnectable,
-          waitForSandboxRuntimeAttachment,
-          waitForSandboxRuntimeReady,
-          readSandboxRuntimeState,
-          stopSandboxInstance,
-          resumeSandboxInstance,
-        });
+            },
+            startContainer: async (containerId) => {
+              await runDockerLifecycleCommand({
+                action: "start",
+                containerId,
+              });
+              if (containerId === systemTestContext.dataPlaneGatewayContainerId) {
+                currentDataPlaneGatewayBaseUrl = await resolveContainerHostBaseUrl({
+                  containerId,
+                  containerPort: 5202,
+                  currentBaseUrl: currentDataPlaneGatewayBaseUrl,
+                });
+              }
+            },
+            waitForSandboxStatus,
+            waitForSandboxConnectable,
+            waitForSandboxRuntimeAttachment,
+            waitForSandboxRuntimeReady,
+            readSandboxRuntimeState,
+            stopSandboxInstance,
+            resumeSandboxInstance,
+          });
+        } finally {
+          writeLegacySystemTimingLine(
+            `legacy fixture test body finished in ${formatLegacySystemTimingDuration(Date.now() - testStartedAt)} provider=${systemTestContext.sandboxProvider}`,
+          );
+        }
       } finally {
+        const cleanupStartedAt = Date.now();
         if (systemTestContext.sandboxProvider === "e2b") {
           await destroyE2BProviderSandboxesCreatedByTest({
             dataPlaneDb,
@@ -1742,6 +1765,9 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
           networkName: systemTestContext.sandboxNetworkName,
         });
         await databasePool.end();
+        writeLegacySystemTimingLine(
+          `legacy fixture cleanup completed in ${formatLegacySystemTimingDuration(Date.now() - cleanupStartedAt)} provider=${systemTestContext.sandboxProvider}`,
+        );
       }
     },
     {

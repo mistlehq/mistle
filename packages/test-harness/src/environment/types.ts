@@ -162,6 +162,9 @@ export type TestEnvironmentRegistryInput<TRegistry extends TestServiceRegistry> 
   registry: TRegistry;
   services: readonly TestServiceSelection<TRegistry>[];
   extraInfra?: readonly TestInfraRequirement[];
+  timing?: {
+    force?: boolean;
+  };
 };
 
 export type SelectedTestServiceId<

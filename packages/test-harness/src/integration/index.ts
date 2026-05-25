@@ -52,6 +52,10 @@ type CreateIntegrationTestInput = {
   auth?: {
     google?: "simulated";
   };
+  __timing?: {
+    force?: boolean;
+    label: string;
+  };
   __dangerouslyIsolatedServices?: DangerouslyIsolatedTestRegistry;
   __internalInfra?: readonly TestInfraRequirement[];
   __afterStart?: (input: {
@@ -94,15 +98,21 @@ function formatSelectedServices(selectionsInput: readonly IntegrationServiceSele
 // stay inside the harness.
 export function createIntegrationTest(input: CreateIntegrationTestInput) {
   const selectedServices = formatSelectedServices(input.services);
+  const timing = input.__timing;
   writeIntegrationTimingEvent(
     "createIntegrationTest evaluated",
-    `caller=${readCallerFromStack()} services=${selectedServices}`,
+    `label=${timing?.label ?? "integration"} caller=${readCallerFromStack()} services=${selectedServices}`,
+    timing,
   );
 
   return base.extend<IntegrationTestFixture>({
     env: [
       async ({}, use) => {
-        writeIntegrationTimingEvent("env fixture start", `services=${selectedServices}`);
+        writeIntegrationTimingEvent(
+          "env fixture start",
+          `label=${timing?.label ?? "integration"} services=${selectedServices}`,
+          timing,
+        );
         const setupStartedAt = Date.now();
         const environmentDefinition = await environmentDefinitionFor(input);
         const services = selections({
@@ -113,6 +123,7 @@ export function createIntegrationTest(input: CreateIntegrationTestInput) {
           registry: environmentDefinition.registry,
           services,
           extraInfra: environmentDefinition.extraInfra,
+          ...(timing === undefined ? {} : { timing }),
         });
         const { createIntegrationEnvironment } = await import("./environment.js");
         const integrationEnvironment = createIntegrationEnvironment({
@@ -132,6 +143,7 @@ export function createIntegrationTest(input: CreateIntegrationTestInput) {
 
         writeIntegrationTimingLine(
           `[integration] env ${environment.id} setup completed in ${formatIntegrationDuration(setupDurationMs)} for ${selectedServices}.`,
+          timing,
         );
 
         try {
@@ -139,6 +151,7 @@ export function createIntegrationTest(input: CreateIntegrationTestInput) {
           await use(integrationEnvironment);
           writeIntegrationTimingLine(
             `[integration] env ${environment.id} test body completed in ${formatIntegrationDuration(Date.now() - testStartedAt)}.`,
+            timing,
           );
         } finally {
           const teardownStartedAt = Date.now();
@@ -149,6 +162,7 @@ export function createIntegrationTest(input: CreateIntegrationTestInput) {
           await environment.stop();
           writeIntegrationTimingLine(
             `[integration] env ${environment.id} teardown completed in ${formatIntegrationDuration(Date.now() - teardownStartedAt)}.`,
+            timing,
           );
         }
       },
