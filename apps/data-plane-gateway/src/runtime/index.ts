@@ -604,9 +604,18 @@ export function createDataPlaneGatewayRuntime(
         await relayResources.stop();
       });
 
-      if (startedServer !== undefined) {
+      const serverToClose = startedServer;
+      if (serverToClose !== undefined) {
         await measureShutdownPhase(shutdownTimings, "http-server-close", async () => {
-          await startedServer?.close();
+          const closeResult = await serverToClose.close();
+          if (closeResult.forcedConnectionClose) {
+            logger.warn(
+              {
+                eventName: "data_plane_gateway.runtime_shutdown.http_server_forced_closed",
+              },
+              "Forced data-plane gateway HTTP server connections closed during runtime shutdown.",
+            );
+          }
           startedServer = undefined;
         });
       }

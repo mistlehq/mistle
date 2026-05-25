@@ -64,7 +64,15 @@ export type StartServerInput = {
 
 export type StartedServer = {
   server: ServerType;
-  close: () => Promise<void>;
+  close: (options?: StartedServerCloseOptions) => Promise<StartedServerCloseResult>;
+};
+
+export type StartedServerCloseOptions = {
+  forceAfterMs?: number;
+};
+
+export type StartedServerCloseResult = {
+  forcedConnectionClose: boolean;
 };
 
 export type DataPlaneGatewayRuntime = {
