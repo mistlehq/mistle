@@ -47,8 +47,8 @@ it.
 | `services.control_plane_api`    | `host`, `port`, `public_url`, `internal_url`           |
 | `services.data_plane_api`       | `host`, `port`, `internal_url`                         |
 | `services.data_plane_gateway`   | `host`, `port`, `internal_url`, sandbox WebSocket URLs |
-| `services.control_plane_worker` | `workflow_concurrency`                                 |
-| `services.data_plane_worker`    | `workflow_concurrency`                                 |
+| `services.control_plane_worker` | `workflow_concurrency`, `workflow_database_pool_max`   |
+| `services.data_plane_worker`    | `workflow_concurrency`, `workflow_database_pool_max`   |
 
 Use public URLs for browser-facing and provider-facing traffic. Use internal
 URLs for service-to-service traffic inside the deployment network.
@@ -207,7 +207,9 @@ This table covers the operator-facing TOML keys accepted by `@mistle/config`.
 | `services.data_plane_gateway.sandbox_ws_public_url`                            | Yes                                        | Public sandbox WebSocket tunnel URL.                                                                      |
 | `services.data_plane_gateway.sandbox_ws_internal_url`                          | Yes                                        | Internal sandbox WebSocket tunnel URL.                                                                    |
 | `services.control_plane_worker.workflow_concurrency`                           | Yes                                        | Control-plane workflow worker concurrency.                                                                |
+| `services.control_plane_worker.workflow_database_pool_max`                     | Yes                                        | Maximum direct Postgres connections for the control-plane worker OpenWorkflow pool.                       |
 | `services.data_plane_worker.workflow_concurrency`                              | Yes                                        | Data-plane workflow worker concurrency.                                                                   |
+| `services.data_plane_worker.workflow_database_pool_max`                        | Yes                                        | Maximum direct Postgres connections for the data-plane worker OpenWorkflow pool.                          |
 | `workflow.control_plane.namespace_id`                                          | Yes                                        | Control-plane workflow namespace.                                                                         |
 | `workflow.data_plane.namespace_id`                                             | Yes                                        | Data-plane workflow namespace.                                                                            |
 | `postgres.control_plane.direct_url`                                            | Yes                                        | Direct control-plane Postgres URL for migrations.                                                         |
