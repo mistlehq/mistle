@@ -22,6 +22,7 @@ import {
 } from "../system/helpers/codex-sandbox.js";
 import { createRuntimeCodexSandboxFixture } from "./helpers/runtime-codex-sandbox.js";
 import { createSandboxSystemTest } from "./helpers/sandbox-system-test.js";
+import { timeSystemRuntimePhase } from "./helpers/system-runtime-phase-timing.js";
 
 const it = createSandboxSystemTest({
   extraInfra: ["mailpit"],
@@ -53,6 +54,7 @@ describe("runtime system sandbox PTY cgroup keepalive", () => {
     "keeps the sandbox alive for a detached PTY child after the PTY stream closes",
     async ({ sandboxProvider, system }) => {
       const fixture = createRuntimeCodexSandboxFixture(system);
+      const timingAttributes = { sandboxProvider };
       let authenticatedSession: CodexSandboxAuthenticatedSession | undefined;
       let currentStep = "prepare sandbox";
       let detachedPid: string | undefined;
@@ -61,9 +63,15 @@ describe("runtime system sandbox PTY cgroup keepalive", () => {
       let sandboxInstanceId: string | undefined;
 
       try {
-        const preparedSandbox = await prepareCodexSandbox({
-          fixture,
-          email: `runtime-sandbox-pty-cgroup-keepalive-${sandboxProvider}@example.com`,
+        const preparedSandbox = await timeSystemRuntimePhase({
+          event: "system_runtime.sandbox_pty_cgroup_keepalive.phase_timing",
+          phase: "prepare_sandbox",
+          attributes: timingAttributes,
+          operation: async () =>
+            await prepareCodexSandbox({
+              fixture,
+              email: `runtime-sandbox-pty-cgroup-keepalive-${sandboxProvider}@example.com`,
+            }),
         });
         const session = preparedSandbox.authenticatedSession;
         const runningSandboxInstanceId = preparedSandbox.sandboxInstanceId;
@@ -82,125 +90,198 @@ describe("runtime system sandbox PTY cgroup keepalive", () => {
         ].join("; ");
 
         currentStep = "open persistent PTY";
-        persistentPty = await openPersistentPtySession({
-          fixture,
-          authenticatedSession: session,
-          sandboxInstanceId: runningSandboxInstanceId,
-          cwd: "/root",
+        persistentPty = await timeSystemRuntimePhase({
+          event: "system_runtime.sandbox_pty_cgroup_keepalive.phase_timing",
+          phase: "open_persistent_pty",
+          attributes: timingAttributes,
+          operation: async () =>
+            await openPersistentPtySession({
+              fixture,
+              authenticatedSession: session,
+              sandboxInstanceId: runningSandboxInstanceId,
+              cwd: "/root",
+            }),
         });
 
         currentStep = "launch detached PTY child";
-        await persistentPty.write(`${launchCommand}\n`);
-        const pidMatch = await persistentPty.waitForOutputMatch({
-          timeoutMs: PTY_COMMAND_TIMEOUT_MS,
-          pattern: /DETACHED_PID:(\d+)/,
+        const launchedPty = persistentPty;
+        const pidMatch = await timeSystemRuntimePhase({
+          event: "system_runtime.sandbox_pty_cgroup_keepalive.phase_timing",
+          phase: "launch_detached_child",
+          attributes: timingAttributes,
+          operation: async () => {
+            await launchedPty.write(`${launchCommand}\n`);
+            return await launchedPty.waitForOutputMatch({
+              timeoutMs: PTY_COMMAND_TIMEOUT_MS,
+              pattern: /DETACHED_PID:(\d+)/,
+            });
+          },
         });
         detachedPid = pidMatch[1];
         if (detachedPid === undefined) {
           throw new Error("Expected detached PID capture from PTY output.");
         }
         expect(detachedPid).toMatch(/^[0-9]+$/u);
+        const runningDetachedPid = detachedPid;
 
         currentStep = "close PTY stream";
-        await persistentPty.close();
+        const ptyToClose = persistentPty;
+        await timeSystemRuntimePhase({
+          event: "system_runtime.sandbox_pty_cgroup_keepalive.phase_timing",
+          phase: "close_persistent_pty",
+          attributes: timingAttributes,
+          operation: async () => {
+            await ptyToClose.close();
+          },
+        });
         persistentPty = undefined;
 
         currentStep = "assert sandbox remains running and connectable";
-        await waitForSandboxStatus({
-          fixture,
-          authenticatedSession: session,
-          sandboxInstanceId: runningSandboxInstanceId,
-          expectedStatus: "running",
+        await timeSystemRuntimePhase({
+          event: "system_runtime.sandbox_pty_cgroup_keepalive.phase_timing",
+          phase: "wait_sandbox_running_after_pty_close",
+          attributes: timingAttributes,
+          operation: async () =>
+            await waitForSandboxStatus({
+              fixture,
+              authenticatedSession: session,
+              sandboxInstanceId: runningSandboxInstanceId,
+              expectedStatus: "running",
+            }),
         });
-        const sandboxStatus = await waitForSandboxConnectable({
-          fixture,
-          authenticatedSession: session,
-          sandboxInstanceId: runningSandboxInstanceId,
-          expectedConnectable: true,
+        const sandboxStatus = await timeSystemRuntimePhase({
+          event: "system_runtime.sandbox_pty_cgroup_keepalive.phase_timing",
+          phase: "wait_sandbox_connectable_after_pty_close",
+          attributes: timingAttributes,
+          operation: async () =>
+            await waitForSandboxConnectable({
+              fixture,
+              authenticatedSession: session,
+              sandboxInstanceId: runningSandboxInstanceId,
+              expectedConnectable: true,
+            }),
         });
         expect(sandboxStatus.status).toBe("running");
 
         currentStep = "probe detached process from a fresh exec session";
-        const aliveProbe = await runSandboxExecCommandInSandbox({
-          fixture,
-          authenticatedSession: session,
-          sandboxInstanceId: runningSandboxInstanceId,
-          command: "sh",
-          args: ["-c", `kill -0 ${detachedPid} >/dev/null 2>&1 && printf '%s\\n' alive`],
+        const aliveProbe = await timeSystemRuntimePhase({
+          event: "system_runtime.sandbox_pty_cgroup_keepalive.phase_timing",
+          phase: "probe_detached_process_alive",
+          attributes: timingAttributes,
+          operation: async () =>
+            await runSandboxExecCommandInSandbox({
+              fixture,
+              authenticatedSession: session,
+              sandboxInstanceId: runningSandboxInstanceId,
+              command: "sh",
+              args: ["-c", `kill -0 ${runningDetachedPid} >/dev/null 2>&1 && printf '%s\\n' alive`],
+            }),
         });
         expect(aliveProbe.exitCode).toBe(0);
         expect(aliveProbe.stdout.trim()).toBe("alive");
 
         currentStep = "capture detached process cgroup diagnostics";
-        detachedProcessCgroupProbe = await captureDetachedProcessCgroupDiagnostics({
-          fixture,
-          authenticatedSession: session,
-          sandboxInstanceId: runningSandboxInstanceId,
-          detachedPid,
+        detachedProcessCgroupProbe = await timeSystemRuntimePhase({
+          event: "system_runtime.sandbox_pty_cgroup_keepalive.phase_timing",
+          phase: "capture_detached_process_cgroup_diagnostics",
+          attributes: timingAttributes,
+          operation: async () =>
+            await captureDetachedProcessCgroupDiagnostics({
+              fixture,
+              authenticatedSession: session,
+              sandboxInstanceId: runningSandboxInstanceId,
+              detachedPid: runningDetachedPid,
+            }),
         });
 
         currentStep = "wait for runtime keepalive after PTY close";
-        const runtimeStateWithDetachedProcess = await waitForCondition({
-          description: "detached process keepalive after PTY close",
-          timeoutMs: RUNTIME_STATE_TIMEOUT_MS,
-          pollIntervalMs: 500,
-          evaluate: async () => {
-            const runtimeState = await fixture.readSandboxRuntimeState(runningSandboxInstanceId);
-            if (runtimeState.presence.activeCount !== 0) {
-              return null;
-            }
+        const runtimeStateWithDetachedProcess = await timeSystemRuntimePhase({
+          event: "system_runtime.sandbox_pty_cgroup_keepalive.phase_timing",
+          phase: "wait_keepalive_active",
+          attributes: timingAttributes,
+          operation: async () =>
+            await waitForCondition({
+              description: "detached process keepalive after PTY close",
+              timeoutMs: RUNTIME_STATE_TIMEOUT_MS,
+              pollIntervalMs: 500,
+              evaluate: async () => {
+                const runtimeState =
+                  await fixture.readSandboxRuntimeState(runningSandboxInstanceId);
+                if (runtimeState.presence.activeCount !== 0) {
+                  return null;
+                }
 
-            return runtimeState.keepalive.active ? runtimeState : null;
-          },
+                return runtimeState.keepalive.active ? runtimeState : null;
+              },
+            }),
         });
         expect(runtimeStateWithDetachedProcess.runtime.ready).toBe(true);
         expect(runtimeStateWithDetachedProcess.presence.activeCount).toBe(0);
         expect(runtimeStateWithDetachedProcess.keepalive.active).toBe(true);
 
         currentStep = "terminate detached process";
-        const terminateResult = await runSandboxExecCommandInSandbox({
-          fixture,
-          authenticatedSession: session,
-          sandboxInstanceId: runningSandboxInstanceId,
-          command: "sh",
-          args: ["-c", `kill ${detachedPid}`],
-        });
-        expect(terminateResult.exitCode).toBe(0);
-
-        currentStep = "wait for detached process to disappear";
-        await waitForCondition({
-          description: `detached process ${detachedPid} to exit`,
-          timeoutMs: RUNTIME_STATE_TIMEOUT_MS,
-          pollIntervalMs: 500,
-          evaluate: async () => {
-            const probe = await runSandboxExecCommandInSandbox({
+        const terminateResult = await timeSystemRuntimePhase({
+          event: "system_runtime.sandbox_pty_cgroup_keepalive.phase_timing",
+          phase: "terminate_detached_process",
+          attributes: timingAttributes,
+          operation: async () =>
+            await runSandboxExecCommandInSandbox({
               fixture,
               authenticatedSession: session,
               sandboxInstanceId: runningSandboxInstanceId,
               command: "sh",
-              args: [
-                "-c",
-                `kill -0 ${detachedPid} >/dev/null 2>&1 && printf '%s\\n' alive || printf '%s\\n' dead`,
-              ],
-            });
+              args: ["-c", `kill ${runningDetachedPid}`],
+            }),
+        });
+        expect(terminateResult.exitCode).toBe(0);
 
-            return probe.exitCode === 0 && probe.stdout.trim() === "dead" ? probe : null;
-          },
+        currentStep = "wait for detached process to disappear";
+        await timeSystemRuntimePhase({
+          event: "system_runtime.sandbox_pty_cgroup_keepalive.phase_timing",
+          phase: "wait_detached_process_exit",
+          attributes: timingAttributes,
+          operation: async () =>
+            await waitForCondition({
+              description: `detached process ${runningDetachedPid} to exit`,
+              timeoutMs: RUNTIME_STATE_TIMEOUT_MS,
+              pollIntervalMs: 500,
+              evaluate: async () => {
+                const probe = await runSandboxExecCommandInSandbox({
+                  fixture,
+                  authenticatedSession: session,
+                  sandboxInstanceId: runningSandboxInstanceId,
+                  command: "sh",
+                  args: [
+                    "-c",
+                    `kill -0 ${runningDetachedPid} >/dev/null 2>&1 && printf '%s\\n' alive || printf '%s\\n' dead`,
+                  ],
+                });
+
+                return probe.exitCode === 0 && probe.stdout.trim() === "dead" ? probe : null;
+              },
+            }),
         });
 
         currentStep = "wait for keepalive to clear after detached process exit";
-        const runtimeStateAfterExit = await waitForCondition({
-          description: "keepalive to clear after detached process exit",
-          timeoutMs: RUNTIME_STATE_TIMEOUT_MS,
-          pollIntervalMs: 500,
-          evaluate: async () => {
-            const runtimeState = await fixture.readSandboxRuntimeState(runningSandboxInstanceId);
-            if (runtimeState.presence.activeCount !== 0) {
-              return null;
-            }
+        const runtimeStateAfterExit = await timeSystemRuntimePhase({
+          event: "system_runtime.sandbox_pty_cgroup_keepalive.phase_timing",
+          phase: "wait_keepalive_clear",
+          attributes: timingAttributes,
+          operation: async () =>
+            await waitForCondition({
+              description: "keepalive to clear after detached process exit",
+              timeoutMs: RUNTIME_STATE_TIMEOUT_MS,
+              pollIntervalMs: 500,
+              evaluate: async () => {
+                const runtimeState =
+                  await fixture.readSandboxRuntimeState(runningSandboxInstanceId);
+                if (runtimeState.presence.activeCount !== 0) {
+                  return null;
+                }
 
-            return runtimeState.keepalive.active ? null : runtimeState;
-          },
+                return runtimeState.keepalive.active ? null : runtimeState;
+              },
+            }),
         });
         expect(runtimeStateAfterExit.runtime.ready).toBe(true);
         expect(runtimeStateAfterExit.presence.activeCount).toBe(0);
@@ -219,12 +300,19 @@ describe("runtime system sandbox PTY cgroup keepalive", () => {
           }${diagnostics.length === 0 ? "" : ` Diagnostics: ${diagnostics.join(" | ")}`}`,
         );
       } finally {
-        await persistentPty?.close().catch(() => {});
-        await killDetachedProcessIfPresent({
-          fixture,
-          authenticatedSession,
-          sandboxInstanceId,
-          detachedPid,
+        await timeSystemRuntimePhase({
+          event: "system_runtime.sandbox_pty_cgroup_keepalive.phase_timing",
+          phase: "cleanup",
+          attributes: timingAttributes,
+          operation: async () => {
+            await persistentPty?.close().catch(() => {});
+            await killDetachedProcessIfPresent({
+              fixture,
+              authenticatedSession,
+              sandboxInstanceId,
+              detachedPid,
+            });
+          },
         });
       }
     },

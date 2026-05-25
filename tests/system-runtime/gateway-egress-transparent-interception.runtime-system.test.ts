@@ -12,6 +12,7 @@ import {
 } from "../system/helpers/codex-sandbox.js";
 import { createRuntimeCodexSandboxFixture } from "./helpers/runtime-codex-sandbox.js";
 import type { SandboxSystemTestProvider } from "./helpers/sandbox-system-test.js";
+import { timeSystemRuntimePhase } from "./helpers/system-runtime-phase-timing.js";
 
 const dockerIt = createSystemTest({
   extraInfra: ["mailpit"],
@@ -72,12 +73,19 @@ async function runTransparentInterceptionScenario(input: {
   sandboxProvider: SandboxSystemTestProvider;
 }): Promise<void> {
   const fixture = createRuntimeCodexSandboxFixture(input.system);
+  const timingAttributes = { sandboxProvider: input.sandboxProvider };
   let sandboxInstanceIdForCleanup: string | undefined;
 
   try {
-    const { authenticatedSession, sandboxInstanceId } = await prepareCodexSandbox({
-      fixture,
-      email: `runtime-transparent-egress-${input.sandboxProvider}@example.com`,
+    const { authenticatedSession, sandboxInstanceId } = await timeSystemRuntimePhase({
+      event: "system_runtime.gateway_egress_transparent_interception.phase_timing",
+      phase: "prepare_sandbox",
+      attributes: timingAttributes,
+      operation: async () =>
+        await prepareCodexSandbox({
+          fixture,
+          email: `runtime-transparent-egress-${input.sandboxProvider}@example.com`,
+        }),
     });
     sandboxInstanceIdForCleanup = sandboxInstanceId;
 
@@ -85,13 +93,19 @@ async function runTransparentInterceptionScenario(input: {
       input.sandboxProvider === "e2b"
         ? transparentHttpsInterceptionSmokeScript()
         : transparentOpaqueTcpInterceptionSmokeScript();
-    const smokeResult = await runSandboxExecCommandInSandbox({
-      fixture,
-      authenticatedSession,
-      sandboxInstanceId,
-      command: "bash",
-      args: ["-lc", smokeScript],
-      timeoutMs: 90_000,
+    const smokeResult = await timeSystemRuntimePhase({
+      event: "system_runtime.gateway_egress_transparent_interception.phase_timing",
+      phase: "run_transparent_interception_smoke",
+      attributes: timingAttributes,
+      operation: async () =>
+        await runSandboxExecCommandInSandbox({
+          fixture,
+          authenticatedSession,
+          sandboxInstanceId,
+          command: "bash",
+          args: ["-lc", smokeScript],
+          timeoutMs: 90_000,
+        }),
     });
 
     if (smokeResult.exitCode !== 0) {
@@ -108,9 +122,16 @@ async function runTransparentInterceptionScenario(input: {
     expect(smokeResult.stdout).toContain(COMMAND_CONTROL_MARKER);
   } finally {
     if (sandboxInstanceIdForCleanup !== undefined) {
-      await stopSandboxInstance({
-        fixture,
-        sandboxInstanceId: sandboxInstanceIdForCleanup,
+      const sandboxInstanceId = sandboxInstanceIdForCleanup;
+      await timeSystemRuntimePhase({
+        event: "system_runtime.gateway_egress_transparent_interception.phase_timing",
+        phase: "stop_sandbox",
+        attributes: timingAttributes,
+        operation: async () =>
+          await stopSandboxInstance({
+            fixture,
+            sandboxInstanceId,
+          }),
       });
     }
   }

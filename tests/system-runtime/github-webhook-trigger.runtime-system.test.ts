@@ -11,6 +11,7 @@ import {
   TestTimeoutMs,
 } from "../system/helpers/github-webhook-trigger.js";
 import { createRuntimeGitHubWebhookTriggerFixture } from "./helpers/runtime-github-webhook-trigger.js";
+import { timeSystemRuntimePhase } from "./helpers/system-runtime-phase-timing.js";
 
 const dockerIt = createSystemTest({
   extraInfra: ["mailpit"],
@@ -55,13 +56,32 @@ async function runGitHubWebhookTriggerScenario({
 }: {
   system: RuntimeSystemTestEnvironment;
 }): Promise<void> {
-  const conversation = await startGitHubWebhookTriggerConversation({
-    fixture: createRuntimeGitHubWebhookTriggerFixture(system),
+  const sandboxProvider = system.sandbox?.provider;
+  if (sandboxProvider === undefined) {
+    throw new Error("GitHub webhook trigger system test requires a configured sandbox provider.");
+  }
+
+  const timingAttributes = { sandboxProvider };
+  const conversation = await timeSystemRuntimePhase({
+    event: "system_runtime.github_webhook_trigger.phase_timing",
+    phase: "start_github_webhook_trigger_conversation",
+    attributes: timingAttributes,
+    operation: async () =>
+      await startGitHubWebhookTriggerConversation({
+        fixture: createRuntimeGitHubWebhookTriggerFixture(system),
+      }),
   });
 
   try {
     expect(conversation.initialThreadRead.threadId).toBe(conversation.providerConversationId);
   } finally {
-    await conversation.cleanup();
+    await timeSystemRuntimePhase({
+      event: "system_runtime.github_webhook_trigger.phase_timing",
+      phase: "cleanup",
+      attributes: timingAttributes,
+      operation: async () => {
+        await conversation.cleanup();
+      },
+    });
   }
 }

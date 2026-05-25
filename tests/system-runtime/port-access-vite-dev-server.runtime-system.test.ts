@@ -120,59 +120,95 @@ describe("system port access vite dev server", () => {
       let tunnelSocketForCleanup: WebSocket | undefined;
 
       try {
-        const { sandboxInstanceId, session } = await prepareViteSandboxFixture({
-          fixture,
+        const { sandboxInstanceId, session } = await timeVitePhase({
+          sandboxProvider: fixture.sandboxProvider,
+          phase: "prepare_vite_sandbox_fixture",
+          operation: async () =>
+            await prepareViteSandboxFixture({
+              fixture,
+            }),
         });
         sandboxInstanceIdForCleanup = sandboxInstanceId;
         const { bootstrap, readTunnelCloseDescription, sessionCookie, tunnelSocket } =
-          await openVitePortAccessSession({
-            fixture,
-            session,
-            sandboxInstanceId,
+          await timeVitePhase({
+            sandboxProvider: fixture.sandboxProvider,
+            phase: "open_vite_port_access_session",
+            operation: async () =>
+              await openVitePortAccessSession({
+                fixture,
+                session,
+                sandboxInstanceId,
+              }),
           });
         tunnelSocketForCleanup = tunnelSocket;
 
         for (let round = 0; round < RefreshRounds; round += 1) {
-          await assertBootstrapTunnelOpen({
-            fixture,
-            session,
-            sandboxInstanceId,
-            tunnelSocket,
-            readTunnelCloseDescription,
-            description: `before refresh round ${String(round)}`,
-          });
-          await assertVitePageAndAssets({
-            fixture,
-            bootstrap,
-            sessionCookie,
-          });
-          await assertBootstrapTunnelOpen({
-            fixture,
-            session,
-            sandboxInstanceId,
-            tunnelSocket,
-            readTunnelCloseDescription,
-            description: `after refresh round ${String(round)}`,
+          await timeVitePhase({
+            sandboxProvider: fixture.sandboxProvider,
+            phase: "assert_vite_page_and_assets_refresh_round",
+            attributes: {
+              refreshRound: round,
+            },
+            operation: async () => {
+              await assertBootstrapTunnelOpen({
+                fixture,
+                session,
+                sandboxInstanceId,
+                tunnelSocket,
+                readTunnelCloseDescription,
+                description: `before refresh round ${String(round)}`,
+              });
+              await assertVitePageAndAssets({
+                fixture,
+                bootstrap,
+                sessionCookie,
+              });
+              await assertBootstrapTunnelOpen({
+                fixture,
+                session,
+                sandboxInstanceId,
+                tunnelSocket,
+                readTunnelCloseDescription,
+                description: `after refresh round ${String(round)}`,
+              });
+            },
           });
         }
 
-        await assertViteHmrUpdate({
-          fixture,
-          bootstrap,
-          session,
-          sandboxInstanceId,
-          sessionCookie,
-          tunnelSocket,
-          readTunnelCloseDescription,
+        await timeVitePhase({
+          sandboxProvider: fixture.sandboxProvider,
+          phase: "assert_vite_hmr_update",
+          operation: async () =>
+            await assertViteHmrUpdate({
+              fixture,
+              bootstrap,
+              session,
+              sandboxInstanceId,
+              sessionCookie,
+              tunnelSocket,
+              readTunnelCloseDescription,
+            }),
         });
       } finally {
         if (tunnelSocketForCleanup !== undefined) {
-          await closeWebSocketIfOpen(tunnelSocketForCleanup);
+          await timeVitePhase({
+            sandboxProvider: fixture.sandboxProvider,
+            phase: "close_bootstrap_tunnel_socket",
+            operation: async () => {
+              await closeWebSocketIfOpen(tunnelSocketForCleanup);
+            },
+          });
         }
         if (sandboxInstanceIdForCleanup !== undefined) {
-          await stopSandboxInstance({
-            fixture,
-            sandboxInstanceId: sandboxInstanceIdForCleanup,
+          const sandboxInstanceId = sandboxInstanceIdForCleanup;
+          await timeVitePhase({
+            sandboxProvider: fixture.sandboxProvider,
+            phase: "stop_sandbox",
+            operation: async () =>
+              await stopSandboxInstance({
+                fixture,
+                sandboxInstanceId,
+              }),
           });
         }
       }
@@ -1075,20 +1111,23 @@ async function prepareViteSandboxFixture(input: {
 async function timeVitePhase<Result>(input: {
   sandboxProvider: string;
   phase: string;
+  attributes?: Record<string, string | number | boolean | null>;
   operation: () => Promise<Result>;
 }): Promise<Result> {
   const startedAt = Date.now();
   try {
     return await input.operation();
   } finally {
-    console.log(
-      JSON.stringify({
-        event: "system_port_access_vite.phase_timing",
-        phase: input.phase,
-        sandboxProvider: input.sandboxProvider,
-        durationMs: Date.now() - startedAt,
-      }),
-    );
+    const basePayload = {
+      event: "system_port_access_vite.phase_timing",
+      phase: input.phase,
+      sandboxProvider: input.sandboxProvider,
+      durationMs: Date.now() - startedAt,
+    };
+    const payload =
+      input.attributes === undefined ? basePayload : { ...input.attributes, ...basePayload };
+
+    console.log(JSON.stringify(payload));
   }
 }
 

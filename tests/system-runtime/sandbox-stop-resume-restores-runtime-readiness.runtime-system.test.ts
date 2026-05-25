@@ -16,6 +16,7 @@ import {
 } from "../system/helpers/codex-sandbox.js";
 import { createRuntimeCodexSandboxFixture } from "./helpers/runtime-codex-sandbox.js";
 import { createSandboxSystemTest } from "./helpers/sandbox-system-test.js";
+import { timeSystemRuntimePhase } from "./helpers/system-runtime-phase-timing.js";
 
 const it = createSandboxSystemTest({
   extraInfra: ["mailpit"],
@@ -36,82 +37,167 @@ describe("runtime system sandbox stop resume restores runtime readiness", () => 
     "waits for runtime-ready recovery across stop and resume",
     async ({ sandboxProvider, system }) => {
       const fixture = createRuntimeCodexSandboxFixture(system);
-      const { authenticatedSession, sandboxInstanceId } = await prepareCodexSandbox({
-        fixture,
-        email: "runtime-sandbox-stop-resume-restores-runtime-readiness@example.com",
+      const timingAttributes = { sandboxProvider };
+
+      const { authenticatedSession, sandboxInstanceId } = await timeSystemRuntimePhase({
+        event: "system_runtime.sandbox_stop_resume.phase_timing",
+        phase: "prepare_sandbox",
+        attributes: timingAttributes,
+        operation: async () =>
+          await prepareCodexSandbox({
+            fixture,
+            email: "runtime-sandbox-stop-resume-restores-runtime-readiness@example.com",
+          }),
       });
 
-      const initialRuntimeState = await fixture.readSandboxRuntimeState(sandboxInstanceId);
+      const initialRuntimeState = await timeSystemRuntimePhase({
+        event: "system_runtime.sandbox_stop_resume.phase_timing",
+        phase: "read_initial_runtime_state",
+        attributes: timingAttributes,
+        operation: async () => await fixture.readSandboxRuntimeState(sandboxInstanceId),
+      });
       expect(initialRuntimeState.attachment).not.toBeNull();
       expect(initialRuntimeState.runtime.ready).toBe(true);
 
-      await stopSandboxInstance({
-        fixture,
-        sandboxInstanceId,
+      await timeSystemRuntimePhase({
+        event: "system_runtime.sandbox_stop_resume.phase_timing",
+        phase: "stop_sandbox",
+        attributes: timingAttributes,
+        operation: async () =>
+          await stopSandboxInstance({
+            fixture,
+            sandboxInstanceId,
+          }),
       });
 
-      await waitForSandboxStatus({
-        fixture,
-        authenticatedSession,
-        sandboxInstanceId,
-        expectedStatus: "stopped",
+      await timeSystemRuntimePhase({
+        event: "system_runtime.sandbox_stop_resume.phase_timing",
+        phase: "wait_sandbox_stopped",
+        attributes: timingAttributes,
+        operation: async () =>
+          await waitForSandboxStatus({
+            fixture,
+            authenticatedSession,
+            sandboxInstanceId,
+            expectedStatus: "stopped",
+          }),
       });
-      await waitForSandboxConnectable({
-        fixture,
-        authenticatedSession,
-        sandboxInstanceId,
-        expectedConnectable: false,
+      await timeSystemRuntimePhase({
+        event: "system_runtime.sandbox_stop_resume.phase_timing",
+        phase: "wait_sandbox_not_connectable",
+        attributes: timingAttributes,
+        operation: async () =>
+          await waitForSandboxConnectable({
+            fixture,
+            authenticatedSession,
+            sandboxInstanceId,
+            expectedConnectable: false,
+          }),
       });
-      await waitForRuntimeReadyValue({
-        fixture,
-        sandboxInstanceId,
-        expectedReady: false,
-        timeoutMs: STOP_RUNTIME_READY_TIMEOUT_MS,
+      await timeSystemRuntimePhase({
+        event: "system_runtime.sandbox_stop_resume.phase_timing",
+        phase: "wait_runtime_ready_false",
+        attributes: timingAttributes,
+        operation: async () =>
+          await waitForRuntimeReadyValue({
+            fixture,
+            sandboxInstanceId,
+            expectedReady: false,
+            timeoutMs: STOP_RUNTIME_READY_TIMEOUT_MS,
+          }),
       });
 
       const publicAccess = readPublicAccessOrThrow(system);
-      await publicAccess.checkReady({
-        timeoutMs: RESUME_PUBLIC_ACCESS_READY_TIMEOUT_MS,
+      await timeSystemRuntimePhase({
+        event: "system_runtime.sandbox_stop_resume.phase_timing",
+        phase: "check_public_access_ready_before_resume",
+        attributes: timingAttributes,
+        operation: async () =>
+          await publicAccess.checkReady({
+            timeoutMs: RESUME_PUBLIC_ACCESS_READY_TIMEOUT_MS,
+          }),
       });
 
-      await resumeSandboxInstance({
-        fixture,
-        authenticatedSession,
-        sandboxInstanceId,
+      await timeSystemRuntimePhase({
+        event: "system_runtime.sandbox_stop_resume.phase_timing",
+        phase: "resume_sandbox",
+        attributes: timingAttributes,
+        operation: async () =>
+          await resumeSandboxInstance({
+            fixture,
+            authenticatedSession,
+            sandboxInstanceId,
+          }),
       });
 
-      await waitForSandboxStatusAfterResume({
-        fixture,
-        authenticatedSession,
-        publicAccess,
-        sandboxInstanceId,
-        sandboxProvider,
+      await timeSystemRuntimePhase({
+        event: "system_runtime.sandbox_stop_resume.phase_timing",
+        phase: "wait_sandbox_running_after_resume",
+        attributes: timingAttributes,
+        operation: async () =>
+          await waitForSandboxStatusAfterResume({
+            fixture,
+            authenticatedSession,
+            publicAccess,
+            sandboxInstanceId,
+            sandboxProvider,
+          }),
       });
-      const runtimeStateWhenRunning = await fixture.readSandboxRuntimeState(sandboxInstanceId);
+      const runtimeStateWhenRunning = await timeSystemRuntimePhase({
+        event: "system_runtime.sandbox_stop_resume.phase_timing",
+        phase: "read_runtime_state_after_resume",
+        attributes: timingAttributes,
+        operation: async () => await fixture.readSandboxRuntimeState(sandboxInstanceId),
+      });
       expect(runtimeStateWhenRunning.runtime.ready).toBe(true);
 
-      const resumedSandboxStatus = await waitForSandboxConnectable({
-        fixture,
-        authenticatedSession,
-        sandboxInstanceId,
-        expectedConnectable: true,
+      const resumedSandboxStatus = await timeSystemRuntimePhase({
+        event: "system_runtime.sandbox_stop_resume.phase_timing",
+        phase: "wait_sandbox_connectable_after_resume",
+        attributes: timingAttributes,
+        operation: async () =>
+          await waitForSandboxConnectable({
+            fixture,
+            authenticatedSession,
+            sandboxInstanceId,
+            expectedConnectable: true,
+          }),
       });
       expect(resumedSandboxStatus.status).toBe("running");
 
-      const recoveredAgentSession = await connectCodexAgentSession({
-        fixture,
-        authenticatedSession,
-        sandboxInstanceId,
+      const recoveredAgentSession = await timeSystemRuntimePhase({
+        event: "system_runtime.sandbox_stop_resume.phase_timing",
+        phase: "connect_agent_session_after_resume",
+        attributes: timingAttributes,
+        operation: async () =>
+          await connectCodexAgentSession({
+            fixture,
+            authenticatedSession,
+            sandboxInstanceId,
+          }),
       });
 
       try {
-        const startedThread = await startCodexThread({
-          rpcClient: recoveredAgentSession.rpcClient,
-          model: "gpt-5.3-codex",
+        const startedThread = await timeSystemRuntimePhase({
+          event: "system_runtime.sandbox_stop_resume.phase_timing",
+          phase: "start_codex_thread_after_resume",
+          attributes: timingAttributes,
+          operation: async () =>
+            await startCodexThread({
+              rpcClient: recoveredAgentSession.rpcClient,
+              model: "gpt-5.3-codex",
+            }),
         });
         expect(startedThread.threadId).toMatch(/^019/u);
       } finally {
-        await recoveredAgentSession.close().catch(() => {});
+        await timeSystemRuntimePhase({
+          event: "system_runtime.sandbox_stop_resume.phase_timing",
+          phase: "close_agent_session_after_resume",
+          attributes: timingAttributes,
+          operation: async () => {
+            await recoveredAgentSession.close().catch(() => {});
+          },
+        });
       }
     },
     SYSTEM_TEST_TIMEOUT_MS,

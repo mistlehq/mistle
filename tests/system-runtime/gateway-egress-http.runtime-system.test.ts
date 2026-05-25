@@ -21,6 +21,7 @@ import {
   stopSandboxInstance,
 } from "../system/helpers/codex-sandbox.js";
 import { createRuntimeCodexSandboxFixture } from "./helpers/runtime-codex-sandbox.js";
+import { timeSystemRuntimePhase } from "./helpers/system-runtime-phase-timing.js";
 
 const SYSTEM_TEST_TIMEOUT_MS = 5 * 60_000;
 const SANDBOXD_EGRESS_PROXY_URL = "http://127.0.0.1:38513";
@@ -93,95 +94,117 @@ describe("runtime system gateway egress HTTP smoke", () => {
   it(
     "forwards sandbox HTTP, HTTPS, WS, WSS, and opaque TCP traffic through the gateway tunnel",
     async ({ system }) => {
-      const upstream = await startSimulatedHttpUpstream();
-      const secureUpstream = await startSimulatedSecureWebsocketUpstream(
-        SecureUpstreamCertificates,
-      );
+      const timingAttributes = { sandboxProvider: "docker" };
+      const upstream = await timeSystemRuntimePhase({
+        event: "system_runtime.gateway_egress_http.phase_timing",
+        phase: "start_simulated_http_upstream",
+        attributes: timingAttributes,
+        operation: async () => await startSimulatedHttpUpstream(),
+      });
+      const secureUpstream = await timeSystemRuntimePhase({
+        event: "system_runtime.gateway_egress_http.phase_timing",
+        phase: "start_simulated_secure_upstream",
+        attributes: timingAttributes,
+        operation: async () =>
+          await startSimulatedSecureWebsocketUpstream(SecureUpstreamCertificates),
+      });
       const fixture = createRuntimeCodexSandboxFixture(system);
       let sandboxInstanceIdForCleanup: string | undefined;
 
       try {
-        const { authenticatedSession, sandboxInstanceId } = await prepareCodexSandbox({
-          fixture,
-          email: "runtime-gateway-egress-http-smoke@example.com",
+        const { authenticatedSession, sandboxInstanceId } = await timeSystemRuntimePhase({
+          event: "system_runtime.gateway_egress_http.phase_timing",
+          phase: "prepare_sandbox",
+          attributes: timingAttributes,
+          operation: async () =>
+            await prepareCodexSandbox({
+              fixture,
+              email: "runtime-gateway-egress-http-smoke@example.com",
+            }),
         });
         sandboxInstanceIdForCleanup = sandboxInstanceId;
         const upstreamUrl = new URL(upstream.sandboxReachableBaseUrl);
         const secureUpstreamUrl = new URL(secureUpstream.sandboxReachableBaseUrl);
 
-        const result = await runSandboxExecCommandInSandbox({
-          fixture,
-          authenticatedSession,
-          sandboxInstanceId,
-          command: "sh",
-          args: [
-            "-lc",
-            [
-              "set -e",
-              publicAccessHttpSmokeHelpers(),
-              [
-                "public_access_http_smoke",
-                shellQuote("POST"),
-                shellQuote(`${upstream.sandboxReachableBaseUrl}/echo?case=http`),
-                shellQuote(HTTP_REQUEST_BODY),
-              ].join(" "),
-              "printf '\\n'",
-              [
-                "curl",
-                "--proxy",
-                shellQuote(SANDBOXD_EGRESS_PROXY_URL),
-                "--noproxy ''",
-                "-k",
-                "-fsS",
-                shellQuote(HTTPS_SMOKE_URL),
-                "| grep -q 'Example Domain'",
-              ].join(" "),
-              [
-                `export WS_PROXY=${shellQuote(SANDBOXD_EGRESS_PROXY_URL)}`,
-                `export WS_URL=${shellQuote(`${upstream.sandboxReachableBaseUrl.replace(/^http:/u, "ws:")}/socket?case=websocket`)}`,
-                `export WS_MESSAGE=${shellQuote(WEBSOCKET_REQUEST_BODY)}`,
-                "timeout 15 bash <<'BASH'",
-                websocketProxySmokeScript(),
-                "BASH",
-              ].join("\n"),
-              [
-                `export TRUSTED_UPSTREAM_CA_CERT_PEM=${shellQuote(secureUpstream.caCertificatePem)}`,
-                "timeout 15 bash <<'BASH'",
-                installTrustedUpstreamCaScript(),
-                "BASH",
-              ].join("\n"),
-              [
-                `export WS_PROXY=${shellQuote(SANDBOXD_EGRESS_PROXY_URL)}`,
-                `export WSS_URL=${shellQuote(`${secureUpstream.sandboxReachableBaseUrl}/socket?case=wss`)}`,
-                `export WSS_MESSAGE=${shellQuote(SECURE_WEBSOCKET_REQUEST_BODY)}`,
-                "timeout 15 bash <<'BASH'",
-                secureWebsocketProxySmokeScript(),
-                "BASH",
-              ].join("\n"),
-              [
-                `export TRANSPARENT_PROXY_PORT=${shellQuote(String(SANDBOXD_TRANSPARENT_EGRESS_PROXY_PORT))}`,
-                `export TRANSPARENT_PROXY_CA_BUNDLE=${shellQuote(SANDBOXD_EGRESS_PROXY_CA_BUNDLE_PATH)}`,
-                `export TRANSPARENT_UPSTREAM_HOST=${shellQuote(upstreamUrl.hostname)}`,
-                `export TRANSPARENT_HTTP_PORT=${shellQuote(upstreamUrl.port)}`,
-                `export TRANSPARENT_SECURE_PORT=${shellQuote(secureUpstreamUrl.port)}`,
-                `export TRANSPARENT_HTTP_URL=${shellQuote(`${upstream.sandboxReachableBaseUrl}/echo?case=transparent-http`)}`,
-                `export TRANSPARENT_HTTPS_URL=${shellQuote(`${secureUpstream.sandboxReachableBaseUrl.replace(/^wss:/u, "https:")}/secure?case=transparent-https`)}`,
-                `export TRANSPARENT_WSS_PATH=${shellQuote("/socket?case=transparent-wss")}`,
-                `export TRUSTED_CA_CERT_PEM=${shellQuote(secureUpstream.caCertificatePem)}`,
-                `export TRANSPARENT_HTTP_MESSAGE=${shellQuote(TRANSPARENT_HTTP_REQUEST_BODY)}`,
-                `export TRANSPARENT_WSS_MESSAGE=${shellQuote(TRANSPARENT_SECURE_WEBSOCKET_REQUEST_BODY)}`,
-                `export TRANSPARENT_TCP_MESSAGE=${shellQuote(TRANSPARENT_TCP_REQUEST_BODY)}`,
-                "timeout 30 bash <<'BASH'",
-                transparentGatewaySmokeScript(),
-                "BASH",
-              ].join("\n"),
-              `printf '%s\\n' ${shellQuote(SMOKE_MARKER)}`,
-              `printf '%s\\n' ${shellQuote(WEBSOCKET_SMOKE_MARKER)}`,
-              `printf '%s\\n' ${shellQuote(SECURE_WEBSOCKET_SMOKE_MARKER)}`,
-              `printf '%s\\n' ${shellQuote(TRANSPARENT_SMOKE_MARKER)}`,
-            ].join("\n"),
-          ],
-          timeoutMs: 90_000,
+        const result = await timeSystemRuntimePhase({
+          event: "system_runtime.gateway_egress_http.phase_timing",
+          phase: "run_gateway_egress_smoke_command",
+          attributes: timingAttributes,
+          operation: async () =>
+            await runSandboxExecCommandInSandbox({
+              fixture,
+              authenticatedSession,
+              sandboxInstanceId,
+              command: "sh",
+              args: [
+                "-lc",
+                [
+                  "set -e",
+                  publicAccessHttpSmokeHelpers(),
+                  [
+                    "public_access_http_smoke",
+                    shellQuote("POST"),
+                    shellQuote(`${upstream.sandboxReachableBaseUrl}/echo?case=http`),
+                    shellQuote(HTTP_REQUEST_BODY),
+                  ].join(" "),
+                  "printf '\\n'",
+                  [
+                    "curl",
+                    "--proxy",
+                    shellQuote(SANDBOXD_EGRESS_PROXY_URL),
+                    "--noproxy ''",
+                    "-k",
+                    "-fsS",
+                    shellQuote(HTTPS_SMOKE_URL),
+                    "| grep -q 'Example Domain'",
+                  ].join(" "),
+                  [
+                    `export WS_PROXY=${shellQuote(SANDBOXD_EGRESS_PROXY_URL)}`,
+                    `export WS_URL=${shellQuote(`${upstream.sandboxReachableBaseUrl.replace(/^http:/u, "ws:")}/socket?case=websocket`)}`,
+                    `export WS_MESSAGE=${shellQuote(WEBSOCKET_REQUEST_BODY)}`,
+                    "timeout 15 bash <<'BASH'",
+                    websocketProxySmokeScript(),
+                    "BASH",
+                  ].join("\n"),
+                  [
+                    `export TRUSTED_UPSTREAM_CA_CERT_PEM=${shellQuote(secureUpstream.caCertificatePem)}`,
+                    "timeout 15 bash <<'BASH'",
+                    installTrustedUpstreamCaScript(),
+                    "BASH",
+                  ].join("\n"),
+                  [
+                    `export WS_PROXY=${shellQuote(SANDBOXD_EGRESS_PROXY_URL)}`,
+                    `export WSS_URL=${shellQuote(`${secureUpstream.sandboxReachableBaseUrl}/socket?case=wss`)}`,
+                    `export WSS_MESSAGE=${shellQuote(SECURE_WEBSOCKET_REQUEST_BODY)}`,
+                    "timeout 15 bash <<'BASH'",
+                    secureWebsocketProxySmokeScript(),
+                    "BASH",
+                  ].join("\n"),
+                  [
+                    `export TRANSPARENT_PROXY_PORT=${shellQuote(String(SANDBOXD_TRANSPARENT_EGRESS_PROXY_PORT))}`,
+                    `export TRANSPARENT_PROXY_CA_BUNDLE=${shellQuote(SANDBOXD_EGRESS_PROXY_CA_BUNDLE_PATH)}`,
+                    `export TRANSPARENT_UPSTREAM_HOST=${shellQuote(upstreamUrl.hostname)}`,
+                    `export TRANSPARENT_HTTP_PORT=${shellQuote(upstreamUrl.port)}`,
+                    `export TRANSPARENT_SECURE_PORT=${shellQuote(secureUpstreamUrl.port)}`,
+                    `export TRANSPARENT_HTTP_URL=${shellQuote(`${upstream.sandboxReachableBaseUrl}/echo?case=transparent-http`)}`,
+                    `export TRANSPARENT_HTTPS_URL=${shellQuote(`${secureUpstream.sandboxReachableBaseUrl.replace(/^wss:/u, "https:")}/secure?case=transparent-https`)}`,
+                    `export TRANSPARENT_WSS_PATH=${shellQuote("/socket?case=transparent-wss")}`,
+                    `export TRUSTED_CA_CERT_PEM=${shellQuote(secureUpstream.caCertificatePem)}`,
+                    `export TRANSPARENT_HTTP_MESSAGE=${shellQuote(TRANSPARENT_HTTP_REQUEST_BODY)}`,
+                    `export TRANSPARENT_WSS_MESSAGE=${shellQuote(TRANSPARENT_SECURE_WEBSOCKET_REQUEST_BODY)}`,
+                    `export TRANSPARENT_TCP_MESSAGE=${shellQuote(TRANSPARENT_TCP_REQUEST_BODY)}`,
+                    "timeout 30 bash <<'BASH'",
+                    transparentGatewaySmokeScript(),
+                    "BASH",
+                  ].join("\n"),
+                  `printf '%s\\n' ${shellQuote(SMOKE_MARKER)}`,
+                  `printf '%s\\n' ${shellQuote(WEBSOCKET_SMOKE_MARKER)}`,
+                  `printf '%s\\n' ${shellQuote(SECURE_WEBSOCKET_SMOKE_MARKER)}`,
+                  `printf '%s\\n' ${shellQuote(TRANSPARENT_SMOKE_MARKER)}`,
+                ].join("\n"),
+              ],
+              timeoutMs: 90_000,
+            }),
         });
 
         if (result.exitCode !== 0) {
@@ -250,13 +273,27 @@ describe("runtime system gateway egress HTTP smoke", () => {
         expect(result.stdout).toContain(`TRANSPARENT-TCP:echo:${TRANSPARENT_TCP_REQUEST_BODY}`);
       } finally {
         if (sandboxInstanceIdForCleanup !== undefined) {
-          await stopSandboxInstance({
-            fixture,
-            sandboxInstanceId: sandboxInstanceIdForCleanup,
+          const sandboxInstanceId = sandboxInstanceIdForCleanup;
+          await timeSystemRuntimePhase({
+            event: "system_runtime.gateway_egress_http.phase_timing",
+            phase: "stop_sandbox",
+            attributes: timingAttributes,
+            operation: async () =>
+              await stopSandboxInstance({
+                fixture,
+                sandboxInstanceId,
+              }),
           });
         }
-        await upstream.stop();
-        await secureUpstream.stop();
+        await timeSystemRuntimePhase({
+          event: "system_runtime.gateway_egress_http.phase_timing",
+          phase: "stop_simulated_upstreams",
+          attributes: timingAttributes,
+          operation: async () => {
+            await upstream.stop();
+            await secureUpstream.stop();
+          },
+        });
       }
     },
     SYSTEM_TEST_TIMEOUT_MS,
