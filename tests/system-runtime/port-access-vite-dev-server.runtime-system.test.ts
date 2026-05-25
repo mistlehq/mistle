@@ -113,7 +113,7 @@ type PendingHmrMessageWaiter = {
 
 describe("system port access vite dev server", () => {
   it(
-    "serves a real Vite dev server including HMR and mixed assets without resetting bootstrap",
+    "serves a real Vite dev server, mixed assets, and HMR without resetting bootstrap",
     async ({ system }) => {
       const fixture = createRuntimeCodexSandboxFixture(system);
       let sandboxInstanceIdForCleanup: string | undefined;
@@ -133,387 +133,38 @@ describe("system port access vite dev server", () => {
         tunnelSocketForCleanup = tunnelSocket;
 
         for (let round = 0; round < RefreshRounds; round += 1) {
-          if (tunnelSocket.readyState !== WebSocket.OPEN) {
-            throw new Error(
-              `Bootstrap tunnel closed before refresh round ${String(round)}. TunnelClose=${readTunnelCloseDescription()} ViteLog=${await readViteLog(
-                {
-                  fixture,
-                  authenticatedSession: session,
-                  sandboxInstanceId,
-                },
-              )}`,
-            );
-          }
-
-          const indexResponse = await withTimeout({
-            operation: sendGatewayHttpRequest({
-              baseUrl: fixture.dataPlaneGatewayBaseUrl,
-              path: "/",
-              method: "GET",
-              headers: {
-                cookie: sessionCookie,
-                host: bootstrap.host,
-              },
-            }),
-            timeoutMs: ViteRequestTimeoutMs,
-            description: "fixture index request",
-          });
-          expect(indexResponse.status).toBe(200);
-          expect(indexResponse.body).toContain("/src/main.ts");
-          expect(indexResponse.body).toContain("/favicon.ico");
-
-          const viteClientResponse = await withTimeout({
-            operation: sendGatewayHttpRequest({
-              baseUrl: fixture.dataPlaneGatewayBaseUrl,
-              path: "/@vite/client",
-              method: "GET",
-              headers: {
-                cookie: sessionCookie,
-                host: bootstrap.host,
-              },
-            }),
-            timeoutMs: ViteRequestTimeoutMs,
-            description: "Vite client request",
-          });
-          expect(viteClientResponse.status).toBe(200);
-          expect(extractHmrPath(viteClientResponse.body)).toContain("?token=");
-
-          const mainModuleResponse = await withTimeout({
-            operation: sendGatewayHttpRequest({
-              baseUrl: fixture.dataPlaneGatewayBaseUrl,
-              path: "/src/main.ts",
-              method: "GET",
-              headers: {
-                cookie: sessionCookie,
-                host: bootstrap.host,
-              },
-            }),
-            timeoutMs: ViteRequestTimeoutMs,
-            description: "Vite main module request",
-          });
-          expect(mainModuleResponse.status).toBe(200);
-          expect(mainModuleResponse.body).toContain("virtual:mistle-vite-fixture");
-
-          const stylesheetResponse = await withTimeout({
-            operation: sendGatewayHttpRequest({
-              baseUrl: fixture.dataPlaneGatewayBaseUrl,
-              path: "/src/styles.css",
-              method: "GET",
-              headers: {
-                cookie: sessionCookie,
-                host: bootstrap.host,
-              },
-            }),
-            timeoutMs: ViteRequestTimeoutMs,
-            description: "Vite stylesheet request",
-          });
-          expect(stylesheetResponse.status).toBe(200);
-          expect(stylesheetResponse.body).toContain("background-image");
-
-          const assetResponses = await Promise.all([
-            withTimeout({
-              operation: sendGatewayHttpRequest({
-                baseUrl: fixture.dataPlaneGatewayBaseUrl,
-                path: extractLogoImportPath(mainModuleResponse.body),
-                method: "GET",
-                headers: {
-                  cookie: sessionCookie,
-                  host: bootstrap.host,
-                },
-              }),
-              timeoutMs: ViteRequestTimeoutMs,
-              description: "Vite logo asset request",
-            }),
-            withTimeout({
-              operation: sendGatewayHttpRequest({
-                baseUrl: fixture.dataPlaneGatewayBaseUrl,
-                path: extractRawTextImportPath(mainModuleResponse.body),
-                method: "GET",
-                headers: {
-                  cookie: sessionCookie,
-                  host: bootstrap.host,
-                },
-              }),
-              timeoutMs: ViteRequestTimeoutMs,
-              description: "Vite raw text request",
-            }),
-            withTimeout({
-              operation: sendGatewayHttpRequest({
-                baseUrl: fixture.dataPlaneGatewayBaseUrl,
-                path: "/src/pattern.svg",
-                method: "GET",
-                headers: {
-                  cookie: sessionCookie,
-                  host: bootstrap.host,
-                },
-              }),
-              timeoutMs: ViteRequestTimeoutMs,
-              description: "Vite stylesheet asset request",
-            }),
-            withTimeout({
-              operation: sendGatewayHttpRequest({
-                baseUrl: fixture.dataPlaneGatewayBaseUrl,
-                path: "/favicon.ico",
-                method: "GET",
-                headers: {
-                  cookie: sessionCookie,
-                  host: bootstrap.host,
-                },
-              }),
-              timeoutMs: ViteRequestTimeoutMs,
-              description: "Vite favicon request",
-            }),
-          ]);
-
-          const [logoResponse, rawTextResponse, patternResponse, faviconResponse] = assetResponses;
-
-          expect(logoResponse.status).toBe(200);
-          expect(logoResponse.body).toContain('export default "data:image/svg+xml,');
-
-          expect(rawTextResponse.status).toBe(200);
-          expect(rawTextResponse.body).toContain("bootstrap tunnel");
-
-          expect(patternResponse.status).toBe(200);
-          expect(patternResponse.body).toContain("<svg");
-
-          expect(faviconResponse.status).toBe(200);
-          expect(faviconResponse.body).toBe("mistle-vite-fixture-favicon");
-          expect(readHeaderValue(faviconResponse.headers, "content-type") ?? "").toBe("");
-
-          if (tunnelSocket.readyState !== WebSocket.OPEN) {
-            throw new Error(
-              `Bootstrap tunnel closed after refresh round ${String(round)}. TunnelClose=${readTunnelCloseDescription()} ViteLog=${await readViteLog(
-                {
-                  fixture,
-                  authenticatedSession: session,
-                  sandboxInstanceId,
-                },
-              )}`,
-            );
-          }
-        }
-      } finally {
-        if (tunnelSocketForCleanup !== undefined) {
-          await closeWebSocketIfOpen(tunnelSocketForCleanup);
-        }
-        if (sandboxInstanceIdForCleanup !== undefined) {
-          await stopSandboxInstance({
-            fixture,
-            sandboxInstanceId: sandboxInstanceIdForCleanup,
-          });
-        }
-      }
-    },
-    TestTimeoutMs,
-  );
-
-  it(
-    "delivers an HMR update when a sandbox source file changes",
-    async ({ system }) => {
-      const fixture = createRuntimeCodexSandboxFixture(system);
-      let sandboxInstanceIdForCleanup: string | undefined;
-      let tunnelSocketForCleanup: WebSocket | undefined;
-
-      try {
-        const { sandboxInstanceId, session } = await prepareViteSandboxFixture({
-          fixture,
-        });
-        sandboxInstanceIdForCleanup = sandboxInstanceId;
-        const { bootstrap, readTunnelCloseDescription, sessionCookie, tunnelSocket } =
-          await openVitePortAccessSession({
+          await assertBootstrapTunnelOpen({
             fixture,
             session,
             sandboxInstanceId,
+            tunnelSocket,
+            readTunnelCloseDescription,
+            description: `before refresh round ${String(round)}`,
           });
-        tunnelSocketForCleanup = tunnelSocket;
-
-        const viteClientResponse = await withTimeout({
-          operation: sendGatewayHttpRequest({
-            baseUrl: fixture.dataPlaneGatewayBaseUrl,
-            path: "/@vite/client",
-            method: "GET",
-            headers: {
-              cookie: sessionCookie,
-              host: bootstrap.host,
-            },
-          }),
-          timeoutMs: ViteRequestTimeoutMs,
-          description: "Vite client request",
-        });
-        expect(viteClientResponse.status).toBe(200);
-
-        const mainModuleResponse = await withTimeout({
-          operation: sendGatewayHttpRequest({
-            baseUrl: fixture.dataPlaneGatewayBaseUrl,
-            path: "/src/main.ts",
-            method: "GET",
-            headers: {
-              cookie: sessionCookie,
-              host: bootstrap.host,
-            },
-          }),
-          timeoutMs: ViteRequestTimeoutMs,
-          description: "Vite main module request before HMR change",
-        });
-        expect(mainModuleResponse.status).toBe(200);
-
-        const stylesheetResponse = await withTimeout({
-          operation: sendGatewayHttpRequest({
-            baseUrl: fixture.dataPlaneGatewayBaseUrl,
-            path: "/src/styles.css",
-            method: "GET",
-            headers: {
-              cookie: sessionCookie,
-              host: bootstrap.host,
-            },
-          }),
-          timeoutMs: ViteRequestTimeoutMs,
-          description: "Vite stylesheet request before HMR change",
-        });
-        expect(stylesheetResponse.status).toBe(200);
-
-        const hmrSocket = new WebSocket(
-          resolvePortAccessWebSocketUrl({
-            gatewayBaseUrl: fixture.dataPlaneGatewayBaseUrl,
-            path: extractHmrPath(viteClientResponse.body),
-          }),
-          "vite-hmr",
-          {
-            headers: {
-              ...readGatewayBaseUrlRequestHeaders(fixture.dataPlaneGatewayBaseUrl),
-              cookie: sessionCookie,
-              host: bootstrap.host,
-            },
-          },
-        );
-
-        let hmrMessagePump: HmrMessagePump | undefined;
-        try {
-          hmrMessagePump = createHmrMessagePump(hmrSocket);
-          await waitForWebSocketOpen(hmrSocket, WebSocketOpenTimeoutMs).catch(
-            async (error: unknown) => {
-              throw new Error(
-                `Timed out opening Vite HMR websocket. TunnelClose=${readTunnelCloseDescription()} ViteLog=${await readViteLog(
-                  {
-                    fixture,
-                    authenticatedSession: session,
-                    sandboxInstanceId,
-                  },
-                )}`,
-                { cause: error },
-              );
-            },
-          );
-          const connectedMessage = await hmrMessagePump
-            .waitForTextMessage(WebSocketMessageTimeoutMs)
-            .catch(async (error: unknown) => {
-              throw new Error(
-                `Timed out waiting for Vite HMR connected message. HmrSocketState=${String(
-                  hmrSocket.readyState,
-                )} TunnelClose=${readTunnelCloseDescription()} ViteLog=${await readViteLog({
-                  fixture,
-                  authenticatedSession: session,
-                  sandboxInstanceId,
-                })}`,
-                { cause: error },
-              );
-            });
-          const connectedPayload = HmrConnectedMessageSchema.parse(JSON.parse(connectedMessage));
-          expect(connectedPayload.type).toBe("connected");
-
-          const hmrMarker = `hmr-${randomUUID()}`;
-          const updateMessagePromise = waitForHmrUpdateMessage({
-            messagePump: hmrMessagePump,
-            timeoutMs: WebSocketMessageTimeoutMs,
-          });
-          await expectSuccessfulSandboxCommand({
+          await assertVitePageAndAssets({
             fixture,
-            authenticatedSession: session,
+            bootstrap,
+            sessionCookie,
+          });
+          await assertBootstrapTunnelOpen({
+            fixture,
+            session,
             sandboxInstanceId,
-            description: "updating Vite stylesheet in sandbox",
-            timeoutMs: SandboxProbeTimeoutMs,
-            command: "sh",
-            args: [
-              "-lc",
-              [
-                "set -eu",
-                `cat <<'__MISTLE_HMR_APPEND__' >> ${shellQuote(`${ViteFixtureSandboxPath}/src/styles.css`)}`,
-                "",
-                `:root { --hmr-marker-${hmrMarker}: 1; }`,
-                "__MISTLE_HMR_APPEND__",
-              ].join("\n"),
-            ],
+            tunnelSocket,
+            readTunnelCloseDescription,
+            description: `after refresh round ${String(round)}`,
           });
-
-          const updateMessage = await updateMessagePromise.catch(async (error: unknown) => {
-            const updatedStylesheetResponse = await withTimeout({
-              operation: sendGatewayHttpRequest({
-                baseUrl: fixture.dataPlaneGatewayBaseUrl,
-                path: "/src/styles.css",
-                method: "GET",
-                headers: {
-                  cookie: sessionCookie,
-                  host: bootstrap.host,
-                },
-              }),
-              timeoutMs: ViteRequestTimeoutMs,
-              description: "Vite stylesheet request after HMR timeout",
-            });
-            throw new Error(
-              `Timed out waiting for Vite HMR update. UpdatedStylesheetStatus=${String(
-                updatedStylesheetResponse.status,
-              )} UpdatedStylesheetContainsMarker=${String(
-                updatedStylesheetResponse.body.includes(`--hmr-marker-${hmrMarker}`),
-              )} ViteLog=${await readViteLog({
-                fixture,
-                authenticatedSession: session,
-                sandboxInstanceId,
-              })}`,
-              { cause: error },
-            );
-          });
-          expect(
-            updateMessage.updates.some((update) => update.path.includes("/src/styles.css")),
-          ).toBe(true);
-          expect(
-            updateMessage.updates.some(
-              (update) =>
-                (update.acceptedPath?.includes("/src/styles.css") ?? false) ||
-                update.path.includes("/src/styles.css"),
-            ),
-          ).toBe(true);
-
-          const updatedStylesheetResponse = await withTimeout({
-            operation: sendGatewayHttpRequest({
-              baseUrl: fixture.dataPlaneGatewayBaseUrl,
-              path: "/src/styles.css",
-              method: "GET",
-              headers: {
-                cookie: sessionCookie,
-                host: bootstrap.host,
-              },
-            }),
-            timeoutMs: ViteRequestTimeoutMs,
-            description: "Vite stylesheet request after HMR change",
-          });
-          expect(updatedStylesheetResponse.status).toBe(200);
-          expect(updatedStylesheetResponse.body).toContain(`--hmr-marker-${hmrMarker}`);
-        } finally {
-          hmrMessagePump?.close();
-          await closeWebSocketIfOpen(hmrSocket);
         }
 
-        if (tunnelSocket.readyState !== WebSocket.OPEN) {
-          throw new Error(
-            `Bootstrap tunnel closed during HMR update validation. TunnelClose=${readTunnelCloseDescription()} ViteLog=${await readViteLog(
-              {
-                fixture,
-                authenticatedSession: session,
-                sandboxInstanceId,
-              },
-            )}`,
-          );
-        }
+        await assertViteHmrUpdate({
+          fixture,
+          bootstrap,
+          session,
+          sandboxInstanceId,
+          sessionCookie,
+          tunnelSocket,
+          readTunnelCloseDescription,
+        });
       } finally {
         if (tunnelSocketForCleanup !== undefined) {
           await closeWebSocketIfOpen(tunnelSocketForCleanup);
@@ -529,6 +180,363 @@ describe("system port access vite dev server", () => {
     TestTimeoutMs,
   );
 });
+
+async function assertVitePageAndAssets(input: {
+  fixture: CodexSandboxFixture;
+  bootstrap: Awaited<ReturnType<typeof mintPortAccess>>;
+  sessionCookie: string;
+}): Promise<void> {
+  const indexResponse = await withTimeout({
+    operation: sendGatewayHttpRequest({
+      baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+      path: "/",
+      method: "GET",
+      headers: {
+        cookie: input.sessionCookie,
+        host: input.bootstrap.host,
+      },
+    }),
+    timeoutMs: ViteRequestTimeoutMs,
+    description: "fixture index request",
+  });
+  expect(indexResponse.status).toBe(200);
+  expect(indexResponse.body).toContain("/src/main.ts");
+  expect(indexResponse.body).toContain("/favicon.ico");
+
+  const viteClientResponse = await withTimeout({
+    operation: sendGatewayHttpRequest({
+      baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+      path: "/@vite/client",
+      method: "GET",
+      headers: {
+        cookie: input.sessionCookie,
+        host: input.bootstrap.host,
+      },
+    }),
+    timeoutMs: ViteRequestTimeoutMs,
+    description: "Vite client request",
+  });
+  expect(viteClientResponse.status).toBe(200);
+  expect(extractHmrPath(viteClientResponse.body)).toContain("?token=");
+
+  const mainModuleResponse = await withTimeout({
+    operation: sendGatewayHttpRequest({
+      baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+      path: "/src/main.ts",
+      method: "GET",
+      headers: {
+        cookie: input.sessionCookie,
+        host: input.bootstrap.host,
+      },
+    }),
+    timeoutMs: ViteRequestTimeoutMs,
+    description: "Vite main module request",
+  });
+  expect(mainModuleResponse.status).toBe(200);
+  expect(mainModuleResponse.body).toContain("virtual:mistle-vite-fixture");
+
+  const stylesheetResponse = await withTimeout({
+    operation: sendGatewayHttpRequest({
+      baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+      path: "/src/styles.css",
+      method: "GET",
+      headers: {
+        cookie: input.sessionCookie,
+        host: input.bootstrap.host,
+      },
+    }),
+    timeoutMs: ViteRequestTimeoutMs,
+    description: "Vite stylesheet request",
+  });
+  expect(stylesheetResponse.status).toBe(200);
+  expect(stylesheetResponse.body).toContain("background-image");
+
+  const assetResponses = await Promise.all([
+    withTimeout({
+      operation: sendGatewayHttpRequest({
+        baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+        path: extractLogoImportPath(mainModuleResponse.body),
+        method: "GET",
+        headers: {
+          cookie: input.sessionCookie,
+          host: input.bootstrap.host,
+        },
+      }),
+      timeoutMs: ViteRequestTimeoutMs,
+      description: "Vite logo asset request",
+    }),
+    withTimeout({
+      operation: sendGatewayHttpRequest({
+        baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+        path: extractRawTextImportPath(mainModuleResponse.body),
+        method: "GET",
+        headers: {
+          cookie: input.sessionCookie,
+          host: input.bootstrap.host,
+        },
+      }),
+      timeoutMs: ViteRequestTimeoutMs,
+      description: "Vite raw text request",
+    }),
+    withTimeout({
+      operation: sendGatewayHttpRequest({
+        baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+        path: "/src/pattern.svg",
+        method: "GET",
+        headers: {
+          cookie: input.sessionCookie,
+          host: input.bootstrap.host,
+        },
+      }),
+      timeoutMs: ViteRequestTimeoutMs,
+      description: "Vite stylesheet asset request",
+    }),
+    withTimeout({
+      operation: sendGatewayHttpRequest({
+        baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+        path: "/favicon.ico",
+        method: "GET",
+        headers: {
+          cookie: input.sessionCookie,
+          host: input.bootstrap.host,
+        },
+      }),
+      timeoutMs: ViteRequestTimeoutMs,
+      description: "Vite favicon request",
+    }),
+  ]);
+
+  const [logoResponse, rawTextResponse, patternResponse, faviconResponse] = assetResponses;
+
+  expect(logoResponse.status).toBe(200);
+  expect(logoResponse.body).toContain('export default "data:image/svg+xml,');
+
+  expect(rawTextResponse.status).toBe(200);
+  expect(rawTextResponse.body).toContain("bootstrap tunnel");
+
+  expect(patternResponse.status).toBe(200);
+  expect(patternResponse.body).toContain("<svg");
+
+  expect(faviconResponse.status).toBe(200);
+  expect(faviconResponse.body).toBe("mistle-vite-fixture-favicon");
+  expect(readHeaderValue(faviconResponse.headers, "content-type") ?? "").toBe("");
+}
+
+async function assertViteHmrUpdate(input: {
+  fixture: CodexSandboxFixture;
+  bootstrap: Awaited<ReturnType<typeof mintPortAccess>>;
+  session: AuthenticatedSystemSession;
+  sandboxInstanceId: string;
+  sessionCookie: string;
+  tunnelSocket: WebSocket;
+  readTunnelCloseDescription: () => string;
+}): Promise<void> {
+  const viteClientResponse = await withTimeout({
+    operation: sendGatewayHttpRequest({
+      baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+      path: "/@vite/client",
+      method: "GET",
+      headers: {
+        cookie: input.sessionCookie,
+        host: input.bootstrap.host,
+      },
+    }),
+    timeoutMs: ViteRequestTimeoutMs,
+    description: "Vite client request",
+  });
+  expect(viteClientResponse.status).toBe(200);
+
+  const mainModuleResponse = await withTimeout({
+    operation: sendGatewayHttpRequest({
+      baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+      path: "/src/main.ts",
+      method: "GET",
+      headers: {
+        cookie: input.sessionCookie,
+        host: input.bootstrap.host,
+      },
+    }),
+    timeoutMs: ViteRequestTimeoutMs,
+    description: "Vite main module request before HMR change",
+  });
+  expect(mainModuleResponse.status).toBe(200);
+
+  const stylesheetResponse = await withTimeout({
+    operation: sendGatewayHttpRequest({
+      baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+      path: "/src/styles.css",
+      method: "GET",
+      headers: {
+        cookie: input.sessionCookie,
+        host: input.bootstrap.host,
+      },
+    }),
+    timeoutMs: ViteRequestTimeoutMs,
+    description: "Vite stylesheet request before HMR change",
+  });
+  expect(stylesheetResponse.status).toBe(200);
+
+  const hmrSocket = new WebSocket(
+    resolvePortAccessWebSocketUrl({
+      gatewayBaseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+      path: extractHmrPath(viteClientResponse.body),
+    }),
+    "vite-hmr",
+    {
+      headers: {
+        ...readGatewayBaseUrlRequestHeaders(input.fixture.dataPlaneGatewayBaseUrl),
+        cookie: input.sessionCookie,
+        host: input.bootstrap.host,
+      },
+    },
+  );
+
+  let hmrMessagePump: HmrMessagePump | undefined;
+  try {
+    hmrMessagePump = createHmrMessagePump(hmrSocket);
+    await waitForWebSocketOpen(hmrSocket, WebSocketOpenTimeoutMs).catch(async (error: unknown) => {
+      throw new Error(
+        `Timed out opening Vite HMR websocket. TunnelClose=${input.readTunnelCloseDescription()} ViteLog=${await readViteLog(
+          {
+            fixture: input.fixture,
+            authenticatedSession: input.session,
+            sandboxInstanceId: input.sandboxInstanceId,
+          },
+        )}`,
+        { cause: error },
+      );
+    });
+    const connectedMessage = await hmrMessagePump
+      .waitForTextMessage(WebSocketMessageTimeoutMs)
+      .catch(async (error: unknown) => {
+        throw new Error(
+          `Timed out waiting for Vite HMR connected message. HmrSocketState=${String(
+            hmrSocket.readyState,
+          )} TunnelClose=${input.readTunnelCloseDescription()} ViteLog=${await readViteLog({
+            fixture: input.fixture,
+            authenticatedSession: input.session,
+            sandboxInstanceId: input.sandboxInstanceId,
+          })}`,
+          { cause: error },
+        );
+      });
+    const connectedPayload = HmrConnectedMessageSchema.parse(JSON.parse(connectedMessage));
+    expect(connectedPayload.type).toBe("connected");
+
+    const hmrMarker = `hmr-${randomUUID()}`;
+    const updateMessagePromise = waitForHmrUpdateMessage({
+      messagePump: hmrMessagePump,
+      timeoutMs: WebSocketMessageTimeoutMs,
+    });
+    await expectSuccessfulSandboxCommand({
+      fixture: input.fixture,
+      authenticatedSession: input.session,
+      sandboxInstanceId: input.sandboxInstanceId,
+      description: "updating Vite stylesheet in sandbox",
+      timeoutMs: SandboxProbeTimeoutMs,
+      command: "sh",
+      args: [
+        "-lc",
+        [
+          "set -eu",
+          `cat <<'__MISTLE_HMR_APPEND__' >> ${shellQuote(`${ViteFixtureSandboxPath}/src/styles.css`)}`,
+          "",
+          `:root { --hmr-marker-${hmrMarker}: 1; }`,
+          "__MISTLE_HMR_APPEND__",
+        ].join("\n"),
+      ],
+    });
+
+    const updateMessage = await updateMessagePromise.catch(async (error: unknown) => {
+      const updatedStylesheetResponse = await withTimeout({
+        operation: sendGatewayHttpRequest({
+          baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+          path: "/src/styles.css",
+          method: "GET",
+          headers: {
+            cookie: input.sessionCookie,
+            host: input.bootstrap.host,
+          },
+        }),
+        timeoutMs: ViteRequestTimeoutMs,
+        description: "Vite stylesheet request after HMR timeout",
+      });
+      throw new Error(
+        `Timed out waiting for Vite HMR update. UpdatedStylesheetStatus=${String(
+          updatedStylesheetResponse.status,
+        )} UpdatedStylesheetContainsMarker=${String(
+          updatedStylesheetResponse.body.includes(`--hmr-marker-${hmrMarker}`),
+        )} ViteLog=${await readViteLog({
+          fixture: input.fixture,
+          authenticatedSession: input.session,
+          sandboxInstanceId: input.sandboxInstanceId,
+        })}`,
+        { cause: error },
+      );
+    });
+    expect(updateMessage.updates.some((update) => update.path.includes("/src/styles.css"))).toBe(
+      true,
+    );
+    expect(
+      updateMessage.updates.some(
+        (update) =>
+          (update.acceptedPath?.includes("/src/styles.css") ?? false) ||
+          update.path.includes("/src/styles.css"),
+      ),
+    ).toBe(true);
+
+    const updatedStylesheetResponse = await withTimeout({
+      operation: sendGatewayHttpRequest({
+        baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+        path: "/src/styles.css",
+        method: "GET",
+        headers: {
+          cookie: input.sessionCookie,
+          host: input.bootstrap.host,
+        },
+      }),
+      timeoutMs: ViteRequestTimeoutMs,
+      description: "Vite stylesheet request after HMR change",
+    });
+    expect(updatedStylesheetResponse.status).toBe(200);
+    expect(updatedStylesheetResponse.body).toContain(`--hmr-marker-${hmrMarker}`);
+  } finally {
+    hmrMessagePump?.close();
+    await closeWebSocketIfOpen(hmrSocket);
+  }
+
+  await assertBootstrapTunnelOpen({
+    fixture: input.fixture,
+    session: input.session,
+    sandboxInstanceId: input.sandboxInstanceId,
+    tunnelSocket: input.tunnelSocket,
+    readTunnelCloseDescription: input.readTunnelCloseDescription,
+    description: "during HMR update validation",
+  });
+}
+
+async function assertBootstrapTunnelOpen(input: {
+  fixture: CodexSandboxFixture;
+  session: AuthenticatedSystemSession;
+  sandboxInstanceId: string;
+  tunnelSocket: WebSocket;
+  readTunnelCloseDescription: () => string;
+  description: string;
+}): Promise<void> {
+  if (input.tunnelSocket.readyState === WebSocket.OPEN) {
+    return;
+  }
+
+  throw new Error(
+    `Bootstrap tunnel closed ${input.description}. TunnelClose=${input.readTunnelCloseDescription()} ViteLog=${await readViteLog(
+      {
+        fixture: input.fixture,
+        authenticatedSession: input.session,
+        sandboxInstanceId: input.sandboxInstanceId,
+      },
+    )}`,
+  );
+}
 
 function shellQuote(input: string): string {
   return `'${input.replaceAll("'", `'\\''`)}'`;
@@ -913,106 +921,175 @@ async function waitForTcpListenerReadyInSandbox(input: {
 async function prepareViteSandboxFixture(input: {
   fixture: CodexSandboxFixture;
 }): Promise<PreparedViteSandbox> {
-  const session = await input.fixture.authSession();
-  const openAiConnectionId = await createOpenAiConnection({
-    fixture: input.fixture,
-    session,
-    displayName: `Port Access Vite ${randomUUID()}`,
-  });
-  const sandboxProfileId = await createSandboxProfile({
-    fixture: input.fixture,
-    session,
-    displayName: `Port Access Vite ${randomUUID()}`,
-  });
-  await updateSandboxBindings({
-    fixture: input.fixture,
-    session,
+  const session = await timeVitePhase({
     sandboxProvider: input.fixture.sandboxProvider,
-    sandboxProfileId,
-    bindings: [
-      {
-        connectionId: openAiConnectionId,
-        kind: "agent",
-        config: {},
-      },
-    ],
+    phase: "auth_session",
+    operation: async () => await input.fixture.authSession(),
   });
-
-  const sandboxInstanceId = await startSandboxInstance({
-    fixture: input.fixture,
-    session,
-    sandboxProfileId,
-  });
-  await waitForSandboxInstanceRunning({
-    fixture: input.fixture,
-    session,
-    sandboxInstanceId,
-  });
-
-  await stageFixtureDirectoryInSandbox({
-    fixture: input.fixture,
-    authenticatedSession: session,
-    sandboxInstanceId,
-    hostFixturePath: ViteFixtureHostPath,
-    sandboxFixturePath: ViteFixtureSandboxPath,
-  });
-
-  await expectSuccessfulSandboxCommand({
-    fixture: input.fixture,
-    authenticatedSession: session,
-    sandboxInstanceId,
-    description: "installing Vite fixture dependencies in sandbox",
-    timeoutMs: ViteInstallTimeoutMs,
-    command: "sh",
-    args: [
-      "-lc",
-      wrapShellScriptWithHeartbeat({
-        intervalSeconds: 5,
-        script: [
-          `cd ${shellQuote(ViteFixtureSandboxPath)}`,
-          `${miseExecCommand({
-            tools: [NodeToolVersion, PnpmToolVersion],
-            command: "pnpm",
-          })} install --frozen-lockfile --ignore-workspace`,
-        ].join("\n"),
+  const openAiConnectionId = await timeVitePhase({
+    sandboxProvider: input.fixture.sandboxProvider,
+    phase: "create_openai_connection",
+    operation: async () =>
+      await createOpenAiConnection({
+        fixture: input.fixture,
+        session,
+        displayName: `Port Access Vite ${randomUUID()}`,
       }),
-    ],
+  });
+  const sandboxProfileId = await timeVitePhase({
+    sandboxProvider: input.fixture.sandboxProvider,
+    phase: "create_sandbox_profile",
+    operation: async () =>
+      await createSandboxProfile({
+        fixture: input.fixture,
+        session,
+        displayName: `Port Access Vite ${randomUUID()}`,
+      }),
+  });
+  await timeVitePhase({
+    sandboxProvider: input.fixture.sandboxProvider,
+    phase: "update_sandbox_bindings",
+    operation: async () =>
+      await updateSandboxBindings({
+        fixture: input.fixture,
+        session,
+        sandboxProvider: input.fixture.sandboxProvider,
+        sandboxProfileId,
+        bindings: [
+          {
+            connectionId: openAiConnectionId,
+            kind: "agent",
+            config: {},
+          },
+        ],
+      }),
   });
 
-  await expectSuccessfulSandboxCommand({
-    fixture: input.fixture,
-    authenticatedSession: session,
-    sandboxInstanceId,
-    description: "starting Vite dev server inside sandbox",
-    timeoutMs: 60_000,
-    command: "sh",
-    args: [
-      "-lc",
-      [
-        "set -eu",
-        `mkdir -p ${shellQuote("/tmp/mistle-port-access-vite-fixture")}`,
-        `cd ${shellQuote(ViteFixtureSandboxPath)}`,
-        `nohup ${miseExecCommand({
-          tools: [NodeToolVersion, PnpmToolVersion],
-          command: "pnpm",
-        })} run dev > ${shellQuote(ViteLogPath)} 2>&1 &`,
-        "printf 'started\\n'",
-      ].join("\n"),
-    ],
+  const sandboxInstanceId = await timeVitePhase({
+    sandboxProvider: input.fixture.sandboxProvider,
+    phase: "start_sandbox_instance",
+    operation: async () =>
+      await startSandboxInstance({
+        fixture: input.fixture,
+        session,
+        sandboxProfileId,
+      }),
+  });
+  await timeVitePhase({
+    sandboxProvider: input.fixture.sandboxProvider,
+    phase: "wait_sandbox_running",
+    operation: async () =>
+      await waitForSandboxInstanceRunning({
+        fixture: input.fixture,
+        session,
+        sandboxInstanceId,
+      }),
   });
 
-  await waitForTcpListenerReadyInSandbox({
-    fixture: input.fixture,
-    authenticatedSession: session,
-    sandboxInstanceId,
-    port: VitePort,
-    description: "Vite dev server to become reachable inside sandbox",
+  await timeVitePhase({
+    sandboxProvider: input.fixture.sandboxProvider,
+    phase: "stage_fixture",
+    operation: async () =>
+      await stageFixtureDirectoryInSandbox({
+        fixture: input.fixture,
+        authenticatedSession: session,
+        sandboxInstanceId,
+        hostFixturePath: ViteFixtureHostPath,
+        sandboxFixturePath: ViteFixtureSandboxPath,
+      }),
+  });
+
+  await timeVitePhase({
+    sandboxProvider: input.fixture.sandboxProvider,
+    phase: "install_vite_dependencies",
+    operation: async () =>
+      await expectSuccessfulSandboxCommand({
+        fixture: input.fixture,
+        authenticatedSession: session,
+        sandboxInstanceId,
+        description: "installing Vite fixture dependencies in sandbox",
+        timeoutMs: ViteInstallTimeoutMs,
+        command: "sh",
+        args: [
+          "-lc",
+          wrapShellScriptWithHeartbeat({
+            intervalSeconds: 5,
+            script: [
+              `cd ${shellQuote(ViteFixtureSandboxPath)}`,
+              `${miseExecCommand({
+                tools: [NodeToolVersion, PnpmToolVersion],
+                command: "pnpm",
+              })} install --frozen-lockfile --ignore-workspace`,
+            ].join("\n"),
+          }),
+        ],
+      }),
+  });
+
+  await timeVitePhase({
+    sandboxProvider: input.fixture.sandboxProvider,
+    phase: "start_vite_dev_server",
+    operation: async () =>
+      await expectSuccessfulSandboxCommand({
+        fixture: input.fixture,
+        authenticatedSession: session,
+        sandboxInstanceId,
+        description: "starting Vite dev server inside sandbox",
+        timeoutMs: 60_000,
+        command: "sh",
+        args: [
+          "-lc",
+          [
+            "set -eu",
+            `mkdir -p ${shellQuote("/tmp/mistle-port-access-vite-fixture")}`,
+            `cd ${shellQuote(ViteFixtureSandboxPath)}`,
+            `nohup ${miseExecCommand({
+              tools: [NodeToolVersion, PnpmToolVersion],
+              command: "pnpm",
+            })} run dev > ${shellQuote(ViteLogPath)} 2>&1 &`,
+            "printf 'started\\n'",
+          ].join("\n"),
+        ],
+      }),
+  });
+
+  await timeVitePhase({
+    sandboxProvider: input.fixture.sandboxProvider,
+    phase: "wait_vite_listener",
+    operation: async () =>
+      await waitForTcpListenerReadyInSandbox({
+        fixture: input.fixture,
+        authenticatedSession: session,
+        sandboxInstanceId,
+        port: VitePort,
+        description: "Vite dev server to become reachable inside sandbox",
+      }),
   });
 
   return {
     sandboxInstanceId,
     session,
   };
+}
+
+async function timeVitePhase<Result>(input: {
+  sandboxProvider: string;
+  phase: string;
+  operation: () => Promise<Result>;
+}): Promise<Result> {
+  const startedAt = Date.now();
+  try {
+    return await input.operation();
+  } finally {
+    console.log(
+      JSON.stringify({
+        event: "system_port_access_vite.phase_timing",
+        phase: input.phase,
+        sandboxProvider: input.sandboxProvider,
+        durationMs: Date.now() - startedAt,
+      }),
+    );
+  }
 }
 
 async function openVitePortAccessSession(input: {
