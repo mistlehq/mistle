@@ -34,8 +34,8 @@ const it = createSandboxSystemTest({
 });
 
 const SYSTEM_TEST_TIMEOUT_MS = 12 * 60_000;
-const PROCESS_LIFETIME_SECONDS = 45;
 const PTY_COMMAND_TIMEOUT_MS = 60_000;
+const DETACHED_PROCESS_EXIT_TIMEOUT_MS = 10_000;
 const RUNTIME_STATE_TIMEOUT_MS = 90_000;
 const OUTPUT_POLL_INTERVAL_MS = 100;
 const TERMINAL_CONTROL_SEQUENCE_PATTERN = new RegExp(
@@ -81,10 +81,14 @@ describe("runtime system sandbox PTY cgroup keepalive", () => {
         const marker = randomUUID();
         const markerDirectory = "/tmp/mistle-system-tests/pty-cgroup-keepalive";
         const pidFilePath = `${markerDirectory}/${marker}.pid`;
+        const detachedProcessScript = [
+          `echo $$ > ${shellQuote(pidFilePath)}`,
+          "exec sleep 3600",
+        ].join("; ");
         const launchCommand = [
           `mkdir -p ${shellQuote(markerDirectory)}`,
           `rm -f ${shellQuote(pidFilePath)}`,
-          `nohup sh -c 'echo $$ > ${pidFilePath}; sleep ${String(PROCESS_LIFETIME_SECONDS)}' >/dev/null 2>&1 < /dev/null & while [ ! -s ${shellQuote(pidFilePath)} ]; do sleep 0.1; done`,
+          `nohup sh -c ${shellQuote(detachedProcessScript)} >/dev/null 2>&1 < /dev/null & while [ ! -s ${shellQuote(pidFilePath)} ]; do sleep 0.1; done`,
           `printf 'DETACHED_PID:%s\\n' "$(cat ${shellQuote(pidFilePath)})"`,
           "cat",
         ].join("; ");
@@ -230,7 +234,7 @@ describe("runtime system sandbox PTY cgroup keepalive", () => {
               authenticatedSession: session,
               sandboxInstanceId: runningSandboxInstanceId,
               command: "sh",
-              args: ["-c", `kill ${runningDetachedPid}`],
+              args: ["-c", `kill -TERM ${runningDetachedPid}`],
             }),
         });
         expect(terminateResult.exitCode).toBe(0);
@@ -241,24 +245,11 @@ describe("runtime system sandbox PTY cgroup keepalive", () => {
           phase: "wait_detached_process_exit",
           attributes: timingAttributes,
           operation: async () =>
-            await waitForCondition({
-              description: `detached process ${runningDetachedPid} to exit`,
-              timeoutMs: RUNTIME_STATE_TIMEOUT_MS,
-              pollIntervalMs: 500,
-              evaluate: async () => {
-                const probe = await runSandboxExecCommandInSandbox({
-                  fixture,
-                  authenticatedSession: session,
-                  sandboxInstanceId: runningSandboxInstanceId,
-                  command: "sh",
-                  args: [
-                    "-c",
-                    `kill -0 ${runningDetachedPid} >/dev/null 2>&1 && printf '%s\\n' alive || printf '%s\\n' dead`,
-                  ],
-                });
-
-                return probe.exitCode === 0 && probe.stdout.trim() === "dead" ? probe : null;
-              },
+            await waitForDetachedProcessExit({
+              fixture,
+              authenticatedSession: session,
+              sandboxInstanceId: runningSandboxInstanceId,
+              detachedPid: runningDetachedPid,
             }),
         });
 
@@ -438,6 +429,80 @@ async function captureDetachedProcessCgroupDiagnostics(input: {
   };
 }
 
+async function waitForDetachedProcessExit(input: {
+  fixture: CodexSandboxFixture;
+  authenticatedSession: CodexSandboxAuthenticatedSession;
+  sandboxInstanceId: string;
+  detachedPid: string;
+}): Promise<void> {
+  try {
+    await waitForCondition({
+      description: `detached process ${input.detachedPid} to exit`,
+      timeoutMs: DETACHED_PROCESS_EXIT_TIMEOUT_MS,
+      pollIntervalMs: 250,
+      evaluate: async () => {
+        const probe = await runSandboxExecCommandInSandbox({
+          fixture: input.fixture,
+          authenticatedSession: input.authenticatedSession,
+          sandboxInstanceId: input.sandboxInstanceId,
+          command: "sh",
+          args: [
+            "-c",
+            `kill -0 ${input.detachedPid} >/dev/null 2>&1 && printf '%s\\n' alive || printf '%s\\n' dead`,
+          ],
+        });
+
+        return probe.exitCode === 0 && probe.stdout.trim() === "dead" ? probe : null;
+      },
+    });
+  } catch (error) {
+    const diagnostics = await captureDetachedProcessExitDiagnostics(input).catch(
+      (diagnosticError) =>
+        `diagnosticError=${
+          diagnosticError instanceof Error ? diagnosticError.message : String(diagnosticError)
+        }`,
+    );
+    throw new Error(
+      `Detached process ${input.detachedPid} did not exit within ${String(
+        DETACHED_PROCESS_EXIT_TIMEOUT_MS,
+      )}ms after TERM. Cause: ${
+        error instanceof Error ? error.message : String(error)
+      }. Diagnostics: ${diagnostics}`,
+    );
+  }
+}
+
+async function captureDetachedProcessExitDiagnostics(input: {
+  fixture: CodexSandboxFixture;
+  authenticatedSession: CodexSandboxAuthenticatedSession;
+  sandboxInstanceId: string;
+  detachedPid: string;
+}): Promise<string> {
+  const result = await runSandboxExecCommandInSandbox({
+    fixture: input.fixture,
+    authenticatedSession: input.authenticatedSession,
+    sandboxInstanceId: input.sandboxInstanceId,
+    command: "sh",
+    args: [
+      "-c",
+      [
+        `printf 'PS\\n'`,
+        `ps -o pid,ppid,pgid,sid,stat,comm,args -p ${input.detachedPid} 2>&1 || true`,
+        `printf 'PROC_CGROUP\\n'`,
+        `cat /proc/${input.detachedPid}/cgroup 2>&1 || true`,
+        `printf 'CHILDREN\\n'`,
+        `pgrep -P ${input.detachedPid} 2>&1 || true`,
+      ].join("; "),
+    ],
+  });
+
+  return JSON.stringify({
+    exitCode: result.exitCode,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  });
+}
+
 async function collectFailureDiagnostics(input: {
   fixture: CodexSandboxFixture;
   authenticatedSession: CodexSandboxAuthenticatedSession | undefined;
@@ -509,6 +574,13 @@ async function killDetachedProcessIfPresent(input: {
     authenticatedSession: input.authenticatedSession,
     sandboxInstanceId: input.sandboxInstanceId,
     command: "sh",
-    args: ["-c", `kill ${input.detachedPid} >/dev/null 2>&1 || true`],
+    args: [
+      "-c",
+      [
+        `kill -TERM ${input.detachedPid} >/dev/null 2>&1 || true`,
+        "sleep 0.2",
+        `kill -KILL ${input.detachedPid} >/dev/null 2>&1 || true`,
+      ].join("; "),
+    ],
   }).catch(() => undefined);
 }
