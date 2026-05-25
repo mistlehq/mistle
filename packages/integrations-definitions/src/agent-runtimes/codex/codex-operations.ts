@@ -60,8 +60,14 @@ const ThreadListResponseSchema = z.looseObject({
       name: z.string().nullable().optional(),
       preview: z.string().optional(),
       cwd: z.string().min(1),
-      updatedAt: z.number().optional(),
-      createdAt: z.number().optional(),
+      updatedAt: z
+        .number()
+        .transform((epochSeconds) => epochSeconds * 1000)
+        .optional(),
+      createdAt: z
+        .number()
+        .transform((epochSeconds) => epochSeconds * 1000)
+        .optional(),
     }),
   ),
   nextCursor: z.string().nullable().optional(),
