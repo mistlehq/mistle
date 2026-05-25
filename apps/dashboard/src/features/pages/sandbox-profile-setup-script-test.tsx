@@ -340,7 +340,11 @@ export function SandboxProfileSetupScriptTestButton(
         </Button>
         {input.setupAssistant === undefined ? null : input.setupAssistant.disabled ? (
           <Tooltip>
-            <TooltipTrigger render={<span className="inline-flex" />}>
+            <TooltipTrigger
+              render={
+                <span className="inline-flex [&>[data-slot=button]]:rounded-l-none [&>[data-slot=button]]:border-l-0" />
+              }
+            >
               {setupAssistantButton}
             </TooltipTrigger>
             <TooltipContent className="max-w-64 text-left" side="top">
