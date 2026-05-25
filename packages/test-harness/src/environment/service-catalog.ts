@@ -45,6 +45,7 @@ import {
   readPreparedTestHarnessRuntime,
 } from "../system/prepared-runtime.js";
 import { resolveHostPathFromContainerPath } from "../system/provision-system-integration-targets.js";
+import { resolveSystemTestSandboxBaseImageSource } from "../system/system-test-sandbox-base-image-source.js";
 import { createServiceRegistry } from "./registry.js";
 import { ensureRunnerPoolSession } from "./runner-pool-session.js";
 import { acquireRunnerServicePoolLease } from "./runner-service-pool.js";
@@ -421,11 +422,19 @@ async function acquireSandboxBaseImageRegistry(): Promise<
   TestServiceRuntime & { release: () => Promise<void> }
 > {
   const session = ensureRunnerPoolSession(process.env);
+  const source = resolveSystemTestSandboxBaseImageSource({
+    env: process.env,
+    localImageRef: DefaultSandboxBaseImageBuild.localReference,
+  });
   return acquireRunnerServicePoolLease({
     runId: session.runId,
     coordinatorDir: session.coordinatorDir,
-    key: `sandbox-base-image-registry:${DefaultSandboxBaseImageBuild.localReference}:${DefaultSandboxBaseImageBuild.repositoryPath}`,
-    start: startSandboxBaseImageRegistry,
+    key: `sandbox-base-image-registry:${source.kind}:${source.imageRef}:${DefaultSandboxBaseImageBuild.repositoryPath}`,
+    start: async () =>
+      startSandboxBaseImageRegistry({
+        sourceImageRef: source.imageRef,
+        pullSourceImage: source.kind === "prepublished",
+      }),
     healthCheck: async (service) => {
       const httpEndpoint = service.endpoints.http;
       if (httpEndpoint === undefined) {
@@ -442,9 +451,10 @@ async function acquireSandboxBaseImageRegistry(): Promise<
   });
 }
 
-async function startSandboxBaseImageRegistry(): Promise<
-  TestServiceRuntime & { stop: () => Promise<void> }
-> {
+async function startSandboxBaseImageRegistry(input: {
+  sourceImageRef: string;
+  pullSourceImage: boolean;
+}): Promise<TestServiceRuntime & { stop: () => Promise<void> }> {
   const registryContainer = await new GenericContainer(RegistryImageReference)
     .withEnvironment({
       REGISTRY_STORAGE_DELETE_ENABLED: "true",
@@ -455,11 +465,10 @@ async function startSandboxBaseImageRegistry(): Promise<
     registryContainer.getMappedPort(RegistryInternalPort),
   )}`;
   const sandboxBaseImageRef = `${registryAuthority}/${DefaultSandboxBaseImageBuild.repositoryPath}:dev`;
-  await execFileAsync("docker", [
-    "tag",
-    DefaultSandboxBaseImageBuild.localReference,
-    sandboxBaseImageRef,
-  ]);
+  if (input.pullSourceImage) {
+    await execFileAsync("docker", ["pull", input.sourceImageRef]);
+  }
+  await execFileAsync("docker", ["tag", input.sourceImageRef, sandboxBaseImageRef]);
   await execFileAsync("docker", ["push", sandboxBaseImageRef]);
 
   return {

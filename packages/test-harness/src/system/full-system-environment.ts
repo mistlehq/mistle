@@ -36,6 +36,7 @@ import {
   createDataPlaneWorkflowMigrationCommandInput,
   resolveHostPathFromContainerPath,
 } from "./provision-system-integration-targets.js";
+import { resolveSystemTestSandboxBaseImageSource } from "./system-test-sandbox-base-image-source.js";
 
 const OMITTED_POSTGRES_OPTIONS = [
   "network",
@@ -407,15 +408,25 @@ async function removeDockerSandboxContainersOnNetwork(input: {
 async function publishSandboxBaseImage(input: {
   buildContextHostPath: string;
   registryAuthority: string;
-  localReference: string;
+  sourceImageRef: string;
+  pullSourceImage: boolean;
   repositoryPath: string;
 }): Promise<string> {
   const registryImageReference = `${input.registryAuthority}/${input.repositoryPath}:dev`;
 
+  if (input.pullSourceImage) {
+    await withStepTiming("pull sandbox base image", async () => {
+      await runCommand({
+        command: "docker",
+        args: ["pull", input.sourceImageRef],
+        cwd: input.buildContextHostPath,
+      });
+    });
+  }
   await withStepTiming("tag sandbox base image", async () => {
     await runCommand({
       command: "docker",
-      args: ["tag", input.localReference, registryImageReference],
+      args: ["tag", input.sourceImageRef, registryImageReference],
       cwd: input.buildContextHostPath,
     });
   });
@@ -500,13 +511,18 @@ export async function startFullSystemEnvironment(
       });
     });
     const registryAuthority = `${registryContainer.getHost()}:${String(registryContainer.getMappedPort(REGISTRY_INTERNAL_PORT))}`;
+    const sandboxBaseImageSource = resolveSystemTestSandboxBaseImageSource({
+      env: process.env,
+      localImageRef: preparedRuntime.sandboxBaseImage.localReference,
+    });
     const sandboxBaseImageReference = await withStepTiming(
       "publish sandbox base image",
       async () => {
         return publishSandboxBaseImage({
           buildContextHostPath: input.buildContextHostPath,
           registryAuthority,
-          localReference: preparedRuntime.sandboxBaseImage.localReference,
+          sourceImageRef: sandboxBaseImageSource.imageRef,
+          pullSourceImage: sandboxBaseImageSource.kind === "prepublished",
           repositoryPath: preparedRuntime.sandboxBaseImage.repositoryPath,
         });
       },

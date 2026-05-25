@@ -9,6 +9,15 @@ import { promisify } from "node:util";
 import { systemClock, systemSleeper } from "@mistle/time";
 
 import { MISTLE_TEST_COORDINATOR_DIR_ENV } from "../environment/runner-pool-session.js";
+import {
+  MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REF_ENV,
+  readPrepublishedSystemTestSandboxBaseImageRef,
+} from "./system-test-sandbox-base-image-source.js";
+export {
+  MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REF_ENV,
+  resolveSystemTestSandboxBaseImageSource,
+  type SystemTestSandboxBaseImageSource,
+} from "./system-test-sandbox-base-image-source.js";
 
 const execFileAsync = promisify(execFile);
 const DefaultBuildContextHostPath = fileURLToPath(new URL("../../../..", import.meta.url));
@@ -19,9 +28,6 @@ const SandboxBaseImageTarget = "sandbox-base-system-tests";
 const SandboxBaseImageHashInputs = ["packages/sandboxd"];
 const SandboxBaseImageLockPollIntervalMs = 1_000;
 const SandboxBaseImageLockTimeoutMs = 30 * 60_000;
-
-export const MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REF_ENV =
-  "MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REF";
 
 let systemTestSandboxBaseImageRefPromise: Promise<string> | undefined;
 
@@ -72,15 +78,6 @@ export async function resolveSystemTestSandboxBaseImageRef(): Promise<string> {
 
     return imageRef;
   });
-}
-
-function readPrepublishedSystemTestSandboxBaseImageRef(): string | undefined {
-  const value = process.env[MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REF_ENV];
-  if (value === undefined || value.trim().length === 0) {
-    return undefined;
-  }
-
-  return value.trim();
 }
 
 async function verifySystemTestSandboxBaseImageExists(imageRef: string): Promise<void> {
