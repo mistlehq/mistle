@@ -263,9 +263,11 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
       },
       control_plane_worker: {
         workflow_concurrency: 1,
+        workflow_database_pool_max: 1,
       },
       data_plane_worker: {
         workflow_concurrency: 1,
+        workflow_database_pool_max: 1,
       },
     },
     workflow: {

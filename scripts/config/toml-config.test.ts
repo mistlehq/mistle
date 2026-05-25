@@ -63,6 +63,7 @@ describe("toml config generation", () => {
     });
 
     expect(content).toContain('backend = "docker_volume"');
+    expect(content).toContain("workflow_database_pool_max = 1");
     loadEveryAppFromContent(content);
   });
 
