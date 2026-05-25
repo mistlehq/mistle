@@ -2,6 +2,16 @@ import type { ConnectionOpts, SandboxConnectOpts, SandboxOpts } from "e2b";
 
 export const E2BHobbySandboxTimeoutMs = 60 * 60 * 1000;
 
+export function createE2BRequestOptions(
+  connectionOptions: ConnectionOpts,
+  requestTimeoutMs: number | undefined,
+): ConnectionOpts {
+  return {
+    ...connectionOptions,
+    ...(requestTimeoutMs === undefined ? {} : { requestTimeoutMs }),
+  };
+}
+
 export function createE2BSandboxCreateOptions(input: {
   connectionOptions: ConnectionOpts;
   templateAlias: string;

@@ -24,6 +24,7 @@ import {
   mapE2BClientError,
 } from "./client-errors.js";
 import {
+  createE2BRequestOptions,
   createE2BSandboxConnectOptions,
   createE2BSandboxCreateOptions,
 } from "./sandbox-options.js";
@@ -465,7 +466,9 @@ export class E2BApiClient implements E2BClient {
     }
   }
 
-  async prepareImage(request: { imageRef: string }): Promise<{ imageRef: string }> {
+  async prepareImage(request: { imageRef: string }): Promise<{
+    imageRef: string;
+  }> {
     return {
       imageRef: await this.#resolveStartTemplateRef(request.imageRef),
     };
@@ -523,11 +526,18 @@ export class E2BApiClient implements E2BClient {
     try {
       const sandbox = await runE2BOperationWithTransientRetries({
         operation: E2BClientOperationIds.CONNECT_SANDBOX,
-        run: async () => Sandbox.connect(parsedRequest.sandboxId, this.#connectionOptions),
+        run: async () =>
+          Sandbox.connect(
+            parsedRequest.sandboxId,
+            createE2BRequestOptions(this.#connectionOptions, parsedRequest.requestTimeoutMs),
+          ),
       });
       const snapshot = await runE2BOperationWithTransientRetries({
         operation: E2BClientOperationIds.CREATE_SNAPSHOT,
-        run: async () => sandbox.createSnapshot(),
+        run: async () =>
+          sandbox.createSnapshot(
+            createE2BRequestOptions(this.#connectionOptions, parsedRequest.requestTimeoutMs),
+          ),
       });
 
       return {

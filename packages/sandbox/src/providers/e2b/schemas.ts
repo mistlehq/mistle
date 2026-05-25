@@ -57,6 +57,7 @@ export const E2BCaptureSandboxSnapshotRequestSchema = z
     sandboxId: z.string().trim().min(1, {
       message: "E2B request field `sandboxId` is required.",
     }),
+    requestTimeoutMs: z.number().int().positive().optional(),
   })
   .strict();
 export type E2BCaptureSandboxSnapshotRequest = z.output<

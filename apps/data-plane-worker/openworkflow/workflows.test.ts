@@ -9,6 +9,7 @@ import {
 } from "@mistle/workflow-registry/data-plane";
 import { describe, expect, it } from "vitest";
 
+import { SnapshotProviderRequestTimeoutMs } from "./materialize-sandbox-profile-version-snapshot/workflow.js";
 import { DataPlaneWorkerWorkflows } from "./workflows.js";
 
 const workflows = new Map(
@@ -26,6 +27,10 @@ describe("data-plane worker openworkflow entrypoints", () => {
     expect(
       readWorkflowSpec(MaterializeSandboxProfileVersionSnapshotWorkflowSpec.name),
     ).toMatchObject(MaterializeSandboxProfileVersionSnapshotWorkflowSpec);
+  });
+
+  it("allows snapshot provider requests to run for five minutes", () => {
+    expect(SnapshotProviderRequestTimeoutMs).toBe(5 * 60 * 1000);
   });
 
   it("preserves the resume sandbox instance workflow identity", () => {

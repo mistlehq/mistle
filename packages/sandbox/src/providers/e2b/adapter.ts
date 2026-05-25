@@ -167,6 +167,9 @@ export class E2BSandboxAdapter implements SandboxAdapter {
     try {
       const response = await this.#client.captureSandboxSnapshot({
         sandboxId: request.id,
+        ...(request.providerRequestTimeoutMs === undefined
+          ? {}
+          : { requestTimeoutMs: request.providerRequestTimeoutMs }),
       });
 
       return createSandboxImageHandle(response.snapshotId);

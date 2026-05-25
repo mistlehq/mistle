@@ -359,6 +359,7 @@ export interface SandboxDestroyRequest {
 
 export interface SandboxCaptureSnapshotRequest {
   readonly id: string;
+  readonly providerRequestTimeoutMs?: number;
 }
 
 export interface SandboxAdapter {
