@@ -280,6 +280,7 @@ export const ConfigSchema = z
           .strict(),
         control_plane_api: ServiceEndpointSchema.extend({
           public_url: UrlSchema,
+          workflow_database_pool_max: z.number().int().min(1),
           auth: ControlPlaneApiAuthSchema,
           mcp: z
             .object({
@@ -297,7 +298,9 @@ export const ConfigSchema = z
             })
             .strict(),
         }).strict(),
-        data_plane_api: ServiceEndpointSchema,
+        data_plane_api: ServiceEndpointSchema.extend({
+          workflow_database_pool_max: z.number().int().min(1),
+        }).strict(),
         data_plane_gateway: ServiceEndpointSchema.extend({
           sandbox_ws_public_url: UrlSchema,
           sandbox_ws_internal_url: UrlSchema,

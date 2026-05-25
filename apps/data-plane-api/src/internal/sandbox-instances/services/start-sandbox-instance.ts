@@ -18,9 +18,8 @@ import {
 import { typeid } from "typeid-js";
 import { z } from "zod";
 
-import { DataPlaneOpenWorkflowSchema } from "../../../openworkflow/index.js";
 import type { AppRuntimeResources } from "../../../resources.js";
-import type { DataPlaneApiConfig, DataPlaneApiSandboxStorageBackend } from "../../../types.js";
+import type { DataPlaneApiSandboxStorageBackend } from "../../../types.js";
 import type {
   StartSandboxInstanceAcceptedResponse,
   StartSandboxInstanceInput,
@@ -36,8 +35,6 @@ type StartSandboxInstanceContext = {
   db: DataPlaneDatabase;
   tables: Pick<DataPlaneTables, "sandboxInstances">;
   openWorkflow: AppRuntimeResources["openWorkflow"];
-  workflowDbPool: AppRuntimeResources["workflowDbPool"];
-  workflowNamespaceId: DataPlaneApiConfig["workflow"]["namespaceId"];
   sandboxStorageBackend: DataPlaneApiSandboxStorageBackend;
 };
 
@@ -118,29 +115,11 @@ export function resolveSandboxInstancePersistenceMode(input: {
   );
 }
 
-async function resolveWorkflowSandboxInstanceId(input: {
-  workflowDbPool: AppRuntimeResources["workflowDbPool"];
-  workflowNamespaceId: string;
+export function resolveWorkflowSandboxInstanceId(input: {
   workflowRunId: string;
-}): Promise<string> {
-  const result = await input.workflowDbPool.query(
-    `
-      select input
-      from ${DataPlaneOpenWorkflowSchema}.workflow_runs
-      where namespace_id = $1 and id = $2
-      limit 1
-    `,
-    [input.workflowNamespaceId, input.workflowRunId],
-  );
-
-  const row = result.rows[0];
-  if (row === undefined) {
-    throw new Error(
-      `Workflow run '${input.workflowRunId}' was not found in the workflow database.`,
-    );
-  }
-
-  const parsedInput = WorkflowRunInputSchema.safeParse(row.input);
+  workflowRunInput: unknown;
+}): string {
+  const parsedInput = WorkflowRunInputSchema.safeParse(input.workflowRunInput);
   if (!parsedInput.success) {
     throw new Error(`Workflow run '${input.workflowRunId}' has invalid stored input.`);
   }
@@ -193,10 +172,9 @@ export async function startSandboxInstance(
     },
   );
 
-  const sandboxInstanceId = await resolveWorkflowSandboxInstanceId({
-    workflowDbPool: ctx.workflowDbPool,
-    workflowNamespaceId: ctx.workflowNamespaceId,
+  const sandboxInstanceId = resolveWorkflowSandboxInstanceId({
     workflowRunId: workflowRunHandle.workflowRun.id,
+    workflowRunInput: workflowRunHandle.workflowRun.input,
   });
 
   await ctx.db

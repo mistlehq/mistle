@@ -236,6 +236,7 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
       databaseUrl: config.postgres.control_plane.direct_url,
       migrationUrl: config.postgres.control_plane.direct_url,
       namespaceId: config.workflow.control_plane.namespace_id,
+      databasePoolMax: config.services.control_plane_api.workflow_database_pool_max,
     },
     dataPlaneApi: {
       baseUrl: config.services.data_plane_api.internal_url,
@@ -368,6 +369,7 @@ export function selectDataPlaneApiConfig(config: Config): DataPlaneApiConfig {
       databaseUrl: config.postgres.data_plane.direct_url,
       migrationUrl: config.postgres.data_plane.direct_url,
       namespaceId: config.workflow.data_plane.namespace_id,
+      databasePoolMax: config.services.data_plane_api.workflow_database_pool_max,
     },
     runtimeState: {
       gatewayBaseUrl: config.services.data_plane_gateway.internal_url,

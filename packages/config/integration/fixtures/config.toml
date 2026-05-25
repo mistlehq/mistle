@@ -24,6 +24,7 @@ host = "0.0.0.0"
 port = 5100
 public_url = "https://mistle.example.test"
 internal_url = "http://127.0.0.1:5100"
+workflow_database_pool_max = 3
 
 [services.control_plane_api.auth]
 secret = "test-secret"
@@ -54,6 +55,7 @@ active_master_encryption_key_version = 2
 host = "0.0.0.0"
 port = 5300
 internal_url = "http://127.0.0.1:5300"
+workflow_database_pool_max = 3
 
 [services.data_plane_gateway]
 host = "0.0.0.0"

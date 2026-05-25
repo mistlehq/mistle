@@ -1,7 +1,35 @@
 import { SandboxInstancePersistenceModes, SandboxInstancePurposes } from "@mistle/db/data-plane";
 import { describe, expect, it } from "vitest";
 
-import { resolveSandboxInstancePersistenceMode } from "./start-sandbox-instance.js";
+import {
+  resolveSandboxInstancePersistenceMode,
+  resolveWorkflowSandboxInstanceId,
+} from "./start-sandbox-instance.js";
+
+describe("resolveWorkflowSandboxInstanceId", () => {
+  it("returns the sandbox instance id from the workflow run input", () => {
+    expect(
+      resolveWorkflowSandboxInstanceId({
+        workflowRunId: "workflow_run_test",
+        workflowRunInput: {
+          sandboxInstanceId: "sbi_test",
+          organizationId: "org_test",
+        },
+      }),
+    ).toBe("sbi_test");
+  });
+
+  it("throws when the workflow run input does not include a sandbox instance id", () => {
+    expect(() =>
+      resolveWorkflowSandboxInstanceId({
+        workflowRunId: "workflow_run_test",
+        workflowRunInput: {
+          organizationId: "org_test",
+        },
+      }),
+    ).toThrow("Workflow run 'workflow_run_test' has invalid stored input.");
+  });
+});
 
 describe("resolveSandboxInstancePersistenceMode", () => {
   it("returns ephemeral when the effective persistence mode is ephemeral", () => {

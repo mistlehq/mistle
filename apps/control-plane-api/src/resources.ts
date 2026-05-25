@@ -89,6 +89,7 @@ export async function createAppResources(
       url: config.workflow.databaseUrl,
       namespaceId: config.workflow.namespaceId,
       runMigrations: false,
+      databasePoolMax: config.workflow.databasePoolMax,
     });
   } catch (error) {
     objectStore.destroy();
@@ -213,6 +214,7 @@ async function createTestControlPlaneWorkflow(input: {
     url: input.config.workflow.databaseUrl,
     namespaceId: createControlPlaneWorkflowNamespaceId(input.testEnvironmentId),
     runMigrations: false,
+    databasePoolMax: input.config.workflow.databasePoolMax,
   });
 
   return {

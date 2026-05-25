@@ -219,6 +219,7 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
         port: 5100,
         public_url: controlPlaneApiUrl,
         internal_url: controlPlaneApiUrl,
+        workflow_database_pool_max: 1,
         auth: {
           secret: createSecret(),
           trusted_origins: [
@@ -253,6 +254,7 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
         host: "127.0.0.1",
         port: 5200,
         internal_url: dataPlaneApiUrl,
+        workflow_database_pool_max: 1,
       },
       data_plane_gateway: {
         host: "127.0.0.1",
@@ -555,6 +557,23 @@ export function applyTomlConfigEnvOverrides(input: {
     ["postgres", "data_plane", "direct_url"],
     readOptionalEnv(input.environment, "MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL") ??
       dataPlaneApiDatabaseUrl,
+  );
+
+  configRoot = upsertOptionalValueAtPath(
+    configRoot,
+    ["services", "control_plane_api", "workflow_database_pool_max"],
+    readOptionalIntegerEnv(
+      input.environment,
+      "MISTLE_SERVICES_CONTROL_PLANE_API_WORKFLOW_DATABASE_POOL_MAX",
+    ),
+  );
+  configRoot = upsertOptionalValueAtPath(
+    configRoot,
+    ["services", "data_plane_api", "workflow_database_pool_max"],
+    readOptionalIntegerEnv(
+      input.environment,
+      "MISTLE_SERVICES_DATA_PLANE_API_WORKFLOW_DATABASE_POOL_MAX",
+    ),
   );
 
   return configRoot;

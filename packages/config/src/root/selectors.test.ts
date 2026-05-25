@@ -41,6 +41,7 @@ function createRootConfig(input: {
         port: 8080,
         public_url: "https://api.example.com",
         internal_url: "http://control-plane-api:8080",
+        workflow_database_pool_max: 2,
         auth: {
           secret: "auth-secret",
           trusted_origins: ["https://app.example.com"],
@@ -72,6 +73,7 @@ function createRootConfig(input: {
         host: "0.0.0.0",
         port: 8082,
         internal_url: "http://data-plane-api:8082",
+        workflow_database_pool_max: 3,
       },
       data_plane_gateway: {
         host: "0.0.0.0",

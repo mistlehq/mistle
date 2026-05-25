@@ -126,6 +126,7 @@ function config(input: {
       databaseUrl: directUrl,
       migrationUrl: directUrl,
       namespaceId: infraValue(input.postgres, PostgresValues.DATA_PLANE_WORKFLOW_NAMESPACE_ID),
+      databasePoolMax: 2,
     },
     runtimeState: {
       gatewayBaseUrl: input.gatewayBaseUrl,

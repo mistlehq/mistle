@@ -32,6 +32,7 @@ function buildControlPlaneApiServiceEnv(): NodeJS.ProcessEnv {
     MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_AUDIENCE: "mistle-mcp",
     MISTLE_SERVICES_DASHBOARD_PUBLIC_URL: "https://app.example",
     MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: "staging",
+    MISTLE_SERVICES_CONTROL_PLANE_API_WORKFLOW_DATABASE_POOL_MAX: "2",
     MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL: "http://data-plane-api:8082",
     MISTLE_INTERNAL_AUTH_SHARED_TOKEN: "internal-service-token",
     MISTLE_SANDBOX_TOKENS_CONNECT_SECRET: "connect-secret",
@@ -70,6 +71,7 @@ function buildDataPlaneApiServiceEnv(): NodeJS.ProcessEnv {
     MISTLE_POSTGRES_DATA_PLANE_POOLED_URL: "postgresql://data-plane-pooled.example/mistle",
     MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL: "postgresql://data-plane-direct.example/mistle",
     MISTLE_WORKFLOW_DATA_PLANE_NAMESPACE_ID: "staging",
+    MISTLE_SERVICES_DATA_PLANE_API_WORKFLOW_DATABASE_POOL_MAX: "3",
     MISTLE_SERVICES_DATA_PLANE_GATEWAY_INTERNAL_URL: "http://data-plane-gateway:8084",
     MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: "http://control-plane-api:8080",
     MISTLE_INTERNAL_AUTH_SHARED_TOKEN: "internal-service-token",
@@ -274,6 +276,7 @@ describe("loadConfig", () => {
       databaseUrl: "postgresql://direct.example/mistle",
       migrationUrl: "postgresql://direct.example/mistle",
       namespaceId: "staging",
+      databasePoolMax: 2,
     });
     expect(loadedConfig.app.sandbox.e2b).toEqual({
       enabled: true,

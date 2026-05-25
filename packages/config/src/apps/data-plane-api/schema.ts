@@ -26,6 +26,7 @@ export const DataPlaneApiDatabaseConfigSchema = z
 const DataPlaneApiWorkflowConfigObjectSchema = z
   .object({
     databaseUrl: z.string().min(1),
+    databasePoolMax: z.number().int().min(1),
     migrationUrl: z.string().min(1).optional(),
     namespaceId: z.string().min(1),
   })

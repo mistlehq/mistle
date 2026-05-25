@@ -22,7 +22,6 @@ export type AppRuntimeResources = {
   db: DataPlaneDatabase;
   tables: DataPlaneTables;
   dbPool: Pool;
-  workflowDbPool: Pool;
   workflowBackend: Awaited<ReturnType<typeof createDataPlaneBackend>>;
   openWorkflow: ReturnType<typeof createDataPlaneOpenWorkflow>;
   credentialCacheInvalidator: CredentialCacheInvalidator;
@@ -55,9 +54,6 @@ export async function createAppResources(
 ): Promise<AppRuntimeResources> {
   const dbPool = new Pool({
     connectionString: runtimeConfig.app.database.url,
-  });
-  const workflowDbPool = new Pool({
-    connectionString: runtimeConfig.app.workflow.databaseUrl,
   });
   const db = createDataPlaneDatabase(dbPool);
   const tables = getDataPlaneDatabaseSchema(db);
@@ -94,9 +90,9 @@ export async function createAppResources(
       url: runtimeConfig.app.workflow.databaseUrl,
       namespaceId: runtimeConfig.app.workflow.namespaceId,
       runMigrations: false,
+      databasePoolMax: runtimeConfig.app.workflow.databasePoolMax,
     });
   } catch (error) {
-    await workflowDbPool.end();
     await dbPool.end();
     throw error;
   }
@@ -108,7 +104,6 @@ export async function createAppResources(
     db,
     tables,
     dbPool,
-    workflowDbPool,
     workflowBackend,
     openWorkflow,
     credentialCacheInvalidator,
@@ -286,7 +281,6 @@ export async function stopAppResources(resources: AppRuntimeResources): Promise<
   const testWorkflows = await Promise.all(resources.testWorkflowsByEnvironmentId.values());
   await Promise.all([
     resources.dbPool.end(),
-    resources.workflowDbPool.end(),
     resources.workflowBackend.stop(),
     ...testWorkflows.map((workflow) => workflow.backend.stop()),
   ]);
@@ -303,6 +297,7 @@ async function createTestDataPlaneWorkflow(input: {
     url: input.runtimeConfig.app.workflow.databaseUrl,
     namespaceId: createDataPlaneWorkflowNamespaceId(input.testEnvironmentId),
     runMigrations: false,
+    databasePoolMax: input.runtimeConfig.app.workflow.databasePoolMax,
   });
 
   return {

@@ -256,6 +256,7 @@ function config(input: {
       databaseUrl: hostDirectUrl,
       migrationUrl: hostDirectUrl,
       namespaceId: infraValue(input.postgres, PostgresValues.CONTROL_PLANE_WORKFLOW_NAMESPACE_ID),
+      databasePoolMax: 2,
     },
     dataPlaneApi: {
       baseUrl: input.dataPlaneBaseUrl,

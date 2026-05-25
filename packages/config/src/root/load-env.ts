@@ -301,6 +301,11 @@ const RootEnvDescriptors = [
     path: ["services", "control_plane_api", "internal_url"],
   },
   {
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_WORKFLOW_DATABASE_POOL_MAX",
+    path: ["services", "control_plane_api", "workflow_database_pool_max"],
+    parse: parseNumberEnv,
+  },
+  {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_SECRET",
     path: ["services", "control_plane_api", "auth", "secret"],
   },
@@ -380,6 +385,11 @@ const RootEnvDescriptors = [
   {
     envVar: "MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL",
     path: ["services", "data_plane_api", "internal_url"],
+  },
+  {
+    envVar: "MISTLE_SERVICES_DATA_PLANE_API_WORKFLOW_DATABASE_POOL_MAX",
+    path: ["services", "data_plane_api", "workflow_database_pool_max"],
+    parse: parseNumberEnv,
   },
   {
     envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_HOST",

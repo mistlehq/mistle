@@ -203,6 +203,7 @@ const controlPlaneApiEnvConfig = {
     databaseUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
     migrationUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
     namespaceId: "development",
+    databasePoolMax: 2,
   },
   dataPlaneApi: {
     baseUrl: "http://127.0.0.1:5002",
@@ -251,6 +252,7 @@ const controlPlaneApiBaseFixtureConfig = {
   workflow: {
     ...controlPlaneApiEnvConfig.workflow,
     namespaceId: "fixture",
+    databasePoolMax: 3,
   },
   dataPlaneApi: {
     baseUrl: "http://127.0.0.1:5300",
@@ -326,6 +328,7 @@ const dataPlaneApiEnvConfig = {
     databaseUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
     migrationUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
     namespaceId: "development",
+    databasePoolMax: 2,
   },
   runtimeState: {
     gatewayBaseUrl: "http://127.0.0.1:5003",
@@ -356,6 +359,7 @@ const dataPlaneApiBaseFixtureConfig = {
   workflow: {
     ...dataPlaneApiEnvConfig.workflow,
     namespaceId: "fixture",
+    databasePoolMax: 3,
   },
   runtimeState: {
     gatewayBaseUrl: "http://127.0.0.1:5302",

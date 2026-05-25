@@ -237,6 +237,7 @@ function buildCommonBaseConfig(env: NodeJS.ProcessEnv): ConfigRecord {
         port: 5100,
         public_url: controlPlaneApiPublicUrl,
         internal_url: "http://127.0.0.1:5100",
+        workflow_database_pool_max: 4,
         auth: {
           trusted_origins: [dashboardPublicUrl],
           enabled_methods: ["otp"],
@@ -261,6 +262,7 @@ function buildCommonBaseConfig(env: NodeJS.ProcessEnv): ConfigRecord {
         host: "127.0.0.1",
         port: 5200,
         internal_url: "http://127.0.0.1:5200",
+        workflow_database_pool_max: 4,
       },
       data_plane_gateway: {
         host: "0.0.0.0",

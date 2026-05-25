@@ -481,6 +481,11 @@ const ControlPlaneApiEnvDescriptors = [
     path: ["workflow", "migrationUrl"],
   },
   {
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_WORKFLOW_DATABASE_POOL_MAX",
+    path: ["workflow", "databasePoolMax"],
+    parse: parseNumberEnv,
+  },
+  {
     envVar: "MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID",
     path: ["workflow", "namespaceId"],
   },
@@ -631,6 +636,11 @@ const DataPlaneApiEnvDescriptors = [
   {
     envVar: "MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL",
     path: ["workflow", "migrationUrl"],
+  },
+  {
+    envVar: "MISTLE_SERVICES_DATA_PLANE_API_WORKFLOW_DATABASE_POOL_MAX",
+    path: ["workflow", "databasePoolMax"],
+    parse: parseNumberEnv,
   },
   { envVar: "MISTLE_WORKFLOW_DATA_PLANE_NAMESPACE_ID", path: ["workflow", "namespaceId"] },
   {

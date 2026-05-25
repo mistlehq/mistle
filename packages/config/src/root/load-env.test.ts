@@ -55,6 +55,7 @@ describe("loadRootConfigFromEnv", () => {
       MISTLE_SERVICES_CONTROL_PLANE_API_PORT: "8080",
       MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: "https://api.example.com",
       MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: "http://control-plane-api:8080",
+      MISTLE_SERVICES_CONTROL_PLANE_API_WORKFLOW_DATABASE_POOL_MAX: "2",
       MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_SECRET: "auth-secret",
       MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: "https://app.example.com",
       MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_ENABLED_METHODS: "otp,google",
@@ -74,6 +75,7 @@ describe("loadRootConfigFromEnv", () => {
       MISTLE_SERVICES_DATA_PLANE_API_HOST: "0.0.0.0",
       MISTLE_SERVICES_DATA_PLANE_API_PORT: "8082",
       MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL: "http://data-plane-api:8082",
+      MISTLE_SERVICES_DATA_PLANE_API_WORKFLOW_DATABASE_POOL_MAX: "3",
       MISTLE_SERVICES_DATA_PLANE_GATEWAY_HOST: "0.0.0.0",
       MISTLE_SERVICES_DATA_PLANE_GATEWAY_PORT: "8084",
       MISTLE_SERVICES_DATA_PLANE_GATEWAY_INTERNAL_URL: "http://data-plane-gateway:8084",
@@ -219,6 +221,7 @@ describe("loadRootConfigFromEnv", () => {
           port: 8080,
           public_url: "https://api.example.com",
           internal_url: "http://control-plane-api:8080",
+          workflow_database_pool_max: 2,
           auth: {
             secret: "auth-secret",
             trusted_origins: ["https://app.example.com"],
@@ -253,6 +256,7 @@ describe("loadRootConfigFromEnv", () => {
           host: "0.0.0.0",
           port: 8082,
           internal_url: "http://data-plane-api:8082",
+          workflow_database_pool_max: 3,
         },
         data_plane_gateway: {
           host: "0.0.0.0",

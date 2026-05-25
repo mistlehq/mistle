@@ -36,6 +36,7 @@ describe("DataPlaneApiSandboxConfigSchema", () => {
       },
       workflow: {
         databaseUrl: "postgresql://127.0.0.1/mistle",
+        databasePoolMax: 2,
         namespaceId: "development",
       },
       runtimeState: {
@@ -87,6 +88,7 @@ describe("DataPlaneApiSandboxConfigSchema", () => {
         },
         workflow: {
           databaseUrl: "postgresql://127.0.0.1/mistle",
+          databasePoolMax: 2,
           namespaceId: "development",
         },
         runtimeState: {

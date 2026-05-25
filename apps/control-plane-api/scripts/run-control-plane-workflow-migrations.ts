@@ -14,6 +14,7 @@ async function main(): Promise<void> {
     url: loadedConfig.app.workflow.migrationUrl,
     namespaceId: loadedConfig.app.workflow.namespaceId,
     runMigrations: true,
+    databasePoolMax: loadedConfig.app.workflow.databasePoolMax,
   });
 
   await workflowBackend.stop();

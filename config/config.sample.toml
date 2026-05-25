@@ -39,6 +39,7 @@ host = "0.0.0.0"
 port = 8080
 public_url = "https://api.mistle.example"
 internal_url = "http://control-plane-api:8080"
+workflow_database_pool_max = 4
 
 [services.control_plane_api.auth]
 secret = "replace-with-strong-auth-secret"
@@ -74,6 +75,7 @@ active_master_encryption_key_version = 1
 host = "0.0.0.0"
 port = 8082
 internal_url = "http://data-plane-api:8082"
+workflow_database_pool_max = 4
 
 [services.data_plane_gateway]
 host = "0.0.0.0"

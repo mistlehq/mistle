@@ -188,6 +188,10 @@ const ControlPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
   { path: ["billing", "stripe", "enabled"], envVar: "MISTLE_BILLING_STRIPE_ENABLED" },
   { path: ["dashboard", "baseUrl"], envVar: "MISTLE_SERVICES_DASHBOARD_PUBLIC_URL" },
   { path: ["workflow", "namespaceId"], envVar: "MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID" },
+  {
+    path: ["workflow", "databasePoolMax"],
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_WORKFLOW_DATABASE_POOL_MAX",
+  },
   { path: ["dataPlaneApi", "baseUrl"], envVar: "MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL" },
   {
     path: ["integrations", "activeMasterEncryptionKeyVersion"],
@@ -240,6 +244,10 @@ const DataPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor
   { path: ["database", "url"], envVar: "MISTLE_POSTGRES_DATA_PLANE_POOLED_URL" },
   { path: ["database", "migrationUrl"], envVar: "MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL" },
   { path: ["workflow", "namespaceId"], envVar: "MISTLE_WORKFLOW_DATA_PLANE_NAMESPACE_ID" },
+  {
+    path: ["workflow", "databasePoolMax"],
+    envVar: "MISTLE_SERVICES_DATA_PLANE_API_WORKFLOW_DATABASE_POOL_MAX",
+  },
   {
     path: ["runtimeState", "gatewayBaseUrl"],
     envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_INTERNAL_URL",
