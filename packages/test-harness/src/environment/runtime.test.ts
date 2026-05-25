@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -204,6 +205,35 @@ async function withRunnerPoolEnvironment<T>(callback: () => Promise<T>): Promise
       process.env[MISTLE_TEST_COORDINATOR_DIR_ENV] = previousCoordinatorDir;
     }
   }
+}
+
+async function captureStderrOutput(callback: () => Promise<void>): Promise<string> {
+  const originalWrite = process.stderr.write.bind(process.stderr);
+  let output = "";
+
+  process.stderr.write = function write(
+    chunk: string | Uint8Array,
+    encodingOrCallback?: BufferEncoding | ((error?: Error | null) => void),
+    callback?: (error?: Error | null) => void,
+  ): boolean {
+    output += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
+
+    if (typeof encodingOrCallback === "function") {
+      encodingOrCallback();
+    } else {
+      callback?.();
+    }
+
+    return true;
+  };
+
+  try {
+    await callback();
+  } finally {
+    process.stderr.write = originalWrite;
+  }
+
+  return output;
 }
 
 describe("startTestEnvironment", () => {
@@ -455,6 +485,62 @@ describe("startTestEnvironment", () => {
       "after-services:provider-cleanup",
       "infra:postgres.control-plane",
     ]);
+  });
+
+  it("reports aggregate and per-service cleanup timings in cleanup order", async () => {
+    const startEvents: string[] = [];
+    const cleanupEvents: string[] = [];
+    const postgresProvisioner = createPostgresProvisioner(cleanupEvents);
+    const postgresRequirement = createPostgresRequirement(postgresProvisioner);
+    const registry = defineTestServiceRegistry({
+      "control-plane-api": createService({
+        id: "control-plane-api",
+        requirement: postgresRequirement,
+        startEvents,
+        cleanupEvents,
+      }),
+      "control-plane-worker": createService({
+        id: "control-plane-worker",
+        requirement: postgresRequirement,
+        serviceReferences: ["control-plane-api"],
+        startEvents,
+        cleanupEvents,
+      }),
+    });
+
+    const environment = await startTestEnvironment({
+      id: "env_cleanup_timing",
+      registry,
+      services: [
+        { service: "control-plane-api", mode: "runtime" },
+        { service: "control-plane-worker", mode: "runtime" },
+      ],
+      timing: { force: true },
+    });
+
+    const stderr = await captureStderrOutput(async () => {
+      await environment.stop();
+    });
+    const cleanupSummary = stderr
+      .split("\n")
+      .find((line) => line.includes("env env_cleanup_timing cleanup phases:"));
+
+    expect(cleanupSummary).toBeDefined();
+    expect(cleanupSummary).toContain("services=");
+    expect(cleanupSummary).toContain("service.control-plane-worker=");
+    expect(cleanupSummary).toContain("service.control-plane-api=");
+
+    const servicesIndex = cleanupSummary?.indexOf("services=") ?? -1;
+    const workerIndex = cleanupSummary?.indexOf("service.control-plane-worker=") ?? -1;
+    const apiIndex = cleanupSummary?.indexOf("service.control-plane-api=") ?? -1;
+    const infraIndex = cleanupSummary?.indexOf("infra=") ?? -1;
+
+    expect([servicesIndex, workerIndex, apiIndex, infraIndex].every((index) => index >= 0)).toBe(
+      true,
+    );
+    expect(servicesIndex).toBeLessThan(workerIndex);
+    expect(workerIndex).toBeLessThan(apiIndex);
+    expect(apiIndex).toBeLessThan(infraIndex);
   });
 
   it("registers process cleanup so explicit stop is optional", async () => {

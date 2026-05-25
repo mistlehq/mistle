@@ -42,6 +42,10 @@ async function measure<T>(
   callback: () => Promise<T>,
 ): Promise<T> {
   const startedAt = Date.now();
+  if (!timings.has(label)) {
+    timings.set(label, 0);
+  }
+
   try {
     return await callback();
   } finally {
@@ -51,6 +55,10 @@ async function measure<T>(
 
 function measureSync<T>(timings: Map<string, number>, label: string, callback: () => T): T {
   const startedAt = Date.now();
+  if (!timings.has(label)) {
+    timings.set(label, 0);
+  }
+
   try {
     return callback();
   } finally {
@@ -250,13 +258,16 @@ type ManagedTestServiceHandle = TestServiceHandle & {
 
 async function stopServices(
   services: ReadonlyMap<string, ManagedTestServiceHandle>,
+  timings: Map<string, number>,
 ): Promise<void> {
   // Services stop before infra. Reverse startup order gives dependents a chance
   // to drain before the services they call are torn down.
   const tasks: CleanupTask[] = [];
 
   for (const service of Array.from(services.values()).reverse()) {
-    tasks.push(service.cleanup);
+    tasks.push(async () => {
+      await measure(timings, `service.${service.id}`, service.cleanup);
+    });
   }
 
   await runCleanupTasks({
@@ -602,7 +613,7 @@ export async function startTestEnvironment<
     // If service startup fails, no environment handle is returned. Clean up infra
     // here so callers do not need a partially-started-environment protocol.
     if (services !== undefined) {
-      await stopServices(services);
+      await stopServices(services, new Map());
     }
     await stopInfra(infra);
     if (plannedEndpoints !== undefined) {
@@ -633,7 +644,9 @@ export async function startTestEnvironment<
       tasks: [
         async () => {
           if (services !== undefined) {
-            await measure(cleanupTimings, "services", async () => stopServices(services));
+            await measure(cleanupTimings, "services", async () =>
+              stopServices(services, cleanupTimings),
+            );
           }
         },
         async () => {
