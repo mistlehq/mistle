@@ -11,6 +11,14 @@ const TensorlakeSystemdBaseImageRef = "tensorlake/ubuntu-systemd";
 const MistleBinPath = "/opt/mistle/bin";
 const SandboxBasePath =
   "/opt/mistle/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin";
+const ForceNftIptablesBackendCommands = [
+  // tensorlake/ubuntu-systemd currently pins iptables/ip6tables to the legacy
+  // backend, but Tensorlake sandboxes expose nftables NAT rather than legacy
+  // iptables NAT. Docker daemon startup calls iptables for bridge setup, so
+  // force the nft compatibility backend until Tensorlake fixes the base image.
+  "update-alternatives --set iptables /usr/sbin/iptables-nft",
+  "update-alternatives --set ip6tables /usr/sbin/ip6tables-nft",
+] as const;
 
 export function createTensorlakeSandboxBaseImage(input: {
   readonly baseImageRef: string;
@@ -35,7 +43,8 @@ function installSandboxBaseCommon(image: Image): Image {
     .run(
       [
         "apt-get update",
-        "apt-get install -y --no-install-recommends bash ca-certificates coreutils curl dbus findutils file fuse gawk git grep iproute2 jq kmod less libatomic1 lsof nftables procps psmisc ripgrep rsync sed sudo systemd systemd-sysv tar unzip zip",
+        "apt-get install -y --no-install-recommends bash ca-certificates coreutils curl dbus findutils file fuse gawk git grep iproute2 iptables jq kmod less libatomic1 lsof nftables procps psmisc ripgrep rsync sed sudo systemd systemd-sysv tar unzip zip",
+        ...ForceNftIptablesBackendCommands,
         "rm -rf /var/lib/apt/lists/*",
       ].join(" && "),
     )

@@ -46,7 +46,10 @@ describe("TensorlakeBaseImageBuilder", () => {
 
     expect(dockerfileText).toContain("FROM tensorlake/ubuntu-systemd");
     expect(dockerfileText).toContain("apt-get install -y --no-install-recommends");
+    expect(dockerfileText).toContain("iptables");
     expect(dockerfileText).toContain("kmod");
+    expect(dockerfileText).toContain("update-alternatives --set iptables /usr/sbin/iptables-nft");
+    expect(dockerfileText).toContain("update-alternatives --set ip6tables /usr/sbin/ip6tables-nft");
     expect(dockerfileText).not.toContain("linux-modules-$(uname -r)");
     expect(dockerfileText).toContain("sudo");
     expect(dockerfileText).toContain("systemd");
