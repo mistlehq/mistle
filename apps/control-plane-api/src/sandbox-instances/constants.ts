@@ -2,6 +2,7 @@ export const SANDBOX_INSTANCES_ROUTE_BASE_PATH = "/v1/sandbox/instances";
 export const SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS = 120;
 export const SANDBOX_INSTANCE_PORT_ACCESS_BOOTSTRAP_PATH = "/_mistle/access/bootstrap";
 export const SANDBOX_INSTANCE_PORT_ACCESS_TOKEN_TTL_SECONDS = 120;
+export const SANDBOX_INSTANCE_PORT_ACCESS_LINK_TTL_SECONDS = 7 * 24 * 60 * 60;
 export const SANDBOX_INSTANCE_PTY_TRANSPORT_TOKEN_TTL_SECONDS = 120;
 
 export const SandboxInstancesBadRequestCodes = {

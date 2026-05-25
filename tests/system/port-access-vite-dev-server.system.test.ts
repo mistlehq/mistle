@@ -597,6 +597,7 @@ async function openVitePortAccessSession(input: {
   });
   const sessionCookie = await bootstrapPortAccess({
     fixture: input.fixture,
+    session: input.session,
     bootstrap,
   });
 

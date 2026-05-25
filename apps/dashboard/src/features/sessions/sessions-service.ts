@@ -82,11 +82,15 @@ const SandboxInstancePtySessionSchema = z
 
 const SandboxInstancePortAccessSchema = z
   .object({
-    bootstrapPath: z.literal("/_mistle/access/bootstrap"),
-    bootstrapUrl: z.url(),
     expiresAt: z.string().min(1),
     host: z.string().min(1),
-    token: z.string().min(1),
+    url: z.url(),
+  })
+  .strict();
+
+const PortAccessLinkRedemptionSchema = z
+  .object({
+    url: z.url(),
   })
   .strict();
 
@@ -440,6 +444,42 @@ export async function createSandboxInstancePortAccess(input: {
         operation: "createSandboxInstancePortAccess",
         error,
         fallbackMessage: "Could not create sandbox port access.",
+      }),
+    );
+  }
+}
+
+export async function redeemPortAccessLink(input: {
+  slug: string;
+  signal?: AbortSignal;
+}): Promise<string> {
+  try {
+    const response = await requestControlPlane({
+      operation: "redeemPortAccessLink",
+      method: "GET",
+      pathname: `/p/ports/${encodeURIComponent(input.slug)}`,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not open sandbox port access.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = PortAccessLinkRedemptionSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "redeemPortAccessLink",
+        status: 500,
+        body: responseBody,
+        message: "Port Access link redemption response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data.url;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "redeemPortAccessLink",
+        error,
+        fallbackMessage: "Could not open sandbox port access.",
       }),
     );
   }

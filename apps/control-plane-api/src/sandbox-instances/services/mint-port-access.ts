@@ -1,13 +1,33 @@
-import type { GetSandboxInstanceResponse } from "@mistle/data-plane-internal-client";
-import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
+import { randomInt } from "node:crypto";
+
+import type {
+  DataPlaneSandboxInstancesClient,
+  GetSandboxInstanceResponse,
+} from "@mistle/data-plane-internal-client";
+import {
+  ControlPlaneConstraintIds,
+  getControlPlaneDatabaseSchema,
+  isControlPlaneUniqueViolation,
+  PortAccessLinkCreatedByKinds,
+} from "@mistle/db/control-plane";
 import { derivePortAccessHost, mintPortAccessBootstrapToken } from "@mistle/port-access-auth";
 
 import { SandboxInstancesNotFoundCodes, SandboxInstancesNotFoundError } from "../errors.js";
-import type { MintSandboxInstancePortAccessInput, SandboxInstancePortAccess } from "./types.js";
+import type {
+  MintSandboxInstancePortAccessInput,
+  ResolveSandboxInstancePortAccessLinkInput,
+  SandboxInstancePortAccess,
+  SandboxInstancePortAccessRedirect,
+} from "./types.js";
+
+const PortAccessLinkSlugAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+const PortAccessLinkSlugLength = 12;
+const MaxPortAccessLinkSlugCreateAttempts = 5;
+const ReusablePortAccessLinkMinimumRemainingTtlSeconds = 30;
 
 type ExistingSandboxInstance = NonNullable<GetSandboxInstanceResponse>;
 
-function buildPortAccessBootstrapUrl(input: {
+export function buildPortAccessBootstrapUrl(input: {
   gatewayWsUrl: string;
   host: string;
   bootstrapPath: string;
@@ -30,26 +50,6 @@ function buildPortAccessBootstrapUrl(input: {
   }
   bootstrapUrl.searchParams.set("token", input.token);
   return bootstrapUrl.toString();
-}
-
-function createExpirationIsoFromToken(token: string): string {
-  const [, payloadSegment] = token.split(".");
-  if (payloadSegment === undefined) {
-    throw new Error("Port Access bootstrap token is malformed.");
-  }
-
-  const payloadJson = Buffer.from(payloadSegment, "base64url").toString("utf8");
-  const payload: unknown = JSON.parse(payloadJson);
-  if (typeof payload !== "object" || payload === null) {
-    throw new Error("Port Access bootstrap token payload must be an object.");
-  }
-
-  const expiresAtSeconds = Object.getOwnPropertyDescriptor(payload, "exp")?.value;
-  if (!Number.isInteger(expiresAtSeconds) || expiresAtSeconds < 1) {
-    throw new Error("Port Access bootstrap token payload is missing a valid exp claim.");
-  }
-
-  return new Date(expiresAtSeconds * 1000).toISOString();
 }
 
 async function getExistingSandboxInstance(
@@ -94,24 +94,200 @@ export async function mintPortAccess(
     sandboxInstanceId: sandboxInstance.id,
     port: input.port,
   });
+  const reusableLink = await findReusablePortAccessLink(input, {
+    sandboxInstanceId: sandboxInstance.id,
+  });
+  if (reusableLink !== null) {
+    return buildSandboxInstancePortAccess({
+      host,
+      publicBaseUrl: input.publicBaseUrl,
+      linkPathBase: input.linkPathBase,
+      slug: reusableLink.slug,
+      expiresAt: reusableLink.expiresAt,
+    });
+  }
+
+  const expiresAt = new Date(input.clock.nowMs() + input.linkTtlSeconds * 1000).toISOString();
+  const slug = await createUniquePortAccessLinkSlug(input, {
+    sandboxInstanceId: sandboxInstance.id,
+    expiresAt,
+  });
+
+  return buildSandboxInstancePortAccess({
+    host,
+    publicBaseUrl: input.publicBaseUrl,
+    linkPathBase: input.linkPathBase,
+    slug,
+    expiresAt,
+  });
+}
+
+export async function resolvePortAccessLink(
+  input: ResolveSandboxInstancePortAccessLinkInput,
+): Promise<SandboxInstancePortAccessRedirect | null> {
+  const link = await input.db.query.portAccessLinks.findFirst({
+    where: (table, { and, eq }) =>
+      and(eq(table.slug, input.slug), eq(table.organizationId, input.organizationId)),
+  });
+
+  if (link === undefined) {
+    return null;
+  }
+
+  const expiresAtMs = Date.parse(link.expiresAt);
+  if (!Number.isFinite(expiresAtMs)) {
+    throw new Error(`Port Access link '${link.id}' has an invalid expires_at timestamp.`);
+  }
+
+  const secondsRemaining = Math.floor((expiresAtMs - input.clock.nowMs()) / 1000);
+  if (secondsRemaining < 1) {
+    return null;
+  }
+
+  const host = derivePortAccessHost({
+    config: {
+      baseDomain: input.baseDomain,
+    },
+    sandboxInstanceId: link.sandboxInstanceId,
+    port: link.port,
+  });
   const token = await mintPortAccessBootstrapToken({
     config: input.tokenConfig,
-    sandboxInstanceId: sandboxInstance.id,
-    port: input.port,
+    sandboxInstanceId: link.sandboxInstanceId,
+    port: link.port,
     host,
-    ttlSeconds: input.tokenTtlSeconds,
+    ttlSeconds: Math.min(secondsRemaining, input.tokenTtlSeconds),
   });
 
   return {
-    host,
-    bootstrapPath: input.bootstrapPath,
     bootstrapUrl: buildPortAccessBootstrapUrl({
       gatewayWsUrl: input.gatewayWsUrl,
       host,
       bootstrapPath: input.bootstrapPath,
       token,
     }),
-    token,
-    expiresAt: createExpirationIsoFromToken(token),
   };
+}
+
+async function createUniquePortAccessLinkSlug(
+  input: MintSandboxInstancePortAccessInput,
+  link: {
+    sandboxInstanceId: string;
+    expiresAt: string;
+  },
+): Promise<string> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
+  for (let attempt = 1; attempt <= MaxPortAccessLinkSlugCreateAttempts; attempt += 1) {
+    const slug = createPortAccessLinkSlug();
+    try {
+      await input.db.insert(tables.portAccessLinks).values({
+        slug,
+        organizationId: input.organizationId,
+        sandboxInstanceId: link.sandboxInstanceId,
+        port: input.port,
+        createdByKind:
+          input.createdBy.kind === "agent"
+            ? PortAccessLinkCreatedByKinds.AGENT
+            : PortAccessLinkCreatedByKinds.USER,
+        createdById: input.createdBy.id,
+        expiresAt: link.expiresAt,
+      });
+      return slug;
+    } catch (error) {
+      if (
+        isControlPlaneUniqueViolation(error, ControlPlaneConstraintIds.PORT_ACCESS_LINK_SLUG) &&
+        attempt < MaxPortAccessLinkSlugCreateAttempts
+      ) {
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw new Error("Unable to create a unique Port Access link slug.");
+}
+
+async function findReusablePortAccessLink(
+  input: MintSandboxInstancePortAccessInput,
+  link: {
+    sandboxInstanceId: string;
+  },
+): Promise<{ slug: string; expiresAt: string } | null> {
+  const minimumExpiresAt = new Date(
+    input.clock.nowMs() + ReusablePortAccessLinkMinimumRemainingTtlSeconds * 1000,
+  ).toISOString();
+  const reusableLink = await input.db.query.portAccessLinks.findFirst({
+    where: (table, { and, eq, gt }) =>
+      and(
+        eq(table.organizationId, input.organizationId),
+        eq(table.sandboxInstanceId, link.sandboxInstanceId),
+        eq(table.port, input.port),
+        gt(table.expiresAt, minimumExpiresAt),
+      ),
+    orderBy: (table, { desc }) => [desc(table.expiresAt)],
+  });
+
+  if (reusableLink === undefined) {
+    return null;
+  }
+
+  return {
+    slug: reusableLink.slug,
+    expiresAt: normalizePortAccessLinkExpiresAt({
+      id: reusableLink.id,
+      expiresAt: reusableLink.expiresAt,
+    }),
+  };
+}
+
+function normalizePortAccessLinkExpiresAt(input: { id: string; expiresAt: string }): string {
+  const expiresAtMs = Date.parse(input.expiresAt);
+  if (!Number.isFinite(expiresAtMs)) {
+    throw new Error(`Port Access link '${input.id}' has an invalid expires_at timestamp.`);
+  }
+
+  return new Date(expiresAtMs).toISOString();
+}
+
+function buildSandboxInstancePortAccess(input: {
+  host: string;
+  publicBaseUrl: string;
+  linkPathBase: "/p/ports";
+  slug: string;
+  expiresAt: string;
+}): SandboxInstancePortAccess {
+  return {
+    host: input.host,
+    url: buildPublicPortAccessLinkUrl({
+      publicBaseUrl: input.publicBaseUrl,
+      linkPathBase: input.linkPathBase,
+      slug: input.slug,
+    }),
+    expiresAt: input.expiresAt,
+  };
+}
+
+function createPortAccessLinkSlug(): string {
+  let slug = "";
+  for (let index = 0; index < PortAccessLinkSlugLength; index += 1) {
+    slug += PortAccessLinkSlugAlphabet[randomInt(PortAccessLinkSlugAlphabet.length)];
+  }
+  return slug;
+}
+
+function buildPublicPortAccessLinkUrl(input: {
+  publicBaseUrl: string;
+  linkPathBase: string;
+  slug: string;
+}): string {
+  const baseUrl = new URL(input.publicBaseUrl);
+  const pathBase = input.linkPathBase.endsWith("/")
+    ? input.linkPathBase.slice(0, -1)
+    : input.linkPathBase;
+  baseUrl.pathname = `${pathBase}/${input.slug}`;
+  baseUrl.search = "";
+  baseUrl.hash = "";
+  return baseUrl.toString();
 }

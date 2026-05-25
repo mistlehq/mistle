@@ -1,14 +1,19 @@
 import type { McpServer, ToolAnnotations } from "@modelcontextprotocol/server";
 
 import { OrganizationPermissions } from "../../auth/services/organization-policy.js";
+import { PUBLIC_PORT_ACCESS_LINKS_ROUTE_BASE_PATH } from "../../public-port-access-links/index.js";
+import { SANDBOX_INSTANCE_PORT_ACCESS_LINK_TTL_SECONDS } from "../../sandbox-instances/constants.js";
 import {
   sandboxInstanceIdParamsSchema,
+  sandboxInstancePortAccessParamsSchema,
+  sandboxInstancePortAccessSchema,
   sandboxInstanceStatusResponseSchema,
   sandboxOperationEventsQuerySchema,
   sandboxOperationEventsResponseSchema,
 } from "../../sandbox-instances/schemas.js";
 import { getInstance } from "../../sandbox-instances/services/get-instance.js";
 import { listOperationEvents } from "../../sandbox-instances/services/list-operation-events.js";
+import { mintPortAccess } from "../../sandbox-instances/services/mint-port-access.js";
 import {
   sandboxProfileVersionParamsSchema,
   startSandboxProfileMaintenanceScriptTestRunBodySchema,
@@ -197,6 +202,61 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
   );
 
   server.registerTool(
+    "sandbox_instance_port_access_create",
+    {
+      title: "Create sandbox Port Access link",
+      description: "Create a short-lived public URL for accessing one port on a sandbox instance",
+      inputSchema: sandboxInstancePortAccessParamsSchema,
+      outputSchema: sandboxInstancePortAccessSchema,
+      annotations: {
+        ...MutatingToolAnnotations,
+        title: "Create sandbox Port Access link",
+      },
+    },
+    async ({ instanceId, port }) => {
+      requireMcpToolPermission(
+        context.organizationActor,
+        OrganizationPermissions.SANDBOX_SESSION_CONNECT,
+      );
+
+      const sandboxInstance = await getInstance(
+        {
+          dataPlaneClient: context.dataPlaneClient,
+          db: context.db,
+        },
+        {
+          organizationId: context.organizationActor.organizationId,
+          instanceId,
+        },
+      );
+      requireMcpSandboxInstanceProfileScope(context.organizationActor, {
+        sandboxProfileId: sandboxInstance.sandboxProfileId,
+        sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+      });
+
+      const portAccess = await mintPortAccess(
+        {
+          dataPlaneClient: context.dataPlaneClient,
+        },
+        {
+          db: context.db,
+          organizationId: context.organizationActor.organizationId,
+          instanceId,
+          port,
+          baseDomain: context.portAccessConfig.baseDomain,
+          publicBaseUrl: context.dashboardBaseUrl,
+          linkPathBase: PUBLIC_PORT_ACCESS_LINKS_ROUTE_BASE_PATH,
+          linkTtlSeconds: SANDBOX_INSTANCE_PORT_ACCESS_LINK_TTL_SECONDS,
+          createdBy: resolvePortAccessLinkCreatedBy(context.organizationActor),
+          clock: context.clock,
+        },
+      );
+
+      return structuredResult(portAccess);
+    },
+  );
+
+  server.registerTool(
     "sandbox_instance_get",
     {
       title: "Get sandbox instance",
@@ -282,6 +342,30 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
       return structuredResult(operationEvents);
     },
   );
+}
+
+function resolvePortAccessLinkCreatedBy(organizationActor: AppOrganizationActor): {
+  kind: "agent" | "user";
+  id: string;
+} {
+  if (organizationActor.kind === "api_key") {
+    return {
+      kind: "agent",
+      id: organizationActor.apiKeyId,
+    };
+  }
+
+  if (organizationActor.kind === "mcp_capability") {
+    return {
+      kind: "agent",
+      id: organizationActor.capability.sandboxInstanceId,
+    };
+  }
+
+  return {
+    kind: "user",
+    id: organizationActor.userId,
+  };
 }
 
 function resolveStartedBy(organizationActor: AppOrganizationActor): {

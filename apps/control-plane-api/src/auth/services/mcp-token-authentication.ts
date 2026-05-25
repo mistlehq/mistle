@@ -51,6 +51,7 @@ export async function authenticateMcpToken(input: {
       OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
       OrganizationPermissions.SANDBOX_SESSION_CREATE,
       OrganizationPermissions.SANDBOX_SESSION_READ,
+      OrganizationPermissions.SANDBOX_SESSION_CONNECT,
     ],
   };
 }

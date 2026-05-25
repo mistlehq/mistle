@@ -59,8 +59,7 @@ const SandboxInstanceConnectionTokenResponseSchema = z.object({
 
 const PortAccessResponseSchema = z.object({
   host: z.string().min(1),
-  bootstrapPath: z.literal("/_mistle/access/bootstrap"),
-  token: z.string().min(1),
+  url: z.url(),
   expiresAt: z.string().min(1),
 });
 
@@ -885,20 +884,85 @@ export async function sendGatewayHttpRequest(input: {
   });
 }
 
+async function sendHttpRequest(input: {
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  body?: string;
+}): Promise<{
+  body: string;
+  headers: IncomingHttpHeaders;
+  status: number;
+}> {
+  return await new Promise((resolve, reject) => {
+    const request = httpRequest(
+      input.url,
+      {
+        method: input.method,
+        headers: input.headers,
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk: Buffer) => {
+          chunks.push(chunk);
+        });
+        response.on("end", () => {
+          resolve({
+            body: Buffer.concat(chunks).toString("utf8"),
+            headers: response.headers,
+            status: response.statusCode ?? 0,
+          });
+        });
+        response.on("error", reject);
+      },
+    );
+
+    request.on("error", reject);
+    if (input.body !== undefined) {
+      request.write(input.body);
+    }
+    request.end();
+  });
+}
+
 export async function bootstrapPortAccess(input: {
-  fixture: Pick<CodexSandboxFixture, "dataPlaneGatewayBaseUrl">;
+  fixture: Pick<CodexSandboxFixture, "controlPlaneApiBaseUrl" | "dataPlaneGatewayBaseUrl">;
+  session: CodexSandboxAuthenticatedSession;
   bootstrap: PortAccessBootstrap;
 }): Promise<string> {
   return await waitForCondition({
     description: `port access bootstrap for host '${input.bootstrap.host}'`,
     timeoutMs: BootstrapReadyTimeoutMs,
     evaluate: async () => {
-      const response = await sendGatewayHttpRequest({
-        baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
-        path: `${input.bootstrap.bootstrapPath}?token=${encodeURIComponent(input.bootstrap.token)}`,
+      const linkResponse = await sendHttpRequest({
+        url: resolvePortAccessApiUrl({
+          controlPlaneApiBaseUrl: input.fixture.controlPlaneApiBaseUrl,
+          portAccessUrl: input.bootstrap.url,
+        }),
         method: "GET",
         headers: {
-          host: input.bootstrap.host,
+          cookie: input.session.cookie,
+        },
+      });
+
+      if (linkResponse.status !== 302) {
+        throw new Error(
+          `Expected Port Access link status 302, got ${String(linkResponse.status)}. Response body: ${linkResponse.body}`,
+        );
+      }
+
+      const bootstrapLocation = readHeaderValue(linkResponse.headers, "location");
+      if (bootstrapLocation === undefined) {
+        throw new Error("Expected Port Access link response to include location.");
+      }
+
+      const bootstrapUrl = new URL(bootstrapLocation);
+      const response = await sendGatewayHttpRequest({
+        baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+        path: `${bootstrapUrl.pathname}${bootstrapUrl.search}`,
+        method: "GET",
+        headers: {
+          host: bootstrapUrl.host,
         },
       });
 
@@ -923,6 +987,18 @@ export async function bootstrapPortAccess(input: {
       return extractCookiePair(setCookie);
     },
   });
+}
+
+function resolvePortAccessApiUrl(input: {
+  controlPlaneApiBaseUrl: string;
+  portAccessUrl: string;
+}): string {
+  const apiUrl = new URL(input.controlPlaneApiBaseUrl);
+  const portAccessUrl = new URL(input.portAccessUrl);
+  apiUrl.pathname = portAccessUrl.pathname;
+  apiUrl.search = portAccessUrl.search;
+  apiUrl.hash = "";
+  return apiUrl.toString();
 }
 
 export async function waitForWebSocketOpen(socket: WebSocket, timeoutMs: number): Promise<void> {

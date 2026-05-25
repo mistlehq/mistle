@@ -183,7 +183,7 @@ export function useSessionPortAccess(input: {
           instanceId: sandboxInstanceId,
           port: primaryListener.port,
         });
-        openedWindow.navigate(access.bootstrapUrl);
+        openedWindow.navigate(access.url);
       } catch (error) {
         openedWindow.close();
         setErrorMessage(normalizePortAccessError(error));

@@ -1,31 +1,36 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   ForbiddenResponseSchema,
+  NotFoundResponseSchema,
   UnauthorizedResponseSchema,
   ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
 
+import { redirectLocationHeaderSchema } from "../../sandbox-instances/schemas.js";
 import {
-  sandboxInstancePortAccessParamsSchema,
-  sandboxInstancePortAccessSchema,
-  sandboxInstancesNotFoundResponseSchema,
+  publicPortAccessLinkParamsSchema,
+  publicPortAccessLinkRedeemResponseSchema,
 } from "../schemas.js";
 
 export const route = createRoute({
-  method: "post",
-  path: "/{instanceId}/ports/{port}/access",
-  tags: ["Sandbox Instances"],
+  method: "get",
+  path: "/{slug}",
+  tags: ["Public Port Access Links"],
   request: {
-    params: sandboxInstancePortAccessParamsSchema,
+    params: publicPortAccessLinkParamsSchema,
   },
   responses: {
-    201: {
-      description: "Create a short-lived public Port Access link for one exact sandbox port.",
+    200: {
+      description: "Return the gateway bootstrap URL for a Port Access link.",
       content: {
         "application/json": {
-          schema: sandboxInstancePortAccessSchema,
+          schema: publicPortAccessLinkRedeemResponseSchema,
         },
       },
+    },
+    302: {
+      description: "Redirect to the gateway bootstrap endpoint for a Port Access link.",
+      headers: redirectLocationHeaderSchema,
     },
     400: {
       description: "Invalid request.",
@@ -36,7 +41,7 @@ export const route = createRoute({
       },
     },
     401: {
-      description: "Authentication is required.",
+      description: "Unauthorized request.",
       content: {
         "application/json": {
           schema: UnauthorizedResponseSchema,
@@ -44,7 +49,7 @@ export const route = createRoute({
       },
     },
     403: {
-      description: "Active organization is required.",
+      description: "Active organization access is required.",
       content: {
         "application/json": {
           schema: ForbiddenResponseSchema,
@@ -52,10 +57,10 @@ export const route = createRoute({
       },
     },
     404: {
-      description: "Sandbox instance was not found.",
+      description: "Port Access link was not found or has expired.",
       content: {
         "application/json": {
-          schema: sandboxInstancesNotFoundResponseSchema,
+          schema: NotFoundResponseSchema,
         },
       },
     },

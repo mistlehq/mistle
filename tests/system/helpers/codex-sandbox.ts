@@ -186,6 +186,7 @@ export type CodexSandboxFixture = {
   sandboxProvider: SystemSandboxProvider;
   authSession: (input?: { email?: string }) => Promise<CodexSandboxAuthenticatedSession>;
   request: (path: string, init?: CodexSandboxRequestInit) => Promise<CodexSandboxHttpResponse>;
+  controlPlaneApiBaseUrl: string;
   dataPlaneApiBaseUrl: string;
   dataPlaneApiHeaders?: Record<string, string>;
   dataPlaneGatewayBaseUrl: string;

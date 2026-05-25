@@ -29,6 +29,7 @@ export function createRuntimeCodexSandboxFixture(
       };
     },
     request: async (path, init) => system.controlPlaneApi.http.fetch(path, init),
+    controlPlaneApiBaseUrl: system.controlPlaneApi.hostBaseUrl,
     dataPlaneApiBaseUrl: system.dataPlaneApi.hostBaseUrl,
     dataPlaneApiHeaders: {
       [TestEnvironmentIdHeader]: system.id,

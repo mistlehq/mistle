@@ -3,6 +3,17 @@ import { describe, expect, it } from "vitest";
 import { ControlPlaneConstraintIds, isControlPlaneUniqueViolation } from "./constraint-errors.js";
 
 describe("control-plane constraint errors", () => {
+  it("matches the port access link slug unique index", () => {
+    const error = {
+      code: "23505",
+      constraint: "port_access_links_slug_uidx",
+    };
+
+    expect(
+      isControlPlaneUniqueViolation(error, ControlPlaneConstraintIds.PORT_ACCESS_LINK_SLUG),
+    ).toBe(true);
+  });
+
   it("matches the sandbox profile one-draft unique index", () => {
     const error = {
       code: "23505",

@@ -29,6 +29,7 @@ import { OrganizationIdentityLinkingSettingsPage } from "./features/pages/organi
 import { OrganizationIntegrationsSettingsPage } from "./features/pages/organization-integrations-settings-page.js";
 import { OrganizationMembersSettingsPage } from "./features/pages/organization-members-settings-page.js";
 // import { OrganizationSandboxStorageSettingsPage } from "./features/pages/organization-sandbox-storage-settings-page.js";
+import { PortAccessRedirectPage } from "./features/pages/port-access-redirect-page.js";
 import { ProfileSettingsPage } from "./features/pages/profile-settings-page.js";
 import {
   SandboxProfileDefaultRedirect,
@@ -59,6 +60,7 @@ export const APP_ROUTES = createRoutesFromElements(
       <Route element={<InvitationAcceptPage />} path="/invitations/accept" />
     </Route>
     <Route element={<RequireAuth />} errorElement={<RouteErrorBoundary />}>
+      <Route element={<PortAccessRedirectPage />} path="/p/ports/:slug" />
       <Route element={<AppShell />} errorElement={<RouteErrorBoundary />}>
         <Route element={<HomePage />} handle={ROUTE_HANDLES.dashboard} index />
         <Route

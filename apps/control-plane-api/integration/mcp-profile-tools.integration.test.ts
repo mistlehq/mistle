@@ -5,6 +5,7 @@
 import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
+  PortAccessLinkCreatedByKinds,
   SandboxProfileStatuses,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
@@ -26,6 +27,7 @@ import { z } from "zod";
 
 import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import {
+  SandboxInstancePortAccessSchema,
   SandboxInstanceStatusResponseSchema,
   SandboxOperationEventsResponseSchema,
 } from "../src/sandbox-instances/index.js";
@@ -632,6 +634,142 @@ describe.concurrent("MCP profile tools integration", () => {
       stream: "stderr",
       payloadBase64: "bWlzc2luZyBkZXBlbmRlbmN5",
     });
+  });
+
+  it("creates a short Port Access link for a sandbox instance and records the MCP actor", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-port-access-create@example.com",
+    });
+    const credential = await createApiKeyCredential({
+      cookie: session.cookie,
+      env,
+      name: "MCP sandbox port access",
+      permissions: [
+        OrganizationPermissions.SANDBOX_SESSION_READ,
+        OrganizationPermissions.SANDBOX_SESSION_CONNECT,
+      ],
+    });
+
+    await insertSandboxInstance(env, {
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_mcp_port_access",
+      status: SandboxInstanceStatuses.RUNNING,
+    });
+
+    const result = await callMcpTool({
+      env,
+      token: credential.token,
+      name: "sandbox_instance_port_access_create",
+      arguments: {
+        instanceId: "sbi_mcp_port_access",
+        port: 4173,
+      },
+    });
+
+    expect(result.isError).toBeUndefined();
+    const portAccess = SandboxInstancePortAccessSchema.parse(result.structuredContent);
+    const url = new URL(portAccess.url);
+    const slug = url.pathname.replace("/p/ports/", "");
+
+    expect(slug).toMatch(/^[0-9A-Za-z]{12}$/u);
+    expect(portAccess.host).toContain("p-4173--");
+    expect(Date.parse(portAccess.expiresAt)).toBeGreaterThan(Date.now());
+
+    const persistedLink = await env.controlPlaneDb.query.portAccessLinks.findFirst({
+      where: (table, { eq }) => eq(table.slug, slug),
+    });
+    expect(persistedLink).toMatchObject({
+      slug,
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_mcp_port_access",
+      port: 4173,
+      createdByKind: PortAccessLinkCreatedByKinds.AGENT,
+      createdById: credential.apiKey.id,
+    });
+    expect(Date.parse(persistedLink?.expiresAt ?? "")).toBe(Date.parse(portAccess.expiresAt));
+  });
+
+  it("allows setup assistant MCP tokens to create Port Access links for the scoped sandbox instance", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-port-access-setup-assistant@example.com",
+    });
+    const sandboxInstanceId = "sbi_mcp_port_access_setup_assistant";
+    const sandboxProfileId = "sbp_mcp_port_access_setup_assistant";
+    const token = await mintMcpToken({
+      config: McpTokenConfig,
+      claims: {
+        kind: "setup_assistant",
+        sub: sandboxInstanceId,
+        organizationId: session.organizationId,
+        sandboxProfileId,
+        sandboxProfileVersion: 1,
+      },
+      ttlSeconds: 300,
+    });
+
+    await insertSandboxInstance(env, {
+      organizationId: session.organizationId,
+      sandboxInstanceId,
+      sandboxProfileId,
+      sandboxProfileVersion: 1,
+      status: SandboxInstanceStatuses.RUNNING,
+    });
+
+    const result = await callMcpTool({
+      env,
+      token: token.token,
+      name: "sandbox_instance_port_access_create",
+      arguments: {
+        instanceId: sandboxInstanceId,
+        port: 4173,
+      },
+    });
+
+    expect(result.isError).toBeUndefined();
+    const portAccess = SandboxInstancePortAccessSchema.parse(result.structuredContent);
+    const slug = new URL(portAccess.url).pathname.replace("/p/ports/", "");
+
+    const persistedLink = await env.controlPlaneDb.query.portAccessLinks.findFirst({
+      where: (table, { eq }) => eq(table.slug, slug),
+    });
+    expect(persistedLink).toMatchObject({
+      slug,
+      organizationId: session.organizationId,
+      sandboxInstanceId,
+      port: 4173,
+      createdByKind: PortAccessLinkCreatedByKinds.AGENT,
+      createdById: sandboxInstanceId,
+    });
+  });
+
+  it("returns a tool error when creating Port Access without sandbox connect permission", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-port-access-connect-forbidden@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "MCP sandbox reader",
+      permissions: [OrganizationPermissions.SANDBOX_SESSION_READ],
+    });
+
+    const result = await callMcpTool({
+      env,
+      token,
+      name: "sandbox_instance_port_access_create",
+      arguments: {
+        instanceId: "sbi_mcp_port_access_forbidden",
+        port: 4173,
+      },
+    });
+
+    expect(result.isError).toBe(true);
   });
 
   it("authorizes setup assistant MCP tokens to read sandbox feedback for the scoped profile version", async ({

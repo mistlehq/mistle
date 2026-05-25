@@ -33,6 +33,7 @@ import { withAuthenticatedRequest } from "./middleware/with-authenticated-reques
 import { withMcpOrganizationAccess } from "./middleware/with-mcp-organization-access.js";
 import { withOrganizationAccess } from "./middleware/with-organization-access.js";
 import { createOrganizationRoutes } from "./organizations/index.js";
+import { createPublicPortAccessLinksRoutes } from "./public-port-access-links/index.js";
 import { createPublicSessionLinksRoutes } from "./public-session-links/index.js";
 import { createSandboxInstancesRoutes } from "./sandbox-instances/index.js";
 import { createSandboxProfilesRoutes } from "./sandbox-profiles/index.js";
@@ -177,6 +178,9 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const meRoutes = withAuthSession(createMeRoutes());
   const mcpRoutes = withMcpOrganizationAccess(createMcpRoutes());
   const organizationRoutes = withActiveOrganizationAccess(createOrganizationRoutes());
+  const publicPortAccessLinksRoutes = withActiveOrganizationAccess(
+    createPublicPortAccessLinksRoutes(),
+  );
   const publicSessionLinksRoutes = createPublicSessionLinksRoutes();
   const sandboxInstancesRoutes = withOrganizationAccess(createSandboxInstancesRoutes());
   const sandboxProvidersRoutes = withActiveOrganizationAccess(createSandboxProvidersRoutes());
@@ -198,6 +202,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   app.route(meRoutes.basePath, meRoutes.routes);
   app.route(mcpRoutes.basePath, mcpRoutes.routes);
   app.route(organizationRoutes.basePath, organizationRoutes.routes);
+  app.route(publicPortAccessLinksRoutes.basePath, publicPortAccessLinksRoutes.routes);
   app.route(publicSessionLinksRoutes.basePath, publicSessionLinksRoutes.routes);
   app.route(sandboxInstancesRoutes.basePath, sandboxInstancesRoutes.routes);
   app.route(sandboxProvidersRoutes.basePath, sandboxProvidersRoutes.routes);

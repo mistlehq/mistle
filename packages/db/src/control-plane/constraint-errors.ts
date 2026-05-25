@@ -1,6 +1,7 @@
 import { isPostgresUniqueConstraintError } from "../postgres-errors.js";
 
 export const ControlPlaneConstraintIds = {
+  PORT_ACCESS_LINK_SLUG: "port_access_link_slug",
   SANDBOX_PROFILE_VERSIONS_ONE_DRAFT_PER_PROFILE: "sandbox_profile_versions_one_draft_per_profile",
   TRIGGER_RUN_SOURCE_SCHEDULED_ACTION: "trigger_run_source_scheduled_action",
   SNAPSHOT_JOB_ACTIVE_PER_VERSION: "snapshot_job_active_per_version",
@@ -14,6 +15,7 @@ const ControlPlaneUniqueConstraintNamesById: Record<
   ControlPlaneConstraintId,
   ReadonlyArray<string>
 > = {
+  [ControlPlaneConstraintIds.PORT_ACCESS_LINK_SLUG]: ["port_access_links_slug_uidx"],
   [ControlPlaneConstraintIds.SANDBOX_PROFILE_VERSIONS_ONE_DRAFT_PER_PROFILE]: [
     "sandbox_profile_versions_one_draft_per_profile_uidx",
     "sandbox_profile_versions_pkey",

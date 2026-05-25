@@ -320,6 +320,115 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/p/ports/{slug}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          slug: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Return the gateway bootstrap URL for a Port Access link. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** Format: uri */
+              url: string;
+            };
+          };
+        };
+        /** @description Redirect to the gateway bootstrap endpoint for a Port Access link. */
+        302: {
+          headers: {
+            Location: string;
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Unauthorized request. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization access is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Port Access link was not found or has expired. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/p/sessions/{instanceId}": {
     parameters: {
       query?: never;
@@ -8259,20 +8368,17 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Create short-lived Port Access bootstrap for one exact sandbox port. */
+        /** @description Create a short-lived public Port Access link for one exact sandbox port. */
         201: {
           headers: {
             [name: string]: unknown;
           };
           content: {
             "application/json": {
-              /** @enum {string} */
-              bootstrapPath: "/_mistle/access/bootstrap";
-              /** Format: uri */
-              bootstrapUrl: string;
               expiresAt: string;
               host: string;
-              token: string;
+              /** Format: uri */
+              url: string;
             };
           };
         };

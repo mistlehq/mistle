@@ -1,3 +1,4 @@
+import { systemClock } from "@mistle/time";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/server";
 import { Hono } from "hono";
 
@@ -17,12 +18,16 @@ export function createMcpRoutes(): AppRoutes<typeof MCP_ROUTE_BASE_PATH> {
 
     const transport = new WebStandardStreamableHTTPServerTransport();
     const server = createMistleMcpServer({
+      clock: systemClock,
+      controlPlaneBaseUrl: ctx.get("config").auth.baseUrl,
+      dashboardBaseUrl: ctx.get("config").dashboard.baseUrl,
       dataPlaneClient: ctx.get("dataPlaneClient"),
       db: ctx.get("db"),
       integrationRegistry: ctx.get("integrationRegistry"),
       integrationsConfig,
       mcpConfig,
       organizationActor,
+      portAccessConfig: ctx.get("portAccessConfig"),
       sandboxConfig: ctx.get("sandboxConfig"),
     });
     await server.connect(transport);

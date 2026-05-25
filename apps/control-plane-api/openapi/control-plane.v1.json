@@ -17370,6 +17370,155 @@
         }
       }
     },
+    "/p/ports/{slug}": {
+      "get": {
+        "tags": ["Public Port Access Links"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 12,
+              "maxLength": 12,
+              "pattern": "^[0-9A-Za-z]+$"
+            },
+            "required": true,
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Return the gateway bootstrap URL for a Port Access link.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "required": ["url"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Redirect to the gateway bootstrap endpoint for a Port Access link.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization access is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Port Access link was not found or has expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/p/sessions/{instanceId}": {
       "get": {
         "tags": ["Public Session Links"],
@@ -19341,7 +19490,7 @@
         ],
         "responses": {
           "201": {
-            "description": "Create short-lived Port Access bootstrap for one exact sandbox port.",
+            "description": "Create a short-lived public Port Access link for one exact sandbox port.",
             "content": {
               "application/json": {
                 "schema": {
@@ -19351,24 +19500,16 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "bootstrapPath": {
-                      "type": "string",
-                      "enum": ["/_mistle/access/bootstrap"]
-                    },
-                    "bootstrapUrl": {
+                    "url": {
                       "type": "string",
                       "format": "uri"
-                    },
-                    "token": {
-                      "type": "string",
-                      "minLength": 1
                     },
                     "expiresAt": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["host", "bootstrapPath", "bootstrapUrl", "token", "expiresAt"],
+                  "required": ["host", "url", "expiresAt"],
                   "additionalProperties": false
                 }
               }
