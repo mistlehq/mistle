@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { parseStartupDiagnostics, toDiagnosticAttributes } from "./sandbox-startup-diagnostics.js";
+import {
+  parseStartupDiagnostics,
+  summarizeStartupDiagnosticPhaseTimings,
+  toDiagnosticAttributes,
+} from "./sandbox-startup-diagnostics.js";
 
 describe("parseStartupDiagnostics", () => {
   it("parses valid startup diagnostic records and skips blank lines", () => {
@@ -83,5 +87,115 @@ describe("toDiagnosticAttributes", () => {
       "mistle.sandbox.startup_detail.stdoutCaptured": false,
       "mistle.sandbox.startup_detail.stderrCaptured": true,
     });
+  });
+});
+
+describe("summarizeStartupDiagnosticPhaseTimings", () => {
+  it("summarizes completed startup phase durations from high precision timestamps", () => {
+    const { records } = parseStartupDiagnostics(
+      [
+        JSON.stringify({
+          timestamp: "2026-05-25T08:16:46.100123456Z",
+          level: "info",
+          event: "sandbox_init_phase_started",
+          sandboxInstanceId: "sbi_123",
+          operation: "init",
+          phase: "start_tunnel_session",
+        }),
+        JSON.stringify({
+          timestamp: "2026-05-25T08:16:46.350987654Z",
+          level: "info",
+          event: "sandbox_init_phase_completed",
+          sandboxInstanceId: "sbi_123",
+          operation: "init",
+          phase: "start_tunnel_session",
+        }),
+        JSON.stringify({
+          timestamp: "2026-05-25T08:16:47.000000001Z",
+          level: "info",
+          event: "sandbox_init_transcript",
+          sandboxInstanceId: "sbi_123",
+          operation: "init",
+          phase: "start_tunnel_session",
+        }),
+      ].join("\n"),
+    );
+
+    const summary = summarizeStartupDiagnosticPhaseTimings(records);
+
+    expect(summary.skippedRecords).toEqual([]);
+    expect(summary.phaseTimings).toEqual([
+      {
+        completedAt: "2026-05-25T08:16:46.350987654Z",
+        durationMs: 250,
+        phase: "start_tunnel_session",
+        startedAt: "2026-05-25T08:16:46.100123456Z",
+      },
+    ]);
+  });
+
+  it("reports completed phases that do not have matching start records", () => {
+    const { records } = parseStartupDiagnostics(
+      JSON.stringify({
+        timestamp: "2026-05-25T08:16:46.350Z",
+        level: "info",
+        event: "sandbox_resume_phase_completed",
+        sandboxInstanceId: "sbi_123",
+        operation: "resume",
+        phase: "start_tunnel_session",
+      }),
+    );
+
+    const summary = summarizeStartupDiagnosticPhaseTimings(records);
+
+    expect(summary.phaseTimings).toEqual([]);
+    expect(summary.skippedRecords).toEqual([
+      "phase start_tunnel_session completed without a matching start record",
+    ]);
+  });
+
+  it("does not reuse a matched start record for duplicate phase completions", () => {
+    const { records } = parseStartupDiagnostics(
+      [
+        JSON.stringify({
+          timestamp: "2026-05-25T08:16:46.100Z",
+          level: "info",
+          event: "sandbox_init_phase_started",
+          sandboxInstanceId: "sbi_123",
+          operation: "init",
+          phase: "start_tunnel_session",
+        }),
+        JSON.stringify({
+          timestamp: "2026-05-25T08:16:46.350Z",
+          level: "info",
+          event: "sandbox_init_phase_completed",
+          sandboxInstanceId: "sbi_123",
+          operation: "init",
+          phase: "start_tunnel_session",
+        }),
+        JSON.stringify({
+          timestamp: "2026-05-25T08:16:46.500Z",
+          level: "info",
+          event: "sandbox_init_phase_completed",
+          sandboxInstanceId: "sbi_123",
+          operation: "init",
+          phase: "start_tunnel_session",
+        }),
+      ].join("\n"),
+    );
+
+    const summary = summarizeStartupDiagnosticPhaseTimings(records);
+
+    expect(summary.phaseTimings).toEqual([
+      {
+        completedAt: "2026-05-25T08:16:46.350Z",
+        durationMs: 250,
+        phase: "start_tunnel_session",
+        startedAt: "2026-05-25T08:16:46.100Z",
+      },
+    ]);
+    expect(summary.skippedRecords).toEqual([
+      "phase start_tunnel_session completed without a matching start record",
+    ]);
   });
 });

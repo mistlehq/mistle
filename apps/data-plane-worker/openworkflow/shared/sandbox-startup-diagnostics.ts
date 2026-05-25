@@ -19,6 +19,13 @@ const SandboxStartupDiagnosticRecordSchema = z
 
 export type SandboxStartupDiagnosticRecord = z.output<typeof SandboxStartupDiagnosticRecordSchema>;
 
+export type SandboxStartupDiagnosticPhaseTiming = {
+  completedAt: string;
+  durationMs: number;
+  phase: string;
+  startedAt: string;
+};
+
 export function toDiagnosticAttributes(record: SandboxStartupDiagnosticRecord): Attributes {
   const attributes: Attributes = {
     "mistle.sandbox.instance_id": record.sandboxInstanceId,
@@ -38,6 +45,95 @@ export function toDiagnosticAttributes(record: SandboxStartupDiagnosticRecord): 
   }
 
   return attributes;
+}
+
+export function summarizeStartupDiagnosticPhaseTimings(
+  records: readonly SandboxStartupDiagnosticRecord[],
+): {
+  phaseTimings: SandboxStartupDiagnosticPhaseTiming[];
+  skippedRecords: string[];
+} {
+  const startedByPhase = new Map<string, { timestamp: string; timestampMs: number }>();
+  const phaseTimings: SandboxStartupDiagnosticPhaseTiming[] = [];
+  const skippedRecords: string[] = [];
+
+  for (const record of records) {
+    const phase = record.phase;
+    if (phase === undefined) {
+      continue;
+    }
+
+    const eventPrefix = record.operation === "init" ? "sandbox_init" : "sandbox_resume";
+    const startedEvent = `${eventPrefix}_phase_started`;
+    const completedEvent = `${eventPrefix}_phase_completed`;
+    if (record.event !== startedEvent && record.event !== completedEvent) {
+      continue;
+    }
+
+    const timestampMs = parseStartupDiagnosticTimestampMs(record.timestamp);
+    if (timestampMs === null) {
+      skippedRecords.push(
+        `phase ${phase} has an unparsable timestamp '${record.timestamp}' for event ${record.event}`,
+      );
+      continue;
+    }
+
+    if (record.event === startedEvent) {
+      startedByPhase.set(phase, {
+        timestamp: record.timestamp,
+        timestampMs,
+      });
+      continue;
+    }
+
+    const started = startedByPhase.get(phase);
+    if (started === undefined) {
+      skippedRecords.push(`phase ${phase} completed without a matching start record`);
+      continue;
+    }
+
+    const durationMs = timestampMs - started.timestampMs;
+    if (durationMs < 0) {
+      skippedRecords.push(`phase ${phase} completed before its start record`);
+      continue;
+    }
+
+    phaseTimings.push({
+      completedAt: record.timestamp,
+      durationMs,
+      phase,
+      startedAt: started.timestamp,
+    });
+    startedByPhase.delete(phase);
+  }
+
+  return {
+    phaseTimings,
+    skippedRecords,
+  };
+}
+
+function parseStartupDiagnosticTimestampMs(timestamp: string): number | null {
+  const parsedMs = Date.parse(timestamp);
+  if (Number.isFinite(parsedMs)) {
+    return parsedMs;
+  }
+
+  const highPrecisionTimestampMatch = /^(.+\.)(\d{3})\d+(Z|[+-]\d{2}:\d{2})$/.exec(timestamp);
+  if (highPrecisionTimestampMatch === null) {
+    return null;
+  }
+
+  const prefix = highPrecisionTimestampMatch[1];
+  const milliseconds = highPrecisionTimestampMatch[2];
+  const suffix = highPrecisionTimestampMatch[3];
+  if (prefix === undefined || milliseconds === undefined || suffix === undefined) {
+    return null;
+  }
+
+  const normalizedTimestamp = `${prefix}${milliseconds}${suffix}`;
+  const normalizedMs = Date.parse(normalizedTimestamp);
+  return Number.isFinite(normalizedMs) ? normalizedMs : null;
 }
 
 export function parseStartupDiagnostics(logText: string): {
@@ -82,6 +178,87 @@ export function parseStartupDiagnostics(logText: string): {
     records,
     parseErrors,
   };
+}
+
+export async function emitSandboxStartupDiagnosticPhaseTimings(input: {
+  logger: MistleLogger;
+  sandboxRuntimeControl: SandboxRuntimeControl;
+  providerSandboxId: string;
+  sandboxInstanceId: string;
+  runtimeProvider: SandboxProvider;
+  operation: "init" | "resume";
+  persistenceMode?: SandboxInstancePersistenceMode;
+}): Promise<void> {
+  const baseAttributes = {
+    "mistle.sandbox.instance_id": input.sandboxInstanceId,
+    "mistle.sandbox.provider_sandbox_id": input.providerSandboxId,
+    "mistle.sandbox.runtime_provider": input.runtimeProvider,
+    "mistle.sandbox.startup_operation": input.operation,
+    ...(input.persistenceMode === undefined
+      ? {}
+      : {
+          "mistle.sandbox.persistence_mode": input.persistenceMode,
+        }),
+  };
+
+  try {
+    const logText = await input.sandboxRuntimeControl.readOperationLog({
+      id: input.providerSandboxId,
+      operation: input.operation,
+    });
+
+    if (logText === null) {
+      input.logger.warn(
+        baseAttributes,
+        "Sandbox startup diagnostic phase timing log was not available.",
+      );
+      return;
+    }
+
+    const { records, parseErrors } = parseStartupDiagnostics(logText);
+    const { phaseTimings, skippedRecords } = summarizeStartupDiagnosticPhaseTimings(records);
+
+    for (const parseError of parseErrors) {
+      input.logger.warn(
+        {
+          ...baseAttributes,
+          parseError,
+        },
+        "Failed to parse sandbox startup diagnostic log line for phase timing.",
+      );
+    }
+
+    for (const skippedRecord of skippedRecords) {
+      input.logger.warn(
+        {
+          ...baseAttributes,
+          skippedRecord,
+        },
+        "Skipped sandbox startup diagnostic phase timing record.",
+      );
+    }
+
+    for (const phaseTiming of phaseTimings) {
+      input.logger.info(
+        {
+          ...baseAttributes,
+          "mistle.sandbox.startup_phase": phaseTiming.phase,
+          "mistle.sandbox.startup_phase_duration_ms": phaseTiming.durationMs,
+          "mistle.sandbox.startup_phase_started_at": phaseTiming.startedAt,
+          "mistle.sandbox.startup_phase_completed_at": phaseTiming.completedAt,
+        },
+        "Sandbox startup diagnostic phase timing.",
+      );
+    }
+  } catch (error) {
+    input.logger.warn(
+      {
+        ...baseAttributes,
+        err: error,
+      },
+      "Failed to collect sandbox startup diagnostic phase timings.",
+    );
+  }
 }
 
 export async function emitSandboxStartupDiagnostics(input: {

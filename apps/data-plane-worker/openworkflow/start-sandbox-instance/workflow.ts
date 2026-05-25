@@ -28,7 +28,10 @@ import {
   createWorkerSandboxLifecycleEventRecorder,
   recordWorkerSandboxLifecyclePhase,
 } from "../shared/sandbox-operation-events.js";
-import { emitSandboxStartupDiagnostics } from "../shared/sandbox-startup-diagnostics.js";
+import {
+  emitSandboxStartupDiagnosticPhaseTimings,
+  emitSandboxStartupDiagnostics,
+} from "../shared/sandbox-startup-diagnostics.js";
 import { createSandboxStorageBackendAdapter } from "../shared/sandbox-storage/create-sandbox-storage-backend-adapter.js";
 import {
   createSandboxUsageEventIdempotencyKey,
@@ -351,6 +354,36 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             sandboxInstanceId: input.sandboxInstanceId,
           },
           "Failed to resolve sandbox runtime for startup diagnostics before cleanup.",
+        );
+      }
+    }
+
+    async function emitStartupPhaseTimings(input: {
+      providerSandboxId: string;
+      sandboxInstanceId: string;
+      runtimeProvider: SandboxProvider;
+      persistenceMode: (typeof workflowInput)["persistenceMode"];
+    }): Promise<void> {
+      try {
+        const resolvedRuntime =
+          await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+        await emitSandboxStartupDiagnosticPhaseTimings({
+          logger,
+          sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
+          providerSandboxId: input.providerSandboxId,
+          sandboxInstanceId: input.sandboxInstanceId,
+          runtimeProvider: input.runtimeProvider,
+          operation: "init",
+          persistenceMode: input.persistenceMode,
+        });
+      } catch (error) {
+        logger.warn(
+          {
+            err: error,
+            providerSandboxId: input.providerSandboxId,
+            sandboxInstanceId: input.sandboxInstanceId,
+          },
+          "Failed to resolve sandbox runtime for startup phase timing diagnostics.",
         );
       }
     }
@@ -1175,6 +1208,13 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         throw error;
       }
     }
+
+    await emitStartupPhaseTimings({
+      providerSandboxId: startedSandbox.providerSandboxId,
+      sandboxInstanceId: startedSandbox.sandboxInstanceId,
+      runtimeProvider: startedSandbox.runtimeProvider,
+      persistenceMode: workflowInput.persistenceMode,
+    });
 
     if (workflowInput.purpose === SandboxInstancePurposes.SETUP_CHECK) {
       await operationEvents.record({
