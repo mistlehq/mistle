@@ -10,8 +10,10 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "scripts/sandbox-base/build-provider-image.ts"
+      - "scripts/test/ensure-system-test-sandbox-base-image.ts"
       - "packages/sandbox/**"
       - "packages/sandboxd/**"
+      - "packages/test-harness/src/system/system-test-sandbox-base-image.ts"
   workflow_dispatch:
     inputs:
       publish_latest:
@@ -106,17 +108,68 @@ jobs:
             echo "- Digest: \`${{ steps.publish.outputs.image_ref }}\`"
           } >> "${GITHUB_STEP_SUMMARY}"
 
+  publish-system-test:
+    name: Publish System Test Sandbox Base Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@739bfe42ca9233c5e6aca07c1a25a9d34aca49b0 # v6
+        with:
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 25
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+
+      - name: Publish system test sandbox base image
+        id: publish-system-test
+        run: |
+          image_ref="$(NODE_OPTIONS='--conditions workspace-src' pnpm exec tsx ./scripts/test/ensure-system-test-sandbox-base-image.ts)"
+          echo "image_ref=${image_ref}" >> "${GITHUB_OUTPUT}"
+          echo "Resolved system test sandbox base image: ${image_ref}"
+
+      - name: Summarize published system test image
+        run: |
+          {
+            echo "## Published system test image"
+            echo
+            echo "- Tag: \`${{ steps.publish-system-test.outputs.image_ref }}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
   notify:
     name: Notify Slack
     runs-on: ubuntu-latest
     needs:
       - publish
+      - publish-system-test
     if: always()
     permissions:
       contents: read
       id-token: write
     env:
       PUBLISH_RESULT: ${{ needs.publish.result }}
+      SYSTEM_TEST_PUBLISH_RESULT: ${{ needs.publish-system-test.result }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       WORKFLOW_NAME: ${{ github.workflow }}
 
@@ -138,6 +191,16 @@ jobs:
           import urllib.request
 
           publish_result = os.environ["PUBLISH_RESULT"]
+          system_test_publish_result = os.environ["SYSTEM_TEST_PUBLISH_RESULT"]
+          notification_result = (
+              "failure"
+              if "failure" in (publish_result, system_test_publish_result)
+              else "cancelled"
+              if "cancelled" in (publish_result, system_test_publish_result)
+              else "success"
+              if publish_result == "success" and system_test_publish_result == "success"
+              else "unknown"
+          )
           color_by_result = {
               "success": "#2eb886",
               "failure": "#e01e5a",
@@ -148,15 +211,15 @@ jobs:
               "failure": ":x:",
               "cancelled": ":warning:",
           }
-          color = color_by_result.get(publish_result, "#808080")
-          emoji = emoji_by_result.get(publish_result, ":grey_question:")
+          color = color_by_result.get(notification_result, "#808080")
+          emoji = emoji_by_result.get(notification_result, ":grey_question:")
           payload = {
               "attachments": [
                   {
                       "color": color,
                       "title": os.environ["WORKFLOW_NAME"],
                       "title_link": os.environ["RUN_URL"],
-                      "text": f"{emoji} Sandbox base image publish finished with result: {publish_result}.",
+                      "text": f"{emoji} Sandbox base image publish finished with result: {publish_result}; system test image result: {system_test_publish_result}.",
                       "fields": [
                           {
                               "title": "Repository",

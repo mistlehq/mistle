@@ -105,20 +105,11 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
 
-      - name: Build local sandbox base image
-        run: >-
-          nix develop --command pnpm sandbox-base:build
-          --provider docker
-          --output-image-ref mistle/sandbox-base:dev
-          --publish-mode load
-          --platform linux/amd64
-          --target sandbox-base-system-tests
-
-      - name: Publish runtime system sandbox base image
+      - name: Resolve runtime system sandbox base image
         run: |
           image_ref="$(nix develop --command env NODE_OPTIONS='--conditions workspace-src' pnpm exec tsx ./scripts/test/ensure-system-test-sandbox-base-image.ts)"
           echo "MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REF=${image_ref}" >> "${GITHUB_ENV}"
-          echo "Published runtime system sandbox base image: ${image_ref}"
+          echo "Resolved runtime system sandbox base image: ${image_ref}"
 
       - name: Run runtime system tests
         run: nix develop --command pnpm --filter @mistle/tests test:system:runtime
