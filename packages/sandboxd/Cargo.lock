@@ -2245,7 +2245,7 @@ dependencies = [
 
 [[package]]
 name = "sandboxd"
-version = "0.22.0"
+version = "0.22.1"
 dependencies = [
  "base64",
  "bytes",
