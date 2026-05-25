@@ -305,8 +305,8 @@ importers:
         specifier: ^3.4.9
         version: 3.4.9
       stripe:
-        specifier: ^20.4.1
-        version: 20.4.1(@types/node@25.8.0)
+        specifier: ^22.1.1
+        version: 22.1.1(@types/node@25.8.0)
       typeid-js:
         specifier: ^1.2.0
         version: 1.2.0
@@ -11393,11 +11393,11 @@ packages:
     resolution: {integrity: sha512-1tB5mhVo7U+ETBKNf92xT4hrQa3pm0MZ0PQvuDnWgAAGHDsfp4lPSpiS6psrSiet87wyGPh9ft6wmhOMQ0hDiw==}
     engines: {node: '>=14.16'}
 
-  stripe@20.4.1:
-    resolution: {integrity: sha512-axCguHItc8Sxt0HC6aSkdVRPffjYPV7EQqZRb2GkIa8FzWDycE7nHJM19C6xAIynH1Qp1/BHiopSi96jGBxT0w==}
-    engines: {node: '>=16'}
+  stripe@22.1.1:
+    resolution: {integrity: sha512-cmodIYP27tBkJ8G7DuGgWw0PFuemlFZbuF3Wwr1TrjFjUa3T7NIgCe6TVwX8BO2ynu+xtTuDGfHafNDCPt9lXA==}
+    engines: {node: '>=18'}
     peerDependencies:
-      '@types/node': '>=16'
+      '@types/node': '>=18'
     peerDependenciesMeta:
       '@types/node':
         optional: true
@@ -24532,7 +24532,7 @@ snapshots:
 
   strip-json-comments@5.0.3: {}
 
-  stripe@20.4.1(@types/node@25.8.0):
+  stripe@22.1.1(@types/node@25.8.0):
     optionalDependencies:
       '@types/node': 25.8.0
 
