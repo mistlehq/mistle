@@ -157,7 +157,7 @@ fn collect_session_candidates(
         }
     }
 
-    candidates.sort_by(|left, right| right.modified.cmp(&left.modified));
+    candidates.sort_by_key(|candidate| std::cmp::Reverse(candidate.modified));
     Ok(candidates)
 }
 
