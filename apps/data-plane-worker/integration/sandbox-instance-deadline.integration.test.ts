@@ -290,6 +290,51 @@ describe.concurrent("data-plane worker sandbox instance deadlines", () => {
 
     await expectDeadlinesCleared(env, sandboxInstanceId);
   });
+
+  it("leaves snapshot lifecycle-owned sandboxes running when idle and disconnect deadlines fire", async ({
+    env,
+  }) => {
+    const sandboxInstanceId = "sbi_integration_snapshot_deadline_owned";
+    await insertSandboxInstance(env, {
+      sandboxInstanceId,
+      status: SandboxInstanceStatuses.RUNNING,
+      providerSandboxId: "provider-integration-snapshot-deadline-owned",
+      purpose: SandboxInstancePurposes.SNAPSHOT,
+    });
+    await insertBothDeadlineKinds(env, sandboxInstanceId);
+
+    await expect(
+      runDeadlineWorkflow(env, {
+        sandboxInstanceId,
+        kind: SandboxInstanceDeadlineKinds.IDLE,
+        ownerLeaseId: `owner_idle_${sandboxInstanceId}`,
+        dueAt: MatchingDeadlineDueAt,
+        generation: 1,
+      }),
+    ).resolves.toEqual({
+      sandboxInstanceId,
+      kind: SandboxInstanceDeadlineKinds.IDLE,
+      executed: false,
+      outcome: "snapshot_skipped",
+    });
+
+    await expect(
+      runDeadlineWorkflow(env, {
+        sandboxInstanceId,
+        kind: SandboxInstanceDeadlineKinds.DISCONNECT,
+        ownerLeaseId: `owner_disconnect_${sandboxInstanceId}`,
+        dueAt: MatchingDeadlineDueAt,
+        generation: 1,
+      }),
+    ).resolves.toEqual({
+      sandboxInstanceId,
+      kind: SandboxInstanceDeadlineKinds.DISCONNECT,
+      executed: false,
+      outcome: "snapshot_skipped",
+    });
+
+    await expectSandboxStillRunning(env, sandboxInstanceId);
+  });
 });
 
 async function insertSandboxInstance(
@@ -298,6 +343,7 @@ async function insertSandboxInstance(
     sandboxInstanceId: string;
     status: typeof SandboxInstanceStatuses.RUNNING | typeof SandboxInstanceStatuses.STARTING;
     providerSandboxId: string;
+    purpose?: typeof SandboxInstancePurposes.SESSION | typeof SandboxInstancePurposes.SNAPSHOT;
   },
 ): Promise<void> {
   await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
@@ -309,7 +355,7 @@ async function insertSandboxInstance(
     providerSandboxId: input.providerSandboxId,
     status: input.status,
     persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
-    purpose: SandboxInstancePurposes.SESSION,
+    purpose: input.purpose ?? SandboxInstancePurposes.SESSION,
     startedByKind: "system",
     startedById: `worker_${input.sandboxInstanceId}`,
     source: SandboxInstanceSources.DASHBOARD,

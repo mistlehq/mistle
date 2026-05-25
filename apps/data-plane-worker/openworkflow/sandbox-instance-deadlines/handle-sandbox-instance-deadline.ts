@@ -1,8 +1,9 @@
 import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
-import type {
-  DataPlaneDatabase,
-  DataPlaneTables,
-  SandboxInstanceDeadlineKind,
+import {
+  SandboxInstancePurposes,
+  type DataPlaneDatabase,
+  type DataPlaneTables,
+  type SandboxInstanceDeadlineKind,
 } from "@mistle/db/data-plane";
 import type { Clock } from "@mistle/time";
 import type { HandleSandboxInstanceDeadlineWorkflowOutput } from "@mistle/workflow-registry/data-plane";
@@ -27,6 +28,7 @@ export type HandleSandboxInstanceDeadlineOutcome =
   | "deadline_generation_mismatch"
   | "deadline_owner_lease_mismatch"
   | "deadline_due_at_mismatch"
+  | "snapshot_skipped"
   | `action_${StopSandboxInstanceResult["outcome"]}`
   | `action_${ReconcileSandboxInstanceResult["outcome"]}`;
 
@@ -100,6 +102,22 @@ export async function handleSandboxInstanceDeadline(
       kind: input.kind,
       executed: false,
       outcome: "deadline_due_at_mismatch",
+    };
+  }
+
+  const sandboxInstance = await ctx.db.query.sandboxInstances.findFirst({
+    columns: {
+      purpose: true,
+    },
+    where: (table, { eq }) => eq(table.id, input.sandboxInstanceId),
+  });
+
+  if (sandboxInstance?.purpose === SandboxInstancePurposes.SNAPSHOT) {
+    return {
+      sandboxInstanceId: input.sandboxInstanceId,
+      kind: input.kind,
+      executed: false,
+      outcome: "snapshot_skipped",
     };
   }
 

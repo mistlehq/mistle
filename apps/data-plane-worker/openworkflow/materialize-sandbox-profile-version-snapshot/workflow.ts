@@ -4,7 +4,7 @@ import {
   SandboxInstanceSources,
   SandboxStopReasons,
 } from "@mistle/db/data-plane";
-import { SandboxProvider } from "@mistle/sandbox";
+import { SandboxProvider, type SandboxImageHandle } from "@mistle/sandbox";
 import {
   MaterializeSandboxProfileVersionSnapshotWorkflowSpec,
   type MaterializeSandboxProfileVersionSnapshotWorkflowInput,
@@ -44,6 +44,16 @@ const SnapshotMaterializationFailureCodes = {
   STATUS_TRANSITION_TO_STOPPED_FAILED: "snapshot_status_transition_to_stopped_failed",
 } as const;
 export const SnapshotProviderRequestTimeoutMs = 5 * 60 * 1000;
+
+type SnapshotCaptureResult =
+  | {
+      captured: true;
+      image: SandboxImageHandle;
+    }
+  | {
+      captured: false;
+      errorMessage: string;
+    };
 
 type MaterializeSnapshotWorkflowExecutionContext = Pick<
   WorkflowContext,
@@ -180,6 +190,8 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
         });
         sandboxDestroyed = true;
       } catch (error) {
+        rethrowDurableStepErrorForRetry(error);
+
         logger.error(
           {
             err: error,
@@ -211,6 +223,8 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
           );
         });
       } catch (error) {
+        rethrowDurableStepErrorForRetry(error);
+
         logger.error(
           {
             err: error,
@@ -235,6 +249,8 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
           });
         });
       } catch (error) {
+        rethrowDurableStepErrorForRetry(error);
+
         logger.error(
           {
             err: error,
@@ -521,15 +537,35 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
         startedMessage: "Snapshot image capture started.",
       },
       async () => {
-        return step.run({ name: "capture-snapshot-image" }, async () => {
-          const resolvedRuntime =
-            await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+        const captureResult = await step.run(
+          { name: "capture-snapshot-image" },
+          async (): Promise<SnapshotCaptureResult> => {
+            const resolvedRuntime =
+              await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
 
-          return resolvedRuntime.sandboxAdapter.captureSnapshot({
-            id: startedSandbox.providerSandboxId,
-            providerRequestTimeoutMs: SnapshotProviderRequestTimeoutMs,
-          });
-        });
+            try {
+              const image = await resolvedRuntime.sandboxAdapter.captureSnapshot({
+                id: startedSandbox.providerSandboxId,
+                providerRequestTimeoutMs: SnapshotProviderRequestTimeoutMs,
+              });
+              return {
+                captured: true,
+                image,
+              };
+            } catch (error) {
+              return {
+                captured: false,
+                errorMessage: error instanceof Error ? error.message : String(error),
+              };
+            }
+          },
+        );
+
+        if (!captureResult.captured) {
+          throw new Error(captureResult.errorMessage);
+        }
+
+        return captureResult.image;
       },
     );
 

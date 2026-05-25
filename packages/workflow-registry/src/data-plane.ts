@@ -240,6 +240,7 @@ export type HandleSandboxInstanceDeadlineWorkflowOutput = {
     | "deadline_generation_mismatch"
     | "deadline_owner_lease_mismatch"
     | "deadline_due_at_mismatch"
+    | "snapshot_skipped"
     | "action_failed"
     | "action_stopped"
     | "action_already_failed"
