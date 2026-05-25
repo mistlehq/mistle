@@ -67,6 +67,25 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
         OrganizationPermissions.SANDBOX_PROFILE_READ,
       );
 
+      if (context.organizationActor.kind === "mcp_capability") {
+        const profile = await getProfile(
+          {
+            db: context.db,
+          },
+          {
+            organizationId: context.organizationActor.organizationId,
+            profileId: context.organizationActor.capability.sandboxProfileId,
+          },
+        );
+
+        return structuredResult({
+          totalResults: 1,
+          items: [profile],
+          nextPage: null,
+          previousPage: null,
+        });
+      }
+
       const result = await listProfiles(
         {
           db: context.db,
@@ -98,6 +117,12 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
         context.organizationActor,
         OrganizationPermissions.SANDBOX_PROFILE_READ,
       );
+      if (context.organizationActor.kind === "mcp_capability") {
+        requireMcpSandboxProfileScope(context.organizationActor, {
+          profileId,
+          version: context.organizationActor.capability.sandboxProfileVersion,
+        });
+      }
 
       const profile = await getProfile(
         {

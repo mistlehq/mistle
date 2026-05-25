@@ -805,6 +805,76 @@ describe.concurrent("MCP profile tools integration", () => {
     expect(queuedWorkflowInput.runtimePlan.setupScript).toBe(setupScript);
   });
 
+  it("authorizes setup assistant MCP tokens to read only the scoped sandbox profile", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-setup-assistant-read-scope@example.com",
+    });
+    const scopedProfileId = "sbp_mcp_setup_assistant_read_scope";
+    const otherProfileId = "sbp_mcp_setup_assistant_read_other";
+    const token = await mintMcpToken({
+      config: McpTokenConfig,
+      claims: {
+        kind: "setup_assistant",
+        sub: "sbi_mcp_setup_assistant_read_scope",
+        organizationId: session.organizationId,
+        sandboxProfileId: scopedProfileId,
+        sandboxProfileVersion: 1,
+      },
+      ttlSeconds: 300,
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values([
+      sandboxProfileRow({
+        id: scopedProfileId,
+        organizationId: session.organizationId,
+        displayName: "MCP Setup Assistant Read Scope Profile",
+        createdAt: "2026-05-06T00:00:00.000Z",
+      }),
+      sandboxProfileRow({
+        id: otherProfileId,
+        organizationId: session.organizationId,
+        displayName: "MCP Setup Assistant Read Other Profile",
+        createdAt: "2026-05-06T01:00:00.000Z",
+      }),
+    ]);
+
+    const scopedGetResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_get",
+      arguments: {
+        profileId: scopedProfileId,
+      },
+    });
+    const otherGetResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_get",
+      arguments: {
+        profileId: otherProfileId,
+      },
+    });
+    const listResult = await callMcpTool({
+      env,
+      token: token.token,
+      name: "profile_list",
+      arguments: {
+        limit: 10,
+      },
+    });
+
+    expect(scopedGetResult.isError).toBeUndefined();
+    expect(otherGetResult.isError).toBe(true);
+    expect(listResult.isError).toBeUndefined();
+    const scopedProfile = SandboxProfileSchema.parse(scopedGetResult.structuredContent);
+    const profileList = ListSandboxProfilesResponseSchema.parse(listResult.structuredContent);
+    expect(scopedProfile.id).toBe(scopedProfileId);
+    expect(profileList.totalResults).toBe(1);
+    expect(profileList.items.map((profile) => profile.id)).toEqual([scopedProfileId]);
+  });
+
   it("authorizes setup assistant MCP tokens for maintenance tools scoped to the token profile version", async ({
     env,
   }) => {
