@@ -27,6 +27,13 @@ export type SandboxProfileEditorVersionMode =
 
 export type SetupAssistantStartDialogVariant = "choice" | "save-required" | "use-saved-required";
 
+export function resolveSetupAssistantCloseSandboxInstanceId(input: {
+  currentPanelSandboxInstanceId: string | null;
+  dialogSandboxInstanceId: string | null;
+}): string | null {
+  return input.dialogSandboxInstanceId ?? input.currentPanelSandboxInstanceId;
+}
+
 type ResolveEditorVersionModeResult =
   | {
       ok: true;

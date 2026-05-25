@@ -135,9 +135,10 @@ import {
   applyDiscardedSandboxProfileVersionDraftToVersions,
   applyPublishedSandboxProfileVersionToProfile,
   applyPublishedSandboxProfileVersionToVersions,
-  resolveSetupAssistantStartDialogVariant,
   resolveSandboxProfileEditorVersionMode,
   resolveSandboxProfileSetupScriptIntegrationRows,
+  resolveSetupAssistantCloseSandboxInstanceId,
+  resolveSetupAssistantStartDialogVariant,
   shouldPollSandboxProfileSnapshotJobs,
   shouldRedirectDraftSandboxProfileViewToPublished,
   type SandboxProfileEditorVersionMode,
@@ -257,8 +258,7 @@ type SetupAssistantStartupOperation = {
 } | null;
 
 type SetupAssistantCloseDialogState = {
-  sandboxInstanceId: string;
-  errorMessage: string | null;
+  sandboxInstanceId: string | null;
 } | null;
 type SetupAssistantStartDialogState = {
   script: string;
@@ -1481,6 +1481,7 @@ function ReadySandboxProfileEditorPage(input: {
   );
   const [setupAssistantPanelState, setSetupAssistantPanelState] =
     useState<SetupScriptAssistantPanelState | null>(null);
+  const setupAssistantClosedDuringStartupRef = useRef(false);
   const setupAssistantPanelIsOpen = setupAssistantPanelState?.isOpen === true;
   const maintenanceAssistantPanelIsOpen =
     setupAssistantPanelState?.isOpen === true &&
@@ -1532,6 +1533,22 @@ function ReadySandboxProfileEditorPage(input: {
       }),
     [input.profileId],
   );
+  const stopSetupAssistantMutation = useMutation({
+    meta: NoLoadingIndicatorMeta,
+    mutationFn: async (sandboxInstanceId: string) =>
+      stopSandboxInstance({
+        instanceId: sandboxInstanceId,
+        idempotencyKey: crypto.randomUUID(),
+      }),
+    onError: (error: unknown) => {
+      console.error(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not stop Setup Assistant.",
+        }),
+      );
+    },
+  });
   const startSetupAssistantMutation = useMutation({
     meta: NoLoadingIndicatorMeta,
     mutationFn: async (request: { scriptKind: SetupAssistantScriptKind; version: number }) =>
@@ -1543,6 +1560,12 @@ function ReadySandboxProfileEditorPage(input: {
       }),
     onSuccess: (result) => {
       setSetupAssistantError(null);
+      if (setupAssistantClosedDuringStartupRef.current) {
+        setupAssistantClosedDuringStartupRef.current = false;
+        stopSetupAssistantMutation.mutate(result.sandboxInstanceId);
+        return;
+      }
+
       setSetupAssistantPanelState((currentState) => {
         if (currentState === null) {
           return currentState;
@@ -1556,6 +1579,7 @@ function ReadySandboxProfileEditorPage(input: {
       });
     },
     onError: (error: unknown) => {
+      setupAssistantClosedDuringStartupRef.current = false;
       setSetupAssistantPanelState((currentState) =>
         currentState === null
           ? currentState
@@ -1574,62 +1598,34 @@ function ReadySandboxProfileEditorPage(input: {
       );
     },
   });
-  const stopSetupAssistantMutation = useMutation({
-    meta: NoLoadingIndicatorMeta,
-    mutationFn: async (sandboxInstanceId: string) =>
-      stopSandboxInstance({
-        instanceId: sandboxInstanceId,
-        idempotencyKey: crypto.randomUUID(),
-      }),
-    onSuccess: () => {
-      setSetupAssistantCloseDialogState(null);
-      setSetupAssistantPanelState(null);
-    },
-    onError: (error: unknown) => {
-      setSetupAssistantCloseDialogState((currentState) =>
-        currentState === null
-          ? currentState
-          : {
-              ...currentState,
-              errorMessage: resolveApiErrorMessage({
-                error,
-                fallbackMessage: "Could not stop Setup Assistant.",
-              }),
-            },
-      );
-    },
-  });
   function requestSetupAssistantPanelClose(): void {
-    const sandboxInstanceId = setupAssistantPanelState?.sandboxInstanceId ?? null;
-    if (sandboxInstanceId === null) {
-      if (startSetupAssistantMutation.isPending) {
-        return;
-      }
-
-      setSetupAssistantPanelState(null);
-      return;
-    }
-
     setSetupAssistantCloseDialogState({
-      sandboxInstanceId,
-      errorMessage: null,
+      sandboxInstanceId: setupAssistantPanelState?.sandboxInstanceId ?? null,
     });
   }
 
   function cancelSetupAssistantPanelClose(): void {
-    if (stopSetupAssistantMutation.isPending) {
-      return;
-    }
-
     setSetupAssistantCloseDialogState(null);
   }
 
   function confirmSetupAssistantPanelClose(): void {
-    if (setupAssistantCloseDialogState === null || stopSetupAssistantMutation.isPending) {
+    if (setupAssistantCloseDialogState === null) {
       return;
     }
 
-    stopSetupAssistantMutation.mutate(setupAssistantCloseDialogState.sandboxInstanceId);
+    const sandboxInstanceId = resolveSetupAssistantCloseSandboxInstanceId({
+      currentPanelSandboxInstanceId: setupAssistantPanelState?.sandboxInstanceId ?? null,
+      dialogSandboxInstanceId: setupAssistantCloseDialogState.sandboxInstanceId,
+    });
+    setSetupAssistantCloseDialogState(null);
+    setSetupAssistantPanelState(null);
+    if (sandboxInstanceId === null) {
+      setupAssistantClosedDuringStartupRef.current = startSetupAssistantMutation.isPending;
+      return;
+    }
+
+    setupAssistantClosedDuringStartupRef.current = false;
+    stopSetupAssistantMutation.mutate(sandboxInstanceId);
   }
 
   function startSetupAssistantWithScript(inputValue: {
@@ -1642,6 +1638,7 @@ function ReadySandboxProfileEditorPage(input: {
     }
 
     setSetupAssistantError(null);
+    setupAssistantClosedDuringStartupRef.current = false;
     const initialComposerText = buildSetupAssistantInitialComposerText(
       inputValue.script,
       inputValue.scriptKind,
@@ -2166,9 +2163,7 @@ function ReadySandboxProfileEditorPage(input: {
         )}
       </ResizablePanelGroup>
       <SetupAssistantCloseDialog
-        errorMessage={setupAssistantCloseDialogState?.errorMessage ?? null}
         isOpen={setupAssistantCloseDialogState !== null}
-        isPending={stopSetupAssistantMutation.isPending}
         onCancel={cancelSetupAssistantPanelClose}
         onConfirm={confirmSetupAssistantPanelClose}
       />
@@ -2228,16 +2223,12 @@ export function SetupAssistantStartDialog(input: {
 }
 
 export function SetupAssistantCloseDialog(input: {
-  errorMessage: string | null;
   isOpen: boolean;
-  isPending: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 }): React.JSX.Element {
   return (
     <Dialog
-      isBusy={input.isPending}
-      isDismissible={!input.isPending}
       onOpenChange={(open) => {
         if (!open) {
           input.onCancel();
@@ -2254,51 +2245,17 @@ export function SetupAssistantCloseDialog(input: {
           </DialogDescription>
         </DialogHeader>
 
-        {input.errorMessage === null ? null : (
-          <Notice title="Could not stop Setup Assistant" variant="alert">
-            {input.errorMessage}
-          </Notice>
-        )}
-
         <DialogFooter>
-          <Button
-            disabled={input.isPending}
-            onClick={input.onCancel}
-            type="button"
-            variant="outline"
-          >
+          <Button onClick={input.onCancel} type="button" variant="outline">
             Cancel
           </Button>
-          <Button disabled={input.isPending} onClick={input.onConfirm} type="button">
-            {input.isPending ? "Stopping..." : "Stop and close"}
+          <Button onClick={input.onConfirm} type="button">
+            Stop and close
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-}
-
-function resolveSetupAssistantCloseDisabledReason(input: {
-  sandboxInstanceId: string | null;
-  sandboxLifecycleStatus: ReturnType<
-    typeof useSessionWorkbenchController
-  >["workbench"]["sandboxLifecycleStatus"];
-}): string | null {
-  if (input.sandboxInstanceId === null) {
-    return "Setup Assistant can be closed after startup completes.";
-  }
-
-  switch (input.sandboxLifecycleStatus) {
-    case "running":
-    case "stopped":
-    case "failed":
-      return null;
-    case "pending":
-    case "resuming":
-    case "starting":
-    case null:
-      return "Setup Assistant can be closed after startup completes.";
-  }
 }
 
 function SetupScriptAssistantPanel(input: {
@@ -2328,10 +2285,6 @@ function SetupScriptAssistantPanel(input: {
     : workbench.terminalPanelState.isVisible
       ? "Terminal"
       : "Open terminal";
-  const closeDisabledReason = resolveSetupAssistantCloseDisabledReason({
-    sandboxInstanceId: input.sandboxInstanceId,
-    sandboxLifecycleStatus: workbench.sandboxLifecycleStatus,
-  });
   const headerStatusKind = workbench.workbenchStatus.kind;
   const headerStatusLabel =
     headerStatusKind === "error" ? "Error" : (workbench.sandboxLifecycleStatus ?? "Starting");
@@ -2364,9 +2317,8 @@ function SetupScriptAssistantPanel(input: {
       <Button
         aria-label="Close Setup Assistant panel"
         className="absolute top-3 left-1 size-8 px-0"
-        disabled={closeDisabledReason !== null}
         onClick={input.onClose}
-        title={closeDisabledReason ?? "Close right panel"}
+        title="Close right panel"
         type="button"
         variant="ghost"
       >

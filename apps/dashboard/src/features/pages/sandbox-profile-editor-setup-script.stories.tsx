@@ -97,6 +97,13 @@ export const SetupAssistantPanelReady: Story = {
   },
 };
 
+export const SetupAssistantPanelDisconnected: Story = {
+  args: {
+    initialBindings: [StoryBindings[0], StoryBindings[1]],
+    setupAssistantPanelState: "disconnected",
+  },
+};
+
 export const SetupAssistantPanelWithDraft: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],

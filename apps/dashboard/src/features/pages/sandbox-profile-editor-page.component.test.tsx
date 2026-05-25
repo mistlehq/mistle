@@ -58,6 +58,7 @@ import {
   resolveCronExpressionBreakdown,
   resolveSandboxProfileEditorVersionMode,
   resolveSandboxProfileSetupScriptIntegrationRows,
+  resolveSetupAssistantCloseSandboxInstanceId,
   resolveSetupAssistantStartDialogVariant,
   resolveSnapshotRefreshScheduleBehaviorDescription,
   shouldPollSandboxProfileSnapshotJobs,
@@ -3045,6 +3046,43 @@ describe("SandboxProfileEditorPage", () => {
     ).toBeTruthy();
   });
 
+  it("closes the Setup Assistant panel immediately after stop confirmation during startup", async () => {
+    renderSandboxProfileEditor({
+      bindings: [
+        {
+          id: "binding-agent",
+          connectionId: "connection-agent",
+          kind: "agent",
+          config: {},
+        },
+      ],
+      routeSection: "sandbox-profile",
+      setupScript: "pnpm install\npnpm dev:bootstrap",
+      versionState: "draft",
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Setup Assistant",
+      }),
+    );
+
+    const closeButton = await screen.findByRole("button", {
+      name: "Close Setup Assistant panel",
+    });
+    expect(closeButton.hasAttribute("disabled")).toBe(false);
+
+    fireEvent.click(closeButton);
+    expect(screen.getByText("Stop Setup Assistant?")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Stop and close" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Close Setup Assistant panel" })).toBeNull();
+      expect(screen.queryByText("Stop Setup Assistant?")).toBeNull();
+    });
+  });
+
   it("asks whether to save before opening Setup Assistant when the saved draft is startable", () => {
     renderSandboxProfileEditor({
       bindings: [
@@ -3098,6 +3136,15 @@ describe("SandboxProfileEditorPage", () => {
         localDraftHasAgentRuntime: true,
       }),
     ).toBe("save-required");
+  });
+
+  it("uses the current Setup Assistant sandbox id when startup completes after close is requested", () => {
+    expect(
+      resolveSetupAssistantCloseSandboxInstanceId({
+        currentPanelSandboxInstanceId: "sbi_start_completed_after_close_request",
+        dialogSandboxInstanceId: null,
+      }),
+    ).toBe("sbi_start_completed_after_close_request");
   });
 
   it("uses the latest saved draft when local changes remove the saved agent", () => {
@@ -3224,9 +3271,7 @@ describe("SandboxProfileEditorPage", () => {
 
     render(
       <SetupAssistantCloseDialog
-        errorMessage={null}
         isOpen
-        isPending={false}
         onCancel={() => {
           canceled = true;
         }}
@@ -3250,38 +3295,6 @@ describe("SandboxProfileEditorPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Stop and close" }));
     expect(confirmed).toBe(true);
-  });
-
-  it("blocks duplicate Setup Assistant stop confirmations while stopping", () => {
-    let canceled = false;
-    let confirmed = false;
-
-    render(
-      <SetupAssistantCloseDialog
-        errorMessage="Stop request timed out."
-        isOpen
-        isPending
-        onCancel={() => {
-          canceled = true;
-        }}
-        onConfirm={() => {
-          confirmed = true;
-        }}
-      />,
-    );
-
-    expect(screen.getByText("Stop request timed out.")).toBeTruthy();
-
-    const cancelButton = screen.getByRole("button", { name: "Cancel" });
-    const confirmButton = screen.getByRole("button", { name: "Stopping..." });
-    expect(cancelButton.hasAttribute("disabled")).toBe(true);
-    expect(confirmButton.hasAttribute("disabled")).toBe(true);
-
-    fireEvent.click(cancelButton);
-    fireEvent.click(confirmButton);
-
-    expect(canceled).toBe(false);
-    expect(confirmed).toBe(false);
   });
 
   it("disables setup script testing for empty and published scripts", () => {

@@ -43,6 +43,7 @@ import {
   SandboxProfileEditorView,
   SandboxProfilePanelSection,
   SandboxProfileSetupScriptPanel,
+  SetupAssistantCloseDialog,
   SetupAssistantStartDialog,
 } from "./sandbox-profile-editor-page.js";
 import type { SandboxProfileEditorSection } from "./sandbox-profile-editor-sections.js";
@@ -124,7 +125,7 @@ export type SandboxProfileEditorPageStoryArgs = {
   setupScript: string | null;
   setupScriptDraft?: string;
   setupAssistantStartDialogState?: "choice" | "save-required" | "use-saved-required";
-  setupAssistantPanelState?: "closed" | "starting" | "ready" | "proposed-script";
+  setupAssistantPanelState?: "closed" | "starting" | "disconnected" | "ready" | "proposed-script";
   setupAssistantErrorMessage?: string;
   setupAssistantState?: "available" | "starting" | "disabled";
   setupScriptTestStatus?: SetupScriptTestStatus;
@@ -509,6 +510,14 @@ function SetupAssistantPanel(input: {
 }): React.JSX.Element {
   const controlClassName =
     "bg-transparent text-foreground shadow-none hover:bg-muted/60 aria-pressed:bg-muted";
+  const isConnected = input.state !== "starting" && input.state !== "disconnected";
+  const statusLabel =
+    input.state === "starting"
+      ? "Starting"
+      : input.state === "disconnected"
+        ? "Disconnected"
+        : "Connected";
+  const controlsAreDisabled = !isConnected;
 
   return (
     <aside className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden overscroll-contain">
@@ -528,25 +537,29 @@ function SetupAssistantPanel(input: {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <span
-            aria-label={input.state === "starting" ? "Starting" : "Connected"}
+            aria-label={statusLabel}
             className={[
               "inline-block size-2.5 rounded-full border",
-              input.state === "starting"
-                ? "border-muted-foreground/30 bg-muted-foreground/30"
-                : "border-emerald-700 bg-emerald-600",
+              isConnected
+                ? "border-emerald-700 bg-emerald-600"
+                : "border-muted-foreground/30 bg-muted-foreground/30",
             ].join(" ")}
             role="status"
-            title={input.state === "starting" ? "Starting" : "Connected"}
+            title={statusLabel}
           />
           <span aria-hidden className="h-5 w-px bg-border" />
           <Button
             aria-label="TUI"
             aria-pressed={false}
             className={controlClassName}
-            disabled={input.state === "starting"}
+            disabled={controlsAreDisabled}
             onClick={() => {}}
             size="sm"
-            title="Open Setup Assistant TUI"
+            title={
+              controlsAreDisabled
+                ? "Setup Assistant TUI is unavailable."
+                : "Open Setup Assistant TUI"
+            }
             type="button"
             variant="ghost"
           >
@@ -556,10 +569,10 @@ function SetupAssistantPanel(input: {
             aria-label="Open terminal"
             aria-pressed={false}
             className={controlClassName}
-            disabled={input.state === "starting"}
+            disabled={controlsAreDisabled}
             onClick={() => {}}
             size="icon-sm"
-            title="Open terminal"
+            title={controlsAreDisabled ? "Terminal is unavailable." : "Open terminal"}
             type="button"
             variant="ghost"
           >
@@ -778,6 +791,7 @@ function SandboxProfileEditorPageStoryView(
   const [setupAssistantStartDialogOpen, setSetupAssistantStartDialogOpen] = useState(
     input.setupAssistantStartDialogState !== undefined,
   );
+  const [setupAssistantCloseDialogOpen, setSetupAssistantCloseDialogOpen] = useState(false);
   const [setupAssistantPanelScript, setSetupAssistantPanelScript] = useState(setupScriptDraft);
   const [duplicateProfileDialogOpen, setDuplicateProfileDialogOpen] = useState(
     input.duplicateProfileDialogState === "open" || input.duplicateProfileDialogState === "error",
@@ -837,7 +851,7 @@ function SandboxProfileEditorPageStoryView(
   const agentRuntimeId = input.agentRuntimeId ?? "codex";
   function handleToggleSetupAssistant(): void {
     if (setupAssistantPanelOpen) {
-      setSetupAssistantPanelOpen(false);
+      setSetupAssistantCloseDialogOpen(true);
       return;
     }
 
@@ -864,6 +878,11 @@ function SandboxProfileEditorPageStoryView(
     setSetupAssistantStartDialogOpen(false);
     setSetupAssistantPanelState("ready");
     setSetupAssistantPanelOpen(true);
+  }
+
+  function handleConfirmSetupAssistantClose(): void {
+    setSetupAssistantCloseDialogOpen(false);
+    setSetupAssistantPanelOpen(false);
   }
 
   async function handleCreateApiKey(createInput: {
@@ -1165,13 +1184,20 @@ function SandboxProfileEditorPageStoryView(
             <ResizablePanel defaultSize="28%" id="setup-assistant-page-panel" minSize="360px">
               <SetupAssistantPanel
                 onClose={() => {
-                  setSetupAssistantPanelOpen(false);
+                  setSetupAssistantCloseDialogOpen(true);
                 }}
                 setupScript={setupAssistantPanelScript}
                 state={setupAssistantPanelState}
               />
             </ResizablePanel>
           </ResizablePanelGroup>
+          <SetupAssistantCloseDialog
+            isOpen={setupAssistantCloseDialogOpen}
+            onCancel={() => {
+              setSetupAssistantCloseDialogOpen(false);
+            }}
+            onConfirm={handleConfirmSetupAssistantClose}
+          />
         </div>
       )}
     </QueryClientProvider>
