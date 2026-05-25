@@ -162,7 +162,12 @@ fn write_auth_file_to_path(path: &Path, auth_file: AuthFile) -> Result<(), CliEr
         .map_err(|source| CliError::WriteAuthFile {
             path: path.display().to_string(),
             source,
-        })
+        })?;
+
+    set_auth_file_permissions(path).map_err(|source| CliError::WriteAuthFile {
+        path: path.display().to_string(),
+        source,
+    })
 }
 
 fn required_trimmed_field(
@@ -219,6 +224,19 @@ fn configure_auth_file_permissions(options: &mut OpenOptions) {
 
 #[cfg(not(unix))]
 fn configure_auth_file_permissions(_options: &mut OpenOptions) {}
+
+#[cfg(unix)]
+fn set_auth_file_permissions(path: &Path) -> io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let permissions = fs::Permissions::from_mode(0o600);
+    fs::set_permissions(path, permissions)
+}
+
+#[cfg(not(unix))]
+fn set_auth_file_permissions(_path: &Path) -> io::Result<()> {
+    Ok(())
+}
 
 fn default_auth_file_path() -> Result<PathBuf, CliError> {
     Ok(default_config_home()?
@@ -342,6 +360,27 @@ mod tests {
             contents,
             "{\n  \"authMode\": \"api_key\",\n  \"apiKey\": \"mstl_apk_written\"\n}\n"
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn tightens_existing_auth_file_permissions_when_rewriting() {
+        use std::fs::Permissions;
+        use std::os::unix::fs::PermissionsExt;
+
+        let path = temp_auth_file_path("permissions");
+        fs::write(&path, "{}\n").expect("write existing auth file");
+        fs::set_permissions(&path, Permissions::from_mode(0o644))
+            .expect("set existing auth file permissions");
+
+        write_api_key_to_path(&path, "mstl_apk_written").expect("rewrite auth file");
+
+        let permissions = fs::metadata(&path)
+            .expect("read auth file metadata")
+            .permissions()
+            .mode()
+            & 0o777;
+        assert_eq!(permissions, 0o600);
     }
 
     fn temp_auth_file_path(name: &str) -> std::path::PathBuf {

@@ -1,7 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 import { getControlPlaneDatabaseSchema, type ControlPlaneDatabase } from "@mistle/db/control-plane";
-import { UnauthorizedError } from "@mistle/http/errors.js";
+import { BadRequestError, UnauthorizedError } from "@mistle/http/errors.js";
 import { addMilliseconds, systemClock, type Clock } from "@mistle/time";
 import { eq, sql } from "drizzle-orm";
 
@@ -71,6 +71,7 @@ export async function createOAuthGrantTokenPair(input: {
 
 export async function refreshOAuthTokenPair(input: {
   db: ControlPlaneDatabase;
+  oauthClientId: string;
   refreshToken: string;
   clock?: Clock;
 }): Promise<OAuthTokenPair> {
@@ -83,6 +84,7 @@ export async function refreshOAuthTokenPair(input: {
   const grant = await input.db.query.oauthGrants.findFirst({
     columns: {
       id: true,
+      oauthClientId: true,
       revokedAt: true,
     },
     where: (table, { eq }) => eq(table.id, refreshTokenRow.oauthGrantId),
@@ -90,6 +92,9 @@ export async function refreshOAuthTokenPair(input: {
 
   if (grant === undefined || grant.revokedAt !== null) {
     throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
+  }
+  if (grant.oauthClientId !== input.oauthClientId) {
+    throw new BadRequestError("invalid_grant", "Refresh token client does not match.");
   }
 
   const permissions = await readGrantPermissions({ db: input.db, oauthGrantId: grant.id });

@@ -2,12 +2,18 @@ use std::process::Command;
 
 use mstl_core::auth::{API_KEY_ENV_VAR, CONTROL_PLANE_API_PUBLIC_URL_ENV_VAR};
 
+mod common;
+
 #[test]
 fn profile_get_requires_api_key_env_var() {
     let output = Command::new(env!("CARGO_BIN_EXE_mistle"))
         .args(["profile", "get", "sbp_test"])
         .env_remove(API_KEY_ENV_VAR)
         .env_remove(CONTROL_PLANE_API_PUBLIC_URL_ENV_VAR)
+        .env(
+            "XDG_CONFIG_HOME",
+            common::isolated_config_home("profile-get"),
+        )
         .output()
         .expect("mistle binary should run");
 

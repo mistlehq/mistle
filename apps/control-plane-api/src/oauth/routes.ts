@@ -1,4 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { OAuthGrantTypes } from "@mistle/db/control-plane";
 import { BadRequestError, handleHttpError, HttpError } from "@mistle/http/errors.js";
 import type { Context } from "hono";
 import { z } from "zod";
@@ -47,6 +48,7 @@ export function createOAuthRoutes(): AppRoutes<typeof OAUTH_ROUTE_BASE_PATH> {
       const client = await requireMistleCliOAuthClient({
         db,
         clientId: query.client_id,
+        grantType: OAuthGrantTypes.AUTHORIZATION_CODE,
       });
       await validateMistleCliRedirectUri({
         db,
@@ -85,12 +87,20 @@ export function createOAuthRoutes(): AppRoutes<typeof OAUTH_ROUTE_BASE_PATH> {
       const client = await requireMistleCliOAuthClient({
         db,
         clientId: body.client_id,
+        grantType:
+          body.grant_type === "authorization_code"
+            ? OAuthGrantTypes.AUTHORIZATION_CODE
+            : OAuthGrantTypes.REFRESH_TOKEN,
       });
 
       const result =
         body.grant_type === "authorization_code"
           ? await exchangeAuthorizationCodeToken({ db, body, oauthClientId: client.id })
-          : await refreshOAuthTokenPair({ db, refreshToken: body.refresh_token });
+          : await refreshOAuthTokenPair({
+              db,
+              oauthClientId: client.id,
+              refreshToken: body.refresh_token,
+            });
 
       return ctx.json(
         {

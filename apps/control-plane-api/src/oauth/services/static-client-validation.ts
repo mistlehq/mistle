@@ -3,7 +3,7 @@ import {
   OAuthApplicationTypes,
   OAuthClientRegistrationKinds,
   OAuthClientTypes,
-  OAuthGrantTypes,
+  type OAuthGrantType,
 } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 
@@ -17,6 +17,7 @@ import { OAuthErrorCodes } from "./authorization-code.js";
 export async function requireMistleCliOAuthClient(input: {
   db: ControlPlaneDatabase;
   clientId: string;
+  grantType: OAuthGrantType;
 }): Promise<{ id: string; permissions: readonly OrganizationPermission[] }> {
   if (input.clientId !== MistleCliOAuthClient.clientId) {
     throw new BadRequestError(OAuthErrorCodes.UNAUTHORIZED_CLIENT, "OAuth client is not allowed.");
@@ -41,15 +42,12 @@ export async function requireMistleCliOAuthClient(input: {
       grantType: true,
     },
     where: (table, { and, eq }) =>
-      and(
-        eq(table.oauthClientId, client.id),
-        eq(table.grantType, OAuthGrantTypes.AUTHORIZATION_CODE),
-      ),
+      and(eq(table.oauthClientId, client.id), eq(table.grantType, input.grantType)),
   });
   if (grantType === undefined) {
     throw new BadRequestError(
       OAuthErrorCodes.UNAUTHORIZED_CLIENT,
-      "OAuth client cannot use authorization code grants.",
+      `OAuth client cannot use ${input.grantType} grants.`,
     );
   }
 

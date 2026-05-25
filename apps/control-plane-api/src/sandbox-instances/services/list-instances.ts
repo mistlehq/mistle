@@ -149,7 +149,7 @@ type ListInstancesStartedByFilter =
     };
 
 type ListInstancesFilterInput = {
-  userId: string;
+  userId?: string;
   search?: string;
   owner?: "me";
   startedFrom?: "manual" | "trigger" | "event" | "schedule";
@@ -283,6 +283,13 @@ export async function listInstances(
     ListInstancesFilterInput,
 ): Promise<ListSandboxInstancesResult> {
   try {
+    if (input.owner === "me" && input.userId === undefined) {
+      throw new SandboxInstancesBadRequestError(
+        SandboxInstancesBadRequestCodes.INVALID_LIST_INSTANCES_INPUT,
+        "The owner=me filter requires a user-authenticated request.",
+      );
+    }
+
     const matchingSandboxProfileIds =
       input.search === undefined
         ? undefined

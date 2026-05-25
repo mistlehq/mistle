@@ -363,6 +363,7 @@ pub enum CurrentActorAuthentication {
         #[serde(rename = "apiKey")]
         api_key: CurrentActorApiKey,
     },
+    #[serde(rename = "oauth")]
     OAuth,
 }
 
@@ -1247,6 +1248,46 @@ mod tests {
                 permissions: vec![
                     "organization:api_keys:read".to_owned(),
                     "organization:sandboxes:read".to_owned(),
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn decodes_oauth_current_actor_response() {
+        let actor = serde_json::from_str::<CurrentActor>(
+            r#"{
+                "authentication": {
+                    "kind": "oauth"
+                },
+                "actor": {
+                    "kind": "user",
+                    "id": "usr_01"
+                },
+                "organization": {
+                    "id": "org_01"
+                },
+                "permissions": [
+                    "organization:read",
+                    "sandboxSession:read"
+                ]
+            }"#,
+        )
+        .expect("OAuth current actor response should decode");
+
+        assert_eq!(
+            actor,
+            CurrentActor {
+                authentication: CurrentActorAuthentication::OAuth,
+                actor: CurrentActorIdentity::User {
+                    id: "usr_01".to_owned(),
+                },
+                organization: CurrentActorOrganization {
+                    id: "org_01".to_owned(),
+                },
+                permissions: vec![
+                    "organization:read".to_owned(),
+                    "sandboxSession:read".to_owned(),
                 ],
             }
         );

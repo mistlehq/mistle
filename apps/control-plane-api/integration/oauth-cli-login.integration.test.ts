@@ -4,15 +4,22 @@
 
 import { createHash, randomUUID } from "node:crypto";
 
+import {
+  OAuthApplicationTypes,
+  OAuthClientRegistrationKinds,
+  OAuthClientTypes,
+} from "@mistle/db/control-plane";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
+import { and, eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import { CurrentActorResponseSchema } from "../src/me/get-current-actor/schema.js";
 import { OAuthTokenResponseSchema } from "../src/oauth/schemas.js";
+import { ListSandboxInstancesResponseSchema } from "../src/sandbox-instances/index.js";
 
 const it = createIntegrationTest({
-  services: ["control-plane-api"],
+  services: ["control-plane-api", "data-plane-api"],
 });
 
 describe.concurrent("OAuth CLI login integration", () => {
@@ -139,6 +146,18 @@ describe.concurrent("OAuth CLI login integration", () => {
       OrganizationPermissions.SANDBOX_SESSION_CONNECT,
     ]);
 
+    const sandboxInstancesResponse = await env.controlPlaneApi.http.fetch("/v1/sandbox/instances", {
+      headers: {
+        authorization: `Bearer ${tokenBody.access_token}`,
+      },
+    });
+    expect(sandboxInstancesResponse.status).toBe(200);
+    const sandboxInstances = ListSandboxInstancesResponseSchema.parse(
+      await sandboxInstancesResponse.json(),
+    );
+    expect(sandboxInstances.items).toStrictEqual([]);
+    expect(sandboxInstances.totalResults).toBe(0);
+
     const repeatedTokenResponse = await env.controlPlaneApi.http.fetch("/oauth/token", {
       method: "POST",
       headers: {
@@ -173,6 +192,44 @@ describe.concurrent("OAuth CLI login integration", () => {
     const refreshedTokenBody = OAuthTokenResponseSchema.parse(await refreshTokenResponse.json());
     expect(refreshedTokenBody.access_token).toMatch(/^mstl_oat_[A-Za-z0-9_-]+$/u);
     expect(refreshedTokenBody.refresh_token).toBe(tokenBody.refresh_token);
+
+    const otherClientId = `oac_test_${randomUUID()}`;
+    await env.controlPlaneDb.insert(env.controlPlaneTables.oauthClients).values({
+      id: otherClientId,
+      clientId: `integration-oauth-client-${randomUUID()}`,
+      name: "Other OAuth Client",
+      clientType: OAuthClientTypes.PUBLIC,
+      applicationType: OAuthApplicationTypes.NATIVE,
+      registrationKind: OAuthClientRegistrationKinds.STATIC,
+    });
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.oauthGrants)
+      .set({
+        oauthClientId: otherClientId,
+      })
+      .where(
+        and(
+          eq(env.controlPlaneTables.oauthGrants.userId, session.userId),
+          eq(env.controlPlaneTables.oauthGrants.organizationId, session.organizationId),
+        ),
+      );
+
+    const mismatchedClientRefreshResponse = await env.controlPlaneApi.http.fetch("/oauth/token", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: "mistle-cli",
+        refresh_token: tokenBody.refresh_token,
+      }),
+    });
+    expect(mismatchedClientRefreshResponse.status).toBe(400);
+    expect(await mismatchedClientRefreshResponse.json()).toStrictEqual({
+      error: "invalid_grant",
+      error_description: "Refresh token client does not match.",
+    });
   });
 
   it("rejects a mismatched PKCE verifier", async ({ env }) => {
