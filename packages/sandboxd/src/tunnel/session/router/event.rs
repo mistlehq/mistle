@@ -4,6 +4,7 @@
 //! loop can serialize writes and mutate shared session state.
 
 use super::*;
+use tracing::{field, warn};
 
 pub(in crate::tunnel::session) async fn handle_tunnel_session_event(
     event: TunnelSessionEvent,
@@ -15,6 +16,23 @@ pub(in crate::tunnel::session) async fn handle_tunnel_session_event(
     match event {
         TunnelSessionEvent::BootstrapClosed { reason } => {
             let reason_text = reason.unwrap_or_else(|| "bootstrap tunnel closed".to_string());
+            warn!(
+                event = "bootstrap_tunnel.router_observed_closed",
+                reason = %reason_text,
+                pending_agent_open_count = session_state.pending_agent_opens.len(),
+                active_agent_stream_count = session_state.agent_streams.len(),
+                pending_exec_open_count = session_state.pending_exec_opens.len(),
+                active_port_access_http_stream_count = session_state.port_access_http_streams.len(),
+                active_port_access_tcp_stream_count = session_state.port_access_tcp_streams.len(),
+                active_file_search_stream_count = session_state.file_search_streams.len(),
+                active_file_upload_count = session_state.file_uploads.len(),
+                operation_stream_requested = session_state.operation_stream_requested,
+                operation_stream_close_requested = session_state.operation_stream_close_requested,
+                pending_operation_record_count = session_state.pending_operation_records.len(),
+                agent_endpoint_url = field::display(
+                    session_state.agent_endpoint_url.as_deref().unwrap_or("")
+                ),
+            );
             close_port_access_tcp_streams(session_state);
             publish_bootstrap_closed_agent_stream_summaries(
                 tunnel_writer_sender,

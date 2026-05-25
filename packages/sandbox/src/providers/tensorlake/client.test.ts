@@ -5,7 +5,9 @@ import {
   DaemonReadinessPollTimeoutMs,
   TensorlakeDaemonSystemdEnvironmentVariables,
   TensorlakeRootProcessUser,
+  TensorlakeSandboxTimeoutSecs,
   createTensorlakeDaemonEnv,
+  createTensorlakeSandboxOptions,
   createTensorlakeSandboxdControlCommand,
   createTensorlakeSandboxName,
   createTensorlakeStartDaemonShellCommand,
@@ -83,5 +85,47 @@ describe("createTensorlakeSandboxName", () => {
         "sbi_abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz",
       ),
     ).toThrow("Sandbox instance id cannot be converted to a valid Tensorlake sandbox name.");
+  });
+});
+
+describe("createTensorlakeSandboxOptions", () => {
+  it("requests the maximum provider timeout so Mistle controls interactive session lifetime", () => {
+    expect(
+      createTensorlakeSandboxOptions({
+        sandboxInstanceId: "sbi_01krb9bvpweh0t4pb7b1mcsmme",
+        image: {
+          kind: "image",
+          id: "mistle-base",
+        },
+      }),
+    ).toMatchObject({
+      image: "mistle-base",
+      name: "mistle-sbi-01krb9bvpweh0t4pb7b1mcsmme",
+      timeoutSecs: TensorlakeSandboxTimeoutSecs,
+    });
+    expect(TensorlakeSandboxTimeoutSecs).toBe(0);
+  });
+
+  it("preserves requested Tensorlake resources with the maximum provider timeout request", () => {
+    expect(
+      createTensorlakeSandboxOptions({
+        sandboxInstanceId: "sbi_01krb9bvpweh0t4pb7b1mcsmme",
+        image: {
+          kind: "snapshot",
+          id: "snapshot-123",
+        },
+        resources: {
+          vcpuCount: 4,
+          memoryMb: 16_384,
+          storageMb: 30_720,
+        },
+      }),
+    ).toMatchObject({
+      snapshotId: "snapshot-123",
+      cpus: 4,
+      memoryMb: 16_384,
+      diskMb: 30_720,
+      timeoutSecs: TensorlakeSandboxTimeoutSecs,
+    });
   });
 });

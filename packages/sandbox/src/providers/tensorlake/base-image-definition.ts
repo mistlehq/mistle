@@ -39,6 +39,7 @@ function installSandboxBaseCommon(image: Image): Image {
   return image
     .env("DEBIAN_FRONTEND", "noninteractive")
     .env("container", "docker")
+    .env("HOME", "/root")
     .env("PATH", SandboxBasePath)
     .run(
       [

@@ -24,6 +24,7 @@ use tokio::time::timeout;
 use tokio_tungstenite::client_async_tls_with_config;
 use tokio_tungstenite::tungstenite::{Error as WebSocketError, Message, client::IntoClientRequest};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
+use tracing::{field, info, warn};
 use url::Url;
 
 use crate::protocol::startup::{StartupInput, TransparentProxyBypassKind};
@@ -507,13 +508,72 @@ pub(super) fn spawn_bootstrap_socket_task(
         loop {
             tokio::select! {
                 writer_result = &mut writer_task => {
-                    return writer_result
-                        .map_err(|error| TunnelSessionError::WriteTunnelText(error.to_string()))?;
+                    match writer_result {
+                        Ok(result) => {
+                            match &result {
+                                Ok(()) => info!(
+                                    event = "bootstrap_tunnel.writer_task_completed",
+                                    close_source = "writer_task",
+                                    outcome = "completed",
+                                ),
+                                Err(error) => warn!(
+                                    event = "bootstrap_tunnel.writer_task_completed",
+                                    close_source = "writer_task",
+                                    outcome = "error",
+                                    error = %error,
+                                ),
+                            }
+                            return result;
+                        }
+                        Err(error) => {
+                            warn!(
+                                event = "bootstrap_tunnel.writer_task_join_failed",
+                                close_source = "writer_task",
+                                outcome = "join_error",
+                                error = %error,
+                            );
+                            return Err(TunnelSessionError::WriteTunnelText(error.to_string()));
+                        }
+                    }
                 }
                 inbound = reader.next() => {
                     match inbound {
-                        Some(Ok(Message::Close(_))) | Some(Err(WebSocketError::ConnectionClosed)) | None => {
-                            let _ = event_sender.send(TunnelSessionEvent::BootstrapClosed { reason: None });
+                        Some(Ok(Message::Close(frame))) => {
+                            let close_code = frame.as_ref().map(|frame| frame.code.to_string());
+                            let close_reason = frame.as_ref().map(|frame| frame.reason.to_string());
+                            info!(
+                                event = "bootstrap_tunnel.reader_closed",
+                                close_source = "reader",
+                                close_kind = "close_frame",
+                                close_code = field::display(close_code.as_deref().unwrap_or("")),
+                                close_reason = field::display(close_reason.as_deref().unwrap_or("")),
+                            );
+                            let reason = bootstrap_close_frame_disconnect_reason(close_code, close_reason);
+                            let _ = event_sender.send(TunnelSessionEvent::BootstrapClosed { reason });
+                            writer_task.abort();
+                            return Ok(());
+                        }
+                        Some(Err(WebSocketError::ConnectionClosed)) => {
+                            info!(
+                                event = "bootstrap_tunnel.reader_closed",
+                                close_source = "reader",
+                                close_kind = "connection_closed",
+                            );
+                            let _ = event_sender.send(TunnelSessionEvent::BootstrapClosed {
+                                reason: Some("bootstrap websocket reported connection closed".to_string()),
+                            });
+                            writer_task.abort();
+                            return Ok(());
+                        }
+                        None => {
+                            info!(
+                                event = "bootstrap_tunnel.reader_closed",
+                                close_source = "reader",
+                                close_kind = "stream_ended",
+                            );
+                            let _ = event_sender.send(TunnelSessionEvent::BootstrapClosed {
+                                reason: Some("bootstrap websocket stream ended".to_string()),
+                            });
                             writer_task.abort();
                             return Ok(());
                         }
@@ -530,6 +590,12 @@ pub(super) fn spawn_bootstrap_socket_task(
                             let _ = event_sender.send(TunnelSessionEvent::BootstrapMessage(message));
                         }
                         Some(Err(error)) => {
+                            warn!(
+                                event = "bootstrap_tunnel.reader_closed",
+                                close_source = "reader",
+                                close_kind = "read_error",
+                                error = %error,
+                            );
                             let _ = event_sender.send(TunnelSessionEvent::BootstrapClosed {
                                 reason: Some(error.to_string()),
                             });
@@ -543,6 +609,15 @@ pub(super) fn spawn_bootstrap_socket_task(
     })
 }
 
+fn bootstrap_close_frame_disconnect_reason(
+    close_code: Option<String>,
+    close_reason: Option<String>,
+) -> Option<String> {
+    close_reason
+        .filter(|reason| !reason.is_empty())
+        .or_else(|| close_code.map(|code| format!("bootstrap tunnel close frame code {code}")))
+}
+
 async fn run_bootstrap_writer<W>(
     mut writer: W,
     mut receiver: mpsc::UnboundedReceiver<TunnelWriterMessage>,
@@ -553,6 +628,11 @@ where
     W: Sink<Message, Error = WebSocketError> + Unpin,
 {
     let notify_bootstrap_closed = |reason: Option<String>| {
+        info!(
+            event = "bootstrap_tunnel.writer_observed_closed",
+            close_source = "writer",
+            reason = field::display(reason.as_deref().unwrap_or("")),
+        );
         let _ = event_sender.send(TunnelSessionEvent::BootstrapClosed { reason });
     };
     let mut pending_outbound = VecDeque::new();
@@ -853,8 +933,8 @@ mod tests {
         TransparentProxyBypass, TransparentProxyBypassKind, TransparentProxyConfiguration,
     };
     use crate::tunnel::session::bootstrap::{
-        prioritize_ipv4_socket_addresses, resolve_tunnel_exchange_url,
-        startup_transparent_passthrough_socket_mark,
+        bootstrap_close_frame_disconnect_reason, prioritize_ipv4_socket_addresses,
+        resolve_tunnel_exchange_url, startup_transparent_passthrough_socket_mark,
     };
 
     #[test]
@@ -901,6 +981,25 @@ mod tests {
         assert_eq!(
             exchange_url,
             "http://127.0.0.1:5202/tunnel/sandbox/sbi_123/token-exchange?x-mistle-test-environment-id=test_env_123"
+        );
+    }
+
+    #[test]
+    fn bootstrap_close_frame_disconnect_reason_falls_back_to_code_for_blank_reason() {
+        assert_eq!(
+            bootstrap_close_frame_disconnect_reason(Some("1000".to_string()), Some(String::new())),
+            Some("bootstrap tunnel close frame code 1000".to_string())
+        );
+    }
+
+    #[test]
+    fn bootstrap_close_frame_disconnect_reason_prefers_non_empty_reason() {
+        assert_eq!(
+            bootstrap_close_frame_disconnect_reason(
+                Some("1000".to_string()),
+                Some("provider timeout".to_string()),
+            ),
+            Some("provider timeout".to_string())
         );
     }
 

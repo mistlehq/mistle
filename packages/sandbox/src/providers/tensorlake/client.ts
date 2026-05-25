@@ -53,6 +53,7 @@ const ResumeCommandArgs = ["resume"];
 const ReadyCommand = SandboxdCommand;
 const ReadyCommandArgs = ["ready"];
 const StartDaemonCommand = "sh";
+export const TensorlakeSandboxTimeoutSecs = 0;
 export const TensorlakeDaemonSystemdEnvironmentVariables = [
   "SANDBOX_RUNTIME_LISTEN_ADDR",
   "SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID",
@@ -168,7 +169,9 @@ function toIsoString(value: Date | undefined): string | null {
   return value === undefined ? null : value.toISOString();
 }
 
-function createSandboxOptions(request: TensorlakeStartSandboxRequest): CreateAndConnectOptions {
+export function createTensorlakeSandboxOptions(
+  request: TensorlakeStartSandboxRequest,
+): CreateAndConnectOptions {
   const imageOptions =
     request.image.kind === TensorlakeStartImageKinds.IMAGE
       ? { image: request.image.id }
@@ -177,6 +180,9 @@ function createSandboxOptions(request: TensorlakeStartSandboxRequest): CreateAnd
   return {
     ...imageOptions,
     name: createTensorlakeSandboxName(request.sandboxInstanceId),
+    // Tensorlake's provider default is 10 minutes. 0 requests the maximum
+    // allowed by the current Tensorlake plan without hard-coding a plan limit.
+    timeoutSecs: TensorlakeSandboxTimeoutSecs,
     ...(request.resources === undefined
       ? {}
       : {
@@ -294,7 +300,7 @@ export class TensorlakeApiClient implements TensorlakeClient {
   ): Promise<TensorlakeStartSandboxResponse> {
     const sandbox = await Sandbox.create({
       ...this.#clientOptions,
-      ...createSandboxOptions(request),
+      ...createTensorlakeSandboxOptions(request),
     });
     return { sandboxId: sandbox.sandboxId };
   }

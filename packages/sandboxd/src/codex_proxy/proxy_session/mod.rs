@@ -33,7 +33,8 @@ use crate::codex_proxy::proxy_session::activity::{
     request_kind_for_method, start_delivery_proxy_span, start_turn_lifecycle_span,
 };
 use crate::codex_proxy::proxy_session::delivery_context::{
-    delivery_trace_id, delivery_webhook_event_id, parse_delivery_context_payload,
+    delivery_scheduled_action_id, delivery_source, delivery_trace_id, delivery_webhook_event_id,
+    parse_delivery_context_payload,
 };
 use crate::codex_proxy::proxy_session::json_rpc::{
     json_rpc_id_key, parse_json_rpc_id_from_message, parse_json_value_from_message,
@@ -72,6 +73,126 @@ struct MatchedRetentionTarget {
     expected_turn_id: Option<String>,
     request_started_at: Instant,
     delivery_context: Option<DeliveryContext>,
+}
+
+fn proxy_client_kind_name(client_kind: ProxyClientKind) -> &'static str {
+    match client_kind {
+        ProxyClientKind::Unknown => "unknown",
+        ProxyClientKind::MistleAgentClient => "mistle_agent_client",
+        ProxyClientKind::Other => "other",
+    }
+}
+
+fn log_codex_proxy_transport_ended(input: CodexProxyTransportEndedLog<'_>) {
+    info!(
+        event = "codex_proxy.transport_ended",
+        transport_outcome = input.transport_outcome,
+        transport_reason = input.transport_reason,
+        client_kind = proxy_client_kind_name(input.client_kind),
+        active_turn_count = input.active_turn_count,
+        pending_request_count = input.pending_request_count,
+        pending_idempotency_count = input.pending_idempotency_count,
+        buffered_idempotency_count = input.buffered_idempotency_count,
+        buffered_success_response_count = input.buffered_success_response_count,
+        pending_compaction_request_count = input.pending_compaction_request_count,
+        active_compaction_count = input.active_compaction_count,
+        "otel.trace_id" =
+            field::display(input.delivery_context.map(delivery_trace_id).unwrap_or("")),
+        "mistle.delivery.source" =
+            field::display(input.delivery_context.map(delivery_source).unwrap_or("")),
+        "mistle.webhook_event_id" = field::display(
+            input
+                .delivery_context
+                .map(delivery_webhook_event_id)
+                .unwrap_or("")
+        ),
+        "mistle.scheduled_action_id" = field::display(
+            input
+                .delivery_context
+                .map(delivery_scheduled_action_id)
+                .unwrap_or("")
+        ),
+        "mistle.delivery_task_id" = field::display(
+            input
+                .delivery_context
+                .map(|context| context.delivery_task_id.as_str())
+                .unwrap_or("")
+        ),
+        "mistle.trigger_run_id" = field::display(
+            input
+                .delivery_context
+                .map(|context| context.trigger_run_id.as_str())
+                .unwrap_or("")
+        ),
+        "mistle.conversation_id" = field::display(
+            input
+                .delivery_context
+                .map(|context| context.conversation_id.as_str())
+                .unwrap_or("")
+        ),
+        "mistle.sandbox_instance_id" = field::display(
+            input
+                .delivery_context
+                .map(|context| context.sandbox_instance_id.as_str())
+                .unwrap_or("")
+        ),
+    );
+}
+
+struct CodexProxyTransportEndedLog<'a> {
+    transport_outcome: &'static str,
+    transport_reason: &'static str,
+    client_kind: ProxyClientKind,
+    active_turn_count: usize,
+    pending_request_count: usize,
+    pending_idempotency_count: usize,
+    buffered_idempotency_count: usize,
+    buffered_success_response_count: usize,
+    pending_compaction_request_count: usize,
+    active_compaction_count: usize,
+    delivery_context: Option<&'a DeliveryContext>,
+}
+
+fn finalize_proxy_transport_outcome(
+    active_turns: &mut BTreeMap<String, ActiveTurnState>,
+    pending_compaction_requests: &mut BTreeMap<String, PendingCompactionRequest>,
+    active_compactions: &mut BTreeMap<String, ActiveCompactionState>,
+    context: ProxyTransportOutcomeContext<'_>,
+) {
+    log_codex_proxy_transport_ended(CodexProxyTransportEndedLog {
+        transport_outcome: context.transport_outcome,
+        transport_reason: context.transport_reason,
+        client_kind: context.client_kind,
+        active_turn_count: active_turns.len(),
+        pending_request_count: context.pending_requests.len(),
+        pending_idempotency_count: context.pending_idempotency.len(),
+        buffered_idempotency_count: context.buffered_idempotency.len(),
+        buffered_success_response_count: context.buffered_success_responses.len(),
+        pending_compaction_request_count: pending_compaction_requests.len(),
+        active_compaction_count: active_compactions.len(),
+        delivery_context: context.current_delivery_context,
+    });
+    finalize_active_turns_for_transport_outcome(
+        active_turns,
+        context.transport_outcome,
+        context.transport_reason,
+    );
+    finalize_unresolved_compactions_for_transport_outcome(
+        pending_compaction_requests,
+        active_compactions,
+        context.transport_reason,
+    );
+}
+
+struct ProxyTransportOutcomeContext<'a> {
+    transport_outcome: &'static str,
+    transport_reason: &'static str,
+    client_kind: ProxyClientKind,
+    current_delivery_context: Option<&'a DeliveryContext>,
+    pending_requests: &'a BTreeMap<String, PendingClientRequest>,
+    pending_idempotency: &'a BTreeMap<String, StartedCodexOperation>,
+    buffered_idempotency: &'a BTreeMap<String, StartedCodexOperation>,
+    buffered_success_responses: &'a VecDeque<BufferedSuccessResponse>,
 }
 
 async fn prepare_client_message_idempotency(
@@ -171,36 +292,42 @@ pub async fn relay_codex_proxy_connection(
     let mut buffered_idempotency = BTreeMap::<String, StartedCodexOperation>::new();
     let mut buffered_success_responses = VecDeque::<BufferedSuccessResponse>::new();
     let mut next_response_sequence = 0_u64;
+    info!(
+        event = "codex_proxy.transport_connected",
+        raw_app_server_url = %raw_app_server_url,
+        client_kind = proxy_client_kind_name(client_kind),
+    );
+    macro_rules! finalize_transport {
+        ($transport_outcome:expr, $transport_reason:expr) => {
+            finalize_proxy_transport_outcome(
+                &mut active_turns,
+                &mut pending_compaction_requests,
+                &mut active_compactions,
+                ProxyTransportOutcomeContext {
+                    transport_outcome: $transport_outcome,
+                    transport_reason: $transport_reason,
+                    client_kind,
+                    current_delivery_context: current_delivery_context.as_ref(),
+                    pending_requests: &pending_requests,
+                    pending_idempotency: &pending_idempotency,
+                    buffered_idempotency: &buffered_idempotency,
+                    buffered_success_responses: &buffered_success_responses,
+                },
+            )
+        };
+    }
 
     loop {
         tokio::select! {
             _ = shutdown_receiver.changed() => {
-                finalize_active_turns_for_transport_outcome(
-                    &mut active_turns,
-                    "closed",
-                    "shutdown",
-                );
-                finalize_unresolved_compactions_for_transport_outcome(
-                    &mut pending_compaction_requests,
-                    &mut active_compactions,
-                    "shutdown",
-                );
+                finalize_transport!("closed", "shutdown");
                 return Ok(());
             },
             retention_result = retention_result_receiver.recv() => {
                 if let Some(retention_result) = retention_result {
                     record_retention_result(&retention_result, &mut buffered_success_responses);
                 } else {
-                    finalize_active_turns_for_transport_outcome(
-                        &mut active_turns,
-                        "closed",
-                        "retention_channel_closed",
-                    );
-                    finalize_unresolved_compactions_for_transport_outcome(
-                        &mut pending_compaction_requests,
-                        &mut active_compactions,
-                        "retention_channel_closed",
-                    );
+                    finalize_transport!("closed", "retention_channel_closed");
                     return Ok(());
                 }
             }
@@ -208,16 +335,7 @@ pub async fn relay_codex_proxy_connection(
                 match client_message {
                     Some(Ok(message)) => {
                         if let Message::Close(frame) = message {
-                            finalize_active_turns_for_transport_outcome(
-                                &mut active_turns,
-                                "closed",
-                                "client_close",
-                            );
-                            finalize_unresolved_compactions_for_transport_outcome(
-                                &mut pending_compaction_requests,
-                                &mut active_compactions,
-                                "client_close",
-                            );
+                            finalize_transport!("closed", "client_close");
                             if let Err(error) = raw_socket.send(Message::Close(frame)).await {
                                 return Err(CodexProxyError::WriteSocket(error));
                             }
@@ -248,56 +366,20 @@ pub async fn relay_codex_proxy_connection(
                                 pending_requests: &mut pending_requests,
                             },
                         )? && let Err(error) = raw_socket.send(prepared_message).await {
-                            finalize_active_turns_for_transport_outcome(
-                                &mut active_turns,
-                                "reset",
-                                "raw_write_error",
-                            );
-                            finalize_unresolved_compactions_for_transport_outcome(
-                                &mut pending_compaction_requests,
-                                &mut active_compactions,
-                                "raw_write_error",
-                            );
+                            finalize_transport!("reset", "raw_write_error");
                             return Err(CodexProxyError::WriteSocket(error));
                         }
                     }
                     Some(Err(error)) if is_connection_termination_error(&error) => {
-                        finalize_active_turns_for_transport_outcome(
-                            &mut active_turns,
-                            "closed",
-                            "client_terminated",
-                        );
-                        finalize_unresolved_compactions_for_transport_outcome(
-                            &mut pending_compaction_requests,
-                            &mut active_compactions,
-                            "client_terminated",
-                        );
+                        finalize_transport!("closed", "client_terminated");
                         return Ok(());
                     }
                     Some(Err(error)) => {
-                        finalize_active_turns_for_transport_outcome(
-                            &mut active_turns,
-                            "reset",
-                            "client_socket_error",
-                        );
-                        finalize_unresolved_compactions_for_transport_outcome(
-                            &mut pending_compaction_requests,
-                            &mut active_compactions,
-                            "client_socket_error",
-                        );
+                        finalize_transport!("reset", "client_socket_error");
                         return Err(CodexProxyError::ReadSocket(error));
                     }
                     None => {
-                        finalize_active_turns_for_transport_outcome(
-                            &mut active_turns,
-                            "closed",
-                            "client_stream_ended",
-                        );
-                        finalize_unresolved_compactions_for_transport_outcome(
-                            &mut pending_compaction_requests,
-                            &mut active_compactions,
-                            "client_stream_ended",
-                        );
+                        finalize_transport!("closed", "client_stream_ended");
                         return Ok(());
                     }
                 }
@@ -306,16 +388,7 @@ pub async fn relay_codex_proxy_connection(
                 match raw_message {
                     Some(Ok(message)) => {
                         if let Message::Close(frame) = message {
-                            finalize_active_turns_for_transport_outcome(
-                                &mut active_turns,
-                                "closed",
-                                "raw_close",
-                            );
-                            finalize_unresolved_compactions_for_transport_outcome(
-                                &mut pending_compaction_requests,
-                                &mut active_compactions,
-                                "raw_close",
-                            );
+                            finalize_transport!("closed", "raw_close");
                             if let Err(error) = client_socket.send(Message::Close(frame)).await {
                                 return Err(CodexProxyError::WriteSocket(error));
                             }
@@ -430,56 +503,20 @@ pub async fn relay_codex_proxy_connection(
                                 });
                             });
                         } else if let Err(error) = client_socket.send(message).await {
-                            finalize_active_turns_for_transport_outcome(
-                                &mut active_turns,
-                                "reset",
-                                "client_write_error",
-                            );
-                            finalize_unresolved_compactions_for_transport_outcome(
-                                &mut pending_compaction_requests,
-                                &mut active_compactions,
-                                "client_write_error",
-                            );
+                            finalize_transport!("reset", "client_write_error");
                             return Err(CodexProxyError::WriteSocket(error));
                         }
                     }
                     Some(Err(error)) if is_connection_termination_error(&error) => {
-                        finalize_active_turns_for_transport_outcome(
-                            &mut active_turns,
-                            "reset",
-                            "raw_terminated",
-                        );
-                        finalize_unresolved_compactions_for_transport_outcome(
-                            &mut pending_compaction_requests,
-                            &mut active_compactions,
-                            "raw_terminated",
-                        );
+                        finalize_transport!("reset", "raw_terminated");
                         return Ok(());
                     }
                     Some(Err(error)) => {
-                        finalize_active_turns_for_transport_outcome(
-                            &mut active_turns,
-                            "reset",
-                            "raw_socket_error",
-                        );
-                        finalize_unresolved_compactions_for_transport_outcome(
-                            &mut pending_compaction_requests,
-                            &mut active_compactions,
-                            "raw_socket_error",
-                        );
+                        finalize_transport!("reset", "raw_socket_error");
                         return Err(CodexProxyError::ReadSocket(error));
                     }
                     None => {
-                        finalize_active_turns_for_transport_outcome(
-                            &mut active_turns,
-                            "reset",
-                            "raw_stream_ended",
-                        );
-                        finalize_unresolved_compactions_for_transport_outcome(
-                            &mut pending_compaction_requests,
-                            &mut active_compactions,
-                            "raw_stream_ended",
-                        );
+                        finalize_transport!("reset", "raw_stream_ended");
                         return Ok(());
                     }
                 }

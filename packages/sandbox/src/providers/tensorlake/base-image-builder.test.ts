@@ -50,12 +50,15 @@ describe("TensorlakeBaseImageBuilder", () => {
     expect(dockerfileText).toContain("kmod");
     expect(dockerfileText).toContain("update-alternatives --set iptables /usr/sbin/iptables-nft");
     expect(dockerfileText).toContain("update-alternatives --set ip6tables /usr/sbin/ip6tables-nft");
+    expect(dockerfileText).not.toContain('"iptables": false');
+    expect(dockerfileText).not.toContain('"ip6tables": false');
     expect(dockerfileText).not.toContain("linux-modules-$(uname -r)");
     expect(dockerfileText).toContain("sudo");
     expect(dockerfileText).toContain("systemd");
     expect(dockerfileText).toContain("systemd-sysv");
     expect(dockerfileText).toContain("https://mise.run");
     expect(dockerfileText).toContain("https://archil.com/install");
+    expect(dockerfileText).toContain('ENV HOME="/root"');
     expect(dockerfileText).toContain("WORKDIR /root");
     expect(dockerfileText).toContain(
       "COPY packages/sandboxd/scripts/cmddir /opt/mistle/bin/cmddir",
