@@ -85,6 +85,7 @@ const MigrationLockTimeoutMs = 120_000;
 const PostgresCleanupRetryDelayMs = 100;
 const PostgresCleanupMaxAttempts = 3;
 const PostgresDeadlockDetectedCode = "40P01";
+const SandboxBaseImageRegistryLockTimeoutMs = 3 * 60_000;
 const PostgresMigrationCoordinatorRootDirectoryPath = join(
   tmpdir(),
   "mistle-test-harness",
@@ -430,6 +431,7 @@ async function acquireSandboxBaseImageRegistry(): Promise<
     runId: session.runId,
     coordinatorDir: session.coordinatorDir,
     key: `sandbox-base-image-registry:${source.kind}:${source.imageRef}:${DefaultSandboxBaseImageBuild.repositoryPath}`,
+    lockTimeoutMs: SandboxBaseImageRegistryLockTimeoutMs,
     start: async () =>
       startSandboxBaseImageRegistry({
         sourceImageRef: source.imageRef,

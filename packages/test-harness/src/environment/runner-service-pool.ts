@@ -53,6 +53,11 @@ type PersistedRunnerService = {
   startedAt: number;
 };
 
+type RunnerServicePoolLockOwner = {
+  createdAt: number;
+  pid: number;
+};
+
 const LocalStopCallbacksByStateFilePath = new Map<string, () => Promise<void>>();
 const LocalLeaseCountsByStateFilePath = new Map<string, number>();
 
@@ -355,18 +360,40 @@ async function withRunnerServicePoolLock<T>(
     }
   }
 
-  throw new Error(`Timed out acquiring runner service pool lock '${paths.lockDirectoryPath}'.`);
+  const lockOwner = await readLockOwner(paths.lockOwnerFilePath);
+  const lockOwnerDescription =
+    lockOwner === undefined
+      ? "lock owner unavailable"
+      : `lock owner pid=${String(lockOwner.pid)} alive=${String(isProcessAlive(lockOwner.pid))} ageMs=${String(
+          systemClock.nowMs() - lockOwner.createdAt,
+        )}`;
+
+  throw new Error(
+    `Timed out acquiring runner service pool lock '${paths.lockDirectoryPath}' after ${String(paths.timeoutMs)}ms (${lockOwnerDescription}).`,
+  );
 }
 
 async function isLockOwnerDead(lockOwnerFilePath: string): Promise<boolean> {
+  const lockOwner = await readLockOwner(lockOwnerFilePath);
+  return lockOwner !== undefined && !isProcessAlive(lockOwner.pid);
+}
+
+async function readLockOwner(
+  lockOwnerFilePath: string,
+): Promise<RunnerServicePoolLockOwner | undefined> {
   const raw = await readTextFile(lockOwnerFilePath);
   if (raw === undefined) {
-    return false;
+    return undefined;
   }
 
   const parsed = parseJsonRecord(raw, "runner service pool lock owner");
   const pid = readNumber(parsed, "pid", "runner service pool lock owner pid");
-  return !isProcessAlive(pid);
+  const createdAt = readNumber(parsed, "createdAt", "runner service pool lock owner createdAt");
+
+  return {
+    createdAt,
+    pid,
+  };
 }
 
 async function readPersistedService(

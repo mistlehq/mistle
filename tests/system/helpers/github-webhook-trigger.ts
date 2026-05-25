@@ -44,6 +44,7 @@ export const ResourceSyncTimeoutMs = 2 * 60_000;
 export const ThreadReadTimeoutMs = 90_000;
 export const AgentReplyTimeoutMs = 3 * 60_000;
 export const GitHubIssueCommentConsistencyTimeoutMs = 30_000;
+export const GitHubIssueCommentCreateRetryDelayMs = 10_000;
 export const GitHubWebhookConfigTimeoutMs = 30_000;
 
 const RequiredEnvNames = [
@@ -153,6 +154,19 @@ const GitHubIssueCommentListResponseSchema = z.array(GitHubIssueCommentResponseS
 type GitHubIssueComment = z.infer<typeof GitHubIssueCommentResponseSchema>;
 type CodexThreadReadResult = Awaited<ReturnType<typeof readCodexThread>>;
 type GitHubWebhookSource = z.infer<typeof IntegrationWebhookSourceResponseSchema>;
+
+class GitHubRequestError extends Error {
+  public readonly bodyText: string;
+  public readonly status: number;
+
+  public constructor(input: { bodyText: string; description: string; status: number }) {
+    super(
+      `${input.description} failed with status ${String(input.status)}. Response body: ${input.bodyText}`,
+    );
+    this.bodyText = input.bodyText;
+    this.status = input.status;
+  }
+}
 
 const GitHubIssueCommentWebhookCapabilitiesProviderMetadata =
   buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata({
@@ -664,9 +678,11 @@ async function githubRequestJson<TSchema extends z.ZodType>(input: {
 
   const bodyText = await response.text().catch(() => "");
   if (!response.ok) {
-    throw new Error(
-      `${input.description} failed with status ${String(response.status)}. Response body: ${bodyText}`,
-    );
+    throw new GitHubRequestError({
+      bodyText,
+      description: input.description,
+      status: response.status,
+    });
   }
 
   let parsed: unknown;
@@ -689,6 +705,35 @@ function isGitHubIssueCommentNodeConsistencyError(error: unknown): boolean {
   );
 }
 
+function isGitHubTransientServerError(error: unknown): boolean {
+  return error instanceof GitHubRequestError && error.status >= 500 && error.status <= 599;
+}
+
+async function findGitHubIssueCommentByBody(input: {
+  owner: string;
+  repo: string;
+  issueNumber: number;
+  token: string;
+  body: string;
+}): Promise<GitHubIssueComment | null> {
+  const comments = await githubRequestJson({
+    method: "GET",
+    path: `/repos/${input.owner}/${input.repo}/issues/${String(input.issueNumber)}/comments`,
+    token: input.token,
+    description: "GitHub issue comment listing",
+    schema: GitHubIssueCommentListResponseSchema,
+  });
+
+  for (let index = comments.length - 1; index >= 0; index -= 1) {
+    const comment = comments[index];
+    if (comment !== undefined && comment.body === input.body) {
+      return comment;
+    }
+  }
+
+  return null;
+}
+
 async function createGitHubIssueCommentWithConsistencyWait(input: {
   owner: string;
   repo: string;
@@ -696,10 +741,43 @@ async function createGitHubIssueCommentWithConsistencyWait(input: {
   token: string;
   body: string;
 }): Promise<GitHubIssueComment> {
+  let lastTransientCreateFailureAtMs: number | null = null;
+  let shouldVerifyPreviousCreateAttempt = false;
+
   return await waitForCondition({
     description: `GitHub issue ${String(input.issueNumber)} comment creation`,
     timeoutMs: GitHubIssueCommentConsistencyTimeoutMs,
     evaluate: async () => {
+      if (shouldVerifyPreviousCreateAttempt) {
+        const existingComment = await findGitHubIssueCommentByBody(input).catch(
+          (error: unknown) => {
+            if (isGitHubTransientServerError(error)) {
+              return undefined;
+            }
+
+            throw error;
+          },
+        );
+
+        if (existingComment === undefined) {
+          return null;
+        }
+
+        if (existingComment !== null) {
+          return existingComment;
+        }
+
+        shouldVerifyPreviousCreateAttempt = false;
+      }
+
+      const nowMs = Date.now();
+      if (
+        lastTransientCreateFailureAtMs !== null &&
+        nowMs - lastTransientCreateFailureAtMs < GitHubIssueCommentCreateRetryDelayMs
+      ) {
+        return null;
+      }
+
       try {
         return await githubRequestJson({
           method: "POST",
@@ -713,6 +791,12 @@ async function createGitHubIssueCommentWithConsistencyWait(input: {
         });
       } catch (error) {
         if (isGitHubIssueCommentNodeConsistencyError(error)) {
+          return null;
+        }
+
+        if (isGitHubTransientServerError(error)) {
+          lastTransientCreateFailureAtMs = Date.now();
+          shouldVerifyPreviousCreateAttempt = true;
           return null;
         }
 
