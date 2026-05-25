@@ -31,6 +31,60 @@ export type StartupFailureEvidence = {
   sequence: number;
 };
 
+export type StartupEventSummary = {
+  operationId: string;
+  sequence: number;
+  recordKind: string;
+  observedAt: string;
+  createdAt: string;
+  phase: SandboxLifecyclePhase | null;
+  status: string | null;
+  stream: SandboxOperationTranscriptStream | null;
+  message: string;
+  attributes: Record<string, unknown>;
+};
+
+export async function resolveLatestStartupEventSummary(ctx: {
+  db: DataPlaneDatabase;
+  sandboxInstanceId: string;
+}): Promise<StartupEventSummary | null> {
+  const latestEvents = await ctx.db.query.sandboxOperationEvents.findMany({
+    columns: {
+      operationId: true,
+      sequence: true,
+      recordKind: true,
+      observedAt: true,
+      createdAt: true,
+      phase: true,
+      status: true,
+      stream: true,
+      message: true,
+      attributes: true,
+    },
+    where: (table, { eq }) => eq(table.sandboxInstanceId, ctx.sandboxInstanceId),
+    orderBy: (table, { desc }) => [desc(table.createdAt), desc(table.sequence)],
+    limit: 1,
+  });
+
+  const latestEvent = latestEvents[0];
+  if (latestEvent === undefined) {
+    return null;
+  }
+
+  return {
+    operationId: latestEvent.operationId,
+    sequence: latestEvent.sequence,
+    recordKind: latestEvent.recordKind,
+    observedAt: latestEvent.observedAt,
+    createdAt: latestEvent.createdAt,
+    phase: latestEvent.phase,
+    status: latestEvent.status,
+    stream: latestEvent.stream,
+    message: latestEvent.message,
+    attributes: latestEvent.attributes,
+  };
+}
+
 export async function resolveStartupFailureEvidence(ctx: {
   db: DataPlaneDatabase;
   sandboxInstanceId: string;

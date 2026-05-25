@@ -419,6 +419,18 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
             if (attachedPeer !== undefined) {
               if (admittedRequest.kind === "bootstrap") {
                 const closeTasks: Promise<void>[] = [];
+                logger.info(
+                  {
+                    eventName: "gateway.bootstrap.close.observed",
+                    closeCode: event.code,
+                    closeReason: event.reason,
+                    ownerLeaseId: admittedRequest.ownerLeaseId,
+                    relaySessionId,
+                    sandboxInstanceId,
+                    tokenKind: sourceTokenKind,
+                  },
+                  "Observed sandbox bootstrap websocket close before detach cleanup.",
+                );
                 input.portAccessTransportService.rejectPendingStreamsForBootstrapSession({
                   sandboxInstanceId,
                   targetBootstrapSessionId: relaySessionId,
@@ -484,6 +496,8 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                   tunnelSessionService
                     .detachBootstrapPeer({
                       attachedPeer,
+                      closeCode: event.code,
+                      closeReason: event.reason,
                       leaseId: admittedRequest.ownerLeaseId,
                       sandboxInstanceId,
                       ...(testEnvironmentId === undefined ? {} : { testEnvironmentId }),

@@ -194,6 +194,7 @@ export const ReconcileSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         reason: input.reason,
         executed: result.executed,
         outcome: result.outcome,
+        ...(result.diagnostics === undefined ? {} : { reconcileDiagnostics: result.diagnostics }),
         ...(terminationResult === undefined
           ? {}
           : { bootstrapAttachmentTerminationOutcome: terminationResult.outcome }),

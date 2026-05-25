@@ -371,6 +371,8 @@ export class TunnelSessionService {
    */
   public async detachBootstrapPeer(input: {
     attachedPeer: AttachedTunnelPeer;
+    closeCode?: number;
+    closeReason?: string;
     leaseId: string;
     sandboxInstanceId: string;
     testEnvironmentId?: string;
@@ -379,6 +381,17 @@ export class TunnelSessionService {
     input.attachedPeer.websocketHealthHandle?.stop();
 
     if (!this.relayCoordinator.isCurrentPeer(input.attachedPeer.relayTarget)) {
+      logger.info(
+        {
+          eventName: "gateway.bootstrap.detach.skipped",
+          closeCode: input.closeCode,
+          closeReason: input.closeReason,
+          ownerLeaseId: input.leaseId,
+          relaySessionId: input.attachedPeer.relayTarget.sessionId,
+          sandboxInstanceId: input.sandboxInstanceId,
+        },
+        "Skipped bootstrap detach side effects because peer was no longer current.",
+      );
       this.relayCoordinator.detachPeerWithOptions({
         target: input.attachedPeer.relayTarget,
         notifyOppositePeer: false,
@@ -390,9 +403,24 @@ export class TunnelSessionService {
       sandboxInstanceId: input.sandboxInstanceId,
       operation: async () => {
         if (!this.relayCoordinator.isCurrentPeer(input.attachedPeer.relayTarget)) {
+          logger.info(
+            {
+              eventName: "gateway.bootstrap.detach.skipped",
+              closeCode: input.closeCode,
+              closeReason: input.closeReason,
+              ownerLeaseId: input.leaseId,
+              relaySessionId: input.attachedPeer.relayTarget.sessionId,
+              sandboxInstanceId: input.sandboxInstanceId,
+            },
+            "Skipped bootstrap detach side effects because peer changed before deadline update.",
+          );
           return;
         }
 
+        const previousAttachment = await this.sandboxRuntimeAttachmentStore.getAttachment({
+          sandboxInstanceId: input.sandboxInstanceId,
+          nowMs: this.clock.nowMs(),
+        });
         await this.sandboxRuntimeAttachmentStore.clearAttachment({
           sandboxInstanceId: input.sandboxInstanceId,
           ownerLeaseId: input.leaseId,
@@ -404,6 +432,26 @@ export class TunnelSessionService {
             ? {}
             : { testEnvironmentId: input.testEnvironmentId }),
         });
+        const nextAttachment = await this.sandboxRuntimeAttachmentStore.getAttachment({
+          sandboxInstanceId: input.sandboxInstanceId,
+          nowMs: this.clock.nowMs(),
+        });
+        logger.info(
+          {
+            eventName: "gateway.bootstrap.detach.recorded",
+            closeCode: input.closeCode,
+            closeReason: input.closeReason,
+            ownerLeaseId: input.leaseId,
+            relaySessionId: input.attachedPeer.relayTarget.sessionId,
+            sandboxInstanceId: input.sandboxInstanceId,
+            previousAttachmentOwnerLeaseId: previousAttachment?.ownerLeaseId ?? null,
+            previousAttachmentSessionId: previousAttachment?.sessionId ?? null,
+            nextAttachmentOwnerLeaseId: nextAttachment?.ownerLeaseId ?? null,
+            nextAttachmentSessionId: nextAttachment?.sessionId ?? null,
+            disconnectDeadlineScheduled: true,
+          },
+          "Recorded sandbox bootstrap detach and scheduled disconnect reconciliation.",
+        );
       },
     });
 

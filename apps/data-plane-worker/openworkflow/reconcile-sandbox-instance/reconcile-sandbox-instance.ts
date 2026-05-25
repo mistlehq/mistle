@@ -29,8 +29,11 @@ import { markSandboxInstanceFailed } from "./mark-sandbox-instance-failed.js";
 import { markSandboxInstanceStopped } from "./mark-sandbox-instance-stopped.js";
 import {
   formatStartupDisconnectFailureMessage,
+  resolveLatestStartupEventSummary,
   resolveStartupFailureEvidence,
   shouldEnrichStartupDisconnectFailure,
+  type StartupEventSummary,
+  type StartupFailureEvidence,
 } from "./startup-failure-evidence.js";
 
 type ActiveSandboxInstance = {
@@ -77,7 +80,36 @@ export type ReconcileSandboxInstanceResult = {
   executed: boolean;
   outcome: ReconcileSandboxInstanceOutcome;
   bootstrapAttachmentTerminationTarget?: ReconcileBootstrapAttachmentTerminationTarget;
+  diagnostics?: ReconcileSandboxInstanceDiagnostics;
   usageEventState?: ReconcileSandboxUsageEventState;
+};
+
+export type SandboxRuntimeStateDiagnostics = {
+  ownerLeaseId: string | null;
+  attachmentOwnerLeaseId: string | null;
+  attachmentSessionId: string | null;
+  attachmentNodeId: string | null;
+  presenceActiveCount: number;
+  keepaliveActive: boolean;
+  runtimeReady: boolean;
+};
+
+export type ReconcileSandboxInstanceDiagnostics = {
+  failureCode: string;
+  providerState: SandboxInspectDisposition | "missing";
+  sandboxStatus: ActiveSandboxInstance["status"];
+  runtimeProvider: SandboxInstanceProvider;
+  providerSandboxId: string;
+  expectedOwnerLeaseId: string;
+  initialRuntimeState: SandboxRuntimeStateDiagnostics;
+  startupFailureEvidence: StartupFailureEvidence | null;
+  latestStartupEvent: StartupEventSummary | null;
+};
+
+type ReconciliationFailureContext = {
+  failureMessage: string;
+  startupFailureEvidence: StartupFailureEvidence | null;
+  latestStartupEvent: StartupEventSummary | null;
 };
 
 function withBootstrapAttachmentTerminationTarget(input: {
@@ -542,7 +574,7 @@ export async function reconcileSandboxInstance(
 
   switch (action.kind) {
     case "fail": {
-      const failureMessage = await resolveReconciliationFailureMessage({
+      const failureContext = await resolveReconciliationFailureContext({
         db: ctx.db,
         failureCode: action.failureCode,
         failureMessage: action.failureMessage,
@@ -554,7 +586,7 @@ export async function reconcileSandboxInstance(
         sandboxInstanceId: sandboxInstance.id,
         currentStatus: sandboxInstance.status,
         failureCode: action.failureCode,
-        failureMessage,
+        failureMessage: failureContext.failureMessage,
         stillPermitted: async () =>
           isDisconnectReconciliationStillPermitted({
             runtimeStateReader: ctx.runtimeStateReader,
@@ -585,6 +617,25 @@ export async function reconcileSandboxInstance(
           result: {
             executed: true,
             outcome: "failed",
+            diagnostics: {
+              failureCode: action.failureCode,
+              providerState,
+              sandboxStatus: sandboxInstance.status,
+              runtimeProvider: sandboxInstance.runtimeProvider,
+              providerSandboxId: sandboxInstance.providerSandboxId,
+              expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+              initialRuntimeState: {
+                ownerLeaseId: initialSnapshot.ownerLeaseId,
+                attachmentOwnerLeaseId: initialSnapshot.attachment?.ownerLeaseId ?? null,
+                attachmentSessionId: initialSnapshot.attachment?.sessionId ?? null,
+                attachmentNodeId: initialSnapshot.attachment?.nodeId ?? null,
+                presenceActiveCount: initialSnapshot.presence.activeCount,
+                keepaliveActive: initialSnapshot.keepalive.active,
+                runtimeReady: initialSnapshot.runtime.ready,
+              },
+              startupFailureEvidence: failureContext.startupFailureEvidence,
+              latestStartupEvent: failureContext.latestStartupEvent,
+            },
           },
           expectedOwnerLeaseId: input.expectedOwnerLeaseId,
         }),
@@ -663,23 +714,37 @@ export async function reconcileSandboxInstance(
   }
 }
 
-async function resolveReconciliationFailureMessage(input: {
+async function resolveReconciliationFailureContext(input: {
   db: DataPlaneDatabase;
   failureCode: string;
   failureMessage: string;
   sandboxInstanceId: string;
-}): Promise<string> {
+}): Promise<ReconciliationFailureContext> {
   if (!shouldEnrichStartupDisconnectFailure({ failureCode: input.failureCode })) {
-    return input.failureMessage;
+    return {
+      failureMessage: input.failureMessage,
+      startupFailureEvidence: null,
+      latestStartupEvent: null,
+    };
   }
 
-  const evidence = await resolveStartupFailureEvidence({
-    db: input.db,
-    sandboxInstanceId: input.sandboxInstanceId,
-  });
+  const [startupFailureEvidence, latestStartupEvent] = await Promise.all([
+    resolveStartupFailureEvidence({
+      db: input.db,
+      sandboxInstanceId: input.sandboxInstanceId,
+    }),
+    resolveLatestStartupEventSummary({
+      db: input.db,
+      sandboxInstanceId: input.sandboxInstanceId,
+    }),
+  ]);
 
-  return formatStartupDisconnectFailureMessage({
-    baseFailureMessage: input.failureMessage,
-    evidence,
-  });
+  return {
+    failureMessage: formatStartupDisconnectFailureMessage({
+      baseFailureMessage: input.failureMessage,
+      evidence: startupFailureEvidence,
+    }),
+    startupFailureEvidence,
+    latestStartupEvent,
+  };
 }
