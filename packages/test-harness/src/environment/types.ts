@@ -202,5 +202,5 @@ export type TestEnvironment<TServiceId extends string = string> = {
   id: string;
   infra: ReadonlyMap<string, ResolvedTestInfra>;
   services: TestServiceCollection<TServiceId>;
-  stop: () => Promise<void>;
+  stop: (input?: { afterServicesStopped?: () => Promise<void> }) => Promise<void>;
 };

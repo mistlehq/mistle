@@ -155,11 +155,17 @@ export function createIntegrationTest(input: CreateIntegrationTestInput) {
           );
         } finally {
           const teardownStartedAt = Date.now();
-          for (const cleanup of extraCleanupTasks) {
-            await cleanup();
-          }
-          await integrationEnvironment.stop();
-          await environment.stop();
+          await environment.stop({
+            afterServicesStopped: async () => {
+              try {
+                for (const cleanup of extraCleanupTasks) {
+                  await cleanup();
+                }
+              } finally {
+                await integrationEnvironment.stop();
+              }
+            },
+          });
           writeIntegrationTimingLine(
             `[integration] env ${environment.id} teardown completed in ${formatIntegrationDuration(Date.now() - teardownStartedAt)}.`,
             timing,

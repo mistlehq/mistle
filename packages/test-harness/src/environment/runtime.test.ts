@@ -426,6 +426,37 @@ describe("startTestEnvironment", () => {
     expect(cleanupEvents).toEqual(["service:control-plane-api", "infra:postgres.control-plane"]);
   });
 
+  it("runs caller cleanup after services stop and before infra stops", async () => {
+    const startEvents: string[] = [];
+    const cleanupEvents: string[] = [];
+    const postgresProvisioner = createPostgresProvisioner(cleanupEvents);
+    const postgresRequirement = createPostgresRequirement(postgresProvisioner);
+    const registry = createSingleServiceRegistry({
+      serviceId: "control-plane-api",
+      requirement: postgresRequirement,
+      startEvents,
+      cleanupEvents,
+    });
+
+    const environment = await startTestEnvironment({
+      id: "env_after_services_cleanup",
+      registry,
+      services: [{ service: "control-plane-api", mode: "runtime" }],
+    });
+
+    await environment.stop({
+      afterServicesStopped: async () => {
+        cleanupEvents.push("after-services:provider-cleanup");
+      },
+    });
+
+    expect(cleanupEvents).toEqual([
+      "service:control-plane-api",
+      "after-services:provider-cleanup",
+      "infra:postgres.control-plane",
+    ]);
+  });
+
   it("registers process cleanup so explicit stop is optional", async () => {
     const startEvents: string[] = [];
     const cleanupEvents: string[] = [];

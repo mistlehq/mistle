@@ -620,7 +620,9 @@ export async function startTestEnvironment<
 
   let cleanupPromise: Promise<void> | undefined;
 
-  const stopInternal = async (): Promise<void> => {
+  const stopInternal = async (
+    stopInput: { afterServicesStopped?: () => Promise<void> } = {},
+  ): Promise<void> => {
     if (cleanupPromise !== undefined) {
       await cleanupPromise;
       return;
@@ -632,6 +634,11 @@ export async function startTestEnvironment<
         async () => {
           if (services !== undefined) {
             await measure(cleanupTimings, "services", async () => stopServices(services));
+          }
+        },
+        async () => {
+          if (stopInput.afterServicesStopped !== undefined) {
+            await measure(cleanupTimings, "after-services", stopInput.afterServicesStopped);
           }
         },
         async () => {
@@ -668,8 +675,8 @@ export async function startTestEnvironment<
       servicesById: services,
       selections: input.services,
     }),
-    stop: async () => {
-      await stopInternal();
+    stop: async (input) => {
+      await stopInternal(input);
       unregisterProcessCleanupTask();
     },
   };
