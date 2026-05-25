@@ -78,9 +78,10 @@ import type {
   DataPlaneGatewayRuntimeConfig,
   StartedServer,
 } from "../types.js";
-import { AsyncTaskTracker } from "./async-task-tracker.js";
+import { AsyncTaskTracker, type AsyncTaskDrainResult } from "./async-task-tracker.js";
 
 const DefaultMaxActiveBindingsPerSandbox = 32;
+const ShutdownTunnelTaskDrainTimeoutMs = 5_000;
 
 type GatewayRelayRuntimeResources = {
   gatewayForwardingClient: GatewayForwardingClientAdapter;
@@ -88,6 +89,27 @@ type GatewayRelayRuntimeResources = {
   start: () => Promise<void>;
   stop: () => Promise<void>;
 };
+
+async function measureShutdownPhase<T>(
+  timings: Map<string, number>,
+  label: string,
+  callback: () => Promise<T>,
+): Promise<T> {
+  const startedAt = performance.now();
+  try {
+    return await callback();
+  } finally {
+    timings.set(label, performance.now() - startedAt);
+  }
+}
+
+function formatShutdownTimings(timings: Map<string, number>): Record<string, number> {
+  const formatted: Record<string, number> = {};
+  for (const [label, durationMs] of timings.entries()) {
+    formatted[label] = Math.round(durationMs);
+  }
+  return formatted;
+}
 
 function closeWebSocketClient(client: WebSocket): Promise<void> {
   if (client.readyState === WebSocket.CLOSED) {
@@ -549,24 +571,75 @@ export function createDataPlaneGatewayRuntime(
   let stopped = false;
 
   async function stopRuntimeResources(): Promise<void> {
-    await closeWebSocketServer(nodeWebSocket.wss);
-    await sandboxTunnelTaskTracker.drain();
-    operationIngressService.shutdown();
-    await telemetryIngressService.shutdown();
-    await relayResources.stop();
+    const shutdownTimings = new Map<string, number>();
+    try {
+      await measureShutdownPhase(shutdownTimings, "close-websocket-server", async () => {
+        await closeWebSocketServer(nodeWebSocket.wss);
+      });
+      const drainResult = await measureShutdownPhase(
+        shutdownTimings,
+        "drain-sandbox-tunnel-tasks",
+        async (): Promise<AsyncTaskDrainResult> =>
+          sandboxTunnelTaskTracker.drain({
+            timeoutMs: ShutdownTunnelTaskDrainTimeoutMs,
+          }),
+      );
+      if (drainResult.timedOut) {
+        logger.warn(
+          {
+            eventName: "data_plane_gateway.runtime_shutdown.tunnel_task_drain_timed_out",
+            activeTaskCount: drainResult.activeTaskCount,
+            timeoutMs: ShutdownTunnelTaskDrainTimeoutMs,
+          },
+          "Timed out draining sandbox tunnel tasks during data-plane gateway runtime shutdown.",
+        );
+      }
+      await measureShutdownPhase(shutdownTimings, "operation-ingress-shutdown", async () => {
+        operationIngressService.shutdown();
+      });
+      await measureShutdownPhase(shutdownTimings, "telemetry-ingress-shutdown", async () => {
+        await telemetryIngressService.shutdown();
+      });
+      await measureShutdownPhase(shutdownTimings, "relay-resources-stop", async () => {
+        await relayResources.stop();
+      });
 
-    if (startedServer !== undefined) {
-      await startedServer.close();
-      startedServer = undefined;
+      if (startedServer !== undefined) {
+        await measureShutdownPhase(shutdownTimings, "http-server-close", async () => {
+          await startedServer?.close();
+          startedServer = undefined;
+        });
+      }
+
+      if (hasValkeyClient) {
+        await measureShutdownPhase(shutdownTimings, "valkey-close", async () => {
+          await closeValkeyClient(valkeyClient);
+          hasValkeyClient = false;
+        });
+      }
+
+      await measureShutdownPhase(shutdownTimings, "app-stop", async () => {
+        await stopApp(app);
+      });
+      logger.info(
+        {
+          eventName: "data_plane_gateway.runtime_shutdown.completed",
+          shutdownPhases: formatShutdownTimings(shutdownTimings),
+        },
+        "Data-plane gateway runtime shutdown completed.",
+      );
+      stopped = true;
+    } catch (error) {
+      logger.error(
+        {
+          err: error,
+          eventName: "data_plane_gateway.runtime_shutdown.failed",
+          shutdownPhases: formatShutdownTimings(shutdownTimings),
+        },
+        "Data-plane gateway runtime shutdown failed.",
+      );
+      throw error;
     }
-
-    if (hasValkeyClient) {
-      await closeValkeyClient(valkeyClient);
-      hasValkeyClient = false;
-    }
-
-    await stopApp(app);
-    stopped = true;
   }
 
   return {

@@ -73,6 +73,27 @@ describe("AsyncTaskTracker", () => {
 
     tracker.track(Promise.reject(new Error("task failed")));
 
-    await expect(tracker.drain()).resolves.toBeUndefined();
+    await expect(tracker.drain()).resolves.toEqual({
+      activeTaskCount: 0,
+      timedOut: false,
+    });
+  });
+
+  it("returns a timeout result when tracked tasks do not settle before the deadline", async () => {
+    const tracker = new AsyncTaskTracker();
+    const task = createDeferredTask();
+
+    tracker.track(task.promise);
+
+    await expect(tracker.drain({ timeoutMs: 1 })).resolves.toEqual({
+      activeTaskCount: 1,
+      timedOut: true,
+    });
+
+    task.resolve();
+    await expect(tracker.drain()).resolves.toEqual({
+      activeTaskCount: 0,
+      timedOut: false,
+    });
   });
 });
