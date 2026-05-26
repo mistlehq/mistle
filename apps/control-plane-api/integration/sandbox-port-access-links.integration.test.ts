@@ -134,6 +134,114 @@ describe.concurrent("sandbox Port Access links integration", () => {
     expect(persistedLinks).toHaveLength(1);
   });
 
+  it("does not reuse active short links created by a different actor", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-port-access-link-creator-reuse@example.com",
+    });
+    const sandboxInstanceId = "sbi_port_access_link_creator_reuse";
+
+    await insertSandboxInstance(env, {
+      organizationId: session.organizationId,
+      sandboxInstanceId,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.portAccessLinks).values({
+      slug: "AgentReuse01",
+      organizationId: session.organizationId,
+      sandboxInstanceId,
+      port: 4173,
+      createdByKind: PortAccessLinkCreatedByKinds.AGENT,
+      createdById: "apk_port_access_link_creator_reuse",
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+
+    const createResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/sandbox/instances/${sandboxInstanceId}/ports/4173/access`,
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(createResponse.status).toBe(201);
+    const portAccess = SandboxInstancePortAccessSchema.parse(await createResponse.json());
+    const slug = new URL(portAccess.url).pathname.replace("/p/ports/", "");
+    expect(slug).not.toBe("AgentReuse01");
+
+    const persistedLinks = await env.controlPlaneDb.query.portAccessLinks.findMany({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, session.organizationId),
+          eq(table.sandboxInstanceId, sandboxInstanceId),
+          eq(table.port, 4173),
+        ),
+    });
+    expect(persistedLinks).toHaveLength(2);
+    expect(persistedLinks).toContainEqual(
+      expect.objectContaining({
+        slug,
+        createdByKind: PortAccessLinkCreatedByKinds.USER,
+        createdById: session.userId,
+      }),
+    );
+  });
+
+  it("does not reuse active short links created by a different actor with the same kind", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-port-access-link-same-kind-creator-reuse@example.com",
+    });
+    const sandboxInstanceId = "sbi_port_access_link_same_kind_creator_reuse";
+
+    await insertSandboxInstance(env, {
+      organizationId: session.organizationId,
+      sandboxInstanceId,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.portAccessLinks).values({
+      slug: "UserReuse001",
+      organizationId: session.organizationId,
+      sandboxInstanceId,
+      port: 4173,
+      createdByKind: PortAccessLinkCreatedByKinds.USER,
+      createdById: "usr_port_access_link_other_creator",
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+
+    const createResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/sandbox/instances/${sandboxInstanceId}/ports/4173/access`,
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(createResponse.status).toBe(201);
+    const portAccess = SandboxInstancePortAccessSchema.parse(await createResponse.json());
+    const slug = new URL(portAccess.url).pathname.replace("/p/ports/", "");
+    expect(slug).not.toBe("UserReuse001");
+
+    const persistedLinks = await env.controlPlaneDb.query.portAccessLinks.findMany({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, session.organizationId),
+          eq(table.sandboxInstanceId, sandboxInstanceId),
+          eq(table.port, 4173),
+        ),
+    });
+    expect(persistedLinks).toHaveLength(2);
+    expect(persistedLinks).toContainEqual(
+      expect.objectContaining({
+        slug,
+        createdByKind: PortAccessLinkCreatedByKinds.USER,
+        createdById: session.userId,
+      }),
+    );
+  });
+
   it("does not redirect expired short links", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-sandbox-port-access-link-expired@example.com",

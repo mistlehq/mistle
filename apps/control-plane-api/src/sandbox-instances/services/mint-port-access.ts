@@ -8,6 +8,7 @@ import {
   ControlPlaneConstraintIds,
   getControlPlaneDatabaseSchema,
   isControlPlaneUniqueViolation,
+  type PortAccessLinkCreatedByKind,
   PortAccessLinkCreatedByKinds,
 } from "@mistle/db/control-plane";
 import { derivePortAccessHost, mintPortAccessBootstrapToken } from "@mistle/port-access-auth";
@@ -26,6 +27,10 @@ const MaxPortAccessLinkSlugCreateAttempts = 5;
 const ReusablePortAccessLinkMinimumRemainingTtlSeconds = 30;
 
 type ExistingSandboxInstance = NonNullable<GetSandboxInstanceResponse>;
+type NormalizedPortAccessLinkCreator = {
+  kind: PortAccessLinkCreatedByKind;
+  id: string;
+};
 
 export function buildPortAccessBootstrapUrl(input: {
   gatewayWsUrl: string;
@@ -177,6 +182,7 @@ async function createUniquePortAccessLinkSlug(
   },
 ): Promise<string> {
   const tables = getControlPlaneDatabaseSchema(input.db);
+  const createdBy = normalizePortAccessLinkCreator(input.createdBy);
 
   for (let attempt = 1; attempt <= MaxPortAccessLinkSlugCreateAttempts; attempt += 1) {
     const slug = createPortAccessLinkSlug();
@@ -186,11 +192,8 @@ async function createUniquePortAccessLinkSlug(
         organizationId: input.organizationId,
         sandboxInstanceId: link.sandboxInstanceId,
         port: input.port,
-        createdByKind:
-          input.createdBy.kind === "agent"
-            ? PortAccessLinkCreatedByKinds.AGENT
-            : PortAccessLinkCreatedByKinds.USER,
-        createdById: input.createdBy.id,
+        createdByKind: createdBy.kind,
+        createdById: createdBy.id,
         expiresAt: link.expiresAt,
       });
       return slug;
@@ -215,6 +218,7 @@ async function findReusablePortAccessLink(
     sandboxInstanceId: string;
   },
 ): Promise<{ slug: string; expiresAt: string } | null> {
+  const createdBy = normalizePortAccessLinkCreator(input.createdBy);
   const minimumExpiresAt = new Date(
     input.clock.nowMs() + ReusablePortAccessLinkMinimumRemainingTtlSeconds * 1000,
   ).toISOString();
@@ -224,6 +228,8 @@ async function findReusablePortAccessLink(
         eq(table.organizationId, input.organizationId),
         eq(table.sandboxInstanceId, link.sandboxInstanceId),
         eq(table.port, input.port),
+        eq(table.createdByKind, createdBy.kind),
+        eq(table.createdById, createdBy.id),
         gt(table.expiresAt, minimumExpiresAt),
       ),
     orderBy: (table, { desc }) => [desc(table.expiresAt)],
@@ -239,6 +245,18 @@ async function findReusablePortAccessLink(
       id: reusableLink.id,
       expiresAt: reusableLink.expiresAt,
     }),
+  };
+}
+
+function normalizePortAccessLinkCreator(
+  createdBy: MintSandboxInstancePortAccessInput["createdBy"],
+): NormalizedPortAccessLinkCreator {
+  return {
+    kind:
+      createdBy.kind === "agent"
+        ? PortAccessLinkCreatedByKinds.AGENT
+        : PortAccessLinkCreatedByKinds.USER,
+    id: createdBy.id,
   };
 }
 
