@@ -941,6 +941,7 @@ export async function bootstrapPortAccess(input: {
         }),
         method: "GET",
         headers: {
+          ...readGatewayBaseUrlRequestHeaders(input.fixture.dataPlaneGatewayBaseUrl),
           cookie: input.session.cookie,
         },
       });
@@ -998,7 +999,10 @@ function resolvePortAccessApiUrl(input: {
   apiUrl.pathname = portAccessUrl.pathname;
   apiUrl.search = portAccessUrl.search;
   apiUrl.hash = "";
-  return apiUrl.toString();
+  return applyBaseUrlQueryParams({
+    baseUrl: new URL(input.controlPlaneApiBaseUrl),
+    url: apiUrl,
+  }).toString();
 }
 
 export async function waitForWebSocketOpen(socket: WebSocket, timeoutMs: number): Promise<void> {
