@@ -111,7 +111,7 @@ type PendingHmrMessageWaiter = {
   timeout: TimerHandle;
 };
 
-describe("system port access vite dev server", () => {
+describe.concurrent("system port access vite dev server", () => {
   it(
     "serves a real Vite dev server, mixed assets, and HMR without resetting bootstrap",
     async ({ system }) => {
