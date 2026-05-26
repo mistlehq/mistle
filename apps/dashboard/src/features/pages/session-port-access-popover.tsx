@@ -30,63 +30,93 @@ type ProcessListenerEntry = {
   bindAddresses: string[];
 };
 
+const MistleManagedProcessCommandPrefixes = [
+  "/opt/mistle/bin/sandboxd",
+  "/usr/local/bin/codex ",
+  "/usr/local/bin/opencode ",
+];
+
+function shouldShowBindAddressInDashboard(bindAddress: string): boolean {
+  // Product decision: the dashboard process menu is for common browser-facing dev servers.
+  // sandboxd may still report IPv6 listeners for lower-level tunnel use, but this surface
+  // intentionally stays focused on localhost IPv4 and all-interface IPv4 binds.
+  return bindAddress === "127.0.0.1" || bindAddress === "0.0.0.0" || bindAddress === "localhost";
+}
+
+function shouldShowProcessInDashboard(process: ProcessEntry): boolean {
+  const command = process.command?.trim();
+  if (command === undefined || command.length === 0) {
+    return true;
+  }
+
+  // Product decision: Mistle-managed daemon and agent runtime ports are internal plumbing.
+  // Keep them available to sandboxd authorization, but do not advertise them as user app ports.
+  return !MistleManagedProcessCommandPrefixes.some((prefix) => command.startsWith(prefix));
+}
+
+function createDisplayProcessLabel(label: string): string {
+  const [commandPath, ...args] = label.trim().split(/\s+/);
+  if (commandPath === undefined) {
+    return label;
+  }
+
+  const commandName = commandPath.split("/").filter(Boolean).at(-1) ?? commandPath;
+  return [commandName, ...args].join(" ");
+}
+
 function createProcessListenerEntries(processes: ProcessEntry[]): ProcessListenerEntry[] {
-  return processes
-    .flatMap((process) => {
-      const listenersByPort = new Map<number, ProcessEntry["listeners"]>();
+  const listenersByPort = new Map<number, ProcessListenerEntry>();
 
-      for (const listener of process.listeners) {
-        const listenersForPort = listenersByPort.get(listener.port) ?? [];
-        listenersForPort.push(listener);
-        listenersByPort.set(listener.port, listenersForPort);
+  for (const process of processes) {
+    if (!shouldShowProcessInDashboard(process)) {
+      continue;
+    }
+
+    for (const listener of process.listeners) {
+      if (!shouldShowBindAddressInDashboard(listener.bindAddress)) {
+        continue;
       }
 
-      return [...listenersByPort.entries()].flatMap(([port, listeners]) => {
-        const firstListener = listeners[0];
-        if (firstListener === undefined) {
-          return [];
+      const existingEntry = listenersByPort.get(listener.port);
+      if (existingEntry !== undefined) {
+        if (!existingEntry.bindAddresses.includes(listener.bindAddress)) {
+          existingEntry.bindAddresses.push(listener.bindAddress);
+          existingEntry.bindAddresses.sort((left, right) => {
+            return left.localeCompare(right);
+          });
         }
+        continue;
+      }
 
-        return [
-          {
-            listenerProcess: {
-              ...process,
-              listeners: [
-                {
-                  bindAddress: firstListener.bindAddress,
-                  port,
-                },
-              ],
-            },
-            processLabel: createProcessLabel(process),
-            bindAddresses: listeners
-              .map((listener) => listener.bindAddress)
-              .sort((left, right) => {
-                return left.localeCompare(right);
-              }),
-          },
-        ];
+      listenersByPort.set(listener.port, {
+        listenerProcess: {
+          ...process,
+          listeners: [listener],
+        },
+        processLabel: createProcessLabel(process),
+        bindAddresses: [listener.bindAddress],
       });
-    })
-    .sort((left, right) => {
-      const leftListener = resolvePrimaryProcessListener(left.listenerProcess);
-      const rightListener = resolvePrimaryProcessListener(right.listenerProcess);
+    }
+  }
 
-      if (leftListener === null && rightListener === null) {
-        return left.processLabel.localeCompare(right.processLabel);
-      }
-      if (leftListener === null) {
-        return 1;
-      }
-      if (rightListener === null) {
-        return -1;
-      }
+  return [...listenersByPort.values()].sort((left, right) => {
+    const leftListener = resolvePrimaryProcessListener(left.listenerProcess);
+    const rightListener = resolvePrimaryProcessListener(right.listenerProcess);
 
-      return (
-        leftListener.port - rightListener.port ||
-        left.processLabel.localeCompare(right.processLabel)
-      );
-    });
+    if (leftListener === null && rightListener === null) {
+      return left.processLabel.localeCompare(right.processLabel);
+    }
+    if (leftListener === null) {
+      return 1;
+    }
+    if (rightListener === null) {
+      return -1;
+    }
+
+    return (
+      leftListener.port - rightListener.port || left.processLabel.localeCompare(right.processLabel)
+    );
+  });
 }
 
 function createOpenLabel(process: ProcessEntry): string {
@@ -130,10 +160,8 @@ export function SessionPortAccessPopover(input: {
         className="max-h-[calc(100dvh-5rem)] w-96 gap-0 overflow-hidden p-0"
       >
         <PopoverHeader className="border-b px-4 py-3">
-          <PopoverTitle>Processes</PopoverTitle>
-          <PopoverDescription>
-            Select a process to open its HTTP port in a new tab.
-          </PopoverDescription>
+          <PopoverTitle>Local Ports</PopoverTitle>
+          <PopoverDescription>Processes listening on 127.0.0.1 and 0.0.0.0.</PopoverDescription>
         </PopoverHeader>
         <ProcessAccessList listenerEntries={listenerEntries} state={input.state} />
       </PopoverContent>
@@ -150,8 +178,8 @@ export function SessionPortAccessSheet(input: {
     <Sheet onOpenChange={input.state.setPanelOpen} open={input.state.isPanelOpen}>
       <SheetContent className="!h-[100dvh] max-h-[100dvh] gap-0 p-0" side="bottom">
         <SheetHeader className="shrink-0 border-b px-4 py-3 pr-12 text-left">
-          <SheetTitle>Processes</SheetTitle>
-          <SheetDescription>Select a process to open its HTTP port in a new tab.</SheetDescription>
+          <SheetTitle>Local Ports</SheetTitle>
+          <SheetDescription>Processes listening on 127.0.0.1 and 0.0.0.0.</SheetDescription>
         </SheetHeader>
         <ProcessAccessList listenerEntries={listenerEntries} state={input.state} />
       </SheetContent>
@@ -207,7 +235,9 @@ function ProcessAccessList(input: {
               </p>
             }
             secondary={
-              <p className="truncate text-xs text-muted-foreground">{entry.processLabel}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {createDisplayProcessLabel(entry.processLabel)}
+              </p>
             }
             title={createOpenLabel(entry.listenerProcess)}
           />
