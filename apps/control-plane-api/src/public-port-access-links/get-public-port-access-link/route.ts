@@ -6,6 +6,7 @@ import {
   ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
 
+import { conflictResponseSchema } from "../../sandbox-instances/create-sandbox-instance-connection-token/schema.js";
 import { redirectLocationHeaderSchema } from "../../sandbox-instances/schemas.js";
 import {
   publicPortAccessLinkParamsSchema,
@@ -61,6 +62,14 @@ export const route = createRoute({
       content: {
         "application/json": {
           schema: NotFoundResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: "Sandbox instance is not running.",
+      content: {
+        "application/json": {
+          schema: conflictResponseSchema,
         },
       },
     },

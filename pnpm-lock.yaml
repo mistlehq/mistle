@@ -441,6 +441,9 @@ importers:
       '@mistle/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@mistle/gateway-tunnel-auth':
+        specifier: workspace:*
+        version: link:../../packages/gateway-tunnel-auth
       '@rolldown/plugin-babel':
         specifier: 0.2.3
         version: 0.2.3(@babel/core@7.29.0)(@babel/runtime@7.29.2)(rolldown@1.0.0-rc.17)(vite@8.0.10(@types/node@25.8.0)(esbuild@0.25.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3))

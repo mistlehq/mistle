@@ -12,7 +12,12 @@ import {
 } from "@mistle/db/control-plane";
 import { derivePortAccessHost, mintPortAccessBootstrapToken } from "@mistle/port-access-auth";
 
-import { SandboxInstancesNotFoundCodes, SandboxInstancesNotFoundError } from "../errors.js";
+import {
+  SandboxInstancesConflictCodes,
+  SandboxInstancesConflictError,
+  SandboxInstancesNotFoundCodes,
+  SandboxInstancesNotFoundError,
+} from "../errors.js";
 import type {
   MintSandboxInstancePortAccessInput,
   ResolveSandboxInstancePortAccessLinkInput,
@@ -74,6 +79,29 @@ async function getExistingSandboxInstance(
   return sandboxInstance;
 }
 
+function createInstanceFailedError(
+  sandboxInstance: Pick<ExistingSandboxInstance, "id" | "failureMessage">,
+): SandboxInstancesConflictError {
+  const failureMessage =
+    sandboxInstance.failureMessage === null
+      ? `Sandbox instance '${sandboxInstance.id}' failed and cannot be connected.`
+      : `Sandbox instance '${sandboxInstance.id}' failed and cannot be connected: ${sandboxInstance.failureMessage}`;
+
+  return new SandboxInstancesConflictError(
+    SandboxInstancesConflictCodes.INSTANCE_FAILED,
+    failureMessage,
+  );
+}
+
+function createInstanceNotConnectableError(
+  sandboxInstance: Pick<ExistingSandboxInstance, "id" | "status">,
+): SandboxInstancesConflictError {
+  return new SandboxInstancesConflictError(
+    SandboxInstancesConflictCodes.INSTANCE_NOT_RESUMABLE,
+    `Sandbox instance '${sandboxInstance.id}' is '${sandboxInstance.status}' and is not connectable.`,
+  );
+}
+
 export async function mintPortAccess(
   {
     dataPlaneClient,
@@ -123,6 +151,11 @@ export async function mintPortAccess(
 }
 
 export async function resolvePortAccessLink(
+  {
+    dataPlaneClient,
+  }: {
+    dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "getSandboxInstance">;
+  },
   input: ResolveSandboxInstancePortAccessLinkInput,
 ): Promise<SandboxInstancePortAccessRedirect | null> {
   const link = await input.db.query.portAccessLinks.findFirst({
@@ -142,6 +175,19 @@ export async function resolvePortAccessLink(
   const secondsRemaining = Math.floor((expiresAtMs - input.clock.nowMs()) / 1000);
   if (secondsRemaining < 1) {
     return null;
+  }
+
+  const sandboxInstance = await getExistingSandboxInstance(dataPlaneClient, {
+    organizationId: input.organizationId,
+    instanceId: link.sandboxInstanceId,
+  });
+
+  if (sandboxInstance.status === "failed") {
+    throw createInstanceFailedError(sandboxInstance);
+  }
+
+  if (!sandboxInstance.connectable) {
+    throw createInstanceNotConnectableError(sandboxInstance);
   }
 
   const host = derivePortAccessHost({

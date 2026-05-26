@@ -57,6 +57,7 @@
   "devDependencies": {
     "@mistle/config": "workspace:*",
     "@mistle/db": "workspace:*",
+    "@mistle/gateway-tunnel-auth": "workspace:*",
     "@rolldown/plugin-babel": "0.2.3",
     "@storybook/react-vite": "^10.4.0",
     "@tailwindcss/vite": "^4.3.0",

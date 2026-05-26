@@ -410,6 +410,19 @@ export interface paths {
             };
           };
         };
+        /** @description Sandbox instance is not running. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "INSTANCE_FAILED" | "INSTANCE_NOT_RESUMABLE" | "INSTANCE_STOP_NOT_SUPPORTED";
+              message: string;
+            };
+          };
+        };
         /** @description Internal server error. */
         500: {
           headers: {

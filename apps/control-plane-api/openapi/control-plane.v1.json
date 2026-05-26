@@ -17505,6 +17505,32 @@
               }
             }
           },
+          "409": {
+            "description": "Sandbox instance is not running.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "INSTANCE_FAILED",
+                        "INSTANCE_NOT_RESUMABLE",
+                        "INSTANCE_STOP_NOT_SUPPORTED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal server error.",
             "content": {

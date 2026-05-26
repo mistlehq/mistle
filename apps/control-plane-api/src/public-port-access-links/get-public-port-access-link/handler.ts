@@ -16,20 +16,26 @@ const routeHandler = async (
   { session }: AppSession,
 ) => {
   const db = ctx.get("db");
+  const dataPlaneClient = ctx.get("dataPlaneClient");
   const portAccessConfig = ctx.get("portAccessConfig");
   const { slug } = ctx.req.valid("param");
 
-  const redirect = await resolvePortAccessLink({
-    db,
-    organizationId: session.activeOrganizationId,
-    slug,
-    baseDomain: portAccessConfig.baseDomain,
-    gatewayWsUrl: portAccessConfig.gatewayWsUrl,
-    bootstrapPath: SANDBOX_INSTANCE_PORT_ACCESS_BOOTSTRAP_PATH,
-    tokenTtlSeconds: SANDBOX_INSTANCE_PORT_ACCESS_TOKEN_TTL_SECONDS,
-    tokenConfig: portAccessConfig.access,
-    clock: systemClock,
-  });
+  const redirect = await resolvePortAccessLink(
+    {
+      dataPlaneClient,
+    },
+    {
+      db,
+      organizationId: session.activeOrganizationId,
+      slug,
+      baseDomain: portAccessConfig.baseDomain,
+      gatewayWsUrl: portAccessConfig.gatewayWsUrl,
+      bootstrapPath: SANDBOX_INSTANCE_PORT_ACCESS_BOOTSTRAP_PATH,
+      tokenTtlSeconds: SANDBOX_INSTANCE_PORT_ACCESS_TOKEN_TTL_SECONDS,
+      tokenConfig: portAccessConfig.access,
+      clock: systemClock,
+    },
+  );
 
   if (redirect === null) {
     throw new NotFoundError("NOT_FOUND", "Port Access link was not found or has expired.");
