@@ -25,6 +25,7 @@ import { startProfileSetupScriptTestRun } from "../../sandbox-profiles/services/
 import type { AppOrganizationActor } from "../../types.js";
 import type { MistleMcpServerContext } from "../server.js";
 import {
+  requireMcpSandboxInstanceScope,
   requireMcpSandboxInstanceProfileScope,
   requireMcpSandboxProfileScope,
   requireMcpToolPermission,
@@ -232,6 +233,9 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
       requireMcpSandboxInstanceProfileScope(context.organizationActor, {
         sandboxProfileId: sandboxInstance.sandboxProfileId,
         sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+      });
+      requireMcpSandboxInstanceScope(context.organizationActor, {
+        sandboxInstanceId: sandboxInstance.id,
       });
 
       const portAccess = await mintPortAccess(

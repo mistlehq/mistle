@@ -746,6 +746,59 @@ describe.concurrent("MCP profile tools integration", () => {
     });
   });
 
+  it("prevents setup assistant MCP tokens from creating Port Access links for sibling sandbox instances", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-port-access-setup-assistant-instance-scope@example.com",
+    });
+    const scopedSandboxInstanceId = "sbi_mcp_port_access_setup_assistant_scoped";
+    const siblingSandboxInstanceId = "sbi_mcp_port_access_setup_assistant_sibling";
+    const sandboxProfileId = "sbp_mcp_port_access_setup_assistant_instance_scope";
+    const token = await mintMcpToken({
+      config: McpTokenConfig,
+      claims: {
+        kind: "setup_assistant",
+        sub: scopedSandboxInstanceId,
+        organizationId: session.organizationId,
+        sandboxProfileId,
+        sandboxProfileVersion: 1,
+      },
+      ttlSeconds: 300,
+    });
+
+    await insertSandboxInstance(env, {
+      organizationId: session.organizationId,
+      sandboxInstanceId: scopedSandboxInstanceId,
+      sandboxProfileId,
+      sandboxProfileVersion: 1,
+      status: SandboxInstanceStatuses.RUNNING,
+    });
+    await insertSandboxInstance(env, {
+      organizationId: session.organizationId,
+      sandboxInstanceId: siblingSandboxInstanceId,
+      sandboxProfileId,
+      sandboxProfileVersion: 1,
+      status: SandboxInstanceStatuses.RUNNING,
+    });
+
+    const result = await callMcpTool({
+      env,
+      token: token.token,
+      name: "sandbox_instance_port_access_create",
+      arguments: {
+        instanceId: siblingSandboxInstanceId,
+        port: 4173,
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    const persistedLink = await env.controlPlaneDb.query.portAccessLinks.findFirst({
+      where: (table, { eq }) => eq(table.sandboxInstanceId, siblingSandboxInstanceId),
+    });
+    expect(persistedLink).toBeUndefined();
+  });
+
   it("returns a tool error when creating Port Access without sandbox connect permission", async ({
     env,
   }) => {
