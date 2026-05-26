@@ -133,12 +133,8 @@
           "tableFrom": "accounts",
           "tableTo": "users",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -180,12 +176,8 @@
           "tableFrom": "api_key_permissions",
           "tableTo": "api_keys",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "api_key_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["api_key_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -193,10 +185,7 @@
       "compositePrimaryKeys": {
         "api_key_permissions_api_key_id_permission_pk": {
           "name": "api_key_permissions_api_key_id_permission_pk",
-          "columns": [
-            "api_key_id",
-            "permission"
-          ]
+          "columns": ["api_key_id", "permission"]
         }
       },
       "uniqueConstraints": {},
@@ -357,12 +346,8 @@
           "tableFrom": "api_keys",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -537,12 +522,8 @@
           "tableFrom": "identity_link_redirect_sessions",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -551,12 +532,8 @@
           "tableFrom": "identity_link_redirect_sessions",
           "tableTo": "users",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -565,12 +542,8 @@
           "tableFrom": "identity_link_redirect_sessions",
           "tableTo": "organization_identity_link_provider_configs",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_provider_config_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_provider_config_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -579,12 +552,8 @@
           "tableFrom": "identity_link_redirect_sessions",
           "tableTo": "integration_connections",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "integration_connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["integration_connection_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -599,12 +568,7 @@
             "integration_connection_id",
             "organization_provider_config_id"
           ],
-          "columnsTo": [
-            "organization_id",
-            "provider_family",
-            "integration_connection_id",
-            "id"
-          ],
+          "columnsTo": ["organization_id", "provider_family", "integration_connection_id", "id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -668,12 +632,8 @@
           "tableFrom": "integration_connection_credentials",
           "tableTo": "integration_connections",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["connection_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -682,12 +642,8 @@
           "tableFrom": "integration_connection_credentials",
           "tableTo": "integration_credentials",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "credential_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["credential_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -695,10 +651,7 @@
       "compositePrimaryKeys": {
         "integration_connection_credentials_connection_id_slot_key_pk": {
           "name": "integration_connection_credentials_connection_id_slot_key_pk",
-          "columns": [
-            "connection_id",
-            "slot_key"
-          ]
+          "columns": ["connection_id", "slot_key"]
         }
       },
       "uniqueConstraints": {},
@@ -917,12 +870,8 @@
           "tableFrom": "integration_connection_device_authorization_attempts",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -931,12 +880,8 @@
           "tableFrom": "integration_connection_device_authorization_attempts",
           "tableTo": "integration_targets",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "target_key"
-          ],
-          "columnsTo": [
-            "target_key"
-          ],
+          "columnsFrom": ["target_key"],
+          "columnsTo": ["target_key"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -945,12 +890,8 @@
           "tableFrom": "integration_connection_device_authorization_attempts",
           "tableTo": "integration_connections",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["connection_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1093,12 +1034,8 @@
           "tableFrom": "integration_connection_redirect_sessions",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1107,12 +1044,8 @@
           "tableFrom": "integration_connection_redirect_sessions",
           "tableTo": "integration_targets",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "target_key"
-          ],
-          "columnsTo": [
-            "target_key"
-          ],
+          "columnsFrom": ["target_key"],
+          "columnsTo": ["target_key"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -1121,12 +1054,8 @@
           "tableFrom": "integration_connection_redirect_sessions",
           "tableTo": "integration_connections",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["connection_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1253,12 +1182,8 @@
           "tableFrom": "integration_connection_resource_states",
           "tableTo": "integration_connections",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["connection_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1266,10 +1191,7 @@
       "compositePrimaryKeys": {
         "integration_connection_resource_states_pk": {
           "name": "integration_connection_resource_states_pk",
-          "columns": [
-            "connection_id",
-            "kind"
-          ]
+          "columns": ["connection_id", "kind"]
         }
       },
       "uniqueConstraints": {},
@@ -1512,12 +1434,8 @@
           "tableFrom": "integration_connection_resources",
           "tableTo": "integration_connections",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["connection_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1673,12 +1591,8 @@
           "tableFrom": "integration_connections",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1687,12 +1601,8 @@
           "tableFrom": "integration_connections",
           "tableTo": "integration_targets",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "target_key"
-          ],
-          "columnsTo": [
-            "target_key"
-          ],
+          "columnsFrom": ["target_key"],
+          "columnsTo": ["target_key"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -1832,12 +1742,8 @@
           "tableFrom": "integration_credentials",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1846,14 +1752,8 @@
           "tableFrom": "integration_credentials",
           "tableTo": "organization_credential_keys",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id",
-            "organization_credential_key_version"
-          ],
-          "columnsTo": [
-            "organization_id",
-            "version"
-          ],
+          "columnsFrom": ["organization_id", "organization_credential_key_version"],
+          "columnsTo": ["organization_id", "version"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -2228,12 +2128,8 @@
           "tableFrom": "integration_webhook_events",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2242,12 +2138,8 @@
           "tableFrom": "integration_webhook_events",
           "tableTo": "integration_connections",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "integration_connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["integration_connection_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2256,12 +2148,8 @@
           "tableFrom": "integration_webhook_events",
           "tableTo": "integration_webhook_sources",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "integration_webhook_source_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["integration_webhook_source_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2270,12 +2158,8 @@
           "tableFrom": "integration_webhook_events",
           "tableTo": "integration_targets",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "target_key"
-          ],
-          "columnsTo": [
-            "target_key"
-          ],
+          "columnsFrom": ["target_key"],
+          "columnsTo": ["target_key"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2284,12 +2168,8 @@
           "tableFrom": "integration_webhook_events",
           "tableTo": "users",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "resolved_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["resolved_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -2298,12 +2178,8 @@
           "tableFrom": "integration_webhook_events",
           "tableTo": "user_external_principals",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "resolved_principal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["resolved_principal_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2493,12 +2369,8 @@
           "tableFrom": "integration_webhook_sources",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2507,12 +2379,8 @@
           "tableFrom": "integration_webhook_sources",
           "tableTo": "integration_connections",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "integration_connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["integration_connection_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2521,12 +2389,8 @@
           "tableFrom": "integration_webhook_sources",
           "tableTo": "integration_targets",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "target_key"
-          ],
-          "columnsTo": [
-            "target_key"
-          ],
+          "columnsFrom": ["target_key"],
+          "columnsTo": ["target_key"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -2535,12 +2399,8 @@
           "tableFrom": "integration_webhook_sources",
           "tableTo": "integration_credentials",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "webhook_secret_credential_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["webhook_secret_credential_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -2665,12 +2525,8 @@
           "tableFrom": "invitations",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2679,12 +2535,8 @@
           "tableFrom": "invitations",
           "tableTo": "teams",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "team_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["team_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -2693,12 +2545,8 @@
           "tableFrom": "invitations",
           "tableTo": "users",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "inviter_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["inviter_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2790,12 +2638,8 @@
           "tableFrom": "members",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2804,12 +2648,8 @@
           "tableFrom": "members",
           "tableTo": "users",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2940,12 +2780,8 @@
           "tableFrom": "oauth_access_tokens",
           "tableTo": "oauth_grants",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "oauth_grant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["oauth_grant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -2987,12 +2823,8 @@
           "tableFrom": "oauth_client_grant_types",
           "tableTo": "oauth_clients",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "oauth_client_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["oauth_client_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3000,10 +2832,7 @@
       "compositePrimaryKeys": {
         "oauth_client_grant_types_oauth_client_id_grant_type_pk": {
           "name": "oauth_client_grant_types_oauth_client_id_grant_type_pk",
-          "columns": [
-            "oauth_client_id",
-            "grant_type"
-          ]
+          "columns": ["oauth_client_id", "grant_type"]
         }
       },
       "uniqueConstraints": {},
@@ -3042,12 +2871,8 @@
           "tableFrom": "oauth_client_redirect_uris",
           "tableTo": "oauth_clients",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "oauth_client_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["oauth_client_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3055,10 +2880,7 @@
       "compositePrimaryKeys": {
         "oauth_client_redirect_uris_oauth_client_id_redirect_uri_pk": {
           "name": "oauth_client_redirect_uris_oauth_client_id_redirect_uri_pk",
-          "columns": [
-            "oauth_client_id",
-            "redirect_uri"
-          ]
+          "columns": ["oauth_client_id", "redirect_uri"]
         }
       },
       "uniqueConstraints": {},
@@ -3097,12 +2919,8 @@
           "tableFrom": "oauth_client_scopes",
           "tableTo": "oauth_clients",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "oauth_client_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["oauth_client_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3110,10 +2928,7 @@
       "compositePrimaryKeys": {
         "oauth_client_scopes_oauth_client_id_scope_pk": {
           "name": "oauth_client_scopes_oauth_client_id_scope_pk",
-          "columns": [
-            "oauth_client_id",
-            "scope"
-          ]
+          "columns": ["oauth_client_id", "scope"]
         }
       },
       "uniqueConstraints": {},
@@ -3249,12 +3064,8 @@
           "tableFrom": "oauth_grant_scopes",
           "tableTo": "oauth_grants",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "oauth_grant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["oauth_grant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3262,10 +3073,7 @@
       "compositePrimaryKeys": {
         "oauth_grant_scopes_oauth_grant_id_scope_pk": {
           "name": "oauth_grant_scopes_oauth_grant_id_scope_pk",
-          "columns": [
-            "oauth_grant_id",
-            "scope"
-          ]
+          "columns": ["oauth_grant_id", "scope"]
         }
       },
       "uniqueConstraints": {},
@@ -3351,12 +3159,8 @@
           "tableFrom": "oauth_grants",
           "tableTo": "oauth_clients",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "oauth_client_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["oauth_client_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3365,12 +3169,8 @@
           "tableFrom": "oauth_grants",
           "tableTo": "users",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -3379,12 +3179,8 @@
           "tableFrom": "oauth_grants",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3500,12 +3296,8 @@
           "tableFrom": "oauth_refresh_tokens",
           "tableTo": "oauth_grants",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "oauth_grant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["oauth_grant_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3777,12 +3569,8 @@
           "tableFrom": "organization_billing_customers",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -3879,12 +3667,8 @@
           "tableFrom": "organization_credential_keys",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4082,12 +3866,8 @@
           "tableFrom": "organization_identity_link_provider_configs",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4096,12 +3876,8 @@
           "tableFrom": "organization_identity_link_provider_configs",
           "tableTo": "integration_targets",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "integration_target_key"
-          ],
-          "columnsTo": [
-            "target_key"
-          ],
+          "columnsFrom": ["integration_target_key"],
+          "columnsTo": ["target_key"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4110,12 +3886,8 @@
           "tableFrom": "organization_identity_link_provider_configs",
           "tableTo": "integration_connections",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "integration_connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["integration_connection_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4124,12 +3896,8 @@
           "tableFrom": "organization_identity_link_provider_configs",
           "tableTo": "users",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "created_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4138,12 +3906,8 @@
           "tableFrom": "organization_identity_link_provider_configs",
           "tableTo": "users",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "updated_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["updated_by_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4152,16 +3916,8 @@
           "tableFrom": "organization_identity_link_provider_configs",
           "tableTo": "integration_connections",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id",
-            "integration_target_key",
-            "integration_connection_id"
-          ],
-          "columnsTo": [
-            "organization_id",
-            "target_key",
-            "id"
-          ],
+          "columnsFrom": ["organization_id", "integration_target_key", "integration_connection_id"],
+          "columnsTo": ["organization_id", "target_key", "id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -4270,12 +4026,8 @@
           "tableFrom": "organization_sandbox_storage_settings",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4498,12 +4250,8 @@
           "tableFrom": "port_access_links",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4580,12 +4328,8 @@
           "tableFrom": "sandbox_profile_snapshot_refresh_schedule_targets",
           "tableTo": "schedules",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "schedule_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["schedule_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4594,12 +4338,8 @@
           "tableFrom": "sandbox_profile_snapshot_refresh_schedule_targets",
           "tableTo": "sandbox_profiles",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "sandbox_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["sandbox_profile_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -4608,14 +4348,8 @@
           "tableFrom": "sandbox_profile_snapshot_refresh_schedule_targets",
           "tableTo": "sandbox_profile_versions",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "sandbox_profile_id",
-            "sandbox_profile_version"
-          ],
-          "columnsTo": [
-            "sandbox_profile_id",
-            "version"
-          ],
+          "columnsFrom": ["sandbox_profile_id", "sandbox_profile_version"],
+          "columnsTo": ["sandbox_profile_id", "version"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4731,12 +4465,8 @@
           "tableFrom": "sandbox_profile_version_integration_bindings",
           "tableTo": "integration_connections",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["connection_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -4745,14 +4475,8 @@
           "tableFrom": "sandbox_profile_version_integration_bindings",
           "tableTo": "sandbox_profile_versions",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "sandbox_profile_id",
-            "sandbox_profile_version"
-          ],
-          "columnsTo": [
-            "sandbox_profile_id",
-            "version"
-          ],
+          "columnsFrom": ["sandbox_profile_id", "sandbox_profile_version"],
+          "columnsTo": ["sandbox_profile_id", "version"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -4762,11 +4486,7 @@
         "spv_integration_bindings_profile_id_version_id_uidx": {
           "name": "spv_integration_bindings_profile_id_version_id_uidx",
           "nullsNotDistinct": false,
-          "columns": [
-            "sandbox_profile_id",
-            "sandbox_profile_version",
-            "id"
-          ]
+          "columns": ["sandbox_profile_id", "sandbox_profile_version", "id"]
         }
       },
       "policies": {},
@@ -4970,12 +4690,8 @@
           "tableFrom": "sandbox_profile_version_snapshot_jobs",
           "tableTo": "scheduled_actions",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "source_scheduled_action_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_scheduled_action_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -4984,14 +4700,8 @@
           "tableFrom": "sandbox_profile_version_snapshot_jobs",
           "tableTo": "sandbox_profile_versions",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "sandbox_profile_id",
-            "sandbox_profile_version"
-          ],
-          "columnsTo": [
-            "sandbox_profile_id",
-            "version"
-          ],
+          "columnsFrom": ["sandbox_profile_id", "sandbox_profile_version"],
+          "columnsTo": ["sandbox_profile_id", "version"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -5148,12 +4858,8 @@
           "tableFrom": "sandbox_profile_versions",
           "tableTo": "sandbox_profiles",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "sandbox_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["sandbox_profile_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -5162,12 +4868,8 @@
           "tableFrom": "sandbox_profile_versions",
           "tableTo": "integration_connections",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "sandbox_connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["sandbox_connection_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -5176,12 +4878,8 @@
           "tableFrom": "sandbox_profile_versions",
           "tableTo": "api_keys",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "mistle_mcp_api_key_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["mistle_mcp_api_key_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -5190,12 +4888,8 @@
           "tableFrom": "sandbox_profile_versions",
           "tableTo": "integration_connections",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "git_commit_signing_integration_connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["git_commit_signing_integration_connection_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -5203,10 +4897,7 @@
       "compositePrimaryKeys": {
         "sandbox_profile_versions_sandbox_profile_id_version_pk": {
           "name": "sandbox_profile_versions_sandbox_profile_id_version_pk",
-          "columns": [
-            "sandbox_profile_id",
-            "version"
-          ]
+          "columns": ["sandbox_profile_id", "version"]
         }
       },
       "uniqueConstraints": {},
@@ -5296,12 +4987,8 @@
           "tableFrom": "sandbox_profiles",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -5384,12 +5071,8 @@
           "tableFrom": "schedule_triggers",
           "tableTo": "schedules",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "schedule_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["schedule_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -5398,12 +5081,8 @@
           "tableFrom": "schedule_triggers",
           "tableTo": "triggers",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "trigger_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["trigger_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -5698,12 +5377,8 @@
           "tableFrom": "scheduled_actions",
           "tableTo": "schedules",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "schedule_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["schedule_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -5712,12 +5387,8 @@
           "tableFrom": "scheduled_actions",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -5884,12 +5555,8 @@
           "tableFrom": "schedules",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -6010,12 +5677,8 @@
           "tableFrom": "sessions",
           "tableTo": "users",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -6100,12 +5763,8 @@
           "tableFrom": "team_members",
           "tableTo": "teams",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "team_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["team_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -6114,12 +5773,8 @@
           "tableFrom": "team_members",
           "tableTo": "users",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -6190,12 +5845,8 @@
           "tableFrom": "teams",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -6258,12 +5909,8 @@
           "tableFrom": "trigger_conversation_delivery_processors",
           "tableTo": "trigger_conversations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "conversation_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["conversation_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -6487,12 +6134,8 @@
           "tableFrom": "trigger_conversation_delivery_tasks",
           "tableTo": "trigger_conversations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "conversation_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["conversation_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -6501,12 +6144,8 @@
           "tableFrom": "trigger_conversation_delivery_tasks",
           "tableTo": "trigger_runs",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "trigger_run_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["trigger_run_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -6515,12 +6154,8 @@
           "tableFrom": "trigger_conversation_delivery_tasks",
           "tableTo": "integration_webhook_events",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "source_webhook_event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_webhook_event_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -6529,12 +6164,8 @@
           "tableFrom": "trigger_conversation_delivery_tasks",
           "tableTo": "scheduled_actions",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "source_scheduled_action_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_scheduled_action_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -6649,12 +6280,8 @@
           "tableFrom": "trigger_conversation_routes",
           "tableTo": "trigger_conversations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "conversation_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["conversation_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -6825,12 +6452,8 @@
           "tableFrom": "trigger_conversations",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -6839,12 +6462,8 @@
           "tableFrom": "trigger_conversations",
           "tableTo": "sandbox_profiles",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "sandbox_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["sandbox_profile_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -6853,12 +6472,8 @@
           "tableFrom": "trigger_conversations",
           "tableTo": "integration_webhook_events",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "last_processed_webhook_event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["last_processed_webhook_event_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -7099,12 +6714,8 @@
           "tableFrom": "trigger_runs",
           "tableTo": "triggers",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "trigger_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["trigger_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -7113,12 +6724,8 @@
           "tableFrom": "trigger_runs",
           "tableTo": "trigger_targets",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "trigger_target_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["trigger_target_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -7127,12 +6734,8 @@
           "tableFrom": "trigger_runs",
           "tableTo": "integration_webhook_events",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "source_webhook_event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_webhook_event_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -7141,12 +6744,8 @@
           "tableFrom": "trigger_runs",
           "tableTo": "scheduled_actions",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "source_scheduled_action_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_scheduled_action_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -7155,12 +6754,8 @@
           "tableFrom": "trigger_runs",
           "tableTo": "trigger_conversations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "conversation_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["conversation_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -7258,12 +6853,8 @@
           "tableFrom": "trigger_targets",
           "tableTo": "triggers",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "trigger_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["trigger_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -7272,12 +6863,8 @@
           "tableFrom": "trigger_targets",
           "tableTo": "sandbox_profiles",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "sandbox_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["sandbox_profile_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -7415,12 +7002,8 @@
           "tableFrom": "triggers",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -7533,12 +7116,8 @@
           "tableFrom": "user_external_principal_credential_secrets",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -7547,12 +7126,8 @@
           "tableFrom": "user_external_principal_credential_secrets",
           "tableTo": "user_external_principal_credentials",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "credential_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["credential_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -7561,14 +7136,8 @@
           "tableFrom": "user_external_principal_credential_secrets",
           "tableTo": "user_external_principal_credentials",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id",
-            "credential_id"
-          ],
-          "columnsTo": [
-            "organization_id",
-            "id"
-          ],
+          "columnsFrom": ["organization_id", "credential_id"],
+          "columnsTo": ["organization_id", "id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -7577,14 +7146,8 @@
           "tableFrom": "user_external_principal_credential_secrets",
           "tableTo": "organization_credential_keys",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id",
-            "organization_credential_key_version"
-          ],
-          "columnsTo": [
-            "organization_id",
-            "version"
-          ],
+          "columnsFrom": ["organization_id", "organization_credential_key_version"],
+          "columnsTo": ["organization_id", "version"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -7592,10 +7155,7 @@
       "compositePrimaryKeys": {
         "user_external_principal_credential_secrets_credential_id_secret_kind_pk": {
           "name": "user_external_principal_credential_secrets_credential_id_secret_kind_pk",
-          "columns": [
-            "credential_id",
-            "secret_kind"
-          ]
+          "columns": ["credential_id", "secret_kind"]
         }
       },
       "uniqueConstraints": {},
@@ -7770,12 +7330,8 @@
           "tableFrom": "user_external_principal_credentials",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -7784,12 +7340,8 @@
           "tableFrom": "user_external_principal_credentials",
           "tableTo": "user_external_principals",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "principal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["principal_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -7798,16 +7350,8 @@
           "tableFrom": "user_external_principal_credentials",
           "tableTo": "user_external_principals",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id",
-            "provider_family",
-            "principal_id"
-          ],
-          "columnsTo": [
-            "organization_id",
-            "provider_family",
-            "id"
-          ],
+          "columnsFrom": ["organization_id", "provider_family", "principal_id"],
+          "columnsTo": ["organization_id", "provider_family", "id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -7957,12 +7501,8 @@
           "tableFrom": "user_external_principal_keys",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -7971,12 +7511,8 @@
           "tableFrom": "user_external_principal_keys",
           "tableTo": "user_external_principals",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "principal_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["principal_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -7985,16 +7521,8 @@
           "tableFrom": "user_external_principal_keys",
           "tableTo": "user_external_principals",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id",
-            "provider_family",
-            "principal_id"
-          ],
-          "columnsTo": [
-            "organization_id",
-            "provider_family",
-            "id"
-          ],
+          "columnsFrom": ["organization_id", "provider_family", "principal_id"],
+          "columnsTo": ["organization_id", "provider_family", "id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -8261,12 +7789,8 @@
           "tableFrom": "user_external_principals",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -8275,12 +7799,8 @@
           "tableFrom": "user_external_principals",
           "tableTo": "users",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -8289,12 +7809,8 @@
           "tableFrom": "user_external_principals",
           "tableTo": "organization_identity_link_provider_configs",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_provider_config_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_provider_config_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -8303,12 +7819,8 @@
           "tableFrom": "user_external_principals",
           "tableTo": "integration_connections",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "integration_connection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["integration_connection_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -8323,12 +7835,7 @@
             "integration_connection_id",
             "organization_provider_config_id"
           ],
-          "columnsTo": [
-            "organization_id",
-            "provider_family",
-            "integration_connection_id",
-            "id"
-          ],
+          "columnsTo": ["organization_id", "provider_family", "integration_connection_id", "id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -8588,12 +8095,8 @@
           "tableFrom": "webhook_triggers",
           "tableTo": "triggers",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "trigger_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["trigger_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -8602,12 +8105,8 @@
           "tableFrom": "webhook_triggers",
           "tableTo": "integration_webhook_sources",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "integration_webhook_source_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["integration_webhook_source_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
