@@ -379,8 +379,8 @@ describe.concurrent("sandbox Port Access links integration", () => {
     expect(redirectResponse.status).toBe(404);
     expect(redirectResponse.headers.get("location")).toBeNull();
     expect(await redirectResponse.json()).toEqual({
-      code: "INSTANCE_NOT_FOUND",
-      message: `Sandbox instance '${sandboxInstanceId}' was not found.`,
+      code: "NOT_FOUND",
+      message: "Port Access link was not found or has expired.",
     });
   });
 

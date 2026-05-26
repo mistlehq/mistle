@@ -185,7 +185,19 @@ export async function resolvePortAccessLink(
   const sandboxInstance = await getExistingSandboxInstance(dataPlaneClient, {
     organizationId: input.organizationId,
     instanceId: link.sandboxInstanceId,
+  }).catch((error: unknown) => {
+    if (
+      error instanceof SandboxInstancesNotFoundError &&
+      error.code === SandboxInstancesNotFoundCodes.INSTANCE_NOT_FOUND
+    ) {
+      return null;
+    }
+
+    throw error;
   });
+  if (sandboxInstance === null) {
+    return null;
+  }
 
   if (sandboxInstance.status === "failed") {
     throw createInstanceFailedError(sandboxInstance);

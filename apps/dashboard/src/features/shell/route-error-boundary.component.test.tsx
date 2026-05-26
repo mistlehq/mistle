@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
 
+import { HttpApiError } from "../api/http-api-error.js";
 import {
   RouteErrorBoundary,
   resolveRouteErrorDisplay,
@@ -42,6 +43,28 @@ describe("resolveRouteErrorDisplay", () => {
     expect(display.description).toBe("The requested page could not be found.");
     expect(display.showSignInAction).toBe(false);
     expect(display.detail).toContain("Route error: 404 Not Found");
+  });
+
+  it("returns request messaging for HTTP API errors", () => {
+    const display = resolveRouteErrorDisplay(
+      new HttpApiError({
+        operation: "redeemPortAccessLink",
+        status: 409,
+        body: {
+          code: "INSTANCE_NOT_RESUMABLE",
+          message: "Sandbox instance is not connectable.",
+        },
+        message: "Sandbox instance is not connectable.",
+        code: "INSTANCE_NOT_RESUMABLE",
+      }),
+      { showDiagnostics: true },
+    );
+
+    expect(display.title).toBe("Request failed");
+    expect(display.description).toBe("Sandbox instance is not connectable.");
+    expect(display.showSignInAction).toBe(false);
+    expect(display.detail).toContain("Route error: 409 Sandbox instance is not connectable.");
+    expect(display.detail).toContain("INSTANCE_NOT_RESUMABLE");
   });
 
   it("returns user-safe fallback for unknown route response errors", () => {

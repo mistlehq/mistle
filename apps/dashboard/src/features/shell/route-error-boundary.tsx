@@ -4,6 +4,7 @@ import { isRouteErrorResponse, useNavigate, useRouteError } from "react-router";
 import { z } from "zod";
 
 import { getRuntimeEnv, type RuntimeEnv } from "../../lib/runtime-env.js";
+import { HttpApiError } from "../api/http-api-error.js";
 
 type RouteErrorDisplay = {
   title: string;
@@ -72,6 +73,55 @@ function buildThrownErrorDetail(error: Error): string {
   return lines.filter((line): line is string => line !== null).join("\n\n");
 }
 
+function buildHttpApiErrorDetail(error: HttpApiError): string {
+  return buildRouteErrorDetail({
+    status: error.status,
+    statusText: error.message,
+    data: error.body,
+  });
+}
+
+function resolveHttpApiErrorDisplay(
+  error: HttpApiError,
+  options: ResolveRouteErrorDisplayOptions,
+): RouteErrorDisplay {
+  const detail = options.showDiagnostics ? buildHttpApiErrorDetail(error) : null;
+
+  if (error.status === 401) {
+    return {
+      title: "Sign in required",
+      description: error.message,
+      detail,
+      showSignInAction: true,
+    };
+  }
+
+  if (error.status === 403) {
+    return {
+      title: "Access denied",
+      description: error.message,
+      detail,
+      showSignInAction: false,
+    };
+  }
+
+  if (error.status === 404) {
+    return {
+      title: "Page not found",
+      description: error.message,
+      detail,
+      showSignInAction: false,
+    };
+  }
+
+  return {
+    title: "Request failed",
+    description: error.message,
+    detail,
+    showSignInAction: false,
+  };
+}
+
 export function resolveRouteErrorDisplay(
   error: unknown,
   options: ResolveRouteErrorDisplayOptions,
@@ -117,6 +167,10 @@ export function resolveRouteErrorDisplay(
       detail,
       showSignInAction: false,
     };
+  }
+
+  if (error instanceof HttpApiError) {
+    return resolveHttpApiErrorDisplay(error, options);
   }
 
   if (error instanceof Error) {
