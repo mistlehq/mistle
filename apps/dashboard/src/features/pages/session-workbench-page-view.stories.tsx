@@ -61,7 +61,7 @@ function buildPageViewTerminalOutput(cwd: string): string {
 }
 
 const FailedSandboxSetupMessage =
-  "Failed to initialize sandbox runtime. Cause: failed to submit sandbox init request: control socket returned an error: failed to initialize sandboxd state: failed to apply startup input: runtime plan artifacts[0] lifecycle.install[0] failed (artifactKey=codex-cli op=github_release_install): github release lookup failed for openai/codex release tag match=exact tag=rust-v0.132.0: http 403";
+  "Failed to initialize sandbox runtime. Cause: failed to submit sandbox init request: control socket returned an error: failed to initialize sandboxd state: failed to apply startup input: runtime plan artifacts[0] lifecycle.install[0] failed (artifactKey=codex-cli op=github_release_install): github release lookup failed for openai/codex release tag match=exact tag=rust-v0.133.0: http 403";
 
 function RuntimeConversationNavigationHeaderTitle(): React.JSX.Element {
   return <span className="block min-w-0 truncate text-sm font-medium">Storybook session</span>;
