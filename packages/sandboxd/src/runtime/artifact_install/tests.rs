@@ -16,7 +16,7 @@ use crate::time::testing::{ManualSleeper, MutableClock};
 
 use super::{
     GitHubReleaseAssetResponse, GitHubReleaseResponse, InstallWorkspace, RetryableFailure,
-    StepBudget, apply_managed_github_client_env, build_mise_install_command,
+    StepBudget, apply_managed_github_client_env, build_mise_install_command, compute_file_sha256,
     find_first_matching_published_release, github_release_asset_download_url,
     is_retryable_http_status, materialize_github_release_asset, merge_exec_environment,
     run_with_retry, select_release_asset_shape_for_arch, stream_download_to_path_with_retry,
@@ -87,6 +87,20 @@ fn rejects_artifact_exec_command_env_that_overrides_managed_values() {
     assert_eq!(
         error,
         "artifact install command env defines managed env 'HTTPS_PROXY', which sandboxd reserves"
+    );
+}
+
+#[test]
+fn computes_sha256_as_lowercase_hex() {
+    let test_dir = tempfile::tempdir().expect("temp dir should be creatable");
+    let file_path = test_dir.path().join("artifact");
+    fs::write(&file_path, b"abc").expect("fixture artifact should be writable");
+
+    let sha256 = compute_file_sha256(&file_path).expect("sha256 should compute");
+
+    assert_eq!(
+        sha256,
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
     );
 }
 
