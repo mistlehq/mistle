@@ -31,6 +31,9 @@ type ProcessListenerEntry = {
 };
 
 const MistleManagedProcessCommandPrefixes = [
+  // Pi is intentionally covered by sandboxd: its managed websocket listener is owned by
+  // /opt/mistle/bin/sandboxd, while the Pi child runs over stdio from
+  // /var/lib/mistle/artifacts/pi-cli/pi and does not own the port row.
   "/opt/mistle/bin/sandboxd",
   "/usr/local/bin/codex ",
   "/usr/local/bin/opencode ",

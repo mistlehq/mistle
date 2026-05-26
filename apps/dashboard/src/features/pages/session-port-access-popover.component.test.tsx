@@ -69,6 +69,16 @@ function SessionPortAccessPopoverHarness(): React.JSX.Element {
               ],
             },
             {
+              pid: 2223,
+              command: "/opt/mistle/bin/sandboxd",
+              listeners: [
+                {
+                  bindAddress: "127.0.0.1",
+                  port: 4520,
+                },
+              ],
+            },
+            {
               pid: 3333,
               command: "/usr/local/bin/codex app-server --listen ws://127.0.0.1:4501",
               listeners: [
@@ -117,6 +127,7 @@ describe("SessionPortAccessPopover", () => {
     expect(screen.queryByText(/::1/)).toBeNull();
     expect(screen.queryByText(/::/)).toBeNull();
     expect(screen.queryByText("3901")).toBeNull();
+    expect(screen.queryByText("4520")).toBeNull();
     expect(screen.queryByText("4501")).toBeNull();
     expect(screen.queryByText("4096")).toBeNull();
     expect(
