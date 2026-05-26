@@ -91,33 +91,33 @@ async function ensureMistleCliOAuthClient(input: { db: ControlPlaneDatabase }): 
       .where(eq(tables.oauthClients.id, oauthClientId));
 
     await tx
-      .insert(tables.oauthClientGrantTypes)
-      .values(
-        MistleCliOAuthClient.grantTypes.map((grantType) => ({
-          oauthClientId,
-          grantType,
-        })),
-      )
-      .onConflictDoNothing();
+      .delete(tables.oauthClientGrantTypes)
+      .where(eq(tables.oauthClientGrantTypes.oauthClientId, oauthClientId));
+    await tx.insert(tables.oauthClientGrantTypes).values(
+      MistleCliOAuthClient.grantTypes.map((grantType) => ({
+        oauthClientId,
+        grantType,
+      })),
+    );
 
     await tx
-      .insert(tables.oauthClientRedirectUris)
-      .values(
-        MistleCliOAuthClient.redirectUris.map((redirectUri) => ({
-          oauthClientId,
-          redirectUri,
-        })),
-      )
-      .onConflictDoNothing();
+      .delete(tables.oauthClientRedirectUris)
+      .where(eq(tables.oauthClientRedirectUris.oauthClientId, oauthClientId));
+    await tx.insert(tables.oauthClientRedirectUris).values(
+      MistleCliOAuthClient.redirectUris.map((redirectUri) => ({
+        oauthClientId,
+        redirectUri,
+      })),
+    );
 
     await tx
-      .insert(tables.oauthClientScopes)
-      .values(
-        MistleCliOAuthClient.scopes.map((scope) => ({
-          oauthClientId,
-          scope,
-        })),
-      )
-      .onConflictDoNothing();
+      .delete(tables.oauthClientScopes)
+      .where(eq(tables.oauthClientScopes.oauthClientId, oauthClientId));
+    await tx.insert(tables.oauthClientScopes).values(
+      MistleCliOAuthClient.scopes.map((scope) => ({
+        oauthClientId,
+        scope,
+      })),
+    );
   });
 }

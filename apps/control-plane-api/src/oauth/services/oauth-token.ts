@@ -6,6 +6,7 @@ import { addMilliseconds, systemClock, type Clock } from "@mistle/time";
 import { eq, sql } from "drizzle-orm";
 
 import { parseApiKeyPermissions } from "../../api-keys/services/permissions.js";
+import { requireOrganizationAccess } from "../../auth/services/organization-authorization.js";
 import type { OrganizationPermission } from "../../auth/services/organization-policy.js";
 import type { AppAuthContext } from "../../types.js";
 
@@ -85,6 +86,8 @@ export async function refreshOAuthTokenPair(input: {
     columns: {
       id: true,
       oauthClientId: true,
+      userId: true,
+      organizationId: true,
       revokedAt: true,
     },
     where: (table, { eq }) => eq(table.id, refreshTokenRow.oauthGrantId),
@@ -97,7 +100,10 @@ export async function refreshOAuthTokenPair(input: {
     throw new BadRequestError("invalid_grant", "Refresh token client does not match.");
   }
 
-  const permissions = await readGrantPermissions({ db: input.db, oauthGrantId: grant.id });
+  const permissions = await readCurrentlyAuthorizedGrantPermissions({
+    db: input.db,
+    grant,
+  });
   const accessToken = generateToken(AccessTokenPrefix);
   const expiresAt = addMilliseconds(clock.nowDate(), OAuthAccessTokenTtlMs).toISOString();
   await insertAccessToken({ db: input.db, oauthGrantId: grant.id, token: accessToken, expiresAt });
@@ -161,7 +167,10 @@ export async function authenticateOAuthAccessToken(input: {
     throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
   }
 
-  const permissions = await readGrantPermissions({ db: input.db, oauthGrantId: grant.id });
+  const permissions = await readCurrentlyAuthorizedGrantPermissions({
+    db: input.db,
+    grant,
+  });
   const tables = getControlPlaneDatabaseSchema(input.db);
   await input.db
     .update(tables.oauthAccessTokens)
@@ -276,6 +285,28 @@ async function readGrantPermissions(input: {
   });
 
   return parseApiKeyPermissions(scopes.map((scope) => scope.scope));
+}
+
+async function readCurrentlyAuthorizedGrantPermissions(input: {
+  db: ControlPlaneDatabase;
+  grant: {
+    id: string;
+    userId: string;
+    organizationId: string;
+  };
+}): Promise<OrganizationPermission[]> {
+  const grantPermissions = await readGrantPermissions({
+    db: input.db,
+    oauthGrantId: input.grant.id,
+  });
+  const authorization = await requireOrganizationAccess({
+    db: input.db,
+    actorUserId: input.grant.userId,
+    organizationId: input.grant.organizationId,
+  });
+  const currentlyAllowedPermissions = new Set(authorization.permissions);
+
+  return grantPermissions.filter((permission) => currentlyAllowedPermissions.has(permission));
 }
 
 function generateToken(prefix: string): string {

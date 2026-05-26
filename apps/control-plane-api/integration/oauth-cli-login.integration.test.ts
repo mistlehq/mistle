@@ -284,6 +284,94 @@ describe.concurrent("OAuth CLI login integration", () => {
       error_description: "Authorization code verifier is invalid.",
     });
   });
+
+  it("rejects OAuth access and refresh tokens after organization membership is revoked", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: `integration-oauth-cli-login-revoked-${randomUUID()}@example.com`,
+    });
+    const redirectUri = "http://127.0.0.1:61743/callback";
+    const codeVerifier = "revoked-verifier-revoked-verifier-revoked-verifier";
+
+    const authorizeResponse = await env.controlPlaneApi.http.fetch(
+      buildAuthorizePath({
+        redirectUri,
+        state: "revoked-state",
+        codeChallenge: pkceChallenge(codeVerifier),
+      }),
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+        redirect: "manual",
+      },
+    );
+    if (authorizeResponse.status !== 302) {
+      throw new Error(await authorizeResponse.text());
+    }
+    const location = authorizeResponse.headers.get("location");
+    if (location === null) {
+      throw new Error("Expected OAuth authorize redirect location.");
+    }
+    const code = new URL(location).searchParams.get("code");
+    if (code === null) {
+      throw new Error("Expected OAuth callback code.");
+    }
+
+    const tokenResponse = await env.controlPlaneApi.http.fetch("/oauth/token", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: "mistle-cli",
+        redirect_uri: redirectUri,
+        code,
+        code_verifier: codeVerifier,
+      }),
+    });
+    expect(tokenResponse.status).toBe(200);
+    const tokenBody = OAuthTokenResponseSchema.parse(await tokenResponse.json());
+
+    await env.controlPlaneDb
+      .delete(env.controlPlaneTables.members)
+      .where(
+        and(
+          eq(env.controlPlaneTables.members.organizationId, session.organizationId),
+          eq(env.controlPlaneTables.members.userId, session.userId),
+        ),
+      );
+
+    const currentActorResponse = await env.controlPlaneApi.http.fetch("/v1/me", {
+      headers: {
+        authorization: `Bearer ${tokenBody.access_token}`,
+      },
+    });
+    expect(currentActorResponse.status).toBe(403);
+    await expect(currentActorResponse.json()).resolves.toStrictEqual({
+      code: "FORBIDDEN",
+      message: "Forbidden API request.",
+    });
+
+    const refreshTokenResponse = await env.controlPlaneApi.http.fetch("/oauth/token", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: "mistle-cli",
+        refresh_token: tokenBody.refresh_token,
+      }),
+    });
+    expect(refreshTokenResponse.status).toBe(403);
+    await expect(refreshTokenResponse.json()).resolves.toStrictEqual({
+      code: "FORBIDDEN",
+      message: "Forbidden API request.",
+    });
+  });
 });
 
 function buildAuthorizePath(input: {
