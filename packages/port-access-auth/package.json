@@ -31,7 +31,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "jose": "^6.2.2",
+    "jose": "^6.2.3",
     "zod": "^4.4.3"
   }
 }
