@@ -1,4 +1,3 @@
-import type { WSContext } from "hono/ws";
 import type { WebSocket } from "ws";
 
 export type RelayPeerSide = "bootstrap" | "connection" | "ptyClient" | "ptySandbox";
@@ -17,7 +16,12 @@ export type RelayTarget = LocalPeerDescriptor & {
   sessionId: string;
 };
 
-export type RelayPeerSocket = WSContext<WebSocket>;
+export type RelayPeerSocket = {
+  readonly raw?: WebSocket;
+  readonly readyState: number;
+  close: (code?: number, reason?: string) => void;
+  send: (payload: string | ArrayBuffer) => void;
+};
 
 export type RelayPayload = string | ArrayBuffer;
 

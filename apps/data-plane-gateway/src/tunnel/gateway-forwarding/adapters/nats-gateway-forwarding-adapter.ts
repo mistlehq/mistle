@@ -25,6 +25,9 @@ import type {
   GatewayForwardingTarget,
   InteractiveStreamRoute,
   OpenInteractiveStreamInput,
+  OpenPortAccessStreamInput,
+  OpenPortAccessStreamResult,
+  ReleasePortAccessStreamInput,
   ReleaseClientSessionStreamsInput,
   ReleaseClientSessionStreamsResult,
 } from "../types.js";
@@ -97,6 +100,13 @@ const InteractiveStreamRouteSchema = z
   .object({
     bootstrapTarget: RelayTargetSchema,
     binding: ClientStreamBindingSchema,
+  })
+  .strict();
+
+const OpenPortAccessStreamResultSchema = z
+  .object({
+    bootstrapTarget: RelayTargetSchema,
+    streamId: z.number().int().positive(),
   })
   .strict();
 
@@ -192,6 +202,30 @@ const GatewayForwardingRequestSchema = z.discriminatedUnion("operation", [
         .strict(),
     })
     .strict(),
+  z
+    .object({
+      operation: z.literal("openPortAccessStream"),
+      target: GatewayForwardingTargetSchema,
+      input: z
+        .object({
+          sandboxInstanceId: z.string().min(1),
+          sourceConnectionSessionId: z.string().min(1),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal("releasePortAccessStream"),
+      target: GatewayForwardingTargetSchema,
+      input: z
+        .object({
+          sandboxInstanceId: z.string().min(1),
+          streamId: z.number().int().positive(),
+        })
+        .strict(),
+    })
+    .strict(),
 ]);
 
 const GatewayForwardingResponseSchema = z.discriminatedUnion("kind", [
@@ -211,6 +245,17 @@ const GatewayForwardingResponseSchema = z.discriminatedUnion("kind", [
     .object({
       kind: z.literal("authorizeResult"),
       result: PortsTargetAuthorizeResultSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("portAccessStream"),
+      result: OpenPortAccessStreamResultSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("ok"),
     })
     .strict(),
   z
@@ -458,6 +503,53 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
     throw new Error("Remote gateway forwarding authorizePortAccessTarget returned no result.");
   }
 
+  public async openPortAccessStream(
+    target: GatewayForwardingTarget,
+    input: OpenPortAccessStreamInput,
+  ): Promise<OpenPortAccessStreamResult> {
+    if (target.targetNodeId === this.nodeId) {
+      return this.localServer.openPortAccessStream(target, input);
+    }
+
+    const response = await this.request({
+      operation: "openPortAccessStream",
+      target,
+      input,
+    });
+    if (response.kind === "portAccessStream") {
+      return response.result;
+    }
+    if (response.kind === "error") {
+      throw toForwardingResponseError(response);
+    }
+
+    throw new Error("Remote gateway forwarding openPortAccessStream returned no result.");
+  }
+
+  public async releasePortAccessStream(
+    target: GatewayForwardingTarget,
+    input: ReleasePortAccessStreamInput,
+  ): Promise<void> {
+    if (target.targetNodeId === this.nodeId) {
+      await this.localServer.releasePortAccessStream(target, input);
+      return;
+    }
+
+    const response = await this.request({
+      operation: "releasePortAccessStream",
+      target,
+      input,
+    });
+    if (response.kind === "ok") {
+      return;
+    }
+    if (response.kind === "error") {
+      throw toForwardingResponseError(response);
+    }
+
+    throw new Error("Remote gateway forwarding releasePortAccessStream returned no result.");
+  }
+
   private async request(request: GatewayForwardingRequest): Promise<GatewayForwardingResponse> {
     const connection = this.connection;
     if (connection === undefined) {
@@ -600,6 +692,18 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
         return {
           kind: "authorizeResult",
           result: await this.localServer.authorizePortAccessTarget(request.target, request.input),
+        };
+      }
+      if (request.operation === "openPortAccessStream") {
+        return {
+          kind: "portAccessStream",
+          result: await this.localServer.openPortAccessStream(request.target, request.input),
+        };
+      }
+      if (request.operation === "releasePortAccessStream") {
+        await this.localServer.releasePortAccessStream(request.target, request.input);
+        return {
+          kind: "ok",
         };
       }
 

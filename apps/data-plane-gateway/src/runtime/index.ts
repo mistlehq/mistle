@@ -373,6 +373,7 @@ export function createDataPlaneGatewayRuntime(
     new InMemoryTunnelSessionRegistryAdapter(DefaultMaxActiveBindingsPerSandbox),
   );
   let portsTargetAuthorizeService: PortsTargetAuthorizeService;
+  let portAccessTransportService: PortAccessTransportService;
   const gatewayForwardingServer = new LocalGatewayForwardingServerAdapter(
     tunnelSessionRegistry,
     async (target, input) => {
@@ -384,6 +385,19 @@ export function createDataPlaneGatewayRuntime(
       } catch (error) {
         throw toGatewayForwardingPortAccessAuthorizationError(error);
       }
+    },
+    {
+      open: async (target, input) =>
+        portAccessTransportService.openForwardedPortAccessStream({
+          ...input,
+          target,
+        }),
+      release: async (target, input) => {
+        portAccessTransportService.releaseForwardedPortAccessStream({
+          ...input,
+          target,
+        });
+      },
     },
   );
   const relayResources = createGatewayRelayRuntimeResources({
@@ -403,12 +417,16 @@ export function createDataPlaneGatewayRuntime(
     client: gatewayForwardingClient,
     localNodeId: nodeId,
   });
-  const portAccessTransportService = new PortAccessTransportService(
+  portAccessTransportService = new PortAccessTransportService(
     relayCoordinator,
     tunnelSessionRegistry,
     {
       clock: systemClock,
       scheduler: systemScheduler,
+    },
+    {
+      client: gatewayForwardingClient,
+      localNodeId: nodeId,
     },
   );
   const directEgressProxyService = new DirectEgressProxyService(

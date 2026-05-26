@@ -7,6 +7,9 @@ import type {
   GatewayForwardingTarget,
   InteractiveStreamRoute,
   OpenInteractiveStreamInput,
+  OpenPortAccessStreamInput,
+  OpenPortAccessStreamResult,
+  ReleasePortAccessStreamInput,
   ReleaseClientSessionStreamsInput,
   ReleaseClientSessionStreamsResult,
 } from "./types.js";
@@ -39,4 +42,12 @@ export interface GatewayForwardingClientAdapter {
     target: GatewayForwardingTarget,
     input: AuthorizePortAccessTargetInput,
   ): Promise<AuthorizePortAccessTargetResult>;
+  openPortAccessStream(
+    target: GatewayForwardingTarget,
+    input: OpenPortAccessStreamInput,
+  ): Promise<OpenPortAccessStreamResult>;
+  releasePortAccessStream(
+    target: GatewayForwardingTarget,
+    input: ReleasePortAccessStreamInput,
+  ): Promise<void>;
 }

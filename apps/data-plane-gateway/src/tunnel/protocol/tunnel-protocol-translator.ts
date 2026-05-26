@@ -738,11 +738,27 @@ export class TunnelProtocolTranslator {
         portsTransportMessage.type === "ports.tcp.error" ||
         portsTransportMessage.type === "ports.stream.error"
       ) {
-        await this.portAccessTransportService.handleBootstrapTransportMessage({
+        const handled = await this.portAccessTransportService.handleBootstrapTransportMessage({
           sandboxInstanceId: input.sandboxInstanceId,
           sourceBootstrapSessionId: input.clientSessionId,
           message: portsTransportMessage,
         });
+        if (!handled) {
+          const targetConnectionSessionId =
+            this.portAccessTransportService.resolveForwardedBootstrapTransportMessage({
+              sandboxInstanceId: input.sandboxInstanceId,
+              sourceBootstrapSessionId: input.clientSessionId,
+              message: portsTransportMessage,
+            });
+          if (targetConnectionSessionId !== undefined) {
+            return createTranslation({
+              delivery: createForwardDelivery({
+                payload: input.payload,
+                targetConnectionSessionId,
+              }),
+            });
+          }
+        }
 
         return createTranslation({
           delivery: {

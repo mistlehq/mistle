@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Duplex } from "node:stream";
 
 import {
@@ -17,6 +18,7 @@ import {
   type StreamWindow,
   PayloadKindRawBytes,
   decodeDataFrame,
+  parsePortsTransportMessage,
 } from "@mistle/sandbox-session-protocol";
 import {
   systemClock,
@@ -29,6 +31,8 @@ import { metrics, SpanStatusCode, trace, type Attributes, type Span } from "@ope
 
 import { logger } from "../logger.js";
 import { BootstrapTunnelNotConnectedError } from "../tunnel/bootstrap-tunnel-not-connected-error.js";
+import type { GatewayForwardingClientAdapter } from "../tunnel/gateway-forwarding/gateway-forwarding-client-adapter.js";
+import type { GatewayForwardingTarget } from "../tunnel/gateway-forwarding/types.js";
 import type { TunnelRelayCoordinator } from "../tunnel/relay-coordinator.js";
 import type { TunnelSessionRegistry } from "../tunnel/tunnel-session/index.js";
 import type { RelayTarget } from "../tunnel/types.js";
@@ -95,6 +99,7 @@ type ActivePortAccessHttpStream = {
   portAccessSpan: Span;
   responseStarted: boolean;
   rejectResponseStart: (error: Error) => void;
+  releaseStream: () => void;
   resolveResponseStart: (responseStart: PortsHttpResponseStart) => void;
   responseBodyWriter: WritableStreamDefaultWriter<Uint8Array>;
   targetBootstrapSessionId: string;
@@ -126,6 +131,11 @@ type ActivePortAccessTcpStream = {
   targetBootstrapSessionId: string;
   totalRequestBytes: number;
   totalResponseBytes: number;
+};
+
+type ForwardedPortAccessStream = {
+  sourceConnectionSessionId: string;
+  targetBootstrapSessionId: string;
 };
 
 export type PortAccessHttpRequestHandle = {
@@ -294,6 +304,69 @@ function finishPortAccessStream(input: {
   input.span.end();
 }
 
+class PortAccessForwardedConnectionPeer {
+  public readonly readyState = 1;
+
+  public constructor(
+    private readonly input: {
+      sandboxInstanceId: string;
+      service: PortAccessTransportService;
+      sourceBootstrapSessionId: string;
+    },
+  ) {}
+
+  public send(payload: string | ArrayBuffer): void {
+    if (typeof payload === "string") {
+      const message = parsePortsTransportMessage(payload);
+      if (message !== undefined) {
+        void this.input.service
+          .handleBootstrapTransportMessage({
+            message,
+            requireCurrentBootstrapSession: false,
+            sandboxInstanceId: this.input.sandboxInstanceId,
+            sourceBootstrapSessionId: this.input.sourceBootstrapSessionId,
+          })
+          .catch((error: unknown) => {
+            logger.warn(
+              {
+                err: error,
+                eventName: "gateway.port_access.forwarded_connection.delivery_failed",
+                "mistle.sandbox.instance_id": this.input.sandboxInstanceId,
+              },
+              "Forwarded Port Access message delivery failed",
+            );
+          });
+      }
+      return;
+    }
+
+    void this.input.service
+      .handleBootstrapDataFrame({
+        payload,
+        requireCurrentBootstrapSession: false,
+        sandboxInstanceId: this.input.sandboxInstanceId,
+        sourceBootstrapSessionId: this.input.sourceBootstrapSessionId,
+      })
+      .catch((error: unknown) => {
+        logger.warn(
+          {
+            err: error,
+            eventName: "gateway.port_access.forwarded_connection.delivery_failed",
+            "mistle.sandbox.instance_id": this.input.sandboxInstanceId,
+          },
+          "Forwarded Port Access data frame delivery failed",
+        );
+      });
+  }
+
+  public close(): void {
+    this.input.service.rejectPendingStreamsForBootstrapSession({
+      sandboxInstanceId: this.input.sandboxInstanceId,
+      targetBootstrapSessionId: this.input.sourceBootstrapSessionId,
+    });
+  }
+}
+
 export function buildPortAccessRequestHeaders(input: {
   browserEdgePort: string;
   browserEdgeProto: "http" | "https";
@@ -359,6 +432,10 @@ export class PortAccessTransportService {
     Map<number, ActivePortAccessTcpStream>
   >();
   readonly #activeTcpStreamCountsByPortAccessSessionKey = new Map<string, number>();
+  readonly #forwardedStreamsBySandboxInstanceId = new Map<
+    string,
+    Map<number, ForwardedPortAccessStream>
+  >();
   readonly #clock: Clock;
   readonly #connectTimeoutMs: number;
   readonly #idleTimeoutMs: number;
@@ -370,13 +447,21 @@ export class PortAccessTransportService {
   public constructor(
     private readonly relayCoordinator: Pick<
       TunnelRelayCoordinator,
-      "forwardPeerMessage" | "getBootstrapPeer"
+      | "attachPeer"
+      | "detachPeerWithOptions"
+      | "forwardPeerMessage"
+      | "getBootstrapPeer"
+      | "resolveBootstrapPeer"
     >,
     private readonly tunnelSessionRegistry: Pick<
       TunnelSessionRegistry,
       "reserveTunnelStream" | "releaseReservedTunnelStream"
     >,
     options: PortAccessTransportOptions = {},
+    private readonly remoteGatewayForwarding?: {
+      client: GatewayForwardingClientAdapter;
+      localNodeId: string;
+    },
   ) {
     this.#clock = options.clock ?? systemClock;
     this.#connectTimeoutMs = options.connectTimeoutMs ?? DefaultTcpConnectTimeoutMs;
@@ -397,13 +482,97 @@ export class PortAccessTransportService {
     target: PortAccessTarget;
     upstreamProtocol: "http" | "https";
   }): Promise<PortAccessHttpRequestHandle> {
-    const bootstrapTarget = this.requireBootstrapTarget({
+    const bootstrapTarget = await this.resolveBootstrapTarget({
       sandboxInstanceId: input.sandboxInstanceId,
     });
+    const forwardedConnectionSessionId =
+      this.remoteGatewayForwarding === undefined ||
+      bootstrapTarget.nodeId === this.remoteGatewayForwarding.localNodeId
+        ? undefined
+        : randomUUID();
+    const forwardedPeer =
+      forwardedConnectionSessionId === undefined
+        ? undefined
+        : new PortAccessForwardedConnectionPeer({
+            sandboxInstanceId: input.sandboxInstanceId,
+            service: this,
+            sourceBootstrapSessionId: bootstrapTarget.sessionId,
+          });
+    if (forwardedConnectionSessionId !== undefined && forwardedPeer !== undefined) {
+      this.relayCoordinator.attachPeer({
+        sandboxInstanceId: input.sandboxInstanceId,
+        side: "connection",
+        sessionId: forwardedConnectionSessionId,
+        socket: forwardedPeer,
+      });
+    }
 
-    const streamId = this.reserveHttpStreamId({
-      sandboxInstanceId: input.sandboxInstanceId,
-    });
+    let streamId: number;
+    let releaseStream: () => void;
+    let streamReleased = false;
+    try {
+      const remoteStream =
+        forwardedConnectionSessionId === undefined
+          ? undefined
+          : await this.requestRemotePortAccessStream({
+              bootstrapTarget,
+              sandboxInstanceId: input.sandboxInstanceId,
+              sourceConnectionSessionId: forwardedConnectionSessionId,
+            });
+      streamId =
+        remoteStream?.streamId ??
+        this.reserveHttpStreamId({
+          sandboxInstanceId: input.sandboxInstanceId,
+        });
+      releaseStream =
+        remoteStream === undefined
+          ? () => {
+              if (streamReleased) {
+                return;
+              }
+              streamReleased = true;
+              this.releaseHttpStreamId({
+                sandboxInstanceId: input.sandboxInstanceId,
+                streamId,
+              });
+            }
+          : () => {
+              if (streamReleased) {
+                return;
+              }
+              streamReleased = true;
+              void this.requestRemotePortAccessStreamRelease({
+                bootstrapTarget,
+                sandboxInstanceId: input.sandboxInstanceId,
+                streamId,
+              }).catch((error: unknown) => {
+                logger.warn(
+                  {
+                    err: error,
+                    eventName: "gateway.port_access.forwarded_stream.release_failed",
+                    "mistle.sandbox.instance_id": input.sandboxInstanceId,
+                    "mistle.port_access.stream_id": streamId,
+                    "mistle.port_access.target_bootstrap_session_id": bootstrapTarget.sessionId,
+                  },
+                  "Forwarded Port Access stream release failed",
+                );
+              });
+              if (forwardedConnectionSessionId !== undefined) {
+                this.detachForwardedConnectionPeer({
+                  sandboxInstanceId: input.sandboxInstanceId,
+                  sessionId: forwardedConnectionSessionId,
+                });
+              }
+            };
+    } catch (error) {
+      if (forwardedConnectionSessionId !== undefined) {
+        this.detachForwardedConnectionPeer({
+          sandboxInstanceId: input.sandboxInstanceId,
+          sessionId: forwardedConnectionSessionId,
+        });
+      }
+      throw error;
+    }
     const openedAtMs = this.#clock.nowMs();
     const streamAttributes = buildPortAccessStreamAttributes({
       sandboxInstanceId: input.sandboxInstanceId,
@@ -450,6 +619,7 @@ export class PortAccessTransportService {
         portAccessSpan,
         responseStarted: false,
         rejectResponseStart,
+        releaseStream,
         resolveResponseStart,
         responseBodyWriter,
         targetBootstrapSessionId: bootstrapTarget.sessionId,
@@ -473,10 +643,7 @@ export class PortAccessTransportService {
         sandboxInstanceId: input.sandboxInstanceId,
         streamId,
       });
-      this.releaseHttpStreamId({
-        sandboxInstanceId: input.sandboxInstanceId,
-        streamId,
-      });
+      releaseStream();
       await responseBodyWriter.abort(error);
       const streamError = error instanceof Error ? error : new Error(String(error));
       finishPortAccessStream({
@@ -508,10 +675,7 @@ export class PortAccessTransportService {
           streamId,
         });
         if (activeStream !== undefined) {
-          this.releaseHttpStreamId({
-            sandboxInstanceId: input.sandboxInstanceId,
-            streamId,
-          });
+          activeStream.releaseStream();
         }
         await responseBodyWriter.abort();
         if (activeStream !== undefined) {
@@ -722,15 +886,18 @@ export class PortAccessTransportService {
 
   public async handleBootstrapTransportMessage(input: {
     message: PortsTransportMessage;
+    requireCurrentBootstrapSession?: boolean;
     sandboxInstanceId: string;
     sourceBootstrapSessionId: string;
   }): Promise<boolean> {
     const activeHttpStream = this.getMatchingActiveHttpStream({
+      requireCurrentBootstrapSession: input.requireCurrentBootstrapSession ?? true,
       sandboxInstanceId: input.sandboxInstanceId,
       sourceBootstrapSessionId: input.sourceBootstrapSessionId,
       streamId: input.message.streamId,
     });
     const activeTcpStream = this.getMatchingActiveTcpStream({
+      requireCurrentBootstrapSession: input.requireCurrentBootstrapSession ?? true,
       sandboxInstanceId: input.sandboxInstanceId,
       sourceBootstrapSessionId: input.sourceBootstrapSessionId,
       streamId: input.message.streamId,
@@ -792,10 +959,7 @@ export class PortAccessTransportService {
           sandboxInstanceId: input.sandboxInstanceId,
           streamId: input.message.streamId,
         });
-        this.releaseHttpStreamId({
-          sandboxInstanceId: input.sandboxInstanceId,
-          streamId: input.message.streamId,
-        });
+        activeHttpStream.releaseStream();
         await activeHttpStream.responseBodyWriter.close();
         this.finishHttpStreamObservability({
           outcome: "completed",
@@ -902,6 +1066,7 @@ export class PortAccessTransportService {
 
   public async handleBootstrapDataFrame(input: {
     payload: ArrayBuffer;
+    requireCurrentBootstrapSession?: boolean;
     sandboxInstanceId: string;
     sourceBootstrapSessionId: string;
   }): Promise<boolean> {
@@ -911,6 +1076,7 @@ export class PortAccessTransportService {
     }
 
     const activeTcpStream = this.getMatchingActiveTcpStream({
+      requireCurrentBootstrapSession: input.requireCurrentBootstrapSession ?? true,
       sandboxInstanceId: input.sandboxInstanceId,
       sourceBootstrapSessionId: input.sourceBootstrapSessionId,
       streamId: frame.streamId,
@@ -947,6 +1113,7 @@ export class PortAccessTransportService {
     sourceBootstrapSessionId: string;
   }): boolean {
     const activeTcpStream = this.getMatchingActiveTcpStream({
+      requireCurrentBootstrapSession: true,
       sandboxInstanceId: input.sandboxInstanceId,
       sourceBootstrapSessionId: input.sourceBootstrapSessionId,
       streamId: input.message.streamId,
@@ -964,6 +1131,85 @@ export class PortAccessTransportService {
     return true;
   }
 
+  public openForwardedPortAccessStream(input: {
+    sandboxInstanceId: string;
+    sourceConnectionSessionId: string;
+    target: GatewayForwardingTarget;
+  }): { bootstrapTarget: RelayTarget; streamId: number } {
+    const bootstrapTarget = this.requireBootstrapTarget({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+    if (bootstrapTarget.sessionId !== input.target.targetBootstrapSessionId) {
+      throw new Error(
+        `Resolved bootstrap session is no longer current for sandbox '${input.sandboxInstanceId}'.`,
+      );
+    }
+
+    const streamId = this.reserveHttpStreamId({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+    const sandboxStreams =
+      this.#forwardedStreamsBySandboxInstanceId.get(input.sandboxInstanceId) ?? new Map();
+    sandboxStreams.set(streamId, {
+      sourceConnectionSessionId: input.sourceConnectionSessionId,
+      targetBootstrapSessionId: bootstrapTarget.sessionId,
+    });
+    this.#forwardedStreamsBySandboxInstanceId.set(input.sandboxInstanceId, sandboxStreams);
+
+    return {
+      bootstrapTarget,
+      streamId,
+    };
+  }
+
+  public releaseForwardedPortAccessStream(input: {
+    sandboxInstanceId: string;
+    streamId: number;
+    target: GatewayForwardingTarget;
+  }): void {
+    const stream = this.getForwardedPortAccessStream({
+      sandboxInstanceId: input.sandboxInstanceId,
+      streamId: input.streamId,
+    });
+    if (
+      stream === undefined ||
+      stream.targetBootstrapSessionId !== input.target.targetBootstrapSessionId
+    ) {
+      return;
+    }
+
+    this.deleteForwardedPortAccessStream({
+      sandboxInstanceId: input.sandboxInstanceId,
+      streamId: input.streamId,
+    });
+  }
+
+  public resolveForwardedBootstrapTransportMessage(input: {
+    message: PortsTransportMessage;
+    sandboxInstanceId: string;
+    sourceBootstrapSessionId: string;
+  }): string | undefined {
+    const stream = this.getForwardedPortAccessStream({
+      sandboxInstanceId: input.sandboxInstanceId,
+      streamId: input.message.streamId,
+    });
+    if (stream?.targetBootstrapSessionId !== input.sourceBootstrapSessionId) {
+      return undefined;
+    }
+
+    if (
+      input.message.type === "ports.http.body.end" ||
+      input.message.type === "ports.stream.error"
+    ) {
+      this.deleteForwardedPortAccessStream({
+        sandboxInstanceId: input.sandboxInstanceId,
+        streamId: input.message.streamId,
+      });
+    }
+
+    return stream.sourceConnectionSessionId;
+  }
+
   public rejectPendingStreamsForBootstrapSession(input: {
     sandboxInstanceId: string;
     targetBootstrapSessionId: string;
@@ -976,10 +1222,7 @@ export class PortAccessTransportService {
         }
 
         activeStreams.delete(streamId);
-        this.releaseHttpStreamId({
-          sandboxInstanceId: input.sandboxInstanceId,
-          streamId,
-        });
+        stream.releaseStream();
         const disconnectError = new PortAccessTransportBootstrapDisconnectedError(
           input.sandboxInstanceId,
         );
@@ -1101,7 +1344,7 @@ export class PortAccessTransportService {
     }
 
     this.deleteActiveHttpStream(input);
-    this.releaseHttpStreamId(input);
+    activeStream.releaseStream();
     if (!activeStream.responseStarted) {
       activeStream.rejectResponseStart(input.error);
     }
@@ -1472,6 +1715,17 @@ export class PortAccessTransportService {
     });
   }
 
+  private async resolveBootstrapTarget(input: { sandboxInstanceId: string }): Promise<RelayTarget> {
+    const bootstrapTarget = await this.relayCoordinator.resolveBootstrapPeer({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+    if (bootstrapTarget === undefined) {
+      throw new BootstrapTunnelNotConnectedError(input.sandboxInstanceId);
+    }
+
+    return bootstrapTarget;
+  }
+
   private requireBootstrapTarget(input: { sandboxInstanceId: string }): RelayTarget {
     const bootstrapTarget = this.relayCoordinator.getBootstrapPeer({
       sandboxInstanceId: input.sandboxInstanceId,
@@ -1481,6 +1735,98 @@ export class PortAccessTransportService {
     }
 
     return bootstrapTarget;
+  }
+
+  private async requestRemotePortAccessStream(input: {
+    bootstrapTarget: RelayTarget;
+    sandboxInstanceId: string;
+    sourceConnectionSessionId: string;
+  }): Promise<{ streamId: number }> {
+    const remoteGatewayForwarding = this.remoteGatewayForwarding;
+    if (remoteGatewayForwarding === undefined) {
+      throw new BootstrapTunnelNotConnectedError(input.sandboxInstanceId);
+    }
+
+    return remoteGatewayForwarding.client.openPortAccessStream(
+      toGatewayForwardingTarget({
+        localNodeId: remoteGatewayForwarding.localNodeId,
+        target: input.bootstrapTarget,
+      }),
+      {
+        sandboxInstanceId: input.sandboxInstanceId,
+        sourceConnectionSessionId: input.sourceConnectionSessionId,
+      },
+    );
+  }
+
+  private async requestRemotePortAccessStreamRelease(input: {
+    bootstrapTarget: RelayTarget;
+    sandboxInstanceId: string;
+    streamId: number;
+  }): Promise<void> {
+    const remoteGatewayForwarding = this.remoteGatewayForwarding;
+    if (remoteGatewayForwarding === undefined) {
+      return;
+    }
+
+    await remoteGatewayForwarding.client.releasePortAccessStream(
+      toGatewayForwardingTarget({
+        localNodeId: remoteGatewayForwarding.localNodeId,
+        target: input.bootstrapTarget,
+      }),
+      {
+        sandboxInstanceId: input.sandboxInstanceId,
+        streamId: input.streamId,
+      },
+    );
+  }
+
+  private detachForwardedConnectionPeer(input: {
+    sandboxInstanceId: string;
+    sessionId: string;
+  }): void {
+    const remoteGatewayForwarding = this.remoteGatewayForwarding;
+    if (remoteGatewayForwarding === undefined) {
+      return;
+    }
+
+    this.relayCoordinator.detachPeerWithOptions({
+      notifyOppositePeer: false,
+      target: {
+        sandboxInstanceId: input.sandboxInstanceId,
+        side: "connection",
+        nodeId: remoteGatewayForwarding.localNodeId,
+        sessionId: input.sessionId,
+      },
+    });
+  }
+
+  private getForwardedPortAccessStream(input: {
+    sandboxInstanceId: string;
+    streamId: number;
+  }): ForwardedPortAccessStream | undefined {
+    return this.#forwardedStreamsBySandboxInstanceId
+      .get(input.sandboxInstanceId)
+      ?.get(input.streamId);
+  }
+
+  private deleteForwardedPortAccessStream(input: {
+    sandboxInstanceId: string;
+    streamId: number;
+  }): void {
+    const sandboxStreams = this.#forwardedStreamsBySandboxInstanceId.get(input.sandboxInstanceId);
+    if (sandboxStreams === undefined) {
+      return;
+    }
+
+    sandboxStreams.delete(input.streamId);
+    this.releaseHttpStreamId({
+      sandboxInstanceId: input.sandboxInstanceId,
+      streamId: input.streamId,
+    });
+    if (sandboxStreams.size === 0) {
+      this.#forwardedStreamsBySandboxInstanceId.delete(input.sandboxInstanceId);
+    }
   }
 
   private getActiveHttpStream(input: {
@@ -1493,11 +1839,12 @@ export class PortAccessTransportService {
   }
 
   private getMatchingActiveHttpStream(input: {
+    requireCurrentBootstrapSession: boolean;
     sandboxInstanceId: string;
     sourceBootstrapSessionId: string;
     streamId: number;
   }): ActivePortAccessHttpStream | undefined {
-    if (!this.isCurrentBootstrapSession(input)) {
+    if (input.requireCurrentBootstrapSession && !this.isCurrentBootstrapSession(input)) {
       return undefined;
     }
 
@@ -1568,11 +1915,12 @@ export class PortAccessTransportService {
   }
 
   private getMatchingActiveTcpStream(input: {
+    requireCurrentBootstrapSession: boolean;
     sandboxInstanceId: string;
     sourceBootstrapSessionId: string;
     streamId: number;
   }): ActivePortAccessTcpStream | undefined {
-    if (!this.isCurrentBootstrapSession(input)) {
+    if (input.requireCurrentBootstrapSession && !this.isCurrentBootstrapSession(input)) {
       return undefined;
     }
 
@@ -1647,6 +1995,17 @@ function toPortAccessSessionKey(input: {
   sandboxInstanceId: string;
 }): string {
   return `${input.sandboxInstanceId}:${input.portAccessSessionId}`;
+}
+
+function toGatewayForwardingTarget(input: {
+  localNodeId: string;
+  target: RelayTarget;
+}): GatewayForwardingTarget {
+  return {
+    sourceNodeId: input.localNodeId,
+    targetNodeId: input.target.nodeId,
+    targetBootstrapSessionId: input.target.sessionId,
+  };
 }
 
 function writeTcpClientBytes(input: { bytes: Uint8Array; client: Duplex }): Promise<void> {

@@ -10,6 +10,9 @@ import type {
   GatewayForwardingTarget,
   InteractiveStreamRoute,
   OpenInteractiveStreamInput,
+  OpenPortAccessStreamInput,
+  OpenPortAccessStreamResult,
+  ReleasePortAccessStreamInput,
   ReleaseClientSessionStreamsInput,
   ReleaseClientSessionStreamsResult,
 } from "../types.js";
@@ -24,6 +27,16 @@ export class LocalGatewayForwardingServerAdapter implements GatewayForwardingSer
       target: GatewayForwardingTarget,
       input: AuthorizePortAccessTargetInput,
     ) => Promise<AuthorizePortAccessTargetResult>,
+    private readonly portAccessStreamHandler?: {
+      open: (
+        target: GatewayForwardingTarget,
+        input: OpenPortAccessStreamInput,
+      ) => Promise<OpenPortAccessStreamResult>;
+      release: (
+        target: GatewayForwardingTarget,
+        input: ReleasePortAccessStreamInput,
+      ) => Promise<void>;
+    },
   ) {}
 
   public async openInteractiveStream(
@@ -132,6 +145,29 @@ export class LocalGatewayForwardingServerAdapter implements GatewayForwardingSer
 
     this.requireBootstrapTarget(target, input.sandboxInstanceId);
     return this.authorizePortAccessTargetHandler(target, input);
+  }
+
+  public async openPortAccessStream(
+    target: GatewayForwardingTarget,
+    input: OpenPortAccessStreamInput,
+  ): Promise<OpenPortAccessStreamResult> {
+    if (this.portAccessStreamHandler === undefined) {
+      throw new Error("Port Access stream forwarding handler is not configured.");
+    }
+
+    this.requireBootstrapTarget(target, input.sandboxInstanceId);
+    return this.portAccessStreamHandler.open(target, input);
+  }
+
+  public async releasePortAccessStream(
+    target: GatewayForwardingTarget,
+    input: ReleasePortAccessStreamInput,
+  ): Promise<void> {
+    if (this.portAccessStreamHandler === undefined) {
+      throw new Error("Port Access stream forwarding handler is not configured.");
+    }
+
+    await this.portAccessStreamHandler.release(target, input);
   }
 
   private getMatchingBootstrapTarget(target: GatewayForwardingTarget, sandboxInstanceId: string) {

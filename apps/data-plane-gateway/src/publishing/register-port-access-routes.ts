@@ -236,46 +236,46 @@ export function registerPortAccessRoutes(input: {
     }
 
     const requestUrl = new URL(ctx.req.url);
-    const requestHandle = await input.portAccessTransportService.openHttpStream({
-      sandboxInstanceId: resolvedRequest.verifiedSession.sandboxInstanceId,
-      target: {
-        kind: "port",
-        port: resolvedRequest.verifiedSession.port,
-      },
-      upstreamProtocol: resolvedRequest.verifiedSession.upstreamProtocol,
-      request: {
-        method: ctx.req.method,
-        path: requestUrl.pathname,
-        query: requestUrl.search.length > 1 ? requestUrl.search.slice(1) : undefined,
-        headers: buildPortAccessRequestHeaders({
-          browserEdgePort: resolvedRequest.browserEdgePort,
-          browserEdgeProto: resolvedRequest.browserEdgeProto,
-          browserVisibleHost: resolvedRequest.parsedHost.host,
-          requestHeaders: ctx.req.raw.headers,
-          targetPort: resolvedRequest.verifiedSession.port,
-          upstreamProtocol: resolvedRequest.verifiedSession.upstreamProtocol,
-        }),
-      },
-    });
-
-    const requestBodyFailureSignal = pipeBrowserRequestBody({
-      requestBody: ctx.req.raw.body,
-      sendChunk: requestHandle.sendRequestBodyChunk,
-      sendEnd: requestHandle.finishRequestBody,
-    }).then(
-      () => neverSettlingPromise<Awaited<PortAccessHttpRequestHandle["responseStart"]>>(),
-      async (error: unknown) => {
-        await requestHandle.close();
-        if (error instanceof Error) {
-          throw error;
-        }
-
-        throw new Error(String(error));
-      },
-    );
-    void requestBodyFailureSignal.catch(() => undefined);
-
     try {
+      const requestHandle = await input.portAccessTransportService.openHttpStream({
+        sandboxInstanceId: resolvedRequest.verifiedSession.sandboxInstanceId,
+        target: {
+          kind: "port",
+          port: resolvedRequest.verifiedSession.port,
+        },
+        upstreamProtocol: resolvedRequest.verifiedSession.upstreamProtocol,
+        request: {
+          method: ctx.req.method,
+          path: requestUrl.pathname,
+          query: requestUrl.search.length > 1 ? requestUrl.search.slice(1) : undefined,
+          headers: buildPortAccessRequestHeaders({
+            browserEdgePort: resolvedRequest.browserEdgePort,
+            browserEdgeProto: resolvedRequest.browserEdgeProto,
+            browserVisibleHost: resolvedRequest.parsedHost.host,
+            requestHeaders: ctx.req.raw.headers,
+            targetPort: resolvedRequest.verifiedSession.port,
+            upstreamProtocol: resolvedRequest.verifiedSession.upstreamProtocol,
+          }),
+        },
+      });
+
+      const requestBodyFailureSignal = pipeBrowserRequestBody({
+        requestBody: ctx.req.raw.body,
+        sendChunk: requestHandle.sendRequestBodyChunk,
+        sendEnd: requestHandle.finishRequestBody,
+      }).then(
+        () => neverSettlingPromise<Awaited<PortAccessHttpRequestHandle["responseStart"]>>(),
+        async (error: unknown) => {
+          await requestHandle.close();
+          if (error instanceof Error) {
+            throw error;
+          }
+
+          throw new Error(String(error));
+        },
+      );
+      void requestBodyFailureSignal.catch(() => undefined);
+
       const responseStart = await Promise.race([
         requestHandle.responseStart,
         requestBodyFailureSignal,

@@ -41,6 +41,21 @@ export type AuthorizePortAccessTargetInput = {
   target: PortAccessTarget;
 };
 
+export type OpenPortAccessStreamInput = {
+  sandboxInstanceId: string;
+  sourceConnectionSessionId: string;
+};
+
+export type OpenPortAccessStreamResult = {
+  bootstrapTarget: RelayTarget;
+  streamId: number;
+};
+
+export type ReleasePortAccessStreamInput = {
+  sandboxInstanceId: string;
+  streamId: number;
+};
+
 export type GatewayForwardingTarget = {
   sourceNodeId: string;
   targetNodeId: string;

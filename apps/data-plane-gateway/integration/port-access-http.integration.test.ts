@@ -38,11 +38,33 @@ const BootstrapTokenIssuer = "integration-new-data-plane-worker";
 const GatewayTokenAudience = "integration-new-data-plane-gateway";
 const PortAccessBaseDomain = "mistle.localhost";
 const PortAccessCookieSigningSecret = "integration-new-port-access-cookie-secret";
+const FirstGatewayId = "data-plane-gateway-a";
+const SecondGatewayId = "data-plane-gateway-b";
 const StepTimeoutMs = 5_000;
 const TestTimeoutMs = 40_000;
 
 const it = createIntegrationTest({
   services: ["data-plane-api", "data-plane-gateway"],
+});
+const distributedIt = createIntegrationTest({
+  services: [
+    "data-plane-api",
+    { id: FirstGatewayId, service: "data-plane-gateway", mode: "runtime" },
+    { id: SecondGatewayId, service: "data-plane-gateway", mode: "runtime" },
+  ],
+  extraInfra: ["nats"],
+  __dangerouslyIsolatedServices: {
+    reason: "This suite starts two gateway runtime instances for distributed Port Access coverage.",
+    services: [FirstGatewayId, SecondGatewayId],
+  },
+  __serviceOptions: {
+    dataPlaneGateway: {
+      gatewayRelay: {
+        backend: "nats",
+        namePrefix: "port-access-http-integration",
+      },
+    },
+  },
 });
 
 type GatewayHttpResponse = {
@@ -50,6 +72,8 @@ type GatewayHttpResponse = {
   headers: IncomingHttpHeaders;
   status: number;
 };
+
+type GatewayHttpService = Pick<IntegrationTestEnvironment["dataPlaneGateway"], "hostBaseUrl">;
 
 type WebSocketMessageQueue = {
   close: () => void;
@@ -318,6 +342,125 @@ describe.concurrent("port access http integration", () => {
       cookie: createCookieHeader(validSessionToken),
     });
   });
+
+  it("returns an upstream failure when the session has no connected bootstrap tunnel", async ({
+    env,
+  }) => {
+    const sandboxInstanceId = typeid("sbi").toString();
+    const port = 5173;
+    const host = deriveAccessHost({
+      sandboxInstanceId,
+      port,
+    });
+    const sessionToken = await mintSessionToken({
+      sandboxInstanceId,
+      port,
+      host,
+    });
+
+    const response = await sendGatewayHttpRequest({
+      env,
+      path: "/demo/path",
+      headers: {
+        cookie: createCookieHeader(sessionToken),
+        host,
+      },
+    });
+
+    expect(response.status).toBe(502);
+    expect(response.body).toBe("Port Access upstream request failed.");
+  });
+
+  distributedIt(
+    "routes a browser HTTP request through the gateway that owns the sandbox bootstrap tunnel",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const port = 5173;
+      const ownerGateway = env.httpService(FirstGatewayId);
+      const accessGateway = env.httpService(SecondGatewayId);
+      await insertSandboxInstanceRow({
+        env,
+        sandboxInstanceId,
+      });
+      const bootstrapSocket = await connectBootstrapSocket({
+        env,
+        gateway: ownerGateway,
+        sandboxInstanceId,
+      });
+      const host = deriveAccessHost({
+        sandboxInstanceId,
+        port,
+      });
+      const sessionToken = await mintSessionToken({
+        sandboxInstanceId,
+        port,
+        host,
+      });
+      const messageQueue = createWebSocketMessageQueue(bootstrapSocket);
+
+      try {
+        const responsePromise = sendGatewayHttpRequest({
+          env,
+          gateway: accessGateway,
+          path: "/remote/path",
+          headers: {
+            cookie: createCookieHeader(sessionToken),
+            host,
+          },
+        });
+
+        const openMessage = await withTimeout({
+          label: "waiting for remote ports.http.open",
+          promise: messageQueue.next(),
+        });
+        if (openMessage.type !== "ports.http.open") {
+          throw new Error("Expected ports.http.open message.");
+        }
+
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "ports.http.response.start",
+            streamId: openMessage.streamId,
+            status: 200,
+            headers: {
+              "content-type": ["text/plain; charset=utf-8"],
+            },
+          }),
+        );
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "ports.http.body.chunk",
+            streamId: openMessage.streamId,
+            direction: "response",
+            bytes: Buffer.from("hello across gateways", "utf8").toString("base64"),
+            encoding: "base64",
+          }),
+        );
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "ports.http.body.end",
+            streamId: openMessage.streamId,
+            direction: "response",
+          }),
+        );
+
+        const response = await withTimeout({
+          label: "waiting for distributed browser response",
+          promise: responsePromise,
+        });
+        expect(response.status).toBe(200);
+        expect(response.headers["content-type"]).toBe("text/plain; charset=utf-8");
+        expect(response.body).toBe("hello across gateways");
+      } finally {
+        messageQueue.close();
+        await closeIfOpen(bootstrapSocket);
+      }
+    },
+    TestTimeoutMs,
+  );
 });
 
 async function insertSandboxInstanceRow(input: {
@@ -340,12 +483,14 @@ async function insertSandboxInstanceRow(input: {
 
 function sendGatewayHttpRequest(input: {
   env: IntegrationTestEnvironment;
+  gateway?: GatewayHttpService;
   path: string;
   method?: string;
   headers: Record<string, string>;
   body?: string;
 }): Promise<GatewayHttpResponse> {
-  const url = new URL(input.path, input.env.dataPlaneGateway.hostBaseUrl);
+  const gateway = input.gateway ?? input.env.dataPlaneGateway;
+  const url = new URL(input.path, gateway.hostBaseUrl);
 
   return new Promise((resolve, reject) => {
     const request = httpRequest(
@@ -383,10 +528,12 @@ function sendGatewayHttpRequest(input: {
 
 async function connectBootstrapSocket(input: {
   env: IntegrationTestEnvironment;
+  gateway?: GatewayHttpService;
   sandboxInstanceId: string;
 }): Promise<WebSocket> {
+  const gateway = input.gateway ?? input.env.dataPlaneGateway;
   return await connectSandboxTunnelWebSocket({
-    websocketBaseUrl: createWebSocketBaseUrl(input.env.dataPlaneGateway.hostBaseUrl),
+    websocketBaseUrl: createWebSocketBaseUrl(gateway.hostBaseUrl),
     sandboxInstanceId: input.sandboxInstanceId,
     tokenKind: "bootstrap",
     token: await mintBootstrapToken({
