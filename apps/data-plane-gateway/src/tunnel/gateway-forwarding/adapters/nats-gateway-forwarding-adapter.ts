@@ -10,7 +10,10 @@ import {
 import { z } from "zod";
 
 import { BootstrapTunnelNotConnectedError } from "../../bootstrap-tunnel-not-connected-error.js";
-import { recordGatewayRelaySubscriptionFailure } from "../../gateway-relay-observability.js";
+import {
+  recordGatewayForwardingPortAccessAuthorizationEvent,
+  recordGatewayRelaySubscriptionFailure,
+} from "../../gateway-relay-observability.js";
 import type { GatewayForwardingClientAdapter } from "../gateway-forwarding-client-adapter.js";
 import type { GatewayForwardingServerAdapter } from "../gateway-forwarding-server-adapter.js";
 import type {
@@ -379,6 +382,17 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
       return this.localServer.authorizePortAccessTarget(target, input);
     }
 
+    const startedAtMs = Date.now();
+    recordGatewayForwardingPortAccessAuthorizationEvent({
+      backend: "nats",
+      localNodeId: this.nodeId,
+      outcome: "started",
+      port: input.target.port,
+      sandboxInstanceId: input.sandboxInstanceId,
+      sourceNodeId: target.sourceNodeId,
+      targetNodeId: target.targetNodeId,
+    });
+
     let response: GatewayForwardingResponse;
     try {
       response = await this.request({
@@ -389,18 +403,58 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
     } catch (error) {
       const portAccessError = toPortAccessForwardingRequestError(error, input);
       if (portAccessError !== null) {
+        this.recordPortAccessAuthorizationCompleted({
+          durationMs: Date.now() - startedAtMs,
+          errorCode: portAccessError.code,
+          input,
+          outcome: "error",
+          target,
+        });
         throw portAccessError;
       }
 
+      this.recordPortAccessAuthorizationCompleted({
+        durationMs: Date.now() - startedAtMs,
+        errorCode: "unexpected_error",
+        input,
+        outcome: "error",
+        target,
+      });
       throw error;
     }
     if (response.kind === "authorizeResult") {
+      this.recordPortAccessAuthorizationCompleted({
+        durationMs: Date.now() - startedAtMs,
+        input,
+        outcome: response.result.authorized ? "authorized" : "rejected",
+        ...(response.result.authorized
+          ? {}
+          : {
+              rejectionReason: response.result.reason,
+            }),
+        target,
+      });
       return response.result;
     }
     if (response.kind === "error") {
-      throw toForwardingResponseError(response);
+      const responseError = toForwardingResponseError(response);
+      this.recordPortAccessAuthorizationCompleted({
+        durationMs: Date.now() - startedAtMs,
+        errorCode: portAccessAuthorizationErrorCode(responseError),
+        input,
+        outcome: "error",
+        target,
+      });
+      throw responseError;
     }
 
+    this.recordPortAccessAuthorizationCompleted({
+      durationMs: Date.now() - startedAtMs,
+      errorCode: "unexpected_response",
+      input,
+      outcome: "error",
+      target,
+    });
     throw new Error("Remote gateway forwarding authorizePortAccessTarget returned no result.");
   }
 
@@ -419,6 +473,36 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
     );
 
     return GatewayForwardingResponseSchema.parse(decodeJson(response.data));
+  }
+
+  private recordPortAccessAuthorizationCompleted(input: {
+    durationMs: number;
+    errorCode?: string;
+    input: AuthorizePortAccessTargetInput;
+    outcome: "authorized" | "rejected" | "error";
+    rejectionReason?: string;
+    target: GatewayForwardingTarget;
+  }): void {
+    recordGatewayForwardingPortAccessAuthorizationEvent({
+      backend: "nats",
+      durationMs: input.durationMs,
+      localNodeId: this.nodeId,
+      outcome: input.outcome,
+      port: input.input.target.port,
+      sandboxInstanceId: input.input.sandboxInstanceId,
+      sourceNodeId: input.target.sourceNodeId,
+      targetNodeId: input.target.targetNodeId,
+      ...(input.errorCode === undefined
+        ? {}
+        : {
+            errorCode: input.errorCode,
+          }),
+      ...(input.rejectionReason === undefined
+        ? {}
+        : {
+            rejectionReason: input.rejectionReason,
+          }),
+    });
   }
 
   private optionalRouteResponse(
@@ -563,6 +647,14 @@ function toForwardingResponseError(
   }
 
   return new Error(response.message);
+}
+
+function portAccessAuthorizationErrorCode(error: Error): string {
+  if (error instanceof GatewayForwardingPortAccessAuthorizationError) {
+    return error.code;
+  }
+
+  return "remote_error";
 }
 
 function toGatewayForwardingErrorResponse(error: unknown): GatewayForwardingResponse {

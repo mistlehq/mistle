@@ -321,6 +321,104 @@ describe.concurrent("distributed port access bootstrap integration", () => {
   );
 
   distributedIt(
+    "preserves a remote sandbox authorization failure reason",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const port = 5173;
+      const ownerGateway = env.httpService(FirstGatewayId);
+      const accessGateway = env.httpService(SecondGatewayId);
+      await insertSandboxInstanceRow({
+        env,
+        sandboxInstanceId,
+      });
+      const bootstrapSocket = await connectBootstrapSocket({
+        env,
+        gateway: ownerGateway,
+        sandboxInstanceId,
+      });
+      const bootstrap = await mintPortAccessBootstrap({
+        sandboxInstanceId,
+        port,
+      });
+
+      try {
+        const responsePromise = sendGatewayHttpRequest({
+          env,
+          gateway: accessGateway,
+          path: createBootstrapPath(bootstrap),
+          headers: {
+            host: bootstrap.host,
+          },
+        });
+        void responsePromise.catch(() => undefined);
+
+        const authorizeRequest = JSON.parse(
+          String((await waitForWebSocketMessage(bootstrapSocket, { timeoutMs: 6_000 })).data),
+        );
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "ports.target.authorize.result",
+            requestId: authorizeRequest.requestId,
+            authorized: false,
+            reason: "unsupported_protocol",
+          }),
+        );
+
+        const response = await responsePromise;
+
+        expect(response.status).toBe(409);
+        expect(response.body).toBe("unsupported_protocol");
+      } finally {
+        await closeIfOpen(bootstrapSocket);
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  distributedIt(
+    "returns a bootstrap failure when the remote bootstrap disconnects before authorizing",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const port = 5173;
+      const ownerGateway = env.httpService(FirstGatewayId);
+      const accessGateway = env.httpService(SecondGatewayId);
+      await insertSandboxInstanceRow({
+        env,
+        sandboxInstanceId,
+      });
+      const bootstrapSocket = await connectBootstrapSocket({
+        env,
+        gateway: ownerGateway,
+        sandboxInstanceId,
+      });
+      const bootstrap = await mintPortAccessBootstrap({
+        sandboxInstanceId,
+        port,
+      });
+
+      const responsePromise = sendGatewayHttpRequest({
+        env,
+        gateway: accessGateway,
+        path: createBootstrapPath(bootstrap),
+        headers: {
+          host: bootstrap.host,
+        },
+      });
+      void responsePromise.catch(() => undefined);
+
+      await waitForWebSocketMessage(bootstrapSocket, { timeoutMs: 6_000 });
+      await closeIfOpen(bootstrapSocket);
+
+      const response = await responsePromise;
+
+      expect(response.status).toBe(502);
+      expect(response.body).toBe("Port Access authorization failed.");
+    },
+    TestTimeoutMs,
+  );
+
+  distributedIt(
     "continues processing distributed authorizations while another remote authorization is pending",
     async ({ env }) => {
       const firstSandboxInstanceId = typeid("sbi").toString();

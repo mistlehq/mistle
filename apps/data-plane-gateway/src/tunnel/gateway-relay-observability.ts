@@ -15,6 +15,11 @@ type GatewayRelayPeerLookupOutcome =
   | "no_responders"
   | "timeout";
 type GatewayRelayLifecycleEvent = "started" | "stopped";
+type GatewayForwardingPortAccessAuthorizationOutcome =
+  | "authorized"
+  | "rejected"
+  | "started"
+  | "error";
 
 const GatewayRelayMeter = metrics.getMeter("@mistle/data-plane-gateway/gateway-relay");
 const GatewayRelayEnvelopeEvents = GatewayRelayMeter.createCounter(
@@ -40,6 +45,21 @@ const GatewayRelaySubscriptionFailures = GatewayRelayMeter.createCounter(
   "mistle.gateway.relay.subscription.failures",
   {
     description: "Gateway relay subscription task failures observed by the data-plane gateway.",
+  },
+);
+const GatewayForwardingPortAccessAuthorizationEvents = GatewayRelayMeter.createCounter(
+  "mistle.gateway.forwarding.port_access_authorization.events",
+  {
+    description:
+      "Gateway forwarding events for distributed Port Access target authorization requests.",
+  },
+);
+const GatewayForwardingPortAccessAuthorizationDuration = GatewayRelayMeter.createHistogram(
+  "mistle.gateway.forwarding.port_access_authorization.duration_ms",
+  {
+    description:
+      "Duration of distributed Port Access target authorization requests forwarded to another gateway.",
+    unit: "ms",
   },
 );
 
@@ -173,6 +193,46 @@ export function recordGatewayRelaySubscriptionFailure(input: {
   );
 }
 
+export function recordGatewayForwardingPortAccessAuthorizationEvent(input: {
+  backend: GatewayRelayBackend;
+  durationMs?: number;
+  errorCode?: string;
+  localNodeId: string;
+  outcome: GatewayForwardingPortAccessAuthorizationOutcome;
+  port: number;
+  rejectionReason?: string;
+  sandboxInstanceId: string;
+  sourceNodeId: string;
+  targetNodeId: string;
+}): void {
+  GatewayForwardingPortAccessAuthorizationEvents.add(
+    1,
+    buildGatewayForwardingPortAccessAuthorizationMetricAttributes(input),
+  );
+  if (input.durationMs !== undefined) {
+    GatewayForwardingPortAccessAuthorizationDuration.record(
+      input.durationMs,
+      buildGatewayForwardingPortAccessAuthorizationMetricAttributes(input),
+    );
+  }
+
+  const logData = buildGatewayForwardingPortAccessAuthorizationLogData(input);
+  if (input.outcome === "error") {
+    logger.warn(logData, "Gateway forwarding Port Access authorization failed");
+    return;
+  }
+  if (input.outcome === "rejected") {
+    logger.info(logData, "Gateway forwarding Port Access authorization was rejected");
+    return;
+  }
+  if (input.outcome === "authorized") {
+    logger.info(logData, "Gateway forwarding Port Access authorization completed");
+    return;
+  }
+
+  logger.debug(logData, "Gateway forwarding Port Access authorization started");
+}
+
 export function buildRelayEnvelopeMetricAttributes(
   input: {
     backend: GatewayRelayBackend;
@@ -194,6 +254,69 @@ export function buildRelayEnvelopeMetricAttributes(
       ? {}
       : {
           "mistle.gateway.relay.drop_reason": input.dropReason,
+        }),
+  };
+}
+
+export function buildGatewayForwardingPortAccessAuthorizationMetricAttributes(input: {
+  backend: GatewayRelayBackend;
+  errorCode?: string;
+  outcome: GatewayForwardingPortAccessAuthorizationOutcome;
+  rejectionReason?: string;
+}): Attributes {
+  return {
+    "mistle.gateway.relay.backend": input.backend,
+    "mistle.gateway.forwarding.operation": "authorize_port_access_target",
+    "mistle.gateway.forwarding.outcome": input.outcome,
+    ...(input.errorCode === undefined
+      ? {}
+      : {
+          "mistle.gateway.forwarding.error_code": input.errorCode,
+        }),
+    ...(input.rejectionReason === undefined
+      ? {}
+      : {
+          "mistle.gateway.forwarding.rejection_reason": input.rejectionReason,
+        }),
+  };
+}
+
+export function buildGatewayForwardingPortAccessAuthorizationLogData(input: {
+  backend: GatewayRelayBackend;
+  durationMs?: number;
+  errorCode?: string;
+  localNodeId: string;
+  outcome: GatewayForwardingPortAccessAuthorizationOutcome;
+  port: number;
+  rejectionReason?: string;
+  sandboxInstanceId: string;
+  sourceNodeId: string;
+  targetNodeId: string;
+}): Record<string, unknown> {
+  return {
+    eventName: "gateway.forwarding.port_access_authorization",
+    "mistle.gateway.node_id": input.localNodeId,
+    "mistle.gateway.relay.backend": input.backend,
+    "mistle.gateway.forwarding.operation": "authorize_port_access_target",
+    "mistle.gateway.forwarding.outcome": input.outcome,
+    "mistle.gateway.forwarding.source_node_id": input.sourceNodeId,
+    "mistle.gateway.forwarding.target_node_id": input.targetNodeId,
+    "mistle.port_access.target.port": input.port,
+    "mistle.sandbox.instance_id": input.sandboxInstanceId,
+    ...(input.durationMs === undefined
+      ? {}
+      : {
+          "mistle.gateway.forwarding.duration_ms": input.durationMs,
+        }),
+    ...(input.errorCode === undefined
+      ? {}
+      : {
+          "mistle.gateway.forwarding.error_code": input.errorCode,
+        }),
+    ...(input.rejectionReason === undefined
+      ? {}
+      : {
+          "mistle.gateway.forwarding.rejection_reason": input.rejectionReason,
         }),
   };
 }

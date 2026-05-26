@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildGatewayForwardingPortAccessAuthorizationLogData,
+  buildGatewayForwardingPortAccessAuthorizationMetricAttributes,
   buildRelayEnvelopeLogData,
   buildRelayEnvelopeMetricAttributes,
   describeRelayPayload,
@@ -80,6 +82,49 @@ describe("gateway relay observability", () => {
       "mistle.sandbox.instance_id": "sbi_observability",
       "mistle.sandbox.tunnel.peer_side": "connection",
       "mistle.tunnel.relay_session_id": "connection-session-1",
+    });
+  });
+
+  it("keeps forwarded Port Access authorization identifiers out of metric attributes", () => {
+    expect(
+      buildGatewayForwardingPortAccessAuthorizationMetricAttributes({
+        backend: "nats",
+        outcome: "error",
+        errorCode: "bootstrap_not_connected",
+      }),
+    ).toEqual({
+      "mistle.gateway.forwarding.error_code": "bootstrap_not_connected",
+      "mistle.gateway.forwarding.operation": "authorize_port_access_target",
+      "mistle.gateway.forwarding.outcome": "error",
+      "mistle.gateway.relay.backend": "nats",
+    });
+  });
+
+  it("includes forwarded Port Access authorization identifiers in logs", () => {
+    expect(
+      buildGatewayForwardingPortAccessAuthorizationLogData({
+        backend: "nats",
+        durationMs: 125,
+        errorCode: "bootstrap_not_connected",
+        localNodeId: "gateway-b",
+        outcome: "error",
+        port: 5173,
+        sandboxInstanceId: "sbi_observability",
+        sourceNodeId: "gateway-b",
+        targetNodeId: "gateway-a",
+      }),
+    ).toEqual({
+      eventName: "gateway.forwarding.port_access_authorization",
+      "mistle.gateway.forwarding.duration_ms": 125,
+      "mistle.gateway.forwarding.error_code": "bootstrap_not_connected",
+      "mistle.gateway.forwarding.operation": "authorize_port_access_target",
+      "mistle.gateway.forwarding.outcome": "error",
+      "mistle.gateway.forwarding.source_node_id": "gateway-b",
+      "mistle.gateway.forwarding.target_node_id": "gateway-a",
+      "mistle.gateway.node_id": "gateway-b",
+      "mistle.gateway.relay.backend": "nats",
+      "mistle.port_access.target.port": 5173,
+      "mistle.sandbox.instance_id": "sbi_observability",
     });
   });
 });
