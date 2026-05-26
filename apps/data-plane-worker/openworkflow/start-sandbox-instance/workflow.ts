@@ -641,6 +641,8 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         {
           attributes: {
             runtimeProvider,
+            timelineKey: "image",
+            timelineLabel: "Preparing image",
           },
           completedMessage: "Sandbox provider image preparation completed.",
           failedMessage: "Sandbox provider image preparation failed.",
@@ -746,6 +748,8 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         {
           attributes: {
             runtimeProvider,
+            timelineKey: "sandbox",
+            timelineLabel: "Creating sandbox",
           },
           completedMessage: "Sandbox provider start completed.",
           failedMessage: "Sandbox provider start failed.",
@@ -1389,6 +1393,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           attributes: {
             providerSandboxId: startedSandbox.providerSandboxId,
             runtimeProvider: startedSandbox.runtimeProvider,
+            timelineHidden: true,
           },
           completedMessage: "Sandbox instance running status transition completed.",
           failedMessage: "Sandbox instance running status transition failed.",

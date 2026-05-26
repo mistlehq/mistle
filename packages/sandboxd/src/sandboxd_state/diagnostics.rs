@@ -13,6 +13,58 @@ use crate::startup_diagnostics::{
     startup_diagnostics_u64,
 };
 
+pub(super) fn timeline_attributes(key: &str, label: &str) -> BTreeMap<String, serde_json::Value> {
+    BTreeMap::from([
+        (
+            "timelineKey".to_string(),
+            startup_diagnostics_string(key.to_string()),
+        ),
+        (
+            "timelineLabel".to_string(),
+            startup_diagnostics_string(label.to_string()),
+        ),
+    ])
+}
+
+pub(super) fn hidden_timeline_attributes() -> BTreeMap<String, serde_json::Value> {
+    BTreeMap::from([("timelineHidden".to_string(), serde_json::Value::Bool(true))])
+}
+
+pub(super) fn runtime_process_timeline_attributes(
+    process_key: &str,
+) -> BTreeMap<String, serde_json::Value> {
+    timeline_attributes(
+        &format!("runtime-process:{process_key}"),
+        &runtime_process_timeline_label(process_key),
+    )
+}
+
+pub(super) fn runtime_adapter_timeline_attributes(
+    runtime_id: &str,
+) -> BTreeMap<String, serde_json::Value> {
+    timeline_attributes(
+        &format!("runtime-adapter:{runtime_id}"),
+        &runtime_adapter_timeline_label(runtime_id),
+    )
+}
+
+fn runtime_process_timeline_label(process_key: &str) -> String {
+    match process_key {
+        "codex-app-server" => "Starting Codex app server".to_string(),
+        "opencode-server" => "Starting OpenCode server".to_string(),
+        _ => format!("Starting {process_key}"),
+    }
+}
+
+fn runtime_adapter_timeline_label(runtime_id: &str) -> String {
+    match runtime_id {
+        "codex" => "Starting Codex adapter".to_string(),
+        "opencode" => "Starting OpenCode adapter".to_string(),
+        "pi" => "Starting Pi adapter".to_string(),
+        _ => format!("Starting {runtime_id} adapter"),
+    }
+}
+
 pub(super) fn record_operation_phase_failure(
     diagnostics_logger: &Option<StartupDiagnosticsLogger>,
     phase: &str,
@@ -43,8 +95,16 @@ pub(super) fn record_operation_phase_started(
     diagnostics_logger: &Option<StartupDiagnosticsLogger>,
     phase: &str,
 ) {
+    record_operation_phase_started_with_attributes(diagnostics_logger, phase, BTreeMap::new());
+}
+
+pub(super) fn record_operation_phase_started_with_attributes(
+    diagnostics_logger: &Option<StartupDiagnosticsLogger>,
+    phase: &str,
+    attributes: BTreeMap<String, serde_json::Value>,
+) {
     if let Some(logger) = diagnostics_logger {
-        if let Err(error) = logger.record_phase_started(phase) {
+        if let Err(error) = logger.record_phase_started_with_attributes(phase, attributes) {
             eprintln!("sandboxd failed to record startup diagnostics phase start: {error}");
         }
         if let Err(error) = logger.record_transcript(
@@ -104,25 +164,29 @@ pub(super) fn record_runtime_plan_apply_failure(
             op,
             error,
             ..
-        } => BTreeMap::from([
-            (
-                "failureKind".to_string(),
-                startup_diagnostics_string("artifact_install_failed"),
-            ),
-            (
-                "artifactKey".to_string(),
-                startup_diagnostics_string(artifact_key.clone()),
-            ),
-            (
-                "installIndex".to_string(),
-                startup_diagnostics_u64(*install_index as u64),
-            ),
-            ("installOp".to_string(), startup_diagnostics_string(*op)),
-            (
-                "error".to_string(),
-                startup_diagnostics_string(error.clone()),
-            ),
-        ]),
+        } => {
+            let mut map = timeline_attributes("runtime-artifacts", "Installing runtime artifacts");
+            map.extend([
+                (
+                    "failureKind".to_string(),
+                    startup_diagnostics_string("artifact_install_failed"),
+                ),
+                (
+                    "artifactKey".to_string(),
+                    startup_diagnostics_string(artifact_key.clone()),
+                ),
+                (
+                    "installIndex".to_string(),
+                    startup_diagnostics_u64(*install_index as u64),
+                ),
+                ("installOp".to_string(), startup_diagnostics_string(*op)),
+                (
+                    "error".to_string(),
+                    startup_diagnostics_string(error.clone()),
+                ),
+            ]);
+            map
+        }
         RuntimePlanApplyError::WorkspaceSource {
             source_kind,
             path,
@@ -131,7 +195,8 @@ pub(super) fn record_runtime_plan_apply_failure(
             error,
             ..
         } => {
-            let mut map = BTreeMap::from([
+            let mut map = timeline_attributes("workspace", "Preparing workspace");
+            map.extend([
                 (
                     "failureKind".to_string(),
                     startup_diagnostics_string("workspace_source_failed"),
@@ -164,25 +229,29 @@ pub(super) fn record_runtime_plan_apply_failure(
             path,
             error,
             ..
-        } => BTreeMap::from([
-            (
-                "failureKind".to_string(),
-                startup_diagnostics_string("runtime_file_failed"),
-            ),
-            (
-                "clientId".to_string(),
-                startup_diagnostics_string(client_id.clone()),
-            ),
-            (
-                "fileId".to_string(),
-                startup_diagnostics_string(file_id.clone()),
-            ),
-            ("path".to_string(), startup_diagnostics_string(path.clone())),
-            (
-                "error".to_string(),
-                startup_diagnostics_string(error.clone()),
-            ),
-        ]),
+        } => {
+            let mut map = timeline_attributes("runtime-files", "Writing runtime files");
+            map.extend([
+                (
+                    "failureKind".to_string(),
+                    startup_diagnostics_string("runtime_file_failed"),
+                ),
+                (
+                    "clientId".to_string(),
+                    startup_diagnostics_string(client_id.clone()),
+                ),
+                (
+                    "fileId".to_string(),
+                    startup_diagnostics_string(file_id.clone()),
+                ),
+                ("path".to_string(), startup_diagnostics_string(path.clone())),
+                (
+                    "error".to_string(),
+                    startup_diagnostics_string(error.clone()),
+                ),
+            ]);
+            map
+        }
     };
 
     record_operation_phase_failure(diagnostics_logger, "apply_runtime_plan", attributes);
@@ -303,6 +372,15 @@ pub(super) fn record_runtime_process_failure(
         )]),
     };
 
+    let mut attributes = attributes;
+    if let Some(process_key) = attributes
+        .get("processKey")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
+    {
+        attributes.extend(runtime_process_timeline_attributes(&process_key));
+    }
+
     record_operation_phase_failure(diagnostics_logger, "start_runtime_processes", attributes);
 }
 
@@ -310,7 +388,8 @@ pub(super) fn record_setup_script_failure(
     diagnostics_logger: &Option<StartupDiagnosticsLogger>,
     error: &CommandFailure,
 ) {
-    let mut attributes = BTreeMap::from([
+    let mut attributes = timeline_attributes("setup-script", "Running setup script");
+    attributes.extend([
         (
             "failureKind".to_string(),
             startup_diagnostics_string("setup_script_failed"),

@@ -30,6 +30,7 @@ use lifecycle::*;
 pub use manager::{
     flatten_runtime_client_processes, start_runtime_client_process_manager,
     start_runtime_client_process_manager_with_supervisor,
+    start_runtime_client_process_manager_with_supervisor_and_observer,
 };
 use opencode_server::*;
 use output::*;
@@ -55,6 +56,12 @@ pub struct RuntimeClientProcessSpec {
     pub command: RuntimeExecCommand,
     pub readiness: RuntimeClientProcessReadiness,
     pub stop: RuntimeClientProcessStopPolicy,
+}
+
+pub trait RuntimeClientProcessObserver {
+    fn record_process_started(&self, process_spec: &RuntimeClientProcessSpec);
+
+    fn record_process_completed(&self, process_spec: &RuntimeClientProcessSpec);
 }
 
 /// Owns the set of runtime client processes started for the current startup input.

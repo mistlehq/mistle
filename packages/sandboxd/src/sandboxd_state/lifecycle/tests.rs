@@ -568,13 +568,13 @@ fn session_initialization_uses_common_minimal_bootstrap_tunnel_phase() {
         .iter()
         .position(|phase| phase == "start_tunnel_session")
         .expect("session tunnel phase should be recorded");
-    let apply_runtime_plan_index = phases
+    let attach_runtime_environment_index = phases
         .iter()
-        .position(|phase| phase == "apply_runtime_plan")
-        .expect("runtime plan phase should be recorded");
+        .position(|phase| phase == "attach_runtime_environment")
+        .expect("runtime environment attach phase should be recorded");
     assert!(
-        start_tunnel_index < apply_runtime_plan_index,
-        "common gateway tunnel must start before runtime plan materialization; phases: {phases:?}"
+        start_tunnel_index < attach_runtime_environment_index,
+        "common gateway tunnel must start before runtime environment attach; phases: {phases:?}"
     );
     assert!(
         phases

@@ -380,6 +380,8 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
         attributes: {
           runtimeProvider: requestedRuntimeProvider,
           snapshotJobId: workflowInput.snapshotJobId,
+          timelineKey: "image",
+          timelineLabel: "Preparing image",
         },
         completedMessage: "Snapshot sandbox provider image preparation completed.",
         failedMessage: "Snapshot sandbox provider image preparation failed.",
@@ -413,6 +415,8 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
         attributes: {
           runtimeProvider: requestedRuntimeProvider,
           snapshotJobId: workflowInput.snapshotJobId,
+          timelineKey: "sandbox",
+          timelineLabel: "Creating sandbox",
           ...(workflowInput.sandboxRuntime.resources === undefined
             ? {}
             : { resources: workflowInput.sandboxRuntime.resources }),
@@ -501,6 +505,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
           providerSandboxId: startedSandbox.providerSandboxId,
           runtimeProvider: startedSandbox.runtimeProvider,
           snapshotJobId: workflowInput.snapshotJobId,
+          timelineHidden: true,
         },
         completedMessage: "Snapshot sandbox running status transition completed.",
         failedMessage: "Snapshot sandbox running status transition failed.",

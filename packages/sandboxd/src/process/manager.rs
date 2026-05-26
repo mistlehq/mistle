@@ -73,6 +73,23 @@ pub fn start_runtime_client_process_manager_with_supervisor(
     sleeper: &dyn Sleeper,
     supervisor_handle: SandboxdSupervisorHandle,
 ) -> Result<RuntimeClientProcessManager, ProcessManagerError> {
+    start_runtime_client_process_manager_with_supervisor_and_observer(
+        process_specs,
+        clock,
+        sleeper,
+        supervisor_handle,
+        None,
+    )
+}
+
+/// Starts every runtime client process using the shared supervisor boundary and lifecycle observer.
+pub fn start_runtime_client_process_manager_with_supervisor_and_observer(
+    process_specs: &[RuntimeClientProcessSpec],
+    clock: &dyn Clock,
+    sleeper: &dyn Sleeper,
+    supervisor_handle: SandboxdSupervisorHandle,
+    observer: Option<&dyn RuntimeClientProcessObserver>,
+) -> Result<RuntimeClientProcessManager, ProcessManagerError> {
     let mut started_processes = Vec::new();
     let mut codex_app_server_observation_handle = None;
     let mut codex_app_server_control_handle = None;
@@ -119,6 +136,9 @@ pub fn start_runtime_client_process_manager_with_supervisor(
                 ),
             );
             supervisor_handle.mark_component_starting(SupervisedComponent::OpenCodeServer);
+        }
+        if let Some(observer) = observer {
+            observer.record_process_started(process_spec);
         }
         let mut process = match start_runtime_client_process(process_spec) {
             Ok(process) => process,
@@ -220,6 +240,9 @@ pub fn start_runtime_client_process_manager_with_supervisor(
             opencode_server_control_handle = Some(control_handle);
         }
 
+        if let Some(observer) = observer {
+            observer.record_process_completed(process_spec);
+        }
         started_processes.push(process);
     }
 

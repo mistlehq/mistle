@@ -226,6 +226,8 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         const providerResumeAttributes = {
           providerSandboxId: existingProviderSandboxId,
           runtimeProvider: resumableSandboxState.runtimeProvider,
+          timelineKey: "sandbox",
+          timelineLabel: "Resuming sandbox",
         };
         await operationEvents.record({
           attributes: providerResumeAttributes,
@@ -804,6 +806,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 attributes: {
                   providerSandboxId: resumedRuntime.providerSandboxId,
                   runtimeProvider: resumedRuntime.runtimeProvider,
+                  timelineHidden: true,
                 },
                 completedMessage: "Resumed sandbox running status transition completed.",
                 failedMessage: "Resumed sandbox running status transition failed.",
@@ -1102,6 +1105,8 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         {
           attributes: {
             runtimeProvider: resumableSandboxState.runtimeProvider,
+            timelineKey: "sandbox",
+            timelineLabel: "Creating sandbox",
           },
           completedMessage: "Replacement sandbox provider start completed.",
           failedMessage: "Replacement sandbox provider start failed.",
@@ -1696,6 +1701,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             attributes: {
               providerSandboxId: replacementProviderSandboxId,
               runtimeProvider: replacementRuntimeProvider,
+              timelineHidden: true,
             },
             completedMessage: "Replacement sandbox running status transition completed.",
             failedMessage: "Replacement sandbox running status transition failed.",

@@ -25,16 +25,21 @@ use crate::protocol::startup::{
 };
 use crate::runtime;
 use crate::runtime::CompiledRuntimePlanImageSource;
-use crate::runtime::RuntimePlanApplyError;
-use crate::runtime::adapters::{RuntimeAdapterRegistry, RuntimeAdapters};
+use crate::runtime::adapters::{
+    RuntimeAdapterLifecycleObserver, RuntimeAdapterRegistry, RuntimeAdapterRegistryError,
+    RuntimeAdapters,
+};
 use crate::runtime::readiness::RuntimeReadinessManager;
+use crate::runtime::{RuntimePlanApplyError, RuntimePlanApplyLifecycleStep};
 use crate::sandboxd_state::components::{
     collect_tracked_components, determine_runtime_readiness_mode,
 };
 use crate::sandboxd_state::diagnostics::{
-    record_operation_phase_completed, record_operation_phase_completed_with_attributes,
-    record_operation_phase_failure, record_operation_phase_started,
+    hidden_timeline_attributes, record_operation_phase_completed,
+    record_operation_phase_completed_with_attributes, record_operation_phase_failure,
+    record_operation_phase_started, record_operation_phase_started_with_attributes,
     record_runtime_plan_apply_failure, record_runtime_process_failure, record_setup_script_failure,
+    runtime_adapter_timeline_attributes, runtime_process_timeline_attributes, timeline_attributes,
 };
 use crate::sandboxd_state::readiness::{
     spawn_runtime_readiness_projection_thread, sync_runtime_readiness_from_snapshot,
@@ -216,24 +221,30 @@ impl SandboxdState {
         if let (Some(logger), Some(tunnel_session)) = (&diagnostics_logger, &startup_tunnel_session)
         {
             logger.attach_operation_sender(tunnel_session.operation_record_sender());
-            record_operation_phase_completed(&diagnostics_logger, "start_tunnel_session");
+            record_operation_phase_completed_with_attributes(
+                &diagnostics_logger,
+                "start_tunnel_session",
+                timeline_attributes("tunnel", "Connecting tunnel"),
+            );
         }
         if wait_for_storage_attach {
             wait_for_storage_attach_signal(clock.as_ref(), sleeper.as_ref(), &diagnostics_logger);
         }
-        record_operation_phase_started(&diagnostics_logger, "apply_git_identity");
+        record_operation_phase_started_with_attributes(
+            &diagnostics_logger,
+            "apply_git_identity",
+            timeline_attributes("git-identity", "Configuring Git"),
+        );
         if !startup_input.is_snapshot()
             && let Err(error) =
                 runtime::git_identity::apply_git_identity(startup_input, global_git_config_path)
         {
-            record_operation_phase_failure(
-                &diagnostics_logger,
-                "apply_git_identity",
-                BTreeMap::from([(
-                    "error".to_string(),
-                    startup_diagnostics_string(error.clone()),
-                )]),
+            let mut attributes = timeline_attributes("git-identity", "Configuring Git");
+            attributes.insert(
+                "error".to_string(),
+                startup_diagnostics_string(error.clone()),
             );
+            record_operation_phase_failure(&diagnostics_logger, "apply_git_identity", attributes);
             if let Some(tunnel_session) = startup_tunnel_session.take() {
                 close_tunnel_session(
                     tunnel_session,
@@ -243,7 +254,11 @@ impl SandboxdState {
             }
             return Err(SandboxdStateError::ApplyGitIdentity(error));
         }
-        record_operation_phase_completed(&diagnostics_logger, "apply_git_identity");
+        record_operation_phase_completed_with_attributes(
+            &diagnostics_logger,
+            "apply_git_identity",
+            timeline_attributes("git-identity", "Configuring Git"),
+        );
 
         if let Some(tunnel_session) = &startup_tunnel_session
             && let Some(provider) = &gateway_egress_token_provider
@@ -253,7 +268,11 @@ impl SandboxdState {
 
         let mut egress_proxy: Option<EgressProxy>;
 
-        record_operation_phase_started(&diagnostics_logger, "start_egress_proxy");
+        record_operation_phase_started_with_attributes(
+            &diagnostics_logger,
+            "start_egress_proxy",
+            timeline_attributes("egress-proxy", "Starting egress proxy"),
+        );
         egress_proxy = match EgressProxy::start(
             &runtime_plan,
             startup_input,
@@ -263,13 +282,15 @@ impl SandboxdState {
         ) {
             Ok(egress_proxy) => egress_proxy,
             Err(error) => {
+                let mut attributes = timeline_attributes("egress-proxy", "Starting egress proxy");
+                attributes.insert(
+                    "error".to_string(),
+                    startup_diagnostics_string(error.to_string()),
+                );
                 record_operation_phase_failure(
                     &diagnostics_logger,
                     "start_egress_proxy",
-                    BTreeMap::from([(
-                        "error".to_string(),
-                        startup_diagnostics_string(error.to_string()),
-                    )]),
+                    attributes,
                 );
                 close_tunnel_session_after_failure(
                     &mut startup_tunnel_session,
@@ -279,7 +300,11 @@ impl SandboxdState {
                 return Err(SandboxdStateError::StartEgressProxy(error.to_string()));
             }
         };
-        record_operation_phase_completed(&diagnostics_logger, "start_egress_proxy");
+        record_operation_phase_completed_with_attributes(
+            &diagnostics_logger,
+            "start_egress_proxy",
+            timeline_attributes("egress-proxy", "Starting egress proxy"),
+        );
 
         let base_runtime_env = match collect_runtime_environment(&runtime_plan) {
             Ok(runtime_env) => runtime_env,
@@ -347,15 +372,16 @@ impl SandboxdState {
         }
 
         if should_apply_runtime_plan {
-            record_operation_phase_started(&diagnostics_logger, "apply_runtime_plan");
-            match runtime::apply_compiled_runtime_plan_with_output_sink(
+            let runtime_plan_observer = RuntimePlanTimelineObserver {
+                diagnostics_logger: diagnostics_logger.clone(),
+            };
+            match runtime::apply_compiled_runtime_plan_with_output_sink_and_observer(
                 &runtime_plan,
                 Some(&runtime_env),
                 command_output_sink(&diagnostics_logger, "apply_runtime_plan"),
+                Some(&runtime_plan_observer),
             ) {
-                Ok(()) => {
-                    record_operation_phase_completed(&diagnostics_logger, "apply_runtime_plan")
-                }
+                Ok(()) => {}
                 Err(error) => {
                     record_runtime_plan_apply_failure(&diagnostics_logger, &error);
                     close_tunnel_session_after_failure(
@@ -373,7 +399,11 @@ impl SandboxdState {
             }
         }
         if should_run_setup_script {
-            record_operation_phase_started(&diagnostics_logger, "run_setup_script");
+            record_operation_phase_started_with_attributes(
+                &diagnostics_logger,
+                "run_setup_script",
+                timeline_attributes("setup-script", "Running setup script"),
+            );
             match run_setup_script_with_output_sink(
                 &runtime_plan,
                 &runtime_env,
@@ -382,7 +412,11 @@ impl SandboxdState {
                 command_output_sink(&diagnostics_logger, "run_setup_script"),
             ) {
                 Ok(()) => {
-                    record_operation_phase_completed(&diagnostics_logger, "run_setup_script");
+                    record_operation_phase_completed_with_attributes(
+                        &diagnostics_logger,
+                        "run_setup_script",
+                        timeline_attributes("setup-script", "Running setup script"),
+                    );
                 }
                 Err(error) => {
                     record_setup_script_failure(&diagnostics_logger, &error);
@@ -475,16 +509,19 @@ impl SandboxdState {
         }
         let process_specs =
             process::flatten_runtime_client_processes(&runtime_plan.runtime_clients, &runtime_env);
-        record_operation_phase_started(&diagnostics_logger, "start_runtime_processes");
+        let runtime_process_observer = RuntimeProcessTimelineObserver {
+            diagnostics_logger: diagnostics_logger.clone(),
+        };
         let process_manager = if process_specs.is_empty() {
             None
         } else {
             Some(
-                process::start_runtime_client_process_manager_with_supervisor(
+                process::start_runtime_client_process_manager_with_supervisor_and_observer(
                     &process_specs,
                     clock.as_ref(),
                     sleeper.as_ref(),
                     supervisor_handle.clone(),
+                    Some(&runtime_process_observer),
                 )
                 .map_err(|error| {
                     record_runtime_process_failure(&diagnostics_logger, &error);
@@ -504,7 +541,6 @@ impl SandboxdState {
                 })?,
             )
         };
-        record_operation_phase_completed(&diagnostics_logger, "start_runtime_processes");
         let codex_app_server_observation_handle = process_manager
             .as_ref()
             .and_then(process::RuntimeClientProcessManager::codex_app_server_observation_handle)
@@ -518,22 +554,27 @@ impl SandboxdState {
             .and_then(process::RuntimeClientProcessManager::opencode_server_control_handle)
             .cloned();
 
-        record_operation_phase_started(&diagnostics_logger, "start_runtime_adapters");
+        let runtime_adapter_observer = RuntimeAdapterTimelineObserver {
+            diagnostics_logger: diagnostics_logger.clone(),
+        };
         let runtime_adapters = RuntimeAdapterRegistry
-            .start_with_supervisor(
+            .start_with_supervisor_and_observer(
                 startup_input,
                 keepalive_manager.clone(),
                 runtime_readiness_manager.clone(),
                 supervisor_handle.clone(),
+                Some(&runtime_adapter_observer),
             )
             .map_err(|error| {
+                let mut attributes = runtime_adapter_failure_timeline_attributes(&error);
+                attributes.insert(
+                    "error".to_string(),
+                    startup_diagnostics_string(error.to_string()),
+                );
                 record_operation_phase_failure(
                     &diagnostics_logger,
                     "start_runtime_adapters",
-                    BTreeMap::from([(
-                        "error".to_string(),
-                        startup_diagnostics_string(error.to_string()),
-                    )]),
+                    attributes,
                 );
                 if let Some(tunnel_session) = startup_tunnel_session.take() {
                     close_tunnel_session(
@@ -549,7 +590,6 @@ impl SandboxdState {
                 );
                 SandboxdStateError::StartRuntimeAdapters(error.to_string())
             })?;
-        record_operation_phase_completed(&diagnostics_logger, "start_runtime_adapters");
         let codex_proxy_control_handle = runtime_adapters.codex_proxy_control_handle().cloned();
         let agent_endpoint_url = match runtime_adapters.adapters() {
             [] => None,
@@ -592,17 +632,23 @@ impl SandboxdState {
                 "minimal bootstrap tunnel session is not initialized".to_string(),
             ));
         };
-        record_operation_phase_started(&diagnostics_logger, "attach_runtime_agent_endpoint");
+        record_operation_phase_started_with_attributes(
+            &diagnostics_logger,
+            "attach_runtime_agent_endpoint",
+            hidden_timeline_attributes(),
+        );
         match tunnel_session.set_agent_endpoint_url(agent_endpoint_url.clone()) {
             Ok(()) => {}
             Err(error) => {
+                let mut attributes = hidden_timeline_attributes();
+                attributes.insert(
+                    "error".to_string(),
+                    startup_diagnostics_string(error.to_string()),
+                );
                 record_operation_phase_failure(
                     &diagnostics_logger,
                     "attach_runtime_agent_endpoint",
-                    BTreeMap::from([(
-                        "error".to_string(),
-                        startup_diagnostics_string(error.to_string()),
-                    )]),
+                    attributes,
                 );
                 close_tunnel_session(
                     tunnel_session,
@@ -617,7 +663,11 @@ impl SandboxdState {
                 return Err(SandboxdStateError::StartTunnelSession(error.to_string()));
             }
         }
-        record_operation_phase_completed(&diagnostics_logger, "attach_runtime_agent_endpoint");
+        record_operation_phase_completed_with_attributes(
+            &diagnostics_logger,
+            "attach_runtime_agent_endpoint",
+            hidden_timeline_attributes(),
+        );
         let runtime_readiness_mode = determine_runtime_readiness_mode(&supervisor_handle);
         sync_runtime_readiness_from_snapshot(
             &supervisor_handle,
@@ -722,20 +772,26 @@ impl SandboxdState {
         })?;
         if let Some(logger) = &diagnostics_logger {
             logger.attach_operation_sender(tunnel_session.operation_record_sender());
-            record_operation_phase_completed(&diagnostics_logger, "start_tunnel_session");
+            record_operation_phase_completed_with_attributes(
+                &diagnostics_logger,
+                "start_tunnel_session",
+                timeline_attributes("tunnel", "Connecting tunnel"),
+            );
         }
-        record_operation_phase_started(&diagnostics_logger, "apply_git_identity");
+        record_operation_phase_started_with_attributes(
+            &diagnostics_logger,
+            "apply_git_identity",
+            timeline_attributes("git-identity", "Configuring Git"),
+        );
         if let Err(error) =
             runtime::git_identity::apply_git_identity(startup_input, global_git_config_path)
         {
-            record_operation_phase_failure(
-                &diagnostics_logger,
-                "apply_git_identity",
-                BTreeMap::from([(
-                    "error".to_string(),
-                    startup_diagnostics_string(error.clone()),
-                )]),
+            let mut attributes = timeline_attributes("git-identity", "Configuring Git");
+            attributes.insert(
+                "error".to_string(),
+                startup_diagnostics_string(error.clone()),
             );
+            record_operation_phase_failure(&diagnostics_logger, "apply_git_identity", attributes);
             close_tunnel_session(
                 tunnel_session,
                 &diagnostics_logger,
@@ -743,7 +799,11 @@ impl SandboxdState {
             );
             return Err(SandboxdStateError::ApplyGitIdentity(error));
         }
-        record_operation_phase_completed(&diagnostics_logger, "apply_git_identity");
+        record_operation_phase_completed_with_attributes(
+            &diagnostics_logger,
+            "apply_git_identity",
+            timeline_attributes("git-identity", "Configuring Git"),
+        );
         if let Some(provider) = &self.gateway_egress_token_provider {
             provider
                 .set_acting_user_id(startup_input.acting_user_id.clone())
@@ -762,15 +822,21 @@ impl SandboxdState {
             );
             return Err(error);
         }
-        record_operation_phase_started(&diagnostics_logger, "attach_runtime_agent_endpoint");
+        record_operation_phase_started_with_attributes(
+            &diagnostics_logger,
+            "attach_runtime_agent_endpoint",
+            hidden_timeline_attributes(),
+        );
         if let Err(error) = tunnel_session.set_agent_endpoint_url(agent_endpoint_url) {
+            let mut attributes = hidden_timeline_attributes();
+            attributes.insert(
+                "error".to_string(),
+                startup_diagnostics_string(error.to_string()),
+            );
             record_operation_phase_failure(
                 &diagnostics_logger,
                 "attach_runtime_agent_endpoint",
-                BTreeMap::from([(
-                    "error".to_string(),
-                    startup_diagnostics_string(error.to_string()),
-                )]),
+                attributes,
             );
             close_tunnel_session(
                 tunnel_session,
@@ -779,7 +845,11 @@ impl SandboxdState {
             );
             return Err(SandboxdStateError::StartTunnelSession(error.to_string()));
         }
-        record_operation_phase_completed(&diagnostics_logger, "attach_runtime_agent_endpoint");
+        record_operation_phase_completed_with_attributes(
+            &diagnostics_logger,
+            "attach_runtime_agent_endpoint",
+            hidden_timeline_attributes(),
+        );
         record_operation_phase_started(&diagnostics_logger, "ready");
         close_operation_stream(&diagnostics_logger);
         self.tunnel_session = Some(tunnel_session);
@@ -907,6 +977,116 @@ fn wait_for_storage_attach_signal(
 }
 
 #[derive(Clone)]
+struct RuntimePlanTimelineObserver {
+    diagnostics_logger: Option<StartupDiagnosticsLogger>,
+}
+
+impl runtime::RuntimePlanApplyObserver for RuntimePlanTimelineObserver {
+    fn record_step_started(&self, step: RuntimePlanApplyLifecycleStep) {
+        let (key, label) = runtime_plan_timeline_step(step);
+        record_operation_phase_started_with_attributes(
+            &self.diagnostics_logger,
+            "apply_runtime_plan",
+            timeline_attributes(key, label),
+        );
+    }
+
+    fn record_step_completed(&self, step: RuntimePlanApplyLifecycleStep) {
+        let (key, label) = runtime_plan_timeline_step(step);
+        record_operation_phase_completed_with_attributes(
+            &self.diagnostics_logger,
+            "apply_runtime_plan",
+            timeline_attributes(key, label),
+        );
+    }
+}
+
+#[derive(Clone)]
+struct RuntimeProcessTimelineObserver {
+    diagnostics_logger: Option<StartupDiagnosticsLogger>,
+}
+
+impl process::RuntimeClientProcessObserver for RuntimeProcessTimelineObserver {
+    fn record_process_started(&self, process_spec: &process::RuntimeClientProcessSpec) {
+        record_operation_phase_started_with_attributes(
+            &self.diagnostics_logger,
+            "start_runtime_processes",
+            runtime_process_timeline_attributes(&process_spec.process_key),
+        );
+    }
+
+    fn record_process_completed(&self, process_spec: &process::RuntimeClientProcessSpec) {
+        record_operation_phase_completed_with_attributes(
+            &self.diagnostics_logger,
+            "start_runtime_processes",
+            runtime_process_timeline_attributes(&process_spec.process_key),
+        );
+    }
+}
+
+#[derive(Clone)]
+struct RuntimeAdapterTimelineObserver {
+    diagnostics_logger: Option<StartupDiagnosticsLogger>,
+}
+
+impl RuntimeAdapterLifecycleObserver for RuntimeAdapterTimelineObserver {
+    fn record_adapter_started(&self, runtime_id: &str) {
+        record_operation_phase_started_with_attributes(
+            &self.diagnostics_logger,
+            "start_runtime_adapters",
+            runtime_adapter_timeline_attributes(runtime_id),
+        );
+    }
+
+    fn record_adapter_completed(&self, runtime_id: &str) {
+        record_operation_phase_completed_with_attributes(
+            &self.diagnostics_logger,
+            "start_runtime_adapters",
+            runtime_adapter_timeline_attributes(runtime_id),
+        );
+    }
+}
+
+fn runtime_plan_timeline_step(step: RuntimePlanApplyLifecycleStep) -> (&'static str, &'static str) {
+    match step {
+        RuntimePlanApplyLifecycleStep::RuntimeArtifacts => {
+            ("runtime-artifacts", "Installing runtime artifacts")
+        }
+        RuntimePlanApplyLifecycleStep::WorkspaceSources => ("workspace", "Preparing workspace"),
+        RuntimePlanApplyLifecycleStep::RuntimeFiles => ("runtime-files", "Writing runtime files"),
+    }
+}
+
+fn runtime_adapter_failure_timeline_attributes(
+    error: &RuntimeAdapterRegistryError,
+) -> BTreeMap<String, serde_json::Value> {
+    match error {
+        RuntimeAdapterRegistryError::UnsupportedRuntimeId { runtime_id }
+        | RuntimeAdapterRegistryError::DuplicateRuntimeId { runtime_id }
+        | RuntimeAdapterRegistryError::MissingRuntimeClient { runtime_id, .. }
+        | RuntimeAdapterRegistryError::MissingRuntimeEndpoint { runtime_id, .. }
+        | RuntimeAdapterRegistryError::MissingRuntimeProcess { runtime_id, .. }
+        | RuntimeAdapterRegistryError::UnsupportedConnectionMode { runtime_id, .. }
+        | RuntimeAdapterRegistryError::RawAppServerReadinessMustUseWebSocket {
+            runtime_id, ..
+        }
+        | RuntimeAdapterRegistryError::RawOpenCodeServerReadinessMustUseHttp {
+            runtime_id, ..
+        } => runtime_adapter_timeline_attributes(runtime_id),
+        RuntimeAdapterRegistryError::StartCodexProxy(_) => {
+            runtime_adapter_timeline_attributes("codex")
+        }
+        RuntimeAdapterRegistryError::StartOpenCodeProxy(_) => {
+            runtime_adapter_timeline_attributes("opencode")
+        }
+        RuntimeAdapterRegistryError::StartPiProxy(_) => runtime_adapter_timeline_attributes("pi"),
+        RuntimeAdapterRegistryError::InvalidRuntimePlan(_) => {
+            timeline_attributes("runtime-adapters", "Starting runtime adapter")
+        }
+    }
+}
+
+#[derive(Clone)]
 struct StartupCommandOutputSink {
     logger: StartupDiagnosticsLogger,
     phase: &'static str,
@@ -975,7 +1155,11 @@ struct StartMinimalTunnelSessionInput<'a> {
 fn start_minimal_tunnel_session(
     input: StartMinimalTunnelSessionInput<'_>,
 ) -> Result<TunnelSession, SandboxdStateError> {
-    record_operation_phase_started(input.diagnostics_logger, "start_tunnel_session");
+    record_operation_phase_started_with_attributes(
+        input.diagnostics_logger,
+        "start_tunnel_session",
+        timeline_attributes("tunnel", "Connecting tunnel"),
+    );
     let tunnel_session = TunnelSession::start_minimal_with_supervisor(
         input.startup_input,
         input.keepalive_manager,
@@ -985,17 +1169,23 @@ fn start_minimal_tunnel_session(
         input.supervisor_handle,
     )
     .map_err(|error| {
+        let mut attributes = timeline_attributes("tunnel", "Connecting tunnel");
+        attributes.insert(
+            "error".to_string(),
+            startup_diagnostics_string(error.to_string()),
+        );
         record_operation_phase_failure(
             input.diagnostics_logger,
             "start_tunnel_session",
-            BTreeMap::from([(
-                "error".to_string(),
-                startup_diagnostics_string(error.to_string()),
-            )]),
+            attributes,
         );
         SandboxdStateError::StartTunnelSession(error.to_string())
     })?;
-    record_operation_phase_completed(input.diagnostics_logger, "start_tunnel_session");
+    record_operation_phase_completed_with_attributes(
+        input.diagnostics_logger,
+        "start_tunnel_session",
+        timeline_attributes("tunnel", "Connecting tunnel"),
+    );
 
     Ok(tunnel_session)
 }

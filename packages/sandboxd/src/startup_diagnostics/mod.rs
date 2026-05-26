@@ -227,11 +227,20 @@ impl StartupDiagnosticsLogger {
     }
 
     pub fn record_phase_started(&self, phase: &str) -> Result<(), String> {
+        self.record_phase_started_with_attributes(phase, BTreeMap::new())
+    }
+
+    pub fn record_phase_started_with_attributes(
+        &self,
+        phase: &str,
+        mut attributes: BTreeMap<String, Value>,
+    ) -> Result<(), String> {
+        attributes.insert("phase".to_string(), Value::String(phase.to_string()));
         self.record_with_clock(
             &SystemClock,
             StartupDiagnosticLevel::Info,
             phase_started_event_name(self.inner.operation),
-            BTreeMap::from([("phase".to_string(), Value::String(phase.to_string()))]),
+            attributes,
         )
     }
 

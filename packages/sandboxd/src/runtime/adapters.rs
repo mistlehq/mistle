@@ -32,6 +32,12 @@ use crate::tunnel::session::derive_sandbox_instance_id;
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RuntimeAdapterRegistry;
 
+pub trait RuntimeAdapterLifecycleObserver {
+    fn record_adapter_started(&self, runtime_id: &str);
+
+    fn record_adapter_completed(&self, runtime_id: &str);
+}
+
 /// Describes why one runtime adapter could not be resolved or started.
 #[derive(Debug)]
 pub enum RuntimeAdapterRegistryError {
@@ -269,6 +275,24 @@ impl RuntimeAdapterRegistry {
         runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
         supervisor_handle: SandboxdSupervisorHandle,
     ) -> Result<RuntimeAdapters, RuntimeAdapterRegistryError> {
+        self.start_with_supervisor_and_observer(
+            startup_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            supervisor_handle,
+            None,
+        )
+    }
+
+    /// Starts all runtime-specific adapters using the shared supervisor boundary and observer.
+    pub fn start_with_supervisor_and_observer(
+        &self,
+        startup_input: &StartupInput,
+        keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+        runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
+        supervisor_handle: SandboxdSupervisorHandle,
+        observer: Option<&dyn RuntimeAdapterLifecycleObserver>,
+    ) -> Result<RuntimeAdapters, RuntimeAdapterRegistryError> {
         let runtime_plan: CompiledRuntimePlan =
             serde_json::from_value(startup_input.runtime_plan.clone())
                 .map_err(RuntimeAdapterRegistryError::InvalidRuntimePlan)?;
@@ -283,6 +307,9 @@ impl RuntimeAdapterRegistry {
                 });
             }
 
+            if let Some(observer) = observer {
+                observer.record_adapter_started(&agent_runtime.runtime_id);
+            }
             match agent_runtime.runtime_id.as_str() {
                 "codex" => {
                     let (adapter, control_handle) = start_codex_runtime_adapter(
@@ -319,6 +346,9 @@ impl RuntimeAdapterRegistry {
                         runtime_id: agent_runtime.runtime_id.clone(),
                     });
                 }
+            }
+            if let Some(observer) = observer {
+                observer.record_adapter_completed(&agent_runtime.runtime_id);
             }
         }
 

@@ -85,6 +85,7 @@ describe("SandboxOperationProgressView", () => {
           createLifecycleEvent({
             id: "soe_provider_completed",
             message: "Snapshot sandbox provider start completed.",
+            observedAt: "2026-05-13T10:00:03.000Z",
             phase: "provider",
             sequence: 2,
             status: "completed",
@@ -102,7 +103,168 @@ describe("SandboxOperationProgressView", () => {
     expect(within(timeline).queryByText("Snapshot sandbox provider start started.")).toBeNull();
     expect(within(timeline).queryByText("Snapshot sandbox provider start completed.")).toBeNull();
     expect(within(timeline).getAllByText("Sandbox")).toHaveLength(1);
+    expect(within(timeline).getByText("3s")).toBeDefined();
     expectScreenReaderOnlyText(timeline, "Status: completed");
+  });
+
+  it("uses explicit timeline keys and labels when lifecycle events split one backend phase", () => {
+    render(
+      <SandboxOperationProgressView
+        events={[
+          createLifecycleEvent({
+            attributes: {
+              timelineKey: "runtime-artifacts",
+              timelineLabel: "Installing runtime artifacts",
+            },
+            id: "soe_runtime_artifacts_completed",
+            message: "runtime artifacts installed",
+            phase: "runtime_plan",
+            sequence: 1,
+            status: "started",
+          }),
+          createLifecycleEvent({
+            attributes: {
+              timelineKey: "runtime-artifacts",
+              timelineLabel: "Installing runtime artifacts",
+            },
+            id: "soe_runtime_artifacts_completed",
+            message: "runtime artifacts installed",
+            observedAt: "2026-05-13T10:01:12.000Z",
+            phase: "runtime_plan",
+            sequence: 2,
+            status: "completed",
+          }),
+          createLifecycleEvent({
+            attributes: {
+              timelineKey: "workspace",
+              timelineLabel: "Preparing workspace",
+            },
+            id: "soe_workspace_started",
+            message: "workspace sources started",
+            phase: "runtime_plan",
+            sequence: 3,
+            status: "started",
+          }),
+        ]}
+        title="Sandbox startup timeline"
+      />,
+    );
+
+    const timeline = screen.getByText("Installing runtime artifacts").closest("ol");
+    if (timeline === null) {
+      throw new Error("Expected sandbox operation timeline to render.");
+    }
+
+    expect(within(timeline).getByText("Installing runtime artifacts")).toBeDefined();
+    expect(within(timeline).getByText("Preparing workspace")).toBeDefined();
+    expect(within(timeline).getByText("1m 12s")).toBeDefined();
+    expect(within(timeline).queryByText("Runtime plan")).toBeNull();
+  });
+
+  it("does not render lifecycle events marked as hidden from the timeline", () => {
+    render(
+      <SandboxOperationProgressView
+        events={[
+          createLifecycleEvent({
+            attributes: {
+              timelineHidden: true,
+            },
+            id: "soe_running_started",
+            message: "Sandbox instance running status transition started.",
+            phase: "running",
+            sequence: 1,
+            status: "started",
+          }),
+          createLifecycleEvent({
+            id: "soe_ready_started",
+            message: "Sandbox runtime ready.",
+            phase: "ready",
+            sequence: 2,
+            status: "started",
+          }),
+        ]}
+        title="Sandbox startup timeline"
+      />,
+    );
+
+    const timeline = screen.getByText("Ready").closest("ol");
+    if (timeline === null) {
+      throw new Error("Expected sandbox operation timeline to render.");
+    }
+
+    expect(within(timeline).queryByText("Running")).toBeNull();
+    expect(within(timeline).getByText("Ready")).toBeDefined();
+  });
+
+  it("shows elapsed duration for an active lifecycle row", () => {
+    render(
+      <SandboxOperationProgressView
+        events={[
+          createLifecycleEvent({
+            id: "soe_provider_started",
+            message: "Sandbox provider start started.",
+            observedAt: "2026-05-13T10:00:00.000Z",
+            phase: "provider",
+            sequence: 1,
+            status: "started",
+          }),
+        ]}
+        nowMs={Date.parse("2026-05-13T10:00:15.000Z")}
+        title="Snapshot creation progress"
+      />,
+    );
+
+    const timeline = screen.getByText("Sandbox").closest("ol");
+    if (timeline === null) {
+      throw new Error("Expected sandbox operation timeline to render.");
+    }
+
+    expect(within(timeline).getByText("15s")).toBeDefined();
+    expectScreenReaderOnlyText(timeline, "Status: started");
+  });
+
+  it("resets active elapsed duration when a lifecycle row retries after failure", () => {
+    render(
+      <SandboxOperationProgressView
+        events={[
+          createLifecycleEvent({
+            id: "soe_provider_started",
+            message: "Sandbox provider start started.",
+            observedAt: "2026-05-13T10:00:00.000Z",
+            phase: "provider",
+            sequence: 1,
+            status: "started",
+          }),
+          createLifecycleEvent({
+            id: "soe_provider_failed",
+            message: "Sandbox provider start failed.",
+            observedAt: "2026-05-13T10:02:00.000Z",
+            phase: "provider",
+            sequence: 2,
+            status: "failed",
+          }),
+          createLifecycleEvent({
+            id: "soe_provider_restarted",
+            message: "Sandbox provider start started.",
+            observedAt: "2026-05-13T10:03:00.000Z",
+            phase: "provider",
+            sequence: 3,
+            status: "started",
+          }),
+        ]}
+        nowMs={Date.parse("2026-05-13T10:03:05.000Z")}
+        title="Snapshot creation progress"
+      />,
+    );
+
+    const timeline = screen.getByText("Sandbox").closest("ol");
+    if (timeline === null) {
+      throw new Error("Expected sandbox operation timeline to render.");
+    }
+
+    expect(within(timeline).getByText("5s")).toBeDefined();
+    expect(within(timeline).queryByText("3m 5s")).toBeNull();
+    expectScreenReaderOnlyText(timeline, "Status: started");
   });
 
   it("keeps one lifecycle row when worker and sandboxd report the same phase", () => {
@@ -599,6 +761,7 @@ function createLifecycleEvent(input: {
   attributes?: Record<string, unknown>;
   id: string;
   message: string;
+  observedAt?: string;
   operationId?: string;
   phase: NonNullable<SandboxOperationEvent["phase"]>;
   sequence: number;
@@ -610,7 +773,7 @@ function createLifecycleEvent(input: {
     createdAt: "2026-05-13T10:00:00.000Z",
     id: input.id,
     message: input.message,
-    observedAt: "2026-05-13T10:00:00.000Z",
+    observedAt: input.observedAt ?? "2026-05-13T10:00:00.000Z",
     operationId: input.operationId ?? "owfr_operation_progress_test",
     operationKind: "snapshot",
     payloadBase64: null,

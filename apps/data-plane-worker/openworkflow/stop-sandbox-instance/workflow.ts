@@ -54,6 +54,8 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
     await operationEvents.record({
       attributes: {
         stopReason: input.stopReason,
+        timelineKey: "stop",
+        timelineLabel: "Stopping sandbox",
       },
       message: "Sandbox stop requested.",
       phase: "stop",
@@ -123,6 +125,8 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           attributes: {
             error: formatLifecycleEventError(error),
             stopReason: input.stopReason,
+            timelineKey: "stop",
+            timelineLabel: "Stopping sandbox",
           },
           message: "Sandbox bootstrap attachment termination failed.",
           phase: "stop",
@@ -157,6 +161,8 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         attributes: {
           error: formatLifecycleEventError(error),
           stopReason: input.stopReason,
+          timelineKey: "stop",
+          timelineLabel: "Stopping sandbox",
         },
         message: "Sandbox stop failed.",
         phase: "stop",
@@ -210,6 +216,8 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         executed: result.executed,
         outcome: result.outcome,
         stopReason: input.stopReason,
+        timelineKey: "stop",
+        timelineLabel: "Stopping sandbox",
         ...(terminationResult === undefined
           ? {}
           : { bootstrapAttachmentTerminationOutcome: terminationResult.outcome }),

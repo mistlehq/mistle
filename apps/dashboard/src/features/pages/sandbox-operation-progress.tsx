@@ -1,3 +1,10 @@
+import {
+  systemClock,
+  systemScheduler,
+  type Clock,
+  type Scheduler,
+  type TimerHandle,
+} from "@mistle/time";
 import { Notice } from "@mistle/ui";
 import {
   CheckCircleIcon,
@@ -31,11 +38,14 @@ type SandboxOperationProgressProps = {
 };
 
 type SandboxOperationProgressViewProps = {
+  clock?: Clock | undefined;
   displayMode?: SandboxOperationProgressDisplayMode | undefined;
   emptyMessage?: string | undefined;
   errorMessage?: string | null | undefined;
   events: readonly SandboxOperationEvent[];
   isLoading?: boolean | undefined;
+  nowMs?: number | undefined;
+  scheduler?: Scheduler | undefined;
   showBorder?: boolean | undefined;
   showLoadError?: boolean | undefined;
   title?: string | undefined;
@@ -46,11 +56,13 @@ type SandboxOperationProgressDisplayMode = "both" | "timeline" | "stdio";
 type SandboxLifecycleTimelineItem = {
   event: SandboxOperationEvent;
   phaseKey: string;
+  phaseLabel: string;
   startedAt: string | null;
 };
 
 const SandboxOperationEventsLimit = 100;
 const SandboxOperationEventsRefetchIntervalMs = 1_000;
+const ActiveLifecycleDurationTickMs = 1_000;
 const TranscriptContainerClassName = "flex max-h-72 min-h-48 flex-col overflow-hidden bg-[#111817]";
 const TerminalFontFamily =
   '"JetBrains Mono Variable", "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
@@ -150,13 +162,48 @@ export function SandboxOperationProgressView(
   input: SandboxOperationProgressViewProps,
 ): React.JSX.Element {
   const lifecycleEvents = useMemo(
-    () => input.events.filter((event) => event.recordKind === "lifecycle"),
+    () =>
+      input.events.filter(
+        (event) =>
+          event.recordKind === "lifecycle" &&
+          readBooleanAttribute(event.attributes, "timelineHidden") !== true,
+      ),
     [input.events],
   );
   const lifecycleItems = useMemo(
     () => createLifecycleTimelineItems(lifecycleEvents),
     [lifecycleEvents],
   );
+  const hasActiveLifecycleItem = lifecycleItems.some(
+    (item) => item.startedAt !== null && item.event.status === "started",
+  );
+  const clock = input.clock ?? systemClock;
+  const scheduler = input.scheduler ?? systemScheduler;
+  const [liveNowMs, setLiveNowMs] = useState(() => clock.nowMs());
+  useEffect(() => {
+    if (!hasActiveLifecycleItem || input.nowMs !== undefined) {
+      return;
+    }
+
+    let tickHandle: TimerHandle | undefined;
+    let cancelled = false;
+    const tick = (): void => {
+      setLiveNowMs(clock.nowMs());
+      if (!cancelled) {
+        tickHandle = scheduler.schedule(tick, ActiveLifecycleDurationTickMs);
+      }
+    };
+
+    tick();
+
+    return () => {
+      cancelled = true;
+      if (tickHandle !== undefined) {
+        scheduler.cancel(tickHandle);
+      }
+    };
+  }, [clock, hasActiveLifecycleItem, input.nowMs, scheduler]);
+  const timelineNowMs = input.nowMs ?? liveNowMs;
   const transcriptEvents = useMemo(
     () =>
       input.events.filter(
@@ -207,7 +254,11 @@ export function SandboxOperationProgressView(
 
       <div className={contentClassName}>
         {shouldShowTimeline ? (
-          <SandboxOperationTimeline isSplit={displayMode === "both"} items={lifecycleItems} />
+          <SandboxOperationTimeline
+            isSplit={displayMode === "both"}
+            items={lifecycleItems}
+            nowMs={timelineNowMs}
+          />
         ) : null}
         {shouldShowTranscript ? <SandboxOperationTranscript events={transcriptEvents} /> : null}
       </div>
@@ -218,6 +269,7 @@ export function SandboxOperationProgressView(
 function SandboxOperationTimeline(input: {
   isSplit: boolean;
   items: readonly SandboxLifecycleTimelineItem[];
+  nowMs: number;
 }): React.JSX.Element {
   const scrollContainerRef = useRef<HTMLOListElement | null>(null);
   const [expandedItemKeys, setExpandedItemKeys] = useState<ReadonlySet<string>>(() => new Set());
@@ -256,10 +308,10 @@ function SandboxOperationTimeline(input: {
       className={`${resolveTimelineContainerClassName(input.isSplit)} space-y-2`}
       ref={scrollContainerRef}
     >
-      {input.items.map(({ event, phaseKey, startedAt }) => {
+      {input.items.map(({ event, phaseKey, phaseLabel, startedAt }) => {
         const diagnosticMessage = resolveLifecycleDiagnosticMessage(event);
         const isExpanded = expandedItemKeys.has(phaseKey);
-        const phaseLabel = formatLifecyclePhase(event.phase);
+        const duration = formatLifecycleItemDuration({ event, nowMs: input.nowMs, startedAt });
 
         return (
           <li className="grid grid-cols-[1rem_minmax(0,1fr)] items-start gap-2" key={phaseKey}>
@@ -268,9 +320,11 @@ function SandboxOperationTimeline(input: {
               <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="text-sm font-medium">{phaseLabel}</span>
                 <span className="sr-only">Status: {formatLifecycleStatus(event.status)}</span>
-                <time className="text-xs text-muted-foreground" dateTime={event.observedAt}>
-                  {formatLifecycleItemTime({ event, startedAt })}
-                </time>
+                {duration === null ? null : (
+                  <time className="text-xs text-muted-foreground" dateTime={duration.dateTime}>
+                    {duration.label}
+                  </time>
+                )}
                 {diagnosticMessage === null ? null : (
                   <button
                     aria-expanded={isExpanded}
@@ -448,13 +502,14 @@ function createLifecycleTimelineItems(
   const itemIndexesByPhase = new Map<string, number>();
 
   for (const event of events) {
-    const phaseKey = event.phase ?? "operation";
+    const phaseKey = resolveLifecycleTimelineKey(event);
     const existingIndex = itemIndexesByPhase.get(phaseKey);
     if (existingIndex === undefined) {
       itemIndexesByPhase.set(phaseKey, items.length);
       items.push({
         event,
         phaseKey,
+        phaseLabel: resolveLifecycleTimelineLabel(event),
         startedAt: event.status === "started" ? event.observedAt : null,
       });
       continue;
@@ -469,11 +524,50 @@ function createLifecycleTimelineItems(
     items[existingIndex] = {
       event: nextEvent,
       phaseKey: existingItem.phaseKey,
-      startedAt: existingItem.startedAt ?? (event.status === "started" ? event.observedAt : null),
+      phaseLabel: resolveLifecycleTimelineLabel(nextEvent),
+      startedAt:
+        nextEvent.status === "started"
+          ? nextEvent.observedAt
+          : (existingItem.startedAt ?? (event.status === "started" ? event.observedAt : null)),
     };
   }
 
   return items;
+}
+
+function resolveLifecycleTimelineKey(event: SandboxOperationEvent): string {
+  const displayKey = readStringAttribute(event.attributes, "timelineKey")?.trim();
+  if (displayKey !== undefined && displayKey.length > 0) {
+    return displayKey;
+  }
+
+  return event.phase ?? "operation";
+}
+
+function resolveLifecycleTimelineLabel(event: SandboxOperationEvent): string {
+  const displayLabel = readStringAttribute(event.attributes, "timelineLabel")?.trim();
+  if (displayLabel !== undefined && displayLabel.length > 0) {
+    return displayLabel;
+  }
+
+  return formatLifecyclePhase(event.phase);
+}
+
+function readBooleanAttribute(
+  attributes: SandboxOperationEvent["attributes"],
+  key: string,
+): boolean | undefined {
+  if (
+    attributes === null ||
+    typeof attributes !== "object" ||
+    Array.isArray(attributes) ||
+    !(key in attributes)
+  ) {
+    return undefined;
+  }
+
+  const value = attributes[key];
+  return typeof value === "boolean" ? value : undefined;
 }
 
 function resolveLifecycleTimelineEvent(
@@ -588,32 +682,60 @@ function readStringAttribute(attributes: Record<string, unknown>, key: string): 
   return typeof value === "string" ? value : undefined;
 }
 
-function formatEventTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.valueOf())) {
-    return value;
+function formatLifecycleItemDuration(input: {
+  event: SandboxOperationEvent;
+  nowMs: number;
+  startedAt: string | null;
+}): { dateTime: string; label: string } | null {
+  if (input.startedAt === null) {
+    return null;
   }
 
-  return new Intl.DateTimeFormat(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(date);
+  const startedAtMs = new Date(input.startedAt).valueOf();
+  const endedAtMs =
+    input.event.status === "started" ? input.nowMs : new Date(input.event.observedAt).valueOf();
+  if (Number.isNaN(startedAtMs) || Number.isNaN(endedAtMs)) {
+    return null;
+  }
+
+  const durationMs = endedAtMs - startedAtMs;
+  if (durationMs < 0) {
+    return null;
+  }
+
+  return {
+    dateTime: formatDurationDateTime(durationMs),
+    label: formatDurationLabel(durationMs),
+  };
 }
 
-function formatLifecycleItemTime(input: {
-  event: SandboxOperationEvent;
-  startedAt: string | null;
-}): string {
-  if (
-    input.startedAt === null ||
-    input.event.status === "started" ||
-    input.startedAt === input.event.observedAt
-  ) {
-    return formatEventTime(input.event.observedAt);
+function formatDurationLabel(durationMs: number): string {
+  if (durationMs < 1_000) {
+    return "<1s";
   }
 
-  return `${formatEventTime(input.startedAt)} - ${formatEventTime(input.event.observedAt)}`;
+  const totalSeconds = Math.round(durationMs / 1_000);
+  const hours = Math.floor(totalSeconds / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${String(hours)}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+  }
+
+  if (minutes > 0) {
+    return `${String(minutes)}m ${String(seconds).padStart(2, "0")}s`;
+  }
+
+  return `${String(seconds)}s`;
+}
+
+function formatDurationDateTime(durationMs: number): string {
+  const totalSeconds = Math.max(0, Math.round(durationMs / 1_000));
+  const hours = Math.floor(totalSeconds / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+  return `PT${String(hours)}H${String(minutes)}M${String(seconds)}S`;
 }
 
 function decodeTranscriptPayload(event: SandboxOperationEvent): Uint8Array {

@@ -108,6 +108,19 @@ impl fmt::Display for RuntimePlanApplyError {
 
 impl std::error::Error for RuntimePlanApplyError {}
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuntimePlanApplyLifecycleStep {
+    RuntimeArtifacts,
+    WorkspaceSources,
+    RuntimeFiles,
+}
+
+pub trait RuntimePlanApplyObserver {
+    fn record_step_started(&self, step: RuntimePlanApplyLifecycleStep);
+
+    fn record_step_completed(&self, step: RuntimePlanApplyLifecycleStep);
+}
+
 /// Applies the artifact, workspace-source, and setup-file portions of one startup input's runtime
 /// plan.
 pub fn apply_runtime_plan(startup_input: &StartupInput) -> Result<(), RuntimePlanApplyError> {
@@ -132,8 +145,31 @@ pub fn apply_compiled_runtime_plan_with_output_sink(
     managed_env: Option<&BTreeMap<String, String>>,
     output_sink: Option<Arc<dyn CommandOutputSink>>,
 ) -> Result<(), RuntimePlanApplyError> {
+    apply_compiled_runtime_plan_with_output_sink_and_observer(
+        runtime_plan,
+        managed_env,
+        output_sink,
+        None,
+    )
+}
+
+/// Applies runtime-plan setup while notifying an observer about user-visible setup sections.
+pub fn apply_compiled_runtime_plan_with_output_sink_and_observer(
+    runtime_plan: &CompiledRuntimePlan,
+    managed_env: Option<&BTreeMap<String, String>>,
+    output_sink: Option<Arc<dyn CommandOutputSink>>,
+    observer: Option<&dyn RuntimePlanApplyObserver>,
+) -> Result<(), RuntimePlanApplyError> {
     // Materialize artifacts, workspace sources, and setup files before later PRs add
     // long-lived process supervision on top of this state.
+    if runtime_plan
+        .artifacts
+        .iter()
+        .any(|artifact| !artifact.lifecycle.install.is_empty())
+        && let Some(observer) = observer
+    {
+        observer.record_step_started(RuntimePlanApplyLifecycleStep::RuntimeArtifacts);
+    }
     for (artifact_index, artifact) in runtime_plan.artifacts.iter().enumerate() {
         for (install_index, install_step) in artifact.lifecycle.install.iter().enumerate() {
             artifact_install::apply_artifact_install_step(
@@ -150,7 +186,20 @@ pub fn apply_compiled_runtime_plan_with_output_sink(
             })?;
         }
     }
+    if runtime_plan
+        .artifacts
+        .iter()
+        .any(|artifact| !artifact.lifecycle.install.is_empty())
+        && let Some(observer) = observer
+    {
+        observer.record_step_completed(RuntimePlanApplyLifecycleStep::RuntimeArtifacts);
+    }
 
+    if !runtime_plan.workspace_sources.is_empty()
+        && let Some(observer) = observer
+    {
+        observer.record_step_started(RuntimePlanApplyLifecycleStep::WorkspaceSources);
+    }
     for (source_index, workspace_source) in runtime_plan.workspace_sources.iter().enumerate() {
         let (source_kind, path, origin_url, clone_url) = match workspace_source {
             plan::CompiledWorkspaceSource::GitClone {
@@ -179,7 +228,20 @@ pub fn apply_compiled_runtime_plan_with_output_sink(
             error,
         })?;
     }
+    if !runtime_plan.workspace_sources.is_empty()
+        && let Some(observer) = observer
+    {
+        observer.record_step_completed(RuntimePlanApplyLifecycleStep::WorkspaceSources);
+    }
 
+    if runtime_plan
+        .runtime_clients
+        .iter()
+        .any(|runtime_client| !runtime_client.setup.files.is_empty())
+        && let Some(observer) = observer
+    {
+        observer.record_step_started(RuntimePlanApplyLifecycleStep::RuntimeFiles);
+    }
     for (client_index, runtime_client) in runtime_plan.runtime_clients.iter().enumerate() {
         for (file_index, file) in runtime_client.setup.files.iter().enumerate() {
             runtime_file::apply_runtime_file(file).map_err(|error| {
@@ -193,6 +255,14 @@ pub fn apply_compiled_runtime_plan_with_output_sink(
                 }
             })?;
         }
+    }
+    if runtime_plan
+        .runtime_clients
+        .iter()
+        .any(|runtime_client| !runtime_client.setup.files.is_empty())
+        && let Some(observer) = observer
+    {
+        observer.record_step_completed(RuntimePlanApplyLifecycleStep::RuntimeFiles);
     }
 
     Ok(())
