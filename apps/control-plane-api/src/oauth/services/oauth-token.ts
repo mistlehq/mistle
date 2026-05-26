@@ -157,6 +157,7 @@ export async function authenticateOAuthAccessToken(input: {
   const grant = await input.db.query.oauthGrants.findFirst({
     columns: {
       id: true,
+      oauthClientId: true,
       userId: true,
       organizationId: true,
       revokedAt: true,
@@ -291,6 +292,7 @@ async function readCurrentlyAuthorizedGrantPermissions(input: {
   db: ControlPlaneDatabase;
   grant: {
     id: string;
+    oauthClientId: string;
     userId: string;
     organizationId: string;
   };
@@ -299,14 +301,36 @@ async function readCurrentlyAuthorizedGrantPermissions(input: {
     db: input.db,
     oauthGrantId: input.grant.id,
   });
+  const clientPermissions = await readClientPermissions({
+    db: input.db,
+    oauthClientId: input.grant.oauthClientId,
+  });
   const authorization = await requireOrganizationAccess({
     db: input.db,
     actorUserId: input.grant.userId,
     organizationId: input.grant.organizationId,
   });
+  const configuredClientPermissions = new Set(clientPermissions);
   const currentlyAllowedPermissions = new Set(authorization.permissions);
 
-  return grantPermissions.filter((permission) => currentlyAllowedPermissions.has(permission));
+  return grantPermissions.filter(
+    (permission) =>
+      configuredClientPermissions.has(permission) && currentlyAllowedPermissions.has(permission),
+  );
+}
+
+async function readClientPermissions(input: {
+  db: ControlPlaneDatabase;
+  oauthClientId: string;
+}): Promise<OrganizationPermission[]> {
+  const scopes = await input.db.query.oauthClientScopes.findMany({
+    columns: {
+      scope: true,
+    },
+    where: (table, { eq }) => eq(table.oauthClientId, input.oauthClientId),
+  });
+
+  return parseApiKeyPermissions(scopes.map((scope) => scope.scope));
 }
 
 function generateToken(prefix: string): string {

@@ -16,6 +16,10 @@ import { describe, expect } from "vitest";
 import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import { CurrentActorResponseSchema } from "../src/me/get-current-actor/schema.js";
 import { OAuthTokenResponseSchema } from "../src/oauth/schemas.js";
+import {
+  authenticateOAuthAccessToken,
+  refreshOAuthTokenPair,
+} from "../src/oauth/services/oauth-token.js";
 import { ListSandboxInstancesResponseSchema } from "../src/sandbox-instances/index.js";
 
 const it = createIntegrationTest({
@@ -192,6 +196,66 @@ describe.concurrent("OAuth CLI login integration", () => {
     const refreshedTokenBody = OAuthTokenResponseSchema.parse(await refreshTokenResponse.json());
     expect(refreshedTokenBody.access_token).toMatch(/^mstl_oat_[A-Za-z0-9_-]+$/u);
     expect(refreshedTokenBody.refresh_token).toBe(tokenBody.refresh_token);
+
+    const mistleCliClient = await env.controlPlaneDb.query.oauthClients.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (table, { eq }) => eq(table.clientId, "mistle-cli"),
+    });
+    if (mistleCliClient === undefined) {
+      throw new Error("Expected Mistle CLI OAuth client to exist.");
+    }
+    await env.controlPlaneDb
+      .delete(env.controlPlaneTables.oauthClientScopes)
+      .where(
+        and(
+          eq(env.controlPlaneTables.oauthClientScopes.oauthClientId, mistleCliClient.id),
+          eq(
+            env.controlPlaneTables.oauthClientScopes.scope,
+            OrganizationPermissions.SANDBOX_SESSION_CONNECT,
+          ),
+        ),
+      );
+
+    const remainingClientScopes = await env.controlPlaneDb.query.oauthClientScopes.findMany({
+      columns: {
+        scope: true,
+      },
+      where: (table, { eq }) => eq(table.oauthClientId, mistleCliClient.id),
+    });
+    expect(remainingClientScopes.map((scope) => scope.scope)).not.toContain(
+      OrganizationPermissions.SANDBOX_SESSION_CONNECT,
+    );
+
+    const narrowedAuthContext = await authenticateOAuthAccessToken({
+      db: env.controlPlaneDb,
+      token: tokenBody.access_token,
+    });
+    expect(narrowedAuthContext.permissions).toStrictEqual([
+      OrganizationPermissions.ORGANIZATION_READ,
+      OrganizationPermissions.SANDBOX_PROFILE_READ,
+      OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
+      OrganizationPermissions.SANDBOX_SESSION_CREATE,
+      OrganizationPermissions.SANDBOX_SESSION_READ,
+      OrganizationPermissions.SANDBOX_SESSION_RESUME,
+    ]);
+
+    const narrowedRefreshToken = await refreshOAuthTokenPair({
+      db: env.controlPlaneDb,
+      oauthClientId: mistleCliClient.id,
+      refreshToken: tokenBody.refresh_token,
+    });
+    expect(narrowedRefreshToken.scope).toBe(
+      [
+        OrganizationPermissions.ORGANIZATION_READ,
+        OrganizationPermissions.SANDBOX_PROFILE_READ,
+        OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
+        OrganizationPermissions.SANDBOX_SESSION_CREATE,
+        OrganizationPermissions.SANDBOX_SESSION_READ,
+        OrganizationPermissions.SANDBOX_SESSION_RESUME,
+      ].join(" "),
+    );
 
     const otherClientId = `oac_test_${randomUUID()}`;
     await env.controlPlaneDb.insert(env.controlPlaneTables.oauthClients).values({
