@@ -1,4 +1,6 @@
 import type {
+  AuthorizePortAccessTargetInput,
+  AuthorizePortAccessTargetResult,
   CloseInteractiveStreamInput,
   FindInteractiveStreamByClientInput,
   FindInteractiveStreamByTunnelInput,
@@ -33,4 +35,8 @@ export interface GatewayForwardingClientAdapter {
     target: GatewayForwardingTarget,
     input: ReleaseClientSessionStreamsInput,
   ): Promise<ReleaseClientSessionStreamsResult>;
+  authorizePortAccessTarget(
+    target: GatewayForwardingTarget,
+    input: AuthorizePortAccessTargetInput,
+  ): Promise<AuthorizePortAccessTargetResult>;
 }

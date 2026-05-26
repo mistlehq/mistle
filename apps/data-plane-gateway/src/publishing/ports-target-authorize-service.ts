@@ -9,6 +9,8 @@ import {
 import type { Scheduler, TimerHandle } from "@mistle/time";
 
 import { BootstrapTunnelNotConnectedError } from "../tunnel/bootstrap-tunnel-not-connected-error.js";
+import type { GatewayForwardingClientAdapter } from "../tunnel/gateway-forwarding/gateway-forwarding-client-adapter.js";
+import type { GatewayForwardingTarget } from "../tunnel/gateway-forwarding/types.js";
 import type { TunnelRelayCoordinator } from "../tunnel/relay-coordinator.js";
 import type { RelayTarget } from "../tunnel/types.js";
 
@@ -66,19 +68,50 @@ export class PortsTargetAuthorizeService {
   public constructor(
     private readonly relayCoordinator: Pick<
       TunnelRelayCoordinator,
-      "forwardPeerMessage" | "getBootstrapPeer"
+      "forwardPeerMessage" | "getBootstrapPeer" | "resolveBootstrapPeer"
     >,
     private readonly scheduler: Scheduler,
+    private readonly remoteGatewayForwarding?: {
+      client: GatewayForwardingClientAdapter;
+      localNodeId: string;
+    },
   ) {}
 
   public async requestTargetAuthorize(input: {
     sandboxInstanceId: string;
     target: PortAccessTarget;
   }): Promise<PortsTargetAuthorizeResult> {
-    const bootstrapTarget = this.requireBootstrapTarget({
+    const bootstrapTarget = await this.resolveBootstrapTarget({
       sandboxInstanceId: input.sandboxInstanceId,
     });
+    if (
+      this.remoteGatewayForwarding !== undefined &&
+      bootstrapTarget.nodeId !== this.remoteGatewayForwarding.localNodeId
+    ) {
+      return this.remoteGatewayForwarding.client.authorizePortAccessTarget(
+        toGatewayForwardingTarget({
+          localNodeId: this.remoteGatewayForwarding.localNodeId,
+          target: bootstrapTarget,
+        }),
+        input,
+      );
+    }
 
+    return this.requestLocalTargetAuthorize({
+      ...input,
+      targetBootstrapSessionId: bootstrapTarget.sessionId,
+    });
+  }
+
+  public async requestLocalTargetAuthorize(input: {
+    sandboxInstanceId: string;
+    target: PortAccessTarget;
+    targetBootstrapSessionId: string;
+  }): Promise<PortsTargetAuthorizeResult> {
+    const bootstrapTarget = this.requireLocalBootstrapTarget({
+      sandboxInstanceId: input.sandboxInstanceId,
+      targetBootstrapSessionId: input.targetBootstrapSessionId,
+    });
     const requestId = randomUUID();
     const payload = JSON.stringify({
       type: "ports.target.authorize",
@@ -132,7 +165,7 @@ export class PortsTargetAuthorizeService {
     clientSessionId: string;
     request: PortsTargetAuthorize;
   }): Promise<void> {
-    const bootstrapTarget = this.requireBootstrapTarget({
+    const bootstrapTarget = this.requireLocalBootstrapTarget({
       sandboxInstanceId: input.sandboxInstanceId,
     });
     const forwardedRequestId = randomUUID();
@@ -343,12 +376,34 @@ export class PortsTargetAuthorizeService {
     }
   }
 
-  private requireBootstrapTarget(input: { sandboxInstanceId: string }): RelayTarget {
+  private async resolveBootstrapTarget(input: { sandboxInstanceId: string }): Promise<RelayTarget> {
+    const bootstrapTarget = await this.relayCoordinator.resolveBootstrapPeer({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+    if (bootstrapTarget === undefined) {
+      throw new BootstrapTunnelNotConnectedError(input.sandboxInstanceId);
+    }
+
+    return bootstrapTarget;
+  }
+
+  private requireLocalBootstrapTarget(input: {
+    sandboxInstanceId: string;
+    targetBootstrapSessionId?: string;
+  }): RelayTarget {
     const bootstrapTarget = this.relayCoordinator.getBootstrapPeer({
       sandboxInstanceId: input.sandboxInstanceId,
     });
     if (bootstrapTarget === undefined) {
       throw new BootstrapTunnelNotConnectedError(input.sandboxInstanceId);
+    }
+    if (
+      input.targetBootstrapSessionId !== undefined &&
+      bootstrapTarget.sessionId !== input.targetBootstrapSessionId
+    ) {
+      throw new Error(
+        `Resolved bootstrap session is no longer current for sandbox '${input.sandboxInstanceId}'.`,
+      );
     }
 
     return bootstrapTarget;
@@ -364,4 +419,15 @@ export class PortsTargetAuthorizeService {
       })?.sessionId === input.sourceBootstrapSessionId
     );
   }
+}
+
+function toGatewayForwardingTarget(input: {
+  localNodeId: string;
+  target: RelayTarget;
+}): GatewayForwardingTarget {
+  return {
+    sourceNodeId: input.localNodeId,
+    targetNodeId: input.target.nodeId,
+    targetBootstrapSessionId: input.target.sessionId,
+  };
 }

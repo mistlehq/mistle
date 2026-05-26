@@ -5,6 +5,7 @@
 import { randomUUID } from "node:crypto";
 import { request as httpRequest, type IncomingHttpHeaders } from "node:http";
 
+import { closeValkeyClient, connectValkeyClient, createValkeyClient } from "@mistle/cache";
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import { derivePortAccessHost, mintPortAccessBootstrapToken } from "@mistle/port-access-auth";
@@ -23,6 +24,7 @@ import {
   sendWebSocketMessage,
   waitForWebSocketMessage,
 } from "../integration/websocket-test-helpers.js";
+import { ValkeySandboxRuntimeAttachmentStore } from "../src/runtime-state/adapters/valkey-sandbox-runtime-attachment-store.js";
 
 type GatewayHttpResponse = {
   body: string;
@@ -37,11 +39,35 @@ const PortAccessTokenSecret = "integration-new-port-access-secret";
 const PortAccessTokenIssuer = "integration-new-control-plane-api";
 const PortAccessBaseDomain = "mistle.localhost";
 const PortAccessTokenAudience = GatewayTokenAudience;
+const FirstGatewayId = "data-plane-gateway-a";
+const SecondGatewayId = "data-plane-gateway-b";
 const TestTimeoutMs = 40_000;
 
 const it = createIntegrationTest({
   services: ["data-plane-api", "data-plane-gateway"],
 });
+const distributedIt = createIntegrationTest({
+  services: [
+    "data-plane-api",
+    { id: FirstGatewayId, service: "data-plane-gateway", mode: "runtime" },
+    { id: SecondGatewayId, service: "data-plane-gateway", mode: "runtime" },
+  ],
+  extraInfra: ["nats"],
+  __dangerouslyIsolatedServices: {
+    reason: "This suite starts two gateway runtime instances for distributed Port Access coverage.",
+    services: [FirstGatewayId, SecondGatewayId],
+  },
+  __serviceOptions: {
+    dataPlaneGateway: {
+      gatewayRelay: {
+        backend: "nats",
+        namePrefix: "port-access-bootstrap-integration",
+      },
+    },
+  },
+});
+
+type GatewayHttpService = Pick<IntegrationTestEnvironment["dataPlaneGateway"], "hostBaseUrl">;
 
 describe.concurrent("port access bootstrap integration", () => {
   it(
@@ -55,6 +81,7 @@ describe.concurrent("port access bootstrap integration", () => {
       });
       const bootstrapSocket = await connectBootstrapSocket({
         env,
+        gateway: env.dataPlaneGateway,
         sandboxInstanceId,
       });
       const bootstrap = await mintPortAccessBootstrap({
@@ -65,6 +92,7 @@ describe.concurrent("port access bootstrap integration", () => {
       try {
         const responsePromise = sendGatewayHttpRequest({
           env,
+          gateway: env.dataPlaneGateway,
           path: createBootstrapPath(bootstrap),
           headers: {
             host: bootstrap.host,
@@ -123,6 +151,7 @@ describe.concurrent("port access bootstrap integration", () => {
 
     const response = await sendGatewayHttpRequest({
       env,
+      gateway: env.dataPlaneGateway,
       path: createBootstrapPath(bootstrap),
       headers: {
         host: mismatchedHost,
@@ -136,6 +165,7 @@ describe.concurrent("port access bootstrap integration", () => {
   it("rejects invalid bootstrap tokens", async ({ env }) => {
     const response = await sendGatewayHttpRequest({
       env,
+      gateway: env.dataPlaneGateway,
       path: "/_mistle/access/bootstrap?token=not-a-valid-token",
       headers: {
         host: deriveAccessHost({
@@ -152,6 +182,7 @@ describe.concurrent("port access bootstrap integration", () => {
   it("rejects bootstrap requests without the token query parameter", async ({ env }) => {
     const response = await sendGatewayHttpRequest({
       env,
+      gateway: env.dataPlaneGateway,
       path: "/_mistle/access/bootstrap",
       headers: {
         host: deriveAccessHost({
@@ -176,6 +207,7 @@ describe.concurrent("port access bootstrap integration", () => {
       });
       const bootstrapSocket = await connectBootstrapSocket({
         env,
+        gateway: env.dataPlaneGateway,
         sandboxInstanceId,
       });
       const bootstrap = await mintPortAccessBootstrap({
@@ -186,6 +218,7 @@ describe.concurrent("port access bootstrap integration", () => {
       try {
         const responsePromise = sendGatewayHttpRequest({
           env,
+          gateway: env.dataPlaneGateway,
           path: createBootstrapPath(bootstrap),
           headers: {
             host: bootstrap.host,
@@ -217,6 +250,216 @@ describe.concurrent("port access bootstrap integration", () => {
   );
 });
 
+describe.concurrent("distributed port access bootstrap integration", () => {
+  distributedIt(
+    "authorizes a Port Access bootstrap request through a gateway that does not own the sandbox tunnel",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const port = 5173;
+      const ownerGateway = env.httpService(FirstGatewayId);
+      const accessGateway = env.httpService(SecondGatewayId);
+      await insertSandboxInstanceRow({
+        env,
+        sandboxInstanceId,
+      });
+      const bootstrapSocket = await connectBootstrapSocket({
+        env,
+        gateway: ownerGateway,
+        sandboxInstanceId,
+      });
+      const bootstrap = await mintPortAccessBootstrap({
+        sandboxInstanceId,
+        port,
+      });
+
+      try {
+        const responsePromise = sendGatewayHttpRequest({
+          env,
+          gateway: accessGateway,
+          path: createBootstrapPath(bootstrap),
+          headers: {
+            host: bootstrap.host,
+          },
+        });
+        void responsePromise.catch(() => undefined);
+
+        const authorizeRequest = JSON.parse(
+          String((await waitForWebSocketMessage(bootstrapSocket, { timeoutMs: 6_000 })).data),
+        );
+        expect(authorizeRequest).toEqual({
+          type: "ports.target.authorize",
+          requestId: expect.any(String),
+          target: {
+            kind: "port",
+            port,
+          },
+        });
+
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "ports.target.authorize.result",
+            requestId: authorizeRequest.requestId,
+            authorized: true,
+            upstreamProtocol: "http",
+            websocketCapable: false,
+          }),
+        );
+
+        const response = await responsePromise;
+
+        expect(response.status).toBe(302);
+        expect(response.headers.location).toBe("/");
+
+        const setCookie = readSetCookieHeader(response);
+        expect(setCookie).toContain("mistle_port_access_session=");
+      } finally {
+        await closeIfOpen(bootstrapSocket);
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  distributedIt(
+    "continues processing distributed authorizations while another remote authorization is pending",
+    async ({ env }) => {
+      const firstSandboxInstanceId = typeid("sbi").toString();
+      const secondSandboxInstanceId = typeid("sbi").toString();
+      const port = 5173;
+      const ownerGateway = env.httpService(FirstGatewayId);
+      const accessGateway = env.httpService(SecondGatewayId);
+      await insertSandboxInstanceRow({
+        env,
+        sandboxInstanceId: firstSandboxInstanceId,
+      });
+      await insertSandboxInstanceRow({
+        env,
+        sandboxInstanceId: secondSandboxInstanceId,
+      });
+      const firstBootstrapSocket = await connectBootstrapSocket({
+        env,
+        gateway: ownerGateway,
+        sandboxInstanceId: firstSandboxInstanceId,
+      });
+      const secondBootstrapSocket = await connectBootstrapSocket({
+        env,
+        gateway: ownerGateway,
+        sandboxInstanceId: secondSandboxInstanceId,
+      });
+      const firstBootstrap = await mintPortAccessBootstrap({
+        sandboxInstanceId: firstSandboxInstanceId,
+        port,
+      });
+      const secondBootstrap = await mintPortAccessBootstrap({
+        sandboxInstanceId: secondSandboxInstanceId,
+        port,
+      });
+
+      try {
+        const firstResponsePromise = sendGatewayHttpRequest({
+          env,
+          gateway: accessGateway,
+          path: createBootstrapPath(firstBootstrap),
+          headers: {
+            host: firstBootstrap.host,
+          },
+        });
+        void firstResponsePromise.catch(() => undefined);
+
+        const firstAuthorizeRequest = JSON.parse(
+          String((await waitForWebSocketMessage(firstBootstrapSocket, { timeoutMs: 6_000 })).data),
+        );
+        expect(firstAuthorizeRequest).toEqual({
+          type: "ports.target.authorize",
+          requestId: expect.any(String),
+          target: {
+            kind: "port",
+            port,
+          },
+        });
+
+        const secondResponsePromise = sendGatewayHttpRequest({
+          env,
+          gateway: accessGateway,
+          path: createBootstrapPath(secondBootstrap),
+          headers: {
+            host: secondBootstrap.host,
+          },
+        });
+
+        const secondAuthorizeRequest = JSON.parse(
+          String((await waitForWebSocketMessage(secondBootstrapSocket, { timeoutMs: 2_000 })).data),
+        );
+        expect(secondAuthorizeRequest).toEqual({
+          type: "ports.target.authorize",
+          requestId: expect.any(String),
+          target: {
+            kind: "port",
+            port,
+          },
+        });
+
+        await sendWebSocketMessage(
+          secondBootstrapSocket,
+          JSON.stringify({
+            type: "ports.target.authorize.result",
+            requestId: secondAuthorizeRequest.requestId,
+            authorized: true,
+            upstreamProtocol: "http",
+            websocketCapable: false,
+          }),
+        );
+
+        const secondResponse = await secondResponsePromise;
+        expect(secondResponse.status).toBe(302);
+        expect(secondResponse.headers.location).toBe("/");
+
+        const firstResponse = await firstResponsePromise;
+        expect(firstResponse.status).toBe(502);
+        expect(firstResponse.body).toBe("Port Access authorization failed.");
+      } finally {
+        await closeIfOpen(secondBootstrapSocket);
+        await closeIfOpen(firstBootstrapSocket);
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  distributedIt(
+    "returns a bootstrap failure when the recorded owner gateway is unavailable",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const port = 5173;
+      const accessGateway = env.httpService(SecondGatewayId);
+      await insertSandboxInstanceRow({
+        env,
+        sandboxInstanceId,
+      });
+      await recordStaleBootstrapAttachment({
+        env,
+        sandboxInstanceId,
+      });
+      const bootstrap = await mintPortAccessBootstrap({
+        sandboxInstanceId,
+        port,
+      });
+
+      const response = await sendGatewayHttpRequest({
+        env,
+        gateway: accessGateway,
+        path: createBootstrapPath(bootstrap),
+        headers: {
+          host: bootstrap.host,
+        },
+      });
+
+      expect(response.status).toBe(502);
+      expect(response.body).toBe("Port Access authorization failed.");
+    },
+    TestTimeoutMs,
+  );
+});
+
 async function insertSandboxInstanceRow(input: {
   env: IntegrationTestEnvironment;
   sandboxInstanceId: string;
@@ -235,12 +478,40 @@ async function insertSandboxInstanceRow(input: {
   });
 }
 
+async function recordStaleBootstrapAttachment(input: {
+  env: IntegrationTestEnvironment;
+  sandboxInstanceId: string;
+}): Promise<void> {
+  const valkeyClient = createValkeyClient({
+    url: input.env.dataPlaneGatewayRuntimeState.valkeyUrl,
+  });
+  try {
+    await connectValkeyClient(valkeyClient);
+    const store = new ValkeySandboxRuntimeAttachmentStore(
+      valkeyClient,
+      input.env.dataPlaneGatewayRuntimeState.keyPrefix,
+    );
+    await store.upsertAttachment({
+      sandboxInstanceId: input.sandboxInstanceId,
+      ownerLeaseId: typeid("dtl").toString(),
+      nodeId: "dpg_unavailable_owner_gateway",
+      sessionId: typeid("dts").toString(),
+      attachedAtMs: Date.now(),
+      nowMs: Date.now(),
+      ttlMs: 30_000,
+    });
+  } finally {
+    await closeValkeyClient(valkeyClient);
+  }
+}
+
 function sendGatewayHttpRequest(input: {
   env: IntegrationTestEnvironment;
+  gateway: GatewayHttpService;
   path: string;
   headers: Record<string, string>;
 }): Promise<GatewayHttpResponse> {
-  const url = new URL(input.path, input.env.dataPlaneGateway.hostBaseUrl);
+  const url = new URL(input.path, input.gateway.hostBaseUrl);
 
   return new Promise((resolve, reject) => {
     const request = httpRequest(
@@ -274,10 +545,11 @@ function sendGatewayHttpRequest(input: {
 
 async function connectBootstrapSocket(input: {
   env: IntegrationTestEnvironment;
+  gateway: GatewayHttpService;
   sandboxInstanceId: string;
 }): Promise<WebSocket> {
   return await connectSandboxTunnelWebSocket({
-    websocketBaseUrl: createWebSocketBaseUrl(input.env.dataPlaneGateway.hostBaseUrl),
+    websocketBaseUrl: createWebSocketBaseUrl(input.gateway.hostBaseUrl),
     sandboxInstanceId: input.sandboxInstanceId,
     tokenKind: "bootstrap",
     token: await mintBootstrapToken({

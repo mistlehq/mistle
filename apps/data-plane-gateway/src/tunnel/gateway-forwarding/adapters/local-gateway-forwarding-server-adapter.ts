@@ -2,6 +2,8 @@ import { BootstrapTunnelNotConnectedError } from "../../bootstrap-tunnel-not-con
 import { TunnelSessionRegistry } from "../../tunnel-session/index.js";
 import type { GatewayForwardingServerAdapter } from "../gateway-forwarding-server-adapter.js";
 import type {
+  AuthorizePortAccessTargetInput,
+  AuthorizePortAccessTargetResult,
   CloseInteractiveStreamInput,
   FindInteractiveStreamByClientInput,
   FindInteractiveStreamByTunnelInput,
@@ -16,7 +18,13 @@ import type {
  * Owner-local forwarding server adapter backed by the tunnel session registry.
  */
 export class LocalGatewayForwardingServerAdapter implements GatewayForwardingServerAdapter {
-  public constructor(private readonly tunnelSessionRegistry: TunnelSessionRegistry) {}
+  public constructor(
+    private readonly tunnelSessionRegistry: TunnelSessionRegistry,
+    private readonly authorizePortAccessTargetHandler?: (
+      target: GatewayForwardingTarget,
+      input: AuthorizePortAccessTargetInput,
+    ) => Promise<AuthorizePortAccessTargetResult>,
+  ) {}
 
   public async openInteractiveStream(
     target: GatewayForwardingTarget,
@@ -112,6 +120,18 @@ export class LocalGatewayForwardingServerAdapter implements GatewayForwardingSer
       bootstrapTarget,
       releasedBindings: this.tunnelSessionRegistry.releaseClientSessionBindings(input),
     };
+  }
+
+  public async authorizePortAccessTarget(
+    target: GatewayForwardingTarget,
+    input: AuthorizePortAccessTargetInput,
+  ): Promise<AuthorizePortAccessTargetResult> {
+    if (this.authorizePortAccessTargetHandler === undefined) {
+      throw new Error("Port Access target authorization handler is not configured.");
+    }
+
+    this.requireBootstrapTarget(target, input.sandboxInstanceId);
+    return this.authorizePortAccessTargetHandler(target, input);
   }
 
   private getMatchingBootstrapTarget(target: GatewayForwardingTarget, sandboxInstanceId: string) {

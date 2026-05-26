@@ -216,6 +216,13 @@ export class TunnelRelayCoordinator {
     return this.peerResolver.resolveSessionPeer(input);
   }
 
+  public async resolveBootstrapPeer(input: {
+    sandboxInstanceId: string;
+    targetSessionId?: string;
+  }): Promise<RelayTarget | undefined> {
+    return this.peerResolver.resolveBootstrapPeer(input);
+  }
+
   public async closePeer(input: {
     target: RelayTarget;
     closeCode: number;

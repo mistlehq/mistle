@@ -1,6 +1,8 @@
 import type { GatewayForwardingClientAdapter } from "../gateway-forwarding-client-adapter.js";
 import type { GatewayForwardingServerAdapter } from "../gateway-forwarding-server-adapter.js";
 import type {
+  AuthorizePortAccessTargetInput,
+  AuthorizePortAccessTargetResult,
   CloseInteractiveStreamInput,
   FindInteractiveStreamByClientInput,
   FindInteractiveStreamByTunnelInput,
@@ -58,6 +60,14 @@ export class LocalGatewayForwardingClientAdapter implements GatewayForwardingCli
   ): Promise<ReleaseClientSessionStreamsResult> {
     this.assertLocalTarget(target);
     return this.gatewayForwardingServer.releaseClientSessionStreams(target, input);
+  }
+
+  public async authorizePortAccessTarget(
+    target: GatewayForwardingTarget,
+    input: AuthorizePortAccessTargetInput,
+  ): Promise<AuthorizePortAccessTargetResult> {
+    this.assertLocalTarget(target);
+    return this.gatewayForwardingServer.authorizePortAccessTarget(target, input);
   }
 
   private assertLocalTarget(target: GatewayForwardingTarget): void {

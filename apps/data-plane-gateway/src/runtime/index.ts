@@ -36,7 +36,11 @@ import { PtyTransportService } from "../pty/pty-transport-service.js";
 import { registerPtyTransportRoutes } from "../pty/register-pty-transport-routes.js";
 import { createPortAccessNodeEntrypoint } from "../publishing/port-access-node-entrypoint.js";
 import { PortAccessTransportService } from "../publishing/port-access-transport.js";
-import { PortsTargetAuthorizeService } from "../publishing/ports-target-authorize-service.js";
+import {
+  PortsTargetAuthorizeBootstrapDisconnectedError,
+  PortsTargetAuthorizeService,
+  PortsTargetAuthorizeTimedOutError,
+} from "../publishing/ports-target-authorize-service.js";
 import { registerPortAccessRoutes } from "../publishing/register-port-access-routes.js";
 import { createAttachmentBackedActiveBootstrapSessionStore } from "../runtime-state/active-bootstrap-session-store.js";
 import { InMemorySandboxKeepaliveStore } from "../runtime-state/adapters/in-memory-sandbox-keepalive-store.js";
@@ -48,11 +52,16 @@ import { ValkeySandboxPresenceStore } from "../runtime-state/adapters/valkey-san
 import { ValkeySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/valkey-sandbox-runtime-attachment-store.js";
 import { ValkeySandboxRuntimeReadinessStore } from "../runtime-state/adapters/valkey-sandbox-runtime-readiness-store.js";
 import { installPortAccessUpgradeEntrypoint, startServer } from "../server.js";
+import { BootstrapTunnelNotConnectedError } from "../tunnel/bootstrap-tunnel-not-connected-error.js";
 import { LocalGatewayForwardingClientAdapter } from "../tunnel/gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
 import { LocalGatewayForwardingServerAdapter } from "../tunnel/gateway-forwarding/adapters/local-gateway-forwarding-server-adapter.js";
 import { NatsGatewayForwardingAdapter } from "../tunnel/gateway-forwarding/adapters/nats-gateway-forwarding-adapter.js";
 import type { GatewayForwardingClientAdapter } from "../tunnel/gateway-forwarding/gateway-forwarding-client-adapter.js";
 import { InteractiveStreamRouter } from "../tunnel/gateway-forwarding/index.js";
+import {
+  GatewayForwardingPortAccessAuthorizationError,
+  GatewayForwardingPortAccessAuthorizationErrorCodes,
+} from "../tunnel/gateway-forwarding/types.js";
 import { InMemoryLocalPeerRegistryAdapter } from "../tunnel/local-peer-registry/adapters/in-memory-local-peer-registry-adapter.js";
 import { LocalRelayPeerResolver } from "../tunnel/local-peer-registry/local-relay-peer-resolver.js";
 import { SandboxOperationIngressService } from "../tunnel/operation-ingress/index.js";
@@ -149,6 +158,34 @@ async function closeWebSocketServer(webSocketServer: WebSocketServer): Promise<v
       resolve();
     });
   });
+}
+
+function toGatewayForwardingPortAccessAuthorizationError(
+  error: unknown,
+): GatewayForwardingPortAccessAuthorizationError {
+  if (error instanceof GatewayForwardingPortAccessAuthorizationError) {
+    return error;
+  }
+  if (error instanceof BootstrapTunnelNotConnectedError) {
+    return new GatewayForwardingPortAccessAuthorizationError(
+      GatewayForwardingPortAccessAuthorizationErrorCodes.BOOTSTRAP_NOT_CONNECTED,
+      error.message,
+    );
+  }
+  if (error instanceof PortsTargetAuthorizeTimedOutError) {
+    return new GatewayForwardingPortAccessAuthorizationError(
+      GatewayForwardingPortAccessAuthorizationErrorCodes.TARGET_AUTHORIZE_TIMED_OUT,
+      error.message,
+    );
+  }
+  if (error instanceof PortsTargetAuthorizeBootstrapDisconnectedError) {
+    return new GatewayForwardingPortAccessAuthorizationError(
+      GatewayForwardingPortAccessAuthorizationErrorCodes.BOOTSTRAP_DISCONNECTED,
+      error.message,
+    );
+  }
+
+  throw error;
 }
 
 function createGatewayRelayRuntimeResources(input: {
@@ -335,7 +372,20 @@ export function createDataPlaneGatewayRuntime(
   const tunnelSessionRegistry = new TunnelSessionRegistry(
     new InMemoryTunnelSessionRegistryAdapter(DefaultMaxActiveBindingsPerSandbox),
   );
-  const gatewayForwardingServer = new LocalGatewayForwardingServerAdapter(tunnelSessionRegistry);
+  let portsTargetAuthorizeService: PortsTargetAuthorizeService;
+  const gatewayForwardingServer = new LocalGatewayForwardingServerAdapter(
+    tunnelSessionRegistry,
+    async (target, input) => {
+      try {
+        return await portsTargetAuthorizeService.requestLocalTargetAuthorize({
+          ...input,
+          targetBootstrapSessionId: target.targetBootstrapSessionId,
+        });
+      } catch (error) {
+        throw toGatewayForwardingPortAccessAuthorizationError(error);
+      }
+    },
+  );
   const relayResources = createGatewayRelayRuntimeResources({
     activeBootstrapSessionStore,
     config: config.app.gatewayRelay,
@@ -349,10 +399,10 @@ export function createDataPlaneGatewayRuntime(
     sandboxOwnerResolver,
     gatewayForwardingClient,
   );
-  const portsTargetAuthorizeService = new PortsTargetAuthorizeService(
-    relayCoordinator,
-    systemScheduler,
-  );
+  portsTargetAuthorizeService = new PortsTargetAuthorizeService(relayCoordinator, systemScheduler, {
+    client: gatewayForwardingClient,
+    localNodeId: nodeId,
+  });
   const portAccessTransportService = new PortAccessTransportService(
     relayCoordinator,
     tunnelSessionRegistry,

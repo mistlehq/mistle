@@ -11,6 +11,7 @@ import {
 import type { Clock } from "@mistle/time";
 
 import { BootstrapTunnelNotConnectedError } from "../tunnel/bootstrap-tunnel-not-connected-error.js";
+import { GatewayForwardingPortAccessAuthorizationError } from "../tunnel/gateway-forwarding/types.js";
 import {
   createPortAccessSessionSetCookieHeader,
   type PortAccessSessionConfig,
@@ -182,7 +183,8 @@ export async function bootstrapPortAccess(input: {
     if (
       error instanceof BootstrapTunnelNotConnectedError ||
       error instanceof PortsTargetAuthorizeTimedOutError ||
-      error instanceof PortsTargetAuthorizeBootstrapDisconnectedError
+      error instanceof PortsTargetAuthorizeBootstrapDisconnectedError ||
+      error instanceof GatewayForwardingPortAccessAuthorizationError
     ) {
       return {
         kind: "failure",
