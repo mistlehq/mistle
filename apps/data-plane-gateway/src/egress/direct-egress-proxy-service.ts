@@ -81,7 +81,20 @@ export type DirectEgressWebSocketUpstream = {
 };
 
 type DirectEgressLogFields = {
+  authInjectionTarget?: string;
+  authInjectionType?: string;
   authority?: string;
+  bindingId?: string;
+  routeCredentialConnectionId?: string;
+  routeCredentialKind?: string;
+  routeCredentialMistleMcpApiKeyId?: string;
+  routeCredentialMistleMcpSandboxProfileId?: string;
+  routeCredentialMistleMcpSandboxProfileVersion?: number;
+  routeCredentialProviderFamily?: string;
+  routeCredentialResolverKind?: string;
+  routeCredentialResolverKey?: string;
+  routeCredentialSecretType?: string;
+  routeCredentialSlotKey?: string;
   durationMs?: number;
   egressRuleId?: string;
   event: string;
@@ -786,7 +799,7 @@ function directEgressLogFieldsForAdmission(input: {
   return {
     authority: input.admission.request.authority,
     ...(input.admission.kind === "managed"
-      ? { egressRuleId: input.admission.classification.route.egressRuleId }
+      ? directEgressManagedRouteLogFields(input.admission.classification.route)
       : {}),
     event: input.event,
     host: input.admission.targetUrl.hostname,
@@ -796,5 +809,87 @@ function directEgressLogFieldsForAdmission(input: {
     sandboxInstanceId: input.admission.token.sub,
     scheme: input.admission.request.scheme,
     transport: input.transport,
+  };
+}
+
+function directEgressManagedRouteLogFields(
+  route: Extract<GatewayEgressRouteClassification, { kind: "matched" }>["route"],
+): Omit<
+  DirectEgressLogFields,
+  | "authority"
+  | "event"
+  | "host"
+  | "method"
+  | "path"
+  | "routeMode"
+  | "sandboxInstanceId"
+  | "scheme"
+  | "transport"
+> {
+  return {
+    authInjectionType: route.authInjection.type,
+    ...(route.authInjection.type === "aws_sigv4"
+      ? {}
+      : { authInjectionTarget: route.authInjection.target }),
+    bindingId: route.bindingId,
+    egressRuleId: route.egressRuleId,
+    ...directEgressCredentialResolverLogFields(route.credentialResolver),
+  };
+}
+
+function directEgressCredentialResolverLogFields(
+  credentialResolver: Extract<
+    GatewayEgressRouteClassification,
+    { kind: "matched" }
+  >["route"]["credentialResolver"],
+): Pick<
+  DirectEgressLogFields,
+  | "routeCredentialConnectionId"
+  | "routeCredentialKind"
+  | "routeCredentialMistleMcpApiKeyId"
+  | "routeCredentialMistleMcpSandboxProfileId"
+  | "routeCredentialMistleMcpSandboxProfileVersion"
+  | "routeCredentialProviderFamily"
+  | "routeCredentialResolverKind"
+  | "routeCredentialResolverKey"
+  | "routeCredentialSecretType"
+  | "routeCredentialSlotKey"
+> {
+  if (credentialResolver.kind === "integration_connection") {
+    return {
+      routeCredentialConnectionId: credentialResolver.connectionId,
+      routeCredentialResolverKind: credentialResolver.kind,
+      ...(credentialResolver.resolverKey === undefined
+        ? {}
+        : { routeCredentialResolverKey: credentialResolver.resolverKey }),
+      routeCredentialSecretType: credentialResolver.secretType,
+      ...(credentialResolver.slotKey === undefined
+        ? {}
+        : { routeCredentialSlotKey: credentialResolver.slotKey }),
+    };
+  }
+
+  if (credentialResolver.kind === "mistle_mcp_token") {
+    return {
+      routeCredentialMistleMcpApiKeyId: credentialResolver.apiKeyId,
+      routeCredentialResolverKind: credentialResolver.kind,
+    };
+  }
+
+  if (credentialResolver.kind === "mistle_mcp_setup_assistant_token") {
+    return {
+      routeCredentialMistleMcpSandboxProfileId: credentialResolver.sandboxProfileId,
+      routeCredentialMistleMcpSandboxProfileVersion: credentialResolver.sandboxProfileVersion,
+      routeCredentialResolverKind: credentialResolver.kind,
+    };
+  }
+
+  return {
+    routeCredentialConnectionId: credentialResolver.integrationConnectionId,
+    ...(credentialResolver.credentialKind === undefined
+      ? {}
+      : { routeCredentialKind: credentialResolver.credentialKind }),
+    routeCredentialProviderFamily: credentialResolver.providerFamily,
+    routeCredentialResolverKind: credentialResolver.kind,
   };
 }

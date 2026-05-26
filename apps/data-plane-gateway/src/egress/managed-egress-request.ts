@@ -88,6 +88,28 @@ type CredentialResolverRef =
       sandboxProfileVersion: number;
     };
 
+type CredentialResolutionLogFields = {
+  bindingId: string;
+  cacheResult?: "hit" | "miss" | "refresh_skew_expired";
+  credentialCacheSource?: "cache" | "resolved";
+  credentialExpiresAt?: string;
+  credentialKind?: string;
+  credentialResolvedKind?: CachedCredential["kind"];
+  credentialResolverKind: CredentialResolverInput["credentialResolverKind"];
+  credentialConnectionId?: string;
+  credentialMistleMcpApiKeyId?: string;
+  credentialMistleMcpSandboxProfileId?: string;
+  credentialMistleMcpSandboxProfileVersion?: number;
+  credentialProviderFamily?: string;
+  credentialResolverKey?: string;
+  credentialSecretType?: string;
+  credentialSlotKey?: string;
+  integrationConnectionId?: string;
+  organizationId?: string;
+  sandboxInstanceId?: string;
+  testEnvironmentId?: string;
+};
+
 export class GatewayManagedEgressUnsupportedRouteError extends Error {
   public constructor(
     message: string,
@@ -754,6 +776,21 @@ async function resolveCredentialWithCache(input: {
   });
   const cacheLookup = await input.credentialCache.getWithResult(cacheKey);
   if (cacheLookup.credential !== undefined) {
+    logger.info(
+      {
+        ...createCredentialResolutionLogFields({
+          bindingId: input.bindingId,
+          resolver: input.resolver,
+          ...(input.testEnvironmentId === undefined
+            ? {}
+            : { testEnvironmentId: input.testEnvironmentId }),
+        }),
+        cacheResult: cacheLookup.result,
+        credentialCacheSource: "cache",
+        ...createResolvedCredentialLogFields(cacheLookup.credential),
+      },
+      "Resolved gateway managed egress credential from cache",
+    );
     return cacheLookup.credential;
   }
 
@@ -838,7 +875,96 @@ async function resolveCredentialWithCache(input: {
   }
 
   await input.credentialCache.set(cacheKey, resolvedCredential);
+  logger.info(
+    {
+      ...createCredentialResolutionLogFields({
+        bindingId: input.bindingId,
+        resolver: input.resolver,
+        ...(input.testEnvironmentId === undefined
+          ? {}
+          : { testEnvironmentId: input.testEnvironmentId }),
+      }),
+      cacheResult: cacheLookup.result,
+      credentialCacheSource: "resolved",
+      ...createResolvedCredentialLogFields(resolvedCredential),
+    },
+    "Resolved gateway managed egress credential",
+  );
   return resolvedCredential;
+}
+
+function createResolvedCredentialLogFields(
+  credential: CachedCredential,
+): Pick<CredentialResolutionLogFields, "credentialExpiresAt" | "credentialResolvedKind"> {
+  return {
+    credentialResolvedKind: credential.kind,
+    ...(credential.expiresAt === undefined ? {} : { credentialExpiresAt: credential.expiresAt }),
+  };
+}
+
+function createCredentialResolutionLogFields(input: {
+  bindingId: string;
+  resolver: CredentialResolverInput;
+  testEnvironmentId?: string;
+}): CredentialResolutionLogFields {
+  if (input.resolver.credentialResolverKind === "integration_connection") {
+    return {
+      bindingId: input.bindingId,
+      credentialConnectionId: input.resolver.connectionId,
+      credentialResolverKind: input.resolver.credentialResolverKind,
+      ...(input.resolver.resolverKey === undefined
+        ? {}
+        : { credentialResolverKey: input.resolver.resolverKey }),
+      credentialSecretType: input.resolver.secretType,
+      ...(input.resolver.slotKey === undefined
+        ? {}
+        : { credentialSlotKey: input.resolver.slotKey }),
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
+    };
+  }
+
+  if (input.resolver.credentialResolverKind === "mistle_mcp_token") {
+    return {
+      bindingId: input.bindingId,
+      credentialMistleMcpApiKeyId: input.resolver.apiKeyId,
+      credentialResolverKind: input.resolver.credentialResolverKind,
+      organizationId: input.resolver.organizationId,
+      sandboxInstanceId: input.resolver.sandboxInstanceId,
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
+    };
+  }
+
+  if (input.resolver.credentialResolverKind === "mistle_mcp_setup_assistant_token") {
+    return {
+      bindingId: input.bindingId,
+      credentialMistleMcpSandboxProfileId: input.resolver.sandboxProfileId,
+      credentialMistleMcpSandboxProfileVersion: input.resolver.sandboxProfileVersion,
+      credentialResolverKind: input.resolver.credentialResolverKind,
+      organizationId: input.resolver.organizationId,
+      sandboxInstanceId: input.resolver.sandboxInstanceId,
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
+    };
+  }
+
+  return {
+    bindingId: input.bindingId,
+    ...(input.resolver.credentialKind === undefined
+      ? {}
+      : { credentialKind: input.resolver.credentialKind }),
+    credentialProviderFamily: input.resolver.providerFamily,
+    credentialResolverKind: input.resolver.credentialResolverKind,
+    integrationConnectionId: input.resolver.integrationConnectionId,
+    organizationId: input.resolver.organizationId,
+    ...(input.testEnvironmentId === undefined
+      ? {}
+      : { testEnvironmentId: input.testEnvironmentId }),
+  };
 }
 
 async function resolveCredentialWithFallback(input: {
