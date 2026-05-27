@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import type { NatsConnection, Subscription } from "@nats-io/transport-node";
 import { WebSocket } from "ws";
 import { z } from "zod";
@@ -13,6 +15,10 @@ import type { RelayTransportAdapter } from "../relay-transport-adapter.js";
 
 const TextDecoderInstance = new TextDecoder();
 const TextEncoderInstance = new TextEncoder();
+const MaxDirectNatsRelayEncodedBytes = 900_000;
+const MaxChunkPayloadBytes = 512 * 1024;
+const MaxReassembledPayloadBytes = 64 * 1024 * 1024;
+const ReassemblyTimeoutMs = 30_000;
 
 const RelayTargetSchema = z
   .object({
@@ -52,11 +58,35 @@ const WireRelayEnvelopeSchema = z.discriminatedUnion("kind", [
       closeReason: z.string(),
     })
     .strict(),
+  z
+    .object({
+      kind: z.literal("frame_chunk"),
+      target: RelayTargetSchema,
+      messageId: z.string().min(1),
+      payloadKind: z.enum(["text", "binary"]),
+      chunkIndex: z.number().int().min(0),
+      chunkCount: z.number().int().min(1),
+      originalPayloadBytes: z.number().int().min(0).max(MaxReassembledPayloadBytes),
+      value: z.string(),
+    })
+    .strict(),
 ]);
 
 type WireRelayEnvelope = z.infer<typeof WireRelayEnvelopeSchema>;
+type WireRelayFrameEnvelope = Extract<WireRelayEnvelope, { kind: "frame" }>;
+type WireRelayFrameChunkEnvelope = Extract<WireRelayEnvelope, { kind: "frame_chunk" }>;
+type WireRelayPayloadKind = WireRelayFrameChunkEnvelope["payloadKind"];
+type ReassemblyState = {
+  chunkCount: number;
+  chunks: Map<number, Uint8Array>;
+  createdAtMs: number;
+  originalPayloadBytes: number;
+  payloadKind: WireRelayPayloadKind;
+  receivedBytes: number;
+  target: RelayTarget;
+};
 
-function toRelayPayload(wirePayload: WireRelayEnvelope & { kind: "frame" }): RelayPayload {
+function toRelayPayload(wirePayload: WireRelayFrameEnvelope): RelayPayload {
   if (wirePayload.payload.kind === "text") {
     return wirePayload.payload.value;
   }
@@ -95,6 +125,7 @@ function decodeJson(data: Uint8Array): unknown {
 }
 
 export class NatsRelayTransportAdapter implements RelayTransportAdapter {
+  private readonly chunkReassemblyByKey = new Map<string, ReassemblyState>();
   private readonly socketsByPeerKey = new Map<string, RelayPeerSocket>();
   private connection: NatsConnection | undefined;
   private subscription: Subscription | undefined;
@@ -135,6 +166,7 @@ export class NatsRelayTransportAdapter implements RelayTransportAdapter {
 
     this.subscription = undefined;
     this.connection = undefined;
+    this.chunkReassemblyByKey.clear();
     await subscription.drain();
     recordGatewayRelayLifecycleEvent({
       backend: "nats",
@@ -156,6 +188,7 @@ export class NatsRelayTransportAdapter implements RelayTransportAdapter {
       return;
     }
     this.socketsByPeerKey.delete(createPeerKey(input.target));
+    this.deleteReassemblyStatesForTarget(input.target);
   }
 
   public async deliverEnvelope(envelope: RelayEnvelope): Promise<void> {
@@ -169,26 +202,26 @@ export class NatsRelayTransportAdapter implements RelayTransportAdapter {
       throw new Error("NATS relay transport adapter has not been started.");
     }
 
-    const encodedEnvelope = encodeJson(toWireEnvelope(envelope));
-    try {
-      connection.publish(this.relaySubject(envelope.target.nodeId), encodedEnvelope);
-    } catch (error) {
-      recordGatewayRelayPublishEvent({
-        backend: "nats",
-        encodedBytes: encodedEnvelope.byteLength,
+    const wireEnvelope = toWireEnvelope(envelope);
+    const encodedEnvelope = encodeJson(wireEnvelope);
+    if (envelope.kind === "frame" && encodedEnvelope.byteLength > MaxDirectNatsRelayEncodedBytes) {
+      this.publishChunkedFrameEnvelope({
+        connection,
         envelope,
-        error,
-        localNodeId: this.nodeId,
-        outcome: "failed",
       });
-      throw error;
+      recordGatewayRelayEnvelopeEvent({
+        backend: "nats",
+        direction: "published",
+        envelope,
+        localNodeId: this.nodeId,
+      });
+      return;
     }
-    recordGatewayRelayPublishEvent({
-      backend: "nats",
-      encodedBytes: encodedEnvelope.byteLength,
+
+    this.publishEncodedEnvelope({
+      connection,
+      encodedEnvelope,
       envelope,
-      localNodeId: this.nodeId,
-      outcome: "succeeded",
     });
     recordGatewayRelayEnvelopeEvent({
       backend: "nats",
@@ -198,9 +231,78 @@ export class NatsRelayTransportAdapter implements RelayTransportAdapter {
     });
   }
 
+  private publishChunkedFrameEnvelope(input: {
+    connection: NatsConnection;
+    envelope: RelayEnvelope & { kind: "frame" };
+  }): void {
+    const messageId = randomUUID();
+    const payloadDescription = describeRelayFramePayload(input.envelope.payload);
+    if (payloadDescription.bytes.byteLength > MaxReassembledPayloadBytes) {
+      throw new Error(
+        `Relay frame payload is too large for NATS chunk reassembly: ${String(payloadDescription.bytes.byteLength)} bytes exceeds ${String(MaxReassembledPayloadBytes)} bytes.`,
+      );
+    }
+
+    const chunkCount = Math.ceil(payloadDescription.bytes.byteLength / MaxChunkPayloadBytes);
+
+    for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex += 1) {
+      const start = chunkIndex * MaxChunkPayloadBytes;
+      const end = Math.min(start + MaxChunkPayloadBytes, payloadDescription.bytes.byteLength);
+      const wireChunk: WireRelayFrameChunkEnvelope = {
+        kind: "frame_chunk",
+        target: input.envelope.target,
+        messageId,
+        payloadKind: payloadDescription.payloadKind,
+        chunkIndex,
+        chunkCount,
+        originalPayloadBytes: payloadDescription.bytes.byteLength,
+        value: Buffer.from(payloadDescription.bytes.subarray(start, end)).toString("base64"),
+      };
+
+      this.publishEncodedEnvelope({
+        connection: input.connection,
+        encodedEnvelope: encodeJson(wireChunk),
+        envelope: input.envelope,
+      });
+    }
+  }
+
+  private publishEncodedEnvelope(input: {
+    connection: NatsConnection;
+    encodedEnvelope: Uint8Array;
+    envelope: RelayEnvelope;
+  }): void {
+    try {
+      input.connection.publish(
+        this.relaySubject(input.envelope.target.nodeId),
+        input.encodedEnvelope,
+      );
+    } catch (error) {
+      recordGatewayRelayPublishEvent({
+        backend: "nats",
+        encodedBytes: input.encodedEnvelope.byteLength,
+        envelope: input.envelope,
+        error,
+        localNodeId: this.nodeId,
+        outcome: "failed",
+      });
+      throw error;
+    }
+    recordGatewayRelayPublishEvent({
+      backend: "nats",
+      encodedBytes: input.encodedEnvelope.byteLength,
+      envelope: input.envelope,
+      localNodeId: this.nodeId,
+      outcome: "succeeded",
+    });
+  }
+
   private async processSubscription(subscription: Subscription): Promise<void> {
     for await (const message of subscription) {
       const envelope = this.decodeEnvelope(message.data);
+      if (envelope === undefined) {
+        continue;
+      }
       recordGatewayRelayEnvelopeEvent({
         backend: "nats",
         direction: "received",
@@ -211,10 +313,13 @@ export class NatsRelayTransportAdapter implements RelayTransportAdapter {
     }
   }
 
-  private decodeEnvelope(data: Uint8Array): RelayEnvelope {
+  private decodeEnvelope(data: Uint8Array): RelayEnvelope | undefined {
     const parsed = WireRelayEnvelopeSchema.parse(decodeJson(data));
     if (parsed.kind === "close") {
       return parsed;
+    }
+    if (parsed.kind === "frame_chunk") {
+      return this.receiveFrameChunk(parsed);
     }
 
     return {
@@ -222,6 +327,83 @@ export class NatsRelayTransportAdapter implements RelayTransportAdapter {
       target: parsed.target,
       payload: toRelayPayload(parsed),
     };
+  }
+
+  private receiveFrameChunk(chunk: WireRelayFrameChunkEnvelope): RelayEnvelope | undefined {
+    this.deleteExpiredReassemblyStates();
+
+    if (chunk.chunkIndex >= chunk.chunkCount) {
+      return undefined;
+    }
+
+    const key = createChunkReassemblyKey(chunk);
+    const existing = this.chunkReassemblyByKey.get(key);
+    const state =
+      existing ??
+      ({
+        chunkCount: chunk.chunkCount,
+        chunks: new Map<number, Uint8Array>(),
+        createdAtMs: Date.now(),
+        originalPayloadBytes: chunk.originalPayloadBytes,
+        payloadKind: chunk.payloadKind,
+        receivedBytes: 0,
+        target: chunk.target,
+      } satisfies ReassemblyState);
+
+    if (!isCompatibleChunkState(state, chunk)) {
+      this.chunkReassemblyByKey.delete(key);
+      return undefined;
+    }
+    if (state.chunks.has(chunk.chunkIndex)) {
+      return undefined;
+    }
+
+    const chunkBytes = Buffer.from(chunk.value, "base64");
+    const nextReceivedBytes = state.receivedBytes + chunkBytes.byteLength;
+    if (nextReceivedBytes > state.originalPayloadBytes) {
+      this.chunkReassemblyByKey.delete(key);
+      return undefined;
+    }
+
+    state.chunks.set(
+      chunk.chunkIndex,
+      new Uint8Array(
+        chunkBytes.buffer.slice(
+          chunkBytes.byteOffset,
+          chunkBytes.byteOffset + chunkBytes.byteLength,
+        ),
+      ),
+    );
+    state.receivedBytes = nextReceivedBytes;
+    this.chunkReassemblyByKey.set(key, state);
+
+    if (state.chunks.size !== state.chunkCount) {
+      return undefined;
+    }
+
+    this.chunkReassemblyByKey.delete(key);
+    return {
+      kind: "frame",
+      target: state.target,
+      payload: reassemblePayload(state),
+    };
+  }
+
+  private deleteExpiredReassemblyStates(): void {
+    const cutoffMs = Date.now() - ReassemblyTimeoutMs;
+    for (const [key, state] of this.chunkReassemblyByKey) {
+      if (state.createdAtMs < cutoffMs) {
+        this.chunkReassemblyByKey.delete(key);
+      }
+    }
+  }
+
+  private deleteReassemblyStatesForTarget(target: RelayTarget): void {
+    for (const [key, state] of this.chunkReassemblyByKey) {
+      if (isSameRelayTarget(state.target, target)) {
+        this.chunkReassemblyByKey.delete(key);
+      }
+    }
   }
 
   private deliverLocalEnvelope(envelope: RelayEnvelope): void {
@@ -282,4 +464,66 @@ export class NatsRelayTransportAdapter implements RelayTransportAdapter {
 
 function createPeerKey(target: RelayTarget): string {
   return `${target.side}:${target.sessionId}`;
+}
+
+function createChunkReassemblyKey(chunk: WireRelayFrameChunkEnvelope): string {
+  return `${createPeerKey(chunk.target)}:${chunk.messageId}`;
+}
+
+function describeRelayFramePayload(payload: RelayPayload): {
+  bytes: Uint8Array;
+  payloadKind: WireRelayPayloadKind;
+} {
+  if (typeof payload === "string") {
+    return {
+      bytes: TextEncoderInstance.encode(payload),
+      payloadKind: "text",
+    };
+  }
+
+  return {
+    bytes: new Uint8Array(payload),
+    payloadKind: "binary",
+  };
+}
+
+function isCompatibleChunkState(
+  state: ReassemblyState,
+  chunk: WireRelayFrameChunkEnvelope,
+): boolean {
+  return (
+    state.chunkCount === chunk.chunkCount &&
+    state.originalPayloadBytes === chunk.originalPayloadBytes &&
+    state.payloadKind === chunk.payloadKind &&
+    isSameRelayTarget(state.target, chunk.target)
+  );
+}
+
+function isSameRelayTarget(left: RelayTarget, right: RelayTarget): boolean {
+  return (
+    left.nodeId === right.nodeId &&
+    left.sandboxInstanceId === right.sandboxInstanceId &&
+    left.sessionId === right.sessionId &&
+    left.side === right.side
+  );
+}
+
+function reassemblePayload(state: ReassemblyState): RelayPayload {
+  const payload = new Uint8Array(state.originalPayloadBytes);
+  let offset = 0;
+
+  for (let chunkIndex = 0; chunkIndex < state.chunkCount; chunkIndex += 1) {
+    const chunk = state.chunks.get(chunkIndex);
+    if (chunk === undefined) {
+      throw new Error("Cannot reassemble relay payload with a missing chunk.");
+    }
+    payload.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  if (state.payloadKind === "text") {
+    return TextDecoderInstance.decode(payload);
+  }
+
+  return payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength);
 }
