@@ -627,6 +627,104 @@ describe.concurrent("control-plane worker schedule dispatch child batches", () =
     );
   });
 
+  it("redispatches a stale failed Tensorlake snapshot refresh enqueue", async ({ env }) => {
+    await seedSnapshotRefreshScheduledAction({
+      env,
+      organizationId: "org_integration_new_schedule_batch_tensorlake_retry",
+      profileId: "sbp_integration_new_schedule_batch_tensorlake_retry",
+      profileVersion: 1,
+      scheduleId: "sch_integration_new_schedule_batch_tensorlake_retry",
+      scheduledActionId: "sca_integration_new_schedule_batch_tensorlake_retry",
+      sandboxProvider: "tensorlake",
+      sandboxVcpuCount: 2,
+      sandboxMemoryMb: 4096,
+      sandboxStorageMb: 8192,
+      maintenanceScript: "echo maintain",
+      snapshotImageProvider: "tensorlake",
+      snapshotImageId: "tensorlake:snapshot:stale-refresh-retry",
+      scheduledActionStatus: ScheduledActionStatuses.DISPATCHING,
+      dispatchClaimKey: "schedule-dispatch-batch:previous-child",
+      dispatchingAt: "2026-04-28T00:30:00.000Z",
+    });
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionSnapshotJobs)
+      .values({
+        id: "ssj_integration_new_schedule_batch_tensorlake_retry",
+        sandboxProfileId: "sbp_integration_new_schedule_batch_tensorlake_retry",
+        sandboxProfileVersion: 1,
+        sandboxInstanceId: "sbi_integration_new_schedule_batch_tensorlake_retry",
+        trigger: SandboxProfileVersionSnapshotJobTriggers.SCHEDULED_REFRESH,
+        state: SandboxProfileVersionSnapshotJobStates.FAILED,
+        sourceScheduledActionId: "sca_integration_new_schedule_batch_tensorlake_retry",
+        workflowRunId: null,
+        errorCode: "snapshot_materialization_enqueue_failed",
+        errorMessage: "previous enqueue failed",
+        finishedAt: "2026-04-28T00:31:00.000Z",
+      });
+
+    const result = await dispatchScheduledAction(createDispatchContext(env), {
+      scheduledActionId: "sca_integration_new_schedule_batch_tensorlake_retry",
+      dispatchClaimKey: "schedule-dispatch-batch:integration-new-tensorlake-retry",
+      staleDispatchingBefore: new Date("2026-04-28T01:00:00.000Z"),
+    });
+
+    expect(result).toEqual({
+      scheduledActionId: "sca_integration_new_schedule_batch_tensorlake_retry",
+      status: "dispatched",
+    });
+
+    const snapshotJob = await env.controlPlaneDb.query.sandboxProfileVersionSnapshotJobs.findFirst({
+      where: (table, { eq }) => eq(table.id, "ssj_integration_new_schedule_batch_tensorlake_retry"),
+    });
+    expect(snapshotJob).toEqual(
+      expect.objectContaining({
+        state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+        errorCode: null,
+        errorMessage: null,
+        finishedAt: null,
+      }),
+    );
+
+    const snapshotWorkflowRun = await readDataPlaneWorkflowRunByIdempotencyKey(env, {
+      workflowName: MaterializeSandboxProfileVersionSnapshotWorkflowSpec.name,
+      idempotencyKey: JSON.stringify({
+        version: 1,
+        snapshotJobId: "ssj_integration_new_schedule_batch_tensorlake_retry",
+      }),
+    });
+    expect(snapshotWorkflowRun).toEqual(
+      expect.objectContaining({
+        workflow_name: MaterializeSandboxProfileVersionSnapshotWorkflowSpec.name,
+        input: expect.objectContaining({
+          snapshotPreparationScriptKind: "maintenance",
+          image: expect.objectContaining({
+            imageId: "tensorlake:snapshot:stale-refresh-retry",
+            kind: "snapshot",
+            provider: "tensorlake",
+          }),
+          sandboxRuntime: {
+            provider: "tensorlake",
+            resources: {
+              vcpuCount: 2,
+              memoryMb: 4096,
+              storageMb: 8192,
+            },
+          },
+        }),
+      }),
+    );
+
+    const persistedAction = await env.controlPlaneDb.query.scheduledActions.findFirst({
+      where: (table, { eq }) => eq(table.id, "sca_integration_new_schedule_batch_tensorlake_retry"),
+    });
+    expect(persistedAction).toEqual(
+      expect.objectContaining({
+        status: ScheduledActionStatuses.DISPATCHED,
+        targetWorkflowId: expect.any(String),
+      }),
+    );
+  });
+
   it("assigns a sandbox instance id when dispatching a queued scheduled snapshot job created before the column existed", async ({
     env,
   }) => {
@@ -780,8 +878,16 @@ async function seedSnapshotRefreshScheduledAction(input: {
   profileVersion: number;
   scheduleId: string;
   scheduledActionId: string;
+  sandboxProvider?: "docker" | "e2b" | "tensorlake";
+  sandboxVcpuCount?: number | null;
+  sandboxMemoryMb?: number | null;
+  sandboxStorageMb?: number | null;
   maintenanceScript?: string | null;
+  snapshotImageProvider?: "docker" | "e2b" | "tensorlake" | null;
   snapshotImageId?: string | null;
+  scheduledActionStatus?: (typeof ScheduledActionStatuses)[keyof typeof ScheduledActionStatuses];
+  dispatchClaimKey?: string | null;
+  dispatchingAt?: string | null;
 }): Promise<void> {
   await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.organizations).values({
     id: input.organizationId,
@@ -799,14 +905,17 @@ async function seedSnapshotRefreshScheduledAction(input: {
     .values({
       sandboxProfileId: input.profileId,
       version: input.profileVersion,
-      sandboxProvider: "docker",
+      sandboxProvider: input.sandboxProvider ?? "docker",
       sandboxConnectionId: null,
-      sandboxVcpuCount: null,
-      sandboxMemoryMb: null,
-      sandboxStorageMb: null,
+      sandboxVcpuCount: input.sandboxVcpuCount ?? null,
+      sandboxMemoryMb: input.sandboxMemoryMb ?? null,
+      sandboxStorageMb: input.sandboxStorageMb ?? null,
       ...(input.maintenanceScript === undefined
         ? {}
         : { maintenanceScript: input.maintenanceScript }),
+      ...(input.snapshotImageProvider === undefined
+        ? {}
+        : { snapshotImageProvider: input.snapshotImageProvider }),
       ...(input.snapshotImageId === undefined ? {} : { snapshotImageId: input.snapshotImageId }),
     });
   await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.schedules).values({
@@ -831,7 +940,9 @@ async function seedSnapshotRefreshScheduledAction(input: {
     scheduledAt: "2026-04-28T01:00:00.000Z",
     localScheduledDate: "2026-04-28",
     localScheduledTime: "09:00",
-    status: ScheduledActionStatuses.PENDING,
+    status: input.scheduledActionStatus ?? ScheduledActionStatuses.PENDING,
+    dispatchClaimKey: input.dispatchClaimKey,
+    dispatchingAt: input.dispatchingAt,
   });
 }
 

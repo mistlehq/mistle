@@ -31,6 +31,7 @@ type SnapshotRefreshJob = Readonly<{
   sandboxProfileVersion: number;
   workflowRunId: string | null;
   state: string;
+  errorCode: string | null;
 }>;
 
 type SnapshotRefreshJobResolution = Readonly<{
@@ -41,7 +42,7 @@ type SnapshotRefreshJobResolution = Readonly<{
 function assertScheduledSnapshotSandboxProvider(
   provider: string | null,
 ): SandboxRuntimeProviderInput["provider"] {
-  if (provider === "docker" || provider === "e2b") {
+  if (provider === "docker" || provider === "e2b" || provider === "tensorlake") {
     return provider;
   }
 
@@ -59,7 +60,7 @@ export async function dispatchSnapshotRefreshScheduledAction(
   input: ScheduleDispatchTargetHandlerInput,
 ): Promise<ScheduleDispatchTargetHandlerResult> {
   const targetPayload = SnapshotRefreshTargetPayloadSchema.parse(input.targetPayload);
-  const snapshotJobResolution = await createOrResolveSnapshotRefreshJob(ctx, {
+  let snapshotJobResolution = await createOrResolveSnapshotRefreshJob(ctx, {
     scheduledActionId: input.scheduledActionId,
     sandboxProfileId: targetPayload.sandboxProfileId,
     sandboxProfileVersion: targetPayload.sandboxProfileVersion,
@@ -68,25 +69,43 @@ export async function dispatchSnapshotRefreshScheduledAction(
 
   if (snapshotJob.state !== SandboxProfileVersionSnapshotJobStates.QUEUED) {
     if (snapshotJobResolution.kind === "source_existing" && snapshotJob.workflowRunId === null) {
-      throw new Error(
-        `Snapshot job '${snapshotJob.id}' for scheduled action '${input.scheduledActionId}' is ${snapshotJob.state} without a workflow handoff.`,
-      );
+      if (
+        snapshotJob.state === SandboxProfileVersionSnapshotJobStates.FAILED &&
+        snapshotJob.errorCode === "snapshot_materialization_enqueue_failed"
+      ) {
+        await requeueFailedSnapshotJobWithoutWorkflowHandoff(ctx, {
+          snapshotJobId: snapshotJob.id,
+        });
+        snapshotJobResolution = {
+          ...snapshotJobResolution,
+          job: {
+            ...snapshotJob,
+            state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+            errorCode: null,
+          },
+        };
+      } else {
+        throw new Error(
+          `Snapshot job '${snapshotJob.id}' for scheduled action '${input.scheduledActionId}' is ${snapshotJob.state} without a workflow handoff.`,
+        );
+      }
+    } else {
+      return {
+        targetWorkflowId: snapshotJob.workflowRunId,
+      };
     }
-
-    return {
-      targetWorkflowId: snapshotJob.workflowRunId,
-    };
   }
 
+  const queuedSnapshotJobCandidate = snapshotJobResolution.job;
   let queuedSnapshotJob: SnapshotRefreshJob & { sandboxInstanceId: string };
-  if (snapshotJob.sandboxInstanceId === null) {
+  if (queuedSnapshotJobCandidate.sandboxInstanceId === null) {
     queuedSnapshotJob = await assignSandboxInstanceIdToQueuedSnapshotJob(ctx, {
-      snapshotJobId: snapshotJob.id,
+      snapshotJobId: queuedSnapshotJobCandidate.id,
     });
   } else {
     queuedSnapshotJob = {
-      ...snapshotJob,
-      sandboxInstanceId: snapshotJob.sandboxInstanceId,
+      ...queuedSnapshotJobCandidate,
+      sandboxInstanceId: queuedSnapshotJobCandidate.sandboxInstanceId,
     };
   }
 
@@ -266,6 +285,7 @@ async function createOrResolveSnapshotRefreshJob(
         sandboxProfileVersion: tables.sandboxProfileVersionSnapshotJobs.sandboxProfileVersion,
         workflowRunId: tables.sandboxProfileVersionSnapshotJobs.workflowRunId,
         state: tables.sandboxProfileVersionSnapshotJobs.state,
+        errorCode: tables.sandboxProfileVersionSnapshotJobs.errorCode,
       });
 
     if (snapshotJob === undefined) {
@@ -345,6 +365,7 @@ async function assignSandboxInstanceIdToQueuedSnapshotJob(
       sandboxProfileVersion: tables.sandboxProfileVersionSnapshotJobs.sandboxProfileVersion,
       workflowRunId: tables.sandboxProfileVersionSnapshotJobs.workflowRunId,
       state: tables.sandboxProfileVersionSnapshotJobs.state,
+      errorCode: tables.sandboxProfileVersionSnapshotJobs.errorCode,
     });
 
   if (snapshotJob?.sandboxInstanceId === undefined || snapshotJob.sandboxInstanceId === null) {
@@ -375,6 +396,7 @@ async function loadSnapshotJobForScheduledAction(
       sandboxProfileVersion: true,
       workflowRunId: true,
       state: true,
+      errorCode: true,
     },
     where: (table, { eq }) => eq(table.sourceScheduledActionId, input.scheduledActionId),
   });
@@ -405,6 +427,7 @@ async function loadActiveSnapshotJobForProfileVersion(
       sandboxProfileVersion: true,
       workflowRunId: true,
       state: true,
+      errorCode: true,
     },
     where: (table, { and, eq, inArray }) =>
       and(
@@ -424,6 +447,49 @@ async function loadActiveSnapshotJobForProfileVersion(
   }
 
   return snapshotJob;
+}
+
+async function requeueFailedSnapshotJobWithoutWorkflowHandoff(
+  ctx: {
+    db: ControlPlaneDatabase;
+  },
+  input: {
+    snapshotJobId: string;
+  },
+): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+  const updatedRows = await ctx.db
+    .update(tables.sandboxProfileVersionSnapshotJobs)
+    .set({
+      state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+      finishedAt: null,
+      errorCode: null,
+      errorMessage: null,
+      updatedAt: sql`now()`,
+    })
+    .where(
+      and(
+        eq(tables.sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId),
+        eq(
+          tables.sandboxProfileVersionSnapshotJobs.state,
+          SandboxProfileVersionSnapshotJobStates.FAILED,
+        ),
+        isNull(tables.sandboxProfileVersionSnapshotJobs.workflowRunId),
+        eq(
+          tables.sandboxProfileVersionSnapshotJobs.errorCode,
+          "snapshot_materialization_enqueue_failed",
+        ),
+      ),
+    )
+    .returning({
+      id: tables.sandboxProfileVersionSnapshotJobs.id,
+    });
+
+  if (updatedRows.length !== 1) {
+    throw new Error(
+      `Expected failed snapshot job '${input.snapshotJobId}' without workflow handoff to be requeued.`,
+    );
+  }
 }
 
 async function markQueuedSnapshotJobFailedToEnqueue(
