@@ -36,6 +36,9 @@ export function createRuntimeGitHubWebhookTriggerFixture(
     ...(publicAccess === undefined
       ? {}
       : {
+          registerPublicWebhookMarkerRoute: async (input) => {
+            await publicAccess.registerWebhookMarkerRoute(input);
+          },
           readPublicAccessDiagnostics: async () => await publicAccess.readDiagnostics(),
         }),
     createSessionRuntime: () =>

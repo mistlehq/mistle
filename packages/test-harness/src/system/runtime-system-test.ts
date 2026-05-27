@@ -86,7 +86,7 @@ export type RuntimeSystemTestEnvironment = {
 
 export type RuntimeSystemPublicAccess = Pick<
   RuntimePublicAccessTunnel,
-  "checkReady" | "publicBaseUrls" | "readDiagnostics"
+  "checkReady" | "publicBaseUrls" | "readDiagnostics" | "registerWebhookMarkerRoute"
 >;
 
 type SystemTestFixture = {

@@ -26,6 +26,7 @@ const RuntimePublicAccessProxyDiagnosticsLogTailBytes = 64 * 1024;
 export type RuntimePublicAccessTunnel = {
   publicBaseUrls: ReadonlyMap<string, string>;
   checkReady: (input?: RuntimePublicAccessReadinessCheckInput) => Promise<void>;
+  registerWebhookMarkerRoute: (input: RuntimePublicAccessWebhookMarkerRouteInput) => Promise<void>;
   readDiagnostics: () => Promise<unknown>;
   stop: () => Promise<void>;
 };
@@ -38,6 +39,12 @@ export type RuntimePublicAccessIngressRule = {
   publicHostname: string;
   localBaseUrl: string;
   upgradeProbePath?: string;
+};
+
+export type RuntimePublicAccessWebhookMarkerRouteInput = {
+  marker: string;
+  publicHostname: string;
+  targetPath: string;
 };
 
 export async function startRuntimeCloudflaredTunnel(input: {
@@ -83,6 +90,13 @@ export async function startRuntimeCloudflaredTunnel(input: {
         environmentId: input.environmentId,
         ingressRules: input.ingressRules,
         timeoutMs: checkInput.timeoutMs ?? RuntimePublicAccessRouteReadyTimeoutMs,
+      });
+    },
+    registerWebhookMarkerRoute: async (routeInput) => {
+      await registerRuntimePublicAccessWebhookMarkerRoute({
+        proxy,
+        environmentId: input.environmentId,
+        markerRoute: routeInput,
       });
     },
     readDiagnostics: async () => readRuntimePublicAccessProxyDiagnostics(proxy),
@@ -423,6 +437,46 @@ async function unregisterRuntimePublicAccessRoutes(input: {
       environmentId: input.environmentId,
     }),
   }).catch(() => undefined);
+}
+
+async function registerRuntimePublicAccessWebhookMarkerRoute(input: {
+  proxy: RuntimePublicAccessProxy;
+  environmentId: string;
+  markerRoute: RuntimePublicAccessWebhookMarkerRouteInput;
+}): Promise<void> {
+  const endpoint = input.proxy.endpoints.http;
+  if (endpoint === undefined) {
+    throw new Error("Runtime public access proxy did not expose an HTTP endpoint.");
+  }
+
+  const response = await fetch(new URL("/__mistle/register-webhook-marker", endpoint.hostBaseUrl), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      environmentId: input.environmentId,
+      marker: input.markerRoute.marker,
+      publicHostname: input.markerRoute.publicHostname,
+      targetPath: input.markerRoute.targetPath,
+    }),
+  });
+  if (!response.ok) {
+    const bodyPreview = await readResponseBodyPreview(response);
+    throw new Error(
+      `Runtime public access proxy webhook marker route registration failed with status ${String(response.status)}. Body: ${bodyPreview}`,
+    );
+  }
+
+  console.info(
+    JSON.stringify({
+      event: "runtime_public_access.webhook_marker_route_registered",
+      environmentId: input.environmentId,
+      marker: input.markerRoute.marker,
+      publicHostname: input.markerRoute.publicHostname,
+      targetPath: input.markerRoute.targetPath,
+    }),
+  );
 }
 
 async function waitForRuntimePublicAccessRoutesReady(input: {
@@ -886,6 +940,7 @@ if (!Number.isSafeInteger(proxyPort) || proxyPort <= 0) {
 
 const logStream = createWriteStream(logPath, { flags: "a" });
 const routes = new Map();
+const webhookMarkerRoutes = new Map();
 const recentUpgradeFailures = [];
 const server = http.createServer(dispatchRequest);
 server.on("upgrade", handleUpgrade);
@@ -1014,6 +1069,11 @@ async function handleRequest(request, response) {
             routes.delete(key);
           }
         }
+        for (const [marker, markerRoute] of webhookMarkerRoutes.entries()) {
+          if (markerRoute.environmentId === parsed.environmentId) {
+            webhookMarkerRoutes.delete(marker);
+          }
+        }
         await persistRoutes();
         logStream.write("unregistered runtime public access routes environmentId=" + parsed.environmentId + " totalRouteCount=" + String(routes.size) + "\n");
       });
@@ -1023,21 +1083,71 @@ async function handleRequest(request, response) {
     return;
   }
 
-  const target = await resolveTarget(request);
+  if (request.url === "/__mistle/register-webhook-marker" && request.method === "POST") {
+    const body = await readBody(request);
+    const parsed = JSON.parse(body);
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      typeof parsed.environmentId !== "string" ||
+      typeof parsed.marker !== "string" ||
+      typeof parsed.publicHostname !== "string" ||
+      typeof parsed.targetPath !== "string" ||
+      parsed.marker.length === 0 ||
+      parsed.publicHostname.length === 0 ||
+      !parsed.targetPath.startsWith("/") ||
+      parsed.targetPath.startsWith("//")
+    ) {
+      response.writeHead(400);
+      response.end("Invalid webhook marker route payload.");
+      return;
+    }
+
+    await mutateRoutes(async () => {
+      await loadRoutes();
+      const routeKey = createRouteKey(parsed.publicHostname, parsed.environmentId);
+      if (!routes.has(routeKey)) {
+        throw new Error("Cannot register webhook marker for missing route " + routeKey + ".");
+      }
+      webhookMarkerRoutes.set(parsed.marker, {
+        environmentId: parsed.environmentId,
+        publicHostname: parsed.publicHostname,
+        targetPath: parsed.targetPath,
+      });
+      await persistRoutes();
+      logStream.write("registered runtime public access webhook marker environmentId=" + parsed.environmentId + " publicHostname=" + parsed.publicHostname + " marker=" + parsed.marker + " totalWebhookMarkerRouteCount=" + String(webhookMarkerRoutes.size) + "\n");
+    });
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+
+  const routeContext = readRouteContext(request);
+  const bodyBuffer =
+    routeContext.host.length > 0 && routeContext.environmentId.length === 0
+      ? await readBodyBuffer(request)
+      : undefined;
+  const target = await resolveTarget(request, bodyBuffer);
   if (target === undefined) {
     response.writeHead(404);
     response.end("No runtime public access route registered.");
     return;
   }
 
-  const targetUrl = new URL(stripEnvironmentPathPrefix(request.url ?? "/"), target.localBaseUrl);
+  const targetPath = target.targetPath ?? stripEnvironmentPathPrefix(request.url ?? "/");
+  const targetUrl = new URL(targetPath, target.localBaseUrl);
+  const proxyHeaders = {
+    ...request.headers,
+    host: targetUrl.host,
+    "x-mistle-test-environment-id": target.environmentId,
+  };
+  if (bodyBuffer !== undefined) {
+    proxyHeaders["content-length"] = String(bodyBuffer.length);
+    delete proxyHeaders["transfer-encoding"];
+  }
   const proxyRequest = http.request(targetUrl, {
     method: request.method,
-    headers: {
-      ...request.headers,
-      host: targetUrl.host,
-      "x-mistle-test-environment-id": target.environmentId,
-    },
+    headers: proxyHeaders,
   }, (proxyResponse) => {
     response.writeHead(proxyResponse.statusCode ?? 502, proxyResponse.headers);
     proxyResponse.pipe(response);
@@ -1046,7 +1156,11 @@ async function handleRequest(request, response) {
     response.writeHead(502);
     response.end(error.message);
   });
-  request.pipe(proxyRequest);
+  if (bodyBuffer === undefined) {
+    request.pipe(proxyRequest);
+  } else {
+    proxyRequest.end(bodyBuffer);
+  }
 }
 
 function handleUpgrade(request, socket, head) {
@@ -1065,7 +1179,7 @@ function handleUpgrade(request, socket, head) {
 }
 
 async function handleUpgradeRequest(request, socket, head) {
-  const target = await resolveTarget(request);
+  const target = await resolveTarget(request, Buffer.alloc(0));
   if (target === undefined) {
     const routeContext = readRouteContext(request);
     recordUpgradeFailure({
@@ -1213,8 +1327,15 @@ async function buildDiagnostics() {
     cloudflaredDockerLogTail: readCloudflaredDockerLogTail(),
     routeStatePath,
     routeCount: routes.size,
+    webhookMarkerRouteCount: webhookMarkerRoutes.size,
     recentUpgradeFailures,
     routes: routeDiagnostics,
+    webhookMarkerRoutes: Array.from(webhookMarkerRoutes.entries()).map(([marker, route]) => ({
+      marker,
+      environmentId: route.environmentId,
+      publicHostname: route.publicHostname,
+      targetPath: route.targetPath,
+    })),
   };
 }
 
@@ -1256,6 +1377,7 @@ async function loadRoutes() {
   } catch (error) {
     if (typeof error === "object" && error !== null && error.code === "ENOENT") {
       routes.clear();
+      webhookMarkerRoutes.clear();
       return;
     }
     throw error;
@@ -1267,11 +1389,34 @@ async function loadRoutes() {
   }
 
   routes.clear();
+  webhookMarkerRoutes.clear();
   for (const route of parsed.routes) {
     if (typeof route !== "object" || route === null || typeof route.key !== "string" || typeof route.localBaseUrl !== "string") {
       throw new Error("Invalid runtime public access route state entry.");
     }
     routes.set(route.key, route.localBaseUrl);
+  }
+  if (parsed.webhookMarkerRoutes !== undefined) {
+    if (!Array.isArray(parsed.webhookMarkerRoutes)) {
+      throw new Error("Invalid runtime public access webhook marker route state file.");
+    }
+    for (const markerRoute of parsed.webhookMarkerRoutes) {
+      if (
+        typeof markerRoute !== "object" ||
+        markerRoute === null ||
+        typeof markerRoute.marker !== "string" ||
+        typeof markerRoute.environmentId !== "string" ||
+        typeof markerRoute.publicHostname !== "string" ||
+        typeof markerRoute.targetPath !== "string"
+      ) {
+        throw new Error("Invalid runtime public access webhook marker route state entry.");
+      }
+      webhookMarkerRoutes.set(markerRoute.marker, {
+        environmentId: markerRoute.environmentId,
+        publicHostname: markerRoute.publicHostname,
+        targetPath: markerRoute.targetPath,
+      });
+    }
   }
 }
 
@@ -1283,6 +1428,12 @@ async function persistRoutes() {
       version: 1,
       updatedAt: new Date().toISOString(),
       routes: Array.from(routes.entries()).map(([key, localBaseUrl]) => ({ key, localBaseUrl })),
+      webhookMarkerRoutes: Array.from(webhookMarkerRoutes.entries()).map(([marker, route]) => ({
+        marker,
+        environmentId: route.environmentId,
+        publicHostname: route.publicHostname,
+        targetPath: route.targetPath,
+      })),
     }),
     "utf8",
   );
@@ -1402,12 +1553,18 @@ function connectUpgradeTarget(input) {
   });
 }
 
-async function resolveTarget(request) {
+async function resolveTarget(request, bodyBuffer) {
   const routeContext = readRouteContext(request);
-  if (routeContext.host.length === 0 || routeContext.environmentId.length === 0) {
+  if (routeContext.host.length === 0) {
     return undefined;
   }
   await loadRoutes();
+  if (routeContext.environmentId.length === 0) {
+    return resolveWebhookMarkerTarget({
+      host: routeContext.host,
+      bodyText: bodyBuffer.toString("utf8"),
+    });
+  }
   const localBaseUrl = routes.get(createRouteKey(routeContext.host, routeContext.environmentId));
   if (localBaseUrl === undefined) {
     return undefined;
@@ -1416,6 +1573,27 @@ async function resolveTarget(request) {
     environmentId: routeContext.environmentId,
     localBaseUrl,
   };
+}
+
+function resolveWebhookMarkerTarget(input) {
+  for (const [marker, markerRoute] of webhookMarkerRoutes.entries()) {
+    if (markerRoute.publicHostname !== input.host || !input.bodyText.includes(marker)) {
+      continue;
+    }
+
+    const localBaseUrl = routes.get(createRouteKey(input.host, markerRoute.environmentId));
+    if (localBaseUrl === undefined) {
+      return undefined;
+    }
+
+    return {
+      environmentId: markerRoute.environmentId,
+      localBaseUrl,
+      targetPath: markerRoute.targetPath,
+    };
+  }
+
+  return undefined;
 }
 
 function readRouteContext(request) {
@@ -1462,10 +1640,14 @@ function createRouteKey(hostname, environmentId) {
 }
 
 function readBody(request) {
+  return readBodyBuffer(request).then((buffer) => buffer.toString("utf8"));
+}
+
+function readBodyBuffer(request) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     request.on("data", (chunk) => chunks.push(chunk));
-    request.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    request.on("end", () => resolve(Buffer.concat(chunks)));
     request.on("error", reject);
   });
 }

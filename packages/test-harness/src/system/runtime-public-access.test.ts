@@ -75,13 +75,25 @@ describe("createRuntimePublicAccessProxyScript", () => {
     expect(script).toContain("await persistRoutes();");
   });
 
+  it("routes public webhook requests by registered body markers", () => {
+    const script = createRuntimePublicAccessProxyScript();
+
+    expect(script).toContain('request.url === "/__mistle/register-webhook-marker"');
+    expect(script).toContain("const webhookMarkerRoutes = new Map();");
+    expect(script).toContain("function resolveWebhookMarkerTarget(input)");
+    expect(script).toContain("!input.bodyText.includes(marker)");
+    expect(script).toContain("target.targetPath ?? stripEnvironmentPathPrefix");
+    expect(script).toContain("webhookMarkerRoutes: Array.from(webhookMarkerRoutes.entries())");
+  });
+
   it("strips path-carried environment ids before forwarding to the target service", () => {
     const script = createRuntimePublicAccessProxyScript();
 
     expect(script).toContain("function stripEnvironmentPathPrefix(requestUrl)");
     expect(script).toContain(
-      'const targetUrl = new URL(stripEnvironmentPathPrefix(request.url ?? "/"), target.localBaseUrl);',
+      'const targetPath = target.targetPath ?? stripEnvironmentPathPrefix(request.url ?? "/");',
     );
+    expect(script).toContain("const targetUrl = new URL(targetPath, target.localBaseUrl);");
   });
 });
 

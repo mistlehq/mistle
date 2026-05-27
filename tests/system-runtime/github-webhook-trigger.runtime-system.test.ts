@@ -35,7 +35,7 @@ const e2bIt = createSystemTest({
   },
 });
 
-const describeIf = hasRequiredGitHubWebhookTriggerEnv() ? describe : describe.skip;
+const describeIf = hasRequiredGitHubWebhookTriggerEnv() ? describe.concurrent : describe.skip;
 
 describeIf("runtime system GitHub webhook trigger", () => {
   dockerIt(

@@ -219,6 +219,11 @@ export type GitHubWebhookTriggerFixture = {
   testContextId?: string;
   testEnvironmentId?: string;
   createSessionRuntime?: () => SandboxSessionRuntime;
+  registerPublicWebhookMarkerRoute?: (input: {
+    marker: string;
+    publicHostname: string;
+    targetPath: string;
+  }) => Promise<void>;
   readPublicAccessDiagnostics?: () => Promise<unknown>;
 };
 
@@ -343,6 +348,19 @@ function withPublicRequestTestEnvironmentId(input: {
   const url = new URL(input.url);
   url.searchParams.set("x-mistle-test-environment-id", input.testEnvironmentId);
   return url.toString();
+}
+
+function buildPublicWebhookRouterUrl(input: { publicHostname: string }): string {
+  const url = new URL(`https://${input.publicHostname}`);
+  url.pathname = "/__mistle/webhook-router/github";
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
+function toWebhookTargetPath(url: string): string {
+  const parsed = new URL(url);
+  return `${parsed.pathname}${parsed.search}`;
 }
 
 export function parseGitHubRepository(input: string): GitHubRepository {
@@ -1862,14 +1880,17 @@ async function createSharedGitHubWebhookTriggerHarness(
     });
 
     originalGitHubAppWebhookConfig = await readGitHubAppWebhookConfig();
-    const expectedWebhookCallbackUrl = withPublicRequestTestEnvironmentId({
-      url: buildIntegrationWebhookCallbackUrl({
-        controlPlaneBaseUrl: `https://${publicHostname}`,
-        targetKey: GitHubTargetKey,
-        endpointKey: githubWebhookSource.endpointKey,
-      }),
-      testEnvironmentId: fixture.testEnvironmentId,
-    });
+    const expectedWebhookCallbackUrl =
+      fixture.registerPublicWebhookMarkerRoute === undefined
+        ? withPublicRequestTestEnvironmentId({
+            url: buildIntegrationWebhookCallbackUrl({
+              controlPlaneBaseUrl: `https://${publicHostname}`,
+              targetKey: GitHubTargetKey,
+              endpointKey: githubWebhookSource.endpointKey,
+            }),
+            testEnvironmentId: fixture.testEnvironmentId,
+          })
+        : buildPublicWebhookRouterUrl({ publicHostname });
     await updateGitHubAppWebhookConfig({
       url: expectedWebhookCallbackUrl,
       ...(originalGitHubAppWebhookConfig.contentType === undefined
@@ -2125,6 +2146,20 @@ export async function startGitHubWebhookTriggerConversation(input: {
         ? {}
         : { instructions: input.triggerInstructions }),
     });
+
+    if (input.fixture.registerPublicWebhookMarkerRoute !== undefined) {
+      await input.fixture.registerPublicWebhookMarkerRoute({
+        marker: payloadMarker,
+        publicHostname,
+        targetPath: toWebhookTargetPath(
+          buildIntegrationWebhookCallbackUrl({
+            controlPlaneBaseUrl: `https://${publicHostname}`,
+            targetKey: GitHubTargetKey,
+            endpointKey: githubWebhookSource.endpointKey,
+          }),
+        ),
+      });
+    }
 
     const issue = await githubRequestJson({
       method: "POST",
