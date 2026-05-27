@@ -419,7 +419,7 @@ export const CodexFixtureMakingEditsGroupEntry: ChatSemanticGroupEntry = {
       detailKind: "code",
       command: null,
       output: [
-        "@@ -48,7 +48,7 @@",
+        "@@ -48,1 +48,1 @@",
         '- return <div className="space-y-3 rounded-xl border p-3">...</div>;',
         '+ return <div className="space-y-2">...</div>;',
       ].join("\n"),
@@ -433,7 +433,7 @@ export const CodexFixtureMakingEditsGroupEntry: ChatSemanticGroupEntry = {
       detailKind: "code",
       command: null,
       output: [
-        "@@ -0,0 +1,38 @@",
+        "@@ -0,0 +1,3 @@",
         "+export function ChatSemanticGroup({ block }: ChatSemanticGroupProps) {",
         '+  return <div className="space-y-3">...</div>;',
         "+}",

@@ -146,4 +146,37 @@ describe("ChatSemanticGroupItemOutput", () => {
       ),
     ).toBeTruthy();
   });
+
+  it("renders single-file making-edits raw source as preformatted output", () => {
+    const rawSource = [
+      "import {",
+      "  SandboxInstanceStatuses,",
+      '} from "@mistle/db/data-plane";',
+      'import { and, eq, isNull, sql } from "drizzle-orm";',
+      "",
+      "export async function markSandboxInstanceStarting(",
+      "): Promise<void> {",
+      "}",
+    ].join("\n");
+
+    const { container } = render(
+      <ChatSemanticGroupItemOutput
+        item={{
+          id: "file-change-raw-source",
+          sourceKind: "file-change",
+          label: "Updated",
+          detail:
+            "apps/data-plane-worker/openworkflow/resume-sandbox-instance/mark-sandbox-instance-starting.ts",
+          detailKind: "code",
+          command: null,
+          output: rawSource,
+          status: "completed",
+        }}
+        semanticKind="making-edits"
+      />,
+    );
+
+    expect(container.querySelector("pre")).toBeTruthy();
+    expect(screen.getByText(/markSandboxInstanceStarting/)).toBeTruthy();
+  });
 });

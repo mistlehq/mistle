@@ -2,6 +2,7 @@ import type { ChatSemanticGroupEntry, ChatSemanticGroupKind } from "../chat-type
 import { getCodeFenceLanguage, isMarkdownPath } from "../code-fence-language.js";
 import { ChatDiffView } from "./chat-diff-view.js";
 import { ChatExternalLink } from "./chat-external-link.js";
+import { canDisplaySingleFilePatch } from "./chat-file-change-diff.js";
 import { ChatMarkdownMessage } from "./chat-markdown-message.js";
 
 type ChatSemanticGroupItemOutputProps = {
@@ -220,7 +221,12 @@ export function ChatSemanticGroupItemOutput({
     return <ChatSemanticGroupProseOutput isRootOutput text={output} />;
   }
 
-  if (semanticKind === "making-edits" && item.detail !== null && !item.detail.includes(", ")) {
+  if (
+    semanticKind === "making-edits" &&
+    item.detail !== null &&
+    !item.detail.includes(", ") &&
+    canDisplaySingleFilePatch({ diff: output, path: item.detail })
+  ) {
     return <ChatDiffView diff={output} path={item.detail} />;
   }
 
