@@ -668,6 +668,9 @@ importers:
       '@mistle/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
+      '@opentelemetry/sdk-metrics':
+        specifier: ^2.7.1
+        version: 2.7.1(@opentelemetry/api@1.9.1)
       '@types/pg':
         specifier: ^8.20.0
         version: 8.20.0

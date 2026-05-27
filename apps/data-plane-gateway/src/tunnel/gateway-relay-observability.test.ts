@@ -5,6 +5,8 @@ import {
   buildGatewayForwardingPortAccessAuthorizationMetricAttributes,
   buildRelayEnvelopeLogData,
   buildRelayEnvelopeMetricAttributes,
+  buildRelayPublishLogData,
+  buildRelayPublishMetricAttributes,
   describeRelayPayload,
 } from "./gateway-relay-observability.js";
 import type { RelayEnvelope } from "./types.js";
@@ -80,6 +82,78 @@ describe("gateway relay observability", () => {
       "mistle.gateway.relay.payload_kind": "none",
       "mistle.gateway.relay.target_node_id": "gateway-b",
       "mistle.sandbox.instance_id": "sbi_observability",
+      "mistle.sandbox.tunnel.peer_side": "connection",
+      "mistle.tunnel.relay_session_id": "connection-session-1",
+    });
+  });
+
+  it("keeps relay identifiers out of publish metric attributes", () => {
+    const envelope: RelayEnvelope = {
+      kind: "frame",
+      target: {
+        nodeId: "gateway-b",
+        sandboxInstanceId: "sbi_publish_observability",
+        sessionId: "connection-session-1",
+        side: "connection",
+      },
+      payload: new Uint8Array([1, 2, 3]).buffer,
+    };
+
+    expect(
+      buildRelayPublishMetricAttributes(
+        {
+          backend: "nats",
+          envelope,
+          outcome: "failed",
+        },
+        describeRelayPayload(envelope.payload),
+      ),
+    ).toEqual({
+      "mistle.gateway.relay.backend": "nats",
+      "mistle.gateway.relay.envelope_kind": "frame",
+      "mistle.gateway.relay.payload_kind": "binary",
+      "mistle.gateway.relay.peer_side": "connection",
+      "mistle.gateway.relay.publish_outcome": "failed",
+    });
+  });
+
+  it("includes encoded payload size and relay identifiers in publish failure logs", () => {
+    const envelope: RelayEnvelope = {
+      kind: "frame",
+      target: {
+        nodeId: "gateway-b",
+        sandboxInstanceId: "sbi_publish_observability",
+        sessionId: "connection-session-1",
+        side: "connection",
+      },
+      payload: "oversized payload",
+    };
+    const error = new Error("payload max_payload size exceeded");
+
+    expect(
+      buildRelayPublishLogData(
+        {
+          backend: "nats",
+          encodedBytes: 1_048_577,
+          envelope,
+          error,
+          localNodeId: "gateway-a",
+          outcome: "failed",
+        },
+        describeRelayPayload(envelope.payload),
+      ),
+    ).toEqual({
+      eventName: "gateway.relay.publish.failed",
+      error,
+      "mistle.gateway.node_id": "gateway-a",
+      "mistle.gateway.relay.backend": "nats",
+      "mistle.gateway.relay.encoded_bytes": 1_048_577,
+      "mistle.gateway.relay.envelope_kind": "frame",
+      "mistle.gateway.relay.payload_bytes": 17,
+      "mistle.gateway.relay.payload_kind": "text",
+      "mistle.gateway.relay.publish_outcome": "failed",
+      "mistle.gateway.relay.target_node_id": "gateway-b",
+      "mistle.sandbox.instance_id": "sbi_publish_observability",
       "mistle.sandbox.tunnel.peer_side": "connection",
       "mistle.tunnel.relay_session_id": "connection-session-1",
     });

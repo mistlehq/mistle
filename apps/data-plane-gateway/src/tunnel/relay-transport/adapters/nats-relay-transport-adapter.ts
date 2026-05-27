@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   recordGatewayRelayEnvelopeEvent,
   recordGatewayRelayLifecycleEvent,
+  recordGatewayRelayPublishEvent,
   recordGatewayRelaySubscriptionFailure,
 } from "../../gateway-relay-observability.js";
 import type { RelayEnvelope, RelayPayload, RelayPeerSocket, RelayTarget } from "../../types.js";
@@ -168,10 +169,27 @@ export class NatsRelayTransportAdapter implements RelayTransportAdapter {
       throw new Error("NATS relay transport adapter has not been started.");
     }
 
-    connection.publish(
-      this.relaySubject(envelope.target.nodeId),
-      encodeJson(toWireEnvelope(envelope)),
-    );
+    const encodedEnvelope = encodeJson(toWireEnvelope(envelope));
+    try {
+      connection.publish(this.relaySubject(envelope.target.nodeId), encodedEnvelope);
+    } catch (error) {
+      recordGatewayRelayPublishEvent({
+        backend: "nats",
+        encodedBytes: encodedEnvelope.byteLength,
+        envelope,
+        error,
+        localNodeId: this.nodeId,
+        outcome: "failed",
+      });
+      throw error;
+    }
+    recordGatewayRelayPublishEvent({
+      backend: "nats",
+      encodedBytes: encodedEnvelope.byteLength,
+      envelope,
+      localNodeId: this.nodeId,
+      outcome: "succeeded",
+    });
     recordGatewayRelayEnvelopeEvent({
       backend: "nats",
       direction: "published",

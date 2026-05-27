@@ -66,6 +66,7 @@
   "devDependencies": {
     "@fast-check/vitest": "^0.4.1",
     "@mistle/test-harness": "workspace:*",
+    "@opentelemetry/sdk-metrics": "^2.7.1",
     "@types/pg": "^8.20.0",
     "@types/ws": "^8.18.1",
     "drizzle-orm": "^0.45.2"

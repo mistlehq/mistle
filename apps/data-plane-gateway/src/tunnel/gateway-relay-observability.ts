@@ -1,4 +1,4 @@
-import { metrics, type Attributes } from "@opentelemetry/api";
+import { metrics, type Attributes, type Counter, type Histogram } from "@opentelemetry/api";
 
 import { logger } from "../logger.js";
 import type { RelayEnvelope, RelayPayload, RelayPeerSide } from "./types.js";
@@ -6,6 +6,7 @@ import type { RelayEnvelope, RelayPayload, RelayPeerSide } from "./types.js";
 type GatewayRelayBackend = "memory" | "nats";
 type GatewayRelayEnvelopeDirection = "published" | "received" | "local_delivered" | "dropped";
 type GatewayRelayPayloadKind = "text" | "binary" | "none";
+type GatewayRelayPublishOutcome = "succeeded" | "failed";
 type GatewayRelayPeerLookupPeerSide = RelayPeerSide;
 type GatewayRelayPeerLookupOutcome =
   | "local_hit"
@@ -21,47 +22,65 @@ type GatewayForwardingPortAccessAuthorizationOutcome =
   | "started"
   | "error";
 
-const GatewayRelayMeter = metrics.getMeter("@mistle/data-plane-gateway/gateway-relay");
-const GatewayRelayEnvelopeEvents = GatewayRelayMeter.createCounter(
-  "mistle.gateway.relay.envelope.events",
-  {
-    description: "Gateway relay envelope events observed by the data-plane gateway.",
-  },
-);
-const GatewayRelayPayloadBytes = GatewayRelayMeter.createHistogram(
-  "mistle.gateway.relay.envelope.payload_bytes",
-  {
-    description: "Gateway relay frame payload sizes observed by the data-plane gateway.",
-    unit: "By",
-  },
-);
-const GatewayRelayPeerLookupEvents = GatewayRelayMeter.createCounter(
-  "mistle.gateway.relay.peer_lookup.events",
-  {
-    description: "Gateway relay peer lookup outcomes observed by the data-plane gateway.",
-  },
-);
-const GatewayRelaySubscriptionFailures = GatewayRelayMeter.createCounter(
-  "mistle.gateway.relay.subscription.failures",
-  {
-    description: "Gateway relay subscription task failures observed by the data-plane gateway.",
-  },
-);
-const GatewayForwardingPortAccessAuthorizationEvents = GatewayRelayMeter.createCounter(
-  "mistle.gateway.forwarding.port_access_authorization.events",
-  {
-    description:
-      "Gateway forwarding events for distributed Port Access target authorization requests.",
-  },
-);
-const GatewayForwardingPortAccessAuthorizationDuration = GatewayRelayMeter.createHistogram(
-  "mistle.gateway.forwarding.port_access_authorization.duration_ms",
-  {
-    description:
-      "Duration of distributed Port Access target authorization requests forwarded to another gateway.",
-    unit: "ms",
-  },
-);
+type GatewayRelayInstruments = {
+  envelopeEvents: Counter;
+  forwardingPortAccessAuthorizationDuration: Histogram;
+  forwardingPortAccessAuthorizationEvents: Counter;
+  payloadBytes: Histogram;
+  peerLookupEvents: Counter;
+  publishEncodedBytes: Histogram;
+  publishEvents: Counter;
+  subscriptionFailures: Counter;
+};
+
+let gatewayRelayInstruments: GatewayRelayInstruments | undefined;
+
+function getGatewayRelayInstruments(): GatewayRelayInstruments {
+  if (gatewayRelayInstruments !== undefined) {
+    return gatewayRelayInstruments;
+  }
+
+  const meter = metrics.getMeter("@mistle/data-plane-gateway/gateway-relay");
+  gatewayRelayInstruments = {
+    envelopeEvents: meter.createCounter("mistle.gateway.relay.envelope.events", {
+      description: "Gateway relay envelope events observed by the data-plane gateway.",
+    }),
+    payloadBytes: meter.createHistogram("mistle.gateway.relay.envelope.payload_bytes", {
+      description: "Gateway relay frame payload sizes observed by the data-plane gateway.",
+      unit: "By",
+    }),
+    publishEvents: meter.createCounter("mistle.gateway.relay.publish.events", {
+      description: "Gateway relay publish outcomes observed by the data-plane gateway.",
+    }),
+    publishEncodedBytes: meter.createHistogram("mistle.gateway.relay.publish.encoded_bytes", {
+      description: "Encoded gateway relay envelope sizes attempted for publish.",
+      unit: "By",
+    }),
+    peerLookupEvents: meter.createCounter("mistle.gateway.relay.peer_lookup.events", {
+      description: "Gateway relay peer lookup outcomes observed by the data-plane gateway.",
+    }),
+    subscriptionFailures: meter.createCounter("mistle.gateway.relay.subscription.failures", {
+      description: "Gateway relay subscription task failures observed by the data-plane gateway.",
+    }),
+    forwardingPortAccessAuthorizationEvents: meter.createCounter(
+      "mistle.gateway.forwarding.port_access_authorization.events",
+      {
+        description:
+          "Gateway forwarding events for distributed Port Access target authorization requests.",
+      },
+    ),
+    forwardingPortAccessAuthorizationDuration: meter.createHistogram(
+      "mistle.gateway.forwarding.port_access_authorization.duration_ms",
+      {
+        description:
+          "Duration of distributed Port Access target authorization requests forwarded to another gateway.",
+        unit: "ms",
+      },
+    ),
+  };
+
+  return gatewayRelayInstruments;
+}
 
 const TextEncoderInstance = new TextEncoder();
 
@@ -96,9 +115,10 @@ export function recordGatewayRelayEnvelopeEvent(input: {
           payloadBytes: 0,
           payloadKind: "none",
         };
-  GatewayRelayEnvelopeEvents.add(1, buildRelayEnvelopeMetricAttributes(input, payloadDescription));
+  const instruments = getGatewayRelayInstruments();
+  instruments.envelopeEvents.add(1, buildRelayEnvelopeMetricAttributes(input, payloadDescription));
   if (input.envelope.kind === "frame") {
-    GatewayRelayPayloadBytes.record(
+    instruments.payloadBytes.record(
       payloadDescription.payloadBytes,
       buildRelayEnvelopePayloadMetricAttributes(input, payloadDescription),
     );
@@ -114,6 +134,36 @@ export function recordGatewayRelayEnvelopeEvent(input: {
   );
 }
 
+export function recordGatewayRelayPublishEvent(input: {
+  backend: GatewayRelayBackend;
+  encodedBytes: number;
+  envelope: RelayEnvelope;
+  error?: unknown;
+  localNodeId: string;
+  outcome: GatewayRelayPublishOutcome;
+}): void {
+  const payloadDescription: { payloadBytes: number; payloadKind: GatewayRelayPayloadKind } =
+    input.envelope.kind === "frame"
+      ? describeRelayPayload(input.envelope.payload)
+      : {
+          payloadBytes: 0,
+          payloadKind: "none",
+        };
+  const attributes = buildRelayPublishMetricAttributes(input, payloadDescription);
+  const instruments = getGatewayRelayInstruments();
+  instruments.publishEvents.add(1, attributes);
+  instruments.publishEncodedBytes.record(input.encodedBytes, attributes);
+
+  if (input.outcome === "succeeded") {
+    return;
+  }
+
+  logger.warn(
+    buildRelayPublishLogData(input, payloadDescription),
+    "Gateway relay envelope publish failed",
+  );
+}
+
 export function recordGatewayRelayPeerLookupEvent(input: {
   backend: GatewayRelayBackend;
   localNodeId: string;
@@ -123,7 +173,7 @@ export function recordGatewayRelayPeerLookupEvent(input: {
   sessionId?: string;
   targetNodeId?: string;
 }): void {
-  GatewayRelayPeerLookupEvents.add(1, buildPeerLookupMetricAttributes(input));
+  getGatewayRelayInstruments().peerLookupEvents.add(1, buildPeerLookupMetricAttributes(input));
 
   if (
     input.outcome === "local_hit" ||
@@ -177,7 +227,7 @@ export function recordGatewayRelaySubscriptionFailure(input: {
   localNodeId: string;
   subscriptionKind: string;
 }): void {
-  GatewayRelaySubscriptionFailures.add(1, {
+  getGatewayRelayInstruments().subscriptionFailures.add(1, {
     "mistle.gateway.relay.backend": input.backend,
     "mistle.gateway.relay.subscription_kind": input.subscriptionKind,
   });
@@ -205,12 +255,13 @@ export function recordGatewayForwardingPortAccessAuthorizationEvent(input: {
   sourceNodeId: string;
   targetNodeId: string;
 }): void {
-  GatewayForwardingPortAccessAuthorizationEvents.add(
+  const instruments = getGatewayRelayInstruments();
+  instruments.forwardingPortAccessAuthorizationEvents.add(
     1,
     buildGatewayForwardingPortAccessAuthorizationMetricAttributes(input),
   );
   if (input.durationMs !== undefined) {
-    GatewayForwardingPortAccessAuthorizationDuration.record(
+    instruments.forwardingPortAccessAuthorizationDuration.record(
       input.durationMs,
       buildGatewayForwardingPortAccessAuthorizationMetricAttributes(input),
     );
@@ -318,6 +369,51 @@ export function buildGatewayForwardingPortAccessAuthorizationLogData(input: {
       : {
           "mistle.gateway.forwarding.rejection_reason": input.rejectionReason,
         }),
+  };
+}
+
+export function buildRelayPublishMetricAttributes(
+  input: {
+    backend: GatewayRelayBackend;
+    envelope: RelayEnvelope;
+    outcome: GatewayRelayPublishOutcome;
+  },
+  payloadDescription: { payloadBytes: number; payloadKind: GatewayRelayPayloadKind },
+): Attributes {
+  return {
+    "mistle.gateway.relay.backend": input.backend,
+    "mistle.gateway.relay.envelope_kind": input.envelope.kind,
+    "mistle.gateway.relay.payload_kind": payloadDescription.payloadKind,
+    "mistle.gateway.relay.peer_side": input.envelope.target.side,
+    "mistle.gateway.relay.publish_outcome": input.outcome,
+  };
+}
+
+export function buildRelayPublishLogData(
+  input: {
+    backend: GatewayRelayBackend;
+    encodedBytes: number;
+    envelope: RelayEnvelope;
+    error?: unknown;
+    localNodeId: string;
+    outcome: GatewayRelayPublishOutcome;
+  },
+  payloadDescription: { payloadBytes: number; payloadKind: GatewayRelayPayloadKind },
+): Record<string, unknown> {
+  return {
+    eventName: "gateway.relay.publish.failed",
+    error: input.error,
+    "mistle.gateway.node_id": input.localNodeId,
+    "mistle.gateway.relay.backend": input.backend,
+    "mistle.gateway.relay.encoded_bytes": input.encodedBytes,
+    "mistle.gateway.relay.envelope_kind": input.envelope.kind,
+    "mistle.gateway.relay.payload_bytes": payloadDescription.payloadBytes,
+    "mistle.gateway.relay.payload_kind": payloadDescription.payloadKind,
+    "mistle.gateway.relay.publish_outcome": input.outcome,
+    "mistle.gateway.relay.target_node_id": input.envelope.target.nodeId,
+    "mistle.sandbox.instance_id": input.envelope.target.sandboxInstanceId,
+    "mistle.sandbox.tunnel.peer_side": input.envelope.target.side,
+    "mistle.tunnel.relay_session_id": input.envelope.target.sessionId,
   };
 }
 
