@@ -917,6 +917,7 @@ const DiagnosticsLogTailBytes = 64 * 1024;
 const DiagnosticsLocalOriginProbeTimeoutMs = 2_000;
 const UpgradeTargetConnectRetryIntervalMs = 100;
 const UpgradeTargetConnectTimeoutMs = 10_000;
+const WebhookMarkerRouterPath = "/__mistle/webhook-router/github";
 const tunnelId = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_TUNNEL_ID");
 const tunnelCredentialsJson = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_TUNNEL_CREDENTIALS_JSON");
 const ownerPid = Number(readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_OWNER_PID"));
@@ -1124,7 +1125,7 @@ async function handleRequest(request, response) {
 
   const routeContext = readRouteContext(request);
   const bodyBuffer =
-    routeContext.host.length > 0 && routeContext.environmentId.length === 0
+    isWebhookMarkerRouterRequest(routeContext)
       ? await readBodyBuffer(request)
       : undefined;
   const target = await resolveTarget(request, bodyBuffer);
@@ -1560,6 +1561,9 @@ async function resolveTarget(request, bodyBuffer) {
   }
   await loadRoutes();
   if (routeContext.environmentId.length === 0) {
+    if (bodyBuffer === undefined) {
+      return undefined;
+    }
     return resolveWebhookMarkerTarget({
       host: routeContext.host,
       bodyText: bodyBuffer.toString("utf8"),
@@ -1605,6 +1609,10 @@ function readRouteContext(request) {
     environmentId,
     requestUrl,
   };
+}
+
+function isWebhookMarkerRouterRequest(routeContext) {
+  return routeContext.host.length > 0 && routeContext.environmentId.length === 0 && routeContext.requestUrl.pathname === WebhookMarkerRouterPath;
 }
 
 function readEnvironmentIdFromPath(requestPath) {

@@ -79,7 +79,9 @@ describe("createRuntimePublicAccessProxyScript", () => {
     const script = createRuntimePublicAccessProxyScript();
 
     expect(script).toContain('request.url === "/__mistle/register-webhook-marker"');
+    expect(script).toContain('const WebhookMarkerRouterPath = "/__mistle/webhook-router/github";');
     expect(script).toContain("const webhookMarkerRoutes = new Map();");
+    expect(script).toContain("isWebhookMarkerRouterRequest(routeContext)");
     expect(script).toContain("function resolveWebhookMarkerTarget(input)");
     expect(script).toContain("!input.bodyText.includes(marker)");
     expect(script).toContain("target.targetPath ?? stripEnvironmentPathPrefix");
