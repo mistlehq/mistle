@@ -21,6 +21,7 @@ import { NatsRelayTransportAdapter } from "../src/tunnel/relay-transport/adapter
 import type { RelayEnvelope, RelayPeerSocket, RelayTarget } from "../src/tunnel/types.js";
 
 const OversizedBinaryPayload = new Uint8Array(900_000).buffer;
+const OversizedTextPayload = "Mistle tunnel relay 🌐 ".repeat(60_000);
 const TooLargeForReassemblyPayload = new Uint8Array(64 * 1024 * 1024 + 1).buffer;
 const TextEncoderInstance = new TextEncoder();
 
@@ -36,7 +37,7 @@ type WebSocketPair = {
   serverSocket: WebSocket;
 };
 
-describe("NatsRelayTransportAdapter publish observability", () => {
+describe("NatsRelayTransportAdapter", () => {
   let exporter: InMemoryMetricExporter;
   let meterProvider: MeterProvider | undefined;
   let reader: PeriodicExportingMetricReader;
@@ -171,6 +172,58 @@ describe("NatsRelayTransportAdapter publish observability", () => {
     }
   }, 30_000);
 
+  it("delivers oversized text relay frames through chunked NATS messages", async () => {
+    const nats = await startNats();
+    const pair = await createWebSocketPair();
+    let senderConnection: NatsConnection | undefined;
+    let receiverConnection: NatsConnection | undefined;
+    let sender: NatsRelayTransportAdapter | undefined;
+    let receiver: NatsRelayTransportAdapter | undefined;
+
+    try {
+      senderConnection = await connect({
+        servers: nats.url,
+      });
+      receiverConnection = await connect({
+        servers: nats.url,
+      });
+      sender = new NatsRelayTransportAdapter("gateway-a", "integration-chunked-text-relay");
+      receiver = new NatsRelayTransportAdapter("gateway-b", "integration-chunked-text-relay");
+      sender.start(senderConnection);
+      receiver.start(receiverConnection);
+      await senderConnection.flush();
+      await receiverConnection.flush();
+
+      const target = createRelayTarget({
+        nodeId: "gateway-b",
+      });
+      receiver.registerLocalPeer({
+        target,
+        socket: pair.peerSocket,
+      });
+
+      const receivedPromise = waitForWebSocketMessage(pair.clientSocket);
+      await sender.deliverEnvelope({
+        kind: "frame",
+        target,
+        payload: OversizedTextPayload,
+      });
+      const received = await receivedPromise;
+
+      expect(received).toEqual({
+        data: OversizedTextPayload,
+        isBinary: false,
+      });
+    } finally {
+      await sender?.stop();
+      await receiver?.stop();
+      await senderConnection?.close();
+      await receiverConnection?.close();
+      await pair.closeAll();
+      await nats.stop();
+    }
+  }, 30_000);
+
   it("rejects frames above the reassembly limit before publishing chunks", async () => {
     const nats = await startNats();
     let connection: NatsConnection | undefined;
@@ -200,6 +253,180 @@ describe("NatsRelayTransportAdapter publish observability", () => {
     } finally {
       await adapter?.stop();
       await connection?.close();
+      await nats.stop();
+    }
+  }, 30_000);
+
+  it("reassembles out-of-order chunks while ignoring duplicate chunks", async () => {
+    const nats = await startNats();
+    const pair = await createWebSocketPair();
+    let connection: NatsConnection | undefined;
+    let receiver: NatsRelayTransportAdapter | undefined;
+
+    try {
+      connection = await connect({
+        servers: nats.url,
+      });
+      const subjectPrefix = "integration-out-of-order-chunks";
+      receiver = new NatsRelayTransportAdapter("gateway-b", subjectPrefix);
+      receiver.start(connection);
+      await connection.flush();
+
+      const target = createRelayTarget({
+        nodeId: "gateway-b",
+      });
+      receiver.registerLocalPeer({
+        target,
+        socket: pair.peerSocket,
+      });
+
+      const receivedPromise = waitForWebSocketMessage(pair.clientSocket);
+      const payload = new Uint8Array([1, 2, 3, 4, 5]);
+      publishFrameChunk({
+        connection,
+        subjectPrefix,
+        target,
+        messageId: "out-of-order-message",
+        payloadKind: "binary",
+        chunkIndex: 2,
+        chunkCount: 3,
+        originalPayloadBytes: payload.byteLength,
+        value: payload.subarray(4, 5),
+      });
+      publishFrameChunk({
+        connection,
+        subjectPrefix,
+        target,
+        messageId: "out-of-order-message",
+        payloadKind: "binary",
+        chunkIndex: 0,
+        chunkCount: 3,
+        originalPayloadBytes: payload.byteLength,
+        value: payload.subarray(0, 2),
+      });
+      publishFrameChunk({
+        connection,
+        subjectPrefix,
+        target,
+        messageId: "out-of-order-message",
+        payloadKind: "binary",
+        chunkIndex: 0,
+        chunkCount: 3,
+        originalPayloadBytes: payload.byteLength,
+        value: payload.subarray(0, 2),
+      });
+      publishFrameChunk({
+        connection,
+        subjectPrefix,
+        target,
+        messageId: "out-of-order-message",
+        payloadKind: "binary",
+        chunkIndex: 1,
+        chunkCount: 3,
+        originalPayloadBytes: payload.byteLength,
+        value: payload.subarray(2, 4),
+      });
+      await connection.flush();
+
+      const received = await receivedPromise;
+      expect(received.isBinary).toBe(true);
+      if (typeof received.data === "string") {
+        throw new Error("Expected binary websocket message.");
+      }
+      expect(received.data.equals(Buffer.from(payload))).toBe(true);
+    } finally {
+      await receiver?.stop();
+      await connection?.close();
+      await pair.closeAll();
+      await nats.stop();
+    }
+  }, 30_000);
+
+  it("drops incompatible chunk sequences without stopping the relay subscription", async () => {
+    const nats = await startNats();
+    const pair = await createWebSocketPair();
+    let senderConnection: NatsConnection | undefined;
+    let receiverConnection: NatsConnection | undefined;
+    let sender: NatsRelayTransportAdapter | undefined;
+    let receiver: NatsRelayTransportAdapter | undefined;
+
+    try {
+      senderConnection = await connect({
+        servers: nats.url,
+      });
+      receiverConnection = await connect({
+        servers: nats.url,
+      });
+      const subjectPrefix = "integration-incompatible-chunks";
+      sender = new NatsRelayTransportAdapter("gateway-a", subjectPrefix);
+      receiver = new NatsRelayTransportAdapter("gateway-b", subjectPrefix);
+      sender.start(senderConnection);
+      receiver.start(receiverConnection);
+      await senderConnection.flush();
+      await receiverConnection.flush();
+
+      const target = createRelayTarget({
+        nodeId: "gateway-b",
+      });
+      receiver.registerLocalPeer({
+        target,
+        socket: pair.peerSocket,
+      });
+
+      publishFrameChunk({
+        connection: receiverConnection,
+        subjectPrefix,
+        target,
+        messageId: "incompatible-message",
+        payloadKind: "binary",
+        chunkIndex: 0,
+        chunkCount: 2,
+        originalPayloadBytes: 3,
+        value: new Uint8Array([1]),
+      });
+      publishFrameChunk({
+        connection: receiverConnection,
+        subjectPrefix,
+        target,
+        messageId: "incompatible-message",
+        payloadKind: "text",
+        chunkIndex: 1,
+        chunkCount: 2,
+        originalPayloadBytes: 3,
+        value: new Uint8Array([2, 3]),
+      });
+      publishFrameChunk({
+        connection: receiverConnection,
+        subjectPrefix,
+        target,
+        messageId: "oversized-declared-message",
+        payloadKind: "binary",
+        chunkIndex: 0,
+        chunkCount: 1,
+        originalPayloadBytes: 1,
+        value: new Uint8Array([4, 5]),
+      });
+      await receiverConnection.flush();
+      await expectNoWebSocketMessage(pair.clientSocket, 150);
+
+      const receivedPromise = waitForWebSocketMessage(pair.clientSocket);
+      await sender.deliverEnvelope({
+        kind: "frame",
+        target,
+        payload: "after corrupt chunks",
+      });
+      const received = await receivedPromise;
+
+      expect(received).toEqual({
+        data: "after corrupt chunks",
+        isBinary: false,
+      });
+    } finally {
+      await sender?.stop();
+      await receiver?.stop();
+      await senderConnection?.close();
+      await receiverConnection?.close();
+      await pair.closeAll();
       await nats.stop();
     }
   }, 30_000);
@@ -259,6 +486,76 @@ describe("NatsRelayTransportAdapter publish observability", () => {
 
       expect(received).toEqual({
         data: "after malformed chunk",
+        isBinary: false,
+      });
+    } finally {
+      await sender?.stop();
+      await receiver?.stop();
+      await senderConnection?.close();
+      await receiverConnection?.close();
+      await pair.closeAll();
+      await nats.stop();
+    }
+  }, 30_000);
+
+  it("ignores schema-invalid NATS messages without stopping the relay subscription", async () => {
+    const nats = await startNats();
+    const pair = await createWebSocketPair();
+    let senderConnection: NatsConnection | undefined;
+    let receiverConnection: NatsConnection | undefined;
+    let sender: NatsRelayTransportAdapter | undefined;
+    let receiver: NatsRelayTransportAdapter | undefined;
+
+    try {
+      senderConnection = await connect({
+        servers: nats.url,
+      });
+      receiverConnection = await connect({
+        servers: nats.url,
+      });
+      const subjectPrefix = "integration-schema-invalid-message";
+      sender = new NatsRelayTransportAdapter("gateway-a", subjectPrefix);
+      receiver = new NatsRelayTransportAdapter("gateway-b", subjectPrefix);
+      sender.start(senderConnection);
+      receiver.start(receiverConnection);
+      await senderConnection.flush();
+      await receiverConnection.flush();
+
+      const target = createRelayTarget({
+        nodeId: "gateway-b",
+      });
+      receiver.registerLocalPeer({
+        target,
+        socket: pair.peerSocket,
+      });
+      receiverConnection.publish(
+        `${subjectPrefix}.relay.gateway-b`,
+        TextEncoderInstance.encode("{invalid json"),
+      );
+      receiverConnection.publish(
+        `${subjectPrefix}.relay.gateway-b`,
+        encodeJson({
+          kind: "frame",
+          target,
+          payload: {
+            kind: "base64",
+            value: 42,
+          },
+        }),
+      );
+      await receiverConnection.flush();
+      await expectNoWebSocketMessage(pair.clientSocket, 150);
+
+      const receivedPromise = waitForWebSocketMessage(pair.clientSocket);
+      await sender.deliverEnvelope({
+        kind: "frame",
+        target,
+        payload: "after invalid messages",
+      });
+      const received = await receivedPromise;
+
+      expect(received).toEqual({
+        data: "after invalid messages",
         isBinary: false,
       });
     } finally {
@@ -365,6 +662,42 @@ async function expectNoNatsMessage(
   if (result !== undefined) {
     throw new Error("Expected NATS subscription to receive no message.");
   }
+}
+
+async function expectNoWebSocketMessage(socket: WebSocket, timeoutMs: number): Promise<void> {
+  const result = await Promise.race([
+    waitForWebSocketMessage(socket),
+    systemSleeper.sleep(timeoutMs).then(() => undefined),
+  ]);
+  if (result !== undefined) {
+    throw new Error("Expected WebSocket to receive no message.");
+  }
+}
+
+function publishFrameChunk(input: {
+  chunkCount: number;
+  chunkIndex: number;
+  connection: NatsConnection;
+  messageId: string;
+  originalPayloadBytes: number;
+  payloadKind: "binary" | "text";
+  subjectPrefix: string;
+  target: RelayTarget;
+  value: Uint8Array;
+}): void {
+  input.connection.publish(
+    `${input.subjectPrefix}.relay.${input.target.nodeId}`,
+    encodeJson({
+      kind: "frame_chunk",
+      target: input.target,
+      messageId: input.messageId,
+      payloadKind: input.payloadKind,
+      chunkIndex: input.chunkIndex,
+      chunkCount: input.chunkCount,
+      originalPayloadBytes: input.originalPayloadBytes,
+      value: Buffer.from(input.value).toString("base64"),
+    }),
+  );
 }
 
 function toBuffer(data: RawData): Buffer {

@@ -299,7 +299,19 @@ export class NatsRelayTransportAdapter implements RelayTransportAdapter {
 
   private async processSubscription(subscription: Subscription): Promise<void> {
     for await (const message of subscription) {
-      const envelope = this.decodeEnvelope(message.data);
+      let envelope: RelayEnvelope | undefined;
+      try {
+        envelope = this.decodeEnvelope(message.data);
+      } catch (error) {
+        recordGatewayRelaySubscriptionFailure({
+          backend: "nats",
+          error,
+          localNodeId: this.nodeId,
+          subscriptionKind: "relay_transport_message",
+        });
+        continue;
+      }
+
       if (envelope === undefined) {
         continue;
       }

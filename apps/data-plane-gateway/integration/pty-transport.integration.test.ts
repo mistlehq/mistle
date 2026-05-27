@@ -44,6 +44,7 @@ const FirstGatewayId = "data-plane-gateway-a";
 const SecondGatewayId = "data-plane-gateway-b";
 const StepTimeoutMs = 5_000;
 const TestTimeoutMs = 30_000;
+const LargeDistributedPtyPayload = "distributed pty relay payload ".repeat(40_000);
 
 const it = createIntegrationTest({
   services: ["data-plane-api", "data-plane-gateway"],
@@ -255,25 +256,25 @@ describe.concurrent("distributed PTY transport integration", () => {
           token: bootstrapMessage.transportToken,
         });
 
-        await sendWebSocketMessage(clientSocket, "client-to-sandbox");
+        await sendWebSocketMessage(clientSocket, LargeDistributedPtyPayload);
         await expect(
           withTimeout({
             label: "waiting for distributed sandbox-side PTY frame",
             promise: waitForWebSocketMessage(sandboxSocket),
           }),
         ).resolves.toMatchObject({
-          data: "client-to-sandbox",
+          data: LargeDistributedPtyPayload,
           isBinary: false,
         });
 
-        await sendWebSocketMessage(sandboxSocket, "sandbox-to-client");
+        await sendWebSocketMessage(sandboxSocket, LargeDistributedPtyPayload);
         await expect(
           withTimeout({
             label: "waiting for distributed client-side PTY frame",
             promise: waitForWebSocketMessage(clientSocket),
           }),
         ).resolves.toMatchObject({
-          data: "sandbox-to-client",
+          data: LargeDistributedPtyPayload,
           isBinary: false,
         });
       } finally {
