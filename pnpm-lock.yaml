@@ -1211,6 +1211,9 @@ importers:
       '@mistle/db':
         specifier: workspace:*
         version: link:../db
+      '@mistle/integrations-definitions':
+        specifier: workspace:*
+        version: link:../integrations-definitions
       '@mistle/sandbox':
         specifier: workspace:*
         version: link:../sandbox

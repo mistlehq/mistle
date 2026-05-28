@@ -1,4 +1,5 @@
 import { ensureRunnerPoolSession } from "../environment/runner-pool-session.js";
+import { prewarmDockerSandboxBaseImageRegistry } from "../environment/service-catalog.js";
 import { formatIntegrationDuration, writeIntegrationTimingLine } from "../integration/timing.js";
 import {
   acquireSharedInfraCoordinatorLease,
@@ -14,6 +15,7 @@ export async function prewarmRuntimeSystemSharedInfra(): Promise<void> {
   writeIntegrationTimingLine(`[system] prewarming shared infra for ${key}.`, {
     force: true,
   });
+  await prewarmRuntimeSystemDockerSandboxBaseImage();
   await acquireSharedInfraCoordinatorLease({
     key,
     postgres: {},
@@ -23,6 +25,21 @@ export async function prewarmRuntimeSystemSharedInfra(): Promise<void> {
   });
   writeIntegrationTimingLine(
     `[system] shared infra prewarm completed in ${formatIntegrationDuration(Date.now() - startedAt)}.`,
+    {
+      force: true,
+    },
+  );
+}
+
+async function prewarmRuntimeSystemDockerSandboxBaseImage(): Promise<void> {
+  const startedAt = Date.now();
+
+  writeIntegrationTimingLine("[system] prewarming Docker sandbox base image registry.", {
+    force: true,
+  });
+  await prewarmDockerSandboxBaseImageRegistry();
+  writeIntegrationTimingLine(
+    `[system] Docker sandbox base image registry prewarm completed in ${formatIntegrationDuration(Date.now() - startedAt)}.`,
     {
       force: true,
     },

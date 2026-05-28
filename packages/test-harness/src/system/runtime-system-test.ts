@@ -3,11 +3,7 @@
  * fixture functions must use object destructuring for the first argument.
  */
 
-import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 
 import type { DataPlaneDatabase } from "@mistle/db/data-plane";
 import {
@@ -24,7 +20,6 @@ import { createIntegrationTest, type IntegrationTestEnvironment } from "../integ
 import { ServiceIds, type ServiceId } from "../integration/services/service-ids.js";
 import { formatIntegrationDuration, writeIntegrationTimingLine } from "../integration/timing.js";
 import { IntegrationConfigPathInContainer } from "./integration-config-paths.js";
-import { resolveHostPathFromContainerPath } from "./provision-system-integration-targets.js";
 import {
   startRuntimeCloudflaredTunnel,
   type RuntimePublicAccessTunnel,
@@ -33,9 +28,6 @@ import {
   getSystemTestSandboxBaseImageRef,
   readSystemTestCoordinatorDirectoryPath,
 } from "./system-test-sandbox-base-image.js";
-
-const execFileAsync = promisify(execFile);
-const DefaultBuildContextHostPath = fileURLToPath(new URL("../../../..", import.meta.url));
 
 export type SystemTestServiceSelection =
   | ServiceId
@@ -128,16 +120,11 @@ export function createSystemTest(input: CreateSystemTestInput = {}) {
           },
         }),
     __internalInfra: createInternalInfra(input),
+    __seedControlPlaneIntegrationTargets: true,
     __timing: RuntimeSystemTiming,
     __serviceOptions: async () => createRuntimeSystemServiceOptions(input),
     __afterStart: async ({ environment, integrationEnvironment }) => {
       const setupTimings = new Map<string, number>();
-      await measureRuntimeSystemPhase(setupTimings, "sync-integration-targets", async () =>
-        syncControlPlaneIntegrationTargets({
-          environment: integrationEnvironment,
-          configPathInContainer: resolveRuntimeSystemIntegrationConfigPathInContainer(input),
-        }),
-      );
       const cleanupTasks: CleanupTask[] = [];
       const cleanupTimings = new Map<string, number>();
       const dockerProviderSandboxCleanup = await measureRuntimeSystemPhase(
@@ -633,124 +620,11 @@ async function startPublicAccess(input: {
   });
 }
 
-async function syncControlPlaneIntegrationTargets(input: {
-  environment: IntegrationTestEnvironment;
-  configPathInContainer: string;
-}): Promise<void> {
-  await runCommand({
-    command: "pnpm",
-    args: ["--filter", "@mistle/control-plane-api", "integration-targets:sync"],
-    cwd: DefaultBuildContextHostPath,
-    env: {
-      ...createOptionalHostConfigPathEnv({
-        configPathInContainer: input.configPathInContainer,
-      }),
-      MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION: "1",
-      MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON: JSON.stringify({
-        "1": "integration-new-master-key-testing",
-      }),
-      MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL: input.environment.controlPlaneDatabase.pooledUrl,
-      MISTLE_CONTROL_PLANE_SCHEMA_NAME: input.environment.controlPlaneDatabase.schemaName,
-    },
-  });
-}
-
-function createOptionalHostConfigPathEnv(input: {
-  configPathInContainer: string;
-}): Record<string, string> {
-  const hostConfigPath = resolveHostPathFromContainerPath({
-    buildContextHostPath: DefaultBuildContextHostPath,
-    containerPath: input.configPathInContainer,
-  });
-  if (!existsSync(hostConfigPath)) {
-    return {};
-  }
-
-  return {
-    MISTLE_CONFIG_PATH: hostConfigPath,
-  };
-}
-
 export function resolveRuntimeSystemIntegrationConfigPathInContainer(
   input: CreateSystemTestInput,
 ): string {
   void input;
   return IntegrationConfigPathInContainer;
-}
-
-async function runCommand(input: {
-  command: string;
-  args: string[];
-  cwd: string;
-  env: Record<string, string>;
-}): Promise<void> {
-  try {
-    await execFileAsync(input.command, input.args, {
-      cwd: input.cwd,
-      env: {
-        ...process.env,
-        ...input.env,
-      },
-    });
-  } catch (error) {
-    const stderr = readErrorOutput(error, "stderr");
-    const stdout = readErrorOutput(error, "stdout");
-    const exitCode = readErrorExitCode(error);
-    const output = formatCommandFailureOutput({ stdout, stderr });
-    throw new Error(
-      `Command failed: ${input.command} ${input.args.join(" ")}.${exitCode} Output:${output}`,
-    );
-  }
-}
-
-function formatCommandFailureOutput(input: { stdout: string; stderr: string }): string {
-  const parts: string[] = [];
-
-  if (input.stdout.length > 0) {
-    parts.push(`\nstdout:\n${input.stdout}`);
-  }
-
-  if (input.stderr.length > 0) {
-    parts.push(`\nstderr:\n${input.stderr}`);
-  }
-
-  if (parts.length === 0) {
-    return "\nno command output";
-  }
-
-  return parts.join("");
-}
-
-function readErrorExitCode(error: unknown): string {
-  if (typeof error !== "object" || error === null) {
-    return "";
-  }
-
-  const descriptor = Object.getOwnPropertyDescriptor(error, "code");
-  const code = descriptor?.value;
-  if (typeof code === "number" || typeof code === "string") {
-    return ` Exit code: ${code}.`;
-  }
-
-  return "";
-}
-
-function readErrorOutput(error: unknown, property: "stderr" | "stdout"): string {
-  if (typeof error !== "object" || error === null) {
-    return "";
-  }
-
-  const descriptor = Object.getOwnPropertyDescriptor(error, property);
-  const output = descriptor?.value;
-  if (typeof output === "string") {
-    return output;
-  }
-
-  if (Buffer.isBuffer(output)) {
-    return output.toString("utf8");
-  }
-
-  return "";
 }
 
 function createRuntimeSystemEnvironment(

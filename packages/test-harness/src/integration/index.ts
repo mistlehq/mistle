@@ -58,6 +58,7 @@ type CreateIntegrationTestInput = {
   };
   __dangerouslyIsolatedServices?: DangerouslyIsolatedTestRegistry;
   __internalInfra?: readonly TestInfraRequirement[];
+  __seedControlPlaneIntegrationTargets?: boolean;
   __afterStart?: (input: {
     environment: TestEnvironment<string>;
     integrationEnvironment: IntegrationTestEnvironment;
@@ -214,7 +215,9 @@ async function environmentDefinitionFor(
   const serviceEntries = await loadSelectedServiceInstances(input.services);
   const { createTestExtraInfra, createTestRegistry } =
     await import("../environment/service-catalog.js");
-  const serviceCatalog = createTestRegistry();
+  const serviceCatalog = createTestRegistry({
+    seedControlPlaneIntegrationTargets: input.__seedControlPlaneIntegrationTargets ?? false,
+  });
   const extraInfra =
     input.extraInfra === undefined
       ? []

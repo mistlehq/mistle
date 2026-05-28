@@ -1,8 +1,9 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -15,11 +16,13 @@ import {
   runControlPlaneMigrations,
   runDataPlaneMigrations,
 } from "@mistle/db/migrator";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
 import { systemSleeper } from "@mistle/time";
 import { BackendPostgres } from "openworkflow/postgres";
 import { Client } from "pg";
 import { createClient } from "redis";
 import { GenericContainer } from "testcontainers";
+import { z } from "zod";
 
 import { startControlPlaneApi } from "../apps/control-plane-api.js";
 import { startControlPlaneWorker } from "../apps/control-plane-worker.js";
@@ -86,6 +89,9 @@ const PostgresCleanupRetryDelayMs = 100;
 const PostgresCleanupMaxAttempts = 3;
 const PostgresDeadlockDetectedCode = "40P01";
 const SandboxBaseImageRegistryLockTimeoutMs = 3 * 60_000;
+const IntegrationTargetsManifestFileName = "integration-targets.json";
+const IntegrationTargetsManifestJsonEnvVarName = "MISTLE_INTEGRATION_TARGETS_MANIFEST_JSON";
+const IntegrationTargetsManifestPathEnvVarName = "MISTLE_INTEGRATION_TARGETS_MANIFEST_PATH";
 const PostgresMigrationCoordinatorRootDirectoryPath = join(
   tmpdir(),
   "mistle-test-harness",
@@ -167,6 +173,41 @@ const SandboxBaseImageValues = {
   IMAGE_REF: "image.ref",
 };
 
+const IntegrationTargetSeedSchema = z
+  .object({
+    targetKey: z.string().min(1),
+    enabled: z.boolean(),
+    config: z.record(z.string(), z.unknown()),
+  })
+  .strict();
+
+const IntegrationTargetsManifestSchema = z
+  .object({
+    version: z.literal(1),
+    targets: z.array(IntegrationTargetSeedSchema),
+  })
+  .strict()
+  .superRefine((input, ctx) => {
+    const seenTargetKeys = new Set<string>();
+    for (const [index, target] of input.targets.entries()) {
+      if (seenTargetKeys.has(target.targetKey)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["targets", index, "targetKey"],
+          message: `Duplicate manifest target key '${target.targetKey}'.`,
+        });
+      }
+      seenTargetKeys.add(target.targetKey);
+    }
+  });
+
+type IntegrationTargetSeed = z.output<typeof IntegrationTargetSeedSchema>;
+
+type IntegrationTargetsManifest = {
+  version: 1;
+  targets: readonly IntegrationTargetSeed[];
+};
+
 function formatDuration(milliseconds: number): string {
   return `${(milliseconds / 1000).toFixed(2)}s`;
 }
@@ -237,6 +278,7 @@ export type CreateTestRegistryInput = {
   configPathInContainer?: string;
   startupTimeoutMs?: number;
   sharedInfraKey?: string;
+  seedControlPlaneIntegrationTargets?: boolean;
   __dangerouslyIsolatedServices?: {
     reason: string;
     services?: readonly MistleTestServiceId[];
@@ -246,6 +288,7 @@ export type CreateTestRegistryInput = {
 type MistleRegistryContext = {
   buildContextHostPath: string;
   configPathInContainer: string;
+  seedControlPlaneIntegrationTargets: boolean;
   startupTimeoutMs: number;
 };
 
@@ -345,14 +388,21 @@ export function createDockerSandboxProviderInfra(): readonly TestInfraRequiremen
   return [createSandboxBaseImageRequirement(), createSandboxDockerNetworkRequirement()];
 }
 
+export async function prewarmDockerSandboxBaseImageRegistry(): Promise<void> {
+  const registry = await acquireSandboxBaseImageRegistry();
+  await registry.release();
+}
+
 function createRegistryContext(input: {
   buildContextHostPath?: string;
   configPathInContainer?: string;
+  seedControlPlaneIntegrationTargets?: boolean;
   startupTimeoutMs?: number;
 }): MistleRegistryContext {
   return {
     buildContextHostPath: input.buildContextHostPath ?? DefaultBuildContextHostPath,
     configPathInContainer: input.configPathInContainer ?? IntegrationConfigPathInContainer,
+    seedControlPlaneIntegrationTargets: input.seedControlPlaneIntegrationTargets ?? false,
     startupTimeoutMs: input.startupTimeoutMs ?? DefaultStartupTimeoutMs,
   };
 }
@@ -1558,15 +1608,22 @@ async function runPostgresLogicalMigrations(input: {
 
   if (requiresControlPlanePostgres(input.requirements)) {
     materializations.push(
-      measure(input.timings, "logical-control-plane-db-migrations", async () =>
-        runControlPlaneMigrations({
+      measure(input.timings, "logical-control-plane-db-migrations", async () => {
+        await runControlPlaneMigrations({
           connectionString: input.hostDirectUrl,
           schemaName: input.controlPlaneSchemaName,
           migrationsFolder: CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
           migrationsSchema: createLogicalMigrationTrackingSchemaName(input.controlPlaneSchemaName),
           migrationsTable: MigrationTracking.CONTROL_PLANE.TABLE_NAME,
-        }),
-      ),
+        });
+        if (input.context.seedControlPlaneIntegrationTargets) {
+          await syncControlPlaneIntegrationTargets({
+            hostDirectUrl: input.hostDirectUrl,
+            schemaName: input.controlPlaneSchemaName,
+            buildContextHostPath: input.context.buildContextHostPath,
+          });
+        }
+      }),
     );
   }
 
@@ -1585,6 +1642,288 @@ async function runPostgresLogicalMigrations(input: {
   }
 
   await Promise.all(materializations);
+}
+
+async function syncControlPlaneIntegrationTargets(input: {
+  hostDirectUrl: string;
+  schemaName: string;
+  buildContextHostPath: string;
+}): Promise<void> {
+  const client = new Client({
+    connectionString: input.hostDirectUrl,
+  });
+  await client.connect();
+
+  try {
+    const integrationRegistry = createIntegrationRegistry();
+    await upsertIntegrationRegistryTargets({
+      client,
+      schemaName: input.schemaName,
+      targets: integrationRegistry.listDefinitions().map((definition) => ({
+        targetKey: definition.variantId,
+        familyId: definition.familyId,
+        variantId: definition.variantId,
+      })),
+    });
+
+    const manifest = loadIntegrationTargetsManifest({
+      env: process.env,
+      startDirectory: input.buildContextHostPath,
+    });
+    if (manifest === undefined) {
+      return;
+    }
+
+    for (const target of manifest.targets) {
+      const existingTarget = await readIntegrationTarget({
+        client,
+        schemaName: input.schemaName,
+        targetKey: target.targetKey,
+      });
+      if (existingTarget === undefined) {
+        throw new Error(
+          `Integration target '${target.targetKey}' was not found. Run integration target sync before provisioning.`,
+        );
+      }
+
+      const definition = integrationRegistry.getDefinition({
+        familyId: existingTarget.familyId,
+        variantId: existingTarget.variantId,
+      });
+      if (definition === undefined) {
+        throw new Error(
+          `Integration definition '${existingTarget.familyId}::${existingTarget.variantId}' for target '${target.targetKey}' was not found.`,
+        );
+      }
+
+      definition.targetConfigSchema.parse(target.config);
+      const parsedDeprecatedTargetSecrets = definition.targetSecretSchema.safeParse({});
+      if (!parsedDeprecatedTargetSecrets.success) {
+        throw new Error(
+          `Integration target '${target.targetKey}' requires target secrets, but tracked manifest seeding no longer supports target secrets.`,
+        );
+      }
+
+      await updateSeededIntegrationTarget({
+        client,
+        schemaName: input.schemaName,
+        target,
+      });
+    }
+  } finally {
+    await client.end();
+  }
+}
+
+async function upsertIntegrationRegistryTargets(input: {
+  client: Client;
+  schemaName: string;
+  targets: readonly {
+    targetKey: string;
+    familyId: string;
+    variantId: string;
+  }[];
+}): Promise<void> {
+  const seenTargetKeys = new Set<string>();
+  const tableName = `${quoteSqlIdentifier(input.schemaName)}.integration_targets`;
+
+  for (const target of input.targets) {
+    if (seenTargetKeys.has(target.targetKey)) {
+      throw new Error(
+        `Integration definition variantId '${target.targetKey}' is duplicated and cannot be used as targetKey.`,
+      );
+    }
+    seenTargetKeys.add(target.targetKey);
+
+    await input.client.query(
+      `
+        insert into ${tableName} (target_key, family_id, variant_id, enabled, config)
+        values ($1, $2, $3, false, '{}'::jsonb)
+        on conflict (target_key) do update set
+          family_id = excluded.family_id,
+          variant_id = excluded.variant_id,
+          updated_at = now()
+      `,
+      [target.targetKey, target.familyId, target.variantId],
+    );
+  }
+}
+
+async function readIntegrationTarget(input: {
+  client: Client;
+  schemaName: string;
+  targetKey: string;
+}): Promise<{ familyId: string; variantId: string } | undefined> {
+  const result = await input.client.query<{ family_id: string; variant_id: string }>(
+    `
+      select family_id, variant_id
+      from ${quoteSqlIdentifier(input.schemaName)}.integration_targets
+      where target_key = $1
+      limit 1
+    `,
+    [input.targetKey],
+  );
+  const row = result.rows[0];
+  if (row === undefined) {
+    return undefined;
+  }
+
+  return {
+    familyId: row.family_id,
+    variantId: row.variant_id,
+  };
+}
+
+async function updateSeededIntegrationTarget(input: {
+  client: Client;
+  schemaName: string;
+  target: IntegrationTargetSeed;
+}): Promise<void> {
+  await input.client.query(
+    `
+      update ${quoteSqlIdentifier(input.schemaName)}.integration_targets
+      set enabled = $2,
+          config = $3::jsonb,
+          secrets = null,
+          updated_at = now()
+      where target_key = $1
+    `,
+    [input.target.targetKey, input.target.enabled, JSON.stringify(input.target.config)],
+  );
+}
+
+function loadIntegrationTargetsManifest(input: {
+  env: NodeJS.ProcessEnv;
+  startDirectory: string;
+}): IntegrationTargetsManifest | undefined {
+  const manifestJson = input.env[IntegrationTargetsManifestJsonEnvVarName];
+  if (manifestJson !== undefined) {
+    if (manifestJson.length === 0) {
+      throw new Error(
+        `${IntegrationTargetsManifestJsonEnvVarName} must not be empty when provided.`,
+      );
+    }
+
+    return parseIntegrationTargetsManifestText(manifestJson);
+  }
+
+  const manifestPathFromEnv = input.env[IntegrationTargetsManifestPathEnvVarName];
+  if (manifestPathFromEnv !== undefined) {
+    if (manifestPathFromEnv.length === 0) {
+      throw new Error(
+        `${IntegrationTargetsManifestPathEnvVarName} must not be empty when provided.`,
+      );
+    }
+
+    return parseIntegrationTargetsManifestFromPath(resolve(manifestPathFromEnv));
+  }
+
+  const discoveredPath = discoverIntegrationTargetsManifestPath({
+    startDirectory: input.startDirectory,
+  });
+  if (discoveredPath === undefined) {
+    return undefined;
+  }
+
+  return parseIntegrationTargetsManifestFromPath(discoveredPath);
+}
+
+function parseIntegrationTargetsManifestFromPath(path: string): IntegrationTargetsManifest {
+  return parseIntegrationTargetsManifestText(readFileSync(path, "utf8"));
+}
+
+function parseIntegrationTargetsManifestText(raw: string): IntegrationTargetsManifest {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error("Integration target manifest must contain valid JSON.", {
+      cause: error,
+    });
+  }
+
+  const manifest = IntegrationTargetsManifestSchema.parse(parsed);
+  return {
+    version: manifest.version,
+    targets: manifest.targets.map((target) => ({
+      targetKey: target.targetKey,
+      enabled: target.enabled,
+      config: normalizeEscapedNewlinesInUnknownObject(target.config),
+    })),
+  };
+}
+
+function discoverIntegrationTargetsManifestPath(input: {
+  startDirectory: string;
+}): string | undefined {
+  let currentDirectory = resolve(input.startDirectory);
+  const repositoryRoot = resolveRepositoryRootFromDirectory(currentDirectory);
+  if (repositoryRoot === undefined) {
+    return undefined;
+  }
+
+  while (true) {
+    const candidatePath = join(currentDirectory, IntegrationTargetsManifestFileName);
+    if (existsSync(candidatePath)) {
+      return candidatePath;
+    }
+
+    if (currentDirectory === repositoryRoot) {
+      return undefined;
+    }
+
+    const parentDirectory = dirname(currentDirectory);
+    if (parentDirectory === currentDirectory) {
+      return undefined;
+    }
+
+    currentDirectory = parentDirectory;
+  }
+}
+
+function resolveRepositoryRootFromDirectory(startDirectory: string): string | undefined {
+  let currentDirectory = resolve(startDirectory);
+
+  while (true) {
+    if (existsSync(join(currentDirectory, ".git"))) {
+      return currentDirectory;
+    }
+
+    const parentDirectory = dirname(currentDirectory);
+    if (parentDirectory === currentDirectory) {
+      return undefined;
+    }
+
+    currentDirectory = parentDirectory;
+  }
+}
+
+function normalizeEscapedNewlinesInUnknownValue(value: unknown): unknown {
+  if (typeof value === "string") {
+    return value
+      .replaceAll("\\\\r\\\\n", "\r\n")
+      .replaceAll("\\\\n", "\n")
+      .replaceAll("\\r\\n", "\r\n")
+      .replaceAll("\\n", "\n");
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeEscapedNewlinesInUnknownValue(item));
+  }
+
+  if (value !== null && typeof value === "object") {
+    return normalizeEscapedNewlinesInUnknownObject(value);
+  }
+
+  return value;
+}
+
+function normalizeEscapedNewlinesInUnknownObject(value: object): Record<string, unknown> {
+  const normalized: Record<string, unknown> = {};
+  for (const [key, entryValue] of Object.entries(value)) {
+    normalized[key] = normalizeEscapedNewlinesInUnknownValue(entryValue);
+  }
+  return normalized;
 }
 
 function createLogicalMigrationTrackingSchemaName(schemaName: string): string {
