@@ -240,51 +240,54 @@ async function assertVitePageAndAssets(input: {
   expect(indexResponse.body).toContain("/src/main.ts");
   expect(indexResponse.body).toContain("/favicon.ico");
 
-  const viteClientResponse = await withTimeout({
-    operation: sendGatewayHttpRequest({
-      baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
-      path: "/@vite/client",
-      method: "GET",
-      headers: {
-        cookie: input.sessionCookie,
-        host: input.bootstrap.host,
-      },
+  const [viteClientResponse, mainModuleResponse, stylesheetResponse] = await Promise.all([
+    withTimeout({
+      operation: sendGatewayHttpRequest({
+        baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+        path: "/@vite/client",
+        method: "GET",
+        headers: {
+          cookie: input.sessionCookie,
+          host: input.bootstrap.host,
+        },
+      }),
+      timeoutMs: ViteRequestTimeoutMs,
+      description: "Vite client request",
     }),
-    timeoutMs: ViteRequestTimeoutMs,
-    description: "Vite client request",
-  });
+    withTimeout({
+      operation: sendGatewayHttpRequest({
+        baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+        path: "/src/main.ts",
+        method: "GET",
+        headers: {
+          cookie: input.sessionCookie,
+          host: input.bootstrap.host,
+        },
+      }),
+      timeoutMs: ViteRequestTimeoutMs,
+      description: "Vite main module request",
+    }),
+    withTimeout({
+      operation: sendGatewayHttpRequest({
+        baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+        path: "/src/styles.css",
+        method: "GET",
+        headers: {
+          cookie: input.sessionCookie,
+          host: input.bootstrap.host,
+        },
+      }),
+      timeoutMs: ViteRequestTimeoutMs,
+      description: "Vite stylesheet request",
+    }),
+  ]);
+
   expect(viteClientResponse.status).toBe(200);
   expect(extractHmrPath(viteClientResponse.body)).toContain("?token=");
 
-  const mainModuleResponse = await withTimeout({
-    operation: sendGatewayHttpRequest({
-      baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
-      path: "/src/main.ts",
-      method: "GET",
-      headers: {
-        cookie: input.sessionCookie,
-        host: input.bootstrap.host,
-      },
-    }),
-    timeoutMs: ViteRequestTimeoutMs,
-    description: "Vite main module request",
-  });
   expect(mainModuleResponse.status).toBe(200);
   expect(mainModuleResponse.body).toContain("virtual:mistle-vite-fixture");
 
-  const stylesheetResponse = await withTimeout({
-    operation: sendGatewayHttpRequest({
-      baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
-      path: "/src/styles.css",
-      method: "GET",
-      headers: {
-        cookie: input.sessionCookie,
-        host: input.bootstrap.host,
-      },
-    }),
-    timeoutMs: ViteRequestTimeoutMs,
-    description: "Vite stylesheet request",
-  });
   expect(stylesheetResponse.status).toBe(200);
   expect(stylesheetResponse.body).toContain("background-image");
 
@@ -368,49 +371,50 @@ async function assertViteHmrUpdate(input: {
   tunnelSocket: WebSocket;
   readTunnelCloseDescription: () => string;
 }): Promise<void> {
-  const viteClientResponse = await withTimeout({
-    operation: sendGatewayHttpRequest({
-      baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
-      path: "/@vite/client",
-      method: "GET",
-      headers: {
-        cookie: input.sessionCookie,
-        host: input.bootstrap.host,
-      },
+  const [viteClientResponse, mainModuleResponse, stylesheetResponse] = await Promise.all([
+    withTimeout({
+      operation: sendGatewayHttpRequest({
+        baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+        path: "/@vite/client",
+        method: "GET",
+        headers: {
+          cookie: input.sessionCookie,
+          host: input.bootstrap.host,
+        },
+      }),
+      timeoutMs: ViteRequestTimeoutMs,
+      description: "Vite client request",
     }),
-    timeoutMs: ViteRequestTimeoutMs,
-    description: "Vite client request",
-  });
+    withTimeout({
+      operation: sendGatewayHttpRequest({
+        baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+        path: "/src/main.ts",
+        method: "GET",
+        headers: {
+          cookie: input.sessionCookie,
+          host: input.bootstrap.host,
+        },
+      }),
+      timeoutMs: ViteRequestTimeoutMs,
+      description: "Vite main module request before HMR change",
+    }),
+    withTimeout({
+      operation: sendGatewayHttpRequest({
+        baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+        path: "/src/styles.css",
+        method: "GET",
+        headers: {
+          cookie: input.sessionCookie,
+          host: input.bootstrap.host,
+        },
+      }),
+      timeoutMs: ViteRequestTimeoutMs,
+      description: "Vite stylesheet request before HMR change",
+    }),
+  ]);
+
   expect(viteClientResponse.status).toBe(200);
-
-  const mainModuleResponse = await withTimeout({
-    operation: sendGatewayHttpRequest({
-      baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
-      path: "/src/main.ts",
-      method: "GET",
-      headers: {
-        cookie: input.sessionCookie,
-        host: input.bootstrap.host,
-      },
-    }),
-    timeoutMs: ViteRequestTimeoutMs,
-    description: "Vite main module request before HMR change",
-  });
   expect(mainModuleResponse.status).toBe(200);
-
-  const stylesheetResponse = await withTimeout({
-    operation: sendGatewayHttpRequest({
-      baseUrl: input.fixture.dataPlaneGatewayBaseUrl,
-      path: "/src/styles.css",
-      method: "GET",
-      headers: {
-        cookie: input.sessionCookie,
-        host: input.bootstrap.host,
-      },
-    }),
-    timeoutMs: ViteRequestTimeoutMs,
-    description: "Vite stylesheet request before HMR change",
-  });
   expect(stylesheetResponse.status).toBe(200);
 
   const hmrSocket = new WebSocket(
