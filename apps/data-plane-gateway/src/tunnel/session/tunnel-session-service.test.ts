@@ -209,6 +209,11 @@ afterEach(async () => {
 async function createDisconnectTestHarness() {
   const clock = createMutableClock(1_000);
   const scheduler = createManualScheduler(clock);
+  const lifecycleEvents: Array<{
+    kind: "bootstrap_detached" | "runtime_readiness_reported";
+    ownerLeaseId: string;
+    runtimeReady?: boolean;
+  }> = [];
   const attachmentStore = new InMemorySandboxRuntimeAttachmentStore(clock);
   await attachmentStore.upsertAttachment({
     sandboxInstanceId: SandboxInstanceId,
@@ -266,6 +271,20 @@ async function createDisconnectTestHarness() {
             kind: "idle",
           };
         },
+        async applySandboxRuntimeLifecycleEvent(input) {
+          lifecycleEvents.push({
+            kind: input.kind,
+            ownerLeaseId: input.ownerLeaseId,
+            ...(input.kind === "runtime_readiness_reported"
+              ? { runtimeReady: input.runtimeReady }
+              : {}),
+          });
+          return {
+            status: "ok",
+            sandboxInstanceId: input.sandboxInstanceId,
+            lifecycleStatus: input.kind === "bootstrap_detached" ? "reconnecting" : "initializing",
+          };
+        },
       },
       clock,
       DefaultDataPlaneGatewayLifecycleDurations,
@@ -300,6 +319,7 @@ async function createDisconnectTestHarness() {
     attachedBootstrapPeer,
     connectionPair,
     interactiveStreamRouter,
+    lifecycleEvents,
     service,
     tunnelSessionRegistry,
   };
@@ -353,6 +373,14 @@ describe("TunnelSessionService", () => {
               status: "ok",
               sandboxInstanceId: input.sandboxInstanceId,
               kind: input.kind,
+            };
+          },
+          async applySandboxRuntimeLifecycleEvent(input) {
+            return {
+              status: "ok",
+              sandboxInstanceId: input.sandboxInstanceId,
+              lifecycleStatus:
+                input.kind === "bootstrap_detached" ? "reconnecting" : "initializing",
             };
           },
         },
@@ -471,6 +499,14 @@ describe("TunnelSessionService", () => {
               kind: input.kind,
             };
           },
+          async applySandboxRuntimeLifecycleEvent(input) {
+            return {
+              status: "ok",
+              sandboxInstanceId: input.sandboxInstanceId,
+              lifecycleStatus:
+                input.kind === "bootstrap_detached" ? "reconnecting" : "initializing",
+            };
+          },
         },
         clock,
         DefaultDataPlaneGatewayLifecycleDurations,
@@ -583,6 +619,14 @@ describe("TunnelSessionService", () => {
               kind: input.kind,
             };
           },
+          async applySandboxRuntimeLifecycleEvent(input) {
+            return {
+              status: "ok",
+              sandboxInstanceId: input.sandboxInstanceId,
+              lifecycleStatus:
+                input.kind === "bootstrap_detached" ? "reconnecting" : "initializing",
+            };
+          },
         },
         clock,
         DefaultDataPlaneGatewayLifecycleDurations,
@@ -665,6 +709,7 @@ describe("TunnelSessionService", () => {
       attachedBootstrapPeer,
       connectionPair,
       interactiveStreamRouter,
+      lifecycleEvents,
       service,
       tunnelSessionRegistry,
     } = await createDisconnectTestHarness();
@@ -682,6 +727,11 @@ describe("TunnelSessionService", () => {
       attachedPeer: attachedBootstrapPeer,
       leaseId: OwnerLeaseId,
       sandboxInstanceId: SandboxInstanceId,
+    });
+
+    expect(lifecycleEvents).toContainEqual({
+      kind: "bootstrap_detached",
+      ownerLeaseId: OwnerLeaseId,
     });
 
     expect(

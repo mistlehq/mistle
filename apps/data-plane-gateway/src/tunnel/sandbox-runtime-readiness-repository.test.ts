@@ -1,6 +1,7 @@
 import { createMutableClock } from "@mistle/time/testing";
 import { describe, expect, it } from "vitest";
 
+import { SandboxDeadlineLifecycleCoordinator } from "../deadlines/sandbox-deadline-lifecycle-coordinator.js";
 import { createAttachmentBackedActiveBootstrapSessionStore } from "../runtime-state/active-bootstrap-session-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
 import { InMemorySandboxRuntimeReadinessStore } from "../runtime-state/adapters/in-memory-sandbox-runtime-readiness-store.js";
@@ -16,9 +17,16 @@ describe("SandboxRuntimeReadinessRepository", () => {
     const clock = createMutableClock(1_000);
     const attachmentStore = new InMemorySandboxRuntimeAttachmentStore(clock);
     const readinessStore = new InMemorySandboxRuntimeReadinessStore();
+    const lifecycleReadinessEvents: boolean[] = [];
     const repository = new SandboxRuntimeReadinessRepository(
       readinessStore,
       createAttachmentBackedActiveBootstrapSessionStore(attachmentStore),
+      {
+        async handleRuntimeReadiness(input) {
+          lifecycleReadinessEvents.push(input.ready);
+        },
+      },
+      new SandboxDeadlineLifecycleCoordinator(),
       clock,
       GatewayNodeId,
     );
@@ -47,6 +55,7 @@ describe("SandboxRuntimeReadinessRepository", () => {
         ownerLeaseId: FirstOwnerLeaseId,
       }),
     ).toEqual({ ready: true });
+    expect(lifecycleReadinessEvents).toEqual([true]);
 
     clock.advanceMs(1_000);
     await attachmentStore.upsertAttachment({
@@ -74,5 +83,6 @@ describe("SandboxRuntimeReadinessRepository", () => {
         ownerLeaseId: SecondOwnerLeaseId,
       }),
     ).toEqual({ ready: false });
+    expect(lifecycleReadinessEvents).toEqual([true]);
   });
 });

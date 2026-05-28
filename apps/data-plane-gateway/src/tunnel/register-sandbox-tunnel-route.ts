@@ -109,6 +109,8 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
   const sandboxRuntimeReadinessRepository = new SandboxRuntimeReadinessRepository(
     input.sandboxRuntimeReadinessStore,
     input.activeBootstrapSessionStore,
+    input.sandboxInstanceDeadlineService,
+    input.sandboxDeadlineLifecycleCoordinator,
     input.clock,
     input.gatewayNodeId,
   );

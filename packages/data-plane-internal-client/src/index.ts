@@ -175,6 +175,40 @@ const DeleteSandboxInstanceDeadlineOkResponseSchema = z
 export type DeleteSandboxInstanceDeadlineOkResponse = z.infer<
   typeof DeleteSandboxInstanceDeadlineOkResponseSchema
 >;
+export type ApplySandboxRuntimeLifecycleEventInput =
+  | {
+      sandboxInstanceId: string;
+      kind: "bootstrap_detached";
+      ownerLeaseId: string;
+      testEnvironmentId?: string;
+    }
+  | {
+      sandboxInstanceId: string;
+      kind: "runtime_readiness_reported";
+      ownerLeaseId: string;
+      runtimeReady: boolean;
+      testEnvironmentId?: string;
+    };
+const ApplySandboxRuntimeLifecycleEventResponseSchema = z
+  .object({
+    status: z.literal("ok"),
+    sandboxInstanceId: z.string().min(1),
+    lifecycleStatus: z.enum([
+      SandboxInstanceStatuses.PENDING,
+      SandboxInstanceStatuses.STARTING,
+      SandboxInstanceStatuses.STARTED,
+      SandboxInstanceStatuses.INITIALIZING,
+      SandboxInstanceStatuses.RUNNING,
+      SandboxInstanceStatuses.RECONNECTING,
+      SandboxInstanceStatuses.STOPPING,
+      SandboxInstanceStatuses.STOPPED,
+      SandboxInstanceStatuses.FAILED,
+    ]),
+  })
+  .strict();
+export type ApplySandboxRuntimeLifecycleEventResponse = z.infer<
+  typeof ApplySandboxRuntimeLifecycleEventResponseSchema
+>;
 export type PatchSandboxInstanceTitleInput = {
   organizationId: string;
   instanceId: string;
@@ -296,6 +330,9 @@ export type DataPlaneSandboxInstancesClient = {
   deleteSandboxInstanceDeadline: (
     input: DeleteSandboxInstanceDeadlineInput,
   ) => Promise<DeleteSandboxInstanceDeadlineOkResponse>;
+  applySandboxRuntimeLifecycleEvent: (
+    input: ApplySandboxRuntimeLifecycleEventInput,
+  ) => Promise<ApplySandboxRuntimeLifecycleEventResponse>;
   patchSandboxInstanceTitle: (
     input: PatchSandboxInstanceTitleInput,
   ) => Promise<PatchSandboxInstanceTitleResponse>;
@@ -347,6 +384,7 @@ function createClientError(input: {
     | "reconcile"
     | "putDeadline"
     | "deleteDeadline"
+    | "applyLifecycle"
     | "patch"
     | "read"
     | "list"
@@ -362,6 +400,7 @@ function createClientError(input: {
     reconcile: "reconcile",
     putDeadline: "put deadline",
     deleteDeadline: "delete deadline",
+    applyLifecycle: "apply lifecycle event",
     patch: "patch",
     read: "read",
     list: "list",
@@ -827,6 +866,55 @@ export function createDataPlaneSandboxInstancesClient(
         status: response.status,
         error: errorBody,
         operation: "deleteDeadline",
+      });
+    },
+
+    async applySandboxRuntimeLifecycleEvent(lifecycleInput) {
+      const response = await fetch(
+        createSandboxInstanceMemberUrl({
+          baseUrl: internalClient.baseUrl,
+          instanceId: lifecycleInput.sandboxInstanceId,
+          suffix: "/runtime-lifecycle-events",
+        }),
+        {
+          method: "POST",
+          headers: createTestHeaders({
+            serviceToken: internalClient.serviceToken,
+            ...(internalClient.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: internalClient.testEnvironmentId }),
+            ...(internalClient.testEnvironmentIdHeader === undefined
+              ? {}
+              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
+            ...(lifecycleInput.testEnvironmentId === undefined
+              ? {}
+              : { overrideTestEnvironmentId: lifecycleInput.testEnvironmentId }),
+          }),
+          body: JSON.stringify({
+            kind: lifecycleInput.kind,
+            ownerLeaseId: lifecycleInput.ownerLeaseId,
+            ...(lifecycleInput.kind === "runtime_readiness_reported"
+              ? { runtimeReady: lifecycleInput.runtimeReady }
+              : {}),
+          }),
+          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+        },
+      );
+
+      if (response.status === 200) {
+        const responseBody = ApplySandboxRuntimeLifecycleEventResponseSchema.parse(
+          await response.json(),
+        );
+
+        return responseBody;
+      }
+
+      const errorBody = await readResponseBody(response);
+
+      throw createClientError({
+        status: response.status,
+        error: errorBody,
+        operation: "applyLifecycle",
       });
     },
 

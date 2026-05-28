@@ -4309,6 +4309,159 @@
         }
       }
     },
+    "/internal/sandbox/instances/:id/runtime-lifecycle-events": {
+      "post": {
+        "tags": ["Internal"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": ["bootstrap_detached"]
+                      },
+                      "ownerLeaseId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["kind", "ownerLeaseId"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": ["runtime_readiness_reported"]
+                      },
+                      "ownerLeaseId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "runtimeReady": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["kind", "ownerLeaseId", "runtimeReady"],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Apply a sandbox runtime lifecycle event for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["ok"]
+                    },
+                    "sandboxInstanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "lifecycleStatus": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "starting",
+                        "started",
+                        "initializing",
+                        "running",
+                        "reconnecting",
+                        "stopping",
+                        "stopped",
+                        "failed"
+                      ]
+                    }
+                  },
+                  "required": ["status", "sandboxInstanceId", "lifecycleStatus"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid lifecycle event request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/sandbox/instances/:id/reconcile": {
       "post": {
         "tags": ["Internal"],

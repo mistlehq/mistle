@@ -121,6 +121,9 @@ export async function handleTunnelWebSocketMessage(input: {
       message: translation.runtimeReadyControlMessage,
       sandboxInstanceId: input.sandboxInstanceId,
       ownerLeaseId: input.bootstrapOwnerLeaseId,
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
     });
   }
 

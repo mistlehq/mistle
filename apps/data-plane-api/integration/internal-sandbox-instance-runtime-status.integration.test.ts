@@ -150,6 +150,109 @@ it("reports a persisted running sandbox as reconnecting until the gateway runtim
   }
 }, 60_000);
 
+it("applies runtime lifecycle events for reconnecting bootstrap sessions", async ({ env }) => {
+  const organizationId = `org_${typeid("org").toString()}`;
+  const sandboxInstanceId = typeid("sbi").toString();
+  const client = clientFor(env);
+
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
+    id: sandboxInstanceId,
+    organizationId,
+    sandboxProfileId: "sbp_integration_runtime_lifecycle",
+    sandboxProfileVersion: 1,
+    runtimeProvider: "docker",
+    providerSandboxId: "provider-runtime-lifecycle",
+    status: SandboxInstanceStatuses.RUNNING,
+    startedByKind: "user",
+    startedById: "usr_integration_runtime_lifecycle",
+    source: "dashboard",
+  });
+
+  await expect(
+    client.applySandboxRuntimeLifecycleEvent({
+      sandboxInstanceId,
+      kind: "bootstrap_detached",
+      ownerLeaseId: "lease_runtime_lifecycle",
+    }),
+  ).resolves.toMatchObject({
+    status: "ok",
+    sandboxInstanceId,
+    lifecycleStatus: SandboxInstanceStatuses.RECONNECTING,
+  });
+
+  await expect(
+    client.applySandboxRuntimeLifecycleEvent({
+      sandboxInstanceId,
+      kind: "runtime_readiness_reported",
+      ownerLeaseId: "lease_runtime_lifecycle",
+      runtimeReady: false,
+    }),
+  ).resolves.toMatchObject({
+    lifecycleStatus: SandboxInstanceStatuses.INITIALIZING,
+  });
+
+  await expect(
+    client.applySandboxRuntimeLifecycleEvent({
+      sandboxInstanceId,
+      kind: "runtime_readiness_reported",
+      ownerLeaseId: "lease_runtime_lifecycle",
+      runtimeReady: true,
+    }),
+  ).resolves.toMatchObject({
+    lifecycleStatus: SandboxInstanceStatuses.RUNNING,
+  });
+});
+
+it("ignores readiness reports that do not match the persisted lifecycle state", async ({ env }) => {
+  const sandboxInstanceId = typeid("sbi").toString();
+
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
+    id: sandboxInstanceId,
+    organizationId: `org_${typeid("org").toString()}`,
+    sandboxProfileId: "sbp_integration_runtime_lifecycle_ignored",
+    sandboxProfileVersion: 1,
+    runtimeProvider: "docker",
+    providerSandboxId: "provider-runtime-lifecycle-ignored",
+    status: SandboxInstanceStatuses.STARTED,
+    startedByKind: "user",
+    startedById: "usr_integration_runtime_lifecycle_ignored",
+    source: "dashboard",
+  });
+
+  await expect(
+    clientFor(env).applySandboxRuntimeLifecycleEvent({
+      sandboxInstanceId,
+      kind: "runtime_readiness_reported",
+      ownerLeaseId: "lease_runtime_lifecycle_ignored",
+      runtimeReady: true,
+    }),
+  ).resolves.toMatchObject({
+    lifecycleStatus: SandboxInstanceStatuses.STARTED,
+  });
+});
+
+it("rejects runtime readiness lifecycle requests without a readiness value", async ({ env }) => {
+  const sandboxInstanceId = typeid("sbi").toString();
+
+  const response = await env.dataPlaneApi.http.fetch(
+    `/internal/sandbox/instances/${sandboxInstanceId}/runtime-lifecycle-events`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-mistle-service-token": InternalServiceToken,
+        [TestEnvironmentIdHeader]: env.id,
+      },
+      body: JSON.stringify({
+        kind: "runtime_readiness_reported",
+        ownerLeaseId: "lease_runtime_lifecycle_missing_ready",
+      }),
+    },
+  );
+
+  expect(response.status).toBe(400);
+});
+
 function createRuntimePlan(input: {
   sandboxProfileId: string;
   version: number;

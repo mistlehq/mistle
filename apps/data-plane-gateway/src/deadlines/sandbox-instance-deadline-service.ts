@@ -17,7 +17,9 @@ export class SandboxInstanceDeadlineService {
   public constructor(
     private readonly dataPlaneClient: Pick<
       DataPlaneSandboxInstancesClient,
-      "putSandboxInstanceDeadline" | "deleteSandboxInstanceDeadline"
+      | "putSandboxInstanceDeadline"
+      | "deleteSandboxInstanceDeadline"
+      | "applySandboxRuntimeLifecycleEvent"
     >,
     private readonly clock: Clock,
     private readonly lifecycleDurations: DataPlaneGatewayLifecycleDurations,
@@ -28,6 +30,15 @@ export class SandboxInstanceDeadlineService {
     ownerLeaseId: string;
     testEnvironmentId?: string;
   }): Promise<void> {
+    await this.dataPlaneClient.applySandboxRuntimeLifecycleEvent({
+      sandboxInstanceId: input.sandboxInstanceId,
+      kind: "runtime_readiness_reported",
+      ownerLeaseId: input.ownerLeaseId,
+      runtimeReady: false,
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
+    });
     await this.touchIdleDeadline(input);
   }
 
@@ -53,6 +64,14 @@ export class SandboxInstanceDeadlineService {
     testEnvironmentId?: string;
   }): Promise<void> {
     await this.clearIdleDeadline(input);
+    await this.dataPlaneClient.applySandboxRuntimeLifecycleEvent({
+      sandboxInstanceId: input.sandboxInstanceId,
+      kind: "bootstrap_detached",
+      ownerLeaseId: input.ownerLeaseId,
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
+    });
     await this.dataPlaneClient.putSandboxInstanceDeadline({
       sandboxInstanceId: input.sandboxInstanceId,
       kind: "disconnect",
@@ -60,6 +79,23 @@ export class SandboxInstanceDeadlineService {
       dueAt: new Date(
         this.clock.nowMs() + this.lifecycleDurations.bootstrapDisconnectGraceMs,
       ).toISOString(),
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
+    });
+  }
+
+  public async handleRuntimeReadiness(input: {
+    sandboxInstanceId: string;
+    ownerLeaseId: string;
+    ready: boolean;
+    testEnvironmentId?: string;
+  }): Promise<void> {
+    await this.dataPlaneClient.applySandboxRuntimeLifecycleEvent({
+      sandboxInstanceId: input.sandboxInstanceId,
+      kind: "runtime_readiness_reported",
+      ownerLeaseId: input.ownerLeaseId,
+      runtimeReady: input.ready,
       ...(input.testEnvironmentId === undefined
         ? {}
         : { testEnvironmentId: input.testEnvironmentId }),
