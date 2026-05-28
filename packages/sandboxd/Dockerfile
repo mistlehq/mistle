@@ -140,12 +140,20 @@ ENTRYPOINT ["/sbin/init"]
 
 FROM sandbox-base AS sandbox-base-system-tests
 
+ARG SYSTEM_TEST_VITE_NODE_VERSION=node@24.14.1
+ARG SYSTEM_TEST_VITE_PNPM_VERSION=pnpm@10.30.2
+
 COPY --from=sandboxd-system-tests-build /app/packages/sandboxd/target/debug/sandboxd /opt/mistle/bin/sandboxd
+COPY tests/system/fixtures/vite-dev-server /opt/mistle/system-test-fixtures/vite-dev-server
 
 RUN chmod +x /opt/mistle/bin/sandboxd \
   && ln -sf /opt/mistle/bin/sandboxd /opt/mistle/bin/mistle-ssh-sign \
   && ln -sf /opt/mistle/bin/sandboxd /usr/local/bin/sandboxd \
   && ln -sf /opt/mistle/bin/mistle-ssh-sign /usr/local/bin/mistle-ssh-sign
+
+RUN cd /opt/mistle/system-test-fixtures/vite-dev-server \
+  && /opt/mistle/bin/mise x -y "${SYSTEM_TEST_VITE_NODE_VERSION}" "${SYSTEM_TEST_VITE_PNPM_VERSION}" -- \
+    pnpm install --frozen-lockfile --ignore-workspace
 
 STOPSIGNAL SIGRTMIN+3
 

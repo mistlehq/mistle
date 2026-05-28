@@ -25,7 +25,11 @@ const DefaultBuildContextHostPath = fileURLToPath(new URL("../../../..", import.
 const SandboxBaseImageRepository = "ghcr.io/mistlehq/sandbox-base";
 const SandboxBaseImagePlatform = "linux/amd64";
 const SandboxBaseImageTarget = "sandbox-base-system-tests";
-const SandboxBaseImageHashInputs = ["packages/sandboxd"];
+const SandboxBaseImageHashInputs = [
+  ".dockerignore",
+  "packages/sandboxd",
+  "tests/system/fixtures/vite-dev-server",
+];
 const SandboxBaseImageLockPollIntervalMs = 1_000;
 const SandboxBaseImageLockTimeoutMs = 30 * 60_000;
 

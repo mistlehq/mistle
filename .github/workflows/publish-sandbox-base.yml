@@ -14,6 +14,7 @@ on:
       - "packages/sandbox/**"
       - "packages/sandboxd/**"
       - "packages/test-harness/src/system/system-test-sandbox-base-image.ts"
+      - "tests/system/fixtures/vite-dev-server/**"
   workflow_dispatch:
     inputs:
       publish_latest:

@@ -3,9 +3,6 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { readFile, readdir } from "node:fs/promises";
-import { join, relative } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 import { describe, expect } from "vitest";
@@ -51,13 +48,10 @@ const it = createSandboxSystemTest({
   },
 });
 
-const ViteFixtureHostPath = fileURLToPath(
-  new URL("../system/fixtures/vite-dev-server", import.meta.url),
-);
+const PreparedViteFixtureImagePath = "/opt/mistle/system-test-fixtures/vite-dev-server";
 const ViteFixtureSandboxPath = "/tmp/mistle-port-access-vite-fixture";
 const ViteLogPath = "/tmp/mistle-port-access-vite-fixture/vite.log";
 const VitePort = 6006;
-const ViteInstallTimeoutMs = 4 * 60_000;
 const SandboxProbeTimeoutMs = 10_000;
 const ListenerReadyTimeoutMs = 30_000;
 const RefreshRounds = 3;
@@ -86,11 +80,6 @@ const HmrUpdateMessageSchema = z.object({
 });
 
 type AuthenticatedSystemSession = Awaited<ReturnType<CodexSandboxFixture["authSession"]>>;
-type FixtureFile = {
-  contents: string;
-  sandboxPath: string;
-};
-
 type PreparedViteSandbox = {
   sandboxInstanceId: string;
   session: AuthenticatedSystemSession;
@@ -587,23 +576,6 @@ function miseExecCommand(input: { command: string; tools: readonly string[] }): 
   return [MiseCommand, "x", "-y", ...input.tools, "--", input.command].join(" ");
 }
 
-function wrapShellScriptWithHeartbeat(input: { script: string; intervalSeconds: number }): string {
-  return [
-    "set -eu",
-    "heartbeat() {",
-    `  while :; do printf '__mistle_heartbeat__\\n'; sleep ${String(input.intervalSeconds)}; done`,
-    "}",
-    "heartbeat &",
-    "heartbeat_pid=$!",
-    "cleanup() {",
-    '  kill "$heartbeat_pid" 2>/dev/null || true',
-    '  wait "$heartbeat_pid" 2>/dev/null || true',
-    "}",
-    "trap cleanup EXIT",
-    input.script,
-  ].join("\n");
-}
-
 function requireMatchedValue(input: {
   description: string;
   pattern: RegExp;
@@ -750,50 +722,6 @@ function extractRawTextImportPath(mainModuleSource: string): string {
   });
 }
 
-async function collectFixtureFiles(input: {
-  hostFixturePath: string;
-  sandboxFixturePath: string;
-}): Promise<FixtureFile[]> {
-  const fixtureFiles: FixtureFile[] = [];
-  const entries = await readdir(input.hostFixturePath, { withFileTypes: true });
-
-  for (const entry of entries) {
-    if (
-      entry.name === "node_modules" ||
-      entry.name === ".vite" ||
-      entry.name === ".vite-temp" ||
-      entry.name === ".pnpm-store"
-    ) {
-      continue;
-    }
-
-    const hostPath = join(input.hostFixturePath, entry.name);
-    const sandboxPath = `${input.sandboxFixturePath}/${entry.name}`;
-
-    if (entry.isDirectory()) {
-      fixtureFiles.push(
-        ...(await collectFixtureFiles({
-          hostFixturePath: hostPath,
-          sandboxFixturePath: sandboxPath,
-        })),
-      );
-      continue;
-    }
-
-    if (!entry.isFile()) {
-      continue;
-    }
-
-    fixtureFiles.push({
-      contents: await readFile(hostPath, "utf8"),
-      sandboxPath,
-    });
-  }
-
-  fixtureFiles.sort((left, right) => left.sandboxPath.localeCompare(right.sandboxPath));
-  return fixtureFiles;
-}
-
 async function expectSuccessfulSandboxCommand(input: {
   fixture: CodexSandboxFixture;
   authenticatedSession: Awaited<ReturnType<CodexSandboxFixture["authSession"]>>;
@@ -840,42 +768,26 @@ async function expectSuccessfulSandboxCommand(input: {
   return result.stdout.trim();
 }
 
-async function stageFixtureDirectoryInSandbox(input: {
+async function copyPreparedViteFixtureInSandbox(input: {
   fixture: CodexSandboxFixture;
   authenticatedSession: Awaited<ReturnType<CodexSandboxFixture["authSession"]>>;
   sandboxInstanceId: string;
-  hostFixturePath: string;
   sandboxFixturePath: string;
 }): Promise<void> {
-  const fixtureFiles = await collectFixtureFiles({
-    hostFixturePath: input.hostFixturePath,
-    sandboxFixturePath: input.sandboxFixturePath,
-  });
-
   const scriptLines = [
     "set -eu",
+    `test -d ${shellQuote(PreparedViteFixtureImagePath)}`,
+    `test -x ${shellQuote(`${PreparedViteFixtureImagePath}/node_modules/.bin/vite`)}`,
     `rm -rf ${shellQuote(input.sandboxFixturePath)}`,
-    `mkdir -p ${shellQuote(input.sandboxFixturePath)}`,
+    `mkdir -p ${shellQuote(input.sandboxFixturePath.slice(0, input.sandboxFixturePath.lastIndexOf("/")))}`,
+    `cp -a ${shellQuote(PreparedViteFixtureImagePath)} ${shellQuote(input.sandboxFixturePath)}`,
   ];
-
-  for (const fixtureFile of fixtureFiles) {
-    const relativePath = relative(input.sandboxFixturePath, fixtureFile.sandboxPath);
-    const delimiter = `MISTLE_FIXTURE_${randomUUID().replaceAll("-", "")}`;
-
-    scriptLines.push(
-      `printf 'staging %s\\n' ${shellQuote(relativePath)}`,
-      `mkdir -p ${shellQuote(fixtureFile.sandboxPath.slice(0, fixtureFile.sandboxPath.lastIndexOf("/")))}`,
-      `cat > ${shellQuote(fixtureFile.sandboxPath)} <<'${delimiter}'`,
-      fixtureFile.contents,
-      delimiter,
-    );
-  }
 
   await expectSuccessfulSandboxCommand({
     fixture: input.fixture,
     authenticatedSession: input.authenticatedSession,
     sandboxInstanceId: input.sandboxInstanceId,
-    description: `staging Vite fixture directory '${input.sandboxFixturePath}'`,
+    description: `copying prepared Vite fixture directory '${input.sandboxFixturePath}'`,
     command: "sh",
     args: ["-lc", scriptLines.join("\n")],
   });
@@ -1024,41 +936,13 @@ async function prepareViteSandboxFixture(input: {
 
   await timeVitePhase({
     sandboxProvider: input.fixture.sandboxProvider,
-    phase: "stage_fixture",
+    phase: "copy_prepared_vite_fixture",
     operation: async () =>
-      await stageFixtureDirectoryInSandbox({
+      await copyPreparedViteFixtureInSandbox({
         fixture: input.fixture,
         authenticatedSession: session,
         sandboxInstanceId,
-        hostFixturePath: ViteFixtureHostPath,
         sandboxFixturePath: ViteFixtureSandboxPath,
-      }),
-  });
-
-  await timeVitePhase({
-    sandboxProvider: input.fixture.sandboxProvider,
-    phase: "install_vite_dependencies",
-    operation: async () =>
-      await expectSuccessfulSandboxCommand({
-        fixture: input.fixture,
-        authenticatedSession: session,
-        sandboxInstanceId,
-        description: "installing Vite fixture dependencies in sandbox",
-        timeoutMs: ViteInstallTimeoutMs,
-        command: "sh",
-        args: [
-          "-lc",
-          wrapShellScriptWithHeartbeat({
-            intervalSeconds: 5,
-            script: [
-              `cd ${shellQuote(ViteFixtureSandboxPath)}`,
-              `${miseExecCommand({
-                tools: [NodeToolVersion, PnpmToolVersion],
-                command: "pnpm",
-              })} install --frozen-lockfile --ignore-workspace`,
-            ].join("\n"),
-          }),
-        ],
       }),
   });
 
