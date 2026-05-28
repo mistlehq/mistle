@@ -963,8 +963,8 @@ importers:
         specifier: ^6.0.0
         version: 6.0.0
       '@opencode-ai/sdk':
-        specifier: 1.15.1
-        version: 1.15.1
+        specifier: 1.15.10
+        version: 1.15.10
       '@opentelemetry/api':
         specifier: ^1.9.0
         version: 1.9.1
@@ -3149,8 +3149,8 @@ packages:
   '@openapi-contrib/openapi-schema-to-json-schema@3.2.0':
     resolution: {integrity: sha512-Gj6C0JwCr8arj0sYuslWXUBSP/KnUlEGnPW4qxlXvAl543oaNQgMgIgkQUA6vs5BCCvwTEiL8m/wdWzfl4UvSw==}
 
-  '@opencode-ai/sdk@1.15.1':
-    resolution: {integrity: sha512-IHxGuizTR2x40GtB49o0swFTc1N4AZIdeYzJ5D8gVAJzfISKyOYn5o5YxDprYJ7z4oWxBXNELIDpYioGVDUkNw==}
+  '@opencode-ai/sdk@1.15.10':
+    resolution: {integrity: sha512-CUhpmMGGOqzvPnNNjjWmEIodAfP6Qnuki2ChIUKWYF7UImZ4zUcMZnzO5BtUxu/Ni1P8qzWxDioXs+7aIZQEhA==}
 
   '@opentelemetry/api-logs@0.208.0':
     resolution: {integrity: sha512-CjruKY9V6NMssL/T1kAFgzosF1v9o6oeN+aX5JB/C/xPNtmgIJqcXHG7fA82Ou1zCpWGl4lROQUKwUNE1pMCyg==}
@@ -14593,7 +14593,7 @@ snapshots:
     dependencies:
       fast-deep-equal: 3.1.3
 
-  '@opencode-ai/sdk@1.15.1':
+  '@opencode-ai/sdk@1.15.10':
     dependencies:
       cross-spawn: 7.0.6
 

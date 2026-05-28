@@ -25,7 +25,7 @@ import {
 } from "./server.js";
 
 const OpenCodeCliArtifactKey = "opencode-cli";
-const OpenCodeCliVersion = "1.15.1";
+const OpenCodeCliVersion = "1.15.11";
 const OpenCodeCliReleaseTag = `v${OpenCodeCliVersion}`;
 const OpenCodeGitHubRepository = "anomalyco/opencode";
 const OpenCodeConfigPath = "/root/.config/opencode/opencode.json";
@@ -35,12 +35,12 @@ const OpenCodeGitHubAssets = {
   x86_64: {
     fileName: "opencode-linux-x64-baseline.tar.gz",
     binaryPath: "opencode",
-    sha256: "5f457b515896df8c9b48707e8475cbd98375f76b4e81a0b97f54b9d98228bd63",
+    sha256: "eb19eabc9cb7fa8a73898328b69720738d35e0cad716898bfdbc2547f88b2450",
   },
   aarch64: {
     fileName: "opencode-linux-arm64.tar.gz",
     binaryPath: "opencode",
-    sha256: "58bdd72718817043f9e3328c9f78acc6c667dd26e5fd013a6cf3c03593de2374",
+    sha256: "93e4399f308c49387c25ec2b570602bf0f9dd5f57989427946c0c28dbf259ff4",
   },
 };
 const ArtifactCommandTimeoutMs = 120_000;
