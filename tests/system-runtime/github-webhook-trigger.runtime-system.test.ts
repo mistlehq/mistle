@@ -69,6 +69,13 @@ async function runGitHubWebhookTriggerScenario({
     operation: async () =>
       await startGitHubWebhookTriggerConversation({
         fixture: createRuntimeGitHubWebhookTriggerFixture(system),
+        timePhase: async ({ phase, operation }) =>
+          await timeSystemRuntimePhase({
+            event: "system_runtime.github_webhook_trigger.phase_timing",
+            phase,
+            attributes: timingAttributes,
+            operation,
+          }),
       }),
   });
 

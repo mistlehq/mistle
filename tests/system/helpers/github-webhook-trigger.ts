@@ -48,6 +48,11 @@ export const GitHubIssueCommentConsistencyTimeoutMs = 30_000;
 export const GitHubIssueCommentCreateRetryDelayMs = 10_000;
 export const GitHubWebhookConfigTimeoutMs = 30_000;
 
+export type GitHubWebhookTriggerPhaseTimer = <Result>(input: {
+  phase: string;
+  operation: () => Promise<Result>;
+}) => Promise<Result>;
+
 const RequiredEnvNames = [
   "MISTLE_TEST_OPENAI_API_KEY",
   "MISTLE_TEST_GITHUB_TOKEN",
@@ -1985,12 +1990,30 @@ export async function getSharedGitHubWebhookTriggerHarness(
 export async function startGitHubWebhookTriggerConversation(input: {
   fixture: GitHubWebhookTriggerFixture;
   triggerInstructions?: string;
+  timePhase?: GitHubWebhookTriggerPhaseTimer;
 }): Promise<GitHubWebhookTriggerConversation> {
   const openAiApiKey = requireGitHubWebhookTriggerEnv("MISTLE_TEST_OPENAI_API_KEY");
   const dataPlaneGatewayBaseUrl = input.fixture.dataPlaneGatewayBaseUrl;
   const payloadMarker = `mistle-system-webhook-${randomUUID()}`;
   const expectedInputSubstring = `GitHub issue comment webhook: ${payloadMarker}`;
-  const sharedHarness = await getSharedGitHubWebhookTriggerHarness(input.fixture);
+  async function timePhase<Result>(
+    phase: string,
+    operation: () => Promise<Result>,
+  ): Promise<Result> {
+    if (input.timePhase === undefined) {
+      return await operation();
+    }
+
+    return await input.timePhase({
+      phase,
+      operation,
+    });
+  }
+
+  const sharedHarness = await timePhase(
+    "get_shared_github_webhook_harness",
+    async () => await getSharedGitHubWebhookTriggerHarness(input.fixture),
+  );
   const {
     session,
     repository,
@@ -2086,102 +2109,129 @@ export async function startGitHubWebhookTriggerConversation(input: {
   }
 
   try {
-    const openAiConnectionId = await createOpenAiConnection({
-      fixture: input.fixture,
-      session,
-      openAiApiKey,
-    });
-    const sandboxProfileId = await createSandboxProfile({
-      fixture: input.fixture,
-      session,
-    });
+    const openAiConnectionId = await timePhase(
+      "create_openai_connection",
+      async () =>
+        await createOpenAiConnection({
+          fixture: input.fixture,
+          session,
+          openAiApiKey,
+        }),
+    );
+    const sandboxProfileId = await timePhase(
+      "create_sandbox_profile",
+      async () =>
+        await createSandboxProfile({
+          fixture: input.fixture,
+          session,
+        }),
+    );
 
-    await putSandboxBindings({
-      fixture: input.fixture,
-      session,
-      sandboxProfileId,
-      description: "sandbox profile integration binding update",
-      bindings: [
-        {
-          connectionId: openAiConnectionId,
-          kind: "agent",
-          config: {},
-        },
-      ],
-    });
-
-    await putSandboxBindings({
-      fixture: input.fixture,
-      session,
-      sandboxProfileId,
-      description: "sandbox profile integration binding update after GitHub connection",
-      bindings: [
-        {
-          connectionId: openAiConnectionId,
-          kind: "agent",
-          config: {},
-        },
-        {
-          connectionId: githubConnectionId,
-          kind: "git",
-          config: {
-            repositories: [`${repository.owner}/${repository.repo}`],
-            tools: ["github-cli"],
+    await timePhase("bind_openai_connection", async () => {
+      await putSandboxBindings({
+        fixture: input.fixture,
+        session,
+        sandboxProfileId,
+        description: "sandbox profile integration binding update",
+        bindings: [
+          {
+            connectionId: openAiConnectionId,
+            kind: "agent",
+            config: {},
           },
-        },
-      ],
+        ],
+      });
     });
 
-    await ensureGitHubWebhookSourceSupportsIssueComments({
-      fixture: input.fixture,
-      githubWebhookSource,
+    await timePhase("bind_github_connection", async () => {
+      await putSandboxBindings({
+        fixture: input.fixture,
+        session,
+        sandboxProfileId,
+        description: "sandbox profile integration binding update after GitHub connection",
+        bindings: [
+          {
+            connectionId: openAiConnectionId,
+            kind: "agent",
+            config: {},
+          },
+          {
+            connectionId: githubConnectionId,
+            kind: "git",
+            config: {
+              repositories: [`${repository.owner}/${repository.repo}`],
+              tools: ["github-cli"],
+            },
+          },
+        ],
+      });
     });
 
-    await createWebhookTrigger({
-      fixture: input.fixture,
-      session,
-      githubWebhookSource,
-      sandboxProfileId,
-      payloadMarker,
-      ...(input.triggerInstructions === undefined
-        ? {}
-        : { instructions: input.triggerInstructions }),
+    await timePhase("ensure_webhook_source_supports_issue_comments", async () => {
+      await ensureGitHubWebhookSourceSupportsIssueComments({
+        fixture: input.fixture,
+        githubWebhookSource,
+      });
+    });
+
+    await timePhase("create_webhook_trigger", async () => {
+      await createWebhookTrigger({
+        fixture: input.fixture,
+        session,
+        githubWebhookSource,
+        sandboxProfileId,
+        payloadMarker,
+        ...(input.triggerInstructions === undefined
+          ? {}
+          : { instructions: input.triggerInstructions }),
+      });
     });
 
     if (input.fixture.registerPublicWebhookMarkerRoute !== undefined) {
-      await input.fixture.registerPublicWebhookMarkerRoute({
-        marker: payloadMarker,
-        publicHostname,
-        targetPath: toWebhookTargetPath(
-          buildIntegrationWebhookCallbackUrl({
-            controlPlaneBaseUrl: `https://${publicHostname}`,
-            targetKey: GitHubTargetKey,
-            endpointKey: githubWebhookSource.endpointKey,
-          }),
-        ),
+      const registerPublicWebhookMarkerRoute = input.fixture.registerPublicWebhookMarkerRoute;
+      await timePhase("register_public_webhook_marker_route", async () => {
+        await registerPublicWebhookMarkerRoute({
+          marker: payloadMarker,
+          publicHostname,
+          targetPath: toWebhookTargetPath(
+            buildIntegrationWebhookCallbackUrl({
+              controlPlaneBaseUrl: `https://${publicHostname}`,
+              targetKey: GitHubTargetKey,
+              endpointKey: githubWebhookSource.endpointKey,
+            }),
+          ),
+        });
       });
     }
 
-    const issue = await githubRequestJson({
-      method: "POST",
-      path: `/repos/${repository.owner}/${repository.repo}/issues`,
-      token: githubToken,
-      description: "GitHub issue creation",
-      schema: GitHubIssueResponseSchema,
-      body: {
-        title: `Webhook trigger system test ${payloadMarker}`,
-        body: `Webhook trigger system test issue ${payloadMarker}`,
-      },
-    });
+    const issue = await timePhase(
+      "create_github_issue",
+      async () =>
+        await githubRequestJson({
+          method: "POST",
+          path: `/repos/${repository.owner}/${repository.repo}/issues`,
+          token: githubToken,
+          description: "GitHub issue creation",
+          schema: GitHubIssueResponseSchema,
+          body: {
+            title: `Webhook trigger system test ${payloadMarker}`,
+            body: `Webhook trigger system test issue ${payloadMarker}`,
+          },
+        }),
+    );
     issueNumber = issue.number;
 
-    const issueComment = await createGitHubIssueCommentWithConsistencyWait({
-      owner: repository.owner,
-      repo: repository.repo,
-      issueNumber: issue.number,
-      token: githubToken,
-      body: payloadMarker,
-    });
+    const issueComment = await timePhase(
+      "create_github_issue_comment",
+      async () =>
+        await createGitHubIssueCommentWithConsistencyWait({
+          owner: repository.owner,
+          repo: repository.repo,
+          issueNumber: issue.number,
+          token: githubToken,
+          body: payloadMarker,
+        }),
+    );
     if (!issueComment.body.includes(payloadMarker)) {
       throw new Error("Expected GitHub issue comment creation to persist the webhook marker.");
     }
@@ -2190,38 +2240,42 @@ export async function startGitHubWebhookTriggerConversation(input: {
       ReturnType<GitHubWebhookTriggerFixture["db"]["query"]["integrationWebhookEvents"]["findMany"]>
     >[number];
     try {
-      webhookEvent = await waitForCondition({
-        description: "processed GitHub webhook event",
-        timeoutMs: WebhookDeliveryTimeoutMs,
-        evaluate: async () => {
-          const events = await input.fixture.db.query.integrationWebhookEvents.findMany({
-            where: (table, { and, eq }) =>
-              and(
-                eq(table.targetKey, GitHubTargetKey),
-                eq(table.integrationWebhookSourceId, githubWebhookSource.id),
-              ),
-            orderBy: (table, { desc }) => [desc(table.finalizedAt), desc(table.id)],
-          });
+      webhookEvent = await timePhase(
+        "wait_processed_webhook_event",
+        async () =>
+          await waitForCondition({
+            description: "processed GitHub webhook event",
+            timeoutMs: WebhookDeliveryTimeoutMs,
+            evaluate: async () => {
+              const events = await input.fixture.db.query.integrationWebhookEvents.findMany({
+                where: (table, { and, eq }) =>
+                  and(
+                    eq(table.targetKey, GitHubTargetKey),
+                    eq(table.integrationWebhookSourceId, githubWebhookSource.id),
+                  ),
+                orderBy: (table, { desc }) => [desc(table.finalizedAt), desc(table.id)],
+              });
 
-          for (const event of events) {
-            const comment = isRecord(event.payload.comment) ? event.payload.comment : null;
-            const body = comment === null ? null : comment.body;
-            if (
-              event.eventType === "github.issue_comment.created" &&
-              typeof body === "string" &&
-              body.includes(payloadMarker)
-            ) {
-              if (event.status === "failed") {
-                throw new Error(`GitHub webhook event '${event.id}' failed during processing.`);
+              for (const event of events) {
+                const comment = isRecord(event.payload.comment) ? event.payload.comment : null;
+                const body = comment === null ? null : comment.body;
+                if (
+                  event.eventType === "github.issue_comment.created" &&
+                  typeof body === "string" &&
+                  body.includes(payloadMarker)
+                ) {
+                  if (event.status === "failed") {
+                    throw new Error(`GitHub webhook event '${event.id}' failed during processing.`);
+                  }
+
+                  return event.status === "processed" ? event : null;
+                }
               }
 
-              return event.status === "processed" ? event : null;
-            }
-          }
-
-          return null;
-        },
-      });
+              return null;
+            },
+          }),
+      );
     } catch (error) {
       const diagnostics = await buildWebhookDeliveryDiagnostics({
         fixture: input.fixture,
@@ -2238,56 +2292,60 @@ export async function startGitHubWebhookTriggerConversation(input: {
       );
     }
 
-    const triggerRun = await waitForCondition({
-      description: "completed trigger run",
-      timeoutMs: TriggerRunTimeoutMs,
-      evaluate: async () => {
-        const run = await input.fixture.db.query.triggerRuns.findFirst({
-          where: (table, { eq }) => eq(table.sourceWebhookEventId, webhookEvent.id),
-        });
+    const triggerRun = await timePhase(
+      "wait_trigger_run_completed",
+      async () =>
+        await waitForCondition({
+          description: "completed trigger run",
+          timeoutMs: TriggerRunTimeoutMs,
+          evaluate: async () => {
+            const run = await input.fixture.db.query.triggerRuns.findFirst({
+              where: (table, { eq }) => eq(table.sourceWebhookEventId, webhookEvent.id),
+            });
 
-        if (run === undefined) {
-          return null;
-        }
+            if (run === undefined) {
+              return null;
+            }
 
-        if (run.status === TriggerRunStatuses.FAILED) {
-          const conversationId = run.conversationId;
-          const route =
-            conversationId === null
-              ? null
-              : await input.fixture.db.query.triggerConversationRoutes.findFirst({
-                  where: (table, { eq }) => eq(table.conversationId, conversationId),
-                });
-          const sandboxInstance =
-            route?.sandboxInstanceId === null || route?.sandboxInstanceId === undefined
-              ? null
-              : await requestJsonOrThrow({
-                  request: input.fixture.request,
-                  path: `/v1/sandbox/instances/${encodeURIComponent(route.sandboxInstanceId)}`,
-                  expectedStatus: 200,
-                  description: "sandbox instance lookup after trigger failure",
-                  schema: SandboxInstanceStatusResponseSchema,
-                  init: {
-                    method: "GET",
-                    headers: {
-                      cookie: session.cookie,
-                    },
-                  },
-                });
-          const diagnostics = await buildTriggerRunFailureDiagnostics({
-            fixture: input.fixture,
-            sessionCookie: session.cookie,
-            triggerRunId: run.id,
-            conversationId: run.conversationId,
-          });
-          throw new Error(
-            `Trigger run failed: ${run.failureCode ?? "unknown"} ${run.failureMessage ?? ""}. route=${JSON.stringify(route)} sandbox=${JSON.stringify(sandboxInstance)} diagnostics=${diagnostics}`,
-          );
-        }
+            if (run.status === TriggerRunStatuses.FAILED) {
+              const conversationId = run.conversationId;
+              const route =
+                conversationId === null
+                  ? null
+                  : await input.fixture.db.query.triggerConversationRoutes.findFirst({
+                      where: (table, { eq }) => eq(table.conversationId, conversationId),
+                    });
+              const sandboxInstance =
+                route?.sandboxInstanceId === null || route?.sandboxInstanceId === undefined
+                  ? null
+                  : await requestJsonOrThrow({
+                      request: input.fixture.request,
+                      path: `/v1/sandbox/instances/${encodeURIComponent(route.sandboxInstanceId)}`,
+                      expectedStatus: 200,
+                      description: "sandbox instance lookup after trigger failure",
+                      schema: SandboxInstanceStatusResponseSchema,
+                      init: {
+                        method: "GET",
+                        headers: {
+                          cookie: session.cookie,
+                        },
+                      },
+                    });
+              const diagnostics = await buildTriggerRunFailureDiagnostics({
+                fixture: input.fixture,
+                sessionCookie: session.cookie,
+                triggerRunId: run.id,
+                conversationId: run.conversationId,
+              });
+              throw new Error(
+                `Trigger run failed: ${run.failureCode ?? "unknown"} ${run.failureMessage ?? ""}. route=${JSON.stringify(route)} sandbox=${JSON.stringify(sandboxInstance)} diagnostics=${diagnostics}`,
+              );
+            }
 
-        return run.status === TriggerRunStatuses.COMPLETED ? run : null;
-      },
-    }).catch(async (error: unknown) => {
+            return run.status === TriggerRunStatuses.COMPLETED ? run : null;
+          },
+        }),
+    ).catch(async (error: unknown) => {
       const run = await input.fixture.db.query.triggerRuns.findFirst({
         where: (table, { eq }) => eq(table.sourceWebhookEventId, webhookEvent.id),
       });
@@ -2318,93 +2376,113 @@ export async function startGitHubWebhookTriggerConversation(input: {
     }
     const conversationId = triggerRun.conversationId;
 
-    const route = await waitForCondition({
-      description: "active trigger conversation route",
-      timeoutMs: SandboxReadyTimeoutMs,
-      evaluate: async () => {
-        const persistedRoute = await input.fixture.db.query.triggerConversationRoutes.findFirst({
-          where: (table, { eq }) => eq(table.conversationId, conversationId),
-        });
+    const route = await timePhase(
+      "wait_active_conversation_route",
+      async () =>
+        await waitForCondition({
+          description: "active trigger conversation route",
+          timeoutMs: SandboxReadyTimeoutMs,
+          evaluate: async () => {
+            const persistedRoute = await input.fixture.db.query.triggerConversationRoutes.findFirst(
+              {
+                where: (table, { eq }) => eq(table.conversationId, conversationId),
+              },
+            );
 
-        if (persistedRoute === undefined || persistedRoute.providerConversationId === null) {
-          return null;
-        }
+            if (persistedRoute === undefined || persistedRoute.providerConversationId === null) {
+              return null;
+            }
 
-        return persistedRoute;
-      },
-    });
+            return persistedRoute;
+          },
+        }),
+    );
     if (route.providerConversationId === null) {
       throw new Error("Expected trigger conversation route to persist providerConversationId.");
     }
     const providerConversationId = route.providerConversationId;
 
-    const sandboxInstance = await waitForCondition({
-      description: "running sandbox instance",
-      timeoutMs: SandboxReadyTimeoutMs,
-      evaluate: async () => {
-        const response = await input.fixture.request(
-          `/v1/sandbox/instances/${encodeURIComponent(route.sandboxInstanceId)}`,
-          {
-            headers: {
-              cookie: session.cookie,
-            },
+    const sandboxInstance = await timePhase(
+      "wait_running_sandbox_instance",
+      async () =>
+        await waitForCondition({
+          description: "running sandbox instance",
+          timeoutMs: SandboxReadyTimeoutMs,
+          evaluate: async () => {
+            const response = await input.fixture.request(
+              `/v1/sandbox/instances/${encodeURIComponent(route.sandboxInstanceId)}`,
+              {
+                headers: {
+                  cookie: session.cookie,
+                },
+              },
+            );
+
+            const bodyText = await response.text().catch(() => "");
+            if (response.status !== 200) {
+              throw new Error(
+                `sandbox instance status lookup failed with status ${String(response.status)} for conversation '${conversationId}' sandbox '${route.sandboxInstanceId}'. Response body: ${bodyText}`,
+              );
+            }
+
+            let parsed: unknown;
+            try {
+              parsed = JSON.parse(bodyText);
+            } catch (error) {
+              throw new Error(
+                `sandbox instance status lookup returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
+              );
+            }
+
+            const status = SandboxInstanceStatusResponseSchema.parse(parsed);
+            if (status.status === "failed" || status.status === "stopped") {
+              throw new Error(
+                `Sandbox instance '${status.id}' entered terminal status '${status.status}': ${status.failureMessage ?? "no failure message"}`,
+              );
+            }
+
+            return status.status === "running" ? status : null;
           },
-        );
+        }),
+    );
 
-        const bodyText = await response.text().catch(() => "");
-        if (response.status !== 200) {
-          throw new Error(
-            `sandbox instance status lookup failed with status ${String(response.status)} for conversation '${conversationId}' sandbox '${route.sandboxInstanceId}'. Response body: ${bodyText}`,
-          );
-        }
+    const connectedRpcClient = await timePhase(
+      "connect_rpc_client",
+      async () =>
+        await connectRpcClient({
+          sandboxInstanceId: route.sandboxInstanceId,
+          dataPlaneGatewayBaseUrl,
+        }),
+    );
 
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(bodyText);
-        } catch (error) {
-          throw new Error(
-            `sandbox instance status lookup returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-
-        const status = SandboxInstanceStatusResponseSchema.parse(parsed);
-        if (status.status === "failed" || status.status === "stopped") {
-          throw new Error(
-            `Sandbox instance '${status.id}' entered terminal status '${status.status}': ${status.failureMessage ?? "no failure message"}`,
-          );
-        }
-
-        return status.status === "running" ? status : null;
-      },
+    await timePhase("resume_codex_thread", async () => {
+      await resumeCodexThread({
+        rpcClient: connectedRpcClient,
+        threadId: providerConversationId,
+      });
     });
 
-    const connectedRpcClient = await connectRpcClient({
-      sandboxInstanceId: route.sandboxInstanceId,
-      dataPlaneGatewayBaseUrl,
-    });
+    const initialThreadRead = await timePhase(
+      "wait_thread_webhook_input",
+      async () =>
+        await waitForCondition({
+          description: "trigger conversation thread containing webhook input",
+          timeoutMs: ThreadReadTimeoutMs,
+          evaluate: async () => {
+            const result = await readCodexThread({
+              rpcClient: connectedRpcClient,
+              threadId: providerConversationId,
+            });
 
-    await resumeCodexThread({
-      rpcClient: connectedRpcClient,
-      threadId: providerConversationId,
-    });
-
-    const initialThreadRead = await waitForCondition({
-      description: "trigger conversation thread containing webhook input",
-      timeoutMs: ThreadReadTimeoutMs,
-      evaluate: async () => {
-        const result = await readCodexThread({
-          rpcClient: connectedRpcClient,
-          threadId: providerConversationId,
-        });
-
-        return hasPersistedUserMessageText({
-          threadReadResult: result.response,
-          expectedSubstring: expectedInputSubstring,
-        })
-          ? result
-          : null;
-      },
-    });
+            return hasPersistedUserMessageText({
+              threadReadResult: result.response,
+              expectedSubstring: expectedInputSubstring,
+            })
+              ? result
+              : null;
+          },
+        }),
+    );
 
     if (sandboxInstance.id !== route.sandboxInstanceId) {
       throw new Error("Expected running sandbox instance id to match conversation route.");
