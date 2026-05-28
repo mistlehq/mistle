@@ -81,6 +81,61 @@ it("returns pending sandbox instances before provider provisioning begins", asyn
   });
 });
 
+it("returns starting sandbox instances while provider allocation is pending", async ({ env }) => {
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values(
+    sandboxInstanceRow({
+      id: "sbi_integration_new_get_starting_without_provider",
+      organizationId: "org_integration_new_get_starting_without_provider",
+      sandboxProfileId: "sbp_integration_new_starting_without_provider",
+      persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
+      status: SandboxInstanceStatuses.STARTING,
+      providerSandboxId: null,
+      title: "Waiting for provider allocation",
+    }),
+  );
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxOperationEvents).values(
+    sandboxOperationEventRow({
+      id: "soe_integration_new_get_starting_without_provider",
+      sandboxInstanceId: "sbi_integration_new_get_starting_without_provider",
+      operationId: "owfr_integration_new_starting_without_provider",
+      operationKind: SandboxOperationKinds.START,
+    }),
+  );
+
+  await expect(
+    clientFor(env).getSandboxInstance({
+      organizationId: "org_integration_new_get_starting_without_provider",
+      instanceId: "sbi_integration_new_get_starting_without_provider",
+    }),
+  ).resolves.toEqual({
+    id: "sbi_integration_new_get_starting_without_provider",
+    title: "Waiting for provider allocation",
+    status: "starting",
+    connectable: false,
+    failureCode: null,
+    failureMessage: null,
+    runtimePlan: null,
+    sandboxProfileId: "sbp_integration_new_starting_without_provider",
+    sandboxProfileVersion: 1,
+    startupOperation: {
+      operationId: "owfr_integration_new_starting_without_provider",
+      operationKind: "start",
+    },
+  });
+
+  const persisted = await env.dataPlaneDb.query.sandboxInstances.findFirst({
+    columns: {
+      status: true,
+      providerSandboxId: true,
+    },
+    where: (table, { eq }) => eq(table.id, "sbi_integration_new_get_starting_without_provider"),
+  });
+  expect(persisted).toEqual({
+    status: SandboxInstanceStatuses.STARTING,
+    providerSandboxId: null,
+  });
+});
+
 it("does not return deleted sandbox sessions from the get route", async ({ env }) => {
   await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values(
     sandboxInstanceRow({

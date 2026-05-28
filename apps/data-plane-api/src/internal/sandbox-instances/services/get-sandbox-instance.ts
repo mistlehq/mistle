@@ -356,29 +356,22 @@ async function inspectStartingSandboxInstance(
   ctx: GetSandboxInstanceContext,
   sandboxInstance: InspectableSandboxInstance,
 ): Promise<SandboxInstanceInspectionResponse> {
-  if (
-    sandboxInstance.providerSandboxId === null &&
-    sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT
-  ) {
-    await markStartingSandboxInstanceStopped(ctx, {
-      sandboxInstanceId: sandboxInstance.id,
-      clearProviderSandboxId: true,
-    });
-    return {
-      id: sandboxInstance.id,
-      title: sandboxInstance.title,
-      status: SandboxInstanceStatuses.STOPPED,
-      connectable: false,
-      failureCode: null,
-      failureMessage: null,
-      runtimePlan: sandboxInstance.runtimePlan,
-      startupOperation: null,
-    };
-  }
-
   if (sandboxInstance.providerSandboxId === null) {
+    if (sandboxInstance.status === SandboxInstanceStatuses.STARTING) {
+      return {
+        id: sandboxInstance.id,
+        title: sandboxInstance.title,
+        status: SandboxInstanceStatuses.STARTING,
+        connectable: false,
+        failureCode: sandboxInstance.failureCode,
+        failureMessage: sandboxInstance.failureMessage,
+        runtimePlan: sandboxInstance.runtimePlan,
+        startupOperation: null,
+      };
+    }
+
     throw new Error(
-      `Expected starting sandbox instance '${sandboxInstance.id}' to have a providerSandboxId.`,
+      `Expected ${sandboxInstance.status} sandbox instance '${sandboxInstance.id}' to have a providerSandboxId.`,
     );
   }
 
