@@ -847,38 +847,33 @@ async function stageFixtureDirectoryInSandbox(input: {
     sandboxFixturePath: input.sandboxFixturePath,
   });
 
-  await expectSuccessfulSandboxCommand({
-    fixture: input.fixture,
-    authenticatedSession: input.authenticatedSession,
-    sandboxInstanceId: input.sandboxInstanceId,
-    description: `creating sandbox fixture directory '${input.sandboxFixturePath}'`,
-    command: "sh",
-    args: [
-      "-lc",
-      `rm -rf ${shellQuote(input.sandboxFixturePath)} && mkdir -p ${shellQuote(input.sandboxFixturePath)}`,
-    ],
-  });
+  const scriptLines = [
+    "set -eu",
+    `rm -rf ${shellQuote(input.sandboxFixturePath)}`,
+    `mkdir -p ${shellQuote(input.sandboxFixturePath)}`,
+  ];
 
   for (const fixtureFile of fixtureFiles) {
     const relativePath = relative(input.sandboxFixturePath, fixtureFile.sandboxPath);
     const delimiter = `MISTLE_FIXTURE_${randomUUID().replaceAll("-", "")}`;
-    const script = [
-      "set -eu",
+
+    scriptLines.push(
+      `printf 'staging %s\\n' ${shellQuote(relativePath)}`,
       `mkdir -p ${shellQuote(fixtureFile.sandboxPath.slice(0, fixtureFile.sandboxPath.lastIndexOf("/")))}`,
       `cat > ${shellQuote(fixtureFile.sandboxPath)} <<'${delimiter}'`,
       fixtureFile.contents,
       delimiter,
-    ].join("\n");
-
-    await expectSuccessfulSandboxCommand({
-      fixture: input.fixture,
-      authenticatedSession: input.authenticatedSession,
-      sandboxInstanceId: input.sandboxInstanceId,
-      description: `staging fixture file '${relativePath}'`,
-      command: "sh",
-      args: ["-lc", script],
-    });
+    );
   }
+
+  await expectSuccessfulSandboxCommand({
+    fixture: input.fixture,
+    authenticatedSession: input.authenticatedSession,
+    sandboxInstanceId: input.sandboxInstanceId,
+    description: `staging Vite fixture directory '${input.sandboxFixturePath}'`,
+    command: "sh",
+    args: ["-lc", scriptLines.join("\n")],
+  });
 }
 
 async function readViteLog(input: {
