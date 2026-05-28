@@ -334,7 +334,11 @@ fn sandbox_status_label(status: &SandboxInstanceStatus) -> &'static str {
     match status {
         SandboxInstanceStatus::Pending => "pending",
         SandboxInstanceStatus::Starting => "starting",
+        SandboxInstanceStatus::Started => "started",
+        SandboxInstanceStatus::Initializing => "initializing",
         SandboxInstanceStatus::Running => "running",
+        SandboxInstanceStatus::Reconnecting => "reconnecting",
+        SandboxInstanceStatus::Stopping => "stopping",
         SandboxInstanceStatus::Stopped => "stopped",
         SandboxInstanceStatus::Failed => "failed",
     }
@@ -366,7 +370,9 @@ mod tests {
         StartSandboxProfileInstanceStatus,
     };
 
-    use crate::sandbox::{render_created_sandbox, render_sandbox, render_sandboxes};
+    use crate::sandbox::{
+        render_created_sandbox, render_sandbox, render_sandboxes, sandbox_status_label,
+    };
 
     #[test]
     fn renders_created_sandbox_details() {
@@ -397,6 +403,26 @@ mod tests {
         };
 
         assert_eq!(render_sandboxes(&response), "No sandboxes found.\n");
+    }
+
+    #[test]
+    fn renders_expanded_sandbox_status_labels() {
+        assert_eq!(
+            sandbox_status_label(&SandboxInstanceStatus::Started),
+            "started"
+        );
+        assert_eq!(
+            sandbox_status_label(&SandboxInstanceStatus::Initializing),
+            "initializing",
+        );
+        assert_eq!(
+            sandbox_status_label(&SandboxInstanceStatus::Reconnecting),
+            "reconnecting",
+        );
+        assert_eq!(
+            sandbox_status_label(&SandboxInstanceStatus::Stopping),
+            "stopping"
+        );
     }
 
     #[test]

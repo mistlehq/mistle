@@ -670,7 +670,7 @@ describe("useSessionWorkbenchController", () => {
       },
     },
     {
-      expected: "sandbox_starting",
+      expected: "sandbox_pending",
       input: {
         connectedSession: false,
         hasResumeInFlightState: false,
@@ -683,6 +683,38 @@ describe("useSessionWorkbenchController", () => {
         connectedSession: false,
         hasResumeInFlightState: false,
         sandboxStatus: "starting" as const,
+      },
+    },
+    {
+      expected: "sandbox_started",
+      input: {
+        connectedSession: false,
+        hasResumeInFlightState: false,
+        sandboxStatus: "started" as const,
+      },
+    },
+    {
+      expected: "sandbox_initializing",
+      input: {
+        connectedSession: false,
+        hasResumeInFlightState: false,
+        sandboxStatus: "initializing" as const,
+      },
+    },
+    {
+      expected: "sandbox_reconnecting",
+      input: {
+        connectedSession: false,
+        hasResumeInFlightState: false,
+        sandboxStatus: "reconnecting" as const,
+      },
+    },
+    {
+      expected: "sandbox_stopping",
+      input: {
+        connectedSession: false,
+        hasResumeInFlightState: false,
+        sandboxStatus: "stopping" as const,
       },
     },
     {

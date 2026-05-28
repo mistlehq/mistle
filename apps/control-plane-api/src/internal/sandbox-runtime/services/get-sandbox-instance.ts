@@ -1,4 +1,5 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
+import type { SandboxInstanceStatus } from "@mistle/sandbox-lifecycle";
 
 import {
   SandboxInstancesNotFoundCodes,
@@ -17,7 +18,7 @@ export async function getSandboxInstance(
   },
 ): Promise<{
   id: string;
-  status: "pending" | "starting" | "running" | "stopped" | "failed";
+  status: SandboxInstanceStatus;
   failureCode: string | null;
   failureMessage: string | null;
 }> {

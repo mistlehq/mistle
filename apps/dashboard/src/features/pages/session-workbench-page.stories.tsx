@@ -1,3 +1,4 @@
+import type { SandboxInstanceStatus } from "@mistle/sandbox-lifecycle";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
@@ -7,7 +8,7 @@ import { SessionsStoryHarness } from "./sessions-story-harness.js";
 type SessionWorkbenchPageStoryArgs = {
   sandboxInstanceId: string;
   sessionTitle: string | null;
-  sandboxStatus: "pending" | "starting" | "running" | "stopped" | "failed";
+  sandboxStatus: SandboxInstanceStatus;
   connectable: boolean;
 };
 

@@ -159,6 +159,9 @@ importers:
       '@mistle/sandbox':
         specifier: workspace:*
         version: link:../../packages/sandbox
+      '@mistle/sandbox-lifecycle':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-lifecycle
       '@mistle/sandbox-session-protocol':
         specifier: workspace:*
         version: link:../../packages/sandbox-session-protocol
@@ -265,6 +268,9 @@ importers:
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging
+      '@mistle/sandbox-lifecycle':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-lifecycle
       '@mistle/sandbox-session-client':
         specifier: workspace:*
         version: link:../../packages/sandbox-session-client
@@ -359,6 +365,9 @@ importers:
       '@mistle/integrations-definitions':
         specifier: workspace:*
         version: link:../../packages/integrations-definitions
+      '@mistle/sandbox-lifecycle':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-lifecycle
       '@mistle/sandbox-session-client':
         specifier: workspace:*
         version: link:../../packages/sandbox-session-client
@@ -519,6 +528,9 @@ importers:
       '@mistle/sandbox':
         specifier: workspace:*
         version: link:../../packages/sandbox
+      '@mistle/sandbox-lifecycle':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-lifecycle
       '@mistle/sandbox-runtime-contract':
         specifier: workspace:*
         version: link:../../packages/sandbox-runtime-contract
@@ -613,6 +625,9 @@ importers:
       '@mistle/port-access-auth':
         specifier: workspace:*
         version: link:../../packages/port-access-auth
+      '@mistle/sandbox-lifecycle':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-lifecycle
       '@mistle/sandbox-runtime-contract':
         specifier: workspace:*
         version: link:../../packages/sandbox-runtime-contract
@@ -823,6 +838,9 @@ importers:
       '@mistle/sandbox':
         specifier: workspace:*
         version: link:../sandbox
+      '@mistle/sandbox-lifecycle':
+        specifier: workspace:*
+        version: link:../sandbox-lifecycle
       openapi-fetch:
         specifier: ^0.17.0
         version: 0.17.0
@@ -836,6 +854,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@mistle/sandbox-lifecycle':
+        specifier: workspace:*
+        version: link:../sandbox-lifecycle
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@electric-sql/pglite@0.3.15)(@opentelemetry/api@1.9.1)(@prisma/client@7.4.2(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.20.0)(kysely@0.28.17)(mysql2@3.15.3)(pg@8.20.0)(postgres@3.4.9)(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@5.9.3))
@@ -1059,6 +1080,8 @@ importers:
       testcontainers:
         specifier: ^11.14.0
         version: 11.14.0
+
+  packages/sandbox-lifecycle: {}
 
   packages/sandbox-runtime-contract:
     dependencies:
@@ -1393,6 +1416,9 @@ importers:
       '@mistle/integrations-definitions':
         specifier: workspace:*
         version: link:../packages/integrations-definitions
+      '@mistle/sandbox-lifecycle':
+        specifier: workspace:*
+        version: link:../packages/sandbox-lifecycle
       '@mistle/sandbox-session-protocol':
         specifier: workspace:*
         version: link:../packages/sandbox-session-protocol

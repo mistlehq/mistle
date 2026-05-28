@@ -22,6 +22,7 @@
     "@mistle/config": "workspace:*",
     "@mistle/db": "workspace:*",
     "@mistle/integrations-definitions": "workspace:*",
+    "@mistle/sandbox-lifecycle": "workspace:*",
     "@mistle/sandbox-session-protocol": "workspace:*",
     "@mistle/test-harness": "workspace:*",
     "@mistle/time": "workspace:*",

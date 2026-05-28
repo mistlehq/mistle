@@ -133,7 +133,16 @@ export interface paths {
                   kind: "user" | "api_key" | "system";
                 };
                 /** @enum {string} */
-                status: "pending" | "starting" | "running" | "stopped" | "failed";
+                status:
+                  | "pending"
+                  | "starting"
+                  | "started"
+                  | "initializing"
+                  | "running"
+                  | "reconnecting"
+                  | "stopping"
+                  | "stopped"
+                  | "failed";
                 title: string | null;
                 updatedAt: string;
               }[];
@@ -1072,7 +1081,16 @@ export interface paths {
                 operationKind: "start" | "resume";
               } | null;
               /** @enum {string} */
-              status: "pending" | "starting" | "running" | "stopped" | "failed";
+              status:
+                | "pending"
+                | "starting"
+                | "started"
+                | "initializing"
+                | "running"
+                | "reconnecting"
+                | "stopping"
+                | "stopped"
+                | "failed";
               title: string | null;
             } | null;
           };
@@ -1975,7 +1993,16 @@ export interface paths {
                   kind: "user" | "api_key" | "system";
                 };
                 /** @enum {string} */
-                status: "pending" | "starting" | "running" | "stopped" | "failed";
+                status:
+                  | "pending"
+                  | "starting"
+                  | "started"
+                  | "initializing"
+                  | "running"
+                  | "reconnecting"
+                  | "stopping"
+                  | "stopped"
+                  | "failed";
                 title: string | null;
                 updatedAt: string;
               }[];

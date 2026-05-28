@@ -2,6 +2,7 @@
  * This suite uses an extended test `it` fixture imported from system test context.
  */
 
+import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
@@ -17,7 +18,7 @@ import { it } from "./system-test-context.js";
 const SandboxInstanceStatusResponseSchema = z.looseObject({
   id: z.string().min(1),
   title: z.string().min(1).nullable(),
-  status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+  status: z.enum(SandboxInstanceStatuses),
   connectable: z.boolean(),
   failureCode: z.string().nullable(),
   failureMessage: z.string().nullable(),

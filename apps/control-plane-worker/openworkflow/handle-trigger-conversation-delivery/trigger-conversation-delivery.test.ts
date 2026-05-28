@@ -1,3 +1,4 @@
+import { SandboxInstanceStatuses, type SandboxInstanceStatus } from "@mistle/sandbox-lifecycle";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -13,6 +14,12 @@ import {
   resolveTriggerConversationExecutionAction,
   resolveTriggerConversationSteerRecoveryAction,
 } from "./trigger-conversation-delivery.js";
+
+const WaitingSandboxStatuses: SandboxInstanceStatus[] = [
+  SandboxInstanceStatuses.STARTED,
+  SandboxInstanceStatuses.INITIALIZING,
+  SandboxInstanceStatuses.RECONNECTING,
+];
 
 describe("conversation delivery plans", () => {
   describe("resolveTriggerConversationDeliverySandboxAction", () => {
@@ -52,6 +59,17 @@ describe("conversation delivery plans", () => {
       ).toBe(TriggerConversationDeliverySandboxActions.REUSE_EXISTING);
     });
 
+    it("reuses the persisted sandbox when it is waiting on provider or runtime readiness", () => {
+      for (const sandboxStatus of WaitingSandboxStatuses) {
+        expect(
+          resolveTriggerConversationDeliverySandboxAction({
+            sandboxInstanceId: "sbi_123",
+            sandboxStatus,
+          }),
+        ).toBe(TriggerConversationDeliverySandboxActions.REUSE_EXISTING);
+      }
+    });
+
     it("reuses the persisted sandbox when it is stopped but resumable", () => {
       expect(
         resolveTriggerConversationDeliverySandboxAction({
@@ -68,6 +86,15 @@ describe("conversation delivery plans", () => {
           sandboxStatus: "failed",
         }),
       ).toBe(TriggerConversationDeliverySandboxActions.RECOVER_FAILED);
+    });
+
+    it("fails when the persisted sandbox is stopping", () => {
+      expect(
+        resolveTriggerConversationDeliverySandboxAction({
+          sandboxInstanceId: "sbi_123",
+          sandboxStatus: "stopping",
+        }),
+      ).toBe(TriggerConversationDeliverySandboxActions.FAIL);
     });
   });
 

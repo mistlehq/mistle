@@ -9,6 +9,7 @@ import { request as httpRequest, type IncomingHttpHeaders } from "node:http";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
+import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 import {
   parseStreamControlMessage,
   type StreamControlMessage,
@@ -56,7 +57,7 @@ const StartSandboxInstanceResponseSchema = z.object({
 
 const SandboxInstanceStatusResponseSchema = z.object({
   id: z.string().min(1),
-  status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+  status: z.enum(SandboxInstanceStatuses),
   failureCode: z.string().min(1).nullable(),
   failureMessage: z.string().min(1).nullable(),
 });

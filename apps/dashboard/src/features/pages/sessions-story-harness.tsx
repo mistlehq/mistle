@@ -1,3 +1,4 @@
+import type { SandboxInstanceStatus } from "@mistle/sandbox-lifecycle";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import {
@@ -40,7 +41,7 @@ type SessionsStoryHarnessProps = {
   sandboxInstanceStatus?: {
     id: string;
     title: string | null;
-    status: "pending" | "starting" | "running" | "stopped" | "failed";
+    status: SandboxInstanceStatus;
     connectable: boolean;
     runtimeContext?: {
       agentRuntimeId: "codex" | "opencode" | "pi" | null;

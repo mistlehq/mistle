@@ -14,7 +14,10 @@ import { useState } from "react";
 import { NavLink, useLocation } from "react-router";
 
 import { isNewSessionPath } from "../shell/app-shell-sessions-sidebar-mode.js";
-import type { SessionsSidebarNavItem } from "./sessions-sidebar-nav-model.js";
+import type {
+  SessionsSidebarNavItem,
+  SessionsSidebarSourceItem,
+} from "./sessions-sidebar-nav-model.js";
 import { filterSessionsSidebarNavItems } from "./sessions-sidebar-nav-model.js";
 
 export function SessionsSidebarNav(input: {
@@ -129,7 +132,7 @@ function SessionsSidebarSearch(input: {
 function SessionsSidebarItemLabel(input: {
   label: string;
   profileName: string;
-  status: "pending" | "starting" | "running" | "stopped" | "failed";
+  status: SessionsSidebarSourceItem["status"];
   updatedAtLabel: string;
 }): React.JSX.Element {
   const isFailed = input.status === "failed";

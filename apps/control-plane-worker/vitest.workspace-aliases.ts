@@ -79,6 +79,12 @@ export const WorkspaceAliases = [
     replacement: fileURLToPath(new URL("../../packages/logging/src/index.ts", import.meta.url)),
   },
   {
+    find: /^@mistle\/sandbox-lifecycle$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/sandbox-lifecycle/src/index.ts", import.meta.url),
+    ),
+  },
+  {
     find: /^@mistle\/sandbox-session-client$/,
     replacement: fileURLToPath(
       new URL("../../packages/sandbox-session-client/src/index.ts", import.meta.url),

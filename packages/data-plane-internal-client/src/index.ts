@@ -6,6 +6,7 @@ import type {
 } from "@mistle/db/data-plane";
 import { CompiledRuntimePlanSchema, type CompiledRuntimePlan } from "@mistle/integrations-core";
 import type { SandboxImageHandle, SandboxProvider } from "@mistle/sandbox";
+import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 import type { Client } from "openapi-fetch";
 import createClient from "openapi-fetch";
 import { z } from "zod";
@@ -204,7 +205,17 @@ const GetSandboxInstanceResponseSchema = z
     sandboxProfileId: z.string().min(1),
     sandboxProfileVersion: z.number().int().min(1),
     title: z.string().min(1).nullable(),
-    status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+    status: z.enum([
+      SandboxInstanceStatuses.PENDING,
+      SandboxInstanceStatuses.STARTING,
+      SandboxInstanceStatuses.STARTED,
+      SandboxInstanceStatuses.INITIALIZING,
+      SandboxInstanceStatuses.RUNNING,
+      SandboxInstanceStatuses.RECONNECTING,
+      SandboxInstanceStatuses.STOPPING,
+      SandboxInstanceStatuses.STOPPED,
+      SandboxInstanceStatuses.FAILED,
+    ]),
     connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),

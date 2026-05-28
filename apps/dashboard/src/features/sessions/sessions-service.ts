@@ -1,3 +1,4 @@
+import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 import { z } from "zod";
 
 import { getControlPlaneApiClient } from "../../lib/control-plane-api/client.js";
@@ -22,7 +23,17 @@ const SandboxInstanceStatusApiResponseSchema = z
     sandboxProfileId: z.string().min(1),
     sandboxProfileVersion: z.number().int().min(1),
     title: z.string().min(1).nullable(),
-    status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+    status: z.enum([
+      SandboxInstanceStatuses.PENDING,
+      SandboxInstanceStatuses.STARTING,
+      SandboxInstanceStatuses.STARTED,
+      SandboxInstanceStatuses.INITIALIZING,
+      SandboxInstanceStatuses.RUNNING,
+      SandboxInstanceStatuses.RECONNECTING,
+      SandboxInstanceStatuses.STOPPING,
+      SandboxInstanceStatuses.STOPPED,
+      SandboxInstanceStatuses.FAILED,
+    ]),
     connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),

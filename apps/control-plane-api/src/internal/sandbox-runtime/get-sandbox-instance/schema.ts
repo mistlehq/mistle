@@ -1,4 +1,5 @@
 import { z } from "@hono/zod-openapi";
+import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 
 export const InternalSandboxRuntimeGetSandboxInstanceRequestSchema = z
   .object({
@@ -10,7 +11,17 @@ export const InternalSandboxRuntimeGetSandboxInstanceRequestSchema = z
 export const InternalSandboxRuntimeGetSandboxInstanceResponseSchema = z
   .object({
     id: z.string().min(1),
-    status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+    status: z.enum([
+      SandboxInstanceStatuses.PENDING,
+      SandboxInstanceStatuses.STARTING,
+      SandboxInstanceStatuses.STARTED,
+      SandboxInstanceStatuses.INITIALIZING,
+      SandboxInstanceStatuses.RUNNING,
+      SandboxInstanceStatuses.RECONNECTING,
+      SandboxInstanceStatuses.STOPPING,
+      SandboxInstanceStatuses.STOPPED,
+      SandboxInstanceStatuses.FAILED,
+    ]),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
   })

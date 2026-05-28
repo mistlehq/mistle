@@ -12,8 +12,10 @@ import {
   createDataPlaneDatabase,
   sandboxInstances,
   sandboxInstanceStorages,
+  type SandboxInstanceStatus,
   SandboxStorageProviders,
 } from "@mistle/db/data-plane";
+import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 import { readCapturedOtlpRequests } from "@mistle/test-harness";
 import { systemClock, systemSleeper } from "@mistle/time";
 import { eq } from "drizzle-orm";
@@ -51,7 +53,7 @@ const InvalidWorkspaceRepositoryUrl =
 
 const SandboxInstanceStatusResponseSchema = z.looseObject({
   id: z.string().min(1),
-  status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+  status: z.enum(SandboxInstanceStatuses),
   connectable: z.boolean(),
   failureCode: z.string().nullable(),
   failureMessage: z.string().nullable(),
@@ -348,7 +350,7 @@ async function readSandboxInstanceState(input: {
   fixture: SystemTestFixture;
   sandboxInstanceId: string;
 }): Promise<{
-  status: "pending" | "starting" | "running" | "stopped" | "failed";
+  status: SandboxInstanceStatus;
   providerSandboxId: string | null;
   computeGeneration: number;
   failureCode: string | null;

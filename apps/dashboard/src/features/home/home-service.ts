@@ -1,3 +1,4 @@
+import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 import { z } from "zod";
 
 import { requestControlPlane } from "../api/request-control-plane.js";
@@ -9,7 +10,17 @@ const HomeSandboxInstanceListItemSchema = z
     sandboxProfileDisplayName: z.string().min(1).nullable(),
     sandboxProfileVersion: z.number().int().min(1),
     title: z.string().min(1).nullable(),
-    status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+    status: z.enum([
+      SandboxInstanceStatuses.PENDING,
+      SandboxInstanceStatuses.STARTING,
+      SandboxInstanceStatuses.STARTED,
+      SandboxInstanceStatuses.INITIALIZING,
+      SandboxInstanceStatuses.RUNNING,
+      SandboxInstanceStatuses.RECONNECTING,
+      SandboxInstanceStatuses.STOPPING,
+      SandboxInstanceStatuses.STOPPED,
+      SandboxInstanceStatuses.FAILED,
+    ]),
     startedBy: z
       .object({
         kind: z.enum(["user", "system"]),

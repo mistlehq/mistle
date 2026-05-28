@@ -4,10 +4,21 @@ import {
   createKeysetPaginationEnvelopeSchema,
   createKeysetPaginationQuerySchema,
 } from "@mistle/http/pagination";
+import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 
 import { SandboxInstancesNotFoundCodes } from "./constants.js";
 
-const sandboxInstanceStatusSchema = z.enum(["pending", "starting", "running", "stopped", "failed"]);
+const sandboxInstanceStatusSchema = z.enum([
+  SandboxInstanceStatuses.PENDING,
+  SandboxInstanceStatuses.STARTING,
+  SandboxInstanceStatuses.STARTED,
+  SandboxInstanceStatuses.INITIALIZING,
+  SandboxInstanceStatuses.RUNNING,
+  SandboxInstanceStatuses.RECONNECTING,
+  SandboxInstanceStatuses.STOPPING,
+  SandboxInstanceStatuses.STOPPED,
+  SandboxInstanceStatuses.FAILED,
+]);
 const sandboxInstanceSourceSchema = z.enum(["dashboard", "webhook", "schedule"]);
 const sandboxInstanceStartedBySchema = z
   .object({

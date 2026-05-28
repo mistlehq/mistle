@@ -10,6 +10,7 @@ import { promisify } from "node:util";
 
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
+import { SandboxInstanceStatuses, type SandboxInstanceStatus } from "@mistle/sandbox-lifecycle";
 import {
   parseStreamControlMessage,
   type StreamControlMessage,
@@ -78,7 +79,7 @@ export type SystemTestFixture = {
   startContainer: (containerId: string) => Promise<void>;
   waitForSandboxStatus: (
     sandboxInstanceId: string,
-    status: "pending" | "starting" | "running" | "stopped" | "failed",
+    status: SandboxInstanceStatus,
     options?: { timeoutMs?: number },
   ) => Promise<SystemSandboxInstanceStatus>;
   waitForSandboxConnectable: (
@@ -150,7 +151,7 @@ const StartSandboxInstanceResponseSchema = z.object({
 
 const SandboxInstanceStatusResponseSchema = z.looseObject({
   id: z.string().min(1),
-  status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+  status: z.enum(SandboxInstanceStatuses),
   connectable: z.boolean(),
   failureCode: z.string().nullable(),
   failureMessage: z.string().nullable(),

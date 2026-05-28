@@ -1,11 +1,16 @@
+import { SandboxInstanceStatuses, type SandboxInstanceStatus } from "@mistle/sandbox-lifecycle";
+
 export function isSessionPageNavigableSandboxStatus(
   sandboxStatus: string | null,
-): sandboxStatus is "pending" | "starting" | "running" | "stopped" {
+): sandboxStatus is Exclude<SandboxInstanceStatus, "failed" | "stopping"> {
   return (
-    sandboxStatus === "pending" ||
-    sandboxStatus === "starting" ||
-    sandboxStatus === "running" ||
-    sandboxStatus === "stopped"
+    sandboxStatus === SandboxInstanceStatuses.PENDING ||
+    sandboxStatus === SandboxInstanceStatuses.STARTING ||
+    sandboxStatus === SandboxInstanceStatuses.STARTED ||
+    sandboxStatus === SandboxInstanceStatuses.INITIALIZING ||
+    sandboxStatus === SandboxInstanceStatuses.RUNNING ||
+    sandboxStatus === SandboxInstanceStatuses.RECONNECTING ||
+    sandboxStatus === SandboxInstanceStatuses.STOPPED
   );
 }
 
@@ -62,9 +67,13 @@ export function resolveSessionConnectionReadiness(input: {
   }
 
   if (
-    input.sandboxStatus === "pending" ||
-    input.sandboxStatus === "starting" ||
-    input.sandboxStatus === "running"
+    input.sandboxStatus === SandboxInstanceStatuses.PENDING ||
+    input.sandboxStatus === SandboxInstanceStatuses.STARTING ||
+    input.sandboxStatus === SandboxInstanceStatuses.STARTED ||
+    input.sandboxStatus === SandboxInstanceStatuses.INITIALIZING ||
+    input.sandboxStatus === SandboxInstanceStatuses.RUNNING ||
+    input.sandboxStatus === SandboxInstanceStatuses.RECONNECTING ||
+    input.sandboxStatus === SandboxInstanceStatuses.STOPPING
   ) {
     return {
       canConnect: false,

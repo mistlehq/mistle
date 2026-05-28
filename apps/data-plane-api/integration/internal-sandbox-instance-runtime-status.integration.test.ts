@@ -44,7 +44,7 @@ const it = createIntegrationTest({
   services: ["data-plane-api", "data-plane-gateway"],
 });
 
-it("reports a provider-running sandbox as starting until the gateway runtime is ready", async ({
+it("reports a persisted running sandbox as reconnecting until the gateway runtime is ready", async ({
   env,
 }) => {
   const adapter = createSandboxAdapter({
@@ -100,7 +100,7 @@ it("reports a provider-running sandbox as starting until the gateway runtime is 
       }),
     ).resolves.toMatchObject({
       id: sandboxInstanceId,
-      status: "starting",
+      status: "reconnecting",
       connectable: false,
       runtimePlan,
     });

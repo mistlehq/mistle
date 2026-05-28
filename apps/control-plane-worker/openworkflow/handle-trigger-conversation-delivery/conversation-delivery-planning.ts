@@ -1,3 +1,9 @@
+import {
+  getSandboxDeliveryDisposition,
+  SandboxDeliveryDispositions,
+  type SandboxInstanceStatus,
+} from "@mistle/sandbox-lifecycle";
+
 export const TriggerConversationDeliverySandboxActions = {
   REUSE_EXISTING: "reuse_existing",
   START_NEW: "start_new",
@@ -10,24 +16,26 @@ export type ConversationDeliverySandboxAction =
 
 export function resolveTriggerConversationDeliverySandboxAction(input: {
   sandboxInstanceId: string | null;
-  sandboxStatus: "pending" | "starting" | "running" | "stopped" | "failed" | null;
+  sandboxStatus: SandboxInstanceStatus | null;
 }): ConversationDeliverySandboxAction {
   if (input.sandboxInstanceId === null) {
     return TriggerConversationDeliverySandboxActions.START_NEW;
   }
-  if (
-    input.sandboxStatus === "pending" ||
-    input.sandboxStatus === "starting" ||
-    input.sandboxStatus === "running" ||
-    input.sandboxStatus === "stopped"
-  ) {
-    return TriggerConversationDeliverySandboxActions.REUSE_EXISTING;
-  }
-  if (input.sandboxStatus === "failed") {
-    return TriggerConversationDeliverySandboxActions.RECOVER_FAILED;
+
+  if (input.sandboxStatus === null) {
+    return TriggerConversationDeliverySandboxActions.FAIL;
   }
 
-  return TriggerConversationDeliverySandboxActions.FAIL;
+  switch (getSandboxDeliveryDisposition(input.sandboxStatus)) {
+    case SandboxDeliveryDispositions.DELIVER:
+    case SandboxDeliveryDispositions.WAIT:
+    case SandboxDeliveryDispositions.RESUME:
+      return TriggerConversationDeliverySandboxActions.REUSE_EXISTING;
+    case SandboxDeliveryDispositions.RECOVER:
+      return TriggerConversationDeliverySandboxActions.RECOVER_FAILED;
+    case SandboxDeliveryDispositions.NON_DELIVERABLE:
+      return TriggerConversationDeliverySandboxActions.FAIL;
+  }
 }
 
 export const TriggerConversationRouteBindingActions = {

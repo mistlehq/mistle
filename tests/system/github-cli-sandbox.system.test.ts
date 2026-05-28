@@ -4,6 +4,7 @@
 
 import { randomUUID } from "node:crypto";
 
+import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 import {
   parseStreamControlMessage,
   type StreamControlMessage,
@@ -73,7 +74,7 @@ const StartSandboxInstanceResponseSchema = z
 
 const SandboxInstanceStatusResponseSchema = z.looseObject({
   id: z.string().min(1),
-  status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+  status: z.enum(SandboxInstanceStatuses),
   connectable: z.boolean(),
   failureCode: z.string().min(1).nullable(),
   failureMessage: z.string().min(1).nullable(),

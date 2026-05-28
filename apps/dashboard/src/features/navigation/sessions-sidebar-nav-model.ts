@@ -1,3 +1,5 @@
+import type { SandboxInstanceStatus } from "@mistle/sandbox-lifecycle";
+
 import { isSessionPageNavigableSandboxStatus } from "../sessions/session-connect-policy.js";
 import { resolveSessionTitleLabel } from "../sessions/session-title-presentation.js";
 import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
@@ -7,7 +9,7 @@ export type SessionsSidebarSourceItem = {
   title: string | null;
   sandboxProfileId: string;
   sandboxProfileDisplayName: string | null;
-  status: "pending" | "starting" | "running" | "stopped" | "failed";
+  status: SandboxInstanceStatus;
   createdAt: string;
   updatedAt: string;
 };

@@ -1,7 +1,11 @@
+import { SandboxInstanceStatuses, type SandboxInstanceStatus } from "@mistle/sandbox-lifecycle";
 import { bigint, index, text, timestamp, uniqueIndex, type PgSchema } from "drizzle-orm/pg-core";
 import { typeid } from "typeid-js";
 
 import { dataPlaneSchema } from "./namespace.js";
+
+export { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
+export type { SandboxInstanceStatus } from "@mistle/sandbox-lifecycle";
 
 export const SandboxInstanceProviders = {
   DOCKER: "docker",
@@ -11,17 +15,6 @@ export const SandboxInstanceProviders = {
 
 export type SandboxInstanceProvider =
   (typeof SandboxInstanceProviders)[keyof typeof SandboxInstanceProviders];
-
-export const SandboxInstanceStatuses = {
-  PENDING: "pending",
-  STARTING: "starting",
-  RUNNING: "running",
-  STOPPED: "stopped",
-  FAILED: "failed",
-} as const;
-
-export type SandboxInstanceStatus =
-  (typeof SandboxInstanceStatuses)[keyof typeof SandboxInstanceStatuses];
 
 export const SandboxInstanceStarterKinds = {
   USER: "user",

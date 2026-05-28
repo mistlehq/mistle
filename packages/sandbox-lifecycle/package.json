@@ -1,0 +1,33 @@
+{
+  "name": "@mistle/sandbox-lifecycle",
+  "private": true,
+  "files": [
+    "dist/**",
+    "*.js"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "workspace-src": "./src/index.ts",
+      "node": "./dist/index.js",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./*.js": {
+      "types": "./src/*.ts",
+      "workspace-src": "./src/*.ts",
+      "node": "./dist/*.js",
+      "import": "./src/*.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "lint": "oxlint --type-aware --deny-warnings .",
+    "typecheck": "tsgo --noEmit",
+    "test": "vitest run",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check ."
+  }
+}

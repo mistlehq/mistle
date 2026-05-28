@@ -4,6 +4,7 @@ import {
   AgentStreamClient,
   CodexJsonRpcClient,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/server";
+import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 import { systemSleeper } from "@mistle/time";
 import { z } from "zod";
 
@@ -47,7 +48,7 @@ const StartSandboxInstanceResponseSchema = z.looseObject({
 
 const SandboxInstanceStatusResponseSchema = z.looseObject({
   id: z.string().min(1),
-  status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+  status: z.enum(SandboxInstanceStatuses),
   connectable: z.boolean(),
   failureCode: z.string().nullable(),
   failureMessage: z.string().nullable(),

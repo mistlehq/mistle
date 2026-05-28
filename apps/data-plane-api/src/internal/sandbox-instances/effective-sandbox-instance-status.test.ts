@@ -1,4 +1,4 @@
-import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 import { describe, expect, it } from "vitest";
 
 import type { SandboxRuntimeStateSnapshot } from "../../runtime-state/sandbox-runtime-state-reader.js";
@@ -14,13 +14,13 @@ describe("resolveEffectiveSandboxInstanceStatus", () => {
     ).toBe("stopped");
   });
 
-  it("treats stopped sandboxes with a live attachment as starting", () => {
+  it("treats stopped sandboxes with a live attachment as initializing", () => {
     expect(
       resolveEffectiveSandboxInstanceStatus({
         persistedStatus: SandboxInstanceStatuses.STOPPED,
         runtimeStateSnapshot: runtimeStateSnapshot({ ready: false }),
       }),
-    ).toBe("starting");
+    ).toBe("initializing");
   });
 
   it("treats stopped sandboxes with a ready runtime as running", () => {
@@ -59,13 +59,13 @@ describe("resolveEffectiveSandboxInstanceStatus", () => {
     ).toBe("starting");
   });
 
-  it("keeps persisted starting sandboxes starting when bootstrap is attached but runtime is not ready", () => {
+  it("treats persisted starting sandboxes with bootstrap attached as initializing until ready", () => {
     expect(
       resolveEffectiveSandboxInstanceStatus({
         persistedStatus: SandboxInstanceStatuses.STARTING,
         runtimeStateSnapshot: runtimeStateSnapshot({ ready: false }),
       }),
-    ).toBe("starting");
+    ).toBe("initializing");
   });
 
   it("treats persisted starting sandboxes as running only when runtime readiness is true", () => {
@@ -77,13 +77,22 @@ describe("resolveEffectiveSandboxInstanceStatus", () => {
     ).toBe("running");
   });
 
-  it("downgrades persisted running sandboxes to starting when bootstrap is attached but runtime is not ready", () => {
+  it("treats persisted running sandboxes as initializing when bootstrap is attached but not ready", () => {
     expect(
       resolveEffectiveSandboxInstanceStatus({
         persistedStatus: SandboxInstanceStatuses.RUNNING,
         runtimeStateSnapshot: runtimeStateSnapshot({ ready: false }),
       }),
-    ).toBe("starting");
+    ).toBe("initializing");
+  });
+
+  it("downgrades persisted running sandboxes to reconnecting when bootstrap is detached", () => {
+    expect(
+      resolveEffectiveSandboxInstanceStatus({
+        persistedStatus: SandboxInstanceStatuses.RUNNING,
+        runtimeStateSnapshot: null,
+      }),
+    ).toBe("reconnecting");
   });
 
   it("keeps persisted running sandboxes running when runtime readiness is true", () => {
@@ -93,6 +102,15 @@ describe("resolveEffectiveSandboxInstanceStatus", () => {
         runtimeStateSnapshot: runtimeStateSnapshot({ ready: true }),
       }),
     ).toBe("running");
+  });
+
+  it("keeps persisted reconnecting sandboxes reconnecting even when runtime readiness is true", () => {
+    expect(
+      resolveEffectiveSandboxInstanceStatus({
+        persistedStatus: SandboxInstanceStatuses.RECONNECTING,
+        runtimeStateSnapshot: runtimeStateSnapshot({ ready: true }),
+      }),
+    ).toBe("reconnecting");
   });
 });
 

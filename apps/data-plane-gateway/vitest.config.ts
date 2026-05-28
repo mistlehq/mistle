@@ -66,6 +66,12 @@ const WorkspaceAliases = [
     replacement: fileURLToPath(new URL("../../packages/sandbox/src/index.ts", import.meta.url)),
   },
   {
+    find: /^@mistle\/sandbox-lifecycle$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/sandbox-lifecycle/src/index.ts", import.meta.url),
+    ),
+  },
+  {
     find: /^@mistle\/sandbox-runtime-contract$/,
     replacement: fileURLToPath(
       new URL("../../packages/sandbox-runtime-contract/src/index.ts", import.meta.url),

@@ -1,4 +1,4 @@
-import { SandboxInstanceStatuses, type SandboxInstance } from "@mistle/db/data-plane";
+import type { SandboxInstance } from "@mistle/db/data-plane";
 
 import type { AppRuntimeResources } from "../../../resources.js";
 import { resolveEffectiveSandboxInstanceStatus } from "../effective-sandbox-instance-status.js";
@@ -15,15 +15,6 @@ export async function readEffectiveSandboxStatus(
     persistedStatus: SandboxInstance["status"];
   },
 ): Promise<NonNullable<GetSandboxInstanceResponse>["status"]> {
-  if (
-    input.persistedStatus !== SandboxInstanceStatuses.PENDING &&
-    input.persistedStatus !== SandboxInstanceStatuses.STOPPED &&
-    input.persistedStatus !== SandboxInstanceStatuses.STARTING &&
-    input.persistedStatus !== SandboxInstanceStatuses.RUNNING
-  ) {
-    return input.persistedStatus;
-  }
-
   const runtimeStateSnapshot = await ctx.runtimeStateReader.readSnapshot({
     sandboxInstanceId: input.sandboxInstanceId,
     nowMs: Date.now(),

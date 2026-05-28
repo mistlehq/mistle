@@ -1,6 +1,8 @@
+import type { SandboxInstanceStatus } from "@mistle/sandbox-lifecycle";
+
 export type SandboxStatusReadState = "error" | "loading" | "ready";
 
-export type SandboxLifecycleStatus = "pending" | "starting" | "running" | "stopped" | "failed";
+export type SandboxLifecycleStatus = SandboxInstanceStatus;
 
 export type WorkbenchSandboxLifecycleStatus = SandboxLifecycleStatus | "resuming" | null;
 
@@ -16,8 +18,13 @@ export type WorkbenchEntryPhase =
   | "ready"
   | "resume_pending"
   | "sandbox_failed"
+  | "sandbox_initializing"
+  | "sandbox_pending"
+  | "sandbox_reconnecting"
+  | "sandbox_started"
   | "sandbox_stopped"
-  | "sandbox_starting";
+  | "sandbox_starting"
+  | "sandbox_stopping";
 
 export type SessionWorkbenchStatusAlert = {
   title: string;
@@ -130,8 +137,28 @@ export function resolveWorkbenchEntryPhase(input: {
     return input.connectedSession ? "ready" : "connecting";
   }
 
-  if (input.sandboxStatus === "starting" || input.sandboxStatus === "pending") {
+  if (input.sandboxStatus === "pending") {
+    return "sandbox_pending";
+  }
+
+  if (input.sandboxStatus === "starting") {
     return "sandbox_starting";
+  }
+
+  if (input.sandboxStatus === "started") {
+    return "sandbox_started";
+  }
+
+  if (input.sandboxStatus === "initializing") {
+    return "sandbox_initializing";
+  }
+
+  if (input.sandboxStatus === "reconnecting") {
+    return "sandbox_reconnecting";
+  }
+
+  if (input.sandboxStatus === "stopping") {
+    return "sandbox_stopping";
   }
 
   if (input.sandboxStatus === "stopped") {
@@ -150,6 +177,26 @@ export function resolveSandboxLifecycleStatusForWorkbenchEntryPhase(
 
   if (phase === "sandbox_starting") {
     return "starting";
+  }
+
+  if (phase === "sandbox_pending") {
+    return "pending";
+  }
+
+  if (phase === "sandbox_started") {
+    return "started";
+  }
+
+  if (phase === "sandbox_initializing") {
+    return "initializing";
+  }
+
+  if (phase === "sandbox_reconnecting") {
+    return "reconnecting";
+  }
+
+  if (phase === "sandbox_stopping") {
+    return "stopping";
   }
 
   if (phase === "resume_pending") {
@@ -250,6 +297,10 @@ export function resolveSessionWorkbenchStatus(input: {
     input.sandboxLifecycleStatus === null ||
     input.sandboxLifecycleStatus === "pending" ||
     input.sandboxLifecycleStatus === "starting" ||
+    input.sandboxLifecycleStatus === "started" ||
+    input.sandboxLifecycleStatus === "initializing" ||
+    input.sandboxLifecycleStatus === "reconnecting" ||
+    input.sandboxLifecycleStatus === "stopping" ||
     input.sandboxLifecycleStatus === "resuming" ||
     input.sandboxLifecycleStatus === "stopped"
   ) {

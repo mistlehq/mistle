@@ -6,6 +6,7 @@ import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
 
+import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 import {
   decodeDataFrame,
   encodeDataFrame,
@@ -173,7 +174,7 @@ const SandboxInstanceStatusResponseSchema = z
   .object({
     id: z.string().min(1),
     title: z.string().min(1).nullable(),
-    status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+    status: z.enum(SandboxInstanceStatuses),
     connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),

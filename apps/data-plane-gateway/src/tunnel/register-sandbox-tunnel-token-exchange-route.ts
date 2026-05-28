@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 
-import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import {
   TunnelExchangeTokenError,
   type VerifiedTunnelExchangeToken,
@@ -10,6 +9,7 @@ import {
   type BootstrapTokenConfig,
   verifyTunnelExchangeToken,
 } from "@mistle/gateway-tunnel-auth";
+import { isSandboxBootstrapTokenExchangeEligible } from "@mistle/sandbox-lifecycle";
 
 import { logger } from "../logger.js";
 import type { DataPlaneGatewayApp } from "../types.js";
@@ -22,10 +22,6 @@ type RegisterSandboxTunnelTokenExchangeRouteInput = {
   bootstrapTokenConfig: BootstrapTokenConfig;
   tunnelExchangeTokenConfig: TunnelExchangeTokenConfig;
 };
-
-const EligibleSandboxInstanceStatuses = new Set<
-  (typeof SandboxInstanceStatuses)[keyof typeof SandboxInstanceStatuses]
->([SandboxInstanceStatuses.STARTING, SandboxInstanceStatuses.RUNNING]);
 
 function readBearerToken(authorizationHeader: string | undefined): string | undefined {
   const normalizedHeader = authorizationHeader?.trim();
@@ -97,7 +93,7 @@ export function registerSandboxTunnelTokenExchangeRoute(
     if (sandboxInstance === undefined) {
       return ctx.json({ error: "Sandbox instance was not found." }, 404);
     }
-    if (!EligibleSandboxInstanceStatuses.has(sandboxInstance.status)) {
+    if (!isSandboxBootstrapTokenExchangeEligible(sandboxInstance.status)) {
       return ctx.json(
         { error: "Sandbox instance is not eligible for tunnel token exchange." },
         409,

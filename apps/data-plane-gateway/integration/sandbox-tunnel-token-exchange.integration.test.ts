@@ -4,7 +4,7 @@
 
 import { randomUUID } from "node:crypto";
 
-import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import { SandboxInstanceStatuses, type SandboxInstanceStatus } from "@mistle/db/data-plane";
 import {
   mintTunnelExchangeToken,
   verifyBootstrapToken,
@@ -34,6 +34,47 @@ const it = createIntegrationTest({
 });
 
 describe.concurrent("sandbox tunnel token exchange integration", () => {
+  it("returns fresh bootstrap and exchange tokens for each attach-capable sandbox status", async ({
+    env,
+  }) => {
+    const eligibleStatuses: SandboxInstanceStatus[] = [
+      SandboxInstanceStatuses.STARTING,
+      SandboxInstanceStatuses.STARTED,
+      SandboxInstanceStatuses.INITIALIZING,
+      SandboxInstanceStatuses.RUNNING,
+      SandboxInstanceStatuses.RECONNECTING,
+    ];
+
+    for (const status of eligibleStatuses) {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const exchangeTokenJti = randomUUID();
+
+      await insertSandboxInstanceRow(env, {
+        sandboxInstanceId,
+        status,
+      });
+
+      const response = await postTunnelTokenExchange({
+        env,
+        sandboxInstanceId,
+        exchangeToken: await mintExchangeToken({
+          sandboxInstanceId,
+          jti: exchangeTokenJti,
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      const body = TokenExchangeResponseSchema.parse(await response.json());
+      const verifiedBootstrapToken = await verifyBootstrapToken({
+        config: bootstrapTokenConfig(),
+        token: body.bootstrapToken,
+      });
+
+      expect(verifiedBootstrapToken.sandboxInstanceId).toBe(sandboxInstanceId);
+      await expect(countRedemptions(env, exchangeTokenJti)).resolves.toBe(1);
+    }
+  });
+
   it("returns fresh bootstrap and exchange tokens for an eligible sandbox instance", async ({
     env,
   }) => {
@@ -178,7 +219,7 @@ async function insertSandboxInstanceRow(
   env: IntegrationTestEnvironment,
   input: {
     sandboxInstanceId: string;
-    status: (typeof SandboxInstanceStatuses)[keyof typeof SandboxInstanceStatuses];
+    status: SandboxInstanceStatus;
   },
 ): Promise<void> {
   await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({

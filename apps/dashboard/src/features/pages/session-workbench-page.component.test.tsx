@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import type { SandboxInstanceStatus } from "@mistle/sandbox-lifecycle";
 import { SidebarProvider } from "@mistle/ui";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, type RenderResult, render, screen, within } from "@testing-library/react";
@@ -16,7 +17,7 @@ function renderSessionWorkbenchPage(input?: {
   queryClientOptions?: Parameters<typeof createTestQueryClient>[0];
   sandboxInstanceId?: string;
   sidebarDefaultOpen?: boolean;
-  seededStatus?: "pending" | "starting" | "running" | "stopped" | "failed";
+  seededStatus?: SandboxInstanceStatus;
 }): RenderResult & { queryClient: ReturnType<typeof createTestQueryClient> } {
   const sandboxInstanceId = input?.sandboxInstanceId ?? "sbi_test";
   const queryClient = createTestQueryClient({

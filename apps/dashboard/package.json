@@ -28,6 +28,7 @@
     "@codemirror/view": "6.41.1",
     "@mistle/integrations-core": "workspace:*",
     "@mistle/integrations-definitions": "workspace:*",
+    "@mistle/sandbox-lifecycle": "workspace:*",
     "@mistle/sandbox-session-client": "workspace:*",
     "@mistle/sandbox-session-protocol": "workspace:*",
     "@mistle/time": "workspace:*",

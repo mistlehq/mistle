@@ -46,6 +46,7 @@
     "@mistle/integrations-definitions": "workspace:*",
     "@mistle/logging": "workspace:*",
     "@mistle/port-access-auth": "workspace:*",
+    "@mistle/sandbox-lifecycle": "workspace:*",
     "@mistle/sandbox-runtime-contract": "workspace:*",
     "@mistle/sandbox-session-protocol": "workspace:*",
     "@mistle/sandbox-signing-auth": "workspace:*",

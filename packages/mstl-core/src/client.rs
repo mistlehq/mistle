@@ -570,7 +570,11 @@ pub enum SandboxInstanceSource {
 pub enum SandboxInstanceStatus {
     Pending,
     Starting,
+    Started,
+    Initializing,
     Running,
+    Reconnecting,
+    Stopping,
     Stopped,
     Failed,
 }
@@ -1593,6 +1597,30 @@ mod tests {
                 token: "token_01".to_owned(),
                 expires_at: "2026-05-18T01:02:03.000Z".to_owned(),
             }
+        );
+    }
+
+    #[test]
+    fn decodes_expanded_sandbox_instance_statuses() {
+        assert_eq!(
+            serde_json::from_str::<SandboxInstanceStatus>(r#""started""#)
+                .expect("started status should decode"),
+            SandboxInstanceStatus::Started,
+        );
+        assert_eq!(
+            serde_json::from_str::<SandboxInstanceStatus>(r#""initializing""#)
+                .expect("initializing status should decode"),
+            SandboxInstanceStatus::Initializing,
+        );
+        assert_eq!(
+            serde_json::from_str::<SandboxInstanceStatus>(r#""reconnecting""#)
+                .expect("reconnecting status should decode"),
+            SandboxInstanceStatus::Reconnecting,
+        );
+        assert_eq!(
+            serde_json::from_str::<SandboxInstanceStatus>(r#""stopping""#)
+                .expect("stopping status should decode"),
+            SandboxInstanceStatus::Stopping,
         );
     }
 

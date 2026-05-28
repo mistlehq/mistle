@@ -1913,7 +1913,17 @@
                           },
                           "status": {
                             "type": "string",
-                            "enum": ["pending", "starting", "running", "stopped", "failed"]
+                            "enum": [
+                              "pending",
+                              "starting",
+                              "started",
+                              "initializing",
+                              "running",
+                              "reconnecting",
+                              "stopping",
+                              "stopped",
+                              "failed"
+                            ]
                           },
                           "startedBy": {
                             "type": "object",
@@ -2209,7 +2219,17 @@
                           },
                           "status": {
                             "type": "string",
-                            "enum": ["pending", "starting", "running", "stopped", "failed"]
+                            "enum": [
+                              "pending",
+                              "starting",
+                              "started",
+                              "initializing",
+                              "running",
+                              "reconnecting",
+                              "stopping",
+                              "stopped",
+                              "failed"
+                            ]
                           },
                           "startedBy": {
                             "type": "object",
@@ -2428,7 +2448,17 @@
                     },
                     "status": {
                       "type": "string",
-                      "enum": ["pending", "starting", "running", "stopped", "failed"]
+                      "enum": [
+                        "pending",
+                        "starting",
+                        "started",
+                        "initializing",
+                        "running",
+                        "reconnecting",
+                        "stopping",
+                        "stopped",
+                        "failed"
+                      ]
                     },
                     "connectable": {
                       "type": "boolean"

@@ -12,6 +12,7 @@ import {
   buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata,
   buildIntegrationWebhookCallbackUrl,
 } from "@mistle/integrations-definitions/server";
+import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 import { readTestContext, writeTestContext } from "@mistle/test-harness";
 import { systemSleeper } from "@mistle/time";
 import { eq, sql } from "drizzle-orm";
@@ -124,7 +125,7 @@ const RefreshIntegrationConnectionResourcesResponseSchema = z
 
 const SandboxInstanceStatusResponseSchema = z.looseObject({
   id: z.string().min(1),
-  status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+  status: z.enum(SandboxInstanceStatuses),
   failureCode: z.string().nullable(),
   failureMessage: z.string().nullable(),
   runtimePlan: z.unknown().nullable().optional(),

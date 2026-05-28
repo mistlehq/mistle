@@ -57,6 +57,34 @@ export function resolveSandboxStatusBadgeUi(
     };
   }
 
+  if (sandboxLifecycleStatus === "started") {
+    return {
+      label: "Started",
+      variant: "outline",
+    };
+  }
+
+  if (sandboxLifecycleStatus === "initializing") {
+    return {
+      label: "Initializing",
+      variant: "outline",
+    };
+  }
+
+  if (sandboxLifecycleStatus === "reconnecting") {
+    return {
+      label: "Reconnecting",
+      variant: "outline",
+    };
+  }
+
+  if (sandboxLifecycleStatus === "stopping") {
+    return {
+      label: "Stopping",
+      variant: "outline",
+    };
+  }
+
   return {
     label: "Starting",
     variant: "outline",

@@ -212,6 +212,10 @@ export function resolveSessionReconnectMessage(input: {
     input.sandboxStatus === "pending" ||
     input.sandboxStatus === "resuming" ||
     input.sandboxStatus === "starting" ||
+    input.sandboxStatus === "started" ||
+    input.sandboxStatus === "initializing" ||
+    input.sandboxStatus === "reconnecting" ||
+    input.sandboxStatus === "stopping" ||
     input.sandboxStatus === null
   ) {
     return `${input.recoveryBaseMessage} Waiting for the sandbox to become ready again.`;

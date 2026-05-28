@@ -3,6 +3,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { request as httpRequest, type IncomingHttpHeaders } from "node:http";
 import { join, relative } from "node:path";
 
+import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 import {
   parseBootstrapControlMessage,
   type BootstrapControlMessage,
@@ -45,7 +46,7 @@ const StartSandboxInstanceResponseSchema = z.object({
 
 const SandboxInstanceStatusResponseSchema = z.object({
   id: z.string().min(1),
-  status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+  status: z.enum(SandboxInstanceStatuses),
   failureCode: z.string().min(1).nullable(),
   failureMessage: z.string().min(1).nullable(),
 });

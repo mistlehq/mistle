@@ -3699,7 +3699,17 @@
                     },
                     "status": {
                       "type": "string",
-                      "enum": ["pending", "starting", "running", "stopped", "failed"]
+                      "enum": [
+                        "pending",
+                        "starting",
+                        "started",
+                        "initializing",
+                        "running",
+                        "reconnecting",
+                        "stopping",
+                        "stopped",
+                        "failed"
+                      ]
                     },
                     "failureCode": {
                       "type": ["string", "null"],

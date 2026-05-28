@@ -121,7 +121,7 @@ export function createSessionsPageStoryQueryClient(input?: {
   sandboxInstanceStatus?: {
     id: string;
     title: string | null;
-    status: "pending" | "starting" | "running" | "stopped" | "failed";
+    status: SandboxInstanceStatus;
     connectable: boolean;
     runtimeContext?: {
       agentRuntimeId: "codex" | "opencode" | "pi" | null;
@@ -241,3 +241,4 @@ export function createSessionsPageStoryQueryClient(input?: {
 
   return queryClient;
 }
+import type { SandboxInstanceStatus } from "@mistle/sandbox-lifecycle";

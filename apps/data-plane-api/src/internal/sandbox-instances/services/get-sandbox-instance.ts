@@ -6,6 +6,7 @@ import {
   SandboxStopReasons,
   type DataPlaneDatabase,
   type DataPlaneTables,
+  type SandboxInstanceStatus,
   type SandboxInstanceProvider,
 } from "@mistle/db/data-plane";
 import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
@@ -15,7 +16,7 @@ import {
   SandboxInspectStates,
   type SandboxAdapter,
 } from "@mistle/sandbox";
-import { and, eq, isNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 import type { AppRuntimeResources } from "../../../resources.js";
 import { assertRuntimeSandboxProvider } from "../../../sandbox/adapter.js";
@@ -53,6 +54,7 @@ type InspectableSandboxInstance = SandboxInstanceRuntimeSelection & {
   title: string | null;
   persistenceMode: string;
   providerSandboxId: string | null;
+  status: SandboxInstanceStatus;
   failureCode: string | null;
   failureMessage: string | null;
   runtimePlan: PersistedRuntimePlan;
@@ -82,6 +84,17 @@ type SandboxInstanceInspectionResponse = Omit<
   NonNullable<GetSandboxInstanceResponse>,
   "sandboxProfileId" | "sandboxProfileVersion"
 >;
+
+const StartupInspectionStatuses: SandboxInstanceStatus[] = [
+  SandboxInstanceStatuses.STARTING,
+  SandboxInstanceStatuses.STARTED,
+  SandboxInstanceStatuses.INITIALIZING,
+];
+
+const RuntimeInspectionStatuses: SandboxInstanceStatus[] = [
+  SandboxInstanceStatuses.RUNNING,
+  SandboxInstanceStatuses.RECONNECTING,
+];
 
 async function readLatestStartupOperation(input: {
   db: DataPlaneDatabase;
@@ -141,7 +154,7 @@ async function markRunningSandboxInstanceStopped(
     .where(
       and(
         eq(sandboxInstances.id, input.sandboxInstanceId),
-        eq(sandboxInstances.status, SandboxInstanceStatuses.RUNNING),
+        inArray(sandboxInstances.status, RuntimeInspectionStatuses),
       ),
     )
     .returning({
@@ -152,7 +165,7 @@ async function markRunningSandboxInstanceStopped(
     return;
   }
 
-  throw new Error("Failed to transition sandbox instance status from running to stopped.");
+  throw new Error("Failed to transition sandbox instance status from runtime-active to stopped.");
 }
 
 async function clearStoppedSandboxInstanceProviderSandboxId(
@@ -213,7 +226,7 @@ async function markStartingSandboxInstanceFailed(
     .where(
       and(
         eq(sandboxInstances.id, input.sandboxInstanceId),
-        eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
+        inArray(sandboxInstances.status, StartupInspectionStatuses),
       ),
     )
     .returning({
@@ -224,7 +237,7 @@ async function markStartingSandboxInstanceFailed(
     return;
   }
 
-  throw new Error("Failed to transition sandbox instance status from starting to failed.");
+  throw new Error("Failed to transition sandbox instance status from startup-active to failed.");
 }
 
 async function markStartingSandboxInstanceStopped(
@@ -251,7 +264,7 @@ async function markStartingSandboxInstanceStopped(
     .where(
       and(
         eq(sandboxInstances.id, input.sandboxInstanceId),
-        eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
+        inArray(sandboxInstances.status, StartupInspectionStatuses),
       ),
     )
     .returning({
@@ -262,7 +275,7 @@ async function markStartingSandboxInstanceStopped(
     return;
   }
 
-  throw new Error("Failed to transition sandbox instance status from starting to stopped.");
+  throw new Error("Failed to transition sandbox instance status from startup-active to stopped.");
 }
 
 async function markRunningSandboxInstanceFailed(
@@ -288,7 +301,7 @@ async function markRunningSandboxInstanceFailed(
     .where(
       and(
         eq(sandboxInstances.id, input.sandboxInstanceId),
-        eq(sandboxInstances.status, SandboxInstanceStatuses.RUNNING),
+        inArray(sandboxInstances.status, RuntimeInspectionStatuses),
       ),
     )
     .returning({
@@ -299,7 +312,7 @@ async function markRunningSandboxInstanceFailed(
     return;
   }
 
-  throw new Error("Failed to transition sandbox instance status from running to failed.");
+  throw new Error("Failed to transition sandbox instance status from runtime-active to failed.");
 }
 
 async function markStoppedSandboxInstanceFailed(
@@ -421,7 +434,7 @@ async function inspectStartingSandboxInstance(
       },
       {
         sandboxInstanceId: sandboxInstance.id,
-        persistedStatus: SandboxInstanceStatuses.STARTING,
+        persistedStatus: sandboxInstance.status,
       },
     );
 
@@ -662,7 +675,7 @@ async function inspectRunningSandboxInstance(
       },
       {
         sandboxInstanceId: sandboxInstance.id,
-        persistedStatus: SandboxInstanceStatuses.RUNNING,
+        persistedStatus: sandboxInstance.status,
       },
     );
 
@@ -841,11 +854,39 @@ export async function getSandboxInstance(
       });
       break;
     }
+    case SandboxInstanceStatuses.STARTED:
+    case SandboxInstanceStatuses.INITIALIZING: {
+      response = await inspectStartingSandboxInstance(ctx, {
+        ...sandboxInstance,
+        runtimePlan,
+      });
+      break;
+    }
     case SandboxInstanceStatuses.RUNNING: {
       response = await inspectRunningSandboxInstance(ctx, {
         ...sandboxInstance,
         runtimePlan,
       });
+      break;
+    }
+    case SandboxInstanceStatuses.RECONNECTING: {
+      response = await inspectRunningSandboxInstance(ctx, {
+        ...sandboxInstance,
+        runtimePlan,
+      });
+      break;
+    }
+    case SandboxInstanceStatuses.STOPPING: {
+      response = {
+        id: sandboxInstance.id,
+        title: sandboxInstance.title,
+        status: SandboxInstanceStatuses.STOPPING,
+        connectable: false,
+        failureCode: sandboxInstance.failureCode,
+        failureMessage: sandboxInstance.failureMessage,
+        runtimePlan,
+        startupOperation: null,
+      };
       break;
     }
     default:

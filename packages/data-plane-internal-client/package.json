@@ -43,6 +43,7 @@
     "@mistle/db": "workspace:*",
     "@mistle/integrations-core": "workspace:*",
     "@mistle/sandbox": "workspace:*",
+    "@mistle/sandbox-lifecycle": "workspace:*",
     "openapi-fetch": "^0.17.0",
     "zod": "^4.4.3"
   },

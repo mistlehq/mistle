@@ -1,19 +1,28 @@
 import { z } from "@hono/zod-openapi";
 import { createKeysetPaginationEnvelopeSchema } from "@mistle/http/pagination";
 import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
+import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 
 export const DataPlaneSandboxInstanceStatuses = Object.freeze({
-  PENDING: "pending",
-  STARTING: "starting",
-  RUNNING: "running",
-  STOPPED: "stopped",
-  FAILED: "failed",
+  PENDING: SandboxInstanceStatuses.PENDING,
+  STARTING: SandboxInstanceStatuses.STARTING,
+  STARTED: SandboxInstanceStatuses.STARTED,
+  INITIALIZING: SandboxInstanceStatuses.INITIALIZING,
+  RUNNING: SandboxInstanceStatuses.RUNNING,
+  RECONNECTING: SandboxInstanceStatuses.RECONNECTING,
+  STOPPING: SandboxInstanceStatuses.STOPPING,
+  STOPPED: SandboxInstanceStatuses.STOPPED,
+  FAILED: SandboxInstanceStatuses.FAILED,
 });
 
 export const DataPlaneSandboxInstanceStatusSchema = z.enum([
   DataPlaneSandboxInstanceStatuses.PENDING,
   DataPlaneSandboxInstanceStatuses.STARTING,
+  DataPlaneSandboxInstanceStatuses.STARTED,
+  DataPlaneSandboxInstanceStatuses.INITIALIZING,
   DataPlaneSandboxInstanceStatuses.RUNNING,
+  DataPlaneSandboxInstanceStatuses.RECONNECTING,
+  DataPlaneSandboxInstanceStatuses.STOPPING,
   DataPlaneSandboxInstanceStatuses.STOPPED,
   DataPlaneSandboxInstanceStatuses.FAILED,
 ]);
