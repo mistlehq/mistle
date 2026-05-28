@@ -722,6 +722,9 @@ importers:
       '@mistle/sandbox':
         specifier: workspace:*
         version: link:../../packages/sandbox
+      '@mistle/sandbox-lifecycle':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-lifecycle
       '@mistle/sandbox-runtime-contract':
         specifier: workspace:*
         version: link:../../packages/sandbox-runtime-contract

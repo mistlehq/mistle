@@ -8,7 +8,13 @@ import {
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
+import {
+  SandboxInstancePurposes,
+  SandboxInstanceSources,
+  SandboxInstanceStatuses,
+} from "@mistle/db/data-plane";
 import { SandboxProvider } from "@mistle/sandbox";
+import { SandboxLifecycleEvents } from "@mistle/sandbox-lifecycle";
 import {
   createIntegrationTest,
   TestEnvironmentIdHeader,
@@ -27,6 +33,10 @@ import {
   executeMaterializeSandboxProfileVersionSnapshot,
   type SnapshotWorkflowStepRunner,
 } from "../openworkflow/materialize-sandbox-profile-version-snapshot/workflow.js";
+import { applySandboxLifecycleEvent } from "../openworkflow/shared/apply-sandbox-lifecycle-event.js";
+import { markSandboxInstanceStarting } from "../openworkflow/shared/mark-sandbox-instance-starting.js";
+import { markSandboxInstanceRunning } from "../openworkflow/start-sandbox-instance/mark-sandbox-instance-running.js";
+import { persistSandboxInstanceProvisioning } from "../openworkflow/start-sandbox-instance/persist-sandbox-instance-provisioning.js";
 
 const InternalServiceToken = "integration-new-internal-service-token";
 const DockerSocketPath = "/var/run/docker.sock";
@@ -247,6 +257,104 @@ describe.concurrent("data-plane worker snapshot materialization", () => {
         where: (table, { eq }) => eq(table.id, sandboxInstanceId),
       }),
     ).resolves.toBeUndefined();
+  });
+
+  it("applies the snapshot sandbox provisioning lifecycle sequence", async ({ env }) => {
+    const sandboxInstanceId = "sbi_snapshot_lifecycle_sequence_integration";
+    const sandboxProfileId = "sbp_snapshot_lifecycle_sequence_integration";
+
+    await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
+      id: sandboxInstanceId,
+      organizationId: "org_snapshot_lifecycle_sequence_integration",
+      sandboxProfileId,
+      sandboxProfileVersion: 1,
+      runtimeProvider: SandboxProvider.DOCKER,
+      status: SandboxInstanceStatuses.PENDING,
+      startedByKind: "system",
+      startedById: "ssj_snapshot_lifecycle_sequence_integration",
+      source: SandboxInstanceSources.SYSTEM,
+      purpose: SandboxInstancePurposes.SNAPSHOT,
+      persistenceMode: "ephemeral",
+    });
+
+    await markSandboxInstanceStarting({
+      db: env.dataPlaneDb,
+      tables: env.dataPlaneTables,
+      sandboxInstanceId,
+    });
+    await persistSandboxInstanceProvisioning(
+      {
+        db: env.dataPlaneDb,
+        tables: env.dataPlaneTables,
+      },
+      {
+        sandboxInstanceId,
+        runtimePlan: {
+          sandboxProfileId,
+          version: 1,
+          image: {
+            source: "base",
+            imageRef: "registry:snapshot-lifecycle",
+          },
+          egressRoutes: [],
+          artifacts: [],
+          runtimeClients: [],
+          workspaceSources: [],
+          agentRuntimes: [],
+        },
+        sandboxProfileId,
+        sandboxProfileVersion: 1,
+        providerSandboxId: "provider-snapshot-lifecycle-sequence-integration",
+      },
+    );
+    await applySandboxLifecycleEvent(
+      {
+        db: env.dataPlaneDb,
+        tables: env.dataPlaneTables,
+      },
+      {
+        sandboxInstanceId,
+        event: SandboxLifecycleEvents.PROVIDER_RUNTIME_INITIALIZATION_STARTED,
+      },
+    );
+    await markSandboxInstanceRunning(
+      {
+        db: env.dataPlaneDb,
+        tables: env.dataPlaneTables,
+      },
+      {
+        sandboxInstanceId,
+      },
+    );
+
+    const sandboxInstance = await env.dataPlaneDb.query.sandboxInstances.findFirst({
+      columns: {
+        status: true,
+        providerSandboxId: true,
+        startedAt: true,
+      },
+      where: (table, { eq }) => eq(table.id, sandboxInstanceId),
+    });
+    expect(sandboxInstance).toMatchObject({
+      status: SandboxInstanceStatuses.RUNNING,
+      providerSandboxId: "provider-snapshot-lifecycle-sequence-integration",
+    });
+    expect(sandboxInstance?.startedAt).not.toBeNull();
+
+    await expect(
+      env.dataPlaneDb.query.sandboxInstanceRuntimePlans.findFirst({
+        columns: {
+          revision: true,
+          compiledFromProfileId: true,
+          compiledFromProfileVersion: true,
+        },
+        where: (table, { eq }) => eq(table.sandboxInstanceId, sandboxInstanceId),
+      }),
+    ).resolves.toEqual({
+      revision: 1,
+      compiledFromProfileId: sandboxProfileId,
+      compiledFromProfileVersion: 1,
+    });
   });
 });
 

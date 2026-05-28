@@ -165,8 +165,7 @@ describe("ChatSemanticGroupItemOutput", () => {
           id: "file-change-raw-source",
           sourceKind: "file-change",
           label: "Updated",
-          detail:
-            "apps/data-plane-worker/openworkflow/resume-sandbox-instance/mark-sandbox-instance-starting.ts",
+          detail: "apps/data-plane-worker/openworkflow/shared/mark-sandbox-instance-starting.ts",
           detailKind: "code",
           command: null,
           output: rawSource,

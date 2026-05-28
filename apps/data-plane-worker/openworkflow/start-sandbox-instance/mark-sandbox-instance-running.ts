@@ -3,7 +3,10 @@ import {
   type DataPlaneDatabase,
   type DataPlaneTables,
 } from "@mistle/db/data-plane";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { SandboxLifecycleEvents } from "@mistle/sandbox-lifecycle";
+import { eq, sql } from "drizzle-orm";
+
+import { applySandboxLifecycleEvent } from "../shared/apply-sandbox-lifecycle-event.js";
 
 export async function markSandboxInstanceRunning(
   ctx: {
@@ -15,29 +18,39 @@ export async function markSandboxInstanceRunning(
   },
 ): Promise<void> {
   const { sandboxInstances } = ctx.tables;
-  const updatedRows = await ctx.db
-    .update(sandboxInstances)
-    .set({
-      status: SandboxInstanceStatuses.RUNNING,
-      startedAt: sql`now()`,
-      stopReason: null,
-      failedAt: null,
-      failureCode: null,
-      failureMessage: null,
-      updatedAt: sql`now()`,
-    })
-    .where(
-      and(
-        eq(sandboxInstances.id, input.sandboxInstanceId),
-        eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
-        isNull(sandboxInstances.deletedAt),
-      ),
-    )
-    .returning({
-      id: sandboxInstances.id,
-    });
+  await ctx.db.transaction(async (tx) => {
+    await applySandboxLifecycleEvent(
+      {
+        db: tx,
+        tables: ctx.tables,
+      },
+      {
+        sandboxInstanceId: input.sandboxInstanceId,
+        event: SandboxLifecycleEvents.RUNTIME_READY,
+      },
+    );
 
-  if (updatedRows[0] === undefined) {
-    throw new Error("Failed to transition sandbox instance status from starting to running.");
+    await tx
+      .update(sandboxInstances)
+      .set({
+        startedAt: sql`now()`,
+        stopReason: null,
+        failedAt: null,
+        failureCode: null,
+        failureMessage: null,
+        updatedAt: sql`now()`,
+      })
+      .where(eq(sandboxInstances.id, input.sandboxInstanceId));
+  });
+
+  const sandboxInstance = await ctx.db.query.sandboxInstances.findFirst({
+    columns: {
+      status: true,
+    },
+    where: (table, { eq: whereEq }) => whereEq(table.id, input.sandboxInstanceId),
+  });
+
+  if (sandboxInstance?.status !== SandboxInstanceStatuses.RUNNING) {
+    throw new Error("Failed to transition sandbox instance status to running.");
   }
 }

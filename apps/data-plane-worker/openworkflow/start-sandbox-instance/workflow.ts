@@ -10,6 +10,7 @@ import {
   isSandboxResourceNotFoundError,
   type SandboxStartStoragePreparation,
 } from "@mistle/sandbox";
+import { SandboxLifecycleEvents } from "@mistle/sandbox-lifecycle";
 import type { SandboxdOperationKind } from "@mistle/sandbox-runtime-contract";
 import {
   type StartSandboxInstanceWorkflowInput,
@@ -20,9 +21,11 @@ import { rethrowDurableStepErrorForRetry } from "@mistle/workflow-registry/durab
 
 import { getWorkflowContext } from "../core/context.js";
 import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
+import { applySandboxLifecycleEvent } from "../shared/apply-sandbox-lifecycle-event.js";
 import { attachSandboxStorage } from "../shared/attach-sandbox-storage.js";
 import { destroySandbox } from "../shared/destroy-sandbox.js";
 import { formatPersistedFailureMessage } from "../shared/format-persisted-failure-message.js";
+import { markSandboxInstanceStarting } from "../shared/mark-sandbox-instance-starting.js";
 import { prepareSandboxStorageForStart } from "../shared/prepare-sandbox-storage-for-start.js";
 import {
   createWorkerSandboxLifecycleEventRecorder,
@@ -53,8 +56,10 @@ const StartSandboxFailureCodes = {
   SANDBOX_STORAGE_PROVISION_FAILED: "sandbox_storage_provision_failed",
   SANDBOX_STORAGE_PREPARE_FAILED: "sandbox_storage_prepare_failed",
   SANDBOX_RUNTIME_RESOLVE_FAILED: "sandbox_runtime_resolve_failed",
+  STATUS_TRANSITION_TO_STARTING_FAILED: "status_transition_to_starting_failed",
   SANDBOX_START_FAILED: "sandbox_start_failed",
   PERSIST_PROVISIONING_METADATA_FAILED: "persist_provisioning_metadata_failed",
+  STATUS_TRANSITION_TO_INITIALIZING_FAILED: "status_transition_to_initializing_failed",
   SANDBOX_INIT_FAILED: "sandbox_init_failed",
   SANDBOX_STORAGE_ATTACH_FAILED: "sandbox_storage_attach_failed",
   BOOTSTRAP_ATTACH_TIMEOUT: "bootstrap_attach_timeout",
@@ -743,6 +748,30 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
     }
 
     try {
+      await step.run({ name: "mark-sandbox-instance-starting" }, async () => {
+        logger.info("Marking sandbox instance as starting before provider start.");
+        await markSandboxInstanceStarting({
+          db: ctx.db,
+          tables: ctx.tables,
+          sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
+        });
+      });
+    } catch (error) {
+      rethrowDurableStepErrorForRetry(error);
+      logger.error({ err: error }, "Failed to mark sandbox instance as starting.");
+      await handleFailedStartup({
+        sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
+        persistenceMode: workflowInput.persistenceMode,
+        failureCode: StartSandboxFailureCodes.STATUS_TRANSITION_TO_STARTING_FAILED,
+        failureMessage: formatPersistedFailureMessage({
+          summary: "Failed to mark sandbox instance as starting before provider start.",
+          error,
+        }),
+      });
+      throw error;
+    }
+
+    try {
       startedSandbox = await recordWorkerSandboxLifecyclePhase(
         operationEvents,
         {
@@ -893,6 +922,48 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           cause: error,
         },
       );
+    }
+
+    try {
+      await step.run({ name: "mark-sandbox-instance-initializing" }, async () => {
+        logger.info(
+          {
+            providerSandboxId: startedSandbox.providerSandboxId,
+          },
+          "Marking sandbox instance as initializing before runtime initialization.",
+        );
+        await applySandboxLifecycleEvent(
+          {
+            db: ctx.db,
+            tables: ctx.tables,
+          },
+          {
+            sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
+            event: SandboxLifecycleEvents.PROVIDER_RUNTIME_INITIALIZATION_STARTED,
+          },
+        );
+      });
+    } catch (error) {
+      rethrowDurableStepErrorForRetry(error);
+      logger.error(
+        {
+          err: error,
+          providerSandboxId: startedSandbox.providerSandboxId,
+        },
+        "Failed to mark sandbox instance as initializing.",
+      );
+      await handleFailedStartup({
+        sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
+        persistenceMode: workflowInput.persistenceMode,
+        runtimeProvider: startedSandbox.runtimeProvider,
+        providerSandboxId: startedSandbox.providerSandboxId,
+        failureCode: StartSandboxFailureCodes.STATUS_TRANSITION_TO_INITIALIZING_FAILED,
+        failureMessage: formatPersistedFailureMessage({
+          summary: "Failed to mark sandbox instance as initializing before runtime initialization.",
+          error,
+        }),
+      });
+      throw error;
     }
 
     try {

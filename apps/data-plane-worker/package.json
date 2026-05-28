@@ -26,6 +26,7 @@
     "@mistle/integrations-core": "workspace:*",
     "@mistle/logging": "workspace:*",
     "@mistle/sandbox": "workspace:*",
+    "@mistle/sandbox-lifecycle": "workspace:*",
     "@mistle/sandbox-runtime-contract": "workspace:*",
     "@mistle/sandbox-signing-auth": "workspace:*",
     "@mistle/telemetry": "workspace:*",

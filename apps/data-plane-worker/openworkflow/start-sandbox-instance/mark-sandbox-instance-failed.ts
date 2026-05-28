@@ -39,6 +39,8 @@ export async function markSandboxInstanceFailed(
           or(
             eq(sandboxInstances.status, SandboxInstanceStatuses.PENDING),
             eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
+            eq(sandboxInstances.status, SandboxInstanceStatuses.STARTED),
+            eq(sandboxInstances.status, SandboxInstanceStatuses.INITIALIZING),
             ...(input.allowRunningCurrentStatus === true
               ? [eq(sandboxInstances.status, SandboxInstanceStatuses.RUNNING)]
               : []),

@@ -5,6 +5,7 @@ import {
   SandboxStopReasons,
 } from "@mistle/db/data-plane";
 import { SandboxProvider, type SandboxImageHandle } from "@mistle/sandbox";
+import { SandboxLifecycleEvents } from "@mistle/sandbox-lifecycle";
 import {
   MaterializeSandboxProfileVersionSnapshotWorkflowSpec,
   type MaterializeSandboxProfileVersionSnapshotWorkflowInput,
@@ -14,8 +15,10 @@ import { rethrowDurableStepErrorForRetry } from "@mistle/workflow-registry/durab
 
 import { getWorkflowContext, type WorkflowContext } from "../core/context.js";
 import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
+import { applySandboxLifecycleEvent } from "../shared/apply-sandbox-lifecycle-event.js";
 import { destroySandbox } from "../shared/destroy-sandbox.js";
 import { formatPersistedFailureMessage } from "../shared/format-persisted-failure-message.js";
+import { markSandboxInstanceStarting } from "../shared/mark-sandbox-instance-starting.js";
 import {
   createWorkerSandboxLifecycleEventRecorder,
   recordWorkerSandboxLifecyclePhase,
@@ -35,8 +38,10 @@ import { markSandboxInstanceStopped } from "../stop-sandbox-instance/mark-sandbo
 const SnapshotMaterializationFailureCodes = {
   RUNTIME_PLAN_COMPILE_FAILED: "snapshot_runtime_plan_compile_failed",
   SANDBOX_RUNTIME_RESOLVE_FAILED: "snapshot_sandbox_runtime_resolve_failed",
+  STATUS_TRANSITION_TO_STARTING_FAILED: "snapshot_status_transition_to_starting_failed",
   SANDBOX_START_FAILED: "snapshot_sandbox_start_failed",
   PERSIST_PROVISIONING_METADATA_FAILED: "snapshot_persist_provisioning_metadata_failed",
+  STATUS_TRANSITION_TO_INITIALIZING_FAILED: "snapshot_status_transition_to_initializing_failed",
   SANDBOX_INIT_FAILED: "snapshot_sandbox_init_failed",
   STATUS_TRANSITION_TO_RUNNING_FAILED: "snapshot_status_transition_to_running_failed",
   SNAPSHOT_CAPTURE_FAILED: "snapshot_capture_failed",
@@ -145,8 +150,10 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     | "compile"
     | "ensure"
     | "prepare_image"
+    | "mark_starting"
     | "start"
     | "persist"
+    | "mark_initializing"
     | "init"
     | "mark_running"
     | "capture"
@@ -408,6 +415,15 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
       },
     );
 
+    currentPhase = "mark_starting";
+    await step.run({ name: "mark-snapshot-sandbox-starting" }, async () => {
+      await markSandboxInstanceStarting({
+        db: ctx.db,
+        tables: ctx.tables,
+        sandboxInstanceId: workflowInput.sandboxInstanceId,
+      });
+    });
+
     currentPhase = "start";
     const startedSandbox = await recordWorkerSandboxLifecyclePhase(
       operationEvents,
@@ -467,6 +483,20 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
           sandboxProfileId: workflowInput.sandboxProfileId,
           sandboxProfileVersion: workflowInput.sandboxProfileVersion,
           providerSandboxId: startedSandbox.providerSandboxId,
+        },
+      );
+    });
+
+    currentPhase = "mark_initializing";
+    await step.run({ name: "mark-snapshot-sandbox-initializing" }, async () => {
+      await applySandboxLifecycleEvent(
+        {
+          db: ctx.db,
+          tables: ctx.tables,
+        },
+        {
+          sandboxInstanceId: workflowInput.sandboxInstanceId,
+          event: SandboxLifecycleEvents.PROVIDER_RUNTIME_INITIALIZATION_STARTED,
         },
       );
     });
@@ -668,8 +698,10 @@ function mapSnapshotFailure(input: {
     | "compile"
     | "ensure"
     | "prepare_image"
+    | "mark_starting"
     | "start"
     | "persist"
+    | "mark_initializing"
     | "init"
     | "mark_running"
     | "capture"
@@ -701,6 +733,13 @@ function mapSnapshotFailure(input: {
     };
   }
 
+  if (input.phase === "mark_starting") {
+    return {
+      failureCode: SnapshotMaterializationFailureCodes.STATUS_TRANSITION_TO_STARTING_FAILED,
+      summary: "Failed to mark snapshot sandbox instance as starting.",
+    };
+  }
+
   if (input.phase === "start") {
     return {
       failureCode: SnapshotMaterializationFailureCodes.SANDBOX_START_FAILED,
@@ -712,6 +751,13 @@ function mapSnapshotFailure(input: {
     return {
       failureCode: SnapshotMaterializationFailureCodes.PERSIST_PROVISIONING_METADATA_FAILED,
       summary: "Failed to persist snapshot sandbox provisioning metadata.",
+    };
+  }
+
+  if (input.phase === "mark_initializing") {
+    return {
+      failureCode: SnapshotMaterializationFailureCodes.STATUS_TRANSITION_TO_INITIALIZING_FAILED,
+      summary: "Failed to mark snapshot sandbox instance as initializing.",
     };
   }
 

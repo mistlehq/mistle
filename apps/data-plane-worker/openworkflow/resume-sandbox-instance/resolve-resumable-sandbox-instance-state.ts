@@ -61,7 +61,9 @@ export async function resolveResumableSandboxInstanceState(input: {
 
   if (
     sandboxInstance.status === SandboxInstanceStatuses.RUNNING ||
-    sandboxInstance.status === SandboxInstanceStatuses.STARTING
+    sandboxInstance.status === SandboxInstanceStatuses.STARTING ||
+    sandboxInstance.status === SandboxInstanceStatuses.STARTED ||
+    sandboxInstance.status === SandboxInstanceStatuses.INITIALIZING
   ) {
     return null;
   }
@@ -71,7 +73,7 @@ export async function resolveResumableSandboxInstanceState(input: {
     sandboxInstance.status !== SandboxInstanceStatuses.FAILED
   ) {
     throw new Error(
-      `Expected sandbox instance '${input.sandboxInstanceId}' to be stopped, failed, starting, or running before resume execution.`,
+      `Expected sandbox instance '${input.sandboxInstanceId}' to be stopped, failed, or already active before resume execution.`,
     );
   }
 

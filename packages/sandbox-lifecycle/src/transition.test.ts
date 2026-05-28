@@ -193,6 +193,36 @@ describe("transitionSandboxLifecycle", () => {
       kind: "unchanged",
       status: SandboxInstanceStatuses.STOPPED,
     });
+
+    expect(
+      transitionSandboxLifecycle({
+        status: SandboxInstanceStatuses.STARTING,
+        event: SandboxLifecycleEvents.PROVIDER_START_REQUESTED,
+      }),
+    ).toEqual({
+      kind: "unchanged",
+      status: SandboxInstanceStatuses.STARTING,
+    });
+
+    expect(
+      transitionSandboxLifecycle({
+        status: SandboxInstanceStatuses.STARTED,
+        event: SandboxLifecycleEvents.PROVIDER_START_ACCEPTED,
+      }),
+    ).toEqual({
+      kind: "unchanged",
+      status: SandboxInstanceStatuses.STARTED,
+    });
+
+    expect(
+      transitionSandboxLifecycle({
+        status: SandboxInstanceStatuses.INITIALIZING,
+        event: SandboxLifecycleEvents.PROVIDER_RUNTIME_INITIALIZATION_STARTED,
+      }),
+    ).toEqual({
+      kind: "unchanged",
+      status: SandboxInstanceStatuses.INITIALIZING,
+    });
   });
 
   it("rejects unsupported event and status combinations", () => {

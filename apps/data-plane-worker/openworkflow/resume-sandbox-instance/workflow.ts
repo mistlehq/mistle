@@ -1,5 +1,6 @@
 import { SandboxUsageEventTypes, type SandboxUsageEventType } from "@mistle/db/data-plane";
 import { isSandboxResourceNotFoundError, type SandboxProvider } from "@mistle/sandbox";
+import { SandboxLifecycleEvents } from "@mistle/sandbox-lifecycle";
 import {
   type ResumeSandboxInstanceWorkflowOutput,
   ResumeSandboxInstanceWorkflowSpec,
@@ -11,9 +12,11 @@ import { rethrowDurableStepErrorForRetry } from "@mistle/workflow-registry/durab
 import { getWorkflowContext } from "../core/context.js";
 import { createResolveSandboxRuntimeInput } from "../core/sandbox-runtime-resolver.js";
 import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
+import { applySandboxLifecycleEvent } from "../shared/apply-sandbox-lifecycle-event.js";
 import { attachSandboxStorage } from "../shared/attach-sandbox-storage.js";
 import { destroySandbox } from "../shared/destroy-sandbox.js";
 import { formatPersistedFailureMessage } from "../shared/format-persisted-failure-message.js";
+import { markSandboxInstanceStarting } from "../shared/mark-sandbox-instance-starting.js";
 import { prepareSandboxStorageForStart } from "../shared/prepare-sandbox-storage-for-start.js";
 import {
   createWorkerSandboxLifecycleEventRecorder,
@@ -31,7 +34,6 @@ import { markSandboxInstanceRunning } from "../start-sandbox-instance/mark-sandb
 import { resumeSandboxRuntime } from "../start-sandbox-instance/resume-sandbox-runtime.js";
 import { prepareSandboxImage, startSandbox } from "../start-sandbox-instance/start-sandbox.js";
 import { waitForSandboxRuntimeReadiness } from "../start-sandbox-instance/wait-for-sandbox-runtime-readiness.js";
-import { markSandboxInstanceStarting } from "./mark-sandbox-instance-starting.js";
 import { persistSandboxInstanceComputeReplacement } from "./persist-sandbox-instance-compute-replacement.js";
 import {
   resolveResumableSandboxInstanceState,
@@ -304,6 +306,19 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         );
 
         if (resumedRuntime !== null) {
+          await step.run({ name: "mark-resumed-sandbox-instance-started" }, async () => {
+            await applySandboxLifecycleEvent(
+              {
+                db: ctx.db,
+                tables: ctx.tables,
+              },
+              {
+                sandboxInstanceId: input.sandboxInstanceId,
+                event: SandboxLifecycleEvents.PROVIDER_START_ACCEPTED,
+              },
+            );
+          });
+
           try {
             await step.run({ name: "record-sandbox-resumed-usage-event" }, async () => {
               await recordResumeSandboxUsageEvent({
@@ -318,6 +333,19 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           }
 
           try {
+            await step.run({ name: "mark-resumed-sandbox-instance-initializing" }, async () => {
+              await applySandboxLifecycleEvent(
+                {
+                  db: ctx.db,
+                  tables: ctx.tables,
+                },
+                {
+                  sandboxInstanceId: input.sandboxInstanceId,
+                  event: SandboxLifecycleEvents.PROVIDER_RUNTIME_INITIALIZATION_STARTED,
+                },
+              );
+            });
+
             logger.info(
               createResumeWorkflowLogFields({
                 sandboxInstanceId: input.sandboxInstanceId,
@@ -1297,6 +1325,19 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       }
 
       try {
+        await step.run({ name: "mark-replacement-sandbox-instance-initializing" }, async () => {
+          await applySandboxLifecycleEvent(
+            {
+              db: ctx.db,
+              tables: ctx.tables,
+            },
+            {
+              sandboxInstanceId: input.sandboxInstanceId,
+              event: SandboxLifecycleEvents.PROVIDER_RUNTIME_INITIALIZATION_STARTED,
+            },
+          );
+        });
+
         await step.run({ name: "initialize-replacement-sandbox-runtime" }, async () => {
           await initializeSandboxRuntime(
             {

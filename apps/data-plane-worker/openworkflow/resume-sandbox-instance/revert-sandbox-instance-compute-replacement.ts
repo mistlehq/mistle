@@ -3,7 +3,7 @@ import {
   type DataPlaneDatabase,
   type DataPlaneTables,
 } from "@mistle/db/data-plane";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 export async function revertSandboxInstanceComputeReplacement(
   ctx: {
@@ -30,9 +30,13 @@ export async function revertSandboxInstanceComputeReplacement(
     .where(
       and(
         eq(sandboxInstances.id, input.sandboxInstanceId),
-        eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
+        inArray(sandboxInstances.status, [
+          SandboxInstanceStatuses.STARTED,
+          SandboxInstanceStatuses.INITIALIZING,
+        ]),
         eq(sandboxInstances.computeGeneration, input.replacementComputeGeneration),
         eq(sandboxInstances.providerSandboxId, input.replacementProviderSandboxId),
+        isNull(sandboxInstances.deletedAt),
       ),
     )
     .returning({

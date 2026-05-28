@@ -11,6 +11,7 @@ import {
   SandboxStorageProviders,
   SandboxStorageStatuses,
 } from "@mistle/db/data-plane";
+import { SandboxLifecycleEvents } from "@mistle/sandbox-lifecycle";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
@@ -19,6 +20,8 @@ import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registr
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
+import { applySandboxLifecycleEvent } from "../openworkflow/shared/apply-sandbox-lifecycle-event.js";
+import { markSandboxInstanceStarting } from "../openworkflow/shared/mark-sandbox-instance-starting.js";
 import {
   getSandboxInstanceStorageBySandboxInstanceId,
   insertSandboxInstanceStorage,
@@ -60,6 +63,12 @@ describe.concurrent("data-plane worker start sandbox instance provisioning", () 
       status: SandboxInstanceStatuses.PENDING,
     });
 
+    await markSandboxInstanceStarting({
+      db: env.dataPlaneDb,
+      tables: env.dataPlaneTables,
+      sandboxInstanceId,
+    });
+
     await persistSandboxInstanceProvisioning(
       {
         db: env.dataPlaneDb,
@@ -88,7 +97,7 @@ describe.concurrent("data-plane worker start sandbox instance provisioning", () 
 
     expect(persistedProvisionedInstance).toEqual({
       id: sandboxInstanceId,
-      status: SandboxInstanceStatuses.STARTING,
+      status: SandboxInstanceStatuses.STARTED,
       providerSandboxId: "provider-runtime-start-provisioning-new",
     });
 
@@ -110,6 +119,87 @@ describe.concurrent("data-plane worker start sandbox instance provisioning", () 
         compiledFromProfileVersion: 3,
       },
     ]);
+  });
+
+  it("treats provisioning replay as idempotent only when provider metadata and runtime plan match", async ({
+    env,
+  }) => {
+    const sandboxInstanceId = "sbi_start_provisioning_replay_new";
+    const runtimePlan = createRuntimePlan({
+      sandboxProfileId: "sbp_start_provisioning_replay_new",
+      version: 2,
+    });
+
+    await ensureEphemeralSandboxInstance(env, {
+      sandboxInstanceId,
+      organizationId: "org_start_provisioning_replay_new",
+      sandboxProfileId: "sbp_start_provisioning_replay_new",
+      sandboxProfileVersion: 2,
+    });
+    await markSandboxInstanceStarting({
+      db: env.dataPlaneDb,
+      tables: env.dataPlaneTables,
+      sandboxInstanceId,
+    });
+
+    await persistSandboxInstanceProvisioning(
+      {
+        db: env.dataPlaneDb,
+        tables: env.dataPlaneTables,
+      },
+      {
+        sandboxInstanceId,
+        runtimePlan,
+        sandboxProfileId: "sbp_start_provisioning_replay_new",
+        sandboxProfileVersion: 2,
+        providerSandboxId: "provider-runtime-start-provisioning-replay-new",
+      },
+    );
+    await expect(
+      persistSandboxInstanceProvisioning(
+        {
+          db: env.dataPlaneDb,
+          tables: env.dataPlaneTables,
+        },
+        {
+          sandboxInstanceId,
+          runtimePlan,
+          sandboxProfileId: "sbp_start_provisioning_replay_new",
+          sandboxProfileVersion: 2,
+          providerSandboxId: "provider-runtime-start-provisioning-replay-new",
+        },
+      ),
+    ).resolves.toBeUndefined();
+
+    await expect(
+      persistSandboxInstanceProvisioning(
+        {
+          db: env.dataPlaneDb,
+          tables: env.dataPlaneTables,
+        },
+        {
+          sandboxInstanceId,
+          runtimePlan,
+          sandboxProfileId: "sbp_start_provisioning_replay_new",
+          sandboxProfileVersion: 2,
+          providerSandboxId: "provider-runtime-start-provisioning-conflict-new",
+        },
+      ),
+    ).rejects.toThrow(
+      "Failed to persist provider sandbox id while sandbox instance was still starting.",
+    );
+
+    const persistedSandboxInstance = await env.dataPlaneDb.query.sandboxInstances.findFirst({
+      columns: {
+        providerSandboxId: true,
+        status: true,
+      },
+      where: (table, { eq }) => eq(table.id, sandboxInstanceId),
+    });
+    expect(persistedSandboxInstance).toEqual({
+      providerSandboxId: "provider-runtime-start-provisioning-replay-new",
+      status: SandboxInstanceStatuses.STARTED,
+    });
   });
 
   it("does not persist provider metadata for a deleted pending session", async ({ env }) => {
@@ -146,7 +236,7 @@ describe.concurrent("data-plane worker start sandbox instance provisioning", () 
         },
       ),
     ).rejects.toThrow(
-      "Failed to persist provider sandbox id while sandbox instance was still pending.",
+      "Failed to persist provider sandbox id while sandbox instance was still starting.",
     );
 
     const persistedDeletedInstance = await env.dataPlaneDb.query.sandboxInstances.findFirst({
@@ -171,6 +261,12 @@ describe.concurrent("data-plane worker start sandbox instance provisioning", () 
       sandboxProfileId: "sbp_start_provisioning_deleted_starting_new",
       sandboxProfileVersion: 1,
     });
+    await markSandboxInstanceStarting({
+      db: env.dataPlaneDb,
+      tables: env.dataPlaneTables,
+      sandboxInstanceId,
+    });
+
     await persistSandboxInstanceProvisioning(
       {
         db: env.dataPlaneDb,
@@ -204,7 +300,9 @@ describe.concurrent("data-plane worker start sandbox instance provisioning", () 
           sandboxInstanceId,
         },
       ),
-    ).rejects.toThrow("Failed to transition sandbox instance status from starting to running.");
+    ).rejects.toThrow(
+      `Sandbox instance '${sandboxInstanceId}' was not found for lifecycle event 'runtime_ready'.`,
+    );
 
     const persistedDeletedInstance = await env.dataPlaneDb.query.sandboxInstances.findFirst({
       columns: {
@@ -215,8 +313,77 @@ describe.concurrent("data-plane worker start sandbox instance provisioning", () 
     });
     expect(persistedDeletedInstance).toEqual({
       providerSandboxId: "provider-runtime-deleted-starting-new",
-      status: SandboxInstanceStatuses.STARTING,
+      status: SandboxInstanceStatuses.STARTED,
     });
+  });
+
+  it("marks an initializing sandbox instance as running", async ({ env }) => {
+    const sandboxInstanceId = "sbi_start_provisioning_initializing_running_new";
+
+    await ensureEphemeralSandboxInstance(env, {
+      sandboxInstanceId,
+      organizationId: "org_start_provisioning_initializing_running_new",
+      sandboxProfileId: "sbp_start_provisioning_initializing_running_new",
+      sandboxProfileVersion: 1,
+    });
+    await markSandboxInstanceStarting({
+      db: env.dataPlaneDb,
+      tables: env.dataPlaneTables,
+      sandboxInstanceId,
+    });
+    await persistSandboxInstanceProvisioning(
+      {
+        db: env.dataPlaneDb,
+        tables: env.dataPlaneTables,
+      },
+      {
+        sandboxInstanceId,
+        runtimePlan: createRuntimePlan({
+          sandboxProfileId: "sbp_start_provisioning_initializing_running_new",
+          version: 1,
+        }),
+        sandboxProfileId: "sbp_start_provisioning_initializing_running_new",
+        sandboxProfileVersion: 1,
+        providerSandboxId: "provider-runtime-initializing-running-new",
+      },
+    );
+    await applySandboxLifecycleEvent(
+      {
+        db: env.dataPlaneDb,
+        tables: env.dataPlaneTables,
+      },
+      {
+        sandboxInstanceId,
+        event: SandboxLifecycleEvents.PROVIDER_RUNTIME_INITIALIZATION_STARTED,
+      },
+    );
+
+    await markSandboxInstanceRunning(
+      {
+        db: env.dataPlaneDb,
+        tables: env.dataPlaneTables,
+      },
+      {
+        sandboxInstanceId,
+      },
+    );
+
+    const runningSandboxInstance = await env.dataPlaneDb.query.sandboxInstances.findFirst({
+      columns: {
+        status: true,
+        startedAt: true,
+        failureCode: true,
+        failureMessage: true,
+      },
+      where: (table, { eq }) => eq(table.id, sandboxInstanceId),
+    });
+
+    expect(runningSandboxInstance).toMatchObject({
+      status: SandboxInstanceStatuses.RUNNING,
+      failureCode: null,
+      failureMessage: null,
+    });
+    expect(runningSandboxInstance?.startedAt).not.toBeNull();
   });
 
   it("persists and updates sandbox storage metadata", async ({ env }) => {
