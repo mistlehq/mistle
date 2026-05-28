@@ -40,11 +40,11 @@ const timingStorage = new AsyncLocalStorage<TestTimingContext>();
 const completedTestTimings: CompletedTestTiming[] = [];
 const fileScopeRecords: PhaseTimingRecord[] = [];
 
-aroundEach(async (runTest, context) => {
+aroundEach(async (runTest, { task }) => {
   const testTimingContext: TestTimingContext = {
     records: [],
     startedAtMs: Date.now(),
-    testName: context.task.fullTestName,
+    testName: task.fullTestName,
   };
 
   try {
