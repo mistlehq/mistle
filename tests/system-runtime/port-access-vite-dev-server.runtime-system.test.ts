@@ -40,6 +40,7 @@ import {
 } from "../system/helpers/port-access.js";
 import { createRuntimeCodexSandboxFixture } from "./helpers/runtime-codex-sandbox.js";
 import { createSandboxSystemTest } from "./helpers/sandbox-system-test.js";
+import { timeSystemRuntimePhase } from "./helpers/system-runtime-phase-timing.js";
 
 const it = createSandboxSystemTest({
   extraInfra: ["mailpit"],
@@ -1109,21 +1110,15 @@ async function timeVitePhase<Result>(input: {
   attributes?: Record<string, string | number | boolean | null>;
   operation: () => Promise<Result>;
 }): Promise<Result> {
-  const startedAt = Date.now();
-  try {
-    return await input.operation();
-  } finally {
-    const basePayload = {
-      event: "system_port_access_vite.phase_timing",
-      phase: input.phase,
+  return timeSystemRuntimePhase({
+    event: "system_port_access_vite.phase_timing",
+    phase: input.phase,
+    attributes: {
       sandboxProvider: input.sandboxProvider,
-      durationMs: Date.now() - startedAt,
-    };
-    const payload =
-      input.attributes === undefined ? basePayload : { ...input.attributes, ...basePayload };
-
-    console.log(JSON.stringify(payload));
-  }
+      ...(input.attributes ?? {}),
+    },
+    operation: input.operation,
+  });
 }
 
 async function openVitePortAccessSession(input: {
