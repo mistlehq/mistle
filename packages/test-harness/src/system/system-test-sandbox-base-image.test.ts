@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REGISTRY_STORAGE_DIR_ENV,
   MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REF_ENV,
+  readSystemTestSandboxBaseImageRegistryStorageDir,
   resolveSystemTestSandboxBaseImageSource,
 } from "./system-test-sandbox-base-image-source.js";
 
@@ -48,5 +50,30 @@ describe("resolveSystemTestSandboxBaseImageSource", () => {
       kind: "local",
       imageRef: LocalSandboxBaseImageRef,
     });
+  });
+});
+
+describe("readSystemTestSandboxBaseImageRegistryStorageDir", () => {
+  it("uses no persistent registry storage when no directory is configured", () => {
+    expect(readSystemTestSandboxBaseImageRegistryStorageDir({})).toBeUndefined();
+  });
+
+  it("trims the configured persistent registry storage directory", () => {
+    expect(
+      readSystemTestSandboxBaseImageRegistryStorageDir({
+        [MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REGISTRY_STORAGE_DIR_ENV]:
+          " /tmp/mistle-system-registry ",
+      }),
+    ).toBe("/tmp/mistle-system-registry");
+  });
+
+  it("rejects relative persistent registry storage directories", () => {
+    expect(() =>
+      readSystemTestSandboxBaseImageRegistryStorageDir({
+        [MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REGISTRY_STORAGE_DIR_ENV]: "mistle-system-registry",
+      }),
+    ).toThrow(
+      `${MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REGISTRY_STORAGE_DIR_ENV} must be an absolute path.`,
+    );
   });
 });

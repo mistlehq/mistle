@@ -21,7 +21,6 @@ import { systemSleeper } from "@mistle/time";
 import { BackendPostgres } from "openworkflow/postgres";
 import { Client } from "pg";
 import { createClient } from "redis";
-import { GenericContainer } from "testcontainers";
 import { z } from "zod";
 
 import { startControlPlaneApi } from "../apps/control-plane-api.js";
@@ -48,6 +47,7 @@ import {
   readPreparedTestHarnessRuntime,
 } from "../system/prepared-runtime.js";
 import { resolveHostPathFromContainerPath } from "../system/provision-system-integration-targets.js";
+import { startSandboxBaseImageRegistry } from "../system/sandbox-base-image-registry.js";
 import { resolveSystemTestSandboxBaseImageSource } from "../system/system-test-sandbox-base-image-source.js";
 import { createServiceRegistry } from "./registry.js";
 import { ensureRunnerPoolSession } from "./runner-pool-session.js";
@@ -78,8 +78,6 @@ const DefaultBuildContextHostPath = fileURLToPath(new URL("../../../..", import.
 const DefaultStartupTimeoutMs = 120_000;
 const HostGatewayName = "host.testcontainers.internal";
 const DockerSocketPath = "/var/run/docker.sock";
-const RegistryImageReference = "registry:3";
-const RegistryInternalPort = 5000;
 const DeadServiceBaseUrl = "http://host.testcontainers.internal:9";
 const ControlPlaneOpenWorkflowSchema = "control_plane_openworkflow";
 const DataPlaneOpenWorkflowSchema = "data_plane_openworkflow";
@@ -556,52 +554,6 @@ async function acquireSandboxBaseImageRegistry(
       timings,
     });
   }
-}
-
-async function startSandboxBaseImageRegistry(input: {
-  sourceImageRef: string;
-  pullSourceImage: boolean;
-  timings: Map<string, number>;
-}): Promise<TestServiceRuntime & { stop: () => Promise<void> }> {
-  const registryContainer = await measure(input.timings, "start-registry-container", async () =>
-    new GenericContainer(RegistryImageReference)
-      .withEnvironment({
-        REGISTRY_STORAGE_DELETE_ENABLED: "true",
-      })
-      .withExposedPorts(RegistryInternalPort)
-      .start(),
-  );
-  const registryAuthority = `${registryContainer.getHost()}:${String(
-    registryContainer.getMappedPort(RegistryInternalPort),
-  )}`;
-  const sandboxBaseImageRef = `${registryAuthority}/${DefaultSandboxBaseImageBuild.repositoryPath}:dev`;
-  if (input.pullSourceImage) {
-    await measure(input.timings, "pull-source-image", async () =>
-      execFileAsync("docker", ["pull", input.sourceImageRef]),
-    );
-  }
-  await measure(input.timings, "tag-source-image", async () =>
-    execFileAsync("docker", ["tag", input.sourceImageRef, sandboxBaseImageRef]),
-  );
-  await measure(input.timings, "push-registry-image", async () =>
-    execFileAsync("docker", ["push", sandboxBaseImageRef]),
-  );
-
-  return {
-    endpoints: {
-      http: {
-        hostBaseUrl: `http://${registryAuthority}`,
-      },
-    },
-    containerId: registryContainer.getId(),
-    stop: async () => {
-      await registryContainer.stop({
-        remove: true,
-        removeVolumes: true,
-        timeout: 0,
-      });
-    },
-  };
 }
 
 async function removeDockerSandboxContainersOnNetwork(networkName: string): Promise<void> {

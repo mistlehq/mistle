@@ -15,7 +15,7 @@ concurrency:
 jobs:
   system-runtime:
     name: Scheduled Runtime System
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     permissions:
       contents: read
@@ -33,8 +33,26 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Create Nix directories
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chmod -R 777 /nix
+
+      - name: Mount Nix sticky disk
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
+        with:
+          key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
+          path: /nix
+
+      - name: Prepare single-user Nix store
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chown "$USER:$USER" /nix /nix/store
+
       - name: Install Nix
         uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+        with:
+          install_options: --no-daemon
 
       - name: Set up Magic Nix Cache
         uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
@@ -106,12 +124,24 @@ jobs:
         run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
 
       - name: Resolve runtime system sandbox base image
+        id: resolve-sandbox-base-image
         run: |
           image_ref="$(nix develop --command env NODE_OPTIONS='--conditions workspace-src' pnpm exec tsx ./scripts/test/ensure-system-test-sandbox-base-image.ts)"
+          image_cache_key="$(printf '%s' "${image_ref}" | sha256sum | cut -d ' ' -f 1)"
           echo "MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REF=${image_ref}" >> "${GITHUB_ENV}"
+          echo "MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_CACHE_KEY=${image_cache_key}" >> "${GITHUB_ENV}"
+          echo "image-cache-key=${image_cache_key}" >> "${GITHUB_OUTPUT}"
           echo "Resolved runtime system sandbox base image: ${image_ref}"
 
+      - name: Mount runtime system sandbox registry sticky disk
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
+        with:
+          key: ${{ github.repository }}-runtime-system-sandbox-registry-${{ steps.resolve-sandbox-base-image.outputs.image-cache-key }}
+          path: /home/runner/.cache/mistle/runtime-system-sandbox-registry
+
       - name: Run runtime system tests
+        env:
+          MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REGISTRY_STORAGE_DIR: /home/runner/.cache/mistle/runtime-system-sandbox-registry
         run: nix develop --command pnpm --filter @mistle/tests test:system:runtime
 
       - name: Save Turbo local cache
