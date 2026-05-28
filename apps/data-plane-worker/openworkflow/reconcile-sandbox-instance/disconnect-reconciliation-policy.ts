@@ -1,5 +1,10 @@
-import { SandboxInstancePersistenceModes, SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import { SandboxInstancePersistenceModes } from "@mistle/db/data-plane";
 import type { SandboxInspectDisposition } from "@mistle/sandbox";
+import {
+  getSandboxDisconnectReconciliationPhase,
+  SandboxDisconnectReconciliationPhases,
+  type SandboxInstanceStatus,
+} from "@mistle/sandbox-lifecycle";
 
 export type DisconnectReconciliationAction =
   | {
@@ -29,11 +34,18 @@ export type DisconnectReconciliationAction =
  */
 export function determineDisconnectReconciliationAction(input: {
   persistenceMode: string;
-  sandboxStatus: string;
+  sandboxStatus: SandboxInstanceStatus;
   providerState: SandboxInspectDisposition | "missing";
 }): DisconnectReconciliationAction {
-  switch (input.sandboxStatus) {
-    case SandboxInstanceStatuses.STARTING: {
+  const lifecyclePhase = getSandboxDisconnectReconciliationPhase(input.sandboxStatus);
+  if (lifecyclePhase === null) {
+    throw new Error(
+      `Disconnect reconciliation does not support sandbox status '${input.sandboxStatus}'.`,
+    );
+  }
+
+  switch (lifecyclePhase) {
+    case SandboxDisconnectReconciliationPhases.STARTUP: {
       switch (input.providerState) {
         case "missing":
           if (input.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
@@ -72,7 +84,8 @@ export function determineDisconnectReconciliationAction(input: {
           };
       }
     }
-    case SandboxInstanceStatuses.RUNNING: {
+    case SandboxDisconnectReconciliationPhases.RUNTIME:
+    case SandboxDisconnectReconciliationPhases.STOPPING: {
       switch (input.providerState) {
         case "missing":
           if (input.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
@@ -108,9 +121,5 @@ export function determineDisconnectReconciliationAction(input: {
           };
       }
     }
-    default:
-      throw new Error(
-        `Disconnect reconciliation does not support sandbox status '${input.sandboxStatus}'.`,
-      );
   }
 }

@@ -157,6 +157,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     | "init"
     | "mark_running"
     | "capture"
+    | "mark_stopping"
     | "destroy"
     | "mark_stopped"
     | "mark_succeeded" = "claim";
@@ -604,6 +605,20 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
       },
     );
 
+    currentPhase = "mark_stopping";
+    await step.run({ name: "mark-snapshot-sandbox-stopping" }, async () => {
+      await applySandboxLifecycleEvent(
+        {
+          db: ctx.db,
+          tables: ctx.tables,
+        },
+        {
+          sandboxInstanceId: workflowInput.sandboxInstanceId,
+          event: SandboxLifecycleEvents.STOP_REQUESTED,
+        },
+      );
+    });
+
     currentPhase = "destroy";
     await recordWorkerSandboxLifecyclePhase(
       operationEvents,
@@ -705,6 +720,7 @@ function mapSnapshotFailure(input: {
     | "init"
     | "mark_running"
     | "capture"
+    | "mark_stopping"
     | "destroy"
     | "mark_stopped"
     | "mark_succeeded";
@@ -779,6 +795,13 @@ function mapSnapshotFailure(input: {
     return {
       failureCode: SnapshotMaterializationFailureCodes.SNAPSHOT_CAPTURE_FAILED,
       summary: "Failed to capture snapshot image.",
+    };
+  }
+
+  if (input.phase === "mark_stopping") {
+    return {
+      failureCode: SnapshotMaterializationFailureCodes.SANDBOX_DESTROY_FAILED,
+      summary: "Failed to mark snapshot sandbox instance as stopping.",
     };
   }
 

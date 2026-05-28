@@ -454,6 +454,18 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       try {
         const resolvedRuntime =
           await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+        await step.run({ name: "mark-setup-check-sandbox-stopping" }, async () =>
+          applySandboxLifecycleEvent(
+            {
+              db: ctx.db,
+              tables: ctx.tables,
+            },
+            {
+              sandboxInstanceId: input.sandboxInstanceId,
+              event: SandboxLifecycleEvents.STOP_REQUESTED,
+            },
+          ),
+        );
         await step.run({ name: "stop-setup-check-sandbox" }, async () => {
           try {
             await stopSandbox(

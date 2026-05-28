@@ -10,6 +10,7 @@ import {
   SandboxInstanceStatuses,
   SandboxStopReasons,
 } from "@mistle/db/data-plane";
+import { SandboxLifecycleEvents } from "@mistle/sandbox-lifecycle";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
@@ -19,6 +20,7 @@ import { describe, expect } from "vitest";
 
 import { markSandboxInstanceFailed as markSandboxInstanceFailedDuringReconcile } from "../openworkflow/reconcile-sandbox-instance/mark-sandbox-instance-failed.js";
 import { markSandboxInstanceStopped as markSandboxInstanceStoppedDuringReconcile } from "../openworkflow/reconcile-sandbox-instance/mark-sandbox-instance-stopped.js";
+import { applySandboxLifecycleEvent } from "../openworkflow/shared/apply-sandbox-lifecycle-event.js";
 import { markSandboxInstanceFailed as markSandboxInstanceFailedDuringStart } from "../openworkflow/start-sandbox-instance/mark-sandbox-instance-failed.js";
 import { markSandboxInstanceStopped as markSandboxInstanceStoppedDuringStop } from "../openworkflow/stop-sandbox-instance/mark-sandbox-instance-stopped.js";
 
@@ -211,6 +213,18 @@ describe.concurrent("data-plane worker sandbox instance deadlines", () => {
     });
     await insertBothDeadlineKinds(env, sandboxInstanceId);
 
+    await applySandboxLifecycleEvent(
+      {
+        db: env.dataPlaneDb,
+        tables: env.dataPlaneTables,
+      },
+      {
+        sandboxInstanceId,
+        event: SandboxLifecycleEvents.STOP_REQUESTED,
+      },
+    );
+    await expectSandboxStatus(env, sandboxInstanceId, SandboxInstanceStatuses.STOPPING);
+
     await markSandboxInstanceStoppedDuringStop({
       db: env.dataPlaneDb,
       tables: env.dataPlaneTables,
@@ -219,6 +233,7 @@ describe.concurrent("data-plane worker sandbox instance deadlines", () => {
     });
 
     await expectDeadlinesCleared(env, sandboxInstanceId);
+    await expectSandboxStatus(env, sandboxInstanceId, SandboxInstanceStatuses.STOPPED);
   });
 
   it("clears both deadline kinds when start failure marks a sandbox instance failed", async ({
@@ -291,6 +306,28 @@ describe.concurrent("data-plane worker sandbox instance deadlines", () => {
     await expectDeadlinesCleared(env, sandboxInstanceId);
   });
 
+  it("clears both deadline kinds when reconcile finalizes a stopping sandbox instance", async ({
+    env,
+  }) => {
+    const sandboxInstanceId = "sbi_integration_new_deadline_reconcile_stopping_clears";
+    await insertSandboxInstance(env, {
+      sandboxInstanceId,
+      status: SandboxInstanceStatuses.STOPPING,
+      providerSandboxId: "provider-integration-new-deadline-reconcile-stopping-clears",
+    });
+    await insertBothDeadlineKinds(env, sandboxInstanceId);
+
+    await markSandboxInstanceStoppedDuringReconcile({
+      db: env.dataPlaneDb,
+      tables: env.dataPlaneTables,
+      sandboxInstanceId,
+      currentStatus: SandboxInstanceStatuses.STOPPING,
+    });
+
+    await expectDeadlinesCleared(env, sandboxInstanceId);
+    await expectSandboxStatus(env, sandboxInstanceId, SandboxInstanceStatuses.STOPPED);
+  });
+
   it("leaves snapshot lifecycle-owned sandboxes running when idle and disconnect deadlines fire", async ({
     env,
   }) => {
@@ -341,7 +378,10 @@ async function insertSandboxInstance(
   env: IntegrationTestEnvironment,
   input: {
     sandboxInstanceId: string;
-    status: typeof SandboxInstanceStatuses.RUNNING | typeof SandboxInstanceStatuses.STARTING;
+    status:
+      | typeof SandboxInstanceStatuses.RUNNING
+      | typeof SandboxInstanceStatuses.STARTING
+      | typeof SandboxInstanceStatuses.STOPPING;
     providerSandboxId: string;
     purpose?: typeof SandboxInstancePurposes.SESSION | typeof SandboxInstancePurposes.SNAPSHOT;
   },
@@ -429,6 +469,23 @@ async function expectSandboxStillRunning(
   expect(persistedInstance).toEqual({
     status: SandboxInstanceStatuses.RUNNING,
     stopReason: null,
+  });
+}
+
+async function expectSandboxStatus(
+  env: IntegrationTestEnvironment,
+  sandboxInstanceId: string,
+  status: string,
+): Promise<void> {
+  const persistedInstance = await env.dataPlaneDb.query.sandboxInstances.findFirst({
+    columns: {
+      status: true,
+    },
+    where: (table, { eq }) => eq(table.id, sandboxInstanceId),
+  });
+
+  expect(persistedInstance).toEqual({
+    status,
   });
 }
 

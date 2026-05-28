@@ -9,6 +9,7 @@ import {
   type SandboxInstanceProvider,
 } from "@mistle/db/data-plane";
 import { isSandboxResourceNotFoundError } from "@mistle/sandbox";
+import { SandboxLifecycleEvents } from "@mistle/sandbox-lifecycle";
 import type { Clock } from "@mistle/time";
 import type { SandboxStopReason } from "@mistle/workflow-registry/data-plane";
 
@@ -21,10 +22,11 @@ import {
   createResolveSandboxRuntimeInput,
   type SandboxRuntimeProviderResolver,
 } from "../core/sandbox-runtime-resolver.js";
+import { applySandboxLifecycleEvent } from "../shared/apply-sandbox-lifecycle-event.js";
 import { stopSandbox } from "../shared/stop-sandbox.js";
 import { markSandboxInstanceStopped } from "./mark-sandbox-instance-stopped.js";
 
-type RunningSandboxInstanceStopState = {
+type StoppableSandboxInstanceStopState = {
   organizationId: string;
   persistenceMode: SandboxInstancePersistenceMode;
   purpose: SandboxInstancePurpose;
@@ -96,11 +98,11 @@ export function shouldExecuteSandboxStop(input: {
   );
 }
 
-async function resolveRunningSandboxInstanceStopState(input: {
+async function resolveStoppableSandboxInstanceStopState(input: {
   db: DataPlaneDatabase;
   tables: DataPlaneTables;
   sandboxInstanceId: string;
-}): Promise<RunningSandboxInstanceStopState | null> {
+}): Promise<StoppableSandboxInstanceStopState | null> {
   const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
     columns: {
       organizationId: true,
@@ -126,15 +128,19 @@ async function resolveRunningSandboxInstanceStopState(input: {
     return null;
   }
 
-  if (sandboxInstance.status !== SandboxInstanceStatuses.RUNNING) {
+  if (
+    sandboxInstance.status !== SandboxInstanceStatuses.RUNNING &&
+    sandboxInstance.status !== SandboxInstanceStatuses.RECONNECTING &&
+    sandboxInstance.status !== SandboxInstanceStatuses.STOPPING
+  ) {
     throw new Error(
-      `Expected sandbox instance '${input.sandboxInstanceId}' to be running or stopped before stop execution.`,
+      `Expected sandbox instance '${input.sandboxInstanceId}' to be running, reconnecting, stopping, or stopped before stop execution.`,
     );
   }
 
   if (sandboxInstance.providerSandboxId === null) {
     throw new Error(
-      `Expected running sandbox instance '${input.sandboxInstanceId}' to have a providerSandboxId.`,
+      `Expected ${sandboxInstance.status} sandbox instance '${input.sandboxInstanceId}' to have a providerSandboxId.`,
     );
   }
 
@@ -266,7 +272,7 @@ export async function stopSandboxInstance(
     initialPermission.snapshot,
   );
 
-  const sandboxInstanceState = await resolveRunningSandboxInstanceStopState({
+  const sandboxInstanceState = await resolveStoppableSandboxInstanceStopState({
     db: ctx.db,
     tables: ctx.tables,
     sandboxInstanceId: input.sandboxInstanceId,
@@ -306,6 +312,30 @@ export async function stopSandboxInstance(
 
   const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve(
     createResolveSandboxRuntimeInput(sandboxInstanceState),
+  );
+
+  const beforeMarkPermission = await readSandboxStopPermission({
+    runtimeStateReader: ctx.runtimeStateReader,
+    clock: ctx.clock,
+    sandboxInstanceId: input.sandboxInstanceId,
+    stopReason: input.stopReason,
+    ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
+  });
+  if (!beforeMarkPermission.permitted) {
+    return {
+      executed: false,
+      outcome: "runtime_state_fence_before_mark",
+    };
+  }
+  await applySandboxLifecycleEvent(
+    {
+      db: ctx.db,
+      tables: ctx.tables,
+    },
+    {
+      sandboxInstanceId: input.sandboxInstanceId,
+      event: SandboxLifecycleEvents.STOP_REQUESTED,
+    },
   );
 
   try {

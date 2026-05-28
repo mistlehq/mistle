@@ -196,6 +196,16 @@ describe("transitionSandboxLifecycle", () => {
 
     expect(
       transitionSandboxLifecycle({
+        status: SandboxInstanceStatuses.STOPPING,
+        event: SandboxLifecycleEvents.STOP_REQUESTED,
+      }),
+    ).toEqual({
+      kind: "unchanged",
+      status: SandboxInstanceStatuses.STOPPING,
+    });
+
+    expect(
+      transitionSandboxLifecycle({
         status: SandboxInstanceStatuses.STARTING,
         event: SandboxLifecycleEvents.PROVIDER_START_REQUESTED,
       }),

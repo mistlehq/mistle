@@ -46,11 +46,59 @@ describe("determineDisconnectReconciliationAction", () => {
     });
   });
 
+  it("uses the startup policy for started and initializing sandboxes", () => {
+    expect(
+      determineDisconnectReconciliationAction({
+        persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
+        sandboxStatus: SandboxInstanceStatuses.STARTED,
+        providerState: "active",
+      }),
+    ).toEqual({
+      kind: "fail",
+      failureCode: "bootstrap_disconnected_during_startup",
+      failureMessage:
+        "Sandbox bootstrap tunnel did not recover before disconnect grace expired during startup.",
+    });
+    expect(
+      determineDisconnectReconciliationAction({
+        persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
+        sandboxStatus: SandboxInstanceStatuses.INITIALIZING,
+        providerState: "active",
+      }),
+    ).toEqual({
+      kind: "fail",
+      failureCode: "bootstrap_disconnected_during_startup",
+      failureMessage:
+        "Sandbox bootstrap tunnel did not recover before disconnect grace expired during startup.",
+    });
+  });
+
   it("stops running sandboxes that still exist at the provider", () => {
     expect(
       determineDisconnectReconciliationAction({
         persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
         sandboxStatus: SandboxInstanceStatuses.RUNNING,
+        providerState: "active",
+      }),
+    ).toEqual({
+      kind: "stop_then_mark_stopped",
+    });
+  });
+
+  it("stops reconnecting and stopping sandboxes that still exist at the provider", () => {
+    expect(
+      determineDisconnectReconciliationAction({
+        persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
+        sandboxStatus: SandboxInstanceStatuses.RECONNECTING,
+        providerState: "active",
+      }),
+    ).toEqual({
+      kind: "stop_then_mark_stopped",
+    });
+    expect(
+      determineDisconnectReconciliationAction({
+        persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
+        sandboxStatus: SandboxInstanceStatuses.STOPPING,
         providerState: "active",
       }),
     ).toEqual({
@@ -75,6 +123,21 @@ describe("determineDisconnectReconciliationAction", () => {
       determineDisconnectReconciliationAction({
         persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
         sandboxStatus: SandboxInstanceStatuses.RUNNING,
+        providerState: "terminal_stopped",
+      }),
+    ).toEqual({
+      kind: "fail",
+      failureCode: "provider_runtime_terminal",
+      failureMessage:
+        "Sandbox runtime was terminal at the provider during disconnect reconciliation.",
+    });
+  });
+
+  it("fails stopping sandboxes when ephemeral provider runtime is terminal", () => {
+    expect(
+      determineDisconnectReconciliationAction({
+        persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
+        sandboxStatus: SandboxInstanceStatuses.STOPPING,
         providerState: "terminal_stopped",
       }),
     ).toEqual({

@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   getSandboxDeliveryDisposition,
+  getSandboxDisconnectReconciliationPhase,
   getSandboxEffectiveStatus,
   isSandboxBootstrapTokenExchangeEligible,
   isSandboxDisconnectReconciliationCandidate,
   isSandboxUserStopEligible,
   SandboxDeliveryDispositions,
+  SandboxDisconnectReconciliationPhases,
   SandboxInstanceStatuses,
 } from "./index.js";
 
@@ -61,7 +63,30 @@ describe("status policy helpers", () => {
     expect(isSandboxDisconnectReconciliationCandidate(SandboxInstanceStatuses.RECONNECTING)).toBe(
       true,
     );
+    expect(isSandboxDisconnectReconciliationCandidate(SandboxInstanceStatuses.STOPPING)).toBe(true);
     expect(isSandboxDisconnectReconciliationCandidate(SandboxInstanceStatuses.PENDING)).toBe(false);
+  });
+
+  it("classifies disconnect reconciliation candidates by lifecycle phase", () => {
+    expect(getSandboxDisconnectReconciliationPhase(SandboxInstanceStatuses.STARTING)).toBe(
+      SandboxDisconnectReconciliationPhases.STARTUP,
+    );
+    expect(getSandboxDisconnectReconciliationPhase(SandboxInstanceStatuses.STARTED)).toBe(
+      SandboxDisconnectReconciliationPhases.STARTUP,
+    );
+    expect(getSandboxDisconnectReconciliationPhase(SandboxInstanceStatuses.INITIALIZING)).toBe(
+      SandboxDisconnectReconciliationPhases.STARTUP,
+    );
+    expect(getSandboxDisconnectReconciliationPhase(SandboxInstanceStatuses.RUNNING)).toBe(
+      SandboxDisconnectReconciliationPhases.RUNTIME,
+    );
+    expect(getSandboxDisconnectReconciliationPhase(SandboxInstanceStatuses.RECONNECTING)).toBe(
+      SandboxDisconnectReconciliationPhases.RUNTIME,
+    );
+    expect(getSandboxDisconnectReconciliationPhase(SandboxInstanceStatuses.STOPPING)).toBe(
+      SandboxDisconnectReconciliationPhases.STOPPING,
+    );
+    expect(getSandboxDisconnectReconciliationPhase(SandboxInstanceStatuses.STOPPED)).toBeNull();
   });
 });
 

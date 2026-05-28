@@ -50,6 +50,27 @@ type ConnectedWebSocket = Awaited<ReturnType<typeof connectSandboxTunnelWebSocke
 
 describe.concurrent("data-plane worker stop sandbox bootstrap attachment cleanup", () => {
   it(
+    "finalizes a running sandbox through the stop workflow",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertRunningSandboxInstance(env, sandboxInstanceId);
+
+      const handle = await env.dataPlaneWorkflow.runWorkflow(StopSandboxInstanceWorkflowSpec, {
+        sandboxInstanceId,
+        stopReason: SandboxStopReasons.USER,
+      });
+      await expect(handle.result({ timeoutMs: 15_000 })).resolves.toEqual({
+        sandboxInstanceId,
+        executed: true,
+        outcome: "stopped",
+      });
+
+      await expectSandboxStopped(env, sandboxInstanceId, SandboxStopReasons.USER);
+    },
+    TestTimeoutMs,
+  );
+
+  it(
     "terminates a stale bootstrap attachment when the stop workflow observes an already-stopped sandbox",
     async ({ env }) => {
       const sandboxInstanceId = typeid("sbi").toString();
@@ -100,6 +121,26 @@ describe.concurrent("data-plane worker stop sandbox bootstrap attachment cleanup
   );
 });
 
+async function insertRunningSandboxInstance(
+  env: IntegrationTestEnvironment,
+  sandboxInstanceId: string,
+): Promise<void> {
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
+    id: sandboxInstanceId,
+    organizationId: `org_${sandboxInstanceId}`,
+    sandboxProfileId: `sbp_${sandboxInstanceId}`,
+    sandboxProfileVersion: 1,
+    runtimeProvider: "docker",
+    providerSandboxId: `provider-${sandboxInstanceId}`,
+    status: SandboxInstanceStatuses.RUNNING,
+    persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
+    purpose: SandboxInstancePurposes.SESSION,
+    startedByKind: "system",
+    startedById: `worker_${sandboxInstanceId}`,
+    source: SandboxInstanceSources.DASHBOARD,
+  });
+}
+
 async function insertStoppedSandboxInstance(
   env: IntegrationTestEnvironment,
   sandboxInstanceId: string,
@@ -119,6 +160,27 @@ async function insertStoppedSandboxInstance(
     source: SandboxInstanceSources.DASHBOARD,
     stoppedAt: "2026-05-16T00:00:00.000Z",
     stopReason: SandboxStopReasons.IDLE,
+  });
+}
+
+async function expectSandboxStopped(
+  env: IntegrationTestEnvironment,
+  sandboxInstanceId: string,
+  stopReason: string,
+): Promise<void> {
+  const persistedInstance = await env.dataPlaneDb.query.sandboxInstances.findFirst({
+    columns: {
+      status: true,
+      stopReason: true,
+      stoppedAt: true,
+    },
+    where: (table, { eq }) => eq(table.id, sandboxInstanceId),
+  });
+
+  expect(persistedInstance).toEqual({
+    status: SandboxInstanceStatuses.STOPPED,
+    stopReason,
+    stoppedAt: expect.any(String),
   });
 }
 

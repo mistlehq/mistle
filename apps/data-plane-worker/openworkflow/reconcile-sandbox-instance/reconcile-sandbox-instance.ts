@@ -4,6 +4,7 @@ import {
   type DataPlaneDatabase,
   type DataPlaneTables,
   type SandboxInstancePersistenceMode,
+  type SandboxInstanceStatus,
   type SandboxInstanceProvider,
 } from "@mistle/db/data-plane";
 import {
@@ -11,6 +12,10 @@ import {
   type SandboxAdapter,
   type SandboxInspectDisposition,
 } from "@mistle/sandbox";
+import {
+  isSandboxDisconnectReconciliationCandidate,
+  SandboxLifecycleEvents,
+} from "@mistle/sandbox-lifecycle";
 import type { Clock } from "@mistle/time";
 import type { SandboxReconcileReason } from "@mistle/workflow-registry/data-plane";
 
@@ -23,6 +28,7 @@ import {
   createResolveSandboxRuntimeInput,
   type SandboxRuntimeProviderResolver,
 } from "../core/sandbox-runtime-resolver.js";
+import { applySandboxLifecycleEvent } from "../shared/apply-sandbox-lifecycle-event.js";
 import { stopSandbox } from "../shared/stop-sandbox.js";
 import { determineDisconnectReconciliationAction } from "./disconnect-reconciliation-policy.js";
 import { markSandboxInstanceFailed } from "./mark-sandbox-instance-failed.js";
@@ -47,7 +53,7 @@ type ActiveSandboxInstance = {
   sandboxMemoryMb: number | null;
   sandboxStorageMb: number | null;
   providerSandboxId: string;
-  status: "starting" | "running";
+  status: SandboxInstanceStatus;
 };
 
 export type ReconcileSandboxInstanceOutcome =
@@ -246,8 +252,11 @@ async function resolveActiveSandboxInstance(input: {
       throw new Error(
         `Disconnect reconciliation does not support pending sandbox instance '${input.sandboxInstanceId}'.`,
       );
-    case SandboxInstanceStatuses.STARTING:
-    case SandboxInstanceStatuses.RUNNING:
+    default:
+      if (!isSandboxDisconnectReconciliationCandidate(sandboxInstance.status)) {
+        throw new Error("Unsupported sandbox instance status.");
+      }
+
       if (sandboxInstance.providerSandboxId === null) {
         throw new Error(
           `Expected ${sandboxInstance.status} sandbox instance '${input.sandboxInstanceId}' to have a providerSandboxId.`,
@@ -267,8 +276,6 @@ async function resolveActiveSandboxInstance(input: {
         providerSandboxId: sandboxInstance.providerSandboxId,
         status: sandboxInstance.status,
       };
-    default:
-      throw new Error("Unsupported sandbox instance status.");
   }
 }
 
@@ -700,6 +707,30 @@ export async function reconcileSandboxInstance(
         };
       }
 
+      if (
+        !(await isDisconnectReconciliationStillPermitted({
+          runtimeStateReader: ctx.runtimeStateReader,
+          clock: ctx.clock,
+          sandboxInstanceId: input.sandboxInstanceId,
+          expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+        }))
+      ) {
+        return {
+          executed: false,
+          outcome: "runtime_state_fence_before_mark",
+        };
+      }
+      await applySandboxLifecycleEvent(
+        {
+          db: ctx.db,
+          tables: ctx.tables,
+        },
+        {
+          sandboxInstanceId: sandboxInstance.id,
+          event: SandboxLifecycleEvents.STOP_REQUESTED,
+        },
+      );
+
       return stopProviderSandboxOrMarkMissing({
         config: ctx.config,
         controlPlaneInternalClient: ctx.controlPlaneInternalClient,
@@ -709,7 +740,10 @@ export async function reconcileSandboxInstance(
         runtimeStateReader: ctx.runtimeStateReader,
         clock: ctx.clock,
         expectedOwnerLeaseId: input.expectedOwnerLeaseId,
-        sandboxInstance,
+        sandboxInstance: {
+          ...sandboxInstance,
+          status: SandboxInstanceStatuses.STOPPING,
+        },
       });
   }
 }

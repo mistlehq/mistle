@@ -3,7 +3,13 @@ import {
   SandboxStopReasons,
   type DataPlaneDatabase,
   type DataPlaneTables,
+  type SandboxInstanceStatus,
 } from "@mistle/db/data-plane";
+import {
+  assertSandboxInstanceLifecycleStatus,
+  SandboxLifecycleEvents,
+  transitionSandboxLifecycle,
+} from "@mistle/sandbox-lifecycle";
 import { and, eq, sql } from "drizzle-orm";
 
 import { clearSandboxInstanceDeadlines } from "../sandbox-instance-deadlines/clear-sandbox-instance-deadlines.js";
@@ -14,7 +20,7 @@ export async function markSandboxInstanceStopped(ctx: {
   db: DataPlaneDatabase;
   tables: Pick<DataPlaneTables, "sandboxInstanceDeadlines" | "sandboxInstances">;
   sandboxInstanceId: string;
-  currentStatus: "starting" | "running";
+  currentStatus: SandboxInstanceStatus;
   clearProviderSandboxId?: boolean;
   stillPermitted?: () => Promise<boolean>;
 }): Promise<MarkSandboxInstanceStoppedOutcome> {
@@ -33,8 +39,12 @@ export async function markSandboxInstanceStopped(ctx: {
     if (lockedRow === undefined) {
       throw new Error(`Sandbox instance '${ctx.sandboxInstanceId}' was not found.`);
     }
+    const lockedStatus = lockedRow.status;
+    if (typeof lockedStatus !== "string") {
+      throw new Error(`Sandbox instance '${ctx.sandboxInstanceId}' returned a non-string status.`);
+    }
 
-    if (lockedRow.status === SandboxInstanceStatuses.STOPPED) {
+    if (lockedStatus === SandboxInstanceStatuses.STOPPED) {
       await clearSandboxInstanceDeadlines({
         db: tx,
         tables: ctx.tables,
@@ -43,10 +53,23 @@ export async function markSandboxInstanceStopped(ctx: {
       return "already_stopped";
     }
 
-    if (lockedRow.status !== ctx.currentStatus) {
+    if (lockedStatus !== ctx.currentStatus) {
       throw new Error(
         `Failed to transition sandbox instance status from ${ctx.currentStatus} to stopped.`,
       );
+    }
+
+    if (ctx.currentStatus === SandboxInstanceStatuses.STOPPING) {
+      assertSandboxInstanceLifecycleStatus(lockedStatus);
+      const transition = transitionSandboxLifecycle({
+        status: lockedStatus,
+        event: SandboxLifecycleEvents.PROVIDER_STOPPED,
+      });
+      if (transition.kind !== "transition" || transition.to !== SandboxInstanceStatuses.STOPPED) {
+        throw new Error(
+          `Failed to transition sandbox instance status from ${ctx.currentStatus} to stopped.`,
+        );
+      }
     }
 
     if (ctx.stillPermitted !== undefined && !(await ctx.stillPermitted())) {

@@ -11,6 +11,15 @@ export const SandboxDeliveryDispositions = Object.freeze({
 export type SandboxDeliveryDisposition =
   (typeof SandboxDeliveryDispositions)[keyof typeof SandboxDeliveryDispositions];
 
+export const SandboxDisconnectReconciliationPhases = Object.freeze({
+  STARTUP: "startup",
+  RUNTIME: "runtime",
+  STOPPING: "stopping",
+});
+
+export type SandboxDisconnectReconciliationPhase =
+  (typeof SandboxDisconnectReconciliationPhases)[keyof typeof SandboxDisconnectReconciliationPhases];
+
 export function getSandboxDeliveryDisposition(
   status: SandboxInstanceStatus,
 ): SandboxDeliveryDisposition {
@@ -65,18 +74,26 @@ export function isSandboxUserStopEligible(status: SandboxInstanceStatus): boolea
 }
 
 export function isSandboxDisconnectReconciliationCandidate(status: SandboxInstanceStatus): boolean {
+  return getSandboxDisconnectReconciliationPhase(status) !== null;
+}
+
+export function getSandboxDisconnectReconciliationPhase(
+  status: SandboxInstanceStatus,
+): SandboxDisconnectReconciliationPhase | null {
   switch (status) {
     case SandboxInstanceStatuses.STARTING:
     case SandboxInstanceStatuses.STARTED:
     case SandboxInstanceStatuses.INITIALIZING:
+      return SandboxDisconnectReconciliationPhases.STARTUP;
     case SandboxInstanceStatuses.RUNNING:
     case SandboxInstanceStatuses.RECONNECTING:
-      return true;
-    case SandboxInstanceStatuses.PENDING:
+      return SandboxDisconnectReconciliationPhases.RUNTIME;
     case SandboxInstanceStatuses.STOPPING:
+      return SandboxDisconnectReconciliationPhases.STOPPING;
+    case SandboxInstanceStatuses.PENDING:
     case SandboxInstanceStatuses.STOPPED:
     case SandboxInstanceStatuses.FAILED:
-      return false;
+      return null;
   }
 }
 
