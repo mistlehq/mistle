@@ -12,13 +12,7 @@ const ActiveSandboxRuntimePlanRecordSchema = z
     providerSandboxId: z.string().min(1).nullable(),
     runtimePlan: CompiledRuntimePlanSchema,
     runtimePlanRevision: z.number().int().positive(),
-    sandboxInstanceStatus: z.enum([
-      SandboxInstanceStatuses.PENDING,
-      SandboxInstanceStatuses.STARTING,
-      SandboxInstanceStatuses.RUNNING,
-      SandboxInstanceStatuses.STOPPED,
-      SandboxInstanceStatuses.FAILED,
-    ]),
+    sandboxInstanceStatus: z.enum(SandboxInstanceStatuses),
   })
   .strict();
 

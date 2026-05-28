@@ -5,6 +5,7 @@
 import { randomUUID } from "node:crypto";
 
 import { Cache, ValkeyCacheAdapter, closeValkeyClient, createValkeyClient } from "@mistle/cache";
+import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import type { CompiledRuntimePlan } from "@mistle/sandbox-runtime-contract";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { systemSleeper } from "@mistle/time";
@@ -21,7 +22,9 @@ const it = createIntegrationTest({
 });
 
 describe.concurrent("runtime-state store integrations", () => {
-  it("caches immutable sandbox runtime plans in valkey", async ({ env }) => {
+  it("caches immutable sandbox runtime plans for every lifecycle status in valkey", async ({
+    env,
+  }) => {
     const keyPrefix = createRuntimeStateKeyPrefix(env.dataPlaneGatewayRuntimeState.keyPrefix);
     const client = createValkeyClient({
       url: env.dataPlaneGatewayRuntimeState.valkeyUrl,
@@ -36,28 +39,32 @@ describe.concurrent("runtime-state store integrations", () => {
       );
       const runtimePlan = createRuntimePlan();
 
-      await cache.set({
-        sandboxInstanceId: "sbi_runtime_plan_cache_it",
-        runtimePlan: {
+      for (const sandboxInstanceStatus of Object.values(SandboxInstanceStatuses)) {
+        const sandboxInstanceId = `sbi_runtime_plan_cache_${sandboxInstanceStatus}_it`;
+
+        await cache.set({
+          sandboxInstanceId,
+          runtimePlan: {
+            organizationId: "org_runtime_plan_cache_it",
+            providerSandboxId: "provider-runtime-plan-cache-it",
+            runtimePlan,
+            runtimePlanRevision: 1,
+            sandboxInstanceStatus,
+          },
+        });
+
+        await expect(
+          cache.get({
+            sandboxInstanceId,
+          }),
+        ).resolves.toEqual({
           organizationId: "org_runtime_plan_cache_it",
           providerSandboxId: "provider-runtime-plan-cache-it",
           runtimePlan,
           runtimePlanRevision: 1,
-          sandboxInstanceStatus: "running",
-        },
-      });
-
-      await expect(
-        cache.get({
-          sandboxInstanceId: "sbi_runtime_plan_cache_it",
-        }),
-      ).resolves.toEqual({
-        organizationId: "org_runtime_plan_cache_it",
-        providerSandboxId: "provider-runtime-plan-cache-it",
-        runtimePlan,
-        runtimePlanRevision: 1,
-        sandboxInstanceStatus: "running",
-      });
+          sandboxInstanceStatus,
+        });
+      }
     } finally {
       await deleteKeysByPrefix({
         client,
