@@ -142,7 +142,16 @@ jobs:
       - name: Run runtime system tests
         env:
           MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REGISTRY_STORAGE_DIR: /home/runner/.cache/mistle/runtime-system-sandbox-registry
+          MISTLE_SYSTEM_RUNTIME_TIMING_ARTIFACT_DIR: test-artifacts/system-runtime-timings
         run: nix develop --command pnpm --filter @mistle/tests test:system:runtime
+
+      - name: Upload runtime system timing artifacts
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: runtime-system-timings
+          path: test-artifacts/system-runtime-timings
+          if-no-files-found: ignore
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.turbo-cache.outputs.cache-hit != 'true' }}

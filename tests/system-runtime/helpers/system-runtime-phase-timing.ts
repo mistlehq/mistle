@@ -1,4 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import process from "node:process";
 
 import { afterAll, aroundEach } from "vitest";
 
@@ -36,9 +39,43 @@ type EventTimingSummary = {
   recordedDurationMs: number;
 };
 
+type TestTimingSummaryArtifact = {
+  event: "system_runtime.test_timing_summary";
+  testName: string;
+  durationMs: number;
+  recordedDurationMs: number;
+  timingEvents: EventTimingSummary[];
+};
+
+type TopPhaseTimingSummaryArtifact = {
+  event: "system_runtime.top_phase_timing_summary";
+  phases: {
+    durationMs: number;
+    event: string;
+    phase: string;
+    sandboxProvider: PhaseTimingAttributeValue | undefined;
+    testName: string;
+  }[];
+};
+
+type FileScopeTimingSummaryArtifact = {
+  event: "system_runtime.file_scope_phase_timing_summary";
+  recordedDurationMs: number;
+  timingEvents: EventTimingSummary[];
+};
+
+type TimingArtifact = {
+  event: "system_runtime.timing_artifact";
+  fileScopeTimingSummary: FileScopeTimingSummaryArtifact | null;
+  testTimingSummaries: TestTimingSummaryArtifact[];
+  topPhaseTimingSummary: TopPhaseTimingSummaryArtifact | null;
+  workerPid: number;
+};
+
 const timingStorage = new AsyncLocalStorage<TestTimingContext>();
 const completedTestTimings: CompletedTestTiming[] = [];
 const fileScopeRecords: PhaseTimingRecord[] = [];
+let artifactWriteCount = 0;
 
 aroundEach(async (runTest, { task }) => {
   const testTimingContext: TestTimingContext = {
@@ -59,9 +96,20 @@ aroundEach(async (runTest, { task }) => {
 });
 
 afterAll(() => {
-  writeCompletedTestTimingSummaries();
-  writeTopPhaseTimingSummary();
-  writeFileScopeTimingSummary();
+  const testTimingSummaries = buildCompletedTestTimingSummaries();
+  const topPhaseTimingSummary = buildTopPhaseTimingSummary();
+  const fileScopeTimingSummary = buildFileScopeTimingSummary();
+
+  writeCompletedTestTimingSummaries(testTimingSummaries);
+  writeTopPhaseTimingSummary(topPhaseTimingSummary);
+  writeFileScopeTimingSummary(fileScopeTimingSummary);
+  writeTimingArtifact({
+    event: "system_runtime.timing_artifact",
+    fileScopeTimingSummary,
+    testTimingSummaries,
+    topPhaseTimingSummary,
+    workerPid: process.pid,
+  });
 });
 
 export async function timeSystemRuntimePhase<Result>(input: {
@@ -107,21 +155,23 @@ function recordPhaseTiming(record: PhaseTimingRecord): void {
   context.records.push(record);
 }
 
-function writeCompletedTestTimingSummaries(): void {
-  for (const completedTestTiming of completedTestTimings) {
-    console.log(
-      JSON.stringify({
-        event: "system_runtime.test_timing_summary",
-        testName: completedTestTiming.testName,
-        durationMs: completedTestTiming.durationMs,
-        recordedDurationMs: sumDurations(completedTestTiming.records),
-        timingEvents: summarizeEvents(completedTestTiming.records),
-      }),
-    );
+function buildCompletedTestTimingSummaries(): TestTimingSummaryArtifact[] {
+  return completedTestTimings.map((completedTestTiming) => ({
+    event: "system_runtime.test_timing_summary",
+    testName: completedTestTiming.testName,
+    durationMs: completedTestTiming.durationMs,
+    recordedDurationMs: sumDurations(completedTestTiming.records),
+    timingEvents: summarizeEvents(completedTestTiming.records),
+  }));
+}
+
+function writeCompletedTestTimingSummaries(summaries: readonly TestTimingSummaryArtifact[]): void {
+  for (const summary of summaries) {
+    console.log(JSON.stringify(summary));
   }
 }
 
-function writeTopPhaseTimingSummary(): void {
+function buildTopPhaseTimingSummary(): TopPhaseTimingSummaryArtifact | null {
   const phaseRecords = completedTestTimings.flatMap((completedTestTiming) =>
     completedTestTiming.records.map((record) => ({
       durationMs: record.durationMs,
@@ -134,28 +184,57 @@ function writeTopPhaseTimingSummary(): void {
   const topPhases = phaseRecords.sort(compareDurationDescending).slice(0, 20);
 
   if (topPhases.length === 0) {
-    return;
+    return null;
   }
 
-  console.log(
-    JSON.stringify({
-      event: "system_runtime.top_phase_timing_summary",
-      phases: topPhases,
-    }),
-  );
+  return {
+    event: "system_runtime.top_phase_timing_summary",
+    phases: topPhases,
+  };
 }
 
-function writeFileScopeTimingSummary(): void {
-  if (fileScopeRecords.length === 0) {
+function writeTopPhaseTimingSummary(summary: TopPhaseTimingSummaryArtifact | null): void {
+  if (summary === null) {
     return;
   }
 
-  console.log(
-    JSON.stringify({
-      event: "system_runtime.file_scope_phase_timing_summary",
-      recordedDurationMs: sumDurations(fileScopeRecords),
-      timingEvents: summarizeEvents(fileScopeRecords),
-    }),
+  console.log(JSON.stringify(summary));
+}
+
+function buildFileScopeTimingSummary(): FileScopeTimingSummaryArtifact | null {
+  if (fileScopeRecords.length === 0) {
+    return null;
+  }
+
+  return {
+    event: "system_runtime.file_scope_phase_timing_summary",
+    recordedDurationMs: sumDurations(fileScopeRecords),
+    timingEvents: summarizeEvents(fileScopeRecords),
+  };
+}
+
+function writeFileScopeTimingSummary(summary: FileScopeTimingSummaryArtifact | null): void {
+  if (summary === null) {
+    return;
+  }
+
+  console.log(JSON.stringify(summary));
+}
+
+function writeTimingArtifact(artifact: TimingArtifact): void {
+  const artifactDirectory = process.env["MISTLE_SYSTEM_RUNTIME_TIMING_ARTIFACT_DIR"];
+  if (artifactDirectory === undefined || artifactDirectory.length === 0) {
+    return;
+  }
+
+  mkdirSync(artifactDirectory, { recursive: true });
+  const sequence = artifactWriteCount;
+  artifactWriteCount += 1;
+
+  writeFileSync(
+    join(artifactDirectory, `system-runtime-timings-${process.pid}-${sequence}.json`),
+    `${JSON.stringify(artifact, null, 2)}\n`,
+    "utf8",
   );
 }
 
