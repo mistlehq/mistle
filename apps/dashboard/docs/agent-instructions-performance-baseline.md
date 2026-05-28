@@ -15,7 +15,7 @@ pnpm --filter @mistle/dashboard test:bench
 - Date: 2026-04-03
 - Commit: `c44eaa3b`
 - Node: `v25.6.1`
-- pnpm: `11.4.0`
+- pnpm: `10.30.2`
 
 ## Key Results
 
