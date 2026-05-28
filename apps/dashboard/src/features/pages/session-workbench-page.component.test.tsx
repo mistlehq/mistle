@@ -213,7 +213,41 @@ describe("SessionWorkbenchPage", () => {
       name: "Running",
     });
     expect(status.className).toContain("bg-emerald-600");
-    expect(status.className).toContain("border-emerald-700");
+    expect(status.className).toContain("text-white");
+  });
+
+  it("shows an expanded lifecycle status indicator in the session workspace header", async () => {
+    const sandboxInstanceId = "sbi_test";
+    const view = renderSessionWorkbenchPage({
+      sandboxInstanceId,
+      seededStatus: "reconnecting",
+    });
+
+    await act(async () => {
+      const status = {
+        triggerConversation: null,
+        connectable: false,
+        failureCode: null,
+        failureMessage: null,
+        id: sandboxInstanceId,
+        sandboxProfileId: "sbp_test",
+        sandboxProfileVersion: 1,
+        runtimeContext: null,
+        startupOperation: null,
+        status: "reconnecting",
+        title: "Test session",
+      } satisfies SandboxInstanceStatusResult;
+
+      view.queryClient.setQueryData(sandboxInstanceStatusQueryKey(sandboxInstanceId), status);
+    });
+
+    const workspaceHeader = screen.getByRole("banner");
+
+    const status = await within(workspaceHeader).findByRole("status", {
+      name: "Reconnecting",
+    });
+    expect(status.className).toContain("border-amber-500/45");
+    expect(status.className).toContain("text-amber-700");
   });
 
   it("shows preparing sandbox while the trusted sandbox status is pending", async () => {

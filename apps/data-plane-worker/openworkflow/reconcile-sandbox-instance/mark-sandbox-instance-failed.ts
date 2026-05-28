@@ -12,6 +12,7 @@ import {
 } from "@mistle/sandbox-lifecycle";
 import { and, eq, sql } from "drizzle-orm";
 
+import { logger } from "../../logger.js";
 import { clearSandboxInstanceDeadlines } from "../sandbox-instance-deadlines/clear-sandbox-instance-deadlines.js";
 
 type MarkSandboxInstanceFailedOutcome = "already_failed" | "fence_mismatch" | "failed";
@@ -109,6 +110,19 @@ export async function markSandboxInstanceFailed(ctx: {
 
     return "failed";
   });
+
+  if (outcome === "failed") {
+    logger.info(
+      {
+        eventName: "sandbox.failed",
+        sandboxInstanceId: ctx.sandboxInstanceId,
+        previousStatus: ctx.currentStatus,
+        status: SandboxInstanceStatuses.FAILED,
+        failureCode: ctx.failureCode,
+      },
+      "Marked sandbox instance failed during reconciliation.",
+    );
+  }
 
   return outcome;
 }

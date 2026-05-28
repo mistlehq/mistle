@@ -8,6 +8,7 @@ import {
   type SandboxInstancePurpose,
   type SandboxInstanceProvider,
 } from "@mistle/db/data-plane";
+import type { MistleLogger } from "@mistle/logging";
 import { isSandboxResourceNotFoundError } from "@mistle/sandbox";
 import { SandboxLifecycleEvents } from "@mistle/sandbox-lifecycle";
 import type { Clock } from "@mistle/time";
@@ -248,6 +249,7 @@ export async function stopSandboxInstance(
     sandboxRuntimeProviderResolver: SandboxRuntimeProviderResolver;
     runtimeStateReader: SandboxRuntimeStateReader;
     clock: Clock;
+    logger?: MistleLogger | undefined;
   },
   input: {
     sandboxInstanceId: string;
@@ -330,6 +332,7 @@ export async function stopSandboxInstance(
   await applySandboxLifecycleEvent(
     {
       db: ctx.db,
+      logger: ctx.logger,
       tables: ctx.tables,
     },
     {

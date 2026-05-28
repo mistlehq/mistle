@@ -6,6 +6,7 @@ import {
 } from "@mistle/db/data-plane";
 import { and, eq, or, sql } from "drizzle-orm";
 
+import { logger } from "../../logger.js";
 import { clearSandboxInstanceDeadlines } from "../sandbox-instance-deadlines/clear-sandbox-instance-deadlines.js";
 
 export async function markSandboxInstanceFailed(
@@ -68,4 +69,14 @@ export async function markSandboxInstanceFailed(
   if (updatedRows[0] === undefined) {
     throw new Error("Failed to transition sandbox instance status to failed.");
   }
+
+  logger.info(
+    {
+      eventName: "sandbox.failed",
+      sandboxInstanceId: input.sandboxInstanceId,
+      status: SandboxInstanceStatuses.FAILED,
+      failureCode: input.failureCode,
+    },
+    "Marked sandbox instance failed.",
+  );
 }

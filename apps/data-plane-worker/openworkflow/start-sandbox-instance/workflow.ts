@@ -458,6 +458,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           applySandboxLifecycleEvent(
             {
               db: ctx.db,
+              logger,
               tables: ctx.tables,
             },
             {
@@ -764,6 +765,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         logger.info("Marking sandbox instance as starting before provider start.");
         await markSandboxInstanceStarting({
           db: ctx.db,
+          logger,
           tables: ctx.tables,
           sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
         });
@@ -869,6 +871,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         await persistSandboxInstanceProvisioning(
           {
             db: ctx.db,
+            logger,
             tables: ctx.tables,
           },
           {
@@ -947,6 +950,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         await applySandboxLifecycleEvent(
           {
             db: ctx.db,
+            logger,
             tables: ctx.tables,
           },
           {
@@ -1494,6 +1498,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             await markSandboxInstanceRunning(
               {
                 db: ctx.db,
+                logger,
                 tables: ctx.tables,
               },
               {

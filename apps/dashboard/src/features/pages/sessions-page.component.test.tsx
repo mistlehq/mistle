@@ -931,9 +931,20 @@ describe("SessionsPage", () => {
     expect(resolveSandboxStatusBadgeUi(null).label).toBe("Loading status");
     expect(resolveSandboxStatusBadgeUi("pending").label).toBe("Pending");
     expect(resolveSandboxStatusBadgeUi("starting").label).toBe("Starting");
+    expect(resolveSandboxStatusBadgeUi("started").label).toBe("Started");
+    expect(resolveSandboxStatusBadgeUi("initializing").label).toBe("Initializing");
     expect(resolveSandboxStatusBadgeUi("running").label).toBe("Running");
+    expect(resolveSandboxStatusBadgeUi("reconnecting").label).toBe("Reconnecting");
+    expect(resolveSandboxStatusBadgeUi("stopping").label).toBe("Stopping");
     expect(resolveSandboxStatusBadgeUi("stopped").label).toBe("Stopped");
     expect(resolveSandboxStatusBadgeUi("failed").label).toBe("Failed");
+  });
+
+  it("uses distinct badge color classes for transient sandbox lifecycle statuses", () => {
+    expect(resolveSandboxStatusBadgeUi("started").className).toContain("blue");
+    expect(resolveSandboxStatusBadgeUi("initializing").className).toContain("indigo");
+    expect(resolveSandboxStatusBadgeUi("reconnecting").className).toContain("amber");
+    expect(resolveSandboxStatusBadgeUi("stopping").className).toContain("orange");
   });
 
   it("routes stopped sessions into the workbench route directly from the row", () => {

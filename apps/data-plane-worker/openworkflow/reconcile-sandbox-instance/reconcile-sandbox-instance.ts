@@ -7,6 +7,7 @@ import {
   type SandboxInstanceStatus,
   type SandboxInstanceProvider,
 } from "@mistle/db/data-plane";
+import type { MistleLogger } from "@mistle/logging";
 import {
   isSandboxResourceNotFoundError,
   type SandboxAdapter,
@@ -56,6 +57,11 @@ type ActiveSandboxInstance = {
   status: SandboxInstanceStatus;
 };
 
+type ProviderInspectionSummary = {
+  disposition: SandboxInspectDisposition | "missing";
+  providerStatus?: string;
+};
+
 export type ReconcileSandboxInstanceOutcome =
   | "failed"
   | "stopped"
@@ -103,6 +109,7 @@ export type SandboxRuntimeStateDiagnostics = {
 export type ReconcileSandboxInstanceDiagnostics = {
   failureCode: string;
   providerState: SandboxInspectDisposition | "missing";
+  providerStatus?: string;
   sandboxStatus: ActiveSandboxInstance["status"];
   runtimeProvider: SandboxInstanceProvider;
   providerSandboxId: string;
@@ -286,20 +293,46 @@ async function resolveActiveSandboxInstance(input: {
 async function inspectProviderStateOrMissing(ctx: {
   sandboxAdapter: SandboxAdapter;
   providerSandboxId: string;
-}): Promise<SandboxInspectDisposition | "missing"> {
+}): Promise<ProviderInspectionSummary> {
   try {
     const inspection = await ctx.sandboxAdapter.inspect({
       id: ctx.providerSandboxId,
     });
 
-    return inspection.disposition;
+    return {
+      disposition: inspection.disposition,
+      ...extractProviderStatus(inspection.raw),
+    };
   } catch (error) {
     if (!isSandboxResourceNotFoundError(error)) {
       throw error;
     }
 
-    return "missing";
+    return {
+      disposition: "missing",
+    };
   }
+}
+
+function extractProviderStatus(rawProviderPayload: unknown): { providerStatus?: string } {
+  if (typeof rawProviderPayload !== "object" || rawProviderPayload === null) {
+    return {};
+  }
+
+  if ("status" in rawProviderPayload) {
+    const providerStatus = rawProviderPayload.status;
+    return typeof providerStatus === "string" ? { providerStatus } : {};
+  }
+
+  if ("State" in rawProviderPayload) {
+    const state = rawProviderPayload.State;
+    if (typeof state === "object" && state !== null && "Status" in state) {
+      const providerStatus = state.Status;
+      return typeof providerStatus === "string" ? { providerStatus } : {};
+    }
+  }
+
+  return {};
 }
 
 async function isDisconnectReconciliationStillPermitted(ctx: {
@@ -499,6 +532,7 @@ export async function reconcileSandboxInstance(
     sandboxRuntimeProviderResolver: SandboxRuntimeProviderResolver;
     runtimeStateReader: SandboxRuntimeStateReader;
     clock: Clock;
+    logger?: MistleLogger | undefined;
   },
   input: {
     sandboxInstanceId: string;
@@ -569,14 +603,14 @@ export async function reconcileSandboxInstance(
     createResolveSandboxRuntimeInput(sandboxInstance),
   );
 
-  const providerState = await inspectProviderStateOrMissing({
+  const providerInspection = await inspectProviderStateOrMissing({
     sandboxAdapter: resolvedRuntime.sandboxAdapter,
     providerSandboxId: sandboxInstance.providerSandboxId,
   });
   const action = determineDisconnectReconciliationAction({
     persistenceMode: sandboxInstance.persistenceMode,
     sandboxStatus: sandboxInstance.status,
-    providerState,
+    providerState: providerInspection.disposition,
   });
 
   switch (action.kind) {
@@ -626,7 +660,10 @@ export async function reconcileSandboxInstance(
             outcome: "failed",
             diagnostics: {
               failureCode: action.failureCode,
-              providerState,
+              providerState: providerInspection.disposition,
+              ...(providerInspection.providerStatus === undefined
+                ? {}
+                : { providerStatus: providerInspection.providerStatus }),
               sandboxStatus: sandboxInstance.status,
               runtimeProvider: sandboxInstance.runtimeProvider,
               providerSandboxId: sandboxInstance.providerSandboxId,
@@ -723,6 +760,7 @@ export async function reconcileSandboxInstance(
       await applySandboxLifecycleEvent(
         {
           db: ctx.db,
+          logger: ctx.logger,
           tables: ctx.tables,
         },
         {

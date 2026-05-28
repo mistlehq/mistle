@@ -12,6 +12,7 @@ import {
 } from "@mistle/sandbox-lifecycle";
 import { and, eq, sql } from "drizzle-orm";
 
+import { logger } from "../../logger.js";
 import { clearSandboxInstanceDeadlines } from "../sandbox-instance-deadlines/clear-sandbox-instance-deadlines.js";
 
 type MarkSandboxInstanceStoppedOutcome = "already_stopped" | "fence_mismatch" | "stopped";
@@ -112,6 +113,18 @@ export async function markSandboxInstanceStopped(ctx: {
 
     return "stopped";
   });
+
+  if (outcome === "stopped") {
+    logger.info(
+      {
+        eventName: "sandbox.stopped",
+        sandboxInstanceId: ctx.sandboxInstanceId,
+        previousStatus: ctx.currentStatus,
+        status: SandboxInstanceStatuses.STOPPED,
+      },
+      "Marked sandbox instance stopped during reconciliation.",
+    );
+  }
 
   return outcome;
 }

@@ -40,6 +40,7 @@ export function resolveSandboxStatusBadgeUi(
     return {
       label: "Stopped",
       variant: "outline",
+      className: "border-zinc-400/50 text-zinc-600 dark:text-zinc-300",
     };
   }
 
@@ -47,6 +48,7 @@ export function resolveSandboxStatusBadgeUi(
     return {
       label: "Resuming",
       variant: "outline",
+      className: "border-sky-500/40 text-sky-700 dark:text-sky-300",
     };
   }
 
@@ -54,6 +56,15 @@ export function resolveSandboxStatusBadgeUi(
     return {
       label: "Pending",
       variant: "outline",
+      className: "border-amber-500/45 text-amber-700 dark:text-amber-300",
+    };
+  }
+
+  if (sandboxLifecycleStatus === "starting") {
+    return {
+      label: "Starting",
+      variant: "outline",
+      className: "border-sky-500/40 text-sky-700 dark:text-sky-300",
     };
   }
 
@@ -61,6 +72,7 @@ export function resolveSandboxStatusBadgeUi(
     return {
       label: "Started",
       variant: "outline",
+      className: "border-blue-500/40 text-blue-700 dark:text-blue-300",
     };
   }
 
@@ -68,6 +80,7 @@ export function resolveSandboxStatusBadgeUi(
     return {
       label: "Initializing",
       variant: "outline",
+      className: "border-indigo-500/40 text-indigo-700 dark:text-indigo-300",
     };
   }
 
@@ -75,6 +88,7 @@ export function resolveSandboxStatusBadgeUi(
     return {
       label: "Reconnecting",
       variant: "outline",
+      className: "border-amber-500/45 text-amber-700 dark:text-amber-300",
     };
   }
 
@@ -82,11 +96,14 @@ export function resolveSandboxStatusBadgeUi(
     return {
       label: "Stopping",
       variant: "outline",
+      className: "border-orange-500/45 text-orange-700 dark:text-orange-300",
     };
   }
 
-  return {
-    label: "Starting",
-    variant: "outline",
-  };
+  return assertUnsupportedSandboxLifecycleStatus(sandboxLifecycleStatus);
+}
+
+function assertUnsupportedSandboxLifecycleStatus(status: never): never {
+  void status;
+  throw new Error("Unsupported sandbox lifecycle status.");
 }

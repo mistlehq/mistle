@@ -147,6 +147,7 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             sandboxRuntimeProviderResolver: ctx.sandboxRuntimeProviderResolver,
             runtimeStateReader: ctx.runtimeStateReader,
             clock: ctx.clock,
+            logger,
           },
           {
             sandboxInstanceId: input.sandboxInstanceId,

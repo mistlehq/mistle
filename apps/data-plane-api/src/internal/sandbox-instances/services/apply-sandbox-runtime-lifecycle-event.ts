@@ -6,9 +6,12 @@ import {
 import {
   SandboxInstanceStatuses,
   SandboxLifecycleEvents,
+  type SandboxLifecycleEvent,
   transitionSandboxLifecycle,
 } from "@mistle/sandbox-lifecycle";
 import { and, eq, isNull, sql } from "drizzle-orm";
+
+import { logger } from "../../../logger.js";
 
 type ApplySandboxRuntimeLifecycleEventContext = {
   db: DataPlaneDatabase;
@@ -40,7 +43,7 @@ export async function applySandboxRuntimeLifecycleEvent(
   ctx: ApplySandboxRuntimeLifecycleEventContext,
   input: ApplySandboxRuntimeLifecycleEventInput,
 ): Promise<ApplySandboxRuntimeLifecycleEventResponse> {
-  const lifecycleStatus = await ctx.db.transaction(async (tx) => {
+  const transitionResult = await ctx.db.transaction(async (tx) => {
     const sandboxInstance = await tx.query.sandboxInstances.findFirst({
       columns: {
         status: true,
@@ -51,6 +54,7 @@ export async function applySandboxRuntimeLifecycleEvent(
     if (sandboxInstance === undefined) {
       throw new Error(`Sandbox instance '${input.sandboxInstanceId}' was not found.`);
     }
+    const previousStatus = sandboxInstance.status;
 
     const event = resolveLifecycleEvent({
       status: sandboxInstance.status,
@@ -58,7 +62,12 @@ export async function applySandboxRuntimeLifecycleEvent(
       ...(input.kind === "runtime_readiness_reported" ? { runtimeReady: input.runtimeReady } : {}),
     });
     if (event === undefined) {
-      return sandboxInstance.status;
+      return {
+        changed: false,
+        lifecycleEvent: undefined,
+        lifecycleStatus: sandboxInstance.status,
+        previousStatus,
+      };
     }
 
     const transition = transitionSandboxLifecycle({
@@ -69,7 +78,12 @@ export async function applySandboxRuntimeLifecycleEvent(
       throw new Error(transition.reason);
     }
     if (transition.kind === "unchanged") {
-      return transition.status;
+      return {
+        changed: false,
+        lifecycleEvent: event,
+        lifecycleStatus: transition.status,
+        previousStatus,
+      };
     }
 
     const { sandboxInstances } = ctx.tables;
@@ -95,13 +109,39 @@ export async function applySandboxRuntimeLifecycleEvent(
       );
     }
 
-    return transition.to;
+    return {
+      changed: true,
+      lifecycleEvent: event,
+      lifecycleStatus: transition.to,
+      previousStatus: transition.from,
+    };
   });
+
+  if (transitionResult.changed) {
+    logger.info(
+      {
+        eventName: resolveRuntimeLifecycleLogEventName({
+          from: transitionResult.previousStatus,
+          to: transitionResult.lifecycleStatus,
+        }),
+        sandboxInstanceId: input.sandboxInstanceId,
+        lifecycleEvent: transitionResult.lifecycleEvent,
+        previousStatus: transitionResult.previousStatus,
+        status: transitionResult.lifecycleStatus,
+        kind: input.kind,
+        ownerLeaseId: input.ownerLeaseId,
+        ...(input.kind === "runtime_readiness_reported"
+          ? { runtimeReady: input.runtimeReady }
+          : {}),
+      },
+      "Applied sandbox runtime lifecycle transition.",
+    );
+  }
 
   return {
     status: "ok",
     sandboxInstanceId: input.sandboxInstanceId,
-    lifecycleStatus,
+    lifecycleStatus: transitionResult.lifecycleStatus,
   };
 }
 
@@ -109,7 +149,7 @@ function resolveLifecycleEvent(input: {
   status: SandboxInstanceStatus;
   kind: SandboxRuntimeLifecycleEventKind;
   runtimeReady?: boolean;
-}): (typeof SandboxLifecycleEvents)[keyof typeof SandboxLifecycleEvents] | undefined {
+}): SandboxLifecycleEvent | undefined {
   if (input.kind === "bootstrap_detached") {
     if (input.status === SandboxInstanceStatuses.RECONNECTING) {
       return undefined;
@@ -135,4 +175,37 @@ function resolveLifecycleEvent(input: {
   }
 
   return undefined;
+}
+
+function resolveRuntimeLifecycleLogEventName(input: {
+  from: SandboxInstanceStatus;
+  to: SandboxInstanceStatus;
+}): string {
+  if (
+    input.from === SandboxInstanceStatuses.RECONNECTING &&
+    input.to === SandboxInstanceStatuses.RUNNING
+  ) {
+    return "sandbox.reconnected";
+  }
+
+  switch (input.to) {
+    case SandboxInstanceStatuses.RECONNECTING:
+      return "sandbox.reconnecting";
+    case SandboxInstanceStatuses.INITIALIZING:
+      return "sandbox.initializing";
+    case SandboxInstanceStatuses.RUNNING:
+      return "sandbox.running";
+    case SandboxInstanceStatuses.PENDING:
+      return "sandbox.pending";
+    case SandboxInstanceStatuses.STARTING:
+      return "sandbox.starting";
+    case SandboxInstanceStatuses.STARTED:
+      return "sandbox.started";
+    case SandboxInstanceStatuses.STOPPING:
+      return "sandbox.stopping";
+    case SandboxInstanceStatuses.STOPPED:
+      return "sandbox.stopped";
+    case SandboxInstanceStatuses.FAILED:
+      return "sandbox.failed";
+  }
 }

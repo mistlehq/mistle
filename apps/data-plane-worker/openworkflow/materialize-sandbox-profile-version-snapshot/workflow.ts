@@ -420,6 +420,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     await step.run({ name: "mark-snapshot-sandbox-starting" }, async () => {
       await markSandboxInstanceStarting({
         db: ctx.db,
+        logger,
         tables: ctx.tables,
         sandboxInstanceId: workflowInput.sandboxInstanceId,
       });
@@ -476,6 +477,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
       await persistSandboxInstanceProvisioning(
         {
           db: ctx.db,
+          logger,
           tables: ctx.tables,
         },
         {
@@ -493,6 +495,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
       await applySandboxLifecycleEvent(
         {
           db: ctx.db,
+          logger,
           tables: ctx.tables,
         },
         {
@@ -548,6 +551,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
           await markSandboxInstanceRunning(
             {
               db: ctx.db,
+              logger,
               tables: ctx.tables,
             },
             {
@@ -610,6 +614,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
       await applySandboxLifecycleEvent(
         {
           db: ctx.db,
+          logger,
           tables: ctx.tables,
         },
         {

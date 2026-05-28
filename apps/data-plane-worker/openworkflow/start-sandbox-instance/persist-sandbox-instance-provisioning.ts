@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from "node:util";
 
 import { type DataPlaneDatabase, type DataPlaneTables } from "@mistle/db/data-plane";
+import type { MistleLogger } from "@mistle/logging";
 import { SandboxInstanceStatuses, SandboxLifecycleEvents } from "@mistle/sandbox-lifecycle";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -10,6 +11,7 @@ import { applySandboxLifecycleEvent } from "../shared/apply-sandbox-lifecycle-ev
 export async function persistSandboxInstanceProvisioning(
   ctx: {
     db: DataPlaneDatabase;
+    logger?: MistleLogger | undefined;
     tables: Pick<DataPlaneTables, "sandboxInstanceRuntimePlans" | "sandboxInstances">;
   },
   input: {
@@ -75,6 +77,7 @@ export async function persistSandboxInstanceProvisioning(
     await applySandboxLifecycleEvent(
       {
         db: tx,
+        logger: ctx.logger,
         tables: ctx.tables,
       },
       {

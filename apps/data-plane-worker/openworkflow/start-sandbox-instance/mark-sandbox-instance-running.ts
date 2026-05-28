@@ -3,14 +3,17 @@ import {
   type DataPlaneDatabase,
   type DataPlaneTables,
 } from "@mistle/db/data-plane";
+import type { MistleLogger } from "@mistle/logging";
 import { SandboxLifecycleEvents } from "@mistle/sandbox-lifecycle";
 import { eq, sql } from "drizzle-orm";
 
+import { logger as dataPlaneWorkerLogger } from "../../logger.js";
 import { applySandboxLifecycleEvent } from "../shared/apply-sandbox-lifecycle-event.js";
 
 export async function markSandboxInstanceRunning(
   ctx: {
     db: DataPlaneDatabase;
+    logger?: MistleLogger | undefined;
     tables: Pick<DataPlaneTables, "sandboxInstances">;
   },
   input: {
@@ -22,6 +25,7 @@ export async function markSandboxInstanceRunning(
     await applySandboxLifecycleEvent(
       {
         db: tx,
+        logger: ctx.logger ?? dataPlaneWorkerLogger,
         tables: ctx.tables,
       },
       {

@@ -205,6 +205,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
     await step.run({ name: "mark-sandbox-instance-starting" }, async () => {
       await markSandboxInstanceStarting({
         db: ctx.db,
+        logger,
         tables: ctx.tables,
         sandboxInstanceId: input.sandboxInstanceId,
       });
@@ -310,6 +311,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             await applySandboxLifecycleEvent(
               {
                 db: ctx.db,
+                logger,
                 tables: ctx.tables,
               },
               {
@@ -337,6 +339,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               await applySandboxLifecycleEvent(
                 {
                   db: ctx.db,
+                  logger,
                   tables: ctx.tables,
                 },
                 {
@@ -1170,6 +1173,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           return persistSandboxInstanceComputeReplacement(
             {
               db: ctx.db,
+              logger,
               tables: ctx.tables,
             },
             {
@@ -1329,6 +1333,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           await applySandboxLifecycleEvent(
             {
               db: ctx.db,
+              logger,
               tables: ctx.tables,
             },
             {

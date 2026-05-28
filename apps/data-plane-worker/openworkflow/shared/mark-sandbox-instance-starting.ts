@@ -3,6 +3,7 @@ import {
   type DataPlaneDatabase,
   type DataPlaneTables,
 } from "@mistle/db/data-plane";
+import type { MistleLogger } from "@mistle/logging";
 import { SandboxLifecycleEvents } from "@mistle/sandbox-lifecycle";
 import { and, eq, isNull, sql } from "drizzle-orm";
 
@@ -10,6 +11,7 @@ import { applySandboxLifecycleEvent } from "./apply-sandbox-lifecycle-event.js";
 
 export async function markSandboxInstanceStarting(ctx: {
   db: DataPlaneDatabase;
+  logger?: MistleLogger | undefined;
   tables: Pick<DataPlaneTables, "sandboxInstances">;
   sandboxInstanceId: string;
 }): Promise<void> {
@@ -19,6 +21,7 @@ export async function markSandboxInstanceStarting(ctx: {
     await applySandboxLifecycleEvent(
       {
         db: tx,
+        logger: ctx.logger,
         tables: ctx.tables,
       },
       {

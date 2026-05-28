@@ -143,6 +143,7 @@ export const ReconcileSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             sandboxRuntimeProviderResolver: ctx.sandboxRuntimeProviderResolver,
             runtimeStateReader: ctx.runtimeStateReader,
             clock: ctx.clock,
+            logger: ctx.logger,
           },
           {
             sandboxInstanceId: input.sandboxInstanceId,

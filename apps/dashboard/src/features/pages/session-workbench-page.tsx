@@ -136,10 +136,10 @@ function SessionWorkbenchPageContent(input: {
     ? "Return to chat"
     : (workbench.primaryPanelState.disabledReason ?? `Open ${cliRuntimeDisplayName} TUI`);
   const headerStatusKind = workbench.workbenchStatus.kind;
-  const headerStatusLabel =
-    headerStatusKind === "error"
-      ? "Error"
-      : resolveSandboxStatusBadgeUi(workbench.sandboxLifecycleStatus).label;
+  const headerStatusUi = resolveSandboxStatusBadgeUi(workbench.sandboxLifecycleStatus);
+  const headerStatusLabel = headerStatusKind === "error" ? "Error" : headerStatusUi.label;
+  const headerStatusVariant =
+    headerStatusUi.variant === "destructive" ? "outline" : headerStatusUi.variant;
   const primaryRepositoryErrorMessage =
     workbench.primaryRepositoryState.errorMessage ??
     workbench.primaryRepositoryControlState.disabledReason;
@@ -265,6 +265,9 @@ function SessionWorkbenchPageContent(input: {
                   : "Primary repository"),
         }}
         status={{
+          ...(headerStatusKind === "error"
+            ? {}
+            : { className: headerStatusUi.className, variant: headerStatusVariant }),
           kind: headerStatusKind,
           label: headerStatusLabel,
         }}

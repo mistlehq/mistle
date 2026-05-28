@@ -71,8 +71,10 @@ export function SessionWorkbenchHeaderActions(input: {
   portAccessControl?: React.ReactNode;
   repositoryControl?: SessionWorkbenchHeaderRepositoryControl;
   status: {
+    className?: string;
     kind: "connected" | "error" | "not_connected";
     label: string;
+    variant?: "outline" | "secondary";
   };
   conversationControl?: SessionWorkbenchHeaderButtonControl;
   terminalControl: SessionWorkbenchHeaderButtonControl;
@@ -109,17 +111,15 @@ export function SessionWorkbenchHeaderActions(input: {
           {input.status.label}
         </Badge>
       ) : (
-        <span
+        <Badge
           aria-label={input.status.label}
-          className={[
-            "inline-block size-2.5 rounded-full border",
-            input.status.kind === "connected"
-              ? "border-emerald-700 bg-emerald-600"
-              : "border-muted-foreground/30 bg-muted-foreground/30",
-          ].join(" ")}
+          className={input.status.className}
           role="status"
           title={input.status.label}
-        />
+          variant={input.status.variant ?? "outline"}
+        >
+          {input.status.label}
+        </Badge>
       )}
       {repositoryControl === undefined ? null : (
         <>
