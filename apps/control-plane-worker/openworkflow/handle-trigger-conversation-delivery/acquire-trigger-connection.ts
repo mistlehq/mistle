@@ -1,4 +1,10 @@
 import type { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
+import {
+  getSandboxDeliveryDisposition,
+  SandboxDeliveryDispositions,
+  SandboxInstanceStatuses,
+  type SandboxInstanceStatus,
+} from "@mistle/sandbox-lifecycle";
 import { systemSleeper } from "@mistle/time";
 
 import type { EnsuredTriggerSandbox, PreparedTriggerRun } from "../shared/trigger-run-types.js";
@@ -11,6 +17,81 @@ import type { AcquiredTriggerConnection } from "./types.js";
 
 const SandboxStartTimeoutMs = 5 * 60 * 1000;
 const SandboxStartPollIntervalMs = 1_000;
+type SandboxWaitPhase = "startup" | "resume" | "reconnect";
+export type TriggerConnectionAcquisitionPollAction =
+  | {
+      action: "mint_connection";
+      waitPhase: SandboxWaitPhase;
+    }
+  | {
+      action: "fail_terminal";
+      waitPhase: SandboxWaitPhase;
+    }
+  | {
+      action: "request_resume";
+      waitPhase: SandboxWaitPhase;
+    }
+  | {
+      action: "wait";
+      waitPhase: SandboxWaitPhase;
+    };
+
+function resolveSandboxWaitPhase(input: {
+  status: SandboxInstanceStatus;
+  didRequestResume: boolean;
+}): SandboxWaitPhase {
+  if (input.didRequestResume) {
+    return "resume";
+  }
+
+  if (input.status === SandboxInstanceStatuses.RECONNECTING) {
+    return "reconnect";
+  }
+
+  if (input.status === SandboxInstanceStatuses.STOPPED) {
+    return "resume";
+  }
+
+  return "startup";
+}
+
+export function resolveTriggerConnectionAcquisitionPollAction(input: {
+  status: SandboxInstanceStatus;
+  didRequestResume: boolean;
+}): TriggerConnectionAcquisitionPollAction {
+  const waitPhase = resolveSandboxWaitPhase(input);
+  const deliveryDisposition = getSandboxDeliveryDisposition(input.status);
+
+  if (deliveryDisposition === SandboxDeliveryDispositions.DELIVER) {
+    return {
+      action: "mint_connection",
+      waitPhase,
+    };
+  }
+
+  if (deliveryDisposition === SandboxDeliveryDispositions.RECOVER) {
+    return {
+      action: "fail_terminal",
+      waitPhase,
+    };
+  }
+
+  if (
+    deliveryDisposition === SandboxDeliveryDispositions.RESUME &&
+    input.status === SandboxInstanceStatuses.STOPPED &&
+    !input.didRequestResume
+  ) {
+    return {
+      action: "request_resume",
+      waitPhase,
+    };
+  }
+
+  return {
+    action: "wait",
+    waitPhase,
+  };
+}
 
 export async function acquireTriggerConnection(
   ctx: {
@@ -21,6 +102,10 @@ export async function acquireTriggerConnection(
     ensuredTriggerSandbox: EnsuredTriggerSandbox;
     deliveryTaskId: string;
     workflowRunId: string;
+    timing?: {
+      timeoutMs: number;
+      pollIntervalMs: number;
+    };
   },
 ): Promise<AcquiredTriggerConnection> {
   if (input.preparedTriggerRun.renderedConversationKey.trim().length === 0) {
@@ -43,10 +128,13 @@ export async function acquireTriggerConnection(
       },
     },
     async (waitSpan) => {
+      const timeoutMs = input.timing?.timeoutMs ?? SandboxStartTimeoutMs;
+      const pollIntervalMs = input.timing?.pollIntervalMs ?? SandboxStartPollIntervalMs;
       const waitStartedAt = Date.now();
-      const deadline = waitStartedAt + SandboxStartTimeoutMs;
+      const deadline = waitStartedAt + timeoutMs;
       let isSandboxRunning = false;
       let didRequestResume = false;
+      let lastObservedSandboxStatus: SandboxInstanceStatus | null = null;
       let pollCount = 0;
 
       while (Date.now() < deadline) {
@@ -55,13 +143,19 @@ export async function acquireTriggerConnection(
           instanceId: input.ensuredTriggerSandbox.sandboxInstanceId,
         });
         pollCount += 1;
+        lastObservedSandboxStatus = sandboxInstance.status;
+        const pollAction = resolveTriggerConnectionAcquisitionPollAction({
+          status: sandboxInstance.status,
+          didRequestResume,
+        });
 
         waitSpan.setAttributes({
           "mistle.sandbox.poll_count": pollCount,
           "mistle.sandbox.status": sandboxInstance.status,
+          "mistle.sandbox.wait_phase": pollAction.waitPhase,
         });
 
-        if (sandboxInstance.status === "running") {
+        if (pollAction.action === "mint_connection") {
           isSandboxRunning = true;
           waitSpan.setAttributes({
             "mistle.sandbox.wait_ms": Date.now() - waitStartedAt,
@@ -79,7 +173,7 @@ export async function acquireTriggerConnection(
             },
             attributes: {
               "mistle.sandbox.poll_count": pollCount,
-              "mistle.sandbox.wait_phase": didRequestResume ? "resume" : "startup",
+              "mistle.sandbox.wait_phase": pollAction.waitPhase,
               "mistle.sandbox.wait_ms": Date.now() - waitStartedAt,
             },
           });
@@ -104,7 +198,7 @@ export async function acquireTriggerConnection(
           break;
         }
 
-        if (sandboxInstance.status === "failed") {
+        if (pollAction.action === "fail_terminal") {
           throw createTriggerRunExecutionError({
             code: TriggerRunFailureCodes.TRIGGER_RUN_EXECUTION_FAILED,
             message:
@@ -116,13 +210,13 @@ export async function acquireTriggerConnection(
               "mistle.sandbox.failure_code": sandboxInstance.failureCode,
               "mistle.sandbox.failure_message": sandboxInstance.failureMessage,
               "mistle.sandbox.poll_count": pollCount,
-              "mistle.sandbox.wait_phase": didRequestResume ? "resume" : "startup",
+              "mistle.sandbox.wait_phase": pollAction.waitPhase,
               "mistle.sandbox.wait_ms": Date.now() - waitStartedAt,
             },
           });
         }
 
-        if (sandboxInstance.status === "stopped" && !didRequestResume) {
+        if (pollAction.action === "request_resume") {
           didRequestResume = true;
           logTriggerConversationDeliveryEvent({
             eventName: "sandbox.resume_requested",
@@ -138,9 +232,9 @@ export async function acquireTriggerConnection(
             attributes: {
               "mistle.sandbox.poll_count": pollCount,
               "mistle.sandbox.status": sandboxInstance.status,
-              "mistle.sandbox.wait_phase": "resume",
-              "mistle.sandbox.wait_timeout_ms": SandboxStartTimeoutMs,
-              "mistle.sandbox.poll_interval_ms": SandboxStartPollIntervalMs,
+              "mistle.sandbox.wait_phase": pollAction.waitPhase,
+              "mistle.sandbox.wait_timeout_ms": timeoutMs,
+              "mistle.sandbox.poll_interval_ms": pollIntervalMs,
             },
           });
 
@@ -157,9 +251,9 @@ export async function acquireTriggerConnection(
           waitSpan.setAttributes({
             "mistle.sandbox.resume_requested": true,
             "mistle.sandbox.resume_workflow_run_id": resumeResult.workflowRunId,
-            "mistle.sandbox.wait_phase": "resume",
-            "mistle.sandbox.wait_timeout_ms": SandboxStartTimeoutMs,
-            "mistle.sandbox.poll_interval_ms": SandboxStartPollIntervalMs,
+            "mistle.sandbox.wait_phase": pollAction.waitPhase,
+            "mistle.sandbox.wait_timeout_ms": timeoutMs,
+            "mistle.sandbox.poll_interval_ms": pollIntervalMs,
           });
 
           logTriggerConversationDeliveryEvent({
@@ -177,16 +271,27 @@ export async function acquireTriggerConnection(
               "mistle.sandbox.poll_count": pollCount,
               "mistle.sandbox.resume_workflow_run_id": resumeResult.workflowRunId,
               "mistle.sandbox.status": sandboxInstance.status,
-              "mistle.sandbox.wait_timeout_ms": SandboxStartTimeoutMs,
-              "mistle.sandbox.poll_interval_ms": SandboxStartPollIntervalMs,
+              "mistle.sandbox.wait_timeout_ms": timeoutMs,
+              "mistle.sandbox.poll_interval_ms": pollIntervalMs,
             },
           });
         }
 
-        await systemSleeper.sleep(SandboxStartPollIntervalMs);
+        await systemSleeper.sleep(pollIntervalMs);
       }
 
       if (!isSandboxRunning) {
+        const waitPhase =
+          lastObservedSandboxStatus === null
+            ? "startup"
+            : resolveSandboxWaitPhase({
+                status: lastObservedSandboxStatus,
+                didRequestResume,
+              });
+        const wasNonDeliverable =
+          lastObservedSandboxStatus !== null &&
+          getSandboxDeliveryDisposition(lastObservedSandboxStatus) ===
+            SandboxDeliveryDispositions.NON_DELIVERABLE;
         logTriggerConversationDeliveryEvent({
           eventName: didRequestResume ? "sandbox.resume_wait_timed_out" : "sandbox.wait_timed_out",
           message: "Trigger conversation sandbox did not become running before timeout",
@@ -200,21 +305,29 @@ export async function acquireTriggerConnection(
           },
           attributes: {
             "mistle.sandbox.poll_count": pollCount,
-            "mistle.sandbox.wait_phase": didRequestResume ? "resume" : "startup",
+            ...(lastObservedSandboxStatus === null
+              ? {}
+              : { "mistle.sandbox.status": lastObservedSandboxStatus }),
+            "mistle.sandbox.wait_phase": waitPhase,
             "mistle.sandbox.wait_ms": Date.now() - waitStartedAt,
-            "mistle.sandbox.wait_timeout_ms": SandboxStartTimeoutMs,
+            "mistle.sandbox.wait_timeout_ms": timeoutMs,
           },
           level: "warn",
         });
         throw createTriggerRunExecutionError({
           code: TriggerRunFailureCodes.TRIGGER_RUN_EXECUTION_FAILED,
-          message: `Sandbox instance '${input.ensuredTriggerSandbox.sandboxInstanceId}' did not become ready before the trigger timeout elapsed.`,
+          message: wasNonDeliverable
+            ? `Sandbox instance '${input.ensuredTriggerSandbox.sandboxInstanceId}' remained in non-deliverable status '${lastObservedSandboxStatus}' before the trigger timeout elapsed.`
+            : `Sandbox instance '${input.ensuredTriggerSandbox.sandboxInstanceId}' did not become ready before the trigger timeout elapsed.`,
           metadata: {
             "mistle.sandbox.instance_id": input.ensuredTriggerSandbox.sandboxInstanceId,
             "mistle.sandbox.poll_count": pollCount,
-            "mistle.sandbox.wait_phase": didRequestResume ? "resume" : "startup",
+            ...(lastObservedSandboxStatus === null
+              ? {}
+              : { "mistle.sandbox.status": lastObservedSandboxStatus }),
+            "mistle.sandbox.wait_phase": waitPhase,
             "mistle.sandbox.wait_ms": Date.now() - waitStartedAt,
-            "mistle.sandbox.wait_timeout_ms": SandboxStartTimeoutMs,
+            "mistle.sandbox.wait_timeout_ms": timeoutMs,
           },
         });
       }

@@ -2,6 +2,10 @@ import { SandboxInstanceStatuses, type SandboxInstanceStatus } from "@mistle/san
 import { describe, expect, it } from "vitest";
 
 import {
+  resolveTriggerConnectionAcquisitionPollAction,
+  type TriggerConnectionAcquisitionPollAction,
+} from "./acquire-trigger-connection.js";
+import {
   TriggerConversationDeliverySandboxActions,
   TriggerConversationRouteBindingActions,
   resolveTriggerConversationDeliverySandboxAction,
@@ -88,13 +92,96 @@ describe("conversation delivery plans", () => {
       ).toBe(TriggerConversationDeliverySandboxActions.RECOVER_FAILED);
     });
 
-    it("fails when the persisted sandbox is stopping", () => {
+    it("reuses the persisted sandbox when it is stopping so acquisition can wait and fail explicitly", () => {
       expect(
         resolveTriggerConversationDeliverySandboxAction({
           sandboxInstanceId: "sbi_123",
           sandboxStatus: "stopping",
         }),
-      ).toBe(TriggerConversationDeliverySandboxActions.FAIL);
+      ).toBe(TriggerConversationDeliverySandboxActions.REUSE_EXISTING);
+    });
+  });
+
+  describe("resolveTriggerConnectionAcquisitionPollAction", () => {
+    it("mints only after the sandbox status is running", () => {
+      expectPollAction({
+        status: SandboxInstanceStatuses.RUNNING,
+        didRequestResume: false,
+        expected: {
+          action: "mint_connection",
+          waitPhase: "startup",
+        },
+      });
+    });
+
+    it("waits for non-running startup statuses without requesting resume", () => {
+      for (const status of [
+        SandboxInstanceStatuses.PENDING,
+        SandboxInstanceStatuses.STARTING,
+        SandboxInstanceStatuses.STARTED,
+        SandboxInstanceStatuses.INITIALIZING,
+      ]) {
+        expectPollAction({
+          status,
+          didRequestResume: false,
+          expected: {
+            action: "wait",
+            waitPhase: "startup",
+          },
+        });
+      }
+    });
+
+    it("waits through reconnecting as a reconnect phase instead of minting a token", () => {
+      expectPollAction({
+        status: SandboxInstanceStatuses.RECONNECTING,
+        didRequestResume: false,
+        expected: {
+          action: "wait",
+          waitPhase: "reconnect",
+        },
+      });
+    });
+
+    it("requests resume once for a stopped sandbox and then waits in the resume phase", () => {
+      expectPollAction({
+        status: SandboxInstanceStatuses.STOPPED,
+        didRequestResume: false,
+        expected: {
+          action: "request_resume",
+          waitPhase: "resume",
+        },
+      });
+      expectPollAction({
+        status: SandboxInstanceStatuses.STOPPED,
+        didRequestResume: true,
+        expected: {
+          action: "wait",
+          waitPhase: "resume",
+        },
+      });
+    });
+
+    it("fails fast when the sandbox is terminal", () => {
+      expectPollAction({
+        status: SandboxInstanceStatuses.FAILED,
+        didRequestResume: true,
+        expected: {
+          action: "fail_terminal",
+          waitPhase: "resume",
+        },
+      });
+    });
+
+    it("waits without resume when the sandbox is stopping", () => {
+      expectPollAction({
+        status: SandboxInstanceStatuses.STOPPING,
+        didRequestResume: false,
+        expected: {
+          action: "wait",
+          waitPhase: "startup",
+        },
+      });
     });
   });
 
@@ -353,3 +440,16 @@ describe("conversation delivery plans", () => {
     });
   });
 });
+
+function expectPollAction(input: {
+  status: SandboxInstanceStatus;
+  didRequestResume: boolean;
+  expected: TriggerConnectionAcquisitionPollAction;
+}): void {
+  expect(
+    resolveTriggerConnectionAcquisitionPollAction({
+      status: input.status,
+      didRequestResume: input.didRequestResume,
+    }),
+  ).toEqual(input.expected);
+}

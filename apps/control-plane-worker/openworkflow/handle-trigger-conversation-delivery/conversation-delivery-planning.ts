@@ -30,11 +30,10 @@ export function resolveTriggerConversationDeliverySandboxAction(input: {
     case SandboxDeliveryDispositions.DELIVER:
     case SandboxDeliveryDispositions.WAIT:
     case SandboxDeliveryDispositions.RESUME:
+    case SandboxDeliveryDispositions.NON_DELIVERABLE:
       return TriggerConversationDeliverySandboxActions.REUSE_EXISTING;
     case SandboxDeliveryDispositions.RECOVER:
       return TriggerConversationDeliverySandboxActions.RECOVER_FAILED;
-    case SandboxDeliveryDispositions.NON_DELIVERABLE:
-      return TriggerConversationDeliverySandboxActions.FAIL;
   }
 }
 

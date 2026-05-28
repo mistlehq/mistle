@@ -7,6 +7,10 @@ import type {
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import { mintConnectionToken as mintGatewayConnectionToken } from "@mistle/gateway-connection-auth";
+import {
+  getSandboxDeliveryDisposition,
+  SandboxDeliveryDispositions,
+} from "@mistle/sandbox-lifecycle";
 import { systemClock, systemSleeper } from "@mistle/time";
 
 import { logger } from "../../../logger.js";
@@ -84,6 +88,15 @@ function createInstanceNotResumableError(
   );
 }
 
+function createInstanceNotDeliverableError(
+  sandboxInstance: Pick<ExistingSandboxInstance, "id" | "status">,
+): SandboxInstancesConflictError {
+  return new SandboxInstancesConflictError(
+    SandboxInstancesConflictCodes.INSTANCE_NOT_RESUMABLE,
+    `Sandbox instance '${sandboxInstance.id}' is '${sandboxInstance.status}' and cannot receive a connection token.`,
+  );
+}
+
 async function getExistingSandboxInstance(
   dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "getSandboxInstance">,
   input: {
@@ -131,7 +144,9 @@ async function waitForRunningSandboxInstance(
           "mistle.sandbox.status": sandboxInstance.status,
         });
 
-        if (sandboxInstance.status === "running") {
+        const disposition = getSandboxDeliveryDisposition(sandboxInstance.status);
+
+        if (disposition === SandboxDeliveryDispositions.DELIVER) {
           span.setAttribute("mistle.sandbox.wait_ms", systemClock.nowMs() - waitStartedAt);
           logger.info(
             {
@@ -145,8 +160,12 @@ async function waitForRunningSandboxInstance(
           return sandboxInstance;
         }
 
-        if (sandboxInstance.status === "failed") {
+        if (disposition === SandboxDeliveryDispositions.RECOVER) {
           throw createInstanceFailedError(sandboxInstance);
+        }
+
+        if (disposition === SandboxDeliveryDispositions.NON_DELIVERABLE) {
+          throw createInstanceNotDeliverableError(sandboxInstance);
         }
 
         const remainingMs = deadlineMs - systemClock.nowMs();
@@ -232,43 +251,52 @@ export async function mintConnectionToken(
           organizationId: input.organizationId,
           instanceId: input.instanceId,
         });
-        if (sandboxInstance.status === "failed") {
-          throw createInstanceFailedError(sandboxInstance);
-        }
 
-        if (sandboxInstance.status === "pending" || sandboxInstance.status === "starting") {
-          sandboxInstance = await waitForRunningSandboxInstance(dataPlaneClient, {
-            organizationId: input.organizationId,
-            instanceId: input.instanceId,
-          });
-        } else if (sandboxInstance.status === "stopped") {
-          logger.info(
-            {
-              eventName: "sandbox.resume_requested",
-              "mistle.sandbox.instance_id": input.instanceId,
-            },
-            "Requested sandbox resume while minting a connection token",
-          );
+        switch (getSandboxDeliveryDisposition(sandboxInstance.status)) {
+          case SandboxDeliveryDispositions.DELIVER:
+            break;
+          case SandboxDeliveryDispositions.WAIT:
+            sandboxInstance = await waitForRunningSandboxInstance(dataPlaneClient, {
+              organizationId: input.organizationId,
+              instanceId: input.instanceId,
+            });
+            break;
+          case SandboxDeliveryDispositions.RESUME:
+            if (isTriggerDeliveryConnectionMint(input)) {
+              throw createInstanceNotResumableError(sandboxInstance);
+            }
+            logger.info(
+              {
+                eventName: "sandbox.resume_requested",
+                "mistle.sandbox.instance_id": input.instanceId,
+              },
+              "Requested sandbox resume while minting a connection token",
+            );
 
-          const gitIdentity =
-            input.actingUserId === undefined
-              ? undefined
-              : await resolveActingUserGitIdentityForSandboxInstance(db, {
-                  actingUserId: input.actingUserId,
-                  organizationId: input.organizationId,
-                  sandboxInstance,
-                });
+            const gitIdentity =
+              input.actingUserId === undefined
+                ? undefined
+                : await resolveActingUserGitIdentityForSandboxInstance(db, {
+                    actingUserId: input.actingUserId,
+                    organizationId: input.organizationId,
+                    sandboxInstance,
+                  });
 
-          await dataPlaneClient.resumeSandboxInstance({
-            organizationId: input.organizationId,
-            instanceId: input.instanceId,
-            ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
-            ...(gitIdentity === undefined ? {} : { gitIdentity }),
-          });
-          sandboxInstance = await waitForRunningSandboxInstance(dataPlaneClient, {
-            organizationId: input.organizationId,
-            instanceId: input.instanceId,
-          });
+            await dataPlaneClient.resumeSandboxInstance({
+              organizationId: input.organizationId,
+              instanceId: input.instanceId,
+              ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
+              ...(gitIdentity === undefined ? {} : { gitIdentity }),
+            });
+            sandboxInstance = await waitForRunningSandboxInstance(dataPlaneClient, {
+              organizationId: input.organizationId,
+              instanceId: input.instanceId,
+            });
+            break;
+          case SandboxDeliveryDispositions.RECOVER:
+            throw createInstanceFailedError(sandboxInstance);
+          case SandboxDeliveryDispositions.NON_DELIVERABLE:
+            throw createInstanceNotDeliverableError(sandboxInstance);
         }
 
         const tokenJti = createTokenJti(sandboxInstance.id);
@@ -362,6 +390,22 @@ export async function mintConnectionToken(
         throw error;
       }
     },
+  );
+}
+
+function isTriggerDeliveryConnectionMint(input: {
+  webhookEventId?: string;
+  deliveryTaskId?: string;
+  externalDeliveryId?: string;
+  triggerRunId?: string;
+  conversationId?: string;
+}): boolean {
+  return (
+    input.webhookEventId !== undefined ||
+    input.deliveryTaskId !== undefined ||
+    input.externalDeliveryId !== undefined ||
+    input.triggerRunId !== undefined ||
+    input.conversationId !== undefined
   );
 }
 

@@ -10,6 +10,7 @@ import {
   UserExternalPrincipalCredentialStatuses,
   UserExternalPrincipalStatuses,
 } from "@mistle/db/control-plane";
+import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import {
   E2BSandboxRuntimeCredentialSlotKeys,
@@ -143,6 +144,61 @@ describe.concurrent("internal sandbox runtime integration", () => {
       code: "VALIDATION_ERROR",
       message: "Invalid request.",
     });
+  });
+
+  it("rejects trigger connection token minting for non-deliverable sandbox statuses", async ({
+    env,
+  }) => {
+    const organizationId = "org_internal_mint_non_deliverable";
+    const reconnectingSandboxInstanceId = "sbi_internal_mint_reconnecting";
+    const stoppedSandboxInstanceId = "sbi_internal_mint_stopped";
+
+    await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values([
+      {
+        id: reconnectingSandboxInstanceId,
+        organizationId,
+        sandboxProfileId: "sbp_internal_mint_non_deliverable",
+        sandboxProfileVersion: 1,
+        runtimeProvider: "docker",
+        providerSandboxId: "provider-internal-mint-reconnecting",
+        status: SandboxInstanceStatuses.RECONNECTING,
+        startedByKind: "system",
+        startedById: "internal_mint_test",
+        source: "webhook",
+      },
+      {
+        id: stoppedSandboxInstanceId,
+        organizationId,
+        sandboxProfileId: "sbp_internal_mint_non_deliverable",
+        sandboxProfileVersion: 1,
+        runtimeProvider: "docker",
+        providerSandboxId: "provider-internal-mint-stopped",
+        status: SandboxInstanceStatuses.STOPPED,
+        startedByKind: "system",
+        startedById: "internal_mint_test",
+        source: "webhook",
+      },
+    ]);
+
+    const reconnectingResponse = await internalSandboxRuntimeRequest(env, {
+      path: "/mint-connection-token",
+      body: {
+        organizationId,
+        instanceId: reconnectingSandboxInstanceId,
+        deliveryTaskId: "cdt_internal_mint_reconnecting",
+      },
+    });
+    expect(reconnectingResponse.status).toBe(409);
+
+    const stoppedResponse = await internalSandboxRuntimeRequest(env, {
+      path: "/mint-connection-token",
+      body: {
+        organizationId,
+        instanceId: stoppedSandboxInstanceId,
+        deliveryTaskId: "cdt_internal_mint_stopped",
+      },
+    });
+    expect(stoppedResponse.status).toBe(409);
   });
 
   it("rejects resume-sandbox-instance requests without internal service token", async ({ env }) => {
