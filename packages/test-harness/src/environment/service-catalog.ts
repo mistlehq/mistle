@@ -212,8 +212,13 @@ function formatDuration(milliseconds: number): string {
   return `${(milliseconds / 1000).toFixed(2)}s`;
 }
 
-function writeTimingLine(message: string): void {
-  if (process.env["MISTLE_TEST_TIMING"] !== "1") {
+function writeTimingLine(
+  message: string,
+  input: {
+    force?: boolean;
+  } = {},
+): void {
+  if (input.force !== true && process.env["MISTLE_TEST_TIMING"] !== "1") {
     return;
   }
 
@@ -244,6 +249,7 @@ function measureSync<T>(timings: Map<string, number>, label: string, callback: (
 
 function writeProvisionerTimingSummary(input: {
   environmentId: string;
+  force?: boolean;
   provisioner: string;
   timings: ReadonlyMap<string, number>;
 }): void {
@@ -253,6 +259,27 @@ function writeProvisionerTimingSummary(input: {
 
   writeTimingLine(
     `[integration] env ${input.environmentId} ${input.provisioner} phases: ${parts.join(", ")}.`,
+    {
+      force: input.force === true,
+    },
+  );
+}
+
+function writeSandboxBaseImageRegistryTimingSummary(input: {
+  force?: boolean;
+  operation: string;
+  sourceKind: string;
+  timings: ReadonlyMap<string, number>;
+}): void {
+  const parts = Array.from(input.timings.entries()).map(
+    ([label, durationMs]) => `${label}=${formatDuration(durationMs)}`,
+  );
+
+  writeTimingLine(
+    `[integration] sandbox base image registry ${input.operation}: source=${input.sourceKind} ${parts.join(", ")}.`,
+    {
+      force: input.force === true,
+    },
   );
 }
 
@@ -388,9 +415,22 @@ export function createDockerSandboxProviderInfra(): readonly TestInfraRequiremen
   return [createSandboxBaseImageRequirement(), createSandboxDockerNetworkRequirement()];
 }
 
-export async function prewarmDockerSandboxBaseImageRegistry(): Promise<void> {
-  const registry = await acquireSandboxBaseImageRegistry();
-  await registry.release();
+export async function prewarmDockerSandboxBaseImageRegistry(
+  input: { forceTiming?: boolean } = {},
+): Promise<void> {
+  const timings = new Map<string, number>();
+  const registry = await measure(timings, "acquire-registry-lease", async () =>
+    acquireSandboxBaseImageRegistry({
+      forceTiming: input.forceTiming === true,
+    }),
+  );
+  await measure(timings, "release-registry-lease", registry.release);
+  writeProvisionerTimingSummary({
+    environmentId: "runtime-system-prewarm",
+    force: input.forceTiming === true,
+    provisioner: "sandbox-base-image-registry-prewarm",
+    timings,
+  });
 }
 
 function createRegistryContext(input: {
@@ -469,59 +509,83 @@ function createSandboxBaseImageRequirement(): TestInfraRequirement {
   };
 }
 
-async function acquireSandboxBaseImageRegistry(): Promise<
-  TestServiceRuntime & { release: () => Promise<void> }
-> {
+async function acquireSandboxBaseImageRegistry(
+  input: { forceTiming?: boolean } = {},
+): Promise<TestServiceRuntime & { release: () => Promise<void> }> {
   const session = ensureRunnerPoolSession(process.env);
+  const timings = new Map<string, number>();
   const source = resolveSystemTestSandboxBaseImageSource({
     env: process.env,
     localImageRef: DefaultSandboxBaseImageBuild.localReference,
   });
-  return acquireRunnerServicePoolLease({
-    runId: session.runId,
-    coordinatorDir: session.coordinatorDir,
-    key: `sandbox-base-image-registry:${source.kind}:${source.imageRef}:${DefaultSandboxBaseImageBuild.repositoryPath}`,
-    lockTimeoutMs: SandboxBaseImageRegistryLockTimeoutMs,
-    start: async () =>
-      startSandboxBaseImageRegistry({
-        sourceImageRef: source.imageRef,
-        pullSourceImage: source.kind === "prepublished",
-      }),
-    healthCheck: async (service) => {
-      const httpEndpoint = service.endpoints.http;
-      if (httpEndpoint === undefined) {
-        throw new Error("Sandbox base image registry did not expose an HTTP endpoint.");
-      }
+  try {
+    return await measure(timings, "acquire-pooled-service", async () =>
+      acquireRunnerServicePoolLease({
+        runId: session.runId,
+        coordinatorDir: session.coordinatorDir,
+        key: `sandbox-base-image-registry:${source.kind}:${source.imageRef}:${DefaultSandboxBaseImageBuild.repositoryPath}`,
+        lockTimeoutMs: SandboxBaseImageRegistryLockTimeoutMs,
+        start: async () =>
+          startSandboxBaseImageRegistry({
+            sourceImageRef: source.imageRef,
+            pullSourceImage: source.kind === "prepublished",
+            timings,
+          }),
+        healthCheck: async (service) => {
+          await measure(timings, "health-check", async () => {
+            const httpEndpoint = service.endpoints.http;
+            if (httpEndpoint === undefined) {
+              throw new Error("Sandbox base image registry did not expose an HTTP endpoint.");
+            }
 
-      const response = await fetch(new URL("/v2/", httpEndpoint.hostBaseUrl));
-      if (!response.ok) {
-        throw new Error(
-          `Sandbox base image registry health check failed with status ${String(response.status)}.`,
-        );
-      }
-    },
-  });
+            const response = await fetch(new URL("/v2/", httpEndpoint.hostBaseUrl));
+            if (!response.ok) {
+              throw new Error(
+                `Sandbox base image registry health check failed with status ${String(response.status)}.`,
+              );
+            }
+          });
+        },
+      }),
+    );
+  } finally {
+    writeSandboxBaseImageRegistryTimingSummary({
+      force: input.forceTiming === true,
+      operation: "acquire",
+      sourceKind: source.kind,
+      timings,
+    });
+  }
 }
 
 async function startSandboxBaseImageRegistry(input: {
   sourceImageRef: string;
   pullSourceImage: boolean;
+  timings: Map<string, number>;
 }): Promise<TestServiceRuntime & { stop: () => Promise<void> }> {
-  const registryContainer = await new GenericContainer(RegistryImageReference)
-    .withEnvironment({
-      REGISTRY_STORAGE_DELETE_ENABLED: "true",
-    })
-    .withExposedPorts(RegistryInternalPort)
-    .start();
+  const registryContainer = await measure(input.timings, "start-registry-container", async () =>
+    new GenericContainer(RegistryImageReference)
+      .withEnvironment({
+        REGISTRY_STORAGE_DELETE_ENABLED: "true",
+      })
+      .withExposedPorts(RegistryInternalPort)
+      .start(),
+  );
   const registryAuthority = `${registryContainer.getHost()}:${String(
     registryContainer.getMappedPort(RegistryInternalPort),
   )}`;
   const sandboxBaseImageRef = `${registryAuthority}/${DefaultSandboxBaseImageBuild.repositoryPath}:dev`;
   if (input.pullSourceImage) {
-    await execFileAsync("docker", ["pull", input.sourceImageRef]);
+    await measure(input.timings, "pull-source-image", async () =>
+      execFileAsync("docker", ["pull", input.sourceImageRef]),
+    );
   }
-  await execFileAsync("docker", ["tag", input.sourceImageRef, sandboxBaseImageRef]);
-  await execFileAsync("docker", ["push", sandboxBaseImageRef]);
+  await measure(input.timings, "tag-source-image", async () =>
+    execFileAsync("docker", ["tag", input.sourceImageRef, sandboxBaseImageRef]),
+  );
+  await measure(input.timings, "push-registry-image", async () =>
+    execFileAsync("docker", ["push", sandboxBaseImageRef]),
+  );
 
   return {
     endpoints: {

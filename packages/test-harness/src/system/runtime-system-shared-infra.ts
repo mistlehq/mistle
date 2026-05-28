@@ -37,7 +37,9 @@ async function prewarmRuntimeSystemDockerSandboxBaseImage(): Promise<void> {
   writeIntegrationTimingLine("[system] prewarming Docker sandbox base image registry.", {
     force: true,
   });
-  await prewarmDockerSandboxBaseImageRegistry();
+  await prewarmDockerSandboxBaseImageRegistry({
+    forceTiming: true,
+  });
   writeIntegrationTimingLine(
     `[system] Docker sandbox base image registry prewarm completed in ${formatIntegrationDuration(Date.now() - startedAt)}.`,
     {
