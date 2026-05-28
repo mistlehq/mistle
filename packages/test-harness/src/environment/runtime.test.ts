@@ -487,6 +487,65 @@ describe("startTestEnvironment", () => {
     ]);
   });
 
+  it("reports setup timings by infra kind, service layer, and service id", async () => {
+    const startEvents: string[] = [];
+    const cleanupEvents: string[] = [];
+    const postgresProvisioner = createPostgresProvisioner(cleanupEvents);
+    const mailpitProvisioner = createMailpitProvisioner(cleanupEvents);
+    const postgresRequirement = createPostgresRequirement(postgresProvisioner);
+    const mailpitRequirement = createMailpitRequirement(mailpitProvisioner);
+    const registry = createServiceRegistry({
+      services: {
+        "control-plane-api": createService({
+          id: "control-plane-api",
+          requirement: postgresRequirement,
+          startEvents,
+          cleanupEvents,
+        }),
+        "control-plane-worker": createService({
+          id: "control-plane-worker",
+          requirement: mailpitRequirement,
+          serviceReferences: ["control-plane-api"],
+          startEvents,
+          cleanupEvents,
+        }),
+      },
+    });
+
+    let stopEnvironment: (() => Promise<void>) | undefined;
+    const stderr = await captureStderrOutput(async () => {
+      const environment = await startTestEnvironment({
+        id: "env_setup_timing",
+        registry,
+        services: [
+          { service: "control-plane-api", mode: "runtime" },
+          { service: "control-plane-worker", mode: "runtime" },
+        ],
+        timing: { force: true },
+      });
+      stopEnvironment = () => environment.stop();
+    });
+
+    if (stopEnvironment === undefined) {
+      throw new Error("Expected setup timing test environment to start.");
+    }
+    await stopEnvironment();
+
+    const setupSummary = stderr
+      .split("\n")
+      .find((line) => line.includes("env env_setup_timing setup phases:"));
+
+    expect(setupSummary).toBeDefined();
+    expect(setupSummary).toContain("infra=");
+    expect(setupSummary).toContain("infra.postgres-database=");
+    expect(setupSummary).toContain("infra.mailpit=");
+    expect(setupSummary).toContain("services=");
+    expect(setupSummary).toContain("service-layer.0=");
+    expect(setupSummary).toContain("service-layer.1=");
+    expect(setupSummary).toContain("service.control-plane-api=");
+    expect(setupSummary).toContain("service.control-plane-worker=");
+  });
+
   it("reports aggregate and per-service cleanup timings in cleanup order", async () => {
     const startEvents: string[] = [];
     const cleanupEvents: string[] = [];

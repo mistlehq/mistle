@@ -168,6 +168,7 @@ function addResolvedInfra(input: {
 async function provisionInfra(input: {
   environmentId: string;
   requirements: readonly TestInfraRequirement[];
+  timings: Map<string, number>;
 }): Promise<ReadonlyMap<string, ResolvedTestInfra>> {
   const groupedRequirements = groupInfraRequirementsByKind(input.requirements);
   const provisionersByKind = createProvisionersByKind(input.requirements);
@@ -182,18 +183,21 @@ async function provisionInfra(input: {
         throw new Error(`Missing test infra provisioner for kind '${kind}'.`);
       }
 
+      const expectedRequirementIds = new Set(requirements.map((requirement) => requirement.id));
       writeIntegrationTimingEvent(
         "infra provision begin",
         `env=${input.environmentId} kind=${kind} requirements=${formatIds(requirements)}`,
       );
-      const expectedRequirementIds = new Set(requirements.map((requirement) => requirement.id));
-      const resolvedInfra = await provisioner.provision({
-        environmentId: input.environmentId,
-        requirements,
-      });
+      const startedAt = Date.now();
+      const resolvedInfra = await measure(input.timings, `infra.${kind}`, async () =>
+        provisioner.provision({
+          environmentId: input.environmentId,
+          requirements,
+        }),
+      );
       writeIntegrationTimingEvent(
         "infra provision end",
-        `env=${input.environmentId} kind=${kind} resolved=${formatIds(resolvedInfra)}`,
+        `env=${input.environmentId} kind=${kind} resolved=${formatIds(resolvedInfra)} duration=${formatDuration(Date.now() - startedAt)}`,
       );
 
       for (const infra of resolvedInfra) {
@@ -280,6 +284,7 @@ async function startServiceLayer(input: {
   environmentId: string;
   infra: ReadonlyMap<string, ResolvedTestInfra>;
   servicesById: Map<string, ManagedTestServiceHandle>;
+  timings: Map<string, number>;
   plannedEndpoints: ReadonlyMap<string, TestServiceEndpoints>;
   layer: readonly TestServiceRequest[];
 }): Promise<void> {
@@ -300,7 +305,9 @@ async function startServiceLayer(input: {
         `env=${input.environmentId} service=${request.service.id} mode=${request.mode}`,
       );
       const startedAt = Date.now();
-      const service = await request.service.start(startInput);
+      const service = await measure(input.timings, `service.${request.service.id}`, async () =>
+        request.service.start(startInput),
+      );
       writeIntegrationTimingEvent(
         "service start end",
         `env=${input.environmentId} service=${request.service.id} mode=${request.mode} duration=${formatDuration(Date.now() - startedAt)}`,
@@ -444,18 +451,22 @@ async function startServices(input: {
   environmentId: string;
   infra: ReadonlyMap<string, ResolvedTestInfra>;
   plannedEndpoints: ReadonlyMap<string, TestServiceEndpoints>;
+  timings: Map<string, number>;
   serviceLayers: readonly (readonly TestServiceRequest[])[];
 }): Promise<ReadonlyMap<string, ManagedTestServiceHandle>> {
   const servicesById = new Map<string, ManagedTestServiceHandle>();
 
-  for (const layer of input.serviceLayers) {
-    await startServiceLayer({
-      environmentId: input.environmentId,
-      infra: input.infra,
-      plannedEndpoints: input.plannedEndpoints,
-      servicesById,
-      layer,
-    });
+  for (const [layerIndex, layer] of input.serviceLayers.entries()) {
+    await measure(input.timings, `service-layer.${String(layerIndex)}`, async () =>
+      startServiceLayer({
+        environmentId: input.environmentId,
+        infra: input.infra,
+        plannedEndpoints: input.plannedEndpoints,
+        servicesById,
+        timings: input.timings,
+        layer,
+      }),
+    );
   }
 
   return servicesById;
@@ -590,6 +601,7 @@ export async function startTestEnvironment<
     provisionInfra({
       environmentId,
       requirements: plan.infraRequirements,
+      timings: setupTimings,
     }),
   );
 
@@ -606,6 +618,7 @@ export async function startTestEnvironment<
         environmentId,
         infra,
         plannedEndpoints: endpoints,
+        timings: setupTimings,
         serviceLayers: plan.serviceLayers,
       }),
     );
