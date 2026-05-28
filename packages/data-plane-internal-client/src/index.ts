@@ -99,27 +99,26 @@ export type ResumeSandboxInstanceAcceptedResponse =
   paths["/internal/sandbox/instances/:id/resume"]["post"]["responses"]["200"]["content"]["application/json"];
 export type StopSandboxInstanceInput = {
   sandboxInstanceId: string;
-  stopReason: "idle";
-  expectedOwnerLeaseId: string;
   idempotencyKey: string;
-};
+} & (
+  | {
+      stopReason: "idle";
+      expectedOwnerLeaseId: string;
+    }
+  | {
+      stopReason: "user";
+      organizationId: string;
+    }
+);
 export type StopSandboxInstanceAcceptedResponse =
   paths["/internal/sandbox/instances/:id/stop"]["post"]["responses"]["200"]["content"]["application/json"];
-export type StopUserRequestedSandboxInstanceInput = {
-  organizationId: string;
-  sandboxInstanceId: string;
-  idempotencyKey: string;
-};
-const StopUserRequestedSandboxInstanceResponseSchema = z
+const StopSandboxInstanceResponseSchema = z
   .object({
     status: z.enum(["accepted", "already_stopped", "already_terminal"]),
     sandboxInstanceId: z.string().min(1),
     workflowRunId: z.string().min(1).nullable(),
   })
   .strict();
-export type StopUserRequestedSandboxInstanceResponse = z.infer<
-  typeof StopUserRequestedSandboxInstanceResponseSchema
->;
 export type DeleteSandboxInstanceInput = {
   organizationId: string;
   sandboxInstanceId: string;
@@ -315,9 +314,6 @@ export type DataPlaneSandboxInstancesClient = {
   stopSandboxInstance: (
     input: StopSandboxInstanceInput,
   ) => Promise<StopSandboxInstanceAcceptedResponse>;
-  stopUserRequestedSandboxInstance: (
-    input: StopUserRequestedSandboxInstanceInput,
-  ) => Promise<StopUserRequestedSandboxInstanceResponse>;
   deleteSandboxInstance: (
     input: DeleteSandboxInstanceInput,
   ) => Promise<DeleteSandboxInstanceResponse>;
@@ -636,58 +632,25 @@ export function createDataPlaneSandboxInstancesClient(
               ? {}
               : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
           }),
-          body: JSON.stringify({
-            stopReason: stopInput.stopReason,
-            expectedOwnerLeaseId: stopInput.expectedOwnerLeaseId,
-            idempotencyKey: stopInput.idempotencyKey,
-          }),
+          body: JSON.stringify(
+            stopInput.stopReason === "idle"
+              ? {
+                  stopReason: stopInput.stopReason,
+                  expectedOwnerLeaseId: stopInput.expectedOwnerLeaseId,
+                  idempotencyKey: stopInput.idempotencyKey,
+                }
+              : {
+                  stopReason: stopInput.stopReason,
+                  organizationId: stopInput.organizationId,
+                  idempotencyKey: stopInput.idempotencyKey,
+                },
+          ),
           signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
         },
       );
 
       if (response.status === 200) {
-        const responseBody: StopSandboxInstanceAcceptedResponse = await response.json();
-
-        return responseBody;
-      }
-
-      const errorBody = await readResponseBody(response);
-
-      throw createClientError({
-        status: response.status,
-        error: errorBody,
-        operation: "stop",
-      });
-    },
-
-    async stopUserRequestedSandboxInstance(stopInput) {
-      const response = await fetch(
-        createSandboxInstanceMemberUrl({
-          baseUrl: internalClient.baseUrl,
-          instanceId: stopInput.sandboxInstanceId,
-          suffix: "/user-stop",
-        }),
-        {
-          method: "POST",
-          headers: createTestHeaders({
-            serviceToken: internalClient.serviceToken,
-            ...(internalClient.testEnvironmentId === undefined
-              ? {}
-              : { testEnvironmentId: internalClient.testEnvironmentId }),
-            ...(internalClient.testEnvironmentIdHeader === undefined
-              ? {}
-              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
-          }),
-          body: JSON.stringify({
-            organizationId: stopInput.organizationId,
-            idempotencyKey: stopInput.idempotencyKey,
-          }),
-          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
-        },
-      );
-
-      if (response.status === 200) {
-        return StopUserRequestedSandboxInstanceResponseSchema.parse(await response.json());
+        return StopSandboxInstanceResponseSchema.parse(await response.json());
       }
 
       const errorBody = await readResponseBody(response);

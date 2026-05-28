@@ -9,7 +9,7 @@ import {
   connectCodexAgentSession,
   prepareCodexSandbox,
   resumeSandboxInstance,
-  stopSandboxInstance,
+  stopSandboxInstanceByUserRequest,
   waitForRuntimeReadyValue,
   waitForSandboxConnectable,
   waitForSandboxStatus,
@@ -64,8 +64,9 @@ describe("runtime system sandbox stop resume restores runtime readiness", () => 
         phase: "stop_sandbox",
         attributes: timingAttributes,
         operation: async () =>
-          await stopSandboxInstance({
+          await stopSandboxInstanceByUserRequest({
             fixture,
+            authenticatedSession,
             sandboxInstanceId,
           }),
       });

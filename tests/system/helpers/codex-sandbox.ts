@@ -54,7 +54,7 @@ const SandboxInstanceStatusResponseSchema = z.looseObject({
   failureMessage: z.string().nullable(),
 });
 
-const StopSandboxInstanceAcceptedResponseSchema = z
+const StopSandboxInstanceResponseSchema = z
   .object({
     status: z.literal("accepted"),
     sandboxInstanceId: z.string().min(1),
@@ -597,7 +597,7 @@ export async function stopSandboxInstance(input: {
     path: `/internal/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/stop`,
     expectedStatus: 200,
     description: "internal sandbox stop",
-    schema: StopSandboxInstanceAcceptedResponseSchema,
+    schema: StopSandboxInstanceResponseSchema,
     init: {
       method: "POST",
       headers: {
@@ -609,6 +609,33 @@ export async function stopSandboxInstance(input: {
         stopReason: "idle",
         expectedOwnerLeaseId: ownerLeaseId,
         idempotencyKey: `system-stop-${randomUUID()}`,
+      }),
+    },
+  });
+}
+
+export async function stopSandboxInstanceByUserRequest(input: {
+  fixture: CodexSandboxFixture;
+  authenticatedSession: CodexSandboxAuthenticatedSession;
+  sandboxInstanceId: string;
+}): Promise<void> {
+  await requestJsonOrThrow({
+    request: async (path, init) => fetch(`${input.fixture.dataPlaneApiBaseUrl}${path}`, init),
+    path: `/internal/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/stop`,
+    expectedStatus: 200,
+    description: "internal user-requested sandbox stop",
+    schema: StopSandboxInstanceResponseSchema,
+    init: {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        [InternalAuthServiceTokenHeader]: input.fixture.internalAuthServiceToken,
+        ...input.fixture.dataPlaneApiHeaders,
+      },
+      body: JSON.stringify({
+        stopReason: "user",
+        organizationId: input.authenticatedSession.organizationId,
+        idempotencyKey: `system-user-stop-${randomUUID()}`,
       }),
     },
   });

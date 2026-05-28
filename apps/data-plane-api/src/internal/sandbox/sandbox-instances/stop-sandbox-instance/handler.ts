@@ -1,25 +1,38 @@
 import type { RouteHandler } from "@hono/zod-openapi";
+import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import type { AppContextBindings } from "../../../../types.js";
 import { stopSandboxInstance } from "../../../sandbox-instances/services/stop-sandbox-instance.js";
 import { route } from "./route.js";
 
-export const handler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
+const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
+  const db = ctx.get("resources").db;
   const openWorkflow = ctx.get("resources").openWorkflow;
   const params = ctx.req.valid("param");
   const body = ctx.req.valid("json");
 
   const response = await stopSandboxInstance(
     {
+      db,
       openWorkflow,
     },
-    {
-      sandboxInstanceId: params.id,
-      stopReason: body.stopReason,
-      expectedOwnerLeaseId: body.expectedOwnerLeaseId,
-      idempotencyKey: body.idempotencyKey,
-    },
+    body.stopReason === "idle"
+      ? {
+          sandboxInstanceId: params.id,
+          stopReason: body.stopReason,
+          expectedOwnerLeaseId: body.expectedOwnerLeaseId,
+          idempotencyKey: body.idempotencyKey,
+        }
+      : {
+          sandboxInstanceId: params.id,
+          stopReason: body.stopReason,
+          organizationId: body.organizationId,
+          idempotencyKey: body.idempotencyKey,
+        },
   );
 
   return ctx.json(response, 200);
 };
+
+export const handler: RouteHandler<typeof route, AppContextBindings> =
+  withHttpErrorHandler(routeHandler);

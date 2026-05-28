@@ -9,7 +9,6 @@ import {
   type DataPlaneSandboxInstancesClient,
   type ReconcileSandboxInstanceInput,
   type StopSandboxInstanceInput,
-  type StopUserRequestedSandboxInstanceInput,
 } from "@mistle/data-plane-internal-client";
 import {
   SandboxInstancePurposes,
@@ -33,6 +32,8 @@ import { describe, expect } from "vitest";
 import { z } from "zod";
 
 const InternalServiceToken = "integration-new-internal-service-token";
+type IdleStopSandboxInstanceInput = Extract<StopSandboxInstanceInput, { stopReason: "idle" }>;
+type UserStopSandboxInstanceInput = Extract<StopSandboxInstanceInput, { stopReason: "user" }>;
 const WorkflowRunPersistTimeoutMs = 30_000;
 const WorkflowRunPersistPollIntervalMs = 100;
 
@@ -95,7 +96,7 @@ const ReconcileWorkflowInputSchema = z
 
 describe.concurrent("internal sandbox instance workflow queue integration", () => {
   it("queues a stop workflow with the request payload and idempotency key", async ({ env }) => {
-    const workflowInput: StopSandboxInstanceInput = {
+    const workflowInput: IdleStopSandboxInstanceInput = {
       sandboxInstanceId: "sbi_dp_api_workflow_stop",
       stopReason: "idle",
       expectedOwnerLeaseId: "sol_dp_api_workflow_stop",
@@ -203,10 +204,13 @@ describe.concurrent("internal sandbox instance workflow queue integration", () =
     );
   });
 
-  it("queues a user stop workflow for running setup sandboxes", async ({ env }) => {
-    const workflowInput: StopUserRequestedSandboxInstanceInput = {
+  it("queues a user stop workflow for running and reconnecting session and setup sandboxes", async ({
+    env,
+  }) => {
+    const workflowInput: UserStopSandboxInstanceInput = {
       organizationId: "org_dp_api_workflow_user_stop",
       sandboxInstanceId: "sbi_dp_api_workflow_user_stop",
+      stopReason: "user",
       idempotencyKey: "dashboard-user-stop-integration-new",
     };
 
@@ -217,18 +221,44 @@ describe.concurrent("internal sandbox instance workflow queue integration", () =
       purpose: SandboxInstancePurposes.SETUP_CHECK,
     });
     await insertRunningSandboxInstance(env, {
+      sandboxInstanceId: "sbi_dp_api_workflow_user_stop_session",
+      organizationId: workflowInput.organizationId,
+      sandboxProfileId: "sbp_dp_api_workflow_user_stop_session",
+      purpose: SandboxInstancePurposes.SESSION,
+    });
+    await insertRunningSandboxInstance(env, {
+      sandboxInstanceId: "sbi_dp_api_workflow_user_stop_reconnecting_session",
+      organizationId: workflowInput.organizationId,
+      sandboxProfileId: "sbp_dp_api_workflow_user_stop_reconnecting_session",
+      status: SandboxInstanceStatuses.RECONNECTING,
+      purpose: SandboxInstancePurposes.SESSION,
+    });
+    await insertRunningSandboxInstance(env, {
       sandboxInstanceId: "sbi_dp_api_workflow_user_stop_assistant",
       organizationId: workflowInput.organizationId,
       sandboxProfileId: "sbp_dp_api_workflow_user_stop_assistant",
       purpose: SandboxInstancePurposes.SETUP_ASSISTANT,
     });
 
-    const firstResponse = await clientFor(env).stopUserRequestedSandboxInstance(workflowInput);
-    const secondResponse = await clientFor(env).stopUserRequestedSandboxInstance(workflowInput);
-    const setupAssistantResponse = await clientFor(env).stopUserRequestedSandboxInstance({
+    const firstResponse = await clientFor(env).stopSandboxInstance(workflowInput);
+    const secondResponse = await clientFor(env).stopSandboxInstance(workflowInput);
+    const setupAssistantResponse = await clientFor(env).stopSandboxInstance({
       organizationId: workflowInput.organizationId,
       sandboxInstanceId: "sbi_dp_api_workflow_user_stop_assistant",
+      stopReason: "user",
       idempotencyKey: "dashboard-user-stop-assistant-integration-new",
+    });
+    const sessionResponse = await clientFor(env).stopSandboxInstance({
+      organizationId: workflowInput.organizationId,
+      sandboxInstanceId: "sbi_dp_api_workflow_user_stop_session",
+      stopReason: "user",
+      idempotencyKey: "dashboard-user-stop-session-integration-new",
+    });
+    const reconnectingSessionResponse = await clientFor(env).stopSandboxInstance({
+      organizationId: workflowInput.organizationId,
+      sandboxInstanceId: "sbi_dp_api_workflow_user_stop_reconnecting_session",
+      stopReason: "user",
+      idempotencyKey: "dashboard-user-stop-reconnecting-session-integration-new",
     });
 
     expect(firstResponse).toEqual({
@@ -286,21 +316,46 @@ describe.concurrent("internal sandbox instance workflow queue integration", () =
       stopReason: "user",
     });
     expect(setupAssistantWorkflowRuns[0]?.id).toBe(setupAssistantResponse.workflowRunId);
+
+    const sessionWorkflowRuns = await waitForQueuedWorkflowRuns({
+      env,
+      sandboxInstanceId: "sbi_dp_api_workflow_user_stop_session",
+      workflowName: StopSandboxInstanceWorkflowName,
+    });
+    expect(sessionWorkflowRuns).toHaveLength(1);
+    expect(UserStopWorkflowInputSchema.parse(sessionWorkflowRuns[0]?.input)).toEqual({
+      sandboxInstanceId: "sbi_dp_api_workflow_user_stop_session",
+      stopReason: "user",
+    });
+    expect(sessionWorkflowRuns[0]?.id).toBe(sessionResponse.workflowRunId);
+
+    const reconnectingSessionWorkflowRuns = await waitForQueuedWorkflowRuns({
+      env,
+      sandboxInstanceId: "sbi_dp_api_workflow_user_stop_reconnecting_session",
+      workflowName: StopSandboxInstanceWorkflowName,
+    });
+    expect(reconnectingSessionWorkflowRuns).toHaveLength(1);
+    expect(UserStopWorkflowInputSchema.parse(reconnectingSessionWorkflowRuns[0]?.input)).toEqual({
+      sandboxInstanceId: "sbi_dp_api_workflow_user_stop_reconnecting_session",
+      stopReason: "user",
+    });
+    expect(reconnectingSessionWorkflowRuns[0]?.id).toBe(reconnectingSessionResponse.workflowRunId);
   });
 
-  it("rejects user stop workflows for session sandbox instances", async ({ env }) => {
+  it("rejects user stop workflows for snapshot sandbox instances", async ({ env }) => {
     await insertRunningSandboxInstance(env, {
-      sandboxInstanceId: "sbi_dp_api_workflow_user_stop_session",
-      organizationId: "org_dp_api_workflow_user_stop_session",
-      sandboxProfileId: "sbp_dp_api_workflow_user_stop_session",
-      purpose: SandboxInstancePurposes.SESSION,
+      sandboxInstanceId: "sbi_dp_api_workflow_user_stop_snapshot",
+      organizationId: "org_dp_api_workflow_user_stop_snapshot",
+      sandboxProfileId: "sbp_dp_api_workflow_user_stop_snapshot",
+      purpose: SandboxInstancePurposes.SNAPSHOT,
     });
 
     await expect(
-      clientFor(env).stopUserRequestedSandboxInstance({
-        organizationId: "org_dp_api_workflow_user_stop_session",
-        sandboxInstanceId: "sbi_dp_api_workflow_user_stop_session",
-        idempotencyKey: "dashboard-user-stop-session-integration-new",
+      clientFor(env).stopSandboxInstance({
+        organizationId: "org_dp_api_workflow_user_stop_snapshot",
+        sandboxInstanceId: "sbi_dp_api_workflow_user_stop_snapshot",
+        stopReason: "user",
+        idempotencyKey: "dashboard-user-stop-snapshot-integration-new",
       }),
     ).rejects.toMatchObject({
       status: 409,
@@ -437,9 +492,10 @@ describe.concurrent("internal sandbox instance workflow queue integration", () =
     ]);
 
     await expect(
-      clientFor(env).stopUserRequestedSandboxInstance({
+      clientFor(env).stopSandboxInstance({
         organizationId: "org_dp_api_workflow_user_stop_terminal",
         sandboxInstanceId: "sbi_dp_api_workflow_user_stop_stopped",
+        stopReason: "user",
         idempotencyKey: "dashboard-user-stop-stopped-integration-new",
       }),
     ).resolves.toEqual({
@@ -448,9 +504,10 @@ describe.concurrent("internal sandbox instance workflow queue integration", () =
       workflowRunId: null,
     });
     await expect(
-      clientFor(env).stopUserRequestedSandboxInstance({
+      clientFor(env).stopSandboxInstance({
         organizationId: "org_dp_api_workflow_user_stop_terminal",
         sandboxInstanceId: "sbi_dp_api_workflow_user_stop_failed",
+        stopReason: "user",
         idempotencyKey: "dashboard-user-stop-failed-integration-new",
       }),
     ).resolves.toEqual({
@@ -487,8 +544,10 @@ async function insertRunningSandboxInstance(
     sandboxInstanceId: string;
     organizationId: string;
     sandboxProfileId: string;
+    status?: typeof SandboxInstanceStatuses.RUNNING | typeof SandboxInstanceStatuses.RECONNECTING;
     purpose?:
       | typeof SandboxInstancePurposes.SESSION
+      | typeof SandboxInstancePurposes.SNAPSHOT
       | typeof SandboxInstancePurposes.SETUP_ASSISTANT
       | typeof SandboxInstancePurposes.SETUP_CHECK;
   },
@@ -498,7 +557,7 @@ async function insertRunningSandboxInstance(
       id: input.sandboxInstanceId,
       organizationId: input.organizationId,
       sandboxProfileId: input.sandboxProfileId,
-      status: SandboxInstanceStatuses.RUNNING,
+      status: input.status ?? SandboxInstanceStatuses.RUNNING,
       ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
     }),
   );
@@ -510,10 +569,12 @@ function sandboxInstanceRow(input: {
   sandboxProfileId: string;
   status:
     | typeof SandboxInstanceStatuses.RUNNING
+    | typeof SandboxInstanceStatuses.RECONNECTING
     | typeof SandboxInstanceStatuses.STOPPED
     | typeof SandboxInstanceStatuses.FAILED;
   purpose?:
     | typeof SandboxInstancePurposes.SESSION
+    | typeof SandboxInstancePurposes.SNAPSHOT
     | typeof SandboxInstancePurposes.SETUP_ASSISTANT
     | typeof SandboxInstancePurposes.SETUP_CHECK;
 }): DataPlaneTables["sandboxInstances"]["$inferInsert"] {
@@ -609,7 +670,7 @@ async function countQueuedWorkflowRuns(input: {
   return count;
 }
 
-function workflowInputForStop(input: StopSandboxInstanceInput) {
+function workflowInputForStop(input: IdleStopSandboxInstanceInput) {
   return {
     sandboxInstanceId: input.sandboxInstanceId,
     stopReason: input.stopReason,
@@ -625,10 +686,10 @@ function workflowInputForReconcile(input: ReconcileSandboxInstanceInput) {
   };
 }
 
-function workflowInputForUserStop(input: StopUserRequestedSandboxInstanceInput) {
+function workflowInputForUserStop(input: UserStopSandboxInstanceInput) {
   return {
     sandboxInstanceId: input.sandboxInstanceId,
-    stopReason: "user" as const,
+    stopReason: input.stopReason,
   };
 }
 

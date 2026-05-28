@@ -2,9 +2,10 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { UnauthorizedResponseSchema, ValidationErrorResponseSchema } from "@mistle/http/errors.js";
 
 import {
-  StopSandboxInstanceAcceptedResponseSchema,
   StopSandboxInstanceBodySchema,
+  StopSandboxInstanceConflictResponseSchema,
   StopSandboxInstanceParamsSchema,
+  StopSandboxInstanceResponseSchema,
 } from "./schema.js";
 
 export const route = createRoute({
@@ -27,7 +28,7 @@ export const route = createRoute({
       description: "Queue sandbox instance stop for internal callers.",
       content: {
         "application/json": {
-          schema: StopSandboxInstanceAcceptedResponseSchema,
+          schema: StopSandboxInstanceResponseSchema,
         },
       },
     },
@@ -44,6 +45,14 @@ export const route = createRoute({
       content: {
         "application/json": {
           schema: UnauthorizedResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: "Sandbox instance cannot be stopped from its current state or purpose.",
+      content: {
+        "application/json": {
+          schema: StopSandboxInstanceConflictResponseSchema,
         },
       },
     },

@@ -13,11 +13,7 @@ import {
 } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
-import {
-  SandboxInstancesConflictCodes,
-  SandboxInstancesConflictResponseSchema,
-  SandboxInstancesNotFoundResponseSchema,
-} from "../src/sandbox-instances/index.js";
+import { SandboxInstancesNotFoundResponseSchema } from "../src/sandbox-instances/index.js";
 import { stopSandboxInstanceResponseSchema } from "../src/sandbox-instances/stop-sandbox-instance/schema.js";
 import { waitForQueuedUserStopWorkflowRun } from "./helpers/data-plane-workflows.js";
 
@@ -122,7 +118,9 @@ describe.concurrent("sandbox instances stop integration", () => {
     });
   });
 
-  it("returns 409 when the public stop route targets a session sandbox", async ({ env }) => {
+  it("queues a user stop workflow for session sandboxes through the public route", async ({
+    env,
+  }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-instances-stop-session@example.com",
     });
@@ -149,9 +147,23 @@ describe.concurrent("sandbox instances stop integration", () => {
       },
     );
 
-    expect(response.status).toBe(409);
-    const body = SandboxInstancesConflictResponseSchema.parse(await response.json());
-    expect(body.code).toBe(SandboxInstancesConflictCodes.INSTANCE_STOP_NOT_SUPPORTED);
+    expect(response.status).toBe(200);
+    const body = stopSandboxInstanceResponseSchema.parse(await response.json());
+    expect(body).toEqual({
+      status: "accepted",
+      sandboxInstanceId: "sbi_cp_stop_session",
+      workflowRunId: expect.any(String),
+    });
+
+    const workflowRun = await waitForQueuedUserStopWorkflowRun({
+      env,
+      sandboxInstanceId: "sbi_cp_stop_session",
+    });
+    expect(workflowRun.id).toBe(body.workflowRunId);
+    expect(workflowRun.input).toEqual({
+      sandboxInstanceId: "sbi_cp_stop_session",
+      stopReason: "user",
+    });
   });
 
   it("returns 404 when the public stop route targets another organization's sandbox", async ({

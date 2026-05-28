@@ -4790,24 +4790,48 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "stopReason": {
-                    "type": "string",
-                    "enum": ["idle"]
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "stopReason": {
+                        "type": "string",
+                        "enum": ["idle"]
+                      },
+                      "expectedOwnerLeaseId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "idempotencyKey": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                      }
+                    },
+                    "required": ["stopReason", "expectedOwnerLeaseId", "idempotencyKey"],
+                    "additionalProperties": false
                   },
-                  "expectedOwnerLeaseId": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "idempotencyKey": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255
+                  {
+                    "type": "object",
+                    "properties": {
+                      "stopReason": {
+                        "type": "string",
+                        "enum": ["user"]
+                      },
+                      "organizationId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "idempotencyKey": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                      }
+                    },
+                    "required": ["stopReason", "organizationId", "idempotencyKey"],
+                    "additionalProperties": false
                   }
-                },
-                "required": ["stopReason", "expectedOwnerLeaseId", "idempotencyKey"],
-                "additionalProperties": false
+                ]
               }
             }
           }
@@ -4815,128 +4839,6 @@
         "responses": {
           "200": {
             "description": "Queue sandbox instance stop for internal callers.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "enum": ["accepted"]
-                    },
-                    "sandboxInstanceId": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "workflowRunId": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["status", "sandboxInstanceId", "workflowRunId"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request body.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["VALIDATION_ERROR"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Internal service authentication failed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["UNAUTHORIZED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/sandbox/instances/:id/user-stop": {
-      "post": {
-        "tags": ["Internal"],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "organizationId": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "idempotencyKey": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255
-                  }
-                },
-                "required": ["organizationId", "idempotencyKey"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Stop a sandbox instance for an internal user-requested stop.",
             "content": {
               "application/json": {
                 "schema": {

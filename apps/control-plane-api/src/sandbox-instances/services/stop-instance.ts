@@ -20,7 +20,7 @@ export async function stopInstance(
     dataPlaneClient,
   }: {
     db: ControlPlaneDatabase;
-    dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "stopUserRequestedSandboxInstance">;
+    dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "stopSandboxInstance">;
   },
   input: {
     organizationId: string;
@@ -29,7 +29,8 @@ export async function stopInstance(
   },
 ): Promise<StopInstanceResult> {
   try {
-    return await dataPlaneClient.stopUserRequestedSandboxInstance({
+    return await dataPlaneClient.stopSandboxInstance({
+      stopReason: "user",
       organizationId: input.organizationId,
       sandboxInstanceId: input.instanceId,
       idempotencyKey: input.idempotencyKey,
