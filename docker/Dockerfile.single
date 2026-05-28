@@ -6,7 +6,7 @@ ENV PNPM_HOME=/pnpm
 ENV PATH=${PNPM_HOME}:${PATH}
 WORKDIR /app
 
-RUN npm install --global pnpm@10.30.2
+RUN npm install --global pnpm@11.4.0
 
 FROM build-base AS workspace-deps
 

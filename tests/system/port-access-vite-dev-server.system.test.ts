@@ -525,7 +525,7 @@ async function prepareViteSandboxFixture(input: {
         intervalSeconds: 5,
         script: [
           `cd ${shellQuote(ViteFixtureSandboxPath)}`,
-          `/usr/local/bin/corepack pnpm@10.30.2 install --frozen-lockfile --ignore-workspace`,
+          `/usr/local/bin/corepack pnpm@11.4.0 install --frozen-lockfile --ignore-workspace`,
         ].join("\n"),
       }),
     ],
@@ -544,7 +544,7 @@ async function prepareViteSandboxFixture(input: {
         "set -eu",
         `mkdir -p ${shellQuote("/tmp/mistle-port-access-vite-fixture")}`,
         `cd ${shellQuote(ViteFixtureSandboxPath)}`,
-        `nohup /usr/local/bin/corepack pnpm@10.30.2 run dev > ${shellQuote(ViteLogPath)} 2>&1 &`,
+        `nohup /usr/local/bin/corepack pnpm@11.4.0 run dev > ${shellQuote(ViteLogPath)} 2>&1 &`,
         "printf 'started\\n'",
       ].join("\n"),
     ],

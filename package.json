@@ -31,7 +31,8 @@
     "lint": "pnpm lint:ts && pnpm lint:rust",
     "lint-staged": "lint-staged",
     "lint:docs": "pnpm --filter @mistle/docs lint",
-    "lint:fast": "pnpm lint:oxlint:fast && pnpm lint:openapi && pnpm lint:docs && pnpm lint:rust",
+    "lint:dashboard-preflight": "pnpm --filter @mistle/dashboard file-names:check && pnpm --filter @mistle/dashboard openapi:check",
+    "lint:fast": "pnpm lint:dashboard-preflight && pnpm lint:oxlint:fast && pnpm lint:openapi && pnpm lint:docs && pnpm lint:rust",
     "lint:knip": "knip --config knip.jsonc --no-progress --reporter compact",
     "lint:knip:report": "knip --config knip.jsonc --no-progress --reporter compact --no-exit-code",
     "lint:openapi": "pnpm --filter @mistle/control-plane-api openapi:check && pnpm --filter @mistle/data-plane-api openapi:check && pnpm --filter @mistle/control-plane-internal-client openapi:check && pnpm --filter @mistle/data-plane-internal-client openapi:check",
@@ -40,7 +41,7 @@
     "lint:rust": "pnpm --filter @mistle/sandboxd lint && pnpm --filter @mistle/commit-sign lint && pnpm --filter @mistle/mstl-core lint && pnpm --filter @mistle/mstl-cli lint",
     "lint:spelling": "typos .",
     "lint:sql": "pnpm --filter @mistle/db lint:sql",
-    "lint:ts": "pnpm lint:oxlint && pnpm lint:openapi && pnpm lint:docs",
+    "lint:ts": "pnpm lint:dashboard-preflight && pnpm lint:oxlint && pnpm lint:openapi && pnpm lint:docs",
     "prepare": "node -e \"const cp = require('child_process'); if (!(process.env.CI || process.env.LEFTHOOK === '0')) { try { cp.execSync('git rev-parse --is-inside-work-tree', { stdio: 'ignore' }); cp.execSync('lefthook install', { stdio: 'inherit' }); } catch {} }\"",
     "release:create-tag": "tsx ./scripts/release/create-tag.ts",
     "release:notes": "tsx ./scripts/release/notes.ts",
@@ -104,47 +105,7 @@
   },
   "engines": {
     "node": "^25.0.0",
-    "pnpm": "10.30.2"
+    "pnpm": "11.4.0"
   },
-  "packageManager": "pnpm@10.30.2",
-  "pnpm": {
-    "overrides": {
-      "@aws-sdk/xml-builder": "3.972.22",
-      "@prisma/dev>@hono/node-server": "1.19.13",
-      "@prisma/dev>hono": "4.12.18",
-      "axios": "1.15.2",
-      "basic-ftp": "5.3.1",
-      "body-parser": "1.20.3",
-      "brace-expansion@2.0.2": "2.0.3",
-      "cookie": "0.7.0",
-      "defu": "6.1.5",
-      "dockerode>protobufjs": "7.5.5",
-      "effect": "3.20.0",
-      "esbuild": "0.25.0",
-      "express": "4.20.0",
-      "fast-uri": "3.1.2",
-      "fast-xml-builder": "1.2.0",
-      "hono": "4.12.18",
-      "ip-address": "10.1.1",
-      "js-yaml@4.1.0": "4.1.1",
-      "kysely": "0.28.17",
-      "lodash": "4.18.0",
-      "lodash-es": "4.18.0",
-      "mermaid>dompurify": "3.4.0",
-      "minimatch@3.1.2": "3.1.4",
-      "minimatch@5.1.6": "5.1.9",
-      "path-to-regexp": "0.1.13",
-      "picomatch@4.0.3": "4.0.4",
-      "postcss": "8.5.10",
-      "qs": "6.14.2",
-      "send": "0.19.0",
-      "tar": "7.5.13",
-      "uuid@11.1.0": "11.1.1",
-      "yaml": "2.8.3",
-      "zod@3.21.4": "3.22.3"
-    },
-    "patchedDependencies": {
-      "@mintlify/previewing@4.0.1016": "patches/@mintlify__previewing@4.0.1016.patch"
-    }
-  }
+  "packageManager": "pnpm@11.4.0"
 }

@@ -64,7 +64,7 @@ const RefreshRounds = 3;
 const ViteRequestTimeoutMs = 30_000;
 const TestTimeoutMs = 12 * 60_000;
 const NodeToolVersion = "node@24.14.1";
-const PnpmToolVersion = "pnpm@10.30.2";
+const PnpmToolVersion = "pnpm@11.4.0";
 const MiseCommand = "/usr/local/bin/mise";
 
 const HmrConnectedMessageSchema = z.object({

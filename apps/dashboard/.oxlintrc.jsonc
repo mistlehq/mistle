@@ -7,14 +7,8 @@
       "name": "dashboard-select",
       "specifier": "./lint/dashboard-select-plugin.ts",
     },
-    {
-      "name": "dashboard-preflight",
-      "specifier": "./lint/dashboard-preflight-plugin.ts",
-    },
   ],
   "rules": {
     "dashboard-select/no-undefined-select-value": "error",
-    "dashboard-preflight/kebab-case-file-names": "error",
-    "dashboard-preflight/control-plane-client-drift": "error",
   },
 }

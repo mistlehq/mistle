@@ -40,9 +40,7 @@ overrides:
   zod@3.21.4: 3.22.3
 
 patchedDependencies:
-  '@mintlify/previewing@4.0.1016':
-    hash: 8d5f5a9791563cf6b3cda9df22ec0b0682f0b0d1c699df07770078d1c200515b
-    path: patches/@mintlify__previewing@4.0.1016.patch
+  '@mintlify/previewing@4.0.1016': 8d5f5a9791563cf6b3cda9df22ec0b0682f0b0d1c699df07770078d1c200515b
 
 importers:
 

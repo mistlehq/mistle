@@ -11,7 +11,7 @@ The contributor workflow in this repository is `pnpm dev`. If you want the separ
 Repo runtime provided by `nix develop`:
 
 - Node v25
-- pnpm 10.30.2
+- pnpm 11.4.0
 - Rust stable with `cargo`, `rustfmt`, and `clippy`
 
 ### Prerequisites
