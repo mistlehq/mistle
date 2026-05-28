@@ -142,7 +142,7 @@ jobs:
       - name: Run runtime system tests
         env:
           MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REGISTRY_STORAGE_DIR: /home/runner/.cache/mistle/runtime-system-sandbox-registry
-          MISTLE_SYSTEM_RUNTIME_TIMING_ARTIFACT_DIR: test-artifacts/system-runtime-timings
+          MISTLE_SYSTEM_RUNTIME_TIMING_ARTIFACT_DIR: ${{ github.workspace }}/test-artifacts/system-runtime-timings
         run: nix develop --command pnpm --filter @mistle/tests test:system:runtime
 
       - name: Upload runtime system timing artifacts
