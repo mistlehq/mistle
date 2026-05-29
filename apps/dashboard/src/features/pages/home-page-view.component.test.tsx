@@ -68,7 +68,7 @@ describe("HomePageView", () => {
       />,
     );
 
-    expect(container.firstElementChild?.className).toContain("flex w-full flex-col");
+    expect(container.firstElementChild?.className).toContain("flex w-full flex-col gap-8");
     expect(container.firstElementChild?.className).not.toContain("justify-center");
     expect(container.firstElementChild?.className).not.toContain("mx-auto");
     expect(screen.getByRole("heading", { name: "Start new session" }).className).toContain(

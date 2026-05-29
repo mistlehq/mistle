@@ -17,7 +17,7 @@ export function HomePageFrame(props: HomePageFrameProps): React.JSX.Element {
   return (
     <PageFrame
       width="normal"
-      {...(props.onboardingState === "completed" ? { className: "bg-muted/30" } : {})}
+      {...(props.onboardingState === "completed" ? { className: "gap-8 bg-muted/30" } : {})}
       {...(showHeaderContent
         ? {
             titleSlot: (

@@ -272,47 +272,47 @@ export function NewSessionForm(input?: { initialSelectedProfileId?: string }): R
                     />
                   </FieldContent>
                 </Field>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+                  <div className="text-muted-foreground min-w-0 text-sm sm:min-h-11 sm:flex-1">
+                    {selectedLocationPath === null ? null : (
+                      <div className="flex flex-col gap-1">
+                        <p className="sm:truncate">
+                          {selectedNoneOption ? (
+                            "The agent will start its session at the workspace root."
+                          ) : (
+                            <>
+                              The agent will start its session in{" "}
+                              <span className="break-all font-mono text-foreground sm:break-normal">
+                                {selectedLocationPath}
+                              </span>
+                              {"."}
+                            </>
+                          )}
+                        </p>
+                        <p className="sm:truncate">
+                          {selectedNoneOption
+                            ? "Git, diffs, and repo-local instructions will not be tied to a specific repository by default."
+                            : "Git, diffs, and repo-local instructions will use this repository by default."}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    className="w-full sm:w-auto"
+                    disabled={!canStartSession}
+                    size="lg"
+                    type="submit"
+                  >
+                    {startSessionMutation.isPending ? "Starting sandbox..." : "Start session"}
+                  </Button>
+                </div>
               </div>
             </FormPageSection>
 
             {selectableProfilesErrorMessage ? (
               <FieldError errors={[{ message: selectableProfilesErrorMessage }]} />
             ) : null}
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-              <div className="text-muted-foreground min-w-0 text-sm sm:min-h-11 sm:flex-1">
-                {selectedLocationPath === null ? null : (
-                  <div className="flex flex-col gap-1">
-                    <p className="sm:truncate">
-                      {selectedNoneOption ? (
-                        "The agent will start its session at the workspace root."
-                      ) : (
-                        <>
-                          The agent will start its session in{" "}
-                          <span className="break-all font-mono text-foreground sm:break-normal">
-                            {selectedLocationPath}
-                          </span>
-                          {"."}
-                        </>
-                      )}
-                    </p>
-                    <p className="sm:truncate">
-                      {selectedNoneOption
-                        ? "Git, diffs, and repo-local instructions will not be tied to a specific repository by default."
-                        : "Git, diffs, and repo-local instructions will use this repository by default."}
-                    </p>
-                  </div>
-                )}
-              </div>
-              <Button
-                className="w-full sm:w-auto"
-                disabled={!canStartSession}
-                size="lg"
-                type="submit"
-              >
-                {startSessionMutation.isPending ? "Starting sandbox..." : "Start session"}
-              </Button>
-            </div>
           </FormPageStack>
         </form>
       )}

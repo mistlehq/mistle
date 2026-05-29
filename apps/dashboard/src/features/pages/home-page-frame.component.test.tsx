@@ -40,6 +40,7 @@ describe("HomePageFrame", () => {
     expect(screen.queryByRole("heading", { name: "Get started" })).toBeNull();
     expect(screen.getByText("Completed home content")).toBeDefined();
     expect(container.firstElementChild?.className).toContain("bg-muted/30");
+    expect(container.firstElementChild?.className).toContain("gap-8");
   });
 
   it("renders the onboarding title without the beta notice when the notice is disabled", () => {

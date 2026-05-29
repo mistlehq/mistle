@@ -113,7 +113,7 @@ describe("NewSessionPage", () => {
   });
 
   it("shows the starting repository picker for a selected multi-repo profile", () => {
-    renderNewSessionPage({
+    const rendered = renderNewSessionPage({
       initialSelectedProfileId: "sbp_profile_alpha",
       launchableProfiles: [
         buildStoryLaunchableSandboxProfile({
@@ -147,6 +147,16 @@ describe("NewSessionPage", () => {
         "Git, diffs, and repo-local instructions will use this repository by default.",
       ),
     ).toBeDefined();
+
+    const formSection = rendered.container.querySelector("form section");
+    const startSessionButton = screen.getByRole("button", { name: "Start session" });
+    const repositoryGuidance = screen.getByText(
+      "Git, diffs, and repo-local instructions will use this repository by default.",
+    );
+
+    expect(formSection).not.toBeNull();
+    expect(startSessionButton.closest("section")).toBe(formSection);
+    expect(repositoryGuidance.closest("section")).toBe(formSection);
   });
 
   it("preselects the only repository when the selected profile has a single repo", () => {
