@@ -16,12 +16,19 @@ import {
 } from "../auth/services/organization-policy.js";
 import { requireAuthSession } from "../middleware/require-auth-session.js";
 import type { AppContextBindings, AppRoutes, AppSession } from "../types.js";
-import { OAuthAuthorizeQuerySchema, OAuthTokenRequestSchema } from "./schemas.js";
+import { MistleCliOAuthClient } from "./clients.js";
+import {
+  OAuthAuthorizeQuerySchema,
+  OAuthClientRegistrationRequestSchema,
+  OAuthTokenRequestSchema,
+} from "./schemas.js";
 import {
   createMistleCliAuthorizationCode,
   exchangeMistleCliAuthorizationCode,
   OAuthErrorCodes,
 } from "./services/authorization-code.js";
+import { registerDynamicOAuthClient } from "./services/client-registration.js";
+import { requireOAuthClient } from "./services/client-validation.js";
 import { refreshOAuthTokenPair } from "./services/oauth-token.js";
 import { buildPublicRequestUrl } from "./services/public-request-url.js";
 import {
@@ -107,20 +114,23 @@ export function createOAuthRoutes(): AppRoutes<typeof OAUTH_ROUTE_BASE_PATH> {
     try {
       const body = OAuthTokenRequestSchema.parse(await ctx.req.parseBody());
       const db = ctx.get("db");
-      const client = await requireMistleCliOAuthClient({
+      const client = await requireOAuthClient({
         db,
         clientId: body.client_id,
         grantType:
           body.grant_type === "authorization_code"
             ? OAuthGrantTypes.AUTHORIZATION_CODE
             : OAuthGrantTypes.REFRESH_TOKEN,
+        ...(body.grant_type === "authorization_code" ? { redirectUri: body.redirect_uri } : {}),
       });
-      const resourceError = validateMistleCliResource({
-        resource: body.resource,
-        expectedResource: ctx.get("config").auth.baseUrl,
-      });
-      if (resourceError !== null) {
-        throw resourceError;
+      if (client.clientId === MistleCliOAuthClient.clientId) {
+        const resourceError = validateMistleCliResource({
+          resource: body.resource,
+          expectedResource: ctx.get("config").auth.baseUrl,
+        });
+        if (resourceError !== null) {
+          throw resourceError;
+        }
       }
 
       const result =
@@ -143,6 +153,20 @@ export function createOAuthRoutes(): AppRoutes<typeof OAUTH_ROUTE_BASE_PATH> {
         },
         200,
       );
+    } catch (error) {
+      return handleOAuthError(ctx, error);
+    }
+  });
+
+  routes.post("/register", async (ctx) => {
+    try {
+      const body = OAuthClientRegistrationRequestSchema.parse(await ctx.req.json<unknown>());
+      const response = await registerDynamicOAuthClient({
+        db: ctx.get("db"),
+        request: body,
+      });
+
+      return ctx.json(response, 201);
     } catch (error) {
       return handleOAuthError(ctx, error);
     }
@@ -174,11 +198,6 @@ async function exchangeAuthorizationCodeToken(input: {
   body: Extract<z.output<typeof OAuthTokenRequestSchema>, { grant_type: "authorization_code" }>;
   oauthClientId: string;
 }) {
-  await validateMistleCliRedirectUri({
-    db: input.db,
-    redirectUri: input.body.redirect_uri,
-  });
-
   return await exchangeMistleCliAuthorizationCode({
     db: input.db,
     oauthClientId: input.oauthClientId,
@@ -240,7 +259,7 @@ async function resolveAuthorizedPermissions(input: {
 }
 
 function handleOAuthError(ctx: Context<AppContextBindings>, error: unknown) {
-  if (error instanceof z.ZodError) {
+  if (error instanceof z.ZodError || error instanceof SyntaxError) {
     return ctx.json(
       {
         error: "invalid_request",

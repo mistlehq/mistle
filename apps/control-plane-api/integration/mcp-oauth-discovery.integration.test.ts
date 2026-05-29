@@ -95,6 +95,7 @@ describe.concurrent("MCP OAuth discovery", () => {
       issuer: env.controlPlaneApi.hostBaseUrl,
       authorization_endpoint: `${env.controlPlaneApi.hostBaseUrl}/oauth/authorize`,
       token_endpoint: `${env.controlPlaneApi.hostBaseUrl}/oauth/token`,
+      registration_endpoint: `${env.controlPlaneApi.hostBaseUrl}/oauth/register`,
       response_types_supported: ["code"],
       grant_types_supported: ["authorization_code", "refresh_token"],
       code_challenge_methods_supported: ["S256"],
