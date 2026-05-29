@@ -1,4 +1,5 @@
 import type { McpServer, ToolAnnotations } from "@modelcontextprotocol/server";
+import { z } from "zod";
 
 import { OrganizationPermissions } from "../../auth/services/organization-policy.js";
 import { PUBLIC_PORT_ACCESS_LINKS_ROUTE_BASE_PATH } from "../../public-port-access-links/index.js";
@@ -56,9 +57,10 @@ const profileMaintenanceScriptTestStartInputSchema =
     sandboxProfileVersionParamsSchema.shape,
   );
 
-const sandboxOperationEventsListInputSchema = sandboxOperationEventsQuerySchema.safeExtend(
-  sandboxInstanceIdParamsSchema.shape,
-);
+const sandboxOperationEventsListInputSchema = sandboxOperationEventsQuerySchema.safeExtend({
+  ...sandboxInstanceIdParamsSchema.shape,
+  limit: z.coerce.number().int().min(1).max(500).optional().default(20),
+});
 
 export function registerSandboxTools(server: McpServer, context: MistleMcpServerContext): void {
   server.registerTool(

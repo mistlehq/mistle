@@ -591,6 +591,18 @@ describe.concurrent("MCP profile tools integration", () => {
         message: "",
         payloadBytes: Buffer.from("missing dependency", "utf8"),
       }),
+      ...Array.from({ length: 19 }, (_, index) => {
+        const sequence = index + 3;
+        return operationEventRow({
+          id: `soe_mcp_feedback_${String(sequence).padStart(3, "0")}`,
+          sandboxInstanceId: "sbi_mcp_feedback",
+          operationId: "op_mcp_feedback",
+          sequence,
+          phase: "setup_script",
+          status: "failed",
+          message: `setup script failed ${sequence}`,
+        });
+      }),
     ]);
 
     const instanceResult = await callMcpTool({
@@ -611,7 +623,6 @@ describe.concurrent("MCP profile tools integration", () => {
         afterSequence: 1,
       },
     });
-
     expect(instanceResult.isError).toBeUndefined();
     expect(eventsResult.isError).toBeUndefined();
     const sandboxInstance = SandboxInstanceStatusResponseSchema.parse(
@@ -625,7 +636,12 @@ describe.concurrent("MCP profile tools integration", () => {
       id: "sbi_mcp_feedback",
       status: "failed",
     });
-    expect(operationEvents.events.map((event) => event.id)).toEqual(["soe_mcp_feedback_002"]);
+    expect(operationEvents.events.map((event) => event.id)).toEqual(
+      Array.from({ length: 20 }, (_, index) => {
+        const sequence = index + 2;
+        return `soe_mcp_feedback_${String(sequence).padStart(3, "0")}`;
+      }),
+    );
     expect(operationEvents.events[0]).toMatchObject({
       sandboxInstanceId: "sbi_mcp_feedback",
       operationKind: "setup_check",
