@@ -123,7 +123,7 @@ describe("SessionPortAccessPopover", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Open processes" }));
 
-    expect(await screen.findByText(/::, ::1, 0\.0\.0\.0, 127\.0\.0\.1/)).toBeTruthy();
+    expect(await screen.findByText(/\[::\], \[::1\], 0\.0\.0\.0, 127\.0\.0\.1/)).toBeTruthy();
     expect(screen.queryByText("3901")).toBeNull();
     expect(screen.queryByText("4520")).toBeNull();
     expect(screen.queryByText("4501")).toBeNull();

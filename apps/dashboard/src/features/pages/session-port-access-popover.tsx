@@ -73,6 +73,14 @@ function createDisplayProcessLabel(label: string): string {
   return [commandName, ...args].join(" ");
 }
 
+function createDisplayBindAddress(bindAddress: string): string {
+  if (bindAddress.includes(":")) {
+    return `[${bindAddress}]`;
+  }
+
+  return bindAddress;
+}
+
 function createProcessListenerEntries(processes: ProcessEntry[]): ProcessListenerEntry[] {
   const listenersByPort = new Map<number, ProcessListenerEntry>();
 
@@ -170,7 +178,9 @@ export function SessionPortAccessPopover(input: {
       >
         <PopoverHeader className="border-b px-4 py-3">
           <PopoverTitle>Local Ports</PopoverTitle>
-          <PopoverDescription>Processes listening on 127.0.0.1 and 0.0.0.0.</PopoverDescription>
+          <PopoverDescription>
+            Processes listening on local loopback or all-interface addresses.
+          </PopoverDescription>
         </PopoverHeader>
         <ProcessAccessList listenerEntries={listenerEntries} state={input.state} />
       </PopoverContent>
@@ -188,7 +198,9 @@ export function SessionPortAccessSheet(input: {
       <SheetContent className="!h-[100dvh] max-h-[100dvh] gap-0 p-0" side="bottom">
         <SheetHeader className="shrink-0 border-b px-4 py-3 pr-12 text-left">
           <SheetTitle>Local Ports</SheetTitle>
-          <SheetDescription>Processes listening on 127.0.0.1 and 0.0.0.0.</SheetDescription>
+          <SheetDescription>
+            Processes listening on local loopback or all-interface addresses.
+          </SheetDescription>
         </SheetHeader>
         <ProcessAccessList listenerEntries={listenerEntries} state={input.state} />
       </SheetContent>
@@ -215,7 +227,7 @@ function ProcessAccessList(input: {
       ) : null}
       {!input.state.isLoadingProcesses && input.listenerEntries.length === 0 ? (
         <p className="px-3 py-3 text-sm text-muted-foreground">
-          No loopback-listening processes found.
+          No local listening processes found.
         </p>
       ) : null}
       {input.listenerEntries.map((entry) => {
@@ -237,7 +249,7 @@ function ProcessAccessList(input: {
             }}
             primary={
               <p className="truncate">
-                {entry.bindAddresses.join(", ")}:
+                {entry.bindAddresses.map(createDisplayBindAddress).join(", ")}:
                 <span className="font-semibold text-foreground">
                   {String(primaryListener.port)}
                 </span>
