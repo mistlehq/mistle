@@ -184,6 +184,7 @@ function createStoryHeaderStatus(
 
   return {
     kind: headerStatusUi.variant === "secondary" ? "connected" : "not_connected",
+    indicatorClassName: headerStatusUi.indicatorClassName,
     label: headerStatusUi.label,
   };
 }
@@ -200,6 +201,7 @@ export function SessionWorkbenchStoryHeaderActions(
   );
   const [isPortAccessPanelOpen, setPortAccessPanelOpen] = useState(false);
   const headerStatusUi = input.headerStatusUi ?? {
+    indicatorClassName: "border-emerald-700 bg-emerald-600",
     label: "Connected",
     variant: "secondary",
   };
@@ -362,6 +364,7 @@ export function renderSessionWorkbenchStoryWithChrome(input: {
     label: "Connected",
     variant: "secondary",
     className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
+    indicatorClassName: "border-emerald-700 bg-emerald-600",
   };
 
   return (

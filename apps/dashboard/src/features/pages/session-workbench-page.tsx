@@ -138,8 +138,6 @@ function SessionWorkbenchPageContent(input: {
   const headerStatusKind = workbench.workbenchStatus.kind;
   const headerStatusUi = resolveSandboxStatusBadgeUi(workbench.sandboxLifecycleStatus);
   const headerStatusLabel = headerStatusKind === "error" ? "Error" : headerStatusUi.label;
-  const headerStatusVariant =
-    headerStatusUi.variant === "destructive" ? "outline" : headerStatusUi.variant;
   const primaryRepositoryErrorMessage =
     workbench.primaryRepositoryState.errorMessage ??
     workbench.primaryRepositoryControlState.disabledReason;
@@ -267,7 +265,7 @@ function SessionWorkbenchPageContent(input: {
         status={{
           ...(headerStatusKind === "error"
             ? {}
-            : { className: headerStatusUi.className, variant: headerStatusVariant }),
+            : { indicatorClassName: headerStatusUi.indicatorClassName }),
           kind: headerStatusKind,
           label: headerStatusLabel,
         }}

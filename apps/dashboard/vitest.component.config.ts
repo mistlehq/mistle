@@ -5,6 +5,9 @@ import { defineConfig } from "vitest/config";
 const IntegrationsDefinitionsSrcPath = fileURLToPath(
   new URL("../../packages/integrations-definitions/src", import.meta.url),
 );
+const SandboxLifecycleIndexPath = fileURLToPath(
+  new URL("../../packages/sandbox-lifecycle/src/index.ts", import.meta.url),
+);
 
 export default defineConfig({
   resolve: {
@@ -63,6 +66,10 @@ export default defineConfig({
         replacement: fileURLToPath(
           new URL("../../packages/sandbox-session-client/src/index.ts", import.meta.url),
         ),
+      },
+      {
+        find: /^@mistle\/sandbox-lifecycle$/,
+        replacement: SandboxLifecycleIndexPath,
       },
       {
         find: /^@mistle\/sandbox-session-client\/node$/,

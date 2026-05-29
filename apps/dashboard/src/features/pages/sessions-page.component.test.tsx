@@ -942,9 +942,14 @@ describe("SessionsPage", () => {
 
   it("uses distinct badge color classes for transient sandbox lifecycle statuses", () => {
     expect(resolveSandboxStatusBadgeUi("started").className).toContain("blue");
-    expect(resolveSandboxStatusBadgeUi("initializing").className).toContain("indigo");
+    expect(resolveSandboxStatusBadgeUi("initializing").className).toContain("amber");
     expect(resolveSandboxStatusBadgeUi("reconnecting").className).toContain("amber");
     expect(resolveSandboxStatusBadgeUi("stopping").className).toContain("orange");
+  });
+
+  it("uses amber filled-circle indicators for sandbox startup lifecycle statuses", () => {
+    expect(resolveSandboxStatusBadgeUi("starting").indicatorClassName).toContain("amber");
+    expect(resolveSandboxStatusBadgeUi("initializing").indicatorClassName).toContain("amber");
   });
 
   it("routes stopped sessions into the workbench route directly from the row", () => {

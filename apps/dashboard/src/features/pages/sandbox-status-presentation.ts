@@ -9,6 +9,7 @@ export type SandboxStatusBadgeUi = {
   label: string;
   variant: "secondary" | "outline" | "destructive";
   className?: string;
+  indicatorClassName: string;
 };
 
 export function resolveSandboxStatusBadgeUi(
@@ -18,6 +19,7 @@ export function resolveSandboxStatusBadgeUi(
     return {
       label: "Loading status",
       variant: "outline",
+      indicatorClassName: "border-muted-foreground/30 bg-muted-foreground/30",
     };
   }
 
@@ -25,6 +27,7 @@ export function resolveSandboxStatusBadgeUi(
     return {
       label: "Failed",
       variant: "destructive",
+      indicatorClassName: "border-destructive bg-destructive",
     };
   }
 
@@ -33,6 +36,7 @@ export function resolveSandboxStatusBadgeUi(
       label: "Running",
       variant: "secondary",
       className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
+      indicatorClassName: "border-emerald-700 bg-emerald-600",
     };
   }
 
@@ -41,6 +45,7 @@ export function resolveSandboxStatusBadgeUi(
       label: "Stopped",
       variant: "outline",
       className: "border-zinc-400/50 text-zinc-600 dark:text-zinc-300",
+      indicatorClassName: "border-muted-foreground/30 bg-muted-foreground/30",
     };
   }
 
@@ -49,6 +54,7 @@ export function resolveSandboxStatusBadgeUi(
       label: "Resuming",
       variant: "outline",
       className: "border-sky-500/40 text-sky-700 dark:text-sky-300",
+      indicatorClassName: "border-amber-600 bg-amber-500",
     };
   }
 
@@ -57,6 +63,7 @@ export function resolveSandboxStatusBadgeUi(
       label: "Pending",
       variant: "outline",
       className: "border-amber-500/45 text-amber-700 dark:text-amber-300",
+      indicatorClassName: "border-amber-600 bg-amber-500",
     };
   }
 
@@ -64,7 +71,8 @@ export function resolveSandboxStatusBadgeUi(
     return {
       label: "Starting",
       variant: "outline",
-      className: "border-sky-500/40 text-sky-700 dark:text-sky-300",
+      className: "border-amber-500/45 text-amber-700 dark:text-amber-300",
+      indicatorClassName: "border-amber-600 bg-amber-500",
     };
   }
 
@@ -73,6 +81,7 @@ export function resolveSandboxStatusBadgeUi(
       label: "Started",
       variant: "outline",
       className: "border-blue-500/40 text-blue-700 dark:text-blue-300",
+      indicatorClassName: "border-amber-600 bg-amber-500",
     };
   }
 
@@ -80,7 +89,8 @@ export function resolveSandboxStatusBadgeUi(
     return {
       label: "Initializing",
       variant: "outline",
-      className: "border-indigo-500/40 text-indigo-700 dark:text-indigo-300",
+      className: "border-amber-500/45 text-amber-700 dark:text-amber-300",
+      indicatorClassName: "border-amber-600 bg-amber-500",
     };
   }
 
@@ -89,6 +99,7 @@ export function resolveSandboxStatusBadgeUi(
       label: "Reconnecting",
       variant: "outline",
       className: "border-amber-500/45 text-amber-700 dark:text-amber-300",
+      indicatorClassName: "border-amber-600 bg-amber-500",
     };
   }
 
@@ -97,6 +108,7 @@ export function resolveSandboxStatusBadgeUi(
       label: "Stopping",
       variant: "outline",
       className: "border-orange-500/45 text-orange-700 dark:text-orange-300",
+      indicatorClassName: "border-amber-600 bg-amber-500",
     };
   }
 

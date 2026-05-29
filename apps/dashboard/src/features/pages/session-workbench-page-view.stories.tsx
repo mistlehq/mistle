@@ -309,6 +309,7 @@ const meta = {
       label: "Connected",
       variant: "secondary",
       className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
+      indicatorClassName: "border-emerald-700 bg-emerald-600",
     },
   },
   decorators: [
@@ -340,6 +341,7 @@ export const NotConnectedHeader: Story = {
     headerStatusUi: {
       label: "Not connected",
       variant: "outline",
+      indicatorClassName: "border-muted-foreground/30 bg-muted-foreground/30",
     },
   },
 };
@@ -349,6 +351,7 @@ export const SessionErrorHeader: Story = {
     headerStatusUi: {
       label: "Error",
       variant: "destructive",
+      indicatorClassName: "border-destructive bg-destructive",
     },
   },
 };
@@ -385,6 +388,7 @@ export const FailedSetupWithRestartAction: Story = {
     headerStatusUi: {
       label: "Error",
       variant: "destructive",
+      indicatorClassName: "border-destructive bg-destructive",
     },
     alert: null,
     mainContent: <FailedSetupWithRestartActionStoryContent />,

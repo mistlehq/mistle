@@ -41,6 +41,7 @@ function SessionStartupStatusStory(): React.JSX.Element {
     headerStatusUi: {
       label: "Not connected",
       variant: "outline",
+      indicatorClassName: "border-amber-600 bg-amber-500",
     },
     mainContent: (
       <div className="mx-auto flex h-full w-full max-w-5xl items-center justify-center px-4 py-6">

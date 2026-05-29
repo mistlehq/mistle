@@ -212,8 +212,11 @@ describe("SessionWorkbenchPage", () => {
     const status = await within(workspaceHeader).findByRole("status", {
       name: "Running",
     });
+    expect(status.textContent).toBe("");
+    expect(status.className).toContain("size-2.5");
+    expect(status.className).toContain("rounded-full");
+    expect(status.className).toContain("border-emerald-700");
     expect(status.className).toContain("bg-emerald-600");
-    expect(status.className).toContain("text-white");
   });
 
   it("shows an expanded lifecycle status indicator in the session workspace header", async () => {
@@ -246,8 +249,11 @@ describe("SessionWorkbenchPage", () => {
     const status = await within(workspaceHeader).findByRole("status", {
       name: "Reconnecting",
     });
-    expect(status.className).toContain("border-amber-500/45");
-    expect(status.className).toContain("text-amber-700");
+    expect(status.textContent).toBe("");
+    expect(status.className).toContain("size-2.5");
+    expect(status.className).toContain("rounded-full");
+    expect(status.className).toContain("border-amber-600");
+    expect(status.className).toContain("bg-amber-500");
   });
 
   it("shows preparing sandbox while the trusted sandbox status is pending", async () => {

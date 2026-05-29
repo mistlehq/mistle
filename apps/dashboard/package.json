@@ -7,7 +7,7 @@
     "dev:e2e": "node --conditions=workspace-src --import tsx scripts/vite-with-config.ts dev --host localhost --port 4173 --strictPort",
     "build": "node --conditions=workspace-src --import tsx scripts/vite-with-config.ts build",
     "preview": "node --conditions=workspace-src --import tsx scripts/vite-with-config.ts preview",
-    "lint": "oxlint --type-aware --deny-warnings .",
+    "lint": "oxlint --type-aware --deny-warnings --threads=1 .",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run -c vitest.config.ts --passWithNoTests",
     "test:component": "vitest run -c vitest.component.config.ts --passWithNoTests",
