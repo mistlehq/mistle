@@ -1,7 +1,8 @@
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { connect as connectTls } from "node:tls";
+import { promisify } from "node:util";
 
 import { systemScheduler, systemSleeper } from "@mistle/time";
 
@@ -22,6 +23,7 @@ const RuntimePublicAccessProxyPoolLockTimeoutMs = 240_000;
 const RuntimePublicAccessRouteReadyTimeoutMs = 30_000;
 const RuntimePublicAccessUpgradeProbeTimeoutMs = 5_000;
 const RuntimePublicAccessProxyDiagnosticsLogTailBytes = 64 * 1024;
+const execFileAsync = promisify(execFile);
 
 export type RuntimePublicAccessTunnel = {
   publicBaseUrls: ReadonlyMap<string, string>;
@@ -203,6 +205,8 @@ async function startRuntimePublicAccessProxy(input: {
   metadata: Readonly<Record<string, string>>;
   stop: () => Promise<void>;
 }> {
+  await pullRuntimePublicAccessCloudflaredImage();
+
   const workDirectoryPath = await mkdtemp(
     join(input.coordinatorDir, "runtime-public-access-proxy-"),
   );
@@ -313,6 +317,12 @@ async function startRuntimePublicAccessProxy(input: {
       } Logs: ${logs}`,
     );
   }
+}
+
+async function pullRuntimePublicAccessCloudflaredImage(): Promise<void> {
+  await execFileAsync("docker", ["pull", CloudflaredImageReference], {
+    timeout: CloudflaredTunnelStartupTimeoutMs,
+  });
 }
 
 function waitForRuntimePublicAccessProxyExit(child: ReturnType<typeof spawn>): Promise<void> {

@@ -1374,7 +1374,7 @@ jobs:
           secret-path: /integration-tests
 
       - name: Generate integration config
-        run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker,e2b pnpm run config:init:integration"
+        run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker,e2b,tensorlake pnpm run config:init:integration"
 
       - name: Build runtime system test dependencies
         run: >-
@@ -1401,6 +1401,15 @@ jobs:
           echo "MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_CACHE_KEY=${image_cache_key}" >> "${GITHUB_ENV}"
           echo "image-cache-key=${image_cache_key}" >> "${GITHUB_OUTPUT}"
           echo "Resolved runtime system sandbox base image: ${image_ref}"
+
+      - name: Register Tensorlake runtime system sandbox base image
+        run: |
+          tensorlake_image_name="mistle-${MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_CACHE_KEY:0:24}"
+          nix develop --command pnpm dev:sandbox-base:push:tensorlake \
+            --source-image-ref "${MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REF}" \
+            --output-image-ref "${tensorlake_image_name}"
+          echo "MISTLE_SYSTEM_TEST_TENSORLAKE_SANDBOX_BASE_IMAGE_REF=tensorlake:image:${tensorlake_image_name}" >> "${GITHUB_ENV}"
+          echo "Registered Tensorlake runtime system sandbox base image: tensorlake:image:${tensorlake_image_name}"
 
       - name: Mount runtime system sandbox registry sticky disk
         uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
@@ -1530,7 +1539,7 @@ jobs:
           secret-path: /integration-tests
 
       - name: Generate integration config
-        run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker,e2b pnpm run config:init:integration"
+        run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker,e2b,tensorlake pnpm run config:init:integration"
 
       - name: Build runtime system test dependencies
         run: >-
@@ -1573,6 +1582,15 @@ jobs:
           echo "Published temporary runtime system sandbox base image: ${image_ref}"
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
+
+      - name: Register Tensorlake runtime system sandbox base image
+        run: |
+          tensorlake_image_name="mistle-${MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_CACHE_KEY:0:24}"
+          nix develop --command pnpm dev:sandbox-base:push:tensorlake \
+            --source-image-ref "${MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REF}" \
+            --output-image-ref "${tensorlake_image_name}"
+          echo "MISTLE_SYSTEM_TEST_TENSORLAKE_SANDBOX_BASE_IMAGE_REF=tensorlake:image:${tensorlake_image_name}" >> "${GITHUB_ENV}"
+          echo "Registered Tensorlake runtime system sandbox base image: tensorlake:image:${tensorlake_image_name}"
 
       - name: Mount runtime system sandbox registry sticky disk
         uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1

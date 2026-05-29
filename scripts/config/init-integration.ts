@@ -50,15 +50,20 @@ async function buildIntegrationConfig(input: {
   providers: readonly IntegrationSandboxProvider[];
   env: NodeJS.ProcessEnv;
 }): Promise<ConfigRecord> {
-  const e2bPreset = input.providers.includes(IntegrationSandboxProvider.E2B)
-    ? await getIntegrationProviderPreset(IntegrationSandboxProvider.E2B)
-    : undefined;
+  const remoteSandboxProvider = input.providers.find(
+    (provider) =>
+      provider === IntegrationSandboxProvider.E2B ||
+      provider === IntegrationSandboxProvider.TENSORLAKE,
+  );
+  const remotePreset =
+    remoteSandboxProvider === undefined
+      ? undefined
+      : await getIntegrationProviderPreset(remoteSandboxProvider);
+  const remoteSandboxBaseImage = remotePreset?.remoteSandboxBaseImage;
   const configRootInput = {
     providers: input.providers,
     environment: input.env,
-    ...(e2bPreset?.e2bSandboxBaseImage === undefined
-      ? {}
-      : { e2bSandboxBaseImage: e2bPreset.e2bSandboxBaseImage }),
+    ...(remoteSandboxBaseImage === undefined ? {} : { remoteSandboxBaseImage }),
   };
   const configRoot = buildIntegrationTomlConfig(configRootInput);
   const withEnvOverrides = applyTomlConfigEnvOverrides({

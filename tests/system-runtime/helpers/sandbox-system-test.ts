@@ -12,6 +12,12 @@ export type SandboxSystemTestFixture = {
   sandboxProvider: SandboxSystemTestProvider;
 };
 
+export const CodexRuntimeSandboxProviders: readonly SandboxSystemTestProvider[] = [
+  "docker",
+  "e2b",
+  "tensorlake",
+];
+
 type SandboxSystemTestCallback = (fixture: SandboxSystemTestFixture) => Promise<void> | void;
 
 type SandboxSystemTest = (

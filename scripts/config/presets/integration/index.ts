@@ -4,6 +4,7 @@ import { resolveLatestPublishedSandboxBaseImageRef } from "../../../../packages/
 export const IntegrationSandboxProvider = {
   DOCKER: "docker",
   E2B: "e2b",
+  TENSORLAKE: "tensorlake",
 } as const;
 
 export type IntegrationSandboxProvider =
@@ -47,7 +48,7 @@ const ArchilIntegrationRequiredConfigValues = [
 
 export type IntegrationProviderPreset = {
   requiredConfigValues: readonly RequiredConfigValue[];
-  e2bSandboxBaseImage?: string;
+  remoteSandboxBaseImage?: string;
 };
 
 const DOCKER_PRESET: IntegrationProviderPreset = {
@@ -61,12 +62,21 @@ const E2B_REQUIRED_CONFIG_VALUES = [
   },
 ] as const satisfies readonly RequiredConfigValue[];
 
-async function createE2BPreset(): Promise<IntegrationProviderPreset> {
-  const e2bIntegrationSandboxBaseImage = await resolveLatestPublishedSandboxBaseImageRef();
+const TENSORLAKE_REQUIRED_CONFIG_VALUES = [
+  {
+    path: ["sandbox", "tensorlake", "api_key"],
+    envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY",
+  },
+] as const satisfies readonly RequiredConfigValue[];
+
+async function createRemoteProviderPreset(
+  requiredConfigValues: readonly RequiredConfigValue[],
+): Promise<IntegrationProviderPreset> {
+  const remoteSandboxBaseImage = await resolveLatestPublishedSandboxBaseImageRef();
 
   return {
-    requiredConfigValues: E2B_REQUIRED_CONFIG_VALUES,
-    e2bSandboxBaseImage: e2bIntegrationSandboxBaseImage,
+    requiredConfigValues,
+    remoteSandboxBaseImage,
   };
 }
 
@@ -74,9 +84,13 @@ export function getRequiredIntegrationConfigValues(input: {
   providers: readonly IntegrationSandboxProvider[];
   configRoot: Record<string, unknown>;
 }): readonly RequiredConfigValue[] {
-  const presetRequiredConfigValues = input.providers.includes(IntegrationSandboxProvider.E2B)
-    ? E2B_REQUIRED_CONFIG_VALUES
-    : [];
+  const presetRequiredConfigValues: RequiredConfigValue[] = [];
+  if (input.providers.includes(IntegrationSandboxProvider.E2B)) {
+    presetRequiredConfigValues.push(...E2B_REQUIRED_CONFIG_VALUES);
+  }
+  if (input.providers.includes(IntegrationSandboxProvider.TENSORLAKE)) {
+    presetRequiredConfigValues.push(...TENSORLAKE_REQUIRED_CONFIG_VALUES);
+  }
   const storageBackend = getValueAtPath(input.configRoot, ["sandbox", "storage", "backend"]);
 
   if (storageBackend === "archil") {
@@ -113,6 +127,11 @@ export function parseIntegrationSandboxProviders(
       continue;
     }
 
+    if (provider === IntegrationSandboxProvider.TENSORLAKE) {
+      providers.add(provider);
+      continue;
+    }
+
     throw new Error(
       `Unsupported provider "${provider}" in MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS.`,
     );
@@ -134,5 +153,9 @@ export async function getIntegrationProviderPreset(
     return DOCKER_PRESET;
   }
 
-  return createE2BPreset();
+  if (provider === IntegrationSandboxProvider.E2B) {
+    return await createRemoteProviderPreset(E2B_REQUIRED_CONFIG_VALUES);
+  }
+
+  return await createRemoteProviderPreset(TENSORLAKE_REQUIRED_CONFIG_VALUES);
 }

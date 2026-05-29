@@ -15,6 +15,7 @@ import {
 } from "./system-test-sandbox-base-image-source.js";
 export {
   MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REF_ENV,
+  readTensorlakeSystemTestSandboxBaseImageRef,
   resolveSystemTestSandboxBaseImageSource,
   type SystemTestSandboxBaseImageSource,
 } from "./system-test-sandbox-base-image-source.js";

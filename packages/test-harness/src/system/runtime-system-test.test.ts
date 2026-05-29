@@ -37,6 +37,16 @@ describe("resolveRuntimeSystemIntegrationConfigPathInContainer", () => {
       }),
     ).toBe(IntegrationConfigPathInContainer);
   });
+
+  it("uses the shared integration config for Tensorlake sandbox runtime system tests", () => {
+    expect(
+      resolveRuntimeSystemIntegrationConfigPathInContainer({
+        sandbox: {
+          provider: "tensorlake",
+        },
+      }),
+    ).toBe(IntegrationConfigPathInContainer);
+  });
 });
 
 describe("createRuntimeSystemServiceOptions", () => {

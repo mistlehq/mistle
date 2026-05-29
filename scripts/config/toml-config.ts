@@ -394,13 +394,15 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
 }
 
 export function buildIntegrationTomlConfig(input: {
-  providers: readonly ("docker" | "e2b")[];
+  providers: readonly ("docker" | "e2b" | "tensorlake")[];
   environment: NodeJS.ProcessEnv;
-  e2bSandboxBaseImage?: string;
+  remoteSandboxBaseImage?: string;
 }): ConfigRecord {
   let configRoot = buildDevelopmentTomlConfig();
   const dockerEnabled = input.providers.includes("docker");
   const e2bEnabled = input.providers.includes("e2b");
+  const tensorlakeEnabled = input.providers.includes("tensorlake");
+  const remoteProviderEnabled = e2bEnabled || tensorlakeEnabled;
 
   configRoot = setValueAtPath(
     configRoot,
@@ -428,7 +430,7 @@ export function buildIntegrationTomlConfig(input: {
     configRoot = deleteValueAtPath(configRoot, ["sandbox", "docker"]);
   }
 
-  if (!e2bEnabled) {
+  if (!remoteProviderEnabled) {
     configRoot = setValueAtPath(configRoot, ["sandbox", "storage"], {
       backend: "docker_volume",
       docker_volume: {
@@ -437,16 +439,14 @@ export function buildIntegrationTomlConfig(input: {
     });
     configRoot = deleteValueAtPath(configRoot, ["object_store", "sandbox_storage"]);
     configRoot = deleteValueAtPath(configRoot, ["sandbox", "e2b"]);
+    configRoot = deleteValueAtPath(configRoot, ["sandbox", "tensorlake"]);
     return configRoot;
   }
-
-  const e2bApiKey = readRequiredEnv(input.environment, "MISTLE_SANDBOX_E2B_API_KEY");
-  const e2bDomain = readOptionalEnv(input.environment, "MISTLE_SANDBOX_E2B_DOMAIN") ?? "e2b.app";
 
   configRoot = setValueAtPath(
     configRoot,
     ["sandbox", "default_base_image"],
-    input.e2bSandboxBaseImage ?? getLocalDevDockerRegistrySandboxBaseImageRef(),
+    input.remoteSandboxBaseImage ?? getLocalDevDockerRegistrySandboxBaseImageRef(),
   );
   configRoot = setValueAtPath(configRoot, ["sandbox", "storage"], {
     backend: "archil",
@@ -459,13 +459,27 @@ export function buildIntegrationTomlConfig(input: {
       mount_object_store: "sandbox_storage",
     },
   });
-  configRoot = setValueAtPath(configRoot, ["sandbox", "e2b"], {
-    enabled: true,
-    api_key: e2bApiKey,
-    domain: e2bDomain,
-    cpu_count: readOptionalIntegerEnv(input.environment, "MISTLE_SANDBOX_E2B_CPU_COUNT") ?? 4,
-    memory_mb: readOptionalIntegerEnv(input.environment, "MISTLE_SANDBOX_E2B_MEMORY_MB") ?? 8192,
-  });
+  if (e2bEnabled) {
+    const e2bApiKey = readRequiredEnv(input.environment, "MISTLE_SANDBOX_E2B_API_KEY");
+    const e2bDomain = readOptionalEnv(input.environment, "MISTLE_SANDBOX_E2B_DOMAIN") ?? "e2b.app";
+    configRoot = setValueAtPath(configRoot, ["sandbox", "e2b"], {
+      enabled: true,
+      api_key: e2bApiKey,
+      domain: e2bDomain,
+      cpu_count: readOptionalIntegerEnv(input.environment, "MISTLE_SANDBOX_E2B_CPU_COUNT") ?? 4,
+      memory_mb: readOptionalIntegerEnv(input.environment, "MISTLE_SANDBOX_E2B_MEMORY_MB") ?? 8192,
+    });
+  } else {
+    configRoot = deleteValueAtPath(configRoot, ["sandbox", "e2b"]);
+  }
+  if (tensorlakeEnabled) {
+    configRoot = setValueAtPath(configRoot, ["sandbox", "tensorlake"], {
+      enabled: true,
+      api_key: readRequiredEnv(input.environment, "MISTLE_SANDBOX_TENSORLAKE_API_KEY"),
+    });
+  } else {
+    configRoot = deleteValueAtPath(configRoot, ["sandbox", "tensorlake"]);
+  }
   configRoot = setValueAtPath(
     configRoot,
     ["object_store", "sandbox_storage"],

@@ -12,12 +12,15 @@ import {
   waitForRuntimeReadyValue,
 } from "../system/helpers/codex-sandbox.js";
 import { createRuntimeCodexSandboxFixture } from "./helpers/runtime-codex-sandbox.js";
-import { createSandboxSystemTest } from "./helpers/sandbox-system-test.js";
+import {
+  CodexRuntimeSandboxProviders,
+  createSandboxSystemTest,
+} from "./helpers/sandbox-system-test.js";
 import { timeSystemRuntimePhase } from "./helpers/system-runtime-phase-timing.js";
 
 const it = createSandboxSystemTest({
   extraInfra: ["mailpit"],
-  sandboxProviders: ["docker", "e2b"],
+  sandboxProviders: CodexRuntimeSandboxProviders,
   publicAccess: {
     provider: "cloudflare",
     services: ["data-plane-gateway"],

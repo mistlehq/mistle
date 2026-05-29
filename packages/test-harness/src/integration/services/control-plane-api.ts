@@ -286,10 +286,7 @@ function config(input: {
     sandbox: {
       defaultBaseImage: input.sandboxBaseImageRef ?? getLocalDevDockerRegistrySandboxBaseImageRef(),
       gatewayWsUrl: input.gatewayWsUrl,
-      docker: {
-        enabled: input.sandbox?.provider !== "e2b",
-      },
-      ...(input.sandbox?.e2b === undefined ? {} : { e2b: mapE2BOptions(input.sandbox.e2b) }),
+      ...createControlPlaneApiSandboxProviderConfig(input.sandbox),
       bootstrap: {
         tokenSecret: "integration-new-bootstrap-token-secret",
         tokenIssuer: "integration-new-data-plane-worker",
@@ -370,6 +367,64 @@ function config(input: {
         : {}),
     },
   };
+}
+
+export function createControlPlaneApiSandboxProviderConfig(
+  input: IntegrationSandboxOptions | undefined,
+):
+  | {
+      docker: { enabled: true };
+    }
+  | {
+      docker: { enabled: false };
+      e2b: { enabled: true; apiKey: string; domain: string };
+    }
+  | {
+      docker: { enabled: false };
+      tensorlake: { enabled: true; apiKey: string };
+    } {
+  if (input?.provider === "e2b") {
+    return {
+      docker: { enabled: false },
+      e2b: requireE2BOptions(input),
+    };
+  }
+
+  if (input?.provider === "tensorlake") {
+    return {
+      docker: { enabled: false },
+      tensorlake: requireTensorlakeOptions(input),
+    };
+  }
+
+  return {
+    docker: { enabled: true },
+  };
+}
+
+function requireTensorlakeOptions(input: IntegrationSandboxOptions): {
+  enabled: true;
+  apiKey: string;
+} {
+  if (input.tensorlake === undefined) {
+    throw new Error(
+      "control-plane-api requires Tensorlake sandbox options when provider is tensorlake.",
+    );
+  }
+
+  return { enabled: true, apiKey: input.tensorlake.apiKey };
+}
+
+function requireE2BOptions(input: IntegrationSandboxOptions): {
+  enabled: true;
+  apiKey: string;
+  domain: string;
+} {
+  if (input.e2b === undefined) {
+    throw new Error("control-plane-api requires E2B sandbox options when provider is e2b.");
+  }
+
+  return mapE2BOptions(input.e2b);
 }
 
 function mapE2BOptions(input: NonNullable<IntegrationSandboxOptions["e2b"]>): {

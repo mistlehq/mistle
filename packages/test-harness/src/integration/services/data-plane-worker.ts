@@ -305,7 +305,7 @@ async function createSandboxReachableEndpoints(input: {
     url: input.peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
     environmentId: input.environmentId,
   });
-  if (input.sandbox?.provider === "e2b") {
+  if (requiresPublicSandboxReachableEndpoints(input.sandbox)) {
     return createPublicSandboxReachableEndpoints({
       environmentId: input.environmentId,
       sandbox: input.sandbox,
@@ -327,6 +327,12 @@ async function createSandboxReachableEndpoints(input: {
   };
 }
 
+export function requiresPublicSandboxReachableEndpoints(
+  input: IntegrationSandboxOptions | undefined,
+): input is IntegrationSandboxOptions & { provider: "e2b" | "tensorlake" } {
+  return input?.provider === "e2b" || input?.provider === "tensorlake";
+}
+
 function createPublicSandboxReachableEndpoints(input: {
   environmentId: string;
   sandbox: IntegrationSandboxOptions;
@@ -335,7 +341,9 @@ function createPublicSandboxReachableEndpoints(input: {
     ServiceIds.DATA_PLANE_GATEWAY,
   );
   if (publicGatewayBaseUrl === undefined) {
-    throw new Error("E2B runtime system tests require public access for data-plane-gateway.");
+    throw new Error(
+      `${input.sandbox.provider} runtime system tests require public access for data-plane-gateway.`,
+    );
   }
 
   return {

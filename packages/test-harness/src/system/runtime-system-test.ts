@@ -26,6 +26,7 @@ import {
 } from "./runtime-public-access.js";
 import {
   getSystemTestSandboxBaseImageRef,
+  readTensorlakeSystemTestSandboxBaseImageRef,
   readSystemTestCoordinatorDirectoryPath,
 } from "./system-test-sandbox-base-image.js";
 
@@ -160,6 +161,24 @@ export function createSystemTest(input: CreateSystemTestInput = {}) {
             label: "e2b-provider-sandboxes",
             timings: cleanupTimings,
             task: e2bProviderSandboxCleanup,
+          }),
+        );
+      }
+      const tensorlakeProviderSandboxCleanup = await measureRuntimeSystemPhase(
+        setupTimings,
+        "prepare-tensorlake-provider-cleanup",
+        async () =>
+          createTensorlakeProviderSandboxCleanup({
+            input,
+            environment: integrationEnvironment,
+          }),
+      );
+      if (tensorlakeProviderSandboxCleanup !== undefined) {
+        cleanupTasks.push(
+          createMeasuredRuntimeSystemCleanupTask({
+            label: "tensorlake-provider-sandboxes",
+            timings: cleanupTimings,
+            task: tensorlakeProviderSandboxCleanup,
           }),
         );
       }
@@ -348,7 +367,7 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
     return {
       sandbox: {
         provider: "tensorlake",
-        defaultBaseImageRef: await getSystemTestSandboxBaseImageRef(),
+        defaultBaseImageRef: readTensorlakeSystemTestSandboxBaseImageRef(),
         tensorlake: readTensorlakeOptions(),
         publicServiceBaseUrls,
       },
@@ -359,7 +378,7 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
     dataPlaneGateway: input.dataPlaneGateway,
     sandbox: {
       provider: "tensorlake",
-      defaultBaseImageRef: await getSystemTestSandboxBaseImageRef(),
+      defaultBaseImageRef: readTensorlakeSystemTestSandboxBaseImageRef(),
       tensorlake: readTensorlakeOptions(),
       publicServiceBaseUrls,
     },
@@ -370,7 +389,7 @@ function readTensorlakeOptions(): {
   apiKey: string;
 } {
   return {
-    apiKey: readRequiredEnv("TENSORLAKE_API_KEY"),
+    apiKey: readRequiredEnv("MISTLE_SANDBOX_TENSORLAKE_API_KEY"),
   };
 }
 
@@ -490,6 +509,39 @@ async function createE2BProviderSandboxCleanup(input: {
   const sandboxAdapter = createSandboxAdapter({
     provider: SandboxProvider.E2B,
     e2b: createE2BSandboxConfig(readE2BOptions()),
+  });
+
+  return async () => {
+    const currentProviderSandboxIds = await listPersistedProviderSandboxIds(dataPlaneDb);
+    const providerSandboxIds = selectProviderSandboxIdsCreatedByTest({
+      baselineProviderSandboxIds,
+      currentProviderSandboxIds,
+    });
+
+    await Promise.all(
+      providerSandboxIds.map(async (providerSandboxId) => {
+        await destroyProviderSandboxForRuntimeSystemCleanup({
+          sandboxAdapter,
+          providerSandboxId,
+        });
+      }),
+    );
+  };
+}
+
+async function createTensorlakeProviderSandboxCleanup(input: {
+  input: CreateSystemTestInput;
+  environment: IntegrationTestEnvironment;
+}): Promise<CleanupTask | undefined> {
+  if (input.input.sandbox?.provider !== "tensorlake") {
+    return undefined;
+  }
+
+  const dataPlaneDb = input.environment.dataPlaneDb;
+  const baselineProviderSandboxIds = await listPersistedProviderSandboxIds(dataPlaneDb);
+  const sandboxAdapter = createSandboxAdapter({
+    provider: SandboxProvider.TENSORLAKE,
+    tensorlake: readTensorlakeOptions(),
   });
 
   return async () => {

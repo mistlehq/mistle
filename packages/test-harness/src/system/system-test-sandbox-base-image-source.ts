@@ -2,6 +2,8 @@ import { isAbsolute } from "node:path";
 
 export const MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REF_ENV =
   "MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REF";
+export const MISTLE_SYSTEM_TEST_TENSORLAKE_SANDBOX_BASE_IMAGE_REF_ENV =
+  "MISTLE_SYSTEM_TEST_TENSORLAKE_SANDBOX_BASE_IMAGE_REF";
 export const MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REGISTRY_STORAGE_DIR_ENV =
   "MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REGISTRY_STORAGE_DIR";
 
@@ -60,4 +62,24 @@ export function readPrepublishedSystemTestSandboxBaseImageRef(
   }
 
   return value.trim();
+}
+
+export function readTensorlakeSystemTestSandboxBaseImageRef(
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const value = env[MISTLE_SYSTEM_TEST_TENSORLAKE_SANDBOX_BASE_IMAGE_REF_ENV];
+  if (value === undefined || value.trim().length === 0) {
+    throw new Error(
+      `${MISTLE_SYSTEM_TEST_TENSORLAKE_SANDBOX_BASE_IMAGE_REF_ENV} is required for Tensorlake runtime system tests.`,
+    );
+  }
+
+  const imageRef = value.trim();
+  if (!imageRef.startsWith("tensorlake:")) {
+    throw new Error(
+      `${MISTLE_SYSTEM_TEST_TENSORLAKE_SANDBOX_BASE_IMAGE_REF_ENV} must be a Tensorlake image handle.`,
+    );
+  }
+
+  return imageRef;
 }
