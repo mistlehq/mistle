@@ -403,8 +403,8 @@ importers:
         specifier: ^1.0.2
         version: 1.0.2(react@19.2.5)
       '@tanstack/react-pacer':
-        specifier: ^0.22.0
-        version: 0.22.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        specifier: ^0.22.1
+        version: 0.22.1(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@tanstack/react-query':
         specifier: ~5.100.10
         version: 5.100.10(react@19.2.5)
@@ -5552,15 +5552,15 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
-  '@tanstack/pacer@0.21.0':
-    resolution: {integrity: sha512-EZyU3fQvdz7faj0vBVrPd5ejkSS9pbGKtrGZI56dLJgotca6iZKhaNDRv7dweG4dnWx0LovE9YYf1MAErGpbLQ==}
+  '@tanstack/pacer@0.21.1':
+    resolution: {integrity: sha512-hB01dd4rlsYcTCNP7wK186jgAe6K5qimgM1Y5Jtvz+9PUaILvpmeLLjmQNUNSO1l23lIt+CeQR6mO1mjlPvRtQ==}
     engines: {node: '>=18'}
 
   '@tanstack/query-core@5.100.10':
     resolution: {integrity: sha512-8UR0yJR+GiQ40m3lPhUr0xbfAupe6GSQiksSBSa9SM2NjezFyxXCIA69/lz8cSoNKZLrw1/PktIyQBJcVeMi3w==}
 
-  '@tanstack/react-pacer@0.22.0':
-    resolution: {integrity: sha512-AuKrkcP/LheBuq1tJCN8DDkwU+RmSql3zpJ1RFwvdc7qJED7Ba+jwlfFkeOZ62WcMtV54RceG9Uyprr0j99Qnw==}
+  '@tanstack/react-pacer@0.22.1':
+    resolution: {integrity: sha512-CenQqK0GluSPIrnsG1yuD7w5uMSQ/4lI9AcGEFxBrRd66r260boWcYRIsS5+eHtXb238FoZYhKmJPGlhRzmHRw==}
     engines: {node: '>=18'}
     peerDependencies:
       react: '>=16.8'
@@ -16834,16 +16834,16 @@ snapshots:
 
   '@tanstack/devtools-event-client@0.4.3': {}
 
-  '@tanstack/pacer@0.21.0':
+  '@tanstack/pacer@0.21.1':
     dependencies:
       '@tanstack/devtools-event-client': 0.4.3
       '@tanstack/store': 0.11.0
 
   '@tanstack/query-core@5.100.10': {}
 
-  '@tanstack/react-pacer@0.22.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
+  '@tanstack/react-pacer@0.22.1(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
-      '@tanstack/pacer': 0.21.0
+      '@tanstack/pacer': 0.21.1
       '@tanstack/react-store': 0.11.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
