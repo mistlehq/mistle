@@ -1,5 +1,9 @@
 import { SandboxUsageEventTypes, type SandboxUsageEventType } from "@mistle/db/data-plane";
-import { isSandboxResourceNotFoundError, type SandboxProvider } from "@mistle/sandbox";
+import {
+  isSandboxResourceNotFoundError,
+  type SandboxAdapter,
+  type SandboxProvider,
+} from "@mistle/sandbox";
 import { SandboxLifecycleEvents } from "@mistle/sandbox-lifecycle";
 import {
   type ResumeSandboxInstanceWorkflowOutput,
@@ -35,6 +39,10 @@ import { resumeSandboxRuntime } from "../start-sandbox-instance/resume-sandbox-r
 import { prepareSandboxImage, startSandbox } from "../start-sandbox-instance/start-sandbox.js";
 import { waitForSandboxRuntimeReadiness } from "../start-sandbox-instance/wait-for-sandbox-runtime-readiness.js";
 import { persistSandboxInstanceComputeReplacement } from "./persist-sandbox-instance-compute-replacement.js";
+import {
+  determineExistingProviderResumeAction,
+  type ExistingProviderResumeAction,
+} from "./provider-resume-inspection-policy.js";
 import {
   resolveResumableSandboxInstanceState,
   type ResumableSandboxInstanceState,
@@ -211,8 +219,170 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       });
     });
 
+    let existingProviderResumeAction: ExistingProviderResumeAction | null = null;
+
     if (resumableSandboxState.providerSandboxId !== null) {
       const existingProviderSandboxId = resumableSandboxState.providerSandboxId;
+      try {
+        existingProviderResumeAction = await step.run(
+          { name: "inspect-existing-sandbox-compute-before-resume" },
+          async () => {
+            return inspectExistingProviderResumeAction(
+              {
+                sandboxAdapter: resolvedRuntime.sandboxAdapter,
+              },
+              {
+                persistenceMode: resumableSandboxState.persistenceMode,
+                providerSandboxId: existingProviderSandboxId,
+              },
+            );
+          },
+        );
+      } catch (error) {
+        rethrowResumeDurableStepErrorForRetry(error);
+
+        await operationEvents.record({
+          attributes: {
+            providerSandboxId: existingProviderSandboxId,
+            runtimeProvider: resumableSandboxState.runtimeProvider,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          message: "Sandbox provider resume preflight inspection failed.",
+          phase: "provider",
+          status: "failed",
+        });
+
+        const failureMessage = formatPersistedFailureMessage({
+          summary: "Failed to resume sandbox runtime.",
+          error,
+        });
+        let markFailedError: unknown;
+        logger.warn(
+          {
+            failureCode: ResumeSandboxFailureCodes.RESUME_SANDBOX_FAILED,
+            failureMessage,
+          },
+          "Marking sandbox instance as failed during resume workflow.",
+        );
+        try {
+          await step.run(
+            { name: "mark-sandbox-instance-failed-after-resume-preflight-inspection-failure" },
+            async () => {
+              await markSandboxInstanceFailed(
+                {
+                  db: ctx.db,
+                  tables: ctx.tables,
+                },
+                {
+                  sandboxInstanceId: input.sandboxInstanceId,
+                  failureCode: ResumeSandboxFailureCodes.RESUME_SANDBOX_FAILED,
+                  failureMessage,
+                },
+              );
+            },
+          );
+        } catch (markError) {
+          logger.error(
+            { err: markError },
+            "Failed to mark sandbox instance as failed after resume preflight inspection failure.",
+          );
+          markFailedError = markError;
+        }
+
+        throwResumeFailureHandlingErrors({
+          markFailedError,
+        });
+        throw error;
+      }
+
+      if (existingProviderResumeAction.kind === "fail") {
+        const failureCode = existingProviderResumeAction.failureCode;
+        const failureMessage = existingProviderResumeAction.failureMessage;
+        await operationEvents.record({
+          attributes: {
+            providerSandboxId: existingProviderSandboxId,
+            runtimeProvider: resumableSandboxState.runtimeProvider,
+            failureCode,
+            error: failureMessage,
+          },
+          message: "Sandbox provider resume preflight failed.",
+          phase: "provider",
+          status: "failed",
+        });
+
+        let markFailedError: unknown;
+        logger.warn(
+          {
+            failureCode,
+            failureMessage,
+          },
+          "Marking sandbox instance as failed during resume workflow.",
+        );
+        try {
+          await step.run(
+            { name: "mark-sandbox-instance-failed-after-resume-preflight" },
+            async () => {
+              await markSandboxInstanceFailed(
+                {
+                  db: ctx.db,
+                  tables: ctx.tables,
+                },
+                {
+                  sandboxInstanceId: input.sandboxInstanceId,
+                  failureCode,
+                  failureMessage,
+                },
+              );
+            },
+          );
+        } catch (markError) {
+          logger.error(
+            { err: markError },
+            "Failed to mark sandbox instance as failed after resume preflight.",
+          );
+          markFailedError = markError;
+        }
+
+        throwResumeFailureHandlingErrors({
+          markFailedError,
+        });
+        throw new Error(failureMessage);
+      }
+
+      if (existingProviderResumeAction.kind === "replace_provider_compute") {
+        await operationEvents.record({
+          attributes: {
+            providerSandboxId: existingProviderSandboxId,
+            runtimeProvider: resumableSandboxState.runtimeProvider,
+            timelineKey: "sandbox",
+            timelineLabel: "Replacing sandbox",
+          },
+          message:
+            "Existing sandbox provider compute was not resumable; switching to replacement resume.",
+          phase: "provider",
+          status: "warning",
+        });
+        logger.info(
+          createResumeWorkflowLogFields({
+            sandboxInstanceId: input.sandboxInstanceId,
+            organizationId: resumableSandboxState.organizationId,
+            runtimeProvider: resumableSandboxState.runtimeProvider,
+            providerSandboxId: existingProviderSandboxId,
+            persistenceMode: resumableSandboxState.persistenceMode,
+            computeGeneration: resumableSandboxState.computeGeneration,
+          }),
+          "Existing sandbox provider compute was not resumable; switching to replacement resume.",
+        );
+      }
+    }
+
+    if (
+      resumableSandboxState.providerSandboxId !== null &&
+      existingProviderResumeAction !== null &&
+      existingProviderResumeAction.kind !== "replace_provider_compute"
+    ) {
+      const existingProviderSandboxId = resumableSandboxState.providerSandboxId;
+      const shouldResumeProvider = existingProviderResumeAction.kind === "resume_provider";
       let existingResumeFailureHandled = false;
       try {
         logger.info(
@@ -224,23 +394,35 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             persistenceMode: resumableSandboxState.persistenceMode,
             computeGeneration: resumableSandboxState.computeGeneration,
           }),
-          "Resuming existing sandbox provider compute.",
+          shouldResumeProvider
+            ? "Resuming existing sandbox provider compute."
+            : "Using already-active sandbox provider compute for resume.",
         );
         const providerResumeAttributes = {
           providerSandboxId: existingProviderSandboxId,
           runtimeProvider: resumableSandboxState.runtimeProvider,
           timelineKey: "sandbox",
-          timelineLabel: "Resuming sandbox",
+          timelineLabel: shouldResumeProvider ? "Resuming sandbox" : "Reconnecting sandbox",
         };
         await operationEvents.record({
           attributes: providerResumeAttributes,
-          message: "Sandbox provider resume started.",
+          message: shouldResumeProvider
+            ? "Sandbox provider resume started."
+            : "Sandbox provider resume skipped because provider compute is already active.",
           phase: "provider",
-          status: "started",
+          status: shouldResumeProvider ? "started" : "completed",
         });
         const resumedRuntime = await step.run(
           { name: "resume-existing-sandbox-compute" },
           async () => {
+            if (!shouldResumeProvider) {
+              return {
+                sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
+                runtimeProvider: resumableSandboxState.runtimeProvider,
+                providerSandboxId: existingProviderSandboxId,
+              };
+            }
+
             try {
               return await resumeSandbox(
                 {
@@ -260,6 +442,70 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 isRecoverableMissingSandboxError(error)
               ) {
                 return null;
+              }
+
+              let postFailureResumeAction: ExistingProviderResumeAction;
+              try {
+                postFailureResumeAction = await inspectExistingProviderResumeAction(
+                  {
+                    sandboxAdapter: resolvedRuntime.sandboxAdapter,
+                  },
+                  {
+                    persistenceMode: resumableSandboxState.persistenceMode,
+                    providerSandboxId: existingProviderSandboxId,
+                  },
+                );
+              } catch (inspectError) {
+                logger.warn(
+                  {
+                    err: inspectError,
+                    originalError: error,
+                    providerSandboxId: existingProviderSandboxId,
+                    runtimeProvider: resumableSandboxState.runtimeProvider,
+                    sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
+                  },
+                  "Failed to inspect provider state after sandbox provider resume failed.",
+                );
+                await operationEvents.record({
+                  attributes: {
+                    ...providerResumeAttributes,
+                    error: error instanceof Error ? error.message : String(error),
+                    inspectError:
+                      inspectError instanceof Error ? inspectError.message : String(inspectError),
+                  },
+                  message: "Sandbox provider resume failed.",
+                  phase: "provider",
+                  status: "failed",
+                });
+                throw error;
+              }
+
+              if (postFailureResumeAction.kind === "use_active_provider") {
+                return {
+                  sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
+                  runtimeProvider: resumableSandboxState.runtimeProvider,
+                  providerSandboxId: existingProviderSandboxId,
+                };
+              }
+
+              if (postFailureResumeAction.kind === "replace_provider_compute") {
+                return null;
+              }
+
+              if (postFailureResumeAction.kind === "fail") {
+                await operationEvents.record({
+                  attributes: {
+                    ...providerResumeAttributes,
+                    error: postFailureResumeAction.failureMessage,
+                    originalError: error instanceof Error ? error.message : String(error),
+                  },
+                  message: "Sandbox provider resume failed.",
+                  phase: "provider",
+                  status: "failed",
+                });
+                throw new Error(postFailureResumeAction.failureMessage, {
+                  cause: error,
+                });
               }
 
               await operationEvents.record({
@@ -283,7 +529,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             phase: "provider",
             status: "warning",
           });
-        } else {
+        } else if (shouldResumeProvider) {
           await operationEvents.record({
             attributes: providerResumeAttributes,
             message: "Sandbox provider resume completed.",
@@ -2044,6 +2290,36 @@ function createReplacementSandboxImage(input: {
 
 function isRecoverableMissingSandboxError(error: unknown): boolean {
   return isSandboxResourceNotFoundError(error);
+}
+
+async function inspectExistingProviderResumeAction(
+  ctx: {
+    sandboxAdapter: SandboxAdapter;
+  },
+  input: {
+    persistenceMode: string;
+    providerSandboxId: string;
+  },
+): Promise<ExistingProviderResumeAction> {
+  try {
+    const inspection = await ctx.sandboxAdapter.inspect({
+      id: input.providerSandboxId,
+    });
+
+    return determineExistingProviderResumeAction({
+      persistenceMode: input.persistenceMode,
+      providerState: inspection.disposition,
+    });
+  } catch (error) {
+    if (!isRecoverableMissingSandboxError(error)) {
+      throw error;
+    }
+
+    return determineExistingProviderResumeAction({
+      persistenceMode: input.persistenceMode,
+      providerState: "missing",
+    });
+  }
 }
 
 function throwResumeFailureHandlingErrors(input: {
