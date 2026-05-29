@@ -59,7 +59,7 @@ describe("OAuth CLI login integration", () => {
     if (redirectTo === null) {
       throw new Error("Expected OAuth login redirectTo parameter.");
     }
-    expect(new URL(redirectTo).pathname).toBe("/oauth/authorize");
+    expect(redirectTo).toBe(new URL(authorizePath, env.controlPlaneApi.hostBaseUrl).toString());
   });
 
   it("exchanges a browser authorization code for OAuth tokens", async ({ env }) => {

@@ -22,6 +22,7 @@ import {
   exchangeMistleCliAuthorizationCode,
 } from "./services/authorization-code.js";
 import { refreshOAuthTokenPair } from "./services/oauth-token.js";
+import { buildPublicRequestUrl } from "./services/public-request-url.js";
 import {
   requireMistleCliOAuthClient,
   validateMistleCliRedirectUri,
@@ -135,7 +136,13 @@ export function createOAuthRoutes(): AppRoutes<typeof OAUTH_ROUTE_BASE_PATH> {
 
 function redirectToDashboardLogin(ctx: Context<AppContextBindings>) {
   const dashboardLoginUrl = new URL("/auth/login", ctx.get("config").dashboard.baseUrl);
-  dashboardLoginUrl.searchParams.set("redirectTo", ctx.req.url);
+  dashboardLoginUrl.searchParams.set(
+    "redirectTo",
+    buildPublicRequestUrl({
+      publicBaseUrl: ctx.get("config").auth.baseUrl,
+      requestUrl: ctx.req.url,
+    }),
+  );
 
   return ctx.redirect(dashboardLoginUrl.toString(), 302);
 }
