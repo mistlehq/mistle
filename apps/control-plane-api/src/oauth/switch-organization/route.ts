@@ -1,6 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   ForbiddenResponseSchema,
+  NotFoundResponseSchema,
   UnauthorizedResponseSchema,
   ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
@@ -52,6 +53,14 @@ export const route = createRoute({
       content: {
         "application/json": {
           schema: ForbiddenResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: "Target organization was not found.",
+      content: {
+        "application/json": {
+          schema: NotFoundResponseSchema,
         },
       },
     },

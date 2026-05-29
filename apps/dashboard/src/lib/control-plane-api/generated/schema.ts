@@ -83,6 +83,19 @@ export interface paths {
             };
           };
         };
+        /** @description Target organization was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "NOT_FOUND";
+              message: string;
+            };
+          };
+        };
         /** @description Internal server error. */
         500: {
           headers: {

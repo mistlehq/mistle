@@ -3,6 +3,7 @@ import { getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import { ForbiddenError, withHttpErrorHandler } from "@mistle/http/errors.js";
 import { asc, eq } from "drizzle-orm";
 
+import { OrganizationPermissions } from "../../auth/services/organization-policy.js";
 import type { AppAuthContext, AppContextBindings } from "../../types.js";
 import { route } from "./route.js";
 
@@ -46,6 +47,10 @@ function resolveUserOrganizationContext(
   authContext: AppAuthContext,
 ): { userId: string; organizationId: string } | null {
   if (authContext.kind === "oauth") {
+    if (!authContext.permissions.includes(OrganizationPermissions.ORGANIZATION_READ)) {
+      throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
+    }
+
     return {
       userId: authContext.oauth.userId,
       organizationId: authContext.oauth.organizationId,

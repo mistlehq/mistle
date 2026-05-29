@@ -351,6 +351,60 @@ describe("OAuth CLI login integration", () => {
       }),
     ]);
 
+    const currentGrant = await authenticateOAuthAccessToken({
+      db: env.controlPlaneDb,
+      token: tokenBody.access_token,
+    });
+    await env.controlPlaneDb
+      .delete(env.controlPlaneTables.oauthGrantScopes)
+      .where(
+        and(
+          eq(env.controlPlaneTables.oauthGrantScopes.oauthGrantId, currentGrant.oauth.grantId),
+          eq(
+            env.controlPlaneTables.oauthGrantScopes.scope,
+            OrganizationPermissions.ORGANIZATION_READ,
+          ),
+        ),
+      );
+
+    const missingScopeOrganizationsResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/me/organizations",
+      {
+        headers: {
+          authorization: `Bearer ${tokenBody.access_token}`,
+        },
+      },
+    );
+    expect(missingScopeOrganizationsResponse.status).toBe(403);
+    expect(await missingScopeOrganizationsResponse.json()).toStrictEqual({
+      code: "FORBIDDEN",
+      message: "Forbidden API request.",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.oauthGrantScopes).values({
+      oauthGrantId: currentGrant.oauth.grantId,
+      scope: OrganizationPermissions.ORGANIZATION_READ,
+    });
+
+    const missingOrganizationSwitchResponse = await env.controlPlaneApi.http.fetch(
+      "/oauth/switch-organization",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${tokenBody.access_token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          organizationId: "org_00000000000000000000000000",
+        }),
+      },
+    );
+    expect(missingOrganizationSwitchResponse.status).toBe(404);
+    expect(await missingOrganizationSwitchResponse.json()).toStrictEqual({
+      code: "NOT_FOUND",
+      message: "Organization was not found.",
+    });
+
     const switchResponse = await env.controlPlaneApi.http.fetch("/oauth/switch-organization", {
       method: "POST",
       headers: {
@@ -367,7 +421,10 @@ describe("OAuth CLI login integration", () => {
     expect(switchedTokenBody.refresh_token).toMatch(/^mstl_ort_[A-Za-z0-9_-]+$/u);
     expect(switchedTokenBody.access_token).not.toBe(tokenBody.access_token);
     expect(switchedTokenBody.refresh_token).not.toBe(tokenBody.refresh_token);
-    expect(switchedTokenBody.scope).toBe(tokenBody.scope);
+    const expectedScopes = tokenBody.scope.split(" ");
+    const switchedScopes = switchedTokenBody.scope.split(" ");
+    expect(switchedScopes).toHaveLength(expectedScopes.length);
+    expect(new Set(switchedScopes)).toStrictEqual(new Set(expectedScopes));
 
     const switchedActorResponse = await env.controlPlaneApi.http.fetch("/v1/me", {
       headers: {
