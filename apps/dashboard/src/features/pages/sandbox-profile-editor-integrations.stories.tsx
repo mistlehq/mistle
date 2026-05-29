@@ -81,6 +81,12 @@ export const GitCommitSigningUnavailable: Story = {
   },
 };
 
+export const GitCommitSigningRequiresIdentityLinkingLink: Story = {
+  args: {
+    identityLinkedGitConnectionIds: [],
+  },
+};
+
 export const StaleConnectorBinding: Story = {
   args: {
     initialBindings: [

@@ -128,7 +128,40 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     expect(runtime.getByText("Jira Production")).toBeDefined();
   });
 
-  it("allows commit signing by default for the selected identity-linked Git connection", async () => {
+  it("enables commit signing for the selected identity-linked Git connection", () => {
+    const gitCommitSigningConnectionChanges: Array<string | null> = [];
+
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [StoryOpenAiConnection, StoryGithubConnection],
+          availableTargets: [StoryOpenAiTarget, StoryGithubTarget],
+          gitCommitSigningIntegrationConnectionId: StoryGithubConnection.id,
+          identityLinkedGitConnectionIds: [StoryGithubConnection.id],
+          integrationRows: [
+            {
+              clientId: "git-row",
+              connectionId: StoryGithubConnection.id,
+              kind: "git",
+              config: {},
+            },
+          ],
+          onGitCommitSigningIntegrationConnectionChange: (connectionId) => {
+            gitCommitSigningConnectionChanges.push(connectionId);
+          },
+        }}
+      />,
+    );
+
+    const switchControl = screen.getByRole("switch", { name: "Sign Git commits" });
+    expect(switchControl.getAttribute("aria-checked")).toBe("true");
+    expect(switchControl.hasAttribute("data-disabled")).toBe(false);
+    fireEvent.click(switchControl);
+    expect(gitCommitSigningConnectionChanges).toEqual([null]);
+    expect(screen.getByRole("button", { name: "About Git commit signing" })).toBeDefined();
+  });
+
+  it("allows commit signing to be turned on for the selected identity-linked Git connection", () => {
     const gitCommitSigningConnectionChanges: Array<string | null> = [];
 
     render(
@@ -154,12 +187,10 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     );
 
     const switchControl = screen.getByRole("switch", { name: "Sign Git commits" });
-    expect(switchControl.getAttribute("aria-checked")).toBe("true");
-    expect(switchControl.hasAttribute("data-disabled")).toBe(true);
-    await waitFor(() => {
-      expect(gitCommitSigningConnectionChanges).toEqual([StoryGithubConnection.id]);
-    });
-    expect(screen.getByRole("button", { name: "About Git commit signing" })).toBeDefined();
+    expect(switchControl.getAttribute("aria-checked")).toBe("false");
+    expect(switchControl.hasAttribute("data-disabled")).toBe(false);
+    fireEvent.click(switchControl);
+    expect(gitCommitSigningConnectionChanges).toEqual([StoryGithubConnection.id]);
   });
 
   it("disables commit signing when the selected Git connection is not identity-linked", () => {
@@ -183,7 +214,11 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
 
     const switchControl = screen.getByRole("switch", { name: "Sign Git commits" });
     expect(switchControl.hasAttribute("data-disabled")).toBe(true);
-    expect(screen.getByText("Requires identity linking")).toBeDefined();
+    expect(screen.getByText("identity linking to enable")).toBeDefined();
+    expect(screen.getByRole("link", { name: "Configure" })).toHaveProperty(
+      "pathname",
+      "/settings/organization/identity-linking",
+    );
   });
 
   it("clears commit signing when the selected Git connection stops being identity-linked", async () => {

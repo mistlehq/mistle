@@ -110,6 +110,7 @@ const IntegrationRegistry = Definitions.integrationRegistry;
 const GitCommitSigningTooltip =
   "Commits made in sandboxes will be signed with the acting user's linked GitHub account when enabled.";
 const GitCommitSigningIdentityLinkingDisabledMessage = "Requires identity linking";
+const OrganizationIdentityLinkingSettingsPath = "/settings/organization/identity-linking";
 
 const SandboxProfileIntegrationConnectionColumns = [
   { key: "integration", label: "Integration", desktopWidth: "minmax(12rem,0.9fr)" },
@@ -336,7 +337,18 @@ function GitCommitSigningSwitchField(input: {
             onCheckedChange={input.onCheckedChange}
           />
           {input.disabledMessage === null ? null : (
-            <p className="text-muted-foreground text-sm leading-none">{input.disabledMessage}</p>
+            <p className="text-muted-foreground text-sm leading-none">
+              {input.disabledMessage === GitCommitSigningIdentityLinkingDisabledMessage ? (
+                <>
+                  <TextLink render={<RouterLink to={OrganizationIdentityLinkingSettingsPath} />}>
+                    Configure
+                  </TextLink>{" "}
+                  identity linking to enable
+                </>
+              ) : (
+                input.disabledMessage
+              )}
+            </p>
           )}
         </div>
       </FieldContent>
@@ -717,14 +729,18 @@ export function SandboxProfileIntegrationsSetupSection(
   });
   const selectedGitConnectionIsIdentityLinked =
     gitRow !== null && input.identityLinkedGitConnectionIds.includes(gitRow.connectionId);
-  const gitCommitSigningIsChecked = selectedGitConnectionIsIdentityLinked;
+  const gitCommitSigningIsChecked =
+    gitRow !== null &&
+    selectedGitConnectionIsIdentityLinked &&
+    input.gitCommitSigningIntegrationConnectionId === gitRow.connectionId;
   const gitCommitSigningDisabledMessage =
     gitRow === null
       ? "Select a Git connection"
       : selectedGitConnectionIsIdentityLinked
         ? null
         : GitCommitSigningIdentityLinkingDisabledMessage;
-  const gitCommitSigningIsDisabled = true;
+  const gitCommitSigningIsDisabled =
+    controlsAreDisabled || gitRow === null || !selectedGitConnectionIsIdentityLinked;
   const hasUnresolvedConnectorRows = connectorRows.some(
     (row) =>
       resolveBindingIssue({
@@ -757,14 +773,16 @@ export function SandboxProfileIntegrationsSetupSection(
       return;
     }
 
-    const nextGitCommitSigningIntegrationConnectionId =
-      selectedGitConnectionIsIdentityLinked && gitRow !== null ? gitRow.connectionId : null;
+    if (input.gitCommitSigningIntegrationConnectionId === null) {
+      return;
+    }
+
     if (
-      input.gitCommitSigningIntegrationConnectionId !== nextGitCommitSigningIntegrationConnectionId
+      gitRow === null ||
+      input.gitCommitSigningIntegrationConnectionId !== gitRow.connectionId ||
+      !selectedGitConnectionIsIdentityLinked
     ) {
-      input.onGitCommitSigningIntegrationConnectionChange(
-        nextGitCommitSigningIntegrationConnectionId,
-      );
+      input.onGitCommitSigningIntegrationConnectionChange(null);
     }
   }, [
     controlsAreDisabled,
