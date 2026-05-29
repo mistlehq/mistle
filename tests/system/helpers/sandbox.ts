@@ -399,6 +399,9 @@ export async function connectCodexAgentSession(input: {
   sessionClient.markInitializing();
   await rpcClient.call("initialize", {
     clientInfo: CodexConversationProviderInitializeClientInfo,
+    capabilities: {
+      experimentalApi: true,
+    },
   });
   await rpcClient.notify("initialized", {});
   sessionClient.markReady();

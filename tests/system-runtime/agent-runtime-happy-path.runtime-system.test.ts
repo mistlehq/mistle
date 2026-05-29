@@ -184,11 +184,13 @@ async function completeCodexConversation(input: {
         if (targetTurn?.status !== "completed") {
           return null;
         }
-        return collectCodexAssistantTexts(threadRead.response).some((text) =>
-          text.includes(input.responseMarker),
-        )
-          ? true
-          : null;
+        const assistantTexts = collectCodexAssistantTexts(threadRead.response);
+        if (assistantTexts.some((text) => text.includes(input.responseMarker))) {
+          return true;
+        }
+        throw new Error(
+          `Codex turn '${turn.turnId}' completed without marker '${input.responseMarker}'. Assistant texts: ${formatUnknownForError(assistantTexts)}`,
+        );
       },
     });
   } finally {
@@ -241,11 +243,14 @@ async function completeOpenCodeConversation(input: {
         const messages = await client.listMessages({
           sessionId: session.id,
         });
-        return messages.some((message) =>
-          nonUserMessageContainsString(message, input.responseMarker),
-        )
-          ? true
-          : null;
+        if (
+          messages.some((message) => nonUserMessageContainsString(message, input.responseMarker))
+        ) {
+          return true;
+        }
+        throw new Error(
+          `OpenCode session '${session.id}' is idle without marker '${input.responseMarker}'. Messages: ${formatUnknownForError(messages)}`,
+        );
       },
     });
   } finally {
@@ -299,11 +304,14 @@ async function completePiConversation(input: {
         const messages = await client.getMessages({
           sessionFile: conversation.sessionFile,
         });
-        return messages.some((message) =>
-          nonUserMessageContainsString(message, input.responseMarker),
-        )
-          ? true
-          : null;
+        if (
+          messages.some((message) => nonUserMessageContainsString(message, input.responseMarker))
+        ) {
+          return true;
+        }
+        throw new Error(
+          `Pi session '${conversation.sessionFile}' is idle without marker '${input.responseMarker}'. State: ${formatUnknownForError(state)}. Messages: ${formatUnknownForError(messages)}`,
+        );
       },
     });
   } finally {
@@ -363,6 +371,10 @@ function unknownContainsString(value: unknown, expectedSubstring: string): boole
     return Object.values(value).some((item) => unknownContainsString(item, expectedSubstring));
   }
   return false;
+}
+
+function formatUnknownForError(value: unknown): string {
+  return JSON.stringify(value, null, 2);
 }
 
 function nonUserMessageContainsString(value: unknown, expectedSubstring: string): boolean {
