@@ -405,16 +405,17 @@ describe.concurrent("internal sandbox runtime integration", () => {
       email: "integration-internal-start-profile-instance-git-identity@example.com",
     });
 
+    await seedGitIdentityProvider(env, {
+      organizationId: session.organizationId,
+      userId: session.userId,
+    });
     await seedProfileWithAgent(env, {
       organizationId: session.organizationId,
       profileId: "sbp_internal_start_git_identity",
       openAiTargetKey: "openai-internal-start-git-identity",
       openAiConnectionId: "icn_internal_start_git_identity_agent",
       agentBindingId: "ibd_internal_start_git_identity_agent",
-    });
-    await seedGitIdentityProvider(env, {
-      organizationId: session.organizationId,
-      userId: session.userId,
+      gitCommitSigningIntegrationConnectionId: "icn_internal_start_git_identity_provider",
     });
 
     const response = await internalSandboxRuntimeRequest(env, {
@@ -549,6 +550,7 @@ async function seedProfileWithAgent(
     openAiTargetKey: string;
     openAiConnectionId: string;
     agentBindingId: string;
+    gitCommitSigningIntegrationConnectionId?: string | null;
   },
 ): Promise<void> {
   await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values({
@@ -566,6 +568,7 @@ async function seedProfileWithAgent(
     sandboxVcpuCount: null,
     sandboxMemoryMb: null,
     sandboxStorageMb: null,
+    gitCommitSigningIntegrationConnectionId: input.gitCommitSigningIntegrationConnectionId ?? null,
   });
   await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values({
     targetKey: input.openAiTargetKey,
