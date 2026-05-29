@@ -301,6 +301,23 @@ function createIdleSandboxProfileGitCommitSigningDraftState(): SandboxProfileGit
   };
 }
 
+export function updateSandboxProfileGitCommitSigningDraftState(input: {
+  currentState: SandboxProfileGitCommitSigningDraftState;
+  currentVersion: SandboxProfileVersion | null;
+  connectionId: string | null;
+}): SandboxProfileGitCommitSigningDraftState {
+  return {
+    ...input.currentState,
+    gitCommitSigningIntegrationConnectionId: input.connectionId,
+    sourceVersionKey:
+      input.currentVersion === null
+        ? input.currentState.sourceVersionKey
+        : createRuntimeDraftSourceVersionKey(input.currentVersion),
+    hasUnpersistedChanges:
+      input.currentVersion?.gitCommitSigningIntegrationConnectionId !== input.connectionId,
+  };
+}
+
 export function resolveSelectedSandboxProfileAgentRuntimeId(input: {
   currentVersion: SandboxProfileVersion | null;
   runtimeDraftState: Pick<
@@ -1602,17 +1619,13 @@ function ReadySandboxProfileEditorPage(input: {
     runtimeDraftState.hasUnpersistedChanges;
   const updateGitCommitSigningIntegrationConnectionId = useCallback(
     (connectionId: string | null) => {
-      setGitCommitSigningDraftState((currentState) => ({
-        ...currentState,
-        gitCommitSigningIntegrationConnectionId: connectionId,
-        sourceVersionKey:
-          input.currentVersion === null
-            ? currentState.sourceVersionKey
-            : createRuntimeDraftSourceVersionKey(input.currentVersion),
-        hasUnpersistedChanges:
-          currentState.hasUnpersistedChanges ||
-          input.currentVersion?.gitCommitSigningIntegrationConnectionId !== connectionId,
-      }));
+      setGitCommitSigningDraftState((currentState) =>
+        updateSandboxProfileGitCommitSigningDraftState({
+          connectionId,
+          currentState,
+          currentVersion: input.currentVersion,
+        }),
+      );
     },
     [input.currentVersion],
   );

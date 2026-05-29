@@ -77,6 +77,7 @@ import {
   resolveSandboxProfileEditorRefetchInterval,
   resolveSelectedSandboxProfileGitCommitSigningIntegrationConnectionId,
   resolveSelectedSandboxProfileAgentRuntimeId,
+  updateSandboxProfileGitCommitSigningDraftState,
 } from "./sandbox-profile-editor-page.js";
 
 beforeAll(() => {
@@ -1295,6 +1296,32 @@ describe("SandboxProfileEditorPage", () => {
         },
       }),
     ).toBe("icn_github_signing");
+  });
+
+  it("clears commit signing dirty state when the selected connection returns to the saved value", () => {
+    const currentVersion = createSandboxProfileVersionFixture({
+      sandboxProfileId: "sbp_current",
+      version: 2,
+      state: "draft",
+      gitCommitSigningIntegrationConnectionId: "icn_github_signing",
+      isActive: false,
+    });
+
+    expect(
+      updateSandboxProfileGitCommitSigningDraftState({
+        currentVersion,
+        connectionId: "icn_github_signing",
+        currentState: {
+          gitCommitSigningIntegrationConnectionId: null,
+          sourceVersionKey: "sbp_current:2",
+          hasUnpersistedChanges: true,
+        },
+      }),
+    ).toEqual({
+      gitCommitSigningIntegrationConnectionId: "icn_github_signing",
+      sourceVersionKey: "sbp_current:2",
+      hasUnpersistedChanges: false,
+    });
   });
 
   it("builds runtime draft changes from persisted runtime settings when the runtime section is not loaded", () => {

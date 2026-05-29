@@ -290,6 +290,16 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
             return;
           }
 
+          if (
+            shouldSkipGitCommitSigningImpactPreviewForIdentityLinkingChange({
+              enabled,
+              row,
+            })
+          ) {
+            await applyEnabledChange({ rowKey, enabled });
+            return;
+          }
+
           let impactConfirmation: Omit<
             PendingGitCommitSigningImpactConfirmation,
             "rowKey" | "enabled"
@@ -531,6 +541,13 @@ async function loadGitCommitSigningImpactConfirmation(input: {
     updatedProfileCount: impact.updatedProfileCount,
     invariantViolationCount: impact.invariantViolationCount,
   };
+}
+
+export function shouldSkipGitCommitSigningImpactPreviewForIdentityLinkingChange(input: {
+  enabled: boolean;
+  row: Pick<IdentityLinkingConnectionRow, "available">;
+}): boolean {
+  return !input.enabled && !input.row.available;
 }
 
 function findIdentityLinkingConnectionRowOrThrow(input: {

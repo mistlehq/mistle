@@ -254,7 +254,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
     await seedIdentityConnection(env, {
       connectionId: "icn_draft_put_git_signing_selector",
       displayName: "GitHub Signing Selector",
-      methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      methodId: IntegrationConnectionMethodIds.API_KEY,
       organizationId: session.organizationId,
       targetKey: "github-draft-put-signing-selector",
     });
@@ -294,6 +294,17 @@ describe.concurrent("sandbox profile version draft put integration", () => {
         },
         body: JSON.stringify({
           gitCommitSigningIntegrationConnectionId: "icn_draft_put_git_signing_selector",
+          integrationBindings: {
+            bindings: [
+              {
+                connectionId: "icn_draft_put_git_signing_selector",
+                kind: IntegrationBindingKinds.GIT,
+                config: {
+                  repositories: [],
+                },
+              },
+            ],
+          },
         }),
       },
     );
@@ -313,6 +324,155 @@ describe.concurrent("sandbox profile version draft put integration", () => {
     });
     expect(persistedVersion).toEqual({
       gitCommitSigningIntegrationConnectionId: "icn_draft_put_git_signing_selector",
+    });
+  });
+
+  it("rejects commit signing without a matching Git binding", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-draft-put-git-signing-without-binding@example.com",
+    });
+
+    await upsertGitHubIdentityTarget(env, {
+      targetKey: "github-draft-put-signing-without-binding",
+    });
+    await seedIdentityConnection(env, {
+      connectionId: "icn_draft_put_git_signing_without_binding",
+      displayName: "GitHub Signing Without Binding",
+      methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      organizationId: session.organizationId,
+      targetKey: "github-draft-put-signing-without-binding",
+    });
+    await seedIdentityProviderConfig(env, {
+      configId: "ilp_draft_put_git_signing_without_binding",
+      connectionId: "icn_draft_put_git_signing_without_binding",
+      organizationId: session.organizationId,
+      providerFamily: "github",
+      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      targetKey: "github-draft-put-signing-without-binding",
+      userId: session.userId,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_draft_put_git_signing_without_binding",
+        organizationId: session.organizationId,
+        displayName: "Draft Put Git Signing Without Binding Profile",
+        createdAt: "2026-05-08T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_draft_put_git_signing_without_binding",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_draft_put_git_signing_without_binding/versions/1/draft",
+      {
+        method: "PUT",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          gitCommitSigningIntegrationConnectionId: "icn_draft_put_git_signing_without_binding",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const responseBody = PutSandboxProfileVersionDraftBadRequestResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody).toEqual({
+      code: "INVALID_GIT_SIGNING_CONFIG",
+      message: "Commit signing requires a GitHub Git connection binding on the sandbox profile.",
+    });
+  });
+
+  it("rejects commit signing when the Git binding uses a different connection", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-draft-put-git-signing-mismatch@example.com",
+    });
+
+    await upsertGitHubIdentityTarget(env, {
+      targetKey: "github-draft-put-signing-mismatch",
+    });
+    await seedIdentityConnection(env, {
+      connectionId: "icn_draft_put_git_signing_mismatch_a",
+      displayName: "GitHub Signing Mismatch A",
+      methodId: IntegrationConnectionMethodIds.API_KEY,
+      organizationId: session.organizationId,
+      targetKey: "github-draft-put-signing-mismatch",
+    });
+    await seedIdentityConnection(env, {
+      connectionId: "icn_draft_put_git_signing_mismatch_b",
+      displayName: "GitHub Signing Mismatch B",
+      methodId: IntegrationConnectionMethodIds.API_KEY,
+      organizationId: session.organizationId,
+      targetKey: "github-draft-put-signing-mismatch",
+    });
+    await seedIdentityProviderConfig(env, {
+      configId: "ilp_draft_put_git_signing_mismatch_a",
+      connectionId: "icn_draft_put_git_signing_mismatch_a",
+      organizationId: session.organizationId,
+      providerFamily: "github",
+      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      targetKey: "github-draft-put-signing-mismatch",
+      userId: session.userId,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_draft_put_git_signing_mismatch",
+        organizationId: session.organizationId,
+        displayName: "Draft Put Git Signing Mismatch Profile",
+        createdAt: "2026-05-08T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_draft_put_git_signing_mismatch",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_draft_put_git_signing_mismatch/versions/1/draft",
+      {
+        method: "PUT",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          gitCommitSigningIntegrationConnectionId: "icn_draft_put_git_signing_mismatch_a",
+          integrationBindings: {
+            bindings: [
+              {
+                connectionId: "icn_draft_put_git_signing_mismatch_b",
+                kind: IntegrationBindingKinds.GIT,
+                config: {
+                  repositories: [],
+                },
+              },
+            ],
+          },
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const responseBody = PutSandboxProfileVersionDraftBadRequestResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody).toEqual({
+      code: "INVALID_GIT_SIGNING_CONFIG",
+      message:
+        "Commit signing must use the same GitHub connection as the sandbox profile Git binding.",
     });
   });
 

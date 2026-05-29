@@ -1,5 +1,6 @@
 import {
   getControlPlaneDatabaseSchema,
+  IntegrationBindingKinds,
   IntegrationConnectionStatuses,
   OrganizationIdentityLinkProviderConfigStatus,
   type IntegrationBindingKind,
@@ -181,6 +182,19 @@ export async function putProfileVersionDraft(
         ? lockedVersion.gitCommitSigningIntegrationConnectionId
         : input.gitCommitSigningIntegrationConnectionId;
     await validateGitCommitSigningDraftConfig(tx, {
+      bindings:
+        validatedBindings ??
+        (await tx.query.sandboxProfileVersionIntegrationBindings.findMany({
+          columns: {
+            connectionId: true,
+            kind: true,
+          },
+          where: (table, { and: whereAnd, eq: whereEq }) =>
+            whereAnd(
+              whereEq(table.sandboxProfileId, input.profileId),
+              whereEq(table.sandboxProfileVersion, input.profileVersion),
+            ),
+        })),
       integrationConnectionId: nextGitCommitSigningIntegrationConnectionId,
       organizationId: input.organizationId,
     });
@@ -333,10 +347,29 @@ async function validateGitCommitSigningDraftConfig(
   input: {
     organizationId: string;
     integrationConnectionId: string | null;
+    bindings: ReadonlyArray<{
+      connectionId: string;
+      kind: IntegrationBindingKind;
+    }>;
   },
 ): Promise<void> {
   if (input.integrationConnectionId === null) {
     return;
+  }
+
+  const gitBinding = input.bindings.find((binding) => binding.kind === IntegrationBindingKinds.GIT);
+  if (gitBinding === undefined) {
+    throw new SandboxProfilesBadRequestError(
+      SandboxProfilesBadRequestCodes.INVALID_GIT_SIGNING_CONFIG,
+      "Commit signing requires a GitHub Git connection binding on the sandbox profile.",
+    );
+  }
+
+  if (gitBinding.connectionId !== input.integrationConnectionId) {
+    throw new SandboxProfilesBadRequestError(
+      SandboxProfilesBadRequestCodes.INVALID_GIT_SIGNING_CONFIG,
+      "Commit signing must use the same GitHub connection as the sandbox profile Git binding.",
+    );
   }
 
   const gitHubConfigs = await db.query.organizationIdentityLinkProviderConfigs.findMany({

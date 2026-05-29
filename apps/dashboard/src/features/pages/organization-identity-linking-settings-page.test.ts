@@ -7,6 +7,7 @@ import type {
 import {
   buildIdentityLinkingConnectionRows,
   buildProviderRow,
+  shouldSkipGitCommitSigningImpactPreviewForIdentityLinkingChange,
 } from "./organization-identity-linking-settings-page.js";
 
 describe("buildIdentityLinkingConnectionRows", () => {
@@ -191,6 +192,29 @@ describe("buildProviderRow", () => {
     expect(providerRow.unavailableMessage).toBe(
       "This connection is no longer active. Disable identity linking or reconnect it.",
     );
+  });
+});
+
+describe("shouldSkipGitCommitSigningImpactPreviewForIdentityLinkingChange", () => {
+  it("skips the preview only when disabling an unavailable row", () => {
+    expect(
+      shouldSkipGitCommitSigningImpactPreviewForIdentityLinkingChange({
+        enabled: false,
+        row: { available: false },
+      }),
+    ).toBe(true);
+    expect(
+      shouldSkipGitCommitSigningImpactPreviewForIdentityLinkingChange({
+        enabled: true,
+        row: { available: false },
+      }),
+    ).toBe(false);
+    expect(
+      shouldSkipGitCommitSigningImpactPreviewForIdentityLinkingChange({
+        enabled: false,
+        row: { available: true },
+      }),
+    ).toBe(false);
   });
 });
 
