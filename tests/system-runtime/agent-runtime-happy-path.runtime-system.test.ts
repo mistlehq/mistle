@@ -58,6 +58,7 @@ const it = createSandboxSystemTest({
 
 const systemTestTimeoutMs = 10 * 60_000;
 const agentResponseTimeoutMs = 3 * 60_000;
+const openAiFastModel = "gpt-5.5";
 const openCodeZenFreeModel = {
   providerID: "opencode",
   modelID: "deepseek-v4-flash-free",
@@ -150,10 +151,16 @@ async function completeCodexConversation(input: {
   try {
     const thread = await startCodexThread({
       rpcClient: attachedAgentSession.rpcClient,
+      model: openAiFastModel,
     });
     const turn = await startCodexTurn({
       rpcClient: attachedAgentSession.rpcClient,
       threadId: thread.threadId,
+      collaborationModeSettings: {
+        model: openAiFastModel,
+        reasoningEffort: null,
+        developerInstructions: null,
+      },
       input: [
         {
           type: "text",
@@ -265,6 +272,15 @@ async function completePiConversation(input: {
   try {
     await client.connect();
     const conversation = await client.createConversation({});
+    await client.setModel({
+      sessionFile: conversation.sessionFile,
+      provider: "openai",
+      modelId: openAiFastModel,
+    });
+    await client.setThinkingLevel({
+      sessionFile: conversation.sessionFile,
+      level: "off",
+    });
     await client.prompt({
       sessionFile: conversation.sessionFile,
       message: input.prompt,
