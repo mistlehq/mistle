@@ -21,7 +21,12 @@ import { CurrentActorResponseSchema } from "../src/me/get-current-actor/schema.j
 import { CurrentUserOrganizationsResponseSchema } from "../src/me/list-organizations/schema.js";
 import { OAuthTokenResponseSchema } from "../src/oauth/schemas.js";
 import {
+  createMistleCliAuthorizationCode,
+  exchangeMistleCliAuthorizationCode,
+} from "../src/oauth/services/authorization-code.js";
+import {
   authenticateOAuthAccessToken,
+  createOAuthGrantTokenPair,
   refreshOAuthTokenPair,
 } from "../src/oauth/services/oauth-token.js";
 import { ListSandboxInstancesResponseSchema } from "../src/sandbox-instances/index.js";
@@ -37,6 +42,7 @@ describe("OAuth CLI login integration", () => {
   }) => {
     const redirectUri = "http://127.0.0.1:61740/callback";
     const authorizePath = buildAuthorizePath({
+      resource: env.controlPlaneApi.hostBaseUrl,
       redirectUri,
       state: "unauthenticated-state",
       codeChallenge: pkceChallenge("unauthenticated-verifier-unauthenticated-verifier"),
@@ -72,6 +78,7 @@ describe("OAuth CLI login integration", () => {
 
     const authorizeResponse = await env.controlPlaneApi.http.fetch(
       buildAuthorizePath({
+        resource: env.controlPlaneApi.hostBaseUrl,
         redirectUri,
         state,
         codeChallenge: pkceChallenge(codeVerifier),
@@ -112,6 +119,7 @@ describe("OAuth CLI login integration", () => {
         grant_type: "authorization_code",
         client_id: "mistle-cli",
         redirect_uri: redirectUri,
+        resource: env.controlPlaneApi.hostBaseUrl,
         code,
         code_verifier: codeVerifier,
       }),
@@ -134,6 +142,11 @@ describe("OAuth CLI login integration", () => {
         OrganizationPermissions.SANDBOX_SESSION_CONNECT,
       ].join(" "),
     );
+    const authContext = await authenticateOAuthAccessToken({
+      db: env.controlPlaneDb,
+      token: tokenBody.access_token,
+    });
+    expect(authContext.oauth.resource).toBe(env.controlPlaneApi.hostBaseUrl);
 
     const currentActorResponse = await env.controlPlaneApi.http.fetch("/v1/me", {
       headers: {
@@ -176,6 +189,7 @@ describe("OAuth CLI login integration", () => {
         grant_type: "authorization_code",
         client_id: "mistle-cli",
         redirect_uri: redirectUri,
+        resource: env.controlPlaneApi.hostBaseUrl,
         code,
         code_verifier: codeVerifier,
       }),
@@ -194,6 +208,7 @@ describe("OAuth CLI login integration", () => {
       body: new URLSearchParams({
         grant_type: "refresh_token",
         client_id: "mistle-cli",
+        resource: env.controlPlaneApi.hostBaseUrl,
         refresh_token: tokenBody.refresh_token,
       }),
     });
@@ -250,6 +265,7 @@ describe("OAuth CLI login integration", () => {
       db: env.controlPlaneDb,
       oauthClientId: mistleCliClient.id,
       refreshToken: tokenBody.refresh_token,
+      resource: env.controlPlaneApi.hostBaseUrl,
     });
     expect(narrowedRefreshToken.scope).toBe(
       [
@@ -291,6 +307,7 @@ describe("OAuth CLI login integration", () => {
       body: new URLSearchParams({
         grant_type: "refresh_token",
         client_id: "mistle-cli",
+        resource: env.controlPlaneApi.hostBaseUrl,
         refresh_token: tokenBody.refresh_token,
       }),
     });
@@ -425,6 +442,11 @@ describe("OAuth CLI login integration", () => {
     const switchedScopes = switchedTokenBody.scope.split(" ");
     expect(switchedScopes).toHaveLength(expectedScopes.length);
     expect(new Set(switchedScopes)).toStrictEqual(new Set(expectedScopes));
+    const switchedGrant = await authenticateOAuthAccessToken({
+      db: env.controlPlaneDb,
+      token: switchedTokenBody.access_token,
+    });
+    expect(switchedGrant.oauth.resource).toBe(env.controlPlaneApi.hostBaseUrl);
 
     const switchedActorResponse = await env.controlPlaneApi.http.fetch("/v1/me", {
       headers: {
@@ -455,6 +477,7 @@ describe("OAuth CLI login integration", () => {
 
     const authorizeResponse = await env.controlPlaneApi.http.fetch(
       buildAuthorizePath({
+        resource: env.controlPlaneApi.hostBaseUrl,
         redirectUri,
         state: "pkce-state",
         codeChallenge: pkceChallenge("correct-verifier-correct-verifier-correct-verifier"),
@@ -488,6 +511,7 @@ describe("OAuth CLI login integration", () => {
         grant_type: "authorization_code",
         client_id: "mistle-cli",
         redirect_uri: redirectUri,
+        resource: env.controlPlaneApi.hostBaseUrl,
         code,
         code_verifier: "wrong-verifier-wrong-verifier-wrong-verifier",
       }),
@@ -498,6 +522,228 @@ describe("OAuth CLI login integration", () => {
       error: "invalid_grant",
       error_description: "Authorization code verifier is invalid.",
     });
+  });
+
+  it("rejects CLI OAuth requests with a non-control-plane resource", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: `integration-oauth-cli-login-invalid-target-${randomUUID()}@example.com`,
+    });
+    const redirectUri = "http://127.0.0.1:61745/callback";
+    const codeVerifier = "invalid-target-verifier-invalid-target-verifier";
+
+    const authorizeResponse = await env.controlPlaneApi.http.fetch(
+      buildAuthorizePath({
+        resource: "https://mcp.example.test/mcp",
+        redirectUri,
+        state: "invalid-target-state",
+        codeChallenge: pkceChallenge(codeVerifier),
+      }),
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+        redirect: "manual",
+      },
+    );
+    expect(authorizeResponse.status).toBe(302);
+    const invalidTargetRedirect = authorizeResponse.headers.get("location");
+    expect(invalidTargetRedirect).not.toBeNull();
+    if (invalidTargetRedirect === null) {
+      throw new Error("Expected invalid target redirect location.");
+    }
+    const invalidTargetUrl = new URL(invalidTargetRedirect);
+    expect(invalidTargetUrl.origin).toBe("http://127.0.0.1:61745");
+    expect(invalidTargetUrl.pathname).toBe("/callback");
+    expect(invalidTargetUrl.searchParams.get("error")).toBe("invalid_target");
+    expect(invalidTargetUrl.searchParams.get("error_description")).toBe(
+      "OAuth resource is invalid.",
+    );
+    expect(invalidTargetUrl.searchParams.get("state")).toBe("invalid-target-state");
+
+    const tokenResponse = await env.controlPlaneApi.http.fetch("/oauth/token", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: "mistle-cli",
+        redirect_uri: redirectUri,
+        resource: "https://mcp.example.test/mcp",
+        code: "unused-code",
+        code_verifier: codeVerifier,
+      }),
+    });
+    expect(tokenResponse.status).toBe(400);
+    expect(await tokenResponse.json()).toStrictEqual({
+      error: "invalid_target",
+      error_description: "OAuth resource is invalid.",
+    });
+
+    const refreshResponse = await env.controlPlaneApi.http.fetch("/oauth/token", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: "mistle-cli",
+        resource: "https://mcp.example.test/mcp",
+        refresh_token: "unused-refresh-token",
+      }),
+    });
+    expect(refreshResponse.status).toBe(400);
+    expect(await refreshResponse.json()).toStrictEqual({
+      error: "invalid_target",
+      error_description: "OAuth resource is invalid.",
+    });
+  });
+
+  it("rejects legacy grants without a stored OAuth resource", async ({ env }) => {
+    const tokenBody = await authorizeAndExchangeCliToken({
+      codeVerifier: "legacy-resource-verifier-legacy-resource-verifier",
+      env,
+      redirectUri: "http://127.0.0.1:61746/callback",
+      sessionCookie: (
+        await env.auth.createSession({
+          email: `integration-oauth-cli-login-legacy-${randomUUID()}@example.com`,
+        })
+      ).cookie,
+      state: "legacy-resource-state",
+    });
+    const authContext = await authenticateOAuthAccessToken({
+      db: env.controlPlaneDb,
+      token: tokenBody.access_token,
+    });
+
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.oauthGrants)
+      .set({ resource: null })
+      .where(eq(env.controlPlaneTables.oauthGrants.id, authContext.oauth.grantId));
+
+    const currentActorResponse = await env.controlPlaneApi.http.fetch("/v1/me", {
+      headers: {
+        authorization: `Bearer ${tokenBody.access_token}`,
+      },
+    });
+    expect(currentActorResponse.status).toBe(401);
+
+    const refreshResponse = await env.controlPlaneApi.http.fetch("/oauth/token", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: "mistle-cli",
+        resource: env.controlPlaneApi.hostBaseUrl,
+        refresh_token: tokenBody.refresh_token,
+      }),
+    });
+    expect(refreshResponse.status).toBe(401);
+  });
+
+  it("rejects MCP-resource OAuth tokens on normal API and organization switch routes", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: `integration-oauth-cli-login-mcp-resource-${randomUUID()}@example.com`,
+    });
+    const client = await env.controlPlaneDb.query.oauthClients.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (table, { eq }) => eq(table.clientId, "mistle-cli"),
+    });
+    if (client === undefined) {
+      throw new Error("Expected Mistle CLI OAuth client.");
+    }
+    const tokenPair = await createOAuthGrantTokenPair({
+      db: env.controlPlaneDb,
+      oauthClientId: client.id,
+      userId: session.userId,
+      organizationId: session.organizationId,
+      resource: "https://mcp.example.test/mcp",
+      permissions: [OrganizationPermissions.ORGANIZATION_READ],
+    });
+
+    const currentActorResponse = await env.controlPlaneApi.http.fetch("/v1/me", {
+      headers: {
+        authorization: `Bearer ${tokenPair.accessToken}`,
+      },
+    });
+    expect(currentActorResponse.status).toBe(401);
+
+    const switchResponse = await env.controlPlaneApi.http.fetch("/oauth/switch-organization", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${tokenPair.accessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        organizationId: session.organizationId,
+      }),
+    });
+    expect(switchResponse.status).toBe(401);
+  });
+
+  it("rejects direct token operations when the requested resource mismatches the grant", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: `integration-oauth-cli-login-mismatch-${randomUUID()}@example.com`,
+    });
+    const client = await env.controlPlaneDb.query.oauthClients.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (table, { eq }) => eq(table.clientId, "mistle-cli"),
+    });
+    if (client === undefined) {
+      throw new Error("Expected Mistle CLI OAuth client.");
+    }
+    const redirectUri = "http://127.0.0.1:61747/callback";
+    const codeVerifier = "resource-mismatch-verifier-resource-mismatch";
+    const codeChallenge = pkceChallenge(codeVerifier);
+    const code = await createMistleCliAuthorizationCode({
+      db: env.controlPlaneDb,
+      clientId: "mistle-cli",
+      redirectUri,
+      resource: env.controlPlaneApi.hostBaseUrl,
+      codeChallenge,
+      userId: session.userId,
+      organizationId: session.organizationId,
+      permissions: [OrganizationPermissions.ORGANIZATION_READ],
+    });
+
+    await expect(
+      exchangeMistleCliAuthorizationCode({
+        db: env.controlPlaneDb,
+        oauthClientId: client.id,
+        clientId: "mistle-cli",
+        redirectUri,
+        resource: "https://mcp.example.test/mcp",
+        code,
+        codeVerifier,
+      }),
+    ).rejects.toThrow("Authorization code resource does not match.");
+
+    const tokenBody = await authorizeAndExchangeCliToken({
+      codeVerifier: "resource-refresh-mismatch-verifier-resource-refresh",
+      env,
+      redirectUri: "http://127.0.0.1:61748/callback",
+      sessionCookie: session.cookie,
+      state: "resource-refresh-mismatch-state",
+    });
+
+    await expect(
+      refreshOAuthTokenPair({
+        db: env.controlPlaneDb,
+        oauthClientId: client.id,
+        refreshToken: tokenBody.refresh_token,
+        resource: "https://mcp.example.test/mcp",
+      }),
+    ).rejects.toThrow("Refresh token resource does not match.");
   });
 
   it("rejects OAuth access and refresh tokens after organization membership is revoked", async ({
@@ -511,6 +757,7 @@ describe("OAuth CLI login integration", () => {
 
     const authorizeResponse = await env.controlPlaneApi.http.fetch(
       buildAuthorizePath({
+        resource: env.controlPlaneApi.hostBaseUrl,
         redirectUri,
         state: "revoked-state",
         codeChallenge: pkceChallenge(codeVerifier),
@@ -543,6 +790,7 @@ describe("OAuth CLI login integration", () => {
         grant_type: "authorization_code",
         client_id: "mistle-cli",
         redirect_uri: redirectUri,
+        resource: env.controlPlaneApi.hostBaseUrl,
         code,
         code_verifier: codeVerifier,
       }),
@@ -578,6 +826,7 @@ describe("OAuth CLI login integration", () => {
       body: new URLSearchParams({
         grant_type: "refresh_token",
         client_id: "mistle-cli",
+        resource: env.controlPlaneApi.hostBaseUrl,
         refresh_token: tokenBody.refresh_token,
       }),
     });
@@ -590,6 +839,7 @@ describe("OAuth CLI login integration", () => {
 });
 
 function buildAuthorizePath(input: {
+  resource: string;
   redirectUri: string;
   state: string;
   codeChallenge: string;
@@ -598,6 +848,7 @@ function buildAuthorizePath(input: {
     response_type: "code",
     client_id: "mistle-cli",
     redirect_uri: input.redirectUri,
+    resource: input.resource,
     state: input.state,
     code_challenge: input.codeChallenge,
     code_challenge_method: "S256",
@@ -617,6 +868,7 @@ async function authorizeAndExchangeCliToken(input: {
 }) {
   const authorizeResponse = await input.env.controlPlaneApi.http.fetch(
     buildAuthorizePath({
+      resource: input.env.controlPlaneApi.hostBaseUrl,
       redirectUri: input.redirectUri,
       state: input.state,
       codeChallenge: pkceChallenge(input.codeVerifier),
@@ -650,6 +902,7 @@ async function authorizeAndExchangeCliToken(input: {
       grant_type: "authorization_code",
       client_id: "mistle-cli",
       redirect_uri: input.redirectUri,
+      resource: input.env.controlPlaneApi.hostBaseUrl,
       code,
       code_verifier: input.codeVerifier,
     }),

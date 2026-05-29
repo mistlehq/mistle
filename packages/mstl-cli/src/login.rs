@@ -80,6 +80,7 @@ where
     let authorization_url = build_authorization_url(AuthorizationUrlInput {
         base_url: &base_url,
         redirect_uri: &redirect_uri,
+        resource: &base_url,
         state: &state,
         code_challenge: &code_challenge,
     })?;
@@ -93,6 +94,7 @@ where
         base_url: &base_url,
         code: &callback.code,
         redirect_uri: &redirect_uri,
+        resource: &base_url,
         code_verifier: &code_verifier,
     })?;
     let auth_file_path = auth_file::write_oauth(oauth_token_response_to_auth(token)?)?;
@@ -105,6 +107,7 @@ where
 struct AuthorizationUrlInput<'a> {
     base_url: &'a str,
     redirect_uri: &'a str,
+    resource: &'a str,
     state: &'a str,
     code_challenge: &'a str,
 }
@@ -120,6 +123,7 @@ fn build_authorization_url(input: AuthorizationUrlInput<'_>) -> Result<Url, CliE
         .append_pair("response_type", "code")
         .append_pair("client_id", CLI_CLIENT_ID)
         .append_pair("redirect_uri", input.redirect_uri)
+        .append_pair("resource", input.resource)
         .append_pair("state", input.state)
         .append_pair("code_challenge", input.code_challenge)
         .append_pair("code_challenge_method", "S256");
@@ -268,6 +272,7 @@ struct TokenExchangeInput<'a> {
     base_url: &'a str,
     code: &'a str,
     redirect_uri: &'a str,
+    resource: &'a str,
     code_verifier: &'a str,
 }
 
@@ -280,6 +285,7 @@ fn exchange_authorization_code(
             ("grant_type", "authorization_code"),
             ("client_id", CLI_CLIENT_ID),
             ("redirect_uri", input.redirect_uri),
+            ("resource", input.resource),
             ("code", input.code),
             ("code_verifier", input.code_verifier),
         ])
@@ -302,6 +308,7 @@ pub(crate) fn refresh_oauth_auth(
         .send_form([
             ("grant_type", "refresh_token"),
             ("client_id", CLI_CLIENT_ID),
+            ("resource", base_url),
             ("refresh_token", refresh_token),
         ])
         .map_err(|source| login_error("refresh OAuth token", source))?;
@@ -423,6 +430,7 @@ mod tests {
         let url = build_authorization_url(AuthorizationUrlInput {
             base_url: "http://127.0.0.1:5100",
             redirect_uri: "http://127.0.0.1:61234/callback",
+            resource: "http://127.0.0.1:5100",
             state: "state-token",
             code_challenge: "challenge-token",
         })
@@ -430,7 +438,7 @@ mod tests {
 
         assert_eq!(
             url.as_str(),
-            "http://127.0.0.1:5100/oauth/authorize?response_type=code&client_id=mistle-cli&redirect_uri=http%3A%2F%2F127.0.0.1%3A61234%2Fcallback&state=state-token&code_challenge=challenge-token&code_challenge_method=S256"
+            "http://127.0.0.1:5100/oauth/authorize?response_type=code&client_id=mistle-cli&redirect_uri=http%3A%2F%2F127.0.0.1%3A61234%2Fcallback&resource=http%3A%2F%2F127.0.0.1%3A5100&state=state-token&code_challenge=challenge-token&code_challenge_method=S256"
         );
     }
 

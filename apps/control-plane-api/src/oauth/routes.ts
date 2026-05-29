@@ -20,6 +20,7 @@ import { OAuthAuthorizeQuerySchema, OAuthTokenRequestSchema } from "./schemas.js
 import {
   createMistleCliAuthorizationCode,
   exchangeMistleCliAuthorizationCode,
+  OAuthErrorCodes,
 } from "./services/authorization-code.js";
 import { refreshOAuthTokenPair } from "./services/oauth-token.js";
 import { buildPublicRequestUrl } from "./services/public-request-url.js";
@@ -63,6 +64,18 @@ export function createOAuthRoutes(): AppRoutes<typeof OAUTH_ROUTE_BASE_PATH> {
         db,
         redirectUri: query.redirect_uri,
       });
+      const resourceError = validateMistleCliResource({
+        resource: query.resource,
+        expectedResource: ctx.get("config").auth.baseUrl,
+      });
+      if (resourceError !== null) {
+        return redirectOAuthErrorToClient({
+          ctx,
+          redirectUri: query.redirect_uri,
+          state: query.state,
+          error: resourceError,
+        });
+      }
       const permissions = await resolveAuthorizedPermissions({
         session,
         requestedScope: query.scope,
@@ -73,6 +86,7 @@ export function createOAuthRoutes(): AppRoutes<typeof OAUTH_ROUTE_BASE_PATH> {
         db,
         clientId: query.client_id,
         redirectUri: query.redirect_uri,
+        resource: query.resource,
         codeChallenge: query.code_challenge,
         userId: session.user.id,
         organizationId: session.activeOrganizationId,
@@ -101,6 +115,13 @@ export function createOAuthRoutes(): AppRoutes<typeof OAUTH_ROUTE_BASE_PATH> {
             ? OAuthGrantTypes.AUTHORIZATION_CODE
             : OAuthGrantTypes.REFRESH_TOKEN,
       });
+      const resourceError = validateMistleCliResource({
+        resource: body.resource,
+        expectedResource: ctx.get("config").auth.baseUrl,
+      });
+      if (resourceError !== null) {
+        throw resourceError;
+      }
 
       const result =
         body.grant_type === "authorization_code"
@@ -109,6 +130,7 @@ export function createOAuthRoutes(): AppRoutes<typeof OAUTH_ROUTE_BASE_PATH> {
               db,
               oauthClientId: client.id,
               refreshToken: body.refresh_token,
+              resource: body.resource,
             });
 
       return ctx.json(
@@ -164,7 +186,19 @@ async function exchangeAuthorizationCodeToken(input: {
     redirectUri: input.body.redirect_uri,
     code: input.body.code,
     codeVerifier: input.body.code_verifier,
+    resource: input.body.resource,
   });
+}
+
+function validateMistleCliResource(input: {
+  resource: string;
+  expectedResource: string;
+}): BadRequestError | null {
+  if (input.resource !== input.expectedResource) {
+    return new BadRequestError(OAuthErrorCodes.INVALID_TARGET, "OAuth resource is invalid.");
+  }
+
+  return null;
 }
 
 async function resolveAuthorizedPermissions(input: {
@@ -217,7 +251,11 @@ function handleOAuthError(ctx: Context<AppContextBindings>, error: unknown) {
   }
 
   if (error instanceof HttpError) {
-    if (error.code.startsWith("invalid_") || error.code === "unauthorized_client") {
+    if (
+      error.code.startsWith("invalid_") ||
+      error.code === "unauthorized_client" ||
+      error.code === OAuthErrorCodes.INVALID_TARGET
+    ) {
       return ctx.json(
         {
           error: error.code,
@@ -231,4 +269,18 @@ function handleOAuthError(ctx: Context<AppContextBindings>, error: unknown) {
   }
 
   throw error;
+}
+
+function redirectOAuthErrorToClient(input: {
+  ctx: Context<AppContextBindings>;
+  redirectUri: string;
+  state: string;
+  error: HttpError;
+}) {
+  const redirectUrl = new URL(input.redirectUri);
+  redirectUrl.searchParams.set("error", input.error.code);
+  redirectUrl.searchParams.set("error_description", input.error.message);
+  redirectUrl.searchParams.set("state", input.state);
+
+  return input.ctx.redirect(redirectUrl.toString(), 302);
 }

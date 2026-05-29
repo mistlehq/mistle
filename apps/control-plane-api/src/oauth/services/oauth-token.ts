@@ -30,6 +30,7 @@ export async function createOAuthGrantTokenPair(input: {
   oauthClientId: string;
   userId: string;
   organizationId: string;
+  resource: string;
   permissions: readonly OrganizationPermission[];
   clock?: Clock;
 }): Promise<OAuthTokenPair> {
@@ -45,6 +46,7 @@ export async function createOAuthGrantTokenPair(input: {
       oauthClientId: input.oauthClientId,
       userId: input.userId,
       organizationId: input.organizationId,
+      resource: input.resource,
     })
     .returning({ id: tables.oauthGrants.id });
 
@@ -74,6 +76,7 @@ export async function refreshOAuthTokenPair(input: {
   db: ControlPlaneDatabase;
   oauthClientId: string;
   refreshToken: string;
+  resource: string;
   clock?: Clock;
 }): Promise<OAuthTokenPair> {
   const clock = input.clock ?? systemClock;
@@ -88,6 +91,7 @@ export async function refreshOAuthTokenPair(input: {
       oauthClientId: true,
       userId: true,
       organizationId: true,
+      resource: true,
       revokedAt: true,
     },
     where: (table, { eq }) => eq(table.id, refreshTokenRow.oauthGrantId),
@@ -98,6 +102,12 @@ export async function refreshOAuthTokenPair(input: {
   }
   if (grant.oauthClientId !== input.oauthClientId) {
     throw new BadRequestError("invalid_grant", "Refresh token client does not match.");
+  }
+  if (grant.resource === null) {
+    throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
+  }
+  if (grant.resource !== input.resource) {
+    throw new BadRequestError("invalid_grant", "Refresh token resource does not match.");
   }
 
   const permissions = await readCurrentlyAuthorizedGrantPermissions({
@@ -121,6 +131,7 @@ export async function switchOAuthOrganizationTokenPair(input: {
   db: ControlPlaneDatabase;
   accessToken: string;
   organizationId: string;
+  expectedResource: string;
   clock?: Clock;
 }): Promise<OAuthTokenPair> {
   const authContext = await authenticateOAuthAccessToken({
@@ -133,12 +144,16 @@ export async function switchOAuthOrganizationTokenPair(input: {
       id: true,
       oauthClientId: true,
       userId: true,
+      resource: true,
       revokedAt: true,
     },
     where: (table, { eq }) => eq(table.id, authContext.oauth.grantId),
   });
 
   if (sourceGrant === undefined || sourceGrant.revokedAt !== null) {
+    throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
+  }
+  if (sourceGrant.resource === null || sourceGrant.resource !== input.expectedResource) {
     throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
   }
 
@@ -161,6 +176,7 @@ export async function switchOAuthOrganizationTokenPair(input: {
     oauthClientId: sourceGrant.oauthClientId,
     userId: sourceGrant.userId,
     organizationId: input.organizationId,
+    resource: sourceGrant.resource,
     permissions,
     ...(input.clock === undefined ? {} : { clock: input.clock }),
   });
@@ -209,11 +225,15 @@ export async function authenticateOAuthAccessToken(input: {
       oauthClientId: true,
       userId: true,
       organizationId: true,
+      resource: true,
       revokedAt: true,
     },
     where: (table, { eq }) => eq(table.id, accessToken.oauthGrantId),
   });
   if (grant === undefined || grant.revokedAt !== null) {
+    throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
+  }
+  if (grant.resource === null) {
     throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
   }
 
@@ -236,6 +256,7 @@ export async function authenticateOAuthAccessToken(input: {
       grantId: grant.id,
       userId: grant.userId,
       organizationId: grant.organizationId,
+      resource: grant.resource,
     },
     permissions,
   };

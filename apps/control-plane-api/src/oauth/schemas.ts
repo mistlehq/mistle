@@ -7,6 +7,7 @@ export const OAuthAuthorizeQuerySchema = z
     response_type: z.literal("code"),
     client_id: z.string().min(1),
     redirect_uri: z.url(),
+    resource: z.url(),
     state: z.string().min(1),
     code_challenge: z.string().min(43).max(128),
     code_challenge_method: z.literal("S256"),
@@ -19,6 +20,7 @@ export const OAuthAuthorizationCodeTokenRequestSchema = z
     grant_type: z.literal("authorization_code"),
     client_id: z.string().min(1),
     redirect_uri: z.url(),
+    resource: z.url(),
     code: z.string().min(1),
     code_verifier: z.string().min(43).max(128),
   })
@@ -28,6 +30,7 @@ export const OAuthRefreshTokenRequestSchema = z
   .object({
     grant_type: z.literal("refresh_token"),
     client_id: z.string().min(1),
+    resource: z.url(),
     refresh_token: z.string().min(1),
   })
   .strict();
@@ -54,11 +57,12 @@ export const OAuthErrorResponseSchema = z
   })
   .strict();
 
-export const MistleCliAuthorizationCodePayloadSchema = z
+export const OAuthAuthorizationCodePayloadSchema = z
   .object({
     kind: z.literal("mistle_cli_authorization_code"),
     clientId: z.string().min(1),
     redirectUri: z.url(),
+    resource: z.url(),
     codeChallenge: z.string().min(43).max(128),
     codeChallengeMethod: z.literal("S256"),
     userId: z.string().min(1),
@@ -67,6 +71,4 @@ export const MistleCliAuthorizationCodePayloadSchema = z
   })
   .strict();
 
-export type MistleCliAuthorizationCodePayload = z.output<
-  typeof MistleCliAuthorizationCodePayloadSchema
->;
+export type OAuthAuthorizationCodePayload = z.output<typeof OAuthAuthorizationCodePayloadSchema>;

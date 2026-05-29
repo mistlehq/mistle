@@ -274,6 +274,13 @@
       "when": 1779779332933,
       "tag": "0038_add-oauth-server-tables",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1780046500000,
+      "tag": "0039_add-oauth-grant-resource",
+      "breakpoints": true
     }
   ]
 }

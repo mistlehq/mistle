@@ -76,6 +76,7 @@ export type AppAuthContext =
         grantId: string;
         userId: string;
         organizationId: string;
+        resource: string;
       };
       permissions: readonly OrganizationPermission[];
     }

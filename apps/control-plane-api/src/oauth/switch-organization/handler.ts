@@ -21,6 +21,7 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
     db: ctx.get("db"),
     accessToken: bearerToken,
     organizationId: body.organizationId,
+    expectedResource: ctx.get("config").auth.baseUrl,
   });
 
   const responseBody: OAuthTokenResponse = {

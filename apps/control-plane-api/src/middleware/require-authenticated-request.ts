@@ -25,6 +25,12 @@ export function createRequireAuthenticatedRequestMiddleware(): MiddlewareHandler
         const authContext = isApiKeyToken(bearerToken)
           ? await authenticateApiKeyToken({ db, token: bearerToken })
           : await authenticateOAuthAccessToken({ db, token: bearerToken });
+        if (
+          authContext.kind === "oauth" &&
+          authContext.oauth.resource !== ctx.get("config").auth.baseUrl
+        ) {
+          throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
+        }
         ctx.set("authContext", authContext);
       } catch (error) {
         return handleHttpError(ctx, error);

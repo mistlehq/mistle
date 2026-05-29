@@ -22,6 +22,8 @@ export function defineOAuthGrants(schema: PgSchema) {
       organizationId: text("organization_id")
         .notNull()
         .references(() => organizations.id, { onDelete: "cascade" }),
+      // OAuth RFC 8707 protected resource audience, not a Mistle domain resource.
+      resource: text("resource"),
       revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "string" }),
       createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
         .notNull()
@@ -30,7 +32,10 @@ export function defineOAuthGrants(schema: PgSchema) {
         .notNull()
         .defaultNow(),
     },
-    (table) => [index("oauth_grants_user_organization_idx").on(table.userId, table.organizationId)],
+    (table) => [
+      index("oauth_grants_user_organization_idx").on(table.userId, table.organizationId),
+      index("oauth_grants_resource_idx").on(table.resource),
+    ],
   );
 }
 

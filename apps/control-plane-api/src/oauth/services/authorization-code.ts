@@ -8,8 +8,8 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 
 import type { OrganizationPermission } from "../../auth/services/organization-policy.js";
 import {
-  MistleCliAuthorizationCodePayloadSchema,
-  type MistleCliAuthorizationCodePayload,
+  OAuthAuthorizationCodePayloadSchema,
+  type OAuthAuthorizationCodePayload,
 } from "../schemas.js";
 import { createOAuthGrantTokenPair } from "./oauth-token.js";
 import { verifyS256Pkce } from "./pkce.js";
@@ -20,10 +20,12 @@ const AuthorizationCodeTtlMs = 10 * 60 * 1000;
 export const OAuthErrorCodes: {
   INVALID_REQUEST: string;
   INVALID_GRANT: string;
+  INVALID_TARGET: string;
   UNAUTHORIZED_CLIENT: string;
 } = {
   INVALID_REQUEST: "invalid_request",
   INVALID_GRANT: "invalid_grant",
+  INVALID_TARGET: "invalid_target",
   UNAUTHORIZED_CLIENT: "unauthorized_client",
 };
 
@@ -31,6 +33,7 @@ export async function createMistleCliAuthorizationCode(input: {
   db: ControlPlaneDatabase;
   clientId: string;
   redirectUri: string;
+  resource: string;
   codeChallenge: string;
   userId: string;
   organizationId: string;
@@ -49,6 +52,7 @@ export async function createMistleCliAuthorizationCode(input: {
       kind: AuthorizationCodeModelName,
       clientId: input.clientId,
       redirectUri: input.redirectUri,
+      resource: input.resource,
       codeChallenge: input.codeChallenge,
       codeChallengeMethod: "S256",
       userId: input.userId,
@@ -66,6 +70,7 @@ export async function exchangeMistleCliAuthorizationCode(input: {
   oauthClientId: string;
   clientId: string;
   redirectUri: string;
+  resource: string;
   code: string;
   codeVerifier: string;
   clock?: Clock;
@@ -94,12 +99,15 @@ export async function exchangeMistleCliAuthorizationCode(input: {
       throw invalidGrant("Authorization code has expired.");
     }
 
-    const payload = MistleCliAuthorizationCodePayloadSchema.parse(state.payload);
+    const payload = OAuthAuthorizationCodePayloadSchema.parse(state.payload);
     if (payload.clientId !== input.clientId) {
       throw invalidGrant("Authorization code client does not match.");
     }
     if (payload.redirectUri !== input.redirectUri) {
       throw invalidGrant("Authorization code redirect URI does not match.");
+    }
+    if (payload.resource !== input.resource) {
+      throw invalidGrant("Authorization code resource does not match.");
     }
     if (
       !verifyS256Pkce({
@@ -130,6 +138,7 @@ export async function exchangeMistleCliAuthorizationCode(input: {
       oauthClientId: input.oauthClientId,
       userId: payload.userId,
       organizationId: payload.organizationId,
+      resource: payload.resource,
       permissions: payload.permissions,
       clock,
     });
@@ -144,8 +153,8 @@ export async function exchangeMistleCliAuthorizationCode(input: {
 }
 
 function createAuthorizationCodePayload(
-  payload: MistleCliAuthorizationCodePayload,
-): MistleCliAuthorizationCodePayload {
+  payload: OAuthAuthorizationCodePayload,
+): OAuthAuthorizationCodePayload {
   return payload;
 }
 
