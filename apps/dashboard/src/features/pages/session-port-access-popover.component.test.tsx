@@ -118,14 +118,12 @@ function SessionPortAccessPopoverHarness(): React.JSX.Element {
 }
 
 describe("SessionPortAccessPopover", () => {
-  it("shows one IPv4 localhost row per port and opens the selected port when clicked", async () => {
+  it("shows one local listener row per port and opens the selected port when clicked", async () => {
     render(<SessionPortAccessPopoverHarness />);
 
     fireEvent.click(screen.getByRole("button", { name: "Open processes" }));
 
-    expect(await screen.findByText(/0\.0\.0\.0, 127\.0\.0\.1/)).toBeTruthy();
-    expect(screen.queryByText(/::1/)).toBeNull();
-    expect(screen.queryByText(/::/)).toBeNull();
+    expect(await screen.findByText(/::, ::1, 0\.0\.0\.0, 127\.0\.0\.1/)).toBeTruthy();
     expect(screen.queryByText("3901")).toBeNull();
     expect(screen.queryByText("4520")).toBeNull();
     expect(screen.queryByText("4501")).toBeNull();

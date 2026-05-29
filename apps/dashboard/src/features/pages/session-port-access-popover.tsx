@@ -41,9 +41,15 @@ const MistleManagedProcessCommandPrefixes = [
 
 function shouldShowBindAddressInDashboard(bindAddress: string): boolean {
   // Product decision: the dashboard process menu is for common browser-facing dev servers.
-  // sandboxd may still report IPv6 listeners for lower-level tunnel use, but this surface
-  // intentionally stays focused on localhost IPv4 and all-interface IPv4 binds.
-  return bindAddress === "127.0.0.1" || bindAddress === "0.0.0.0" || bindAddress === "localhost";
+  // Include IPv4 and IPv6 loopback/all-interface binds because common tools can report
+  // localhost listeners as IPv6 wildcard sockets while still serving local browser traffic.
+  return (
+    bindAddress === "127.0.0.1" ||
+    bindAddress === "0.0.0.0" ||
+    bindAddress === "::1" ||
+    bindAddress === "::" ||
+    bindAddress === "localhost"
+  );
 }
 
 function shouldShowProcessInDashboard(process: ProcessEntry): boolean {
