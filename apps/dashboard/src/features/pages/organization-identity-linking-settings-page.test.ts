@@ -153,7 +153,7 @@ describe("buildProviderRow", () => {
 
     expect(providerRow.rowKey).toBe("github:icn_github_engineering");
     expect(providerRow.organizationProviderConfigId).toBe("ilp_github_engineering");
-    expect(providerRow.connectionLabel).toBe("GitHub Engineering · GitHub App installation");
+    expect(providerRow.connectionLabel).toBe("GitHub Engineering");
     expect(providerRow.enabled).toBe(false);
     expect(providerRow.linkedUsersCount).toBe(1);
     expect(providerRow.unavailableMessage).toBeNull();
@@ -187,7 +187,7 @@ describe("buildProviderRow", () => {
       providerLinksQuery: null,
     });
 
-    expect(providerRow.connectionLabel).toBe("GitHub Engineering · GitHub App installation");
+    expect(providerRow.connectionLabel).toBe("GitHub Engineering");
     expect(providerRow.unavailableMessage).toBe(
       "This connection is no longer active. Disable identity linking or reconnect it.",
     );

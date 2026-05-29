@@ -19,7 +19,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
         onConfirmGitCommitSigningImpactConfirmation={async () => {}}
         providers={[
           createProviderRow({
-            connectionLabel: "Engineering GitHub · GitHub App installation",
+            connectionLabel: "Engineering GitHub",
             linkedUsersCount: 1,
             memberLinks: [
               {
@@ -47,11 +47,11 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
     );
 
     expect(screen.getByText("GitHub")).toBeTruthy();
-    expect(screen.getByText("Engineering GitHub · GitHub App installation")).toBeTruthy();
+    expect(screen.getByText("Engineering GitHub")).toBeTruthy();
     expect(screen.queryByRole("combobox", { name: "GitHub connection" })).toBeNull();
     expect(
       screen.getByRole("switch", {
-        name: "Enable GitHub identity linking for Engineering GitHub · GitHub App installation",
+        name: "Enable GitHub identity linking for Engineering GitHub",
       }),
     ).toBeTruthy();
     expect(screen.getByText("Linear Workspace")).toBeTruthy();
@@ -59,13 +59,11 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "View GitHub linked users for Engineering GitHub · GitHub App installation",
+        name: "View GitHub linked users for Engineering GitHub",
       }),
     );
 
-    expect(
-      screen.getByText("GitHub linked users for Engineering GitHub · GitHub App installation"),
-    ).toBeTruthy();
+    expect(screen.getByText("GitHub linked users for Engineering GitHub")).toBeTruthy();
     expect(screen.getByText("Owner User")).toBeTruthy();
     expect(screen.getByText("owner-github")).toBeTruthy();
   });

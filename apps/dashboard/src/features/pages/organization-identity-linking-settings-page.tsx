@@ -7,7 +7,6 @@ import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import {
   canManageOrganizationIdentityLinking,
-  formatIdentityLinkEligibleConnectionLabel,
   formatIdentityLinkProviderMemberStatus,
   formatIdentityLinkProviderPrincipalSummary,
   type IdentityLinkEligibleConnection,
@@ -450,7 +449,7 @@ export function buildProviderRow(input: {
     organizationProviderConfigId: input.row.config?.organizationProviderConfigId ?? null,
     displayName: input.row.provider.displayName,
     logoKey: input.row.provider.logoKey,
-    connectionLabel: formatIdentityLinkEligibleConnectionLabel(input.row.connection),
+    connectionLabel: input.row.connection.displayName,
     enablePending:
       input.configuringRowKey === input.row.rowKey ||
       input.statusUpdatingRowKey === input.row.rowKey,
@@ -526,7 +525,7 @@ async function loadGitCommitSigningImpactConfirmation(input: {
 
   return {
     action,
-    connectionLabel: formatIdentityLinkEligibleConnectionLabel(input.row.connection),
+    connectionLabel: input.row.connection.displayName,
     providerDisplayName: input.row.provider.displayName,
     updatedProfileCount: impact.updatedProfileCount,
     invariantViolationCount: impact.invariantViolationCount,
