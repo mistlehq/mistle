@@ -4,8 +4,8 @@ FROM ${NODE_IMAGE} AS node
 
 FROM rust:1.93-bookworm
 
-# Installed from npm, so this must not outrun pnpm-workspace.yaml minimumReleaseAge.
-ARG CODEX_CLI_VERSION=0.133.0
+# Installed through npm in the test image, so keep this explicit pin in sync with Codex runtime pins.
+ARG CODEX_CLI_VERSION=0.135.0
 ARG OPENCODE_CLI_VERSION=1.15.11
 ARG TARGETARCH
 ARG MISE_VERSION=v2026.4.19

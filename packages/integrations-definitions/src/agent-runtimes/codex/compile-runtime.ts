@@ -27,7 +27,7 @@ import {
 import { CodexPtyLaunchSpec } from "./pty-launch.js";
 
 const CodexCliArtifactKey = "codex-cli";
-const CodexCliVersion = "0.134.0";
+const CodexCliVersion = "0.135.0";
 const CodexCliReleaseTag = `rust-v${CodexCliVersion}`;
 const ProxyModelProviderKey = "proxy";
 const ProxyModelProviderName = "OpenAI";
@@ -38,12 +38,12 @@ const CodexGitHubAssets = {
   x86_64: {
     fileName: "codex-x86_64-unknown-linux-musl.tar.gz",
     binaryPath: "codex-x86_64-unknown-linux-musl",
-    sha256: "e54b983c3ab5ca992da8edde83bb29a545761a72c4fa39f18a165d9e792e1c71",
+    sha256: "a15e7dad657da4a0e120eede29556fee6d50e8c919759cc2ecba3c99099363e2",
   },
   aarch64: {
     fileName: "codex-aarch64-unknown-linux-musl.tar.gz",
     binaryPath: "codex-aarch64-unknown-linux-musl",
-    sha256: "8e066f998111eb8b44250ac11df004daa07fadf276c5942a7183cb8e421091a3",
+    sha256: "568bce1d593ef25ffdf5549369a8606085652294646a5c4961547a894ea2f76d",
   },
 };
 const ArtifactCommandTimeoutMs = 120_000;
