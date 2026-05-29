@@ -62,6 +62,17 @@ type SessionWorkbenchHeaderMobileSurfaceControl = {
   title: string;
 };
 
+type SessionWorkbenchHeaderStatus =
+  | {
+      indicatorClassName: string;
+      kind: "connected" | "not_connected";
+      label: string;
+    }
+  | {
+      kind: "error";
+      label: string;
+    };
+
 export function SessionWorkbenchHeaderActions(input: {
   cliControl: SessionWorkbenchHeaderButtonControl;
   diffControl: SessionWorkbenchHeaderButtonControl;
@@ -69,11 +80,7 @@ export function SessionWorkbenchHeaderActions(input: {
   mobileConversationNavigatorControl?: SessionWorkbenchHeaderMobileSurfaceControl;
   portAccessControl?: React.ReactNode;
   repositoryControl?: SessionWorkbenchHeaderRepositoryControl;
-  status: {
-    indicatorClassName?: string;
-    kind: "connected" | "error" | "not_connected";
-    label: string;
-  };
+  status: SessionWorkbenchHeaderStatus;
   conversationControl?: SessionWorkbenchHeaderButtonControl;
   terminalControl: SessionWorkbenchHeaderButtonControl;
 }): React.JSX.Element {
@@ -116,10 +123,7 @@ export function SessionWorkbenchHeaderActions(input: {
           aria-label={input.status.label}
           className={[
             "inline-block size-2.5 rounded-full border",
-            input.status.indicatorClassName ??
-              (input.status.kind === "connected"
-                ? "border-emerald-700 bg-emerald-600"
-                : "border-muted-foreground/30 bg-muted-foreground/30"),
+            input.status.indicatorClassName,
           ].join(" ")}
           role="status"
           title={input.status.label}

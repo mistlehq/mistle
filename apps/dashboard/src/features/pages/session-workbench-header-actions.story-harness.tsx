@@ -130,10 +130,15 @@ const StoryManyProcesses: ProcessEntry[] = Array.from(
 );
 
 function createHeaderStatus(status: StoryStatus): {
+  indicatorClassName: string;
   kind: "connected" | "not_connected";
   label: string;
 } {
   return {
+    indicatorClassName:
+      status === "connected"
+        ? "border-emerald-700 bg-emerald-600"
+        : "border-muted-foreground/30 bg-muted-foreground/30",
     kind: status,
     label: status === "connected" ? "Connected" : "Not connected",
   };

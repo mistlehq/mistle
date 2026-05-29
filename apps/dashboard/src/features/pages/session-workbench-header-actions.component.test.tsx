@@ -40,6 +40,7 @@ function renderHeaderActions(
         title: "Open changes",
       }}
       status={{
+        indicatorClassName: "border-emerald-700 bg-emerald-600",
         kind: "connected",
         label: "Connected",
       }}
@@ -101,6 +102,7 @@ describe("SessionWorkbenchHeaderActions", () => {
   it("does not render the repository selector when no repository control is provided", () => {
     renderHeaderActions({
       status: {
+        indicatorClassName: "border-muted-foreground/30 bg-muted-foreground/30",
         kind: "not_connected",
         label: "Not connected",
       },
@@ -192,6 +194,7 @@ describe("SessionWorkbenchHeaderActions", () => {
             title: "Show conversations",
           }}
           status={{
+            indicatorClassName: "border-emerald-700 bg-emerald-600",
             kind: "connected",
             label: "Connected",
           }}

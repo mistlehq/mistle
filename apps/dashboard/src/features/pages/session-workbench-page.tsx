@@ -262,13 +262,18 @@ function SessionWorkbenchPageContent(input: {
                   ? "Refreshing repositories from the active sandbox."
                   : "Primary repository"),
         }}
-        status={{
-          ...(headerStatusKind === "error"
-            ? {}
-            : { indicatorClassName: headerStatusUi.indicatorClassName }),
-          kind: headerStatusKind,
-          label: headerStatusLabel,
-        }}
+        status={
+          headerStatusKind === "error"
+            ? {
+                kind: headerStatusKind,
+                label: headerStatusLabel,
+              }
+            : {
+                indicatorClassName: headerStatusUi.indicatorClassName,
+                kind: headerStatusKind,
+                label: headerStatusLabel,
+              }
+        }
         {...(conversationNavigation.runtimeConversationNavigatorProps !== null
           ? {
               conversationControl: {

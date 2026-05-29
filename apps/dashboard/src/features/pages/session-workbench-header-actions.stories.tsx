@@ -48,6 +48,7 @@ const StorybookArgs = {
     title: "Open changes",
   },
   status: {
+    indicatorClassName: "border-muted-foreground/30 bg-muted-foreground/30",
     kind: "not_connected",
     label: "Not connected",
   },

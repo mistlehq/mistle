@@ -460,6 +460,7 @@ function DocsSessionHeaderActions(input: {
         title: "Primary repository",
       }}
       status={{
+        indicatorClassName: "border-emerald-700 bg-emerald-600",
         kind: "connected",
         label: "Connected",
       }}
