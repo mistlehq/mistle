@@ -5,6 +5,7 @@ mod config;
 mod error;
 mod format;
 mod login;
+mod org;
 mod profile;
 mod sandbox;
 mod update;
@@ -16,7 +17,7 @@ use std::path::PathBuf;
 use bpaf::{OptionParser, Parser, construct, long, positional, pure};
 
 use crate::command_metadata::{
-    CODEX, CODEX_ARG, LOGIN, LOGOUT, PROFILE, PROFILE_GET, PROFILE_ID, PROFILE_LIST,
+    CODEX, CODEX_ARG, LOGIN, LOGOUT, ORG, ORG_LIST, PROFILE, PROFILE_GET, PROFILE_ID, PROFILE_LIST,
     PROFILE_VERSION, PROFILE_VERSION_LIST, PROFILE_VERSION_SETUP_SCRIPT,
     PROFILE_VERSION_SETUP_SCRIPT_SET, PROFILE_VERSION_VALUE, ROOT, SANDBOX, SANDBOX_CREATE,
     SANDBOX_GET, SANDBOX_ID, SANDBOX_LIST, SANDBOX_LIST_AFTER, SANDBOX_LIST_LIMIT,
@@ -38,6 +39,7 @@ enum CliCommand {
     Logout,
     Whoami,
     Update,
+    OrgList,
     ProfileList,
     ProfileGet {
         profile_id: String,
@@ -87,6 +89,16 @@ fn options() -> OptionParser<CliCommand> {
         .to_options()
         .descr(UPDATE.description)
         .command(UPDATE.name);
+
+    let org_list = pure(CliCommand::OrgList)
+        .to_options()
+        .descr(ORG_LIST.description)
+        .command(ORG_LIST.name);
+
+    let org = construct!([org_list])
+        .to_options()
+        .descr(ORG.description)
+        .command(ORG.name);
 
     let profile_list = pure(CliCommand::ProfileList)
         .to_options()
@@ -234,7 +246,7 @@ fn options() -> OptionParser<CliCommand> {
     .descr(CODEX.description)
     .command(CODEX.name);
 
-    construct!([login, logout, whoami, update, profile, sandbox, codex])
+    construct!([login, logout, whoami, update, org, profile, sandbox, codex])
         .to_options()
         .descr(ROOT.description)
         .version(env!("CARGO_PKG_VERSION"))
@@ -250,6 +262,7 @@ where
         CliCommand::Logout => login::run_logout(stdout, stderr),
         CliCommand::Whoami => whoami::run(stdout, stderr),
         CliCommand::Update => update::run(stdout, stderr),
+        CliCommand::OrgList => org::run_list(stdout, stderr),
         CliCommand::ProfileList => profile::run_list(stdout, stderr),
         CliCommand::ProfileGet { profile_id } => profile::run_get(&profile_id, stdout, stderr),
         CliCommand::ProfileVersionList { profile_id } => {

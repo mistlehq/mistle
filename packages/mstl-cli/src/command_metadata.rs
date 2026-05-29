@@ -33,6 +33,16 @@ pub const UPDATE: CommandMetadata = CommandMetadata {
     description: "Update the Mistle CLI",
 };
 
+pub const ORG: CommandMetadata = CommandMetadata {
+    name: "org",
+    description: "Manage Mistle organizations",
+};
+
+pub const ORG_LIST: CommandMetadata = CommandMetadata {
+    name: "list",
+    description: "List available Mistle organizations",
+};
+
 pub const PROFILE: CommandMetadata = CommandMetadata {
     name: "profile",
     description: "Manage sandbox profiles",

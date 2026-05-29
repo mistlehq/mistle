@@ -41,6 +41,12 @@ impl MistleClient {
         self.get_json(self.current_actor_url().as_str())
     }
 
+    pub fn list_current_user_organizations(
+        &self,
+    ) -> Result<CurrentUserOrganizationsResponse, MistleClientError> {
+        self.get_json(self.current_user_organizations_url().as_str())
+    }
+
     pub fn list_sandbox_profiles(&self) -> Result<ListSandboxProfilesResponse, MistleClientError> {
         let mut page = self.list_sandbox_profiles_page(None)?;
         let total_results = page.total_results;
@@ -225,6 +231,10 @@ impl MistleClient {
         endpoint_url(&self.base_url, "/v1/me")
     }
 
+    fn current_user_organizations_url(&self) -> Url {
+        endpoint_url(&self.base_url, "/v1/me/organizations")
+    }
+
     fn list_sandbox_profiles_url(&self, after: Option<&str>) -> Url {
         let mut url = endpoint_url(&self.base_url, "/v1/sandbox/profiles");
 
@@ -383,6 +393,22 @@ pub enum CurrentActorIdentity {
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct CurrentActorOrganization {
     pub id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CurrentUserOrganizationsResponse {
+    pub organizations: Vec<CurrentUserOrganization>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CurrentUserOrganization {
+    pub id: String,
+    pub name: String,
+    pub slug: String,
+    pub role: String,
+    pub is_current: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -805,7 +831,8 @@ fn endpoint_url(base_url: &Url, endpoint_path: &str) -> Url {
 mod tests {
     use crate::client::{
         CurrentActor, CurrentActorApiKey, CurrentActorAuthentication, CurrentActorIdentity,
-        CurrentActorOrganization, ListSandboxInstancesRequest, ListSandboxInstancesResponse,
+        CurrentActorOrganization, CurrentUserOrganization, CurrentUserOrganizationsResponse,
+        ListSandboxInstancesRequest, ListSandboxInstancesResponse,
         ListSandboxProfileVersionsResponse, MistleClient, MistleClientAuthorizationHeaderConfig,
         MistleClientConfig, SandboxInstance, SandboxInstanceAgentRuntimeId,
         SandboxInstanceConnectionToken, SandboxInstanceListItem, SandboxInstanceRuntimeContext,
@@ -835,6 +862,16 @@ mod tests {
         assert_eq!(
             client.current_actor_url().as_str(),
             "https://api.example.test/control-plane/v1/me"
+        );
+    }
+
+    #[test]
+    fn builds_current_user_organizations_url_from_nested_base_url() {
+        let client = client_with_base_url("https://api.example.test/control-plane/");
+
+        assert_eq!(
+            client.current_user_organizations_url().as_str(),
+            "https://api.example.test/control-plane/v1/me/organizations"
         );
     }
 
@@ -1292,6 +1329,53 @@ mod tests {
                 permissions: vec![
                     "organization:read".to_owned(),
                     "sandboxSession:read".to_owned(),
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn decodes_current_user_organizations_response() {
+        let response = serde_json::from_str::<CurrentUserOrganizationsResponse>(
+            r#"{
+                "organizations": [
+                    {
+                        "id": "org_first",
+                        "name": "First Organization",
+                        "slug": "first",
+                        "role": "owner",
+                        "isCurrent": true
+                    },
+                    {
+                        "id": "org_second",
+                        "name": "Second Organization",
+                        "slug": "second",
+                        "role": "member",
+                        "isCurrent": false
+                    }
+                ]
+            }"#,
+        )
+        .expect("current user organizations response should decode");
+
+        assert_eq!(
+            response,
+            CurrentUserOrganizationsResponse {
+                organizations: vec![
+                    CurrentUserOrganization {
+                        id: "org_first".to_owned(),
+                        name: "First Organization".to_owned(),
+                        slug: "first".to_owned(),
+                        role: "owner".to_owned(),
+                        is_current: true,
+                    },
+                    CurrentUserOrganization {
+                        id: "org_second".to_owned(),
+                        name: "Second Organization".to_owned(),
+                        slug: "second".to_owned(),
+                        role: "member".to_owned(),
+                        is_current: false,
+                    },
                 ],
             }
         );
