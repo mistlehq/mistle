@@ -489,7 +489,7 @@ describe("compileOpenCodeRuntime", () => {
     });
   });
 
-  it("does not render auth content when no supported provider egress route is present", () => {
+  it("enables the OpenCode Zen provider without auth content when no supported provider egress route is present", () => {
     const compiled = compileDefaultOpenCodeRuntime();
 
     const rendered = renderRuntimeClients({
@@ -508,7 +508,7 @@ describe("compileOpenCodeRuntime", () => {
     });
 
     expect(rendered[0]?.setup.env).toEqual({
-      OPENCODE_CONFIG_CONTENT: JSON.stringify({ enabled_providers: [] }),
+      OPENCODE_CONFIG_CONTENT: JSON.stringify({ enabled_providers: ["opencode"] }),
     });
     expect(rendered[0]?.setup.files.some((file) => file.fileId === "opencode_auth")).toBe(false);
     expect(
@@ -563,7 +563,7 @@ describe("compileOpenCodeRuntime", () => {
           secretType: "api_key",
         }),
       ]),
-    ).toEqual({ enabled_providers: ["anthropic", "openai", "opencode-go"] });
+    ).toEqual({ enabled_providers: ["anthropic", "openai", "opencode", "opencode-go"] });
   });
 
   it("renders OpenAI API auth file from proxied egress routes", () => {

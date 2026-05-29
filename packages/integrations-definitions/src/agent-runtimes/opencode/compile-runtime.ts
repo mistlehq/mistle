@@ -84,7 +84,7 @@ type OpenCodeAuthContent = Record<string, OpenCodeAuth>;
 function resolveOpenCodeEnabledProviders(
   egressRoutes: ReadonlyArray<EgressCredentialRoute>,
 ): readonly string[] {
-  const providers = new Set<string>();
+  const providers = new Set<string>(["opencode"]);
 
   for (const route of egressRoutes) {
     if (isOpenAiApiRoute(route) || isOpenAiChatGptSubscriptionRoute(route)) {

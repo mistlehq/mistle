@@ -162,6 +162,7 @@ export type CodexSandboxRequestInit = {
 };
 
 export type SystemSandboxProvider = "docker" | "e2b" | "tensorlake";
+export type SystemAgentRuntimeId = "codex" | "opencode" | "pi";
 
 export type SandboxProfileRuntimeConfigUpdate =
   | {
@@ -248,7 +249,59 @@ export async function prepareCodexSandbox(input: {
     fixture: input.fixture,
     authenticatedSession,
     sandboxProfileId,
-    openAiConnectionId,
+    agentBinding: {
+      connectionId: openAiConnectionId,
+      kind: "agent",
+      config: {},
+    },
+  });
+
+  const sandboxInstanceId = await startSandboxInstance({
+    fixture: input.fixture,
+    authenticatedSession,
+    sandboxProfileId,
+  });
+  await waitForSandboxReady({
+    fixture: input.fixture,
+    authenticatedSession,
+    sandboxInstanceId,
+  });
+
+  return {
+    authenticatedSession,
+    sandboxInstanceId,
+  };
+}
+
+export async function prepareAgentRuntimeSandbox(input: {
+  fixture: CodexSandboxFixture;
+  agentRuntimeId: SystemAgentRuntimeId;
+  openAiApiKey?: string;
+  email?: string;
+  authenticatedSession?: CodexSandboxAuthenticatedSession;
+}): Promise<{ authenticatedSession: CodexSandboxAuthenticatedSession; sandboxInstanceId: string }> {
+  const authenticatedSession =
+    input.authenticatedSession ??
+    (await input.fixture.authSession({
+      ...(input.email === undefined ? {} : { email: input.email }),
+    }));
+  const agentBinding = await createAgentRuntimeModelProviderBinding({
+    fixture: input.fixture,
+    authenticatedSession,
+    agentRuntimeId: input.agentRuntimeId,
+    ...(input.openAiApiKey === undefined ? {} : { openAiApiKey: input.openAiApiKey }),
+  });
+  const sandboxProfileId = await createSandboxProfile({
+    fixture: input.fixture,
+    authenticatedSession,
+    displayName: `System ${input.agentRuntimeId} Sandbox ${randomUUID()}`,
+  });
+  await updateSandboxBindings({
+    fixture: input.fixture,
+    authenticatedSession,
+    sandboxProfileId,
+    ...(agentBinding === undefined ? {} : { agentBinding }),
+    agentRuntimeId: input.agentRuntimeId,
   });
 
   const sandboxInstanceId = await startSandboxInstance({
@@ -706,6 +759,8 @@ export async function waitForCondition<T>(input: {
 async function createOpenAiConnection(input: {
   fixture: CodexSandboxFixture;
   authenticatedSession: CodexSandboxAuthenticatedSession;
+  apiKey?: string;
+  displayName?: string;
 }): Promise<string> {
   const connection = await requestJsonOrThrow({
     request: input.fixture.request,
@@ -720,13 +775,13 @@ async function createOpenAiConnection(input: {
         cookie: input.authenticatedSession.cookie,
       },
       body: JSON.stringify({
-        displayName: `System Codex Sandbox OpenAI ${randomUUID()}`,
+        displayName: input.displayName ?? `System Codex Sandbox OpenAI ${randomUUID()}`,
         methodId: OPENAI_CONNECTION_METHOD_ID,
         config: {
           connection_method: OPENAI_CONNECTION_METHOD_ID,
         },
         secrets: {
-          apiKey: OPENAI_API_KEY,
+          apiKey: input.apiKey ?? OPENAI_API_KEY,
         },
       }),
     },
@@ -735,9 +790,43 @@ async function createOpenAiConnection(input: {
   return connection.id;
 }
 
+type SandboxProfileAgentBinding = {
+  config: Record<string, never>;
+  connectionId: string;
+  kind: "agent";
+};
+
+async function createAgentRuntimeModelProviderBinding(input: {
+  fixture: CodexSandboxFixture;
+  authenticatedSession: CodexSandboxAuthenticatedSession;
+  agentRuntimeId: SystemAgentRuntimeId;
+  openAiApiKey?: string;
+}): Promise<SandboxProfileAgentBinding | undefined> {
+  switch (input.agentRuntimeId) {
+    case "codex":
+    case "pi":
+      if (input.openAiApiKey === undefined || input.openAiApiKey.length === 0) {
+        throw new Error(`${input.agentRuntimeId} runtime happy path requires an OpenAI API key.`);
+      }
+      return {
+        connectionId: await createOpenAiConnection({
+          fixture: input.fixture,
+          authenticatedSession: input.authenticatedSession,
+          apiKey: input.openAiApiKey,
+          displayName: `System ${input.agentRuntimeId} Sandbox OpenAI ${randomUUID()}`,
+        }),
+        kind: "agent",
+        config: {},
+      };
+    case "opencode":
+      return undefined;
+  }
+}
+
 async function createSandboxProfile(input: {
   fixture: CodexSandboxFixture;
   authenticatedSession: CodexSandboxAuthenticatedSession;
+  displayName?: string;
 }): Promise<string> {
   const sandboxProfile = await requestJsonOrThrow({
     request: input.fixture.request,
@@ -752,7 +841,7 @@ async function createSandboxProfile(input: {
         cookie: input.authenticatedSession.cookie,
       },
       body: JSON.stringify({
-        displayName: `System Codex Sandbox ${randomUUID()}`,
+        displayName: input.displayName ?? `System Codex Sandbox ${randomUUID()}`,
       }),
     },
   });
@@ -764,7 +853,8 @@ async function updateSandboxBindings(input: {
   fixture: CodexSandboxFixture;
   authenticatedSession: CodexSandboxAuthenticatedSession;
   sandboxProfileId: string;
-  openAiConnectionId: string;
+  agentBinding?: SandboxProfileAgentBinding;
+  agentRuntimeId?: SystemAgentRuntimeId;
 }): Promise<void> {
   await requestJsonOrThrow({
     request: input.fixture.request,
@@ -780,14 +870,9 @@ async function updateSandboxBindings(input: {
       },
       body: JSON.stringify({
         ...createSandboxProfileRuntimeConfigUpdate(input.fixture.sandboxProvider),
+        ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
         integrationBindings: {
-          bindings: [
-            {
-              connectionId: input.openAiConnectionId,
-              kind: "agent",
-              config: {},
-            },
-          ],
+          bindings: input.agentBinding === undefined ? [] : [input.agentBinding],
         },
       }),
     },
