@@ -10,7 +10,7 @@ import {
   prepareCodexSandbox,
   waitForCondition,
   waitForRuntimeReadyValue,
-} from "../system/helpers/codex-sandbox.js";
+} from "../system/helpers/sandbox.js";
 import { createRuntimeCodexSandboxFixture } from "./helpers/runtime-codex-sandbox.js";
 import {
   CodexRuntimeSandboxProviders,

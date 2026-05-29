@@ -10,7 +10,7 @@ import {
   prepareCodexSandbox,
   waitForCondition,
   waitForRuntimeReadyValue,
-} from "./helpers/codex-sandbox.js";
+} from "./helpers/sandbox.js";
 import { it } from "./system-test-context.js";
 
 const SYSTEM_TEST_TIMEOUT_MS = 5 * 60_000;

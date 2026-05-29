@@ -22,14 +22,11 @@ import { createNodeSandboxSessionRuntime } from "../../../packages/sandbox-sessi
 import type { SandboxSessionRuntime } from "../../../packages/sandbox-session-client/src/runtime.js";
 import { SandboxSessionTransport } from "../../../packages/sandbox-session-client/src/transport.js";
 import {
-  createSandboxProfileRuntimeConfigUpdate,
-  type SystemSandboxProvider,
-} from "./codex-sandbox.js";
-import {
   readGitHubAppWebhookConfig,
   resolveGitHubAppInstallationId,
   updateGitHubAppWebhookConfig,
 } from "./github-app-installation.js";
+import { createSandboxProfileRuntimeConfigUpdate, type SystemSandboxProvider } from "./sandbox.js";
 
 export const OpenAiTargetKey = "openai-default";
 export const GitHubTargetKey = "github-cloud";

@@ -19,7 +19,7 @@ import {
   prepareCodexSandbox,
   runSandboxExecCommandInSandbox,
   stopSandboxInstance,
-} from "../system/helpers/codex-sandbox.js";
+} from "../system/helpers/sandbox.js";
 import { createRuntimeCodexSandboxFixture } from "./helpers/runtime-codex-sandbox.js";
 import { timeSystemRuntimePhase } from "./helpers/system-runtime-phase-timing.js";
 

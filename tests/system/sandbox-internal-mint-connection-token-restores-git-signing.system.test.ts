@@ -30,7 +30,7 @@ import {
   stopSandboxInstance,
   waitForSandboxConnectable,
   waitForSandboxStatus,
-} from "./helpers/codex-sandbox.js";
+} from "./helpers/sandbox.js";
 import { it, type AuthenticatedSession, type SystemTestFixture } from "./system-test-context.js";
 
 const execFileAsync = promisify(execFile);

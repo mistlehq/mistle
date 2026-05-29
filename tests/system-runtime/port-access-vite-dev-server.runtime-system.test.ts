@@ -9,11 +9,6 @@ import { describe, expect } from "vitest";
 import WebSocket, { type RawData } from "ws";
 import { z } from "zod";
 
-import type { CodexSandboxFixture } from "../system/helpers/codex-sandbox.js";
-import {
-  runSandboxExecCommandInSandbox,
-  stopSandboxInstance,
-} from "../system/helpers/codex-sandbox.js";
 import {
   createOpenAiConnection,
   createSandboxProfile,
@@ -35,6 +30,8 @@ import {
   WebSocketOpenTimeoutMs,
   withTimeout,
 } from "../system/helpers/port-access.js";
+import type { CodexSandboxFixture } from "../system/helpers/sandbox.js";
+import { runSandboxExecCommandInSandbox, stopSandboxInstance } from "../system/helpers/sandbox.js";
 import { createRuntimeCodexSandboxFixture } from "./helpers/runtime-codex-sandbox.js";
 import { createSandboxSystemTest } from "./helpers/sandbox-system-test.js";
 import { timeSystemRuntimePhase } from "./helpers/system-runtime-phase-timing.js";

@@ -6,7 +6,7 @@ import type {
   CodexSandboxAuthenticatedSession,
   CodexSandboxFixture,
   SystemSandboxProvider,
-} from "../../system/helpers/codex-sandbox.js";
+} from "../../system/helpers/sandbox.js";
 
 const InternalAuthServiceToken = "integration-new-internal-service-token";
 const InternalAuthServiceTokenHeader = "x-mistle-service-token";

@@ -2,11 +2,11 @@ import { TestEnvironmentIdHeader } from "@mistle/test-harness/integration";
 import type { RuntimeSystemTestEnvironment } from "@mistle/test-harness/system";
 
 import { createNodeSandboxSessionRuntime } from "../../../packages/sandbox-session-client/src/node.js";
-import type { SystemSandboxProvider } from "../../system/helpers/codex-sandbox.js";
 import type {
   AuthenticatedSession,
   GitHubWebhookTriggerFixture,
 } from "../../system/helpers/github-webhook-trigger.js";
+import type { SystemSandboxProvider } from "../../system/helpers/sandbox.js";
 
 export function createRuntimeGitHubWebhookTriggerFixture(
   system: RuntimeSystemTestEnvironment,

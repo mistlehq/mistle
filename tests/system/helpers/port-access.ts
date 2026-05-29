@@ -17,7 +17,7 @@ import {
   type CodexSandboxAuthenticatedSession,
   type CodexSandboxFixture,
   type SystemSandboxProvider,
-} from "./codex-sandbox.js";
+} from "./sandbox.js";
 
 const OpenAiTargetKey = "openai-default";
 const OpenAiConnectionMethodId = "api-key";

@@ -12,7 +12,6 @@ import { describe, expect } from "vitest";
 import WebSocket, { type RawData } from "ws";
 import { z } from "zod";
 
-import { runSandboxExecCommandInSandbox } from "./helpers/codex-sandbox.js";
 import {
   createOpenAiConnection,
   createSandboxProfile,
@@ -34,6 +33,7 @@ import {
   WebSocketOpenTimeoutMs,
   withTimeout,
 } from "./helpers/port-access.js";
+import { runSandboxExecCommandInSandbox } from "./helpers/sandbox.js";
 import { it, type SystemTestFixture } from "./system-test-context.js";
 
 const ViteFixtureHostPath = fileURLToPath(new URL("./fixtures/vite-dev-server", import.meta.url));
