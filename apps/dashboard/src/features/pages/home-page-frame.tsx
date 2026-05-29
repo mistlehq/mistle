@@ -41,12 +41,8 @@ function HomePageHeaderContent(input: {
   return (
     <div className="flex min-w-0 flex-col gap-5">
       {input.showMistleCloudBetaNotice ? (
-        <Notice
-          title="Mistle Cloud is in beta - Usage is free, subject to usage limits"
-          variant="warning"
-        >
-          The free tier includes up to 2 concurrent sandboxes, with runtime and instance-size
-          limits. During beta, some limits may be higher while we tune capacity.
+        <Notice title="Mistle Cloud Beta" variant="warning">
+          Mistle Cloud usage is free during beta. Beta limits apply while we tune capacity.
         </Notice>
       ) : null}
       {input.showGetStartedTitle ? (

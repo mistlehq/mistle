@@ -13,15 +13,13 @@ describe("HomePageFrame", () => {
       </HomePageFrame>,
     );
 
-    const noticeTitle = screen.getByText(
-      "Mistle Cloud is in beta - Usage is free, subject to usage limits",
-    );
+    const noticeTitle = screen.getByText("Mistle Cloud Beta");
     const pageTitle = screen.getByRole("heading", { name: "Get started" });
 
     expect(noticeTitle.compareDocumentPosition(pageTitle)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(
       screen.getByText(
-        "The free tier includes up to 2 concurrent sandboxes, with runtime and instance-size limits. During beta, some limits may be higher while we tune capacity.",
+        "Mistle Cloud usage is free during beta. Beta limits apply while we tune capacity.",
       ),
     ).toBeDefined();
     expect(screen.getByText("Home content")).toBeDefined();
@@ -34,9 +32,7 @@ describe("HomePageFrame", () => {
       </HomePageFrame>,
     );
 
-    expect(
-      screen.getByText("Mistle Cloud is in beta - Usage is free, subject to usage limits"),
-    ).toBeDefined();
+    expect(screen.getByText("Mistle Cloud Beta")).toBeDefined();
     expect(screen.queryByRole("heading", { name: "Get started" })).toBeNull();
     expect(screen.getByText("Completed home content")).toBeDefined();
     expect(container.firstElementChild?.className).toContain("bg-muted/30");
@@ -50,9 +46,7 @@ describe("HomePageFrame", () => {
       </HomePageFrame>,
     );
 
-    expect(
-      screen.queryByText("Mistle Cloud is in beta - Usage is free, subject to usage limits"),
-    ).toBeNull();
+    expect(screen.queryByText("Mistle Cloud Beta")).toBeNull();
     expect(screen.getByRole("heading", { name: "Get started" })).toBeDefined();
     expect(screen.getByText("Home content")).toBeDefined();
   });
@@ -64,9 +58,7 @@ describe("HomePageFrame", () => {
       </HomePageFrame>,
     );
 
-    expect(
-      screen.queryByText("Mistle Cloud is in beta - Usage is free, subject to usage limits"),
-    ).toBeNull();
+    expect(screen.queryByText("Mistle Cloud Beta")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Get started" })).toBeNull();
     expect(container.querySelector('[data-slot="page-frame-header-shell"]')).toBeNull();
     expect(screen.getByText("Completed home content")).toBeDefined();

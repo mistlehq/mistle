@@ -16,18 +16,14 @@ describe("HomePage", () => {
   it("shows the beta notice when the billing capability is enabled", () => {
     renderHomePage({ dashboardCapabilities: { billing: { stripe: { enabled: true } } } });
 
-    expect(
-      screen.getByText("Mistle Cloud is in beta - Usage is free, subject to usage limits"),
-    ).toBeDefined();
+    expect(screen.getByText("Mistle Cloud Beta")).toBeDefined();
     expect(screen.getByRole("heading", { name: "Get started" })).toBeDefined();
   });
 
   it("omits the beta notice when the billing capability is absent", () => {
     renderHomePage({ dashboardCapabilities: {} });
 
-    expect(
-      screen.queryByText("Mistle Cloud is in beta - Usage is free, subject to usage limits"),
-    ).toBeNull();
+    expect(screen.queryByText("Mistle Cloud Beta")).toBeNull();
     expect(screen.getByRole("heading", { name: "Get started" })).toBeDefined();
   });
 });
