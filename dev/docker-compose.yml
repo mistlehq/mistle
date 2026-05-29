@@ -6,6 +6,14 @@ services:
     environment:
       AWS_ACCESS_KEY_ID: "${DEV_OBJECT_STORE_ACCESS_KEY_ID:-mistle-access-key}"
       AWS_SECRET_ACCESS_KEY: "${DEV_OBJECT_STORE_SECRET_ACCESS_KEY:-mistle-secret-key}"
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      NO_PROXY: ""
+      http_proxy: ""
+      https_proxy: ""
+      all_proxy: ""
+      no_proxy: ""
     command:
       - server
       - -ip=0.0.0.0
