@@ -72,7 +72,7 @@ const AuthMethodSchema = z.enum(["otp", "google"]);
 
 const ControlPlaneApiWelcomeEmailSchema = z
   .object({
-    enabled: z.boolean(),
+    enabled: z.boolean().default(false),
     call_url: UrlSchema.optional(),
   })
   .strict()

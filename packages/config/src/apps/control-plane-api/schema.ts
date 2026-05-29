@@ -55,7 +55,7 @@ const ControlPlaneApiAuthGoogleConfigSchema = z
 
 const ControlPlaneApiWelcomeEmailConfigSchema = z
   .object({
-    enabled: z.boolean(),
+    enabled: z.boolean().default(false),
     callUrl: z.url().optional(),
   })
   .strict()

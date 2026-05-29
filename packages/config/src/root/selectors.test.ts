@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Config } from "./schema.js";
+import { ConfigSchema, type Config } from "./schema.js";
 import {
   selectControlPlaneApiConfig,
   selectControlPlaneWorkerConfig,
@@ -292,6 +292,30 @@ describe("selectControlPlaneApiConfig", () => {
 
     expect(config.auth.welcomeEmail).toEqual({
       enabled: true,
+    });
+  });
+
+  it("keeps welcome email disabled when only the call URL is configured", () => {
+    const rootConfig = createRootConfig({});
+    const parsedRootConfig = ConfigSchema.parse({
+      ...rootConfig,
+      services: {
+        ...rootConfig.services,
+        control_plane_api: {
+          ...rootConfig.services.control_plane_api,
+          auth: {
+            ...rootConfig.services.control_plane_api.auth,
+            welcome_email: {
+              call_url: "https://cal.example.com/jonathan/mistle",
+            },
+          },
+        },
+      },
+    });
+    const config = selectControlPlaneApiConfig(parsedRootConfig);
+
+    expect(config.auth.welcomeEmail).toEqual({
+      enabled: false,
     });
   });
 

@@ -289,6 +289,23 @@ describe("loadConfig", () => {
     });
   });
 
+  it("keeps control-plane API welcome email disabled when only the call URL env is provisioned", () => {
+    const loadedConfig = loadConfig({
+      app: AppIds.CONTROL_PLANE_API,
+      includeGlobal: false,
+      env: {
+        ...buildControlPlaneApiServiceEnv(),
+        MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_WELCOME_EMAIL_CALL_URL:
+          "https://cal.example.com/jonathan/mistle",
+      },
+    });
+
+    expect(loadedConfig.app.auth.welcomeEmail).toEqual({
+      callUrl: "https://cal.example.com/jonathan/mistle",
+      enabled: false,
+    });
+  });
+
   it("loads env data-plane API Docker config when shared E2B env is also present", () => {
     const loadedConfig = loadConfig({
       app: AppIds.DATA_PLANE_API,
