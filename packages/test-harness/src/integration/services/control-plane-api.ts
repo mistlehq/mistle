@@ -13,7 +13,11 @@ import type {
   TestServiceStartInput,
 } from "../../environment/index.js";
 import { TestEnvironmentIdHeader } from "../../environment/test-isolation.js";
-import type { IntegrationServiceOptions, IntegrationSandboxOptions } from "./options.js";
+import type {
+  IntegrationControlPlaneApiWelcomeEmailOptions,
+  IntegrationServiceOptions,
+  IntegrationSandboxOptions,
+} from "./options.js";
 import { peers } from "./peers.js";
 import { ServiceIds } from "./service-ids.js";
 import { httpEndpoint, httpHealth, infraRequirement, infraValue, resolvedInfra } from "./shared.js";
@@ -120,15 +124,7 @@ function start(input: {
   googleAuth?: "simulated";
   allowSignups?: boolean;
   billingStripeEnabled?: boolean;
-  welcomeEmail?:
-    | {
-        enabled: true;
-        callUrl?: string;
-      }
-    | {
-        enabled: false;
-        callUrl?: string;
-      };
+  welcomeEmail?: IntegrationControlPlaneApiWelcomeEmailOptions;
   sandbox: IntegrationSandboxOptions | undefined;
 }): (startInput: TestServiceStartInput) => Promise<TestService> {
   return async (startInput) => {
@@ -234,15 +230,7 @@ function config(input: {
   googleAuth?: "simulated";
   allowSignups?: boolean;
   billingStripeEnabled?: boolean;
-  welcomeEmail?:
-    | {
-        enabled: true;
-        callUrl?: string;
-      }
-    | {
-        enabled: false;
-        callUrl?: string;
-      };
+  welcomeEmail?: IntegrationControlPlaneApiWelcomeEmailOptions;
 }): ControlPlaneApiConfig {
   const hostPooledUrl = infraValue(input.postgres, PostgresValues.HOST_POOLED_URL);
   const hostDirectUrl = infraValue(input.postgres, PostgresValues.HOST_DIRECT_URL);

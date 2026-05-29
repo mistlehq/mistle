@@ -10,12 +10,15 @@ import { type createControlPlaneOpenWorkflow } from "../../openworkflow.js";
 
 type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenWorkflow>;
 
-type WelcomeEmailConfig =
-  | { enabled: true; callUrl?: string | undefined }
-  | { enabled: false; callUrl?: string | undefined };
+type WelcomeEmailConfig = {
+  enabled: boolean;
+  callUrl?: string | undefined;
+};
 
 type CreateSendWelcomeEmailServiceInput = {
   openWorkflow: ControlPlaneOpenWorkflow;
+  db: ControlPlaneDatabase;
+  tables: Pick<ControlPlaneTables, "members">;
   config: WelcomeEmailConfig;
 };
 
@@ -25,7 +28,7 @@ type SendWelcomeEmailInput = {
   email: string;
 };
 
-export async function isFirstOrganizationMember(input: {
+async function isFirstOrganizationMember(input: {
   db: ControlPlaneDatabase;
   table: ControlPlaneTables["members"];
   organizationId: string;
@@ -48,6 +51,15 @@ export function createSendWelcomeEmailService(input: CreateSendWelcomeEmailServi
     }
 
     try {
+      const shouldSendWelcomeEmail = await isFirstOrganizationMember({
+        db: input.db,
+        table: input.tables.members,
+        organizationId: welcomeInput.organizationId,
+      });
+      if (!shouldSendWelcomeEmail) {
+        return;
+      }
+
       const workflowInput =
         input.config.callUrl === undefined
           ? {
@@ -69,7 +81,7 @@ export function createSendWelcomeEmailService(input: CreateSendWelcomeEmailServi
           userId: welcomeInput.userId,
           workflowName: SendWelcomeEmailWorkflowSpec.name,
         },
-        "Failed to enqueue welcome email workflow",
+        "Failed to evaluate welcome email delivery for created organization",
       );
     }
   };

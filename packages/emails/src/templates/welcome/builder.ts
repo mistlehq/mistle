@@ -1,10 +1,9 @@
 import type { EmailTemplate, EmailTemplateMetadata } from "../../render.js";
+import { buildWelcomeEmailContent } from "./content.js";
 
 export type BuildWelcomeTemplateOptions = {
   callUrl?: string | undefined;
 };
-
-const Subject = "Welcome to Mistle";
 
 function escapeHtml(value: string): string {
   return value
@@ -14,65 +13,56 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
-function buildMetadata(): EmailTemplateMetadata {
+function buildMetadata(input: BuildWelcomeTemplateOptions): EmailTemplateMetadata {
+  const content = buildWelcomeEmailContent(input);
+
   return {
-    templateName: "Welcome",
-    subject: Subject,
+    templateName: content.templateName,
+    subject: content.subject,
   };
 }
 
 function buildText(input: BuildWelcomeTemplateOptions): string {
-  const callUrl = input.callUrl?.trim();
+  const content = buildWelcomeEmailContent(input);
   const lines = [
-    "Hey there,",
+    content.greeting,
     "",
-    "I'm Jonathan, one of the co-founders.",
+    content.intro,
     "",
-    "Ways I can help:",
-    "- Have feedback or questions? Reply to this email.",
-    "- Support via Slack Connect. Reply to this email and I'd set it up.",
+    content.helpHeading,
+    ...content.helpItems.map((item) =>
+      item.kind === "call" ? `- ${item.text} ${item.callUrl}.` : `- ${item.text}`,
+    ),
   ];
 
-  if (callUrl !== undefined && callUrl.length > 0) {
-    lines.push(`- Setup guidance/Use case exploration. Book a call: ${callUrl}.`);
-  }
-
-  lines.push(
-    "",
-    "Also, I'd really appreciate it if you can share what use cases you're exploring Mistle for. Just reply to this email with a line or two.",
-    "",
-    "Cheers,",
-    "Jonathan",
-  );
+  lines.push("", content.useCaseRequest, "", content.signoff.valediction, content.signoff.name);
 
   return lines.join("\n");
 }
 
 function buildHtml(input: BuildWelcomeTemplateOptions): string {
-  const callUrl = input.callUrl?.trim();
-  const callUrlItem =
-    callUrl === undefined || callUrl.length === 0
-      ? ""
-      : `<li>Setup guidance/Use case exploration. Book a call: <a href="${escapeHtml(callUrl)}">${escapeHtml(callUrl)}</a>.</li>`;
+  const content = buildWelcomeEmailContent(input);
 
   return [
-    "<p>Hey there,</p>",
-    "<p>I'm Jonathan, one of the co-founders.</p>",
-    "<p>Ways I can help:</p>",
+    `<p>${escapeHtml(content.greeting)}</p>`,
+    `<p>${escapeHtml(content.intro)}</p>`,
+    `<p>${escapeHtml(content.helpHeading)}</p>`,
     "<ul>",
-    "<li>Have feedback or questions? Reply to this email.</li>",
-    "<li>Support via Slack Connect. Reply to this email and I'd set it up.</li>",
-    callUrlItem,
+    ...content.helpItems.map((item) =>
+      item.kind === "call"
+        ? `<li>${escapeHtml(item.text)} <a href="${escapeHtml(item.callUrl)}">${escapeHtml(item.callUrl)}</a>.</li>`
+        : `<li>${escapeHtml(item.text)}</li>`,
+    ),
     "</ul>",
-    "<p>Also, I'd really appreciate it if you can share what use cases you're exploring Mistle for. Just reply to this email with a line or two.</p>",
-    "<p>Cheers,<br>Jonathan</p>",
+    `<p>${escapeHtml(content.useCaseRequest)}</p>`,
+    `<p>${escapeHtml(content.signoff.valediction)}<br>${escapeHtml(content.signoff.name)}</p>`,
   ].join("\n");
 }
 
 export async function buildWelcomeTemplate(
   input: BuildWelcomeTemplateOptions,
 ): Promise<EmailTemplate> {
-  const metadata = buildMetadata();
+  const metadata = buildMetadata(input);
 
   return {
     metadata,

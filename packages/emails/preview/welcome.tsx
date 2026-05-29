@@ -1,15 +1,20 @@
 import { PreviewMetadataLayout } from "../preview-support/preview-metadata.js";
 import type { BuildWelcomeTemplateOptions } from "../src/templates/welcome/builder.js";
+import {
+  buildWelcomeEmailContent,
+  WelcomeEmailSubject,
+  WelcomeEmailTemplateName,
+} from "../src/templates/welcome/content.js";
 
-export const templateName = "Welcome";
-const subject = "Welcome to Mistle";
+export const templateName = WelcomeEmailTemplateName;
+const subject = WelcomeEmailSubject;
 
 export const previewProps: BuildWelcomeTemplateOptions = {
   callUrl: "https://cal.example.com/jonathan/mistle",
 };
 
 export function Template(props: BuildWelcomeTemplateOptions) {
-  const callUrl = props.callUrl?.trim();
+  const content = buildWelcomeEmailContent(props);
 
   return (
     <PreviewMetadataLayout subject={subject} templateName={templateName}>
@@ -25,26 +30,27 @@ export function Template(props: BuildWelcomeTemplateOptions) {
           padding: "24px",
         }}
       >
-        <p>Hey there,</p>
-        <p>I'm Jonathan, one of the co-founders.</p>
-        <p>Ways I can help:</p>
+        <p>{content.greeting}</p>
+        <p>{content.intro}</p>
+        <p>{content.helpHeading}</p>
         <ul>
-          <li>Have feedback or questions? Reply to this email.</li>
-          <li>Support via Slack Connect. Reply to this email and I'd set it up.</li>
-          {callUrl === undefined || callUrl.length === 0 ? null : (
-            <li>
-              Setup guidance/Use case exploration. Book a call: <a href={callUrl}>{callUrl}</a>.
+          {content.helpItems.map((item) => (
+            <li key={item.kind === "call" ? item.callUrl : item.text}>
+              {item.kind === "call" ? (
+                <>
+                  {item.text} <a href={item.callUrl}>{item.callUrl}</a>.
+                </>
+              ) : (
+                item.text
+              )}
             </li>
-          )}
+          ))}
         </ul>
+        <p>{content.useCaseRequest}</p>
         <p>
-          Also, I'd really appreciate it if you can share what use cases you're exploring Mistle
-          for. Just reply to this email with a line or two.
-        </p>
-        <p>
-          Cheers,
+          {content.signoff.valediction}
           <br />
-          Jonathan
+          {content.signoff.name}
         </p>
       </div>
     </PreviewMetadataLayout>

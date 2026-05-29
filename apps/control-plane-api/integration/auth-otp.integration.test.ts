@@ -9,16 +9,19 @@ import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
-import { systemClock, systemSleeper } from "@mistle/time";
 import {
   createWelcomeEmailIdempotencyKey,
   SendWelcomeEmailWorkflowSpec,
 } from "@mistle/workflow-registry/control-plane";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import { readLatestSignInOtp } from "../integration/helpers/sign-in-otp.js";
 import { MembershipCapabilitiesSchema } from "../src/organizations/index.js";
+import {
+  countQueuedControlPlaneWorkflows,
+  waitForQueuedControlPlaneWorkflowRun,
+} from "./helpers/control-plane-workflows.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api", "control-plane-worker"],
@@ -37,8 +40,6 @@ const welcomeEmailIt = createIntegrationTest({
   },
 });
 const OtpAllowedAttempts = 3;
-const WorkflowRunPersistTimeoutMs = 30_000;
-const WorkflowRunPersistPollIntervalMs = 100;
 
 describe("auth otp integration", () => {
   it("sends OTP, signs in, and leaves organization context empty", async ({ env }) => {
@@ -297,7 +298,7 @@ describe("auth otp integration", () => {
     const email = `integration-new-auth-otp-welcome-${randomUUID()}@example.com`;
 
     const cookie = await signInAndReadCookie({ env, email });
-    expect(await findQueuedWelcomeWorkflowInput({ env, email })).toBeNull();
+    await expectNoQueuedWelcomeWorkflow({ env, email });
 
     const organizationId = await createOrganization({
       env,
@@ -306,9 +307,10 @@ describe("auth otp integration", () => {
       slug: `integration-welcome-${randomUUID()}`,
     });
 
-    const workflowRun = await waitForQueuedWelcomeWorkflowInput({
+    const workflowRun = await waitForQueuedControlPlaneWorkflowRun({
       env,
-      email,
+      workflowName: SendWelcomeEmailWorkflowSpec.name,
+      inputEquals: { email },
     });
     expect(workflowRun.input).toEqual({
       email,
@@ -332,7 +334,7 @@ describe("auth otp integration", () => {
       });
 
       const cookie = await signInAndReadCookie({ env, email });
-      expect(await findQueuedWelcomeWorkflowInput({ env, email })).toBeNull();
+      await expectNoQueuedWelcomeWorkflow({ env, email });
 
       const acceptResponse = await env.controlPlaneApi.http.fetch(
         "/v1/auth/organization/accept-invitation",
@@ -349,7 +351,7 @@ describe("auth otp integration", () => {
       );
       expect(acceptResponse.status).toBe(200);
 
-      expect(await findQueuedWelcomeWorkflowInput({ env, email })).toBeNull();
+      await expectNoQueuedWelcomeWorkflow({ env, email });
     },
   );
 });
@@ -517,51 +519,17 @@ async function readLatestSession(input: {
   return session;
 }
 
-async function waitForQueuedWelcomeWorkflowInput(input: {
+async function expectNoQueuedWelcomeWorkflow(input: {
   env: AuthOtpEnvironment;
   email: string;
-}): Promise<{ input: unknown; idempotencyKey: string | null }> {
-  const deadline = systemClock.nowMs() + WorkflowRunPersistTimeoutMs;
-
-  while (systemClock.nowMs() < deadline) {
-    const workflowRun = await findQueuedWelcomeWorkflowInput(input);
-    if (workflowRun !== null) {
-      return workflowRun;
-    }
-
-    await systemSleeper.sleep(WorkflowRunPersistPollIntervalMs);
-  }
-
-  throw new Error(
-    `Timed out waiting for queued welcome workflow input for email '${input.email}'.`,
-  );
-}
-
-async function findQueuedWelcomeWorkflowInput(input: {
-  env: AuthOtpEnvironment;
-  email: string;
-}): Promise<{ input: unknown; idempotencyKey: string | null } | null> {
-  const result = await input.env.controlPlaneDb.execute(sql<{
-    input: unknown;
-    idempotencyKey: string | null;
-  }>`
-    select input, idempotency_key as "idempotencyKey"
-    from control_plane_openworkflow.workflow_runs
-    where
-      workflow_name = ${SendWelcomeEmailWorkflowSpec.name}
-      and input->>'email' = ${input.email}
-    order by created_at desc
-    limit 1
-  `);
-  const row = result.rows[0];
-  if (row === undefined) {
-    return null;
-  }
-
-  return {
-    input: row.input,
-    idempotencyKey: typeof row.idempotencyKey === "string" ? row.idempotencyKey : null,
-  };
+}): Promise<void> {
+  await expect(
+    countQueuedControlPlaneWorkflows({
+      env: input.env,
+      workflowName: SendWelcomeEmailWorkflowSpec.name,
+      inputEquals: { email: input.email },
+    }),
+  ).resolves.toBe(0);
 }
 
 async function expectUserMissing(input: { env: AuthOtpEnvironment; email: string }): Promise<void> {
