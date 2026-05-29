@@ -117,6 +117,55 @@ export async function refreshOAuthTokenPair(input: {
   };
 }
 
+export async function switchOAuthOrganizationTokenPair(input: {
+  db: ControlPlaneDatabase;
+  accessToken: string;
+  organizationId: string;
+  clock?: Clock;
+}): Promise<OAuthTokenPair> {
+  const authContext = await authenticateOAuthAccessToken({
+    db: input.db,
+    token: input.accessToken,
+    ...(input.clock === undefined ? {} : { clock: input.clock }),
+  });
+  const sourceGrant = await input.db.query.oauthGrants.findFirst({
+    columns: {
+      id: true,
+      oauthClientId: true,
+      userId: true,
+      revokedAt: true,
+    },
+    where: (table, { eq }) => eq(table.id, authContext.oauth.grantId),
+  });
+
+  if (sourceGrant === undefined || sourceGrant.revokedAt !== null) {
+    throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
+  }
+
+  const permissions = await readCurrentlyAuthorizedGrantPermissions({
+    db: input.db,
+    grant: {
+      id: sourceGrant.id,
+      oauthClientId: sourceGrant.oauthClientId,
+      userId: sourceGrant.userId,
+      organizationId: input.organizationId,
+    },
+  });
+
+  if (permissions.length === 0) {
+    throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
+  }
+
+  return createOAuthGrantTokenPair({
+    db: input.db,
+    oauthClientId: sourceGrant.oauthClientId,
+    userId: sourceGrant.userId,
+    organizationId: input.organizationId,
+    permissions,
+    ...(input.clock === undefined ? {} : { clock: input.clock }),
+  });
+}
+
 export async function authenticateOAuthAccessToken(input: {
   db: ControlPlaneDatabase;
   token: string;

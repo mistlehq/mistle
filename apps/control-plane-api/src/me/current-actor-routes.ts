@@ -4,6 +4,7 @@ import { OpenApiValidationHook } from "@mistle/http/errors.js";
 import type { AppContextBindings, AppRoutes } from "../types.js";
 import { ME_ROUTE_BASE_PATH } from "./constants.js";
 import * as getCurrentActor from "./get-current-actor/index.js";
+import * as listOrganizations from "./list-organizations/index.js";
 
 export function createCurrentActorMeRoutes(): AppRoutes<typeof ME_ROUTE_BASE_PATH> {
   const routes = new OpenAPIHono<AppContextBindings>({
@@ -11,6 +12,7 @@ export function createCurrentActorMeRoutes(): AppRoutes<typeof ME_ROUTE_BASE_PAT
   });
 
   routes.openapi(getCurrentActor.route, getCurrentActor.handler);
+  routes.openapi(listOrganizations.route, listOrganizations.handler);
 
   return {
     basePath: ME_ROUTE_BASE_PATH,

@@ -1,6 +1,11 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { OAuthGrantTypes } from "@mistle/db/control-plane";
-import { BadRequestError, handleHttpError, HttpError } from "@mistle/http/errors.js";
+import {
+  BadRequestError,
+  handleHttpError,
+  HttpError,
+  OpenApiValidationHook,
+} from "@mistle/http/errors.js";
 import type { Context } from "hono";
 import { z } from "zod";
 
@@ -21,11 +26,14 @@ import {
   requireMistleCliOAuthClient,
   validateMistleCliRedirectUri,
 } from "./services/static-client-validation.js";
+import * as switchOrganization from "./switch-organization/index.js";
 
 export const OAUTH_ROUTE_BASE_PATH = "/oauth";
 
 export function createOAuthRoutes(): AppRoutes<typeof OAUTH_ROUTE_BASE_PATH> {
-  const routes = new OpenAPIHono<AppContextBindings>();
+  const routes = new OpenAPIHono<AppContextBindings>({
+    defaultHook: OpenApiValidationHook,
+  });
 
   routes.get("/authorize", async (ctx) => {
     const sessionErrorResponse = await requireAuthSession(ctx);
@@ -116,6 +124,8 @@ export function createOAuthRoutes(): AppRoutes<typeof OAUTH_ROUTE_BASE_PATH> {
       return handleOAuthError(ctx, error);
     }
   });
+
+  routes.openapi(switchOrganization.route, switchOrganization.handler);
 
   return {
     basePath: OAUTH_ROUTE_BASE_PATH,

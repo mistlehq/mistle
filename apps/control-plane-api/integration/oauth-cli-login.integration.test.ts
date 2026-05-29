@@ -9,12 +9,16 @@ import {
   OAuthClientRegistrationKinds,
   OAuthClientTypes,
 } from "@mistle/db/control-plane";
-import { createIntegrationTest } from "@mistle/test-harness/integration";
+import {
+  createIntegrationTest,
+  type IntegrationTestEnvironment,
+} from "@mistle/test-harness/integration";
 import { and, eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import { CurrentActorResponseSchema } from "../src/me/get-current-actor/schema.js";
+import { CurrentUserOrganizationsResponseSchema } from "../src/me/list-organizations/schema.js";
 import { OAuthTokenResponseSchema } from "../src/oauth/schemas.js";
 import {
   authenticateOAuthAccessToken,
@@ -26,7 +30,8 @@ const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api"],
 });
 
-describe.concurrent("OAuth CLI login integration", () => {
+// These scenarios share the static Mistle CLI OAuth client and one scenario mutates its scopes.
+describe("OAuth CLI login integration", () => {
   it("redirects unauthenticated browser authorization requests to dashboard login", async ({
     env,
   }) => {
@@ -296,6 +301,95 @@ describe.concurrent("OAuth CLI login integration", () => {
     });
   });
 
+  it("lists OAuth user organizations and mints a fresh token pair for a selected organization", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: `integration-oauth-cli-login-switch-org-${randomUUID()}@example.com`,
+      organizationName: "First OAuth Switch Organization",
+      organizationSlug: `integration-oauth-switch-first-${randomUUID()}`,
+    });
+    const secondOrganizationId = await createOrganization({
+      cookie: session.cookie,
+      env,
+      name: "Second OAuth Switch Organization",
+      slug: `integration-oauth-switch-second-${randomUUID()}`,
+    });
+    await setActiveOrganization({
+      cookie: session.cookie,
+      env,
+      organizationId: session.organizationId,
+    });
+
+    const tokenBody = await authorizeAndExchangeCliToken({
+      codeVerifier: "switch-verifier-switch-verifier-switch-verifier",
+      env,
+      redirectUri: "http://127.0.0.1:61744/callback",
+      sessionCookie: session.cookie,
+      state: "switch-state",
+    });
+
+    const organizationsResponse = await env.controlPlaneApi.http.fetch("/v1/me/organizations", {
+      headers: {
+        authorization: `Bearer ${tokenBody.access_token}`,
+      },
+    });
+    expect(organizationsResponse.status).toBe(200);
+    const organizations = CurrentUserOrganizationsResponseSchema.parse(
+      await organizationsResponse.json(),
+    );
+    expect(organizations.organizations).toEqual([
+      expect.objectContaining({
+        id: session.organizationId,
+        name: "First OAuth Switch Organization",
+        isCurrent: true,
+      }),
+      expect.objectContaining({
+        id: secondOrganizationId,
+        name: "Second OAuth Switch Organization",
+        isCurrent: false,
+      }),
+    ]);
+
+    const switchResponse = await env.controlPlaneApi.http.fetch("/oauth/switch-organization", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${tokenBody.access_token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        organizationId: secondOrganizationId,
+      }),
+    });
+    expect(switchResponse.status).toBe(200);
+    const switchedTokenBody = OAuthTokenResponseSchema.parse(await switchResponse.json());
+    expect(switchedTokenBody.access_token).toMatch(/^mstl_oat_[A-Za-z0-9_-]+$/u);
+    expect(switchedTokenBody.refresh_token).toMatch(/^mstl_ort_[A-Za-z0-9_-]+$/u);
+    expect(switchedTokenBody.access_token).not.toBe(tokenBody.access_token);
+    expect(switchedTokenBody.refresh_token).not.toBe(tokenBody.refresh_token);
+    expect(switchedTokenBody.scope).toBe(tokenBody.scope);
+
+    const switchedActorResponse = await env.controlPlaneApi.http.fetch("/v1/me", {
+      headers: {
+        authorization: `Bearer ${switchedTokenBody.access_token}`,
+      },
+    });
+    expect(switchedActorResponse.status).toBe(200);
+    const switchedActor = CurrentActorResponseSchema.parse(await switchedActorResponse.json());
+    expect(switchedActor.authentication.kind).toBe("oauth");
+    expect(switchedActor.actor).toStrictEqual({ kind: "user", id: session.userId });
+    expect(switchedActor.organization.id).toBe(secondOrganizationId);
+
+    const originalActorResponse = await env.controlPlaneApi.http.fetch("/v1/me", {
+      headers: {
+        authorization: `Bearer ${tokenBody.access_token}`,
+      },
+    });
+    expect(originalActorResponse.status).toBe(200);
+    const originalActor = CurrentActorResponseSchema.parse(await originalActorResponse.json());
+    expect(originalActor.organization.id).toBe(session.organizationId);
+  });
+
   it("rejects a mismatched PKCE verifier", async ({ env }) => {
     const session = await env.auth.createSession({
       email: `integration-oauth-cli-login-pkce-${randomUUID()}@example.com`,
@@ -455,4 +549,104 @@ function buildAuthorizePath(input: {
 
 function pkceChallenge(codeVerifier: string): string {
   return createHash("sha256").update(codeVerifier, "utf8").digest("base64url");
+}
+
+async function authorizeAndExchangeCliToken(input: {
+  env: IntegrationTestEnvironment;
+  sessionCookie: string;
+  redirectUri: string;
+  state: string;
+  codeVerifier: string;
+}) {
+  const authorizeResponse = await input.env.controlPlaneApi.http.fetch(
+    buildAuthorizePath({
+      redirectUri: input.redirectUri,
+      state: input.state,
+      codeChallenge: pkceChallenge(input.codeVerifier),
+    }),
+    {
+      headers: {
+        cookie: input.sessionCookie,
+      },
+      redirect: "manual",
+    },
+  );
+  if (authorizeResponse.status !== 302) {
+    throw new Error(await authorizeResponse.text());
+  }
+
+  const location = authorizeResponse.headers.get("location");
+  if (location === null) {
+    throw new Error("Expected OAuth authorize redirect location.");
+  }
+  const code = new URL(location).searchParams.get("code");
+  if (code === null) {
+    throw new Error("Expected OAuth callback code.");
+  }
+
+  const tokenResponse = await input.env.controlPlaneApi.http.fetch("/oauth/token", {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: "mistle-cli",
+      redirect_uri: input.redirectUri,
+      code,
+      code_verifier: input.codeVerifier,
+    }),
+  });
+  expect(tokenResponse.status).toBe(200);
+
+  return OAuthTokenResponseSchema.parse(await tokenResponse.json());
+}
+
+async function createOrganization(input: {
+  env: IntegrationTestEnvironment;
+  cookie: string;
+  name: string;
+  slug: string;
+}): Promise<string> {
+  const response = await input.env.controlPlaneApi.http.fetch("/v1/auth/organization/create", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      cookie: input.cookie,
+    },
+    body: JSON.stringify({
+      name: input.name,
+      slug: input.slug,
+    }),
+  });
+  expect(response.status).toBe(200);
+  const payload = await response.json();
+  if (typeof payload !== "object" || payload === null) {
+    throw new Error("Expected organization create response payload.");
+  }
+
+  const organizationId = Reflect.get(payload, "id");
+  if (typeof organizationId !== "string" || organizationId.length === 0) {
+    throw new Error("Expected organization create response to include organization id.");
+  }
+
+  return organizationId;
+}
+
+async function setActiveOrganization(input: {
+  env: IntegrationTestEnvironment;
+  cookie: string;
+  organizationId: string;
+}): Promise<void> {
+  const response = await input.env.controlPlaneApi.http.fetch("/v1/auth/organization/set-active", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      cookie: input.cookie,
+    },
+    body: JSON.stringify({
+      organizationId: input.organizationId,
+    }),
+  });
+  expect(response.status).toBe(200);
 }
