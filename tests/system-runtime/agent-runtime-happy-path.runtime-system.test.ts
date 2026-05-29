@@ -32,7 +32,7 @@ type AgentRuntimeHappyPathCase = {
   email: string;
 };
 
-const AgentRuntimeHappyPathCases: readonly AgentRuntimeHappyPathCase[] = [
+const agentRuntimeHappyPathCases: readonly AgentRuntimeHappyPathCase[] = [
   {
     runtimeId: "codex",
     email: "agent-runtime-happy-path-codex@example.com",
@@ -56,15 +56,15 @@ const it = createSandboxSystemTest({
   },
 });
 
-const SystemTestTimeoutMs = 10 * 60_000;
-const AgentResponseTimeoutMs = 3 * 60_000;
-const OpenCodeZenFreeModel = {
+const systemTestTimeoutMs = 10 * 60_000;
+const agentResponseTimeoutMs = 3 * 60_000;
+const openCodeZenFreeModel = {
   providerID: "opencode",
   modelID: "deepseek-v4-flash-free",
 };
 
 describe("runtime system agent runtime happy path", () => {
-  for (const testCase of AgentRuntimeHappyPathCases) {
+  for (const testCase of agentRuntimeHappyPathCases) {
     it(
       `starts a sandbox and completes a direct conversation with ${testCase.runtimeId}`,
       async ({ sandboxProvider, system }) => {
@@ -126,7 +126,7 @@ describe("runtime system agent runtime happy path", () => {
           },
         });
       },
-      SystemTestTimeoutMs,
+      systemTestTimeoutMs,
     );
   }
 });
@@ -164,7 +164,7 @@ async function completeCodexConversation(input: {
 
     await waitForCondition({
       description: `Codex assistant message containing '${input.responseMarker}'`,
-      timeoutMs: AgentResponseTimeoutMs,
+      timeoutMs: agentResponseTimeoutMs,
       evaluate: async () => {
         const threadRead = await readCodexThread({
           rpcClient: attachedAgentSession.rpcClient,
@@ -207,13 +207,13 @@ async function completeOpenCodeConversation(input: {
   try {
     const session = await client.createSession({
       model: {
-        providerID: OpenCodeZenFreeModel.providerID,
-        id: OpenCodeZenFreeModel.modelID,
+        providerID: openCodeZenFreeModel.providerID,
+        id: openCodeZenFreeModel.modelID,
       },
     });
     await client.sendPrompt({
       sessionId: session.id,
-      model: OpenCodeZenFreeModel,
+      model: openCodeZenFreeModel,
       parts: [
         {
           type: "text",
@@ -224,7 +224,7 @@ async function completeOpenCodeConversation(input: {
 
     await waitForCondition({
       description: `OpenCode assistant message containing '${input.responseMarker}'`,
-      timeoutMs: AgentResponseTimeoutMs,
+      timeoutMs: agentResponseTimeoutMs,
       evaluate: async () => {
         const sessionStatuses = await client.listSessionStatuses();
         const status = sessionStatuses[session.id];
@@ -272,7 +272,7 @@ async function completePiConversation(input: {
 
     await waitForCondition({
       description: `Pi assistant message containing '${input.responseMarker}'`,
-      timeoutMs: AgentResponseTimeoutMs,
+      timeoutMs: agentResponseTimeoutMs,
       evaluate: async () => {
         const state = await client.getState({
           sessionFile: conversation.sessionFile,
