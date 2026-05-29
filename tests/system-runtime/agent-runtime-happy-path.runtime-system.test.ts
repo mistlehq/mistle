@@ -27,12 +27,12 @@ import { createRuntimeCodexSandboxFixture } from "./helpers/runtime-codex-sandbo
 import { createSandboxSystemTest } from "./helpers/sandbox-system-test.js";
 import { timeSystemRuntimePhase } from "./helpers/system-runtime-phase-timing.js";
 
-type AgentRuntimeHappyPathCase = {
+type TestCase = {
   runtimeId: SystemAgentRuntimeId;
   email: string;
 };
 
-const agentRuntimeHappyPathCases: readonly AgentRuntimeHappyPathCase[] = [
+const testCases: readonly TestCase[] = [
   {
     runtimeId: "codex",
     email: "agent-runtime-happy-path-codex@example.com",
@@ -64,7 +64,7 @@ const openCodeZenFreeModel = {
 };
 
 describe("runtime system agent runtime happy path", () => {
-  for (const testCase of agentRuntimeHappyPathCases) {
+  for (const testCase of testCases) {
     it(
       `starts a sandbox and completes a direct conversation with ${testCase.runtimeId}`,
       async ({ sandboxProvider, system }) => {
