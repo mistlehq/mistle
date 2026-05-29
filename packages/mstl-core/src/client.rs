@@ -47,6 +47,13 @@ impl MistleClient {
         self.get_json(self.current_user_organizations_url().as_str())
     }
 
+    pub fn switch_organization(
+        &self,
+        request: SwitchOrganizationRequest<'_>,
+    ) -> Result<OAuthTokenResponse, MistleClientError> {
+        self.post_json(self.switch_organization_url().as_str(), &request)
+    }
+
     pub fn list_sandbox_profiles(&self) -> Result<ListSandboxProfilesResponse, MistleClientError> {
         let mut page = self.list_sandbox_profiles_page(None)?;
         let total_results = page.total_results;
@@ -235,6 +242,10 @@ impl MistleClient {
         endpoint_url(&self.base_url, "/v1/me/organizations")
     }
 
+    fn switch_organization_url(&self) -> Url {
+        endpoint_url(&self.base_url, "/oauth/switch-organization")
+    }
+
     fn list_sandbox_profiles_url(&self, after: Option<&str>) -> Url {
         let mut url = endpoint_url(&self.base_url, "/v1/sandbox/profiles");
 
@@ -409,6 +420,20 @@ pub struct CurrentUserOrganization {
     pub slug: String,
     pub role: String,
     pub is_current: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SwitchOrganizationRequest<'a> {
+    pub organization_id: &'a str,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct OAuthTokenResponse {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub expires_in: u64,
+    pub scope: String,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -834,15 +859,15 @@ mod tests {
         CurrentActorOrganization, CurrentUserOrganization, CurrentUserOrganizationsResponse,
         ListSandboxInstancesRequest, ListSandboxInstancesResponse,
         ListSandboxProfileVersionsResponse, MistleClient, MistleClientAuthorizationHeaderConfig,
-        MistleClientConfig, SandboxInstance, SandboxInstanceAgentRuntimeId,
+        MistleClientConfig, OAuthTokenResponse, SandboxInstance, SandboxInstanceAgentRuntimeId,
         SandboxInstanceConnectionToken, SandboxInstanceListItem, SandboxInstanceRuntimeContext,
         SandboxInstanceSource, SandboxInstanceStartedBy, SandboxInstanceStartupOperation,
         SandboxInstanceStartupOperationKind, SandboxInstanceStatus,
         SandboxInstanceTriggerConversation, SandboxProfileVersion,
         SandboxProfileVersionAgentRuntimeId, SandboxProfileVersionDefaultPersistenceMode,
         SandboxProfileVersionState, StartSandboxProfileInstanceResponse,
-        StartSandboxProfileInstanceStatus, UpdateSandboxProfileVersionDraftRequest,
-        UpdateSandboxProfileVersionDraftResponse,
+        StartSandboxProfileInstanceStatus, SwitchOrganizationRequest,
+        UpdateSandboxProfileVersionDraftRequest, UpdateSandboxProfileVersionDraftResponse,
     };
 
     #[test]
@@ -872,6 +897,16 @@ mod tests {
         assert_eq!(
             client.current_user_organizations_url().as_str(),
             "https://api.example.test/control-plane/v1/me/organizations"
+        );
+    }
+
+    #[test]
+    fn builds_switch_organization_url_from_nested_base_url() {
+        let client = client_with_base_url("https://api.example.test/control-plane/");
+
+        assert_eq!(
+            client.switch_organization_url().as_str(),
+            "https://api.example.test/control-plane/oauth/switch-organization"
         );
     }
 
@@ -1377,6 +1412,41 @@ mod tests {
                         is_current: false,
                     },
                 ],
+            }
+        );
+    }
+
+    #[test]
+    fn encodes_switch_organization_request() {
+        let request = SwitchOrganizationRequest {
+            organization_id: "org_second",
+        };
+
+        let encoded = serde_json::to_string(&request).expect("request should encode");
+
+        assert_eq!(encoded, r#"{"organizationId":"org_second"}"#);
+    }
+
+    #[test]
+    fn decodes_oauth_token_response() {
+        let response = serde_json::from_str::<OAuthTokenResponse>(
+            r#"{
+                "token_type": "Bearer",
+                "access_token": "mstl_oat_access",
+                "refresh_token": "mstl_ort_refresh",
+                "expires_in": 3600,
+                "scope": "organization:read sandboxSession:read"
+            }"#,
+        )
+        .expect("OAuth token response should decode");
+
+        assert_eq!(
+            response,
+            OAuthTokenResponse {
+                access_token: "mstl_oat_access".to_owned(),
+                refresh_token: "mstl_ort_refresh".to_owned(),
+                expires_in: 3600,
+                scope: "organization:read sandboxSession:read".to_owned(),
             }
         );
     }

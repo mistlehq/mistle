@@ -17,8 +17,8 @@ use std::path::PathBuf;
 use bpaf::{OptionParser, Parser, construct, long, positional, pure};
 
 use crate::command_metadata::{
-    CODEX, CODEX_ARG, LOGIN, LOGOUT, ORG, ORG_LIST, PROFILE, PROFILE_GET, PROFILE_ID, PROFILE_LIST,
-    PROFILE_VERSION, PROFILE_VERSION_LIST, PROFILE_VERSION_SETUP_SCRIPT,
+    CODEX, CODEX_ARG, LOGIN, LOGOUT, ORG, ORG_LIST, ORG_SELECTOR, ORG_SWITCH, PROFILE, PROFILE_GET,
+    PROFILE_ID, PROFILE_LIST, PROFILE_VERSION, PROFILE_VERSION_LIST, PROFILE_VERSION_SETUP_SCRIPT,
     PROFILE_VERSION_SETUP_SCRIPT_SET, PROFILE_VERSION_VALUE, ROOT, SANDBOX, SANDBOX_CREATE,
     SANDBOX_GET, SANDBOX_ID, SANDBOX_LIST, SANDBOX_LIST_AFTER, SANDBOX_LIST_LIMIT,
     SETUP_SCRIPT_FILE, UPDATE, WHOAMI,
@@ -40,6 +40,9 @@ enum CliCommand {
     Whoami,
     Update,
     OrgList,
+    OrgSwitch {
+        selector: String,
+    },
     ProfileList,
     ProfileGet {
         profile_id: String,
@@ -95,7 +98,19 @@ fn options() -> OptionParser<CliCommand> {
         .descr(ORG_LIST.description)
         .command(ORG_LIST.name);
 
-    let org = construct!([org_list])
+    let org_selector = positional::<String>(ORG_SELECTOR.name)
+        .help(ORG_SELECTOR.description)
+        .guard(
+            |value| !value.trim().is_empty(),
+            "organization cannot be blank",
+        );
+    let org_switch = org_selector
+        .map(|selector| CliCommand::OrgSwitch { selector })
+        .to_options()
+        .descr(ORG_SWITCH.description)
+        .command(ORG_SWITCH.name);
+
+    let org = construct!([org_list, org_switch])
         .to_options()
         .descr(ORG.description)
         .command(ORG.name);
@@ -263,6 +278,7 @@ where
         CliCommand::Whoami => whoami::run(stdout, stderr),
         CliCommand::Update => update::run(stdout, stderr),
         CliCommand::OrgList => org::run_list(stdout, stderr),
+        CliCommand::OrgSwitch { selector } => org::run_switch(&selector, stdout, stderr),
         CliCommand::ProfileList => profile::run_list(stdout, stderr),
         CliCommand::ProfileGet { profile_id } => profile::run_get(&profile_id, stdout, stderr),
         CliCommand::ProfileVersionList { profile_id } => {

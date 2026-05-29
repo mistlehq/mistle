@@ -7,7 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use serde::Deserialize;
+use mstl_core::client::OAuthTokenResponse;
 use sha2::{Digest, Sha256};
 use url::Url;
 
@@ -95,7 +95,7 @@ where
         redirect_uri: &redirect_uri,
         code_verifier: &code_verifier,
     })?;
-    let auth_file_path = auth_file::write_oauth(token.into_oauth_auth()?)?;
+    let auth_file_path = auth_file::write_oauth(oauth_token_response_to_auth(token)?)?;
 
     writeln!(stdout, "Logged in to Mistle")
         .and_then(|()| writeln!(stdout, "Wrote auth file: {}", auth_file_path.display()))
@@ -310,9 +310,9 @@ pub(crate) fn refresh_oauth_auth(
         .read_to_string()
         .map_err(|source| login_error("read token response", source))?;
 
-    serde_json::from_str::<OAuthTokenResponse>(&response_body)
-        .map_err(|source| login_error("decode token response", source))?
-        .into_oauth_auth()
+    let token = serde_json::from_str::<OAuthTokenResponse>(&response_body)
+        .map_err(|source| login_error("decode token response", source))?;
+    oauth_token_response_to_auth(token)
 }
 
 fn token_url(base_url: &str) -> Result<Url, CliError> {
@@ -322,23 +322,15 @@ fn token_url(base_url: &str) -> Result<Url, CliError> {
     Ok(url)
 }
 
-#[derive(Debug, Deserialize)]
-struct OAuthTokenResponse {
-    access_token: String,
-    refresh_token: String,
-    expires_in: u64,
-    scope: String,
-}
-
-impl OAuthTokenResponse {
-    fn into_oauth_auth(self) -> Result<auth_file::OAuthAuth, CliError> {
-        Ok(auth_file::OAuthAuth {
-            access_token: self.access_token,
-            refresh_token: self.refresh_token,
-            expires_at_unix_seconds: current_unix_seconds()? + self.expires_in,
-            scope: self.scope,
-        })
-    }
+pub(crate) fn oauth_token_response_to_auth(
+    response: OAuthTokenResponse,
+) -> Result<auth_file::OAuthAuth, CliError> {
+    Ok(auth_file::OAuthAuth {
+        access_token: response.access_token,
+        refresh_token: response.refresh_token,
+        expires_at_unix_seconds: current_unix_seconds()? + response.expires_in,
+        scope: response.scope,
+    })
 }
 
 pub(crate) fn current_unix_seconds() -> Result<u64, CliError> {

@@ -43,6 +43,11 @@ pub const ORG_LIST: CommandMetadata = CommandMetadata {
     description: "List available Mistle organizations",
 };
 
+pub const ORG_SWITCH: CommandMetadata = CommandMetadata {
+    name: "switch",
+    description: "Switch the active Mistle organization",
+};
+
 pub const PROFILE: CommandMetadata = CommandMetadata {
     name: "profile",
     description: "Manage sandbox profiles",
@@ -101,6 +106,11 @@ pub const SANDBOX_GET: CommandMetadata = CommandMetadata {
 pub const CODEX: CommandMetadata = CommandMetadata {
     name: "codex",
     description: "Run Codex against a Mistle sandbox",
+};
+
+pub const ORG_SELECTOR: ArgumentMetadata = ArgumentMetadata {
+    name: "organization",
+    description: "Organization id or slug",
 };
 
 pub const PROFILE_ID: ArgumentMetadata = ArgumentMetadata {

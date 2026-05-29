@@ -27,6 +27,13 @@ pub(crate) enum CliError {
         path: String,
     },
     MissingAuthFile,
+    OAuthLoginRequired,
+    OrganizationSelectorNotFound {
+        selector: String,
+    },
+    OrganizationSelectorAmbiguous {
+        selector: String,
+    },
     ReadAuthFile {
         path: String,
         source: io::Error,
@@ -87,6 +94,21 @@ impl fmt::Display for CliError {
                 write!(
                     formatter,
                     "missing Mistle authentication; run `mistle login` or set MISTLE_API_KEY"
+                )
+            }
+            Self::OAuthLoginRequired => {
+                write!(
+                    formatter,
+                    "organization switching requires `mistle login`; API key authentication cannot be switched"
+                )
+            }
+            Self::OrganizationSelectorNotFound { selector } => {
+                write!(formatter, "organization `{selector}` was not found")
+            }
+            Self::OrganizationSelectorAmbiguous { selector } => {
+                write!(
+                    formatter,
+                    "organization `{selector}` matched multiple organizations"
                 )
             }
             Self::ReadAuthFile { path, source } => {
