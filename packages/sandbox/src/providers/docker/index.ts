@@ -1,6 +1,5 @@
 import type { SandboxRuntimeControl } from "../../types.js";
 import { DockerSandboxAdapter, createDockerSandboxAdapter } from "./adapter.js";
-import { createDockerBaseImageBuilder } from "./base-image-builder.js";
 import { DockerApiClient, type DockerClient } from "./client.js";
 import { validateDockerSandboxConfig, type DockerSandboxConfig } from "./config.js";
 import { createDockerSandboxRuntimeControl } from "./runtime-control.js";

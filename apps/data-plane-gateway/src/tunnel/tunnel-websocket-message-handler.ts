@@ -5,7 +5,6 @@ import type { WebSocket } from "ws";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
 import {
   TunnelProtocolTranslator,
-  TunnelProtocolViolationError,
   type TunnelProtocolDelivery,
 } from "./protocol/tunnel-protocol-translator.js";
 import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
