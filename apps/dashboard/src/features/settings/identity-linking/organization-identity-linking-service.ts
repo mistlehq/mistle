@@ -252,35 +252,6 @@ export async function createOrganizationIdentityLinkProviderConfig(input: {
   }
 }
 
-export async function updateOrganizationIdentityLinkProviderConfig(input: {
-  organizationProviderConfigId: string;
-  integrationConnectionId: string;
-}): Promise<OrganizationIdentityLinkProviderConfig> {
-  try {
-    const response = await requestControlPlane({
-      operation: "updateOrganizationIdentityLinkProviderConfig",
-      method: "PUT",
-      pathname: `/v1/organization/identity-linking/provider-configs/${encodeURIComponent(input.organizationProviderConfigId)}`,
-      body: {
-        integrationConnectionId: input.integrationConnectionId,
-      },
-      fallbackMessage: "Could not save identity-linking provider configuration.",
-    });
-
-    return readJsonWithSchema({
-      response,
-      schema: OrganizationIdentityLinkProviderConfigSchema,
-      operation: "updateOrganizationIdentityLinkProviderConfig",
-    });
-  } catch (error) {
-    throw wrapOrganizationIdentityLinkingApiError({
-      operation: "updateOrganizationIdentityLinkProviderConfig",
-      error,
-      fallbackMessage: "Could not save identity-linking provider configuration.",
-    });
-  }
-}
-
 export async function listOrganizationIdentityLinkProviderLinks(input: {
   organizationProviderConfigId: string;
   signal?: AbortSignal;
@@ -316,16 +287,15 @@ export async function getOrganizationIdentityLinkGitCommitSigningImpact(input: {
   action: "enable" | "disable";
   signal?: AbortSignal;
 }): Promise<OrganizationIdentityLinkGitCommitSigningImpact> {
-  const searchParams = new URLSearchParams({
-    integrationConnectionId: input.integrationConnectionId,
-    action: input.action,
-  });
-
   try {
     const response = await requestControlPlane({
       operation: "getOrganizationIdentityLinkGitCommitSigningImpact",
       method: "GET",
-      pathname: `/v1/organization/identity-linking/providers/${encodeURIComponent(input.providerFamily)}/git-commit-signing-impact?${searchParams.toString()}`,
+      pathname: `/v1/organization/identity-linking/providers/${encodeURIComponent(input.providerFamily)}/git-commit-signing-impact`,
+      query: {
+        integrationConnectionId: input.integrationConnectionId,
+        action: input.action,
+      },
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not load commit-signing impact.",
     });

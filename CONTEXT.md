@@ -360,7 +360,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Mistle-managed Pi runtimes may require the current Pi conversation contract rather than supporting older Pi builds.
 - A **Pi follow-up message** is the Pi runtime equivalent of the composer queue action while a **Working agent turn** is active.
 - A **Git commit signing** setting belongs to a **Sandbox profile version** and depends on an **Identity-linked Git connection** being available.
-- Changes to an **Identity-linked Git connection** may update the **Git commit signing** setting on current active and draft **Sandbox profile versions** without creating a new version.
+- Changes to an **Identity-linked Git connection** update matching current active and draft **Sandbox profile versions** without creating a new version.
 - A **Git commit signing** setting should reference the same Git connection that the **Sandbox profile version** uses for Git access.
 - A **Sandbox profile version** uses a Git connection when its Git integration binding references that connection.
 - An **Identity-linking connection row** represents a connection, so selecting a different connection would mean selecting a different row.

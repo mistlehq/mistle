@@ -7,13 +7,12 @@ import {
 import { and, eq, or } from "drizzle-orm";
 
 import { logger } from "../../logger.js";
+import { resolveGitCommitSigningPolicy } from "../../sandbox-profiles/services/git-signing-policy.js";
 import { GitHubProviderFamily } from "../github-signing.js";
 
 export type GitCommitSigningSyncAction = "enable" | "disable";
 
-export type GitCommitSigningSyncInvariantViolationReason =
-  | "already_configured"
-  | "mismatched_signing_connection";
+export type GitCommitSigningSyncInvariantViolationReason = "mismatched_signing_connection";
 
 export type GitCommitSigningSyncResult = {
   action: GitCommitSigningSyncAction;
@@ -95,6 +94,19 @@ async function enableProfileGitCommitSigning(
     apply: boolean;
   },
 ): Promise<GitCommitSigningSyncResult> {
+  const signingPolicyAllowsSync = await gitCommitSigningPolicyAllowsSync(db, {
+    organizationId: input.organizationId,
+    integrationConnectionId: input.integrationConnectionId,
+    requireExistingProviderConfig: input.apply,
+  });
+  if (!signingPolicyAllowsSync) {
+    return {
+      action: "enable",
+      updatedProfileIds: [],
+      invariantViolations: [],
+    };
+  }
+
   const tables = getControlPlaneDatabaseSchema(db);
   const currentVersionRows = await loadCurrentProfileVersionsUsingGitConnection(db, input);
   const updatedProfileIds: string[] = [];
@@ -119,13 +131,14 @@ async function enableProfileGitCommitSigning(
       continue;
     }
 
+    if (row.gitCommitSigningIntegrationConnectionId === input.integrationConnectionId) {
+      continue;
+    }
+
     invariantViolations.push({
       profileId: row.profileId,
       version: row.version,
-      reason:
-        row.gitCommitSigningIntegrationConnectionId === input.integrationConnectionId
-          ? "already_configured"
-          : "mismatched_signing_connection",
+      reason: "mismatched_signing_connection",
       gitConnectionId: row.gitConnectionId,
       gitCommitSigningIntegrationConnectionId: row.gitCommitSigningIntegrationConnectionId,
     });
@@ -140,6 +153,40 @@ async function enableProfileGitCommitSigning(
     updatedProfileIds: uniqueProfileIds(updatedProfileIds),
     invariantViolations,
   };
+}
+
+async function gitCommitSigningPolicyAllowsSync(
+  db: ControlPlaneTransaction,
+  input: {
+    organizationId: string;
+    integrationConnectionId: string;
+    requireExistingProviderConfig: boolean;
+  },
+): Promise<boolean> {
+  const providerConfig = await db.query.organizationIdentityLinkProviderConfigs.findFirst({
+    columns: {
+      policy: true,
+    },
+    where: (table, { and: whereAnd, eq: whereEq }) =>
+      whereAnd(
+        whereEq(table.organizationId, input.organizationId),
+        whereEq(table.providerFamily, GitHubProviderFamily),
+        whereEq(table.integrationConnectionId, input.integrationConnectionId),
+      ),
+  });
+
+  if (providerConfig === undefined && input.requireExistingProviderConfig) {
+    throw new Error(
+      `Expected GitHub identity-linking provider config for connection '${input.integrationConnectionId}' before syncing profile Git commit signing.`,
+    );
+  }
+
+  return (
+    resolveGitCommitSigningPolicy({
+      policy: providerConfig?.policy ?? null,
+      gitCommitSigningIntegrationConnectionId: input.integrationConnectionId,
+    }).mode !== "disabled"
+  );
 }
 
 async function disableProfileGitCommitSigning(
@@ -164,6 +211,7 @@ async function disableProfileGitCommitSigning(
         gitConnectionId: row.gitConnectionId,
         gitCommitSigningIntegrationConnectionId: row.gitCommitSigningIntegrationConnectionId,
       });
+      continue;
     }
 
     if (input.apply) {

@@ -221,7 +221,97 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     );
   });
 
-  it("clears commit signing when the selected Git connection stops being identity-linked", async () => {
+  it("preserves commit signing while identity-linking state is loading", () => {
+    const gitCommitSigningConnectionChanges: Array<string | null> = [];
+
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [StoryGithubConnection],
+          availableTargets: [StoryGithubTarget],
+          gitCommitSigningIntegrationConnectionId: StoryGithubConnection.id,
+          identityLinkedGitConnectionIds: null,
+          integrationRows: [
+            {
+              clientId: "git-row",
+              connectionId: StoryGithubConnection.id,
+              kind: "git",
+              config: {},
+            },
+          ],
+          onGitCommitSigningIntegrationConnectionChange: (connectionId) => {
+            gitCommitSigningConnectionChanges.push(connectionId);
+          },
+        }}
+      />,
+    );
+
+    const switchControl = screen.getByRole("switch", { name: "Sign Git commits" });
+    expect(switchControl.getAttribute("aria-checked")).toBe("true");
+    expect(switchControl.hasAttribute("data-disabled")).toBe(true);
+    expect(screen.getByText("Loading identity linking")).toBeDefined();
+    expect(gitCommitSigningConnectionChanges).toEqual([]);
+  });
+
+  it("clears commit signing when changing the Git connection before identity-linking state loads", async () => {
+    const secondaryGithubConnection: IntegrationConnectionSummary = {
+      ...StoryGithubConnection,
+      id: "connection-github-secondary",
+      displayName: "GitHub Secondary",
+    };
+    const gitCommitSigningConnectionChanges: Array<string | null> = [];
+    const rowChanges: Array<{
+      clientId: string;
+      connectionId: string | undefined;
+    }> = [];
+
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [StoryGithubConnection, secondaryGithubConnection],
+          availableTargets: [StoryGithubTarget],
+          gitCommitSigningIntegrationConnectionId: StoryGithubConnection.id,
+          identityLinkedGitConnectionIds: null,
+          integrationRows: [
+            {
+              clientId: "git-row",
+              connectionId: StoryGithubConnection.id,
+              kind: "git",
+              config: {},
+            },
+          ],
+          onGitCommitSigningIntegrationConnectionChange: (connectionId) => {
+            gitCommitSigningConnectionChanges.push(connectionId);
+          },
+          onIntegrationBindingRowChange: (clientId, changes) => {
+            rowChanges.push({
+              clientId,
+              connectionId: changes.connectionId,
+            });
+          },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("combobox", { name: "git connection" }));
+    const secondaryOption = screen.getByRole("option", { name: "GitHub - GitHub Secondary" });
+    fireEvent.mouseMove(secondaryOption);
+    fireEvent.mouseDown(secondaryOption, { button: 0 });
+    fireEvent.mouseUp(secondaryOption, { button: 0 });
+    fireEvent.click(secondaryOption, { button: 0 });
+
+    await waitFor(() => {
+      expect(rowChanges).toEqual([
+        {
+          clientId: "git-row",
+          connectionId: secondaryGithubConnection.id,
+        },
+      ]);
+      expect(gitCommitSigningConnectionChanges).toEqual([null]);
+    });
+  });
+
+  it("does not rewrite a persisted commit signing mismatch when identity linking is unavailable", () => {
     const gitCommitSigningConnectionChanges: Array<string | null> = [];
 
     render(
@@ -246,9 +336,12 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(gitCommitSigningConnectionChanges).toEqual([null]);
-    });
+    const switchControl = screen.getByRole("switch", { name: "Sign Git commits" });
+    expect(switchControl.getAttribute("aria-checked")).toBe("true");
+    expect(switchControl.hasAttribute("data-disabled")).toBe(true);
+    expect(screen.getByRole("link", { name: "Configure" })).toBeDefined();
+    expect(screen.getByText("identity linking to enable")).toBeDefined();
+    expect(gitCommitSigningConnectionChanges).toEqual([]);
   });
 
   it("renders editable connector binding config controls in resources and tools", () => {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -9,10 +9,7 @@ import type {
   SandboxProfileVersion,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { ApiKey } from "../settings/api-keys/api-keys-service.js";
-import {
-  SandboxProfileRuntimeSection,
-  type SandboxProfileRuntimeDraftState,
-} from "./sandbox-profile-runtime-section.js";
+import { SandboxProfileRuntimeSection } from "./sandbox-profile-runtime-section.js";
 
 afterEach(() => {
   cleanup();
@@ -254,50 +251,6 @@ describe("SandboxProfileRuntimeSection", () => {
 
     expect(toggle.getAttribute("aria-checked")).toBe("true");
     expect(screen.getByRole("combobox", { name: "Mistle API key" })).toBeTruthy();
-  });
-
-  it("includes Git commit signing connection updates in runtime draft changes", async () => {
-    const runtimeDraftStates: SandboxProfileRuntimeDraftState[] = [];
-
-    render(
-      <SandboxProfileRuntimeSection
-        apiKeys={[]}
-        availableConnections={[]}
-        availableTargets={[]}
-        disabled={false}
-        isDraft={true}
-        onDraftStateChange={(state) => {
-          runtimeDraftStates.push(state);
-        }}
-        providers={[DockerProvider]}
-        version={createVersion({
-          sandboxProvider: "docker",
-          sandboxConnectionId: null,
-          sandboxResources: null,
-        })}
-      />,
-    );
-
-    await waitFor(() => {
-      const runtimeDraftState = runtimeDraftStates.at(-1);
-      if (runtimeDraftState?.updateGitCommitSigningIntegrationConnectionId === undefined) {
-        throw new Error("Expected runtime draft state to expose Git commit signing updater.");
-      }
-
-      runtimeDraftState.updateGitCommitSigningIntegrationConnectionId("icn_github_support");
-    });
-
-    await waitFor(() => {
-      const runtimeDraftState = runtimeDraftStates.at(-1);
-      const buildDraftChanges = runtimeDraftState?.buildDraftChanges;
-      if (buildDraftChanges === undefined) {
-        throw new Error("Expected runtime draft changes builder.");
-      }
-
-      expect(buildDraftChanges()).toMatchObject({
-        gitCommitSigningIntegrationConnectionId: "icn_github_support",
-      });
-    });
   });
 
   it("disables Mistle API key selection when no API keys exist", () => {

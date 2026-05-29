@@ -73,7 +73,9 @@ import {
   SandboxProfileEditorShell,
   SandboxProfileEditorView,
   SandboxProfileSetupScriptPanel,
+  buildSandboxProfileRuntimeDraftChanges,
   resolveSandboxProfileEditorRefetchInterval,
+  resolveSelectedSandboxProfileGitCommitSigningIntegrationConnectionId,
   resolveSelectedSandboxProfileAgentRuntimeId,
 } from "./sandbox-profile-editor-page.js";
 
@@ -104,6 +106,7 @@ function createSandboxProfileVersionFixture(input: {
   state: SandboxProfileVersion["state"];
   agentRuntimeId?: SandboxProfileVersion["agentRuntimeId"];
   defaultPersistenceMode?: SandboxProfileVersion["defaultPersistenceMode"];
+  gitCommitSigningIntegrationConnectionId?: string | null;
   maintenanceScript?: string | null;
   isActive: boolean;
   usable?: boolean;
@@ -116,7 +119,7 @@ function createSandboxProfileVersionFixture(input: {
     state: input.state,
     publishedAt: input.state === "published" ? "2026-05-01T00:00:00.000Z" : null,
     agentRuntimeId: input.agentRuntimeId ?? "codex",
-    gitCommitSigningIntegrationConnectionId: null,
+    gitCommitSigningIntegrationConnectionId: input.gitCommitSigningIntegrationConnectionId ?? null,
     mistleMcpEnabled: false,
     mistleMcpApiKeyId: null,
     defaultPersistenceMode: input.defaultPersistenceMode ?? "ephemeral",
@@ -1252,6 +1255,74 @@ describe("SandboxProfileEditorPage", () => {
         },
       }),
     ).toBe("codex");
+  });
+
+  it("preserves explicit null commit signing draft state", () => {
+    const currentVersion = createSandboxProfileVersionFixture({
+      sandboxProfileId: "sbp_current",
+      version: 2,
+      state: "draft",
+      gitCommitSigningIntegrationConnectionId: "icn_github_signing",
+      isActive: false,
+    });
+
+    expect(
+      resolveSelectedSandboxProfileGitCommitSigningIntegrationConnectionId({
+        currentVersion,
+        gitCommitSigningDraftState: {
+          gitCommitSigningIntegrationConnectionId: null,
+          sourceVersionKey: "sbp_current:2",
+        },
+      }),
+    ).toBeNull();
+  });
+
+  it("falls back to the persisted commit signing connection when draft state is unset", () => {
+    const currentVersion = createSandboxProfileVersionFixture({
+      sandboxProfileId: "sbp_current",
+      version: 2,
+      state: "draft",
+      gitCommitSigningIntegrationConnectionId: "icn_github_signing",
+      isActive: false,
+    });
+
+    expect(
+      resolveSelectedSandboxProfileGitCommitSigningIntegrationConnectionId({
+        currentVersion,
+        gitCommitSigningDraftState: {
+          gitCommitSigningIntegrationConnectionId: undefined,
+          sourceVersionKey: "sbp_current:2",
+        },
+      }),
+    ).toBe("icn_github_signing");
+  });
+
+  it("builds runtime draft changes from persisted runtime settings when the runtime section is not loaded", () => {
+    const currentVersion = createSandboxProfileVersionFixture({
+      sandboxProfileId: "sbp_current",
+      version: 2,
+      state: "draft",
+      gitCommitSigningIntegrationConnectionId: "icn_github_previous",
+      isActive: false,
+    });
+
+    expect(
+      buildSandboxProfileRuntimeDraftChanges({
+        currentVersion,
+        runtimeDraftState: {
+          agentRuntimeId: undefined,
+          sourceVersionKey: "sbp_current:2",
+          hasUnpersistedChanges: true,
+        },
+      }),
+    ).toMatchObject({
+      agentRuntimeId: "codex",
+      mistleMcpEnabled: false,
+      mistleMcpApiKeyId: null,
+      sandboxProvider: "docker",
+      sandboxConnectionId: null,
+      sandboxResources: null,
+    });
   });
 
   it("returns an explicit unavailable state when the published resolver has no published version", () => {

@@ -61,7 +61,6 @@ type AgentRuntimeId = SandboxProfileVersion["agentRuntimeId"];
 
 export type SandboxProfileRuntimeDraftChanges = {
   agentRuntimeId: AgentRuntimeId;
-  gitCommitSigningIntegrationConnectionId: string | null;
   mistleMcpEnabled: boolean;
   mistleMcpApiKeyId: string | null;
   sandboxProvider: string;
@@ -71,19 +70,16 @@ export type SandboxProfileRuntimeDraftChanges = {
 
 export type SandboxProfileRuntimeDraftState = {
   agentRuntimeId: AgentRuntimeId | undefined;
-  gitCommitSigningIntegrationConnectionId?: string | null | undefined;
   sourceVersionKey: string | undefined;
   hasUnpersistedChanges: boolean;
   applyDraftSaveError?: (error: unknown) => void;
   applySavedRuntimeConfig?: (runtimeConfig: SandboxProfileRuntimeDraftChanges) => void;
   buildDraftChanges?: () => SandboxProfileRuntimeDraftChanges;
-  updateGitCommitSigningIntegrationConnectionId?: (connectionId: string | null) => void;
 };
 
 type RuntimeConfigState = {
   agentRuntimeId: AgentRuntimeId;
   credentialSource: SandboxCredentialSource;
-  gitCommitSigningIntegrationConnectionId: string | null;
   mistleMcpEnabled: boolean;
   mistleMcpApiKeyId: string | null;
   sandboxProvider: string | null;
@@ -173,7 +169,6 @@ export function SandboxProfileRuntimeSection(input: {
 
     return {
       agentRuntimeId: runtime.agentRuntimeId,
-      gitCommitSigningIntegrationConnectionId: runtime.gitCommitSigningIntegrationConnectionId,
       mistleMcpEnabled: runtime.mistleMcpEnabled,
       mistleMcpApiKeyId: runtime.mistleMcpEnabled ? runtime.mistleMcpApiKeyId : null,
       sandboxProvider: provider,
@@ -194,8 +189,6 @@ export function SandboxProfileRuntimeSection(input: {
           provider,
         }),
         agentRuntimeId: runtimeConfig.agentRuntimeId,
-        gitCommitSigningIntegrationConnectionId:
-          runtimeConfig.gitCommitSigningIntegrationConnectionId,
         mistleMcpEnabled: runtimeConfig.mistleMcpEnabled,
         mistleMcpApiKeyId: runtimeConfig.mistleMcpApiKeyId,
         sandboxProvider: runtimeConfig.sandboxProvider,
@@ -229,7 +222,6 @@ export function SandboxProfileRuntimeSection(input: {
   }, [
     input.providers,
     input.version.agentRuntimeId,
-    input.version.gitCommitSigningIntegrationConnectionId,
     input.version.mistleMcpApiKeyId,
     input.version.mistleMcpEnabled,
     input.version.sandboxConnectionId,
@@ -241,12 +233,10 @@ export function SandboxProfileRuntimeSection(input: {
   useEffect(() => {
     input.onDraftStateChange?.({
       agentRuntimeId: draftRuntime.agentRuntimeId,
-      gitCommitSigningIntegrationConnectionId: draftRuntime.gitCommitSigningIntegrationConnectionId,
       sourceVersionKey: createRuntimeDraftSourceVersionKey(input.version),
       applyDraftSaveError,
       applySavedRuntimeConfig,
       buildDraftChanges,
-      updateGitCommitSigningIntegrationConnectionId: updateGitSigningConnection,
       hasUnpersistedChanges: !runtimeConfigStatesAreEqual(draftRuntime, persistedRuntimeState),
     });
   }, [
@@ -271,8 +261,6 @@ export function SandboxProfileRuntimeSection(input: {
     setDraftRuntime({
       agentRuntimeId: draftRuntimeRef.current.agentRuntimeId,
       credentialSource: resolveDefaultCredentialSourceForProvider(provider),
-      gitCommitSigningIntegrationConnectionId:
-        draftRuntimeRef.current.gitCommitSigningIntegrationConnectionId,
       mistleMcpEnabled: draftRuntimeRef.current.mistleMcpEnabled,
       mistleMcpApiKeyId: draftRuntimeRef.current.mistleMcpApiKeyId,
       sandboxProvider: provider.id,
@@ -341,14 +329,6 @@ export function SandboxProfileRuntimeSection(input: {
     setDraftRuntime((currentRuntime) => ({
       ...currentRuntime,
       agentRuntimeId: value,
-    }));
-    setSaveErrorMessage(null);
-  }
-
-  function updateGitSigningConnection(value: string | null): void {
-    setDraftRuntime((currentRuntime) => ({
-      ...currentRuntime,
-      gitCommitSigningIntegrationConnectionId: value,
     }));
     setSaveErrorMessage(null);
   }
@@ -1496,7 +1476,6 @@ function createRuntimeConfigState(input: {
       connectionId: input.version.sandboxConnectionId,
       provider,
     }),
-    gitCommitSigningIntegrationConnectionId: input.version.gitCommitSigningIntegrationConnectionId,
     mistleMcpEnabled: input.version.mistleMcpEnabled,
     mistleMcpApiKeyId: input.version.mistleMcpApiKeyId,
     sandboxProvider: input.version.sandboxProvider,
@@ -1606,8 +1585,6 @@ function resolveSandboxProviderIdFromTarget(target: IntegrationTargetSummary): s
 function runtimeConfigStatesAreEqual(left: RuntimeConfigState, right: RuntimeConfigState): boolean {
   return (
     left.agentRuntimeId === right.agentRuntimeId &&
-    left.gitCommitSigningIntegrationConnectionId ===
-      right.gitCommitSigningIntegrationConnectionId &&
     left.mistleMcpEnabled === right.mistleMcpEnabled &&
     left.mistleMcpApiKeyId === right.mistleMcpApiKeyId &&
     left.sandboxProvider === right.sandboxProvider &&

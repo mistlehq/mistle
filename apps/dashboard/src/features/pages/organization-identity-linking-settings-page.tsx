@@ -240,9 +240,10 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
     const status = input.enabled ? "active" : "disabled";
 
     if (row.config === null) {
-      await createConfigForConnectionRow({
-        row,
-        createConfigMutation,
+      await createConfigMutation.mutateAsync({
+        rowKey: row.rowKey,
+        providerFamily: row.provider.providerFamily,
+        integrationConnectionId: row.connection.id,
         status,
       });
       return;
@@ -542,32 +543,6 @@ function findIdentityLinkingConnectionRowOrThrow(input: {
   }
 
   return row;
-}
-
-async function createConfigForConnectionRow(input: {
-  row: IdentityLinkingConnectionRow;
-  createConfigMutation: {
-    mutateAsync: (input: {
-      rowKey: string;
-      providerFamily: string;
-      integrationConnectionId: string;
-      status: "active" | "disabled";
-    }) => Promise<OrganizationIdentityLinkProviderConfig>;
-  };
-  status: "active" | "disabled";
-}): Promise<string> {
-  if (input.row.config !== null) {
-    return input.row.config.organizationProviderConfigId;
-  }
-
-  const config = await input.createConfigMutation.mutateAsync({
-    rowKey: input.row.rowKey,
-    providerFamily: input.row.provider.providerFamily,
-    integrationConnectionId: input.row.connection.id,
-    status: input.status,
-  });
-
-  return config.organizationProviderConfigId;
 }
 
 function toIdentityLinkEligibleConnection(

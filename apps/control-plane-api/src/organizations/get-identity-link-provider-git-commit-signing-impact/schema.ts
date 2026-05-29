@@ -37,6 +37,7 @@ export const GetIdentityLinkProviderGitCommitSigningImpactNotFoundResponseSchema
   createCodeMessageErrorSchema(
     z.enum([
       IdentityLinkingNotFoundCodes.PROVIDER_NOT_FOUND,
+      IdentityLinkingNotFoundCodes.PROVIDER_CONFIG_NOT_FOUND,
       IdentityLinkingNotFoundCodes.CONNECTION_NOT_FOUND,
     ]),
   );

@@ -335,6 +335,10 @@ async function validateGitCommitSigningDraftConfig(
     integrationConnectionId: string | null;
   },
 ): Promise<void> {
+  if (input.integrationConnectionId === null) {
+    return;
+  }
+
   const gitHubConfigs = await db.query.organizationIdentityLinkProviderConfigs.findMany({
     columns: {
       integrationConnectionId: true,
@@ -359,10 +363,6 @@ async function validateGitCommitSigningDraftConfig(
         gitCommitSigningIntegrationConnectionId: config.integrationConnectionId,
       }).mode !== "disabled",
   );
-
-  if (input.integrationConnectionId === null) {
-    return;
-  }
 
   const selectedConfig = signingEligibleConfigs.find(
     (config) => config.integrationConnectionId === input.integrationConnectionId,
