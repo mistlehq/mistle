@@ -24,9 +24,12 @@ use tokio::net::{TcpListener, TcpSocket, TcpStream};
 use tokio::runtime::Builder;
 use tokio::sync::oneshot;
 use tokio_tungstenite::tungstenite::{
-    Message, client::IntoClientRequest, handshake::derive_accept_key, protocol::Role,
+    Message,
+    client::IntoClientRequest,
+    handshake::{client::Request as ClientWebSocketRequest, derive_accept_key},
+    protocol::Role,
 };
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, client_async, connect_async};
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, client_async};
 use url::Url;
 
 use crate::egress_proxy::body::{
@@ -761,8 +764,8 @@ async fn forward_upgrade_request_through_direct_gateway(
         })?,
     );
 
-    let (gateway_socket, _) = match connect_async(gateway_request).await {
-        Ok(connection) => connection,
+    let gateway_socket = match connect_direct_gateway_websocket_request(gateway_request).await {
+        Ok(socket) => socket,
         Err(error) => {
             let mut fields = request_context.common_fields();
             fields.push(("outcome", Value::String("connect_failed".to_string())));
@@ -1108,19 +1111,44 @@ async fn connect_direct_upstream_websocket(
     mark_upstream_socket: bool,
 ) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, EgressProxyError> {
     let target = websocket_target_url(uri)?;
+    let request = target.into_client_request().map_err(|error| {
+        EgressProxyError::new(format!(
+            "failed to build direct upstream websocket request: {error}"
+        ))
+    })?;
+    connect_direct_websocket_request(
+        request,
+        mark_upstream_socket,
+        "direct upstream websocket target",
+    )
+    .await
+}
+
+async fn connect_direct_gateway_websocket_request(
+    request: ClientWebSocketRequest,
+) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, EgressProxyError> {
+    connect_direct_websocket_request(request, true, "direct gateway websocket target").await
+}
+
+async fn connect_direct_websocket_request(
+    request: ClientWebSocketRequest,
+    mark_upstream_socket: bool,
+    target_description: &str,
+) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, EgressProxyError> {
+    let target = request.uri().to_string();
     let target_url = Url::parse(&target).map_err(|error| {
         EgressProxyError::new(format!(
-            "failed to parse direct upstream websocket target '{target}': {error}"
+            "failed to parse {target_description} '{target}': {error}"
         ))
     })?;
     let host = target_url.host_str().ok_or_else(|| {
         EgressProxyError::new(format!(
-            "direct upstream websocket target '{target_url}' is missing a host"
+            "{target_description} '{target_url}' is missing a host"
         ))
     })?;
     let port = target_url.port_or_known_default().ok_or_else(|| {
         EgressProxyError::new(format!(
-            "direct upstream websocket target '{target_url}' is missing a port for scheme '{}'",
+            "{target_description} '{target_url}' is missing a port for scheme '{}'",
             target_url.scheme()
         ))
     })?;
@@ -1128,35 +1156,28 @@ async fn connect_direct_upstream_websocket(
     let upstream_stream = match target_url.scheme() {
         "ws" => MaybeTlsStream::Plain(tcp_stream),
         "wss" => {
-            let server_name = tls_server_name(host, "direct upstream websocket target")?;
+            let server_name = tls_server_name(host, target_description)?;
             let tls_stream = build_direct_tls_connector()?
                 .connect(server_name, tcp_stream)
                 .await
                 .map_err(|error| {
                     EgressProxyError::new(format!(
-                        "direct upstream websocket TLS handshake to '{host}:{port}' failed: {error}"
+                        "{target_description} TLS handshake to '{host}:{port}' failed: {error}"
                     ))
                 })?;
             MaybeTlsStream::Rustls(tls_stream)
         }
         scheme => {
             return Err(EgressProxyError::new(format!(
-                "direct upstream websocket target must use ws or wss, got '{scheme}'"
+                "{target_description} must use ws or wss, got '{scheme}'"
             )));
         }
     };
-    let request = target.into_client_request().map_err(|error| {
-        EgressProxyError::new(format!(
-            "failed to build direct upstream websocket request: {error}"
-        ))
-    })?;
     client_async(request, upstream_stream)
         .await
         .map(|(socket, _)| socket)
         .map_err(|error| {
-            EgressProxyError::new(format!(
-                "direct upstream websocket connection failed: {error}"
-            ))
+            EgressProxyError::new(format!("{target_description} connection failed: {error}"))
         })
 }
 
@@ -1375,4 +1396,105 @@ fn filter_outbound_response_headers(
             Some((name.clone(), value.clone()))
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::{Read, Write};
+    use std::net::TcpListener as StdTcpListener;
+    use std::sync::mpsc;
+    use std::thread;
+    use std::time::Duration;
+
+    use tokio_tungstenite::tungstenite::handshake::derive_accept_key;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn direct_gateway_websocket_connector_preserves_egress_token_header() {
+        let listener = StdTcpListener::bind(("127.0.0.1", 0))
+            .expect("test gateway should bind to an ephemeral loopback port");
+        let gateway_address = listener
+            .local_addr()
+            .expect("test gateway should expose its bound address");
+        let (request_sender, request_receiver) = mpsc::channel();
+        let server_thread = thread::spawn(move || {
+            let (mut stream, _) = listener
+                .accept()
+                .expect("test gateway should accept one request");
+            let request_text = read_test_http_headers_from_stream(&mut stream);
+            let websocket_key = request_text
+                .lines()
+                .find_map(|line| {
+                    let (name, value) = line.split_once(':')?;
+                    if name.eq_ignore_ascii_case("sec-websocket-key") {
+                        Some(value.trim().to_string())
+                    } else {
+                        None
+                    }
+                })
+                .expect("websocket request should include Sec-WebSocket-Key");
+            let accept_key = derive_accept_key(websocket_key.as_bytes());
+            request_sender
+                .send(request_text)
+                .expect("test gateway request should be recorded");
+            write!(
+                stream,
+                "HTTP/1.1 101 Switching Protocols\r\nconnection: upgrade\r\nupgrade: websocket\r\nsec-websocket-accept: {accept_key}\r\n\r\n"
+            )
+            .expect("test gateway should write handshake response");
+        });
+        let mut gateway_request = format!(
+            "ws://{gateway_address}/_mistle/egress/ws?target=wss%3A%2F%2Fchatgpt.com%2Fbackend-api%2Fcodex%2Fresponses"
+        )
+        .into_client_request()
+        .expect("gateway websocket request should build");
+        gateway_request.headers_mut().insert(
+            HeaderName::from_static(DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME),
+            HeaderValue::from_static("Bearer gateway-token"),
+        );
+
+        let socket = connect_direct_gateway_websocket_request(gateway_request)
+            .await
+            .expect("direct gateway websocket should connect");
+        drop(socket);
+        let request_text = request_receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("test gateway should receive the websocket request");
+
+        assert!(
+            request_text.starts_with("GET /_mistle/egress/ws?target=wss%3A%2F%2Fchatgpt.com%2Fbackend-api%2Fcodex%2Fresponses HTTP/1.1\r\n"),
+            "gateway should receive encoded target path: {request_text}"
+        );
+        assert!(
+            request_text.lines().any(|line| {
+                line == format!(
+                    "{DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME}: Bearer gateway-token"
+                )
+            }),
+            "gateway should receive the egress token header: {request_text}"
+        );
+
+        server_thread
+            .join()
+            .expect("test gateway server thread should join");
+    }
+
+    fn read_test_http_headers_from_stream(stream: &mut std::net::TcpStream) -> String {
+        let mut request_bytes = Vec::new();
+        let mut buffer = [0_u8; 1024];
+        loop {
+            let read_count = stream
+                .read(&mut buffer)
+                .expect("test server should read request bytes");
+            if read_count == 0 {
+                break;
+            }
+            request_bytes.extend_from_slice(&buffer[..read_count]);
+            if request_bytes.windows(4).any(|window| window == b"\r\n\r\n") {
+                break;
+            }
+        }
+        String::from_utf8(request_bytes).expect("test request should be UTF-8")
+    }
 }
