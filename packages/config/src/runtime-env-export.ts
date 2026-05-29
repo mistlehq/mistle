@@ -182,6 +182,10 @@ const ControlPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_URL",
   },
   {
+    path: ["mcp", "trustForwardedHeaders"],
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_TRUST_FORWARDED_HEADERS",
+  },
+  {
     path: ["mcp", "auth", "secret"],
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_SECRET",
   },

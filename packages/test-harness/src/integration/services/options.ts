@@ -28,6 +28,7 @@ export type IntegrationServiceOptions = {
     billingStripeEnabled?: boolean;
     googleAuth?: "simulated";
     welcomeEmail?: IntegrationControlPlaneApiWelcomeEmailOptions;
+    mcpTrustForwardedHeaders?: boolean;
   };
   dataPlaneGateway?: {
     directEgress?: {

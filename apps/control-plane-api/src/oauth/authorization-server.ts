@@ -5,6 +5,7 @@ import type { NodeRequestHandler } from "../types.js";
 const OidcWellKnownPaths = new Set([
   "/.well-known/openid-configuration",
   "/.well-known/oauth-authorization-server",
+  "/.well-known/oauth-protected-resource/mcp",
 ]);
 
 const OidcRoutePrefix = "/oauth";

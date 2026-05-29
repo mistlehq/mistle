@@ -111,6 +111,7 @@ export const ControlPlaneApiMcpAuthConfigSchema = z
 export const ControlPlaneApiMcpConfigSchema = z
   .object({
     url: z.string().trim().min(1),
+    trustForwardedHeaders: z.boolean().default(false),
     auth: ControlPlaneApiMcpAuthConfigSchema,
   })
   .strict();

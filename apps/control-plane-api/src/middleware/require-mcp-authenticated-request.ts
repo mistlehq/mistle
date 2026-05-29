@@ -1,4 +1,4 @@
-import { handleHttpError, UnauthorizedError } from "@mistle/http/errors.js";
+import { UnauthorizedError } from "@mistle/http/errors.js";
 import type { MiddlewareHandler } from "hono";
 
 import {
@@ -7,12 +7,21 @@ import {
   parseBearerToken,
 } from "../auth/services/api-key-authentication.js";
 import { authenticateMcpToken } from "../auth/services/mcp-token-authentication.js";
+import { createOAuthBearerChallenge } from "../oauth/well-known/challenge.js";
+import {
+  getMcpProtectedResourceMetadataUrl,
+  isConfiguredMcpResourceRequest,
+} from "../oauth/well-known/protected-resource.js";
 import type { AppContextBindings } from "../types.js";
-import { requireAuthSession } from "./require-auth-session.js";
 
 export function createRequireMcpAuthenticatedRequestMiddleware(): MiddlewareHandler<AppContextBindings> {
   return async (ctx, next) => {
+    if (!isConfiguredMcpResourceRequest(ctx)) {
+      return ctx.notFound();
+    }
+
     const authorization = ctx.req.header("authorization") ?? null;
+    const metadataUrl = getMcpProtectedResourceMetadataUrl(ctx.get("config").mcp);
 
     if (authorization !== null) {
       try {
@@ -33,18 +42,27 @@ export function createRequireMcpAuthenticatedRequestMiddleware(): MiddlewareHand
             });
         ctx.set("authContext", authContext);
       } catch (error) {
-        return handleHttpError(ctx, error);
+        if (error instanceof UnauthorizedError) {
+          return ctx.text("Unauthorized MCP request.", 401, {
+            "WWW-Authenticate": createOAuthBearerChallenge({
+              kind: "invalid_token",
+              metadataUrl,
+            }),
+          });
+        }
+
+        throw error;
       }
 
       await next();
       return;
     }
 
-    const authSessionErrorResponse = await requireAuthSession(ctx);
-    if (authSessionErrorResponse !== null) {
-      return authSessionErrorResponse;
-    }
-
-    await next();
+    return ctx.text("Unauthorized MCP request.", 401, {
+      "WWW-Authenticate": createOAuthBearerChallenge({
+        kind: "missing_token",
+        metadataUrl,
+      }),
+    });
   };
 }

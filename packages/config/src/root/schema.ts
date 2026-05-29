@@ -294,6 +294,7 @@ export const ConfigSchema = z
           mcp: z
             .object({
               url: UrlSchema,
+              trust_forwarded_headers: z.boolean().default(false),
               auth: ControlPlaneApiMcpAuthSchema,
             })
             .strict(),

@@ -464,6 +464,11 @@ const ControlPlaneApiEnvDescriptors = [
     path: ["mcp", "url"],
   },
   {
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_TRUST_FORWARDED_HEADERS",
+    path: ["mcp", "trustForwardedHeaders"],
+    parse: parseStrictBooleanEnv,
+  },
+  {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_SECRET",
     path: ["mcp", "auth", "secret"],
   },

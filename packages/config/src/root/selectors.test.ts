@@ -60,6 +60,7 @@ function createRootConfig(input: {
         },
         mcp: {
           url: "https://mcp.example.com/mcp",
+          trust_forwarded_headers: true,
           auth: {
             secret: "mcp-auth-secret",
             issuer: "control-plane-api",
@@ -323,6 +324,7 @@ describe("selectControlPlaneApiConfig", () => {
     const config = selectControlPlaneApiConfig(createRootConfig({}));
 
     expect(config.mcp.url).toBe("https://mcp.example.com/mcp");
+    expect(config.mcp.trustForwardedHeaders).toBe(true);
     expect(config.mcp.auth).toEqual({
       secret: "mcp-auth-secret",
       issuer: "control-plane-api",

@@ -1570,6 +1570,7 @@ async function callMcpTool(input: {
       accept: "application/json, text/event-stream",
       authorization: `Bearer ${input.token}`,
       "content-type": "application/json",
+      forwarded: createForwardedHeaderForBaseUrl(input.env.controlPlaneApi.hostBaseUrl),
     },
     body: JSON.stringify({
       jsonrpc: "2.0",
@@ -1585,6 +1586,11 @@ async function callMcpTool(input: {
   expect(response.status).toBe(200);
   const message = parseStreamableHttpJsonRpcMessage(await response.text());
   return JsonRpcToolResponseSchema.parse(message).result;
+}
+
+function createForwardedHeaderForBaseUrl(baseUrl: string): string {
+  const url = new URL(baseUrl);
+  return `proto=${url.protocol.slice(0, -1)};host=${url.host}`;
 }
 
 function parseStreamableHttpJsonRpcMessage(responseBody: string): unknown {

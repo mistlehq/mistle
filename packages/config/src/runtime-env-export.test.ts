@@ -63,6 +63,10 @@ describe("exportServiceConfigToEnv", () => {
       value: "https://mcp.mistle.example/mcp",
     });
     expectEntry(entries, {
+      name: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_TRUST_FORWARDED_HEADERS",
+      value: false,
+    });
+    expectEntry(entries, {
       name: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_SECRET",
       value: "replace-with-mcp-runtime-token-secret",
     });

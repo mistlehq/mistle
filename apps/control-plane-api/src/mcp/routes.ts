@@ -2,6 +2,7 @@ import { systemClock } from "@mistle/time";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/server";
 import { Hono } from "hono";
 
+import { isConfiguredMcpResourceRequest } from "../oauth/well-known/protected-resource.js";
 import type { AppContextBindings, AppRoutes } from "../types.js";
 import { MCP_ROUTE_BASE_PATH } from "./constants.js";
 import { createMistleMcpServer } from "./server.js";
@@ -10,6 +11,10 @@ export function createMcpRoutes(): AppRoutes<typeof MCP_ROUTE_BASE_PATH> {
   const routes = new Hono<AppContextBindings>();
 
   routes.all("/", async (ctx) => {
+    if (!isConfiguredMcpResourceRequest(ctx)) {
+      return ctx.notFound();
+    }
+
     const organizationActor = ctx.get("organizationActor");
     if (organizationActor === null) {
       throw new Error("Expected organization actor to be available.");

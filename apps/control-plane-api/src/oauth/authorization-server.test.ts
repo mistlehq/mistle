@@ -6,6 +6,7 @@ describe("isOidcProviderRequestPath", () => {
   it("matches OAuth and OIDC provider paths", () => {
     expect(isOidcProviderRequestPath("/.well-known/openid-configuration")).toBe(true);
     expect(isOidcProviderRequestPath("/.well-known/oauth-authorization-server")).toBe(true);
+    expect(isOidcProviderRequestPath("/.well-known/oauth-protected-resource/mcp")).toBe(true);
     expect(isOidcProviderRequestPath("/oauth/authorize?client_id=mistle-cli")).toBe(true);
     expect(isOidcProviderRequestPath("/oauth/token")).toBe(true);
   });

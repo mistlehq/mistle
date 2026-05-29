@@ -72,7 +72,8 @@ export function service(
     options.controlPlaneApi?.billingStripeEnabled === true ||
     options.controlPlaneApi?.googleAuth === "simulated" ||
     options.controlPlaneApi?.allowSignups === false ||
-    options.controlPlaneApi?.welcomeEmail?.enabled === true;
+    options.controlPlaneApi?.welcomeEmail?.enabled === true ||
+    options.controlPlaneApi?.mcpTrustForwardedHeaders === false;
 
   return {
     id: ServiceIds.CONTROL_PLANE_API,
@@ -99,6 +100,9 @@ export function service(
             ...(options.controlPlaneApi?.welcomeEmail === undefined
               ? {}
               : { welcomeEmail: options.controlPlaneApi.welcomeEmail }),
+            ...(options.controlPlaneApi?.mcpTrustForwardedHeaders === undefined
+              ? {}
+              : { mcpTrustForwardedHeaders: options.controlPlaneApi.mcpTrustForwardedHeaders }),
             sandbox: options.sandbox,
           }
         : {
@@ -113,6 +117,9 @@ export function service(
             ...(options.controlPlaneApi.welcomeEmail === undefined
               ? {}
               : { welcomeEmail: options.controlPlaneApi.welcomeEmail }),
+            ...(options.controlPlaneApi.mcpTrustForwardedHeaders === undefined
+              ? {}
+              : { mcpTrustForwardedHeaders: options.controlPlaneApi.mcpTrustForwardedHeaders }),
             sandbox: options.sandbox,
           },
     ),
@@ -125,6 +132,7 @@ function start(input: {
   allowSignups?: boolean;
   billingStripeEnabled?: boolean;
   welcomeEmail?: IntegrationControlPlaneApiWelcomeEmailOptions;
+  mcpTrustForwardedHeaders?: boolean;
   sandbox: IntegrationSandboxOptions | undefined;
 }): (startInput: TestServiceStartInput) => Promise<TestService> {
   return async (startInput) => {
@@ -165,6 +173,9 @@ function start(input: {
                 : { billingStripeEnabled: input.billingStripeEnabled }),
               ...(input.welcomeEmail === undefined ? {} : { welcomeEmail: input.welcomeEmail }),
               ...(input.allowSignups === undefined ? {} : { allowSignups: input.allowSignups }),
+              ...(input.mcpTrustForwardedHeaders === undefined
+                ? {}
+                : { mcpTrustForwardedHeaders: input.mcpTrustForwardedHeaders }),
             }
           : {
               controlPlaneBaseUrl: endpoint.hostBaseUrl,
@@ -187,6 +198,9 @@ function start(input: {
                 : { billingStripeEnabled: input.billingStripeEnabled }),
               ...(input.welcomeEmail === undefined ? {} : { welcomeEmail: input.welcomeEmail }),
               ...(input.allowSignups === undefined ? {} : { allowSignups: input.allowSignups }),
+              ...(input.mcpTrustForwardedHeaders === undefined
+                ? {}
+                : { mcpTrustForwardedHeaders: input.mcpTrustForwardedHeaders }),
             },
       ),
     });
@@ -231,6 +245,7 @@ function config(input: {
   allowSignups?: boolean;
   billingStripeEnabled?: boolean;
   welcomeEmail?: IntegrationControlPlaneApiWelcomeEmailOptions;
+  mcpTrustForwardedHeaders?: boolean;
 }): ControlPlaneApiConfig {
   const hostPooledUrl = infraValue(input.postgres, PostgresValues.HOST_POOLED_URL);
   const hostDirectUrl = infraValue(input.postgres, PostgresValues.HOST_DIRECT_URL);
@@ -344,6 +359,7 @@ function config(input: {
     },
     mcp: {
       url: `${input.controlPlaneBaseUrl}/mcp`,
+      trustForwardedHeaders: input.mcpTrustForwardedHeaders ?? true,
       auth: {
         secret: "integration-new-mcp-auth-secret",
         issuer: "integration-new-control-plane-api",

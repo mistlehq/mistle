@@ -231,6 +231,7 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
     },
     mcp: {
       url: config.services.control_plane_api.mcp.url,
+      trustForwardedHeaders: config.services.control_plane_api.mcp.trust_forwarded_headers,
       auth: {
         secret: config.services.control_plane_api.mcp.auth.secret,
         issuer: config.services.control_plane_api.mcp.auth.issuer,

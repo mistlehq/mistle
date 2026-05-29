@@ -800,6 +800,7 @@ async function compilePlan(
       integrationsConfig: IntegrationIntegrationsConfig,
       mcpConfig: {
         url: "https://mcp.example.test/mcp",
+        trustForwardedHeaders: false,
         auth: {
           secret: "mcp-runtime-token-secret",
           issuer: "control-plane-api",
