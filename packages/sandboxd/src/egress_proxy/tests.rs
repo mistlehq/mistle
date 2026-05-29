@@ -127,6 +127,74 @@ fn leaves_unmatched_requests_for_direct_passthrough() {
 }
 
 #[test]
+fn does_not_match_sibling_paths_that_only_share_a_string_prefix() {
+    let routes = vec![EgressProxyRoute {
+        egress_rule_id: "egress-rule-planetscale".to_string(),
+        hosts: vec!["mcp.pscale.dev".to_string()],
+        path_prefixes: vec!["/mcp/planetscale".to_string()],
+        methods: Some(vec!["POST".to_string()]),
+    }];
+
+    let route = match_route(
+        &routes,
+        "mcp.pscale.dev",
+        "/mcp/planetscale-insights-only",
+        "POST",
+    )
+    .expect("sibling route evaluation should succeed");
+
+    assert!(route.is_none());
+}
+
+#[test]
+fn matches_child_paths_under_declared_path_prefix() {
+    let routes = vec![EgressProxyRoute {
+        egress_rule_id: "egress-rule-planetscale".to_string(),
+        hosts: vec!["mcp.pscale.dev".to_string()],
+        path_prefixes: vec!["/mcp/planetscale".to_string()],
+        methods: Some(vec!["POST".to_string()]),
+    }];
+
+    let route = match_route(
+        &routes,
+        "mcp.pscale.dev",
+        "/mcp/planetscale/tools/list",
+        "POST",
+    )
+    .expect("child route evaluation should succeed");
+
+    assert_eq!(
+        route.expect("child path should match").egress_rule_id,
+        "egress-rule-planetscale"
+    );
+}
+
+#[test]
+fn matches_exact_path_prefix_when_request_includes_query_string() {
+    let routes = vec![EgressProxyRoute {
+        egress_rule_id: "egress-rule-planetscale".to_string(),
+        hosts: vec!["mcp.pscale.dev".to_string()],
+        path_prefixes: vec!["/mcp/planetscale".to_string()],
+        methods: Some(vec!["POST".to_string()]),
+    }];
+
+    let route = match_route(
+        &routes,
+        "mcp.pscale.dev",
+        "/mcp/planetscale?cursor=1",
+        "POST",
+    )
+    .expect("query-string route evaluation should succeed");
+
+    assert_eq!(
+        route
+            .expect("exact path prefix with query string should match")
+            .egress_rule_id,
+        "egress-rule-planetscale"
+    );
+}
+
+#[test]
 fn builds_https_direct_forward_uris_for_tunneled_requests() {
     let direct_uri = build_direct_forward_uri(
         "https",

@@ -159,7 +159,7 @@ pub(super) fn match_route<'a>(
                 && route
                     .path_prefixes
                     .iter()
-                    .any(|path_prefix| path.starts_with(path_prefix))
+                    .any(|path_prefix| path_belongs_to_prefix(path, path_prefix))
                 && route
                     .methods
                     .as_ref()
@@ -174,6 +174,32 @@ pub(super) fn match_route<'a>(
             "multiple sandbox egress routes matched proxied request {method} {host}{path}"
         ))),
     }
+}
+
+fn path_belongs_to_prefix(path: &str, path_prefix: &str) -> bool {
+    let normalized_path;
+    let path = if path.starts_with('/') {
+        path
+    } else {
+        normalized_path = format!("/{path}");
+        &normalized_path
+    };
+    let path = path.split_once('?').map_or(path, |(path, _)| path);
+    let normalized_path_prefix = normalize_path_prefix(path_prefix);
+
+    normalized_path_prefix == "/"
+        || path == normalized_path_prefix
+        || path.starts_with(&format!("{normalized_path_prefix}/"))
+}
+
+fn normalize_path_prefix(path_prefix: &str) -> &str {
+    let trimmed_path_prefix = path_prefix.trim();
+    if trimmed_path_prefix == "/" {
+        return "/";
+    }
+    trimmed_path_prefix
+        .strip_suffix('/')
+        .unwrap_or(trimmed_path_prefix)
 }
 
 fn normalize_authority_host(authority: &str) -> String {

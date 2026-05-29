@@ -49,6 +49,49 @@ describe("classifyRuntimePlanEgressRoute", () => {
     });
   });
 
+  it("does not match sibling paths that only share a string prefix", () => {
+    const classification = classifyRuntimePlanEgressRoute({
+      authority: "mcp.pscale.dev",
+      method: "POST",
+      path: "/mcp/planetscale-insights-only",
+      runtimePlan: createRuntimePlan({
+        egressRoutes: [
+          createRoute({
+            egressRuleId: "egress_rule_planetscale",
+            hosts: ["mcp.pscale.dev"],
+            pathPrefixes: ["/mcp/planetscale"],
+          }),
+        ],
+      }),
+    });
+
+    expect(classification).toEqual({ kind: "unmatched" });
+  });
+
+  it("matches child paths under the declared path prefix", () => {
+    const classification = classifyRuntimePlanEgressRoute({
+      authority: "mcp.pscale.dev",
+      method: "POST",
+      path: "/mcp/planetscale/tools/list",
+      runtimePlan: createRuntimePlan({
+        egressRoutes: [
+          createRoute({
+            egressRuleId: "egress_rule_planetscale",
+            hosts: ["mcp.pscale.dev"],
+            pathPrefixes: ["/mcp/planetscale"],
+          }),
+        ],
+      }),
+    });
+
+    expect(classification).toMatchObject({
+      kind: "matched",
+      route: {
+        egressRuleId: "egress_rule_planetscale",
+      },
+    });
+  });
+
   it("returns ambiguous when more than one runtime-plan route matches the request", () => {
     const classification = classifyRuntimePlanEgressRoute({
       authority: "api.openai.com",

@@ -61,12 +61,34 @@ function doesRouteMatchRequest(input: {
   return (
     input.route.match.hosts.some((host) => host.toLowerCase() === input.host) &&
     (input.route.match.pathPrefixes ?? ["/"]).some((pathPrefix) =>
-      input.path.startsWith(pathPrefix),
+      pathBelongsToPrefix({ path: input.path, pathPrefix }),
     ) &&
     (input.route.match.methods ?? [input.method]).some(
       (routeMethod) => routeMethod.toUpperCase() === input.method,
     )
   );
+}
+
+function pathBelongsToPrefix(input: { path: string; pathPrefix: string }): boolean {
+  const normalizedPath = input.path.startsWith("/") ? input.path : `/${input.path}`;
+  const normalizedPathPrefix = normalizePathPrefix(input.pathPrefix);
+
+  return (
+    normalizedPathPrefix === "/" ||
+    normalizedPath === normalizedPathPrefix ||
+    normalizedPath.startsWith(`${normalizedPathPrefix}/`)
+  );
+}
+
+function normalizePathPrefix(pathPrefix: string): string {
+  const normalizedPathPrefix = pathPrefix.trim();
+  if (normalizedPathPrefix === "/") {
+    return "/";
+  }
+  if (normalizedPathPrefix.endsWith("/")) {
+    return normalizedPathPrefix.slice(0, -1);
+  }
+  return normalizedPathPrefix;
 }
 
 function normalizeAuthorityHost(authority: string): string {
