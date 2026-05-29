@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import type { OpenWorkflow } from "openworkflow";
 import { z } from "zod";
 
+import { logger } from "../logger.js";
 import { enqueueStripeCustomerProvisioning } from "../organizations/services/organization-billing.js";
 import { AUTH_ROUTE_BASE_PATH } from "./constants.js";
 import { createAuthProviders } from "./providers/index.js";
@@ -16,6 +17,10 @@ import { applyActiveOrganizationToSession } from "./services/apply-active-organi
 import { createInitialOrganizationCredentialKey } from "./services/create-initial-organization-credential-key.js";
 import { createSendOrganizationInvitationService } from "./services/create-send-organization-invitation.js";
 import { createSendVerificationOTPService } from "./services/create-send-verification-otp.js";
+import {
+  createSendWelcomeEmailService,
+  isFirstOrganizationMember,
+} from "./services/create-send-welcome-email.js";
 
 export type ControlPlaneAuthConfig = {
   authBaseUrl: string;
@@ -29,6 +34,9 @@ export type ControlPlaneAuthConfig = {
   authGoogleClientId: string | null;
   authGoogleClientSecret: string | null;
   authGoogleProviderOverrides?: Omit<GoogleProviderConfig, "clientId" | "clientSecret">;
+  welcomeEmail:
+    | { enabled: true; callUrl?: string | undefined }
+    | { enabled: false; callUrl?: string | undefined };
   activeMasterEncryptionKeyVersion: number;
   masterEncryptionKeys: Record<string, string>;
   billing: {
@@ -64,6 +72,10 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
   const sendOrganizationInvitation = createSendOrganizationInvitationService({
     openWorkflow,
     dashboardBaseUrl: config.dashboardBaseUrl,
+  });
+  const sendWelcomeEmail = createSendWelcomeEmailService({
+    openWorkflow,
+    config: config.welcomeEmail,
   });
   const googleConfig =
     config.authGoogleClientId === null || config.authGoogleClientSecret === null
@@ -173,7 +185,7 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
           });
         },
         organizationHooks: {
-          afterCreateOrganization: async ({ organization }) => {
+          afterCreateOrganization: async ({ organization, user }) => {
             try {
               await createInitialOrganizationCredentialKey({
                 db,
@@ -198,6 +210,36 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
               throw new Error(`Failed to initialize organization '${organization.id}'.`, {
                 cause: error,
               });
+            }
+
+            if (!config.welcomeEmail.enabled) {
+              return;
+            }
+
+            try {
+              const shouldSendWelcomeEmail = await isFirstOrganizationMember({
+                db,
+                table: tables.members,
+                organizationId: organization.id,
+              });
+              if (!shouldSendWelcomeEmail) {
+                return;
+              }
+
+              await sendWelcomeEmail({
+                organizationId: organization.id,
+                userId: user.id,
+                email: user.email,
+              });
+            } catch (error) {
+              logger.error(
+                {
+                  err: error,
+                  organizationId: organization.id,
+                  userId: user.id,
+                },
+                "Failed to evaluate welcome email delivery for created organization",
+              );
             }
           },
         },

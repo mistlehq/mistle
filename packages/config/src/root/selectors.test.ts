@@ -19,6 +19,7 @@ function createRootConfig(input: {
     client_secret: string;
   };
   sandbox?: Partial<Config["sandbox"]>;
+  welcomeEmail?: Config["services"]["control_plane_api"]["auth"]["welcome_email"];
 }): Config {
   return {
     global: {
@@ -46,6 +47,9 @@ function createRootConfig(input: {
           secret: "auth-secret",
           trusted_origins: ["https://app.example.com"],
           allow_signups: input.allowSignups ?? true,
+          welcome_email: input.welcomeEmail ?? {
+            enabled: false,
+          },
           ...(input.enabledMethods === undefined ? {} : { enabled_methods: input.enabledMethods }),
           otp: {
             length: 6,
@@ -251,6 +255,44 @@ describe("selectControlPlaneApiConfig", () => {
     const config = selectControlPlaneApiConfig(createRootConfig({ allowSignups: false }));
 
     expect(config.auth.allowSignups).toBe(false);
+  });
+
+  it("selects disabled welcome email config", () => {
+    const config = selectControlPlaneApiConfig(createRootConfig({}));
+
+    expect(config.auth.welcomeEmail).toEqual({
+      enabled: false,
+    });
+  });
+
+  it("selects enabled welcome email config", () => {
+    const config = selectControlPlaneApiConfig(
+      createRootConfig({
+        welcomeEmail: {
+          enabled: true,
+          call_url: "https://cal.example.com/jonathan/mistle",
+        },
+      }),
+    );
+
+    expect(config.auth.welcomeEmail).toEqual({
+      enabled: true,
+      callUrl: "https://cal.example.com/jonathan/mistle",
+    });
+  });
+
+  it("selects enabled welcome email config without a call URL", () => {
+    const config = selectControlPlaneApiConfig(
+      createRootConfig({
+        welcomeEmail: {
+          enabled: true,
+        },
+      }),
+    );
+
+    expect(config.auth.welcomeEmail).toEqual({
+      enabled: true,
+    });
   });
 
   it("selects MCP config for runtime credential validation", () => {

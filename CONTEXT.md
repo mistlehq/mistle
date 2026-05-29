@@ -120,6 +120,10 @@ _Avoid_: Billing org
 A tenant boundary containing the product resources its members may use.
 _Avoid_: Org when the tenant boundary could be confused with an external organization
 
+**Welcome email**:
+A personal onboarding email sent to the first user in a Mistle organization after that organization is created.
+_Avoid_: Organization welcome, invite welcome
+
 **Unavailable resource**:
 A user-visible resource that is missing, deleted, or outside the user's accessible **Mistle organization** scope.
 _Avoid_: Cross-org resource, unauthorized resource
@@ -321,6 +325,9 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Provider conversation** is owned by an agent runtime provider.
 - A **Runtime conversation** is a provider-owned conversation visible inside a **Sandbox session**.
 - A Mistle organization may have one **Billing customer** per billing provider.
+- A **Welcome email** is sent once per **Mistle organization**.
+- The first user in a newly created **Mistle organization** receives the **Welcome email** after organization initialization succeeds.
+- Invited users joining an existing **Mistle organization** do not receive a **Welcome email**.
 - A Jira Cloud connection has one **Jira site name**.
 - A **Sandbox session** may contain multiple **Codex threads**.
 - A **Sandbox session** may contain multiple **OpenCode sessions** when its **Agent runtime** is OpenCode.

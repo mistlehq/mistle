@@ -152,6 +152,14 @@ const ControlPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
     path: ["auth", "allowSignups"],
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_ALLOW_SIGNUPS",
   },
+  {
+    path: ["auth", "welcomeEmail", "enabled"],
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_WELCOME_EMAIL_ENABLED",
+  },
+  {
+    path: ["auth", "welcomeEmail", "callUrl"],
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_WELCOME_EMAIL_CALL_URL",
+  },
   { path: ["auth", "otpLength"], envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_OTP_LENGTH" },
   {
     path: ["auth", "otpExpiresInSeconds"],

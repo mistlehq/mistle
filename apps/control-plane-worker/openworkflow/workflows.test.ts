@@ -8,6 +8,7 @@ import {
   ScheduleDispatchWorkflowSpec,
   SendOrganizationInvitationWorkflowSpec,
   SendVerificationOTPWorkflowSpec,
+  SendWelcomeEmailWorkflowSpec,
   StartSandboxProfileInstanceWorkflowSpec,
   SyncIntegrationConnectionResourcesWorkflowSpec,
 } from "@mistle/workflow-registry/control-plane";
@@ -59,6 +60,12 @@ describe("control-plane worker openworkflow entrypoints", () => {
   it("preserves the send verification OTP workflow identity", () => {
     expect(readWorkflowSpec(SendVerificationOTPWorkflowSpec.name)).toMatchObject(
       SendVerificationOTPWorkflowSpec,
+    );
+  });
+
+  it("preserves the send welcome email workflow identity", () => {
+    expect(readWorkflowSpec(SendWelcomeEmailWorkflowSpec.name)).toMatchObject(
+      SendWelcomeEmailWorkflowSpec,
     );
   });
 

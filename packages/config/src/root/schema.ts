@@ -206,6 +206,22 @@ const ControlPlaneApiAuthSchema = z
     trusted_origins: z.array(UrlSchema).min(1),
     enabled_methods: z.array(AuthMethodSchema).min(1).optional(),
     allow_signups: z.boolean().default(true),
+    welcome_email: z
+      .discriminatedUnion("enabled", [
+        z
+          .object({
+            enabled: z.literal(true),
+            call_url: UrlSchema.optional(),
+          })
+          .strict(),
+        z
+          .object({
+            enabled: z.literal(false),
+            call_url: UrlSchema.optional(),
+          })
+          .strict(),
+      ])
+      .default({ enabled: false }),
     otp: z
       .object({
         length: z.number().int().min(4).max(12),

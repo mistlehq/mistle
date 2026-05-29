@@ -5,10 +5,12 @@ import {
 } from "./organization-invitation/builder.js";
 import { buildEmailOTPTemplate, type BuildEmailOTPTemplateOptions } from "./otp/builder.js";
 import { EmailTemplateIds, type EmailTemplateId } from "./template-ids.js";
+import { buildWelcomeTemplate, type BuildWelcomeTemplateOptions } from "./welcome/builder.js";
 
 export type EmailTemplateInputById = {
   [EmailTemplateIds.OTP]: BuildEmailOTPTemplateOptions;
   [EmailTemplateIds.ORGANIZATION_INVITATION]: BuildOrganizationInvitationTemplateOptions;
+  [EmailTemplateIds.WELCOME]: BuildWelcomeTemplateOptions;
 };
 
 type EmailTemplateBuilderById = {
@@ -20,6 +22,7 @@ type EmailTemplateBuilderById = {
 const EmailTemplateBuilders: EmailTemplateBuilderById = {
   [EmailTemplateIds.OTP]: buildEmailOTPTemplate,
   [EmailTemplateIds.ORGANIZATION_INVITATION]: buildOrganizationInvitationTemplate,
+  [EmailTemplateIds.WELCOME]: buildWelcomeTemplate,
 };
 
 export function buildRegisteredEmailTemplate<TTemplateId extends EmailTemplateId>(

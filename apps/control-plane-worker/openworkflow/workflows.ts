@@ -8,6 +8,7 @@ import { DispatchOneOffScheduleWorkflow } from "./schedule-dispatch/one-off-work
 import { ScheduleDispatchWorkflow } from "./schedule-dispatch/workflow.js";
 import { SendOrganizationInvitationWorkflow } from "./send-organization-invitation.js";
 import { SendVerificationOTPWorkflow } from "./send-verification-otp.js";
+import { SendWelcomeEmailWorkflow } from "./send-welcome-email.js";
 import { StartSandboxProfileInstanceWorkflow } from "./start-sandbox-profile-instance/workflow.js";
 import { SyncIntegrationConnectionResourcesWorkflow } from "./sync-integration-connection-resources/workflow.js";
 
@@ -30,6 +31,7 @@ export const ControlPlaneWorkerWorkflows = [
   ScheduleDispatchWorkflow,
   SendOrganizationInvitationWorkflow,
   SendVerificationOTPWorkflow,
+  SendWelcomeEmailWorkflow,
   StartSandboxProfileInstanceWorkflow,
   SyncIntegrationConnectionResourcesWorkflow,
 ];

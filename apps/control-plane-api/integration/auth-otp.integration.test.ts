@@ -9,7 +9,12 @@ import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
-import { eq } from "drizzle-orm";
+import { systemClock, systemSleeper } from "@mistle/time";
+import {
+  createWelcomeEmailIdempotencyKey,
+  SendWelcomeEmailWorkflowSpec,
+} from "@mistle/workflow-registry/control-plane";
+import { eq, sql } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import { readLatestSignInOtp } from "../integration/helpers/sign-in-otp.js";
@@ -19,7 +24,21 @@ const it = createIntegrationTest({
   services: ["control-plane-api", "control-plane-worker"],
   extraInfra: ["mailpit"],
 });
+const welcomeEmailIt = createIntegrationTest({
+  services: ["control-plane-api", "control-plane-worker"],
+  extraInfra: ["mailpit"],
+  __serviceOptions: {
+    controlPlaneApi: {
+      welcomeEmail: {
+        enabled: true,
+        callUrl: "https://cal.example.com/jonathan/mistle",
+      },
+    },
+  },
+});
 const OtpAllowedAttempts = 3;
+const WorkflowRunPersistTimeoutMs = 30_000;
+const WorkflowRunPersistPollIntervalMs = 100;
 
 describe("auth otp integration", () => {
   it("sends OTP, signs in, and leaves organization context empty", async ({ env }) => {
@@ -273,6 +292,66 @@ describe("auth otp integration", () => {
     await signInAndReadCookie({ env, email });
     await expectNoOrganizationBootstrapRecords({ env, userId: user.id });
   });
+
+  welcomeEmailIt("enqueues the welcome email for the first organization user", async ({ env }) => {
+    const email = `integration-new-auth-otp-welcome-${randomUUID()}@example.com`;
+
+    const cookie = await signInAndReadCookie({ env, email });
+    expect(await findQueuedWelcomeWorkflowInput({ env, email })).toBeNull();
+
+    const organizationId = await createOrganization({
+      env,
+      cookie,
+      name: "Integration Welcome Organization",
+      slug: `integration-welcome-${randomUUID()}`,
+    });
+
+    const workflowRun = await waitForQueuedWelcomeWorkflowInput({
+      env,
+      email,
+    });
+    expect(workflowRun.input).toEqual({
+      email,
+      callUrl: "https://cal.example.com/jonathan/mistle",
+    });
+    expect(workflowRun.idempotencyKey).toBe(createWelcomeEmailIdempotencyKey(organizationId));
+  });
+
+  welcomeEmailIt(
+    "does not enqueue the welcome email for invited users joining an existing organization",
+    async ({ env }) => {
+      const inviterSession = await env.auth.createSession({
+        email: `integration-new-auth-otp-welcome-inviter-${randomUUID()}@example.com`,
+      });
+      const email = `integration-new-auth-otp-welcome-invitee-${randomUUID()}@example.com`;
+      const invitationId = await inviteMember({
+        env,
+        cookie: inviterSession.cookie,
+        organizationId: inviterSession.organizationId,
+        email,
+      });
+
+      const cookie = await signInAndReadCookie({ env, email });
+      expect(await findQueuedWelcomeWorkflowInput({ env, email })).toBeNull();
+
+      const acceptResponse = await env.controlPlaneApi.http.fetch(
+        "/v1/auth/organization/accept-invitation",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie,
+          },
+          body: JSON.stringify({
+            invitationId,
+          }),
+        },
+      );
+      expect(acceptResponse.status).toBe(200);
+
+      expect(await findQueuedWelcomeWorkflowInput({ env, email })).toBeNull();
+    },
+  );
 });
 
 type AuthOtpEnvironment = IntegrationTestEnvironment;
@@ -371,6 +450,38 @@ async function createOrganization(input: {
   return organizationId;
 }
 
+async function inviteMember(input: {
+  env: AuthOtpEnvironment;
+  cookie: string;
+  organizationId: string;
+  email: string;
+}): Promise<string> {
+  const response = await input.env.controlPlaneApi.http.fetch(
+    "/v1/auth/organization/invite-member",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: input.cookie,
+      },
+      body: JSON.stringify({
+        organizationId: input.organizationId,
+        email: input.email,
+        role: "member",
+      }),
+    },
+  );
+  expect(response.status).toBe(200);
+
+  const payload: unknown = await response.json().catch(() => null);
+  const invitationId = readStringField(payload, "id");
+  if (invitationId === null) {
+    throw new Error("Expected invite-member response to include invitation id.");
+  }
+
+  return invitationId;
+}
+
 async function readUser(input: {
   env: AuthOtpEnvironment;
   email: string;
@@ -404,6 +515,53 @@ async function readLatestSession(input: {
   }
 
   return session;
+}
+
+async function waitForQueuedWelcomeWorkflowInput(input: {
+  env: AuthOtpEnvironment;
+  email: string;
+}): Promise<{ input: unknown; idempotencyKey: string | null }> {
+  const deadline = systemClock.nowMs() + WorkflowRunPersistTimeoutMs;
+
+  while (systemClock.nowMs() < deadline) {
+    const workflowRun = await findQueuedWelcomeWorkflowInput(input);
+    if (workflowRun !== null) {
+      return workflowRun;
+    }
+
+    await systemSleeper.sleep(WorkflowRunPersistPollIntervalMs);
+  }
+
+  throw new Error(
+    `Timed out waiting for queued welcome workflow input for email '${input.email}'.`,
+  );
+}
+
+async function findQueuedWelcomeWorkflowInput(input: {
+  env: AuthOtpEnvironment;
+  email: string;
+}): Promise<{ input: unknown; idempotencyKey: string | null } | null> {
+  const result = await input.env.controlPlaneDb.execute(sql<{
+    input: unknown;
+    idempotencyKey: string | null;
+  }>`
+    select input, idempotency_key as "idempotencyKey"
+    from control_plane_openworkflow.workflow_runs
+    where
+      workflow_name = ${SendWelcomeEmailWorkflowSpec.name}
+      and input->>'email' = ${input.email}
+    order by created_at desc
+    limit 1
+  `);
+  const row = result.rows[0];
+  if (row === undefined) {
+    return null;
+  }
+
+  return {
+    input: row.input,
+    idempotencyKey: typeof row.idempotencyKey === "string" ? row.idempotencyKey : null,
+  };
 }
 
 async function expectUserMissing(input: { env: AuthOtpEnvironment; email: string }): Promise<void> {

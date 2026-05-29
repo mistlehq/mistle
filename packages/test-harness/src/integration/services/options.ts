@@ -27,6 +27,15 @@ export type IntegrationServiceOptions = {
     allowSignups?: boolean;
     billingStripeEnabled?: boolean;
     googleAuth?: "simulated";
+    welcomeEmail?:
+      | {
+          enabled: true;
+          callUrl?: string;
+        }
+      | {
+          enabled: false;
+          callUrl?: string;
+        };
   };
   dataPlaneGateway?: {
     directEgress?: {

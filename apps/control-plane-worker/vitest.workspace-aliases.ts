@@ -28,6 +28,12 @@ export const WorkspaceAliases = [
     replacement: fileURLToPath(new URL("../../packages/db/src/migrator/index.ts", import.meta.url)),
   },
   {
+    find: /^@mistle\/db\/test-environment$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/db/src/test-environment.ts", import.meta.url),
+    ),
+  },
+  {
     find: /^@mistle\/emails$/,
     replacement: fileURLToPath(new URL("../../packages/emails/src/index.ts", import.meta.url)),
   },
@@ -107,6 +113,12 @@ export const WorkspaceAliases = [
     replacement: fileURLToPath(new URL("../../packages/telemetry/src/index.ts", import.meta.url)),
   },
   {
+    find: /^@mistle\/telemetry\/trace-context\.js$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/telemetry/src/trace-context.ts", import.meta.url),
+    ),
+  },
+  {
     find: /^@mistle\/telemetry\/testing\.js$/,
     replacement: fileURLToPath(new URL("../../packages/telemetry/src/testing.ts", import.meta.url)),
   },
@@ -128,6 +140,12 @@ export const WorkspaceAliases = [
     find: /^@mistle\/workflow-registry\/control-plane$/,
     replacement: fileURLToPath(
       new URL("../../packages/workflow-registry/src/control-plane.ts", import.meta.url),
+    ),
+  },
+  {
+    find: /^@mistle\/workflow-registry\/durable-step-retry\.js$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/workflow-registry/src/durable-step-retry.ts", import.meta.url),
     ),
   },
 ];

@@ -428,6 +428,15 @@ const ControlPlaneApiEnvDescriptors = [
     parse: parseStrictBooleanEnv,
   },
   {
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_WELCOME_EMAIL_ENABLED",
+    path: ["auth", "welcomeEmail", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  {
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_WELCOME_EMAIL_CALL_URL",
+    path: ["auth", "welcomeEmail", "callUrl"],
+  },
+  {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_OTP_LENGTH",
     path: ["auth", "otpLength"],
     parse: parseNumberEnv,

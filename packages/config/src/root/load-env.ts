@@ -325,6 +325,15 @@ const RootEnvDescriptors = [
     parse: parseBooleanEnv,
   },
   {
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_WELCOME_EMAIL_ENABLED",
+    path: ["services", "control_plane_api", "auth", "welcome_email", "enabled"],
+    parse: parseBooleanEnv,
+  },
+  {
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_WELCOME_EMAIL_CALL_URL",
+    path: ["services", "control_plane_api", "auth", "welcome_email", "call_url"],
+  },
+  {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_OTP_LENGTH",
     path: ["services", "control_plane_api", "auth", "otp", "length"],
     parse: parseNumberEnv,

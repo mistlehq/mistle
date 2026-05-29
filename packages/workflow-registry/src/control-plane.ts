@@ -59,6 +59,30 @@ export const SendOrganizationInvitationWorkflowSpec = defineWorkflowSpec<
   version: SendOrganizationInvitationWorkflowVersion,
 });
 
+export const SendWelcomeEmailWorkflowName = "control-plane.auth.send-welcome-email";
+export const SendWelcomeEmailWorkflowVersion = "1";
+
+export type SendWelcomeEmailWorkflowInput = {
+  email: string;
+  callUrl?: string | undefined;
+};
+
+export type SendWelcomeEmailWorkflowOutput = {
+  messageId: string;
+};
+
+export const SendWelcomeEmailWorkflowSpec = defineWorkflowSpec<
+  SendWelcomeEmailWorkflowInput,
+  SendWelcomeEmailWorkflowOutput
+>({
+  name: SendWelcomeEmailWorkflowName,
+  version: SendWelcomeEmailWorkflowVersion,
+});
+
+export function createWelcomeEmailIdempotencyKey(organizationId: string): string {
+  return `welcome-email:organization:${organizationId}`;
+}
+
 export const ProvisionStripeCustomerWorkflowName =
   "control-plane.billing.provision-stripe-customer";
 export const ProvisionStripeCustomerWorkflowVersion = "1";

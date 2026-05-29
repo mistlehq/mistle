@@ -67,7 +67,8 @@ export function service(
     options.sandbox !== undefined ||
     options.controlPlaneApi?.billingStripeEnabled === true ||
     options.controlPlaneApi?.googleAuth === "simulated" ||
-    options.controlPlaneApi?.allowSignups === false;
+    options.controlPlaneApi?.allowSignups === false ||
+    options.controlPlaneApi?.welcomeEmail?.enabled === true;
 
   return {
     id: ServiceIds.CONTROL_PLANE_API,
@@ -91,6 +92,9 @@ export function service(
             ...(options.controlPlaneApi?.billingStripeEnabled === undefined
               ? {}
               : { billingStripeEnabled: options.controlPlaneApi.billingStripeEnabled }),
+            ...(options.controlPlaneApi?.welcomeEmail === undefined
+              ? {}
+              : { welcomeEmail: options.controlPlaneApi.welcomeEmail }),
             sandbox: options.sandbox,
           }
         : {
@@ -102,6 +106,9 @@ export function service(
             ...(options.controlPlaneApi.billingStripeEnabled === undefined
               ? {}
               : { billingStripeEnabled: options.controlPlaneApi.billingStripeEnabled }),
+            ...(options.controlPlaneApi.welcomeEmail === undefined
+              ? {}
+              : { welcomeEmail: options.controlPlaneApi.welcomeEmail }),
             sandbox: options.sandbox,
           },
     ),
@@ -113,6 +120,15 @@ function start(input: {
   googleAuth?: "simulated";
   allowSignups?: boolean;
   billingStripeEnabled?: boolean;
+  welcomeEmail?:
+    | {
+        enabled: true;
+        callUrl?: string;
+      }
+    | {
+        enabled: false;
+        callUrl?: string;
+      };
   sandbox: IntegrationSandboxOptions | undefined;
 }): (startInput: TestServiceStartInput) => Promise<TestService> {
   return async (startInput) => {
@@ -151,6 +167,7 @@ function start(input: {
               ...(input.billingStripeEnabled === undefined
                 ? {}
                 : { billingStripeEnabled: input.billingStripeEnabled }),
+              ...(input.welcomeEmail === undefined ? {} : { welcomeEmail: input.welcomeEmail }),
               ...(input.allowSignups === undefined ? {} : { allowSignups: input.allowSignups }),
             }
           : {
@@ -172,6 +189,7 @@ function start(input: {
               ...(input.billingStripeEnabled === undefined
                 ? {}
                 : { billingStripeEnabled: input.billingStripeEnabled }),
+              ...(input.welcomeEmail === undefined ? {} : { welcomeEmail: input.welcomeEmail }),
               ...(input.allowSignups === undefined ? {} : { allowSignups: input.allowSignups }),
             },
       ),
@@ -216,6 +234,15 @@ function config(input: {
   googleAuth?: "simulated";
   allowSignups?: boolean;
   billingStripeEnabled?: boolean;
+  welcomeEmail?:
+    | {
+        enabled: true;
+        callUrl?: string;
+      }
+    | {
+        enabled: false;
+        callUrl?: string;
+      };
 }): ControlPlaneApiConfig {
   const hostPooledUrl = infraValue(input.postgres, PostgresValues.HOST_POOLED_URL);
   const hostDirectUrl = infraValue(input.postgres, PostgresValues.HOST_DIRECT_URL);
@@ -312,6 +339,9 @@ function config(input: {
       secret: "integration-new-auth-secret",
       trustedOrigins: [input.controlPlaneBaseUrl],
       allowSignups: input.allowSignups ?? true,
+      welcomeEmail: input.welcomeEmail ?? {
+        enabled: false,
+      },
       otpLength: 6,
       otpExpiresInSeconds: 300,
       otpAllowedAttempts: 3,
