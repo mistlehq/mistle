@@ -14,6 +14,7 @@ import {
   AUTH_SWITCH_ORGANIZATION_PATH,
   AuthSwitchOrganizationPage,
 } from "./features/auth/auth-switch-organization-page.js";
+import { OAuthConsentPage } from "./features/auth/oauth-consent/oauth-consent-page.js";
 import { ROUTE_HANDLES } from "./features/navigation/route-handles.js";
 import { HomePage } from "./features/pages/home-page.js";
 import { IntegrationConnectionCreatePage } from "./features/pages/integration-connection-create-page.js";
@@ -60,6 +61,7 @@ export const APP_ROUTES = createRoutesFromElements(
       <Route element={<InvitationAcceptPage />} path="/invitations/accept" />
     </Route>
     <Route element={<RequireAuth />} errorElement={<RouteErrorBoundary />}>
+      <Route element={<OAuthConsentPage />} path="/auth/oauth/consent/:requestId" />
       <Route element={<PortAccessRedirectPage />} path="/p/ports/:slug" />
       <Route element={<AppShell />} errorElement={<RouteErrorBoundary />}>
         <Route element={<HomePage />} handle={ROUTE_HANDLES.dashboard} index />

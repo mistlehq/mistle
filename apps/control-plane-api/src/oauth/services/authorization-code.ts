@@ -20,11 +20,13 @@ const AuthorizationCodeTtlMs = 10 * 60 * 1000;
 export const OAuthErrorCodes: {
   INVALID_REQUEST: string;
   INVALID_GRANT: string;
+  INVALID_SCOPE: string;
   INVALID_TARGET: string;
   UNAUTHORIZED_CLIENT: string;
 } = {
   INVALID_REQUEST: "invalid_request",
   INVALID_GRANT: "invalid_grant",
+  INVALID_SCOPE: "invalid_scope",
   INVALID_TARGET: "invalid_target",
   UNAUTHORIZED_CLIENT: "unauthorized_client",
 };

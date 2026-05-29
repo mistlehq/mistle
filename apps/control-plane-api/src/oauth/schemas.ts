@@ -84,6 +84,32 @@ export const OAuthAuthorizationCodePayloadSchema = z
 
 export type OAuthAuthorizationCodePayload = z.output<typeof OAuthAuthorizationCodePayloadSchema>;
 
+export const OAuthAuthorizationConsentPayloadSchema = z
+  .object({
+    kind: z.literal("oauth_authorization_consent"),
+    clientId: z.string().min(1),
+    clientName: z.string().min(1),
+    redirectUri: z.url(),
+    resource: z.url(),
+    codeChallenge: z.string().min(43).max(128),
+    codeChallengeMethod: z.literal("S256"),
+    state: z.string().min(1),
+    userId: z.string().min(1),
+    organizationId: z.string().min(1),
+    requestedScopes: z.array(ApiKeyPermissionSchema).min(1),
+  })
+  .strict();
+
+export const OAuthConsentApprovalRequestSchema = z
+  .object({
+    scopes: z.array(ApiKeyPermissionSchema).min(1),
+  })
+  .strict();
+
+export type OAuthAuthorizationConsentPayload = z.output<
+  typeof OAuthAuthorizationConsentPayloadSchema
+>;
+
 export const OAuthClientRegistrationRequestSchema = z
   .object({
     client_name: z.string().trim().min(1).max(OAuthClientRegistrationLimits.CLIENT_NAME_MAX_LENGTH),

@@ -1,5 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { OAuthGrantTypes } from "@mistle/db/control-plane";
+import { OAuthClientRegistrationKinds, OAuthGrantTypes } from "@mistle/db/control-plane";
 import {
   BadRequestError,
   handleHttpError,
@@ -20,6 +20,7 @@ import { MistleCliOAuthClient } from "./clients.js";
 import {
   OAuthAuthorizeQuerySchema,
   OAuthClientRegistrationRequestSchema,
+  OAuthConsentApprovalRequestSchema,
   OAuthTokenRequestSchema,
 } from "./schemas.js";
 import {
@@ -27,15 +28,18 @@ import {
   exchangeMistleCliAuthorizationCode,
   OAuthErrorCodes,
 } from "./services/authorization-code.js";
+import {
+  approveOAuthAuthorizationConsent,
+  createOAuthAuthorizationConsentRequest,
+  denyOAuthAuthorizationConsent,
+  getOAuthAuthorizationConsentDetails,
+} from "./services/authorization-consent.js";
 import { registerDynamicOAuthClient } from "./services/client-registration.js";
 import { requireOAuthClient } from "./services/client-validation.js";
 import { refreshOAuthTokenPair } from "./services/oauth-token.js";
 import { buildPublicRequestUrl } from "./services/public-request-url.js";
-import {
-  requireMistleCliOAuthClient,
-  validateMistleCliRedirectUri,
-} from "./services/static-client-validation.js";
 import * as switchOrganization from "./switch-organization/index.js";
+import { requireCanonicalMcpResourceUrl } from "./well-known/protected-resource.js";
 
 export const OAUTH_ROUTE_BASE_PATH = "/oauth";
 
@@ -45,50 +49,88 @@ export function createOAuthRoutes(): AppRoutes<typeof OAUTH_ROUTE_BASE_PATH> {
   });
 
   routes.get("/authorize", async (ctx) => {
-    const sessionErrorResponse = await requireAuthSession(ctx);
-    if (sessionErrorResponse !== null) {
-      if (sessionErrorResponse.status === 401) {
-        return redirectToDashboardLogin(ctx);
-      }
-
-      return sessionErrorResponse;
-    }
-
-    const session = ctx.get("session");
-    if (session === null) {
-      throw new Error("Expected OAuth authorize session to be available.");
-    }
-
     try {
       const query = OAuthAuthorizeQuerySchema.parse(ctx.req.query());
       const db = ctx.get("db");
-      const client = await requireMistleCliOAuthClient({
+      const client = await requireOAuthClient({
         db,
         clientId: query.client_id,
         grantType: OAuthGrantTypes.AUTHORIZATION_CODE,
-      });
-      await validateMistleCliRedirectUri({
-        db,
         redirectUri: query.redirect_uri,
       });
-      const resourceError = validateMistleCliResource({
-        resource: query.resource,
-        expectedResource: ctx.get("config").auth.baseUrl,
-      });
-      if (resourceError !== null) {
-        return redirectOAuthErrorToClient({
-          ctx,
+      try {
+        requireAuthorizeResource({
+          resource: query.resource,
+          clientId: client.clientId,
+          registrationKind: client.registrationKind,
+          controlPlaneResource: ctx.get("config").auth.baseUrl,
+          mcpResource: requireCanonicalMcpResourceUrl(ctx.get("config").mcp).toString(),
+        });
+      } catch (error) {
+        return handleAuthorizeRedirectableOAuthError(ctx, {
+          error,
           redirectUri: query.redirect_uri,
           state: query.state,
-          error: resourceError,
         });
       }
-      const permissions = await resolveAuthorizedPermissions({
-        session,
-        requestedScope: query.scope,
-        clientPermissions: client.permissions,
-        db,
-      });
+      let requestedPermissions: OrganizationPermission[];
+      try {
+        requestedPermissions = resolveRequestedClientPermissions({
+          requestedScope: query.scope,
+          clientPermissions: client.permissions,
+        });
+      } catch (error) {
+        return handleAuthorizeRedirectableOAuthError(ctx, {
+          error,
+          redirectUri: query.redirect_uri,
+          state: query.state,
+        });
+      }
+
+      const sessionErrorResponse = await requireAuthSession(ctx);
+      if (sessionErrorResponse !== null) {
+        if (sessionErrorResponse.status === 401) {
+          return redirectToDashboardLogin(ctx);
+        }
+
+        return sessionErrorResponse;
+      }
+
+      const session = ctx.get("session");
+      if (session === null) {
+        throw new Error("Expected OAuth authorize session to be available.");
+      }
+
+      let permissions: OrganizationPermission[];
+      try {
+        permissions = await resolveAuthorizedPermissions({
+          session,
+          requestedPermissions,
+          db,
+        });
+      } catch (error) {
+        return handleAuthorizeRedirectableOAuthError(ctx, {
+          error,
+          redirectUri: query.redirect_uri,
+          state: query.state,
+        });
+      }
+      if (client.registrationKind === OAuthClientRegistrationKinds.DYNAMIC) {
+        const requestId = await createOAuthAuthorizationConsentRequest({
+          db,
+          clientId: client.clientId,
+          clientName: client.name,
+          redirectUri: query.redirect_uri,
+          resource: query.resource,
+          codeChallenge: query.code_challenge,
+          state: query.state,
+          userId: session.user.id,
+          organizationId: session.activeOrganizationId,
+          requestedScopes: permissions,
+        });
+        return ctx.redirect(createDashboardConsentUrl(ctx, requestId), 302);
+      }
+
       const code = await createMistleCliAuthorizationCode({
         db,
         clientId: query.client_id,
@@ -172,6 +214,81 @@ export function createOAuthRoutes(): AppRoutes<typeof OAUTH_ROUTE_BASE_PATH> {
     }
   });
 
+  routes.get("/consent/:requestId", async (ctx) => {
+    const sessionErrorResponse = await requireAuthSession(ctx);
+    if (sessionErrorResponse !== null) {
+      return sessionErrorResponse;
+    }
+    const session = ctx.get("session");
+    if (session === null) {
+      throw new Error("Expected OAuth consent session to be available.");
+    }
+
+    try {
+      const details = await getOAuthAuthorizationConsentDetails({
+        db: ctx.get("db"),
+        requestId: ctx.req.param("requestId"),
+        userId: session.user.id,
+        organizationId: session.activeOrganizationId,
+      });
+
+      return ctx.json(details, 200);
+    } catch (error) {
+      return handleHttpError(ctx, error);
+    }
+  });
+
+  routes.post("/consent/:requestId/approve", async (ctx) => {
+    const sessionErrorResponse = await requireAuthSession(ctx);
+    if (sessionErrorResponse !== null) {
+      return sessionErrorResponse;
+    }
+    const session = ctx.get("session");
+    if (session === null) {
+      throw new Error("Expected OAuth consent session to be available.");
+    }
+
+    try {
+      const body = OAuthConsentApprovalRequestSchema.parse(await ctx.req.json<unknown>());
+      const redirectUri = await approveOAuthAuthorizationConsent({
+        db: ctx.get("db"),
+        requestId: ctx.req.param("requestId"),
+        userId: session.user.id,
+        organizationId: session.activeOrganizationId,
+        approvedScopes: body.scopes,
+        mcpResource: requireCanonicalMcpResourceUrl(ctx.get("config").mcp).toString(),
+      });
+
+      return ctx.json({ redirectUri }, 200);
+    } catch (error) {
+      return handleOAuthError(ctx, error);
+    }
+  });
+
+  routes.post("/consent/:requestId/deny", async (ctx) => {
+    const sessionErrorResponse = await requireAuthSession(ctx);
+    if (sessionErrorResponse !== null) {
+      return sessionErrorResponse;
+    }
+    const session = ctx.get("session");
+    if (session === null) {
+      throw new Error("Expected OAuth consent session to be available.");
+    }
+
+    try {
+      const redirectUri = await denyOAuthAuthorizationConsent({
+        db: ctx.get("db"),
+        requestId: ctx.req.param("requestId"),
+        userId: session.user.id,
+        organizationId: session.activeOrganizationId,
+      });
+
+      return ctx.json({ redirectUri }, 200);
+    } catch (error) {
+      return handleHttpError(ctx, error);
+    }
+  });
+
   routes.openapi(switchOrganization.route, switchOrganization.handler);
 
   return {
@@ -191,6 +308,13 @@ function redirectToDashboardLogin(ctx: Context<AppContextBindings>) {
   );
 
   return ctx.redirect(dashboardLoginUrl.toString(), 302);
+}
+
+function createDashboardConsentUrl(ctx: Context<AppContextBindings>, requestId: string): string {
+  return new URL(
+    `/auth/oauth/consent/${requestId}`,
+    ctx.get("config").dashboard.baseUrl,
+  ).toString();
 }
 
 async function exchangeAuthorizationCodeToken(input: {
@@ -220,31 +344,51 @@ function validateMistleCliResource(input: {
   return null;
 }
 
+function requireAuthorizeResource(input: {
+  resource: string;
+  clientId: string;
+  registrationKind:
+    | typeof OAuthClientRegistrationKinds.STATIC
+    | typeof OAuthClientRegistrationKinds.DYNAMIC;
+  controlPlaneResource: string;
+  mcpResource: string;
+}): void {
+  const expectedResource =
+    input.registrationKind === OAuthClientRegistrationKinds.DYNAMIC
+      ? input.mcpResource
+      : input.controlPlaneResource;
+  if (
+    input.clientId === MistleCliOAuthClient.clientId ||
+    input.registrationKind === OAuthClientRegistrationKinds.DYNAMIC
+  ) {
+    const resourceError = validateMistleCliResource({
+      resource: input.resource,
+      expectedResource,
+    });
+    if (resourceError !== null) {
+      throw resourceError;
+    }
+    return;
+  }
+
+  throw new BadRequestError(OAuthErrorCodes.UNAUTHORIZED_CLIENT, "OAuth client is not allowed.");
+}
+
 async function resolveAuthorizedPermissions(input: {
   db: AppContextBindings["Variables"]["db"];
   session: AppSession;
-  requestedScope: string | undefined;
-  clientPermissions: readonly string[];
+  requestedPermissions: readonly OrganizationPermission[];
 }): Promise<OrganizationPermission[]> {
   const authorization = await requireActiveOrganizationAccess({
     db: input.db,
     actorUserId: input.session.user.id,
     activeOrganizationId: input.session.activeOrganizationId,
   });
-  const requestedPermissions =
-    input.requestedScope === undefined
-      ? input.clientPermissions
-      : input.requestedScope.split(" ").filter((scope) => scope.length > 0);
-  const clientPermissionSet = new Set(input.clientPermissions);
   const actorPermissionSet = new Set(authorization.permissions);
   const grantedPermissions: OrganizationPermission[] = [];
 
-  for (const permission of requestedPermissions) {
-    if (!isOrganizationPermission(permission)) {
-      throw new BadRequestError("invalid_scope", `OAuth scope '${permission}' is invalid.`);
-    }
-
-    if (clientPermissionSet.has(permission) && actorPermissionSet.has(permission)) {
+  for (const permission of input.requestedPermissions) {
+    if (actorPermissionSet.has(permission)) {
       grantedPermissions.push(permission);
     }
   }
@@ -256,6 +400,36 @@ async function resolveAuthorizedPermissions(input: {
   }
 
   return uniqueGrantedPermissions;
+}
+
+function resolveRequestedClientPermissions(input: {
+  requestedScope: string | undefined;
+  clientPermissions: readonly string[];
+}): OrganizationPermission[] {
+  const requestedPermissions =
+    input.requestedScope === undefined
+      ? input.clientPermissions
+      : input.requestedScope.split(" ").filter((scope) => scope.length > 0);
+  const clientPermissionSet = new Set(input.clientPermissions);
+  const allowedPermissions: OrganizationPermission[] = [];
+
+  for (const permission of requestedPermissions) {
+    if (!isOrganizationPermission(permission)) {
+      throw new BadRequestError("invalid_scope", `OAuth scope '${permission}' is invalid.`);
+    }
+    if (!clientPermissionSet.has(permission)) {
+      throw new BadRequestError("invalid_scope", `OAuth scope '${permission}' is not allowed.`);
+    }
+
+    allowedPermissions.push(permission);
+  }
+
+  const uniqueAllowedPermissions = [...new Set(allowedPermissions)];
+  if (uniqueAllowedPermissions.length === 0) {
+    throw new BadRequestError("invalid_scope", "No requested OAuth scopes can be granted.");
+  }
+
+  return uniqueAllowedPermissions;
 }
 
 function handleOAuthError(ctx: Context<AppContextBindings>, error: unknown) {
@@ -290,16 +464,25 @@ function handleOAuthError(ctx: Context<AppContextBindings>, error: unknown) {
   throw error;
 }
 
-function redirectOAuthErrorToClient(input: {
-  ctx: Context<AppContextBindings>;
-  redirectUri: string;
-  state: string;
-  error: HttpError;
-}) {
-  const redirectUrl = new URL(input.redirectUri);
-  redirectUrl.searchParams.set("error", input.error.code);
-  redirectUrl.searchParams.set("error_description", input.error.message);
-  redirectUrl.searchParams.set("state", input.state);
+function handleAuthorizeRedirectableOAuthError(
+  ctx: Context<AppContextBindings>,
+  input: {
+    error: unknown;
+    redirectUri: string;
+    state: string;
+  },
+) {
+  if (
+    input.error instanceof HttpError &&
+    (input.error.code === OAuthErrorCodes.INVALID_SCOPE ||
+      input.error.code === OAuthErrorCodes.INVALID_TARGET)
+  ) {
+    const redirectUrl = new URL(input.redirectUri);
+    redirectUrl.searchParams.set("error", input.error.code);
+    redirectUrl.searchParams.set("error_description", input.error.message);
+    redirectUrl.searchParams.set("state", input.state);
+    return ctx.redirect(redirectUrl.toString(), 302);
+  }
 
-  return input.ctx.redirect(redirectUrl.toString(), 302);
+  return handleOAuthError(ctx, input.error);
 }
