@@ -45,13 +45,13 @@
     "@jsx-email/plugin-minify": "^2.0.0",
     "@jsx-email/plugin-pretty": "^2.0.0",
     "jsx-email": "^3.2.0",
-    "nodemailer": "^8.0.5",
+    "nodemailer": "^8.0.7",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
   },
   "devDependencies": {
     "@mistle/test-harness": "workspace:*",
-    "@types/nodemailer": "^7.0.11",
+    "@types/nodemailer": "^8.0.0",
     "zod": "^4.4.3"
   }
 }
