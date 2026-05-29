@@ -3,15 +3,11 @@ import {
   Button,
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   Notice,
   ScrollArea,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Switch,
 } from "@mistle/ui";
 import { EyeIcon } from "@phosphor-icons/react";
@@ -31,16 +27,11 @@ export type OrganizationIdentityLinkingProviderRow = {
   providerFamily: string;
   organizationProviderConfigId: string | null;
   displayName: string;
-  configurationLabel?: string | null;
   logoKey: string;
-  connectionOptions: readonly {
-    id: string;
-    label: string;
-  }[];
-  selectedConnectionId: string | null;
-  connectionPending: boolean;
+  connectionLabel: string;
   enablePending: boolean;
   enabled: boolean;
+  unavailableMessage: string | null;
   linkedUsersCount: number | null;
   memberLinksErrorMessage: string | null;
   memberLinks: readonly {
@@ -53,13 +44,21 @@ export type OrganizationIdentityLinkingProviderRow = {
   }[];
 };
 
+export type GitCommitSigningImpactConfirmation = {
+  action: "enable" | "disable";
+  connectionLabel: string;
+  providerDisplayName: string;
+  updatedProfileCount: number;
+  invariantViolationCount: number;
+  pending: boolean;
+};
+
 export type OrganizationIdentityLinkingSettingsPageViewProps = {
   loadErrorMessage: string | null;
   providers: readonly OrganizationIdentityLinkingProviderRow[];
-  onProviderConnectionChange: (input: {
-    rowKey: string;
-    integrationConnectionId: string;
-  }) => Promise<void> | void;
+  gitCommitSigningImpactConfirmation: GitCommitSigningImpactConfirmation | null;
+  onCancelGitCommitSigningImpactConfirmation: () => void;
+  onConfirmGitCommitSigningImpactConfirmation: () => Promise<void> | void;
   onEnabledChange: (input: { rowKey: string; enabled: boolean }) => Promise<void> | void;
 };
 
@@ -104,9 +103,9 @@ export function OrganizationIdentityLinkingSettingsPageView(
 
   return (
     <>
-      <FormPageStack>
+      <FormPageStack className="w-full min-w-0">
         <ResponsiveFieldList
-          className="border-y bg-card"
+          className="w-full min-w-0 border-y bg-card"
           columns={IdentityLinkingProviderColumns}
           headerClassName="px-4 py-3 font-medium"
         >
@@ -118,7 +117,6 @@ export function OrganizationIdentityLinkingSettingsPageView(
               onOpenLinkedUsers={() => {
                 setLinkedUsersDialogRowKey(provider.rowKey);
               }}
-              onProviderConnectionChange={props.onProviderConnectionChange}
               provider={provider}
             />
           ))}
@@ -133,6 +131,11 @@ export function OrganizationIdentityLinkingSettingsPageView(
         }}
         provider={linkedUsersDialogProvider}
       />
+      <GitCommitSigningImpactConfirmationDialog
+        confirmation={props.gitCommitSigningImpactConfirmation}
+        onCancel={props.onCancelGitCommitSigningImpactConfirmation}
+        onConfirm={props.onConfirmGitCommitSigningImpactConfirmation}
+      />
     </>
   );
 }
@@ -140,21 +143,22 @@ export function OrganizationIdentityLinkingSettingsPageView(
 function IdentityLinkingProviderRowView(input: {
   provider: OrganizationIdentityLinkingProviderRow;
   isLastRow: boolean;
-  onProviderConnectionChange: OrganizationIdentityLinkingSettingsPageViewProps["onProviderConnectionChange"];
   onEnabledChange: OrganizationIdentityLinkingSettingsPageViewProps["onEnabledChange"];
   onOpenLinkedUsers: () => void;
 }): React.JSX.Element {
   const provider = input.provider;
-  const selectedConnectionLabel = resolveSelectedConnectionLabel(provider);
-  const hasEligibleConnections = provider.connectionOptions.length > 0;
-  const rowStatusMessage = provider.connectionPending ? "Saving connection..." : null;
+  const canOpenLinkedUsers = provider.organizationProviderConfigId !== null;
 
   return (
     <ResponsiveFieldListRow
       className="px-4 py-4"
       isLastRow={input.isLastRow}
-      status={rowStatusMessage}
-      statusClassName="pt-4"
+      status={provider.enablePending ? "Saving..." : provider.unavailableMessage}
+      statusClassName={
+        provider.unavailableMessage === null || provider.enablePending
+          ? "pt-4"
+          : "pt-4 text-warning-foreground"
+      }
     >
       <ResponsiveFieldListCell columnKey="integration">
         <div className="flex min-w-0 items-center gap-3">
@@ -165,79 +169,41 @@ function IdentityLinkingProviderRowView(input: {
           />
           <div className="min-w-0">
             <div className="truncate text-sm font-medium">{provider.displayName}</div>
-            {provider.configurationLabel === null ? null : (
-              <div className="truncate text-xs text-muted-foreground">
-                {provider.configurationLabel}
-              </div>
-            )}
           </div>
         </div>
       </ResponsiveFieldListCell>
 
       <ResponsiveFieldListCell columnKey="connection">
-        {hasEligibleConnections ? (
-          <Select
-            onValueChange={(integrationConnectionId) => {
-              if (integrationConnectionId === null || integrationConnectionId.length === 0) {
-                return;
-              }
-
-              void input.onProviderConnectionChange({
-                rowKey: provider.rowKey,
-                integrationConnectionId,
-              });
-            }}
-            value={provider.selectedConnectionId ?? ""}
-          >
-            <SelectTrigger
-              aria-label={`${provider.displayName} connection`}
-              className="w-full md:max-w-xl"
-              disabled={provider.connectionPending}
-            >
-              <SelectValue placeholder={`Select ${provider.displayName} connection`}>
-                {selectedConnectionLabel}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {provider.connectionOptions.map((connection) => (
-                <SelectItem key={connection.id} value={connection.id}>
-                  {connection.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : (
-          <div className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
-            No eligible active connections
-          </div>
-        )}
+        <div className="truncate text-sm">{provider.connectionLabel}</div>
       </ResponsiveFieldListCell>
 
       <ResponsiveFieldListCell columnKey="linkedUsers">
         <div className="inline-flex items-center gap-2.5 md:justify-center">
-          {provider.linkedUsersCount === null ? null : (
+          {provider.linkedUsersCount === null ? (
+            <span className="text-sm text-muted-foreground">-</span>
+          ) : (
             <span className="text-sm">{String(provider.linkedUsersCount)}</span>
           )}
-          <Button
-            aria-label={`View ${provider.displayName} linked users`}
-            className="h-auto w-auto p-0 hover:bg-transparent"
-            onClick={input.onOpenLinkedUsers}
-            type="button"
-            variant="ghost"
-          >
-            <EyeIcon />
-          </Button>
+          {canOpenLinkedUsers ? (
+            <Button
+              aria-label={`View ${provider.displayName} linked users for ${provider.connectionLabel}`}
+              className="h-auto w-auto p-0 hover:bg-transparent"
+              onClick={input.onOpenLinkedUsers}
+              type="button"
+              variant="ghost"
+            >
+              <EyeIcon />
+            </Button>
+          ) : null}
         </div>
       </ResponsiveFieldListCell>
 
       <ResponsiveFieldListCell columnKey="enable">
         <Switch
-          aria-label={`Enable ${provider.displayName} identity linking`}
+          aria-label={`Enable ${provider.displayName} identity linking for ${provider.connectionLabel}`}
           checked={provider.enabled}
           disabled={
-            provider.enablePending ||
-            provider.connectionPending ||
-            provider.selectedConnectionId === null
+            provider.enablePending || (provider.unavailableMessage !== null && !provider.enabled)
           }
           onCheckedChange={(enabled) => {
             void input.onEnabledChange({
@@ -249,6 +215,94 @@ function IdentityLinkingProviderRowView(input: {
       </ResponsiveFieldListCell>
     </ResponsiveFieldListRow>
   );
+}
+
+function GitCommitSigningImpactConfirmationDialog(input: {
+  confirmation: GitCommitSigningImpactConfirmation | null;
+  onCancel: () => void;
+  onConfirm: () => Promise<void> | void;
+}): React.JSX.Element {
+  const confirmation = input.confirmation;
+  const title =
+    confirmation === null
+      ? "Enable identity linking?"
+      : confirmation.action === "disable"
+        ? `Disable ${confirmation.providerDisplayName} identity linking?`
+        : `Enable ${confirmation.providerDisplayName} identity linking?`;
+  const confirmLabel =
+    confirmation?.action === "disable" ? "Disable identity linking" : "Enable identity linking";
+
+  return (
+    <Dialog
+      onOpenChange={(open) => {
+        if (!open && confirmation?.pending !== true) {
+          input.onCancel();
+        }
+      }}
+      open={confirmation !== null}
+    >
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader variant="sectioned">
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+
+        {confirmation === null ? null : (
+          <div className="flex flex-col gap-3 text-sm text-muted-foreground">
+            {confirmation.updatedProfileCount === 0 ? null : (
+              <p>
+                {formatGitCommitSigningImpactSentence({
+                  action: confirmation.action,
+                  connectionLabel: confirmation.connectionLabel,
+                  updatedProfileCount: confirmation.updatedProfileCount,
+                })}
+              </p>
+            )}
+            {confirmation.invariantViolationCount === 0 ? null : (
+              <Notice variant="warning">
+                Some sandbox profiles have inconsistent commit signing state and will not be
+                updated.
+              </Notice>
+            )}
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button
+            disabled={confirmation?.pending === true}
+            onClick={input.onCancel}
+            type="button"
+            variant="outline"
+          >
+            Cancel
+          </Button>
+          <Button
+            disabled={confirmation?.pending === true}
+            onClick={() => {
+              void input.onConfirm();
+            }}
+            type="button"
+            variant={confirmation?.action === "disable" ? "destructive" : "default"}
+          >
+            {confirmation?.pending === true ? "Saving..." : confirmLabel}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function formatGitCommitSigningImpactSentence(input: {
+  action: "enable" | "disable";
+  connectionLabel: string;
+  updatedProfileCount: number;
+}): string {
+  const profileCountText =
+    input.updatedProfileCount === 1
+      ? "1 sandbox profile"
+      : `${String(input.updatedProfileCount)} sandbox profiles`;
+  const actionText = input.action === "enable" ? "enabled" : "disabled";
+
+  return `Commit signing will be ${actionText} for ${profileCountText} using ${input.connectionLabel}.`;
 }
 
 function LinkedUsersDialog(input: {
@@ -271,7 +325,9 @@ function LinkedUsersDialog(input: {
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader variant="sectioned">
           <DialogTitle>
-            {provider === null ? "Linked users" : `${provider.displayName} linked users`}
+            {provider === null
+              ? "Linked users"
+              : `${provider.displayName} linked users for ${provider.connectionLabel}`}
           </DialogTitle>
         </DialogHeader>
 
@@ -312,19 +368,4 @@ function LinkedUsersDialog(input: {
       </DialogContent>
     </Dialog>
   );
-}
-
-function resolveSelectedConnectionLabel(
-  provider: Pick<
-    OrganizationIdentityLinkingProviderRow,
-    "connectionOptions" | "selectedConnectionId"
-  >,
-): string | undefined {
-  if (provider.selectedConnectionId === null) {
-    return undefined;
-  }
-
-  return provider.connectionOptions.find(
-    (connection) => connection.id === provider.selectedConnectionId,
-  )?.label;
 }

@@ -54,9 +54,6 @@ const AgentRuntimeRegistry = Definitions.agentRuntimeRegistry;
 
 const MissingProviderValue = "__missing_provider__";
 const MissingConnectionValue = "__missing_connection__";
-const MissingGitSigningConnectionValue = "__missing_git_signing_connection__";
-const NoEligibleGitHubSigningConnectionLabel = "No eligible GitHub connection";
-const SelectGitHubSigningConnectionLabel = "Select GitHub connection";
 const DockerSandboxProviderId = "docker";
 
 type SandboxCredentialSource = "managed" | "organization";
@@ -74,11 +71,13 @@ export type SandboxProfileRuntimeDraftChanges = {
 
 export type SandboxProfileRuntimeDraftState = {
   agentRuntimeId: AgentRuntimeId | undefined;
+  gitCommitSigningIntegrationConnectionId?: string | null | undefined;
   sourceVersionKey: string | undefined;
   hasUnpersistedChanges: boolean;
   applyDraftSaveError?: (error: unknown) => void;
   applySavedRuntimeConfig?: (runtimeConfig: SandboxProfileRuntimeDraftChanges) => void;
   buildDraftChanges?: () => SandboxProfileRuntimeDraftChanges;
+  updateGitCommitSigningIntegrationConnectionId?: (connectionId: string | null) => void;
 };
 
 type RuntimeConfigState = {
@@ -94,11 +93,6 @@ type RuntimeConfigState = {
 
 type ResourceCapability = NonNullable<SandboxProviderSummary["resourceCapabilities"]>["vcpuCount"];
 
-export type GitHubSigningConnectionOption = {
-  integrationConnectionId: string;
-  label: string;
-};
-
 export function createRuntimeDraftSourceVersionKey(
   version: Pick<SandboxProfileVersion, "sandboxProfileId" | "version">,
 ): string {
@@ -112,7 +106,6 @@ export function SandboxProfileRuntimeSection(input: {
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
   disabled: boolean;
-  gitHubSigningConnectionOptions?: readonly GitHubSigningConnectionOption[] | undefined;
   isDraft: boolean;
   onCreateApiKey?:
     | ((input: { name: string; permissions: readonly string[] }) => Promise<CreatedApiKey>)
@@ -248,10 +241,12 @@ export function SandboxProfileRuntimeSection(input: {
   useEffect(() => {
     input.onDraftStateChange?.({
       agentRuntimeId: draftRuntime.agentRuntimeId,
+      gitCommitSigningIntegrationConnectionId: draftRuntime.gitCommitSigningIntegrationConnectionId,
       sourceVersionKey: createRuntimeDraftSourceVersionKey(input.version),
       applyDraftSaveError,
       applySavedRuntimeConfig,
       buildDraftChanges,
+      updateGitCommitSigningIntegrationConnectionId: updateGitSigningConnection,
       hasUnpersistedChanges: !runtimeConfigStatesAreEqual(draftRuntime, persistedRuntimeState),
     });
   }, [
@@ -353,8 +348,7 @@ export function SandboxProfileRuntimeSection(input: {
   function updateGitSigningConnection(value: string | null): void {
     setDraftRuntime((currentRuntime) => ({
       ...currentRuntime,
-      gitCommitSigningIntegrationConnectionId:
-        value === null || value === MissingGitSigningConnectionValue ? null : value,
+      gitCommitSigningIntegrationConnectionId: value,
     }));
     setSaveErrorMessage(null);
   }
@@ -422,29 +416,17 @@ export function SandboxProfileRuntimeSection(input: {
       readOnly={fieldIsReadOnly}
     />
   );
-  const gitHubSigningConnectionContent = (
-    <GitHubCommitSigningConnectionField
-      connectionId={draftRuntime.gitCommitSigningIntegrationConnectionId}
-      disabled={fieldIsReadOnly}
-      horizontal={inlineRuntimeFields}
-      onConnectionChange={updateGitSigningConnection}
-      options={input.gitHubSigningConnectionOptions ?? []}
-      readOnly={fieldIsReadOnly}
-    />
-  );
   const agentRuntimeContent = fieldIsReadOnly ? (
     <div className="grid gap-3">
       <SandboxProfileAgentRuntimeReadOnlySummary
         horizontal={inlineRuntimeFields}
         runtimeId={draftRuntime.agentRuntimeId}
       />
-      {gitHubSigningConnectionContent}
       {mistleMcpAccessContent}
     </div>
   ) : (
     <div className="grid gap-4">
       {agentRuntimeField}
-      {gitHubSigningConnectionContent}
       {mistleMcpAccessContent}
     </div>
   );
@@ -931,89 +913,6 @@ function SandboxProfileAgentRuntimeReadOnlySummary(input: {
       <AgentRuntimeOptionLabel runtimeId={input.runtimeId} />
     </ReadOnlyRuntimeField>
   );
-}
-
-function GitHubCommitSigningConnectionField(input: {
-  connectionId: string | null;
-  disabled: boolean;
-  horizontal: boolean;
-  onConnectionChange: (value: string | null) => void;
-  options: readonly GitHubSigningConnectionOption[];
-  readOnly: boolean;
-}): React.JSX.Element | null {
-  const selectedOption = resolveGitHubCommitSigningConnectionOption(input);
-  const placeholderLabel =
-    input.options.length === 0
-      ? NoEligibleGitHubSigningConnectionLabel
-      : SelectGitHubSigningConnectionLabel;
-
-  if (input.readOnly) {
-    return (
-      <ReadOnlyRuntimeField horizontal={input.horizontal} label="GitHub commit signing">
-        {selectedOption?.label ?? input.connectionId ?? placeholderLabel}
-      </ReadOnlyRuntimeField>
-    );
-  }
-
-  const selectedValue = input.connectionId ?? MissingGitSigningConnectionValue;
-  return (
-    <Field
-      contentWidth={input.horizontal ? "fill" : "fit"}
-      orientation={input.horizontal ? "horizontal" : "vertical"}
-    >
-      <FieldHeader>
-        <FieldLabel htmlFor="sandbox-profile-github-signing-connection">
-          GitHub commit signing
-        </FieldLabel>
-      </FieldHeader>
-      <FieldContent>
-        <Select
-          disabled={input.disabled}
-          onValueChange={input.onConnectionChange}
-          value={selectedValue}
-        >
-          <SelectTrigger id="sandbox-profile-github-signing-connection">
-            <SelectValue placeholder="Select GitHub connection">
-              {selectedOption === null ? (
-                <span className="text-muted-foreground">{placeholderLabel}</span>
-              ) : (
-                selectedOption.label
-              )}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={MissingGitSigningConnectionValue}>{placeholderLabel}</SelectItem>
-            {input.connectionId !== null && selectedOption === null ? (
-              <SelectItem disabled value={input.connectionId}>
-                Missing GitHub connection
-              </SelectItem>
-            ) : null}
-            {input.options.map((option) => (
-              <SelectItem
-                key={option.integrationConnectionId}
-                value={option.integrationConnectionId}
-              >
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </FieldContent>
-    </Field>
-  );
-}
-
-function resolveGitHubCommitSigningConnectionOption(input: {
-  connectionId: string | null;
-  options: readonly GitHubSigningConnectionOption[];
-}): GitHubSigningConnectionOption | null {
-  if (input.connectionId !== null) {
-    return (
-      input.options.find((option) => option.integrationConnectionId === input.connectionId) ?? null
-    );
-  }
-
-  return input.options.length === 1 ? (input.options[0] ?? null) : null;
 }
 
 function MistleMcpAccessField(input: {

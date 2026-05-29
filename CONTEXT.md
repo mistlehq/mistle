@@ -224,6 +224,22 @@ _Avoid_: File attachment, uploaded file, file reference
 A file or directory path inside a **Sandbox session** filesystem that can be inserted through a **Context mention**.
 _Avoid_: Workspace search result, local file, host path
 
+**Git commit signing**:
+A sandbox profile setting that asks Mistle to sign sandbox Git commits as the acting user's linked GitHub identity when signing credentials are available.
+_Avoid_: GitHub commit signing selector, signing provider selection
+
+**Identity-linked Git connection**:
+A Git connection that can be used to link Mistle users to external Git identities for profile-level Git commit signing.
+_Avoid_: Signing-enabled connection, GitHub signing provider
+
+**Identity-linking connection row**:
+An organization settings row representing one eligible integration connection and its identity-linking enablement state.
+_Avoid_: Provider config row, draft provider row, connection selector row
+
+**Unavailable identity-linking connection row**:
+An organization settings row for an existing identity-linking configuration whose integration connection is no longer eligible for identity linking.
+_Avoid_: Hidden identity-linking config, orphaned provider row
+
 **Composer command**:
 A composer input selected with `/` that submits a command owned by the session's **Agent runtime**.
 _Avoid_: Slash autocomplete
@@ -343,6 +359,13 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Pi source file reference** should use Pi's file-marker language rather than the generic attached-files prompt text.
 - Mistle-managed Pi runtimes may require the current Pi conversation contract rather than supporting older Pi builds.
 - A **Pi follow-up message** is the Pi runtime equivalent of the composer queue action while a **Working agent turn** is active.
+- A **Git commit signing** setting belongs to a **Sandbox profile version** and depends on an **Identity-linked Git connection** being available.
+- Changes to an **Identity-linked Git connection** may update the **Git commit signing** setting on current active and draft **Sandbox profile versions** without creating a new version.
+- A **Git commit signing** setting should reference the same Git connection that the **Sandbox profile version** uses for Git access.
+- A **Sandbox profile version** uses a Git connection when its Git integration binding references that connection.
+- An **Identity-linking connection row** represents a connection, so selecting a different connection would mean selecting a different row.
+- An **Unavailable identity-linking connection row** should remain visible so users can understand or disable the existing configuration.
+- An **Identity-linking connection row** should have at most one identity-linking configuration for its connection.
 - A **Working agent turn** is a live conversation state, not a chat semantic group.
 - Chat semantic groups describe the specific visible work within a **Working agent turn**, such as thinking, exploring, running commands, or making edits.
 - Pi tool execution events are the source of truth for live in-progress chat semantic groups.

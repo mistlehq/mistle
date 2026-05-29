@@ -316,7 +316,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
     });
   });
 
-  it("requires a GitHub commit signing selector when multiple active GitHub configs are eligible", async ({
+  it("keeps commit signing disabled when a draft does not select a signing connection", async ({
     env,
   }) => {
     const session = await env.auth.createSession({
@@ -389,15 +389,9 @@ describe.concurrent("sandbox profile version draft put integration", () => {
       },
     );
 
-    expect(response.status).toBe(400);
-    const responseBody = PutSandboxProfileVersionDraftBadRequestResponseSchema.parse(
-      await response.json(),
-    );
-    expect(responseBody).toEqual({
-      code: "GIT_SIGNING_CONFIGURATION_REQUIRED",
-      message:
-        "Select a GitHub identity-linking connection for commit signing before saving this draft.",
-    });
+    expect(response.status).toBe(200);
+    const responseBody = PutSandboxProfileVersionDraftResponseSchema.parse(await response.json());
+    expect(responseBody.gitCommitSigningIntegrationConnectionId).toBeNull();
   });
 
   it("updates a draft with an API key that has update permission", async ({ env }) => {

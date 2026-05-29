@@ -2059,6 +2059,7 @@ function ReadySandboxProfileEditorPage(input: {
           invalidateProfileVersions={input.invalidateProfileVersions}
           mode={input.mode}
           onPersistenceDraftStateChange={setPersistenceDraftState}
+          runtimeDraftState={runtimeDraftState}
           onRuntimeDraftStateChange={setRuntimeDraftState}
           onIntegrationDraftStateChange={setIntegrationDraftState}
           onPublishSuccessMessageDismiss={() => {
@@ -2566,6 +2567,7 @@ function SandboxProfileEditorSectionPanels(input: {
   invalidateProfileVersions: (profileId: string) => Promise<void>;
   mode: SandboxProfileEditorVersionMode;
   onPersistenceDraftStateChange: (state: SandboxProfilePersistenceDraftState) => void;
+  runtimeDraftState: SandboxProfileRuntimeSettingsDraftState;
   onRuntimeDraftStateChange: (state: SandboxProfileRuntimeSettingsDraftState) => void;
   onIntegrationDraftStateChange: (state: SandboxProfileDraftSectionState) => void;
   buildSetupScriptTestRuntimeConfig?: () => SandboxProfileRuntimeDraftChanges;
@@ -2640,6 +2642,14 @@ function SandboxProfileEditorSectionPanels(input: {
         loader={input.integrationsLoader}
         onDraftStateChange={input.onIntegrationDraftStateChange}
         profileId={input.profileId}
+        gitCommitSigningIntegrationConnectionId={
+          input.runtimeDraftState.gitCommitSigningIntegrationConnectionId ??
+          input.currentVersion?.gitCommitSigningIntegrationConnectionId ??
+          null
+        }
+        onGitCommitSigningIntegrationConnectionChange={(connectionId) => {
+          input.runtimeDraftState.updateGitCommitSigningIntegrationConnectionId?.(connectionId);
+        }}
         runtimeSettings={
           input.currentVersion === null ? null : (
             <LoadedSandboxProfileRuntimeSection
@@ -2718,11 +2728,6 @@ function LoadedSandboxProfileRuntimeSection(input: {
     queryFn: async ({ signal }) => listApiKeys({ signal }),
     retry: false,
   });
-  const identityLinkProvidersQuery = useQuery({
-    queryKey: organizationIdentityLinkProvidersQueryKey(activeOrganizationId),
-    queryFn: async ({ signal }) => listOrganizationIdentityLinkProviders({ signal }),
-    retry: false,
-  });
   const createApiKeyMutation = useMutation({
     mutationFn: createApiKey,
     onSuccess: (createdApiKey) => {
@@ -2768,32 +2773,10 @@ function LoadedSandboxProfileRuntimeSection(input: {
         fallbackMessage: "Could not load API keys.",
       })
     : null;
-  const identityLinkProvidersLoadErrorMessage = identityLinkProvidersQuery.isError
-    ? resolveApiErrorMessage({
-        error: identityLinkProvidersQuery.error,
-        fallbackMessage: "Could not load identity-linking providers.",
-      })
-    : null;
   const apiKeys = apiKeysQuery.isSuccess ? apiKeysQuery.data.items : [];
-  const gitHubSigningConnectionOptions =
-    identityLinkProvidersQuery.data
-      ?.find((provider) => provider.providerFamily === "github")
-      ?.configs.filter(
-        (config) =>
-          config.configurationStatus === "active" && config.selectedConnection.status === "active",
-      )
-      .map((config) => ({
-        integrationConnectionId: config.integrationConnectionId,
-        label: config.selectedConnection.displayName,
-      })) ?? [];
 
   return (
     <div className="grid gap-3">
-      {identityLinkProvidersLoadErrorMessage === null ? null : (
-        <Notice title="Could not load GitHub signing connections" variant="alert">
-          {identityLinkProvidersLoadErrorMessage}
-        </Notice>
-      )}
       <SandboxProfileRuntimeSection
         apiKeys={apiKeys}
         apiKeysAreLoading={apiKeysQuery.isPending}
@@ -2801,7 +2784,6 @@ function LoadedSandboxProfileRuntimeSection(input: {
         availableConnections={input.availableConnections}
         availableTargets={input.availableTargets}
         disabled={input.disabled}
-        gitHubSigningConnectionOptions={gitHubSigningConnectionOptions}
         isDraft={input.isDraft}
         onCreateApiKey={(createInput) => createApiKeyMutation.mutateAsync(createInput)}
         onDraftStateChange={input.onDraftStateChange}
@@ -3577,6 +3559,8 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
   disabled: boolean;
   readOnly: boolean;
   loader: ReturnType<typeof useSandboxProfileIntegrationsLoader>;
+  gitCommitSigningIntegrationConnectionId: string | null;
+  onGitCommitSigningIntegrationConnectionChange: (connectionId: string | null) => void;
   runtimeSettings: ReactNode | null;
   onDraftStateChange?: (state: SandboxProfileDraftSectionState) => void;
 }): React.JSX.Element | null {
@@ -3628,6 +3612,10 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
       availableTargets={input.loader.availableTargets}
       disabled={input.disabled}
       readOnly={input.readOnly}
+      gitCommitSigningIntegrationConnectionId={input.gitCommitSigningIntegrationConnectionId}
+      onGitCommitSigningIntegrationConnectionChange={
+        input.onGitCommitSigningIntegrationConnectionChange
+      }
       integrationDirectoryQuery={input.loader.integrationDirectoryQuery}
       runtimeSettings={input.runtimeSettings}
       {...(input.onDraftStateChange === undefined
@@ -3659,11 +3647,19 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
   disabled: boolean;
   readOnly: boolean;
   runtimeSettings: ReactNode | null;
+  gitCommitSigningIntegrationConnectionId: string | null;
+  onGitCommitSigningIntegrationConnectionChange: (connectionId: string | null) => void;
   integrationDirectoryQuery: ReturnType<
     typeof useSandboxProfileIntegrationsLoader
   >["integrationDirectoryQuery"];
   onDraftStateChange?: (state: SandboxProfileDraftSectionState) => void;
 }): React.JSX.Element {
+  const activeOrganizationId = useRequiredOrganizationId();
+  const identityLinkProvidersQuery = useQuery({
+    queryKey: organizationIdentityLinkProvidersQueryKey(activeOrganizationId),
+    queryFn: async ({ signal }) => listOrganizationIdentityLinkProviders({ signal }),
+    retry: false,
+  });
   const integrationsState = useLoadedSandboxProfileIntegrationsState({
     profileId: input.profileId,
     version: input.version,
@@ -3672,6 +3668,20 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
     availableTargets: input.availableTargets,
   });
   const onDraftStateChange = input.onDraftStateChange;
+  const identityLinkedGitConnectionIds =
+    identityLinkProvidersQuery.data
+      ?.find((provider) => provider.providerFamily === "github")
+      ?.configs.filter(
+        (config) =>
+          config.configurationStatus === "active" && config.selectedConnection.status === "active",
+      )
+      .map((config) => config.integrationConnectionId) ?? [];
+  const identityLinkProvidersLoadErrorMessage = identityLinkProvidersQuery.isError
+    ? resolveApiErrorMessage({
+        error: identityLinkProvidersQuery.error,
+        fallbackMessage: "Could not load identity-linking providers.",
+      })
+    : null;
 
   useEffect(() => {
     onDraftStateChange?.({
@@ -3697,14 +3707,24 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
         integrationDirectoryQuery={input.integrationDirectoryQuery}
         integrationRows={integrationsState.integrationRows}
         integrationSaveError={integrationsState.integrationSaveError}
+        gitCommitSigningIntegrationConnectionId={input.gitCommitSigningIntegrationConnectionId}
+        identityLinkedGitConnectionIds={identityLinkedGitConnectionIds}
         runtimeSettings={input.runtimeSettings}
         disabled={input.disabled}
         readOnly={input.readOnly}
         onAddIntegrationBindingRow={integrationsState.onAddIntegrationBindingRow}
+        onGitCommitSigningIntegrationConnectionChange={
+          input.onGitCommitSigningIntegrationConnectionChange
+        }
         onIntegrationBindingRowChange={integrationsState.onIntegrationBindingRowChange}
         onRemoveIntegrationBindingRow={integrationsState.onRemoveIntegrationBindingRow}
         onIntegrationSaveErrorDismiss={integrationsState.onIntegrationSaveErrorDismiss}
       />
+      {identityLinkProvidersLoadErrorMessage === null ? null : (
+        <Notice title="Could not load Git commit signing settings" variant="alert">
+          {identityLinkProvidersLoadErrorMessage}
+        </Notice>
+      )}
     </SandboxProfilePanelSection>
   );
 }

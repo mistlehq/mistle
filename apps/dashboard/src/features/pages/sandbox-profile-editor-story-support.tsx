@@ -122,6 +122,8 @@ export type SandboxProfileEditorPageStoryArgs = {
     kind: "agent" | "git" | "connector";
     config: Record<string, unknown>;
   }[];
+  identityLinkedGitConnectionIds?: readonly string[];
+  initialGitCommitSigningIntegrationConnectionId?: string | null;
   setupScript: string | null;
   setupScriptDraft?: string;
   setupAssistantStartDialogState?: "choice" | "save-required" | "use-saved-required";
@@ -428,6 +430,7 @@ function createSnapshotRefreshScheduleInitialDraft(
 
 function createRuntimeStoryVersion(input: {
   agentRuntimeId: SandboxProfileVersion["agentRuntimeId"];
+  gitCommitSigningIntegrationConnectionId: string | null;
   mistleMcpApiKeyId: string | null;
   mistleMcpEnabled: boolean;
   runtimeState: SandboxProfileEditorPageStoryArgs["runtimeState"];
@@ -440,7 +443,7 @@ function createRuntimeStoryVersion(input: {
     state: "draft",
     publishedAt: null,
     agentRuntimeId: input.agentRuntimeId,
-    gitCommitSigningIntegrationConnectionId: null,
+    gitCommitSigningIntegrationConnectionId: input.gitCommitSigningIntegrationConnectionId,
     mistleMcpEnabled: input.mistleMcpEnabled,
     mistleMcpApiKeyId: input.mistleMcpApiKeyId,
     defaultPersistenceMode: "ephemeral",
@@ -774,6 +777,8 @@ function SandboxProfileEditorPageStoryView(
     () => mapBindingsToEditorRows(input.initialBindings ?? StoryBindings),
   );
   const [apiKeys, setApiKeys] = useState<readonly ApiKey[]>(input.apiKeys ?? StoryMistleApiKeys);
+  const [gitCommitSigningIntegrationConnectionId, setGitCommitSigningIntegrationConnectionId] =
+    useState<string | null>(input.initialGitCommitSigningIntegrationConnectionId ?? null);
   const [setupScriptDraft, setSetupScriptDraft] = useState(
     input.setupScriptDraft ?? input.setupScript ?? "",
   );
@@ -995,6 +1000,12 @@ function SandboxProfileEditorPageStoryView(
                     }}
                     integrationRows={integrationRows}
                     integrationSaveError={null}
+                    gitCommitSigningIntegrationConnectionId={
+                      gitCommitSigningIntegrationConnectionId
+                    }
+                    identityLinkedGitConnectionIds={
+                      input.identityLinkedGitConnectionIds ?? [StoryGithubConnection.id]
+                    }
                     runtimeSettings={
                       <SandboxProfileRuntimeSection
                         apiKeys={apiKeys}
@@ -1009,6 +1020,7 @@ function SandboxProfileEditorPageStoryView(
                         sectionChrome={false}
                         version={createRuntimeStoryVersion({
                           agentRuntimeId,
+                          gitCommitSigningIntegrationConnectionId,
                           mistleMcpApiKeyId:
                             input.mistleMcpApiKeyId === undefined ? null : input.mistleMcpApiKeyId,
                           mistleMcpEnabled: input.mistleMcpEnabled === true,
@@ -1031,6 +1043,9 @@ function SandboxProfileEditorPageStoryView(
                       ]);
                       return true;
                     }}
+                    onGitCommitSigningIntegrationConnectionChange={
+                      setGitCommitSigningIntegrationConnectionId
+                    }
                     onIntegrationBindingRowChange={(clientId, changes) => {
                       setIntegrationRows((currentRows) =>
                         currentRows.map((row) =>

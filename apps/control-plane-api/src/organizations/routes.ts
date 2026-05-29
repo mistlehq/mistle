@@ -9,6 +9,7 @@ import * as deleteIdentityLinkProvider from "./delete-identity-link-provider/ind
 import * as deleteLogo from "./delete-logo/index.js";
 import * as ensureBillingCustomer from "./ensure-billing-customer/index.js";
 import * as getBilling from "./get-billing/index.js";
+import * as getIdentityLinkProviderGitCommitSigningImpact from "./get-identity-link-provider-git-commit-signing-impact/index.js";
 import * as getLogoContent from "./get-logo-content/index.js";
 import * as getLogo from "./get-logo/index.js";
 import * as getMembershipCapabilities from "./get-membership-capabilities/index.js";
@@ -39,6 +40,10 @@ export function createOrganizationRoutes(): AppRoutes<typeof ORGANIZATION_ROUTE_
   routes.openapi(getMembershipCapabilities.route, getMembershipCapabilities.handler);
   routes.openapi(listIdentityLinkProviders.route, listIdentityLinkProviders.handler);
   routes.openapi(listIdentityLinkProviderLinks.route, listIdentityLinkProviderLinks.handler);
+  routes.openapi(
+    getIdentityLinkProviderGitCommitSigningImpact.route,
+    getIdentityLinkProviderGitCommitSigningImpact.handler,
+  );
   routes.openapi(createIdentityLinkProviderConfig.route, createIdentityLinkProviderConfig.handler);
   routes.openapi(putIdentityLinkProviderConfig.route, putIdentityLinkProviderConfig.handler);
   routes.openapi(

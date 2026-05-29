@@ -128,6 +128,94 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     expect(runtime.getByText("Jira Production")).toBeDefined();
   });
 
+  it("allows commit signing by default for the selected identity-linked Git connection", async () => {
+    const gitCommitSigningConnectionChanges: Array<string | null> = [];
+
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [StoryOpenAiConnection, StoryGithubConnection],
+          availableTargets: [StoryOpenAiTarget, StoryGithubTarget],
+          gitCommitSigningIntegrationConnectionId: null,
+          identityLinkedGitConnectionIds: [StoryGithubConnection.id],
+          integrationRows: [
+            {
+              clientId: "git-row",
+              connectionId: StoryGithubConnection.id,
+              kind: "git",
+              config: {},
+            },
+          ],
+          onGitCommitSigningIntegrationConnectionChange: (connectionId) => {
+            gitCommitSigningConnectionChanges.push(connectionId);
+          },
+        }}
+      />,
+    );
+
+    const switchControl = screen.getByRole("switch", { name: "Sign Git commits" });
+    expect(switchControl.getAttribute("aria-checked")).toBe("true");
+    expect(switchControl.hasAttribute("data-disabled")).toBe(true);
+    await waitFor(() => {
+      expect(gitCommitSigningConnectionChanges).toEqual([StoryGithubConnection.id]);
+    });
+    expect(screen.getByRole("button", { name: "About Git commit signing" })).toBeDefined();
+  });
+
+  it("disables commit signing when the selected Git connection is not identity-linked", () => {
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [StoryGithubConnection],
+          availableTargets: [StoryGithubTarget],
+          identityLinkedGitConnectionIds: [],
+          integrationRows: [
+            {
+              clientId: "git-row",
+              connectionId: StoryGithubConnection.id,
+              kind: "git",
+              config: {},
+            },
+          ],
+        }}
+      />,
+    );
+
+    const switchControl = screen.getByRole("switch", { name: "Sign Git commits" });
+    expect(switchControl.hasAttribute("data-disabled")).toBe(true);
+    expect(screen.getByText("Requires identity linking")).toBeDefined();
+  });
+
+  it("clears commit signing when the selected Git connection stops being identity-linked", async () => {
+    const gitCommitSigningConnectionChanges: Array<string | null> = [];
+
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [StoryGithubConnection],
+          availableTargets: [StoryGithubTarget],
+          gitCommitSigningIntegrationConnectionId: StoryGithubConnection.id,
+          identityLinkedGitConnectionIds: [],
+          integrationRows: [
+            {
+              clientId: "git-row",
+              connectionId: StoryGithubConnection.id,
+              kind: "git",
+              config: {},
+            },
+          ],
+          onGitCommitSigningIntegrationConnectionChange: (connectionId) => {
+            gitCommitSigningConnectionChanges.push(connectionId);
+          },
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(gitCommitSigningConnectionChanges).toEqual([null]);
+    });
+  });
+
   it("renders editable connector binding config controls in resources and tools", () => {
     const rowChanges: Array<{
       clientId: string;
@@ -554,10 +642,13 @@ function TestSandboxProfileIntegrationsSetupSection(input: {
       error: null,
       isPending: false,
     },
+    gitCommitSigningIntegrationConnectionId: null,
+    identityLinkedGitConnectionIds: [],
     integrationRows: [],
     integrationSaveError: null,
     runtimeSettings: <div>Sandbox Runtime</div>,
     onAddIntegrationBindingRow: async () => true,
+    onGitCommitSigningIntegrationConnectionChange: () => {},
     onIntegrationBindingRowChange: () => {},
     onRemoveIntegrationBindingRow: () => {},
     onIntegrationSaveErrorDismiss: () => {},

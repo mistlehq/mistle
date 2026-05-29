@@ -256,7 +256,7 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(screen.getByRole("combobox", { name: "Mistle API key" })).toBeTruthy();
   });
 
-  it("includes the selected GitHub commit signing connection in runtime draft changes", async () => {
+  it("includes Git commit signing connection updates in runtime draft changes", async () => {
     const runtimeDraftStates: SandboxProfileRuntimeDraftState[] = [];
 
     render(
@@ -265,16 +265,6 @@ describe("SandboxProfileRuntimeSection", () => {
         availableConnections={[]}
         availableTargets={[]}
         disabled={false}
-        gitHubSigningConnectionOptions={[
-          {
-            integrationConnectionId: "icn_github_engineering",
-            label: "Engineering GitHub",
-          },
-          {
-            integrationConnectionId: "icn_github_support",
-            label: "Support GitHub",
-          },
-        ]}
         isDraft={true}
         onDraftStateChange={(state) => {
           runtimeDraftStates.push(state);
@@ -288,11 +278,14 @@ describe("SandboxProfileRuntimeSection", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("combobox", { name: "GitHub commit signing" }));
-    const supportGitHubOption = screen.getByRole("option", { name: "Support GitHub" });
-    fireEvent.pointerDown(supportGitHubOption, { button: 0 });
-    fireEvent.click(supportGitHubOption);
-    fireEvent.keyDown(supportGitHubOption, { key: "Enter" });
+    await waitFor(() => {
+      const runtimeDraftState = runtimeDraftStates.at(-1);
+      if (runtimeDraftState?.updateGitCommitSigningIntegrationConnectionId === undefined) {
+        throw new Error("Expected runtime draft state to expose Git commit signing updater.");
+      }
+
+      runtimeDraftState.updateGitCommitSigningIntegrationConnectionId("icn_github_support");
+    });
 
     await waitFor(() => {
       const runtimeDraftState = runtimeDraftStates.at(-1);
@@ -305,57 +298,6 @@ describe("SandboxProfileRuntimeSection", () => {
         gitCommitSigningIntegrationConnectionId: "icn_github_support",
       });
     });
-  });
-
-  it("shows the only eligible GitHub commit signing connection when none is explicitly selected", () => {
-    render(
-      <SandboxProfileRuntimeSection
-        apiKeys={[]}
-        availableConnections={[]}
-        availableTargets={[]}
-        disabled={false}
-        gitHubSigningConnectionOptions={[
-          {
-            integrationConnectionId: "icn_github_engineering",
-            label: "Engineering GitHub",
-          },
-        ]}
-        isDraft={true}
-        providers={[DockerProvider]}
-        version={createVersion({
-          sandboxProvider: "docker",
-          sandboxConnectionId: null,
-          sandboxResources: null,
-        })}
-      />,
-    );
-
-    expect(screen.getByRole("combobox", { name: "GitHub commit signing" }).textContent).toContain(
-      "Engineering GitHub",
-    );
-  });
-
-  it("shows when no GitHub commit signing connection is eligible", () => {
-    render(
-      <SandboxProfileRuntimeSection
-        apiKeys={[]}
-        availableConnections={[]}
-        availableTargets={[]}
-        disabled={false}
-        gitHubSigningConnectionOptions={[]}
-        isDraft={true}
-        providers={[DockerProvider]}
-        version={createVersion({
-          sandboxProvider: "docker",
-          sandboxConnectionId: null,
-          sandboxResources: null,
-        })}
-      />,
-    );
-
-    expect(screen.getByRole("combobox", { name: "GitHub commit signing" }).textContent).toContain(
-      "No eligible GitHub connection",
-    );
   });
 
   it("disables Mistle API key selection when no API keys exist", () => {

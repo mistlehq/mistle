@@ -12,6 +12,7 @@ import {
   FieldContent,
   FieldHeader,
   FieldLabel,
+  FieldLabelWithTooltip,
   Notice,
   SectionBlock,
   Select,
@@ -19,6 +20,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Switch,
   TextLink,
 } from "@mistle/ui";
 import { PlusIcon, TrashIcon } from "@phosphor-icons/react";
@@ -82,11 +84,14 @@ type SandboxProfileIntegrationsSetupSectionProps = {
   integrationRows: readonly SandboxProfileBindingEditorRow[];
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
+  gitCommitSigningIntegrationConnectionId: string | null;
+  identityLinkedGitConnectionIds: readonly string[];
   onAddIntegrationBindingRow: (input: {
     kind: SandboxIntegrationBindingKind;
     connectionId: string;
     config: Record<string, unknown>;
   }) => Promise<boolean>;
+  onGitCommitSigningIntegrationConnectionChange: (connectionId: string | null) => void;
   onIntegrationBindingRowChange: (
     clientId: string,
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
@@ -102,6 +107,9 @@ const NoGitConnectionValue = "none";
 const NoProxiedConnectionValue = "none";
 const Definitions = createBrowserDefinitionsBundle();
 const IntegrationRegistry = Definitions.integrationRegistry;
+const GitCommitSigningTooltip =
+  "Commits made in sandboxes will be signed with the acting user's linked GitHub account when enabled.";
+const GitCommitSigningIdentityLinkingDisabledMessage = "Requires identity linking";
 
 const SandboxProfileIntegrationConnectionColumns = [
   { key: "integration", label: "Integration", desktopWidth: "minmax(12rem,0.9fr)" },
@@ -278,6 +286,61 @@ function GitConnectionSelectionCell(input: {
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+function GitCommitSigningSwitchField(input: {
+  checked: boolean;
+  disabled: boolean;
+  disabledMessage: string | null;
+  onCheckedChange: (checked: boolean) => void;
+  readOnly: boolean;
+}): React.JSX.Element {
+  if (input.readOnly) {
+    return (
+      <Field contentWidth="fill" orientation="horizontal">
+        <FieldHeader>
+          <FieldLabelWithTooltip
+            tooltip={GitCommitSigningTooltip}
+            tooltipLabel="About Git commit signing"
+          >
+            Sign Git commits
+          </FieldLabelWithTooltip>
+        </FieldHeader>
+        <FieldContent>
+          <div className={SandboxProfileIntegrationCellContentClassName}>
+            <p className="text-sm">{input.checked ? "Yes" : "No"}</p>
+          </div>
+        </FieldContent>
+      </Field>
+    );
+  }
+
+  return (
+    <Field contentWidth="fill" orientation="horizontal">
+      <FieldHeader>
+        <FieldLabelWithTooltip
+          htmlFor="sandbox-profile-git-commit-signing"
+          tooltip={GitCommitSigningTooltip}
+          tooltipLabel="About Git commit signing"
+        >
+          Sign Git commits
+        </FieldLabelWithTooltip>
+      </FieldHeader>
+      <FieldContent>
+        <div className="flex min-h-10 items-center gap-3">
+          <Switch
+            checked={input.checked}
+            disabled={input.disabled}
+            id="sandbox-profile-git-commit-signing"
+            onCheckedChange={input.onCheckedChange}
+          />
+          {input.disabledMessage === null ? null : (
+            <p className="text-muted-foreground text-sm leading-none">{input.disabledMessage}</p>
+          )}
+        </div>
+      </FieldContent>
+    </Field>
   );
 }
 
@@ -652,6 +715,16 @@ export function SandboxProfileIntegrationsSetupSection(
     availableConnections: input.availableConnections,
     availableTargets: input.availableTargets,
   });
+  const selectedGitConnectionIsIdentityLinked =
+    gitRow !== null && input.identityLinkedGitConnectionIds.includes(gitRow.connectionId);
+  const gitCommitSigningIsChecked = selectedGitConnectionIsIdentityLinked;
+  const gitCommitSigningDisabledMessage =
+    gitRow === null
+      ? "Select a Git connection"
+      : selectedGitConnectionIsIdentityLinked
+        ? null
+        : GitCommitSigningIdentityLinkingDisabledMessage;
+  const gitCommitSigningIsDisabled = true;
   const hasUnresolvedConnectorRows = connectorRows.some(
     (row) =>
       resolveBindingIssue({
@@ -679,6 +752,29 @@ export function SandboxProfileIntegrationsSetupSection(
     isReadOnly,
   ]);
 
+  useEffect(() => {
+    if (controlsAreDisabled || isReadOnly) {
+      return;
+    }
+
+    const nextGitCommitSigningIntegrationConnectionId =
+      selectedGitConnectionIsIdentityLinked && gitRow !== null ? gitRow.connectionId : null;
+    if (
+      input.gitCommitSigningIntegrationConnectionId !== nextGitCommitSigningIntegrationConnectionId
+    ) {
+      input.onGitCommitSigningIntegrationConnectionChange(
+        nextGitCommitSigningIntegrationConnectionId,
+      );
+    }
+  }, [
+    controlsAreDisabled,
+    gitRow,
+    input.gitCommitSigningIntegrationConnectionId,
+    input.onGitCommitSigningIntegrationConnectionChange,
+    isReadOnly,
+    selectedGitConnectionIsIdentityLinked,
+  ]);
+
   function saveBindingConnection(
     kind: SandboxIntegrationBindingKind,
     row: SandboxProfileBindingEditorRow | null,
@@ -699,13 +795,26 @@ export function SandboxProfileIntegrationsSetupSection(
         connectionId: nextConnectionId,
         config: nextConfig,
       });
+      if (
+        kind === "git" &&
+        input.gitCommitSigningIntegrationConnectionId !== null &&
+        input.identityLinkedGitConnectionIds.includes(nextConnectionId)
+      ) {
+        input.onGitCommitSigningIntegrationConnectionChange(nextConnectionId);
+      }
       return;
     }
 
+    const previousConnectionId = row.connectionId;
     input.onIntegrationBindingRowChange(row.clientId, {
       connectionId: nextConnectionId,
       config: nextConfig,
     });
+    if (kind === "git" && input.gitCommitSigningIntegrationConnectionId === previousConnectionId) {
+      input.onGitCommitSigningIntegrationConnectionChange(
+        input.identityLinkedGitConnectionIds.includes(nextConnectionId) ? nextConnectionId : null,
+      );
+    }
   }
 
   async function addConnector(targetKey: string): Promise<void> {
@@ -801,6 +910,12 @@ export function SandboxProfileIntegrationsSetupSection(
                               if (controlsAreDisabled || gitRow === null) {
                                 return;
                               }
+                              if (
+                                input.gitCommitSigningIntegrationConnectionId ===
+                                gitRow.connectionId
+                              ) {
+                                input.onGitCommitSigningIntegrationConnectionChange(null);
+                              }
                               input.onRemoveIntegrationBindingRow(gitRow.clientId);
                             }}
                             selectedConnectionId={gitRow?.connectionId}
@@ -821,6 +936,11 @@ export function SandboxProfileIntegrationsSetupSection(
                             if (controlsAreDisabled) {
                               return;
                             }
+                            if (
+                              input.gitCommitSigningIntegrationConnectionId === gitRow.connectionId
+                            ) {
+                              input.onGitCommitSigningIntegrationConnectionChange(null);
+                            }
 
                             input.onRemoveIntegrationBindingRow(gitRow.clientId);
                           }}
@@ -829,6 +949,21 @@ export function SandboxProfileIntegrationsSetupSection(
                     </div>
                   </FieldContent>
                 </Field>
+
+                <GitCommitSigningSwitchField
+                  checked={gitCommitSigningIsChecked}
+                  disabled={gitCommitSigningIsDisabled}
+                  disabledMessage={gitCommitSigningDisabledMessage}
+                  onCheckedChange={(checked) => {
+                    if (gitCommitSigningIsDisabled || gitRow === null) {
+                      return;
+                    }
+                    input.onGitCommitSigningIntegrationConnectionChange(
+                      checked ? gitRow.connectionId : null,
+                    );
+                  }}
+                  readOnly={isReadOnly}
+                />
 
                 {gitRow === null ||
                 !hasSandboxProfileBindingResourcesAndToolsCellContent({

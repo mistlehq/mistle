@@ -68,6 +68,19 @@ export const MistleMcpNoApiKeys: Story = {
   },
 };
 
+export const GitCommitSigningEnabled: Story = {
+  args: {
+    identityLinkedGitConnectionIds: [StoryGithubConnection.id],
+    initialGitCommitSigningIntegrationConnectionId: StoryGithubConnection.id,
+  },
+};
+
+export const GitCommitSigningUnavailable: Story = {
+  args: {
+    identityLinkedGitConnectionIds: [],
+  },
+};
+
 export const StaleConnectorBinding: Story = {
   args: {
     initialBindings: [

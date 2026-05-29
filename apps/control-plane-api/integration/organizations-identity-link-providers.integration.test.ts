@@ -3,11 +3,13 @@
  */
 
 import {
+  IntegrationBindingKinds,
   IntegrationConnectionStatuses,
   type IntegrationConnectionStatus,
   IntegrationCredentialSecretKinds,
   MemberRoles,
   OrganizationIdentityLinkProviderConfigStatus,
+  SandboxProfileVersionStates,
   UserExternalPrincipalStatuses,
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
@@ -28,6 +30,11 @@ import {
   OrganizationIdentityLinkProviderSchema,
   OrganizationIdentityLinkProvidersResponseSchema,
 } from "../src/organizations/schemas.js";
+import {
+  sandboxProfileRow,
+  sandboxProfileVersionIntegrationBindingRow,
+  sandboxProfileVersionRow,
+} from "./helpers/sandbox-profiles.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api"],
@@ -312,6 +319,88 @@ describe.concurrent("organization identity-linking providers integration", () =>
       });
     expect(persistedConfig?.status).toBe(OrganizationIdentityLinkProviderConfigStatus.DISABLED);
     expect(persistedConfig?.integrationConnectionId).toBe(connectionId);
+  });
+
+  it("updates active and draft profile commit signing when GitHub identity linking is enabled and disabled", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-identity-link-providers-profile-signing@example.com",
+    });
+    await upsertGitHubTarget(env, "github-cloud");
+    const connectionId = await createGitHubIdentityLinkReadyConnection(env, {
+      displayName: "GitHub Identity Profile Signing",
+      session,
+    });
+    await seedIdentityLinkProviderConfig(env, {
+      connectionId,
+      organizationId: session.organizationId,
+      status: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
+      userId: session.userId,
+    });
+    await seedProfileWithActiveAndDraftGitBinding(env, {
+      connectionId,
+      organizationId: session.organizationId,
+      profileId: "sbp_identity_link_signing_sync",
+    });
+
+    const previewResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/organization/identity-linking/providers/github/git-commit-signing-impact?${new URLSearchParams(
+        {
+          integrationConnectionId: connectionId,
+          action: "enable",
+        },
+      ).toString()}`,
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+    expect(previewResponse.status).toBe(200);
+    await expect(previewResponse.json()).resolves.toEqual({
+      action: "enable",
+      updatedProfileCount: 1,
+      invariantViolationCount: 0,
+    });
+
+    const enableResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/identity-linking/providers/github/status",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+        }),
+      },
+    );
+    expect(enableResponse.status).toBe(200);
+
+    await expectProfileVersionSigning(env, {
+      expectedConnectionId: connectionId,
+      profileId: "sbp_identity_link_signing_sync",
+      versions: [1, 2],
+    });
+
+    const disableResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/identity-linking/providers/github",
+      {
+        method: "DELETE",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+    expect(disableResponse.status).toBe(200);
+
+    await expectProfileVersionSigning(env, {
+      expectedConnectionId: null,
+      profileId: "sbp_identity_link_signing_sync",
+      versions: [1, 2],
+    });
   });
 
   it("rejects invalid or ineligible connections for identity-linking provider configuration", async ({
@@ -637,6 +726,81 @@ async function putProviderConnection(
         integrationConnectionId: input.connectionId,
       }),
     },
+  );
+}
+
+async function seedProfileWithActiveAndDraftGitBinding(
+  env: IntegrationTestEnvironment,
+  input: {
+    connectionId: string;
+    organizationId: string;
+    profileId: string;
+  },
+): Promise<void> {
+  await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+    sandboxProfileRow({
+      id: input.profileId,
+      organizationId: input.organizationId,
+      displayName: "Identity Link Signing Profile",
+      activeVersion: 1,
+      createdAt: "2026-05-23T00:00:00.000Z",
+    }),
+  );
+  await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+    sandboxProfileVersionRow({
+      sandboxProfileId: input.profileId,
+      version: 1,
+      state: SandboxProfileVersionStates.PUBLISHED,
+      gitCommitSigningIntegrationConnectionId: null,
+    }),
+    sandboxProfileVersionRow({
+      sandboxProfileId: input.profileId,
+      version: 2,
+      state: SandboxProfileVersionStates.DRAFT,
+      gitCommitSigningIntegrationConnectionId: null,
+    }),
+  ]);
+  await env.controlPlaneDb
+    .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+    .values([
+      sandboxProfileVersionIntegrationBindingRow({
+        id: `${input.profileId}_active_git`,
+        sandboxProfileId: input.profileId,
+        sandboxProfileVersion: 1,
+        connectionId: input.connectionId,
+        kind: IntegrationBindingKinds.GIT,
+      }),
+      sandboxProfileVersionIntegrationBindingRow({
+        id: `${input.profileId}_draft_git`,
+        sandboxProfileId: input.profileId,
+        sandboxProfileVersion: 2,
+        connectionId: input.connectionId,
+        kind: IntegrationBindingKinds.GIT,
+      }),
+    ]);
+}
+
+async function expectProfileVersionSigning(
+  env: IntegrationTestEnvironment,
+  input: {
+    expectedConnectionId: string | null;
+    profileId: string;
+    versions: readonly number[];
+  },
+): Promise<void> {
+  const versions = await env.controlPlaneDb.query.sandboxProfileVersions.findMany({
+    columns: {
+      version: true,
+      gitCommitSigningIntegrationConnectionId: true,
+    },
+    where: (table, { and, eq, inArray }) =>
+      and(eq(table.sandboxProfileId, input.profileId), inArray(table.version, input.versions)),
+    orderBy: (table, { asc }) => [asc(table.version)],
+  });
+
+  expect(versions).toHaveLength(input.versions.length);
+  expect(versions.map((version) => version.gitCommitSigningIntegrationConnectionId)).toEqual(
+    input.versions.map(() => input.expectedConnectionId),
   );
 }
 

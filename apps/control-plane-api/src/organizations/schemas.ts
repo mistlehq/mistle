@@ -219,3 +219,16 @@ export const OrganizationIdentityLinkProviderLinksResponseSchema = z
     links: z.array(OrganizationIdentityLinkProviderLinkSchema),
   })
   .strict();
+
+export const OrganizationIdentityLinkGitCommitSigningImpactActionSchema = z.enum([
+  "enable",
+  "disable",
+]);
+
+export const OrganizationIdentityLinkGitCommitSigningImpactSchema = z
+  .object({
+    action: OrganizationIdentityLinkGitCommitSigningImpactActionSchema,
+    updatedProfileCount: z.number().int().min(0),
+    invariantViolationCount: z.number().int().min(0),
+  })
+  .strict();

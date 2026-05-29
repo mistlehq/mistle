@@ -361,13 +361,6 @@ async function validateGitCommitSigningDraftConfig(
   );
 
   if (input.integrationConnectionId === null) {
-    if (gitHubConfigs.length > 1) {
-      throw new SandboxProfilesBadRequestError(
-        SandboxProfilesBadRequestCodes.GIT_SIGNING_CONFIGURATION_REQUIRED,
-        "Select a GitHub identity-linking connection for commit signing before saving this draft.",
-      );
-    }
-
     return;
   }
 
