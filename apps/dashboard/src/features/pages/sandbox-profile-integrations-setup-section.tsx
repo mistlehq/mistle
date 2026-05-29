@@ -771,11 +771,11 @@ export function SandboxProfileIntegrationsSetupSection(
     isReadOnly,
   ]);
 
-  function saveBindingConnection(
+  async function saveBindingConnection(
     kind: SandboxIntegrationBindingKind,
     row: SandboxProfileBindingEditorRow | null,
     nextConnectionId: string,
-  ): void {
+  ): Promise<void> {
     const nextConfig = buildDefaultConfig({
       connectionId: nextConnectionId,
       availableConnections: input.availableConnections,
@@ -786,12 +786,13 @@ export function SandboxProfileIntegrationsSetupSection(
     }
 
     if (row === null) {
-      void input.onAddIntegrationBindingRow({
+      const didSave = await input.onAddIntegrationBindingRow({
         kind,
         connectionId: nextConnectionId,
         config: nextConfig,
       });
       if (
+        didSave &&
         kind === "git" &&
         input.gitCommitSigningIntegrationConnectionId !== null &&
         input.identityLinkedGitConnectionIds?.includes(nextConnectionId) === true
@@ -905,7 +906,7 @@ export function SandboxProfileIntegrationsSetupSection(
                               if (controlsAreDisabled) {
                                 return;
                               }
-                              saveBindingConnection("git", gitRow, nextConnectionId);
+                              void saveBindingConnection("git", gitRow, nextConnectionId);
                             }}
                             onNone={() => {
                               if (controlsAreDisabled || gitRow === null) {
@@ -1116,7 +1117,7 @@ export function SandboxProfileIntegrationsSetupSection(
                                 }
                                 return;
                               }
-                              saveBindingConnection("agent", agentRow, nextConnectionId);
+                              void saveBindingConnection("agent", agentRow, nextConnectionId);
                             }}
                             selectedConnectionId={agentRow?.connectionId}
                             disabled={controlsAreDisabled}
@@ -1183,7 +1184,7 @@ export function SandboxProfileIntegrationsSetupSection(
                                 if (controlsAreDisabled) {
                                   return;
                                 }
-                                saveBindingConnection("connector", row, nextConnectionId);
+                                void saveBindingConnection("connector", row, nextConnectionId);
                               }}
                               selectedConnectionId={row.connectionId}
                               disabled={controlsAreDisabled}

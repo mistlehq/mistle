@@ -12,20 +12,9 @@ export type IdentityLinkEligibleConnection = {
   connectionMethodLabel?: string;
 };
 
-export type ReturnedIdentityLinkConnectionSelection = {
-  providerFamily: string;
-  integrationConnectionId: string;
-};
-
 type ProviderWithEligibleConnections = Pick<
   OrganizationIdentityLinkProvider,
   "eligibleConnections"
-> &
-  Record<string, unknown>;
-
-type ProviderWithFamilyAndEligibleConnections = Pick<
-  OrganizationIdentityLinkProvider,
-  "providerFamily" | "eligibleConnections"
 > &
   Record<string, unknown>;
 
@@ -33,36 +22,6 @@ export function canManageOrganizationIdentityLinking(input: {
   actorRole: OrganizationRole;
 }): boolean {
   return input.actorRole === "owner" || input.actorRole === "admin";
-}
-
-export function formatIdentityLinkProviderConfigurationStatus(input: {
-  configurationStatus: OrganizationIdentityLinkProvider["configurationStatus"];
-}): string {
-  switch (input.configurationStatus) {
-    case "active":
-      return "Enabled";
-    case "disabled":
-      return "Disabled";
-    case "unconfigured":
-      return "Not enabled";
-  }
-}
-
-export function resolveIdentityLinkConfigureActionLabel(): string {
-  return "Save";
-}
-
-export function resolveIdentityLinkStatusActionLabel(input: {
-  configurationStatus: OrganizationIdentityLinkProvider["configurationStatus"];
-}): string {
-  switch (input.configurationStatus) {
-    case "active":
-      return "Disable";
-    case "disabled":
-      return "Enable";
-    case "unconfigured":
-      return "Enable";
-  }
 }
 
 export function listEligibleIdentityLinkConnections(input: {
@@ -98,24 +57,6 @@ export function formatIdentityLinkEligibleConnectionLabel(
   }
 
   return `${input.displayName} · ${input.connectionMethodLabel}`;
-}
-
-export function resolveReturnedIdentityLinkConnectionSelection(input: {
-  connectionId: string;
-  providers: readonly ProviderWithFamilyAndEligibleConnections[];
-}): ReturnedIdentityLinkConnectionSelection | null {
-  for (const provider of input.providers) {
-    const eligibleConnections = listEligibleIdentityLinkConnections({ provider });
-
-    if (eligibleConnections.some((connection) => connection.id === input.connectionId)) {
-      return {
-        providerFamily: provider.providerFamily,
-        integrationConnectionId: input.connectionId,
-      };
-    }
-  }
-
-  return null;
 }
 
 export function formatIdentityLinkProviderMemberStatus(input: { linked: boolean }): string {

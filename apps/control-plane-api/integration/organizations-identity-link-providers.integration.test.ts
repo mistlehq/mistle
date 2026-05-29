@@ -145,6 +145,115 @@ describe.concurrent("organization identity-linking providers integration", () =>
     expect(payload.organizationProviderConfigId).toBe(persistedConfig?.id);
   });
 
+  it("rejects duplicate GitHub identity-linking configs for the same connection", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-identity-link-providers-duplicate-github@example.com",
+    });
+    await upsertGitHubTarget(env, "github-cloud");
+    const firstConnectionId = await createGitHubIdentityLinkReadyConnection(env, {
+      displayName: "GitHub Duplicate First",
+      session,
+    });
+    const secondConnectionId = await createGitHubIdentityLinkReadyConnection(env, {
+      displayName: "GitHub Duplicate Second",
+      session,
+    });
+
+    const firstCreateResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/identity-linking/providers/github/configs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          integrationConnectionId: firstConnectionId,
+          status: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
+        }),
+      },
+    );
+    expect(firstCreateResponse.status).toBe(201);
+    const firstConfig = OrganizationIdentityLinkProviderSchema.shape.configs.element.parse(
+      await firstCreateResponse.json(),
+    );
+
+    const secondCreateResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/identity-linking/providers/github/configs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          integrationConnectionId: secondConnectionId,
+          status: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
+        }),
+      },
+    );
+    expect(secondCreateResponse.status).toBe(201);
+    const secondConfig = OrganizationIdentityLinkProviderSchema.shape.configs.element.parse(
+      await secondCreateResponse.json(),
+    );
+
+    const duplicateCreateResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/identity-linking/providers/github/configs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          integrationConnectionId: firstConnectionId,
+          status: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
+        }),
+      },
+    );
+    expect(duplicateCreateResponse.status).toBe(400);
+    await expect(duplicateCreateResponse.json()).resolves.toEqual({
+      code: "INVALID_PROVIDER_CONFIG_INPUT",
+      message: `GitHub identity-linking connection '${firstConnectionId}' is already configured.`,
+    });
+
+    const duplicateUpdateResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/organization/identity-linking/provider-configs/${secondConfig.organizationProviderConfigId}`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          integrationConnectionId: firstConnectionId,
+        }),
+      },
+    );
+    expect(duplicateUpdateResponse.status).toBe(400);
+    await expect(duplicateUpdateResponse.json()).resolves.toEqual({
+      code: "INVALID_PROVIDER_CONFIG_INPUT",
+      message: `GitHub identity-linking connection '${firstConnectionId}' is already configured.`,
+    });
+
+    const unchangedUpdateResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/organization/identity-linking/provider-configs/${firstConfig.organizationProviderConfigId}`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          integrationConnectionId: firstConnectionId,
+        }),
+      },
+    );
+    expect(unchangedUpdateResponse.status).toBe(200);
+  });
+
   it("creates and manages multiple Slack identity-linking configs independently", async ({
     env,
   }) => {
@@ -456,6 +565,114 @@ describe.concurrent("organization identity-linking providers integration", () =>
       expectedConnectionId: connectionId,
       profileId: "sbp_identity_link_signing_mismatch",
       versions: [1],
+    });
+  });
+
+  it("syncs profile commit signing when an active GitHub identity-linking config changes connection", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-identity-link-providers-active-connection-change@example.com",
+    });
+    await upsertGitHubTarget(env, "github-cloud");
+    const firstConnectionId = await createGitHubIdentityLinkReadyConnection(env, {
+      displayName: "GitHub Identity Active Change First",
+      session,
+    });
+    const secondConnectionId = await createGitHubIdentityLinkReadyConnection(env, {
+      displayName: "GitHub Identity Active Change Second",
+      session,
+    });
+    await seedIdentityLinkProviderConfig(env, {
+      connectionId: firstConnectionId,
+      organizationId: session.organizationId,
+      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      userId: session.userId,
+    });
+    await seedProfileWithActiveAndDraftGitBinding(env, {
+      connectionId: firstConnectionId,
+      gitCommitSigningIntegrationConnectionId: firstConnectionId,
+      organizationId: session.organizationId,
+      profileId: "sbp_identity_link_signing_change_first",
+    });
+    await seedProfileWithActiveAndDraftGitBinding(env, {
+      connectionId: secondConnectionId,
+      organizationId: session.organizationId,
+      profileId: "sbp_identity_link_signing_change_second",
+    });
+
+    await expectProfileVersionSigning(env, {
+      expectedConnectionId: firstConnectionId,
+      profileId: "sbp_identity_link_signing_change_first",
+      versions: [1, 2],
+    });
+    await expectProfileVersionSigning(env, {
+      expectedConnectionId: null,
+      profileId: "sbp_identity_link_signing_change_second",
+      versions: [1, 2],
+    });
+
+    const firstPreviewResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/organization/identity-linking/providers/github/git-commit-signing-impact?${new URLSearchParams(
+        {
+          integrationConnectionId: firstConnectionId,
+          action: "enable",
+        },
+      ).toString()}`,
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+    expect(firstPreviewResponse.status).toBe(200);
+    await expect(firstPreviewResponse.json()).resolves.toEqual({
+      action: "enable",
+      updatedProfileCount: 0,
+      invariantViolationCount: 0,
+    });
+
+    const config = await env.controlPlaneDb.query.organizationIdentityLinkProviderConfigs.findFirst(
+      {
+        columns: {
+          id: true,
+        },
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.organizationId, session.organizationId),
+            eq(table.providerFamily, "github"),
+            eq(table.integrationConnectionId, firstConnectionId),
+          ),
+      },
+    );
+    if (config === undefined) {
+      throw new Error("Expected GitHub identity-linking provider config.");
+    }
+
+    const updateResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/organization/identity-linking/provider-configs/${config.id}`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          integrationConnectionId: secondConnectionId,
+        }),
+      },
+    );
+    expect(updateResponse.status).toBe(200);
+
+    await expectProfileVersionSigning(env, {
+      expectedConnectionId: null,
+      profileId: "sbp_identity_link_signing_change_first",
+      versions: [1, 2],
+    });
+    await expectProfileVersionSigning(env, {
+      expectedConnectionId: secondConnectionId,
+      profileId: "sbp_identity_link_signing_change_second",
+      versions: [1, 2],
     });
   });
 
@@ -947,6 +1164,7 @@ async function seedProfileWithActiveAndDraftGitBinding(
   env: IntegrationTestEnvironment,
   input: {
     connectionId: string;
+    gitCommitSigningIntegrationConnectionId?: string | null;
     organizationId: string;
     profileId: string;
   },
@@ -965,13 +1183,15 @@ async function seedProfileWithActiveAndDraftGitBinding(
       sandboxProfileId: input.profileId,
       version: 1,
       state: SandboxProfileVersionStates.PUBLISHED,
-      gitCommitSigningIntegrationConnectionId: null,
+      gitCommitSigningIntegrationConnectionId:
+        input.gitCommitSigningIntegrationConnectionId ?? null,
     }),
     sandboxProfileVersionRow({
       sandboxProfileId: input.profileId,
       version: 2,
       state: SandboxProfileVersionStates.DRAFT,
-      gitCommitSigningIntegrationConnectionId: null,
+      gitCommitSigningIntegrationConnectionId:
+        input.gitCommitSigningIntegrationConnectionId ?? null,
     }),
   ]);
   await env.controlPlaneDb

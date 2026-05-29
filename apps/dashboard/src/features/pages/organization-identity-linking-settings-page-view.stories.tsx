@@ -13,8 +13,7 @@ import {
 const BaseProviders = [
   {
     rowKey: "github:conn_github_engineering",
-    organizationProviderConfigId: "ilp_github_engineering",
-    providerFamily: "github",
+    canOpenLinkedUsers: true,
     displayName: "GitHub",
     logoKey: "github",
     connectionLabel: "GitHub Engineering",
@@ -44,8 +43,7 @@ const BaseProviders = [
   },
   {
     rowKey: "github:conn_github_platform",
-    organizationProviderConfigId: null,
-    providerFamily: "github",
+    canOpenLinkedUsers: false,
     displayName: "GitHub",
     logoKey: "github",
     connectionLabel: "GitHub Platform",
@@ -58,8 +56,7 @@ const BaseProviders = [
   },
   {
     rowKey: "slack:conn_slack_workspace",
-    organizationProviderConfigId: "ilp_slack_workspace",
-    providerFamily: "slack",
+    canOpenLinkedUsers: true,
     displayName: "Slack",
     logoKey: "slack",
     connectionLabel: "Slack Workspace",
@@ -116,8 +113,7 @@ function StatefulPrototype(
               ? provider
               : {
                   ...provider,
-                  organizationProviderConfigId:
-                    provider.organizationProviderConfigId ?? `ilp_${provider.rowKey}`,
+                  canOpenLinkedUsers: true,
                   linkedUsersCount: provider.linkedUsersCount ?? 0,
                   enabled,
                   enablePending: false,

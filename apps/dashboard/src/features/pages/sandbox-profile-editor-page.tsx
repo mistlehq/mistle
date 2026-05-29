@@ -3794,6 +3794,7 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
 }): React.JSX.Element {
   const activeOrganizationId = useRequiredOrganizationId();
   const identityLinkProvidersQuery = useQuery({
+    enabled: !input.readOnly,
     queryKey: organizationIdentityLinkProvidersQueryKey(activeOrganizationId),
     queryFn: async ({ signal }) => listOrganizationIdentityLinkProviders({ signal }),
     retry: false,
@@ -3806,8 +3807,9 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
     availableTargets: input.availableTargets,
   });
   const onDraftStateChange = input.onDraftStateChange;
-  const identityLinkedGitConnectionIds =
-    identityLinkProvidersQuery.data === undefined
+  const identityLinkedGitConnectionIds = input.readOnly
+    ? []
+    : identityLinkProvidersQuery.data === undefined
       ? null
       : (identityLinkProvidersQuery.data
           .find((provider) => provider.providerFamily === "github")
@@ -3817,12 +3819,13 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
               config.selectedConnection.status === "active",
           )
           .map((config) => config.integrationConnectionId) ?? []);
-  const identityLinkProvidersLoadErrorMessage = identityLinkProvidersQuery.isError
-    ? resolveApiErrorMessage({
-        error: identityLinkProvidersQuery.error,
-        fallbackMessage: "Could not load identity-linking providers.",
-      })
-    : null;
+  const identityLinkProvidersLoadErrorMessage =
+    !input.readOnly && identityLinkProvidersQuery.isError
+      ? resolveApiErrorMessage({
+          error: identityLinkProvidersQuery.error,
+          fallbackMessage: "Could not load identity-linking providers.",
+        })
+      : null;
 
   useEffect(() => {
     onDraftStateChange?.({

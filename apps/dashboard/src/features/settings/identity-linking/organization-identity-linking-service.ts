@@ -342,28 +342,3 @@ export async function putOrganizationIdentityLinkProviderStatus(input: {
     });
   }
 }
-
-export async function disableOrganizationIdentityLinkProvider(input: {
-  organizationProviderConfigId: string;
-}): Promise<OrganizationIdentityLinkProviderConfig> {
-  try {
-    const response = await requestControlPlane({
-      operation: "disableOrganizationIdentityLinkProvider",
-      method: "DELETE",
-      pathname: `/v1/organization/identity-linking/provider-configs/${encodeURIComponent(input.organizationProviderConfigId)}`,
-      fallbackMessage: "Could not disable identity-linking provider configuration.",
-    });
-
-    return readJsonWithSchema({
-      response,
-      schema: OrganizationIdentityLinkProviderConfigSchema,
-      operation: "disableOrganizationIdentityLinkProvider",
-    });
-  } catch (error) {
-    throw wrapOrganizationIdentityLinkingApiError({
-      operation: "disableOrganizationIdentityLinkProvider",
-      error,
-      fallbackMessage: "Could not disable identity-linking provider configuration.",
-    });
-  }
-}

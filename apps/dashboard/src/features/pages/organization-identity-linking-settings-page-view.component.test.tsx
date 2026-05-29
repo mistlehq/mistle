@@ -34,8 +34,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
           }),
           createProviderRow({
             rowKey: "linear:icn_linear",
-            providerFamily: "linear",
-            organizationProviderConfigId: null,
+            canOpenLinkedUsers: false,
             displayName: "Linear",
             logoKey: "linear",
             connectionLabel: "Linear Workspace",
@@ -83,8 +82,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
         providers={[
           createProviderRow({
             rowKey: "slack:icn_slack",
-            providerFamily: "slack",
-            organizationProviderConfigId: null,
+            canOpenLinkedUsers: false,
             displayName: "Slack",
             logoKey: "slack",
             connectionLabel: "Slack Workspace",
@@ -116,7 +114,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
         onConfirmGitCommitSigningImpactConfirmation={async () => {}}
         providers={[
           createProviderRow({
-            organizationProviderConfigId: null,
+            canOpenLinkedUsers: false,
             enabled: false,
             unavailableMessage:
               "This connection is no longer active. Reconnect it before enabling identity linking.",
@@ -214,16 +212,14 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
         providers={[
           createProviderRow({
             rowKey: "slack:icn_slack_engineering",
-            providerFamily: "slack",
-            organizationProviderConfigId: "ilp_slack_engineering",
+            canOpenLinkedUsers: true,
             displayName: "Slack",
             logoKey: "slack",
             connectionLabel: "Mistle Engineering · Slack app",
           }),
           createProviderRow({
             rowKey: "slack:icn_slack_support",
-            providerFamily: "slack",
-            organizationProviderConfigId: "ilp_slack_support",
+            canOpenLinkedUsers: true,
             displayName: "Slack",
             logoKey: "slack",
             connectionLabel: "Mistle Support · Slack app",
@@ -303,7 +299,6 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
         onConfirmGitCommitSigningImpactConfirmation={async () => {}}
         providers={[
           createProviderRow({
-            providerFamily: "slack",
             displayName: "Slack",
             logoKey: "slack",
             connectionLabel: "Slack Workspace",
@@ -329,8 +324,7 @@ function createProviderRow(
 ): OrganizationIdentityLinkingProviderRow {
   return {
     rowKey: "github:icn_github_engineering",
-    providerFamily: "github",
-    organizationProviderConfigId: "ilp_github",
+    canOpenLinkedUsers: true,
     displayName: "GitHub",
     logoKey: "github",
     connectionLabel: "Engineering GitHub",

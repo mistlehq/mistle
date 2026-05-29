@@ -24,8 +24,7 @@ import {
 
 export type OrganizationIdentityLinkingProviderRow = {
   rowKey: string;
-  providerFamily: string;
-  organizationProviderConfigId: string | null;
+  canOpenLinkedUsers: boolean;
   displayName: string;
   logoKey: string;
   connectionLabel: string;
@@ -147,7 +146,7 @@ function IdentityLinkingProviderRowView(input: {
   onOpenLinkedUsers: () => void;
 }): React.JSX.Element {
   const provider = input.provider;
-  const canOpenLinkedUsers = provider.organizationProviderConfigId !== null;
+  const canOpenLinkedUsers = provider.canOpenLinkedUsers;
 
   return (
     <ResponsiveFieldListRow
@@ -333,7 +332,7 @@ function LinkedUsersDialog(input: {
 
         {provider === null ? null : provider.memberLinksErrorMessage !== null ? (
           <Notice variant="alert">{provider.memberLinksErrorMessage}</Notice>
-        ) : provider.organizationProviderConfigId === null ? (
+        ) : !provider.canOpenLinkedUsers ? (
           <Notice>No linked users.</Notice>
         ) : provider.linkedUsersCount === null ? null : provider.memberLinks.length === 0 ? (
           <Notice>No linked users.</Notice>

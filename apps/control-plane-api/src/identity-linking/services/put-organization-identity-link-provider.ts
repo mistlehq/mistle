@@ -3,9 +3,12 @@ import {
   type ControlPlaneDatabase,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
+import { BadRequestError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { sql } from "drizzle-orm";
 
+import { IdentityLinkingBadRequestCodes } from "../constants.js";
+import { GitHubProviderFamily } from "../github-signing.js";
 import { listOrganizationIdentityLinkProviders } from "./list-organization-identity-link-providers.js";
 import {
   resolveExactOneOrganizationIdentityLinkProviderConfigForFamilyOrThrow,
@@ -109,6 +112,12 @@ export async function createOrganizationIdentityLinkProviderConfig(
         provider,
       },
     );
+    await assertGitHubIdentityLinkingConnectionIsNotConfigured(tx, {
+      organizationId: input.organizationId,
+      providerFamily: provider.providerFamily,
+      integrationConnectionId: input.integrationConnectionId,
+      organizationProviderConfigId: null,
+    });
 
     const [config] = await tx
       .insert(tables.organizationIdentityLinkProviderConfigs)
@@ -190,6 +199,12 @@ export async function updateOrganizationIdentityLinkProviderConfigConnection(
         provider,
       },
     );
+    await assertGitHubIdentityLinkingConnectionIsNotConfigured(tx, {
+      organizationId: input.organizationId,
+      providerFamily: provider.providerFamily,
+      integrationConnectionId: input.integrationConnectionId,
+      organizationProviderConfigId: existingConfig.id,
+    });
 
     const [config] = await tx
       .update(tables.organizationIdentityLinkProviderConfigs)
@@ -233,4 +248,39 @@ export async function updateOrganizationIdentityLinkProviderConfigConnection(
 
     return config;
   });
+}
+
+async function assertGitHubIdentityLinkingConnectionIsNotConfigured(
+  db: ControlPlaneDatabase,
+  input: {
+    organizationId: string;
+    providerFamily: string;
+    integrationConnectionId: string;
+    organizationProviderConfigId: string | null;
+  },
+): Promise<void> {
+  if (input.providerFamily !== GitHubProviderFamily) {
+    return;
+  }
+
+  const existingConfig = await db.query.organizationIdentityLinkProviderConfigs.findFirst({
+    columns: {
+      id: true,
+    },
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.organizationId, input.organizationId),
+        eq(table.providerFamily, input.providerFamily),
+        eq(table.integrationConnectionId, input.integrationConnectionId),
+      ),
+  });
+
+  if (existingConfig === undefined || existingConfig.id === input.organizationProviderConfigId) {
+    return;
+  }
+
+  throw new BadRequestError(
+    IdentityLinkingBadRequestCodes.INVALID_PROVIDER_CONFIG_INPUT,
+    `GitHub identity-linking connection '${input.integrationConnectionId}' is already configured.`,
+  );
 }

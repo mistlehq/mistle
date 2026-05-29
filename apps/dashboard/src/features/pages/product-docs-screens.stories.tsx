@@ -80,8 +80,7 @@ import type { SessionPortAccessState } from "./use-session-port-access.js";
 const IdentityLinkingProviders: OrganizationIdentityLinkingProviderRow[] = [
   {
     rowKey: "ilp_github",
-    organizationProviderConfigId: "ilp_github",
-    providerFamily: "github",
+    canOpenLinkedUsers: true,
     displayName: "GitHub",
     logoKey: "github",
     connectionLabel: "GitHub Engineering",
@@ -111,8 +110,7 @@ const IdentityLinkingProviders: OrganizationIdentityLinkingProviderRow[] = [
   },
   {
     rowKey: "ilp_slack",
-    organizationProviderConfigId: "ilp_slack",
-    providerFamily: "slack",
+    canOpenLinkedUsers: true,
     displayName: "Slack",
     logoKey: "slack",
     connectionLabel: "Slack Workspace",

@@ -39,9 +39,12 @@ import {
 type IdentityLinkingConnectionRow = {
   rowKey: string;
   provider: OrganizationIdentityLinkProvider;
-  connection: IdentityLinkEligibleConnection;
+  connection: IdentityLinkEligibleConnection | null;
   config: OrganizationIdentityLinkProviderConfig | null;
   available: boolean;
+};
+type ConfiguredIdentityLinkingConnectionRow = IdentityLinkingConnectionRow & {
+  config: OrganizationIdentityLinkProviderConfig;
 };
 
 type PendingGitCommitSigningImpactConfirmation = {
@@ -151,17 +154,17 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
 
   const providers = providersQuery.data ?? [];
   const connectionRows = useMemo(() => buildIdentityLinkingConnectionRows(providers), [providers]);
-  const configuredRows = connectionRows.filter((row) => row.config !== null);
+  const configuredRows = connectionRows.filter(isConfiguredIdentityLinkingConnectionRow);
   const providerLinksQueries = useQueries({
     queries: configuredRows.map((row) => ({
-      enabled: canManage && !providersQuery.isPending && row.config !== null,
+      enabled: canManage && !providersQuery.isPending,
       queryKey: organizationIdentityLinkProviderLinksQueryKey({
         activeOrganizationId,
-        organizationProviderConfigId: row.config?.organizationProviderConfigId ?? row.rowKey,
+        organizationProviderConfigId: row.config.organizationProviderConfigId,
       }),
       queryFn: async ({ signal }: { signal: AbortSignal }) =>
         listOrganizationIdentityLinkProviderLinks({
-          organizationProviderConfigId: row.config?.organizationProviderConfigId ?? row.rowKey,
+          organizationProviderConfigId: row.config.organizationProviderConfigId,
           signal,
         }),
     })),
@@ -176,7 +179,7 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
     }
   >(
     configuredRows.map((row, index) => [
-      row.config?.organizationProviderConfigId ?? row.rowKey,
+      row.config.organizationProviderConfigId,
       {
         data: providerLinksQueries[index]?.data,
         isPending: providerLinksQueries[index]?.isPending ?? false,
@@ -233,17 +236,23 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
       return;
     }
 
-    if (row.config === null && !row.available) {
-      throw new Error("Unavailable identity-linking connections cannot be enabled.");
-    }
-
     const status = input.enabled ? "active" : "disabled";
 
     if (row.config === null) {
+      const connection = row.connection;
+      if (connection === null) {
+        throw new Error(
+          "Identity-linking providers without eligible connections cannot be enabled.",
+        );
+      }
+      if (!row.available) {
+        throw new Error("Unavailable identity-linking connections cannot be enabled.");
+      }
+
       await createConfigMutation.mutateAsync({
         rowKey: row.rowKey,
         providerFamily: row.provider.providerFamily,
-        integrationConnectionId: row.connection.id,
+        integrationConnectionId: connection.id,
         status,
       });
       return;
@@ -287,16 +296,6 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
           });
 
           if (row.config === null && !enabled) {
-            return;
-          }
-
-          if (
-            shouldSkipGitCommitSigningImpactPreviewForIdentityLinkingChange({
-              enabled,
-              row,
-            })
-          ) {
-            await applyEnabledChange({ rowKey, enabled });
             return;
           }
 
@@ -415,7 +414,20 @@ function buildProviderConnectionRows(
     ];
   });
 
-  return [...eligibleRows, ...unavailableRows];
+  const rows = [...eligibleRows, ...unavailableRows];
+  if (rows.length > 0) {
+    return rows;
+  }
+
+  return [
+    {
+      rowKey: buildProviderWithoutConnectionRowKey(provider.providerFamily),
+      provider,
+      connection: null,
+      config: null,
+      available: false,
+    },
+  ];
 }
 
 function buildConnectionRowKey(input: {
@@ -423,6 +435,16 @@ function buildConnectionRowKey(input: {
   integrationConnectionId: string;
 }): string {
   return `${input.providerFamily}:${input.integrationConnectionId}`;
+}
+
+function buildProviderWithoutConnectionRowKey(providerFamily: string): string {
+  return `${providerFamily}:no-eligible-connection`;
+}
+
+function isConfiguredIdentityLinkingConnectionRow(
+  row: IdentityLinkingConnectionRow,
+): row is ConfiguredIdentityLinkingConnectionRow {
+  return row.config !== null;
 }
 
 function resolveLoadErrorMessage(input: {
@@ -456,11 +478,10 @@ export function buildProviderRow(input: {
 }): OrganizationIdentityLinkingProviderRow {
   return {
     rowKey: input.row.rowKey,
-    providerFamily: input.row.provider.providerFamily,
-    organizationProviderConfigId: input.row.config?.organizationProviderConfigId ?? null,
+    canOpenLinkedUsers: input.row.config !== null,
     displayName: input.row.provider.displayName,
     logoKey: input.row.provider.logoKey,
-    connectionLabel: input.row.connection.displayName,
+    connectionLabel: input.row.connection?.displayName ?? "No eligible active connections",
     enablePending:
       input.configuringRowKey === input.row.rowKey ||
       input.statusUpdatingRowKey === input.row.rowKey,
@@ -495,6 +516,10 @@ function resolveUnavailableConnectionMessage(row: IdentityLinkingConnectionRow):
     return null;
   }
 
+  if (row.connection === null) {
+    return "Add an active connection before enabling identity linking.";
+  }
+
   if (row.config?.configurationStatus === "active") {
     return "This connection is no longer active. Disable identity linking or reconnect it.";
   }
@@ -509,6 +534,10 @@ async function loadGitCommitSigningImpactConfirmation(input: {
   row: IdentityLinkingConnectionRow;
 }): Promise<Omit<PendingGitCommitSigningImpactConfirmation, "rowKey" | "enabled"> | null> {
   if (input.row.provider.providerFamily !== "github") {
+    return null;
+  }
+
+  if (input.row.connection === null) {
     return null;
   }
 
@@ -541,13 +570,6 @@ async function loadGitCommitSigningImpactConfirmation(input: {
     updatedProfileCount: impact.updatedProfileCount,
     invariantViolationCount: impact.invariantViolationCount,
   };
-}
-
-export function shouldSkipGitCommitSigningImpactPreviewForIdentityLinkingChange(input: {
-  enabled: boolean;
-  row: Pick<IdentityLinkingConnectionRow, "available">;
-}): boolean {
-  return !input.enabled && !input.row.available;
 }
 
 function findIdentityLinkingConnectionRowOrThrow(input: {

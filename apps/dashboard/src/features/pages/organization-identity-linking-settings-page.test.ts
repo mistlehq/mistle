@@ -7,7 +7,6 @@ import type {
 import {
   buildIdentityLinkingConnectionRows,
   buildProviderRow,
-  shouldSkipGitCommitSigningImpactPreviewForIdentityLinkingChange,
 } from "./organization-identity-linking-settings-page.js";
 
 describe("buildIdentityLinkingConnectionRows", () => {
@@ -74,6 +73,19 @@ describe("buildIdentityLinkingConnectionRows", () => {
       "github:icn_github_engineering",
     ]);
     expect(rows.map((row) => row.available)).toEqual([true, false]);
+  });
+
+  it("keeps a provider row visible when no eligible connections exist", () => {
+    const rows = buildIdentityLinkingConnectionRows([
+      createProvider({
+        eligibleConnections: [],
+        configs: [],
+      }),
+    ]);
+
+    expect(rows.map((row) => row.rowKey)).toEqual(["github:no-eligible-connection"]);
+    expect(rows.map((row) => row.config)).toEqual([null]);
+    expect(rows.map((row) => row.available)).toEqual([false]);
   });
 
   it("fails when multiple configs reference the same connection", () => {
@@ -153,7 +165,7 @@ describe("buildProviderRow", () => {
     });
 
     expect(providerRow.rowKey).toBe("github:icn_github_engineering");
-    expect(providerRow.organizationProviderConfigId).toBe("ilp_github_engineering");
+    expect(providerRow.canOpenLinkedUsers).toBe(true);
     expect(providerRow.connectionLabel).toBe("GitHub Engineering");
     expect(providerRow.enabled).toBe(false);
     expect(providerRow.linkedUsersCount).toBe(1);
@@ -193,28 +205,30 @@ describe("buildProviderRow", () => {
       "This connection is no longer active. Disable identity linking or reconnect it.",
     );
   });
-});
 
-describe("shouldSkipGitCommitSigningImpactPreviewForIdentityLinkingChange", () => {
-  it("skips the preview only when disabling an unavailable row", () => {
-    expect(
-      shouldSkipGitCommitSigningImpactPreviewForIdentityLinkingChange({
-        enabled: false,
-        row: { available: false },
+  it("marks providers without eligible connections as disabled rows", () => {
+    const [row] = buildIdentityLinkingConnectionRows([
+      createProvider({
+        eligibleConnections: [],
+        configs: [],
       }),
-    ).toBe(true);
-    expect(
-      shouldSkipGitCommitSigningImpactPreviewForIdentityLinkingChange({
-        enabled: true,
-        row: { available: false },
-      }),
-    ).toBe(false);
-    expect(
-      shouldSkipGitCommitSigningImpactPreviewForIdentityLinkingChange({
-        enabled: false,
-        row: { available: true },
-      }),
-    ).toBe(false);
+    ]);
+    if (row === undefined) {
+      throw new Error("Expected provider row.");
+    }
+
+    const providerRow = buildProviderRow({
+      configuringRowKey: null,
+      statusUpdatingRowKey: null,
+      row,
+      providerLinksQuery: null,
+    });
+
+    expect(providerRow.connectionLabel).toBe("No eligible active connections");
+    expect(providerRow.enabled).toBe(false);
+    expect(providerRow.unavailableMessage).toBe(
+      "Add an active connection before enabling identity linking.",
+    );
   });
 });
 

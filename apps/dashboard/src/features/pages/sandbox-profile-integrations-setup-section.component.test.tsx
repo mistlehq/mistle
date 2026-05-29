@@ -6,6 +6,7 @@ import { type ComponentProps, useState } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
+import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
 import {
   StoryAnthropicConnection,
   StoryAnthropicTarget,
@@ -681,6 +682,39 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     const listbox = screen.getByRole("listbox");
     expect(within(listbox).getByText("None")).toBeDefined();
     expect(within(listbox).getByText("GitHub - GitHub Production")).toBeDefined();
+  });
+
+  it("does not update commit signing when adding a Git row is rejected", async () => {
+    const addedRows: Array<SandboxIntegrationBindingKind> = [];
+    const gitCommitSigningConnectionChanges: Array<string | null> = [];
+
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          gitCommitSigningIntegrationConnectionId: StoryGithubConnection.id,
+          identityLinkedGitConnectionIds: [StoryGithubConnection.id],
+          onAddIntegrationBindingRow: async (row) => {
+            addedRows.push(row.kind);
+            return false;
+          },
+          onGitCommitSigningIntegrationConnectionChange: (connectionId) => {
+            gitCommitSigningConnectionChanges.push(connectionId);
+          },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("combobox", { name: "git connection" }));
+    const githubOption = screen.getByRole("option", { name: "GitHub - GitHub Production" });
+    fireEvent.mouseMove(githubOption);
+    fireEvent.mouseDown(githubOption, { button: 0 });
+    fireEvent.mouseUp(githubOption, { button: 0 });
+    fireEvent.click(githubOption, { button: 0 });
+
+    await waitFor(() => {
+      expect(addedRows).toEqual(["git"]);
+    });
+    expect(gitCommitSigningConnectionChanges).toEqual([]);
   });
 
   it("shows stale git connection rows when the target is missing", () => {

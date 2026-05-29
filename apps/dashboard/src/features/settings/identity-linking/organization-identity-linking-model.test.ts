@@ -5,11 +5,7 @@ import {
   formatIdentityLinkEligibleConnectionLabel,
   formatIdentityLinkProviderMemberStatus,
   formatIdentityLinkProviderPrincipalSummary,
-  formatIdentityLinkProviderConfigurationStatus,
   listEligibleIdentityLinkConnections,
-  resolveIdentityLinkConfigureActionLabel,
-  resolveReturnedIdentityLinkConnectionSelection,
-  resolveIdentityLinkStatusActionLabel,
 } from "./organization-identity-linking-model.js";
 
 describe("organization identity linking model", () => {
@@ -77,102 +73,6 @@ describe("organization identity linking model", () => {
     expect(formatIdentityLinkEligibleConnectionLabel(connections[0]!)).toBe(
       "Archive GitHub · GitHub App installation",
     );
-  });
-
-  it("formats provider state and primary actions", () => {
-    expect(
-      formatIdentityLinkProviderConfigurationStatus({
-        configurationStatus: "active",
-      }),
-    ).toBe("Enabled");
-    expect(
-      formatIdentityLinkProviderConfigurationStatus({
-        configurationStatus: "disabled",
-      }),
-    ).toBe("Disabled");
-    expect(
-      formatIdentityLinkProviderConfigurationStatus({
-        configurationStatus: "unconfigured",
-      }),
-    ).toBe("Not enabled");
-
-    expect(resolveIdentityLinkConfigureActionLabel()).toBe("Save");
-
-    expect(
-      resolveIdentityLinkStatusActionLabel({
-        configurationStatus: "active",
-      }),
-    ).toBe("Disable");
-    expect(
-      resolveIdentityLinkStatusActionLabel({
-        configurationStatus: "disabled",
-      }),
-    ).toBe("Enable");
-    expect(
-      resolveIdentityLinkStatusActionLabel({
-        configurationStatus: "unconfigured",
-      }),
-    ).toBe("Enable");
-  });
-
-  it("resolves which provider should preselect a newly created connection", () => {
-    expect(
-      resolveReturnedIdentityLinkConnectionSelection({
-        connectionId: "icn_1",
-        providers: [
-          {
-            providerFamily: "github",
-            organizationProviderConfigId: "ilp_github",
-            integrationConnectionId: "icn_1",
-            displayName: "GitHub",
-            logoKey: "github",
-            eligibleTargetKeys: ["github-cloud"],
-            eligibleConnectionMethodIds: ["github-app-installation"],
-            eligibleConnections: [
-              {
-                id: "icn_1",
-                targetKey: "github-cloud",
-                displayName: "Engineering GitHub",
-                status: "active",
-                connectionMethodId: "github-app-installation",
-                connectionMethodLabel: "GitHub App installation",
-                createdAt: "2026-04-18T00:00:00.000Z",
-                updatedAt: "2026-04-18T00:00:00.000Z",
-              },
-            ],
-            configurationStatus: "active",
-            selectedConnection: null,
-            configuredAt: null,
-            updatedAt: null,
-          },
-        ],
-      }),
-    ).toEqual({
-      providerFamily: "github",
-      integrationConnectionId: "icn_1",
-    });
-
-    expect(
-      resolveReturnedIdentityLinkConnectionSelection({
-        connectionId: "icn_2",
-        providers: [
-          {
-            providerFamily: "github",
-            organizationProviderConfigId: null,
-            integrationConnectionId: null,
-            displayName: "GitHub",
-            logoKey: "github",
-            eligibleTargetKeys: ["github-cloud"],
-            eligibleConnectionMethodIds: ["github-app-installation"],
-            eligibleConnections: [],
-            configurationStatus: "unconfigured",
-            selectedConnection: null,
-            configuredAt: null,
-            updatedAt: null,
-          },
-        ],
-      }),
-    ).toBeNull();
   });
 
   it("formats provider member visibility rows", () => {
