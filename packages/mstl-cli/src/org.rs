@@ -1,12 +1,13 @@
 use std::io::{self, Write};
 
+use mstl_core::auth::API_KEY_ENV_VAR;
 use mstl_core::client::{
     CurrentUserOrganization, CurrentUserOrganizationsResponse, MistleClient,
     MistleClientAuthorizationHeaderConfig, SwitchOrganizationRequest,
 };
 
 use crate::auth_file::{self, OAuthAuth};
-use crate::config::mistle_client;
+use crate::config::{mistle_client, optional_env_var};
 use crate::error::CliError;
 use crate::format::format_bool;
 use crate::login::{current_unix_seconds, oauth_token_response_to_auth, refresh_oauth_auth};
@@ -63,6 +64,7 @@ fn list_organizations() -> Result<CurrentUserOrganizationsResponse, CliError> {
 }
 
 fn switch_organization(selector: &str) -> Result<SwitchOrganizationResult, CliError> {
+    reject_api_key_env_auth()?;
     let base_url = crate::config::control_plane_api_public_url()?;
     let oauth = fresh_oauth_auth(&base_url, read_oauth_auth()?)?;
     let client = oauth_client(&base_url, &oauth.access_token)?;
@@ -157,6 +159,13 @@ fn render_switched_organization(result: &SwitchOrganizationResult) -> String {
         "Switched organization\nName: {}\nSlug: {}\nID: {}\n",
         result.organization.name, result.organization.slug, result.organization.id,
     )
+}
+
+fn reject_api_key_env_auth() -> Result<(), CliError> {
+    match optional_env_var(API_KEY_ENV_VAR)? {
+        Some(_) => Err(CliError::OAuthLoginRequired),
+        None => Ok(()),
+    }
 }
 
 fn read_oauth_auth() -> Result<OAuthAuth, CliError> {

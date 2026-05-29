@@ -52,7 +52,7 @@ fn resolve_authorization_header(base_url: &str) -> Result<String, CliError> {
     }
 }
 
-fn optional_env_var(name: &'static str) -> Result<Option<String>, CliError> {
+pub(crate) fn optional_env_var(name: &'static str) -> Result<Option<String>, CliError> {
     match env::var(name) {
         Ok(value) if value.trim().is_empty() => Err(CliError::BlankEnvironmentVariable { name }),
         Ok(value) => Ok(Some(value)),
