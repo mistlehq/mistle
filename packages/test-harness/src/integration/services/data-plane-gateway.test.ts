@@ -8,6 +8,7 @@ describe("createGatewayWsUrl", () => {
   it("uses the Docker host gateway for sandbox-reachable gateway transport URLs", () => {
     expect(
       createGatewayWsUrl({
+        environmentId: "test_env_gateway_url",
         sandbox: {
           provider: "docker",
         },
@@ -19,6 +20,7 @@ describe("createGatewayWsUrl", () => {
   it("uses the public gateway URL when the sandbox provider requires public access", () => {
     expect(
       createGatewayWsUrl({
+        environmentId: "test_env_gateway_url",
         sandbox: {
           provider: "e2b",
           publicServiceBaseUrls: new Map([
@@ -27,12 +29,15 @@ describe("createGatewayWsUrl", () => {
         },
         peer: createPeerResolver("ws://127.0.0.1:52123"),
       }),
-    ).toBe("wss://data-plane-gateway-dev.example.com/tunnel/sandbox");
+    ).toBe(
+      "wss://data-plane-gateway-dev.example.com/tunnel/sandbox?x-mistle-test-environment-id=test_env_gateway_url",
+    );
   });
 
   it("uses the harness-local gateway URL when no sandbox runtime is configured", () => {
     expect(
       createGatewayWsUrl({
+        environmentId: "test_env_gateway_url",
         sandbox: undefined,
         peer: createPeerResolver("ws://127.0.0.1:52123"),
       }),

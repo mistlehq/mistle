@@ -4,6 +4,7 @@ import type { PeerResolver } from "./peers.js";
 import { ServiceIds } from "./service-ids.js";
 
 export function createGatewayWsUrl(input: {
+  environmentId: string;
   sandbox: IntegrationSandboxOptions | undefined;
   peer: Pick<PeerResolver, "ws">;
 }): string {
@@ -21,5 +22,6 @@ export function createGatewayWsUrl(input: {
 
   const url = new URL("/tunnel/sandbox", publicGatewayBaseUrl);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.searchParams.set("x-mistle-test-environment-id", input.environmentId);
   return url.toString();
 }

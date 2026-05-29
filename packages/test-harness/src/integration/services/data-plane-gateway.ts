@@ -113,6 +113,7 @@ function start(input: {
       dataPlaneApiBaseUrl: peer.url(ServiceIds.DATA_PLANE_API),
       controlPlaneBaseUrl: peer.url(ServiceIds.CONTROL_PLANE_API),
       gatewayWsUrl: createGatewayWsUrl({
+        environmentId: startInput.environmentId,
         sandbox: input.sandbox,
         peer,
       }),
