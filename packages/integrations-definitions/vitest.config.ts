@@ -41,6 +41,10 @@ export default defineConfig({
         find: /^@mistle\/time$/,
         replacement: fileURLToPath(new URL("../time/src/index.ts", import.meta.url)),
       },
+      {
+        find: /^@mistle\/time\/testing$/,
+        replacement: fileURLToPath(new URL("../time/src/testing/index.ts", import.meta.url)),
+      },
     ],
   },
   test: {
