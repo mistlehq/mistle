@@ -1,0 +1,250 @@
+name: CI - System (Scheduled)
+
+on:
+  schedule:
+    - cron: "0 0,6,15 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scheduled-system-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  system-runtime:
+    name: Scheduled Runtime System
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 120
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    env:
+      CI: true
+      TURBO_TELEMETRY_DISABLED: "1"
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Create Nix directories
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chmod -R 777 /nix
+
+      - name: Mount Nix sticky disk
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
+        with:
+          key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
+          path: /nix
+
+      - name: Prepare single-user Nix store
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chown "$USER:$USER" /nix /nix/store
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+        with:
+          install_options: --no-daemon
+
+      - name: Set up Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
+        with:
+          use-gha-cache: enabled
+          use-flakehub: disabled
+          diagnostic-endpoint: ""
+          source-url: https://github.com/DeterminateSystems/magic-nix-cache/releases/download/v0.1.6/magic-nix-cache-X64-Linux
+
+      - name: Restore pnpm store cache
+        id: pnpm-store-cache
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Restore Turbo local cache
+        id: turbo-cache
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: .turbo/cache
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-system-runtime-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ github.workflow }}-system-runtime-
+            ${{ runner.os }}-turbo-${{ github.workflow }}-
+            ${{ runner.os }}-turbo-
+
+      - name: Materialize Nix shell
+        run: nix develop --command true
+
+      - name: Install pnpm dependencies
+        run: nix develop --command pnpm install --frozen-lockfile
+
+      - name: Save pnpm store cache
+        if: steps.pnpm-store-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Fetch Infisical secrets
+        uses: Infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995 # v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ vars.INFISICAL_INTEGRATION_TESTS_IDENTITY_ID }}
+          project-slug: mistle-oss
+          env-slug: ci
+          secret-path: /integration-tests
+
+      - name: Generate integration config
+        run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker,e2b,tensorlake pnpm run config:init:integration"
+
+      - name: Build runtime system test dependencies
+        run: >-
+          nix develop --command pnpm turbo run build --output-logs=errors-only
+          --filter=@mistle/tests^...
+          --filter=@mistle/control-plane-api...
+          --filter=@mistle/control-plane-worker...
+          --filter=@mistle/data-plane-api...
+          --filter=@mistle/data-plane-gateway...
+          --filter=@mistle/data-plane-worker...
+
+      - name: Login to GitHub Container Registry
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+
+      - name: Resolve runtime system sandbox base image
+        id: resolve-sandbox-base-image
+        run: |
+          image_ref="$(nix develop --command env NODE_OPTIONS='--conditions workspace-src' pnpm exec tsx ./scripts/test/ensure-system-test-sandbox-base-image.ts)"
+          image_cache_key="$(printf '%s' "${image_ref}" | sha256sum | cut -d ' ' -f 1)"
+          echo "MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REF=${image_ref}" >> "${GITHUB_ENV}"
+          echo "MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_CACHE_KEY=${image_cache_key}" >> "${GITHUB_ENV}"
+          echo "image-cache-key=${image_cache_key}" >> "${GITHUB_OUTPUT}"
+          echo "Resolved runtime system sandbox base image: ${image_ref}"
+
+      - name: Register Tensorlake runtime system sandbox base image
+        run: |
+          tensorlake_image_name="mistle-${MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_CACHE_KEY:0:24}"
+          nix develop --command pnpm dev:sandbox-base:push:tensorlake \
+            --source-image-ref "${MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REF}" \
+            --output-image-ref "${tensorlake_image_name}"
+          echo "MISTLE_SYSTEM_TEST_TENSORLAKE_SANDBOX_BASE_IMAGE_REF=tensorlake:image:${tensorlake_image_name}" >> "${GITHUB_ENV}"
+          echo "Registered Tensorlake runtime system sandbox base image: tensorlake:image:${tensorlake_image_name}"
+
+      - name: Mount runtime system sandbox registry sticky disk
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
+        with:
+          key: ${{ github.repository }}-runtime-system-sandbox-registry-${{ steps.resolve-sandbox-base-image.outputs.image-cache-key }}
+          path: /home/runner/.cache/mistle/runtime-system-sandbox-registry
+
+      - name: Run runtime system tests
+        env:
+          MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REGISTRY_STORAGE_DIR: /home/runner/.cache/mistle/runtime-system-sandbox-registry
+          MISTLE_SYSTEM_RUNTIME_TIMING_ARTIFACT_DIR: ${{ github.workspace }}/test-artifacts/system-runtime-timings
+        run: nix develop --command pnpm --filter @mistle/tests test:system:runtime
+
+      - name: Upload runtime system timing artifacts
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: runtime-system-timings
+          path: test-artifacts/system-runtime-timings
+          if-no-files-found: ignore
+
+      - name: Save Turbo local cache
+        if: ${{ always() && !cancelled() && steps.turbo-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: .turbo/cache
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-system-runtime-${{ github.sha }}
+
+  notify:
+    name: Notify Slack
+    runs-on: ubuntu-latest
+    needs:
+      - system-runtime
+    if: always() && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      SYSTEM_RUNTIME_RESULT: ${{ needs.system-runtime.result }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      WORKFLOW_NAME: ${{ github.workflow }}
+
+    steps:
+      - name: Fetch Infisical secrets
+        uses: Infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995 # v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ vars.INFISICAL_CI_SHARED_IDENTITY_ID }}
+          project-slug: mistle-oss
+          env-slug: ci
+          secret-path: /ci-shared
+
+      - name: Post Slack notification
+        run: |
+          python3 <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          result = os.environ["SYSTEM_RUNTIME_RESULT"]
+          color_by_result = {
+              "success": "#2eb886",
+              "failure": "#e01e5a",
+              "cancelled": "#ecb22e",
+              "skipped": "#808080",
+          }
+          emoji_by_result = {
+              "success": ":white_check_mark:",
+              "failure": ":x:",
+              "cancelled": ":warning:",
+              "skipped": ":white_circle:",
+          }
+          color = color_by_result.get(result, "#808080")
+          emoji = emoji_by_result.get(result, ":grey_question:")
+          payload = {
+              "attachments": [
+                  {
+                      "color": color,
+                      "title": os.environ["WORKFLOW_NAME"],
+                      "title_link": os.environ["RUN_URL"],
+                      "text": f"{emoji} Scheduled runtime system run finished with result: {result}.",
+                      "fields": [
+                          {
+                              "title": "Repository",
+                              "value": os.environ["GITHUB_REPOSITORY"],
+                              "short": True,
+                          },
+                          {
+                              "title": "Branch",
+                              "value": os.environ["GITHUB_REF_NAME"],
+                              "short": True,
+                          },
+                      ],
+                  }
+              ]
+          }
+          request = urllib.request.Request(
+              os.environ["SLACK_WEBHOOK_URL"],
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(request) as response:
+              if response.status != 200:
+                  raise RuntimeError(f"Slack webhook returned unexpected status {response.status}.")
+          PY
