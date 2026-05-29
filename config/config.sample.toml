@@ -51,7 +51,7 @@ allow_signups = true
 # [services.control_plane_api.auth.welcome_email]
 # enabled = false
 # Optional. When omitted, the welcome email does not include a booking link.
-# call_url = "https://cal.example.com/jonathan/mistle"
+# call_url = "https://mistle-booking-link.com"
 
 [services.control_plane_api.auth.otp]
 length = 6
