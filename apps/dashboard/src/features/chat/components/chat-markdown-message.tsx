@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import type { ComponentProps, JSX } from "react";
 import { defaultRemarkPlugins, Streamdown } from "streamdown";
 
 import { ChatExternalLinkDialog } from "./chat-external-link-dialog.js";
@@ -78,7 +78,9 @@ export function ChatMarkdownMessage(props: ChatMarkdownMessageProps): JSX.Elemen
         isAnimating={props.isStreaming}
         linkSafety={{
           enabled: true,
-          renderModal: (modalProps) => <ChatExternalLinkDialog {...modalProps} />,
+          renderModal: (modalProps: ComponentProps<typeof ChatExternalLinkDialog>) => (
+            <ChatExternalLinkDialog {...modalProps} />
+          ),
         }}
         mode={props.isStreaming ? "streaming" : "static"}
         plugins={StreamdownPlugins}

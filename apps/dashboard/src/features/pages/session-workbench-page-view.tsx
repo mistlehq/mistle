@@ -174,7 +174,7 @@ export function SessionWorkbenchPageView({
     <ResizablePanelGroup
       className="min-h-0 h-full"
       defaultLayout={bottomPanelLayoutPersistence.defaultLayout}
-      onLayoutChanged={(layout) => {
+      onLayoutChanged={(layout: { [id: string]: number }) => {
         if (!isBottomPanelVisible) {
           return;
         }

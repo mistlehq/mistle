@@ -133,7 +133,7 @@ function resolveMultiSelectStringComboboxOptions(
   }
 
   if (Array.isArray(itemsSchema.oneOf)) {
-    return itemsSchema.oneOf.flatMap((option) => {
+    return itemsSchema.oneOf.flatMap((option: unknown) => {
       if (
         !isRecord(option) ||
         typeof option.const !== "string" ||
@@ -159,7 +159,7 @@ function resolveMultiSelectStringComboboxOptions(
     ? props.uiSchema["ui:enumNames"]
     : [];
 
-  return itemsSchema.enum.flatMap((entry, index) => {
+  return itemsSchema.enum.flatMap((entry: unknown, index: number) => {
     if (typeof entry !== "string") {
       return [];
     }
@@ -178,7 +178,7 @@ function resolveSingleSelectStringComboboxOptions(
   props: WidgetProps<JsonObject, RJSFSchema, SchemaFormContext>,
 ): readonly { label: string; value: string }[] {
   if (Array.isArray(props.schema.oneOf)) {
-    return props.schema.oneOf.flatMap((option) => {
+    return props.schema.oneOf.flatMap((option: unknown) => {
       if (
         !isRecord(option) ||
         typeof option.const !== "string" ||
@@ -204,7 +204,7 @@ function resolveSingleSelectStringComboboxOptions(
     ? props.uiSchema["ui:enumNames"]
     : [];
 
-  return props.schema.enum.flatMap((entry, index) => {
+  return props.schema.enum.flatMap((entry: unknown, index: number) => {
     if (typeof entry !== "string") {
       return [];
     }
@@ -383,7 +383,9 @@ function resolveCheckboxOptionLabel(
   const uiEnumNames = props.uiSchema?.["ui:enumNames"];
   const itemsSchema = isRecord(props.schema.items) ? props.schema.items : null;
   if (Array.isArray(uiEnumNames) && itemsSchema !== null && Array.isArray(itemsSchema.enum)) {
-    const optionIndex = itemsSchema.enum.findIndex((candidate) => candidate === option.value);
+    const optionIndex = itemsSchema.enum.findIndex(
+      (candidate: unknown) => candidate === option.value,
+    );
     const optionLabel = uiEnumNames[optionIndex];
     if (typeof optionLabel === "string") {
       return optionLabel;

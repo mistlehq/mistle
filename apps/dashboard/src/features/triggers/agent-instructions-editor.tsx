@@ -377,7 +377,7 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
           basicSetup={false}
           editable={!input.disabled}
           extensions={extensions}
-          onChange={(nextValue) => {
+          onChange={(nextValue: string) => {
             input.onChange(nextValue);
           }}
           theme="none"

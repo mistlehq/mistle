@@ -31,6 +31,10 @@ import { SchemaFormWithoutSubmit, type SchemaFormContext } from "./schema-form.j
 
 type JsonObject = Record<string, unknown>;
 
+function isJsonObject(input: unknown): input is JsonObject {
+  return typeof input === "object" && input !== null && !Array.isArray(input);
+}
+
 function RjsfExampleForm(input: {
   formContext: SchemaFormContext;
   formData: JsonObject;
@@ -63,13 +67,9 @@ function RjsfExampleForm(input: {
         formContext={input.formContext}
         formData={formData}
         noHtml5Validate
-        onChange={(event) => {
+        onChange={(event: { formData?: unknown }) => {
           const nextValue = event.formData;
-          setFormData(
-            typeof nextValue === "object" && nextValue !== null && !Array.isArray(nextValue)
-              ? nextValue
-              : {},
-          );
+          setFormData(isJsonObject(nextValue) ? nextValue : {});
         }}
         schema={input.schema}
         showErrorList={false}

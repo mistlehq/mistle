@@ -114,7 +114,7 @@ export function SandboxSetupScriptEditor(input: SandboxSetupScriptEditorProps): 
           basicSetup={false}
           editable={!(input.disabled ?? false)}
           extensions={extensions}
-          onChange={(nextValue) => {
+          onChange={(nextValue: string) => {
             input.onChange(nextValue);
           }}
           theme="none"

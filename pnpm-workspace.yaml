@@ -3,6 +3,8 @@ packages:
   - packages/*
   - tests
 
+enableGlobalVirtualStore: true
+
 # 3 days = 4320 minutes.
 minimumReleaseAge: 4320
 minimumReleaseAgeExclude:
@@ -56,6 +58,36 @@ overrides:
   "uuid@11.1.0": "11.1.1"
   yaml: "2.8.3"
   "zod@3.21.4": "3.22.3"
+
+packageExtensions:
+  "@phosphor-icons/react@*":
+    peerDependencies:
+      "@types/react": "*"
+  "@rjsf/core@*":
+    dependencies:
+      "@rjsf/validator-ajv8": "~6.5.1"
+  "@mintlify/link-rot@*":
+    dependencies:
+      react: "^19.0.0"
+  "@mintlify/scraping@*":
+    dependencies:
+      openapi-types: "12.1.3"
+  "@testing-library/jest-dom@*":
+    dependencies:
+      vitest: "^4.1.5"
+  langium@*:
+    dependencies:
+      "@chevrotain/regexp-to-ast": "11.1.2"
+      "@chevrotain/types": "11.1.2"
+      vscode-jsonrpc: "8.2.0"
+      vscode-languageserver-protocol: "3.17.5"
+      vscode-languageserver-types: "3.17.5"
+  input-otp@*:
+    peerDependencies:
+      "@types/react": "*"
+  next-themes@*:
+    peerDependencies:
+      "@types/react": "*"
 
 patchedDependencies:
   "@mintlify/previewing@4.0.1016": "patches/@mintlify__previewing@4.0.1016.patch"
