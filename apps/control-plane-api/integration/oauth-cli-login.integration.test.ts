@@ -215,7 +215,65 @@ describe("OAuth CLI login integration", () => {
     expect(refreshTokenResponse.status).toBe(200);
     const refreshedTokenBody = OAuthTokenResponseSchema.parse(await refreshTokenResponse.json());
     expect(refreshedTokenBody.access_token).toMatch(/^mstl_oat_[A-Za-z0-9_-]+$/u);
-    expect(refreshedTokenBody.refresh_token).toBe(tokenBody.refresh_token);
+    expect(refreshedTokenBody.refresh_token).toMatch(/^mstl_ort_[A-Za-z0-9_-]+$/u);
+    expect(refreshedTokenBody.refresh_token).not.toBe(tokenBody.refresh_token);
+
+    const reusedRefreshTokenResponse = await env.controlPlaneApi.http.fetch("/oauth/token", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: "mistle-cli",
+        resource: env.controlPlaneApi.hostBaseUrl,
+        refresh_token: tokenBody.refresh_token,
+      }),
+    });
+    expect(reusedRefreshTokenResponse.status).toBe(400);
+    expect(await reusedRefreshTokenResponse.json()).toStrictEqual({
+      error: "invalid_grant",
+      error_description: "Refresh token has been revoked.",
+    });
+
+    const concurrentTokenBody = await authorizeAndExchangeCliToken({
+      codeVerifier: "concurrent-refresh-verifier-concurrent-refresh-verifier",
+      env,
+      redirectUri: "http://127.0.0.1:61749/callback",
+      sessionCookie: session.cookie,
+      state: "concurrent-refresh-state",
+    });
+    const concurrentRefreshResponses = await Promise.all([
+      refreshMistleCliToken({
+        env,
+        refreshToken: concurrentTokenBody.refresh_token,
+      }),
+      refreshMistleCliToken({
+        env,
+        refreshToken: concurrentTokenBody.refresh_token,
+      }),
+    ]);
+    expect(
+      concurrentRefreshResponses
+        .map((response) => response.status)
+        .sort((left, right) => left - right),
+    ).toStrictEqual([200, 400]);
+    const concurrentRefreshBodies = await Promise.all(
+      concurrentRefreshResponses.map(async (response) => await response.json()),
+    );
+    expect(concurrentRefreshBodies).toContainEqual({
+      error: "invalid_grant",
+      error_description: "Refresh token has been revoked.",
+    });
+    const successfulConcurrentRefresh = concurrentRefreshBodies.find(
+      (body): body is Record<string, unknown> =>
+        typeof body === "object" && body !== null && "refresh_token" in body,
+    );
+    if (successfulConcurrentRefresh === undefined) {
+      throw new Error("Expected one concurrent refresh to succeed.");
+    }
+    const successfulConcurrentToken = OAuthTokenResponseSchema.parse(successfulConcurrentRefresh);
+    expect(successfulConcurrentToken.refresh_token).not.toBe(concurrentTokenBody.refresh_token);
 
     const mistleCliClient = await env.controlPlaneDb.query.oauthClients.findFirst({
       columns: {
@@ -264,9 +322,10 @@ describe("OAuth CLI login integration", () => {
     const narrowedRefreshToken = await refreshOAuthTokenPair({
       db: env.controlPlaneDb,
       oauthClientId: mistleCliClient.id,
-      refreshToken: tokenBody.refresh_token,
+      refreshToken: refreshedTokenBody.refresh_token,
       resource: env.controlPlaneApi.hostBaseUrl,
     });
+    expect(narrowedRefreshToken.refreshToken).not.toBe(refreshedTokenBody.refresh_token);
     expect(narrowedRefreshToken.scope).toBe(
       [
         OrganizationPermissions.ORGANIZATION_READ,
@@ -308,7 +367,7 @@ describe("OAuth CLI login integration", () => {
         grant_type: "refresh_token",
         client_id: "mistle-cli",
         resource: env.controlPlaneApi.hostBaseUrl,
-        refresh_token: tokenBody.refresh_token,
+        refresh_token: narrowedRefreshToken.refreshToken,
       }),
     });
     expect(mismatchedClientRefreshResponse.status).toBe(400);
@@ -910,6 +969,24 @@ async function authorizeAndExchangeCliToken(input: {
   expect(tokenResponse.status).toBe(200);
 
   return OAuthTokenResponseSchema.parse(await tokenResponse.json());
+}
+
+async function refreshMistleCliToken(input: {
+  env: IntegrationTestEnvironment;
+  refreshToken: string;
+}) {
+  return await input.env.controlPlaneApi.http.fetch("/oauth/token", {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: "mistle-cli",
+      resource: input.env.controlPlaneApi.hostBaseUrl,
+      refresh_token: input.refreshToken,
+    }),
+  });
 }
 
 async function createOrganization(input: {

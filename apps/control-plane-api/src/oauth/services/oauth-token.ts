@@ -3,7 +3,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { getControlPlaneDatabaseSchema, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { BadRequestError, UnauthorizedError } from "@mistle/http/errors.js";
 import { addMilliseconds, systemClock, type Clock } from "@mistle/time";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { parseApiKeyPermissions } from "../../api-keys/services/permissions.js";
 import { requireOrganizationAccess } from "../../auth/services/organization-authorization.js";
@@ -80,51 +80,73 @@ export async function refreshOAuthTokenPair(input: {
   clock?: Clock;
 }): Promise<OAuthTokenPair> {
   const clock = input.clock ?? systemClock;
-  const refreshTokenRow = await requireRefreshToken({
-    db: input.db,
-    token: input.refreshToken,
-    clock,
-  });
-  const grant = await input.db.query.oauthGrants.findFirst({
-    columns: {
-      id: true,
-      oauthClientId: true,
-      userId: true,
-      organizationId: true,
-      resource: true,
-      revokedAt: true,
-    },
-    where: (table, { eq }) => eq(table.id, refreshTokenRow.oauthGrantId),
-  });
+  return await input.db.transaction(async (tx) => {
+    const refreshTokenRow = await requireRefreshToken({
+      db: tx,
+      token: input.refreshToken,
+      clock,
+    });
+    const grant = await tx.query.oauthGrants.findFirst({
+      columns: {
+        id: true,
+        oauthClientId: true,
+        userId: true,
+        organizationId: true,
+        resource: true,
+        revokedAt: true,
+      },
+      where: (table, { eq }) => eq(table.id, refreshTokenRow.oauthGrantId),
+    });
 
-  if (grant === undefined || grant.revokedAt !== null) {
-    throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
-  }
-  if (grant.oauthClientId !== input.oauthClientId) {
-    throw new BadRequestError("invalid_grant", "Refresh token client does not match.");
-  }
-  if (grant.resource === null) {
-    throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
-  }
-  if (grant.resource !== input.resource) {
-    throw new BadRequestError("invalid_grant", "Refresh token resource does not match.");
-  }
+    if (grant === undefined || grant.revokedAt !== null) {
+      throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
+    }
+    if (grant.oauthClientId !== input.oauthClientId) {
+      throw new BadRequestError("invalid_grant", "Refresh token client does not match.");
+    }
+    if (grant.resource === null) {
+      throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
+    }
+    if (grant.resource !== input.resource) {
+      throw new BadRequestError("invalid_grant", "Refresh token resource does not match.");
+    }
 
-  const permissions = await readCurrentlyAuthorizedGrantPermissions({
-    db: input.db,
-    grant,
+    const permissions = await readCurrentlyAuthorizedGrantPermissions({
+      db: tx,
+      grant,
+    });
+    const accessToken = generateToken(AccessTokenPrefix);
+    const refreshToken = generateToken(RefreshTokenPrefix);
+    const expiresAt = addMilliseconds(clock.nowDate(), OAuthAccessTokenTtlMs).toISOString();
+    const tables = getControlPlaneDatabaseSchema(tx);
+    const [revokedRefreshToken] = await tx
+      .update(tables.oauthRefreshTokens)
+      .set({
+        revokedAt: sql`now()`,
+        updatedAt: sql`now()`,
+      })
+      .where(
+        and(
+          eq(tables.oauthRefreshTokens.id, refreshTokenRow.id),
+          isNull(tables.oauthRefreshTokens.revokedAt),
+        ),
+      )
+      .returning({ id: tables.oauthRefreshTokens.id });
+    if (revokedRefreshToken === undefined) {
+      throw new BadRequestError("invalid_grant", "Refresh token has been revoked.");
+    }
+
+    await insertAccessToken({ db: tx, oauthGrantId: grant.id, token: accessToken, expiresAt });
+    await insertRefreshToken({ db: tx, oauthGrantId: grant.id, token: refreshToken });
+
+    return {
+      accessToken,
+      refreshToken,
+      expiresAt,
+      expiresIn: OAuthAccessTokenExpiresInSeconds,
+      scope: permissions.join(" "),
+    };
   });
-  const accessToken = generateToken(AccessTokenPrefix);
-  const expiresAt = addMilliseconds(clock.nowDate(), OAuthAccessTokenTtlMs).toISOString();
-  await insertAccessToken({ db: input.db, oauthGrantId: grant.id, token: accessToken, expiresAt });
-
-  return {
-    accessToken,
-    refreshToken: input.refreshToken,
-    expiresAt,
-    expiresIn: OAuthAccessTokenExpiresInSeconds,
-    scope: permissions.join(" "),
-  };
 }
 
 export async function switchOAuthOrganizationTokenPair(input: {
@@ -313,8 +335,11 @@ async function requireRefreshToken(input: {
     },
     where: (table, { eq }) => eq(table.tokenPrefix, tokenPrefix),
   });
-  if (refreshToken === undefined || refreshToken.revokedAt !== null) {
+  if (refreshToken === undefined) {
     throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
+  }
+  if (refreshToken.revokedAt !== null) {
+    throw new BadRequestError("invalid_grant", "Refresh token has been revoked.");
   }
   if (refreshToken.tokenHashAlgorithm !== TokenHashAlgorithm) {
     throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");

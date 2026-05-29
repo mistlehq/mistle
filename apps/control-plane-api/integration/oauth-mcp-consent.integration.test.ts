@@ -11,12 +11,39 @@ import {
 } from "@mistle/test-harness/integration";
 import { and, eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
+import { z } from "zod";
 
-import { OAuthTokenResponseSchema } from "../src/oauth/schemas.js";
+import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
+import {
+  OAuthClientRegistrationResponseSchema,
+  OAuthTokenResponseSchema,
+} from "../src/oauth/schemas.js";
+import { createOAuthGrantTokenPair } from "../src/oauth/services/oauth-token.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
+
+const JsonRpcToolResponseSchema = z
+  .object({
+    jsonrpc: z.literal("2.0"),
+    id: z.union([z.string(), z.number()]),
+    result: z
+      .object({
+        content: z
+          .array(
+            z.object({
+              type: z.literal("text"),
+              text: z.string(),
+            }),
+          )
+          .optional(),
+        structuredContent: z.unknown().optional(),
+        isError: z.boolean().optional(),
+      })
+      .loose(),
+  })
+  .strict();
 
 describe.concurrent("OAuth MCP consent", () => {
   it("redirects valid unauthenticated MCP authorization requests to dashboard login", async ({
@@ -393,7 +420,219 @@ describe.concurrent("OAuth MCP consent", () => {
     expect(redirectUrl.searchParams.get("error")).toBe("invalid_scope");
     expect(redirectUrl.searchParams.get("state")).toBe("invalid-scope-state");
   });
+
+  it("exchanges an approved dynamic-client authorization code and calls MCP with the bearer token", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: `integration-oauth-mcp-bearer-${randomUUID()}@example.com`,
+    });
+    const tokenBody = await authorizeApproveAndExchangeMcpToken({
+      env,
+      sessionCookie: session.cookie,
+      scope: "sandboxProfile:read",
+      state: "mcp-bearer-state",
+    });
+
+    const result = await callMcpTool({
+      env,
+      token: tokenBody.access_token,
+      name: "profile_list",
+      arguments: {
+        limit: 10,
+      },
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(tokenBody.refresh_token).toMatch(/^mstl_ort_[A-Za-z0-9_-]+$/u);
+  });
+
+  it("rejects OAuth bearer tokens issued for non-MCP resources on the MCP endpoint", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: `integration-oauth-mcp-wrong-resource-${randomUUID()}@example.com`,
+    });
+    const client = await env.controlPlaneDb.query.oauthClients.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (table, { eq }) => eq(table.clientId, "mistle-cli"),
+    });
+    if (client === undefined) {
+      throw new Error("Expected Mistle CLI OAuth client.");
+    }
+    const tokenPair = await createOAuthGrantTokenPair({
+      db: env.controlPlaneDb,
+      oauthClientId: client.id,
+      userId: session.userId,
+      organizationId: session.organizationId,
+      resource: env.controlPlaneApi.hostBaseUrl,
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_READ],
+    });
+
+    const response = await fetchMcpTool({
+      env,
+      token: tokenPair.accessToken,
+      name: "profile_list",
+      arguments: {
+        limit: 10,
+      },
+    });
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("www-authenticate")).toContain('error="invalid_token"');
+  });
+
+  it("returns an invalid-token challenge when an MCP OAuth token loses organization access", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: `integration-oauth-mcp-revoked-member-${randomUUID()}@example.com`,
+    });
+    const client = await env.controlPlaneDb.query.oauthClients.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (table, { eq }) => eq(table.clientId, "mistle-cli"),
+    });
+    if (client === undefined) {
+      throw new Error("Expected Mistle CLI OAuth client.");
+    }
+    const tokenPair = await createOAuthGrantTokenPair({
+      db: env.controlPlaneDb,
+      oauthClientId: client.id,
+      userId: session.userId,
+      organizationId: session.organizationId,
+      resource: `${env.controlPlaneApi.hostBaseUrl}/mcp`,
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_READ],
+    });
+    await env.controlPlaneDb
+      .delete(env.controlPlaneTables.members)
+      .where(
+        and(
+          eq(env.controlPlaneTables.members.organizationId, session.organizationId),
+          eq(env.controlPlaneTables.members.userId, session.userId),
+        ),
+      );
+
+    const response = await fetchMcpTool({
+      env,
+      token: tokenPair.accessToken,
+      name: "profile_list",
+      arguments: {
+        limit: 10,
+      },
+    });
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("www-authenticate")).toContain('error="invalid_token"');
+  });
+
+  it("returns a JSON-RPC tool error when an MCP OAuth token lacks the required scope", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: `integration-oauth-mcp-missing-scope-${randomUUID()}@example.com`,
+    });
+    const client = await env.controlPlaneDb.query.oauthClients.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (table, { eq }) => eq(table.clientId, "mistle-cli"),
+    });
+    if (client === undefined) {
+      throw new Error("Expected Mistle CLI OAuth client.");
+    }
+    const tokenPair = await createOAuthGrantTokenPair({
+      db: env.controlPlaneDb,
+      oauthClientId: client.id,
+      userId: session.userId,
+      organizationId: session.organizationId,
+      resource: `${env.controlPlaneApi.hostBaseUrl}/mcp`,
+      permissions: [OrganizationPermissions.SANDBOX_SESSION_READ],
+    });
+
+    const result = await callMcpTool({
+      env,
+      token: tokenPair.accessToken,
+      name: "profile_list",
+      arguments: {},
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content?.map((item) => item.text).join("\n")).toContain(
+      "Missing required MCP permission: sandboxProfile:read.",
+    );
+  });
 });
+
+async function authorizeApproveAndExchangeMcpToken(input: {
+  env: IntegrationTestEnvironment;
+  sessionCookie: string;
+  scope: string;
+  state: string;
+}) {
+  const client = await registerMcpClient(input.env);
+  const codeVerifier = `${input.state}-verifier-${input.state}-verifier-${input.state}`;
+  const authorizeResponse = await input.env.controlPlaneApi.http.fetch(
+    buildAuthorizePath({
+      clientId: client.clientId,
+      redirectUri: client.redirectUri,
+      resource: `${input.env.controlPlaneApi.hostBaseUrl}/mcp`,
+      state: input.state,
+      scope: input.scope,
+      codeChallenge: pkceChallenge(codeVerifier),
+    }),
+    {
+      headers: {
+        cookie: input.sessionCookie,
+      },
+      redirect: "manual",
+    },
+  );
+  expect(authorizeResponse.status).toBe(302);
+  const consentRequestId =
+    new URL(requireHeader(authorizeResponse, "location")).pathname.split("/").at(-1) ?? "";
+
+  const approveResponse = await input.env.controlPlaneApi.http.fetch(
+    `/oauth/consent/${consentRequestId}/approve`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: input.sessionCookie,
+      },
+      body: JSON.stringify({
+        scopes: input.scope.split(" "),
+      }),
+    },
+  );
+  expect(approveResponse.status).toBe(200);
+  const redirectUri = readRedirectUri(await approveResponse.json());
+  const code = new URL(redirectUri).searchParams.get("code");
+  if (code === null) {
+    throw new Error("Expected OAuth callback code.");
+  }
+
+  const tokenResponse = await input.env.controlPlaneApi.http.fetch("/oauth/token", {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: client.clientId,
+      redirect_uri: client.redirectUri,
+      resource: `${input.env.controlPlaneApi.hostBaseUrl}/mcp`,
+      code,
+      code_verifier: codeVerifier,
+    }),
+  });
+  expect(tokenResponse.status).toBe(200);
+
+  return OAuthTokenResponseSchema.parse(await tokenResponse.json());
+}
 
 async function createPendingConsentRequest(input: {
   env: IntegrationTestEnvironment;
@@ -466,16 +705,9 @@ async function registerMcpClient(
     }),
   });
   expect(response.status).toBe(201);
-  const body = await response.json();
-  if (typeof body !== "object" || body === null) {
-    throw new Error("Expected client registration response.");
-  }
-  const clientId = Object.fromEntries(Object.entries(body)).client_id;
-  if (typeof clientId !== "string") {
-    throw new Error("Expected client id.");
-  }
+  const body = OAuthClientRegistrationResponseSchema.parse(await response.json());
 
-  return { clientId, redirectUri };
+  return { clientId: body.client_id, redirectUri };
 }
 
 function buildAuthorizePath(input: {
@@ -510,6 +742,60 @@ function requireHeader(response: { headers: { get(name: string): string | null }
   }
 
   return value;
+}
+
+async function callMcpTool(input: {
+  env: IntegrationTestEnvironment;
+  token: string;
+  name: string;
+  arguments: Record<string, unknown>;
+}): Promise<z.infer<typeof JsonRpcToolResponseSchema>["result"]> {
+  const response = await fetchMcpTool(input);
+
+  expect(response.status).toBe(200);
+  const message = parseStreamableHttpJsonRpcMessage(await response.text());
+  return JsonRpcToolResponseSchema.parse(message).result;
+}
+
+async function fetchMcpTool(input: {
+  env: IntegrationTestEnvironment;
+  token: string;
+  name: string;
+  arguments: Record<string, unknown>;
+}) {
+  return await input.env.controlPlaneApi.http.fetch("/mcp", {
+    method: "POST",
+    headers: {
+      accept: "application/json, text/event-stream",
+      authorization: `Bearer ${input.token}`,
+      "content-type": "application/json",
+      forwarded: createForwardedHeaderForBaseUrl(input.env.controlPlaneApi.hostBaseUrl),
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: "mcp-test",
+      method: "tools/call",
+      params: {
+        name: input.name,
+        arguments: input.arguments,
+      },
+    }),
+  });
+}
+
+function createForwardedHeaderForBaseUrl(baseUrl: string): string {
+  const url = new URL(baseUrl);
+  return `proto=${url.protocol.slice(0, -1)};host=${url.host}`;
+}
+
+function parseStreamableHttpJsonRpcMessage(responseBody: string): unknown {
+  const dataLine = responseBody.split("\n").find((line) => line.startsWith("data: "));
+
+  if (dataLine === undefined) {
+    throw new Error("Expected MCP streamable HTTP response to contain a data line.");
+  }
+
+  return JSON.parse(dataLine.slice("data: ".length));
 }
 
 function readRedirectUri(value: unknown): string {

@@ -21,7 +21,7 @@ export function requireMcpToolPermission(
   permission: OrganizationPermission,
 ): void {
   if (!organizationActor.permissions.includes(permission)) {
-    throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
+    throw new ForbiddenError("FORBIDDEN", `Missing required MCP permission: ${permission}.`);
   }
 }
 
