@@ -113,6 +113,38 @@ jobs:
             --label "org.opencontainers.image.vendor=Mistle" \
             .
 
+      - name: Run service image smoke
+        run: |
+          case "${{ matrix.component }}" in
+            control-plane-api)
+              smoke_module="/app/apps/control-plane-api/dist/instrument.js"
+              ;;
+            control-plane-worker)
+              smoke_module="/app/apps/control-plane-worker/dist/instrument.js"
+              ;;
+            data-plane-api)
+              smoke_module="/app/apps/data-plane-api/dist/instrument.js"
+              ;;
+            data-plane-worker)
+              smoke_module="/app/apps/data-plane-worker/dist/instrument.js"
+              ;;
+            data-plane-gateway)
+              smoke_module="/app/apps/data-plane-gateway/dist/instrument.js"
+              ;;
+            *)
+              echo "No smoke module configured for ${{ matrix.component }}." >&2
+              exit 1
+              ;;
+          esac
+
+          docker run --rm \
+            --env MISTLE_CONFIG_PATH=/app/config/config.sample.toml \
+            --env MISTLE_SMOKE_COMPONENT="${{ matrix.component }}" \
+            --env MISTLE_SMOKE_MODULE="${smoke_module}" \
+            --entrypoint node \
+            "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}" \
+            -e "const smoke = await import(process.env.MISTLE_SMOKE_MODULE); if (smoke.appConfig === undefined) { throw new Error('Missing appConfig export for ' + process.env.MISTLE_SMOKE_COMPONENT); } console.log('Loaded runtime config for ' + process.env.MISTLE_SMOKE_COMPONENT);"
+
       - name: Push service image
         run: docker push "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}"
 
