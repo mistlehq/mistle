@@ -33,7 +33,7 @@ describe("OAuthConsentPageView", () => {
       />,
     );
 
-    fireEvent.click(screen.getByLabelText("sandboxSession:create"));
+    fireEvent.click(screen.getByRole("checkbox", { name: "sandboxSession:create" }));
     rerender(
       <OAuthConsentPageView
         approveErrorMessage={null}

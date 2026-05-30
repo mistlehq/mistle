@@ -1,4 +1,4 @@
-import { Button, Spinner } from "@mistle/ui";
+import { Button, Checkbox, Field, FieldGroup, FieldLabel, Spinner } from "@mistle/ui";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useParams } from "react-router";
@@ -122,31 +122,31 @@ export function OAuthConsentPageView(input: {
           <p className="text-muted-foreground break-all">{input.resource}</p>
         </div>
 
-        <div className="gap-2 flex flex-col">
+        <FieldGroup className="gap-2">
           {input.requestedScopes.map((scope) => (
-            <label
-              className="border-border bg-background gap-3 rounded-md border px-3 py-2 text-sm flex items-center"
+            <Field
+              className="flex-row items-center gap-3 rounded-md border bg-background p-3 [&>*]:w-auto"
               key={scope}
+              orientation="horizontal"
             >
-              <input
+              <Checkbox
                 checked={input.selectedScopes.has(scope)}
-                className="size-4"
                 disabled={input.isSubmitting}
-                onChange={(event) => {
+                id={`oauth-consent-scope-${scope}`}
+                onCheckedChange={(checked) => {
                   const nextScopes = new Set(input.selectedScopes);
-                  if (event.currentTarget.checked) {
+                  if (checked === true) {
                     nextScopes.add(scope);
                   } else {
                     nextScopes.delete(scope);
                   }
                   input.onSelectedScopesChange(nextScopes);
                 }}
-                type="checkbox"
               />
-              <span>{scope}</span>
-            </label>
+              <FieldLabel htmlFor={`oauth-consent-scope-${scope}`}>{scope}</FieldLabel>
+            </Field>
           ))}
-        </div>
+        </FieldGroup>
 
         {input.approveErrorMessage === null ? null : (
           <ErrorNotice message={input.approveErrorMessage} />

@@ -51,7 +51,7 @@ export async function createOAuthAuthorizationConsentRequest(input: {
   await input.db.insert(tables.oauthServerStates).values({
     modelName: AuthorizationConsentModelName,
     recordId: requestId,
-    payload: createAuthorizationConsentPayload({
+    payload: {
       kind: AuthorizationConsentModelName,
       clientId: input.clientId,
       clientName: input.clientName,
@@ -63,7 +63,7 @@ export async function createOAuthAuthorizationConsentRequest(input: {
       userId: input.userId,
       organizationId: input.organizationId,
       requestedScopes: [...input.requestedScopes],
-    }),
+    } satisfies OAuthAuthorizationConsentPayload,
     expiresAt,
   });
 
@@ -244,12 +244,6 @@ async function consumePendingAuthorizationConsent(input: {
   if (consumedState === undefined) {
     throw new NotFoundError("NOT_FOUND", "OAuth consent request was not found.");
   }
-}
-
-function createAuthorizationConsentPayload(
-  payload: OAuthAuthorizationConsentPayload,
-): OAuthAuthorizationConsentPayload {
-  return payload;
 }
 
 function generateOpaqueToken(): string {
