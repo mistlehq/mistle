@@ -198,7 +198,7 @@ describe("compilePiRuntime", () => {
     expect("materializeMcpConfig" in PiRuntimeDefinition).toBe(false);
   });
 
-  it("pins Pi to the v0.76.0 direct Linux release distribution archives", () => {
+  it("pins Pi to the v0.77.0 direct Linux release distribution archives", () => {
     const compiled = compileDefaultPiRuntime();
     expect(compiled.artifacts).toHaveLength(1);
     const artifact = compiled.artifacts?.[0];
@@ -214,7 +214,7 @@ describe("compilePiRuntime", () => {
           release: {
             kind: "tag",
             match: "exact",
-            tag: "v0.76.0",
+            tag: "v0.77.0",
           },
           asset: {
             kind: "by_arch",
@@ -222,13 +222,13 @@ describe("compilePiRuntime", () => {
               fileName: "pi-linux-x64.tar.gz",
               format: "tar.gz",
               extractedPath: "pi",
-              sha256: "b8ed8b905ffbf0d48dd51b5da4758a8fc704b258808f0253e2104bec7b52251a",
+              sha256: "e75031cdabc690b43f4d134fdaa6a4d693038d1a13b2cfa705c4c706dfef81c5",
             },
             aarch64: {
               fileName: "pi-linux-arm64.tar.gz",
               format: "tar.gz",
               extractedPath: "pi",
-              sha256: "c1de115472855aca4ca1afe9bac4787e003ace11428ce48a8b6ceb7c1a1036b5",
+              sha256: "d8d145d89a95d4919369332b3009951473daafa538c7b6ffa1dcae106bf0e3e9",
             },
           },
           installPath: "/var/lib/mistle/artifacts/pi-cli",
