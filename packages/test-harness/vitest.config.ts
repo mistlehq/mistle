@@ -6,6 +6,30 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: /^@mistle\/control-plane-internal-client$/,
+        replacement: fileURLToPath(
+          new URL("../control-plane-internal-client/src/index.ts", import.meta.url),
+        ),
+      },
+      {
+        find: /^@mistle\/control-plane-internal-client\/generated\/schema\.js$/,
+        replacement: fileURLToPath(
+          new URL("../control-plane-internal-client/src/generated/schema.ts", import.meta.url),
+        ),
+      },
+      {
+        find: /^@mistle\/data-plane-internal-client$/,
+        replacement: fileURLToPath(
+          new URL("../data-plane-internal-client/src/index.ts", import.meta.url),
+        ),
+      },
+      {
+        find: /^@mistle\/data-plane-internal-client\/generated\/schema\.js$/,
+        replacement: fileURLToPath(
+          new URL("../data-plane-internal-client/src/generated/schema.ts", import.meta.url),
+        ),
+      },
+      {
         find: /^@mistle\/object-store$/,
         replacement: fileURLToPath(new URL("../object-store/src/index.ts", import.meta.url)),
       },
