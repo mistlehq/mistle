@@ -101,7 +101,10 @@ function validateDynamicClientRegistration(request: OAuthClientRegistrationReque
     throw invalidRegistrationRequest("OAuth client must use the code response type.");
   }
 
-  const scopes = uniqueValues(request.scope.split(" ").filter((scope) => scope.length > 0));
+  const scopes =
+    request.scope === undefined
+      ? [...McpOAuthScopes]
+      : uniqueValues(request.scope.split(" ").filter((scope) => scope.length > 0));
   if (scopes.length === 0) {
     throw invalidRegistrationRequest("OAuth client must request at least one scope.");
   }

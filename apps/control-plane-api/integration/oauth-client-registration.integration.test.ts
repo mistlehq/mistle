@@ -90,6 +90,36 @@ describe.concurrent("OAuth dynamic client registration", () => {
     );
   });
 
+  it("registers a Codex-shaped dynamic MCP client without explicit registration scopes", async ({
+    env,
+  }) => {
+    const response = await registerClient(env, {
+      client_name: "Codex",
+      redirect_uris: ["http://127.0.0.1:61758/callback/codex-state"],
+      grant_types: [OAuthGrantTypes.AUTHORIZATION_CODE, OAuthGrantTypes.REFRESH_TOKEN],
+      response_types: ["code"],
+      token_endpoint_auth_method: "none",
+    });
+
+    expect(response.status).toBe(201);
+    const registration = OAuthClientRegistrationResponseSchema.parse(await response.json());
+    expect(registration.client_name).toBe("Codex");
+    expect(registration.scope).toBe(McpOAuthScopes.join(" "));
+
+    const client = await env.controlPlaneDb.query.oauthClients.findFirst({
+      where: (table, { eq }) => eq(table.clientId, registration.client_id),
+    });
+    if (client === undefined) {
+      throw new Error("Expected registered OAuth client.");
+    }
+
+    const scopes = await env.controlPlaneDb.query.oauthClientScopes.findMany({
+      columns: { scope: true },
+      where: (table, { eq }) => eq(table.oauthClientId, client.id),
+    });
+    expect(new Set(scopes.map((row) => row.scope))).toStrictEqual(new Set(McpOAuthScopes));
+  });
+
   it("rejects invalid redirect URIs", async ({ env }) => {
     for (const redirectUri of [
       "mistle://oauth/callback",

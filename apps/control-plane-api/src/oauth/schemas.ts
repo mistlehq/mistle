@@ -124,7 +124,7 @@ export const OAuthClientRegistrationRequestSchema = z
     response_types: z
       .array(z.literal("code"))
       .length(OAuthClientRegistrationLimits.RESPONSE_TYPE_COUNT),
-    scope: z.string().min(1).max(OAuthClientRegistrationLimits.SCOPE_MAX_LENGTH),
+    scope: z.string().min(1).max(OAuthClientRegistrationLimits.SCOPE_MAX_LENGTH).optional(),
     token_endpoint_auth_method: z.literal("none"),
   })
   .strict()
@@ -142,6 +142,10 @@ export const OAuthClientRegistrationRequestSchema = z
         message: "OAuth client grant types must be unique.",
         path: ["grant_types"],
       });
+    }
+
+    if (value.scope === undefined) {
+      return;
     }
 
     const scopes = value.scope.split(" ").filter((scope) => scope.length > 0);
