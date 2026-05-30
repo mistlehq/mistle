@@ -100,7 +100,7 @@ jobs:
         uses: Infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995 # v1.0.16
         with:
           method: oidc
-          identity-id: ${{ vars.INFISICAL_INTEGRATION_TESTS_IDENTITY_ID }}
+          identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
           project-slug: mistle-oss
           env-slug: ci
           secret-path: /integration-tests
@@ -189,7 +189,7 @@ jobs:
         uses: Infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995 # v1.0.16
         with:
           method: oidc
-          identity-id: ${{ vars.INFISICAL_CI_SHARED_IDENTITY_ID }}
+          identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
           project-slug: mistle-oss
           env-slug: ci
           secret-path: /ci-shared
