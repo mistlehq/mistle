@@ -6,6 +6,10 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: /^@mistle\/object-store$/,
+        replacement: fileURLToPath(new URL("../object-store/src/index.ts", import.meta.url)),
+      },
+      {
         find: /^@mistle\/control-plane-api\/runtime$/,
         replacement: fileURLToPath(
           new URL("../../apps/control-plane-api/src/main.ts", import.meta.url),
