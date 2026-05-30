@@ -604,20 +604,11 @@ describe("OAuth CLI login integration", () => {
         redirect: "manual",
       },
     );
-    expect(authorizeResponse.status).toBe(302);
-    const invalidTargetRedirect = authorizeResponse.headers.get("location");
-    expect(invalidTargetRedirect).not.toBeNull();
-    if (invalidTargetRedirect === null) {
-      throw new Error("Expected invalid target redirect location.");
-    }
-    const invalidTargetUrl = new URL(invalidTargetRedirect);
-    expect(invalidTargetUrl.origin).toBe("http://127.0.0.1:61745");
-    expect(invalidTargetUrl.pathname).toBe("/callback");
-    expect(invalidTargetUrl.searchParams.get("error")).toBe("invalid_target");
-    expect(invalidTargetUrl.searchParams.get("error_description")).toBe(
-      "OAuth resource is invalid.",
-    );
-    expect(invalidTargetUrl.searchParams.get("state")).toBe("invalid-target-state");
+    expect(authorizeResponse.status).toBe(400);
+    expect(await authorizeResponse.json()).toStrictEqual({
+      error: "invalid_target",
+      error_description: "OAuth resource is invalid.",
+    });
 
     const tokenResponse = await env.controlPlaneApi.http.fetch("/oauth/token", {
       method: "POST",

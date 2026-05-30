@@ -472,11 +472,7 @@ function handleAuthorizeRedirectableOAuthError(
     state: string;
   },
 ) {
-  if (
-    input.error instanceof HttpError &&
-    (input.error.code === OAuthErrorCodes.INVALID_SCOPE ||
-      input.error.code === OAuthErrorCodes.INVALID_TARGET)
-  ) {
+  if (input.error instanceof HttpError && input.error.code === OAuthErrorCodes.INVALID_SCOPE) {
     const redirectUrl = new URL(input.redirectUri);
     redirectUrl.searchParams.set("error", input.error.code);
     redirectUrl.searchParams.set("error_description", input.error.message);

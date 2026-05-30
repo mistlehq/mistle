@@ -95,6 +95,29 @@ describe.concurrent("OAuth MCP consent", () => {
     });
   });
 
+  it("returns OAuth JSON errors for invalid MCP authorization resources", async ({ env }) => {
+    const client = await registerMcpClient(env);
+    const response = await env.controlPlaneApi.http.fetch(
+      buildAuthorizePath({
+        clientId: client.clientId,
+        redirectUri: client.redirectUri,
+        resource: env.controlPlaneApi.hostBaseUrl,
+        state: "invalid-resource-state",
+        scope: "sandboxProfile:read",
+        codeChallenge: pkceChallenge("invalid-resource-verifier-invalid-resource-verifier"),
+      }),
+      {
+        redirect: "manual",
+      },
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toStrictEqual({
+      error: "invalid_target",
+      error_description: "OAuth resource is invalid.",
+    });
+  });
+
   it("redirects invalid unauthenticated scopes to the validated redirect URI", async ({ env }) => {
     const client = await registerMcpClient(env);
     const response = await env.controlPlaneApi.http.fetch(
