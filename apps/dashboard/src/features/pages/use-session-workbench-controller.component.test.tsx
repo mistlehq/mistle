@@ -18,7 +18,10 @@ import {
   shouldWaitForTriggerSessionThread,
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
-import { resolveSandboxStatusRefetchInterval } from "./use-session-workbench-lifecycle-state.js";
+import {
+  resolveSandboxStatusRefetchInterval,
+  resolveSessionSnapshotStatusRefreshKey,
+} from "./use-session-workbench-lifecycle-state.js";
 import {
   reduceSessionWorkbenchRecoveryState,
   resolveSessionWorkbenchRecoveryStateForRender,
@@ -841,6 +844,37 @@ describe("useSessionWorkbenchController", () => {
         status: "running",
       }),
     ).toBe(false);
+  });
+
+  it("keys an immediate status refresh to one connected session snapshot", () => {
+    const sessionSnapshot = {
+      sandboxInstanceId: "sbi_reconnect_refresh",
+      connectedAtIso: "2026-05-31T23:37:17.208Z",
+    };
+
+    expect(
+      resolveSessionSnapshotStatusRefreshKey({
+        connectionReadinessReason: "starting",
+        sandboxInstanceId: "sbi_reconnect_refresh",
+        sessionSnapshot,
+      }),
+    ).toBe("sbi_reconnect_refresh:2026-05-31T23:37:17.208Z");
+
+    expect(
+      resolveSessionSnapshotStatusRefreshKey({
+        connectionReadinessReason: "ready",
+        sandboxInstanceId: "sbi_reconnect_refresh",
+        sessionSnapshot,
+      }),
+    ).toBeNull();
+
+    expect(
+      resolveSessionSnapshotStatusRefreshKey({
+        connectionReadinessReason: "starting",
+        sandboxInstanceId: "sbi_other",
+        sessionSnapshot,
+      }),
+    ).toBeNull();
   });
 
   it("shows the stopped-session message once a stopped sandbox status is trusted", () => {

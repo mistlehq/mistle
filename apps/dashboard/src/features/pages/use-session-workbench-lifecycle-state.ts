@@ -109,6 +109,26 @@ function resolveAvailableSandboxStatusRefetchInterval(
   return input.status === "failed" || input.status === "stopped" ? false : 1_000;
 }
 
+export function resolveSessionSnapshotStatusRefreshKey(input: {
+  connectionReadinessReason: ReturnType<typeof resolveSessionConnectionReadiness>["reason"];
+  sandboxInstanceId: string | null;
+  sessionSnapshot: SessionSnapshotForWorkbench | null;
+}): string | null {
+  if (input.sandboxInstanceId === null || input.sessionSnapshot === null) {
+    return null;
+  }
+
+  if (input.sessionSnapshot.sandboxInstanceId !== input.sandboxInstanceId) {
+    return null;
+  }
+
+  if (input.connectionReadinessReason !== "starting") {
+    return null;
+  }
+
+  return `${input.sandboxInstanceId}:${input.sessionSnapshot.connectedAtIso}`;
+}
+
 export function useSessionWorkbenchLifecycleState(input: {
   sandboxInstanceId: string | null;
   mainPanelTransitionState: MainPanelTransitionState;
@@ -130,6 +150,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     latestCompletedEpoch: 0,
     inFlight: false,
   });
+  const sessionSnapshotStatusRefreshKeyRef = useRef<string | null>(null);
 
   const sandboxStatusQuery = useQuery({
     queryKey:
@@ -289,6 +310,7 @@ export function useSessionWorkbenchLifecycleState(input: {
       latestCompletedEpoch: 0,
       inFlight: false,
     };
+    sessionSnapshotStatusRefreshKeyRef.current = null;
   }, [input.queryClient, input.sandboxInstanceId]);
 
   useEffect(() => {
@@ -468,19 +490,22 @@ export function useSessionWorkbenchLifecycleState(input: {
   ]);
 
   useEffect(() => {
-    if (input.sandboxInstanceId === null || sessionSnapshot === null) {
+    const refreshKey = resolveSessionSnapshotStatusRefreshKey({
+      connectionReadinessReason: connectionReadiness.reason,
+      sandboxInstanceId: input.sandboxInstanceId,
+      sessionSnapshot,
+    });
+    if (refreshKey === null || sessionSnapshotStatusRefreshKeyRef.current === refreshKey) {
       return;
     }
 
-    if (connectionReadiness.reason !== "starting") {
-      return;
-    }
-
+    sessionSnapshotStatusRefreshKeyRef.current = refreshKey;
     void sandboxStatusQuery.refetch();
   }, [
     connectionReadiness.reason,
     input.sandboxInstanceId,
-    sessionSnapshot,
+    sessionSnapshot?.connectedAtIso,
+    sessionSnapshot?.sandboxInstanceId,
     sandboxStatusQuery.refetch,
   ]);
 
