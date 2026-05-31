@@ -17,8 +17,8 @@ const SlackCliArtifactName = "Slack CLI";
 const ArtifactCommandTimeoutMs = 120_000;
 // Pin exact release tags for sandbox startup to avoid live upstream version
 // resolution and the associated rate-limit / availability failures.
-const SlackCliReleaseTag = "slack/v0.3.0";
-const SlackCliLinuxAmd64Sha256 = "1847b087fe7675ce4712b0a140552df51fbc8a8276d7611dbd7ab717c64946c4";
+const SlackCliReleaseTag = "slack/v0.4.0";
+const SlackCliLinuxAmd64Sha256 = "1424d32aad0e8f5cd82bdbbeb47f112b1ecd84a78caaea9bf1dff77744647424";
 
 function createSlackCliArtifact(
   upstreamBaseUrl: string,
