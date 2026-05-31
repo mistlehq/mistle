@@ -30,7 +30,10 @@ import {
   OrganizationIdentityLinkingSettingsPageView,
   type OrganizationIdentityLinkingProviderRow,
 } from "./organization-identity-linking-settings-page-view.js";
-import { createIdentityLinkingMemberLinks } from "./organization-identity-linking-settings-page-view.story-fixtures.js";
+import {
+  IdentityLinkingStoryMemberLinkStatusCounts,
+  createIdentityLinkingMemberLinks,
+} from "./organization-identity-linking-settings-page-view.story-fixtures.js";
 import {
   createDraftGitHubConnection,
   GitHubAppSetupPageStory,
@@ -78,9 +81,6 @@ import { SessionWorkbenchHeaderActions } from "./session-workbench-header-action
 import { buildStoryLaunchableSandboxProfile } from "./sessions-page.story-fixtures.js";
 import type { SessionPortAccessState } from "./use-session-port-access.js";
 
-const GitHubEngineeringMemberLinkStatusCounts = { linked: 12, total: 36 };
-const SlackWorkspaceMemberLinkStatusCounts = { linked: 3, total: 14 };
-
 const IdentityLinkingProviders: OrganizationIdentityLinkingProviderRow[] = [
   {
     rowKey: "ilp_github",
@@ -91,13 +91,12 @@ const IdentityLinkingProviders: OrganizationIdentityLinkingProviderRow[] = [
     enablePending: false,
     enabled: true,
     unavailableMessage: null,
-    memberLinkStatusCounts: GitHubEngineeringMemberLinkStatusCounts,
+    memberLinkStatusCounts: IdentityLinkingStoryMemberLinkStatusCounts.GITHUB_ENGINEERING,
     memberLinksErrorMessage: null,
     memberLinks: createIdentityLinkingMemberLinks({
-      count: GitHubEngineeringMemberLinkStatusCounts,
+      count: IdentityLinkingStoryMemberLinkStatusCounts.GITHUB_ENGINEERING,
       emailDomain: "example.com",
       idPrefix: "github_engineering",
-      providerPrincipalPrefix: "github-user",
     }),
   },
   {
@@ -109,13 +108,12 @@ const IdentityLinkingProviders: OrganizationIdentityLinkingProviderRow[] = [
     enablePending: false,
     enabled: true,
     unavailableMessage: null,
-    memberLinkStatusCounts: SlackWorkspaceMemberLinkStatusCounts,
+    memberLinkStatusCounts: IdentityLinkingStoryMemberLinkStatusCounts.SLACK_WORKSPACE,
     memberLinksErrorMessage: null,
     memberLinks: createIdentityLinkingMemberLinks({
-      count: SlackWorkspaceMemberLinkStatusCounts,
+      count: IdentityLinkingStoryMemberLinkStatusCounts.SLACK_WORKSPACE,
       emailDomain: "example.com",
       idPrefix: "slack_workspace",
-      providerPrincipalPrefix: "slack-user",
     }),
   },
 ];

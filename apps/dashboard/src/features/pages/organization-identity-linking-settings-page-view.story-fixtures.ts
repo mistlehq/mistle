@@ -41,6 +41,11 @@ const StoryMemberNames: readonly string[] = [
 
 type StoryMemberLink = OrganizationIdentityLinkingProviderRow["memberLinks"][number];
 
+export const IdentityLinkingStoryMemberLinkStatusCounts = {
+  GITHUB_ENGINEERING: { linked: 12, total: 36 },
+  SLACK_WORKSPACE: { linked: 3, total: 14 },
+};
+
 export function createIdentityLinkingMemberLinks(input: {
   count: {
     linked: number;
@@ -48,7 +53,6 @@ export function createIdentityLinkingMemberLinks(input: {
   };
   emailDomain: string;
   idPrefix: string;
-  providerPrincipalPrefix: string;
 }): StoryMemberLink[] {
   return Array.from({ length: input.count.total }, (_, index) => {
     const memberNumber = index + 1;
@@ -62,8 +66,6 @@ export function createIdentityLinkingMemberLinks(input: {
       email: `${name.toLowerCase().replaceAll(" ", ".")}@${input.emailDomain}`,
       linked,
       statusLabel: linked ? "Linked" : "Not linked",
-      principalSummary: linked ? `${input.providerPrincipalPrefix}-${memberNumberLabel}` : null,
-      updatedAt: linked ? "2026-04-20T00:00:00.000Z" : null,
     };
   });
 }

@@ -50,8 +50,6 @@ export type OrganizationIdentityLinkingProviderRow = {
     email: string;
     linked: boolean;
     statusLabel: string;
-    principalSummary: string | null;
-    updatedAt: string | null;
   }[];
 };
 

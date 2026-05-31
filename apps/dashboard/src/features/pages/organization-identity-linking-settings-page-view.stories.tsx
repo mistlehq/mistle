@@ -9,10 +9,10 @@ import {
   OrganizationIdentityLinkingSettingsPageView,
   type OrganizationIdentityLinkingProviderRow,
 } from "./organization-identity-linking-settings-page-view.js";
-import { createIdentityLinkingMemberLinks } from "./organization-identity-linking-settings-page-view.story-fixtures.js";
-
-const GitHubEngineeringMemberLinkStatusCounts = { linked: 12, total: 36 };
-const SlackWorkspaceMemberLinkStatusCounts = { linked: 3, total: 14 };
+import {
+  IdentityLinkingStoryMemberLinkStatusCounts,
+  createIdentityLinkingMemberLinks,
+} from "./organization-identity-linking-settings-page-view.story-fixtures.js";
 
 const BaseProviders = [
   {
@@ -24,13 +24,12 @@ const BaseProviders = [
     enablePending: false,
     enabled: true,
     unavailableMessage: null,
-    memberLinkStatusCounts: GitHubEngineeringMemberLinkStatusCounts,
+    memberLinkStatusCounts: IdentityLinkingStoryMemberLinkStatusCounts.GITHUB_ENGINEERING,
     memberLinksErrorMessage: null,
     memberLinks: createIdentityLinkingMemberLinks({
-      count: GitHubEngineeringMemberLinkStatusCounts,
+      count: IdentityLinkingStoryMemberLinkStatusCounts.GITHUB_ENGINEERING,
       emailDomain: "example.com",
       idPrefix: "github_engineering",
-      providerPrincipalPrefix: "github-user",
     }),
   },
   {
@@ -55,13 +54,12 @@ const BaseProviders = [
     enablePending: false,
     enabled: false,
     unavailableMessage: null,
-    memberLinkStatusCounts: SlackWorkspaceMemberLinkStatusCounts,
+    memberLinkStatusCounts: IdentityLinkingStoryMemberLinkStatusCounts.SLACK_WORKSPACE,
     memberLinksErrorMessage: null,
     memberLinks: createIdentityLinkingMemberLinks({
-      count: SlackWorkspaceMemberLinkStatusCounts,
+      count: IdentityLinkingStoryMemberLinkStatusCounts.SLACK_WORKSPACE,
       emailDomain: "example.com",
       idPrefix: "slack_workspace",
-      providerPrincipalPrefix: "slack-user",
     }),
   },
 ] as const satisfies readonly OrganizationIdentityLinkingProviderRow[];

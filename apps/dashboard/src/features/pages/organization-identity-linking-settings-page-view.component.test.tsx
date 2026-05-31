@@ -28,8 +28,6 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
                 email: "owner@example.com",
                 linked: true,
                 statusLabel: "Linked",
-                principalSummary: "owner-github",
-                updatedAt: "2026-04-20T00:00:00.000Z",
               },
               {
                 userId: "usr_member",
@@ -37,8 +35,6 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
                 email: "member@example.com",
                 linked: false,
                 statusLabel: "Not linked",
-                principalSummary: null,
-                updatedAt: null,
               },
             ],
           }),
@@ -76,8 +72,6 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
     expect(screen.getByText("Link Status for Engineering GitHub")).toBeTruthy();
     expect(screen.getByText("Owner User")).toBeTruthy();
     expect(screen.getByText("Member User")).toBeTruthy();
-    expect(screen.queryByText("owner-github")).toBeNull();
-    expect(screen.queryByText("Updated 2026-04-20T00:00:00.000Z")).toBeNull();
 
     fireEvent.click(screen.getByRole("tab", { name: "Not linked 1" }));
 

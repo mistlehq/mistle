@@ -8,7 +8,6 @@ import { useAppPageMeta } from "../navigation/route-meta.js";
 import {
   canManageOrganizationIdentityLinking,
   formatIdentityLinkProviderMemberStatus,
-  formatIdentityLinkProviderPrincipalSummary,
   type IdentityLinkEligibleConnection,
   listEligibleIdentityLinkConnections,
 } from "../settings/identity-linking/organization-identity-linking-model.js";
@@ -513,10 +512,6 @@ export function buildProviderRow(input: {
         statusLabel: formatIdentityLinkProviderMemberStatus({
           linked: link.linked,
         }),
-        principalSummary: formatIdentityLinkProviderPrincipalSummary({
-          link,
-        }),
-        updatedAt: link.updatedAt,
       })) ?? [],
   };
 }

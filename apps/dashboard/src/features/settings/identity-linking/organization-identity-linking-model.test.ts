@@ -4,7 +4,6 @@ import {
   canManageOrganizationIdentityLinking,
   formatIdentityLinkEligibleConnectionLabel,
   formatIdentityLinkProviderMemberStatus,
-  formatIdentityLinkProviderPrincipalSummary,
   listEligibleIdentityLinkConnections,
 } from "./organization-identity-linking-model.js";
 
@@ -86,36 +85,5 @@ describe("organization identity linking model", () => {
         linked: false,
       }),
     ).toBe("Not linked");
-
-    expect(
-      formatIdentityLinkProviderPrincipalSummary({
-        link: {
-          userId: "usr_123",
-          name: "Owner User",
-          email: "owner@example.com",
-          linked: true,
-          principalSummary: {
-            providerSubjectId: "github-owner-123",
-            login: "owner-github",
-            displayName: "Owner GitHub",
-            email: "owner@example.com",
-          },
-          updatedAt: "2026-04-20T00:00:00.000Z",
-        },
-      }),
-    ).toBe("Owner GitHub");
-
-    expect(
-      formatIdentityLinkProviderPrincipalSummary({
-        link: {
-          userId: "usr_124",
-          name: "Member User",
-          email: "member@example.com",
-          linked: false,
-          principalSummary: null,
-          updatedAt: null,
-        },
-      }),
-    ).toBeNull();
   });
 });
