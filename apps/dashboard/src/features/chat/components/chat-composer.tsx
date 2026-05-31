@@ -252,6 +252,38 @@ function createSkillSlashPaletteOption(skill: SkillMentionDescriptor): SlashPale
   };
 }
 
+function SkillMentionOptionButton(input: {
+  id: string;
+  isActive: boolean;
+  onMouseEnter: () => void;
+  onSelect: () => void;
+  skill: SkillMentionDescriptor;
+}): React.JSX.Element {
+  return (
+    <button
+      aria-label={formatSkillMentionOptionLabel(input.skill)}
+      aria-selected={input.isActive}
+      className={[
+        "flex w-full items-start gap-3 rounded-sm px-3 py-2 text-left text-sm outline-none",
+        input.isActive ? "bg-muted text-foreground" : "hover:bg-muted/70",
+      ].join(" ")}
+      id={input.id}
+      onMouseDown={(event) => {
+        event.preventDefault();
+        input.onSelect();
+      }}
+      onMouseEnter={input.onMouseEnter}
+      role="option"
+      type="button"
+    >
+      <span className="min-w-24 font-mono text-xs text-muted-foreground">${input.skill.name}</span>
+      {input.skill.description === undefined ? null : (
+        <span className="min-w-0 flex-1 text-muted-foreground">{input.skill.description}</span>
+      )}
+    </button>
+  );
+}
+
 function ChoiceCommandPanelActions(input: {
   choices: readonly ChoiceCommandPanelChoice[];
   title: string;
@@ -559,15 +591,11 @@ export function ChatComposer({
     });
   }
 
-  function insertSlashCommand(command: ComposerCommandDescriptor): void {
-    if (
-      activeComposerTrigger === null ||
-      activeComposerTrigger.capabilityKind !== "composerCommand"
-    ) {
+  function replaceActiveTriggerRange(insertedText: string): void {
+    if (activeComposerTrigger === null) {
       return;
     }
 
-    const insertedText = `/${command.name} `;
     const nextComposerText = [
       composerText.slice(0, activeComposerTrigger.range.start),
       insertedText,
@@ -586,6 +614,17 @@ export function ChatComposer({
     });
   }
 
+  function insertSlashCommand(command: ComposerCommandDescriptor): void {
+    if (
+      activeComposerTrigger === null ||
+      activeComposerTrigger.capabilityKind !== "composerCommand"
+    ) {
+      return;
+    }
+
+    replaceActiveTriggerRange(`/${command.name} `);
+  }
+
   function insertSkillMention(skill: SkillMentionDescriptor): void {
     if (
       activeComposerTrigger === null ||
@@ -595,24 +634,8 @@ export function ChatComposer({
       return;
     }
 
-    const insertedText = `$${skill.name} `;
-    const nextComposerText = [
-      composerText.slice(0, activeComposerTrigger.range.start),
-      insertedText,
-      composerText.slice(activeComposerTrigger.range.end),
-    ].join("");
-    const nextCursorIndex = activeComposerTrigger.range.start + insertedText.length;
-
-    onComposerTextChange(nextComposerText);
-    setComposerSelection({
-      start: nextCursorIndex,
-      end: nextCursorIndex,
-    });
+    replaceActiveTriggerRange(`$${skill.name} `);
     setActiveSlashCommandIndex(0);
-    requestAnimationFrame(() => {
-      textareaRef.current?.focus();
-      textareaRef.current?.setSelectionRange(nextCursorIndex, nextCursorIndex);
-    });
   }
 
   function insertContextMentionPath(path: string, query: string): void {
@@ -1023,34 +1046,18 @@ export function ChatComposer({
                       activeSlashPaletteOption.skill.name === skill.name;
 
                     return (
-                      <button
-                        aria-label={formatSkillMentionOptionLabel(skill)}
-                        aria-selected={isActiveSkill}
-                        className={[
-                          "flex w-full items-start gap-3 rounded-sm px-3 py-2 text-left text-sm outline-none",
-                          isActiveSkill ? "bg-muted text-foreground" : "hover:bg-muted/70",
-                        ].join(" ")}
+                      <SkillMentionOptionButton
                         id={`${commandListId}-skill-${skill.name}`}
                         key={skill.name}
-                        onMouseDown={(event) => {
-                          event.preventDefault();
-                          insertSkillMention(skill);
-                        }}
                         onMouseEnter={() => {
                           setActiveSlashCommandIndex(optionIndex);
                         }}
-                        role="option"
-                        type="button"
-                      >
-                        <span className="min-w-24 font-mono text-xs text-muted-foreground">
-                          ${skill.name}
-                        </span>
-                        {skill.description === undefined ? null : (
-                          <span className="min-w-0 flex-1 text-muted-foreground">
-                            {skill.description}
-                          </span>
-                        )}
-                      </button>
+                        onSelect={() => {
+                          insertSkillMention(skill);
+                        }}
+                        isActive={isActiveSkill}
+                        skill={skill}
+                      />
                     );
                   })}
                 </>
@@ -1071,34 +1078,18 @@ export function ChatComposer({
                   const isActiveSkill = skill.name === activeSkillMention?.name;
 
                   return (
-                    <button
-                      aria-label={formatSkillMentionOptionLabel(skill)}
-                      aria-selected={isActiveSkill}
-                      className={[
-                        "flex w-full items-start gap-3 rounded-sm px-3 py-2 text-left text-sm outline-none",
-                        isActiveSkill ? "bg-muted text-foreground" : "hover:bg-muted/70",
-                      ].join(" ")}
+                    <SkillMentionOptionButton
                       id={`${commandListId}-skill-${skill.name}`}
                       key={skill.name}
-                      onMouseDown={(event) => {
-                        event.preventDefault();
-                        insertSkillMention(skill);
-                      }}
                       onMouseEnter={() => {
                         setActiveSlashCommandIndex(skillIndex);
                       }}
-                      role="option"
-                      type="button"
-                    >
-                      <span className="min-w-24 font-mono text-xs text-muted-foreground">
-                        ${skill.name}
-                      </span>
-                      {skill.description === undefined ? null : (
-                        <span className="min-w-0 flex-1 text-muted-foreground">
-                          {skill.description}
-                        </span>
-                      )}
-                    </button>
+                      onSelect={() => {
+                        insertSkillMention(skill);
+                      }}
+                      isActive={isActiveSkill}
+                      skill={skill}
+                    />
                   );
                 })
               )}
