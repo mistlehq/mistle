@@ -389,6 +389,15 @@ describe("useSessionWorkbenchController", () => {
         recoveryBaseMessage: "Sandbox session stream reset.",
         recoveryErrorMessage: null,
         reconnectAttemptCount: 0,
+        sandboxStatus: "degraded",
+      }),
+    ).toBe("Sandbox session stream reset. Waiting for the sandbox to become ready again.");
+
+    expect(
+      resolveSessionReconnectMessage({
+        recoveryBaseMessage: "Sandbox session stream reset.",
+        recoveryErrorMessage: null,
+        reconnectAttemptCount: 0,
         sandboxStatus: "stopped",
       }),
     ).toBe("Sandbox session stream reset. Resuming sandbox to restore the session.");

@@ -215,6 +215,7 @@ export function resolveSessionReconnectMessage(input: {
     input.sandboxStatus === "started" ||
     input.sandboxStatus === "initializing" ||
     input.sandboxStatus === "reconnecting" ||
+    input.sandboxStatus === "degraded" ||
     input.sandboxStatus === "stopping" ||
     input.sandboxStatus === null
   ) {

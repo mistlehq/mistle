@@ -32,6 +32,14 @@ export class SandboxInstanceDeadlineService {
   }): Promise<void> {
     await this.dataPlaneClient.applySandboxRuntimeLifecycleEvent({
       sandboxInstanceId: input.sandboxInstanceId,
+      kind: "bootstrap_recovered",
+      ownerLeaseId: input.ownerLeaseId,
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
+    });
+    await this.dataPlaneClient.applySandboxRuntimeLifecycleEvent({
+      sandboxInstanceId: input.sandboxInstanceId,
       kind: "runtime_readiness_reported",
       ownerLeaseId: input.ownerLeaseId,
       runtimeReady: false,

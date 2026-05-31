@@ -383,6 +383,7 @@ function createBootstrapHealthTestHarness() {
   const tunnelSessionRegistry = new TunnelSessionRegistry(
     new InMemoryTunnelSessionRegistryAdapter(),
   );
+  const lifecycleCoordinator = new SandboxDeadlineLifecycleCoordinator();
   const relayCoordinator = new TunnelRelayCoordinator(
     GatewayNodeId,
     new InMemoryLocalPeerRegistryAdapter(),
@@ -443,13 +444,14 @@ function createBootstrapHealthTestHarness() {
       clock,
       DefaultDataPlaneGatewayLifecycleDurations,
     ),
-    new SandboxDeadlineLifecycleCoordinator(),
+    lifecycleCoordinator,
     clock,
     scheduler,
   );
 
   return {
     clock,
+    lifecycleCoordinator,
     lifecycleEvents,
     rawSocket: new FakeRawSocket(),
     scheduler,
@@ -479,6 +481,19 @@ describe("TunnelSessionService", () => {
     });
 
     await attachedPeer.activationPromise;
+    expect(lifecycleEvents).toEqual(
+      expect.arrayContaining([
+        {
+          kind: "bootstrap_recovered",
+          ownerLeaseId: OwnerLeaseId,
+        },
+        {
+          kind: "runtime_readiness_reported",
+          ownerLeaseId: OwnerLeaseId,
+          runtimeReady: false,
+        },
+      ]),
+    );
 
     clock.advanceMs(WEBSOCKET_PING_INTERVAL_MS);
     scheduler.runDue();
@@ -503,6 +518,92 @@ describe("TunnelSessionService", () => {
       ownerLeaseId: OwnerLeaseId,
     });
     attachedPeer.websocketHealthHandle?.stop();
+  });
+
+  it("ignores queued bootstrap health changes from a replaced bootstrap peer", async () => {
+    const { clock, lifecycleCoordinator, lifecycleEvents, rawSocket, scheduler, service } =
+      createBootstrapHealthTestHarness();
+    const attachedPeer = service.attachBootstrapPeer({
+      leaseId: OwnerLeaseId,
+      onFatalError: () => {
+        throw new Error("Initial bootstrap attach should not fail in this test.");
+      },
+      onLeaseLost: () => {
+        throw new Error("Initial bootstrap lease should not be lost in this test.");
+      },
+      onTransportUnhealthy: () => {
+        throw new Error("Initial bootstrap transport should remain healthy in this test.");
+      },
+      ownerLeaseTtlMs: 60_000,
+      relaySessionId: BootstrapSessionId,
+      sandboxInstanceId: SandboxInstanceId,
+      socket: createFakePeerSocket(rawSocket),
+    });
+
+    await attachedPeer.activationPromise;
+
+    let releaseBlockedLifecycleOperation: (() => void) | undefined;
+    const blockedLifecycleOperation = lifecycleCoordinator.enqueue({
+      sandboxInstanceId: SandboxInstanceId,
+      operation: () =>
+        new Promise<void>((resolve) => {
+          releaseBlockedLifecycleOperation = resolve;
+        }),
+    });
+    for (
+      let attempt = 0;
+      releaseBlockedLifecycleOperation === undefined && attempt < 10;
+      attempt += 1
+    ) {
+      await Promise.resolve();
+    }
+
+    clock.advanceMs(WEBSOCKET_PING_INTERVAL_MS);
+    scheduler.runDue();
+    clock.advanceMs(WEBSOCKET_PONG_TIMEOUT_MS);
+    scheduler.runDue();
+
+    const replacementLeaseId = "lease_replacement";
+    const replacementRawSocket = new FakeRawSocket();
+    const replacementAttachedPeer = service.attachBootstrapPeer({
+      leaseId: replacementLeaseId,
+      onFatalError: () => {
+        throw new Error("Replacement bootstrap attach should not fail in this test.");
+      },
+      onLeaseLost: () => {
+        throw new Error("Replacement bootstrap lease should not be lost in this test.");
+      },
+      onTransportUnhealthy: () => {
+        throw new Error("Replacement bootstrap transport should remain healthy in this test.");
+      },
+      ownerLeaseTtlMs: 60_000,
+      relaySessionId: "sess_bootstrap_replacement",
+      sandboxInstanceId: SandboxInstanceId,
+      socket: createFakePeerSocket(replacementRawSocket),
+    });
+
+    if (releaseBlockedLifecycleOperation === undefined) {
+      throw new Error("Expected lifecycle operation to be blocked before replacement attach.");
+    }
+    releaseBlockedLifecycleOperation();
+    await blockedLifecycleOperation;
+    await replacementAttachedPeer.activationPromise;
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await Promise.resolve();
+    }
+
+    expect(lifecycleEvents).not.toContainEqual({
+      kind: "bootstrap_degraded",
+      ownerLeaseId: OwnerLeaseId,
+    });
+    expect(lifecycleEvents).toContainEqual({
+      kind: "runtime_readiness_reported",
+      ownerLeaseId: replacementLeaseId,
+      runtimeReady: false,
+    });
+
+    attachedPeer.websocketHealthHandle?.stop();
+    replacementAttachedPeer.websocketHealthHandle?.stop();
   });
 
   it("renews the active runtime attachment while the bootstrap attachment remains healthy", async () => {

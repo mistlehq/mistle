@@ -150,6 +150,10 @@ export class TunnelSessionService {
             .enqueue({
               sandboxInstanceId: input.sandboxInstanceId,
               operation: async () => {
+                if (!this.relayCoordinator.isCurrentPeer(relayTarget)) {
+                  return;
+                }
+
                 await this.sandboxInstanceDeadlineService.handleBootstrapDegraded({
                   sandboxInstanceId: input.sandboxInstanceId,
                   ownerLeaseId: input.leaseId,
@@ -184,6 +188,10 @@ export class TunnelSessionService {
             .enqueue({
               sandboxInstanceId: input.sandboxInstanceId,
               operation: async () => {
+                if (!this.relayCoordinator.isCurrentPeer(relayTarget)) {
+                  return;
+                }
+
                 await this.sandboxInstanceDeadlineService.handleBootstrapRecovered({
                   sandboxInstanceId: input.sandboxInstanceId,
                   ownerLeaseId: input.leaseId,
