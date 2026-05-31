@@ -30,6 +30,7 @@ import {
   OrganizationIdentityLinkingSettingsPageView,
   type OrganizationIdentityLinkingProviderRow,
 } from "./organization-identity-linking-settings-page-view.js";
+import { createIdentityLinkingMemberLinks } from "./organization-identity-linking-settings-page-view.story-fixtures.js";
 import {
   createDraftGitHubConnection,
   GitHubAppSetupPageStory,
@@ -77,6 +78,9 @@ import { SessionWorkbenchHeaderActions } from "./session-workbench-header-action
 import { buildStoryLaunchableSandboxProfile } from "./sessions-page.story-fixtures.js";
 import type { SessionPortAccessState } from "./use-session-port-access.js";
 
+const GitHubEngineeringMemberLinkStatusCounts = { linked: 12, total: 36 };
+const SlackWorkspaceMemberLinkStatusCounts = { linked: 3, total: 14 };
+
 const IdentityLinkingProviders: OrganizationIdentityLinkingProviderRow[] = [
   {
     rowKey: "ilp_github",
@@ -87,26 +91,14 @@ const IdentityLinkingProviders: OrganizationIdentityLinkingProviderRow[] = [
     enablePending: false,
     enabled: true,
     unavailableMessage: null,
-    memberLinkStatusCounts: { linked: 12, total: 36 },
+    memberLinkStatusCounts: GitHubEngineeringMemberLinkStatusCounts,
     memberLinksErrorMessage: null,
-    memberLinks: [
-      {
-        userId: "usr_owner",
-        name: "Owner User",
-        email: "owner@example.com",
-        statusLabel: "Linked",
-        principalSummary: "owner-github",
-        updatedAt: "2026-04-20T00:00:00.000Z",
-      },
-      {
-        userId: "usr_member",
-        name: "Member User",
-        email: "member@example.com",
-        statusLabel: "Not linked",
-        principalSummary: null,
-        updatedAt: null,
-      },
-    ],
+    memberLinks: createIdentityLinkingMemberLinks({
+      count: GitHubEngineeringMemberLinkStatusCounts,
+      emailDomain: "example.com",
+      idPrefix: "github_engineering",
+      providerPrincipalPrefix: "github-user",
+    }),
   },
   {
     rowKey: "ilp_slack",
@@ -117,18 +109,14 @@ const IdentityLinkingProviders: OrganizationIdentityLinkingProviderRow[] = [
     enablePending: false,
     enabled: true,
     unavailableMessage: null,
-    memberLinkStatusCounts: { linked: 3, total: 14 },
+    memberLinkStatusCounts: SlackWorkspaceMemberLinkStatusCounts,
     memberLinksErrorMessage: null,
-    memberLinks: [
-      {
-        userId: "usr_slack_admin",
-        name: "Slack Admin",
-        email: "admin@example.com",
-        statusLabel: "Linked",
-        principalSummary: "mistle-workspace",
-        updatedAt: "2026-04-22T09:15:00.000Z",
-      },
-    ],
+    memberLinks: createIdentityLinkingMemberLinks({
+      count: SlackWorkspaceMemberLinkStatusCounts,
+      emailDomain: "example.com",
+      idPrefix: "slack_workspace",
+      providerPrincipalPrefix: "slack-user",
+    }),
   },
 ];
 

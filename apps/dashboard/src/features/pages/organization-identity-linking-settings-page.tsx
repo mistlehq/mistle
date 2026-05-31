@@ -509,6 +509,7 @@ export function buildProviderRow(input: {
         userId: link.userId,
         name: link.name,
         email: link.email,
+        linked: link.linked,
         statusLabel: formatIdentityLinkProviderMemberStatus({
           linked: link.linked,
         }),

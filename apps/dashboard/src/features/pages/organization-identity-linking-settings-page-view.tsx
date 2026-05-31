@@ -1,6 +1,6 @@
 import {
-  Badge,
   Button,
+  cn,
   Dialog,
   DialogContent,
   DialogFooter,
@@ -8,9 +8,17 @@ import {
   DialogTitle,
   Notice,
   ScrollArea,
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
   Switch,
+  Tabs,
+  TabsList,
+  TabsTrigger,
 } from "@mistle/ui";
-import { EyeIcon } from "@phosphor-icons/react";
+import { EyeIcon, XIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
 import { IntegrationLogo } from "../integrations/integration-logo.js";
@@ -40,6 +48,7 @@ export type OrganizationIdentityLinkingProviderRow = {
     userId: string;
     name: string;
     email: string;
+    linked: boolean;
     statusLabel: string;
     principalSummary: string | null;
     updatedAt: string | null;
@@ -71,17 +80,26 @@ const IdentityLinkingProviderColumns = [
   { key: "enable", label: "Enable", desktopWidth: "88px", align: "center" },
 ] satisfies readonly ResponsiveFieldListColumn[];
 
+type LinkStatusFilter = "all" | "linked" | "not-linked";
+
+type LoadedMemberLinkStatusProvider = OrganizationIdentityLinkingProviderRow & {
+  memberLinkStatusCounts: {
+    linked: number;
+    total: number;
+  };
+};
+
 export function OrganizationIdentityLinkingSettingsPageView(
   props: OrganizationIdentityLinkingSettingsPageViewProps,
 ): React.JSX.Element {
-  const [memberLinkStatusDialogRowKey, setMemberLinkStatusDialogRowKey] = useState<string | null>(
+  const [memberLinkStatusSheetRowKey, setMemberLinkStatusSheetRowKey] = useState<string | null>(
     null,
   );
 
-  const memberLinkStatusDialogProvider =
-    memberLinkStatusDialogRowKey === null
+  const memberLinkStatusSheetProvider =
+    memberLinkStatusSheetRowKey === null
       ? null
-      : (props.providers.find((provider) => provider.rowKey === memberLinkStatusDialogRowKey) ??
+      : (props.providers.find((provider) => provider.rowKey === memberLinkStatusSheetRowKey) ??
         null);
 
   if (props.loadErrorMessage !== null) {
@@ -120,7 +138,7 @@ export function OrganizationIdentityLinkingSettingsPageView(
               isLastRow={index === props.providers.length - 1}
               onEnabledChange={props.onEnabledChange}
               onOpenMemberLinkStatus={() => {
-                setMemberLinkStatusDialogRowKey(provider.rowKey);
+                setMemberLinkStatusSheetRowKey(provider.rowKey);
               }}
               provider={provider}
             />
@@ -128,13 +146,13 @@ export function OrganizationIdentityLinkingSettingsPageView(
         </ResponsiveFieldList>
       </FormPageStack>
 
-      <MemberLinkStatusDialog
+      <MemberLinkStatusSheet
         onOpenChange={(open) => {
           if (!open) {
-            setMemberLinkStatusDialogRowKey(null);
+            setMemberLinkStatusSheetRowKey(null);
           }
         }}
-        provider={memberLinkStatusDialogProvider}
+        provider={memberLinkStatusSheetProvider}
       />
       <GitCommitSigningImpactConfirmationDialog
         confirmation={props.gitCommitSigningImpactConfirmation}
@@ -316,65 +334,167 @@ function formatMemberLinkStatusCounts(input: { linked: number; total: number }):
   return `${String(input.linked)} linked out of ${String(input.total)}`;
 }
 
-function MemberLinkStatusDialog(input: {
+function MemberLinkStatusSheet(input: {
   provider: OrganizationIdentityLinkingProviderRow | null;
   onOpenChange: (open: boolean) => void;
 }): React.JSX.Element {
   const [lastProvider, setLastProvider] = useState<OrganizationIdentityLinkingProviderRow | null>(
     null,
   );
+  const [activeFilter, setActiveFilter] = useState<LinkStatusFilter>("all");
   const provider = input.provider ?? lastProvider;
 
   useEffect(() => {
     if (input.provider !== null) {
       setLastProvider(input.provider);
+      setActiveFilter("all");
     }
   }, [input.provider]);
 
+  const visibleMemberLinks =
+    provider === null ? [] : filterMemberLinks(provider.memberLinks, activeFilter);
+  const showStatusFilters =
+    provider !== null &&
+    provider.memberLinksErrorMessage === null &&
+    provider.canOpenMemberLinkStatus &&
+    hasLoadedMemberLinkStatus(provider) &&
+    provider.memberLinks.length > 0;
+
   return (
-    <Dialog onOpenChange={input.onOpenChange} open={input.provider !== null}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader variant="sectioned">
-          <DialogTitle>
-            {provider === null ? "Link Status" : `Link Status for ${provider.connectionLabel}`}
-          </DialogTitle>
-        </DialogHeader>
+    <Sheet onOpenChange={input.onOpenChange} open={input.provider !== null}>
+      <SheetContent
+        className="!left-0 !right-0 !h-[100dvh] !w-auto max-w-none !border-t-0 max-h-[100dvh] gap-0 overflow-hidden p-0"
+        showCloseButton={false}
+        side="bottom"
+      >
+        <SheetHeader className="shrink-0 border-b px-4 py-3 text-left">
+          <div className="flex min-h-8 items-center justify-between gap-3">
+            <SheetTitle className="min-w-0 truncate">
+              {provider === null ? "Link Status" : `Link Status for ${provider.connectionLabel}`}
+            </SheetTitle>
+            <SheetClose
+              render={
+                <Button
+                  aria-label="Close"
+                  className="-mr-2 shrink-0"
+                  size="icon-sm"
+                  type="button"
+                  variant="ghost"
+                />
+              }
+            >
+              <XIcon />
+              <span className="sr-only">Close</span>
+            </SheetClose>
+          </div>
+
+          {showStatusFilters ? (
+            <Tabs
+              onValueChange={(nextValue) => {
+                if (isLinkStatusFilter(nextValue)) {
+                  setActiveFilter(nextValue);
+                }
+              }}
+              value={activeFilter}
+            >
+              <TabsList>
+                <TabsTrigger value="all">
+                  All{" "}
+                  <span className="text-muted-foreground">
+                    {String(provider.memberLinkStatusCounts.total)}
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger value="linked">
+                  Linked{" "}
+                  <span className="text-muted-foreground">
+                    {String(provider.memberLinkStatusCounts.linked)}
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger value="not-linked">
+                  Not linked{" "}
+                  <span className="text-muted-foreground">
+                    {String(
+                      provider.memberLinkStatusCounts.total -
+                        provider.memberLinkStatusCounts.linked,
+                    )}
+                  </span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          ) : null}
+        </SheetHeader>
 
         {provider === null ? null : provider.memberLinksErrorMessage !== null ? (
-          <Notice variant="alert">{provider.memberLinksErrorMessage}</Notice>
+          <div className="p-4">
+            <Notice variant="alert">{provider.memberLinksErrorMessage}</Notice>
+          </div>
         ) : !provider.canOpenMemberLinkStatus ? (
-          <Notice>No members to show.</Notice>
-        ) : provider.memberLinkStatusCounts === null ? null : provider.memberLinks.length === 0 ? (
-          <Notice>No members to show.</Notice>
+          <div className="p-4">
+            <Notice>No members to show.</Notice>
+          </div>
+        ) : !hasLoadedMemberLinkStatus(provider) ? null : provider.memberLinks.length === 0 ? (
+          <div className="p-4">
+            <Notice>No members to show.</Notice>
+          </div>
         ) : (
-          <ScrollArea className="max-h-96 rounded-md border">
-            <div className="flex flex-col divide-y">
-              {provider.memberLinks.map((memberLink) => (
-                <div
-                  className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-                  key={memberLink.userId}
-                >
-                  <div className="min-w-0">
-                    <div className="font-medium">{memberLink.name}</div>
-                    <div className="text-sm text-muted-foreground">{memberLink.email}</div>
-                    {memberLink.principalSummary === null ? null : (
-                      <div className="text-sm text-muted-foreground">
-                        {memberLink.principalSummary}
+          <ScrollArea className="min-h-0 flex-1">
+            {visibleMemberLinks.length === 0 ? (
+              <div className="px-4 py-4">
+                <Notice>No users match this filter.</Notice>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1 py-2">
+                {visibleMemberLinks.map((memberLink) => (
+                  <div
+                    className="flex min-h-14 items-center justify-between gap-4 px-4 py-2.5 hover:bg-muted/60"
+                    key={memberLink.userId}
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{memberLink.name}</div>
+                      <div className="truncate text-sm text-muted-foreground">
+                        {memberLink.email}
                       </div>
-                    )}
-                    {memberLink.updatedAt === null ? null : (
-                      <div className="text-sm text-muted-foreground">
-                        Updated {memberLink.updatedAt}
-                      </div>
-                    )}
+                    </div>
+                    <span
+                      className={cn(
+                        "shrink-0 text-xs font-medium",
+                        memberLink.linked ? "text-foreground" : "text-muted-foreground",
+                      )}
+                    >
+                      {memberLink.statusLabel}
+                    </span>
                   </div>
-                  <Badge variant="outline">{memberLink.statusLabel}</Badge>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </ScrollArea>
         )}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
+}
+
+function hasLoadedMemberLinkStatus(
+  provider: OrganizationIdentityLinkingProviderRow,
+): provider is LoadedMemberLinkStatusProvider {
+  return provider.memberLinkStatusCounts !== null;
+}
+
+function isLinkStatusFilter(value: string): value is LinkStatusFilter {
+  return value === "all" || value === "linked" || value === "not-linked";
+}
+
+function filterMemberLinks(
+  memberLinks: OrganizationIdentityLinkingProviderRow["memberLinks"],
+  filter: LinkStatusFilter,
+): OrganizationIdentityLinkingProviderRow["memberLinks"] {
+  if (filter === "linked") {
+    return memberLinks.filter((memberLink) => memberLink.linked);
+  }
+
+  if (filter === "not-linked") {
+    return memberLinks.filter((memberLink) => !memberLink.linked);
+  }
+
+  return memberLinks;
 }

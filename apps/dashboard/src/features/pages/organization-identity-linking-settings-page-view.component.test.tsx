@@ -9,7 +9,7 @@ import {
 } from "./organization-identity-linking-settings-page-view.js";
 
 describe("OrganizationIdentityLinkingSettingsPageView", () => {
-  it("renders connection rows and opens the member link status dialog", () => {
+  it("renders connection rows and opens the link status sheet", () => {
     render(
       <OrganizationIdentityLinkingSettingsPageView
         gitCommitSigningImpactConfirmation={null}
@@ -26,6 +26,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
                 userId: "usr_owner",
                 name: "Owner User",
                 email: "owner@example.com",
+                linked: true,
                 statusLabel: "Linked",
                 principalSummary: "owner-github",
                 updatedAt: "2026-04-20T00:00:00.000Z",
@@ -34,6 +35,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
                 userId: "usr_member",
                 name: "Member User",
                 email: "member@example.com",
+                linked: false,
                 statusLabel: "Not linked",
                 principalSummary: null,
                 updatedAt: null,
@@ -74,7 +76,18 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
     expect(screen.getByText("Link Status for Engineering GitHub")).toBeTruthy();
     expect(screen.getByText("Owner User")).toBeTruthy();
     expect(screen.getByText("Member User")).toBeTruthy();
-    expect(screen.getByText("owner-github")).toBeTruthy();
+    expect(screen.queryByText("owner-github")).toBeNull();
+    expect(screen.queryByText("Updated 2026-04-20T00:00:00.000Z")).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Not linked 1" }));
+
+    expect(screen.queryByText("Owner User")).toBeNull();
+    expect(screen.getByText("Member User")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Linked 1" }));
+
+    expect(screen.getByText("Owner User")).toBeTruthy();
+    expect(screen.queryByText("Member User")).toBeNull();
   });
 
   it("runs the enabled-change handler from the row switch", async () => {
@@ -244,7 +257,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
     expect(screen.getByText("Mistle Support · Slack app")).toBeTruthy();
   });
 
-  it("renders provider-scoped member link status errors in the dialog", () => {
+  it("renders provider-scoped link status errors in the sheet", () => {
     render(
       <OrganizationIdentityLinkingSettingsPageView
         gitCommitSigningImpactConfirmation={null}
@@ -271,7 +284,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
     expect(screen.getByText("Could not load link status.")).toBeTruthy();
   });
 
-  it("keeps the member link status dialog body empty while status counts are unknown", () => {
+  it("keeps the link status sheet body empty while status counts are unknown", () => {
     render(
       <OrganizationIdentityLinkingSettingsPageView
         gitCommitSigningImpactConfirmation={null}
