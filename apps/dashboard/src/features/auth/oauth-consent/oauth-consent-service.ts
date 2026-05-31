@@ -6,6 +6,14 @@ export type OAuthConsentDetails = {
   organizationName: string;
   resource: string;
   requestedScopes: readonly string[];
+  authorizationRestartUri: string;
+};
+
+export type OAuthConsentOrganization = {
+  id: string;
+  name: string;
+  role: string;
+  isCurrent: boolean;
 };
 
 export async function getOAuthConsentDetails(input: {
@@ -40,6 +48,20 @@ export async function approveOAuthConsent(input: {
   return parseRedirectUri(await response.json());
 }
 
+export async function getOAuthConsentOrganizations(input: {
+  signal?: AbortSignal;
+}): Promise<OAuthConsentOrganization[]> {
+  const response = await requestControlPlane({
+    operation: "getOAuthConsentOrganizations",
+    pathname: "/v1/me/organizations",
+    method: "GET",
+    fallbackMessage: "Unable to load organizations.",
+    ...(input.signal === undefined ? {} : { signal: input.signal }),
+  });
+
+  return parseOAuthConsentOrganizations(await response.json());
+}
+
 export async function denyOAuthConsent(input: { requestId: string }): Promise<string> {
   const response = await requestControlPlane({
     operation: "denyOAuthConsent",
@@ -58,12 +80,14 @@ function parseOAuthConsentDetails(value: unknown): OAuthConsentDetails {
   const organizationName = readString(record, "organizationName");
   const resource = readString(record, "resource");
   const requestedScopes = readStringArray(record, "requestedScopes");
+  const authorizationRestartUri = readString(record, "authorizationRestartUri");
   if (
     requestId === null ||
     clientName === null ||
     organizationName === null ||
     resource === null ||
-    requestedScopes === null
+    requestedScopes === null ||
+    authorizationRestartUri === null
   ) {
     throw new Error("OAuth consent response was invalid.");
   }
@@ -74,7 +98,34 @@ function parseOAuthConsentDetails(value: unknown): OAuthConsentDetails {
     organizationName,
     resource,
     requestedScopes,
+    authorizationRestartUri,
   };
+}
+
+function parseOAuthConsentOrganizations(value: unknown): OAuthConsentOrganization[] {
+  const record = toRecord(value);
+  const organizations = record.organizations;
+  if (!Array.isArray(organizations)) {
+    throw new Error("OAuth consent organizations response was invalid.");
+  }
+
+  return organizations.map((organization) => {
+    const organizationRecord = toRecord(organization);
+    const id = readString(organizationRecord, "id");
+    const name = readString(organizationRecord, "name");
+    const role = readString(organizationRecord, "role");
+    const isCurrent = readBoolean(organizationRecord, "isCurrent");
+    if (id === null || name === null || role === null || isCurrent === null) {
+      throw new Error("OAuth consent organizations response included an invalid organization.");
+    }
+
+    return {
+      id,
+      name,
+      role,
+      isCurrent,
+    };
+  });
 }
 
 function parseRedirectUri(value: unknown): string {
@@ -97,6 +148,11 @@ function toRecord(value: unknown): Record<string, unknown> {
 function readString(record: Record<string, unknown>, key: string): string | null {
   const value = record[key];
   return typeof value === "string" ? value : null;
+}
+
+function readBoolean(record: Record<string, unknown>, key: string): boolean | null {
+  const value = record[key];
+  return typeof value === "boolean" ? value : null;
 }
 
 function readStringArray(record: Record<string, unknown>, key: string): string[] | null {

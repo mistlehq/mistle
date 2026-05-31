@@ -6,6 +6,7 @@ import {
   OAuthClientRegistrationKinds,
   OAuthGrantTypes,
 } from "@mistle/db/control-plane";
+import { buildUrlWithPath } from "@mistle/http";
 import { BadRequestError, ForbiddenError, NotFoundError } from "@mistle/http/errors.js";
 import { addMilliseconds, systemClock, type Clock } from "@mistle/time";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -28,6 +29,7 @@ export type OAuthAuthorizationConsentDetails = {
   organizationName: string;
   resource: string;
   requestedScopes: readonly OrganizationPermission[];
+  authorizationRestartUri: string;
 };
 
 export async function createOAuthAuthorizationConsentRequest(input: {
@@ -41,6 +43,7 @@ export async function createOAuthAuthorizationConsentRequest(input: {
   userId: string;
   organizationId: string;
   requestedScopes: readonly OrganizationPermission[];
+  authorizationRequestedScopes: readonly OrganizationPermission[];
   clock?: Clock;
 }): Promise<string> {
   const requestId = generateOpaqueToken();
@@ -63,6 +66,7 @@ export async function createOAuthAuthorizationConsentRequest(input: {
       userId: input.userId,
       organizationId: input.organizationId,
       requestedScopes: [...input.requestedScopes],
+      authorizationRequestedScopes: [...input.authorizationRequestedScopes],
     } satisfies OAuthAuthorizationConsentPayload,
     expiresAt,
   });
@@ -75,6 +79,7 @@ export async function getOAuthAuthorizationConsentDetails(input: {
   requestId: string;
   userId: string;
   organizationId: string;
+  authBaseUrl: string;
   clock?: Clock;
 }): Promise<OAuthAuthorizationConsentDetails> {
   const payload = await readPendingAuthorizationConsentPayload(input);
@@ -94,6 +99,10 @@ export async function getOAuthAuthorizationConsentDetails(input: {
     organizationName: organization.name,
     resource: payload.resource,
     requestedScopes: payload.requestedScopes,
+    authorizationRestartUri: createAuthorizationRestartUri({
+      authBaseUrl: input.authBaseUrl,
+      payload,
+    }),
   };
 }
 
@@ -248,4 +257,21 @@ async function consumePendingAuthorizationConsent(input: {
 
 function generateOpaqueToken(): string {
   return randomBytes(32).toString("base64url");
+}
+
+function createAuthorizationRestartUri(input: {
+  authBaseUrl: string;
+  payload: OAuthAuthorizationConsentPayload;
+}): string {
+  const url = new URL(buildUrlWithPath(input.authBaseUrl, "/oauth/authorize"));
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("client_id", input.payload.clientId);
+  url.searchParams.set("redirect_uri", input.payload.redirectUri);
+  url.searchParams.set("resource", input.payload.resource);
+  url.searchParams.set("scope", input.payload.authorizationRequestedScopes.join(" "));
+  url.searchParams.set("state", input.payload.state);
+  url.searchParams.set("code_challenge", input.payload.codeChallenge);
+  url.searchParams.set("code_challenge_method", input.payload.codeChallengeMethod);
+
+  return url.toString();
 }

@@ -18,6 +18,10 @@ import {
   OAuthClientRegistrationResponseSchema,
   OAuthTokenResponseSchema,
 } from "../src/oauth/schemas.js";
+import {
+  createOAuthAuthorizationConsentRequest,
+  getOAuthAuthorizationConsentDetails,
+} from "../src/oauth/services/authorization-consent.js";
 import { createOAuthGrantTokenPair } from "../src/oauth/services/oauth-token.js";
 
 const it = createIntegrationTest({
@@ -179,12 +183,66 @@ describe.concurrent("OAuth MCP consent", () => {
       },
     );
     expect(detailsResponse.status).toBe(200);
-    expect(await detailsResponse.json()).toMatchObject({
+    const detailsBody = await detailsResponse.json();
+    expect(detailsBody).toMatchObject({
       clientName: "Integration MCP Client",
       organizationName: "Integration MCP Consent Organization",
       resource: `${env.controlPlaneApi.hostBaseUrl}/mcp`,
       requestedScopes: ["sandboxProfile:read", "sandboxSession:create"],
     });
+    const restartUrl = new URL(readStringProperty(detailsBody, "authorizationRestartUri"));
+    expect(restartUrl.origin).toBe(new URL(env.controlPlaneApi.hostBaseUrl).origin);
+    expect(restartUrl.pathname).toBe("/oauth/authorize");
+    expect(restartUrl.searchParams.get("response_type")).toBe("code");
+    expect(restartUrl.searchParams.get("client_id")).toBe(client.clientId);
+    expect(restartUrl.searchParams.get("redirect_uri")).toBe(client.redirectUri);
+    expect(restartUrl.searchParams.get("resource")).toBe(`${env.controlPlaneApi.hostBaseUrl}/mcp`);
+    expect(restartUrl.searchParams.get("scope")).toBe("sandboxProfile:read sandboxSession:create");
+    expect(restartUrl.searchParams.get("state")).toBe("pending-consent-state");
+    expect(restartUrl.searchParams.get("code_challenge")).toBe(
+      pkceChallenge("pending-consent-verifier-pending-consent-verifier"),
+    );
+    expect(restartUrl.searchParams.get("code_challenge_method")).toBe("S256");
+  });
+
+  it("builds restart URIs from the original requested scopes and preserves auth path prefixes", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: `integration-oauth-mcp-consent-restart-${randomUUID()}@example.com`,
+      organizationName: "Integration MCP Restart Organization",
+    });
+    const requestId = await createOAuthAuthorizationConsentRequest({
+      db: env.controlPlaneDb,
+      clientId: "restart-uri-client",
+      clientName: "Restart URI Client",
+      redirectUri: "https://client.example.test/restart-callback",
+      resource: `${env.controlPlaneApi.hostBaseUrl}/mcp`,
+      codeChallenge: pkceChallenge("restart-uri-verifier-restart-uri-verifier"),
+      state: "restart-uri-state",
+      userId: session.userId,
+      organizationId: session.organizationId,
+      requestedScopes: [OrganizationPermissions.SANDBOX_PROFILE_READ],
+      authorizationRequestedScopes: [
+        OrganizationPermissions.SANDBOX_PROFILE_READ,
+        OrganizationPermissions.SANDBOX_SESSION_CREATE,
+      ],
+    });
+
+    const details = await getOAuthAuthorizationConsentDetails({
+      db: env.controlPlaneDb,
+      requestId,
+      userId: session.userId,
+      organizationId: session.organizationId,
+      authBaseUrl: "https://auth.example.test/base",
+    });
+
+    expect(details.requestedScopes).toStrictEqual([OrganizationPermissions.SANDBOX_PROFILE_READ]);
+    const restartUrl = new URL(details.authorizationRestartUri);
+    expect(restartUrl.origin).toBe("https://auth.example.test");
+    expect(restartUrl.pathname).toBe("/base/oauth/authorize");
+    expect(restartUrl.searchParams.get("scope")).toBe("sandboxProfile:read sandboxSession:create");
+    expect(restartUrl.searchParams.get("state")).toBe("restart-uri-state");
   });
 
   it("approves selected scopes and preserves state in the client redirect", async ({ env }) => {
@@ -831,4 +889,16 @@ function readRedirectUri(value: unknown): string {
   }
 
   return redirectUri;
+}
+
+function readStringProperty(value: unknown, key: string): string {
+  if (typeof value !== "object" || value === null) {
+    throw new Error("Expected object response.");
+  }
+  const property = Object.fromEntries(Object.entries(value))[key];
+  if (typeof property !== "string") {
+    throw new Error(`Expected ${key} to be a string.`);
+  }
+
+  return property;
 }

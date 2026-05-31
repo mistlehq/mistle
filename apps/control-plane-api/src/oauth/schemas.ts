@@ -97,6 +97,7 @@ export const OAuthAuthorizationConsentPayloadSchema = z
     userId: z.string().min(1),
     organizationId: z.string().min(1),
     requestedScopes: z.array(ApiKeyPermissionSchema).min(1),
+    authorizationRequestedScopes: z.array(ApiKeyPermissionSchema).min(1),
   })
   .strict();
 

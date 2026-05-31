@@ -127,6 +127,7 @@ export function createOAuthRoutes(): AppRoutes<typeof OAUTH_ROUTE_BASE_PATH> {
           userId: session.user.id,
           organizationId: session.activeOrganizationId,
           requestedScopes: permissions,
+          authorizationRequestedScopes: requestedPermissions,
         });
         return ctx.redirect(createDashboardConsentUrl(ctx, requestId), 302);
       }
@@ -230,6 +231,7 @@ export function createOAuthRoutes(): AppRoutes<typeof OAUTH_ROUTE_BASE_PATH> {
         requestId: ctx.req.param("requestId"),
         userId: session.user.id,
         organizationId: session.activeOrganizationId,
+        authBaseUrl: ctx.get("config").auth.baseUrl,
       });
 
       return ctx.json(details, 200);
