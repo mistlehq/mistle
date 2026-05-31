@@ -4,6 +4,7 @@ import {
   buildCodexReviewStartRequest,
   buildCodexTurnInputItems,
   buildCodexTurnStartRequest,
+  parseCodexSkillsListResponse,
   parseCodexThreadSessionResponse,
 } from "./codex-operations.js";
 
@@ -229,5 +230,68 @@ describe("parseCodexThreadSessionResponse", () => {
         },
       }),
     ).toThrow("thread/start response payload is invalid.");
+  });
+});
+
+describe("parseCodexSkillsListResponse", () => {
+  it("reads enabled skill metadata from Codex app-server skills/list responses", () => {
+    expect(
+      parseCodexSkillsListResponse({
+        data: [
+          {
+            cwd: "/repo",
+            skills: [
+              {
+                name: "grill-with-docs",
+                description: "Stress test a plan against docs",
+                shortDescription: "Grill docs",
+                interface: {
+                  shortDescription: "Stress test docs",
+                },
+                path: "/home/.codex/skills/grill-with-docs/SKILL.md",
+                scope: "user",
+                enabled: true,
+              },
+            ],
+            errors: [],
+          },
+        ],
+      }),
+    ).toEqual({
+      data: [
+        {
+          cwd: "/repo",
+          skills: [
+            {
+              name: "grill-with-docs",
+              description: "Stress test a plan against docs",
+              shortDescription: "Stress test docs",
+              enabled: true,
+            },
+          ],
+          errors: [],
+        },
+      ],
+    });
+  });
+
+  it("rejects malformed skills/list responses", () => {
+    expect(() =>
+      parseCodexSkillsListResponse({
+        data: [
+          {
+            cwd: "/repo",
+            skills: [
+              {
+                name: "",
+                description: "Missing a name",
+                enabled: true,
+              },
+            ],
+            errors: [],
+          },
+        ],
+      }),
+    ).toThrow("skills/list response payload is invalid.");
   });
 });

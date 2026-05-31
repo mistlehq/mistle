@@ -1,11 +1,15 @@
-import type { ComposerCapability, ComposerCommandDescriptor } from "@mistle/integrations-core";
+import type {
+  ComposerCapability,
+  ComposerCommandDescriptor,
+  SkillMentionDescriptor,
+} from "@mistle/integrations-core";
 
 const SlashCommandQueryPattern = /^[a-z0-9-]*$/;
 const WhitespacePattern = /\s/;
 
 export type ActiveComposerTrigger = {
-  capabilityKind: "composerCommand" | "contextMention";
-  trigger: "/" | "@";
+  capabilityKind: "composerCommand" | "contextMention" | "skillMention";
+  trigger: "/" | "@" | "$";
   query: string;
   range: {
     start: number;
@@ -28,6 +32,11 @@ export function detectActiveComposerTrigger(input: {
     return contextMentionTrigger;
   }
 
+  const skillMentionTrigger = detectSkillMentionTrigger(input);
+  if (skillMentionTrigger !== null) {
+    return skillMentionTrigger;
+  }
+
   return detectComposerCommandTrigger(input);
 }
 
@@ -41,33 +50,65 @@ function detectComposerCommandTrigger(input: {
     return null;
   }
 
-  const cursorIndex = input.selectionStart;
-  if (cursorIndex < 1 || cursorIndex > input.composerText.length) {
+  const tokenRange = findWhitespaceDelimitedTokenRange({
+    composerText: input.composerText,
+    cursorIndex: input.selectionStart,
+  });
+  if (tokenRange === null) {
     return null;
   }
 
-  if (!input.composerText.startsWith("/")) {
+  const commandToken = input.composerText.slice(tokenRange.start, tokenRange.end);
+  if (!commandToken.startsWith("/")) {
     return null;
   }
 
-  const commandTokenEnd = findCommandTokenEnd(input.composerText);
-  if (cursorIndex > commandTokenEnd) {
-    return null;
-  }
-
-  const commandToken = input.composerText.slice(1, commandTokenEnd);
-  if (!isSlashCommandQuery(commandToken)) {
+  const commandQuery = commandToken.slice(1);
+  if (!isSlashCommandQuery(commandQuery)) {
     return null;
   }
 
   return {
     capabilityKind: "composerCommand",
     trigger: "/",
-    query: input.composerText.slice(1, cursorIndex),
-    range: {
-      start: 0,
-      end: commandTokenEnd,
-    },
+    query: input.composerText.slice(tokenRange.start + 1, input.selectionStart),
+    range: tokenRange,
+  };
+}
+
+function detectSkillMentionTrigger(input: {
+  composerCapabilities: readonly ComposerCapability[];
+  composerText: string;
+  selectionStart: number;
+  selectionEnd: number;
+}): ActiveComposerTrigger | null {
+  if (!hasSkillMentionCapability(input.composerCapabilities)) {
+    return null;
+  }
+
+  const tokenRange = findWhitespaceDelimitedTokenRange({
+    composerText: input.composerText,
+    cursorIndex: input.selectionStart,
+  });
+  if (tokenRange === null) {
+    return null;
+  }
+
+  const tokenText = input.composerText.slice(tokenRange.start, tokenRange.end);
+  if (!tokenText.startsWith("$")) {
+    return null;
+  }
+
+  const skillToken = tokenText.slice(1);
+  if (!isSlashCommandQuery(skillToken)) {
+    return null;
+  }
+
+  return {
+    capabilityKind: "skillMention",
+    trigger: "$",
+    query: input.composerText.slice(tokenRange.start + 1, input.selectionStart),
+    range: tokenRange,
   };
 }
 
@@ -120,6 +161,14 @@ export function listComposerCommands(
   );
 }
 
+export function listSkillMentions(
+  composerCapabilities: readonly ComposerCapability[],
+): readonly SkillMentionDescriptor[] {
+  return composerCapabilities.flatMap((capability) =>
+    capability.kind === "skillMention" ? (capability.skills ?? []) : [],
+  );
+}
+
 export function hasComposerCommand(input: {
   composerCapabilities: readonly ComposerCapability[];
   commandId: string;
@@ -139,6 +188,10 @@ function hasComposerCommandCapability(
 
 function hasContextMentionCapability(composerCapabilities: readonly ComposerCapability[]): boolean {
   return composerCapabilities.some((capability) => capability.kind === "contextMention");
+}
+
+function hasSkillMentionCapability(composerCapabilities: readonly ComposerCapability[]): boolean {
+  return composerCapabilities.some((capability) => capability.kind === "skillMention");
 }
 
 function findWhitespaceDelimitedTokenRange(input: {

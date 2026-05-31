@@ -1,4 +1,4 @@
-import type { ComposerCapability } from "@mistle/integrations-core";
+import type { ComposerCapability, SkillMentionDescriptor } from "@mistle/integrations-core";
 
 export const CodexRuntimeCommandIds = {
   COMPACT_THREAD: "codex.compact",
@@ -58,8 +58,9 @@ export const CodexComposerCapabilities = [
 
 export function resolveCodexComposerCapabilities(input: {
   goalsEnabled: boolean;
+  skills?: readonly SkillMentionDescriptor[];
 }): readonly ComposerCapability[] {
-  return CodexComposerCapabilities.map((capability) => {
+  const commandCapabilities = CodexComposerCapabilities.map((capability) => {
     if (capability.kind !== "composerCommand") {
       return capability;
     }
@@ -71,4 +72,19 @@ export function resolveCodexComposerCapabilities(input: {
       ),
     };
   });
+
+  if (input.skills === undefined) {
+    return commandCapabilities;
+  }
+
+  return [
+    ...commandCapabilities,
+    {
+      kind: "skillMention",
+      trigger: "$",
+      source: "runtimeSkill",
+      submitAs: "inlineText",
+      skills: input.skills,
+    },
+  ];
 }

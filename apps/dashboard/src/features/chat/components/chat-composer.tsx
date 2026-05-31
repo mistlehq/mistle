@@ -1,4 +1,8 @@
-import type { ComposerCapability, ComposerCommandDescriptor } from "@mistle/integrations-core";
+import type {
+  ComposerCapability,
+  ComposerCommandDescriptor,
+  SkillMentionDescriptor,
+} from "@mistle/integrations-core";
 import {
   Button,
   ButtonGroup,
@@ -35,6 +39,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   detectActiveComposerTrigger,
   listComposerCommands,
+  listSkillMentions,
 } from "../../pages/session-composer/session-composer-trigger-detection.js";
 import { resolveSelectableValue } from "../../shared/select-value.js";
 import {
@@ -49,6 +54,14 @@ function formatSlashCommandOptionLabel(command: ComposerCommandDescriptor): stri
   }
 
   return `/${command.name} ${command.description}`;
+}
+
+function formatSkillMentionOptionLabel(skill: SkillMentionDescriptor): string {
+  if (skill.description === undefined) {
+    return `$${skill.name}`;
+  }
+
+  return `$${skill.name} ${skill.description}`;
 }
 
 function formatContextMentionInsertion(path: string): string {
@@ -215,6 +228,30 @@ type ChoiceCommandPanelChoice = Extract<
   { kind: "choice" }
 >["choices"][number];
 
+type SlashPaletteOption =
+  | {
+      kind: "command";
+      command: ComposerCommandDescriptor;
+    }
+  | {
+      kind: "skill";
+      skill: SkillMentionDescriptor;
+    };
+
+function createCommandSlashPaletteOption(command: ComposerCommandDescriptor): SlashPaletteOption {
+  return {
+    kind: "command",
+    command,
+  };
+}
+
+function createSkillSlashPaletteOption(skill: SkillMentionDescriptor): SlashPaletteOption {
+  return {
+    kind: "skill",
+    skill,
+  };
+}
+
 function ChoiceCommandPanelActions(input: {
   choices: readonly ChoiceCommandPanelChoice[];
   title: string;
@@ -351,22 +388,55 @@ export function ChatComposer({
     () => listComposerCommands(composerCapabilities),
     [composerCapabilities],
   );
+  const skillMentionOptions = useMemo(
+    () => listSkillMentions(composerCapabilities),
+    [composerCapabilities],
+  );
   const filteredSlashCommandOptions =
     activeComposerTrigger === null || activeComposerTrigger.capabilityKind !== "composerCommand"
       ? []
-      : slashCommandOptions.filter((command) =>
-          command.name.startsWith(activeComposerTrigger.query),
+      : slashCommandOptions.filter(
+          (command) =>
+            (activeComposerTrigger.range.start === 0 || command.submitAs === "inlineText") &&
+            command.name.startsWith(activeComposerTrigger.query),
         );
+  const filteredSlashSkillOptions =
+    activeComposerTrigger === null || activeComposerTrigger.capabilityKind !== "composerCommand"
+      ? []
+      : skillMentionOptions.filter((skill) => skill.name.startsWith(activeComposerTrigger.query));
+  const slashPaletteOptions = useMemo<readonly SlashPaletteOption[]>(
+    () => [
+      ...filteredSlashCommandOptions.map(createCommandSlashPaletteOption),
+      ...filteredSlashSkillOptions.map(createSkillSlashPaletteOption),
+    ],
+    [filteredSlashCommandOptions, filteredSlashSkillOptions],
+  );
   const showSlashCommandMenu =
     activeComposerTrigger !== null && activeComposerTrigger.capabilityKind === "composerCommand";
   const activeSlashCommandIndexWithinBounds =
-    filteredSlashCommandOptions.length === 0
+    slashPaletteOptions.length === 0
       ? null
-      : Math.min(activeSlashCommandIndex, filteredSlashCommandOptions.length - 1);
-  const activeSlashCommand =
+      : Math.min(activeSlashCommandIndex, slashPaletteOptions.length - 1);
+  const activeSlashPaletteOption =
     activeSlashCommandIndexWithinBounds === null
       ? null
-      : (filteredSlashCommandOptions[activeSlashCommandIndexWithinBounds] ?? null);
+      : (slashPaletteOptions[activeSlashCommandIndexWithinBounds] ?? null);
+  const activeSkillMentionQuery =
+    activeComposerTrigger?.capabilityKind === "skillMention" ? activeComposerTrigger.query : null;
+  const filteredSkillMentionOptions =
+    activeSkillMentionQuery === null
+      ? []
+      : skillMentionOptions.filter((skill) => skill.name.startsWith(activeSkillMentionQuery));
+  const showSkillMentionMenu =
+    activeComposerTrigger !== null && activeComposerTrigger.capabilityKind === "skillMention";
+  const activeSkillMentionIndexWithinBounds =
+    filteredSkillMentionOptions.length === 0
+      ? null
+      : Math.min(activeSlashCommandIndex, filteredSkillMentionOptions.length - 1);
+  const activeSkillMention =
+    activeSkillMentionIndexWithinBounds === null
+      ? null
+      : (filteredSkillMentionOptions[activeSkillMentionIndexWithinBounds] ?? null);
   const contextMentionResults = contextMentionControl?.results ?? [];
   const activeContextMentionKey =
     activeComposerTrigger?.capabilityKind === "contextMention"
@@ -516,6 +586,35 @@ export function ChatComposer({
     });
   }
 
+  function insertSkillMention(skill: SkillMentionDescriptor): void {
+    if (
+      activeComposerTrigger === null ||
+      (activeComposerTrigger.capabilityKind !== "composerCommand" &&
+        activeComposerTrigger.capabilityKind !== "skillMention")
+    ) {
+      return;
+    }
+
+    const insertedText = `$${skill.name} `;
+    const nextComposerText = [
+      composerText.slice(0, activeComposerTrigger.range.start),
+      insertedText,
+      composerText.slice(activeComposerTrigger.range.end),
+    ].join("");
+    const nextCursorIndex = activeComposerTrigger.range.start + insertedText.length;
+
+    onComposerTextChange(nextComposerText);
+    setComposerSelection({
+      start: nextCursorIndex,
+      end: nextCursorIndex,
+    });
+    setActiveSlashCommandIndex(0);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(nextCursorIndex, nextCursorIndex);
+    });
+  }
+
   function insertContextMentionPath(path: string, query: string): void {
     if (
       activeComposerTrigger === null ||
@@ -558,6 +657,15 @@ export function ChatComposer({
     insertSlashCommand(command);
   }
 
+  function selectSlashPaletteOption(option: SlashPaletteOption): void {
+    if (option.kind === "command") {
+      selectSlashCommand(option.command);
+      return;
+    }
+
+    insertSkillMention(option.skill);
+  }
+
   function commandIsDisabledDuringActiveTurn(command: ComposerCommandDescriptor): boolean {
     return (
       (submitMode === "steer" || submitMode === "interrupt") &&
@@ -566,14 +674,16 @@ export function ChatComposer({
   }
 
   function moveActiveSlashCommand(delta: number): void {
-    if (filteredSlashCommandOptions.length === 0) {
+    const optionCount =
+      activeComposerTrigger?.capabilityKind === "skillMention"
+        ? filteredSkillMentionOptions.length
+        : slashPaletteOptions.length;
+    if (optionCount === 0) {
       return;
     }
 
     setActiveSlashCommandIndex(
-      (currentIndex) =>
-        (currentIndex + delta + filteredSlashCommandOptions.length) %
-        filteredSlashCommandOptions.length,
+      (currentIndex) => (currentIndex + delta + optionCount) % optionCount,
     );
   }
 
@@ -853,41 +963,139 @@ export function ChatComposer({
               id={commandListId}
               role="listbox"
             >
-              {filteredSlashCommandOptions.length === 0 ? (
+              {slashPaletteOptions.length === 0 ? (
                 <div className="px-3 py-2 text-sm text-muted-foreground">No commands</div>
               ) : (
-                filteredSlashCommandOptions.map((command, commandIndex) => {
-                  const isActiveCommand = command.id === activeSlashCommand?.id;
-                  const isDisabledCommand = commandIsDisabledDuringActiveTurn(command);
+                <>
+                  {filteredSlashCommandOptions.length === 0 ? null : (
+                    <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                      Commands
+                    </div>
+                  )}
+                  {filteredSlashCommandOptions.map((command, commandIndex) => {
+                    const isActiveCommand =
+                      activeSlashPaletteOption?.kind === "command" &&
+                      activeSlashPaletteOption.command.id === command.id;
+                    const isDisabledCommand = commandIsDisabledDuringActiveTurn(command);
+
+                    return (
+                      <button
+                        aria-label={formatSlashCommandOptionLabel(command)}
+                        aria-disabled={isDisabledCommand}
+                        aria-selected={isActiveCommand}
+                        className={[
+                          "flex w-full items-start gap-3 rounded-sm px-3 py-2 text-left text-sm outline-none",
+                          isActiveCommand ? "bg-muted text-foreground" : "hover:bg-muted/70",
+                          isDisabledCommand ? "cursor-not-allowed opacity-50" : null,
+                        ].join(" ")}
+                        id={`${commandListId}-command-${command.id}`}
+                        key={command.id}
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          selectSlashCommand(command);
+                        }}
+                        onMouseEnter={() => {
+                          setActiveSlashCommandIndex(commandIndex);
+                        }}
+                        role="option"
+                        type="button"
+                      >
+                        <span className="min-w-24 font-mono text-xs text-muted-foreground">
+                          /{command.name}
+                        </span>
+                        {command.description === undefined ? null : (
+                          <span className="min-w-0 flex-1 text-muted-foreground">
+                            {command.description}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                  {filteredSlashSkillOptions.length === 0 ? null : (
+                    <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                      Skills
+                    </div>
+                  )}
+                  {filteredSlashSkillOptions.map((skill, skillIndex) => {
+                    const optionIndex = filteredSlashCommandOptions.length + skillIndex;
+                    const isActiveSkill =
+                      activeSlashPaletteOption?.kind === "skill" &&
+                      activeSlashPaletteOption.skill.name === skill.name;
+
+                    return (
+                      <button
+                        aria-label={formatSkillMentionOptionLabel(skill)}
+                        aria-selected={isActiveSkill}
+                        className={[
+                          "flex w-full items-start gap-3 rounded-sm px-3 py-2 text-left text-sm outline-none",
+                          isActiveSkill ? "bg-muted text-foreground" : "hover:bg-muted/70",
+                        ].join(" ")}
+                        id={`${commandListId}-skill-${skill.name}`}
+                        key={skill.name}
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          insertSkillMention(skill);
+                        }}
+                        onMouseEnter={() => {
+                          setActiveSlashCommandIndex(optionIndex);
+                        }}
+                        role="option"
+                        type="button"
+                      >
+                        <span className="min-w-24 font-mono text-xs text-muted-foreground">
+                          ${skill.name}
+                        </span>
+                        {skill.description === undefined ? null : (
+                          <span className="min-w-0 flex-1 text-muted-foreground">
+                            {skill.description}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+          ) : null}
+          {showSkillMentionMenu ? (
+            <div
+              aria-label="Skills"
+              className="absolute right-0 bottom-full left-0 z-20 mb-2 max-h-64 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+              id={commandListId}
+              role="listbox"
+            >
+              {filteredSkillMentionOptions.length === 0 ? (
+                <div className="px-3 py-2 text-sm text-muted-foreground">No skills</div>
+              ) : (
+                filteredSkillMentionOptions.map((skill, skillIndex) => {
+                  const isActiveSkill = skill.name === activeSkillMention?.name;
 
                   return (
                     <button
-                      aria-label={formatSlashCommandOptionLabel(command)}
-                      aria-disabled={isDisabledCommand}
-                      aria-selected={isActiveCommand}
+                      aria-label={formatSkillMentionOptionLabel(skill)}
+                      aria-selected={isActiveSkill}
                       className={[
                         "flex w-full items-start gap-3 rounded-sm px-3 py-2 text-left text-sm outline-none",
-                        isActiveCommand ? "bg-muted text-foreground" : "hover:bg-muted/70",
-                        isDisabledCommand ? "cursor-not-allowed opacity-50" : null,
+                        isActiveSkill ? "bg-muted text-foreground" : "hover:bg-muted/70",
                       ].join(" ")}
-                      id={`${commandListId}-${command.id}`}
-                      key={command.id}
+                      id={`${commandListId}-skill-${skill.name}`}
+                      key={skill.name}
                       onMouseDown={(event) => {
                         event.preventDefault();
-                        selectSlashCommand(command);
+                        insertSkillMention(skill);
                       }}
                       onMouseEnter={() => {
-                        setActiveSlashCommandIndex(commandIndex);
+                        setActiveSlashCommandIndex(skillIndex);
                       }}
                       role="option"
                       type="button"
                     >
                       <span className="min-w-24 font-mono text-xs text-muted-foreground">
-                        /{command.name}
+                        ${skill.name}
                       </span>
-                      {command.description === undefined ? null : (
+                      {skill.description === undefined ? null : (
                         <span className="min-w-0 flex-1 text-muted-foreground">
-                          {command.description}
+                          {skill.description}
                         </span>
                       )}
                     </button>
@@ -900,18 +1108,22 @@ export function ChatComposer({
             aria-activedescendant={
               showContextMentionMenu && activeContextMentionIndexWithinBounds !== null
                 ? `${contextMentionListId}-${String(activeContextMentionIndexWithinBounds)}`
-                : activeSlashCommand === null
-                  ? undefined
-                  : `${commandListId}-${activeSlashCommand.id}`
+                : showSlashCommandMenu && activeSlashPaletteOption !== null
+                  ? activeSlashPaletteOption.kind === "command"
+                    ? `${commandListId}-command-${activeSlashPaletteOption.command.id}`
+                    : `${commandListId}-skill-${activeSlashPaletteOption.skill.name}`
+                  : showSkillMentionMenu && activeSkillMention !== null
+                    ? `${commandListId}-skill-${activeSkillMention.name}`
+                    : undefined
             }
             aria-controls={
               showContextMentionMenu
                 ? contextMentionListId
-                : showSlashCommandMenu
+                : showSlashCommandMenu || showSkillMentionMenu
                   ? commandListId
                   : undefined
             }
-            aria-expanded={showSlashCommandMenu || showContextMentionMenu}
+            aria-expanded={showSlashCommandMenu || showSkillMentionMenu || showContextMentionMenu}
             aria-haspopup="listbox"
             className="max-h-48 min-h-12 resize-none overflow-y-auto border-0 bg-transparent p-1.5 shadow-none placeholder:text-muted-foreground/60 focus-visible:border-transparent focus-visible:ring-0"
             id="session-composer"
@@ -960,7 +1172,7 @@ export function ChatComposer({
                 }
               }
 
-              if (showSlashCommandMenu && filteredSlashCommandOptions.length > 0) {
+              if (showSlashCommandMenu && slashPaletteOptions.length > 0) {
                 if (event.key === "ArrowDown") {
                   event.preventDefault();
                   moveActiveSlashCommand(1);
@@ -975,8 +1187,30 @@ export function ChatComposer({
 
                 if (event.key === "Tab" || event.key === "Enter") {
                   event.preventDefault();
-                  if (activeSlashCommand !== null) {
-                    selectSlashCommand(activeSlashCommand);
+                  if (activeSlashPaletteOption !== null) {
+                    selectSlashPaletteOption(activeSlashPaletteOption);
+                  }
+                  return;
+                }
+              }
+
+              if (showSkillMentionMenu && filteredSkillMentionOptions.length > 0) {
+                if (event.key === "ArrowDown") {
+                  event.preventDefault();
+                  moveActiveSlashCommand(1);
+                  return;
+                }
+
+                if (event.key === "ArrowUp") {
+                  event.preventDefault();
+                  moveActiveSlashCommand(-1);
+                  return;
+                }
+
+                if (event.key === "Tab" || event.key === "Enter") {
+                  event.preventDefault();
+                  if (activeSkillMention !== null) {
+                    insertSkillMention(activeSkillMention);
                   }
                   return;
                 }

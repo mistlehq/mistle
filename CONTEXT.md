@@ -220,6 +220,18 @@ _Avoid_: Thread panel, Codex thread panel
 A special composer interaction available for a session, including how the input is represented while editing and how it is submitted.
 _Avoid_: Autocomplete feature, composer shortcut
 
+**Inline composer command**:
+A **Composer command** that can be inserted as editable prompt text away from the start of the composer.
+_Avoid_: Runtime command, start-only command
+
+**Codex skill mention**:
+A Codex **Composer capability** selected with `$` or from the **Codex slash palette** that inserts a skill from Codex app-server `skills/list` into the composer as prompt text.
+_Avoid_: Hardcoded skill, dashboard skill, slash command
+
+**Codex slash palette**:
+The Codex composer palette opened with `/`, listing **Composer commands** before runtime-discovered **Codex skill mentions**.
+_Avoid_: Skill picker, command-only palette
+
 **Context mention**:
 A **Session workbench** **Composer capability** selected with `@` that inserts a referenced sandbox workspace path into the composer as prompt text.
 _Avoid_: File attachment, uploaded file, file reference

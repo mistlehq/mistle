@@ -21,6 +21,20 @@ describe("bootstrap connection context", () => {
           sandboxInstanceId: "sandbox_123",
           connectedAtIso: "2026-03-27T00:00:00.000Z",
           activeThreadId: null,
+          activeThreadCwd: null,
+        },
+      }),
+    ).toBeNull();
+  });
+
+  it("returns null when no thread cwd is known yet", () => {
+    expect(
+      resolveBootstrapConnectionContext({
+        connectionCandidate: {
+          sandboxInstanceId: "sandbox_123",
+          connectedAtIso: "2026-03-27T00:00:00.000Z",
+          activeThreadId: "thread_123",
+          activeThreadCwd: null,
         },
       }),
     ).toBeNull();
@@ -33,11 +47,13 @@ describe("bootstrap connection context", () => {
           sandboxInstanceId: "sandbox_123",
           connectedAtIso: "2026-03-27T00:00:00.000Z",
           activeThreadId: "thread_123",
+          activeThreadCwd: "/repo",
         },
       }),
     ).toEqual({
       connectionKey: "sandbox_123:2026-03-27T00:00:00.000Z",
       activeThreadId: "thread_123",
+      activeThreadCwd: "/repo",
     });
   });
 });
@@ -75,6 +91,7 @@ describe("session bootstrap plan", () => {
         bootstrapConnectionContext: {
           connectionKey: "sandbox_123:2026-03-27T00:00:00.000Z",
           activeThreadId: "thread_123",
+          activeThreadCwd: "/repo",
         },
         establishedConnectionKey: null,
       }),
@@ -91,6 +108,7 @@ describe("session bootstrap plan", () => {
         bootstrapConnectionContext: {
           connectionKey: "sandbox_123:2026-03-27T00:05:00.000Z",
           activeThreadId: "thread_123",
+          activeThreadCwd: "/repo",
         },
         establishedConnectionKey: "sandbox_123:2026-03-27T00:00:00.000Z",
       }),
@@ -107,6 +125,7 @@ describe("session bootstrap plan", () => {
         bootstrapConnectionContext: {
           connectionKey: "sandbox_123:2026-03-27T00:05:00.000Z",
           activeThreadId: "thread_123",
+          activeThreadCwd: "/repo",
         },
         establishedConnectionKey: "sandbox_123:2026-03-27T00:05:00.000Z",
       }),
@@ -123,6 +142,7 @@ describe("session bootstrap plan", () => {
         bootstrapConnectionContext: {
           connectionKey: "sandbox_123:2026-03-27T00:05:00.000Z",
           activeThreadId: "thread_456",
+          activeThreadCwd: "/repo",
         },
         establishedConnectionKey: "sandbox_123:2026-03-27T00:05:00.000Z",
       }),

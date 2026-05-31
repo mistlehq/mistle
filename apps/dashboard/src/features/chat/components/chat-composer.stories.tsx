@@ -113,6 +113,34 @@ const ContextMentionCapability: React.ComponentProps<
   submitAs: "inlineText",
 };
 
+const CodexSkillMentionCapability: React.ComponentProps<
+  typeof ChatComposer
+>["composerCapabilities"][number] = {
+  kind: "skillMention",
+  trigger: "$",
+  source: "runtimeSkill",
+  submitAs: "inlineText",
+  skills: [
+    {
+      name: "grill-with-docs",
+      description: "Stress test a plan against docs",
+    },
+    {
+      name: "writing-sharpen",
+      description: "Tighten a draft while preserving voice",
+    },
+    {
+      name: "codex-review",
+      description: "Review code changes with Codex",
+    },
+  ],
+};
+
+const CodexComposerCapabilitiesWithSkills = [
+  ...CodexComposerCapabilities,
+  CodexSkillMentionCapability,
+];
+
 const ContextMentionSearchResults: ChatComposerContextMentionControl = {
   status: "ready",
   results: [
@@ -316,6 +344,79 @@ export const SlashCommandAutocomplete: Story = {
     ).toBeVisible();
     await expect(
       canvas.getByRole("option", { name: "/compact Compact the current context" }),
+    ).toBeVisible();
+  },
+};
+
+export const CodexSlashCommandsAndSkills: Story = {
+  args: {
+    composerCapabilities: CodexComposerCapabilitiesWithSkills,
+    composerText: "/",
+  },
+  render: (args) => (
+    <div className="flex min-h-[420px] items-end">
+      <PlatformAwareChatComposerStory {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByRole("listbox", { name: "Slash commands" })).toBeVisible();
+    await expect(canvas.getByText("Commands")).toBeVisible();
+    await expect(canvas.getByText("Skills")).toBeVisible();
+    await expect(
+      canvas.getByRole("option", { name: "/review Review the current changes" }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("option", {
+        name: "$grill-with-docs Stress test a plan against docs",
+      }),
+    ).toBeVisible();
+  },
+};
+
+export const InlineSlashSkillDiscovery: Story = {
+  args: {
+    composerCapabilities: CodexComposerCapabilitiesWithSkills,
+    composerText: "Use /gr",
+  },
+  render: (args) => (
+    <div className="flex min-h-[420px] items-end">
+      <PlatformAwareChatComposerStory {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByRole("listbox", { name: "Slash commands" })).toBeVisible();
+    await expect(canvas.queryByText("Commands")).toBeNull();
+    await expect(canvas.getByText("Skills")).toBeVisible();
+    await expect(
+      canvas.getByRole("option", {
+        name: "$grill-with-docs Stress test a plan against docs",
+      }),
+    ).toBeVisible();
+  },
+};
+
+export const CodexSkillMentionAutocomplete: Story = {
+  args: {
+    composerCapabilities: CodexComposerCapabilitiesWithSkills,
+    composerText: "Use $gr",
+  },
+  render: (args) => (
+    <div className="flex min-h-[420px] items-end">
+      <PlatformAwareChatComposerStory {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByRole("listbox", { name: "Skills" })).toBeVisible();
+    await expect(
+      canvas.getByRole("option", {
+        name: "$grill-with-docs Stress test a plan against docs",
+      }),
     ).toBeVisible();
   },
 };

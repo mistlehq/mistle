@@ -2,11 +2,13 @@ import {
   batchWriteCodexConfig,
   listCodexExperimentalFeatures,
   listCodexModels,
+  listCodexSkills,
   readCodexConfig,
   writeCodexConfigValue,
   type CodexExperimentalFeatureSummary,
   type CodexJsonRpcClient,
   type CodexModelSummary,
+  type CodexSkillsListEntry,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useState, type RefObject } from "react";
@@ -34,6 +36,10 @@ export type CodexSessionBootstrapDataState = {
   readConfigAsync: (includeLayers: boolean) => Promise<{ config: unknown; response: unknown }>;
   listFeaturesAsync: (input: { threadId: string }) => Promise<{
     features: readonly CodexExperimentalFeatureSummary[];
+    response: unknown;
+  }>;
+  listSkillsAsync: (input: { cwd: string; forceReload?: boolean }) => Promise<{
+    data: readonly CodexSkillsListEntry[];
     response: unknown;
   }>;
 };
@@ -227,6 +233,21 @@ export function useCodexSessionBootstrapData(input: {
           rpcClient,
           limit: 100,
           threadId: inputValue.threadId,
+        });
+      },
+      [input.rpcClientRef],
+    ),
+    listSkillsAsync: useCallback(
+      async (inputValue: { cwd: string; forceReload?: boolean }) => {
+        const rpcClient = input.rpcClientRef.current;
+        if (rpcClient === null) {
+          throw new Error("Connect to a sandbox session before listing skills.");
+        }
+
+        return await listCodexSkills({
+          rpcClient,
+          cwds: [inputValue.cwd],
+          ...(inputValue.forceReload === undefined ? {} : { forceReload: inputValue.forceReload }),
         });
       },
       [input.rpcClientRef],

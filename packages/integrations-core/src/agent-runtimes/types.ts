@@ -57,6 +57,12 @@ export type SkillMentionCapability = {
   trigger: "$";
   source: "runtimeSkill";
   submitAs: "inlineText";
+  skills?: readonly SkillMentionDescriptor[];
+};
+
+export type SkillMentionDescriptor = {
+  name: string;
+  description?: string;
 };
 
 export type ComposerCommandDescriptor = {

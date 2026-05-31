@@ -32,6 +32,19 @@ const ContextMentionCapabilityFixture: ComposerCapability = {
   submitAs: "inlineText",
 };
 
+const SkillMentionCapabilityFixture: ComposerCapability = {
+  kind: "skillMention",
+  trigger: "$",
+  source: "runtimeSkill",
+  submitAs: "inlineText",
+  skills: [
+    {
+      name: "grill-with-docs",
+      description: "Stress test a plan against docs",
+    },
+  ],
+};
+
 function detect(input: {
   composerCapabilities?: readonly ComposerCapability[];
   composerText: string;
@@ -143,24 +156,48 @@ describe("detectActiveComposerTrigger", () => {
     });
   });
 
-  it("does not treat slash text outside the whole-composer start as a command trigger", () => {
+  it("detects slash command queries away from the composer start", () => {
     expect(
       detect({
         composerText: "look at /review",
       }),
-    ).toBeNull();
+    ).toEqual({
+      capabilityKind: "composerCommand",
+      trigger: "/",
+      query: "review",
+      range: {
+        start: 8,
+        end: 15,
+      },
+    });
 
     expect(
       detect({
         composerText: " /review",
       }),
-    ).toBeNull();
+    ).toEqual({
+      capabilityKind: "composerCommand",
+      trigger: "/",
+      query: "review",
+      range: {
+        start: 1,
+        end: 8,
+      },
+    });
 
     expect(
       detect({
         composerText: "first line\n/review",
       }),
-    ).toBeNull();
+    ).toEqual({
+      capabilityKind: "composerCommand",
+      trigger: "/",
+      query: "review",
+      range: {
+        start: 11,
+        end: 18,
+      },
+    });
   });
 
   it("does not hijack slash-looking paths or urls", () => {
@@ -257,6 +294,23 @@ describe("detectActiveComposerTrigger", () => {
         composerText: "$grill-with-docs",
       }),
     ).toBeNull();
+  });
+
+  it("detects runtime skill mention queries", () => {
+    expect(
+      detect({
+        composerCapabilities: [SkillMentionCapabilityFixture],
+        composerText: "Use $grill",
+      }),
+    ).toEqual({
+      capabilityKind: "skillMention",
+      trigger: "$",
+      query: "grill",
+      range: {
+        start: 4,
+        end: 10,
+      },
+    });
   });
 
   it("does not detect malformed slash command tokens", () => {

@@ -146,6 +146,34 @@ const ExperimentalFeatureListResponseSchema = z.object({
   nextCursor: z.string().nullable().optional(),
 });
 
+const SkillsListResponseSchema = z.object({
+  data: z.array(
+    z.looseObject({
+      cwd: z.string().min(1),
+      skills: z.array(
+        z.looseObject({
+          name: z.string().min(1),
+          description: z.string(),
+          shortDescription: z.string().nullable().optional(),
+          interface: z
+            .looseObject({
+              shortDescription: z.string().nullable().optional(),
+            })
+            .nullable()
+            .optional(),
+          enabled: z.boolean(),
+        }),
+      ),
+      errors: z.array(
+        z.looseObject({
+          path: z.string(),
+          message: z.string().min(1),
+        }),
+      ),
+    }),
+  ),
+});
+
 const ConfigReadResponseSchema = z.looseObject({
   config: z.unknown(),
 });
@@ -202,6 +230,22 @@ export type CodexExperimentalFeatureSummary = {
   announcement: string | null;
   enabled: boolean | null;
   defaultEnabled: boolean | null;
+};
+
+export type CodexSkillSummary = {
+  name: string;
+  description: string;
+  shortDescription: string | null;
+  enabled: boolean;
+};
+
+export type CodexSkillsListEntry = {
+  cwd: string;
+  skills: readonly CodexSkillSummary[];
+  errors: readonly {
+    path: string;
+    message: string;
+  }[];
 };
 
 export type CodexThreadGoalStatus = z.infer<typeof ThreadGoalStatusSchema>;
@@ -831,6 +875,54 @@ export async function listCodexExperimentalFeatures(input: {
       defaultEnabled: feature.defaultEnabled ?? null,
     })),
     nextCursor: parsedResponse.data.nextCursor ?? null,
+    response,
+  };
+}
+
+export function parseCodexSkillsListResponse(response: unknown): {
+  data: readonly CodexSkillsListEntry[];
+} {
+  const parsedResponse = SkillsListResponseSchema.safeParse(response);
+  if (!parsedResponse.success) {
+    throw new Error(
+      `skills/list response payload is invalid. Payload: ${JSON.stringify(response)}`,
+    );
+  }
+
+  return {
+    data: parsedResponse.data.data.map((entry) => ({
+      cwd: entry.cwd,
+      skills: entry.skills.map((skill) => ({
+        name: skill.name,
+        description: skill.description,
+        shortDescription: skill.interface?.shortDescription ?? skill.shortDescription ?? null,
+        enabled: skill.enabled,
+      })),
+      errors: entry.errors.map((errorInfo) => ({
+        path: errorInfo.path,
+        message: errorInfo.message,
+      })),
+    })),
+  };
+}
+
+export async function listCodexSkills(input: {
+  rpcClient: CodexJsonRpcClient;
+  cwds: readonly string[];
+  forceReload?: boolean;
+}): Promise<{
+  data: readonly CodexSkillsListEntry[];
+  response: unknown;
+}> {
+  const response = await input.rpcClient.call("skills/list", {
+    cwds: input.cwds,
+    ...(input.forceReload === undefined ? {} : { forceReload: input.forceReload }),
+  });
+
+  const parsedResponse = parseCodexSkillsListResponse(response);
+
+  return {
+    data: parsedResponse.data,
     response,
   };
 }

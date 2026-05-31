@@ -410,6 +410,7 @@ export function useCodexSessionState(input: {
     isWritingConfigValue,
     isBatchWritingConfig,
     listFeaturesAsync,
+    listSkillsAsync,
     loadModelsAsync,
     readConfigAsync,
     writeConfigValue,
@@ -502,6 +503,7 @@ export function useCodexSessionState(input: {
       sandboxInstanceId: sessionSnapshot.sandboxInstanceId,
       connectedAtIso: sessionSnapshot.connectedAtIso,
       activeThreadId: sessionSnapshot.activeThreadId,
+      activeThreadCwd: sessionSnapshot.activeThreadCwd,
     };
   }, [sessionSnapshot]);
   const bootstrapConnectionContext = useMemo(
@@ -516,6 +518,7 @@ export function useCodexSessionState(input: {
     bootstrapConnectionContext,
     hydrateInitialThread,
     listFeaturesAsync,
+    listSkillsAsync,
     loadModelsAsync,
     readConfigAsync,
     rpcClientRef: input.rpcClientRef,
@@ -2002,6 +2005,7 @@ export function useCodexSessionState(input: {
       isLoadingModels,
       isReadingConfig,
       listFeaturesAsync,
+      listSkillsAsync,
       loadModelsAsync,
       readConfigAsync,
     };
@@ -2012,6 +2016,7 @@ export function useCodexSessionState(input: {
     isLoadingModels,
     isReadingConfig,
     listFeaturesAsync,
+    listSkillsAsync,
     loadModelsAsync,
     readConfigAsync,
     modelCatalogStatus,

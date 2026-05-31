@@ -68,6 +68,31 @@ describe("Codex composer capabilities", () => {
       "compact",
     ]);
   });
+
+  it("adds runtime-discovered skill mentions when skills are supplied", () => {
+    expect(
+      resolveCodexComposerCapabilities({
+        goalsEnabled: true,
+        skills: [
+          {
+            name: "grill-with-docs",
+            description: "Stress test a plan against docs",
+          },
+        ],
+      }).find((capability) => capability.kind === "skillMention"),
+    ).toEqual({
+      kind: "skillMention",
+      trigger: "$",
+      source: "runtimeSkill",
+      submitAs: "inlineText",
+      skills: [
+        {
+          name: "grill-with-docs",
+          description: "Stress test a plan against docs",
+        },
+      ],
+    });
+  });
 });
 
 function listCommandNames(capabilities: readonly ComposerCapability[]): string[] {

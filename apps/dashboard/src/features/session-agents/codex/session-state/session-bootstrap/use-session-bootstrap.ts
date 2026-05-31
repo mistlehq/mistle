@@ -1,8 +1,9 @@
-import type { ComposerCapability } from "@mistle/integrations-core";
+import type { ComposerCapability, SkillMentionDescriptor } from "@mistle/integrations-core";
 import type {
   CodexExperimentalFeatureSummary,
   CodexJsonRpcClient,
   CodexModelSummary,
+  CodexSkillsListEntry,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { resolveCodexComposerCapabilities } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -40,6 +41,7 @@ const EmptyComposerConfig: ComposerConfigSnapshot = {
 };
 const EmptyModels: readonly CodexModelSummary[] = [];
 const EmptyFeatures: readonly CodexExperimentalFeatureSummary[] = [];
+const EmptySkills: readonly SkillMentionDescriptor[] = [];
 
 export function ensureCurrentThreadSyncGeneration(input: {
   currentGeneration: number;
@@ -62,6 +64,11 @@ type ReadConfigResult = {
 
 type ListFeaturesResult = {
   features: readonly CodexExperimentalFeatureSummary[];
+  response: unknown;
+};
+
+type ListSkillsResult = {
+  data: readonly CodexSkillsListEntry[];
   response: unknown;
 };
 
@@ -90,11 +97,39 @@ function createFeaturesQueryKey(
   return ["codex-session-bootstrap", "features", connectionKey, threadId];
 }
 
+function createSkillsQueryKey(
+  connectionKey: string,
+  cwd: string,
+): readonly ["codex-session-bootstrap", "skills", string, string] {
+  return ["codex-session-bootstrap", "skills", connectionKey, cwd];
+}
+
 function featureIsEnabled(input: {
   features: readonly CodexExperimentalFeatureSummary[];
   name: string;
 }): boolean {
   return input.features.some((feature) => feature.name === input.name && feature.enabled === true);
+}
+
+function resolveEnabledSkillMentions(input: {
+  cwd: string;
+  entries: readonly CodexSkillsListEntry[];
+}): readonly SkillMentionDescriptor[] {
+  const entry = input.entries.find((candidateEntry) => candidateEntry.cwd === input.cwd);
+  if (entry === undefined) {
+    throw new Error(`skills/list did not return an entry for '${input.cwd}'.`);
+  }
+
+  if (entry.errors.length > 0) {
+    throw new Error(entry.errors.map((errorInfo) => errorInfo.message).join("\n"));
+  }
+
+  return entry.skills
+    .filter((skill) => skill.enabled)
+    .map((skill) => ({
+      name: skill.name,
+      description: skill.shortDescription ?? skill.description,
+    }));
 }
 
 export function useSessionBootstrap(input: {
@@ -109,6 +144,10 @@ export function useSessionBootstrap(input: {
   readConfigAsync: (includeLayers: boolean) => Promise<{ config: unknown; response: unknown }>;
   listFeaturesAsync: (input: { threadId: string }) => Promise<{
     features: readonly CodexExperimentalFeatureSummary[];
+    response: unknown;
+  }>;
+  listSkillsAsync: (input: { cwd: string; forceReload?: boolean }) => Promise<{
+    data: readonly CodexSkillsListEntry[];
     response: unknown;
   }>;
   rpcClientRef: RefObject<CodexJsonRpcClient | null>;
@@ -130,6 +169,7 @@ export function useSessionBootstrap(input: {
   const shouldLoadBootstrapData = bootstrapPlan.shouldLoadBootstrapData;
   const activeThreadSyncKey = bootstrapPlan.threadSyncKey;
   const activeThreadId = input.bootstrapConnectionContext?.activeThreadId ?? null;
+  const activeThreadCwd = input.bootstrapConnectionContext?.activeThreadCwd ?? null;
 
   const modelsQuery = useQuery<LoadModelsResult>({
     queryKey:
@@ -179,6 +219,51 @@ export function useSessionBootstrap(input: {
     gcTime: Number.POSITIVE_INFINITY,
     refetchOnWindowFocus: false,
   });
+
+  const skillsQuery = useQuery<ListSkillsResult>({
+    queryKey:
+      activeConnectionKey === null || activeThreadCwd === null
+        ? ["codex-session-bootstrap", "skills", "disconnected"]
+        : createSkillsQueryKey(activeConnectionKey, activeThreadCwd),
+    queryFn: async () => {
+      if (activeThreadCwd === null) {
+        throw new Error("Choose a Codex thread before listing skills.");
+      }
+
+      const result = await input.listSkillsAsync({ cwd: activeThreadCwd });
+      resolveEnabledSkillMentions({
+        cwd: activeThreadCwd,
+        entries: result.data,
+      });
+      return result;
+    },
+    enabled: activeConnectionKey !== null && activeThreadCwd !== null,
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: Number.POSITIVE_INFINITY,
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    if (activeConnectionKey === null || activeThreadCwd === null) {
+      return;
+    }
+
+    const rpcClient = input.rpcClientRef.current;
+    if (rpcClient === null) {
+      return;
+    }
+
+    return rpcClient.onNotification((notification) => {
+      if (notification.method !== "skills/changed") {
+        return;
+      }
+
+      void queryClient.invalidateQueries({
+        queryKey: createSkillsQueryKey(activeConnectionKey, activeThreadCwd),
+      });
+    });
+  }, [activeConnectionKey, activeThreadCwd, input.rpcClientRef, queryClient]);
 
   useEffect(() => {
     if (activeThreadSyncKey === null || activeThreadId === null) {
@@ -271,6 +356,24 @@ export function useSessionBootstrap(input: {
     );
   }, [activeThreadId, establishedConnectionKey, queryClient]);
 
+  const establishedSkills = useMemo(() => {
+    if (establishedConnectionKey === null || activeThreadCwd === null) {
+      return EmptySkills;
+    }
+
+    const cachedSkills = queryClient.getQueryData<ListSkillsResult>(
+      createSkillsQueryKey(establishedConnectionKey, activeThreadCwd),
+    );
+    if (cachedSkills === undefined) {
+      return EmptySkills;
+    }
+
+    return resolveEnabledSkillMentions({
+      cwd: activeThreadCwd,
+      entries: cachedSkills.data,
+    });
+  }, [activeThreadCwd, establishedConnectionKey, queryClient]);
+
   const availableModels = useMemo(() => {
     if (shouldLoadBootstrapData) {
       return modelsQuery.data?.models ?? establishedModels;
@@ -295,6 +398,17 @@ export function useSessionBootstrap(input: {
     return featuresQuery.data?.features ?? establishedFeatures;
   }, [establishedFeatures, featuresQuery.data?.features]);
 
+  const skillMentions = useMemo(() => {
+    if (skillsQuery.data === undefined || activeThreadCwd === null) {
+      return establishedSkills;
+    }
+
+    return resolveEnabledSkillMentions({
+      cwd: activeThreadCwd,
+      entries: skillsQuery.data.data,
+    });
+  }, [activeThreadCwd, establishedSkills, skillsQuery.data]);
+
   const composerCapabilities = useMemo(
     () =>
       resolveCodexComposerCapabilities({
@@ -302,8 +416,9 @@ export function useSessionBootstrap(input: {
           features,
           name: "goals",
         }),
+        skills: skillMentions,
       }),
-    [features],
+    [features, skillMentions],
   );
 
   const threadSyncFailedForCurrentThread =
@@ -319,7 +434,8 @@ export function useSessionBootstrap(input: {
     activeThreadSyncKey !== null &&
     (!threadSyncReadyForCurrentThread ||
       (shouldLoadBootstrapData && (modelsQuery.isPending || configQuery.isPending)) ||
-      featuresQuery.isPending);
+      featuresQuery.isPending ||
+      skillsQuery.isPending);
 
   const state = useMemo(
     (): SessionBootstrapPhase =>
@@ -331,7 +447,9 @@ export function useSessionBootstrap(input: {
             ? configQuery.error
             : featuresQuery.isError && featuresQuery.error instanceof Error
               ? featuresQuery.error
-              : null,
+              : skillsQuery.isError && skillsQuery.error instanceof Error
+                ? skillsQuery.error
+                : null,
         isCurrentConnectionBootstrapping,
         modelsError:
           modelsQuery.isError && modelsQuery.error instanceof Error ? modelsQuery.error : null,
@@ -350,6 +468,8 @@ export function useSessionBootstrap(input: {
       isCurrentConnectionBootstrapping,
       modelsQuery.error,
       modelsQuery.isError,
+      skillsQuery.error,
+      skillsQuery.isError,
       threadSyncFailedForCurrentThread,
       threadSyncState,
     ],

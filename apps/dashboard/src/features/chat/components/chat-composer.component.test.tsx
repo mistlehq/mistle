@@ -65,6 +65,25 @@ const ContextMentionCapabilityFixture: React.ComponentProps<
   submitAs: "inlineText",
 };
 
+const SkillMentionCapabilityFixture: React.ComponentProps<
+  typeof ChatComposer
+>["composerCapabilities"][number] = {
+  kind: "skillMention",
+  trigger: "$",
+  source: "runtimeSkill",
+  submitAs: "inlineText",
+  skills: [
+    {
+      name: "grill-with-docs",
+      description: "Stress test a plan against docs",
+    },
+    {
+      name: "write-a-skill",
+      description: "Create a reusable skill",
+    },
+  ],
+};
+
 function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
   return {
     composerCapabilities: [],
@@ -557,6 +576,40 @@ describe("ChatComposer", () => {
     expect(screen.queryByRole("option", { name: "/explain Explain the selected code" })).toBeNull();
   });
 
+  it("shows inline slash commands away from the composer start without start-only commands", () => {
+    render(
+      <ControlledChatComposer
+        composerCapabilities={[ComposerCommandCapabilityFixture]}
+        composerText="Use /re"
+      />,
+    );
+
+    expect(screen.getByRole("listbox", { name: "Slash commands" })).toBeTruthy();
+    expect(screen.queryByRole("option", { name: "/review Review the current changes" })).toBeNull();
+    expect(screen.getByRole("option", { name: "/rewrite Rewrite with constraints" })).toBeTruthy();
+  });
+
+  it("groups commands before skills in the slash palette", () => {
+    render(
+      <ControlledChatComposer
+        composerCapabilities={[ComposerCommandCapabilityFixture, SkillMentionCapabilityFixture]}
+        composerText="/"
+      />,
+    );
+
+    const options = screen.getAllByRole("option").map((option) => option.textContent);
+    expect(options).toEqual([
+      "/reviewReview the current changes",
+      "/explainExplain the selected code",
+      "/rewriteRewrite with constraints",
+      "/planPlan before making changes",
+      "/goalSet or update the current goal",
+      "/compactCompact the current context",
+      "$grill-with-docsStress test a plan against docs",
+      "$write-a-skillCreate a reusable skill",
+    ]);
+  });
+
   it("shows no-results slash command state without blocking normal submit", () => {
     let submitCount = 0;
 
@@ -604,6 +657,52 @@ describe("ChatComposer", () => {
     fireEvent.mouseDown(screen.getByRole("option", { name: "/rewrite Rewrite with constraints" }));
 
     expect(getComposerTextarea().value).toBe("/rewrite ");
+  });
+
+  it("inserts slash-discovered skills using Codex skill mention syntax", () => {
+    render(
+      <ControlledChatComposer
+        composerCapabilities={[ComposerCommandCapabilityFixture, SkillMentionCapabilityFixture]}
+        composerText="Use /gr"
+      />,
+    );
+
+    fireEvent.mouseDown(
+      screen.getByRole("option", {
+        name: "$grill-with-docs Stress test a plan against docs",
+      }),
+    );
+
+    expect(getComposerTextarea().value).toBe("Use $grill-with-docs ");
+  });
+
+  it("shows skill suggestions from runtime skill mention capabilities", () => {
+    render(
+      <ControlledChatComposer
+        composerCapabilities={[SkillMentionCapabilityFixture]}
+        composerText="Use $gr"
+      />,
+    );
+
+    expect(screen.getByRole("listbox", { name: "Skills" })).toBeTruthy();
+    expect(
+      screen.getByRole("option", {
+        name: "$grill-with-docs Stress test a plan against docs",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("inserts selected skill suggestions as editable prompt text", () => {
+    render(
+      <ControlledChatComposer
+        composerCapabilities={[SkillMentionCapabilityFixture]}
+        composerText="Use $gr"
+      />,
+    );
+
+    fireEvent.keyDown(getComposerTextarea(), { key: "Enter" });
+
+    expect(getComposerTextarea().value).toBe("Use $grill-with-docs ");
   });
 
   it("shows context mention file search results for inline @ queries", () => {
