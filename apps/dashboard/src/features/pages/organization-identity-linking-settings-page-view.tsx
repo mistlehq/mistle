@@ -24,14 +24,17 @@ import {
 
 export type OrganizationIdentityLinkingProviderRow = {
   rowKey: string;
-  canOpenLinkedUsers: boolean;
+  canOpenMemberLinkStatus: boolean;
   displayName: string;
   logoKey: string;
   connectionLabel: string;
   enablePending: boolean;
   enabled: boolean;
   unavailableMessage: string | null;
-  linkedUsersCount: number | null;
+  memberLinkStatusCounts: {
+    linked: number;
+    total: number;
+  } | null;
   memberLinksErrorMessage: string | null;
   memberLinks: readonly {
     userId: string;
@@ -64,19 +67,22 @@ export type OrganizationIdentityLinkingSettingsPageViewProps = {
 const IdentityLinkingProviderColumns = [
   { key: "integration", label: "Integration", desktopWidth: "minmax(0,1.1fr)" },
   { key: "connection", label: "Connection", desktopWidth: "minmax(0,1.6fr)" },
-  { key: "linkedUsers", label: "Linked Users", desktopWidth: "180px", align: "center" },
+  { key: "memberLinks", label: "Users Linked", desktopWidth: "220px", align: "center" },
   { key: "enable", label: "Enable", desktopWidth: "88px", align: "center" },
 ] satisfies readonly ResponsiveFieldListColumn[];
 
 export function OrganizationIdentityLinkingSettingsPageView(
   props: OrganizationIdentityLinkingSettingsPageViewProps,
 ): React.JSX.Element {
-  const [linkedUsersDialogRowKey, setLinkedUsersDialogRowKey] = useState<string | null>(null);
+  const [memberLinkStatusDialogRowKey, setMemberLinkStatusDialogRowKey] = useState<string | null>(
+    null,
+  );
 
-  const linkedUsersDialogProvider =
-    linkedUsersDialogRowKey === null
+  const memberLinkStatusDialogProvider =
+    memberLinkStatusDialogRowKey === null
       ? null
-      : (props.providers.find((provider) => provider.rowKey === linkedUsersDialogRowKey) ?? null);
+      : (props.providers.find((provider) => provider.rowKey === memberLinkStatusDialogRowKey) ??
+        null);
 
   if (props.loadErrorMessage !== null) {
     return (
@@ -113,8 +119,8 @@ export function OrganizationIdentityLinkingSettingsPageView(
               key={provider.rowKey}
               isLastRow={index === props.providers.length - 1}
               onEnabledChange={props.onEnabledChange}
-              onOpenLinkedUsers={() => {
-                setLinkedUsersDialogRowKey(provider.rowKey);
+              onOpenMemberLinkStatus={() => {
+                setMemberLinkStatusDialogRowKey(provider.rowKey);
               }}
               provider={provider}
             />
@@ -122,13 +128,13 @@ export function OrganizationIdentityLinkingSettingsPageView(
         </ResponsiveFieldList>
       </FormPageStack>
 
-      <LinkedUsersDialog
+      <MemberLinkStatusDialog
         onOpenChange={(open) => {
           if (!open) {
-            setLinkedUsersDialogRowKey(null);
+            setMemberLinkStatusDialogRowKey(null);
           }
         }}
-        provider={linkedUsersDialogProvider}
+        provider={memberLinkStatusDialogProvider}
       />
       <GitCommitSigningImpactConfirmationDialog
         confirmation={props.gitCommitSigningImpactConfirmation}
@@ -143,10 +149,10 @@ function IdentityLinkingProviderRowView(input: {
   provider: OrganizationIdentityLinkingProviderRow;
   isLastRow: boolean;
   onEnabledChange: OrganizationIdentityLinkingSettingsPageViewProps["onEnabledChange"];
-  onOpenLinkedUsers: () => void;
+  onOpenMemberLinkStatus: () => void;
 }): React.JSX.Element {
   const provider = input.provider;
-  const canOpenLinkedUsers = provider.canOpenLinkedUsers;
+  const canOpenMemberLinkStatus = provider.canOpenMemberLinkStatus;
 
   return (
     <ResponsiveFieldListRow
@@ -176,18 +182,20 @@ function IdentityLinkingProviderRowView(input: {
         <div className="truncate text-sm">{provider.connectionLabel}</div>
       </ResponsiveFieldListCell>
 
-      <ResponsiveFieldListCell columnKey="linkedUsers">
+      <ResponsiveFieldListCell columnKey="memberLinks">
         <div className="inline-flex items-center gap-2.5 md:justify-center">
-          {provider.linkedUsersCount === null ? (
+          {provider.memberLinkStatusCounts === null ? (
             <span className="text-sm text-muted-foreground">-</span>
           ) : (
-            <span className="text-sm">{String(provider.linkedUsersCount)}</span>
+            <span className="text-sm">
+              {formatMemberLinkStatusCounts(provider.memberLinkStatusCounts)}
+            </span>
           )}
-          {canOpenLinkedUsers ? (
+          {canOpenMemberLinkStatus ? (
             <Button
-              aria-label={`View ${provider.displayName} linked users for ${provider.connectionLabel}`}
+              aria-label={`View link status for ${provider.connectionLabel}`}
               className="h-auto w-auto p-0 hover:bg-transparent"
-              onClick={input.onOpenLinkedUsers}
+              onClick={input.onOpenMemberLinkStatus}
               type="button"
               variant="ghost"
             >
@@ -304,7 +312,11 @@ function formatGitCommitSigningImpactSentence(input: {
   return `Commit signing will be ${actionText} for ${profileCountText} using ${input.connectionLabel}.`;
 }
 
-function LinkedUsersDialog(input: {
+function formatMemberLinkStatusCounts(input: { linked: number; total: number }): string {
+  return `${String(input.linked)} linked out of ${String(input.total)}`;
+}
+
+function MemberLinkStatusDialog(input: {
   provider: OrganizationIdentityLinkingProviderRow | null;
   onOpenChange: (open: boolean) => void;
 }): React.JSX.Element {
@@ -324,18 +336,16 @@ function LinkedUsersDialog(input: {
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader variant="sectioned">
           <DialogTitle>
-            {provider === null
-              ? "Linked users"
-              : `${provider.displayName} linked users for ${provider.connectionLabel}`}
+            {provider === null ? "Link Status" : `Link Status for ${provider.connectionLabel}`}
           </DialogTitle>
         </DialogHeader>
 
         {provider === null ? null : provider.memberLinksErrorMessage !== null ? (
           <Notice variant="alert">{provider.memberLinksErrorMessage}</Notice>
-        ) : !provider.canOpenLinkedUsers ? (
-          <Notice>No linked users.</Notice>
-        ) : provider.linkedUsersCount === null ? null : provider.memberLinks.length === 0 ? (
-          <Notice>No linked users.</Notice>
+        ) : !provider.canOpenMemberLinkStatus ? (
+          <Notice>No members to show.</Notice>
+        ) : provider.memberLinkStatusCounts === null ? null : provider.memberLinks.length === 0 ? (
+          <Notice>No members to show.</Notice>
         ) : (
           <ScrollArea className="max-h-96 rounded-md border">
             <div className="flex flex-col divide-y">

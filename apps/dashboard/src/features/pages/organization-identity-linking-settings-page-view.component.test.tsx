@@ -9,7 +9,7 @@ import {
 } from "./organization-identity-linking-settings-page-view.js";
 
 describe("OrganizationIdentityLinkingSettingsPageView", () => {
-  it("renders connection rows and opens the linked users dialog", () => {
+  it("renders connection rows and opens the member link status dialog", () => {
     render(
       <OrganizationIdentityLinkingSettingsPageView
         gitCommitSigningImpactConfirmation={null}
@@ -20,7 +20,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
         providers={[
           createProviderRow({
             connectionLabel: "Engineering GitHub",
-            linkedUsersCount: 1,
+            memberLinkStatusCounts: { linked: 1, total: 2 },
             memberLinks: [
               {
                 userId: "usr_owner",
@@ -30,16 +30,24 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
                 principalSummary: "owner-github",
                 updatedAt: "2026-04-20T00:00:00.000Z",
               },
+              {
+                userId: "usr_member",
+                name: "Member User",
+                email: "member@example.com",
+                statusLabel: "Not linked",
+                principalSummary: null,
+                updatedAt: null,
+              },
             ],
           }),
           createProviderRow({
             rowKey: "linear:icn_linear",
-            canOpenLinkedUsers: false,
+            canOpenMemberLinkStatus: false,
             displayName: "Linear",
             logoKey: "linear",
             connectionLabel: "Linear Workspace",
             enabled: false,
-            linkedUsersCount: null,
+            memberLinkStatusCounts: null,
           }),
         ]}
       />,
@@ -53,17 +61,19 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
         name: "Enable GitHub identity linking for Engineering GitHub",
       }),
     ).toBeTruthy();
+    expect(screen.getByText("1 linked out of 2")).toBeTruthy();
     expect(screen.getByText("Linear Workspace")).toBeTruthy();
     expect(screen.getByText("-")).toBeTruthy();
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "View GitHub linked users for Engineering GitHub",
+        name: "View link status for Engineering GitHub",
       }),
     );
 
-    expect(screen.getByText("GitHub linked users for Engineering GitHub")).toBeTruthy();
+    expect(screen.getByText("Link Status for Engineering GitHub")).toBeTruthy();
     expect(screen.getByText("Owner User")).toBeTruthy();
+    expect(screen.getByText("Member User")).toBeTruthy();
     expect(screen.getByText("owner-github")).toBeTruthy();
   });
 
@@ -82,12 +92,12 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
         providers={[
           createProviderRow({
             rowKey: "slack:icn_slack",
-            canOpenLinkedUsers: false,
+            canOpenMemberLinkStatus: false,
             displayName: "Slack",
             logoKey: "slack",
             connectionLabel: "Slack Workspace",
             enabled: false,
-            linkedUsersCount: null,
+            memberLinkStatusCounts: null,
           }),
         ]}
       />,
@@ -114,7 +124,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
         onConfirmGitCommitSigningImpactConfirmation={async () => {}}
         providers={[
           createProviderRow({
-            canOpenLinkedUsers: false,
+            canOpenMemberLinkStatus: false,
             enabled: false,
             unavailableMessage:
               "This connection is no longer active. Reconnect it before enabling identity linking.",
@@ -212,18 +222,18 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
         providers={[
           createProviderRow({
             rowKey: "slack:icn_slack_engineering",
-            canOpenLinkedUsers: true,
+            canOpenMemberLinkStatus: true,
             displayName: "Slack",
             logoKey: "slack",
             connectionLabel: "Mistle Engineering · Slack app",
           }),
           createProviderRow({
             rowKey: "slack:icn_slack_support",
-            canOpenLinkedUsers: true,
+            canOpenMemberLinkStatus: true,
             displayName: "Slack",
             logoKey: "slack",
             connectionLabel: "Mistle Support · Slack app",
-            linkedUsersCount: 0,
+            memberLinkStatusCounts: { linked: 0, total: 0 },
           }),
         ]}
       />,
@@ -234,7 +244,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
     expect(screen.getByText("Mistle Support · Slack app")).toBeTruthy();
   });
 
-  it("renders provider-scoped linked-user errors in the dialog", () => {
+  it("renders provider-scoped member link status errors in the dialog", () => {
     render(
       <OrganizationIdentityLinkingSettingsPageView
         gitCommitSigningImpactConfirmation={null}
@@ -244,9 +254,9 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
         onConfirmGitCommitSigningImpactConfirmation={async () => {}}
         providers={[
           createProviderRow({
-            memberLinksErrorMessage: "Could not load linked-member visibility.",
+            memberLinksErrorMessage: "Could not load link status.",
             memberLinks: [],
-            linkedUsersCount: 0,
+            memberLinkStatusCounts: { linked: 0, total: 0 },
           }),
         ]}
       />,
@@ -254,14 +264,14 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "View GitHub linked users for Engineering GitHub",
+        name: "View link status for Engineering GitHub",
       }),
     );
 
-    expect(screen.getByText("Could not load linked-member visibility.")).toBeTruthy();
+    expect(screen.getByText("Could not load link status.")).toBeTruthy();
   });
 
-  it("keeps the linked-users dialog body empty while linked users are unknown", () => {
+  it("keeps the member link status dialog body empty while status counts are unknown", () => {
     render(
       <OrganizationIdentityLinkingSettingsPageView
         gitCommitSigningImpactConfirmation={null}
@@ -271,7 +281,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
         onConfirmGitCommitSigningImpactConfirmation={async () => {}}
         providers={[
           createProviderRow({
-            linkedUsersCount: null,
+            memberLinkStatusCounts: null,
             memberLinks: [],
           }),
         ]}
@@ -280,16 +290,16 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "View GitHub linked users for Engineering GitHub",
+        name: "View link status for Engineering GitHub",
       }),
     );
 
-    expect(screen.getByText("GitHub linked users for Engineering GitHub")).toBeTruthy();
+    expect(screen.getByText("Link Status for Engineering GitHub")).toBeTruthy();
     expect(screen.queryByText("0")).toBeNull();
-    expect(screen.queryByText("No linked users.")).toBeNull();
+    expect(screen.queryByText("No members to show.")).toBeNull();
   });
 
-  it("shows an empty state when there are no linked users", () => {
+  it("shows an empty state when there are no members to show", () => {
     render(
       <OrganizationIdentityLinkingSettingsPageView
         gitCommitSigningImpactConfirmation={null}
@@ -302,7 +312,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
             displayName: "Slack",
             logoKey: "slack",
             connectionLabel: "Slack Workspace",
-            linkedUsersCount: 0,
+            memberLinkStatusCounts: { linked: 0, total: 0 },
             memberLinks: [],
           }),
         ]}
@@ -311,11 +321,11 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "View Slack linked users for Slack Workspace",
+        name: "View link status for Slack Workspace",
       }),
     );
 
-    expect(screen.getByText("No linked users.")).toBeTruthy();
+    expect(screen.getByText("No members to show.")).toBeTruthy();
   });
 });
 
@@ -324,14 +334,14 @@ function createProviderRow(
 ): OrganizationIdentityLinkingProviderRow {
   return {
     rowKey: "github:icn_github_engineering",
-    canOpenLinkedUsers: true,
+    canOpenMemberLinkStatus: true,
     displayName: "GitHub",
     logoKey: "github",
     connectionLabel: "Engineering GitHub",
     enablePending: false,
     enabled: true,
     unavailableMessage: null,
-    linkedUsersCount: 1,
+    memberLinkStatusCounts: { linked: 1, total: 1 },
     memberLinksErrorMessage: null,
     memberLinks: [],
     ...overrides,

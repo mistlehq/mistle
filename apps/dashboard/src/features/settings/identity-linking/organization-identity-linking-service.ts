@@ -262,7 +262,7 @@ export async function listOrganizationIdentityLinkProviderLinks(input: {
       method: "GET",
       pathname: `/v1/organization/identity-linking/provider-configs/${encodeURIComponent(input.organizationProviderConfigId)}/links`,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
-      fallbackMessage: "Could not load linked-provider visibility.",
+      fallbackMessage: "Could not load link status.",
     });
 
     const data = await readJsonWithSchema({
@@ -276,7 +276,7 @@ export async function listOrganizationIdentityLinkProviderLinks(input: {
     throw wrapOrganizationIdentityLinkingApiError({
       operation: "listOrganizationIdentityLinkProviderLinks",
       error,
-      fallbackMessage: "Could not load linked-provider visibility.",
+      fallbackMessage: "Could not load link status.",
     });
   }
 }

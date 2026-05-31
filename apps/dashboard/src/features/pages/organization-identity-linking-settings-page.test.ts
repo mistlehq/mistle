@@ -157,6 +157,14 @@ describe("buildProviderRow", () => {
             },
             updatedAt: "2026-01-01T00:00:00.000Z",
           },
+          {
+            userId: "usr_github_unlinked",
+            name: "GitHub Unlinked User",
+            email: "unlinked@example.com",
+            linked: false,
+            principalSummary: null,
+            updatedAt: null,
+          },
         ],
         isPending: false,
         isError: false,
@@ -165,10 +173,10 @@ describe("buildProviderRow", () => {
     });
 
     expect(providerRow.rowKey).toBe("github:icn_github_engineering");
-    expect(providerRow.canOpenLinkedUsers).toBe(true);
+    expect(providerRow.canOpenMemberLinkStatus).toBe(true);
     expect(providerRow.connectionLabel).toBe("GitHub Engineering");
     expect(providerRow.enabled).toBe(false);
-    expect(providerRow.linkedUsersCount).toBe(1);
+    expect(providerRow.memberLinkStatusCounts).toEqual({ linked: 1, total: 2 });
     expect(providerRow.unavailableMessage).toBeNull();
   });
 

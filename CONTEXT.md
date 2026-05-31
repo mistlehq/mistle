@@ -240,6 +240,10 @@ _Avoid_: Signing-enabled connection, GitHub signing provider
 An organization settings row representing one eligible integration connection and its identity-linking enablement state.
 _Avoid_: Provider config row, draft provider row, connection selector row
 
+**Member identity-link status**:
+An organization member's linked-or-not-linked state for one identity-linking provider configuration.
+_Avoid_: Linked user, linked users count
+
 **Unavailable identity-linking connection row**:
 An organization settings row for an existing identity-linking configuration whose integration connection is no longer eligible for identity linking.
 _Avoid_: Hidden identity-linking config, orphaned provider row
@@ -373,6 +377,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - An **Identity-linking connection row** represents a connection, so selecting a different connection would mean selecting a different row.
 - An **Unavailable identity-linking connection row** should remain visible so users can understand or disable the existing configuration.
 - An **Identity-linking connection row** should have at most one identity-linking configuration for its connection.
+- **Member identity-link status** is scoped to one identity-linking provider configuration, not only a provider family.
 - A **Working agent turn** is a live conversation state, not a chat semantic group.
 - Chat semantic groups describe the specific visible work within a **Working agent turn**, such as thinking, exploring, running commands, or making edits.
 - Pi tool execution events are the source of truth for live in-progress chat semantic groups.

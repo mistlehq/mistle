@@ -13,14 +13,14 @@ import {
 const BaseProviders = [
   {
     rowKey: "github:conn_github_engineering",
-    canOpenLinkedUsers: true,
+    canOpenMemberLinkStatus: true,
     displayName: "GitHub",
     logoKey: "github",
     connectionLabel: "GitHub Engineering",
     enablePending: false,
     enabled: true,
     unavailableMessage: null,
-    linkedUsersCount: 12,
+    memberLinkStatusCounts: { linked: 12, total: 36 },
     memberLinksErrorMessage: null,
     memberLinks: [
       {
@@ -43,27 +43,27 @@ const BaseProviders = [
   },
   {
     rowKey: "github:conn_github_platform",
-    canOpenLinkedUsers: false,
+    canOpenMemberLinkStatus: false,
     displayName: "GitHub",
     logoKey: "github",
     connectionLabel: "GitHub Platform",
     enablePending: false,
     enabled: false,
     unavailableMessage: null,
-    linkedUsersCount: null,
+    memberLinkStatusCounts: null,
     memberLinksErrorMessage: null,
     memberLinks: [],
   },
   {
     rowKey: "slack:conn_slack_workspace",
-    canOpenLinkedUsers: true,
+    canOpenMemberLinkStatus: true,
     displayName: "Slack",
     logoKey: "slack",
     connectionLabel: "Slack Workspace",
     enablePending: false,
     enabled: false,
     unavailableMessage: null,
-    linkedUsersCount: 3,
+    memberLinkStatusCounts: { linked: 3, total: 14 },
     memberLinksErrorMessage: null,
     memberLinks: [
       {
@@ -113,8 +113,11 @@ function StatefulPrototype(
               ? provider
               : {
                   ...provider,
-                  canOpenLinkedUsers: true,
-                  linkedUsersCount: provider.linkedUsersCount ?? 0,
+                  canOpenMemberLinkStatus: true,
+                  memberLinkStatusCounts: provider.memberLinkStatusCounts ?? {
+                    linked: 0,
+                    total: 0,
+                  },
                   enabled,
                   enablePending: false,
                 },
@@ -288,14 +291,14 @@ export const MultipleGitHubConnectionsEnableConfirmation: Story = {
   },
 };
 
-export const LinkedUsersDialogError: Story = {
+export const MemberLinkStatusDialogError: Story = {
   args: {
     providers: [
       {
         ...BaseProviders[0],
-        memberLinksErrorMessage: "Could not load linked-member visibility.",
+        memberLinksErrorMessage: "Could not load link status.",
         memberLinks: [],
-        linkedUsersCount: 0,
+        memberLinkStatusCounts: { linked: 0, total: 0 },
       },
     ],
   },
@@ -304,18 +307,18 @@ export const LinkedUsersDialogError: Story = {
 
     await userEvent.click(
       canvas.getByRole("button", {
-        name: "View GitHub linked users for GitHub Engineering",
+        name: "View link status for GitHub Engineering",
       }),
     );
   },
 };
 
-export const LinkedUsersUnknown: Story = {
+export const MemberLinkStatusUnknown: Story = {
   args: {
     providers: [
       {
         ...BaseProviders[0],
-        linkedUsersCount: null,
+        memberLinkStatusCounts: null,
         memberLinks: [],
       },
     ],
