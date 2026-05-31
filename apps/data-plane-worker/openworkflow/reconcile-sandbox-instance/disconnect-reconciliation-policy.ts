@@ -17,6 +17,11 @@ export type DisconnectReconciliationAction =
     }
   | {
       kind: "stop_then_mark_stopped";
+    }
+  | {
+      kind: "fail_if_startup_failure_evidence_else_stop";
+      failureCode: string;
+      failureMessage: string;
     };
 
 /**
@@ -77,7 +82,7 @@ export function determineDisconnectReconciliationAction(input: {
           };
         case "active":
           return {
-            kind: "fail",
+            kind: "fail_if_startup_failure_evidence_else_stop",
             failureCode: "bootstrap_disconnected_during_startup",
             failureMessage:
               "Sandbox bootstrap tunnel did not recover before disconnect grace expired during startup.",

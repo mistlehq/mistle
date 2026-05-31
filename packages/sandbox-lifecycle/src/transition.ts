@@ -101,6 +101,8 @@ export function transitionSandboxLifecycle(input: {
     case SandboxLifecycleEvents.STOP_REQUESTED:
       return transitionFrom(input, {
         from: [
+          SandboxInstanceStatuses.STARTING,
+          SandboxInstanceStatuses.STARTED,
           SandboxInstanceStatuses.RUNNING,
           SandboxInstanceStatuses.DEGRADED,
           SandboxInstanceStatuses.RECONNECTING,

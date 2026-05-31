@@ -31,7 +31,7 @@ describe("determineDisconnectReconciliationAction", () => {
     });
   });
 
-  it("fails starting sandboxes when the bootstrap tunnel never recovered during startup", () => {
+  it("conditionally stops starting sandboxes when bootstrap disconnect is the only startup failure", () => {
     expect(
       determineDisconnectReconciliationAction({
         persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
@@ -39,7 +39,7 @@ describe("determineDisconnectReconciliationAction", () => {
         providerState: "active",
       }),
     ).toEqual({
-      kind: "fail",
+      kind: "fail_if_startup_failure_evidence_else_stop",
       failureCode: "bootstrap_disconnected_during_startup",
       failureMessage:
         "Sandbox bootstrap tunnel did not recover before disconnect grace expired during startup.",
@@ -54,7 +54,7 @@ describe("determineDisconnectReconciliationAction", () => {
         providerState: "active",
       }),
     ).toEqual({
-      kind: "fail",
+      kind: "fail_if_startup_failure_evidence_else_stop",
       failureCode: "bootstrap_disconnected_during_startup",
       failureMessage:
         "Sandbox bootstrap tunnel did not recover before disconnect grace expired during startup.",
@@ -66,7 +66,7 @@ describe("determineDisconnectReconciliationAction", () => {
         providerState: "active",
       }),
     ).toEqual({
-      kind: "fail",
+      kind: "fail_if_startup_failure_evidence_else_stop",
       failureCode: "bootstrap_disconnected_during_startup",
       failureMessage:
         "Sandbox bootstrap tunnel did not recover before disconnect grace expired during startup.",

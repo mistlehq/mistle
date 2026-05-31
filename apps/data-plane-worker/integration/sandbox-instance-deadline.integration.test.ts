@@ -283,6 +283,40 @@ describe.concurrent("data-plane worker sandbox instance deadlines", () => {
     await expectDeadlinesCleared(env, sandboxInstanceId);
   });
 
+  it("can stop and finalize a starting sandbox during disconnect reconciliation", async ({
+    env,
+  }) => {
+    const sandboxInstanceId = "sbi_integration_new_deadline_reconcile_starting_stop";
+    await insertSandboxInstance(env, {
+      sandboxInstanceId,
+      status: SandboxInstanceStatuses.STARTING,
+      providerSandboxId: "provider-integration-new-deadline-reconcile-starting-stop",
+    });
+    await insertBothDeadlineKinds(env, sandboxInstanceId);
+
+    await applySandboxLifecycleEvent(
+      {
+        db: env.dataPlaneDb,
+        tables: env.dataPlaneTables,
+      },
+      {
+        sandboxInstanceId,
+        event: SandboxLifecycleEvents.STOP_REQUESTED,
+      },
+    );
+    await expectSandboxStatus(env, sandboxInstanceId, SandboxInstanceStatuses.STOPPING);
+
+    await markSandboxInstanceStoppedDuringReconcile({
+      db: env.dataPlaneDb,
+      tables: env.dataPlaneTables,
+      sandboxInstanceId,
+      currentStatus: SandboxInstanceStatuses.STOPPING,
+    });
+
+    await expectDeadlinesCleared(env, sandboxInstanceId);
+    await expectSandboxStatus(env, sandboxInstanceId, SandboxInstanceStatuses.STOPPED);
+  });
+
   it("clears both deadline kinds when reconcile marks a sandbox instance failed", async ({
     env,
   }) => {

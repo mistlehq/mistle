@@ -126,6 +126,28 @@ describe("transitionSandboxLifecycle", () => {
   it("models stop and failure transitions", () => {
     expect(
       transitionSandboxLifecycle({
+        status: SandboxInstanceStatuses.STARTING,
+        event: SandboxLifecycleEvents.STOP_REQUESTED,
+      }),
+    ).toEqual({
+      kind: "transition",
+      from: SandboxInstanceStatuses.STARTING,
+      to: SandboxInstanceStatuses.STOPPING,
+    });
+
+    expect(
+      transitionSandboxLifecycle({
+        status: SandboxInstanceStatuses.STARTED,
+        event: SandboxLifecycleEvents.STOP_REQUESTED,
+      }),
+    ).toEqual({
+      kind: "transition",
+      from: SandboxInstanceStatuses.STARTED,
+      to: SandboxInstanceStatuses.STOPPING,
+    });
+
+    expect(
+      transitionSandboxLifecycle({
         status: SandboxInstanceStatuses.RECONNECTING,
         event: SandboxLifecycleEvents.STOP_REQUESTED,
       }),

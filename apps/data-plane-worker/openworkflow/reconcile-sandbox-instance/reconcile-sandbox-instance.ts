@@ -514,6 +514,74 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
   });
 }
 
+async function stopActiveProviderSandboxDuringDisconnect(ctx: {
+  config: DataPlaneWorkerRuntimeConfig;
+  controlPlaneInternalClient: ControlPlaneInternalClient;
+  sandboxAdapter: SandboxAdapter;
+  db: DataPlaneDatabase;
+  tables: DataPlaneTables;
+  runtimeStateReader: SandboxRuntimeStateReader;
+  clock: Clock;
+  expectedOwnerLeaseId: string;
+  sandboxInstance: ActiveSandboxInstance;
+  logger?: MistleLogger | undefined;
+}): Promise<ReconcileSandboxInstanceResult> {
+  if (
+    !(await isDisconnectReconciliationStillPermitted({
+      runtimeStateReader: ctx.runtimeStateReader,
+      clock: ctx.clock,
+      sandboxInstanceId: ctx.sandboxInstance.id,
+      expectedOwnerLeaseId: ctx.expectedOwnerLeaseId,
+    }))
+  ) {
+    return {
+      executed: false,
+      outcome: "runtime_state_fence_before_stop",
+    };
+  }
+
+  if (
+    !(await isDisconnectReconciliationStillPermitted({
+      runtimeStateReader: ctx.runtimeStateReader,
+      clock: ctx.clock,
+      sandboxInstanceId: ctx.sandboxInstance.id,
+      expectedOwnerLeaseId: ctx.expectedOwnerLeaseId,
+    }))
+  ) {
+    return {
+      executed: false,
+      outcome: "runtime_state_fence_before_mark",
+    };
+  }
+
+  await applySandboxLifecycleEvent(
+    {
+      db: ctx.db,
+      logger: ctx.logger,
+      tables: ctx.tables,
+    },
+    {
+      sandboxInstanceId: ctx.sandboxInstance.id,
+      event: SandboxLifecycleEvents.STOP_REQUESTED,
+    },
+  );
+
+  return stopProviderSandboxOrMarkMissing({
+    config: ctx.config,
+    controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+    sandboxAdapter: ctx.sandboxAdapter,
+    db: ctx.db,
+    tables: ctx.tables,
+    runtimeStateReader: ctx.runtimeStateReader,
+    clock: ctx.clock,
+    expectedOwnerLeaseId: ctx.expectedOwnerLeaseId,
+    sandboxInstance: {
+      ...ctx.sandboxInstance,
+      status: SandboxInstanceStatuses.STOPPING,
+    },
+  });
+}
+
 /**
  * Reconciles durable sandbox state after disconnect grace elapses.
  *
@@ -686,6 +754,93 @@ export async function reconcileSandboxInstance(
         sandboxInstance,
       });
     }
+    case "fail_if_startup_failure_evidence_else_stop": {
+      const failureContext = await resolveReconciliationFailureContext({
+        db: ctx.db,
+        failureCode: action.failureCode,
+        failureMessage: action.failureMessage,
+        sandboxInstanceId: sandboxInstance.id,
+      });
+      if (failureContext.startupFailureEvidence === null) {
+        return stopActiveProviderSandboxDuringDisconnect({
+          config: ctx.config,
+          controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+          sandboxAdapter: resolvedRuntime.sandboxAdapter,
+          db: ctx.db,
+          tables: ctx.tables,
+          runtimeStateReader: ctx.runtimeStateReader,
+          clock: ctx.clock,
+          expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+          sandboxInstance,
+          logger: ctx.logger,
+        });
+      }
+
+      const markOutcome = await markSandboxInstanceFailed({
+        db: ctx.db,
+        tables: ctx.tables,
+        sandboxInstanceId: sandboxInstance.id,
+        currentStatus: sandboxInstance.status,
+        failureCode: action.failureCode,
+        failureMessage: failureContext.failureMessage,
+        stillPermitted: async () =>
+          isDisconnectReconciliationStillPermitted({
+            runtimeStateReader: ctx.runtimeStateReader,
+            clock: ctx.clock,
+            sandboxInstanceId: input.sandboxInstanceId,
+            expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+          }),
+      });
+      if (markOutcome === "fence_mismatch") {
+        return {
+          executed: false,
+          outcome: "runtime_state_fence_before_mark",
+        };
+      }
+
+      if (markOutcome === "already_failed") {
+        return {
+          executed: false,
+          outcome: "already_failed",
+          bootstrapAttachmentTerminationTarget: {
+            expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+          },
+        };
+      }
+
+      return withUsageEventState({
+        result: withBootstrapAttachmentTerminationTarget({
+          result: {
+            executed: true,
+            outcome: "failed",
+            diagnostics: {
+              failureCode: action.failureCode,
+              providerState: providerInspection.disposition,
+              ...(providerInspection.providerStatus === undefined
+                ? {}
+                : { providerStatus: providerInspection.providerStatus }),
+              sandboxStatus: sandboxInstance.status,
+              runtimeProvider: sandboxInstance.runtimeProvider,
+              providerSandboxId: sandboxInstance.providerSandboxId,
+              expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+              initialRuntimeState: {
+                ownerLeaseId: initialSnapshot.ownerLeaseId,
+                attachmentOwnerLeaseId: initialSnapshot.attachment?.ownerLeaseId ?? null,
+                attachmentSessionId: initialSnapshot.attachment?.sessionId ?? null,
+                attachmentNodeId: initialSnapshot.attachment?.nodeId ?? null,
+                presenceActiveCount: initialSnapshot.presence.activeCount,
+                keepaliveActive: initialSnapshot.keepalive.active,
+                runtimeReady: initialSnapshot.runtime.ready,
+              },
+              startupFailureEvidence: failureContext.startupFailureEvidence,
+              latestStartupEvent: failureContext.latestStartupEvent,
+            },
+          },
+          expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+        }),
+        sandboxInstance,
+      });
+    }
     case "mark_stopped": {
       const markOutcome = await markSandboxInstanceStopped({
         db: ctx.db,
@@ -730,46 +885,7 @@ export async function reconcileSandboxInstance(
       });
     }
     case "stop_then_mark_stopped":
-      if (
-        !(await isDisconnectReconciliationStillPermitted({
-          runtimeStateReader: ctx.runtimeStateReader,
-          clock: ctx.clock,
-          sandboxInstanceId: input.sandboxInstanceId,
-          expectedOwnerLeaseId: input.expectedOwnerLeaseId,
-        }))
-      ) {
-        return {
-          executed: false,
-          outcome: "runtime_state_fence_before_stop",
-        };
-      }
-
-      if (
-        !(await isDisconnectReconciliationStillPermitted({
-          runtimeStateReader: ctx.runtimeStateReader,
-          clock: ctx.clock,
-          sandboxInstanceId: input.sandboxInstanceId,
-          expectedOwnerLeaseId: input.expectedOwnerLeaseId,
-        }))
-      ) {
-        return {
-          executed: false,
-          outcome: "runtime_state_fence_before_mark",
-        };
-      }
-      await applySandboxLifecycleEvent(
-        {
-          db: ctx.db,
-          logger: ctx.logger,
-          tables: ctx.tables,
-        },
-        {
-          sandboxInstanceId: sandboxInstance.id,
-          event: SandboxLifecycleEvents.STOP_REQUESTED,
-        },
-      );
-
-      return stopProviderSandboxOrMarkMissing({
+      return stopActiveProviderSandboxDuringDisconnect({
         config: ctx.config,
         controlPlaneInternalClient: ctx.controlPlaneInternalClient,
         sandboxAdapter: resolvedRuntime.sandboxAdapter,
@@ -778,10 +894,8 @@ export async function reconcileSandboxInstance(
         runtimeStateReader: ctx.runtimeStateReader,
         clock: ctx.clock,
         expectedOwnerLeaseId: input.expectedOwnerLeaseId,
-        sandboxInstance: {
-          ...sandboxInstance,
-          status: SandboxInstanceStatuses.STOPPING,
-        },
+        sandboxInstance,
+        logger: ctx.logger,
       });
   }
 }
