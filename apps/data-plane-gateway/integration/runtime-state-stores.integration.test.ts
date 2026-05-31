@@ -169,22 +169,24 @@ describe.concurrent("runtime-state store integrations", () => {
     try {
       const store = new ValkeySandboxPresenceStore(client, keyPrefix);
       const sandboxInstanceId = "sbi_presence_it";
+      const nowMs = Date.now();
+      const leaseTtlMs = 30_000;
 
       await store.touchLease({
         sandboxInstanceId,
         leaseId: "spl_first",
         source: "dashboard",
         sessionId: "session_first",
-        ttlMs: 30_000,
-        nowMs: Date.now(),
+        ttlMs: leaseTtlMs,
+        nowMs,
       });
       await store.touchLease({
         sandboxInstanceId,
         leaseId: "spl_second",
         source: "cli",
         sessionId: "session_second",
-        ttlMs: 50,
-        nowMs: Date.now(),
+        ttlMs: leaseTtlMs,
+        nowMs,
       });
 
       await expect(
@@ -218,18 +220,16 @@ describe.concurrent("runtime-state store integrations", () => {
         }),
       ).resolves.toBe(1);
 
-      await systemSleeper.sleep(100);
-
       await expect(
         store.hasAnyActiveLease({
           sandboxInstanceId,
-          nowMs: Date.now(),
+          nowMs: nowMs + leaseTtlMs + 1,
         }),
       ).resolves.toBe(false);
       await expect(
         store.countActiveLeases({
           sandboxInstanceId,
-          nowMs: Date.now(),
+          nowMs: nowMs + leaseTtlMs + 1,
         }),
       ).resolves.toBe(0);
     } finally {
