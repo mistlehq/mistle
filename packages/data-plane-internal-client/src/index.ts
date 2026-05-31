@@ -183,6 +183,12 @@ export type ApplySandboxRuntimeLifecycleEventInput =
     }
   | {
       sandboxInstanceId: string;
+      kind: "bootstrap_degraded" | "bootstrap_recovered";
+      ownerLeaseId: string;
+      testEnvironmentId?: string;
+    }
+  | {
+      sandboxInstanceId: string;
       kind: "runtime_readiness_reported";
       ownerLeaseId: string;
       runtimeReady: boolean;
@@ -198,6 +204,7 @@ const ApplySandboxRuntimeLifecycleEventResponseSchema = z
       SandboxInstanceStatuses.STARTED,
       SandboxInstanceStatuses.INITIALIZING,
       SandboxInstanceStatuses.RUNNING,
+      SandboxInstanceStatuses.DEGRADED,
       SandboxInstanceStatuses.RECONNECTING,
       SandboxInstanceStatuses.STOPPING,
       SandboxInstanceStatuses.STOPPED,

@@ -264,6 +264,7 @@ describe("startWebSocketHealthMonitor", () => {
     const scheduler = createManualScheduler(clock);
     const rawSocket = new FakeRawSocket();
     const missedPongCounts: number[] = [];
+    const recoveredMissedPongCounts: number[] = [];
     let unhealthyCount = 0;
 
     const handle = startWebSocketHealthMonitor({
@@ -278,6 +279,9 @@ describe("startWebSocketHealthMonitor", () => {
       onMissedPong: ({ consecutiveMissedPongs }) => {
         missedPongCounts.push(consecutiveMissedPongs);
       },
+      onRecovered: ({ consecutiveMissedPongs }) => {
+        recoveredMissedPongCounts.push(consecutiveMissedPongs);
+      },
       onUnhealthy: () => {
         unhealthyCount += 1;
       },
@@ -291,8 +295,10 @@ describe("startWebSocketHealthMonitor", () => {
     expect(handle.isHealthy()).toBe(true);
     expect(unhealthyCount).toBe(0);
     expect(missedPongCounts).toEqual([1]);
+    expect(recoveredMissedPongCounts).toEqual([]);
 
     rawSocket.emit("pong", Buffer.alloc(0));
+    expect(recoveredMissedPongCounts).toEqual([1]);
 
     clock.advanceMs(10);
     scheduler.runDue();
@@ -302,6 +308,7 @@ describe("startWebSocketHealthMonitor", () => {
     expect(handle.isHealthy()).toBe(true);
     expect(unhealthyCount).toBe(0);
     expect(missedPongCounts).toEqual([1, 1]);
+    expect(recoveredMissedPongCounts).toEqual([1]);
     handle.stop();
   });
 

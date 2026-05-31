@@ -93,6 +93,7 @@ const StartupInspectionStatuses: SandboxInstanceStatus[] = [
 
 const RuntimeInspectionStatuses: SandboxInstanceStatus[] = [
   SandboxInstanceStatuses.RUNNING,
+  SandboxInstanceStatuses.DEGRADED,
   SandboxInstanceStatuses.RECONNECTING,
 ];
 
@@ -862,6 +863,7 @@ export async function getSandboxInstance(
       });
       break;
     }
+    case SandboxInstanceStatuses.DEGRADED:
     case SandboxInstanceStatuses.RECONNECTING: {
       response = await inspectRunningSandboxInstance(ctx, {
         ...sandboxInstance,

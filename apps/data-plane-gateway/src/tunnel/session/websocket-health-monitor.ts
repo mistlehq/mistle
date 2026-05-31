@@ -27,6 +27,11 @@ export type WebSocketHealthMissedPong = {
   maxConsecutiveMissedPongs: number;
 };
 
+export type WebSocketHealthRecovered = {
+  consecutiveMissedPongs: number;
+  lastPongAgeMs: number;
+};
+
 /**
  * Starts active ping/pong health checks for a tunnel websocket.
  *
@@ -43,6 +48,7 @@ export function startWebSocketHealthMonitor(input: {
   pongTimeoutMs: number;
   maxConsecutiveMissedPongs?: number;
   onMissedPong?: (state: WebSocketHealthMissedPong) => void;
+  onRecovered?: (state: WebSocketHealthRecovered) => void;
   onUnhealthy: () => void;
   onRoundTripTimeObserved?: (roundTripTimeMs: number) => void;
 }): WebSocketHealthHandle {
@@ -80,8 +86,15 @@ export function startWebSocketHealthMonitor(input: {
       input.onRoundTripTimeObserved?.(roundTripTimeMs);
       pingSentAtMs = undefined;
     }
+    const nowMs = input.clock.nowMs();
+    if (consecutiveMissedPongs > 0) {
+      input.onRecovered?.({
+        consecutiveMissedPongs,
+        lastPongAgeMs: nowMs - lastPongAtMs,
+      });
+    }
     consecutiveMissedPongs = 0;
-    lastPongAtMs = input.clock.nowMs();
+    lastPongAtMs = nowMs;
     if (pongTimeoutHandle !== undefined) {
       input.scheduler.cancel(pongTimeoutHandle);
       pongTimeoutHandle = undefined;

@@ -578,13 +578,26 @@ pub(super) fn spawn_bootstrap_socket_task(
                             return Ok(());
                         }
                         Some(Ok(Message::Ping(payload))) => {
+                            let payload_len = payload.len();
+                            info!(
+                                event = "bootstrap_tunnel.ping_received",
+                                payload_len,
+                            );
                             control_sender
                                 .send(BootstrapWriterControlMessage::Pong(payload.to_vec()))
                                 .map_err(|_| {
+                                    warn!(
+                                        event = "bootstrap_tunnel.pong_queue_failed",
+                                        payload_len,
+                                    );
                                     TunnelSessionError::WriteTunnelText(
                                         "bootstrap tunnel writer is closed".to_string(),
                                     )
                                 })?;
+                            info!(
+                                event = "bootstrap_tunnel.pong_queued",
+                                payload_len,
+                            );
                         }
                         Some(Ok(message)) => {
                             let _ = event_sender.send(TunnelSessionEvent::BootstrapMessage(message));
@@ -639,7 +652,13 @@ where
 
     loop {
         while let Ok(control) = control_receiver.try_recv() {
-            write_bootstrap_control_message(&mut writer, control, &notify_bootstrap_closed).await?;
+            write_bootstrap_control_message(
+                &mut writer,
+                control,
+                pending_outbound.len(),
+                &notify_bootstrap_closed,
+            )
+            .await?;
         }
         while let Ok(message) = receiver.try_recv() {
             match message {
@@ -666,7 +685,13 @@ where
             biased;
             control = control_receiver.recv() => {
                 if let Some(control) = control {
-                    write_bootstrap_control_message(&mut writer, control, &notify_bootstrap_closed).await?;
+                    write_bootstrap_control_message(
+                        &mut writer,
+                        control,
+                        pending_outbound.len(),
+                        &notify_bootstrap_closed,
+                    )
+                    .await?;
                 }
             }
             outbound = receiver.recv() => {
@@ -686,6 +711,7 @@ where
 async fn write_bootstrap_control_message<W>(
     writer: &mut W,
     message: BootstrapWriterControlMessage,
+    pending_outbound_len: usize,
     notify_bootstrap_closed: &impl Fn(Option<String>),
 ) -> Result<(), TunnelSessionError>
 where
@@ -693,6 +719,11 @@ where
 {
     match message {
         BootstrapWriterControlMessage::Pong(payload) => {
+            info!(
+                event = "bootstrap_tunnel.pong_write_started",
+                payload_len = payload.len(),
+                pending_outbound_len,
+            );
             write_bootstrap_pong(writer, payload, notify_bootstrap_closed).await
         }
     }
@@ -748,12 +779,19 @@ async fn write_bootstrap_pong<W>(
 where
     W: Sink<Message, Error = WebSocketError> + Unpin,
 {
+    let payload_len = payload.len();
     if let Err(error) = writer.send(Message::Pong(payload.into())).await {
+        warn!(
+            event = "bootstrap_tunnel.pong_write_failed",
+            payload_len,
+            error = %error,
+        );
         notify_bootstrap_closed(Some(format!(
             "failed to write bootstrap tunnel pong frame: {error}"
         )));
         return Err(TunnelSessionError::WriteTunnelText(error.to_string()));
     }
+    info!(event = "bootstrap_tunnel.pong_write_completed", payload_len,);
     Ok(())
 }
 

@@ -1019,6 +1019,7 @@ export interface paths {
                 | "started"
                 | "initializing"
                 | "running"
+                | "degraded"
                 | "reconnecting"
                 | "stopping"
                 | "stopped"

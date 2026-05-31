@@ -17,6 +17,12 @@ export const ApplyRuntimeLifecycleEventBodySchema = z.discriminatedUnion("kind",
     .strict(),
   z
     .object({
+      kind: z.enum(["bootstrap_degraded", "bootstrap_recovered"]),
+      ownerLeaseId: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
       kind: z.literal("runtime_readiness_reported"),
       ownerLeaseId: z.string().min(1),
       runtimeReady: z.boolean(),

@@ -9,6 +9,7 @@ export function isSessionPageNavigableSandboxStatus(
     sandboxStatus === SandboxInstanceStatuses.STARTED ||
     sandboxStatus === SandboxInstanceStatuses.INITIALIZING ||
     sandboxStatus === SandboxInstanceStatuses.RUNNING ||
+    sandboxStatus === SandboxInstanceStatuses.DEGRADED ||
     sandboxStatus === SandboxInstanceStatuses.RECONNECTING ||
     sandboxStatus === SandboxInstanceStatuses.STOPPED
   );
@@ -72,6 +73,7 @@ export function resolveSessionConnectionReadiness(input: {
     input.sandboxStatus === SandboxInstanceStatuses.STARTED ||
     input.sandboxStatus === SandboxInstanceStatuses.INITIALIZING ||
     input.sandboxStatus === SandboxInstanceStatuses.RUNNING ||
+    input.sandboxStatus === SandboxInstanceStatuses.DEGRADED ||
     input.sandboxStatus === SandboxInstanceStatuses.RECONNECTING ||
     input.sandboxStatus === SandboxInstanceStatuses.STOPPING
   ) {

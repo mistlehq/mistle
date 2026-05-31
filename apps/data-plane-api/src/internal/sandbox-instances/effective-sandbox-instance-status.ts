@@ -14,9 +14,9 @@ import type { GetSandboxInstanceResponse } from "./schemas.js";
  * Composes the effective user-facing sandbox status from durable lifecycle
  * state, live gateway bootstrap attachment, and runtime readiness.
  *
- * Durable non-connectable states such as `pending`, `failed`, `reconnecting`,
- * and `stopping` win. Runtime readiness is required before the effective status
- * becomes `running`.
+ * Durable non-connectable states such as `pending`, `failed`, `degraded`,
+ * `reconnecting`, and `stopping` win. Runtime readiness is required before the
+ * effective status becomes `running`.
  */
 export function resolveEffectiveSandboxInstanceStatus(input: {
   persistedStatus: string;

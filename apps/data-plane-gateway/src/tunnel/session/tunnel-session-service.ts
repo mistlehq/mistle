@@ -146,6 +146,63 @@ export class TunnelSessionService {
             },
             "Bootstrap websocket missed pong health check",
           );
+          void this.sandboxDeadlineLifecycleCoordinator
+            .enqueue({
+              sandboxInstanceId: input.sandboxInstanceId,
+              operation: async () => {
+                await this.sandboxInstanceDeadlineService.handleBootstrapDegraded({
+                  sandboxInstanceId: input.sandboxInstanceId,
+                  ownerLeaseId: input.leaseId,
+                  ...(input.testEnvironmentId === undefined
+                    ? {}
+                    : { testEnvironmentId: input.testEnvironmentId }),
+                });
+              },
+            })
+            .catch((error: unknown) => {
+              logger.warn(
+                {
+                  err: error,
+                  sandboxInstanceId: input.sandboxInstanceId,
+                  leaseId: input.leaseId,
+                },
+                "Failed to mark bootstrap websocket as degraded after missed pong",
+              );
+            });
+        },
+        onRecovered: ({ consecutiveMissedPongs, lastPongAgeMs }) => {
+          logger.info(
+            {
+              sandboxInstanceId: input.sandboxInstanceId,
+              leaseId: input.leaseId,
+              consecutiveMissedPongs,
+              lastPongAgeMs,
+            },
+            "Bootstrap websocket recovered after missed pong health check",
+          );
+          void this.sandboxDeadlineLifecycleCoordinator
+            .enqueue({
+              sandboxInstanceId: input.sandboxInstanceId,
+              operation: async () => {
+                await this.sandboxInstanceDeadlineService.handleBootstrapRecovered({
+                  sandboxInstanceId: input.sandboxInstanceId,
+                  ownerLeaseId: input.leaseId,
+                  ...(input.testEnvironmentId === undefined
+                    ? {}
+                    : { testEnvironmentId: input.testEnvironmentId }),
+                });
+              },
+            })
+            .catch((error: unknown) => {
+              logger.warn(
+                {
+                  err: error,
+                  sandboxInstanceId: input.sandboxInstanceId,
+                  leaseId: input.leaseId,
+                },
+                "Failed to mark bootstrap websocket as recovered after pong health check",
+              );
+            });
         },
         onUnhealthy: () => {
           logger.error(

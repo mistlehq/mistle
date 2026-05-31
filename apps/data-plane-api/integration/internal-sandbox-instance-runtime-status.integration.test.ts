@@ -171,6 +171,42 @@ it("applies runtime lifecycle events for reconnecting bootstrap sessions", async
   await expect(
     client.applySandboxRuntimeLifecycleEvent({
       sandboxInstanceId,
+      kind: "bootstrap_degraded",
+      ownerLeaseId: "lease_runtime_lifecycle",
+    }),
+  ).resolves.toMatchObject({
+    status: "ok",
+    sandboxInstanceId,
+    lifecycleStatus: SandboxInstanceStatuses.DEGRADED,
+  });
+
+  await expect(
+    client.applySandboxRuntimeLifecycleEvent({
+      sandboxInstanceId,
+      kind: "bootstrap_recovered",
+      ownerLeaseId: "lease_runtime_lifecycle",
+    }),
+  ).resolves.toMatchObject({
+    status: "ok",
+    sandboxInstanceId,
+    lifecycleStatus: SandboxInstanceStatuses.RUNNING,
+  });
+
+  await expect(
+    client.applySandboxRuntimeLifecycleEvent({
+      sandboxInstanceId,
+      kind: "bootstrap_degraded",
+      ownerLeaseId: "lease_runtime_lifecycle",
+    }),
+  ).resolves.toMatchObject({
+    status: "ok",
+    sandboxInstanceId,
+    lifecycleStatus: SandboxInstanceStatuses.DEGRADED,
+  });
+
+  await expect(
+    client.applySandboxRuntimeLifecycleEvent({
+      sandboxInstanceId,
       kind: "bootstrap_detached",
       ownerLeaseId: "lease_runtime_lifecycle",
     }),

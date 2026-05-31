@@ -1,6 +1,8 @@
+import { EventEmitter } from "node:events";
 import { createServer } from "node:http";
 
 import type { PutSandboxInstanceDeadlineAcceptedResponse } from "@mistle/data-plane-internal-client";
+import type { SandboxInstanceStatus } from "@mistle/sandbox-lifecycle";
 import { createManualScheduler, createMutableClock } from "@mistle/time/testing";
 import { WSContext } from "hono/ws";
 import { afterEach, describe, expect, it } from "vitest";
@@ -14,7 +16,11 @@ import {
 import { createAttachmentBackedActiveBootstrapSessionStore } from "../../runtime-state/active-bootstrap-session-store.js";
 import { InMemorySandboxPresenceStore } from "../../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
-import { OWNER_LEASE_RENEW_INTERVAL_MS } from "../../runtime-state/durations.js";
+import {
+  OWNER_LEASE_RENEW_INTERVAL_MS,
+  WEBSOCKET_PING_INTERVAL_MS,
+  WEBSOCKET_PONG_TIMEOUT_MS,
+} from "../../runtime-state/durations.js";
 import { LocalGatewayForwardingClientAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
 import { LocalGatewayForwardingServerAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-server-adapter.js";
 import { InteractiveStreamRouter } from "../gateway-forwarding/interactive-stream-router.js";
@@ -33,6 +39,12 @@ const BootstrapSessionId = "sess_bootstrap";
 const ConnectionSessionId = "conn_1";
 const OwnerLeaseId = "lease_test";
 
+type RuntimeLifecycleEventKind =
+  | "bootstrap_degraded"
+  | "bootstrap_detached"
+  | "bootstrap_recovered"
+  | "runtime_readiness_reported";
+
 type ReceivedWebSocketMessage = {
   data: string | Buffer;
   isBinary: boolean;
@@ -44,6 +56,27 @@ type WebSocketPair = {
   peerSocket: RelayPeerSocket;
   closeAll: () => Promise<void>;
 };
+
+class FakeRawSocket extends EventEmitter {
+  public ping(
+    _data: Buffer | undefined,
+    _mask: boolean,
+    callback?: (error: Error | null | undefined) => void,
+  ): void {
+    callback?.(null);
+  }
+}
+
+function createFakePeerSocket(rawSocket: FakeRawSocket): RelayPeerSocket {
+  return {
+    send: () => undefined,
+    close: () => undefined,
+    get readyState() {
+      return WebSocket.OPEN;
+    },
+    raw: rawSocket as unknown as WebSocket,
+  } as unknown as RelayPeerSocket;
+}
 
 function toBuffer(data: RawData): Buffer {
   if (Buffer.isBuffer(data)) {
@@ -206,11 +239,24 @@ afterEach(async () => {
   openPairs.clear();
 });
 
+function resolveTestLifecycleStatus(kind: RuntimeLifecycleEventKind): SandboxInstanceStatus {
+  switch (kind) {
+    case "bootstrap_degraded":
+      return "degraded";
+    case "bootstrap_detached":
+      return "reconnecting";
+    case "bootstrap_recovered":
+      return "running";
+    case "runtime_readiness_reported":
+      return "initializing";
+  }
+}
+
 async function createDisconnectTestHarness() {
   const clock = createMutableClock(1_000);
   const scheduler = createManualScheduler(clock);
   const lifecycleEvents: Array<{
-    kind: "bootstrap_detached" | "runtime_readiness_reported";
+    kind: RuntimeLifecycleEventKind;
     ownerLeaseId: string;
     runtimeReady?: boolean;
   }> = [];
@@ -282,7 +328,7 @@ async function createDisconnectTestHarness() {
           return {
             status: "ok",
             sandboxInstanceId: input.sandboxInstanceId,
-            lifecycleStatus: input.kind === "bootstrap_detached" ? "reconnecting" : "initializing",
+            lifecycleStatus: resolveTestLifecycleStatus(input.kind),
           };
         },
       },
@@ -325,7 +371,140 @@ async function createDisconnectTestHarness() {
   };
 }
 
+function createBootstrapHealthTestHarness() {
+  const clock = createMutableClock(1_000);
+  const scheduler = createManualScheduler(clock);
+  const lifecycleEvents: Array<{
+    kind: RuntimeLifecycleEventKind;
+    ownerLeaseId: string;
+    runtimeReady?: boolean;
+  }> = [];
+  const attachmentStore = new InMemorySandboxRuntimeAttachmentStore(clock);
+  const tunnelSessionRegistry = new TunnelSessionRegistry(
+    new InMemoryTunnelSessionRegistryAdapter(),
+  );
+  const relayCoordinator = new TunnelRelayCoordinator(
+    GatewayNodeId,
+    new InMemoryLocalPeerRegistryAdapter(),
+    new InMemoryRelayTransportAdapter(GatewayNodeId),
+  );
+  const interactiveStreamRouter = new InteractiveStreamRouter(
+    GatewayNodeId,
+    new AttachmentBackedSandboxOwnerResolver(
+      GatewayNodeId,
+      createAttachmentBackedActiveBootstrapSessionStore(attachmentStore),
+      clock,
+    ),
+    new LocalGatewayForwardingClientAdapter(
+      GatewayNodeId,
+      new LocalGatewayForwardingServerAdapter(tunnelSessionRegistry),
+    ),
+  );
+  const service = new TunnelSessionService(
+    GatewayNodeId,
+    interactiveStreamRouter,
+    relayCoordinator,
+    tunnelSessionRegistry,
+    new InMemorySandboxPresenceStore(clock),
+    attachmentStore,
+    new SandboxInstanceDeadlineService(
+      {
+        async putSandboxInstanceDeadline(input) {
+          return {
+            status: "accepted",
+            sandboxInstanceId: input.sandboxInstanceId,
+            kind: input.kind,
+            generation: 1,
+            workflowRunId: "owfr_test",
+          } satisfies PutSandboxInstanceDeadlineAcceptedResponse;
+        },
+        async deleteSandboxInstanceDeadline(input) {
+          return {
+            status: "ok",
+            sandboxInstanceId: input.sandboxInstanceId,
+            kind: input.kind,
+          };
+        },
+        async applySandboxRuntimeLifecycleEvent(input) {
+          lifecycleEvents.push({
+            kind: input.kind,
+            ownerLeaseId: input.ownerLeaseId,
+            ...(input.kind === "runtime_readiness_reported"
+              ? { runtimeReady: input.runtimeReady }
+              : {}),
+          });
+          return {
+            status: "ok",
+            sandboxInstanceId: input.sandboxInstanceId,
+            lifecycleStatus: resolveTestLifecycleStatus(input.kind),
+          };
+        },
+      },
+      clock,
+      DefaultDataPlaneGatewayLifecycleDurations,
+    ),
+    new SandboxDeadlineLifecycleCoordinator(),
+    clock,
+    scheduler,
+  );
+
+  return {
+    clock,
+    lifecycleEvents,
+    rawSocket: new FakeRawSocket(),
+    scheduler,
+    service,
+  };
+}
+
 describe("TunnelSessionService", () => {
+  it("marks bootstrap sessions degraded on missed pong and recovered on the next pong", async () => {
+    const { clock, lifecycleEvents, rawSocket, scheduler, service } =
+      createBootstrapHealthTestHarness();
+    const attachedPeer = service.attachBootstrapPeer({
+      leaseId: OwnerLeaseId,
+      onFatalError: () => {
+        throw new Error("Bootstrap attach should not fail in this test.");
+      },
+      onLeaseLost: () => {
+        throw new Error("Bootstrap lease should not be lost in this test.");
+      },
+      onTransportUnhealthy: () => {
+        throw new Error("Bootstrap transport should remain healthy in this test.");
+      },
+      ownerLeaseTtlMs: 60_000,
+      relaySessionId: BootstrapSessionId,
+      sandboxInstanceId: SandboxInstanceId,
+      socket: createFakePeerSocket(rawSocket),
+    });
+
+    await attachedPeer.activationPromise;
+
+    clock.advanceMs(WEBSOCKET_PING_INTERVAL_MS);
+    scheduler.runDue();
+    clock.advanceMs(WEBSOCKET_PONG_TIMEOUT_MS);
+    scheduler.runDue();
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await Promise.resolve();
+    }
+
+    expect(lifecycleEvents).toContainEqual({
+      kind: "bootstrap_degraded",
+      ownerLeaseId: OwnerLeaseId,
+    });
+
+    rawSocket.emit("pong", Buffer.alloc(0));
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await Promise.resolve();
+    }
+
+    expect(lifecycleEvents).toContainEqual({
+      kind: "bootstrap_recovered",
+      ownerLeaseId: OwnerLeaseId,
+    });
+    attachedPeer.websocketHealthHandle?.stop();
+  });
+
   it("renews the active runtime attachment while the bootstrap attachment remains healthy", async () => {
     const clock = createMutableClock(1_000);
     const scheduler = createManualScheduler(clock);
@@ -379,8 +558,7 @@ describe("TunnelSessionService", () => {
             return {
               status: "ok",
               sandboxInstanceId: input.sandboxInstanceId,
-              lifecycleStatus:
-                input.kind === "bootstrap_detached" ? "reconnecting" : "initializing",
+              lifecycleStatus: resolveTestLifecycleStatus(input.kind),
             };
           },
         },
@@ -503,8 +681,7 @@ describe("TunnelSessionService", () => {
             return {
               status: "ok",
               sandboxInstanceId: input.sandboxInstanceId,
-              lifecycleStatus:
-                input.kind === "bootstrap_detached" ? "reconnecting" : "initializing",
+              lifecycleStatus: resolveTestLifecycleStatus(input.kind),
             };
           },
         },
@@ -623,8 +800,7 @@ describe("TunnelSessionService", () => {
             return {
               status: "ok",
               sandboxInstanceId: input.sandboxInstanceId,
-              lifecycleStatus:
-                input.kind === "bootstrap_detached" ? "reconnecting" : "initializing",
+              lifecycleStatus: resolveTestLifecycleStatus(input.kind),
             };
           },
         },

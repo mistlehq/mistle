@@ -30,6 +30,7 @@ export function getSandboxDeliveryDisposition(
     case SandboxInstanceStatuses.STARTING:
     case SandboxInstanceStatuses.STARTED:
     case SandboxInstanceStatuses.INITIALIZING:
+    case SandboxInstanceStatuses.DEGRADED:
     case SandboxInstanceStatuses.RECONNECTING:
       return SandboxDeliveryDispositions.WAIT;
     case SandboxInstanceStatuses.STOPPED:
@@ -47,6 +48,7 @@ export function isSandboxBootstrapTokenExchangeEligible(status: SandboxInstanceS
     case SandboxInstanceStatuses.STARTED:
     case SandboxInstanceStatuses.INITIALIZING:
     case SandboxInstanceStatuses.RUNNING:
+    case SandboxInstanceStatuses.DEGRADED:
     case SandboxInstanceStatuses.RECONNECTING:
       return true;
     case SandboxInstanceStatuses.PENDING:
@@ -60,6 +62,7 @@ export function isSandboxBootstrapTokenExchangeEligible(status: SandboxInstanceS
 export function isSandboxUserStopEligible(status: SandboxInstanceStatus): boolean {
   switch (status) {
     case SandboxInstanceStatuses.RUNNING:
+    case SandboxInstanceStatuses.DEGRADED:
     case SandboxInstanceStatuses.RECONNECTING:
       return true;
     case SandboxInstanceStatuses.PENDING:
@@ -86,6 +89,7 @@ export function getSandboxDisconnectReconciliationPhase(
     case SandboxInstanceStatuses.INITIALIZING:
       return SandboxDisconnectReconciliationPhases.STARTUP;
     case SandboxInstanceStatuses.RUNNING:
+    case SandboxInstanceStatuses.DEGRADED:
     case SandboxInstanceStatuses.RECONNECTING:
       return SandboxDisconnectReconciliationPhases.RUNTIME;
     case SandboxInstanceStatuses.STOPPING:
@@ -105,6 +109,7 @@ export function getSandboxEffectiveStatus(input: {
   switch (input.persistedStatus) {
     case SandboxInstanceStatuses.PENDING:
     case SandboxInstanceStatuses.FAILED:
+    case SandboxInstanceStatuses.DEGRADED:
     case SandboxInstanceStatuses.RECONNECTING:
     case SandboxInstanceStatuses.STOPPING:
       return input.persistedStatus;

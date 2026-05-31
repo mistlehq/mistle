@@ -85,6 +85,36 @@ export class SandboxInstanceDeadlineService {
     });
   }
 
+  public async handleBootstrapDegraded(input: {
+    sandboxInstanceId: string;
+    ownerLeaseId: string;
+    testEnvironmentId?: string;
+  }): Promise<void> {
+    await this.dataPlaneClient.applySandboxRuntimeLifecycleEvent({
+      sandboxInstanceId: input.sandboxInstanceId,
+      kind: "bootstrap_degraded",
+      ownerLeaseId: input.ownerLeaseId,
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
+    });
+  }
+
+  public async handleBootstrapRecovered(input: {
+    sandboxInstanceId: string;
+    ownerLeaseId: string;
+    testEnvironmentId?: string;
+  }): Promise<void> {
+    await this.dataPlaneClient.applySandboxRuntimeLifecycleEvent({
+      sandboxInstanceId: input.sandboxInstanceId,
+      kind: "bootstrap_recovered",
+      ownerLeaseId: input.ownerLeaseId,
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
+    });
+  }
+
   public async handleRuntimeReadiness(input: {
     sandboxInstanceId: string;
     ownerLeaseId: string;

@@ -88,6 +88,41 @@ describe("transitionSandboxLifecycle", () => {
     });
   });
 
+  it("models degraded bootstrap health transitions", () => {
+    expect(
+      transitionSandboxLifecycle({
+        status: SandboxInstanceStatuses.RUNNING,
+        event: SandboxLifecycleEvents.BOOTSTRAP_DEGRADED,
+      }),
+    ).toEqual({
+      kind: "transition",
+      from: SandboxInstanceStatuses.RUNNING,
+      to: SandboxInstanceStatuses.DEGRADED,
+    });
+
+    expect(
+      transitionSandboxLifecycle({
+        status: SandboxInstanceStatuses.DEGRADED,
+        event: SandboxLifecycleEvents.BOOTSTRAP_RECOVERED,
+      }),
+    ).toEqual({
+      kind: "transition",
+      from: SandboxInstanceStatuses.DEGRADED,
+      to: SandboxInstanceStatuses.RUNNING,
+    });
+
+    expect(
+      transitionSandboxLifecycle({
+        status: SandboxInstanceStatuses.DEGRADED,
+        event: SandboxLifecycleEvents.BOOTSTRAP_DETACHED,
+      }),
+    ).toEqual({
+      kind: "transition",
+      from: SandboxInstanceStatuses.DEGRADED,
+      to: SandboxInstanceStatuses.RECONNECTING,
+    });
+  });
+
   it("models stop and failure transitions", () => {
     expect(
       transitionSandboxLifecycle({
@@ -97,6 +132,17 @@ describe("transitionSandboxLifecycle", () => {
     ).toEqual({
       kind: "transition",
       from: SandboxInstanceStatuses.RECONNECTING,
+      to: SandboxInstanceStatuses.STOPPING,
+    });
+
+    expect(
+      transitionSandboxLifecycle({
+        status: SandboxInstanceStatuses.DEGRADED,
+        event: SandboxLifecycleEvents.STOP_REQUESTED,
+      }),
+    ).toEqual({
+      kind: "transition",
+      from: SandboxInstanceStatuses.DEGRADED,
       to: SandboxInstanceStatuses.STOPPING,
     });
 
@@ -162,6 +208,26 @@ describe("transitionSandboxLifecycle", () => {
     ).toEqual({
       kind: "unchanged",
       status: SandboxInstanceStatuses.RECONNECTING,
+    });
+
+    expect(
+      transitionSandboxLifecycle({
+        status: SandboxInstanceStatuses.DEGRADED,
+        event: SandboxLifecycleEvents.BOOTSTRAP_DEGRADED,
+      }),
+    ).toEqual({
+      kind: "unchanged",
+      status: SandboxInstanceStatuses.DEGRADED,
+    });
+
+    expect(
+      transitionSandboxLifecycle({
+        status: SandboxInstanceStatuses.RUNNING,
+        event: SandboxLifecycleEvents.BOOTSTRAP_RECOVERED,
+      }),
+    ).toEqual({
+      kind: "unchanged",
+      status: SandboxInstanceStatuses.RUNNING,
     });
 
     expect(

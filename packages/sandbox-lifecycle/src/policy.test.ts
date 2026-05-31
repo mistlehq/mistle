@@ -20,6 +20,9 @@ describe("getSandboxDeliveryDisposition", () => {
     expect(getSandboxDeliveryDisposition(SandboxInstanceStatuses.RECONNECTING)).toBe(
       SandboxDeliveryDispositions.WAIT,
     );
+    expect(getSandboxDeliveryDisposition(SandboxInstanceStatuses.DEGRADED)).toBe(
+      SandboxDeliveryDispositions.WAIT,
+    );
     expect(getSandboxDeliveryDisposition(SandboxInstanceStatuses.STOPPED)).toBe(
       SandboxDeliveryDispositions.RESUME,
     );
@@ -40,6 +43,7 @@ describe("status policy helpers", () => {
       true,
     );
     expect(isSandboxBootstrapTokenExchangeEligible(SandboxInstanceStatuses.RUNNING)).toBe(true);
+    expect(isSandboxBootstrapTokenExchangeEligible(SandboxInstanceStatuses.DEGRADED)).toBe(true);
     expect(isSandboxBootstrapTokenExchangeEligible(SandboxInstanceStatuses.RECONNECTING)).toBe(
       true,
     );
@@ -48,6 +52,7 @@ describe("status policy helpers", () => {
 
   it("allows user stops for running and reconnecting sandboxes only", () => {
     expect(isSandboxUserStopEligible(SandboxInstanceStatuses.RUNNING)).toBe(true);
+    expect(isSandboxUserStopEligible(SandboxInstanceStatuses.DEGRADED)).toBe(true);
     expect(isSandboxUserStopEligible(SandboxInstanceStatuses.RECONNECTING)).toBe(true);
     expect(isSandboxUserStopEligible(SandboxInstanceStatuses.INITIALIZING)).toBe(false);
     expect(isSandboxUserStopEligible(SandboxInstanceStatuses.STOPPED)).toBe(false);
@@ -60,6 +65,7 @@ describe("status policy helpers", () => {
       true,
     );
     expect(isSandboxDisconnectReconciliationCandidate(SandboxInstanceStatuses.RUNNING)).toBe(true);
+    expect(isSandboxDisconnectReconciliationCandidate(SandboxInstanceStatuses.DEGRADED)).toBe(true);
     expect(isSandboxDisconnectReconciliationCandidate(SandboxInstanceStatuses.RECONNECTING)).toBe(
       true,
     );
@@ -80,6 +86,9 @@ describe("status policy helpers", () => {
     expect(getSandboxDisconnectReconciliationPhase(SandboxInstanceStatuses.RUNNING)).toBe(
       SandboxDisconnectReconciliationPhases.RUNTIME,
     );
+    expect(getSandboxDisconnectReconciliationPhase(SandboxInstanceStatuses.DEGRADED)).toBe(
+      SandboxDisconnectReconciliationPhases.RUNTIME,
+    );
     expect(getSandboxDisconnectReconciliationPhase(SandboxInstanceStatuses.RECONNECTING)).toBe(
       SandboxDisconnectReconciliationPhases.RUNTIME,
     );
@@ -91,7 +100,7 @@ describe("status policy helpers", () => {
 });
 
 describe("getSandboxEffectiveStatus", () => {
-  it("keeps durable terminal and reconnecting states authoritative", () => {
+  it("keeps durable terminal, degraded, and reconnecting states authoritative", () => {
     expect(
       getSandboxEffectiveStatus({
         persistedStatus: SandboxInstanceStatuses.FAILED,
@@ -99,6 +108,14 @@ describe("getSandboxEffectiveStatus", () => {
         bootstrapAttached: true,
       }),
     ).toBe(SandboxInstanceStatuses.FAILED);
+
+    expect(
+      getSandboxEffectiveStatus({
+        persistedStatus: SandboxInstanceStatuses.DEGRADED,
+        runtimeReady: true,
+        bootstrapAttached: true,
+      }),
+    ).toBe(SandboxInstanceStatuses.DEGRADED);
 
     expect(
       getSandboxEffectiveStatus({

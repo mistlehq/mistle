@@ -17,6 +17,7 @@ export type WorkbenchEntryPhase =
   | "loading"
   | "ready"
   | "resume_pending"
+  | "sandbox_degraded"
   | "sandbox_failed"
   | "sandbox_initializing"
   | "sandbox_pending"
@@ -157,6 +158,10 @@ export function resolveWorkbenchEntryPhase(input: {
     return "sandbox_reconnecting";
   }
 
+  if (input.sandboxStatus === "degraded") {
+    return "sandbox_degraded";
+  }
+
   if (input.sandboxStatus === "stopping") {
     return "sandbox_stopping";
   }
@@ -193,6 +198,10 @@ export function resolveSandboxLifecycleStatusForWorkbenchEntryPhase(
 
   if (phase === "sandbox_reconnecting") {
     return "reconnecting";
+  }
+
+  if (phase === "sandbox_degraded") {
+    return "degraded";
   }
 
   if (phase === "sandbox_stopping") {
@@ -299,6 +308,7 @@ export function resolveSessionWorkbenchStatus(input: {
     input.sandboxLifecycleStatus === "starting" ||
     input.sandboxLifecycleStatus === "started" ||
     input.sandboxLifecycleStatus === "initializing" ||
+    input.sandboxLifecycleStatus === "degraded" ||
     input.sandboxLifecycleStatus === "reconnecting" ||
     input.sandboxLifecycleStatus === "stopping" ||
     input.sandboxLifecycleStatus === "resuming" ||

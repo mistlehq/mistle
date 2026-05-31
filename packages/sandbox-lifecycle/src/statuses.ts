@@ -4,6 +4,7 @@ export const SandboxInstanceStatuses = Object.freeze({
   STARTED: "started",
   INITIALIZING: "initializing",
   RUNNING: "running",
+  DEGRADED: "degraded",
   RECONNECTING: "reconnecting",
   STOPPING: "stopping",
   STOPPED: "stopped",
@@ -22,6 +23,7 @@ export function isSandboxInstanceStatus(input: string): input is SandboxInstance
     case SandboxInstanceStatuses.STARTED:
     case SandboxInstanceStatuses.INITIALIZING:
     case SandboxInstanceStatuses.RUNNING:
+    case SandboxInstanceStatuses.DEGRADED:
     case SandboxInstanceStatuses.RECONNECTING:
     case SandboxInstanceStatuses.STOPPING:
     case SandboxInstanceStatuses.STOPPED:

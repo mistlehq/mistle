@@ -1919,6 +1919,7 @@
                               "started",
                               "initializing",
                               "running",
+                              "degraded",
                               "reconnecting",
                               "stopping",
                               "stopped",
@@ -2225,6 +2226,7 @@
                               "started",
                               "initializing",
                               "running",
+                              "degraded",
                               "reconnecting",
                               "stopping",
                               "stopped",
@@ -2454,6 +2456,7 @@
                         "started",
                         "initializing",
                         "running",
+                        "degraded",
                         "reconnecting",
                         "stopping",
                         "stopped",
@@ -4349,6 +4352,21 @@
                     "properties": {
                       "kind": {
                         "type": "string",
+                        "enum": ["bootstrap_degraded", "bootstrap_recovered"]
+                      },
+                      "ownerLeaseId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["kind", "ownerLeaseId"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
                         "enum": ["runtime_readiness_reported"]
                       },
                       "ownerLeaseId": {
@@ -4391,6 +4409,7 @@
                         "started",
                         "initializing",
                         "running",
+                        "degraded",
                         "reconnecting",
                         "stopping",
                         "stopped",

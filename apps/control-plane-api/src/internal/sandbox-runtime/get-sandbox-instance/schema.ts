@@ -17,6 +17,7 @@ export const InternalSandboxRuntimeGetSandboxInstanceResponseSchema = z
       SandboxInstanceStatuses.STARTED,
       SandboxInstanceStatuses.INITIALIZING,
       SandboxInstanceStatuses.RUNNING,
+      SandboxInstanceStatuses.DEGRADED,
       SandboxInstanceStatuses.RECONNECTING,
       SandboxInstanceStatuses.STOPPING,
       SandboxInstanceStatuses.STOPPED,

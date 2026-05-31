@@ -18,12 +18,21 @@ type ApplySandboxRuntimeLifecycleEventContext = {
   tables: Pick<DataPlaneTables, "sandboxInstances">;
 };
 
-export type SandboxRuntimeLifecycleEventKind = "bootstrap_detached" | "runtime_readiness_reported";
+export type SandboxRuntimeLifecycleEventKind =
+  | "bootstrap_degraded"
+  | "bootstrap_detached"
+  | "bootstrap_recovered"
+  | "runtime_readiness_reported";
 
 export type ApplySandboxRuntimeLifecycleEventInput =
   | {
       sandboxInstanceId: string;
       kind: "bootstrap_detached";
+      ownerLeaseId: string;
+    }
+  | {
+      sandboxInstanceId: string;
+      kind: "bootstrap_degraded" | "bootstrap_recovered";
       ownerLeaseId: string;
     }
   | {
@@ -154,10 +163,27 @@ function resolveLifecycleEvent(input: {
     if (input.status === SandboxInstanceStatuses.RECONNECTING) {
       return undefined;
     }
-    if (input.status !== SandboxInstanceStatuses.RUNNING) {
+    if (
+      input.status !== SandboxInstanceStatuses.RUNNING &&
+      input.status !== SandboxInstanceStatuses.DEGRADED
+    ) {
       return undefined;
     }
     return SandboxLifecycleEvents.BOOTSTRAP_DETACHED;
+  }
+
+  if (input.kind === "bootstrap_degraded") {
+    if (input.status !== SandboxInstanceStatuses.RUNNING) {
+      return undefined;
+    }
+    return SandboxLifecycleEvents.BOOTSTRAP_DEGRADED;
+  }
+
+  if (input.kind === "bootstrap_recovered") {
+    if (input.status !== SandboxInstanceStatuses.DEGRADED) {
+      return undefined;
+    }
+    return SandboxLifecycleEvents.BOOTSTRAP_RECOVERED;
   }
 
   if (input.status === SandboxInstanceStatuses.RECONNECTING) {
@@ -189,6 +215,8 @@ function resolveRuntimeLifecycleLogEventName(input: {
   }
 
   switch (input.to) {
+    case SandboxInstanceStatuses.DEGRADED:
+      return "sandbox.degraded";
     case SandboxInstanceStatuses.RECONNECTING:
       return "sandbox.reconnecting";
     case SandboxInstanceStatuses.INITIALIZING:

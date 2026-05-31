@@ -5,6 +5,8 @@ export const SandboxLifecycleEvents = Object.freeze({
   PROVIDER_START_ACCEPTED: "provider_start_accepted",
   PROVIDER_RUNTIME_INITIALIZATION_STARTED: "provider_runtime_initialization_started",
   RUNTIME_READY: "runtime_ready",
+  BOOTSTRAP_DEGRADED: "bootstrap_degraded",
+  BOOTSTRAP_RECOVERED: "bootstrap_recovered",
   BOOTSTRAP_DETACHED: "bootstrap_detached",
   BOOTSTRAP_REATTACHED_NOT_READY: "bootstrap_reattached_not_ready",
   BOOTSTRAP_REATTACHED_READY: "bootstrap_reattached_ready",
@@ -66,9 +68,21 @@ export function transitionSandboxLifecycle(input: {
         to: SandboxInstanceStatuses.RUNNING,
         idempotent: [SandboxInstanceStatuses.RUNNING],
       });
-    case SandboxLifecycleEvents.BOOTSTRAP_DETACHED:
+    case SandboxLifecycleEvents.BOOTSTRAP_DEGRADED:
       return transitionFrom(input, {
         from: [SandboxInstanceStatuses.RUNNING],
+        to: SandboxInstanceStatuses.DEGRADED,
+        idempotent: [SandboxInstanceStatuses.DEGRADED],
+      });
+    case SandboxLifecycleEvents.BOOTSTRAP_RECOVERED:
+      return transitionFrom(input, {
+        from: [SandboxInstanceStatuses.DEGRADED],
+        to: SandboxInstanceStatuses.RUNNING,
+        idempotent: [SandboxInstanceStatuses.RUNNING],
+      });
+    case SandboxLifecycleEvents.BOOTSTRAP_DETACHED:
+      return transitionFrom(input, {
+        from: [SandboxInstanceStatuses.RUNNING, SandboxInstanceStatuses.DEGRADED],
         to: SandboxInstanceStatuses.RECONNECTING,
         idempotent: [SandboxInstanceStatuses.RECONNECTING],
       });
@@ -88,6 +102,7 @@ export function transitionSandboxLifecycle(input: {
       return transitionFrom(input, {
         from: [
           SandboxInstanceStatuses.RUNNING,
+          SandboxInstanceStatuses.DEGRADED,
           SandboxInstanceStatuses.RECONNECTING,
           SandboxInstanceStatuses.INITIALIZING,
         ],
@@ -108,6 +123,7 @@ export function transitionSandboxLifecycle(input: {
           SandboxInstanceStatuses.STARTED,
           SandboxInstanceStatuses.INITIALIZING,
           SandboxInstanceStatuses.RUNNING,
+          SandboxInstanceStatuses.DEGRADED,
           SandboxInstanceStatuses.RECONNECTING,
           SandboxInstanceStatuses.STOPPING,
           SandboxInstanceStatuses.STOPPED,

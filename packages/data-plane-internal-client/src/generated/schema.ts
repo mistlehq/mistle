@@ -139,6 +139,7 @@ export interface paths {
                   | "started"
                   | "initializing"
                   | "running"
+                  | "degraded"
                   | "reconnecting"
                   | "stopping"
                   | "stopped"
@@ -1087,6 +1088,7 @@ export interface paths {
                 | "started"
                 | "initializing"
                 | "running"
+                | "degraded"
                 | "reconnecting"
                 | "stopping"
                 | "stopped"
@@ -1776,6 +1778,11 @@ export interface paths {
               }
             | {
                 /** @enum {string} */
+                kind: "bootstrap_degraded" | "bootstrap_recovered";
+                ownerLeaseId: string;
+              }
+            | {
+                /** @enum {string} */
                 kind: "runtime_readiness_reported";
                 ownerLeaseId: string;
                 runtimeReady: boolean;
@@ -1797,6 +1804,7 @@ export interface paths {
                 | "started"
                 | "initializing"
                 | "running"
+                | "degraded"
                 | "reconnecting"
                 | "stopping"
                 | "stopped"
@@ -2024,6 +2032,7 @@ export interface paths {
                   | "started"
                   | "initializing"
                   | "running"
+                  | "degraded"
                   | "reconnecting"
                   | "stopping"
                   | "stopped"

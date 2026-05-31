@@ -103,6 +103,15 @@ export function resolveSandboxStatusBadgeUi(
     };
   }
 
+  if (sandboxLifecycleStatus === "degraded") {
+    return {
+      label: "Degraded",
+      variant: "outline",
+      className: "border-amber-500/45 text-amber-700 dark:text-amber-300",
+      indicatorClassName: "border-amber-600 bg-amber-500",
+    };
+  }
+
   if (sandboxLifecycleStatus === "stopping") {
     return {
       label: "Stopping",

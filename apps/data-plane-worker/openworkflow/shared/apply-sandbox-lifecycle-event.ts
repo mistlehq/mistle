@@ -125,6 +125,8 @@ function resolveSandboxLifecycleLogEventName(input: {
       return "sandbox.initializing";
     case "running":
       return "sandbox.running";
+    case "degraded":
+      return "sandbox.degraded";
     case "reconnecting":
       return "sandbox.reconnecting";
     case "stopping":

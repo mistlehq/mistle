@@ -44,7 +44,10 @@ function resolveSandboxWaitPhase(input: {
     return "resume";
   }
 
-  if (input.status === SandboxInstanceStatuses.RECONNECTING) {
+  if (
+    input.status === SandboxInstanceStatuses.DEGRADED ||
+    input.status === SandboxInstanceStatuses.RECONNECTING
+  ) {
     return "reconnect";
   }
 

@@ -132,15 +132,20 @@ describe("conversation delivery plans", () => {
       }
     });
 
-    it("waits through reconnecting as a reconnect phase instead of minting a token", () => {
-      expectPollAction({
-        status: SandboxInstanceStatuses.RECONNECTING,
-        didRequestResume: false,
-        expected: {
-          action: "wait",
-          waitPhase: "reconnect",
-        },
-      });
+    it("waits through degraded and reconnecting as a reconnect phase instead of resuming", () => {
+      for (const status of [
+        SandboxInstanceStatuses.DEGRADED,
+        SandboxInstanceStatuses.RECONNECTING,
+      ]) {
+        expectPollAction({
+          status,
+          didRequestResume: false,
+          expected: {
+            action: "wait",
+            waitPhase: "reconnect",
+          },
+        });
+      }
     });
 
     it("requests resume once for a stopped sandbox and then waits in the resume phase", () => {
