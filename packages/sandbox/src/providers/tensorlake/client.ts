@@ -26,6 +26,7 @@ import { createTensorlakeSdkImageBuildContext } from "./base-image-builder.js";
 import {
   TensorlakeClientOperationIds,
   TensorlakeCommandExitError,
+  isTensorlakeRemoteApiStatusCode,
   mapTensorlakeClientError,
 } from "./client-errors.js";
 import type { TensorlakeStartImage } from "./image-handle.js";
@@ -67,6 +68,8 @@ const DaemonReadinessPollIntervalMs = 100;
 export const DaemonReadinessPollAttempts = 600;
 export const DaemonReadinessPollTimeoutMs =
   DaemonReadinessPollIntervalMs * DaemonReadinessPollAttempts;
+const ClaimedSandboxReadinessPollIntervalMs = 500;
+const ClaimedSandboxReadinessPollAttempts = 120;
 const StartupCommandPollIntervalMs = 250;
 const StartupCommandPollAttempts = 1200;
 
@@ -259,6 +262,20 @@ function joinOutputLines(lines: readonly string[]): string {
   return lines.join("\n");
 }
 
+export function resolveTensorlakeClaimedSandboxStartResponse(input: {
+  expectedSandboxName: string;
+  claimedSandbox: SandboxInfo;
+}): TensorlakeStartSandboxResponse | null {
+  if (
+    input.claimedSandbox.name !== input.expectedSandboxName ||
+    input.claimedSandbox.status !== SandboxStatus.RUNNING
+  ) {
+    return null;
+  }
+
+  return { sandboxId: input.claimedSandbox.sandboxId };
+}
+
 export class TensorlakeApiClient implements TensorlakeClient {
   readonly #client: SandboxClient;
   readonly #clientOptions: SandboxClientOptions;
@@ -279,6 +296,11 @@ export class TensorlakeApiClient implements TensorlakeClient {
     try {
       return await this.#createSandbox(parsedRequest);
     } catch (error) {
+      const recoveredSandbox = await this.#recoverClaimedSandbox(parsedRequest, error);
+      if (recoveredSandbox !== null) {
+        return recoveredSandbox;
+      }
+
       throw mapTensorlakeClientError(TensorlakeClientOperationIds.CREATE_SANDBOX, error);
     }
   }
@@ -303,6 +325,49 @@ export class TensorlakeApiClient implements TensorlakeClient {
       ...createTensorlakeSandboxOptions(request),
     });
     return { sandboxId: sandbox.sandboxId };
+  }
+
+  async #recoverClaimedSandbox(
+    request: TensorlakeStartSandboxRequest,
+    error: unknown,
+  ): Promise<TensorlakeStartSandboxResponse | null> {
+    if (!isTensorlakeRemoteApiStatusCode(error, 409)) {
+      return null;
+    }
+
+    const expectedSandboxName = createTensorlakeSandboxName(request.sandboxInstanceId);
+
+    for (let attempt = 1; attempt <= ClaimedSandboxReadinessPollAttempts; attempt += 1) {
+      let claimedSandbox: SandboxInfo;
+      try {
+        // Tensorlake accepts named sandbox identifiers here, even though the
+        // SDK parameter is called sandboxId. This avoids depending on the
+        // human-readable 409 message or paginated list results.
+        claimedSandbox = await this.#client.get(expectedSandboxName);
+      } catch {
+        return null;
+      }
+
+      const response = resolveTensorlakeClaimedSandboxStartResponse({
+        expectedSandboxName,
+        claimedSandbox,
+      });
+      if (response !== null) {
+        return response;
+      }
+
+      if (
+        claimedSandbox.name !== expectedSandboxName ||
+        claimedSandbox.status === SandboxStatus.SUSPENDED ||
+        claimedSandbox.status === SandboxStatus.TERMINATED
+      ) {
+        return null;
+      }
+
+      await systemSleeper.sleep(ClaimedSandboxReadinessPollIntervalMs);
+    }
+
+    return null;
   }
 
   async #ensureBaseImageRegistered(image: TensorlakeStartSandboxRequest["image"]): Promise<void> {

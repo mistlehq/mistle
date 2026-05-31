@@ -91,6 +91,13 @@ export class TensorlakeCommandExitError extends TensorlakeClientError {
   }
 }
 
+export function isTensorlakeRemoteApiStatusCode(
+  error: unknown,
+  statusCode: number,
+): error is RemoteAPIError {
+  return error instanceof RemoteAPIError && error.statusCode === statusCode;
+}
+
 function formatCommandOutput(input: { stdout: string; stderr: string }): string {
   const outputs: string[] = [];
   const trimmedStdout = input.stdout.trim();

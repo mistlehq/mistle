@@ -1,3 +1,4 @@
+import { SandboxStatus, type SandboxInfo } from "tensorlake";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -11,6 +12,7 @@ import {
   createTensorlakeSandboxdControlCommand,
   createTensorlakeSandboxName,
   createTensorlakeStartDaemonShellCommand,
+  resolveTensorlakeClaimedSandboxStartResponse,
 } from "./client.js";
 
 describe("daemon readiness polling", () => {
@@ -129,3 +131,61 @@ describe("createTensorlakeSandboxOptions", () => {
     });
   });
 });
+
+describe("resolveTensorlakeClaimedSandboxStartResponse", () => {
+  it("recovers the provider id only when the claimed sandbox is the requested running sandbox", () => {
+    expect(
+      resolveTensorlakeClaimedSandboxStartResponse({
+        expectedSandboxName: "mistle-sbi-01kt00t8d0fqerdvskrsc6ycr8",
+        claimedSandbox: createSandboxInfo({
+          sandboxId: "hr550lb6u4k2m8pbrz47g",
+          name: "mistle-sbi-01kt00t8d0fqerdvskrsc6ycr8",
+          status: SandboxStatus.RUNNING,
+        }),
+      }),
+    ).toEqual({ sandboxId: "hr550lb6u4k2m8pbrz47g" });
+  });
+
+  it("does not recover mismatched or non-running claimed sandboxes", () => {
+    expect(
+      resolveTensorlakeClaimedSandboxStartResponse({
+        expectedSandboxName: "mistle-sbi-expected",
+        claimedSandbox: createSandboxInfo({
+          sandboxId: "provider-1",
+          name: "mistle-sbi-other",
+          status: SandboxStatus.RUNNING,
+        }),
+      }),
+    ).toBeNull();
+
+    expect(
+      resolveTensorlakeClaimedSandboxStartResponse({
+        expectedSandboxName: "mistle-sbi-expected",
+        claimedSandbox: createSandboxInfo({
+          sandboxId: "provider-1",
+          name: "mistle-sbi-expected",
+          status: SandboxStatus.SUSPENDED,
+        }),
+      }),
+    ).toBeNull();
+  });
+});
+
+function createSandboxInfo(input: {
+  sandboxId: string;
+  name: string;
+  status: SandboxStatus;
+}): SandboxInfo {
+  return {
+    sandboxId: input.sandboxId,
+    namespace: "default",
+    status: input.status,
+    resources: {
+      cpus: 4,
+      memoryMb: 16_384,
+      ephemeralDiskMb: 40_960,
+    },
+    secretNames: [],
+    name: input.name,
+  };
+}
