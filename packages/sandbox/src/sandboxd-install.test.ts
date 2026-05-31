@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   SandboxdInstallCommand,
   SandboxdInstallEnvVars,
+  SandboxdResetTransparentEgressNftablesCommand,
   SandboxdStopDaemonCommand,
 } from "./sandboxd-install.js";
 
@@ -49,5 +50,34 @@ describe("SandboxdStopDaemonCommand", () => {
     expect(SandboxdStopDaemonCommand).toContain("command -v pgrep");
     expect(SandboxdStopDaemonCommand).toContain("command -v pkill");
     expect(SandboxdStopDaemonCommand).toContain('rm -f "$socket_path"');
+  });
+
+  it("stops the systemd unit before killing leftover sandboxd processes", () => {
+    const systemdStopIndex = SandboxdStopDaemonCommand.indexOf("systemctl stop sandboxd.service");
+    const processKillIndex = SandboxdStopDaemonCommand.indexOf(
+      'pkill -TERM -f "^/opt/mistle/bin/sandboxd( |$)"',
+    );
+
+    expect(systemdStopIndex).toBeGreaterThanOrEqual(0);
+    expect(processKillIndex).toBeGreaterThan(systemdStopIndex);
+    expect(SandboxdStopDaemonCommand).toContain("systemctl is-active --quiet sandboxd.service");
+  });
+});
+
+describe("SandboxdResetTransparentEgressNftablesCommand", () => {
+  it("deletes only the sandboxd transparent egress nftables table", () => {
+    expect(SandboxdResetTransparentEgressNftablesCommand).toContain(
+      'table_name="mistle_transparent_egress"',
+    );
+    expect(SandboxdResetTransparentEgressNftablesCommand).toContain(
+      'nft delete table ip "$table_name"',
+    );
+    expect(SandboxdResetTransparentEgressNftablesCommand).not.toContain("flush ruleset");
+  });
+
+  it("treats an already absent nftables table as reset", () => {
+    expect(SandboxdResetTransparentEgressNftablesCommand).toContain(
+      'grep -Eq "No such file or directory|No such table|does not exist"',
+    );
   });
 });

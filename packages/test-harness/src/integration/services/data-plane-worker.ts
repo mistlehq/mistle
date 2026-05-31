@@ -73,6 +73,7 @@ export function service(
     start: start({
       postgresInfra: infraRequirement(infra, InfraIds.POSTGRES, ServiceIds.DATA_PLANE_WORKER),
       sandbox: options.sandbox,
+      options: options.dataPlaneWorker,
     }),
   };
 }
@@ -80,6 +81,7 @@ export function service(
 function start(input: {
   postgresInfra: TestInfraRequirement;
   sandbox: IntegrationSandboxOptions | undefined;
+  options: IntegrationServiceOptions["dataPlaneWorker"] | undefined;
 }): (startInput: TestServiceStartInput) => Promise<TestService> {
   return async (startInput) => {
     const postgres = resolvedInfra(startInput.infra, input.postgresInfra.id);
@@ -100,6 +102,7 @@ function start(input: {
         sandboxBaseImage,
         sandboxEndpoints,
         sandbox: input.sandbox,
+        options: input.options,
       });
     }
 
@@ -139,6 +142,7 @@ async function startRuntimeDataPlaneWorker(input: {
   sandboxBaseImage: ResolvedTestInfra | undefined;
   sandboxEndpoints: SandboxReachableEndpoints;
   sandbox: IntegrationSandboxOptions | undefined;
+  options: IntegrationServiceOptions["dataPlaneWorker"] | undefined;
 }): Promise<TestService> {
   const peer = peers(input.startInput.services, input.startInput.plannedEndpoints);
   const env = createDataPlaneWorkerEnv({
@@ -179,7 +183,10 @@ async function startRuntimeDataPlaneWorker(input: {
   const runtime = {
     backend,
     workerConfig: config,
-    environment: loadedConfig.global.env,
+    environment:
+      input.options?.sandboxdArtifactResolver === "release"
+        ? "production"
+        : loadedConfig.global.env,
   };
   const hostedContext = await createHostedWorkflowContext({
     runtime,

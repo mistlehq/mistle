@@ -6,6 +6,7 @@ import {
 import {
   SandboxdInstallCommand,
   SandboxdInstallEnvVars,
+  SandboxdResetTransparentEgressNftablesCommand,
   SandboxdStopDaemonCommand,
 } from "../../sandboxd-install.js";
 import type {
@@ -19,6 +20,7 @@ import type { E2BClient } from "./client.js";
 
 const SandboxdEnsureTimeoutMs = 120_000;
 export const SandboxdStopDaemonTimeoutMs = 30_000;
+export const SandboxdResetTransparentEgressNftablesTimeoutMs = 10_000;
 export const SandboxdReadOperationLogTimeoutMs = 60_000;
 
 function requireSandboxId(id: string): void {
@@ -93,6 +95,14 @@ export class E2BSandboxRuntimeControl implements SandboxRuntimeControl {
             command: SandboxdStopDaemonCommand,
             user: "root",
             timeoutMs: SandboxdStopDaemonTimeoutMs,
+          });
+          await this.#client.runCommand({
+            sandboxId: input.id,
+            operation: E2BClientOperationIds.RESET_TRANSPARENT_EGRESS_NFTABLES,
+            commandDescription: "Reset transparent egress nftables",
+            command: SandboxdResetTransparentEgressNftablesCommand,
+            user: "root",
+            timeoutMs: SandboxdResetTransparentEgressNftablesTimeoutMs,
           });
           await this.#client.runCommand({
             sandboxId: input.id,

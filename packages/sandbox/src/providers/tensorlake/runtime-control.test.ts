@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  SandboxdResetTransparentEgressNftablesTimeoutMs,
   SandboxdReadOperationLogTimeoutMs,
   SandboxdStopDaemonTimeoutMs,
   createTensorlakeRootShellCommand,
@@ -10,6 +11,7 @@ describe("Tensorlake sandbox runtime control timeouts", () => {
   it("uses expanded diagnostic and daemon-stop timeouts during resume investigation", () => {
     expect(SandboxdReadOperationLogTimeoutMs).toBe(60_000);
     expect(SandboxdStopDaemonTimeoutMs).toBe(30_000);
+    expect(SandboxdResetTransparentEgressNftablesTimeoutMs).toBe(10_000);
   });
 });
 

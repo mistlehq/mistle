@@ -6,6 +6,7 @@ import {
 import {
   SandboxdInstallCommand,
   SandboxdInstallEnvVars,
+  SandboxdResetTransparentEgressNftablesCommand,
   SandboxdStopDaemonCommand,
 } from "../../sandboxd-install.js";
 import type {
@@ -23,6 +24,7 @@ import { TensorlakeRootProcessUser, type TensorlakeClient } from "./client.js";
 
 const SandboxdEnsureTimeoutMs = 120_000;
 export const SandboxdStopDaemonTimeoutMs = 30_000;
+export const SandboxdResetTransparentEgressNftablesTimeoutMs = 10_000;
 export const SandboxdReadOperationLogTimeoutMs = 60_000;
 const TensorlakeRootShellCommand = "sh";
 const TensorlakeRootShellCommandArgs = ["-euc"];
@@ -111,6 +113,16 @@ export class TensorlakeSandboxRuntimeControl implements SandboxRuntimeControl {
             ...createTensorlakeRootShellCommand({ script: SandboxdStopDaemonCommand }),
             user: TensorlakeRootProcessUser,
             timeoutMs: SandboxdStopDaemonTimeoutMs,
+          });
+          await this.#client.runCommand({
+            sandboxId: input.id,
+            operation: TensorlakeClientOperationIds.RESET_TRANSPARENT_EGRESS_NFTABLES,
+            commandDescription: "Reset transparent egress nftables",
+            ...createTensorlakeRootShellCommand({
+              script: SandboxdResetTransparentEgressNftablesCommand,
+            }),
+            user: TensorlakeRootProcessUser,
+            timeoutMs: SandboxdResetTransparentEgressNftablesTimeoutMs,
           });
           await this.#client.runCommand({
             sandboxId: input.id,

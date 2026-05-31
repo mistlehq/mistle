@@ -72,6 +72,14 @@ command -v pkill >/dev/null 2>&1 || {
   exit 1
 }
 
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl stop sandboxd.service || true
+  if systemctl is-active --quiet sandboxd.service; then
+    echo "failed to stop sandboxd.service" >&2
+    exit 1
+  fi
+fi
+
 if pgrep -f "^/opt/mistle/bin/sandboxd( |$)" >/dev/null 2>&1; then
   pkill -TERM -f "^/opt/mistle/bin/sandboxd( |$)" || true
   attempts=0
@@ -91,4 +99,31 @@ if pgrep -f "^/opt/mistle/bin/sandboxd( |$)" >/dev/null 2>&1; then
 fi
 
 rm -f "$socket_path"
+`.trim();
+
+export const SandboxdResetTransparentEgressNftablesCommand = `
+set -eu
+
+table_name="mistle_transparent_egress"
+stderr_path="$(mktemp /tmp/mistle-sandboxd-nft-delete.XXXXXX)"
+cleanup() {
+  rm -f "$stderr_path"
+}
+trap cleanup EXIT INT TERM
+
+command -v nft >/dev/null 2>&1 || {
+  echo "nft is required to reset sandboxd transparent egress rules" >&2
+  exit 1
+}
+
+if nft delete table ip "$table_name" 2>"$stderr_path"; then
+  exit 0
+fi
+
+if grep -Eq "No such file or directory|No such table|does not exist" "$stderr_path"; then
+  exit 0
+fi
+
+cat "$stderr_path" >&2
+exit 1
 `.trim();

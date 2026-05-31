@@ -30,6 +30,9 @@ export type IntegrationServiceOptions = {
     welcomeEmail?: IntegrationControlPlaneApiWelcomeEmailOptions;
     mcpTrustForwardedHeaders?: boolean;
   };
+  dataPlaneWorker?: {
+    sandboxdArtifactResolver?: "release";
+  };
   dataPlaneGateway?: {
     directEgress?: {
       trustedCaCertificates?: readonly string[];

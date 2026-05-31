@@ -87,6 +87,7 @@ export const E2BClientOperationIds = {
   CLEANUP_STORAGE: "cleanup_storage",
   ENSURE_SANDBOXD: "ensure_sandboxd",
   STOP_SANDBOXD_DAEMON: "stop_sandboxd_daemon",
+  RESET_TRANSPARENT_EGRESS_NFTABLES: "reset_transparent_egress_nftables",
   READ_SANDBOXD_VERSION: "read_sandboxd_version",
   READ_OPERATION_LOG: "read_operation_log",
 } as const;

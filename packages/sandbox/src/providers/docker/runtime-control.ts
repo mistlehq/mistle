@@ -9,7 +9,12 @@ import {
   SandboxResourceNotFoundError,
 } from "../../errors.js";
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
-import { SandboxdInstallCommand, SandboxdInstallEnvVars } from "../../sandboxd-install.js";
+import {
+  SandboxdInstallCommand,
+  SandboxdInstallEnvVars,
+  SandboxdResetTransparentEgressNftablesCommand,
+  SandboxdStopDaemonCommand,
+} from "../../sandboxd-install.js";
 import type {
   SandboxRuntimeControl,
   SandboxRuntimeControlRequest,
@@ -27,9 +32,17 @@ const InitCommand = ["/opt/mistle/bin/sandboxd", "init"];
 const DetachedInitCommand = ["/opt/mistle/bin/sandboxd", "init", "--detach"];
 const WaitInitCommand = ["/opt/mistle/bin/sandboxd", "wait-init"];
 const VersionCommand = ["/opt/mistle/bin/sandboxd", "version"];
+const StopSandboxdCommand = ["sh", "-euc", SandboxdStopDaemonCommand];
+const ResetTransparentEgressNftablesCommand = [
+  "sh",
+  "-euc",
+  SandboxdResetTransparentEgressNftablesCommand,
+];
 const EnsureSandboxdCommand = ["sh", "-euc", SandboxdInstallCommand];
 const DockerExecExitPollIntervalMs = 50;
 const DockerExecExitTimeoutMs = 120_000;
+export const SandboxdStopDaemonTimeoutMs = 30_000;
+export const SandboxdResetTransparentEgressNftablesTimeoutMs = 10_000;
 
 async function sleep(ms: number): Promise<void> {
   await systemSleeper.sleep(ms);
@@ -83,8 +96,10 @@ function captureUtf8Stream(stream: NodeJS.ReadableStream): {
 async function waitForDockerExecExitCode(input: {
   exec: DockerClient.Exec;
   failureDescription: string;
+  timeoutMs?: number;
 }): Promise<number> {
-  const attempts = DockerExecExitTimeoutMs / DockerExecExitPollIntervalMs;
+  const timeoutMs = input.timeoutMs ?? DockerExecExitTimeoutMs;
+  const attempts = timeoutMs / DockerExecExitPollIntervalMs;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const execInspect = await input.exec.inspect();
     if (execInspect.ExitCode !== null) {
@@ -190,6 +205,20 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
     }
 
     try {
+      await this.#runExecCommand({
+        id: input.id,
+        operation: DockerClientOperationIds.STOP_SANDBOXD_DAEMON,
+        command: StopSandboxdCommand,
+        failureDescription: "Docker sandboxd daemon stop command",
+        timeoutMs: SandboxdStopDaemonTimeoutMs,
+      });
+      await this.#runExecCommand({
+        id: input.id,
+        operation: DockerClientOperationIds.RESET_TRANSPARENT_EGRESS_NFTABLES,
+        command: ResetTransparentEgressNftablesCommand,
+        failureDescription: "Docker transparent egress nftables reset command",
+        timeoutMs: SandboxdResetTransparentEgressNftablesTimeoutMs,
+      });
       await this.#runExecCommand({
         id: input.id,
         operation: DockerClientOperationIds.ENSURE_SANDBOXD,
@@ -377,6 +406,7 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
     command: readonly string[];
     env?: Readonly<Record<string, string>>;
     failureDescription: string;
+    timeoutMs?: number;
   }): Promise<{ stdout: string; stderr: string }> {
     const container = this.#docker.getContainer(input.id);
     const env =
@@ -414,6 +444,7 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
       waitForDockerExecExitCode({
         exec,
         failureDescription: input.failureDescription,
+        ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
       }),
     );
     const stdoutText = capturedStdout.read();

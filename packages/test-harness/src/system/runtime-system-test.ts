@@ -17,6 +17,7 @@ import { runCleanupTasks, type CleanupTask } from "../cleanup/index.js";
 import { createDockerSandboxProviderInfra } from "../environment/service-catalog.js";
 import type { TestEnvironment, TestInfraRequirement } from "../environment/types.js";
 import { createIntegrationTest, type IntegrationTestEnvironment } from "../integration/index.js";
+import type { IntegrationServiceOptions } from "../integration/services/options.js";
 import { ServiceIds, type ServiceId } from "../integration/services/service-ids.js";
 import { formatIntegrationDuration, writeIntegrationTimingLine } from "../integration/timing.js";
 import { IntegrationConfigPathInContainer } from "./integration-config-paths.js";
@@ -59,6 +60,7 @@ export type CreateSystemTestInput = {
       trustedCaCertificates?: readonly string[];
     };
   };
+  dataPlaneWorker?: IntegrationServiceOptions["dataPlaneWorker"];
   publicAccess?: SystemTestPublicAccess;
   auth?: {
     google?: "simulated";
@@ -292,6 +294,7 @@ function createInternalInfra(input: CreateSystemTestInput): readonly TestInfraRe
 }
 
 export async function createRuntimeSystemServiceOptions(input: CreateSystemTestInput): Promise<{
+  dataPlaneWorker?: IntegrationServiceOptions["dataPlaneWorker"];
   dataPlaneGateway?: {
     directEgress?: {
       trustedCaCertificates?: readonly string[];
@@ -314,10 +317,11 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
 }> {
   if (input.sandbox === undefined) {
     if (input.dataPlaneGateway === undefined) {
-      return {};
+      return input.dataPlaneWorker === undefined ? {} : { dataPlaneWorker: input.dataPlaneWorker };
     }
 
     return {
+      ...(input.dataPlaneWorker === undefined ? {} : { dataPlaneWorker: input.dataPlaneWorker }),
       dataPlaneGateway: input.dataPlaneGateway,
     };
   }
@@ -325,6 +329,7 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
   if (input.sandbox.provider === "docker") {
     if (input.dataPlaneGateway === undefined) {
       return {
+        ...(input.dataPlaneWorker === undefined ? {} : { dataPlaneWorker: input.dataPlaneWorker }),
         sandbox: {
           provider: "docker",
         },
@@ -332,6 +337,7 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
     }
 
     return {
+      ...(input.dataPlaneWorker === undefined ? {} : { dataPlaneWorker: input.dataPlaneWorker }),
       dataPlaneGateway: input.dataPlaneGateway,
       sandbox: {
         provider: "docker",
@@ -343,6 +349,7 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
   if (input.sandbox.provider === "e2b") {
     if (input.dataPlaneGateway === undefined) {
       return {
+        ...(input.dataPlaneWorker === undefined ? {} : { dataPlaneWorker: input.dataPlaneWorker }),
         sandbox: {
           provider: "e2b",
           defaultBaseImageRef: await getSystemTestSandboxBaseImageRef(),
@@ -353,6 +360,7 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
     }
 
     return {
+      ...(input.dataPlaneWorker === undefined ? {} : { dataPlaneWorker: input.dataPlaneWorker }),
       dataPlaneGateway: input.dataPlaneGateway,
       sandbox: {
         provider: "e2b",
@@ -365,6 +373,7 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
 
   if (input.dataPlaneGateway === undefined) {
     return {
+      ...(input.dataPlaneWorker === undefined ? {} : { dataPlaneWorker: input.dataPlaneWorker }),
       sandbox: {
         provider: "tensorlake",
         defaultBaseImageRef: readTensorlakeSystemTestSandboxBaseImageRef(),
@@ -375,6 +384,7 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
   }
 
   return {
+    ...(input.dataPlaneWorker === undefined ? {} : { dataPlaneWorker: input.dataPlaneWorker }),
     dataPlaneGateway: input.dataPlaneGateway,
     sandbox: {
       provider: "tensorlake",
