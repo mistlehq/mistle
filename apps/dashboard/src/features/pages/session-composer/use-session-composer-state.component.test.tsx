@@ -492,6 +492,46 @@ describe("useSessionComposerState", () => {
     expect(screen.getByTestId("composer-text").textContent).toBe("");
   });
 
+  it("submits leading-whitespace slash text as ordinary prompt text", async () => {
+    const submittedRuntimeCommands: { commandId: string; text: string }[] = [];
+
+    render(
+      <SessionComposerStateHarness
+        composerCapabilities={[
+          {
+            kind: "composerCommand",
+            trigger: "/",
+            source: "runtimeCommand",
+            commands: [
+              {
+                id: "codex.goal",
+                name: "goal",
+                availability: {
+                  duringActiveTurn: "enabled",
+                },
+                submitAs: "typedRuntimeCommand",
+              },
+            ],
+          },
+        ]}
+        composerText=" /goal ship the command"
+        executeTypedRuntimeCommand={(command) => {
+          submittedRuntimeCommands.push(command);
+          return true;
+        }}
+        pendingDiffComments={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("submitted-prompt").textContent).toBe("/goal ship the command");
+    });
+    expect(submittedRuntimeCommands).toEqual([]);
+    expect(screen.getByTestId("composer-text").textContent).toBe("");
+  });
+
   it("keeps typed runtime command text when the runtime rejects it", () => {
     const submittedRuntimeCommands: { commandId: string; text: string }[] = [];
 

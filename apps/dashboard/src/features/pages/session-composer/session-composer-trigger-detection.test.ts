@@ -1,7 +1,10 @@
 import type { ComposerCapability } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
-import { detectActiveComposerTrigger } from "./session-composer-trigger-detection.js";
+import {
+  detectActiveComposerTrigger,
+  readLeadingSlashCommandName,
+} from "./session-composer-trigger-detection.js";
 
 const ComposerCommandCapabilityFixture: ComposerCapability = {
   kind: "composerCommand",
@@ -342,5 +345,15 @@ describe("detectActiveComposerTrigger", () => {
         selectionStart: 8,
       }),
     ).toBeNull();
+  });
+});
+
+describe("readLeadingSlashCommandName", () => {
+  it("reads slash command names only from the literal composer start", () => {
+    expect(readLeadingSlashCommandName("/review")).toBe("review");
+    expect(readLeadingSlashCommandName("/review check auth")).toBe("review");
+    expect(readLeadingSlashCommandName(" /review")).toBeNull();
+    expect(readLeadingSlashCommandName("\n/review")).toBeNull();
+    expect(readLeadingSlashCommandName("Use /review")).toBeNull();
   });
 });

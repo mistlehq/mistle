@@ -144,13 +144,12 @@ function detectContextMentionTrigger(input: {
 }
 
 export function readLeadingSlashCommandName(value: string): string | null {
-  const trimmedText = value.trimStart();
-  if (!trimmedText.startsWith("/")) {
+  if (!value.startsWith("/")) {
     return null;
   }
 
-  const commandTokenEnd = findCommandTokenEnd(trimmedText);
-  return trimmedText.slice(1, commandTokenEnd);
+  const commandTokenEnd = findCommandTokenEnd(value);
+  return value.slice(1, commandTokenEnd);
 }
 
 export function listComposerCommands(
