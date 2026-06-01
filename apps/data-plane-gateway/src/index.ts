@@ -14,6 +14,9 @@ let shutdownPromise: Promise<void> | undefined;
 
 async function stopRuntimeAndExit(signal: NodeJS.Signals): Promise<void> {
   try {
+    if (signal === "SIGTERM") {
+      runtime.startDrain();
+    }
     await runtime.stop();
     await shutdownTelemetry();
     process.exit(0);

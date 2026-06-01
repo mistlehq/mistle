@@ -4,6 +4,7 @@ import WebSocket from "ws";
 
 import { logger } from "../logger.js";
 import { createGatewayDrainingAdmissionResponse } from "../runtime/gateway-drain-admission.js";
+import type { GatewayDrainRegistry } from "../runtime/gateway-drain-registry.js";
 import type { GatewayLifecycle } from "../runtime/gateway-lifecycle.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import {
@@ -15,6 +16,7 @@ import {
 
 type RegisterPtyTransportRoutesInput = {
   app: DataPlaneGatewayApp;
+  drainRegistry: GatewayDrainRegistry;
   lifecycle: GatewayLifecycle;
   ptyTransportService: PtyTransportService;
   testEnvironmentIdQueryParam?: string;
@@ -46,9 +48,17 @@ export function registerPtyTransportRoutes(input: RegisterPtyTransportRoutesInpu
         return ctx.text("PTY transport session is not attachable.", 409);
       }
       const testEnvironmentId = ctx.get("testEnvironmentId");
+      let unregisterDrainHandle: (() => void) | undefined;
 
       return input.upgradeWebSocket(ctx, {
         onOpen: (_event, socket) => {
+          if (socket.raw === undefined) {
+            throw new Error("Expected PTY transport websocket to expose the raw Node websocket.");
+          }
+          unregisterDrainHandle = input.drainRegistry.registerGatewayWebSocket({
+            category: "pty_transport",
+            socket: socket.raw,
+          });
           if (admission.side === "client") {
             input.ptyTransportService.attachClient({
               admission,
@@ -89,6 +99,8 @@ export function registerPtyTransportRoutes(input: RegisterPtyTransportRoutesInpu
             });
         },
         onClose: (event) => {
+          unregisterDrainHandle?.();
+          unregisterDrainHandle = undefined;
           input.ptyTransportService.detach({
             admission,
             closeCode: event.code,
@@ -96,6 +108,8 @@ export function registerPtyTransportRoutes(input: RegisterPtyTransportRoutesInpu
           });
         },
         onError: (event) => {
+          unregisterDrainHandle?.();
+          unregisterDrainHandle = undefined;
           input.ptyTransportService.detach({
             admission,
             closeCode: WebSocketCloseCodes.INTERNAL_ERROR,

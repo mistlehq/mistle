@@ -3,6 +3,7 @@ import type { WSContext, WSMessageReceive } from "hono/ws";
 import WebSocket, { type RawData } from "ws";
 
 import { createGatewayDrainingAdmissionResponse } from "../runtime/gateway-drain-admission.js";
+import type { GatewayDrainRegistry } from "../runtime/gateway-drain-registry.js";
 import type { GatewayLifecycle } from "../runtime/gateway-lifecycle.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import {
@@ -24,6 +25,7 @@ import {
 type RegisterDirectEgressRoutesInput = {
   app: DataPlaneGatewayApp;
   directEgressProxyService: DirectEgressProxyService;
+  drainRegistry: GatewayDrainRegistry;
   lifecycle: GatewayLifecycle;
   trustedUpstreamCaCertificates: readonly string[] | undefined;
   upgradeWebSocket: NodeWebSocket["upgradeWebSocket"];
@@ -134,9 +136,17 @@ export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInpu
       let upstreamSocket: WebSocket | undefined;
       const pendingClientMessages: WSMessageReceive[] = [];
       const startedAtMs = Date.now();
+      let unregisterDrainHandle: (() => void) | undefined;
 
       return {
         onOpen: (_event, ws) => {
+          if (ws.raw === undefined) {
+            throw new Error("Expected direct egress websocket to expose the raw Node websocket.");
+          }
+          unregisterDrainHandle = input.drainRegistry.registerGatewayWebSocket({
+            category: "direct_egress",
+            socket: ws.raw,
+          });
           logDirectEgressWebSocketEvent({
             admission,
             event: "gateway_direct_egress_websocket_client_opened",
@@ -209,6 +219,8 @@ export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInpu
           });
         },
         onClose: (event) => {
+          unregisterDrainHandle?.();
+          unregisterDrainHandle = undefined;
           logDirectEgressWebSocketEvent({
             admission,
             closeCode: event.code,
@@ -221,6 +233,8 @@ export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInpu
           upstreamSocket?.close();
         },
         onError: (event) => {
+          unregisterDrainHandle?.();
+          unregisterDrainHandle = undefined;
           logDirectEgressWebSocketEvent({
             admission,
             error: event instanceof Error ? event : undefined,

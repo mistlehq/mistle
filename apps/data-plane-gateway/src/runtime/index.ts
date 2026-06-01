@@ -88,6 +88,7 @@ import type {
   StartedServer,
 } from "../types.js";
 import { AsyncTaskTracker, type AsyncTaskDrainResult } from "./async-task-tracker.js";
+import { GatewayDrainRegistry } from "./gateway-drain-registry.js";
 import { GatewayLifecycle } from "./gateway-lifecycle.js";
 export {
   GatewayWebSocketCloseCodes,
@@ -97,6 +98,7 @@ export {
 import { GatewayWebSocketCloseReasons } from "./gateway-websocket-close.js";
 
 const DefaultMaxActiveBindingsPerSandbox = 32;
+const ServiceRestartConnectionDrainTimeoutMs = 25_000;
 const ShutdownTunnelTaskDrainTimeoutMs = 5_000;
 
 type GatewayRelayRuntimeResources = {
@@ -292,6 +294,7 @@ export function createDataPlaneGatewayRuntime(
   const app = createApp(config.app, lifecycle);
   const nodeWebSocket = createNodeWebSocket({ app });
   const nodeId = typeid("dpg").toString();
+  const drainRegistry = new GatewayDrainRegistry();
   const sandboxTunnelTaskTracker = new AsyncTaskTracker();
   let hasValkeyClient = false;
   let valkeyClient!: ValkeyClient;
@@ -485,6 +488,7 @@ export function createDataPlaneGatewayRuntime(
     hostConfig: {
       baseDomain: config.app.sandbox.publish.baseDomain,
     },
+    drainRegistry,
     lifecycle,
     portAccessTransportService,
     portsTargetAuthorizeService,
@@ -593,6 +597,7 @@ export function createDataPlaneGatewayRuntime(
     sandboxTunnelTaskTracker,
     allowRemoteOwnerConnections: config.app.gatewayRelay.backend === "nats",
     clock: systemClock,
+    drainRegistry,
     lifecycle,
     scheduler: systemScheduler,
   });
@@ -612,12 +617,14 @@ export function createDataPlaneGatewayRuntime(
   registerDirectEgressRoutes({
     app,
     directEgressProxyService,
+    drainRegistry,
     lifecycle,
     trustedUpstreamCaCertificates: config.app.__dangerouslyTrustDirectEgressTlsCaCertificates,
     upgradeWebSocket: nodeWebSocket.upgradeWebSocket,
   });
   registerPtyTransportRoutes({
     app,
+    drainRegistry,
     lifecycle,
     ptyTransportService,
     ...(config.app.__dangerouslyEnableTestIsolation === undefined
@@ -654,6 +661,41 @@ export function createDataPlaneGatewayRuntime(
   async function stopRuntimeResources(): Promise<void> {
     const shutdownTimings = new Map<string, number>();
     try {
+      const drainState = lifecycle.startDrain({
+        reason: GatewayWebSocketCloseReasons.SERVICE_RESTART,
+      });
+      if (drainState.status !== "draining") {
+        throw new Error("Expected data-plane gateway lifecycle to enter draining state.");
+      }
+      logger.info(
+        {
+          eventName: "data_plane_gateway.runtime_shutdown.service_restart_drain_started",
+          activeConnections: drainRegistry.activeCounts(),
+          activeConnectionCategories: drainRegistry.activeCategoryCounts(),
+          drainReason: drainState.reason,
+          drainStartedAtMs: drainState.startedAtMs,
+          timeoutMs: ServiceRestartConnectionDrainTimeoutMs,
+        },
+        "Data-plane gateway runtime service-restart drain started.",
+      );
+      const closeResult = await measureShutdownPhase(
+        shutdownTimings,
+        "service-restart-connection-drain",
+        async () =>
+          drainRegistry.closeForServiceRestart({
+            waitMs: ServiceRestartConnectionDrainTimeoutMs,
+          }),
+      );
+      logger.info(
+        {
+          eventName: "data_plane_gateway.runtime_shutdown.service_restart_drain_completed",
+          ...closeResult,
+          remainingActiveConnections: drainRegistry.activeCounts(),
+          remainingActiveConnectionCategories: drainRegistry.activeCategoryCounts(),
+          timeoutMs: ServiceRestartConnectionDrainTimeoutMs,
+        },
+        "Data-plane gateway runtime service-restart drain completed.",
+      );
       await measureShutdownPhase(shutdownTimings, "close-websocket-server", async () => {
         await closeWebSocketServer(nodeWebSocket.wss);
       });
@@ -711,6 +753,7 @@ export function createDataPlaneGatewayRuntime(
       await measureShutdownPhase(shutdownTimings, "app-stop", async () => {
         await stopApp(app);
       });
+      drainRegistry.finishServiceRestartDrain();
       logger.info(
         {
           eventName: "data_plane_gateway.runtime_shutdown.completed",

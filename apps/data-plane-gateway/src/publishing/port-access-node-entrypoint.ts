@@ -12,6 +12,7 @@ import {
   GatewayDrainingRejectionCode,
   GatewayDrainingRejectionMessage,
 } from "../runtime/gateway-drain-admission.js";
+import type { GatewayDrainRegistry } from "../runtime/gateway-drain-registry.js";
 import type { GatewayLifecycle } from "../runtime/gateway-lifecycle.js";
 import { BootstrapTunnelNotConnectedError } from "../tunnel/bootstrap-tunnel-not-connected-error.js";
 import {
@@ -38,6 +39,7 @@ export const PortAccessBootstrapPath = "/_mistle/access/bootstrap";
 type PortAccessNodeEntrypointInput = {
   bootstrapTokenConfig: PortAccessBootstrapTokenConfig;
   clock: Clock;
+  drainRegistry: GatewayDrainRegistry;
   hostConfig: PortAccessHostConfig;
   lifecycle: GatewayLifecycle;
   portAccessTransportService: PortAccessTransportService;
@@ -657,6 +659,10 @@ export function createPortAccessNodeEntrypoint(
         socket: request.socket,
         source: request,
       });
+      const unregisterDrainHandle = input.drainRegistry.registerRawLongLivedConnection({
+        category: "port_access",
+        socket: client,
+      });
 
       try {
         await waitForTcpConnected({
@@ -669,6 +675,7 @@ export function createPortAccessNodeEntrypoint(
           resolvedRequest,
         });
       } catch (error) {
+        unregisterDrainHandle();
         client.destroy();
         if (isClientVisiblePortAccessFailure(error)) {
           writePlainResponse({
@@ -722,6 +729,10 @@ export function createPortAccessNodeEntrypoint(
         socket,
         source: socket,
       });
+      const unregisterDrainHandle = input.drainRegistry.registerRawLongLivedConnection({
+        category: "port_access",
+        socket: client,
+      });
 
       try {
         await waitForTcpConnected({
@@ -735,6 +746,7 @@ export function createPortAccessNodeEntrypoint(
           resolvedRequest,
         });
       } catch (error) {
+        unregisterDrainHandle();
         client.destroy();
         if (isClientVisiblePortAccessFailure(error)) {
           writeRawSocketResponse({

@@ -18,6 +18,7 @@ import type { SandboxRuntimeAttachmentStore } from "../runtime-state/sandbox-run
 import type { SandboxRuntimeReadinessStore } from "../runtime-state/sandbox-runtime-readiness-store.js";
 import type { AsyncTaskTracker } from "../runtime/async-task-tracker.js";
 import { createGatewayDrainingAdmissionResponse } from "../runtime/gateway-drain-admission.js";
+import type { GatewayDrainRegistry } from "../runtime/gateway-drain-registry.js";
 import type { GatewayLifecycle } from "../runtime/gateway-lifecycle.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import { SandboxTunnelWebSocketAdmission } from "./admission/sandbox-tunnel-websocket-admission.js";
@@ -72,6 +73,7 @@ type RegisterSandboxTunnelRouteInput = {
   sandboxTunnelTaskTracker: AsyncTaskTracker;
   allowRemoteOwnerConnections: boolean;
   clock: Clock;
+  drainRegistry: GatewayDrainRegistry;
   lifecycle: GatewayLifecycle;
   scheduler: Scheduler;
 };
@@ -188,9 +190,19 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
         let tunnelSessionSpan: Span | undefined;
         let tunnelOpenedAtMs: number | undefined;
         const relaySessionId = admittedRequest.relaySessionId;
+        let unregisterDrainHandle: (() => void) | undefined;
 
         return {
           onOpen: (_event, ws) => {
+            if (ws.raw === undefined) {
+              throw new Error(
+                "Expected sandbox tunnel websocket to expose the raw Node websocket.",
+              );
+            }
+            unregisterDrainHandle = input.drainRegistry.registerGatewayWebSocket({
+              category: "sandbox_tunnel",
+              socket: ws.raw,
+            });
             tunnelOpenedAtMs = Date.now();
             tunnelSessionSpan = startSandboxTunnelSessionSpan({
               sandboxInstanceId,
@@ -428,6 +440,8 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
             );
           },
           onClose: (event) => {
+            unregisterDrainHandle?.();
+            unregisterDrainHandle = undefined;
             if (attachedPeer !== undefined) {
               if (admittedRequest.kind === "bootstrap") {
                 const closeTasks: Promise<void>[] = [];
@@ -566,6 +580,8 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
             tunnelSessionSpan = undefined;
           },
           onError: (_event, ws) => {
+            unregisterDrainHandle?.();
+            unregisterDrainHandle = undefined;
             const error = new Error("Sandbox tunnel websocket emitted an error event.");
             recordTunnelSessionError({
               tunnelSessionSpan,
