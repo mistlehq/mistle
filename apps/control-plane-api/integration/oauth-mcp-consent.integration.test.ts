@@ -615,6 +615,31 @@ describe.concurrent("OAuth MCP consent", () => {
     });
 
     expect(result.isError).toBeUndefined();
+
+    const refreshResponse = await env.controlPlaneApi.http.fetch("/oauth/token", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: client.clientId,
+        refresh_token: tokenBody.refresh_token,
+      }),
+    });
+    expect(refreshResponse.status).toBe(200);
+    const refreshedTokenBody = OAuthTokenResponseSchema.parse(await refreshResponse.json());
+
+    const refreshedResult = await callMcpTool({
+      env,
+      token: refreshedTokenBody.access_token,
+      name: "profile_list",
+      arguments: {
+        limit: 10,
+      },
+    });
+
+    expect(refreshedResult.isError).toBeUndefined();
   });
 
   it("rejects OAuth bearer tokens issued for non-MCP resources on the MCP endpoint", async ({
