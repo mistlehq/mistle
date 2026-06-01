@@ -381,6 +381,7 @@ export function ChatComposer({
     end: composerText.length,
   });
   const [activeSlashCommandIndex, setActiveSlashCommandIndex] = useState(0);
+  const [activeSkillMentionIndex, setActiveSkillMentionIndex] = useState(0);
   const [activeContextMentionIndex, setActiveContextMentionIndex] = useState(0);
   const [dismissedContextMentionKey, setDismissedContextMentionKey] = useState<string | null>(null);
   const [activeCommandPanelOptionIndex, setActiveCommandPanelOptionIndex] = useState(0);
@@ -445,6 +446,14 @@ export function ChatComposer({
   );
   const showSlashCommandMenu =
     activeComposerTrigger !== null && activeComposerTrigger.capabilityKind === "composerCommand";
+  const activeSlashCommandKey =
+    activeComposerTrigger?.capabilityKind === "composerCommand"
+      ? [
+          String(activeComposerTrigger.range.start),
+          String(activeComposerTrigger.range.end),
+          activeComposerTrigger.query,
+        ].join(":")
+      : null;
   const activeSlashCommandIndexWithinBounds =
     slashPaletteOptions.length === 0
       ? null
@@ -461,10 +470,18 @@ export function ChatComposer({
       : skillMentionOptions.filter((skill) => skill.name.startsWith(activeSkillMentionQuery));
   const showSkillMentionMenu =
     activeComposerTrigger !== null && activeComposerTrigger.capabilityKind === "skillMention";
+  const activeSkillMentionKey =
+    activeComposerTrigger?.capabilityKind === "skillMention"
+      ? [
+          String(activeComposerTrigger.range.start),
+          String(activeComposerTrigger.range.end),
+          activeComposerTrigger.query,
+        ].join(":")
+      : null;
   const activeSkillMentionIndexWithinBounds =
     filteredSkillMentionOptions.length === 0
       ? null
-      : Math.min(activeSlashCommandIndex, filteredSkillMentionOptions.length - 1);
+      : Math.min(activeSkillMentionIndex, filteredSkillMentionOptions.length - 1);
   const activeSkillMention =
     activeSkillMentionIndexWithinBounds === null
       ? null
@@ -565,6 +582,14 @@ export function ChatComposer({
   ]);
 
   useEffect(() => {
+    setActiveSlashCommandIndex(0);
+  }, [activeSlashCommandKey]);
+
+  useEffect(() => {
+    setActiveSkillMentionIndex(0);
+  }, [activeSkillMentionKey]);
+
+  useEffect(() => {
     if (!showContextMentionMenu || activeContextMentionIndexWithinBounds === null) {
       return;
     }
@@ -636,6 +661,7 @@ export function ChatComposer({
 
     replaceActiveTriggerRange(`$${skill.name} `);
     setActiveSlashCommandIndex(0);
+    setActiveSkillMentionIndex(0);
   }
 
   function insertContextMentionPath(path: string, query: string): void {
@@ -697,16 +723,25 @@ export function ChatComposer({
   }
 
   function moveActiveSlashCommand(delta: number): void {
-    const optionCount =
-      activeComposerTrigger?.capabilityKind === "skillMention"
-        ? filteredSkillMentionOptions.length
-        : slashPaletteOptions.length;
-    if (optionCount === 0) {
+    if (slashPaletteOptions.length === 0) {
       return;
     }
 
     setActiveSlashCommandIndex(
-      (currentIndex) => (currentIndex + delta + optionCount) % optionCount,
+      (currentIndex) =>
+        (currentIndex + delta + slashPaletteOptions.length) % slashPaletteOptions.length,
+    );
+  }
+
+  function moveActiveSkillMention(delta: number): void {
+    if (filteredSkillMentionOptions.length === 0) {
+      return;
+    }
+
+    setActiveSkillMentionIndex(
+      (currentIndex) =>
+        (currentIndex + delta + filteredSkillMentionOptions.length) %
+        filteredSkillMentionOptions.length,
     );
   }
 
@@ -1082,7 +1117,7 @@ export function ChatComposer({
                       id={`${commandListId}-skill-${skill.name}`}
                       key={skill.name}
                       onMouseEnter={() => {
-                        setActiveSlashCommandIndex(skillIndex);
+                        setActiveSkillMentionIndex(skillIndex);
                       }}
                       onSelect={() => {
                         insertSkillMention(skill);
@@ -1122,6 +1157,7 @@ export function ChatComposer({
               onComposerTextChange(event.target.value);
               updateComposerSelection(event.currentTarget);
               setActiveSlashCommandIndex(0);
+              setActiveSkillMentionIndex(0);
               setActiveContextMentionIndex(0);
               setDismissedContextMentionKey(null);
             }}
@@ -1188,13 +1224,13 @@ export function ChatComposer({
               if (showSkillMentionMenu && filteredSkillMentionOptions.length > 0) {
                 if (event.key === "ArrowDown") {
                   event.preventDefault();
-                  moveActiveSlashCommand(1);
+                  moveActiveSkillMention(1);
                   return;
                 }
 
                 if (event.key === "ArrowUp") {
                   event.preventDefault();
-                  moveActiveSlashCommand(-1);
+                  moveActiveSkillMention(-1);
                   return;
                 }
 

@@ -705,6 +705,27 @@ describe("ChatComposer", () => {
     expect(getComposerTextarea().value).toBe("Use $grill-with-docs ");
   });
 
+  it("does not reuse slash palette selection when opening the skill menu", () => {
+    render(
+      <ControlledChatComposer
+        composerCapabilities={[ComposerCommandCapabilityFixture, SkillMentionCapabilityFixture]}
+        composerText="/"
+      />,
+    );
+
+    fireEvent.keyDown(getComposerTextarea(), { key: "ArrowDown" });
+    fireEvent.change(getComposerTextarea(), {
+      target: {
+        value: "Use $",
+        selectionStart: 5,
+        selectionEnd: 5,
+      },
+    });
+    fireEvent.keyDown(getComposerTextarea(), { key: "Enter" });
+
+    expect(getComposerTextarea().value).toBe("Use $grill-with-docs ");
+  });
+
   it("shows context mention file search results for inline @ queries", () => {
     const observedQueries: string[] = [];
 
