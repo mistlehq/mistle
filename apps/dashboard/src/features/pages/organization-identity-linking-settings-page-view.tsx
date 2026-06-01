@@ -209,7 +209,7 @@ function IdentityLinkingProviderRowView(input: {
           )}
           {canOpenMemberLinkStatus ? (
             <Button
-              aria-label={`View link status for ${provider.connectionLabel}`}
+              aria-label={`View ${provider.displayName} link status for ${provider.connectionLabel}`}
               className="h-auto w-auto p-0 hover:bg-transparent"
               onClick={input.onOpenMemberLinkStatus}
               type="button"
@@ -340,14 +340,24 @@ function MemberLinkStatusSheet(input: {
     null,
   );
   const [activeFilter, setActiveFilter] = useState<LinkStatusFilter>("all");
+  const [activeFilterRowKey, setActiveFilterRowKey] = useState<string | null>(null);
   const provider = input.provider ?? lastProvider;
+  const openProviderRowKey = input.provider?.rowKey ?? null;
 
   useEffect(() => {
     if (input.provider !== null) {
       setLastProvider(input.provider);
-      setActiveFilter("all");
     }
   }, [input.provider]);
+
+  useEffect(() => {
+    if (openProviderRowKey !== activeFilterRowKey) {
+      setActiveFilterRowKey(openProviderRowKey);
+      if (openProviderRowKey !== null) {
+        setActiveFilter("all");
+      }
+    }
+  }, [activeFilterRowKey, openProviderRowKey]);
 
   const visibleMemberLinks =
     provider === null ? [] : filterMemberLinks(provider.memberLinks, activeFilter);

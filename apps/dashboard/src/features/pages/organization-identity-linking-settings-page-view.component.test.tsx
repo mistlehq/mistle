@@ -65,7 +65,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "View link status for Engineering GitHub",
+        name: "View GitHub link status for Engineering GitHub",
       }),
     );
 
@@ -82,6 +82,53 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
 
     expect(screen.getByText("Owner User")).toBeTruthy();
     expect(screen.queryByText("Member User")).toBeNull();
+  });
+
+  it("preserves the selected link status filter when row data refreshes", () => {
+    const { rerender } = render(
+      <OrganizationIdentityLinkingSettingsPageView
+        gitCommitSigningImpactConfirmation={null}
+        loadErrorMessage={null}
+        onCancelGitCommitSigningImpactConfirmation={() => {}}
+        onEnabledChange={async () => {}}
+        onConfirmGitCommitSigningImpactConfirmation={async () => {}}
+        providers={[
+          createProviderRow({
+            memberLinkStatusCounts: { linked: 1, total: 2 },
+            memberLinks: createMixedMemberLinks(),
+          }),
+        ]}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "View GitHub link status for Engineering GitHub",
+      }),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Not linked 1" }));
+
+    expect(screen.getByText("Member User")).toBeTruthy();
+    expect(screen.queryByText("Owner User")).toBeNull();
+
+    rerender(
+      <OrganizationIdentityLinkingSettingsPageView
+        gitCommitSigningImpactConfirmation={null}
+        loadErrorMessage={null}
+        onCancelGitCommitSigningImpactConfirmation={() => {}}
+        onEnabledChange={async () => {}}
+        onConfirmGitCommitSigningImpactConfirmation={async () => {}}
+        providers={[
+          createProviderRow({
+            memberLinkStatusCounts: { linked: 1, total: 2 },
+            memberLinks: createMixedMemberLinks(),
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Member User")).toBeTruthy();
+    expect(screen.queryByText("Owner User")).toBeNull();
   });
 
   it("runs the enabled-change handler from the row switch", async () => {
@@ -271,7 +318,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "View link status for Engineering GitHub",
+        name: "View GitHub link status for Engineering GitHub",
       }),
     );
 
@@ -297,7 +344,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "View link status for Engineering GitHub",
+        name: "View GitHub link status for Engineering GitHub",
       }),
     );
 
@@ -328,7 +375,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "View link status for Slack Workspace",
+        name: "View Slack link status for Slack Workspace",
       }),
     );
 
@@ -353,4 +400,23 @@ function createProviderRow(
     memberLinks: [],
     ...overrides,
   };
+}
+
+function createMixedMemberLinks(): OrganizationIdentityLinkingProviderRow["memberLinks"] {
+  return [
+    {
+      userId: "usr_owner",
+      name: "Owner User",
+      email: "owner@example.com",
+      linked: true,
+      statusLabel: "Linked",
+    },
+    {
+      userId: "usr_member",
+      name: "Member User",
+      email: "member@example.com",
+      linked: false,
+      statusLabel: "Not linked",
+    },
+  ];
 }

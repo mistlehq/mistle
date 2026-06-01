@@ -293,7 +293,7 @@ export const MemberLinkStatusSheetError: Story = {
 
     await userEvent.click(
       canvas.getByRole("button", {
-        name: "View link status for GitHub Engineering",
+        name: "View GitHub link status for GitHub Engineering",
       }),
     );
   },
