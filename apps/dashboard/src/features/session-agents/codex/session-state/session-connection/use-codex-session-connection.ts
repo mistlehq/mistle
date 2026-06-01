@@ -59,6 +59,7 @@ export type CodexSessionConnectionLifecycleState = {
   sessionConnectionState: "detached" | "connecting" | "connected" | "recovering";
   recoverableDisconnect: {
     id: number;
+    isGatewayServiceRestart: boolean;
     message: string;
     targetThreadId: string | null;
     recoveryStrategy: "reconnect_transport" | "reopen_stream";
@@ -142,6 +143,7 @@ export function useCodexSessionConnection(input: {
   >("detached");
   const [recoverableDisconnect, setRecoverableDisconnect] = useState<{
     id: number;
+    isGatewayServiceRestart: boolean;
     message: string;
     targetThreadId: string | null;
     recoveryStrategy: "reconnect_transport" | "reopen_stream";
@@ -241,6 +243,7 @@ export function useCodexSessionConnection(input: {
             const connectionStateTransition = resolveCodexConnectionStateTransition({
               hasConnectedSession:
                 lastConnectedSessionRef.current !== null || input.threadIdRef.current !== null,
+              isGatewayServiceRestart: event.gatewayServiceRestart !== undefined,
               state: event.state,
               errorMessage: event.errorMessage ?? null,
             });
@@ -249,14 +252,18 @@ export function useCodexSessionConnection(input: {
               input.connectionGenerationRef.current += 1;
               teardownConnection();
               setSessionConnectionState("recovering");
-              if (connectionStateTransition.recoverableDisconnectMessage !== null) {
+              if (
+                connectionStateTransition.recoverableDisconnectMessage !== null &&
+                connectionStateTransition.recoverableDisconnectStrategy !== null
+              ) {
                 const recoverableDisconnectId = nextRecoverableDisconnectIdRef.current + 1;
                 nextRecoverableDisconnectIdRef.current = recoverableDisconnectId;
                 setRecoverableDisconnect({
                   id: recoverableDisconnectId,
+                  isGatewayServiceRestart: connectionStateTransition.isGatewayServiceRestart,
                   message: connectionStateTransition.recoverableDisconnectMessage,
                   targetThreadId,
-                  recoveryStrategy: "reconnect_transport",
+                  recoveryStrategy: connectionStateTransition.recoverableDisconnectStrategy,
                 });
               } else {
                 setRecoverableDisconnect(null);
@@ -288,6 +295,7 @@ export function useCodexSessionConnection(input: {
             setSessionConnectionState("recovering");
             setRecoverableDisconnect({
               id: recoverableDisconnectId,
+              isGatewayServiceRestart: false,
               message: `Sandbox session stream reset (${event.resetInfo.code}): ${event.resetInfo.message}`,
               targetThreadId,
               recoveryStrategy: "reopen_stream",

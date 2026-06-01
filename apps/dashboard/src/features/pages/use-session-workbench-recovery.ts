@@ -1,14 +1,17 @@
-import { useEffect, useReducer, useRef } from "react";
+import { systemScheduler } from "@mistle/time";
+import { useEffect, useReducer, useRef, useState } from "react";
 
 import type { MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import type { WorkbenchSandboxLifecycleStatus } from "./session-workbench-state.js";
 import type { SessionLifecycleForWorkbench } from "./use-session-workbench-lifecycle-state.js";
 
 const MaxSessionReconnectAttempts = 3;
+export const SessionReconnectMessageDelayMs = 500;
 const SessionReconnectLimitMessage = `Could not reconnect session after ${String(MaxSessionReconnectAttempts)} attempts.`;
 
 type RecoverableSessionDisconnect = {
   id: number;
+  isGatewayServiceRestart: boolean;
   message: string;
   targetRuntimeConversationId: string | null;
   recoveryStrategy: "reconnect_transport" | "reopen_stream";
@@ -39,6 +42,7 @@ export type SessionWorkbenchRecoveryState =
       kind: "recovering";
       baseMessage: string;
       errorMessage: string | null;
+      isGatewayServiceRestart: boolean;
       targetRuntimeConversationId: string | null;
       recoveryStrategy: "reconnect_transport" | "reopen_stream";
       reconnectAttemptCount: number;
@@ -72,6 +76,7 @@ function createSessionWorkbenchRecoveryStateFromDisconnect(
     kind: "recovering",
     baseMessage: disconnect.message,
     errorMessage: null,
+    isGatewayServiceRestart: disconnect.isGatewayServiceRestart,
     targetRuntimeConversationId: disconnect.targetRuntimeConversationId,
     recoveryStrategy: disconnect.recoveryStrategy,
     reconnectAttemptCount: 0,
@@ -100,6 +105,7 @@ export function reduceSessionWorkbenchRecoveryState(
             return {
               ...state,
               baseMessage: event.disconnect.message,
+              isGatewayServiceRestart: event.disconnect.isGatewayServiceRestart,
               targetRuntimeConversationId: event.disconnect.targetRuntimeConversationId,
               recoveryStrategy: event.disconnect.recoveryStrategy,
             };
@@ -193,11 +199,16 @@ export function reduceSessionWorkbenchRecoveryState(
 export function resolveSessionReconnectMessage(input: {
   recoveryBaseMessage: string | null;
   recoveryErrorMessage: string | null;
+  shouldShowRecoveryMessage?: boolean;
   reconnectAttemptCount: number;
   sandboxStatus: WorkbenchSandboxLifecycleStatus;
 }): string | null {
   if (input.recoveryErrorMessage !== null) {
     return input.recoveryErrorMessage;
+  }
+
+  if (input.shouldShowRecoveryMessage === false) {
+    return null;
   }
 
   if (input.recoveryBaseMessage === null) {
@@ -227,6 +238,26 @@ export function resolveSessionReconnectMessage(input: {
   }
 
   return `${input.recoveryBaseMessage} Reconnecting session${input.reconnectAttemptCount > 0 ? ` (attempt ${String(input.reconnectAttemptCount)} of ${String(MaxSessionReconnectAttempts)})` : ""}.`;
+}
+
+export function shouldShowDelayedSessionReconnectMessage(input: {
+  isGatewayServiceRestart: boolean;
+  recoverableDisconnectId: number | null;
+  visibleRecoverableDisconnectId: number | null;
+  recoveryErrorMessage: string | null;
+}): boolean {
+  if (input.recoveryErrorMessage !== null) {
+    return true;
+  }
+
+  if (!input.isGatewayServiceRestart) {
+    return true;
+  }
+
+  return (
+    input.recoverableDisconnectId !== null &&
+    input.recoverableDisconnectId === input.visibleRecoverableDisconnectId
+  );
 }
 
 export function resolveSessionWorkbenchRecoveryStateForRender(input: {
@@ -285,6 +316,9 @@ export function useSessionWorkbenchRecovery(input: {
       kind: "idle",
     },
   );
+  const [visibleRecoverableDisconnectId, setVisibleRecoverableDisconnectId] = useState<
+    number | null
+  >(null);
   const lastRecoverableDisconnectIdRef = useRef<number | null>(null);
   const previousSandboxInstanceIdRef = useRef(input.sandboxInstanceId);
   const sessionRecoveryState = resolveSessionWorkbenchRecoveryStateForRender({
@@ -298,6 +332,26 @@ export function useSessionWorkbenchRecovery(input: {
     sandboxStatus: input.sandboxStatus,
     sessionConnectionState: input.sessionConnectionState,
   });
+  const delayedGatewayRestartDisconnectId =
+    sessionRecoveryState.kind === "recovering" && sessionRecoveryState.isGatewayServiceRestart
+      ? sessionRecoveryState.recoverableDisconnectId
+      : null;
+
+  useEffect(() => {
+    if (delayedGatewayRestartDisconnectId === null) {
+      setVisibleRecoverableDisconnectId(null);
+      return;
+    }
+
+    setVisibleRecoverableDisconnectId(null);
+    const timeout = systemScheduler.schedule(() => {
+      setVisibleRecoverableDisconnectId(delayedGatewayRestartDisconnectId);
+    }, SessionReconnectMessageDelayMs);
+
+    return () => {
+      systemScheduler.cancel(timeout);
+    };
+  }, [delayedGatewayRestartDisconnectId]);
 
   useEffect(() => {
     if (input.recoverableDisconnect === null) {
@@ -385,13 +439,27 @@ export function useSessionWorkbenchRecovery(input: {
       type: "sandbox_changed",
     });
     lastRecoverableDisconnectIdRef.current = null;
+    setVisibleRecoverableDisconnectId(null);
   }, [input.sandboxInstanceId]);
 
+  const recoveryErrorMessage =
+    sessionRecoveryState.kind === "recovering" ? sessionRecoveryState.errorMessage : null;
   const sessionReconnectMessage = resolveSessionReconnectMessage({
     recoveryBaseMessage:
       sessionRecoveryState.kind === "recovering" ? sessionRecoveryState.baseMessage : null,
-    recoveryErrorMessage:
-      sessionRecoveryState.kind === "recovering" ? sessionRecoveryState.errorMessage : null,
+    recoveryErrorMessage,
+    shouldShowRecoveryMessage: shouldShowDelayedSessionReconnectMessage({
+      isGatewayServiceRestart:
+        sessionRecoveryState.kind === "recovering"
+          ? sessionRecoveryState.isGatewayServiceRestart
+          : false,
+      recoverableDisconnectId:
+        sessionRecoveryState.kind === "recovering"
+          ? sessionRecoveryState.recoverableDisconnectId
+          : null,
+      visibleRecoverableDisconnectId,
+      recoveryErrorMessage,
+    }),
     reconnectAttemptCount:
       sessionRecoveryState.kind === "recovering" ? sessionRecoveryState.reconnectAttemptCount : 0,
     sandboxStatus: input.sandboxStatus,

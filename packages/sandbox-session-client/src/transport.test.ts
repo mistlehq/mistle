@@ -17,11 +17,17 @@ import { type RawData, type WebSocket as NodeWebSocket, WebSocketServer } from "
 
 import { createNodeSandboxSessionRuntime } from "./node.js";
 import { SandboxSessionSocketReadyStates } from "./runtime.js";
-import { SandboxSessionTransport } from "./transport.js";
+import {
+  GatewayServiceRestartCloseCode,
+  GatewayServiceRestartCloseReason,
+  GatewayServiceRestartReconnectMessage,
+  SandboxSessionTransport,
+  isGatewayServiceRestartClose,
+} from "./transport.js";
 
 type TestServer = {
   close: () => Promise<void>;
-  closeClientSocket: () => void;
+  closeClientSocket: (code?: number, reason?: string) => void;
   connectionCount: () => number;
   receivedControlMessages: StreamControlMessage[];
   receivedDataFrames: StreamDataFrame[];
@@ -146,12 +152,12 @@ async function startTestServer(input?: {
         });
       });
     },
-    closeClientSocket: (): void => {
+    closeClientSocket: (code, reason): void => {
       if (clientSocket === null) {
         throw new Error("Expected websocket client to be connected before closing.");
       }
 
-      clientSocket.close();
+      clientSocket.close(code, reason);
     },
     connectionCount: (): number => currentConnectionCount,
     receivedControlMessages,
@@ -301,6 +307,69 @@ describe("SandboxSessionTransport", () => {
     expect(secondStream.streamId).toBe(2);
     expect(firstStream.state).toBe("open");
     expect(secondStream.state).toBe("open");
+  });
+
+  it("classifies gateway service restart closes and marks active streams as transiently closed", async () => {
+    const server = await createManagedTestServer();
+    const transport = new SandboxSessionTransport({
+      runtime: createNodeSandboxSessionRuntime(),
+    });
+    const closeEvents: Array<{ code: number; reason: string; isGatewayServiceRestart: boolean }> =
+      [];
+    const streamEvents: string[] = [];
+
+    transport.onEvent((event) => {
+      if (event.type === "close") {
+        closeEvents.push({
+          code: event.code,
+          reason: event.reason,
+          isGatewayServiceRestart: event.gatewayServiceRestart !== null,
+        });
+      }
+    });
+
+    await transport.connect({
+      connectionUrl: server.url,
+    });
+    const stream = await transport.openStream({
+      channel: {
+        kind: "agent",
+      },
+    });
+    stream.onEvent((event) => {
+      if (event.type === "state_changed") {
+        streamEvents.push(
+          event.gatewayServiceRestart === undefined
+            ? `${event.state}:${event.errorMessage ?? ""}:ordinary`
+            : `${event.state}:${event.errorMessage ?? ""}:service_restart`,
+        );
+      }
+    });
+    streamEvents.length = 0;
+
+    server.closeClientSocket(GatewayServiceRestartCloseCode, GatewayServiceRestartCloseReason);
+
+    await waitForCondition({
+      description: "gateway service restart close event",
+      evaluate: () => closeEvents.length === 1 && streamEvents.length === 1,
+      timeoutMs: 1000,
+    });
+
+    const closeEvent = closeEvents[0];
+    if (closeEvent === undefined) {
+      throw new Error("Expected a gateway service restart close event.");
+    }
+
+    expect(isGatewayServiceRestartClose(closeEvent)).toBe(true);
+    expect(closeEvent).toEqual({
+      code: GatewayServiceRestartCloseCode,
+      reason: GatewayServiceRestartCloseReason,
+      isGatewayServiceRestart: true,
+    });
+    expect(streamEvents).toEqual([
+      `transport_closed:${GatewayServiceRestartReconnectMessage}:service_restart`,
+    ]);
+    expect(transport.errorMessage).toBe(GatewayServiceRestartReconnectMessage);
   });
 
   it("routes control and data frames to the owning stream id", async () => {

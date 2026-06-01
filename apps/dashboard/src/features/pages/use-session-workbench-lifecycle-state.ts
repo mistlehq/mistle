@@ -64,6 +64,7 @@ export type SessionLifecycleForWorkbench = {
   }) => void;
   recoverableDisconnect: {
     id: number;
+    isGatewayServiceRestart: boolean;
     message: string;
     targetRuntimeConversationId: string | null;
     recoveryStrategy: "reconnect_transport" | "reopen_stream";

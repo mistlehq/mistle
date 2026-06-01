@@ -16,6 +16,7 @@ import {
   type SandboxSessionRuntime,
   type SandboxSessionSocket,
 } from "./runtime.js";
+import { resolveGatewayServiceRestartCloseInfo } from "./transport.js";
 
 const DirectPtyStreamId = 1;
 const DefaultConnectTimeoutMs = 30_000;
@@ -143,6 +144,7 @@ export class PtyTransportClient {
   readonly #dataListeners = new Set<(chunk: Uint8Array) => void>();
   readonly #errorListeners = new Set<(error: Error) => void>();
   readonly #exitListeners = new Set<(info: SandboxPtyExitInfo) => void>();
+  readonly #gatewayServiceRestartListeners = new Set<() => void>();
   readonly #resetListeners = new Set<(info: SandboxPtyResetInfo) => void>();
   readonly #runtime: SandboxSessionRuntime;
   readonly #stateListeners = new Set<(state: SandboxPtyState) => void>();
@@ -207,6 +209,13 @@ export class PtyTransportClient {
     this.#errorListeners.add(listener);
     return () => {
       this.#errorListeners.delete(listener);
+    };
+  }
+
+  onGatewayServiceRestart(listener: () => void): () => void {
+    this.#gatewayServiceRestartListeners.add(listener);
+    return () => {
+      this.#gatewayServiceRestartListeners.delete(listener);
     };
   }
 
@@ -401,6 +410,13 @@ export class PtyTransportClient {
     const close = normalizeSocketCloseEvent(event);
     if (this.#state === SandboxPtyStates.CLOSING || close.code === 1000) {
       this.#setState(SandboxPtyStates.CLOSED);
+      return;
+    }
+    if (resolveGatewayServiceRestartCloseInfo(close) !== null) {
+      this.#setState(SandboxPtyStates.CLOSED);
+      for (const listener of this.#gatewayServiceRestartListeners) {
+        listener();
+      }
       return;
     }
     this.#setErrorState(

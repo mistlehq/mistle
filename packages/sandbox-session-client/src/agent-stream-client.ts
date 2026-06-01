@@ -13,10 +13,12 @@ import {
 import { isRecord } from "./shared/is-record.js";
 import {
   SandboxSessionStreamOpenError,
+  GatewayServiceRestartReconnectMessage,
   type SandboxSessionStream,
   type SandboxSessionStreamEvent,
   type SandboxSessionTransport,
   type SandboxSessionTransportEvent,
+  type GatewayServiceRestartCloseInfo,
 } from "./transport.js";
 import type {
   JsonRpcErrorResponse,
@@ -192,6 +194,7 @@ export class AgentStreamClient {
   #state: SandboxSessionConnectionState = "idle";
   #stream: SandboxSessionStream | null = null;
   #unsubscribeStreamEvent: (() => void) | null = null;
+  #gatewayServiceRestartCloseInfo: GatewayServiceRestartCloseInfo | null = null;
 
   constructor(input: AgentStreamClientInput) {
     this.#transport = input.transport;
@@ -260,6 +263,10 @@ export class AgentStreamClient {
       this.#attachStream(stream);
       this.#setState("connected_socket", null);
     } catch (error) {
+      if (this.#hasGatewayServiceRestartCloseState()) {
+        throw error;
+      }
+
       if (error instanceof SandboxSessionStreamOpenError) {
         this.#openError = error.openError;
         this.#setState("error", error.openError.message);
@@ -338,7 +345,12 @@ export class AgentStreamClient {
       this.#detachStream();
       this.#setState(
         "closed",
-        event.reason.length > 0 ? event.reason : "Sandbox websocket connection closed.",
+        event.gatewayServiceRestart !== null
+          ? GatewayServiceRestartReconnectMessage
+          : event.reason.length > 0
+            ? event.reason
+            : "Sandbox websocket connection closed.",
+        event.gatewayServiceRestart,
       );
       return;
     }
@@ -370,7 +382,11 @@ export class AgentStreamClient {
 
       if (event.state === "transport_closed") {
         this.#detachStream();
-        this.#setState("closed", event.errorMessage ?? "Sandbox websocket connection closed.");
+        this.#setState(
+          "closed",
+          event.errorMessage ?? "Sandbox websocket connection closed.",
+          event.gatewayServiceRestart ?? null,
+        );
         return;
       }
 
@@ -410,14 +426,33 @@ export class AgentStreamClient {
     });
   }
 
-  #setState(state: SandboxSessionConnectionState, errorMessage: string | null): void {
+  #setState(
+    state: SandboxSessionConnectionState,
+    errorMessage: string | null,
+    gatewayServiceRestart?: GatewayServiceRestartCloseInfo | null,
+  ): void {
     this.#state = state;
     this.#errorMessage = errorMessage;
-    this.#emit({
-      type: "connection_state_changed",
-      state,
-      errorMessage,
-    });
+    this.#gatewayServiceRestartCloseInfo =
+      state === "closed" && gatewayServiceRestart !== undefined ? gatewayServiceRestart : null;
+    this.#emit(
+      gatewayServiceRestart === undefined || gatewayServiceRestart === null
+        ? {
+            type: "connection_state_changed",
+            state,
+            errorMessage,
+          }
+        : {
+            type: "connection_state_changed",
+            state,
+            errorMessage,
+            gatewayServiceRestart,
+          },
+    );
+  }
+
+  #hasGatewayServiceRestartCloseState(): boolean {
+    return this.#state === "closed" && this.#gatewayServiceRestartCloseInfo !== null;
   }
 
   #emit(event: SandboxSessionEvent): void {

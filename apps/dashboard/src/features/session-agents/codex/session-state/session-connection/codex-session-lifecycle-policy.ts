@@ -19,19 +19,24 @@ export type CodexConnectionThreadStrategy =
 
 export function resolveCodexConnectionStateTransition(input: {
   hasConnectedSession: boolean;
+  isGatewayServiceRestart: boolean;
   state: CodexSessionConnectionState;
   errorMessage: string | null;
 }): {
   shouldDisconnectSession: boolean;
   lifecycleErrorMessage: string | null;
+  isGatewayServiceRestart: boolean;
   recoverableDisconnectMessage: string | null;
   recoverableDisconnectStrategy: "reconnect_transport" | null;
 } {
   if (input.state === "closed" || input.state === "error") {
-    const disconnectMessage = input.errorMessage ?? "The Codex session connection closed.";
+    const disconnectMessage = input.isGatewayServiceRestart
+      ? "Gateway service is restarting."
+      : (input.errorMessage ?? "The Codex session connection closed.");
     return {
       shouldDisconnectSession: true,
       lifecycleErrorMessage: input.hasConnectedSession ? null : disconnectMessage,
+      isGatewayServiceRestart: input.isGatewayServiceRestart,
       recoverableDisconnectMessage: input.hasConnectedSession ? disconnectMessage : null,
       recoverableDisconnectStrategy: input.hasConnectedSession ? "reconnect_transport" : null,
     };
@@ -40,6 +45,7 @@ export function resolveCodexConnectionStateTransition(input: {
   return {
     shouldDisconnectSession: false,
     lifecycleErrorMessage: null,
+    isGatewayServiceRestart: false,
     recoverableDisconnectMessage: null,
     recoverableDisconnectStrategy: null,
   };

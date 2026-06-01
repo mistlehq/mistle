@@ -35,6 +35,8 @@ type UseSandboxPtyStateResult = {
   };
 };
 
+type SandboxPtyOpenInput = { sandboxInstanceId: string } & SandboxPtyOpenOptions;
+
 function isNonEmptyString(value: string): boolean {
   return value.trim().length > 0;
 }
@@ -49,6 +51,8 @@ export function useSandboxPtyState(_hookInput: {
 }): UseSandboxPtyStateResult {
   const clientRef = useRef<PtyTransportClient | null>(null);
   const connectedSandboxInstanceIdRef = useRef<string | null>(null);
+  const gatewayServiceRestartHandlerRef = useRef<(generation: number) => void>(() => {});
+  const lastOpenInputRef = useRef<SandboxPtyOpenInput | null>(null);
   const listenerCleanupRef = useRef<(() => void)[]>([]);
   const openGenerationRef = useRef(0);
 
@@ -125,6 +129,13 @@ export function useSandboxPtyState(_hookInput: {
 
           setResetInfo(nextResetInfo);
         }),
+        client.onGatewayServiceRestart(() => {
+          if (!isCurrentGeneration(generation)) {
+            return;
+          }
+
+          gatewayServiceRestartHandlerRef.current(generation);
+        }),
       ];
     },
     [detachClientListeners, isCurrentGeneration],
@@ -154,32 +165,12 @@ export function useSandboxPtyState(_hookInput: {
 
   const disconnectPty = useCallback(async (): Promise<void> => {
     openGenerationRef.current += 1;
+    lastOpenInputRef.current = null;
     await disconnectCurrentClient();
   }, [disconnectCurrentClient]);
 
-  const openPty = useCallback(
-    async (openInput: { sandboxInstanceId: string } & SandboxPtyOpenOptions): Promise<void> => {
-      if (!isNonEmptyString(openInput.sandboxInstanceId)) {
-        throw new Error("Sandbox instance id is required to open a PTY session.");
-      }
-
-      const generation = openGenerationRef.current + 1;
-      openGenerationRef.current = generation;
-
-      const existingClient = clientRef.current;
-      setErrorMessage(null);
-      setExitInfo(null);
-      setResetInfo(null);
-      setOutputChunks([]);
-      clearConnectedSandboxInstanceId();
-
-      if (existingClient !== null) {
-        await disconnectCurrentClient();
-        if (!isCurrentGeneration(generation)) {
-          throw new Error("Sandbox PTY connection attempt was superseded.");
-        }
-      }
-
+  const connectPtyClient = useCallback(
+    async (openInput: SandboxPtyOpenInput, generation: number): Promise<void> => {
       const ptySession = await createSandboxInstancePtySession({
         instanceId: openInput.sandboxInstanceId,
         ptySessionId: openInput.ptySessionId,
@@ -212,6 +203,7 @@ export function useSandboxPtyState(_hookInput: {
 
         connectedSandboxInstanceIdRef.current = openInput.sandboxInstanceId;
         setConnectedSandboxInstanceId(openInput.sandboxInstanceId);
+        lastOpenInputRef.current = openInput;
       } catch (error) {
         try {
           await client.disconnect();
@@ -223,6 +215,72 @@ export function useSandboxPtyState(_hookInput: {
           }
         }
 
+        throw error instanceof Error ? error : new Error("Could not open sandbox PTY session.");
+      }
+    },
+    [bindClient, isCurrentGeneration],
+  );
+
+  const reconnectPtyAfterGatewayRestart = useCallback(
+    (closedGeneration: number): void => {
+      const openInput = lastOpenInputRef.current;
+      if (openInput === null) {
+        setErrorMessage("Gateway service restarted before the PTY open request was recorded.");
+        return;
+      }
+
+      const reconnectGeneration = closedGeneration + 1;
+      openGenerationRef.current = reconnectGeneration;
+      detachClientListeners();
+      clientRef.current = null;
+      setErrorMessage(null);
+      setExitInfo(null);
+      setResetInfo(null);
+
+      void connectPtyClient(openInput, reconnectGeneration).catch((error: unknown) => {
+        if (!isCurrentGeneration(reconnectGeneration)) {
+          return;
+        }
+
+        const resolvedError =
+          error instanceof Error ? error : new Error("Could not reconnect sandbox PTY session.");
+        clearConnectedSandboxInstanceId();
+        setErrorMessage(resolvedError.message);
+      });
+    },
+    [clearConnectedSandboxInstanceId, connectPtyClient, detachClientListeners, isCurrentGeneration],
+  );
+
+  useEffect(() => {
+    gatewayServiceRestartHandlerRef.current = reconnectPtyAfterGatewayRestart;
+  }, [reconnectPtyAfterGatewayRestart]);
+
+  const openPty = useCallback(
+    async (openInput: SandboxPtyOpenInput): Promise<void> => {
+      if (!isNonEmptyString(openInput.sandboxInstanceId)) {
+        throw new Error("Sandbox instance id is required to open a PTY session.");
+      }
+
+      const generation = openGenerationRef.current + 1;
+      openGenerationRef.current = generation;
+
+      const existingClient = clientRef.current;
+      setErrorMessage(null);
+      setExitInfo(null);
+      setResetInfo(null);
+      setOutputChunks([]);
+      clearConnectedSandboxInstanceId();
+
+      if (existingClient !== null) {
+        await disconnectCurrentClient();
+        if (!isCurrentGeneration(generation)) {
+          throw new Error("Sandbox PTY connection attempt was superseded.");
+        }
+      }
+
+      try {
+        await connectPtyClient(openInput, generation);
+      } catch (error) {
         const resolvedError =
           error instanceof Error ? error : new Error("Could not open sandbox PTY session.");
 
@@ -234,7 +292,12 @@ export function useSandboxPtyState(_hookInput: {
         throw resolvedError;
       }
     },
-    [bindClient, clearConnectedSandboxInstanceId, disconnectCurrentClient, isCurrentGeneration],
+    [
+      clearConnectedSandboxInstanceId,
+      connectPtyClient,
+      disconnectCurrentClient,
+      isCurrentGeneration,
+    ],
   );
 
   const writeInput = useCallback(async (data: string | Uint8Array): Promise<void> => {

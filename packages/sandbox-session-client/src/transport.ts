@@ -29,11 +29,20 @@ import {
 
 const DefaultConnectTimeoutMs = 30_000;
 const ProtocolViolationCloseCode = 4008;
+export const GatewayServiceRestartCloseCode = 4001;
+export const GatewayServiceRestartCloseReason = "service_restart";
+export const GatewayServiceRestartReconnectMessage = "Gateway service is restarting.";
+
+export type GatewayServiceRestartCloseInfo = {
+  code: typeof GatewayServiceRestartCloseCode;
+  reason: typeof GatewayServiceRestartCloseReason;
+};
 
 export type SandboxSessionTransportEvent =
   | {
       type: "close";
       code: number;
+      gatewayServiceRestart: GatewayServiceRestartCloseInfo | null;
       reason: string;
       wasClean: boolean;
     }
@@ -79,6 +88,7 @@ export type SandboxSessionStreamEvent =
       type: "state_changed";
       state: SandboxSessionStreamState;
       errorMessage: string | null;
+      gatewayServiceRestart?: GatewayServiceRestartCloseInfo;
     }
   | {
       type: "control";
@@ -210,6 +220,27 @@ function normalizeSocketCloseEvent(event: unknown): {
   };
 }
 
+export function resolveGatewayServiceRestartCloseInfo(input: {
+  code: number;
+  reason: string;
+}): GatewayServiceRestartCloseInfo | null {
+  if (
+    input.code !== GatewayServiceRestartCloseCode ||
+    input.reason !== GatewayServiceRestartCloseReason
+  ) {
+    return null;
+  }
+
+  return {
+    code: GatewayServiceRestartCloseCode,
+    reason: GatewayServiceRestartCloseReason,
+  };
+}
+
+export function isGatewayServiceRestartClose(input: { code: number; reason: string }): boolean {
+  return resolveGatewayServiceRestartCloseInfo(input) !== null;
+}
+
 function createStreamResetError(
   message: Extract<StreamControlMessage, { type: "stream.reset" }>,
 ): Error {
@@ -322,8 +353,11 @@ class SandboxSessionTransportStream implements SandboxSessionStream {
     this.#setState("reset", createStreamResetError(resetMessage).message);
   }
 
-  markTransportClosed(errorMessage: string): void {
-    this.#setState("transport_closed", errorMessage);
+  markTransportClosed(
+    errorMessage: string,
+    gatewayServiceRestart: GatewayServiceRestartCloseInfo | null,
+  ): void {
+    this.#setState("transport_closed", errorMessage, gatewayServiceRestart);
   }
 
   emitControl(message: StreamControlMessage): void {
@@ -355,13 +389,26 @@ class SandboxSessionTransportStream implements SandboxSessionStream {
     }
   }
 
-  #setState(state: SandboxSessionStreamState, errorMessage: string | null): void {
+  #setState(
+    state: SandboxSessionStreamState,
+    errorMessage: string | null,
+    gatewayServiceRestart?: GatewayServiceRestartCloseInfo | null,
+  ): void {
     this.#state = state;
-    this.#emit({
-      type: "state_changed",
-      state,
-      errorMessage,
-    });
+    this.#emit(
+      gatewayServiceRestart === undefined || gatewayServiceRestart === null
+        ? {
+            type: "state_changed",
+            state,
+            errorMessage,
+          }
+        : {
+            type: "state_changed",
+            state,
+            errorMessage,
+            gatewayServiceRestart,
+          },
+    );
   }
 }
 
@@ -473,7 +520,7 @@ export class SandboxSessionTransport {
     const socket = this.#socket;
     this.#socket = null;
     this.#rejectPendingOpens(new Error("Sandbox websocket connection closed."));
-    this.#markAllStreamsTransportClosed("Sandbox websocket connection closed.");
+    this.#markAllStreamsTransportClosed("Sandbox websocket connection closed.", null);
     if (socket === null) {
       return;
     }
@@ -772,14 +819,23 @@ export class SandboxSessionTransport {
   readonly #handleSocketClose = (event: unknown): void => {
     this.#socket = null;
     const closeEvent = normalizeSocketCloseEvent(event);
+    const gatewayServiceRestart = resolveGatewayServiceRestartCloseInfo({
+      code: closeEvent.code,
+      reason: closeEvent.reason,
+    });
     const message =
-      closeEvent.reason.length > 0 ? closeEvent.reason : "Sandbox websocket connection closed.";
+      gatewayServiceRestart !== null
+        ? GatewayServiceRestartReconnectMessage
+        : closeEvent.reason.length > 0
+          ? closeEvent.reason
+          : "Sandbox websocket connection closed.";
     this.#errorMessage = message;
     this.#rejectPendingOpens(new Error(message));
-    this.#markAllStreamsTransportClosed(message);
+    this.#markAllStreamsTransportClosed(message, gatewayServiceRestart);
     this.#emit({
       type: "close",
       code: closeEvent.code,
+      gatewayServiceRestart,
       reason: closeEvent.reason,
       wasClean: closeEvent.wasClean,
     });
@@ -789,7 +845,7 @@ export class SandboxSessionTransport {
     const error = new Error("Sandbox websocket connection failed.");
     this.#errorMessage = error.message;
     this.#rejectPendingOpens(error);
-    this.#markAllStreamsTransportClosed(error.message);
+    this.#markAllStreamsTransportClosed(error.message, null);
     this.#emit({
       type: "error",
       error,
@@ -801,7 +857,7 @@ export class SandboxSessionTransport {
     this.#socket = null;
     this.#errorMessage = message;
     this.#rejectPendingOpens(new Error(message));
-    this.#markAllStreamsTransportClosed(message);
+    this.#markAllStreamsTransportClosed(message, null);
     if (socket !== null) {
       this.#detachSocketListeners(socket);
       socket.close(ProtocolViolationCloseCode, message);
@@ -820,9 +876,12 @@ export class SandboxSessionTransport {
     this.#pendingOpensByStreamId.clear();
   }
 
-  #markAllStreamsTransportClosed(message: string): void {
+  #markAllStreamsTransportClosed(
+    message: string,
+    gatewayServiceRestart: GatewayServiceRestartCloseInfo | null,
+  ): void {
     for (const streamRecord of this.#activeStreamsByStreamId.values()) {
-      streamRecord.stream.markTransportClosed(message);
+      streamRecord.stream.markTransportClosed(message, gatewayServiceRestart);
     }
     this.#activeStreamsByStreamId.clear();
   }

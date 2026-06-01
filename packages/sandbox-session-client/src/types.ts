@@ -1,5 +1,7 @@
 import type { StreamOpenError, StreamOpenOK } from "@mistle/sandbox-session-protocol";
 
+import type { GatewayServiceRestartCloseInfo } from "./transport.js";
+
 export type SandboxSessionConnectionState =
   | "idle"
   | "connecting_socket"
@@ -49,6 +51,7 @@ export type SandboxSessionEvent =
       type: "connection_state_changed";
       state: SandboxSessionConnectionState;
       errorMessage: string | null;
+      gatewayServiceRestart?: GatewayServiceRestartCloseInfo;
     }
   | {
       type: "notification";

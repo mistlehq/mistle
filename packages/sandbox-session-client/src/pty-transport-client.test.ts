@@ -5,6 +5,7 @@ import { type RawData, WebSocket, WebSocketServer } from "ws";
 import { createNodeSandboxSessionRuntime } from "./node.js";
 import { PtyTransportClient } from "./pty-transport-client.js";
 import { SandboxPtyStates } from "./pty-types.js";
+import { GatewayServiceRestartCloseCode, GatewayServiceRestartCloseReason } from "./transport.js";
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -14,6 +15,7 @@ type Deferred<T> = {
 
 type TestServer = {
   close: () => Promise<void>;
+  closeClientSocket: (code: number, reason: string) => void;
   closeRequest: Promise<unknown>;
   openRequest: Promise<unknown>;
   receivedInput: Promise<Uint8Array>;
@@ -92,6 +94,31 @@ describe("PtyTransportClient", () => {
     });
     expect(states).toContain(SandboxPtyStates.CONNECTING);
     expect(states).toContain(SandboxPtyStates.OPEN);
+  });
+
+  it("surfaces gateway service restart closes as reconnectable PTY disconnects", async () => {
+    const server = await startTestServer();
+    servers.push(server);
+    const client = new PtyTransportClient({
+      connectionUrl: server.url,
+      runtime: createNodeSandboxSessionRuntime(),
+    });
+    let serviceRestartCount = 0;
+    client.onGatewayServiceRestart(() => {
+      serviceRestartCount += 1;
+    });
+
+    await client.open({
+      ptySessionId: "terminal",
+      cols: 100,
+      rows: 30,
+    });
+
+    server.closeClientSocket(GatewayServiceRestartCloseCode, GatewayServiceRestartCloseReason);
+    await waitFor(() => serviceRestartCount === 1);
+
+    expect(client.state).toBe(SandboxPtyStates.CLOSED);
+    expect(client.error).toBeNull();
   });
 });
 
@@ -211,6 +238,12 @@ async function startTestServer(): Promise<TestServer> {
           reject(error);
         });
       });
+    },
+    closeClientSocket: (code, reason) => {
+      if (connectedSocket === null || connectedSocket.readyState !== WebSocket.OPEN) {
+        throw new Error("Expected direct PTY transport socket to be connected.");
+      }
+      connectedSocket.close(code, reason);
     },
     closeRequest: closeRequest.promise,
     openRequest: openRequest.promise,

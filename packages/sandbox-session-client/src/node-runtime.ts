@@ -59,7 +59,7 @@ class NodeSandboxSessionSocket implements SandboxSessionSocket {
   readonly #socket: WebSocket;
   readonly #listenerMap = new Map<
     SandboxSessionSocketEventMap[SandboxSessionSocketEventName],
-    (event: unknown) => void
+    (...args: unknown[]) => void
   >();
   readonly #messageListenerMap = new Map<
     SandboxSessionSocketEventMap["message"],
@@ -91,6 +91,20 @@ class NodeSandboxSessionSocket implements SandboxSessionSocket {
 
       this.#messageListenerMap.set(listener, wrappedMessageListener);
       this.#socket.on(eventName, wrappedMessageListener);
+      return;
+    }
+
+    if (eventName === "close") {
+      const wrappedCloseListener = (code: unknown, reason: unknown): void => {
+        listener({
+          code: typeof code === "number" ? code : 1006,
+          reason: Buffer.isBuffer(reason) ? reason.toString("utf8") : "",
+          wasClean: code === 1000,
+        });
+      };
+
+      this.#listenerMap.set(listener, wrappedCloseListener);
+      this.#socket.on(eventName, wrappedCloseListener);
       return;
     }
 

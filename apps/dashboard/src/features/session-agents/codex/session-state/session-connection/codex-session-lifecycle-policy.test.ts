@@ -10,12 +10,14 @@ describe("codex session lifecycle policy", () => {
     expect(
       resolveCodexConnectionStateTransition({
         hasConnectedSession: false,
+        isGatewayServiceRestart: false,
         state: "closed",
         errorMessage: null,
       }),
     ).toEqual({
       shouldDisconnectSession: true,
       lifecycleErrorMessage: "The Codex session connection closed.",
+      isGatewayServiceRestart: false,
       recoverableDisconnectMessage: null,
       recoverableDisconnectStrategy: null,
     });
@@ -23,12 +25,14 @@ describe("codex session lifecycle policy", () => {
     expect(
       resolveCodexConnectionStateTransition({
         hasConnectedSession: false,
+        isGatewayServiceRestart: false,
         state: "error",
         errorMessage: "Socket failed.",
       }),
     ).toEqual({
       shouldDisconnectSession: true,
       lifecycleErrorMessage: "Socket failed.",
+      isGatewayServiceRestart: false,
       recoverableDisconnectMessage: null,
       recoverableDisconnectStrategy: null,
     });
@@ -38,13 +42,32 @@ describe("codex session lifecycle policy", () => {
     expect(
       resolveCodexConnectionStateTransition({
         hasConnectedSession: true,
+        isGatewayServiceRestart: false,
         state: "closed",
         errorMessage: "Stream dropped.",
       }),
     ).toEqual({
       shouldDisconnectSession: true,
       lifecycleErrorMessage: null,
+      isGatewayServiceRestart: false,
       recoverableDisconnectMessage: "Stream dropped.",
+      recoverableDisconnectStrategy: "reconnect_transport",
+    });
+  });
+
+  it("uses the gateway restart message for recoverable service-restart websocket closes", () => {
+    expect(
+      resolveCodexConnectionStateTransition({
+        hasConnectedSession: true,
+        isGatewayServiceRestart: true,
+        state: "closed",
+        errorMessage: "service_restart",
+      }),
+    ).toEqual({
+      shouldDisconnectSession: true,
+      lifecycleErrorMessage: null,
+      isGatewayServiceRestart: true,
+      recoverableDisconnectMessage: "Gateway service is restarting.",
       recoverableDisconnectStrategy: "reconnect_transport",
     });
   });
@@ -53,12 +76,14 @@ describe("codex session lifecycle policy", () => {
     expect(
       resolveCodexConnectionStateTransition({
         hasConnectedSession: false,
+        isGatewayServiceRestart: false,
         state: "ready",
         errorMessage: null,
       }),
     ).toEqual({
       shouldDisconnectSession: false,
       lifecycleErrorMessage: null,
+      isGatewayServiceRestart: false,
       recoverableDisconnectMessage: null,
       recoverableDisconnectStrategy: null,
     });

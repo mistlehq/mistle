@@ -13,7 +13,12 @@ import { AgentStreamClient, parseStreamOpenControlMessage } from "./agent-stream
 import { createBrowserSandboxSessionRuntime } from "./browser.js";
 import { createNodeSandboxSessionRuntime } from "./node.js";
 import { SandboxSessionSendGuarantees } from "./runtime.js";
-import { SandboxSessionTransport } from "./transport.js";
+import {
+  GatewayServiceRestartCloseCode,
+  GatewayServiceRestartCloseReason,
+  GatewayServiceRestartReconnectMessage,
+  SandboxSessionTransport,
+} from "./transport.js";
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -21,7 +26,7 @@ type Deferred<T> = {
   reject: (reason: unknown) => void;
 };
 
-type TestServerMode = "accept" | "close_after_payload" | "reject";
+type TestServerMode = "accept" | "close_after_payload" | "pending" | "reject";
 
 type TestServer = {
   url: string;
@@ -35,7 +40,7 @@ type TestServer = {
   sendNotification: (payload: unknown) => void;
   sendReset: (input: { code: string; message: string }) => void;
   sendWindowUpdate: (bytes: number) => void;
-  closeClientSocket: () => void;
+  closeClientSocket: (code?: number, reason?: string) => void;
   close: () => Promise<void>;
 };
 
@@ -177,6 +182,9 @@ async function startTestServer(mode: TestServerMode): Promise<TestServer> {
             openRequestDeferred.resolve(messageText);
           }
           activeStreamId = parsedJson.streamId;
+          if (mode === "pending") {
+            return;
+          }
 
           const controlMessage = parseStreamOpenControlMessage(
             JSON.stringify({
@@ -301,12 +309,12 @@ async function startTestServer(mode: TestServerMode): Promise<TestServer> {
         }),
       );
     },
-    closeClientSocket: () => {
+    closeClientSocket: (code, reason) => {
       if (connectedSocket === null) {
         throw new Error("Expected websocket client to be connected before closing.");
       }
 
-      connectedSocket.close();
+      connectedSocket.close(code, reason);
     },
     close: async () => {
       if (connectedSocket !== null) {
@@ -402,6 +410,7 @@ function disconnectClient(client: AgentStreamClient): void {
 
 type RecordedEvent = {
   type: string;
+  gatewayServiceRestart?: boolean;
   state?: string;
   method?: string;
   resetInfo?: { code: string; message: string };
@@ -414,6 +423,9 @@ function recordConnectionAndNotificationEvents(client: AgentStreamClient): Array
     if (event.type === "connection_state_changed") {
       events.push({
         type: event.type,
+        ...(event.gatewayServiceRestart === undefined
+          ? {}
+          : { gatewayServiceRestart: event.gatewayServiceRestart.reason === "service_restart" }),
         state: event.state,
       });
       return;
@@ -675,6 +687,71 @@ describe("agent stream client", () => {
     });
 
     expect(client.errorMessage).toBe("Sandbox websocket connection closed.");
+  });
+
+  it("marks gateway service restart closes as recoverable connection-state events", async () => {
+    const server = await createManagedTestServer("accept");
+    const client = createClient(server.url);
+    const events = recordConnectionAndNotificationEvents(client);
+
+    await expectClientToOpenAgentStream({
+      client,
+      server,
+    });
+
+    server.closeClientSocket(GatewayServiceRestartCloseCode, GatewayServiceRestartCloseReason);
+
+    await waitForCondition({
+      description: "client to close after gateway service restart",
+      timeoutMs: 500,
+      evaluate: () =>
+        events.some(
+          (event) =>
+            event.type === "connection_state_changed" &&
+            event.state === "closed" &&
+            event.gatewayServiceRestart === true,
+        ),
+    });
+
+    expect(client.errorMessage).toBe(GatewayServiceRestartReconnectMessage);
+  });
+
+  it("keeps pending agent stream opens in the recoverable gateway restart state", async () => {
+    const server = await createManagedTestServer("pending");
+    const client = createClient(server.url);
+    const events = recordConnectionAndNotificationEvents(client);
+    const transport = transportByClient.get(client);
+    if (transport === undefined) {
+      throw new Error("Expected test client transport metadata.");
+    }
+
+    await transport.connect({
+      connectionUrl: server.url,
+    });
+    const openPromise = client.openAgentStream();
+
+    expect(JSON.parse(await server.openRequest)).toEqual({
+      type: "stream.open",
+      streamId: 1,
+      channel: {
+        kind: "agent",
+      },
+    });
+
+    server.closeClientSocket(GatewayServiceRestartCloseCode, GatewayServiceRestartCloseReason);
+
+    await expect(openPromise).rejects.toThrow(GatewayServiceRestartReconnectMessage);
+    expect(client.state).toBe("closed");
+    expect(client.errorMessage).toBe(GatewayServiceRestartReconnectMessage);
+    expect(events).toContainEqual({
+      type: "connection_state_changed",
+      state: "closed",
+      gatewayServiceRestart: true,
+    });
+    expect(events).not.toContainEqual({
+      type: "connection_state_changed",
+      state: "error",
+    });
   });
 
   it("surfaces active stream reset without closing the websocket", async () => {

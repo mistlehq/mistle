@@ -140,7 +140,7 @@ export function buildOpenCodeLifecycleForWorkbench(
         targetSessionId: recoverInput.targetRuntimeConversationId,
       });
     },
-    recoverableDisconnect: lifecycle.recoverableDisconnect,
+    recoverableDisconnect: null,
     sessionConnectionState: lifecycle.sessionConnectionState,
     sessionSnapshot:
       lifecycle.sessionSnapshot === null
@@ -177,6 +177,7 @@ export function buildCodexLifecycleForWorkbench(
         ? null
         : {
             id: lifecycle.recoverableDisconnect.id,
+            isGatewayServiceRestart: lifecycle.recoverableDisconnect.isGatewayServiceRestart,
             message: lifecycle.recoverableDisconnect.message,
             targetRuntimeConversationId: lifecycle.recoverableDisconnect.targetThreadId,
             recoveryStrategy: lifecycle.recoverableDisconnect.recoveryStrategy,
@@ -233,7 +234,7 @@ export function buildPiLifecycleForWorkbench(
         targetConversationId: recoverInput.targetRuntimeConversationId,
       });
     },
-    recoverableDisconnect: lifecycle.recoverableDisconnect,
+    recoverableDisconnect: null,
     sessionConnectionState: lifecycle.sessionConnectionState,
     sessionSnapshot:
       lifecycle.sessionSnapshot === null
