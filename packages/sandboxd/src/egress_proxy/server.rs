@@ -27,7 +27,7 @@ use tokio_tungstenite::tungstenite::{
     Message,
     client::IntoClientRequest,
     handshake::{client::Request as ClientWebSocketRequest, derive_accept_key},
-    protocol::Role,
+    protocol::{CloseFrame, Role, frame::coding::CloseCode},
 };
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, client_async};
 use url::Url;
@@ -53,6 +53,15 @@ use crate::egress_proxy::{
     DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME, EgressProxyError, EgressProxyState,
     SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME,
 };
+
+const GATEWAY_SERVICE_RESTART_CLOSE_CODE: u16 = 4001;
+const GATEWAY_SERVICE_RESTART_CLOSE_REASON: &str = "service_restart";
+
+#[derive(Debug, Eq, PartialEq)]
+enum DirectGatewayWebSocketTunnelOutcome {
+    Completed,
+    GatewayServiceRestart,
+}
 
 enum DirectHttpUpstreamStream {
     Plain(TcpStream),
@@ -602,9 +611,22 @@ async fn forward_upgrade_request_direct(
         let tunnel_result = tunnel_websocket_upgrade(downstream_upgrade, upstream_socket).await;
 
         match tunnel_result {
-            Ok(()) => {
+            Ok(DirectGatewayWebSocketTunnelOutcome::Completed) => {
                 let mut fields = tunnel_context.common_fields();
                 fields.push(("outcome", Value::String("completed".to_string())));
+                emit_egress_proxy_log(
+                    tunnel_context.clock.as_ref(),
+                    &tunnel_context.sandbox_instance_id,
+                    "egress_proxy_upgrade_completed",
+                    &fields,
+                );
+            }
+            Ok(DirectGatewayWebSocketTunnelOutcome::GatewayServiceRestart) => {
+                let mut fields = tunnel_context.common_fields();
+                fields.push((
+                    "outcome",
+                    Value::String("gateway_service_restart".to_string()),
+                ));
                 emit_egress_proxy_log(
                     tunnel_context.clock.as_ref(),
                     &tunnel_context.sandbox_instance_id,
@@ -787,9 +809,22 @@ async fn forward_upgrade_request_through_direct_gateway(
         let tunnel_result = tunnel_direct_gateway_upgrade(downstream_upgrade, gateway_socket).await;
 
         match tunnel_result {
-            Ok(()) => {
+            Ok(DirectGatewayWebSocketTunnelOutcome::Completed) => {
                 let mut fields = tunnel_context.common_fields();
                 fields.push(("outcome", Value::String("completed".to_string())));
+                emit_egress_proxy_log(
+                    tunnel_context.clock.as_ref(),
+                    &tunnel_context.sandbox_instance_id,
+                    "egress_proxy_upgrade_completed",
+                    &fields,
+                );
+            }
+            Ok(DirectGatewayWebSocketTunnelOutcome::GatewayServiceRestart) => {
+                let mut fields = tunnel_context.common_fields();
+                fields.push((
+                    "outcome",
+                    Value::String("gateway_service_restart".to_string()),
+                ));
                 emit_egress_proxy_log(
                     tunnel_context.clock.as_ref(),
                     &tunnel_context.sandbox_instance_id,
@@ -934,14 +969,14 @@ async fn send_direct_gateway_http_request(
 async fn tunnel_direct_gateway_upgrade(
     downstream_upgrade: hyper::upgrade::OnUpgrade,
     gateway_socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
-) -> Result<(), EgressProxyError> {
+) -> Result<DirectGatewayWebSocketTunnelOutcome, EgressProxyError> {
     tunnel_websocket_upgrade(downstream_upgrade, gateway_socket).await
 }
 
 async fn tunnel_websocket_upgrade(
     downstream_upgrade: hyper::upgrade::OnUpgrade,
     upstream_socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
-) -> Result<(), EgressProxyError> {
+) -> Result<DirectGatewayWebSocketTunnelOutcome, EgressProxyError> {
     let downstream = downstream_upgrade.await.map_err(|error| {
         EgressProxyError::new(format!("failed to upgrade downstream websocket: {error}"))
     })?;
@@ -963,7 +998,9 @@ async fn tunnel_websocket_upgrade(
                         "failed to close upstream websocket request stream: {error}"
                     ))
                 })?;
-                return Ok::<(), EgressProxyError>(());
+                return Ok::<DirectGatewayWebSocketTunnelOutcome, EgressProxyError>(
+                    DirectGatewayWebSocketTunnelOutcome::Completed,
+                );
             }
             upstream_writer.send(message).await.map_err(|error| {
                 EgressProxyError::new(format!(
@@ -975,7 +1012,8 @@ async fn tunnel_websocket_upgrade(
             EgressProxyError::new(format!(
                 "failed to close upstream websocket request stream: {error}"
             ))
-        })
+        })?;
+        Ok(DirectGatewayWebSocketTunnelOutcome::Completed)
     });
 
     let mut response_task = tokio::spawn(async move {
@@ -985,19 +1023,33 @@ async fn tunnel_websocket_upgrade(
                     "failed to read upstream websocket response message: {error}"
                 ))
             })?;
+            let gateway_service_restart_close = match &message {
+                Message::Close(close_frame) => {
+                    is_gateway_service_restart_close_frame(close_frame.as_ref())
+                }
+                _ => false,
+            };
             let close_received = matches!(message, Message::Close(_));
             downstream_writer.send(message).await.map_err(|error| {
                 EgressProxyError::new(format!(
                     "failed to write downstream websocket response message: {error}"
                 ))
             })?;
+            if gateway_service_restart_close {
+                return Ok::<DirectGatewayWebSocketTunnelOutcome, EgressProxyError>(
+                    DirectGatewayWebSocketTunnelOutcome::GatewayServiceRestart,
+                );
+            }
             if close_received {
-                return Ok::<(), EgressProxyError>(());
+                return Ok::<DirectGatewayWebSocketTunnelOutcome, EgressProxyError>(
+                    DirectGatewayWebSocketTunnelOutcome::Completed,
+                );
             }
         }
         downstream_writer.close().await.map_err(|error| {
             EgressProxyError::new(format!("failed to close downstream websocket: {error}"))
-        })
+        })?;
+        Ok(DirectGatewayWebSocketTunnelOutcome::Completed)
     });
 
     tokio::select! {
@@ -1013,6 +1065,17 @@ async fn tunnel_websocket_upgrade(
                 .map_err(|error| EgressProxyError::new(format!("direct gateway websocket response task failed: {error}")))?
         }
     }
+}
+
+fn is_gateway_service_restart_close_frame(close_frame: Option<&CloseFrame>) -> bool {
+    let Some(close_frame) = close_frame else {
+        return false;
+    };
+
+    matches!(
+        close_frame.code,
+        CloseCode::Library(GATEWAY_SERVICE_RESTART_CLOSE_CODE)
+    ) && close_frame.reason == GATEWAY_SERVICE_RESTART_CLOSE_REASON
 }
 
 async fn send_direct_upstream_http_request(
@@ -1402,11 +1465,13 @@ fn filter_outbound_response_headers(
 mod tests {
     use std::io::{Read, Write};
     use std::net::TcpListener as StdTcpListener;
-    use std::sync::mpsc;
+    use std::sync::{Mutex, mpsc};
     use std::thread;
     use std::time::Duration;
 
+    use tokio::time::timeout;
     use tokio_tungstenite::tungstenite::handshake::derive_accept_key;
+    use tokio_tungstenite::{connect_async, tungstenite::Message as TestWebSocketMessage};
 
     use super::*;
 
@@ -1478,6 +1543,157 @@ mod tests {
         server_thread
             .join()
             .expect("test gateway server thread should join");
+    }
+
+    #[test]
+    fn direct_gateway_websocket_close_classifier_requires_service_restart_code_and_reason() {
+        assert!(is_gateway_service_restart_close_frame(Some(&CloseFrame {
+            code: CloseCode::Library(4001),
+            reason: "service_restart".into(),
+        })));
+
+        assert!(!is_gateway_service_restart_close_frame(Some(&CloseFrame {
+            code: CloseCode::Library(4001),
+            reason: "ordinary_close".into(),
+        })));
+
+        assert!(!is_gateway_service_restart_close_frame(Some(&CloseFrame {
+            code: CloseCode::Normal,
+            reason: "service_restart".into(),
+        })));
+
+        assert!(!is_gateway_service_restart_close_frame(None));
+    }
+
+    #[tokio::test]
+    async fn direct_gateway_websocket_service_restart_close_is_forwarded_to_downstream() {
+        let gateway_listener = TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .expect("test gateway listener should bind");
+        let gateway_address = gateway_listener
+            .local_addr()
+            .expect("test gateway listener should expose its address");
+        let gateway_client_stream = TcpStream::connect(gateway_address)
+            .await
+            .expect("test should connect gateway client stream");
+        let (gateway_server_stream, _) = gateway_listener
+            .accept()
+            .await
+            .expect("test gateway should accept client stream");
+        let gateway_client_socket = WebSocketStream::from_raw_socket(
+            MaybeTlsStream::Plain(gateway_client_stream),
+            Role::Client,
+            None,
+        )
+        .await;
+        let mut gateway_server_socket =
+            WebSocketStream::from_raw_socket(gateway_server_stream, Role::Server, None).await;
+
+        let downstream_listener = TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .expect("downstream proxy listener should bind");
+        let downstream_address = downstream_listener
+            .local_addr()
+            .expect("downstream proxy listener should expose its address");
+        let gateway_socket = Arc::new(Mutex::new(Some(gateway_client_socket)));
+        let (tunnel_result_sender, tunnel_result_receiver) = oneshot::channel();
+        let tunnel_result_sender = Arc::new(Mutex::new(Some(tunnel_result_sender)));
+        let gateway_socket_for_service = gateway_socket.clone();
+        let tunnel_result_sender_for_service = tunnel_result_sender.clone();
+
+        let downstream_server = tokio::spawn(async move {
+            let (stream, _) = downstream_listener
+                .accept()
+                .await
+                .expect("downstream proxy should accept websocket client");
+            http1::Builder::new()
+                .serve_connection(
+                    TokioIo::new(stream),
+                    service_fn(move |mut request| {
+                        let gateway_socket_for_request = gateway_socket_for_service.clone();
+                        let tunnel_result_sender_for_request =
+                            tunnel_result_sender_for_service.clone();
+                        async move {
+                            let websocket_accept_key = request
+                                .headers()
+                                .get("sec-websocket-key")
+                                .map(|value| derive_accept_key(value.as_bytes()))
+                                .expect("downstream websocket request should include key");
+                            let downstream_upgrade = hyper::upgrade::on(&mut request);
+                            let gateway_socket = gateway_socket_for_request
+                                .lock()
+                                .expect("gateway socket mutex should not be poisoned")
+                                .take()
+                                .expect("gateway socket should be available");
+                            let tunnel_result_sender = tunnel_result_sender_for_request
+                                .lock()
+                                .expect("tunnel result sender mutex should not be poisoned")
+                                .take()
+                                .expect("tunnel result sender should be available");
+                            tokio::spawn(async move {
+                                let tunnel_result = tunnel_direct_gateway_upgrade(
+                                    downstream_upgrade,
+                                    gateway_socket,
+                                )
+                                .await
+                                .map_err(|error| error.to_string());
+                                let _ = tunnel_result_sender.send(tunnel_result);
+                            });
+
+                            Response::builder()
+                                .status(StatusCode::SWITCHING_PROTOCOLS)
+                                .header("connection", "upgrade")
+                                .header("upgrade", "websocket")
+                                .header("sec-websocket-accept", websocket_accept_key)
+                                .body(empty_body())
+                                .map_err(|error| {
+                                    EgressProxyError::new(format!(
+                                        "failed to build downstream websocket response: {error}"
+                                    ))
+                                })
+                        }
+                    }),
+                )
+                .with_upgrades()
+                .await
+                .expect("downstream proxy websocket server should complete");
+        });
+
+        let downstream_url = format!("ws://{downstream_address}/socket");
+        let (mut downstream_socket, _) = connect_async(downstream_url)
+            .await
+            .expect("downstream websocket client should connect");
+        gateway_server_socket
+            .send(TestWebSocketMessage::Close(Some(CloseFrame {
+                code: CloseCode::Library(4001),
+                reason: "service_restart".into(),
+            })))
+            .await
+            .expect("gateway should send service restart close");
+
+        let downstream_message = timeout(Duration::from_secs(5), downstream_socket.next())
+            .await
+            .expect("downstream client should receive a websocket close")
+            .expect("downstream websocket stream should produce close")
+            .expect("downstream websocket close should be valid");
+        let TestWebSocketMessage::Close(Some(close_frame)) = downstream_message else {
+            panic!("expected downstream service_restart close frame, got {downstream_message:?}");
+        };
+        assert_eq!(close_frame.code, CloseCode::Library(4001));
+        assert_eq!(close_frame.reason, "service_restart");
+
+        let tunnel_result = timeout(Duration::from_secs(5), tunnel_result_receiver)
+            .await
+            .expect("tunnel should finish after service restart close")
+            .expect("tunnel result sender should complete");
+        assert_eq!(
+            tunnel_result,
+            Ok(DirectGatewayWebSocketTunnelOutcome::GatewayServiceRestart)
+        );
+
+        downstream_server
+            .await
+            .expect("downstream websocket server task should join");
     }
 
     fn read_test_http_headers_from_stream(stream: &mut std::net::TcpStream) -> String {
