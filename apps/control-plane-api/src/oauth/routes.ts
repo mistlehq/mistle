@@ -1,5 +1,9 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { OAuthClientRegistrationKinds, OAuthGrantTypes } from "@mistle/db/control-plane";
+import {
+  OAuthClientRegistrationKinds,
+  OAuthGrantTypes,
+  type OAuthClientRegistrationKind,
+} from "@mistle/db/control-plane";
 import {
   BadRequestError,
   handleHttpError,
@@ -59,13 +63,19 @@ export function createOAuthRoutes(): AppRoutes<typeof OAUTH_ROUTE_BASE_PATH> {
         redirectUri: query.redirect_uri,
       });
       try {
-        requireAuthorizeResource({
+        const resource = resolveOAuthRequestResource({
           resource: query.resource,
+          clientRegistrationKind: client.registrationKind,
+          mcpResource: requireCanonicalMcpResourceUrl(ctx.get("config").mcp).toString(),
+        });
+        requireAuthorizeResource({
+          resource,
           clientId: client.clientId,
           registrationKind: client.registrationKind,
           controlPlaneResource: ctx.get("config").auth.baseUrl,
           mcpResource: requireCanonicalMcpResourceUrl(ctx.get("config").mcp).toString(),
         });
+        query.resource = resource;
       } catch (error) {
         return handleAuthorizeRedirectableOAuthError(ctx, {
           error,
@@ -166,9 +176,14 @@ export function createOAuthRoutes(): AppRoutes<typeof OAUTH_ROUTE_BASE_PATH> {
             : OAuthGrantTypes.REFRESH_TOKEN,
         ...(body.grant_type === "authorization_code" ? { redirectUri: body.redirect_uri } : {}),
       });
+      const resource = resolveOAuthRequestResource({
+        resource: body.resource,
+        clientRegistrationKind: client.registrationKind,
+        mcpResource: requireCanonicalMcpResourceUrl(ctx.get("config").mcp).toString(),
+      });
       if (client.clientId === MistleCliOAuthClient.clientId) {
         const resourceError = validateMistleCliResource({
-          resource: body.resource,
+          resource,
           expectedResource: ctx.get("config").auth.baseUrl,
         });
         if (resourceError !== null) {
@@ -178,12 +193,12 @@ export function createOAuthRoutes(): AppRoutes<typeof OAUTH_ROUTE_BASE_PATH> {
 
       const result =
         body.grant_type === "authorization_code"
-          ? await exchangeAuthorizationCodeToken({ db, body, oauthClientId: client.id })
+          ? await exchangeAuthorizationCodeToken({ db, body, oauthClientId: client.id, resource })
           : await refreshOAuthTokenPair({
               db,
               oauthClientId: client.id,
               refreshToken: body.refresh_token,
-              resource: body.resource,
+              resource,
             });
 
       return ctx.json(
@@ -323,6 +338,7 @@ async function exchangeAuthorizationCodeToken(input: {
   db: AppContextBindings["Variables"]["db"];
   body: Extract<z.output<typeof OAuthTokenRequestSchema>, { grant_type: "authorization_code" }>;
   oauthClientId: string;
+  resource: string;
 }) {
   return await exchangeMistleCliAuthorizationCode({
     db: input.db,
@@ -331,7 +347,7 @@ async function exchangeAuthorizationCodeToken(input: {
     redirectUri: input.body.redirect_uri,
     code: input.body.code,
     codeVerifier: input.body.code_verifier,
-    resource: input.body.resource,
+    resource: input.resource,
   });
 }
 
@@ -344,6 +360,24 @@ function validateMistleCliResource(input: {
   }
 
   return null;
+}
+
+function resolveOAuthRequestResource(input: {
+  resource: string | undefined;
+  clientRegistrationKind: OAuthClientRegistrationKind;
+  mcpResource: string;
+}): string {
+  if (input.resource !== undefined) {
+    return input.resource;
+  }
+
+  // Compatibility for MCP clients that support DCR but still omit RFC 8707 resource.
+  // The inferred value remains the configured MCP resource and is persisted into the grant.
+  if (input.clientRegistrationKind === OAuthClientRegistrationKinds.DYNAMIC) {
+    return input.mcpResource;
+  }
+
+  throw new BadRequestError(OAuthErrorCodes.INVALID_REQUEST, "OAuth resource is required.");
 }
 
 function requireAuthorizeResource(input: {

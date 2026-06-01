@@ -528,6 +528,95 @@ describe.concurrent("OAuth MCP consent", () => {
     expect(tokenBody.refresh_token).toMatch(/^mstl_ort_[A-Za-z0-9_-]+$/u);
   });
 
+  it("defaults omitted dynamic-client OAuth resources to the configured MCP resource", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: `integration-oauth-mcp-default-resource-${randomUUID()}@example.com`,
+    });
+    const client = await registerMcpClient(env);
+    const codeVerifier = "default-resource-verifier-default-resource-verifier";
+    const authorizeResponse = await env.controlPlaneApi.http.fetch(
+      buildAuthorizePath({
+        clientId: client.clientId,
+        redirectUri: client.redirectUri,
+        state: "default-resource-state",
+        scope: "sandboxProfile:read",
+        codeChallenge: pkceChallenge(codeVerifier),
+      }),
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+        redirect: "manual",
+      },
+    );
+    expect(authorizeResponse.status).toBe(302);
+    const consentRequestId =
+      new URL(requireHeader(authorizeResponse, "location")).pathname.split("/").at(-1) ?? "";
+
+    const detailsResponse = await env.controlPlaneApi.http.fetch(
+      `/oauth/consent/${consentRequestId}`,
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+    expect(detailsResponse.status).toBe(200);
+    const detailsBody = await detailsResponse.json();
+    expect(detailsBody).toMatchObject({
+      resource: `${env.controlPlaneApi.hostBaseUrl}/mcp`,
+    });
+
+    const approveResponse = await env.controlPlaneApi.http.fetch(
+      `/oauth/consent/${consentRequestId}/approve`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          scopes: ["sandboxProfile:read"],
+        }),
+      },
+    );
+    expect(approveResponse.status).toBe(200);
+    const redirectUri = readRedirectUri(await approveResponse.json());
+    const code = new URL(redirectUri).searchParams.get("code");
+    if (code === null) {
+      throw new Error("Expected OAuth callback code.");
+    }
+
+    const tokenResponse = await env.controlPlaneApi.http.fetch("/oauth/token", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: client.clientId,
+        redirect_uri: client.redirectUri,
+        code,
+        code_verifier: codeVerifier,
+      }),
+    });
+    expect(tokenResponse.status).toBe(200);
+    const tokenBody = OAuthTokenResponseSchema.parse(await tokenResponse.json());
+
+    const result = await callMcpTool({
+      env,
+      token: tokenBody.access_token,
+      name: "profile_list",
+      arguments: {
+        limit: 10,
+      },
+    });
+
+    expect(result.isError).toBeUndefined();
+  });
+
   it("rejects OAuth bearer tokens issued for non-MCP resources on the MCP endpoint", async ({
     env,
   }) => {
@@ -794,7 +883,7 @@ async function registerMcpClient(
 function buildAuthorizePath(input: {
   clientId: string;
   redirectUri: string;
-  resource: string;
+  resource?: string;
   state: string;
   scope: string;
   codeChallenge: string;
@@ -803,12 +892,14 @@ function buildAuthorizePath(input: {
     response_type: "code",
     client_id: input.clientId,
     redirect_uri: input.redirectUri,
-    resource: input.resource,
     state: input.state,
     code_challenge: input.codeChallenge,
     code_challenge_method: "S256",
     scope: input.scope,
   });
+  if (input.resource !== undefined) {
+    params.set("resource", input.resource);
+  }
   return `/oauth/authorize?${params.toString()}`;
 }
 

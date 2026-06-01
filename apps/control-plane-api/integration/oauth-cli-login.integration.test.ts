@@ -649,6 +649,69 @@ describe("OAuth CLI login integration", () => {
     });
   });
 
+  it("rejects CLI OAuth requests without an explicit resource", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: `integration-oauth-cli-login-missing-resource-${randomUUID()}@example.com`,
+    });
+    const redirectUri = "http://127.0.0.1:61749/callback";
+    const codeVerifier = "missing-resource-verifier-missing-resource-verifier";
+
+    const authorizeResponse = await env.controlPlaneApi.http.fetch(
+      buildAuthorizePath({
+        redirectUri,
+        state: "missing-resource-state",
+        codeChallenge: pkceChallenge(codeVerifier),
+      }),
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+        redirect: "manual",
+      },
+    );
+    expect(authorizeResponse.status).toBe(400);
+    expect(await authorizeResponse.json()).toStrictEqual({
+      error: "invalid_request",
+      error_description: "OAuth resource is required.",
+    });
+
+    const tokenResponse = await env.controlPlaneApi.http.fetch("/oauth/token", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: "mistle-cli",
+        redirect_uri: redirectUri,
+        code: "unused-code",
+        code_verifier: codeVerifier,
+      }),
+    });
+    expect(tokenResponse.status).toBe(400);
+    expect(await tokenResponse.json()).toStrictEqual({
+      error: "invalid_request",
+      error_description: "OAuth resource is required.",
+    });
+
+    const refreshResponse = await env.controlPlaneApi.http.fetch("/oauth/token", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: "mistle-cli",
+        refresh_token: "unused-refresh-token",
+      }),
+    });
+    expect(refreshResponse.status).toBe(400);
+    expect(await refreshResponse.json()).toStrictEqual({
+      error: "invalid_request",
+      error_description: "OAuth resource is required.",
+    });
+  });
+
   it("rejects legacy grants without a stored OAuth resource", async ({ env }) => {
     const tokenBody = await authorizeAndExchangeCliToken({
       codeVerifier: "legacy-resource-verifier-legacy-resource-verifier",
@@ -889,20 +952,23 @@ describe("OAuth CLI login integration", () => {
 });
 
 function buildAuthorizePath(input: {
-  resource: string;
+  resource?: string;
   redirectUri: string;
   state: string;
   codeChallenge: string;
 }): string {
-  return `/oauth/authorize?${new URLSearchParams({
+  const params = new URLSearchParams({
     response_type: "code",
     client_id: "mistle-cli",
     redirect_uri: input.redirectUri,
-    resource: input.resource,
     state: input.state,
     code_challenge: input.codeChallenge,
     code_challenge_method: "S256",
-  }).toString()}`;
+  });
+  if (input.resource !== undefined) {
+    params.set("resource", input.resource);
+  }
+  return `/oauth/authorize?${params.toString()}`;
 }
 
 function pkceChallenge(codeVerifier: string): string {
