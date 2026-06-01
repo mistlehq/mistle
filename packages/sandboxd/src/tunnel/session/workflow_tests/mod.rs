@@ -45,6 +45,7 @@ use tokio::time::timeout;
 use tungstenite::{
     Error as WebSocketError, Message, WebSocket, accept, accept_hdr,
     handshake::server::{Request, Response},
+    protocol::{CloseFrame, frame::coding::CloseCode},
 };
 
 use crate::keepalive::KeepaliveManager;

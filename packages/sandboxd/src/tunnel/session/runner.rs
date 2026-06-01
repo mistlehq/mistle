@@ -4,18 +4,20 @@ use std::collections::{BTreeMap, VecDeque};
 use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 use futures_util::FutureExt;
 use serde_json::Value;
 use tokio::sync::mpsc;
+use tokio::time::timeout;
 
 use crate::supervision::SupervisedComponent;
 use crate::tunnel::session::TunnelSessionError;
 use crate::tunnel::session::bootstrap::{
-    TunnelWebSocket, build_tunnel_exchange_http_client, connect_bootstrap_websocket,
-    reconnect_bootstrap_tunnel, resolve_bootstrap_tunnel_url, resolve_tunnel_exchange_url,
-    send_telemetry_frames, spawn_bootstrap_socket_task, spawn_tunnel_wake_thread,
-    write_tunnel_close, write_tunnel_text,
+    TunnelWebSocket, TunnelWriterMessage, build_tunnel_exchange_http_client,
+    connect_bootstrap_websocket, reconnect_bootstrap_tunnel, resolve_bootstrap_tunnel_url,
+    resolve_tunnel_exchange_url, send_telemetry_frames, spawn_bootstrap_socket_task,
+    spawn_tunnel_wake_thread, write_tunnel_close, write_tunnel_text,
 };
 use crate::tunnel::session::egress::fail_pending_egress_token_requests;
 use crate::tunnel::session::exec::cancel_pending_exec_open;
@@ -30,10 +32,12 @@ use crate::tunnel::session::router::{handle_tunnel_session_event, handle_tunnel_
 use crate::tunnel::session::signing::fail_pending_signing_requests;
 use crate::tunnel::session::state::{
     ConnectedTunnelSessionLoopItem, ConnectedTunnelSessionOutcome, ConnectedTunnelSessionResult,
-    TunnelSessionControlFlow, TunnelSessionLoopContext, TunnelSessionMutableState,
-    TunnelSessionRequest, TunnelSessionRuntime,
+    TunnelSessionControlFlow, TunnelSessionEvent, TunnelSessionLoopContext,
+    TunnelSessionMutableState, TunnelSessionRequest, TunnelSessionRuntime,
 };
 use crate::tunnel::telemetry::TelemetryRelay;
+
+const BOOTSTRAP_CLOSE_CLASSIFICATION_TIMEOUT: Duration = Duration::from_millis(50);
 
 pub(in crate::tunnel::session) async fn run_tunnel_supervisor(
     runtime: TunnelSessionRuntime,
@@ -560,6 +564,22 @@ async fn run_connected_tunnel_session(
                     &tunnel_writer_sender,
                 );
             }
+            Ok(TunnelSessionControlFlow::ShutdownRequested) => {
+                fail_pending_signing_requests(
+                    &mut session_state,
+                    "bootstrap tunnel session shut down before a signing result arrived",
+                );
+                fail_pending_egress_token_requests(
+                    &mut session_state,
+                    "bootstrap tunnel session shut down before an egress token arrived",
+                );
+                mark_tunnel_disconnected(runtime);
+                let _ = write_tunnel_close(&tunnel_writer_sender);
+                return ConnectedTunnelSessionResult {
+                    outcome: ConnectedTunnelSessionOutcome::ShutdownRequested,
+                    startup_completed,
+                };
+            }
             Ok(TunnelSessionControlFlow::RestartRequired) => {
                 fail_pending_signing_requests(
                     &mut session_state,
@@ -576,6 +596,51 @@ async fn run_connected_tunnel_session(
                 };
             }
             Err(error) => {
+                if tunnel_writer_is_closed_error(&error) {
+                    let close_control_flow = wait_for_bootstrap_close_classification(
+                        &mut event_receiver,
+                        &tunnel_writer_sender,
+                        &event_sender,
+                        &loop_context,
+                        &mut session_state,
+                    )
+                    .await
+                    .unwrap_or(TunnelSessionControlFlow::ShutdownRequested);
+                    match close_control_flow {
+                        TunnelSessionControlFlow::Continue
+                        | TunnelSessionControlFlow::ShutdownRequested => {
+                            fail_pending_signing_requests(
+                                &mut session_state,
+                                "bootstrap tunnel session shut down before a signing result arrived",
+                            );
+                            fail_pending_egress_token_requests(
+                                &mut session_state,
+                                "bootstrap tunnel session shut down before an egress token arrived",
+                            );
+                            mark_tunnel_disconnected(runtime);
+                            let _ = write_tunnel_close(&tunnel_writer_sender);
+                            return ConnectedTunnelSessionResult {
+                                outcome: ConnectedTunnelSessionOutcome::ShutdownRequested,
+                                startup_completed,
+                            };
+                        }
+                        TunnelSessionControlFlow::RestartRequired => {
+                            fail_pending_signing_requests(
+                                &mut session_state,
+                                "bootstrap tunnel session restarted before a signing result arrived",
+                            );
+                            fail_pending_egress_token_requests(
+                                &mut session_state,
+                                "bootstrap tunnel session restarted before an egress token arrived",
+                            );
+                            mark_tunnel_disconnected(runtime);
+                            return ConnectedTunnelSessionResult {
+                                outcome: ConnectedTunnelSessionOutcome::RestartRequired,
+                                startup_completed,
+                            };
+                        }
+                    }
+                }
                 let error_text = error.to_string();
                 update_tunnel_supervision_details(
                     loop_context.supervisor_handle,
@@ -633,4 +698,43 @@ async fn run_connected_tunnel_session(
         outcome: ConnectedTunnelSessionOutcome::RestartRequired,
         startup_completed,
     }
+}
+
+fn tunnel_writer_is_closed_error(error: &TunnelSessionError) -> bool {
+    match error {
+        TunnelSessionError::WriteTunnelText(message)
+        | TunnelSessionError::WriteTunnelBinary(message) => {
+            message == "bootstrap tunnel writer is closed"
+        }
+        _ => false,
+    }
+}
+
+async fn wait_for_bootstrap_close_classification(
+    event_receiver: &mut mpsc::UnboundedReceiver<TunnelSessionEvent>,
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    event_sender: &mpsc::UnboundedSender<TunnelSessionEvent>,
+    loop_context: &TunnelSessionLoopContext<'_>,
+    session_state: &mut TunnelSessionMutableState,
+) -> Option<TunnelSessionControlFlow> {
+    timeout(BOOTSTRAP_CLOSE_CLASSIFICATION_TIMEOUT, async {
+        loop {
+            let event = event_receiver.recv().await?;
+            if !matches!(event, TunnelSessionEvent::BootstrapClosed { .. }) {
+                continue;
+            }
+            return handle_tunnel_session_event(
+                event,
+                tunnel_writer_sender,
+                event_sender,
+                loop_context,
+                session_state,
+            )
+            .await
+            .ok();
+        }
+    })
+    .await
+    .ok()
+    .flatten()
 }

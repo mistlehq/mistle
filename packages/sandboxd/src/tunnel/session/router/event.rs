@@ -14,10 +14,14 @@ pub(in crate::tunnel::session) async fn handle_tunnel_session_event(
     session_state: &mut TunnelSessionMutableState,
 ) -> Result<TunnelSessionControlFlow, TunnelSessionError> {
     match event {
-        TunnelSessionEvent::BootstrapClosed { reason } => {
+        TunnelSessionEvent::BootstrapClosed {
+            is_gateway_service_restart,
+            reason,
+        } => {
             let reason_text = reason.unwrap_or_else(|| "bootstrap tunnel closed".to_string());
             warn!(
                 event = "bootstrap_tunnel.router_observed_closed",
+                is_gateway_service_restart,
                 reason = %reason_text,
                 pending_agent_open_count = session_state.pending_agent_opens.len(),
                 active_agent_stream_count = session_state.agent_streams.len(),
@@ -57,7 +61,11 @@ pub(in crate::tunnel::session) async fn handle_tunnel_session_event(
                 "bootstrap_connection",
                 &[],
             );
-            Ok(TunnelSessionControlFlow::RestartRequired)
+            if is_gateway_service_restart {
+                Ok(TunnelSessionControlFlow::RestartRequired)
+            } else {
+                Ok(TunnelSessionControlFlow::ShutdownRequested)
+            }
         }
         TunnelSessionEvent::Wake => {
             if let Err(error) = poll_process_streams(

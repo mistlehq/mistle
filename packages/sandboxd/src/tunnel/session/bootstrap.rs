@@ -46,6 +46,9 @@ pub(super) type TunnelWebSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 pub(super) type TunnelExchangeHttpClient = Client<HttpsConnector<HttpConnector>, Empty<Bytes>>;
 type TunnelExchangeHttpClientResult = Result<TunnelExchangeHttpClient, TunnelSessionError>;
 
+const GATEWAY_SERVICE_RESTART_CLOSE_CODE: &str = "4001";
+const GATEWAY_SERVICE_RESTART_CLOSE_REASON: &str = "service_restart";
+
 struct TunnelExchangeSuccess {
     bootstrap_token: String,
     tunnel_exchange_token: String,
@@ -541,6 +544,10 @@ pub(super) fn spawn_bootstrap_socket_task(
                         Some(Ok(Message::Close(frame))) => {
                             let close_code = frame.as_ref().map(|frame| frame.code.to_string());
                             let close_reason = frame.as_ref().map(|frame| frame.reason.to_string());
+                            let is_gateway_service_restart = is_gateway_service_restart_close_frame(
+                                close_code.as_deref(),
+                                close_reason.as_deref(),
+                            );
                             info!(
                                 event = "bootstrap_tunnel.reader_closed",
                                 close_source = "reader",
@@ -549,7 +556,10 @@ pub(super) fn spawn_bootstrap_socket_task(
                                 close_reason = field::display(close_reason.as_deref().unwrap_or("")),
                             );
                             let reason = bootstrap_close_frame_disconnect_reason(close_code, close_reason);
-                            let _ = event_sender.send(TunnelSessionEvent::BootstrapClosed { reason });
+                            let _ = event_sender.send(TunnelSessionEvent::BootstrapClosed {
+                                is_gateway_service_restart,
+                                reason,
+                            });
                             writer_task.abort();
                             return Ok(());
                         }
@@ -560,6 +570,7 @@ pub(super) fn spawn_bootstrap_socket_task(
                                 close_kind = "connection_closed",
                             );
                             let _ = event_sender.send(TunnelSessionEvent::BootstrapClosed {
+                                is_gateway_service_restart: false,
                                 reason: Some("bootstrap websocket reported connection closed".to_string()),
                             });
                             writer_task.abort();
@@ -572,6 +583,7 @@ pub(super) fn spawn_bootstrap_socket_task(
                                 close_kind = "stream_ended",
                             );
                             let _ = event_sender.send(TunnelSessionEvent::BootstrapClosed {
+                                is_gateway_service_restart: false,
                                 reason: Some("bootstrap websocket stream ended".to_string()),
                             });
                             writer_task.abort();
@@ -610,6 +622,7 @@ pub(super) fn spawn_bootstrap_socket_task(
                                 error = %error,
                             );
                             let _ = event_sender.send(TunnelSessionEvent::BootstrapClosed {
+                                is_gateway_service_restart: false,
                                 reason: Some(error.to_string()),
                             });
                             writer_task.abort();
@@ -626,9 +639,21 @@ fn bootstrap_close_frame_disconnect_reason(
     close_code: Option<String>,
     close_reason: Option<String>,
 ) -> Option<String> {
+    if is_gateway_service_restart_close_frame(close_code.as_deref(), close_reason.as_deref()) {
+        return Some(GATEWAY_SERVICE_RESTART_CLOSE_REASON.to_string());
+    }
+
     close_reason
         .filter(|reason| !reason.is_empty())
         .or_else(|| close_code.map(|code| format!("bootstrap tunnel close frame code {code}")))
+}
+
+fn is_gateway_service_restart_close_frame(
+    close_code: Option<&str>,
+    close_reason: Option<&str>,
+) -> bool {
+    close_code == Some(GATEWAY_SERVICE_RESTART_CLOSE_CODE)
+        && close_reason == Some(GATEWAY_SERVICE_RESTART_CLOSE_REASON)
 }
 
 async fn run_bootstrap_writer<W>(
@@ -646,7 +671,10 @@ where
             close_source = "writer",
             reason = field::display(reason.as_deref().unwrap_or("")),
         );
-        let _ = event_sender.send(TunnelSessionEvent::BootstrapClosed { reason });
+        let _ = event_sender.send(TunnelSessionEvent::BootstrapClosed {
+            is_gateway_service_restart: false,
+            reason,
+        });
     };
     let mut pending_outbound = VecDeque::new();
 
@@ -971,8 +999,10 @@ mod tests {
         TransparentProxyBypass, TransparentProxyBypassKind, TransparentProxyConfiguration,
     };
     use crate::tunnel::session::bootstrap::{
-        bootstrap_close_frame_disconnect_reason, prioritize_ipv4_socket_addresses,
-        resolve_tunnel_exchange_url, startup_transparent_passthrough_socket_mark,
+        GATEWAY_SERVICE_RESTART_CLOSE_CODE, GATEWAY_SERVICE_RESTART_CLOSE_REASON,
+        bootstrap_close_frame_disconnect_reason, is_gateway_service_restart_close_frame,
+        prioritize_ipv4_socket_addresses, resolve_tunnel_exchange_url,
+        startup_transparent_passthrough_socket_mark,
     };
 
     #[test]
@@ -1038,6 +1068,24 @@ mod tests {
                 Some("provider timeout".to_string()),
             ),
             Some("provider timeout".to_string())
+        );
+    }
+
+    #[test]
+    fn bootstrap_close_frame_disconnect_reason_preserves_gateway_service_restart_reason() {
+        assert!(
+            is_gateway_service_restart_close_frame(
+                Some(GATEWAY_SERVICE_RESTART_CLOSE_CODE),
+                Some(GATEWAY_SERVICE_RESTART_CLOSE_REASON),
+            ),
+            "gateway service restart close code and reason should be classified explicitly"
+        );
+        assert_eq!(
+            bootstrap_close_frame_disconnect_reason(
+                Some(GATEWAY_SERVICE_RESTART_CLOSE_CODE.to_string()),
+                Some(GATEWAY_SERVICE_RESTART_CLOSE_REASON.to_string()),
+            ),
+            Some(GATEWAY_SERVICE_RESTART_CLOSE_REASON.to_string())
         );
     }
 

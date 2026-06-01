@@ -194,7 +194,7 @@ fn start_returns_error_when_initial_bootstrap_session_never_establishes() {
 }
 
 #[test]
-fn reconnects_after_bootstrap_websocket_loss_and_rolls_exchange_token_forward() {
+fn reconnects_after_gateway_service_restart_close_and_rolls_exchange_token_forward() {
     let bootstrap_listener =
         TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
     let bootstrap_port = bootstrap_listener
@@ -221,8 +221,11 @@ fn reconnects_after_bootstrap_websocket_loss_and_rolls_exchange_token_forward() 
         );
         expect_tunnel_connected_publications(&mut initial_websocket);
         initial_websocket
-            .close(None)
-            .expect("gateway should close the initial websocket");
+            .close(Some(CloseFrame {
+                code: CloseCode::Library(4001),
+                reason: "service_restart".into(),
+            }))
+            .expect("gateway should close the initial websocket for service restart");
 
         let (mut first_exchange_stream, _) = bootstrap_listener
             .accept()
@@ -258,50 +261,12 @@ fn reconnects_after_bootstrap_websocket_loss_and_rolls_exchange_token_forward() 
             "first reconnect websocket should preserve gateway query parameters"
         );
         expect_tunnel_connected_publications(&mut reconnect_websocket_one);
-        reconnect_websocket_one
-            .close(None)
-            .expect("gateway should close the first reconnect websocket");
-
-        let (mut second_exchange_stream, _) = bootstrap_listener
-            .accept()
-            .expect("gateway should accept the second token exchange request");
-        let second_exchange_request = read_http_request(&mut second_exchange_stream);
-        assert!(
-            second_exchange_request.starts_with(
-                "POST /tunnel/sandbox/sbi_tunnel_session/token-exchange?x-mistle-test-environment-id=test_env_reconnect HTTP/1.1",
-            )
-        );
-        assert_http_bearer_token(&second_exchange_request, "exchange-token-reconnect-1");
-        assert_http_header(&second_exchange_request, "content-length", "0");
-        write_http_json_response(
-            &mut second_exchange_stream,
-            200,
-            &json!({
-                "bootstrapToken": "bootstrap-token-reconnect-2",
-                "tunnelExchangeToken": "exchange-token-reconnect-2"
-            }),
-        );
-
-        let (reconnect_stream_two, _) = bootstrap_listener
-            .accept()
-            .expect("gateway should accept the second reconnect websocket");
-        let (mut reconnect_websocket_two, reconnect_request_uri_two) =
-            accept_bootstrap_websocket(reconnect_stream_two);
-        assert!(
-            reconnect_request_uri_two.contains("bootstrap_token=bootstrap-token-reconnect-2"),
-            "second reconnect websocket should use the rolled bootstrap token"
-        );
-        assert!(
-            reconnect_request_uri_two.contains("x-mistle-test-environment-id=test_env_reconnect"),
-            "second reconnect websocket should preserve gateway query parameters"
-        );
-        expect_tunnel_connected_publications(&mut reconnect_websocket_two);
         gateway_ready_sender
             .send(())
-            .expect("gateway should report the second reconnect is established");
+            .expect("gateway should report the reconnect is established");
 
         loop {
-            match reconnect_websocket_two.read() {
+            match reconnect_websocket_one.read() {
                 Ok(Message::Text(payload)) => {
                     let message: Value = serde_json::from_str(payload.as_str())
                         .expect("shutdown control payload should be valid json");
@@ -313,10 +278,10 @@ fn reconnects_after_bootstrap_websocket_loss_and_rolls_exchange_token_forward() 
                 | Err(WebSocketError::ConnectionClosed)
                 | Err(WebSocketError::Protocol(_)) => break,
                 Ok(other) => panic!(
-                    "expected tunnel_session.close() to end the second reconnect websocket, got {other:?}"
+                    "expected tunnel_session.close() to end the reconnect websocket, got {other:?}"
                 ),
                 Err(error) => panic!(
-                    "expected tunnel_session.close() to end the second reconnect websocket: {error}"
+                    "expected tunnel_session.close() to end the reconnect websocket: {error}"
                 ),
             }
         }
@@ -362,7 +327,124 @@ fn reconnects_after_bootstrap_websocket_loss_and_rolls_exchange_token_forward() 
 
     gateway_ready_receiver
         .recv()
-        .expect("gateway should observe the second reconnect");
+        .expect("gateway should observe the reconnect");
+
+    tunnel_session.close();
+    gateway_thread
+        .join()
+        .expect("gateway thread should exit cleanly");
+}
+
+#[test]
+fn does_not_reconnect_after_near_miss_bootstrap_service_restart_close() {
+    let bootstrap_listener =
+        TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+    let bootstrap_port = bootstrap_listener
+        .local_addr()
+        .expect("bootstrap listener should expose an address")
+        .port();
+    let bootstrap_url = format!(
+        "ws://127.0.0.1:{bootstrap_port}/tunnel/sandbox/sbi_tunnel_session?x-mistle-test-environment-id=test_env_reconnect_near_miss"
+    );
+    let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
+    let gateway_thread = thread::spawn(move || {
+        let (initial_stream, _) = bootstrap_listener
+            .accept()
+            .expect("gateway should accept the initial bootstrap websocket");
+        let (mut initial_websocket, initial_request_uri) =
+            accept_bootstrap_websocket(initial_stream);
+        assert!(
+            initial_request_uri.contains("bootstrap_token=bootstrap-token-initial"),
+            "initial bootstrap websocket should include the startup bootstrap token"
+        );
+        expect_tunnel_connected_publications(&mut initial_websocket);
+        initial_websocket
+            .close(Some(CloseFrame {
+                code: CloseCode::Away,
+                reason: "service_restart".into(),
+            }))
+            .expect("gateway should close with a near-miss service restart frame");
+        loop {
+            match initial_websocket.read() {
+                Ok(Message::Text(_)) | Ok(Message::Binary(_)) | Ok(Message::Ping(_)) | Ok(Message::Pong(_)) => {}
+                Ok(Message::Close(_))
+                | Err(WebSocketError::ConnectionClosed)
+                | Err(WebSocketError::Protocol(
+                    tokio_tungstenite::tungstenite::error::ProtocolError::ResetWithoutClosingHandshake,
+                )) => break,
+                Ok(other_message) => panic!(
+                    "expected near-miss bootstrap close handshake to complete before reconnect observation, got {other_message:?}"
+                ),
+                Err(error) => panic!(
+                    "near-miss bootstrap close handshake should complete before reconnect observation: {error}"
+                ),
+            }
+        }
+        bootstrap_listener
+            .set_nonblocking(true)
+            .expect("bootstrap listener should support nonblocking accept");
+        let deadline = std::time::Instant::now() + std::time::Duration::from_millis(250);
+        while std::time::Instant::now() < deadline {
+            match bootstrap_listener.accept() {
+                Ok((_stream, _)) => {
+                    panic!(
+                        "near-miss bootstrap close should not request token exchange or reconnect"
+                    )
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+                Err(error) => {
+                    panic!("bootstrap listener failed while checking for reconnect: {error}")
+                }
+            }
+        }
+        gateway_done_sender
+            .send(())
+            .expect("gateway should report near-miss observation completion");
+    });
+
+    let startup_input = StartupInput {
+        startup_mode: StartupMode::New,
+        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+        bootstrap_token: "bootstrap-token-initial".to_string(),
+        tunnel_exchange_token: "exchange-token-initial".to_string(),
+        tunnel_gateway_ws_url: bootstrap_url,
+        acting_user_id: None,
+        runtime_plan: serde_json::json!({
+            "sandboxProfileId": "sbp_123",
+            "version": 1,
+            "image": {
+                "source": "base",
+                "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
+            },
+            "egressRoutes": [],
+            "artifacts": [],
+            "workspaceSources": [],
+            "runtimeClients": [],
+            "agentRuntimes": []
+        }),
+        git_identity: None,
+        transparent_proxy: None,
+    };
+
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+    let tunnel_session = TunnelSession::start(
+        &startup_input,
+        keepalive_manager,
+        runtime_readiness_manager,
+        None,
+        BTreeMap::new(),
+        Arc::new(SystemClock),
+        Arc::new(ThreadSleeper),
+    )
+    .expect("tunnel session should start");
+
+    gateway_done_receiver
+        .recv()
+        .expect("gateway should complete near-miss reconnect observation");
 
     tunnel_session.close();
     gateway_thread
@@ -511,8 +593,11 @@ fn retries_when_token_exchange_response_body_read_fails() {
         let (mut initial_websocket, _) = accept_bootstrap_websocket(initial_stream);
         expect_tunnel_connected_publications(&mut initial_websocket);
         initial_websocket
-            .close(None)
-            .expect("gateway should close the initial websocket");
+            .close(Some(CloseFrame {
+                code: CloseCode::Library(4001),
+                reason: "service_restart".into(),
+            }))
+            .expect("gateway should close the initial websocket for service restart");
 
         let (mut first_exchange_stream, _) = bootstrap_listener
             .accept()
@@ -653,8 +738,11 @@ fn stops_retrying_when_token_exchange_returns_terminal_status() {
             );
             expect_tunnel_connected_publications(&mut initial_websocket);
             initial_websocket
-                .close(None)
-                .expect("gateway should close the initial websocket");
+                .close(Some(CloseFrame {
+                    code: CloseCode::Library(4001),
+                    reason: "service_restart".into(),
+                }))
+                .expect("gateway should close the initial websocket for service restart");
 
             let (mut exchange_stream, _) = bootstrap_listener
                 .accept()

@@ -796,6 +796,7 @@ async fn bootstrap_disconnect_terminates_active_port_access_tcp_streams() {
 
     let control_flow = handle_tunnel_session_event(
         TunnelSessionEvent::BootstrapClosed {
+            is_gateway_service_restart: true,
             reason: Some("test bootstrap disconnect".to_string()),
         },
         &tunnel_writer_sender,
@@ -821,6 +822,41 @@ async fn bootstrap_disconnect_terminates_active_port_access_tcp_streams() {
         PortAccessTcpCommand::Terminate => {}
         command => panic!("unexpected tcp command: {command:?}"),
     }
+}
+
+#[tokio::test]
+async fn ordinary_bootstrap_disconnect_requests_shutdown_without_reconnect() {
+    let (tunnel_writer_sender, _tunnel_writer_receiver) = tokio::sync::mpsc::unbounded_channel();
+    let (event_sender, _event_receiver) = tokio::sync::mpsc::unbounded_channel();
+    let clock = SystemClock;
+    let mut session_state = empty_tunnel_session_state();
+    let supervisor_handle = test_tunnel_supervisor_handle("sbi_test", Arc::new(SystemClock));
+    let context = TunnelSessionLoopContext {
+        attachment_root: std::path::Path::new("/tmp"),
+        cgroup_root: std::path::Path::new("/tmp"),
+        sandbox_instance_id: "sbi_test",
+        gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
+        clock: &clock,
+        supervisor_handle: &supervisor_handle,
+    };
+
+    let control_flow = handle_tunnel_session_event(
+        TunnelSessionEvent::BootstrapClosed {
+            is_gateway_service_restart: false,
+            reason: Some("provider timeout".to_string()),
+        },
+        &tunnel_writer_sender,
+        &event_sender,
+        &context,
+        &mut session_state,
+    )
+    .await
+    .expect("ordinary bootstrap disconnect should be handled");
+
+    assert!(matches!(
+        control_flow,
+        TunnelSessionControlFlow::ShutdownRequested
+    ));
 }
 
 #[tokio::test]

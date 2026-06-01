@@ -31,6 +31,7 @@ use crate::tunnel::telemetry::TelemetryRelay;
 pub(in crate::tunnel::session) enum TunnelSessionControlFlow {
     Continue,
     RestartRequired,
+    ShutdownRequested,
 }
 
 pub(in crate::tunnel::session) enum ConnectedTunnelSessionOutcome {
@@ -51,6 +52,7 @@ pub(in crate::tunnel::session) enum ConnectedTunnelSessionLoopItem {
 pub(in crate::tunnel::session) enum TunnelSessionEvent {
     BootstrapMessage(Message),
     BootstrapClosed {
+        is_gateway_service_restart: bool,
         reason: Option<String>,
     },
     AgentDialed {
