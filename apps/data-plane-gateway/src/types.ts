@@ -82,6 +82,7 @@ export type DataPlaneGatewayRuntime = {
     portsTargetAuthorizeService: PortsTargetAuthorizeService;
   };
   request: (path: string, init?: RequestInit) => Promise<Response>;
+  startDrain: () => void;
   start: () => Promise<void>;
   stop: () => Promise<void>;
 };

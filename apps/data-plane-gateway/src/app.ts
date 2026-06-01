@@ -1,14 +1,35 @@
 import { Hono } from "hono";
 
+import type { GatewayLifecycle } from "./runtime/gateway-lifecycle.js";
 import { createAppResources, setAppResources, stopAppResources } from "./runtime/resources.js";
 import type { AppContextBindings, DataPlaneGatewayApp, DataPlaneGatewayConfig } from "./types.js";
 
-export function createApp(config: DataPlaneGatewayConfig): DataPlaneGatewayApp {
+export function createApp(
+  config: DataPlaneGatewayConfig,
+  lifecycle: GatewayLifecycle,
+): DataPlaneGatewayApp {
   const app = new Hono<AppContextBindings>();
   const resources = createAppResources(config);
 
   app.get("/__healthz", (c) => {
     return c.json({ ok: true });
+  });
+
+  app.get("/__readyz", (c) => {
+    const state = lifecycle.getState();
+    if (state.status === "serving") {
+      return c.json({ ok: true, status: state.status });
+    }
+
+    return c.json(
+      {
+        ok: false,
+        status: state.status,
+        reason: state.reason,
+        startedAtMs: state.startedAtMs,
+      },
+      503,
+    );
   });
 
   app.use("*", async (ctx, next) => {

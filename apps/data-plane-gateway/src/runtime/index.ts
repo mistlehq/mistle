@@ -88,11 +88,13 @@ import type {
   StartedServer,
 } from "../types.js";
 import { AsyncTaskTracker, type AsyncTaskDrainResult } from "./async-task-tracker.js";
+import { GatewayLifecycle } from "./gateway-lifecycle.js";
 export {
   GatewayWebSocketCloseCodes,
   GatewayWebSocketCloseReasons,
   type GatewayWebSocketCloseReason,
 } from "./gateway-websocket-close.js";
+import { GatewayWebSocketCloseReasons } from "./gateway-websocket-close.js";
 
 const DefaultMaxActiveBindingsPerSandbox = 32;
 const ShutdownTunnelTaskDrainTimeoutMs = 5_000;
@@ -286,7 +288,8 @@ function createGatewayRelayRuntimeResources(input: {
 export function createDataPlaneGatewayRuntime(
   config: DataPlaneGatewayRuntimeConfig,
 ): DataPlaneGatewayRuntime {
-  const app = createApp(config.app);
+  const lifecycle = new GatewayLifecycle(systemClock);
+  const app = createApp(config.app, lifecycle);
   const nodeWebSocket = createNodeWebSocket({ app });
   const nodeId = typeid("dpg").toString();
   const sandboxTunnelTaskTracker = new AsyncTaskTracker();
@@ -731,6 +734,11 @@ export function createDataPlaneGatewayRuntime(
       portsTargetAuthorizeService,
     },
     request: async (path, init) => app.request(path, init),
+    startDrain: () => {
+      lifecycle.startDrain({
+        reason: GatewayWebSocketCloseReasons.SERVICE_RESTART,
+      });
+    },
     start: async () => {
       if (stopped) {
         throw new Error("Data plane gateway runtime is already stopped.");
@@ -763,6 +771,9 @@ export function createDataPlaneGatewayRuntime(
         return;
       }
 
+      lifecycle.startDrain({
+        reason: GatewayWebSocketCloseReasons.SERVICE_RESTART,
+      });
       stopPromise = stopRuntimeResources();
       await stopPromise;
     },

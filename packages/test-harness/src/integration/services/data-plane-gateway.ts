@@ -151,6 +151,7 @@ function start(input: {
           internalBaseUrl: endpoint.hostBaseUrl,
         },
       },
+      startDrain: runtime.startDrain,
       stop: async () => {
         await runtime.stop();
         await telemetry?.shutdown();

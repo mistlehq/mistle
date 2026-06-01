@@ -445,6 +445,12 @@ function syncHandleRuntime(handle: TestServiceHandle, service: TestService): voi
   } else {
     handle.containerId = service.containerId;
   }
+
+  if (service.startDrain === undefined) {
+    delete handle.startDrain;
+  } else {
+    handle.startDrain = service.startDrain;
+  }
 }
 
 async function startServices(input: {

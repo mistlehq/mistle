@@ -88,6 +88,7 @@ export type TestService = TestServiceRuntime & {
   id: string;
   mode: TestServiceLaunchMode;
   isPooled?: true;
+  startDrain?: () => void;
   stop: () => Promise<void>;
 };
 
