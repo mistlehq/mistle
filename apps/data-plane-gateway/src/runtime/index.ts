@@ -88,6 +88,11 @@ import type {
   StartedServer,
 } from "../types.js";
 import { AsyncTaskTracker, type AsyncTaskDrainResult } from "./async-task-tracker.js";
+export {
+  GatewayWebSocketCloseCodes,
+  GatewayWebSocketCloseReasons,
+  type GatewayWebSocketCloseReason,
+} from "./gateway-websocket-close.js";
 
 const DefaultMaxActiveBindingsPerSandbox = 32;
 const ShutdownTunnelTaskDrainTimeoutMs = 5_000;
