@@ -485,6 +485,7 @@ export function createDataPlaneGatewayRuntime(
     hostConfig: {
       baseDomain: config.app.sandbox.publish.baseDomain,
     },
+    lifecycle,
     portAccessTransportService,
     portsTargetAuthorizeService,
     sessionConfig: {
@@ -592,6 +593,7 @@ export function createDataPlaneGatewayRuntime(
     sandboxTunnelTaskTracker,
     allowRemoteOwnerConnections: config.app.gatewayRelay.backend === "nats",
     clock: systemClock,
+    lifecycle,
     scheduler: systemScheduler,
   });
   registerSandboxTunnelTokenExchangeRoute({
@@ -610,11 +612,13 @@ export function createDataPlaneGatewayRuntime(
   registerDirectEgressRoutes({
     app,
     directEgressProxyService,
+    lifecycle,
     trustedUpstreamCaCertificates: config.app.__dangerouslyTrustDirectEgressTlsCaCertificates,
     upgradeWebSocket: nodeWebSocket.upgradeWebSocket,
   });
   registerPtyTransportRoutes({
     app,
+    lifecycle,
     ptyTransportService,
     ...(config.app.__dangerouslyEnableTestIsolation === undefined
       ? {}
@@ -634,6 +638,7 @@ export function createDataPlaneGatewayRuntime(
     hostConfig: {
       baseDomain: config.app.sandbox.publish.baseDomain,
     },
+    lifecycle,
     portAccessTransportService,
     sessionConfig: {
       cookieSigningSecret: config.app.sandbox.publish.session.cookieSigningSecret,

@@ -9,6 +9,8 @@ import {
 } from "@mistle/port-access-auth";
 import type { Clock } from "@mistle/time";
 
+import { createGatewayDrainingAdmissionResponse } from "../runtime/gateway-drain-admission.js";
+import type { GatewayLifecycle } from "../runtime/gateway-lifecycle.js";
 import { BootstrapTunnelNotConnectedError } from "../tunnel/bootstrap-tunnel-not-connected-error.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import {
@@ -177,6 +179,7 @@ export function registerPortAccessRoutes(input: {
   app: DataPlaneGatewayApp;
   bootstrapTokenConfig: PortAccessBootstrapTokenConfig;
   hostConfig: PortAccessHostConfig;
+  lifecycle: GatewayLifecycle;
   portAccessTransportService: PortAccessTransportService;
   sessionConfig: PortAccessSessionConfig;
   portsTargetAuthorizeService: PortsTargetAuthorizeService;
@@ -217,6 +220,20 @@ export function registerPortAccessRoutes(input: {
     const requestHost = ctx.req.header("host");
     if (requestHost === undefined) {
       return next();
+    }
+    if (
+      isPortAccessHost({
+        hostConfig: input.hostConfig,
+        requestHost,
+      })
+    ) {
+      const drainRejection = createGatewayDrainingAdmissionResponse({
+        lifecycle: input.lifecycle,
+        responseKind: "text",
+      });
+      if (drainRejection !== undefined) {
+        return drainRejection;
+      }
     }
 
     const resolvedRequest = await resolvePortAccessRequest({
@@ -302,6 +319,30 @@ export function registerPortAccessRoutes(input: {
       throw error;
     }
   });
+}
+
+export function isPortAccessHost(input: {
+  hostConfig: PortAccessHostConfig;
+  requestHost: string;
+}): boolean {
+  try {
+    parsePortAccessHost({
+      config: input.hostConfig,
+      host: input.requestHost,
+    });
+  } catch (error) {
+    if (error instanceof PortAccessHostError) {
+      if (error.code === PortAccessHostErrorCode.BASE_DOMAIN_REQUIRED) {
+        throw error;
+      }
+
+      return false;
+    }
+
+    throw error;
+  }
+
+  return true;
 }
 
 export async function resolvePortAccessRequest(input: {

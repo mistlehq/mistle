@@ -3,6 +3,8 @@ import type { WSContext } from "hono/ws";
 import WebSocket from "ws";
 
 import { logger } from "../logger.js";
+import { createGatewayDrainingAdmissionResponse } from "../runtime/gateway-drain-admission.js";
+import type { GatewayLifecycle } from "../runtime/gateway-lifecycle.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import {
   PtyTransportError,
@@ -13,6 +15,7 @@ import {
 
 type RegisterPtyTransportRoutesInput = {
   app: DataPlaneGatewayApp;
+  lifecycle: GatewayLifecycle;
   ptyTransportService: PtyTransportService;
   testEnvironmentIdQueryParam?: string;
   upgradeWebSocket: NodeWebSocket["upgradeWebSocket"];
@@ -26,6 +29,13 @@ export function registerPtyTransportRoutes(input: RegisterPtyTransportRoutesInpu
   input.app.get(PtyTransportWebSocketRoutePath, async (ctx) => {
     if (ctx.req.header("upgrade")?.toLowerCase() !== "websocket") {
       return ctx.text("PTY transport endpoint requires websocket upgrade.", 400);
+    }
+    const drainRejection = createGatewayDrainingAdmissionResponse({
+      lifecycle: input.lifecycle,
+      responseKind: "text",
+    });
+    if (drainRejection !== undefined) {
+      return drainRejection;
     }
 
     try {

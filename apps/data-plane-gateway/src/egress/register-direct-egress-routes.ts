@@ -2,6 +2,8 @@ import type { NodeWebSocket } from "@hono/node-ws";
 import type { WSContext, WSMessageReceive } from "hono/ws";
 import WebSocket, { type RawData } from "ws";
 
+import { createGatewayDrainingAdmissionResponse } from "../runtime/gateway-drain-admission.js";
+import type { GatewayLifecycle } from "../runtime/gateway-lifecycle.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import {
   DirectEgressHttpRoutePath,
@@ -22,6 +24,7 @@ import {
 type RegisterDirectEgressRoutesInput = {
   app: DataPlaneGatewayApp;
   directEgressProxyService: DirectEgressProxyService;
+  lifecycle: GatewayLifecycle;
   trustedUpstreamCaCertificates: readonly string[] | undefined;
   upgradeWebSocket: NodeWebSocket["upgradeWebSocket"];
 };
@@ -33,6 +36,14 @@ const WebSocketCloseCodes = {
 
 export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInput): void {
   input.app.all(DirectEgressHttpRoutePath, async (ctx) => {
+    const drainRejection = createGatewayDrainingAdmissionResponse({
+      lifecycle: input.lifecycle,
+      responseKind: "json",
+    });
+    if (drainRejection !== undefined) {
+      return drainRejection;
+    }
+
     const target = new URL(ctx.req.url).searchParams.get("target");
     let admission: DirectEgressAdmission | undefined;
     try {
@@ -76,6 +87,13 @@ export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInpu
     async (ctx, next) => {
       if (ctx.req.header("upgrade")?.toLowerCase() !== "websocket") {
         return ctx.text("Direct websocket egress endpoint requires websocket upgrade.", 400);
+      }
+      const drainRejection = createGatewayDrainingAdmissionResponse({
+        lifecycle: input.lifecycle,
+        responseKind: "text",
+      });
+      if (drainRejection !== undefined) {
+        return drainRejection;
       }
       const target = new URL(ctx.req.url).searchParams.get("target");
       let admission: DirectEgressAdmission | undefined;

@@ -8,6 +8,11 @@ import type {
 } from "@mistle/port-access-auth";
 import type { Clock } from "@mistle/time";
 
+import {
+  GatewayDrainingRejectionCode,
+  GatewayDrainingRejectionMessage,
+} from "../runtime/gateway-drain-admission.js";
+import type { GatewayLifecycle } from "../runtime/gateway-lifecycle.js";
 import { BootstrapTunnelNotConnectedError } from "../tunnel/bootstrap-tunnel-not-connected-error.js";
 import {
   PortAccessSessionCookieName,
@@ -22,7 +27,11 @@ import {
   PortAccessTransportStreamError,
 } from "./port-access-transport.js";
 import type { PortsTargetAuthorizeService } from "./ports-target-authorize-service.js";
-import { readCookieValue, resolvePortAccessRequest } from "./register-port-access-routes.js";
+import {
+  isPortAccessHost,
+  readCookieValue,
+  resolvePortAccessRequest,
+} from "./register-port-access-routes.js";
 
 export const PortAccessBootstrapPath = "/_mistle/access/bootstrap";
 
@@ -30,6 +39,7 @@ type PortAccessNodeEntrypointInput = {
   bootstrapTokenConfig: PortAccessBootstrapTokenConfig;
   clock: Clock;
   hostConfig: PortAccessHostConfig;
+  lifecycle: GatewayLifecycle;
   portAccessTransportService: PortAccessTransportService;
   portsTargetAuthorizeService: PortsTargetAuthorizeService;
   sessionConfig: PortAccessSessionConfig;
@@ -435,7 +445,7 @@ function writePlainResponse(input: {
 }
 
 function writeRawSocketResponse(input: { body: string; socket: Duplex; status: number }): void {
-  const reason = input.status === 401 ? "Unauthorized" : "Bad Gateway";
+  const reason = toHttpStatusReason(input.status);
   const bodyBytes = Buffer.from(input.body, "utf8");
   input.socket.write(
     [
@@ -448,6 +458,39 @@ function writeRawSocketResponse(input: { body: string; socket: Duplex; status: n
     ].join("\r\n"),
   );
   input.socket.end(bodyBytes);
+}
+
+function toHttpStatusReason(status: number): string {
+  if (status === 401) {
+    return "Unauthorized";
+  }
+  if (status === 503) {
+    return "Service Unavailable";
+  }
+
+  return "Bad Gateway";
+}
+
+function gatewayDrainingText(): string {
+  return `${GatewayDrainingRejectionCode}: ${GatewayDrainingRejectionMessage}`;
+}
+
+function isNodePortAccessHost(input: {
+  hostConfig: PortAccessHostConfig;
+  request: IncomingMessage;
+}): boolean {
+  const requestHost = getSingleHeaderValue({
+    headers: input.request.headers,
+    name: "host",
+  });
+  if (requestHost === undefined) {
+    return false;
+  }
+
+  return isPortAccessHost({
+    hostConfig: input.hostConfig,
+    requestHost,
+  });
 }
 
 function isClientVisiblePortAccessFailure(error: unknown): boolean {
@@ -573,6 +616,20 @@ export function createPortAccessNodeEntrypoint(
       if (requestUrl.pathname === PortAccessBootstrapPath) {
         return false;
       }
+      if (
+        isNodePortAccessHost({
+          hostConfig: input.hostConfig,
+          request,
+        }) &&
+        !input.lifecycle.isServing()
+      ) {
+        writePlainResponse({
+          body: gatewayDrainingText(),
+          response,
+          status: 503,
+        });
+        return true;
+      }
 
       const resolvedRequest = await resolveNodePortAccessRequest({
         clock: input.clock,
@@ -628,6 +685,21 @@ export function createPortAccessNodeEntrypoint(
       return true;
     },
     handleUpgrade: async (request, socket, head) => {
+      if (
+        isNodePortAccessHost({
+          hostConfig: input.hostConfig,
+          request,
+        }) &&
+        !input.lifecycle.isServing()
+      ) {
+        writeRawSocketResponse({
+          body: gatewayDrainingText(),
+          socket,
+          status: 503,
+        });
+        return true;
+      }
+
       const resolvedRequest = await resolveNodePortAccessRequest({
         clock: input.clock,
         hostConfig: input.hostConfig,

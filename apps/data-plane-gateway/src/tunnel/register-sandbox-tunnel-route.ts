@@ -17,6 +17,8 @@ import type { SandboxPresenceStore } from "../runtime-state/sandbox-presence-sto
 import type { SandboxRuntimeAttachmentStore } from "../runtime-state/sandbox-runtime-attachment-store.js";
 import type { SandboxRuntimeReadinessStore } from "../runtime-state/sandbox-runtime-readiness-store.js";
 import type { AsyncTaskTracker } from "../runtime/async-task-tracker.js";
+import { createGatewayDrainingAdmissionResponse } from "../runtime/gateway-drain-admission.js";
+import type { GatewayLifecycle } from "../runtime/gateway-lifecycle.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import { SandboxTunnelWebSocketAdmission } from "./admission/sandbox-tunnel-websocket-admission.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
@@ -70,6 +72,7 @@ type RegisterSandboxTunnelRouteInput = {
   sandboxTunnelTaskTracker: AsyncTaskTracker;
   allowRemoteOwnerConnections: boolean;
   clock: Clock;
+  lifecycle: GatewayLifecycle;
   scheduler: Scheduler;
 };
 
@@ -132,6 +135,13 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
     async (ctx, next) => {
       if (ctx.req.header("upgrade")?.toLowerCase() !== "websocket") {
         return ctx.json({ error: "Sandbox tunnel endpoint requires websocket upgrade." }, 400);
+      }
+      const drainRejection = createGatewayDrainingAdmissionResponse({
+        lifecycle: input.lifecycle,
+        responseKind: "json",
+      });
+      if (drainRejection !== undefined) {
+        return drainRejection;
       }
       const requestedInstanceId = ctx.req.param("instanceId").trim();
       if (requestedInstanceId.length === 0) {
