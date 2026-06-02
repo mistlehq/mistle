@@ -9,6 +9,7 @@ import {
 } from "@mistle/db/data-plane";
 import { isSandboxResourceNotFoundError } from "@mistle/sandbox";
 import { and, eq, sql } from "drizzle-orm";
+import { z } from "zod";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import {
@@ -52,6 +53,30 @@ const StartupStatuses = new Set<SandboxInstanceStatus>([
   SandboxInstanceStatuses.INITIALIZING,
 ]);
 
+const LockedSandboxInstanceRowSchema = z
+  .object({
+    status: z.enum([
+      SandboxInstanceStatuses.PENDING,
+      SandboxInstanceStatuses.STARTING,
+      SandboxInstanceStatuses.STARTED,
+      SandboxInstanceStatuses.INITIALIZING,
+      SandboxInstanceStatuses.RUNNING,
+      SandboxInstanceStatuses.DEGRADED,
+      SandboxInstanceStatuses.RECONNECTING,
+      SandboxInstanceStatuses.STOPPING,
+      SandboxInstanceStatuses.STOPPED,
+      SandboxInstanceStatuses.FAILED,
+    ]),
+    provider_sandbox_id: z.string().min(1).nullable(),
+  })
+  .strict();
+
+export function shouldTransitionDeletedProviderCleanupToStopped(
+  status: SandboxInstanceStatus,
+): boolean {
+  return StartupStatuses.has(status);
+}
+
 async function resolveDeleteSandboxInstanceState(input: {
   db: DataPlaneDatabase;
   sandboxInstanceId: string;
@@ -89,14 +114,14 @@ async function markDeletedSandboxProviderComputeDestroyed(ctx: {
   return ctx.db.transaction(async (tx) => {
     const { sandboxInstances } = ctx.tables;
     const lockedRows = await tx.execute(
-      sql<{ status: SandboxInstanceStatus; provider_sandbox_id: string | null }>`
+      sql`
         select status, provider_sandbox_id
         from ${sandboxInstances}
         where id = ${ctx.sandboxInstanceId}
         for update
       `,
     );
-    const lockedRow = lockedRows.rows[0];
+    const lockedRow = LockedSandboxInstanceRowSchema.optional().parse(lockedRows.rows[0]);
 
     if (lockedRow === undefined) {
       throw new Error(`Sandbox instance '${ctx.sandboxInstanceId}' was not found.`);
@@ -125,9 +150,20 @@ async function markDeletedSandboxProviderComputeDestroyed(ctx: {
           ),
         );
     } else {
+      const shouldTransitionToStopped = shouldTransitionDeletedProviderCleanupToStopped(
+        lockedRow.status,
+      );
+
       await tx
         .update(sandboxInstances)
         .set({
+          ...(shouldTransitionToStopped
+            ? {
+                status: SandboxInstanceStatuses.STOPPED,
+                stoppedAt: sql`now()`,
+                stopReason: SandboxStopReasons.USER,
+              }
+            : {}),
           providerSandboxId: null,
           updatedAt: sql`now()`,
         })
