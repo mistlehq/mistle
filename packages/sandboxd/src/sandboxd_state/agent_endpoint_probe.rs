@@ -325,7 +325,7 @@ fn check_pi_proxy_connectivity(proxy_url: &str) -> Result<(), String> {
             .into(),
         ))
         .map_err(|error| format!("failed to send Pi proxy health request: {error}"))?;
-    let response = read_json_text_message(&mut socket)?;
+    let response = read_json_rpc_response_with_id(&mut socket, "sandboxd-pi-health")?;
     if response.get("error").is_some() {
         return Err(format!(
             "Pi proxy health returned an error response: {response}"
@@ -373,6 +373,22 @@ fn read_json_text_message(
         other => Err(format!(
             "websocket probe expected text response, received {other:?}"
         )),
+    }
+}
+
+fn read_json_rpc_response_with_id(
+    socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    expected_id: &str,
+) -> Result<Value, String> {
+    loop {
+        let response = read_json_text_message(socket)?;
+        if response
+            .get("id")
+            .and_then(Value::as_str)
+            .is_some_and(|id| id == expected_id)
+        {
+            return Ok(response);
+        }
     }
 }
 
@@ -548,6 +564,45 @@ mod tests {
 
         check_pi_proxy_connectivity(&server.url)
             .expect("Pi proxy connectivity probe should accept getState result");
+
+        server.join();
+    }
+
+    #[test]
+    fn pi_proxy_connectivity_probe_ignores_notifications_before_get_state_response() {
+        let server = SingleConnectionWebSocketServer::start(|socket| {
+            let _ = socket.read().expect("Pi probe request should be readable");
+            socket
+                .send(Message::Text(
+                    serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "method": "pi/event",
+                        "params": {
+                            "type": "message",
+                            "message": "queued event"
+                        }
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("Pi event notification should be writable");
+            socket
+                .send(Message::Text(
+                    serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": "sandboxd-pi-health",
+                        "result": {
+                            "sessionFile": "/tmp/session.json"
+                        }
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("Pi probe response should be writable");
+        });
+
+        check_pi_proxy_connectivity(&server.url)
+            .expect("Pi proxy connectivity probe should ignore notifications before response");
 
         server.join();
     }
