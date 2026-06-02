@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use serde::Serialize;
+use yaml_rust2::{Yaml, YamlLoader};
 
 const SKILL_FILE_NAME: &str = "SKILL.md";
 
@@ -47,16 +48,16 @@ pub enum SkillsDiscoverError {
     },
     MissingFrontmatter(PathBuf),
     UnterminatedFrontmatter(PathBuf),
-    InvalidFrontmatterLine {
+    InvalidFrontmatterYaml {
         path: PathBuf,
-        line_number: usize,
-        line: String,
+        error: yaml_rust2::ScanError,
     },
-    DuplicateFrontmatterField {
-        path: PathBuf,
-        field: String,
-    },
+    FrontmatterNotMapping(PathBuf),
     MissingFrontmatterField {
+        path: PathBuf,
+        field: &'static str,
+    },
+    InvalidFrontmatterFieldType {
         path: PathBuf,
         field: &'static str,
     },
@@ -107,31 +108,32 @@ impl fmt::Display for SkillsDiscoverError {
                     path.display()
                 )
             }
-            Self::InvalidFrontmatterLine {
-                path,
-                line_number,
-                line,
-            } => {
+            Self::InvalidFrontmatterYaml { path, error } => {
                 write!(
                     f,
-                    "skill file {} has invalid frontmatter line {}: {}",
-                    path.display(),
-                    line_number,
-                    line
+                    "skill file {} has invalid YAML frontmatter: {error}",
+                    path.display()
                 )
             }
-            Self::DuplicateFrontmatterField { path, field } => {
+            Self::FrontmatterNotMapping(path) => {
                 write!(
                     f,
-                    "skill file {} repeats frontmatter field '{}'",
-                    path.display(),
-                    field
+                    "skill file {} must use a YAML mapping for frontmatter",
+                    path.display()
                 )
             }
             Self::MissingFrontmatterField { path, field } => {
                 write!(
                     f,
                     "skill file {} is missing required frontmatter field '{}'",
+                    path.display(),
+                    field
+                )
+            }
+            Self::InvalidFrontmatterFieldType { path, field } => {
+                write!(
+                    f,
+                    "skill file {} frontmatter field '{}' must be a string",
                     path.display(),
                     field
                 )
@@ -303,12 +305,9 @@ fn read_skill_file(
     })
 }
 
-fn parse_frontmatter(
-    skill_file_path: &Path,
-    content: &str,
-) -> Result<BTreeMap<String, String>, SkillsDiscoverError> {
-    let mut lines = content.lines().enumerate();
-    let Some((_, first_line)) = lines.next() else {
+fn parse_frontmatter(skill_file_path: &Path, content: &str) -> Result<Yaml, SkillsDiscoverError> {
+    let mut lines = content.lines();
+    let Some(first_line) = lines.next() else {
         return Err(SkillsDiscoverError::MissingFrontmatter(
             skill_file_path.to_path_buf(),
         ));
@@ -319,40 +318,30 @@ fn parse_frontmatter(
         ));
     }
 
-    let mut fields = BTreeMap::new();
-    for (line_index, raw_line) in lines {
+    let mut frontmatter = String::new();
+    for raw_line in lines {
         let line = raw_line.trim_end_matches('\r');
         if line == "---" {
-            return Ok(fields);
+            let documents = YamlLoader::load_from_str(&frontmatter).map_err(|error| {
+                SkillsDiscoverError::InvalidFrontmatterYaml {
+                    path: skill_file_path.to_path_buf(),
+                    error,
+                }
+            })?;
+            let Some(document) = documents.into_iter().next() else {
+                return Err(SkillsDiscoverError::FrontmatterNotMapping(
+                    skill_file_path.to_path_buf(),
+                ));
+            };
+            if matches!(document, Yaml::Hash(_)) {
+                return Ok(document);
+            }
+            return Err(SkillsDiscoverError::FrontmatterNotMapping(
+                skill_file_path.to_path_buf(),
+            ));
         }
-        if line.trim().is_empty() || line.trim_start().starts_with('#') {
-            continue;
-        }
-
-        let Some((raw_key, raw_value)) = line.split_once(':') else {
-            return Err(SkillsDiscoverError::InvalidFrontmatterLine {
-                path: skill_file_path.to_path_buf(),
-                line_number: line_index + 1,
-                line: line.to_string(),
-            });
-        };
-        let key = raw_key.trim();
-        if key.is_empty() || key.contains(char::is_whitespace) {
-            return Err(SkillsDiscoverError::InvalidFrontmatterLine {
-                path: skill_file_path.to_path_buf(),
-                line_number: line_index + 1,
-                line: line.to_string(),
-            });
-        }
-        if fields.contains_key(key) {
-            return Err(SkillsDiscoverError::DuplicateFrontmatterField {
-                path: skill_file_path.to_path_buf(),
-                field: key.to_string(),
-            });
-        }
-
-        let value = parse_frontmatter_scalar(skill_file_path, line_index + 1, raw_value.trim())?;
-        fields.insert(key.to_string(), value);
+        frontmatter.push_str(line);
+        frontmatter.push('\n');
     }
 
     Err(SkillsDiscoverError::UnterminatedFrontmatter(
@@ -360,92 +349,29 @@ fn parse_frontmatter(
     ))
 }
 
-fn parse_frontmatter_scalar(
-    skill_file_path: &Path,
-    line_number: usize,
-    value: &str,
-) -> Result<String, SkillsDiscoverError> {
-    if value.is_empty() {
-        return Err(SkillsDiscoverError::InvalidFrontmatterLine {
-            path: skill_file_path.to_path_buf(),
-            line_number,
-            line: String::new(),
-        });
-    }
-
-    if value.starts_with('"') || value.starts_with('\'') {
-        let Some(quote) = value.chars().next() else {
-            return Err(SkillsDiscoverError::InvalidFrontmatterLine {
-                path: skill_file_path.to_path_buf(),
-                line_number,
-                line: value.to_string(),
-            });
-        };
-        if !value.ends_with(quote) || value.len() < 2 {
-            return Err(SkillsDiscoverError::InvalidFrontmatterLine {
-                path: skill_file_path.to_path_buf(),
-                line_number,
-                line: value.to_string(),
-            });
-        }
-        let inner = &value[1..value.len() - 1];
-        if quote == '\'' {
-            return Ok(inner.replace("''", "'").trim().to_string());
-        }
-        return parse_double_quoted_scalar(skill_file_path, line_number, inner);
-    }
-
-    Ok(value.trim().to_string())
-}
-
-fn parse_double_quoted_scalar(
-    skill_file_path: &Path,
-    line_number: usize,
-    value: &str,
-) -> Result<String, SkillsDiscoverError> {
-    let mut output = String::new();
-    let mut chars = value.chars();
-    while let Some(character) = chars.next() {
-        if character != '\\' {
-            output.push(character);
-            continue;
-        }
-        let Some(escaped) = chars.next() else {
-            return Err(SkillsDiscoverError::InvalidFrontmatterLine {
-                path: skill_file_path.to_path_buf(),
-                line_number,
-                line: value.to_string(),
-            });
-        };
-        match escaped {
-            '\\' => output.push('\\'),
-            '"' => output.push('"'),
-            'n' => output.push('\n'),
-            't' => output.push('\t'),
-            _ => {
-                return Err(SkillsDiscoverError::InvalidFrontmatterLine {
-                    path: skill_file_path.to_path_buf(),
-                    line_number,
-                    line: value.to_string(),
-                });
-            }
-        }
-    }
-    Ok(output.trim().to_string())
-}
-
 fn read_required_frontmatter_field(
     skill_file_path: &Path,
-    frontmatter: &BTreeMap<String, String>,
+    frontmatter: &Yaml,
     field: &'static str,
 ) -> Result<String, SkillsDiscoverError> {
-    let value =
-        frontmatter
-            .get(field)
-            .ok_or_else(|| SkillsDiscoverError::MissingFrontmatterField {
-                path: skill_file_path.to_path_buf(),
-                field,
-            })?;
+    let Yaml::Hash(fields) = frontmatter else {
+        return Err(SkillsDiscoverError::FrontmatterNotMapping(
+            skill_file_path.to_path_buf(),
+        ));
+    };
+    let key = Yaml::String(field.to_string());
+    let value = fields
+        .get(&key)
+        .ok_or_else(|| SkillsDiscoverError::MissingFrontmatterField {
+            path: skill_file_path.to_path_buf(),
+            field,
+        })?;
+    let Yaml::String(value) = value else {
+        return Err(SkillsDiscoverError::InvalidFrontmatterFieldType {
+            path: skill_file_path.to_path_buf(),
+            field,
+        });
+    };
     let trimmed_value = value.trim();
     if trimmed_value.is_empty() {
         return Err(SkillsDiscoverError::MissingFrontmatterField {
@@ -490,7 +416,7 @@ fn path_to_repo_relative_string(path: &Path) -> Option<String> {
         components.push(value.to_str()?);
     }
     if components.is_empty() {
-        return None;
+        return Some(".".to_string());
     }
     Some(components.join("/"))
 }
@@ -636,7 +562,14 @@ Skill body.
             &repo_root,
             "nested/custom-skill",
             r#"---
-description: "Custom skill with a quoted description."
+description: |-
+  Custom skill with
+  a multiline description.
+metadata:
+  runtimes:
+    - codex
+  owner:
+    team: agents
 name: custom-skill
 ---
 "#,
@@ -652,7 +585,7 @@ name: custom-skill
             vec![
                 DiscoveredSkill {
                     name: "custom-skill".to_string(),
-                    description: "Custom skill with a quoted description.".to_string(),
+                    description: "Custom skill with\na multiline description.".to_string(),
                     relative_path: "nested/custom-skill".to_string(),
                 },
                 DiscoveredSkill {
@@ -663,6 +596,33 @@ name: custom-skill
             ]
         );
 
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
+    }
+
+    #[test]
+    fn discovers_root_skill_with_dot_relative_path() {
+        let repo_root = create_git_repo("skills_discover_root_skill");
+        write_skill(
+            &repo_root,
+            ".",
+            r#"---
+name: root-skill
+description: Skill defined at the repository root.
+---
+"#,
+        );
+        commit_all(&repo_root);
+
+        let output = discover_skills(&repo_root).expect("root skill should discover");
+
+        assert_eq!(
+            output.skills,
+            vec![DiscoveredSkill {
+                name: "root-skill".to_string(),
+                description: "Skill defined at the repository root.".to_string(),
+                relative_path: ".".to_string(),
+            }]
+        );
         fs::remove_dir_all(repo_root).expect("repo should be removable");
     }
 
@@ -762,6 +722,53 @@ description: Second.
     }
 
     #[test]
+    fn rejects_malformed_yaml_frontmatter() {
+        let repo_root = create_git_repo("skills_discover_malformed_yaml");
+        write_skill(
+            &repo_root,
+            ".agents/skills/malformed",
+            r#"---
+name: malformed
+description: [invalid
+---
+"#,
+        );
+        commit_all(&repo_root);
+
+        let error = discover_skills(&repo_root).expect_err("malformed yaml should fail");
+
+        assert!(matches!(
+            error,
+            SkillsDiscoverError::InvalidFrontmatterYaml { .. }
+        ));
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
+    }
+
+    #[test]
+    fn rejects_non_string_required_frontmatter_fields() {
+        let repo_root = create_git_repo("skills_discover_non_string_field");
+        write_skill(
+            &repo_root,
+            ".agents/skills/non-string",
+            r#"---
+name:
+  nested: value
+description: Invalid name type.
+---
+"#,
+        );
+        commit_all(&repo_root);
+
+        let error = discover_skills(&repo_root).expect_err("non-string required field should fail");
+
+        assert!(matches!(
+            error,
+            SkillsDiscoverError::InvalidFrontmatterFieldType { field: "name", .. }
+        ));
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
+    }
+
+    #[test]
     fn rejects_invalid_skill_names() {
         let repo_root = create_git_repo("skills_discover_invalid_name");
         write_skill(
@@ -826,6 +833,7 @@ description: Invalid name.
 
     fn run_git<const N: usize>(repo_root: &Path, args: [&str; N]) {
         let output = Command::new("git")
+            .args(["-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false"])
             .arg("-C")
             .arg(repo_root)
             .args(args)
@@ -840,6 +848,7 @@ description: Invalid name.
 
     fn git_stdout<const N: usize>(repo_root: &Path, args: [&str; N]) -> String {
         let output = Command::new("git")
+            .args(["-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false"])
             .arg("-C")
             .arg(repo_root)
             .args(args)
