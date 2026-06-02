@@ -15,6 +15,7 @@ use serde::Serialize;
 use yaml_rust2::{Yaml, YamlLoader};
 
 const SKILL_FILE_NAME: &str = "SKILL.md";
+const AGENT_SKILLS_TARGET_ROOT: &str = "/root/.agents/skills";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -29,6 +30,23 @@ pub struct DiscoveredSkill {
     pub name: String,
     pub description: String,
     pub relative_path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillsReconcileOutput {
+    pub runtime: String,
+    pub target_root: String,
+    pub skills: Vec<ReconciledSkill>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReconciledSkill {
+    pub name: String,
+    pub relative_path: String,
+    pub source_path: String,
+    pub target_path: String,
 }
 
 #[derive(Debug)]
@@ -183,6 +201,230 @@ impl fmt::Display for SkillsDiscoverError {
 
 impl std::error::Error for SkillsDiscoverError {}
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SkillsRuntime {
+    Codex,
+    OpenCode,
+    Pi,
+}
+
+impl SkillsRuntime {
+    fn parse(value: &str) -> Result<Self, SkillsReconcileError> {
+        match value {
+            "codex" => Ok(Self::Codex),
+            "opencode" => Ok(Self::OpenCode),
+            "pi" => Ok(Self::Pi),
+            _ => Err(SkillsReconcileError::UnknownRuntime(value.to_string())),
+        }
+    }
+
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Codex => "codex",
+            Self::OpenCode => "opencode",
+            Self::Pi => "pi",
+        }
+    }
+
+    fn default_target_root(&self) -> PathBuf {
+        PathBuf::from(AGENT_SKILLS_TARGET_ROOT)
+    }
+}
+
+#[derive(Debug)]
+pub enum SkillsReconcileError {
+    RepoRootCanonicalize {
+        path: PathBuf,
+        error: io::Error,
+    },
+    RepoRootNotDirectory(PathBuf),
+    GitPull {
+        repo_root: PathBuf,
+        error: String,
+    },
+    TargetRootCreate {
+        path: PathBuf,
+        error: io::Error,
+    },
+    TargetRootSymlink(PathBuf),
+    TargetRootRead {
+        path: PathBuf,
+        error: io::Error,
+    },
+    TargetEntryRemove {
+        path: PathBuf,
+        error: io::Error,
+    },
+    TargetSymlinkCreate {
+        source_path: PathBuf,
+        target_path: PathBuf,
+        error: io::Error,
+    },
+    SelectedSkillPathInvalid(String),
+    SelectedSkillPathOutsideRepo(String),
+    SelectedSkillPathCanonicalize {
+        relative_path: String,
+        path: PathBuf,
+        error: io::Error,
+    },
+    SelectedSkillNotDirectory {
+        relative_path: String,
+        path: PathBuf,
+    },
+    SelectedSkillMissingSkillFile {
+        relative_path: String,
+        path: PathBuf,
+    },
+    DuplicateSelectedSkillPath(String),
+    DuplicateSelectedSkillName {
+        name: String,
+        first_path: String,
+        second_path: String,
+    },
+    UnknownRuntime(String),
+    Discover(SkillsDiscoverError),
+    SerializeOutput(serde_json::Error),
+    WriteOutput(io::Error),
+}
+
+impl fmt::Display for SkillsReconcileError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RepoRootCanonicalize { path, error } => {
+                write!(f, "failed to resolve repo root {}: {error}", path.display())
+            }
+            Self::RepoRootNotDirectory(path) => {
+                write!(f, "repo root {} is not a directory", path.display())
+            }
+            Self::GitPull { repo_root, error } => {
+                write!(
+                    f,
+                    "failed to pull skills repo {} before reconciliation: {error}",
+                    repo_root.display()
+                )
+            }
+            Self::TargetRootCreate { path, error } => {
+                write!(
+                    f,
+                    "failed to create skills target root {}: {error}",
+                    path.display()
+                )
+            }
+            Self::TargetRootSymlink(path) => {
+                write!(
+                    f,
+                    "skills target root path {} must not contain symlinks",
+                    path.display()
+                )
+            }
+            Self::TargetRootRead { path, error } => {
+                write!(
+                    f,
+                    "failed to read skills target root {}: {error}",
+                    path.display()
+                )
+            }
+            Self::TargetEntryRemove { path, error } => {
+                write!(
+                    f,
+                    "failed to remove stale skills target entry {}: {error}",
+                    path.display()
+                )
+            }
+            Self::TargetSymlinkCreate {
+                source_path,
+                target_path,
+                error,
+            } => {
+                write!(
+                    f,
+                    "failed to symlink skill {} to {}: {error}",
+                    target_path.display(),
+                    source_path.display()
+                )
+            }
+            Self::SelectedSkillPathInvalid(relative_path) => {
+                write!(
+                    f,
+                    "selected skill path '{relative_path}' must be a repo-relative directory path"
+                )
+            }
+            Self::SelectedSkillPathOutsideRepo(relative_path) => {
+                write!(
+                    f,
+                    "selected skill path '{relative_path}' resolves outside the repo root"
+                )
+            }
+            Self::SelectedSkillPathCanonicalize {
+                relative_path,
+                path,
+                error,
+            } => {
+                write!(
+                    f,
+                    "failed to resolve selected skill path '{}' at {}: {error}",
+                    relative_path,
+                    path.display()
+                )
+            }
+            Self::SelectedSkillNotDirectory {
+                relative_path,
+                path,
+            } => {
+                write!(
+                    f,
+                    "selected skill path '{}' at {} is not a directory",
+                    relative_path,
+                    path.display()
+                )
+            }
+            Self::SelectedSkillMissingSkillFile {
+                relative_path,
+                path,
+            } => {
+                write!(
+                    f,
+                    "selected skill path '{}' at {} is missing SKILL.md",
+                    relative_path,
+                    path.display()
+                )
+            }
+            Self::DuplicateSelectedSkillPath(relative_path) => {
+                write!(
+                    f,
+                    "selected skill path '{relative_path}' was provided more than once"
+                )
+            }
+            Self::DuplicateSelectedSkillName {
+                name,
+                first_path,
+                second_path,
+            } => {
+                write!(
+                    f,
+                    "selected skills '{}' and '{}' both declare skill name '{}'",
+                    first_path, second_path, name
+                )
+            }
+            Self::UnknownRuntime(runtime) => {
+                write!(
+                    f,
+                    "unknown skills runtime '{runtime}' (expected 'codex', 'opencode', or 'pi')"
+                )
+            }
+            Self::Discover(error) => write!(f, "{error}"),
+            Self::SerializeOutput(error) => {
+                write!(f, "failed to serialize skill reconcile output: {error}")
+            }
+            Self::WriteOutput(error) => {
+                write!(f, "failed to write skill reconcile output: {error}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for SkillsReconcileError {}
+
 pub fn discover_skills(repo_root: &Path) -> Result<SkillsDiscoverOutput, SkillsDiscoverError> {
     let repo_root =
         repo_root
@@ -230,6 +472,289 @@ pub fn run_skills_discover<W: io::Write>(
     let output = discover_skills(repo_root)?;
     serde_json::to_writer(&mut *stdout, &output).map_err(SkillsDiscoverError::SerializeOutput)?;
     writeln!(stdout).map_err(SkillsDiscoverError::WriteOutput)
+}
+
+pub fn reconcile_skills(
+    repo_root: &Path,
+    runtime: &SkillsRuntime,
+    selected_relative_paths: &[String],
+    target_root_override: Option<&Path>,
+) -> Result<SkillsReconcileOutput, SkillsReconcileError> {
+    let repo_root =
+        repo_root
+            .canonicalize()
+            .map_err(|error| SkillsReconcileError::RepoRootCanonicalize {
+                path: repo_root.to_path_buf(),
+                error,
+            })?;
+    if !repo_root.is_dir() {
+        return Err(SkillsReconcileError::RepoRootNotDirectory(repo_root));
+    }
+
+    let target_root = target_root_override
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| runtime.default_target_root());
+    pull_git_repo(&repo_root)?;
+    let selected_skills = read_selected_skills(&repo_root, selected_relative_paths)?;
+
+    prepare_target_root(&target_root)?;
+    prune_target_root(&target_root)?;
+
+    let mut reconciled_skills = Vec::new();
+    for selected_skill in selected_skills {
+        let target_path = target_root.join(&selected_skill.name);
+        create_skill_symlink(&selected_skill.source_path, &target_path)?;
+        reconciled_skills.push(ReconciledSkill {
+            name: selected_skill.name,
+            relative_path: selected_skill.relative_path,
+            source_path: selected_skill.source_path.display().to_string(),
+            target_path: target_path.display().to_string(),
+        });
+    }
+
+    Ok(SkillsReconcileOutput {
+        runtime: runtime.as_str().to_string(),
+        target_root: target_root.display().to_string(),
+        skills: reconciled_skills,
+    })
+}
+
+pub fn run_skills_reconcile<W: io::Write>(
+    repo_root: &Path,
+    runtime: &SkillsRuntime,
+    selected_relative_paths: &[String],
+    target_root_override: Option<&Path>,
+    stdout: &mut W,
+) -> Result<(), SkillsReconcileError> {
+    let output = reconcile_skills(
+        repo_root,
+        runtime,
+        selected_relative_paths,
+        target_root_override,
+    )?;
+    serde_json::to_writer(&mut *stdout, &output).map_err(SkillsReconcileError::SerializeOutput)?;
+    writeln!(stdout).map_err(SkillsReconcileError::WriteOutput)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SelectedSkill {
+    name: String,
+    relative_path: String,
+    source_path: PathBuf,
+}
+
+fn read_selected_skills(
+    repo_root: &Path,
+    selected_relative_paths: &[String],
+) -> Result<Vec<SelectedSkill>, SkillsReconcileError> {
+    let mut selected_skills = Vec::new();
+    let mut selected_paths = BTreeMap::new();
+    let mut names_to_paths = BTreeMap::new();
+    for selected_relative_path in selected_relative_paths {
+        let normalized_relative_path = normalize_selected_relative_path(selected_relative_path)?;
+        if selected_paths
+            .insert(normalized_relative_path.clone(), ())
+            .is_some()
+        {
+            return Err(SkillsReconcileError::DuplicateSelectedSkillPath(
+                normalized_relative_path,
+            ));
+        }
+
+        let source_path = repo_root.join(repo_relative_path_to_path(&normalized_relative_path));
+        let source_path = match source_path.canonicalize() {
+            Ok(source_path) => source_path,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            Err(error) => {
+                return Err(SkillsReconcileError::SelectedSkillPathCanonicalize {
+                    relative_path: normalized_relative_path.clone(),
+                    path: source_path,
+                    error,
+                });
+            }
+        };
+        if !source_path.starts_with(repo_root) {
+            return Err(SkillsReconcileError::SelectedSkillPathOutsideRepo(
+                normalized_relative_path.clone(),
+            ));
+        }
+        if !source_path.is_dir() {
+            return Err(SkillsReconcileError::SelectedSkillNotDirectory {
+                relative_path: normalized_relative_path,
+                path: source_path,
+            });
+        }
+
+        let skill_file_path = source_path.join(SKILL_FILE_NAME);
+        if !skill_file_path.is_file() {
+            return Err(SkillsReconcileError::SelectedSkillMissingSkillFile {
+                relative_path: normalized_relative_path,
+                path: source_path,
+            });
+        }
+        let skill =
+            read_skill_file(repo_root, &skill_file_path).map_err(SkillsReconcileError::Discover)?;
+        if let Some(first_path) =
+            names_to_paths.insert(skill.name.clone(), normalized_relative_path.clone())
+        {
+            return Err(SkillsReconcileError::DuplicateSelectedSkillName {
+                name: skill.name,
+                first_path,
+                second_path: normalized_relative_path,
+            });
+        }
+
+        selected_skills.push(SelectedSkill {
+            name: skill.name,
+            relative_path: skill.relative_path,
+            source_path,
+        });
+    }
+    selected_skills.sort_by(|left, right| left.name.cmp(&right.name));
+    Ok(selected_skills)
+}
+
+fn normalize_selected_relative_path(relative_path: &str) -> Result<String, SkillsReconcileError> {
+    if relative_path == "." {
+        return Ok(".".to_string());
+    }
+    if relative_path.trim().is_empty() {
+        return Err(SkillsReconcileError::SelectedSkillPathInvalid(
+            relative_path.to_string(),
+        ));
+    }
+
+    let path = Path::new(relative_path);
+    if path.is_absolute() {
+        return Err(SkillsReconcileError::SelectedSkillPathInvalid(
+            relative_path.to_string(),
+        ));
+    }
+
+    let mut components = Vec::new();
+    for component in path.components() {
+        let std::path::Component::Normal(value) = component else {
+            return Err(SkillsReconcileError::SelectedSkillPathInvalid(
+                relative_path.to_string(),
+            ));
+        };
+        let value = value.to_str().ok_or_else(|| {
+            SkillsReconcileError::SelectedSkillPathInvalid(relative_path.to_string())
+        })?;
+        components.push(value);
+    }
+    if components.is_empty() {
+        return Err(SkillsReconcileError::SelectedSkillPathInvalid(
+            relative_path.to_string(),
+        ));
+    }
+    Ok(components.join("/"))
+}
+
+fn repo_relative_path_to_path(relative_path: &str) -> PathBuf {
+    if relative_path == "." {
+        return PathBuf::new();
+    }
+    PathBuf::from(relative_path)
+}
+
+fn pull_git_repo(repo_root: &Path) -> Result<(), SkillsReconcileError> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(repo_root)
+        .arg("pull")
+        .arg("--ff-only")
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .output()
+        .map_err(|error| SkillsReconcileError::GitPull {
+            repo_root: repo_root.to_path_buf(),
+            error: error.to_string(),
+        })?;
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let details = if stderr.is_empty() { stdout } else { stderr };
+    Err(SkillsReconcileError::GitPull {
+        repo_root: repo_root.to_path_buf(),
+        error: details,
+    })
+}
+
+fn prepare_target_root(target_root: &Path) -> Result<(), SkillsReconcileError> {
+    reject_symlinked_existing_target_path(target_root)?;
+    fs::create_dir_all(target_root).map_err(|error| SkillsReconcileError::TargetRootCreate {
+        path: target_root.to_path_buf(),
+        error,
+    })?;
+    reject_symlinked_existing_target_path(target_root)
+}
+
+fn reject_symlinked_existing_target_path(target_root: &Path) -> Result<(), SkillsReconcileError> {
+    let mut current_path = PathBuf::new();
+    for component in target_root.components() {
+        current_path.push(component);
+        match fs::symlink_metadata(&current_path) {
+            Ok(metadata) => {
+                if metadata.file_type().is_symlink() {
+                    return Err(SkillsReconcileError::TargetRootSymlink(current_path));
+                }
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => {
+                return Err(SkillsReconcileError::TargetRootCreate {
+                    path: current_path,
+                    error,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn prune_target_root(target_root: &Path) -> Result<(), SkillsReconcileError> {
+    let entries =
+        fs::read_dir(target_root).map_err(|error| SkillsReconcileError::TargetRootRead {
+            path: target_root.to_path_buf(),
+            error,
+        })?;
+    for entry in entries {
+        let entry = entry.map_err(|error| SkillsReconcileError::TargetRootRead {
+            path: target_root.to_path_buf(),
+            error,
+        })?;
+        let path = entry.path();
+        let file_type =
+            entry
+                .file_type()
+                .map_err(|error| SkillsReconcileError::TargetRootRead {
+                    path: target_root.to_path_buf(),
+                    error,
+                })?;
+        let result = if file_type.is_dir() {
+            fs::remove_dir_all(&path)
+        } else {
+            fs::remove_file(&path)
+        };
+        result.map_err(|error| SkillsReconcileError::TargetEntryRemove { path, error })?;
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn create_skill_symlink(
+    source_path: &Path,
+    target_path: &Path,
+) -> Result<(), SkillsReconcileError> {
+    std::os::unix::fs::symlink(source_path, target_path).map_err(|error| {
+        SkillsReconcileError::TargetSymlinkCreate {
+            source_path: source_path.to_path_buf(),
+            target_path: target_path.to_path_buf(),
+            error,
+        }
+    })
 }
 
 fn collect_skill_files(
@@ -451,12 +976,33 @@ where
         SkillsCommand::Discover { repo_root } => {
             run_skills_discover(&repo_root, stdout).map_err(SkillsCommandError::Discover)
         }
+        SkillsCommand::Reconcile {
+            repo_root,
+            runtime,
+            selected_relative_paths,
+            target_root_override,
+        } => run_skills_reconcile(
+            &repo_root,
+            &runtime,
+            &selected_relative_paths,
+            target_root_override.as_deref(),
+            stdout,
+        )
+        .map_err(SkillsCommandError::Reconcile),
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SkillsCommand {
-    Discover { repo_root: PathBuf },
+    Discover {
+        repo_root: PathBuf,
+    },
+    Reconcile {
+        repo_root: PathBuf,
+        runtime: SkillsRuntime,
+        selected_relative_paths: Vec<String>,
+        target_root_override: Option<PathBuf>,
+    },
 }
 
 #[derive(Debug)]
@@ -464,8 +1010,12 @@ pub enum SkillsCommandError {
     MissingSubcommand,
     UnknownSubcommand(String),
     MissingRepo,
+    MissingRuntime,
+    MissingSkillValue,
+    MissingTargetRoot,
     UnexpectedArgument(String),
     Discover(SkillsDiscoverError),
+    Reconcile(SkillsReconcileError),
 }
 
 impl fmt::Display for SkillsCommandError {
@@ -474,20 +1024,30 @@ impl fmt::Display for SkillsCommandError {
             Self::MissingSubcommand => {
                 write!(
                     f,
-                    "sandboxd skills requires a subcommand (expected 'discover')"
+                    "sandboxd skills requires a subcommand (expected 'discover' or 'reconcile')"
                 )
             }
             Self::UnknownSubcommand(subcommand) => {
                 write!(
                     f,
-                    "unknown sandboxd skills subcommand '{subcommand}' (expected 'discover')"
+                    "unknown sandboxd skills subcommand '{subcommand}' (expected 'discover' or 'reconcile')"
                 )
             }
-            Self::MissingRepo => write!(f, "sandboxd skills discover requires --repo <path>"),
+            Self::MissingRepo => write!(f, "sandboxd skills requires --repo <path>"),
+            Self::MissingRuntime => write!(f, "sandboxd skills reconcile requires --runtime <id>"),
+            Self::MissingSkillValue => write!(
+                f,
+                "sandboxd skills reconcile --skill requires a relative path value"
+            ),
+            Self::MissingTargetRoot => write!(
+                f,
+                "sandboxd skills reconcile --target-root requires a path value"
+            ),
             Self::UnexpectedArgument(argument) => {
                 write!(f, "unexpected sandboxd skills argument: {argument}")
             }
             Self::Discover(error) => write!(f, "{error}"),
+            Self::Reconcile(error) => write!(f, "{error}"),
         }
     }
 }
@@ -505,6 +1065,7 @@ where
     };
     match subcommand.as_str() {
         "discover" => parse_skills_discover_args(args),
+        "reconcile" => parse_skills_reconcile_args(args),
         _ => Err(SkillsCommandError::UnknownSubcommand(subcommand)),
     }
 }
@@ -531,6 +1092,58 @@ where
     Ok(SkillsCommand::Discover { repo_root })
 }
 
+fn parse_skills_reconcile_args<I>(mut args: I) -> Result<SkillsCommand, SkillsCommandError>
+where
+    I: Iterator<Item = String>,
+{
+    let mut repo_root = None;
+    let mut runtime = None;
+    let mut selected_relative_paths = Vec::new();
+    let mut target_root_override = None;
+    while let Some(argument) = args.next() {
+        match argument.as_str() {
+            "--repo" => {
+                if repo_root.is_some() {
+                    return Err(SkillsCommandError::UnexpectedArgument(argument));
+                }
+                repo_root = Some(PathBuf::from(
+                    args.next().ok_or(SkillsCommandError::MissingRepo)?,
+                ));
+            }
+            "--runtime" => {
+                if runtime.is_some() {
+                    return Err(SkillsCommandError::UnexpectedArgument(argument));
+                }
+                let runtime_arg = args.next().ok_or(SkillsCommandError::MissingRuntime)?;
+                runtime = Some(
+                    SkillsRuntime::parse(&runtime_arg).map_err(SkillsCommandError::Reconcile)?,
+                );
+            }
+            "--skill" => {
+                selected_relative_paths
+                    .push(args.next().ok_or(SkillsCommandError::MissingSkillValue)?);
+            }
+            "--target-root" => {
+                if target_root_override.is_some() {
+                    return Err(SkillsCommandError::UnexpectedArgument(argument));
+                }
+                target_root_override = Some(PathBuf::from(
+                    args.next().ok_or(SkillsCommandError::MissingTargetRoot)?,
+                ));
+            }
+            _ => return Err(SkillsCommandError::UnexpectedArgument(argument)),
+        }
+    }
+    let repo_root = repo_root.ok_or(SkillsCommandError::MissingRepo)?;
+    let runtime = runtime.ok_or(SkillsCommandError::MissingRuntime)?;
+    Ok(SkillsCommand::Reconcile {
+        repo_root,
+        runtime,
+        selected_relative_paths,
+        target_root_override,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -540,8 +1153,9 @@ mod tests {
     use serde_json::Value;
 
     use super::{
-        DiscoveredSkill, SkillsCommand, SkillsCommandError, SkillsDiscoverError, discover_skills,
-        parse_skills_command,
+        DiscoveredSkill, ReconciledSkill, SkillsCommand, SkillsCommandError, SkillsDiscoverError,
+        SkillsReconcileError, SkillsReconcileOutput, SkillsRuntime, discover_skills,
+        parse_skills_command, reconcile_skills,
     };
 
     #[test]
@@ -674,6 +1288,341 @@ description: Write a new skill.
     }
 
     #[test]
+    fn reconciles_selected_skills_to_runtime_target_root() {
+        let (repo_root, remote_root) = create_git_repo_with_origin("skills_reconcile_selected");
+        let target_root = create_temp_test_dir("skills_reconcile_target");
+        write_skill(
+            &repo_root,
+            ".agents/skills/github-pr-authoring",
+            r#"---
+name: github-pr-authoring
+description: Draft or update GitHub pull requests.
+---
+"#,
+        );
+        write_skill(
+            &repo_root,
+            "nested/custom-skill",
+            r#"---
+name: custom-skill
+description: Custom skill.
+---
+"#,
+        );
+
+        let output = reconcile_skills(
+            &repo_root,
+            &SkillsRuntime::Codex,
+            &[
+                "nested/custom-skill".to_string(),
+                ".agents/skills/github-pr-authoring".to_string(),
+            ],
+            Some(&target_root),
+        )
+        .expect("selected skills should reconcile");
+
+        assert_eq!(
+            output,
+            SkillsReconcileOutput {
+                runtime: "codex".to_string(),
+                target_root: target_root.display().to_string(),
+                skills: vec![
+                    ReconciledSkill {
+                        name: "custom-skill".to_string(),
+                        relative_path: "nested/custom-skill".to_string(),
+                        source_path: repo_root.join("nested/custom-skill").display().to_string(),
+                        target_path: target_root.join("custom-skill").display().to_string(),
+                    },
+                    ReconciledSkill {
+                        name: "github-pr-authoring".to_string(),
+                        relative_path: ".agents/skills/github-pr-authoring".to_string(),
+                        source_path: repo_root
+                            .join(".agents/skills/github-pr-authoring")
+                            .display()
+                            .to_string(),
+                        target_path: target_root
+                            .join("github-pr-authoring")
+                            .display()
+                            .to_string(),
+                    },
+                ],
+            }
+        );
+        assert_eq!(
+            fs::read_link(target_root.join("custom-skill"))
+                .expect("custom skill symlink should exist"),
+            repo_root.join("nested/custom-skill")
+        );
+        assert_eq!(
+            fs::read_link(target_root.join("github-pr-authoring"))
+                .expect("github skill symlink should exist"),
+            repo_root.join(".agents/skills/github-pr-authoring")
+        );
+
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
+        fs::remove_dir_all(remote_root).expect("remote should be removable");
+        fs::remove_dir_all(target_root).expect("target root should be removable");
+    }
+
+    #[test]
+    fn reconcile_prunes_stale_target_entries() {
+        let (repo_root, remote_root) = create_git_repo_with_origin("skills_reconcile_prune_repo");
+        let target_root = create_temp_test_dir("skills_reconcile_prune_target");
+        write_skill(
+            &repo_root,
+            ".",
+            r#"---
+name: root-skill
+description: Skill defined at the repository root.
+---
+"#,
+        );
+        fs::create_dir_all(target_root.join("stale-directory"))
+            .expect("stale directory should be created");
+        fs::write(target_root.join("stale-directory/old.txt"), "old")
+            .expect("stale file should be created");
+        fs::write(target_root.join("stale-file"), "old").expect("stale file should be created");
+
+        let output = reconcile_skills(
+            &repo_root,
+            &SkillsRuntime::OpenCode,
+            &[".".to_string()],
+            Some(&target_root),
+        )
+        .expect("root skill should reconcile");
+
+        assert_eq!(output.runtime, "opencode");
+        assert_eq!(
+            fs::read_link(target_root.join("root-skill")).expect("root skill symlink should exist"),
+            repo_root
+        );
+        assert!(
+            !target_root.join("stale-directory").exists(),
+            "stale directory should be pruned"
+        );
+        assert!(
+            !target_root.join("stale-file").exists(),
+            "stale file should be pruned"
+        );
+
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
+        fs::remove_dir_all(remote_root).expect("remote should be removable");
+        fs::remove_dir_all(target_root).expect("target root should be removable");
+    }
+
+    #[test]
+    fn reconcile_empty_selection_prunes_target_root() {
+        let (repo_root, remote_root) = create_git_repo_with_origin("skills_reconcile_empty_repo");
+        let target_root = create_temp_test_dir("skills_reconcile_empty_target");
+        fs::write(target_root.join("stale-skill"), "old").expect("stale skill should be created");
+
+        let output = reconcile_skills(&repo_root, &SkillsRuntime::Pi, &[], Some(&target_root))
+            .expect("empty selection should reconcile");
+
+        assert_eq!(output.runtime, "pi");
+        assert_eq!(output.skills, Vec::<ReconciledSkill>::new());
+        assert!(
+            fs::read_dir(&target_root)
+                .expect("target root should be readable")
+                .next()
+                .is_none(),
+            "target root should be empty"
+        );
+
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
+        fs::remove_dir_all(remote_root).expect("remote should be removable");
+        fs::remove_dir_all(target_root).expect("target root should be removable");
+    }
+
+    #[test]
+    fn reconcile_pulls_repo_and_prunes_selected_skills_removed_upstream() {
+        let (repo_root, remote_root) = create_git_repo_with_origin("skills_reconcile_pull_repo");
+        let updater_root = create_temp_test_dir("skills_reconcile_pull_updater");
+        fs::remove_dir_all(&updater_root).expect("updater placeholder should be removable");
+        let target_root = create_temp_test_dir("skills_reconcile_pull_target");
+        write_skill(
+            &repo_root,
+            "skills/old-skill",
+            r#"---
+name: old-skill
+description: Old skill.
+---
+"#,
+        );
+        commit_all(&repo_root);
+        run_git(&repo_root, ["push"]);
+        fs::write(target_root.join("old-skill"), "stale").expect("stale skill should be created");
+        clone_repo(&remote_root, &updater_root);
+        run_git(&updater_root, ["config", "user.name", "Mistle Test"]);
+        run_git(
+            &updater_root,
+            ["config", "user.email", "mistle-test@example.com"],
+        );
+        fs::remove_dir_all(updater_root.join("skills/old-skill"))
+            .expect("old skill should be removed upstream");
+        write_skill(
+            &updater_root,
+            "skills/new-skill",
+            r#"---
+name: new-skill
+description: New skill.
+---
+"#,
+        );
+        commit_all(&updater_root);
+        run_git(&updater_root, ["push"]);
+
+        let output = reconcile_skills(
+            &repo_root,
+            &SkillsRuntime::Codex,
+            &[
+                "skills/old-skill".to_string(),
+                "skills/new-skill".to_string(),
+            ],
+            Some(&target_root),
+        )
+        .expect("reconcile should pull before linking selected skills");
+
+        assert_eq!(
+            output.skills,
+            vec![ReconciledSkill {
+                name: "new-skill".to_string(),
+                relative_path: "skills/new-skill".to_string(),
+                source_path: repo_root.join("skills/new-skill").display().to_string(),
+                target_path: target_root.join("new-skill").display().to_string(),
+            }]
+        );
+        assert!(
+            !target_root.join("old-skill").exists(),
+            "stale removed skill target should be pruned"
+        );
+        assert_eq!(
+            fs::read_link(target_root.join("new-skill"))
+                .expect("new skill symlink should be created"),
+            repo_root.join("skills/new-skill")
+        );
+
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
+        fs::remove_dir_all(remote_root).expect("remote should be removable");
+        fs::remove_dir_all(updater_root).expect("updater should be removable");
+        fs::remove_dir_all(target_root).expect("target root should be removable");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_symlinked_reconcile_target_root_without_pruning_destination() {
+        let (repo_root, remote_root) =
+            create_git_repo_with_origin("skills_reconcile_symlink_root_repo");
+        let destination = create_temp_test_dir("skills_reconcile_symlink_root_destination");
+        let target_root = create_temp_test_dir("skills_reconcile_symlink_root_target");
+        fs::remove_dir_all(&target_root).expect("target root placeholder should be removed");
+        fs::write(destination.join("stale-skill"), "old").expect("stale skill should be created");
+        std::os::unix::fs::symlink(&destination, &target_root)
+            .expect("target root symlink should be created");
+
+        let error = reconcile_skills(&repo_root, &SkillsRuntime::Codex, &[], Some(&target_root))
+            .expect_err("symlinked target root should fail");
+
+        assert!(matches!(error, SkillsReconcileError::TargetRootSymlink(_)));
+        assert_eq!(
+            fs::read_to_string(destination.join("stale-skill"))
+                .expect("stale skill should remain in symlink destination"),
+            "old"
+        );
+
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
+        fs::remove_dir_all(remote_root).expect("remote should be removable");
+        fs::remove_file(target_root).expect("target root symlink should be removable");
+        fs::remove_dir_all(destination).expect("destination should be removable");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_symlinked_reconcile_target_ancestor_without_pruning_destination() {
+        let (repo_root, remote_root) =
+            create_git_repo_with_origin("skills_reconcile_symlink_ancestor_repo");
+        let base = create_temp_test_dir("skills_reconcile_symlink_ancestor_base");
+        let destination = create_temp_test_dir("skills_reconcile_symlink_ancestor_destination");
+        let target_parent = base.join("linked-parent");
+        let target_root = target_parent.join("skills");
+        fs::create_dir_all(destination.join("skills"))
+            .expect("destination target root should be created");
+        fs::write(destination.join("skills/stale-skill"), "old")
+            .expect("stale skill should be created");
+        std::os::unix::fs::symlink(&destination, &target_parent)
+            .expect("target parent symlink should be created");
+
+        let error = reconcile_skills(&repo_root, &SkillsRuntime::Pi, &[], Some(&target_root))
+            .expect_err("symlinked target ancestor should fail");
+
+        assert!(matches!(error, SkillsReconcileError::TargetRootSymlink(_)));
+        assert_eq!(
+            fs::read_to_string(destination.join("skills/stale-skill"))
+                .expect("stale skill should remain in symlink destination"),
+            "old"
+        );
+
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
+        fs::remove_dir_all(remote_root).expect("remote should be removable");
+        fs::remove_file(target_parent).expect("target parent symlink should be removable");
+        fs::remove_dir_all(base).expect("base should be removable");
+        fs::remove_dir_all(destination).expect("destination should be removable");
+    }
+
+    #[test]
+    fn skills_reconcile_command_writes_json_output() {
+        let (repo_root, remote_root) = create_git_repo_with_origin("skills_reconcile_command_repo");
+        let target_root = create_temp_test_dir("skills_reconcile_command_target");
+        write_skill(
+            &repo_root,
+            ".agents/skills/write-a-skill",
+            r#"---
+name: write-a-skill
+description: Write a new skill.
+---
+"#,
+        );
+
+        let mut stdout = Vec::new();
+        let exit_code = crate::run(
+            "sandboxd",
+            [
+                "skills".to_string(),
+                "reconcile".to_string(),
+                "--repo".to_string(),
+                repo_root.display().to_string(),
+                "--runtime".to_string(),
+                "pi".to_string(),
+                "--skill".to_string(),
+                ".agents/skills/write-a-skill".to_string(),
+                "--target-root".to_string(),
+                target_root.display().to_string(),
+            ],
+            &mut std::io::empty(),
+            &mut stdout,
+            &mut Vec::new(),
+        );
+
+        assert_eq!(exit_code, 0);
+        let output: Value = serde_json::from_slice(&stdout).expect("stdout should be json");
+        assert_eq!(output["runtime"], "pi");
+        assert_eq!(output["skills"][0]["name"], "write-a-skill");
+        assert_eq!(
+            output["skills"][0]["relativePath"],
+            ".agents/skills/write-a-skill"
+        );
+        assert_eq!(
+            fs::read_link(target_root.join("write-a-skill"))
+                .expect("write skill symlink should exist"),
+            repo_root.join(".agents/skills/write-a-skill")
+        );
+
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
+        fs::remove_dir_all(remote_root).expect("remote should be removable");
+        fs::remove_dir_all(target_root).expect("target root should be removable");
+    }
+
+    #[test]
     fn rejects_duplicate_skill_names() {
         let repo_root = create_git_repo("skills_discover_duplicate");
         write_skill(
@@ -769,6 +1718,87 @@ description: Invalid name type.
     }
 
     #[test]
+    fn rejects_reconcile_selected_paths_that_escape_repo() {
+        let (repo_root, remote_root) = create_git_repo_with_origin("skills_reconcile_escape");
+
+        let error = reconcile_skills(
+            &repo_root,
+            &SkillsRuntime::Codex,
+            &["../outside".to_string()],
+            None,
+        )
+        .expect_err("escaping selected path should fail");
+
+        assert!(matches!(
+            error,
+            SkillsReconcileError::SelectedSkillPathInvalid(_)
+        ));
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
+        fs::remove_dir_all(remote_root).expect("remote should be removable");
+    }
+
+    #[test]
+    fn rejects_reconcile_selected_paths_without_skill_file() {
+        let (repo_root, remote_root) =
+            create_git_repo_with_origin("skills_reconcile_missing_skill_file");
+        fs::create_dir_all(repo_root.join("not-a-skill")).expect("directory should be created");
+
+        let error = reconcile_skills(
+            &repo_root,
+            &SkillsRuntime::Codex,
+            &["not-a-skill".to_string()],
+            None,
+        )
+        .expect_err("directory without SKILL.md should fail");
+
+        assert!(matches!(
+            error,
+            SkillsReconcileError::SelectedSkillMissingSkillFile { .. }
+        ));
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
+        fs::remove_dir_all(remote_root).expect("remote should be removable");
+    }
+
+    #[test]
+    fn rejects_reconcile_duplicate_selected_skill_names() {
+        let (repo_root, remote_root) =
+            create_git_repo_with_origin("skills_reconcile_duplicate_names");
+        write_skill(
+            &repo_root,
+            "one",
+            r#"---
+name: duplicate-skill
+description: First.
+---
+"#,
+        );
+        write_skill(
+            &repo_root,
+            "two",
+            r#"---
+name: duplicate-skill
+description: Second.
+---
+"#,
+        );
+
+        let error = reconcile_skills(
+            &repo_root,
+            &SkillsRuntime::Codex,
+            &["one".to_string(), "two".to_string()],
+            None,
+        )
+        .expect_err("duplicate names should fail");
+
+        assert!(matches!(
+            error,
+            SkillsReconcileError::DuplicateSelectedSkillName { .. }
+        ));
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
+        fs::remove_dir_all(remote_root).expect("remote should be removable");
+    }
+
+    #[test]
     fn rejects_invalid_skill_names() {
         let repo_root = create_git_repo("skills_discover_invalid_name");
         write_skill(
@@ -802,11 +1832,65 @@ description: Invalid name.
     }
 
     #[test]
+    fn parses_skills_reconcile_command() {
+        let command = parse_skills_command([
+            "reconcile",
+            "--repo",
+            "/root/org/repo",
+            "--runtime",
+            "codex",
+            "--skill",
+            ".agents/skills/one",
+            "--skill",
+            "nested/two",
+            "--target-root",
+            "/tmp/skills",
+        ]);
+
+        let Ok(SkillsCommand::Reconcile {
+            repo_root,
+            runtime,
+            selected_relative_paths,
+            target_root_override,
+        }) = command
+        else {
+            panic!("skills reconcile command should parse");
+        };
+        assert_eq!(repo_root, PathBuf::from("/root/org/repo"));
+        assert_eq!(runtime, SkillsRuntime::Codex);
+        assert_eq!(
+            selected_relative_paths,
+            vec![".agents/skills/one".to_string(), "nested/two".to_string()]
+        );
+        assert_eq!(target_root_override, Some(PathBuf::from("/tmp/skills")));
+    }
+
+    #[test]
     fn rejects_skills_discover_without_repo() {
         assert!(matches!(
             parse_skills_command(["discover"]),
             Err(SkillsCommandError::MissingRepo)
         ));
+    }
+
+    #[test]
+    fn parses_skills_reconcile_with_empty_selection() {
+        let command = parse_skills_command([
+            "reconcile",
+            "--repo",
+            "/root/org/repo",
+            "--runtime",
+            "codex",
+        ]);
+
+        let Ok(SkillsCommand::Reconcile {
+            selected_relative_paths,
+            ..
+        }) = command
+        else {
+            panic!("skills reconcile command should parse without selected skills");
+        };
+        assert_eq!(selected_relative_paths, Vec::<String>::new());
     }
 
     fn write_skill(repo_root: &Path, relative_directory: &str, content: &str) {
@@ -826,6 +1910,45 @@ description: Invalid name.
         repo_root
     }
 
+    fn create_git_repo_with_origin(prefix: &str) -> (PathBuf, PathBuf) {
+        let repo_root = create_git_repo(prefix);
+        let remote_root = create_temp_test_dir(&format!("{prefix}_remote"));
+        fs::remove_dir_all(&remote_root).expect("remote placeholder should be removable");
+        run_git_command(["init", "--bare"], Some(&remote_root));
+        fs::write(repo_root.join(".gitkeep"), "").expect("initial file should be written");
+        commit_all(&repo_root);
+        let remote_root_arg = remote_root
+            .to_str()
+            .expect("remote path should be utf-8")
+            .to_string();
+        run_git_dynamic(
+            &repo_root,
+            vec![
+                "remote".to_string(),
+                "add".to_string(),
+                "origin".to_string(),
+                remote_root_arg,
+            ],
+        );
+        run_git(&repo_root, ["push", "-u", "origin", "HEAD"]);
+        (repo_root, remote_root)
+    }
+
+    fn clone_repo(remote_root: &Path, clone_root: &Path) {
+        let output = Command::new("git")
+            .args(["-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false"])
+            .arg("clone")
+            .arg(remote_root)
+            .arg(clone_root)
+            .output()
+            .expect("git should run");
+        assert!(
+            output.status.success(),
+            "git command failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
     fn commit_all(repo_root: &Path) {
         run_git(repo_root, ["add", "."]);
         run_git(repo_root, ["commit", "-m", "Add skills"]);
@@ -839,6 +1962,39 @@ description: Invalid name.
             .args(args)
             .output()
             .expect("git should run");
+        assert!(
+            output.status.success(),
+            "git command failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    fn run_git_dynamic(repo_root: &Path, args: Vec<String>) {
+        let output = Command::new("git")
+            .args(["-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false"])
+            .arg("-C")
+            .arg(repo_root)
+            .args(args)
+            .output()
+            .expect("git should run");
+        assert!(
+            output.status.success(),
+            "git command failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    fn run_git_command<const N: usize, P>(args: [&str; N], path_argument: Option<P>)
+    where
+        P: AsRef<Path>,
+    {
+        let mut command = Command::new("git");
+        command.args(["-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false"]);
+        command.args(args);
+        if let Some(path_argument) = path_argument {
+            command.arg(path_argument.as_ref());
+        }
+        let output = command.output().expect("git should run");
         assert!(
             output.status.success(),
             "git command failed: {}",
