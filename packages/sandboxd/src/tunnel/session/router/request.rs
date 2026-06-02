@@ -65,9 +65,9 @@ pub(in crate::tunnel::session) fn handle_tunnel_session_request(
 }
 
 pub(in crate::tunnel::session) fn startup_operation_kind(
-    startup_input: &StartupInput,
+    session_input: &SessionRuntimeInput,
 ) -> &'static str {
-    startup_input.operation_kind.as_str()
+    session_input.operation_kind.as_str()
 }
 
 pub(in crate::tunnel::session) fn derive_startup_operation_id(

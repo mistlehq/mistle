@@ -16,6 +16,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
+use crate::protocol::activation::ActivationInput;
 use crate::protocol::startup::StartupInput;
 use crate::time::Sleeper;
 
@@ -27,7 +28,7 @@ mod request;
 mod state;
 
 pub use crate::control::client::{
-    submit_init, submit_ready, submit_resume, submit_signing, submit_wait_init,
+    submit_activate, submit_init, submit_ready, submit_resume, submit_signing, submit_wait_init,
 };
 pub use crate::control::error::ControlError;
 use crate::control::health::run_health_server_loop;
@@ -86,6 +87,13 @@ impl ControlServer {
         lock_control_state(&self.state)
             .ok()
             .and_then(|state| state.startup_input.clone())
+    }
+
+    /// Returns the activation input accepted by this daemon, if any.
+    pub fn activation_input(&self) -> Option<ActivationInput> {
+        lock_control_state(&self.state)
+            .ok()
+            .and_then(|state| state.activation_input.clone())
     }
 
     /// Returns the loopback socket address bound by the local health endpoint.
@@ -252,6 +260,7 @@ where
     let state = Arc::new(Mutex::new(ControlServerState {
         init_phase: InitPhase::Uninitialized,
         startup_input: None,
+        activation_input: None,
         sandboxd_state: None,
         global_git_config_path: global_git_config_path.to_path_buf(),
         shutdown_after_init: false,
@@ -385,9 +394,10 @@ mod tests {
     use crate::control::{
         ControlSignRequest, DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL, DEFAULT_HEALTH_ENDPOINT_PATH,
         EGRESS_PROXY_FAULT_KILL_PATH, InitPhase, TEST_FAULTS_ENABLED_ENV,
-        start_control_server_with_health_endpoint, submit_init, submit_ready, submit_resume,
-        submit_signing, submit_wait_init,
+        start_control_server_with_health_endpoint, submit_activate, submit_init, submit_ready,
+        submit_resume, submit_signing, submit_wait_init,
     };
+    use crate::protocol::activation::ActivationInput;
     use crate::protocol::startup::{
         GitIdentity, GitSigningConfig, StartupExecutionMode, StartupInput, StartupMode,
     };
@@ -434,21 +444,16 @@ mod tests {
     }
 
     #[test]
-    fn accepts_second_init_request_after_initialization_completes() {
+    fn accepts_matching_second_init_request_after_initialization_completes() {
         let test_dir = create_temp_test_dir("control_second_init");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
         let startup_input =
             valid_startup_input(StartupMode::New, "bootstrap-token-value", &gateway.ws_url);
-        let duplicate_startup_input = valid_startup_input(
-            StartupMode::New,
-            "duplicate-bootstrap-token-value",
-            &gateway.ws_url,
-        );
         let server = start_test_control_server(&socket_path, ThreadSleeper);
 
         submit_init(&socket_path, &startup_input, true).expect("first init should succeed");
-        submit_init(&socket_path, &duplicate_startup_input, true)
+        submit_init(&socket_path, &startup_input, true)
             .expect("second init should be idempotent after initialization completes");
 
         assert_eq!(server.init_phase(), InitPhase::Initialized);
@@ -462,7 +467,40 @@ mod tests {
     }
 
     #[test]
-    fn accepts_second_init_request_while_initialization_is_running() {
+    fn rejects_different_second_init_request_after_initialization_completes() {
+        let test_dir = create_temp_test_dir("control_second_init_different");
+        let socket_path = test_dir.join("control.sock");
+        let gateway = start_bootstrap_gateway();
+        let startup_input =
+            valid_startup_input(StartupMode::New, "bootstrap-token-value", &gateway.ws_url);
+        let duplicate_startup_input = valid_startup_input(
+            StartupMode::New,
+            "duplicate-bootstrap-token-value",
+            &gateway.ws_url,
+        );
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        submit_init(&socket_path, &startup_input, true).expect("first init should succeed");
+        let error = submit_init(&socket_path, &duplicate_startup_input, true)
+            .expect_err("different second init should fail after initialization completes");
+
+        assert!(
+            error
+                .to_string()
+                .contains("sandboxd is already initialized with different startup input")
+        );
+        assert_eq!(server.init_phase(), InitPhase::Initialized);
+        assert_eq!(server.startup_input(), Some(startup_input));
+
+        server.close().expect("control server should stop cleanly");
+        gateway
+            .close()
+            .expect("bootstrap gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn accepts_matching_second_init_request_while_initialization_is_running() {
         let test_dir = create_temp_test_dir("control_second_init_running");
         let socket_path = test_dir.join("control.sock");
         let setup_release_path = test_dir.join("release-setup");
@@ -471,35 +509,12 @@ mod tests {
         let server = start_test_control_server(&socket_path, ThreadSleeper);
         let mut startup_input =
             valid_startup_input(StartupMode::New, "bootstrap-token-value", &gateway.ws_url);
-        startup_input.runtime_plan["artifacts"] = serde_json::json!([
-            {
-                "artifactKey": "hold_init",
-                "name": "hold init",
-                "lifecycle": {
-                    "install": [
-                        {
-                            "op": "exec",
-                            "command": {
-                                "args": [
-                                    "/bin/sh",
-                                    "-c",
-                                    format!(
-                                        "printf run >> {}; while ! test -f {}; do sleep 0.05; done",
-                                        setup_runs_path.display(),
-                                        setup_release_path.display()
-                                    )
-                                ]
-                            }
-                        }
-                    ]
-                }
-            }
-        ]);
-        let duplicate_startup_input = valid_startup_input(
-            StartupMode::New,
-            "duplicate-bootstrap-token-value",
-            &gateway.ws_url,
-        );
+        startup_input.runtime_plan["setupScript"] = serde_json::json!(format!(
+            "printf run >> {}; while ! test -f {}; do sleep 0.05; done",
+            setup_runs_path.display(),
+            setup_release_path.display()
+        ));
+        let duplicate_startup_input = startup_input.clone();
 
         submit_init(&socket_path, &startup_input, false).expect("first init should start");
         wait_for_init_phase(&server, InitPhase::Initializing);
@@ -566,6 +581,50 @@ mod tests {
     }
 
     #[test]
+    fn rejects_different_second_init_request_while_initialization_is_running() {
+        let test_dir = create_temp_test_dir("control_second_init_running_different");
+        let socket_path = test_dir.join("control.sock");
+        let setup_release_path = test_dir.join("release-setup");
+        let setup_started_path = test_dir.join("setup-started");
+        let gateway = start_bootstrap_gateway();
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+        let mut startup_input =
+            valid_startup_input(StartupMode::New, "bootstrap-token-value", &gateway.ws_url);
+        startup_input.runtime_plan["setupScript"] = serde_json::json!(format!(
+            "printf started > {}; while ! test -f {}; do sleep 0.05; done",
+            setup_started_path.display(),
+            setup_release_path.display()
+        ));
+        let different_startup_input = valid_startup_input(
+            StartupMode::New,
+            "different-bootstrap-token-value",
+            &gateway.ws_url,
+        );
+
+        submit_init(&socket_path, &startup_input, false).expect("first init should start");
+        wait_for_path(&setup_started_path);
+        wait_for_init_phase(&server, InitPhase::Initializing);
+        let error = submit_init(&socket_path, &different_startup_input, false)
+            .expect_err("different duplicate init should fail while original init is running");
+
+        assert!(
+            error.to_string().contains(
+                "sandboxd initialization is already running with different startup input"
+            )
+        );
+        std::fs::write(&setup_release_path, "release").expect("setup script should be released");
+        submit_wait_init(&socket_path).expect("initialization should complete after setup release");
+        wait_for_init_phase(&server, InitPhase::Initialized);
+        assert_eq!(server.startup_input(), Some(startup_input));
+
+        server.close().expect("control server should stop cleanly");
+        gateway
+            .close()
+            .expect("bootstrap gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
     fn resumes_after_initialization_completes() {
         let test_dir = create_temp_test_dir("control_resume");
         let socket_path = test_dir.join("control.sock");
@@ -586,6 +645,38 @@ mod tests {
 
         assert_eq!(server.init_phase(), InitPhase::Initialized);
         assert_eq!(server.startup_input(), Some(resume_startup_input));
+
+        server.close().expect("control server should stop cleanly");
+        gateway
+            .close()
+            .expect("bootstrap gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn failed_resume_keeps_the_accepted_startup_input() {
+        let test_dir = create_temp_test_dir("control_resume_rejected_input");
+        let socket_path = test_dir.join("control.sock");
+        let gateway = start_bootstrap_gateway();
+        let startup_input =
+            valid_signing_startup_input(&gateway.ws_url, format!("key::{TEST_PUBLIC_KEY}"));
+        let rejected_resume_input = valid_startup_input(
+            StartupMode::Existing,
+            "bootstrap-token-value-2",
+            "ws://127.0.0.1:1/bootstrap?operation_id=rejected",
+        );
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        submit_init(&socket_path, &startup_input, true).expect("init submission should succeed");
+        let error = submit_resume(&socket_path, &rejected_resume_input)
+            .expect_err("resume with unreachable gateway should fail");
+
+        assert!(
+            error
+                .to_string()
+                .contains("failed to start bootstrap tunnel session")
+        );
+        assert_eq!(server.startup_input(), Some(startup_input));
 
         server.close().expect("control server should stop cleanly");
         gateway
@@ -684,6 +775,212 @@ mod tests {
         gateway
             .close()
             .expect("signing gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn activation_without_git_identity_disables_previous_signing_identity() {
+        let test_dir = create_temp_test_dir("control_activate_clears_signing");
+        let socket_path = test_dir.join("control.sock");
+        let signing_gateway = start_signing_gateway();
+        let activation_gateway = start_bootstrap_gateway();
+        let startup_input =
+            valid_signing_startup_input(&signing_gateway.ws_url, format!("key::{TEST_PUBLIC_KEY}"));
+        let activation_input = valid_activation_input(&activation_gateway.ws_url);
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        submit_init(&socket_path, &startup_input, true).expect("init submission should succeed");
+        submit_activate(&socket_path, &activation_input)
+            .expect("activation without git identity should succeed");
+        let error = submit_signing(
+            &socket_path,
+            &ControlSignRequest {
+                key_ref: format!("key::{TEST_PUBLIC_KEY}"),
+                payload_base64: "cGF5bG9hZA==".to_string(),
+            },
+        )
+        .expect_err("signing should fail after activation clears git identity");
+
+        assert!(
+            error
+                .to_string()
+                .contains("sandbox does not have a configured Git signing identity")
+        );
+
+        server.close().expect("control server should stop cleanly");
+        signing_gateway
+            .close()
+            .expect("signing gateway should stop cleanly");
+        activation_gateway
+            .close()
+            .expect("activation gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn failed_initialized_activation_keeps_the_accepted_session_usable() {
+        let test_dir = create_temp_test_dir("control_activate_rejected_input");
+        let socket_path = test_dir.join("control.sock");
+        let init_gateway = start_bootstrap_gateway();
+        let accepted_gateway = start_signing_gateway();
+        let startup_input = valid_startup_input(
+            StartupMode::New,
+            "bootstrap-token-value",
+            &init_gateway.ws_url,
+        );
+        let accepted_activation_input = valid_signing_activation_input(
+            &accepted_gateway.ws_url,
+            format!("key::{TEST_PUBLIC_KEY}"),
+        );
+        let rejected_activation_input =
+            valid_activation_input("ws://127.0.0.1:1/bootstrap?operation_id=rejected");
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        submit_init(&socket_path, &startup_input, true).expect("init submission should succeed");
+        submit_activate(&socket_path, &accepted_activation_input)
+            .expect("first activation should be accepted");
+        let accepted_tunnel_health =
+            tunnel_session_health_component(fetch_health_response(server.health_endpoint_addr()).1);
+        let error = submit_activate(&socket_path, &rejected_activation_input)
+            .expect_err("activation with unreachable gateway should fail");
+
+        assert!(
+            error
+                .to_string()
+                .contains("failed to start bootstrap tunnel session")
+        );
+        assert_eq!(
+            server
+                .activation_input()
+                .expect("accepted activation input should remain stored")
+                .tunnel_gateway_ws_url,
+            accepted_activation_input.tunnel_gateway_ws_url
+        );
+        assert_eq!(
+            tunnel_session_health_component(fetch_health_response(server.health_endpoint_addr()).1),
+            accepted_tunnel_health,
+            "rejected activation should preserve accepted tunnel health metadata"
+        );
+        let signature_base64 = submit_signing(
+            &socket_path,
+            &ControlSignRequest {
+                key_ref: format!("key::{TEST_PUBLIC_KEY}"),
+                payload_base64: "cGF5bG9hZA==".to_string(),
+            },
+        )
+        .expect("accepted activation tunnel should still handle signing after rejected refresh");
+        assert_eq!(
+            signature_base64,
+            "LS0tLS1CRUdJTiBTU0ggU0lHTkFUVVJFLS0tLS0KZXhhbXBsZS1zaWduYXR1cmUKLS0tLS1FTkQgU1NIIFNJR05BVFVSRS0tLS0tCg=="
+        );
+
+        server.close().expect("control server should stop cleanly");
+        init_gateway
+            .close()
+            .expect("init gateway should stop cleanly");
+        accepted_gateway
+            .close()
+            .expect("accepted activation gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn rejects_snapshot_preparation_operation_kinds_for_activation() {
+        let test_dir = create_temp_test_dir("control_activate_snapshot_operation_kind");
+        let socket_path = test_dir.join("control.sock");
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        for operation_kind in [
+            crate::protocol::startup::StartupOperationKind::SetupCheck,
+            crate::protocol::startup::StartupOperationKind::Snapshot,
+        ] {
+            let mut activation_input =
+                valid_activation_input("ws://127.0.0.1:1/bootstrap?operation_id=rejected");
+            activation_input.operation_kind = operation_kind;
+
+            let error = submit_activate(&socket_path, &activation_input)
+                .expect_err("activation should reject snapshot materialization operation kinds");
+
+            assert!(error.to_string().contains(
+                "sandboxd activate does not support snapshot materialization operationKind"
+            ));
+            assert_eq!(server.init_phase(), InitPhase::Uninitialized);
+            assert!(
+                server.activation_input().is_none(),
+                "rejected activation should not become accepted"
+            );
+        }
+
+        server.close().expect("control server should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn rejects_initialized_activation_that_changes_egress_proxy_input_while_egress_proxy_runs() {
+        let test_dir = create_temp_test_dir("control_activate_egress_input_change");
+        let socket_path = test_dir.join("control.sock");
+        let init_gateway = start_bootstrap_gateway();
+        let activation_gateway = start_bootstrap_gateway();
+        let mut startup_input = valid_startup_input(
+            StartupMode::New,
+            "bootstrap-token-value",
+            &init_gateway.ws_url,
+        );
+        startup_input.runtime_plan = runtime_plan_with_egress_route();
+        let activation_input = valid_activation_input(&activation_gateway.ws_url);
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        submit_init(&socket_path, &startup_input, true).expect("init submission should succeed");
+        let error = submit_activate(&socket_path, &activation_input)
+            .expect_err("activation should reject gateway URL changes with active egress proxy");
+
+        assert!(
+            error
+                .to_string()
+                .contains("initialized activation cannot change egress proxy input")
+        );
+        assert!(
+            server.activation_input().is_none(),
+            "rejected activation should not become accepted"
+        );
+
+        server.close().expect("control server should stop cleanly");
+        init_gateway
+            .close()
+            .expect("init gateway should stop cleanly");
+        activation_gateway
+            .close()
+            .expect("activation gateway should stop cleanly");
+
+        let socket_path = test_dir.join("control-routes.sock");
+        let route_gateway = start_bootstrap_gateway();
+        let mut startup_input = valid_startup_input(
+            StartupMode::New,
+            "bootstrap-token-value",
+            &route_gateway.ws_url,
+        );
+        startup_input.runtime_plan = runtime_plan_with_egress_route();
+        let activation_input = valid_activation_input(&route_gateway.ws_url);
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        submit_init(&socket_path, &startup_input, true).expect("init submission should succeed");
+        let error = submit_activate(&socket_path, &activation_input)
+            .expect_err("activation should reject egress route changes with active egress proxy");
+
+        assert!(
+            error
+                .to_string()
+                .contains("initialized activation cannot change egress proxy input")
+        );
+        assert!(
+            server.activation_input().is_none(),
+            "rejected activation should not become accepted"
+        );
+
+        server.close().expect("control server should stop cleanly");
+        route_gateway
+            .close()
+            .expect("route gateway should stop cleanly");
         std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
 
@@ -989,6 +1286,16 @@ mod tests {
         fetch_http_json_response(health_endpoint_addr, "GET", DEFAULT_HEALTH_ENDPOINT_PATH)
     }
 
+    fn tunnel_session_health_component(body: serde_json::Value) -> serde_json::Value {
+        body["snapshot"]["components"]
+            .as_array()
+            .expect("health response should include component snapshots")
+            .iter()
+            .find(|component| component["component"] == "tunnel_session")
+            .expect("health response should include tunnel session component")
+            .clone()
+    }
+
     fn fetch_http_json_response(
         health_endpoint_addr: SocketAddr,
         method: &str,
@@ -1040,6 +1347,18 @@ mod tests {
         }
 
         panic!("timed out waiting for init phase");
+    }
+
+    fn wait_for_path(path: &std::path::Path) {
+        for _ in 0..100 {
+            if path.exists() {
+                return;
+            }
+
+            ThreadSleeper.sleep(Duration::from_millis(10));
+        }
+
+        panic!("timed out waiting for path {}", path.display());
     }
 
     fn valid_startup_input(
@@ -1110,6 +1429,102 @@ mod tests {
                 }),
             }),
             transparent_proxy: None,
+        }
+    }
+
+    fn valid_activation_input(tunnel_gateway_ws_url: &str) -> ActivationInput {
+        ActivationInput {
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+            bootstrap_token: "activation-bootstrap-token-value".to_string(),
+            tunnel_exchange_token: "activation-tunnel-exchange-token-value".to_string(),
+            tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),
+            acting_user_id: None,
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": "registry.example.test/base:latest"
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            }),
+            git_identity: None,
+            transparent_proxy: None,
+        }
+    }
+
+    fn runtime_plan_with_egress_route() -> serde_json::Value {
+        serde_json::json!({
+            "sandboxProfileId": "sbp_123",
+            "version": 1,
+            "image": {
+                "source": "base",
+                "imageRef": "registry.example.test/base:latest"
+            },
+            "egressRoutes": [
+                {
+                    "egressRuleId": "egress-rule-1",
+                    "bindingId": "binding-1",
+                    "familyId": "family-1",
+                    "variantId": "variant-1",
+                    "match": {
+                        "hosts": ["api.openai.com"],
+                        "pathPrefixes": ["/v1"],
+                        "methods": ["POST"]
+                    },
+                    "upstream": {
+                        "baseUrl": "https://api.openai.com"
+                    },
+                    "authInjection": {
+                        "type": "bearer",
+                        "target": null,
+                        "username": null,
+                        "service": null,
+                        "region": null
+                    },
+                    "additionalHeaders": null,
+                    "additionalCredentialHeaders": null,
+                    "credentialResolver": {
+                        "kind": "integration_connection",
+                        "connectionId": "connection-1",
+                        "secretType": "token",
+                        "slotKey": null,
+                        "resolverKey": null
+                    },
+                    "requestMiddleware": null
+                }
+            ],
+            "artifacts": [],
+            "workspaceSources": [],
+            "runtimeClients": [],
+            "agentRuntimes": []
+        })
+    }
+
+    fn valid_signing_activation_input(
+        tunnel_gateway_ws_url: &str,
+        key_ref: String,
+    ) -> ActivationInput {
+        ActivationInput {
+            git_identity: Some(GitIdentity {
+                name: "Mistle User".to_string(),
+                email: "mistle-user@example.com".to_string(),
+                signing: Some(GitSigningConfig {
+                    format: "ssh".to_string(),
+                    program: "/opt/mistle/bin/mistle-ssh-sign".to_string(),
+                    key_ref,
+                    organization_id: "org_123".to_string(),
+                    provider_family: "github".to_string(),
+                    integration_connection_id: Some("icn_github".to_string()),
+                    acting_user_id: "usr_123".to_string(),
+                    grant: "grant-token".to_string(),
+                }),
+            }),
+            ..valid_activation_input(tunnel_gateway_ws_url)
         }
     }
 

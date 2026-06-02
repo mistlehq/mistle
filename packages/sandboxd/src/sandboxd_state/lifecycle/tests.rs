@@ -10,7 +10,12 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use crate::codex_proxy::start_codex_proxy_with_supervisor;
 use crate::keepalive::KeepaliveManager;
 use crate::process::start_runtime_client_process_manager_with_supervisor;
-use crate::protocol::startup::{GitIdentity, StartupExecutionMode, StartupInput, StartupMode};
+use crate::protocol::activation::ActivationInput;
+use crate::protocol::session::SessionRuntimeInput;
+use crate::protocol::startup::{
+    GitIdentity, GitSigningConfig, StartupExecutionMode, StartupInput, StartupMode,
+};
+use crate::runtime::adapters::RuntimeAdapters;
 use crate::runtime::readiness::{RuntimeReadinessManager, RuntimeReadinessMode};
 use crate::runtime::{
     CompiledRuntimePlan, RuntimeClientProcessReadiness, RuntimeClientProcessStopPolicy,
@@ -504,6 +509,134 @@ fn snapshot_preparation_operations_run_setup_script_from_snapshot() {
 }
 
 #[test]
+fn activation_start_from_snapshot_skips_materialization_setup() {
+    assert!(!super::should_apply_runtime_plan_for_activation(
+        true,
+        crate::protocol::startup::StartupOperationKind::Start
+    ));
+    assert!(!super::should_run_setup_script_for_activation(false));
+    assert!(super::should_apply_runtime_plan_for_activation(
+        false,
+        crate::protocol::startup::StartupOperationKind::Start
+    ));
+    assert!(super::should_run_setup_script_for_activation(true));
+    assert!(super::should_apply_runtime_plan_for_activation(
+        true,
+        crate::protocol::startup::StartupOperationKind::SetupCheck
+    ));
+}
+
+#[test]
+fn restore_accepted_git_identity_after_activation_failure_reapplies_previous_config() {
+    let git_config_path = std::env::temp_dir().join(format!(
+        "mistle-activation-git-rollback-config-{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after unix epoch")
+            .as_nanos()
+    ));
+    let accepted_startup_input = build_startup_input(
+        StartupMode::New,
+        StartupExecutionMode::Session,
+        "ws://127.0.0.1:5003/tunnel/sandbox",
+        minimal_runtime_plan_json(),
+        Some(GitIdentity {
+            name: "Accepted User".to_string(),
+            email: "accepted@example.com".to_string(),
+            signing: Some(GitSigningConfig {
+                format: "ssh".to_string(),
+                program: "/opt/mistle/bin/mistle-ssh-sign".to_string(),
+                key_ref: "key::accepted".to_string(),
+                organization_id: "org_accepted".to_string(),
+                provider_family: "github".to_string(),
+                integration_connection_id: Some("icn_accepted".to_string()),
+                acting_user_id: "usr_accepted".to_string(),
+                grant: "accepted-grant".to_string(),
+            }),
+        }),
+    );
+    let rejected_startup_input = build_startup_input(
+        StartupMode::New,
+        StartupExecutionMode::Session,
+        "ws://127.0.0.1:5003/tunnel/sandbox",
+        minimal_runtime_plan_json(),
+        Some(GitIdentity {
+            name: "Rejected User".to_string(),
+            email: "rejected@example.com".to_string(),
+            signing: None,
+        }),
+    );
+    let accepted_session_input = SessionRuntimeInput::from_startup_input(&accepted_startup_input);
+    let rejected_session_input = SessionRuntimeInput::from_startup_input(&rejected_startup_input);
+
+    crate::runtime::git_identity::apply_git_identity(&rejected_session_input, &git_config_path)
+        .expect("rejected candidate Git identity should apply before rollback");
+    super::restore_accepted_git_identity_after_activation_failure(
+        &accepted_session_input,
+        &git_config_path,
+        "test failure",
+    )
+    .expect("accepted Git identity should be restored");
+
+    let git_config_contents =
+        fs::read_to_string(&git_config_path).expect("Git config should be readable");
+    assert!(git_config_contents.contains("name = Accepted User"));
+    assert!(git_config_contents.contains("email = accepted@example.com"));
+    assert!(git_config_contents.contains("signingkey = key::accepted"));
+    assert!(!git_config_contents.contains("Rejected User"));
+    assert!(!git_config_contents.contains("rejected@example.com"));
+
+    let _ = fs::remove_file(git_config_path);
+}
+
+#[test]
+fn restore_accepted_git_identity_after_activation_failure_clears_rejected_identity() {
+    let git_config_path = std::env::temp_dir().join(format!(
+        "mistle-activation-git-clear-rollback-config-{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after unix epoch")
+            .as_nanos()
+    ));
+    let accepted_startup_input = build_startup_input(
+        StartupMode::New,
+        StartupExecutionMode::Session,
+        "ws://127.0.0.1:5003/tunnel/sandbox",
+        minimal_runtime_plan_json(),
+        None,
+    );
+    let rejected_startup_input = build_startup_input(
+        StartupMode::New,
+        StartupExecutionMode::Session,
+        "ws://127.0.0.1:5003/tunnel/sandbox",
+        minimal_runtime_plan_json(),
+        Some(GitIdentity {
+            name: "Rejected User".to_string(),
+            email: "rejected@example.com".to_string(),
+            signing: None,
+        }),
+    );
+    let accepted_session_input = SessionRuntimeInput::from_startup_input(&accepted_startup_input);
+    let rejected_session_input = SessionRuntimeInput::from_startup_input(&rejected_startup_input);
+
+    crate::runtime::git_identity::apply_git_identity(&rejected_session_input, &git_config_path)
+        .expect("rejected candidate Git identity should apply before rollback");
+    super::restore_accepted_git_identity_after_activation_failure(
+        &accepted_session_input,
+        &git_config_path,
+        "test failure",
+    )
+    .expect("accepted absent Git identity should be restored");
+
+    let git_config_contents =
+        fs::read_to_string(&git_config_path).expect("Git config should be readable");
+    assert!(!git_config_contents.contains("Rejected User"));
+    assert!(!git_config_contents.contains("rejected@example.com"));
+
+    let _ = fs::remove_file(git_config_path);
+}
+
+#[test]
 fn session_initialization_uses_common_minimal_bootstrap_tunnel_phase() {
     let log_dir = std::env::temp_dir().join(format!(
         "mistle-session-initialization-gateway-log-{}",
@@ -617,14 +750,15 @@ fn resume_reopens_minimal_bootstrap_tunnel_with_initial_runtime_not_ready() {
             .expect("system time should be after unix epoch")
             .as_nanos()
     ));
+    let accepted_startup_input = build_startup_input(
+        StartupMode::New,
+        StartupExecutionMode::Session,
+        &bootstrap_url,
+        minimal_runtime_plan_json(),
+        None,
+    );
     let mut state = SandboxdState::initialize(
-        &build_startup_input(
-            StartupMode::New,
-            StartupExecutionMode::Session,
-            &bootstrap_url,
-            minimal_runtime_plan_json(),
-            None,
-        ),
+        &accepted_startup_input,
         git_config_path.as_path(),
         Arc::new(SystemClock),
         Arc::new(ThreadSleeper),
@@ -649,6 +783,7 @@ fn resume_reopens_minimal_bootstrap_tunnel_with_initial_runtime_not_ready() {
                 minimal_runtime_plan_json(),
                 None,
             ),
+            &SessionRuntimeInput::from_startup_input(&accepted_startup_input),
             git_config_path.as_path(),
             Some(
                 StartupDiagnosticsLogger::initialize(StartupOperation::Resume, &bootstrap_url)
@@ -687,16 +822,172 @@ fn resume_reopens_minimal_bootstrap_tunnel_with_initial_runtime_not_ready() {
 }
 
 #[test]
+fn failed_initialized_activation_restores_detached_gateway_egress_token_provider() {
+    let (bootstrap_url, gateway_thread) = start_egress_token_bootstrap_gateway();
+    let git_config_path = std::env::temp_dir().join(format!(
+        "mistle-activation-egress-provider-rollback-git-config-{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after unix epoch")
+            .as_nanos()
+    ));
+    let accepted_startup_input = build_startup_input(
+        StartupMode::New,
+        StartupExecutionMode::Session,
+        &bootstrap_url,
+        minimal_runtime_plan_json(),
+        None,
+    );
+    let accepted_session_input = SessionRuntimeInput::from_startup_input(&accepted_startup_input);
+    let mut state = SandboxdState::initialize(
+        &accepted_startup_input,
+        git_config_path.as_path(),
+        Arc::new(SystemClock),
+        Arc::new(ThreadSleeper),
+        None,
+    )
+    .expect("accepted session initialization should succeed");
+    let token_provider = state
+        .gateway_egress_token_provider
+        .as_ref()
+        .expect("initialized session should have gateway egress token provider")
+        .clone();
+    let rejected_activation_input = build_activation_input(
+        "ws://127.0.0.1:1/tunnel/sandbox/sbi_rejected_activation",
+        minimal_runtime_plan_json(),
+        None,
+    );
+
+    let error = state
+        .activate_initialized(
+            &rejected_activation_input,
+            &accepted_session_input,
+            git_config_path.as_path(),
+            None,
+        )
+        .expect_err("activation with unreachable candidate gateway should fail");
+
+    assert!(
+        error
+            .to_string()
+            .contains("failed to start bootstrap tunnel session")
+    );
+    let token = token_provider
+        .token()
+        .expect("rejected activation should restore provider attachment to accepted tunnel");
+    assert_eq!(token.token, "accepted-egress-jwt");
+
+    state
+        .close()
+        .expect("accepted session state should close cleanly");
+    gateway_thread
+        .join()
+        .expect("egress token gateway thread should exit after tunnel shutdown");
+    let _ = fs::remove_file(git_config_path);
+}
+
+#[test]
+fn initialized_activation_rejects_adding_egress_routes_when_no_proxy_is_running() {
+    let (bootstrap_url, gateway_thread) = start_snapshot_bootstrap_gateway();
+    let git_config_path = std::env::temp_dir().join(format!(
+        "mistle-activation-egress-route-drift-git-config-{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after unix epoch")
+            .as_nanos()
+    ));
+    let accepted_startup_input = build_startup_input(
+        StartupMode::New,
+        StartupExecutionMode::Session,
+        &bootstrap_url,
+        minimal_runtime_plan_json(),
+        None,
+    );
+    let accepted_session_input = SessionRuntimeInput::from_startup_input(&accepted_startup_input);
+    let mut state = SandboxdState::initialize(
+        &accepted_startup_input,
+        git_config_path.as_path(),
+        Arc::new(SystemClock),
+        Arc::new(ThreadSleeper),
+        None,
+    )
+    .expect("accepted session initialization should succeed");
+    assert!(
+        state.egress_proxy.is_none(),
+        "accepted fixture should start without an egress proxy"
+    );
+
+    let mut candidate_runtime_plan = minimal_runtime_plan_json();
+    candidate_runtime_plan["egressRoutes"] = serde_json::json!([
+        {
+            "egressRuleId": "egress-rule-1",
+            "bindingId": "binding-1",
+            "familyId": "family-1",
+            "variantId": "variant-1",
+            "match": {
+                "hosts": ["api.example.test"],
+                "pathPrefixes": ["/"],
+                "methods": ["GET"]
+            },
+            "upstream": {
+                "baseUrl": "https://api.example.test"
+            },
+            "authInjection": {
+                "type": "bearer",
+                "target": null,
+                "username": null,
+                "service": null,
+                "region": null
+            },
+            "additionalHeaders": null,
+            "additionalCredentialHeaders": null,
+            "credentialResolver": {
+                "kind": "integration_connection",
+                "connectionId": "connection-1",
+                "grant": "grant-token"
+            }
+        }
+    ]);
+    let rejected_activation_input =
+        build_activation_input(&bootstrap_url, candidate_runtime_plan, None);
+
+    let error = state
+        .activate_initialized(
+            &rejected_activation_input,
+            &accepted_session_input,
+            git_config_path.as_path(),
+            None,
+        )
+        .expect_err("activation should reject adding egress routes without proxy reconfiguration");
+
+    assert!(
+        error
+            .to_string()
+            .contains("initialized activation cannot change egress proxy input")
+    );
+    assert!(state.egress_proxy.is_none());
+
+    state
+        .close()
+        .expect("accepted session state should close cleanly");
+    gateway_thread
+        .join()
+        .expect("gateway thread should exit after tunnel shutdown");
+    let _ = fs::remove_file(git_config_path);
+}
+
+#[test]
 fn snapshot_materialization_state_rejects_resume() {
     let (bootstrap_url, gateway_thread) = start_snapshot_bootstrap_gateway();
+    let accepted_startup_input = build_startup_input(
+        StartupMode::New,
+        StartupExecutionMode::Snapshot,
+        &bootstrap_url,
+        minimal_runtime_plan_json(),
+        None,
+    );
     let mut state = SandboxdState::initialize(
-        &build_startup_input(
-            StartupMode::New,
-            StartupExecutionMode::Snapshot,
-            &bootstrap_url,
-            minimal_runtime_plan_json(),
-            None,
-        ),
+        &accepted_startup_input,
         Path::new(DEFAULT_GLOBAL_GIT_CONFIG_PATH),
         Arc::new(SystemClock),
         Arc::new(ThreadSleeper),
@@ -716,6 +1007,7 @@ fn snapshot_materialization_state_rejects_resume() {
                 minimal_runtime_plan_json(),
                 None,
             ),
+            &SessionRuntimeInput::from_startup_input(&accepted_startup_input),
             Path::new(DEFAULT_GLOBAL_GIT_CONFIG_PATH),
             None,
         )
@@ -729,6 +1021,68 @@ fn snapshot_materialization_state_rejects_resume() {
 
 fn start_snapshot_bootstrap_gateway() -> (String, thread::JoinHandle<()>) {
     start_bootstrap_gateway_with_connections(1, RuntimeReadyExpectation::OptionalFalseBeforeClose)
+}
+
+fn start_egress_token_bootstrap_gateway() -> (String, thread::JoinHandle<()>) {
+    let bootstrap_listener =
+        TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+    let bootstrap_url = format!(
+        "ws://127.0.0.1:{}/tunnel/sandbox/sbi_egress_token",
+        bootstrap_listener
+            .local_addr()
+            .expect("bootstrap listener should expose an address")
+            .port()
+    );
+    let gateway_thread = thread::spawn(move || {
+        let (stream, _) = bootstrap_listener
+            .accept()
+            .expect("gateway should accept the bootstrap tunnel");
+        let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
+
+        let telemetry_open = read_websocket_json_text_message(&mut websocket);
+        assert_eq!(telemetry_open["type"], "telemetry.open");
+        loop {
+            match websocket
+                .read()
+                .expect("websocket message should be readable")
+            {
+                Message::Text(payload) => {
+                    let message: serde_json::Value = serde_json::from_str(&payload)
+                        .expect("websocket text payload should be json");
+                    if message["type"] != "egress.token.request" {
+                        continue;
+                    }
+                    assert_eq!(
+                        message,
+                        serde_json::json!({
+                            "type": "egress.token.request",
+                            "requestId": "egress_token_req_1"
+                        })
+                    );
+                    websocket
+                        .send(Message::Text(
+                            serde_json::json!({
+                                "type": "egress.token.response",
+                                "requestId": "egress_token_req_1",
+                                "token": "accepted-egress-jwt",
+                                "expiresAt": "2100-01-01T00:00:00Z",
+                                "ttlMs": 300000
+                            })
+                            .to_string()
+                            .into(),
+                        ))
+                        .expect("gateway should return an egress token");
+                }
+                Message::Ping(payload) => websocket
+                    .send(Message::Pong(payload))
+                    .expect("pong should be sent"),
+                Message::Close(_) => break,
+                _ => {}
+            }
+        }
+    });
+
+    (bootstrap_url, gateway_thread)
 }
 
 fn start_bootstrap_gateway_with_connections(
@@ -890,6 +1244,23 @@ fn build_startup_input_with_operation_kind(
     }
 }
 
+fn build_activation_input(
+    tunnel_gateway_ws_url: &str,
+    runtime_plan: serde_json::Value,
+    git_identity: Option<GitIdentity>,
+) -> ActivationInput {
+    ActivationInput {
+        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+        bootstrap_token: "activation-bootstrap-token-value".to_string(),
+        tunnel_exchange_token: "activation-tunnel-exchange-token-value".to_string(),
+        tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),
+        acting_user_id: None,
+        runtime_plan,
+        git_identity,
+        transparent_proxy: None,
+    }
+}
+
 #[test]
 fn coordinated_codex_recovery_restarts_the_raw_app_server_and_recovers_the_proxy() {
     let raw_port = reserve_test_port();
@@ -1036,6 +1407,118 @@ fn runtime_readiness_projection_tracks_codex_component_health() {
 
     shutdown_requested.store(true, std::sync::atomic::Ordering::Relaxed);
     let _ = projection_thread.join();
+}
+
+#[test]
+fn activation_failure_restore_derives_runtime_readiness_from_restored_health_snapshot() {
+    let (bootstrap_url, gateway_thread) = start_bootstrap_gateway_with_connections(
+        1,
+        RuntimeReadyExpectation::OptionalFalseBeforeClose,
+    );
+    let session_input = SessionRuntimeInput::from_startup_input(&build_startup_input(
+        StartupMode::New,
+        StartupExecutionMode::Session,
+        &bootstrap_url,
+        minimal_runtime_plan_json(),
+        None,
+    ));
+    let supervisor_handle = SandboxdSupervisorHandle::new(
+        "sandbox-123",
+        Arc::new(SystemClock),
+        BTreeSet::from([
+            SupervisedComponent::TunnelSession,
+            SupervisedComponent::CodexProxy,
+            SupervisedComponent::CodexAppServer,
+        ]),
+    );
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+    let previous_tunnel_session =
+        super::start_minimal_tunnel_session(super::StartMinimalTunnelSessionInput {
+            session_input: &session_input,
+            keepalive_manager: keepalive_manager.clone(),
+            runtime_readiness_manager: runtime_readiness_manager.clone(),
+            clock: Arc::new(SystemClock),
+            sleeper: Arc::new(ThreadSleeper),
+            supervisor_handle: supervisor_handle.clone(),
+            diagnostics_logger: &None,
+        })
+        .expect("previous tunnel session should start");
+    let previous_tunnel_health_snapshot = supervisor_handle
+        .component_snapshot(SupervisedComponent::TunnelSession)
+        .expect("tunnel health should be tracked before failed activation");
+    supervisor_handle.replace_component_details(
+        SupervisedComponent::CodexProxy,
+        BTreeMap::from([
+            ("sessionManagerState".to_string(), "Connected".to_string()),
+            ("rawConnectivityState".to_string(), "Connected".to_string()),
+        ]),
+    );
+    supervisor_handle.mark_component_healthy(SupervisedComponent::CodexProxy);
+    supervisor_handle.mark_component_healthy(SupervisedComponent::CodexAppServer);
+    {
+        let mut runtime_readiness = runtime_readiness_manager
+            .lock()
+            .expect("runtime readiness lock should not be poisoned");
+        runtime_readiness.set_ready(true);
+        runtime_readiness.on_tunnel_connected();
+    }
+    supervisor_handle.mark_component_restarting(
+        SupervisedComponent::CodexAppServer,
+        "app server became unhealthy during failed activation",
+    );
+    supervisor_handle.mark_component_restarting(
+        SupervisedComponent::TunnelSession,
+        "candidate activation failed after replacing tunnel health",
+    );
+
+    let mut state = SandboxdState {
+        execution_mode: StartupExecutionMode::Session,
+        egress_proxy: None,
+        process_manager: None,
+        runtime_adapters: RuntimeAdapters::default(),
+        codex_app_server_observation_handle: None,
+        codex_app_server_control_handle: None,
+        opencode_server_control_handle: None,
+        codex_proxy_control_handle: None,
+        runtime_coordination_shutdown_requested: Arc::new(AtomicBool::new(false)),
+        runtime_coordination_thread: None,
+        runtime_readiness_shutdown_requested: Arc::new(AtomicBool::new(false)),
+        runtime_readiness_thread: None,
+        daemon_liveness_monitor: None,
+        supervisor_handle: supervisor_handle.clone(),
+        keepalive_manager,
+        runtime_readiness_manager: runtime_readiness_manager.clone(),
+        agent_endpoint_url: None,
+        runtime_env: BTreeMap::new(),
+        gateway_egress_token_provider: None,
+        clock: Arc::new(SystemClock),
+        sleeper: Arc::new(ThreadSleeper),
+        tunnel_session: None,
+    };
+
+    state.restore_previous_tunnel_session_after_activation_failure(
+        Some(previous_tunnel_session),
+        Some(previous_tunnel_health_snapshot.clone()),
+    );
+
+    assert_eq!(
+        supervisor_handle.component_snapshot(SupervisedComponent::TunnelSession),
+        Some(previous_tunnel_health_snapshot),
+        "rollback should restore the accepted tunnel health snapshot"
+    );
+    assert!(
+        !runtime_readiness_manager
+            .lock()
+            .expect("runtime readiness lock should not be poisoned")
+            .ready(),
+        "rollback must derive runtime readiness from current component health"
+    );
+
+    state.close().expect("test state should close cleanly");
+    gateway_thread
+        .join()
+        .expect("gateway thread should exit after tunnel shutdown");
 }
 
 fn reserve_test_port() -> u16 {

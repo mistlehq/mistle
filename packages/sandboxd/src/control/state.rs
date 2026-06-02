@@ -9,6 +9,7 @@ use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread::JoinHandle;
 
 use crate::control::{ControlError, InitPhase};
+use crate::protocol::activation::ActivationInput;
 use crate::protocol::startup::StartupInput;
 use crate::sandboxd_state::SandboxdState;
 
@@ -16,6 +17,7 @@ use crate::sandboxd_state::SandboxdState;
 pub(super) struct ControlServerState {
     pub(super) init_phase: InitPhase,
     pub(super) startup_input: Option<StartupInput>,
+    pub(super) activation_input: Option<ActivationInput>,
     pub(super) sandboxd_state: Option<SandboxdState>,
     pub(super) global_git_config_path: PathBuf,
     pub(super) shutdown_after_init: bool,

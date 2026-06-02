@@ -20,6 +20,8 @@ use crate::process;
 use crate::process::{
     CodexAppServerControlHandle, CodexAppServerObservationHandle, OpenCodeServerControlHandle,
 };
+use crate::protocol::activation::ActivationInput;
+use crate::protocol::session::SessionRuntimeInput;
 use crate::protocol::startup::{
     StartupExecutionMode, StartupInput, StartupMode, StartupOperationKind,
 };
@@ -56,7 +58,9 @@ use crate::sandboxd_state::snapshot::scrub_snapshot_runtime_artifacts;
 use crate::startup_diagnostics::{
     StartupDiagnosticsLogger, StartupTranscriptStream, startup_diagnostics_string,
 };
-use crate::supervision::{SandboxdHealthSnapshot, SandboxdSupervisorHandle};
+use crate::supervision::{
+    ComponentHealthSnapshot, SandboxdHealthSnapshot, SandboxdSupervisorHandle, SupervisedComponent,
+};
 use crate::time::{Clock, Sleeper};
 use crate::tunnel::session::{
     GatewayEgressTokenProvider, TunnelSession, TunnelSessionError, TunnelSigningRequest,
@@ -157,7 +161,56 @@ pub struct SandboxdState {
     tunnel_session: Option<TunnelSession>,
 }
 
+struct InitializeSessionInput<'a> {
+    session_input: &'a SessionRuntimeInput,
+    execution_mode: StartupExecutionMode,
+    is_snapshot: bool,
+    should_apply_runtime_plan: bool,
+    should_run_setup_script: bool,
+}
+
 impl SandboxdState {
+    /// Initializes a session from one activation input.
+    pub fn activate_new(
+        activation_input: &ActivationInput,
+        global_git_config_path: &Path,
+        clock: Arc<dyn Clock>,
+        sleeper: Arc<dyn Sleeper>,
+        diagnostics_logger: Option<StartupDiagnosticsLogger>,
+    ) -> Result<Self, SandboxdStateError> {
+        let session_input = SessionRuntimeInput::from_activation_input(activation_input);
+        let runtime_plan: runtime::CompiledRuntimePlan =
+            serde_json::from_value(session_input.runtime_plan.clone()).map_err(|error| {
+                let error_text = error.to_string();
+                record_runtime_plan_apply_failure(
+                    &diagnostics_logger,
+                    &RuntimePlanApplyError::InvalidRuntimePlan(error),
+                );
+                SandboxdStateError::ApplyRuntimePlan(error_text)
+            })?;
+        let uses_pre_materialized_snapshot =
+            runtime_plan.image.source == CompiledRuntimePlanImageSource::Snapshot;
+        let should_apply_runtime_plan = should_apply_runtime_plan_for_activation(
+            uses_pre_materialized_snapshot,
+            activation_input.operation_kind,
+        );
+        let should_run_setup_script =
+            should_run_setup_script_for_activation(should_apply_runtime_plan);
+        Self::initialize_session(
+            InitializeSessionInput {
+                session_input: &session_input,
+                execution_mode: StartupExecutionMode::Session,
+                is_snapshot: false,
+                should_apply_runtime_plan,
+                should_run_setup_script,
+            },
+            global_git_config_path,
+            clock,
+            sleeper,
+            diagnostics_logger,
+        )
+    }
+
     /// Initializes the sandbox runtime from one accepted startup input.
     pub fn initialize(
         startup_input: &StartupInput,
@@ -166,8 +219,9 @@ impl SandboxdState {
         sleeper: Arc<dyn Sleeper>,
         diagnostics_logger: Option<StartupDiagnosticsLogger>,
     ) -> Result<Self, SandboxdStateError> {
+        let session_input = SessionRuntimeInput::from_startup_input(startup_input);
         let runtime_plan: runtime::CompiledRuntimePlan =
-            serde_json::from_value(startup_input.runtime_plan.clone()).map_err(|error| {
+            serde_json::from_value(session_input.runtime_plan.clone()).map_err(|error| {
                 let error_text = error.to_string();
                 record_runtime_plan_apply_failure(
                     &diagnostics_logger,
@@ -185,10 +239,42 @@ impl SandboxdState {
             uses_pre_materialized_snapshot,
             startup_input,
         );
-        let sandbox_instance_id = derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)
+        Self::initialize_session(
+            InitializeSessionInput {
+                session_input: &session_input,
+                execution_mode: startup_input.execution_mode,
+                is_snapshot: startup_input.is_snapshot(),
+                should_apply_runtime_plan,
+                should_run_setup_script,
+            },
+            global_git_config_path,
+            clock,
+            sleeper,
+            diagnostics_logger,
+        )
+    }
+
+    fn initialize_session(
+        input: InitializeSessionInput<'_>,
+        global_git_config_path: &Path,
+        clock: Arc<dyn Clock>,
+        sleeper: Arc<dyn Sleeper>,
+        diagnostics_logger: Option<StartupDiagnosticsLogger>,
+    ) -> Result<Self, SandboxdStateError> {
+        let session_input = input.session_input;
+        let runtime_plan: runtime::CompiledRuntimePlan =
+            serde_json::from_value(session_input.runtime_plan.clone()).map_err(|error| {
+                let error_text = error.to_string();
+                record_runtime_plan_apply_failure(
+                    &diagnostics_logger,
+                    &RuntimePlanApplyError::InvalidRuntimePlan(error),
+                );
+                SandboxdStateError::ApplyRuntimePlan(error_text)
+            })?;
+        let sandbox_instance_id = derive_sandbox_instance_id(&session_input.tunnel_gateway_ws_url)
             .map_err(|error| SandboxdStateError::StartTunnelSession(error.to_string()))?;
         let mistle_context_env =
-            collect_mistle_context_runtime_environment(startup_input, &sandbox_instance_id)
+            collect_mistle_context_runtime_environment(session_input, &sandbox_instance_id)
                 .map_err(SandboxdStateError::StartRuntimeProcesses)?;
         let supervisor_handle = SandboxdSupervisorHandle::new(
             sandbox_instance_id.clone(),
@@ -197,14 +283,14 @@ impl SandboxdState {
         );
         let gateway_egress_token_provider = Some(GatewayEgressTokenProvider::new(
             sandbox_instance_id,
-            startup_input.acting_user_id.clone(),
+            session_input.acting_user_id.clone(),
         ));
-        let execution_mode = startup_input.execution_mode;
+        let execution_mode = input.execution_mode;
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
         let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
         let mut startup_tunnel_session = Some(start_minimal_tunnel_session(
             StartMinimalTunnelSessionInput {
-                startup_input,
+                session_input,
                 keepalive_manager: keepalive_manager.clone(),
                 runtime_readiness_manager: runtime_readiness_manager.clone(),
                 clock: clock.clone(),
@@ -227,9 +313,9 @@ impl SandboxdState {
             "apply_git_identity",
             timeline_attributes("git-identity", "Configuring Git"),
         );
-        if !startup_input.is_snapshot()
+        if !input.is_snapshot
             && let Err(error) =
-                runtime::git_identity::apply_git_identity(startup_input, global_git_config_path)
+                runtime::git_identity::apply_git_identity(session_input, global_git_config_path)
         {
             let mut attributes = timeline_attributes("git-identity", "Configuring Git");
             attributes.insert(
@@ -267,7 +353,7 @@ impl SandboxdState {
         );
         egress_proxy = match EgressProxy::start(
             &runtime_plan,
-            startup_input,
+            session_input,
             gateway_egress_token_provider.clone(),
             clock.clone(),
             supervisor_handle.clone(),
@@ -363,7 +449,7 @@ impl SandboxdState {
             return Err(error);
         }
 
-        if should_apply_runtime_plan {
+        if input.should_apply_runtime_plan {
             let runtime_plan_observer = RuntimePlanTimelineObserver {
                 diagnostics_logger: diagnostics_logger.clone(),
             };
@@ -390,7 +476,7 @@ impl SandboxdState {
                 }
             }
         }
-        if should_run_setup_script {
+        if input.should_run_setup_script {
             record_operation_phase_started_with_attributes(
                 &diagnostics_logger,
                 "run_setup_script",
@@ -445,7 +531,7 @@ impl SandboxdState {
                 }
             }
         }
-        if startup_input.is_snapshot() {
+        if input.is_snapshot {
             // Snapshot materialization captures image-layer state only, so snapshot workflows stop
             // here before starting session runtime resources.
             record_operation_phase_started(&diagnostics_logger, "stop_egress_proxy");
@@ -549,7 +635,7 @@ impl SandboxdState {
         };
         let runtime_adapters = RuntimeAdapterRegistry
             .start_with_supervisor_and_observer(
-                startup_input,
+                session_input,
                 keepalive_manager.clone(),
                 runtime_readiness_manager.clone(),
                 supervisor_handle.clone(),
@@ -724,9 +810,11 @@ impl SandboxdState {
     pub fn resume(
         &mut self,
         startup_input: &StartupInput,
+        accepted_session_input: &SessionRuntimeInput,
         global_git_config_path: &Path,
         diagnostics_logger: Option<StartupDiagnosticsLogger>,
     ) -> Result<(), SandboxdStateError> {
+        let session_input = SessionRuntimeInput::from_startup_input(startup_input);
         if self.execution_mode == StartupExecutionMode::Snapshot || startup_input.is_snapshot() {
             return Err(SandboxdStateError::StartTunnelSession(
                 "snapshot materialization sandboxes do not support resume".to_string(),
@@ -752,7 +840,7 @@ impl SandboxdState {
             };
 
         let tunnel_session = start_minimal_tunnel_session(StartMinimalTunnelSessionInput {
-            startup_input,
+            session_input: &session_input,
             keepalive_manager: self.keepalive_manager.clone(),
             runtime_readiness_manager: self.runtime_readiness_manager.clone(),
             clock: self.clock.clone(),
@@ -774,7 +862,7 @@ impl SandboxdState {
             timeline_attributes("git-identity", "Configuring Git"),
         );
         if let Err(error) =
-            runtime::git_identity::apply_git_identity(startup_input, global_git_config_path)
+            runtime::git_identity::apply_git_identity(&session_input, global_git_config_path)
         {
             let mut attributes = timeline_attributes("git-identity", "Configuring Git");
             attributes.insert(
@@ -787,6 +875,15 @@ impl SandboxdState {
                 &diagnostics_logger,
                 "stop_tunnel_session_after_git_identity_failure",
             );
+            if let Err(restore_error) = restore_accepted_git_identity_after_activation_failure(
+                accepted_session_input,
+                global_git_config_path,
+                "apply resume Git identity",
+            ) {
+                return Err(SandboxdStateError::ApplyGitIdentity(format!(
+                    "{error}; {restore_error}"
+                )));
+            }
             return Err(SandboxdStateError::ApplyGitIdentity(error));
         }
         record_operation_phase_completed_with_attributes(
@@ -795,9 +892,19 @@ impl SandboxdState {
             timeline_attributes("git-identity", "Configuring Git"),
         );
         if let Some(provider) = &self.gateway_egress_token_provider {
-            provider
-                .set_acting_user_id(startup_input.acting_user_id.clone())
-                .map_err(|error| SandboxdStateError::StartTunnelSession(error.to_string()))?;
+            if let Err(error) = provider.set_acting_user_id(session_input.acting_user_id.clone()) {
+                close_tunnel_session(
+                    tunnel_session,
+                    &diagnostics_logger,
+                    "stop_tunnel_session_after_gateway_egress_token_provider_failure",
+                );
+                restore_accepted_git_identity_after_activation_failure(
+                    accepted_session_input,
+                    global_git_config_path,
+                    "attach gateway egress token provider to resume tunnel",
+                )?;
+                return Err(SandboxdStateError::StartTunnelSession(error.to_string()));
+            }
             tunnel_session.attach_gateway_egress_token_provider(provider);
         }
         if let Err(error) = attach_runtime_environment_to_tunnel(
@@ -810,6 +917,11 @@ impl SandboxdState {
                 &diagnostics_logger,
                 "stop_tunnel_session_after_runtime_environment_failure",
             );
+            restore_accepted_git_identity_after_activation_failure(
+                accepted_session_input,
+                global_git_config_path,
+                "attach runtime environment to resume tunnel",
+            )?;
             return Err(error);
         }
         record_operation_phase_started_with_attributes(
@@ -833,6 +945,11 @@ impl SandboxdState {
                 &diagnostics_logger,
                 "stop_tunnel_session_after_agent_endpoint_attach_failure",
             );
+            restore_accepted_git_identity_after_activation_failure(
+                accepted_session_input,
+                global_git_config_path,
+                "attach runtime agent endpoint to resume tunnel",
+            )?;
             return Err(SandboxdStateError::StartTunnelSession(error.to_string()));
         }
         record_operation_phase_completed_with_attributes(
@@ -851,6 +968,301 @@ impl SandboxdState {
         );
 
         Ok(())
+    }
+
+    /// Refreshes live session resources from one activation input.
+    pub fn activate_initialized(
+        &mut self,
+        activation_input: &ActivationInput,
+        accepted_session_input: &SessionRuntimeInput,
+        global_git_config_path: &Path,
+        diagnostics_logger: Option<StartupDiagnosticsLogger>,
+    ) -> Result<(), SandboxdStateError> {
+        let session_input = SessionRuntimeInput::from_activation_input(activation_input);
+        if self.execution_mode == StartupExecutionMode::Snapshot {
+            return Err(SandboxdStateError::StartTunnelSession(
+                "snapshot materialization sandboxes do not support activation".to_string(),
+            ));
+        }
+        if !initialized_activation_egress_inputs_match(
+            self.egress_proxy.is_some(),
+            accepted_session_input,
+            &session_input,
+        ) {
+            return Err(SandboxdStateError::StartEgressProxy(
+                "initialized activation cannot change egress proxy input".to_string(),
+            ));
+        }
+        let previous_tunnel_health_snapshot = self
+            .supervisor_handle
+            .component_snapshot(SupervisedComponent::TunnelSession);
+        let gateway_egress_provider_detached =
+            if let Some(provider) = &self.gateway_egress_token_provider {
+                provider
+                    .detach()
+                    .map_err(|error| SandboxdStateError::StartTunnelSession(error.to_string()))?;
+                true
+            } else {
+                false
+            };
+        let previous_tunnel_session = self.tunnel_session.take();
+
+        let agent_endpoint_url =
+            if let Some(codex_proxy_control_handle) = &self.codex_proxy_control_handle {
+                Some(codex_proxy_control_handle.listen_url().to_string())
+            } else {
+                self.agent_endpoint_url.clone()
+            };
+
+        let tunnel_session = match start_minimal_tunnel_session(StartMinimalTunnelSessionInput {
+            session_input: &session_input,
+            keepalive_manager: self.keepalive_manager.clone(),
+            runtime_readiness_manager: self.runtime_readiness_manager.clone(),
+            clock: self.clock.clone(),
+            sleeper: self.sleeper.clone(),
+            supervisor_handle: self.supervisor_handle.clone(),
+            diagnostics_logger: &diagnostics_logger,
+        }) {
+            Ok(tunnel_session) => tunnel_session,
+            Err(error) => {
+                self.restore_previous_tunnel_session_after_activation_failure(
+                    previous_tunnel_session,
+                    previous_tunnel_health_snapshot,
+                );
+                restore_accepted_gateway_egress_actor_after_activation_failure(
+                    &self.gateway_egress_token_provider,
+                    accepted_session_input,
+                    false,
+                    gateway_egress_provider_detached,
+                    self.tunnel_session.as_ref(),
+                )?;
+                return Err(error);
+            }
+        };
+        if let Some(logger) = &diagnostics_logger {
+            logger.attach_operation_sender(tunnel_session.operation_record_sender());
+            record_operation_phase_completed_with_attributes(
+                &diagnostics_logger,
+                "start_tunnel_session",
+                timeline_attributes("tunnel", "Connecting tunnel"),
+            );
+        }
+        record_operation_phase_started_with_attributes(
+            &diagnostics_logger,
+            "apply_git_identity",
+            timeline_attributes("git-identity", "Configuring Git"),
+        );
+        if let Err(error) =
+            runtime::git_identity::apply_git_identity(&session_input, global_git_config_path)
+        {
+            let mut attributes = timeline_attributes("git-identity", "Configuring Git");
+            attributes.insert(
+                "error".to_string(),
+                startup_diagnostics_string(error.clone()),
+            );
+            record_operation_phase_failure(&diagnostics_logger, "apply_git_identity", attributes);
+            close_tunnel_session(
+                tunnel_session,
+                &diagnostics_logger,
+                "stop_tunnel_session_after_git_identity_failure",
+            );
+            let git_restore_result = restore_accepted_git_identity_after_activation_failure(
+                accepted_session_input,
+                global_git_config_path,
+                "apply candidate Git identity",
+            );
+            self.restore_previous_tunnel_session_after_activation_failure(
+                previous_tunnel_session,
+                previous_tunnel_health_snapshot,
+            );
+            let gateway_restore_result =
+                restore_accepted_gateway_egress_actor_after_activation_failure(
+                    &self.gateway_egress_token_provider,
+                    accepted_session_input,
+                    false,
+                    gateway_egress_provider_detached,
+                    self.tunnel_session.as_ref(),
+                );
+            if let Err(gateway_restore_error) = gateway_restore_result {
+                return Err(SandboxdStateError::ApplyGitIdentity(format!(
+                    "{error}; {gateway_restore_error}"
+                )));
+            }
+            if let Err(restore_error) = git_restore_result {
+                return Err(SandboxdStateError::ApplyGitIdentity(format!(
+                    "{error}; {restore_error}"
+                )));
+            }
+            return Err(SandboxdStateError::ApplyGitIdentity(error));
+        }
+        record_operation_phase_completed_with_attributes(
+            &diagnostics_logger,
+            "apply_git_identity",
+            timeline_attributes("git-identity", "Configuring Git"),
+        );
+        if let Err(error) = attach_runtime_environment_to_tunnel(
+            &tunnel_session,
+            self.runtime_env.clone(),
+            &diagnostics_logger,
+        ) {
+            close_tunnel_session(
+                tunnel_session,
+                &diagnostics_logger,
+                "stop_tunnel_session_after_runtime_environment_failure",
+            );
+            self.restore_previous_tunnel_session_after_activation_failure(
+                previous_tunnel_session,
+                previous_tunnel_health_snapshot,
+            );
+            restore_accepted_activation_runtime_mutations_after_failure(
+                &self.gateway_egress_token_provider,
+                accepted_session_input,
+                false,
+                gateway_egress_provider_detached,
+                self.tunnel_session.as_ref(),
+                global_git_config_path,
+                "attach runtime environment to tunnel",
+            )?;
+            return Err(error);
+        }
+        record_operation_phase_started_with_attributes(
+            &diagnostics_logger,
+            "attach_runtime_agent_endpoint",
+            hidden_timeline_attributes(),
+        );
+        if let Err(error) = tunnel_session.set_agent_endpoint_url(agent_endpoint_url) {
+            let mut attributes = hidden_timeline_attributes();
+            attributes.insert(
+                "error".to_string(),
+                startup_diagnostics_string(error.to_string()),
+            );
+            record_operation_phase_failure(
+                &diagnostics_logger,
+                "attach_runtime_agent_endpoint",
+                attributes,
+            );
+            close_tunnel_session(
+                tunnel_session,
+                &diagnostics_logger,
+                "stop_tunnel_session_after_agent_endpoint_attach_failure",
+            );
+            self.restore_previous_tunnel_session_after_activation_failure(
+                previous_tunnel_session,
+                previous_tunnel_health_snapshot,
+            );
+            restore_accepted_activation_runtime_mutations_after_failure(
+                &self.gateway_egress_token_provider,
+                accepted_session_input,
+                false,
+                gateway_egress_provider_detached,
+                self.tunnel_session.as_ref(),
+                global_git_config_path,
+                "attach runtime agent endpoint to tunnel",
+            )?;
+            return Err(SandboxdStateError::StartTunnelSession(error.to_string()));
+        }
+        record_operation_phase_completed_with_attributes(
+            &diagnostics_logger,
+            "attach_runtime_agent_endpoint",
+            hidden_timeline_attributes(),
+        );
+        if let Some(provider) = &self.gateway_egress_token_provider {
+            if let Err(error) = provider.set_acting_user_id(session_input.acting_user_id.clone()) {
+                close_tunnel_session(
+                    tunnel_session,
+                    &diagnostics_logger,
+                    "stop_tunnel_session_after_gateway_egress_token_provider_failure",
+                );
+                self.restore_previous_tunnel_session_after_activation_failure(
+                    previous_tunnel_session,
+                    previous_tunnel_health_snapshot,
+                );
+                restore_accepted_activation_runtime_mutations_after_failure(
+                    &self.gateway_egress_token_provider,
+                    accepted_session_input,
+                    false,
+                    gateway_egress_provider_detached,
+                    self.tunnel_session.as_ref(),
+                    global_git_config_path,
+                    "set gateway egress token provider actor",
+                )?;
+                return Err(SandboxdStateError::StartTunnelSession(error.to_string()));
+            }
+            tunnel_session.attach_gateway_egress_token_provider(provider);
+        }
+        record_operation_phase_started(&diagnostics_logger, "ready");
+        close_operation_stream(&diagnostics_logger);
+        if let Some(previous_tunnel_session) = previous_tunnel_session {
+            close_tunnel_session(
+                previous_tunnel_session,
+                &diagnostics_logger,
+                "stop_previous_tunnel_session_after_activation_refresh",
+            );
+        }
+        self.supervisor_handle.replace_component_details(
+            SupervisedComponent::TunnelSession,
+            BTreeMap::from([(
+                "gatewayWsUrl".to_string(),
+                session_input.tunnel_gateway_ws_url.clone(),
+            )]),
+        );
+        self.supervisor_handle
+            .mark_component_healthy(SupervisedComponent::TunnelSession);
+        self.tunnel_session = Some(tunnel_session);
+        let runtime_readiness_mode = determine_runtime_readiness_mode(&self.supervisor_handle);
+        sync_runtime_readiness_from_snapshot(
+            &self.supervisor_handle,
+            &self.runtime_readiness_manager,
+            runtime_readiness_mode,
+        );
+        self.mark_accepted_tunnel_connected();
+
+        Ok(())
+    }
+
+    fn restore_previous_tunnel_session_after_activation_failure(
+        &mut self,
+        previous_tunnel_session: Option<TunnelSession>,
+        previous_tunnel_health_snapshot: Option<ComponentHealthSnapshot>,
+    ) {
+        let has_previous_tunnel_session = previous_tunnel_session.is_some();
+        self.tunnel_session = previous_tunnel_session;
+        if !has_previous_tunnel_session {
+            return;
+        }
+        if let Some(snapshot) = previous_tunnel_health_snapshot {
+            self.supervisor_handle.restore_component_snapshot(snapshot);
+        }
+        let runtime_readiness_mode = determine_runtime_readiness_mode(&self.supervisor_handle);
+        sync_runtime_readiness_from_snapshot(
+            &self.supervisor_handle,
+            &self.runtime_readiness_manager,
+            runtime_readiness_mode,
+        );
+        self.mark_accepted_tunnel_connected();
+    }
+
+    fn mark_accepted_tunnel_connected(&self) {
+        self.mark_keepalive_tunnel_connected();
+        match self.runtime_readiness_manager.lock() {
+            Ok(mut runtime_readiness_manager) => runtime_readiness_manager.on_tunnel_connected(),
+            Err(error) => {
+                eprintln!(
+                    "sandboxd failed to reconnect runtime readiness after activation refresh: {error}"
+                );
+            }
+        }
+    }
+
+    fn mark_keepalive_tunnel_connected(&self) {
+        match self.keepalive_manager.lock() {
+            Ok(mut keepalive_manager) => keepalive_manager.on_tunnel_connected(self.clock.as_ref()),
+            Err(error) => {
+                eprintln!(
+                    "sandboxd failed to reconnect keepalive after activation refresh: {error}"
+                );
+            }
+        }
     }
 
     pub fn request_signing(
@@ -1103,6 +1515,111 @@ fn should_run_setup_script_for_startup(
             || is_snapshot_preparation_operation(startup_input.operation_kind))
 }
 
+fn should_run_setup_script_for_activation(should_apply_runtime_plan: bool) -> bool {
+    should_apply_runtime_plan
+}
+
+fn egress_proxy_inputs_match(
+    accepted_session_input: &SessionRuntimeInput,
+    candidate_session_input: &SessionRuntimeInput,
+) -> bool {
+    accepted_session_input.tunnel_gateway_ws_url == candidate_session_input.tunnel_gateway_ws_url
+        && accepted_session_input.transparent_proxy == candidate_session_input.transparent_proxy
+        && runtime_plan_egress_routes(&accepted_session_input.runtime_plan)
+            == runtime_plan_egress_routes(&candidate_session_input.runtime_plan)
+}
+
+fn initialized_activation_egress_inputs_match(
+    egress_proxy_is_running: bool,
+    accepted_session_input: &SessionRuntimeInput,
+    candidate_session_input: &SessionRuntimeInput,
+) -> bool {
+    if egress_proxy_is_running {
+        return egress_proxy_inputs_match(accepted_session_input, candidate_session_input);
+    }
+
+    accepted_session_input.transparent_proxy == candidate_session_input.transparent_proxy
+        && runtime_plan_egress_routes(&accepted_session_input.runtime_plan)
+            == runtime_plan_egress_routes(&candidate_session_input.runtime_plan)
+}
+
+fn runtime_plan_egress_routes(runtime_plan: &serde_json::Value) -> Option<&serde_json::Value> {
+    runtime_plan.get("egressRoutes")
+}
+
+fn restore_accepted_git_identity_after_activation_failure(
+    accepted_session_input: &SessionRuntimeInput,
+    global_git_config_path: &Path,
+    failed_step: &str,
+) -> Result<(), SandboxdStateError> {
+    runtime::git_identity::apply_git_identity(accepted_session_input, global_git_config_path)
+        .map_err(|error| {
+            SandboxdStateError::ApplyGitIdentity(format!(
+                "failed to restore accepted Git identity after activation failure in {failed_step}: {error}"
+            ))
+        })
+}
+
+fn restore_accepted_gateway_egress_actor_after_activation_failure(
+    provider: &Option<GatewayEgressTokenProvider>,
+    accepted_session_input: &SessionRuntimeInput,
+    actor_may_have_changed: bool,
+    provider_was_detached: bool,
+    accepted_tunnel_session: Option<&TunnelSession>,
+) -> Result<(), SandboxdStateError> {
+    let Some(provider) = provider else {
+        return Ok(());
+    };
+    if actor_may_have_changed {
+        provider
+            .set_acting_user_id(accepted_session_input.acting_user_id.clone())
+            .map_err(|error| SandboxdStateError::StartTunnelSession(error.to_string()))?;
+    }
+    if provider_was_detached && let Some(accepted_tunnel_session) = accepted_tunnel_session {
+        accepted_tunnel_session.attach_gateway_egress_token_provider(provider);
+    }
+    Ok(())
+}
+
+fn restore_accepted_activation_runtime_mutations_after_failure(
+    provider: &Option<GatewayEgressTokenProvider>,
+    accepted_session_input: &SessionRuntimeInput,
+    gateway_egress_actor_may_have_changed: bool,
+    gateway_egress_provider_was_detached: bool,
+    accepted_tunnel_session: Option<&TunnelSession>,
+    global_git_config_path: &Path,
+    failed_step: &str,
+) -> Result<(), SandboxdStateError> {
+    let gateway_restore_result = restore_accepted_gateway_egress_actor_after_activation_failure(
+        provider,
+        accepted_session_input,
+        gateway_egress_actor_may_have_changed,
+        gateway_egress_provider_was_detached,
+        accepted_tunnel_session,
+    );
+    let git_restore_result = restore_accepted_git_identity_after_activation_failure(
+        accepted_session_input,
+        global_git_config_path,
+        failed_step,
+    );
+
+    match (gateway_restore_result, git_restore_result) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(gateway_error), Ok(())) => Err(gateway_error),
+        (Ok(()), Err(git_error)) => Err(git_error),
+        (Err(gateway_error), Err(git_error)) => Err(SandboxdStateError::StartTunnelSession(
+            format!("{gateway_error}; {git_error}"),
+        )),
+    }
+}
+
+fn should_apply_runtime_plan_for_activation(
+    uses_pre_materialized_snapshot: bool,
+    operation_kind: StartupOperationKind,
+) -> bool {
+    !uses_pre_materialized_snapshot || is_snapshot_preparation_operation(operation_kind)
+}
+
 fn should_apply_runtime_plan_for_startup(
     uses_pre_materialized_snapshot: bool,
     startup_input: &StartupInput,
@@ -1113,7 +1630,7 @@ fn should_apply_runtime_plan_for_startup(
 }
 
 struct StartMinimalTunnelSessionInput<'a> {
-    startup_input: &'a StartupInput,
+    session_input: &'a SessionRuntimeInput,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     clock: Arc<dyn Clock>,
@@ -1130,8 +1647,8 @@ fn start_minimal_tunnel_session(
         "start_tunnel_session",
         timeline_attributes("tunnel", "Connecting tunnel"),
     );
-    let tunnel_session = TunnelSession::start_minimal_with_supervisor(
-        input.startup_input,
+    let tunnel_session = TunnelSession::start_minimal_session_input_with_supervisor(
+        input.session_input,
         input.keepalive_manager,
         input.runtime_readiness_manager,
         input.clock,

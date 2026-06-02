@@ -27,7 +27,8 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use tracing::{field, info, warn};
 use url::Url;
 
-use crate::protocol::startup::{StartupInput, TransparentProxyBypassKind};
+use crate::protocol::session::SessionRuntimeInput;
+use crate::protocol::startup::TransparentProxyBypassKind;
 use crate::supervision::SupervisedComponent;
 use crate::time::{Duration, Sleeper};
 use crate::tunnel::telemetry::TelemetryRelayFrame;
@@ -487,9 +488,9 @@ fn configure_bootstrap_transparent_passthrough_socket(
 }
 
 pub(super) fn startup_transparent_passthrough_socket_mark(
-    startup_input: &StartupInput,
+    session_input: &SessionRuntimeInput,
 ) -> Option<u32> {
-    let transparent_proxy = startup_input.transparent_proxy.as_ref()?;
+    let transparent_proxy = session_input.transparent_proxy.as_ref()?;
     match transparent_proxy.passthrough_bypass.kind {
         TransparentProxyBypassKind::SocketMark => Some(transparent_proxy.passthrough_bypass.mark),
     }
@@ -1111,7 +1112,9 @@ mod tests {
         };
 
         assert_eq!(
-            startup_transparent_passthrough_socket_mark(&startup_input),
+            startup_transparent_passthrough_socket_mark(
+                &crate::protocol::session::SessionRuntimeInput::from_startup_input(&startup_input)
+            ),
             Some(38_514)
         );
     }

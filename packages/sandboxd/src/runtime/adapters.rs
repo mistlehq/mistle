@@ -19,6 +19,7 @@ use crate::opencode_proxy::{
     start_opencode_proxy_with_supervisor,
 };
 use crate::pi_proxy::{PiProxy, PiProxyConfig, PiProxyError, start_pi_proxy_with_supervisor};
+use crate::protocol::session::SessionRuntimeInput;
 use crate::protocol::startup::StartupInput;
 use crate::runtime::plan::{
     CompiledAgentRuntime, CompiledRuntimePlan, RuntimeClientConnectionMode,
@@ -244,14 +245,15 @@ impl RuntimeAdapterRegistry {
         keepalive_manager: Arc<Mutex<KeepaliveManager>>,
         runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     ) -> Result<RuntimeAdapters, RuntimeAdapterRegistryError> {
-        let sandbox_instance_id = derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)
+        let session_input = SessionRuntimeInput::from_startup_input(startup_input);
+        let sandbox_instance_id = derive_sandbox_instance_id(&session_input.tunnel_gateway_ws_url)
             .map_err(|error| {
                 RuntimeAdapterRegistryError::StartCodexProxy(CodexProxyError::ConfigureRuntime(
                     error.to_string(),
                 ))
             })?;
         let runtime_plan: CompiledRuntimePlan =
-            serde_json::from_value(startup_input.runtime_plan.clone())
+            serde_json::from_value(session_input.runtime_plan.clone())
                 .map_err(RuntimeAdapterRegistryError::InvalidRuntimePlan)?;
         let supervisor_handle = SandboxdSupervisorHandle::new(
             sandbox_instance_id,
@@ -260,7 +262,7 @@ impl RuntimeAdapterRegistry {
         );
 
         self.start_with_supervisor(
-            startup_input,
+            &session_input,
             keepalive_manager,
             runtime_readiness_manager,
             supervisor_handle,
@@ -270,13 +272,13 @@ impl RuntimeAdapterRegistry {
     /// Starts all runtime-specific adapters using the shared supervisor boundary.
     pub fn start_with_supervisor(
         &self,
-        startup_input: &StartupInput,
+        session_input: &SessionRuntimeInput,
         keepalive_manager: Arc<Mutex<KeepaliveManager>>,
         runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
         supervisor_handle: SandboxdSupervisorHandle,
     ) -> Result<RuntimeAdapters, RuntimeAdapterRegistryError> {
         self.start_with_supervisor_and_observer(
-            startup_input,
+            session_input,
             keepalive_manager,
             runtime_readiness_manager,
             supervisor_handle,
@@ -287,14 +289,14 @@ impl RuntimeAdapterRegistry {
     /// Starts all runtime-specific adapters using the shared supervisor boundary and observer.
     pub fn start_with_supervisor_and_observer(
         &self,
-        startup_input: &StartupInput,
+        session_input: &SessionRuntimeInput,
         keepalive_manager: Arc<Mutex<KeepaliveManager>>,
         runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
         supervisor_handle: SandboxdSupervisorHandle,
         observer: Option<&dyn RuntimeAdapterLifecycleObserver>,
     ) -> Result<RuntimeAdapters, RuntimeAdapterRegistryError> {
         let runtime_plan: CompiledRuntimePlan =
-            serde_json::from_value(startup_input.runtime_plan.clone())
+            serde_json::from_value(session_input.runtime_plan.clone())
                 .map_err(RuntimeAdapterRegistryError::InvalidRuntimePlan)?;
 
         let mut seen_runtime_ids = BTreeSet::new();

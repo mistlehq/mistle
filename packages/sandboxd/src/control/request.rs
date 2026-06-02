@@ -19,7 +19,9 @@ use crate::control::state::{
     wait_for_init_completion,
 };
 use crate::control::{ControlError, InitPhase};
-use crate::protocol::startup::StartupInput;
+use crate::protocol::activation::ActivationInput;
+use crate::protocol::session::SessionRuntimeInput;
+use crate::protocol::startup::{StartupInput, StartupOperationKind};
 use crate::sandboxd_state::{SandboxdState, SandboxdStateError};
 use crate::security;
 use crate::startup_diagnostics::{
@@ -67,6 +69,10 @@ pub(super) fn handle_connection(
             begin_resume(startup_input, state)?;
             Ok(ControlResponse::ok(None))
         }
+        ControlRequest::Activate { activation_input } => {
+            begin_activate(activation_input, state, init_thread, init_completion)?;
+            Ok(ControlResponse::ok(None))
+        }
         ControlRequest::WaitInit => {
             begin_wait_init(state, init_thread)?;
             Ok(ControlResponse::ok(None))
@@ -99,12 +105,23 @@ fn begin_sign(
     state: &Arc<Mutex<crate::control::state::ControlServerState>>,
 ) -> Result<String, ControlError> {
     let state_guard = lock_control_state(state)?;
-    let startup_input = state_guard.startup_input.as_ref().ok_or_else(|| {
-        ControlError::StartupRequestRejected("sandboxd is not initialized".to_string())
-    })?;
-    let git_signing_config = startup_input
-        .git_identity
-        .as_ref()
+    let (git_identity, tunnel_gateway_ws_url) =
+        if let Some(activation_input) = state_guard.activation_input.as_ref() {
+            (
+                activation_input.git_identity.as_ref(),
+                activation_input.tunnel_gateway_ws_url.as_str(),
+            )
+        } else if let Some(startup_input) = state_guard.startup_input.as_ref() {
+            (
+                startup_input.git_identity.as_ref(),
+                startup_input.tunnel_gateway_ws_url.as_str(),
+            )
+        } else {
+            return Err(ControlError::StartupRequestRejected(
+                "sandboxd is not initialized".to_string(),
+            ));
+        };
+    let git_signing_config = git_identity
         .and_then(|git_identity| git_identity.signing.as_ref())
         .ok_or_else(|| {
             ControlError::StartupRequestRejected(
@@ -124,7 +141,7 @@ fn begin_sign(
         ));
     }
 
-    let sandbox_instance_id = derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)
+    let sandbox_instance_id = derive_sandbox_instance_id(tunnel_gateway_ws_url)
         .map_err(|error| ControlError::InitializeSandboxdState(error.to_string()))?;
     let request_id = format!(
         "sign_req_{}",
@@ -188,6 +205,11 @@ fn begin_init(
                 state_guard.startup_input = Some(startup_input.clone());
             }
             InitPhase::Initializing => {
+                reject_different_duplicate_init(
+                    state_guard.startup_input.as_ref(),
+                    &startup_input,
+                    "sandboxd initialization is already running with different startup input",
+                )?;
                 drop(state_guard);
                 if wait_for_completion {
                     match wait_for_init_completion(state, init_completion)? {
@@ -207,6 +229,11 @@ fn begin_init(
                 return Ok(());
             }
             InitPhase::Initialized => {
+                reject_different_duplicate_init(
+                    state_guard.startup_input.as_ref(),
+                    &startup_input,
+                    "sandboxd is already initialized with different startup input",
+                )?;
                 return Ok(());
             }
             InitPhase::Failed(error) => {
@@ -322,6 +349,17 @@ fn publish_init_failure(
     Ok(())
 }
 
+fn reject_different_duplicate_init(
+    accepted_startup_input: Option<&StartupInput>,
+    candidate_startup_input: &StartupInput,
+    message: &str,
+) -> Result<(), ControlError> {
+    if accepted_startup_input == Some(candidate_startup_input) {
+        return Ok(());
+    }
+    Err(ControlError::StartupRequestRejected(message.to_string()))
+}
+
 fn begin_resume(
     startup_input: StartupInput,
     state: &Arc<Mutex<crate::control::state::ControlServerState>>,
@@ -336,7 +374,7 @@ fn begin_resume(
     {
         eprintln!("sandboxd failed to record resume diagnostics start event: {error}");
     }
-    let mut sandboxd_state = {
+    let resume_state = {
         let mut state_guard = lock_control_state(state)?;
         match &state_guard.init_phase {
             InitPhase::Uninitialized => {
@@ -350,12 +388,14 @@ fn begin_resume(
                 ));
             }
             InitPhase::Initialized => {
-                state_guard.startup_input = Some(startup_input.clone());
-                state_guard.sandboxd_state.take().ok_or_else(|| {
+                let accepted_session_input =
+                    accepted_session_input_from_control_state(&state_guard)?;
+                let sandboxd_state = state_guard.sandboxd_state.take().ok_or_else(|| {
                     ControlError::ResumeSandboxdState(
                         "sandboxd state is missing for an initialized daemon".to_string(),
                     )
-                })?
+                })?;
+                (sandboxd_state, accepted_session_input)
             }
             InitPhase::Failed(error) => {
                 return Err(ControlError::StartupRequestRejected(format!(
@@ -364,11 +404,13 @@ fn begin_resume(
             }
         }
     };
+    let (mut sandboxd_state, accepted_session_input) = resume_state;
     let global_git_config_path = lock_control_state(state)?.global_git_config_path.clone();
 
     let resume_result = sandboxd_state
         .resume(
             &startup_input,
+            &accepted_session_input,
             &global_git_config_path,
             diagnostics_logger.clone(),
         )
@@ -387,9 +429,238 @@ fn begin_resume(
             ControlError::ResumeSandboxdState(error_text)
         });
 
-    lock_control_state(state)?.sandboxd_state = Some(sandboxd_state);
+    let mut state_guard = lock_control_state(state)?;
+    if resume_result.is_ok() {
+        state_guard.startup_input = Some(startup_input);
+        state_guard.activation_input = None;
+    }
+    state_guard.sandboxd_state = Some(sandboxd_state);
 
     resume_result
+}
+
+fn begin_activate(
+    activation_input: ActivationInput,
+    state: &Arc<Mutex<crate::control::state::ControlServerState>>,
+    init_thread: &SharedInitThread,
+    init_completion: &InitCompletion,
+) -> Result<(), ControlError> {
+    validate_activation_operation_kind(activation_input.operation_kind)?;
+    loop {
+        {
+            let mut state_guard = lock_control_state(state)?;
+            match &state_guard.init_phase {
+                InitPhase::Uninitialized => {
+                    state_guard.init_phase = InitPhase::Initializing;
+                    state_guard.activation_input = Some(activation_input.clone());
+                    drop(state_guard);
+                    start_activation_init_worker(
+                        activation_input.clone(),
+                        state,
+                        init_thread,
+                        init_completion,
+                    )?;
+                    crate::control::state::join_init_thread(init_thread)?;
+                    match wait_for_init_completion(state, init_completion)? {
+                        InitPhase::Initialized => return Ok(()),
+                        InitPhase::Uninitialized => continue,
+                        InitPhase::Failed(error) => {
+                            return Err(ControlError::StartupRequestRejected(format!(
+                                "sandboxd activation failed: {error}"
+                            )));
+                        }
+                        InitPhase::Initializing => {
+                            return Err(ControlError::StartupRequestRejected(
+                                "sandboxd is still initializing after activation wait".to_string(),
+                            ));
+                        }
+                    }
+                }
+                InitPhase::Initializing => {
+                    drop(state_guard);
+                    crate::control::state::join_init_thread(init_thread)?;
+                    match wait_for_init_completion(state, init_completion)? {
+                        InitPhase::Initialized => continue,
+                        InitPhase::Uninitialized => continue,
+                        InitPhase::Failed(error) => {
+                            return Err(ControlError::StartupRequestRejected(format!(
+                                "sandboxd initialization already failed: {error}"
+                            )));
+                        }
+                        InitPhase::Initializing => {
+                            return Err(ControlError::StartupRequestRejected(
+                                "sandboxd is still initializing after activation wait".to_string(),
+                            ));
+                        }
+                    }
+                }
+                InitPhase::Initialized => {
+                    let accepted_session_input =
+                        accepted_session_input_from_control_state(&state_guard)?;
+                    let sandboxd_state = state_guard.sandboxd_state.take().ok_or_else(|| {
+                        ControlError::ResumeSandboxdState(
+                            "sandboxd state is missing for an initialized daemon".to_string(),
+                        )
+                    })?;
+                    drop(state_guard);
+                    return refresh_initialized_activation(
+                        activation_input,
+                        sandboxd_state,
+                        accepted_session_input,
+                        state,
+                    );
+                }
+                InitPhase::Failed(error) => {
+                    return Err(ControlError::StartupRequestRejected(format!(
+                        "sandboxd initialization already failed: {error}"
+                    )));
+                }
+            }
+        }
+    }
+}
+
+fn validate_activation_operation_kind(
+    operation_kind: StartupOperationKind,
+) -> Result<(), ControlError> {
+    match operation_kind {
+        StartupOperationKind::Start | StartupOperationKind::Resume => Ok(()),
+        StartupOperationKind::SetupCheck | StartupOperationKind::Snapshot => {
+            Err(ControlError::StartupRequestRejected(format!(
+                "sandboxd activate does not support snapshot materialization operationKind `{}`; use sandboxd init for snapshot materialization",
+                operation_kind.as_str()
+            )))
+        }
+    }
+}
+
+fn accepted_session_input_from_control_state(
+    state_guard: &crate::control::state::ControlServerState,
+) -> Result<SessionRuntimeInput, ControlError> {
+    if let Some(activation_input) = state_guard.activation_input.as_ref() {
+        return Ok(SessionRuntimeInput::from_activation_input(activation_input));
+    }
+    if let Some(startup_input) = state_guard.startup_input.as_ref() {
+        return Ok(SessionRuntimeInput::from_startup_input(startup_input));
+    }
+    Err(ControlError::StartupRequestRejected(
+        "sandboxd is initialized without accepted session input".to_string(),
+    ))
+}
+
+fn refresh_initialized_activation(
+    activation_input: ActivationInput,
+    mut sandboxd_state: SandboxdState,
+    accepted_session_input: SessionRuntimeInput,
+    state: &Arc<Mutex<crate::control::state::ControlServerState>>,
+) -> Result<(), ControlError> {
+    let global_git_config_path = lock_control_state(state)?.global_git_config_path.clone();
+    let diagnostics_logger = StartupDiagnosticsLogger::initialize(
+        StartupOperation::Resume,
+        &activation_input.tunnel_gateway_ws_url,
+    )
+    .ok();
+    if let Some(logger) = &diagnostics_logger
+        && let Err(error) = logger.record_started()
+    {
+        eprintln!("sandboxd failed to record activation diagnostics start event: {error}");
+    }
+
+    let activate_result = sandboxd_state
+        .activate_initialized(
+            &activation_input,
+            &accepted_session_input,
+            &global_git_config_path,
+            diagnostics_logger.clone(),
+        )
+        .map_err(|error| {
+            let error_text = error.to_string();
+            if let Some(logger) = &diagnostics_logger
+                && let Err(record_error) = logger.record_failed(BTreeMap::from([(
+                    "error".to_string(),
+                    startup_diagnostics_string(error_text.clone()),
+                )]))
+            {
+                eprintln!(
+                    "sandboxd failed to record activation diagnostics failure event: {record_error}"
+                );
+            }
+            ControlError::ResumeSandboxdState(error_text)
+        });
+
+    let mut state_guard = lock_control_state(state)?;
+    if activate_result.is_ok() {
+        state_guard.activation_input = Some(activation_input);
+    }
+    state_guard.sandboxd_state = Some(sandboxd_state);
+    activate_result
+}
+
+fn start_activation_init_worker(
+    activation_input: ActivationInput,
+    state: &Arc<Mutex<crate::control::state::ControlServerState>>,
+    init_thread: &SharedInitThread,
+    init_completion: &InitCompletion,
+) -> Result<(), ControlError> {
+    let mut init_thread_guard = lock_init_thread(init_thread)?;
+    if init_thread_guard.is_some() {
+        return Ok(());
+    }
+
+    let state_for_thread = state.clone();
+    let init_completion_for_thread = init_completion.clone();
+    let global_git_config_path = lock_control_state(state)?.global_git_config_path.clone();
+    let diagnostics_logger = StartupDiagnosticsLogger::initialize(
+        StartupOperation::Init,
+        &activation_input.tunnel_gateway_ws_url,
+    )
+    .ok();
+    if let Some(logger) = &diagnostics_logger
+        && let Err(error) = logger.record_started()
+    {
+        eprintln!("sandboxd failed to record activation diagnostics start event: {error}");
+    }
+
+    *init_thread_guard = Some(thread::spawn(move || {
+        let result = catch_init_unwind(|| {
+            SandboxdState::activate_new(
+                &activation_input,
+                &global_git_config_path,
+                Arc::new(SystemClock),
+                Arc::new(ThreadSleeper),
+                diagnostics_logger.clone(),
+            )
+        });
+
+        match result {
+            Ok(Ok(sandboxd_state)) => {
+                let mut state_guard = lock_control_state(&state_for_thread)?;
+                state_guard.shutdown_after_init = false;
+                state_guard.sandboxd_state = Some(sandboxd_state);
+                state_guard.init_phase = InitPhase::Initialized;
+                notify_init_completion(&init_completion_for_thread);
+                Ok(())
+            }
+            Ok(Err(error)) => {
+                let error_text = error.to_string();
+                record_init_failure(&diagnostics_logger, error_text.clone());
+                publish_init_failure(
+                    &state_for_thread,
+                    &init_completion_for_thread,
+                    error_text.clone(),
+                )?;
+                Err(ControlError::InitializeSandboxdState(error_text))
+            }
+            Err(panic_text) => {
+                let error_text = format!("sandbox activation worker panicked: {panic_text}");
+                record_init_failure(&diagnostics_logger, error_text.clone());
+                publish_init_failure(&state_for_thread, &init_completion_for_thread, error_text)?;
+                Err(ControlError::InitPanicked)
+            }
+        }
+    }));
+
+    Ok(())
 }
 
 #[cfg(test)]
