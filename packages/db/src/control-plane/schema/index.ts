@@ -256,6 +256,12 @@ export type {
   SandboxProfileStatus,
 } from "./sandbox-profiles.js";
 export {
+  skillsSourceRepos,
+  type InsertSkillsSourceRepo,
+  type SkillsSourceRepo,
+  type SkillsSourceRepoSkill,
+} from "./skills-source-repos.js";
+export {
   sandboxProfileVersions,
   SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionStates,

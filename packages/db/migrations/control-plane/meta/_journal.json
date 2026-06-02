@@ -288,6 +288,13 @@
       "when": 1780375000000,
       "tag": "0040_remove-sandbox-storage-and-persistence",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1780391818472,
+      "tag": "0041_add-skills-source-repos",
+      "breakpoints": true
     }
   ]
 }

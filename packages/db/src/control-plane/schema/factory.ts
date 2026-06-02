@@ -40,6 +40,7 @@ import { defineScheduleTriggers } from "./schedule-triggers.js";
 import { defineScheduledActions } from "./scheduled-actions.js";
 import { defineSchedules } from "./schedules.js";
 import { defineSessions } from "./sessions.js";
+import { defineSkillsSourceRepos } from "./skills-source-repos.js";
 import { defineTeamMembers } from "./team-members.js";
 import { defineTeams } from "./teams.js";
 import { defineTriggerConversationDeliveryProcessors } from "./trigger-conversation-delivery-processors.js";
@@ -116,6 +117,7 @@ export function createControlPlaneDbSchema(schemaName: string) {
   const scheduledActions = defineScheduledActions(schema);
   const schedules = defineSchedules(schema);
   const sessions = defineSessions(schema);
+  const skillsSourceRepos = defineSkillsSourceRepos(schema);
   const teamMembers = defineTeamMembers(schema);
   const teams = defineTeams(schema);
   const userExternalPrincipalCredentialSecrets =
@@ -184,6 +186,7 @@ export function createControlPlaneDbSchema(schemaName: string) {
     scheduledActions,
     schedules,
     sessions,
+    skillsSourceRepos,
     teamMembers,
     teams,
     userExternalPrincipalCredentialSecrets,
