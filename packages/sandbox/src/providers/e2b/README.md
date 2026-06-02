@@ -52,7 +52,7 @@ const runtimeControl = createSandboxRuntimeControl({
 
 ## Runtime Control
 
-- `ensureSandboxd({ id, artifact, env })` installs sandboxd from the requested artifact when needed, then ensures `sandboxd.service` is running and ready.
+- `ensureSandboxd({ id, artifact, env })` stops any existing daemon state, resets transparent-egress nftables state, and runs the sandboxd installer with the requested artifact URL, SHA-256, and version.
 - `readSandboxdVersion({ id, env })` runs `/opt/mistle/bin/sandboxd version` as `root` and returns trimmed stdout.
 - `beginInit({ id, payload, env })` connects to the sandbox, ensures `sandboxd.service` is running, waits for daemon readiness, then runs `/opt/mistle/bin/sandboxd init --detach` with `payload` on stdin.
 - `init({ id, payload, env })` connects to the sandbox, ensures `sandboxd.service` is running, waits for daemon readiness, then runs `/opt/mistle/bin/sandboxd init` with `payload` on stdin.
