@@ -1,19 +1,14 @@
 import type { MistleLogger } from "@mistle/logging";
-import { SandboxProvider, type SandboxAdapter, type SandboxRuntimeControl } from "@mistle/sandbox";
+import type { SandboxAdapter, SandboxProvider, SandboxRuntimeControl } from "@mistle/sandbox";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 import { trace, type Attributes } from "@opentelemetry/api";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import type { SandboxdArtifactResolver } from "../core/sandboxd-artifact-resolver.js";
+import { createSandboxActivationInput } from "./initialize-sandbox-runtime.js";
 import {
-  createSandboxActivationInput,
-  createSandboxStartupInput,
-} from "./initialize-sandbox-runtime.js";
-import {
-  SandboxStartupModes,
   type SandboxActivationInput,
   encodeSandboxActivationInput,
-  encodeSandboxStartupInput,
 } from "./sandbox-startup-input.js";
 import { createSandboxRuntimeEnv } from "./start-sandbox.js";
 
@@ -122,50 +117,6 @@ export async function resumeSandboxRuntime(
     "Read sandboxd version before runtime resume.",
   );
 
-  if (usesLegacyResumeForProviderPreservedDaemonEgressRefresh(input.runtimeProvider)) {
-    const startupInput = await createSandboxStartupInput({
-      config: ctx.config,
-      organizationId: input.organizationId,
-      operationId: input.operationId,
-      operationKind: input.operationKind,
-      sandboxInstanceId: input.sandboxInstanceId,
-      startupMode: SandboxStartupModes.EXISTING,
-      runtimePlan: input.runtimePlan,
-      ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
-      ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
-      sandboxAdapter: ctx.sandboxAdapter,
-      processEnv: ctx.processEnv,
-    });
-    const runtimeControlRequest = {
-      id: input.providerSandboxId,
-      payload: encodeSandboxStartupInput(startupInput),
-      env: runtimeEnv,
-    };
-
-    addResumeRuntimeEvent({
-      event: "sandbox_resume_runtime.resume.started",
-      providerSandboxId: input.providerSandboxId,
-      runtimeProvider: input.runtimeProvider,
-      sandboxInstanceId: input.sandboxInstanceId,
-    });
-    await ctx.sandboxRuntimeControl.resume(runtimeControlRequest);
-    addResumeRuntimeEvent({
-      event: "sandbox_resume_runtime.resume.completed",
-      providerSandboxId: input.providerSandboxId,
-      runtimeProvider: input.runtimeProvider,
-      sandboxInstanceId: input.sandboxInstanceId,
-    });
-    ctx.logger.info(
-      {
-        providerSandboxId: input.providerSandboxId,
-        runtimeProvider: input.runtimeProvider,
-        sandboxInstanceId: input.sandboxInstanceId,
-      },
-      "Resumed sandboxd with the temporary E2B legacy path.",
-    );
-    return;
-  }
-
   const activationInput = await createSandboxActivationInput({
     config: ctx.config,
     organizationId: input.organizationId,
@@ -197,10 +148,4 @@ export async function resumeSandboxRuntime(
     runtimeProvider: input.runtimeProvider,
     sandboxInstanceId: input.sandboxInstanceId,
   });
-}
-
-export function usesLegacyResumeForProviderPreservedDaemonEgressRefresh(
-  runtimeProvider: SandboxProvider,
-): boolean {
-  return runtimeProvider === SandboxProvider.E2B;
 }
