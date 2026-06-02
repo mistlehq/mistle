@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   DaemonReadinessPollAttempts,
   DaemonReadinessPollTimeoutMs,
+  StartupCommandPollTimeoutMs,
   TensorlakeDaemonSystemdEnvironmentVariables,
   TensorlakeRootProcessUser,
   TensorlakeSandboxTimeoutSecs,
@@ -11,6 +12,7 @@ import {
   createTensorlakeSandboxOptions,
   createTensorlakeSandboxdControlCommand,
   createTensorlakeSandboxName,
+  createTensorlakeSnapshotAndWaitOptions,
   createTensorlakeStartDaemonShellCommand,
   resolveTensorlakeClaimedSandboxStartResponse,
 } from "./client.js";
@@ -19,6 +21,31 @@ describe("daemon readiness polling", () => {
   it("allows sandboxd up to one minute to expose the control socket", () => {
     expect(DaemonReadinessPollAttempts).toBe(600);
     expect(DaemonReadinessPollTimeoutMs).toBe(60_000);
+  });
+});
+
+describe("startup command polling", () => {
+  it("allows sandboxd startup commands to run for one hour", () => {
+    expect(StartupCommandPollTimeoutMs).toBe(60 * 60 * 1000);
+  });
+});
+
+describe("createTensorlakeSnapshotAndWaitOptions", () => {
+  it("requests filesystem snapshots without overriding the SDK timeout by default", () => {
+    expect(createTensorlakeSnapshotAndWaitOptions({})).toEqual({
+      snapshotType: "filesystem",
+    });
+  });
+
+  it("passes requested provider timeouts to Tensorlake in seconds", () => {
+    expect(
+      createTensorlakeSnapshotAndWaitOptions({
+        requestTimeoutMs: 60 * 60 * 1000,
+      }),
+    ).toEqual({
+      snapshotType: "filesystem",
+      timeout: 60 * 60,
+    });
   });
 });
 

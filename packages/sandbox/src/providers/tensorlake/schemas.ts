@@ -73,6 +73,14 @@ export const TensorlakeSandboxIdRequestSchema = z
   .strict();
 export type TensorlakeSandboxIdRequest = z.output<typeof TensorlakeSandboxIdRequestSchema>;
 
+export const TensorlakeCaptureSandboxSnapshotRequestSchema =
+  TensorlakeSandboxIdRequestSchema.extend({
+    requestTimeoutMs: z.number().int().positive().optional(),
+  }).strict();
+export type TensorlakeCaptureSandboxSnapshotRequest = z.output<
+  typeof TensorlakeCaptureSandboxSnapshotRequestSchema
+>;
+
 export const TensorlakeRuntimeControlRequestSchema = z
   .object({
     sandboxId: z.string().trim().min(1, {

@@ -29,8 +29,8 @@ describe("data-plane worker openworkflow entrypoints", () => {
     ).toMatchObject(MaterializeSandboxProfileVersionSnapshotWorkflowSpec);
   });
 
-  it("allows snapshot provider requests to run for five minutes", () => {
-    expect(SnapshotProviderRequestTimeoutMs).toBe(5 * 60 * 1000);
+  it("allows snapshot provider requests to run for one hour", () => {
+    expect(SnapshotProviderRequestTimeoutMs).toBe(60 * 60 * 1000);
   });
 
   it("preserves the resume sandbox instance workflow identity", () => {

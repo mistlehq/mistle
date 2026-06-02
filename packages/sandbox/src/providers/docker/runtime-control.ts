@@ -40,7 +40,8 @@ const ResetTransparentEgressNftablesCommand = [
 ];
 const EnsureSandboxdCommand = ["sh", "-euc", SandboxdInstallCommand];
 const DockerExecExitPollIntervalMs = 50;
-const DockerExecExitTimeoutMs = 120_000;
+export const DockerExecExitTimeoutMs = 120_000;
+export const DockerLongRunningExecExitTimeoutMs = 60 * 60 * 1000;
 export const SandboxdStopDaemonTimeoutMs = 30_000;
 export const SandboxdResetTransparentEgressNftablesTimeoutMs = 10_000;
 
@@ -229,6 +230,7 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
           [SandboxdInstallEnvVars.VERSION]: input.artifact.version,
         },
         failureDescription: "Docker sandboxd ensure command",
+        timeoutMs: DockerLongRunningExecExitTimeoutMs,
       });
     } catch (error) {
       if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
@@ -271,6 +273,7 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
         command: WaitInitCommand,
         ...(input.env === undefined ? {} : { env: input.env }),
         failureDescription: "Docker sandbox wait-init command",
+        timeoutMs: DockerLongRunningExecExitTimeoutMs,
       });
     } catch (error) {
       if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
@@ -334,6 +337,7 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
         waitForDockerExecExitCode({
           exec,
           failureDescription: "Docker sandbox init exec",
+          timeoutMs: DockerLongRunningExecExitTimeoutMs,
         }),
       );
       const stdoutText = capturedStdout.read();

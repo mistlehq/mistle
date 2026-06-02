@@ -171,7 +171,12 @@ export class TensorlakeSandboxAdapter implements SandboxAdapter {
     requireSandboxId(request.id);
 
     try {
-      const response = await this.#client.captureSandboxSnapshot({ sandboxId: request.id });
+      const response = await this.#client.captureSandboxSnapshot({
+        sandboxId: request.id,
+        ...(request.providerRequestTimeoutMs === undefined
+          ? {}
+          : { requestTimeoutMs: request.providerRequestTimeoutMs }),
+      });
       return createTensorlakeSnapshotImageHandle(response.snapshotId);
     } catch (error) {
       if (

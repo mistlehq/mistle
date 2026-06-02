@@ -48,7 +48,7 @@ const SnapshotMaterializationFailureCodes = {
   SANDBOX_DESTROY_FAILED: "snapshot_sandbox_destroy_failed",
   STATUS_TRANSITION_TO_STOPPED_FAILED: "snapshot_status_transition_to_stopped_failed",
 } as const;
-export const SnapshotProviderRequestTimeoutMs = 5 * 60 * 1000;
+export const SnapshotProviderRequestTimeoutMs = 60 * 60 * 1000;
 
 type SnapshotCaptureResult =
   | {

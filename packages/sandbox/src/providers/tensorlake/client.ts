@@ -10,6 +10,7 @@ import {
   type RunOptions,
   type SandboxClientOptions,
   type SandboxInfo,
+  type SnapshotAndWaitOptions,
   type SnapshotInfo,
   type StartProcessOptions,
 } from "tensorlake";
@@ -32,10 +33,12 @@ import {
 import type { TensorlakeStartImage } from "./image-handle.js";
 import { registerTensorlakeSandboxBaseImage } from "./image-registration.js";
 import {
+  TensorlakeCaptureSandboxSnapshotRequestSchema,
   TensorlakeRuntimeControlRequestSchema,
   TensorlakeSandboxIdRequestSchema,
   TensorlakeStartImageKinds,
   TensorlakeStartSandboxRequestSchema,
+  type TensorlakeCaptureSandboxSnapshotRequest,
   type TensorlakeRuntimeControlRequest,
   type TensorlakeSandboxIdRequest,
   type TensorlakeStartSandboxRequest,
@@ -71,7 +74,8 @@ export const DaemonReadinessPollTimeoutMs =
 const ClaimedSandboxReadinessPollIntervalMs = 500;
 const ClaimedSandboxReadinessPollAttempts = 120;
 const StartupCommandPollIntervalMs = 250;
-const StartupCommandPollAttempts = 1200;
+export const StartupCommandPollTimeoutMs = 60 * 60 * 1000;
+const StartupCommandPollAttempts = StartupCommandPollTimeoutMs / StartupCommandPollIntervalMs;
 
 export function createTensorlakeStartDaemonShellCommand(): string {
   return [
@@ -100,6 +104,15 @@ export function createTensorlakeSandboxdControlCommand(input: {
   };
 }
 
+export function createTensorlakeSnapshotAndWaitOptions(input: {
+  requestTimeoutMs?: number;
+}): SnapshotAndWaitOptions {
+  return {
+    snapshotType: "filesystem",
+    ...(input.requestTimeoutMs === undefined ? {} : { timeout: input.requestTimeoutMs / 1000 }),
+  };
+}
+
 export type TensorlakeStartSandboxResponse = { sandboxId: string };
 export type TensorlakeCaptureSandboxSnapshotResponse = { snapshotId: string };
 
@@ -109,7 +122,7 @@ export interface TensorlakeClient {
   inspectSandbox(request: TensorlakeSandboxIdRequest): Promise<TensorlakeSandboxInspectResult>;
   resumeSandbox(request: TensorlakeSandboxIdRequest): Promise<TensorlakeStartSandboxResponse>;
   captureSandboxSnapshot(
-    request: TensorlakeSandboxIdRequest,
+    request: TensorlakeCaptureSandboxSnapshotRequest,
   ): Promise<TensorlakeCaptureSandboxSnapshotResponse>;
   stopSandbox(request: TensorlakeSandboxIdRequest): Promise<void>;
   destroySandbox(request: TensorlakeSandboxIdRequest): Promise<void>;
@@ -467,14 +480,18 @@ export class TensorlakeApiClient implements TensorlakeClient {
   }
 
   async captureSandboxSnapshot(
-    request: TensorlakeSandboxIdRequest,
+    request: TensorlakeCaptureSandboxSnapshotRequest,
   ): Promise<TensorlakeCaptureSandboxSnapshotResponse> {
-    const parsedRequest = TensorlakeSandboxIdRequestSchema.parse(request);
+    const parsedRequest = TensorlakeCaptureSandboxSnapshotRequestSchema.parse(request);
 
     try {
-      const snapshot = await this.#client.snapshotAndWait(parsedRequest.sandboxId, {
-        snapshotType: "filesystem",
-      });
+      const options =
+        parsedRequest.requestTimeoutMs === undefined
+          ? createTensorlakeSnapshotAndWaitOptions({})
+          : createTensorlakeSnapshotAndWaitOptions({
+              requestTimeoutMs: parsedRequest.requestTimeoutMs,
+            });
+      const snapshot = await this.#client.snapshotAndWait(parsedRequest.sandboxId, options);
       return { snapshotId: snapshot.snapshotId };
     } catch (error) {
       throw mapTensorlakeClientError(TensorlakeClientOperationIds.CREATE_SNAPSHOT, error);
