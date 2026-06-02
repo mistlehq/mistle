@@ -70,12 +70,29 @@ pub(super) fn handle_connection(
             Ok(ControlResponse::ok(None))
         }
         ControlRequest::WaitInit => {
-            crate::control::state::join_init_thread(init_thread)?;
+            begin_wait_init(state, init_thread)?;
             Ok(ControlResponse::ok(None))
         }
         ControlRequest::Sign { sign_request } => {
             begin_sign(sign_request, state).map(|signature| ControlResponse::ok(Some(signature)))
         }
+    }
+}
+
+fn begin_wait_init(
+    state: &Arc<Mutex<crate::control::state::ControlServerState>>,
+    init_thread: &SharedInitThread,
+) -> Result<(), ControlError> {
+    crate::control::state::join_init_thread(init_thread)?;
+
+    match &lock_control_state(state)?.init_phase {
+        InitPhase::Uninitialized | InitPhase::Initialized => Ok(()),
+        InitPhase::Failed(error) => Err(ControlError::StartupRequestRejected(format!(
+            "sandboxd initialization already failed: {error}"
+        ))),
+        InitPhase::Initializing => Err(ControlError::StartupRequestRejected(
+            "sandboxd is still initializing after init worker wait".to_string(),
+        )),
     }
 }
 

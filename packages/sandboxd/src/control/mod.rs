@@ -386,7 +386,7 @@ mod tests {
         ControlSignRequest, DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL, DEFAULT_HEALTH_ENDPOINT_PATH,
         EGRESS_PROXY_FAULT_KILL_PATH, InitPhase, TEST_FAULTS_ENABLED_ENV,
         start_control_server_with_health_endpoint, submit_init, submit_ready, submit_resume,
-        submit_signing,
+        submit_signing, submit_wait_init,
     };
     use crate::protocol::startup::{
         GitIdentity, GitSigningConfig, StartupExecutionMode, StartupInput, StartupMode,
@@ -711,6 +711,20 @@ mod tests {
             .expect_err("duplicate init should remain rejected after initialization fails");
         assert!(
             duplicate_error
+                .to_string()
+                .contains("sandboxd initialization already failed")
+        );
+        let wait_error = submit_wait_init(&socket_path)
+            .expect_err("wait init should remain rejected after initialization fails");
+        assert!(
+            wait_error
+                .to_string()
+                .contains("sandboxd initialization already failed")
+        );
+        let second_wait_error = submit_wait_init(&socket_path)
+            .expect_err("repeated wait init should remain rejected after initialization fails");
+        assert!(
+            second_wait_error
                 .to_string()
                 .contains("sandboxd initialization already failed")
         );
