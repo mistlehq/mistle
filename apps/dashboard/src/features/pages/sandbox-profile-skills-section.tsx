@@ -41,7 +41,9 @@ type SelectedSkill = NonNullable<SandboxProfileSkillsConfig>["selectedSkills"][n
 export type SandboxProfileSkillsDraftState = {
   skillsConfig: SandboxProfileSkillsConfig | undefined;
   sourceVersionKey: string | undefined;
+  saveBlockedMessage: string | null;
   hasUnpersistedChanges: boolean;
+  applyDraftValidationError?: (message: string) => void;
   applyDraftSaveError?: (error: unknown) => void;
   applySavedSkillsConfig?: (skillsConfig: SandboxProfileSkillsConfig) => void;
   buildDraftChanges?: () => SandboxProfileSkillsConfig;
@@ -58,11 +60,28 @@ type SkillOption = SelectedSkill & {
 };
 
 const NoSkillsSourceValue = "__no_skills_source__";
+const UnavailableSkillsSourceSaveBlockedMessage =
+  "Choose an available skills source, or clear the skills source before saving.";
 
 export function createSkillsDraftSourceVersionKey(
   version: Pick<SandboxProfileVersion, "sandboxProfileId" | "version">,
 ): string {
   return `${version.sandboxProfileId}:${String(version.version)}`;
+}
+
+export function resolveSkillsConfigSaveBlockedMessage(input: {
+  skillsConfig: SandboxProfileSkillsConfig;
+  sourceOptions: readonly { originUrl: string }[];
+}): string | null {
+  const selectedOriginUrl = input.skillsConfig?.originUrl ?? null;
+  if (selectedOriginUrl === null) {
+    return null;
+  }
+
+  const sourceIsAvailable = input.sourceOptions.some(
+    (sourceOption) => sourceOption.originUrl === selectedOriginUrl,
+  );
+  return sourceIsAvailable ? null : UnavailableSkillsSourceSaveBlockedMessage;
 }
 
 export function SandboxProfileSkillsSection(input: {
@@ -100,7 +119,11 @@ export function SandboxProfileSkillsSection(input: {
       ? null
       : (sourceOptions.find((sourceOption) => sourceOption.originUrl === selectedOriginUrl) ??
         null);
-  const sourceIsUnavailable = selectedOriginUrl !== null && selectedSourceOption === null;
+  const saveBlockedMessage = resolveSkillsConfigSaveBlockedMessage({
+    skillsConfig: draftConfig,
+    sourceOptions,
+  });
+  const sourceIsUnavailable = saveBlockedMessage !== null;
   const skillsSourceQuery = useQuery({
     queryKey: sandboxProfileVersionSkillsSourceReposQueryKey({
       profileId: input.profileId,
@@ -180,6 +203,9 @@ export function SandboxProfileSkillsSection(input: {
       }),
     );
   }, []);
+  const applyDraftValidationError = useCallback((message: string): void => {
+    setSaveErrorMessage(message);
+  }, []);
 
   useEffect(() => {
     setDraftConfig(persistedConfig);
@@ -191,6 +217,8 @@ export function SandboxProfileSkillsSection(input: {
     input.onDraftStateChange?.({
       skillsConfig: draftConfig,
       sourceVersionKey: createSkillsDraftSourceVersionKey(input.version),
+      saveBlockedMessage,
+      applyDraftValidationError,
       applyDraftSaveError,
       applySavedSkillsConfig,
       buildDraftChanges,
@@ -198,12 +226,14 @@ export function SandboxProfileSkillsSection(input: {
     });
   }, [
     applyDraftSaveError,
+    applyDraftValidationError,
     applySavedSkillsConfig,
     buildDraftChanges,
     draftConfig,
     input.onDraftStateChange,
     input.version,
     persistedDraftConfig,
+    saveBlockedMessage,
   ]);
 
   function updateSelectedSource(value: string | null): void {

@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 use crate::command::CommandOutputSink;
 use crate::protocol::startup::StartupInput;
-use crate::skills::{SkillsRuntime, reconcile_skills};
+use crate::skills::{SkillsRuntime, reconcile_materialized_skills};
 
 pub use plan::{
     CompiledAgentRuntime, CompiledEgressRoute, CompiledEgressRouteAuthInjection,
@@ -321,7 +321,7 @@ fn apply_runtime_plan_skills(
         .map(|skill| skill.relative_path.clone())
         .collect::<Vec<_>>();
 
-    reconcile_skills(
+    reconcile_materialized_skills(
         Path::new(repo_path),
         &runtime,
         &selected_relative_paths,

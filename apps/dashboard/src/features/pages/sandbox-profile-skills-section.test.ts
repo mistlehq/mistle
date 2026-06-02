@@ -8,6 +8,7 @@ import type {
 import {
   createSkillOptions,
   normalizeSkillsConfig,
+  resolveSkillsConfigSaveBlockedMessage,
   resolveSkillsSourceRepositoryOptions,
   skillsConfigsAreEqual,
 } from "./sandbox-profile-skills-section.js";
@@ -169,5 +170,21 @@ describe("sandbox profile skills section model", () => {
     });
 
     expect(skillsConfigsAreEqual(left, right)).toBe(true);
+  });
+
+  it("blocks saving when the selected skills source is no longer available", () => {
+    expect(
+      resolveSkillsConfigSaveBlockedMessage({
+        skillsConfig: {
+          originUrl: "https://github.com/mistlehq/skills.git",
+          selectedSkills: [],
+        },
+        sourceOptions: [
+          {
+            originUrl: "https://github.com/mistlehq/app.git",
+          },
+        ],
+      }),
+    ).toBe("Choose an available skills source, or clear the skills source before saving.");
   });
 });

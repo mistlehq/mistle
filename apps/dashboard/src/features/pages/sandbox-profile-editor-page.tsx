@@ -283,6 +283,7 @@ function createIdleSandboxProfileSkillsDraftState(): SandboxProfileSkillsSetting
   return {
     skillsConfig: undefined,
     sourceVersionKey: undefined,
+    saveBlockedMessage: null,
     hasUnpersistedChanges: false,
   };
 }
@@ -1936,6 +1937,12 @@ function ReadySandboxProfileEditorPage(input: {
     const shouldSaveGitCommitSigning = gitCommitSigningDraftState.hasUnpersistedChanges;
     const shouldSaveIntegrations = integrationDraftState.hasUnpersistedChanges;
     const shouldSaveSetupScript = setupScriptDraftState.hasUnpersistedChanges;
+
+    if (skillsDraftState.saveBlockedMessage !== null) {
+      skillsDraftState.applyDraftValidationError?.(skillsDraftState.saveBlockedMessage);
+      setPublishFlushError(DraftSaveErrorMessage);
+      return false;
+    }
 
     if (
       !shouldSaveRuntime &&

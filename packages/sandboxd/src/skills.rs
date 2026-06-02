@@ -11,11 +11,13 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use yaml_rust2::{Yaml, YamlLoader};
 
 const SKILL_FILE_NAME: &str = "SKILL.md";
 const AGENT_SKILLS_TARGET_ROOT: &str = "/root/.agents/skills";
+const MANAGED_SKILLS_MANIFEST_FILE_NAME: &str = ".mistle-managed-skills.json";
+const MANAGED_SKILLS_MANIFEST_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -255,6 +257,27 @@ pub enum SkillsReconcileError {
         path: PathBuf,
         error: io::Error,
     },
+    TargetManagedEntryNotSymlink(PathBuf),
+    TargetManifestRead {
+        path: PathBuf,
+        error: io::Error,
+    },
+    TargetManifestParse {
+        path: PathBuf,
+        error: serde_json::Error,
+    },
+    TargetManifestInvalidVersion {
+        path: PathBuf,
+        version: u32,
+    },
+    TargetManifestInvalidSkillName {
+        path: PathBuf,
+        name: String,
+    },
+    TargetManifestWrite {
+        path: PathBuf,
+        error: io::Error,
+    },
     TargetSymlinkCreate {
         source_path: PathBuf,
         target_path: PathBuf,
@@ -328,6 +351,50 @@ impl fmt::Display for SkillsReconcileError {
                 write!(
                     f,
                     "failed to remove stale skills target entry {}: {error}",
+                    path.display()
+                )
+            }
+            Self::TargetManagedEntryNotSymlink(path) => {
+                write!(
+                    f,
+                    "managed skills target entry {} is not a symlink",
+                    path.display()
+                )
+            }
+            Self::TargetManifestRead { path, error } => {
+                write!(
+                    f,
+                    "failed to read managed skills manifest {}: {error}",
+                    path.display()
+                )
+            }
+            Self::TargetManifestParse { path, error } => {
+                write!(
+                    f,
+                    "failed to parse managed skills manifest {}: {error}",
+                    path.display()
+                )
+            }
+            Self::TargetManifestInvalidVersion { path, version } => {
+                write!(
+                    f,
+                    "managed skills manifest {} has unsupported version {}",
+                    path.display(),
+                    version
+                )
+            }
+            Self::TargetManifestInvalidSkillName { path, name } => {
+                write!(
+                    f,
+                    "managed skills manifest {} contains invalid skill name '{}'",
+                    path.display(),
+                    name
+                )
+            }
+            Self::TargetManifestWrite { path, error } => {
+                write!(
+                    f,
+                    "failed to write managed skills manifest {}: {error}",
                     path.display()
                 )
             }
@@ -480,6 +547,55 @@ pub fn reconcile_skills(
     selected_relative_paths: &[String],
     target_root_override: Option<&Path>,
 ) -> Result<SkillsReconcileOutput, SkillsReconcileError> {
+    reconcile_skills_with_options(
+        repo_root,
+        runtime,
+        selected_relative_paths,
+        target_root_override,
+        SkillsReconcileOptions {
+            pull_repo: true,
+            target_ownership: SkillsTargetOwnership::AllTargetRootEntries,
+        },
+    )
+}
+
+pub fn reconcile_materialized_skills(
+    repo_root: &Path,
+    runtime: &SkillsRuntime,
+    selected_relative_paths: &[String],
+    target_root_override: Option<&Path>,
+) -> Result<SkillsReconcileOutput, SkillsReconcileError> {
+    reconcile_skills_with_options(
+        repo_root,
+        runtime,
+        selected_relative_paths,
+        target_root_override,
+        SkillsReconcileOptions {
+            pull_repo: false,
+            target_ownership: SkillsTargetOwnership::ManagedSymlinks,
+        },
+    )
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SkillsReconcileOptions {
+    pull_repo: bool,
+    target_ownership: SkillsTargetOwnership,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SkillsTargetOwnership {
+    AllTargetRootEntries,
+    ManagedSymlinks,
+}
+
+fn reconcile_skills_with_options(
+    repo_root: &Path,
+    runtime: &SkillsRuntime,
+    selected_relative_paths: &[String],
+    target_root_override: Option<&Path>,
+    options: SkillsReconcileOptions,
+) -> Result<SkillsReconcileOutput, SkillsReconcileError> {
     let repo_root =
         repo_root
             .canonicalize()
@@ -494,11 +610,16 @@ pub fn reconcile_skills(
     let target_root = target_root_override
         .map(Path::to_path_buf)
         .unwrap_or_else(|| runtime.default_target_root());
-    pull_git_repo(&repo_root)?;
+    if options.pull_repo {
+        pull_git_repo(&repo_root)?;
+    }
     let selected_skills = read_selected_skills(&repo_root, selected_relative_paths)?;
 
     prepare_target_root(&target_root)?;
-    prune_target_root(&target_root)?;
+    match options.target_ownership {
+        SkillsTargetOwnership::AllTargetRootEntries => prune_target_root(&target_root)?,
+        SkillsTargetOwnership::ManagedSymlinks => prune_managed_target_symlinks(&target_root)?,
+    }
 
     let mut reconciled_skills = Vec::new();
     for selected_skill in selected_skills {
@@ -511,12 +632,26 @@ pub fn reconcile_skills(
             target_path: target_path.display().to_string(),
         });
     }
+    if options.target_ownership == SkillsTargetOwnership::ManagedSymlinks {
+        let managed_skill_names = reconciled_skills
+            .iter()
+            .map(|skill| skill.name.as_str())
+            .collect::<Vec<_>>();
+        write_managed_skills_manifest(&target_root, &managed_skill_names)?;
+    }
 
     Ok(SkillsReconcileOutput {
         runtime: runtime.as_str().to_string(),
         target_root: target_root.display().to_string(),
         skills: reconciled_skills,
     })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ManagedSkillsManifest {
+    version: u32,
+    skill_names: Vec<String>,
 }
 
 pub fn run_skills_reconcile<W: io::Write>(
@@ -741,6 +876,100 @@ fn prune_target_root(target_root: &Path) -> Result<(), SkillsReconcileError> {
         result.map_err(|error| SkillsReconcileError::TargetEntryRemove { path, error })?;
     }
     Ok(())
+}
+
+fn prune_managed_target_symlinks(target_root: &Path) -> Result<(), SkillsReconcileError> {
+    let Some(manifest) = read_managed_skills_manifest(target_root)? else {
+        return Ok(());
+    };
+
+    for skill_name in manifest.skill_names {
+        if !is_valid_skill_name(&skill_name) {
+            return Err(SkillsReconcileError::TargetManifestInvalidSkillName {
+                path: managed_skills_manifest_path(target_root),
+                name: skill_name,
+            });
+        }
+
+        let target_path = target_root.join(skill_name);
+        let metadata = match fs::symlink_metadata(&target_path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            Err(error) => {
+                return Err(SkillsReconcileError::TargetRootRead {
+                    path: target_path,
+                    error,
+                });
+            }
+        };
+        if !metadata.file_type().is_symlink() {
+            return Err(SkillsReconcileError::TargetManagedEntryNotSymlink(
+                target_path,
+            ));
+        }
+        fs::remove_file(&target_path).map_err(|error| SkillsReconcileError::TargetEntryRemove {
+            path: target_path,
+            error,
+        })?;
+    }
+    Ok(())
+}
+
+fn read_managed_skills_manifest(
+    target_root: &Path,
+) -> Result<Option<ManagedSkillsManifest>, SkillsReconcileError> {
+    let manifest_path = managed_skills_manifest_path(target_root);
+    let content = match fs::read_to_string(&manifest_path) {
+        Ok(content) => content,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => {
+            return Err(SkillsReconcileError::TargetManifestRead {
+                path: manifest_path,
+                error,
+            });
+        }
+    };
+    let manifest: ManagedSkillsManifest = serde_json::from_str(&content).map_err(|error| {
+        SkillsReconcileError::TargetManifestParse {
+            path: manifest_path.clone(),
+            error,
+        }
+    })?;
+    if manifest.version != MANAGED_SKILLS_MANIFEST_VERSION {
+        return Err(SkillsReconcileError::TargetManifestInvalidVersion {
+            path: manifest_path,
+            version: manifest.version,
+        });
+    }
+    Ok(Some(manifest))
+}
+
+fn write_managed_skills_manifest(
+    target_root: &Path,
+    skill_names: &[&str],
+) -> Result<(), SkillsReconcileError> {
+    let manifest_path = managed_skills_manifest_path(target_root);
+    let manifest = ManagedSkillsManifest {
+        version: MANAGED_SKILLS_MANIFEST_VERSION,
+        skill_names: skill_names
+            .iter()
+            .map(|skill_name| skill_name.to_string())
+            .collect(),
+    };
+    let content = serde_json::to_string_pretty(&manifest).map_err(|error| {
+        SkillsReconcileError::TargetManifestWrite {
+            path: manifest_path.clone(),
+            error: io::Error::other(error),
+        }
+    })?;
+    fs::write(&manifest_path, content).map_err(|error| SkillsReconcileError::TargetManifestWrite {
+        path: manifest_path,
+        error,
+    })
+}
+
+fn managed_skills_manifest_path(target_root: &Path) -> PathBuf {
+    target_root.join(MANAGED_SKILLS_MANIFEST_FILE_NAME)
 }
 
 #[cfg(unix)]
@@ -1155,7 +1384,7 @@ mod tests {
     use super::{
         DiscoveredSkill, ReconciledSkill, SkillsCommand, SkillsCommandError, SkillsDiscoverError,
         SkillsReconcileError, SkillsReconcileOutput, SkillsRuntime, discover_skills,
-        parse_skills_command, reconcile_skills,
+        parse_skills_command, reconcile_materialized_skills, reconcile_skills,
     };
 
     #[test]
@@ -1505,6 +1734,120 @@ description: New skill.
         fs::remove_dir_all(repo_root).expect("repo should be removable");
         fs::remove_dir_all(remote_root).expect("remote should be removable");
         fs::remove_dir_all(updater_root).expect("updater should be removable");
+        fs::remove_dir_all(target_root).expect("target root should be removable");
+    }
+
+    #[test]
+    fn materialized_reconcile_does_not_pull_repo() {
+        let repo_root = create_git_repo("skills_materialized_reconcile_without_origin");
+        let target_root =
+            create_temp_test_dir("skills_materialized_reconcile_without_origin_target");
+        write_skill(
+            &repo_root,
+            "skills/local-skill",
+            r#"---
+name: local-skill
+description: Local skill.
+---
+"#,
+        );
+        commit_all(&repo_root);
+
+        let output = reconcile_materialized_skills(
+            &repo_root,
+            &SkillsRuntime::Codex,
+            &["skills/local-skill".to_string()],
+            Some(&target_root),
+        )
+        .expect("materialized reconcile should not require a pullable origin");
+
+        assert_eq!(
+            output.skills,
+            vec![ReconciledSkill {
+                name: "local-skill".to_string(),
+                relative_path: "skills/local-skill".to_string(),
+                source_path: repo_root.join("skills/local-skill").display().to_string(),
+                target_path: target_root.join("local-skill").display().to_string(),
+            }]
+        );
+        assert_eq!(
+            fs::read_link(target_root.join("local-skill"))
+                .expect("local skill symlink should be created"),
+            repo_root.join("skills/local-skill")
+        );
+
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
+        fs::remove_dir_all(target_root).expect("target root should be removable");
+    }
+
+    #[test]
+    fn materialized_reconcile_prunes_only_previously_managed_symlinks() {
+        let repo_root = create_git_repo("skills_materialized_reconcile_managed_prune");
+        let target_root = create_temp_test_dir("skills_materialized_reconcile_managed_target");
+        write_skill(
+            &repo_root,
+            "skills/old-skill",
+            r#"---
+name: old-skill
+description: Old skill.
+---
+"#,
+        );
+        write_skill(
+            &repo_root,
+            "skills/new-skill",
+            r#"---
+name: new-skill
+description: New skill.
+---
+"#,
+        );
+        commit_all(&repo_root);
+        fs::create_dir_all(target_root.join("image-skill"))
+            .expect("image skill directory should be created");
+        fs::write(target_root.join("image-skill/SKILL.md"), "image")
+            .expect("image skill file should be created");
+
+        reconcile_materialized_skills(
+            &repo_root,
+            &SkillsRuntime::OpenCode,
+            &["skills/old-skill".to_string()],
+            Some(&target_root),
+        )
+        .expect("old skill should reconcile");
+
+        let output = reconcile_materialized_skills(
+            &repo_root,
+            &SkillsRuntime::OpenCode,
+            &["skills/new-skill".to_string()],
+            Some(&target_root),
+        )
+        .expect("new skill should reconcile");
+
+        assert_eq!(
+            output.skills,
+            vec![ReconciledSkill {
+                name: "new-skill".to_string(),
+                relative_path: "skills/new-skill".to_string(),
+                source_path: repo_root.join("skills/new-skill").display().to_string(),
+                target_path: target_root.join("new-skill").display().to_string(),
+            }]
+        );
+        assert!(
+            !target_root.join("old-skill").exists(),
+            "previous managed symlink should be pruned"
+        );
+        assert!(
+            target_root.join("image-skill/SKILL.md").is_file(),
+            "unmanaged image skill should remain"
+        );
+        assert_eq!(
+            fs::read_link(target_root.join("new-skill"))
+                .expect("new skill symlink should be created"),
+            repo_root.join("skills/new-skill")
+        );
+
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
         fs::remove_dir_all(target_root).expect("target root should be removable");
     }
 
@@ -2032,6 +2375,7 @@ description: Invalid name.
                 .as_nanos()
         ));
         fs::create_dir_all(&path).expect("temp test dir should be created");
-        path
+        path.canonicalize()
+            .expect("temp test dir should canonicalize")
     }
 }
