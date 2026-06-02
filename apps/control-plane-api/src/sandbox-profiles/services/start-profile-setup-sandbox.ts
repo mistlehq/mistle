@@ -5,7 +5,6 @@ import {
   type SandboxProfileVersionAgentRuntimeId,
 } from "@mistle/db/control-plane";
 import {
-  SandboxInstancePersistenceModes,
   SandboxInstancePurposes,
   type SandboxInstanceSource,
   type SandboxInstanceStarterKind,
@@ -220,7 +219,6 @@ export async function startProfileSetupSandbox(
     organizationId: input.organizationId,
     sandboxProfileId: input.profileId,
     sandboxProfileVersion: input.profileVersion,
-    persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
     purpose: input.purpose,
     idempotencyKey,
     runtimePlan,

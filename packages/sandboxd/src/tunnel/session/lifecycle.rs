@@ -31,7 +31,7 @@ pub(in crate::tunnel::session) fn publish_initial_runtime_readiness(
         .runtime_readiness_manager
         .lock()
         .expect("runtime readiness manager lock should not be poisoned")
-        .take_publishable_state()
+        .take_initial_publishable_state()
         .ok_or_else(|| {
             TunnelSessionError::MissingRuntimeReadyState(
                 "runtime readiness manager did not produce an initial state after tunnel attachment"

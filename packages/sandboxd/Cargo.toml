@@ -51,6 +51,7 @@ tracing-opentelemetry = "0.33.0"
 tracing-subscriber = { version = "0.3.20", features = ["fmt", "std"] }
 tungstenite = "0.29.0"
 url = "2.5.7"
+yaml-rust2 = "0.11.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 rtnetlink = { version = "0.21.0", features = ["tokio_socket"] }

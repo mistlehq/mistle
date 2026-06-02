@@ -36,6 +36,7 @@ export type IntegrationServiceOptions = {
   dataPlaneGateway?: {
     directEgress?: {
       trustedCaCertificates?: readonly string[];
+      webSocketUpstreamResolutionDelayMs?: number;
     };
     gatewayRelay?: { backend: "memory" } | { backend: "nats"; namePrefix: string };
   };

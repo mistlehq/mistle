@@ -3,7 +3,6 @@ import type {
   ControlPlaneDatabase,
   SandboxProfile,
   SandboxProfileVersionAgentRuntimeId,
-  SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionState,
   SandboxProfileVersionIntegrationBinding,
 } from "@mistle/db/control-plane";
@@ -19,6 +18,7 @@ import type { createControlPlaneOpenWorkflow } from "../../openworkflow.js";
 import type { ControlPlaneApiMcpConfig, ControlPlaneApiSandboxRuntimeConfig } from "../../types.js";
 import type { ListProfilesInput } from "./list-profiles.js";
 import type { SandboxProfileVersionResources } from "./profile-version-runtime-config.js";
+import type { SandboxProfileVersionSkillsConfig } from "./profile-version-skills-config.js";
 
 export type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenWorkflow>;
 
@@ -48,7 +48,6 @@ export type SandboxProfilesService = {
     sandboxProfileId: string;
     version: number;
     state: SandboxProfileVersionState;
-    defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
     gitCommitSigningIntegrationConnectionId: string | null;
     mistleMcpEnabled: boolean;
@@ -56,6 +55,7 @@ export type SandboxProfilesService = {
     sandboxProvider: string | null;
     sandboxConnectionId: string | null;
     sandboxResources: SandboxProfileVersionResources | null;
+    skillsConfig: SandboxProfileVersionSkillsConfig | null;
     isActive: boolean;
   }>;
   getProfile: (input: { organizationId: string; profileId: string }) => Promise<SandboxProfile>;
@@ -72,7 +72,6 @@ export type SandboxProfilesService = {
       sandboxProfileId: string;
       version: number;
       state: SandboxProfileVersionState;
-      defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
       agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
       gitCommitSigningIntegrationConnectionId: string | null;
       mistleMcpEnabled: boolean;
@@ -80,6 +79,7 @@ export type SandboxProfilesService = {
       sandboxProvider: string | null;
       sandboxConnectionId: string | null;
       sandboxResources: SandboxProfileVersionResources | null;
+      skillsConfig: SandboxProfileVersionSkillsConfig | null;
       isActive: boolean;
     }>;
   }>;
@@ -134,7 +134,6 @@ export type SandboxProfilesService = {
       sandboxProfileId: string;
       version: number;
       state: SandboxProfileVersionState;
-      defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
       agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
       gitCommitSigningIntegrationConnectionId: string | null;
       mistleMcpEnabled: boolean;
@@ -142,6 +141,7 @@ export type SandboxProfilesService = {
       sandboxProvider: string | null;
       sandboxConnectionId: string | null;
       sandboxResources: SandboxProfileVersionResources | null;
+      skillsConfig: SandboxProfileVersionSkillsConfig | null;
       isActive: boolean;
     };
     activeVersion: number | null;

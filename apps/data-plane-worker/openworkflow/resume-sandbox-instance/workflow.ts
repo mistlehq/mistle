@@ -8,20 +8,19 @@ import { SandboxLifecycleEvents } from "@mistle/sandbox-lifecycle";
 import {
   type ResumeSandboxInstanceWorkflowOutput,
   ResumeSandboxInstanceWorkflowSpec,
-  SandboxStartImageKinds,
-  type StartSandboxInstanceWorkflowImageInput,
 } from "@mistle/workflow-registry/data-plane";
-import { rethrowDurableStepErrorForRetry } from "@mistle/workflow-registry/durable-step-retry.js";
+import {
+  type DurableStepRetryOptions,
+  resolveDurableStepFinalError,
+  rethrowDurableStepErrorForRetry,
+} from "@mistle/workflow-registry/durable-step-retry.js";
 
 import { getWorkflowContext } from "../core/context.js";
 import { createResolveSandboxRuntimeInput } from "../core/sandbox-runtime-resolver.js";
 import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
 import { applySandboxLifecycleEvent } from "../shared/apply-sandbox-lifecycle-event.js";
-import { attachSandboxStorage } from "../shared/attach-sandbox-storage.js";
-import { destroySandbox } from "../shared/destroy-sandbox.js";
 import { formatPersistedFailureMessage } from "../shared/format-persisted-failure-message.js";
 import { markSandboxInstanceStarting } from "../shared/mark-sandbox-instance-starting.js";
-import { prepareSandboxStorageForStart } from "../shared/prepare-sandbox-storage-for-start.js";
 import {
   createWorkerSandboxLifecycleEventRecorder,
   recordWorkerSandboxLifecyclePhase,
@@ -32,13 +31,10 @@ import {
   recordWorkerSandboxUsageEvent,
 } from "../shared/sandbox-usage-events.js";
 import { stopSandbox } from "../shared/stop-sandbox.js";
-import { initializeSandboxRuntime } from "../start-sandbox-instance/initialize-sandbox-runtime.js";
 import { markSandboxInstanceFailed } from "../start-sandbox-instance/mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "../start-sandbox-instance/mark-sandbox-instance-running.js";
 import { resumeSandboxRuntime } from "../start-sandbox-instance/resume-sandbox-runtime.js";
-import { prepareSandboxImage, startSandbox } from "../start-sandbox-instance/start-sandbox.js";
 import { waitForSandboxRuntimeReadiness } from "../start-sandbox-instance/wait-for-sandbox-runtime-readiness.js";
-import { persistSandboxInstanceComputeReplacement } from "./persist-sandbox-instance-compute-replacement.js";
 import {
   determineExistingProviderResumeAction,
   type ExistingProviderResumeAction,
@@ -48,7 +44,6 @@ import {
   type ResumableSandboxInstanceState,
 } from "./resolve-resumable-sandbox-instance-state.js";
 import { resumeSandbox } from "./resume-sandbox.js";
-import { revertSandboxInstanceComputeReplacement } from "./revert-sandbox-instance-compute-replacement.js";
 
 const ResumeSandboxFailureCodes = {
   RESUME_SANDBOX_FAILED: "resume_sandbox_failed",
@@ -58,12 +53,15 @@ const ResumeSandboxFailureCodes = {
   STATUS_TRANSITION_TO_RUNNING_FAILED: "status_transition_to_running_failed",
 } as const;
 
+const ResumeDurableStepRetryOptions: DurableStepRetryOptions = {
+  finalizeNonRetryableOriginalError: true,
+};
+
 function createResumeWorkflowLogFields(input: {
   sandboxInstanceId: string;
   organizationId?: string | undefined;
   runtimeProvider?: SandboxProvider | undefined;
   providerSandboxId?: string | null | undefined;
-  persistenceMode?: string | undefined;
   computeGeneration?: number | undefined;
 }) {
   return {
@@ -74,7 +72,6 @@ function createResumeWorkflowLogFields(input: {
     ...(input.providerSandboxId === undefined || input.providerSandboxId === null
       ? {}
       : { providerSandboxId: input.providerSandboxId }),
-    ...(input.persistenceMode === undefined ? {} : { persistenceMode: input.persistenceMode }),
     ...(input.computeGeneration === undefined
       ? {}
       : { computeGeneration: input.computeGeneration }),
@@ -100,1189 +97,92 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
     });
 
     function rethrowResumeDurableStepErrorForRetry(error: unknown): void {
-      rethrowDurableStepErrorForRetry(error, {
-        attributes: {
-          sandboxInstanceId: input.sandboxInstanceId,
-        },
-        eventName: "sandbox_instance.resume_step_retry",
-        logger,
-        message: "Retrying sandbox resume workflow after durable step failure.",
-      });
-    }
-
-    async function recordResumeSandboxUsageEvent(input: {
-      eventType: SandboxUsageEventType;
-      providerSandboxId: string;
-      computeGeneration: number;
-      discriminator?: string;
-      payload?: Record<string, unknown>;
-    }): Promise<void> {
-      await recordWorkerSandboxUsageEvent(
+      rethrowDurableStepErrorForRetry(
+        error,
         {
-          clock: ctx.clock,
-          db: ctx.db,
-          tables: ctx.tables,
+          attributes: {
+            sandboxInstanceId: input.sandboxInstanceId,
+          },
+          eventName: "sandbox_instance.resume_step_retry",
+          logger,
+          message: "Retrying sandbox resume workflow after durable step failure.",
         },
-        {
-          idempotencyKey: createSandboxUsageEventIdempotencyKey({
-            sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
-            computeGeneration: input.computeGeneration,
-            eventType: input.eventType,
-            operationId: run.id,
-            ...(input.discriminator === undefined ? {} : { discriminator: input.discriminator }),
-          }),
-          organizationId: resumableSandboxState.organizationId,
-          sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
-          computeGeneration: input.computeGeneration,
-          eventType: input.eventType,
-          runtimeProvider: resumableSandboxState.runtimeProvider,
-          providerSandboxId: input.providerSandboxId,
-          storageProvider: null,
-          providerStorageId: null,
-          vcpuCount: resumableSandboxState.sandboxVcpuCount,
-          memoryMb: resumableSandboxState.sandboxMemoryMb,
-          storageMb: resumableSandboxState.sandboxStorageMb,
-          payload: {
-            workflowRunId: run.id,
-            operationKind: "resume",
-            persistenceMode: resumableSandboxState.persistenceMode,
-            ...(input.payload ?? {}),
-          },
-        },
+        ResumeDurableStepRetryOptions,
       );
     }
 
-    logger.info(
-      createResumeWorkflowLogFields({
-        sandboxInstanceId: input.sandboxInstanceId,
-      }),
-      "Starting sandbox instance resume workflow.",
-    );
-
-    const resumableSandboxInstance = await step.run(
-      { name: "resolve-resumable-sandbox-instance-state" },
-      async () => {
-        return resolveResumableSandboxInstanceState({
-          db: ctx.db,
-          tables: ctx.tables,
-          sandboxInstanceId: input.sandboxInstanceId,
-        });
-      },
-    );
-
-    if (resumableSandboxInstance === null) {
-      logger.info(
-        createResumeWorkflowLogFields({
-          sandboxInstanceId: input.sandboxInstanceId,
-        }),
-        "Skipping sandbox instance resume workflow because sandbox is already active.",
-      );
-      return {
-        sandboxInstanceId: input.sandboxInstanceId,
-      };
-    }
-
-    const resumableSandboxState = resumableSandboxInstance;
-    logger.info(
-      createResumeWorkflowLogFields({
-        sandboxInstanceId: input.sandboxInstanceId,
-        organizationId: resumableSandboxState.organizationId,
-        runtimeProvider: resumableSandboxState.runtimeProvider,
-        providerSandboxId: resumableSandboxState.providerSandboxId,
-        persistenceMode: resumableSandboxState.persistenceMode,
-        computeGeneration: resumableSandboxState.computeGeneration,
-      }),
-      "Resolved resumable sandbox instance state.",
-    );
-
-    const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve(
-      createResolveSandboxRuntimeInput(resumableSandboxState),
-    );
-
-    logger.info(
-      createResumeWorkflowLogFields({
-        sandboxInstanceId: input.sandboxInstanceId,
-        organizationId: resumableSandboxState.organizationId,
-        runtimeProvider: resumableSandboxState.runtimeProvider,
-        providerSandboxId: resumableSandboxState.providerSandboxId,
-        persistenceMode: resumableSandboxState.persistenceMode,
-        computeGeneration: resumableSandboxState.computeGeneration,
-      }),
-      "Marking sandbox instance as starting before resume.",
-    );
-    await step.run({ name: "mark-sandbox-instance-starting" }, async () => {
-      await markSandboxInstanceStarting({
-        db: ctx.db,
-        logger,
-        tables: ctx.tables,
-        sandboxInstanceId: input.sandboxInstanceId,
-      });
-    });
-
-    let existingProviderResumeAction: ExistingProviderResumeAction | null = null;
-
-    if (resumableSandboxState.providerSandboxId !== null) {
-      const existingProviderSandboxId = resumableSandboxState.providerSandboxId;
-      try {
-        existingProviderResumeAction = await step.run(
-          { name: "inspect-existing-sandbox-compute-before-resume" },
-          async () => {
-            return inspectExistingProviderResumeAction(
-              {
-                sandboxAdapter: resolvedRuntime.sandboxAdapter,
-              },
-              {
-                persistenceMode: resumableSandboxState.persistenceMode,
-                providerSandboxId: existingProviderSandboxId,
-              },
-            );
-          },
-        );
-      } catch (error) {
-        rethrowResumeDurableStepErrorForRetry(error);
-
-        await operationEvents.record({
-          attributes: {
-            providerSandboxId: existingProviderSandboxId,
-            runtimeProvider: resumableSandboxState.runtimeProvider,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          message: "Sandbox provider resume preflight inspection failed.",
-          phase: "provider",
-          status: "failed",
-        });
-
-        const failureMessage = formatPersistedFailureMessage({
-          summary: "Failed to resume sandbox runtime.",
-          error,
-        });
-        let markFailedError: unknown;
-        logger.warn(
-          {
-            failureCode: ResumeSandboxFailureCodes.RESUME_SANDBOX_FAILED,
-            failureMessage,
-          },
-          "Marking sandbox instance as failed during resume workflow.",
-        );
-        try {
-          await step.run(
-            { name: "mark-sandbox-instance-failed-after-resume-preflight-inspection-failure" },
-            async () => {
-              await markSandboxInstanceFailed(
-                {
-                  db: ctx.db,
-                  tables: ctx.tables,
-                },
-                {
-                  sandboxInstanceId: input.sandboxInstanceId,
-                  failureCode: ResumeSandboxFailureCodes.RESUME_SANDBOX_FAILED,
-                  failureMessage,
-                },
-              );
-            },
-          );
-        } catch (markError) {
-          logger.error(
-            { err: markError },
-            "Failed to mark sandbox instance as failed after resume preflight inspection failure.",
-          );
-          markFailedError = markError;
-        }
-
-        throwResumeFailureHandlingErrors({
-          markFailedError,
-        });
-        throw error;
-      }
-
-      if (existingProviderResumeAction.kind === "fail") {
-        const failureCode = existingProviderResumeAction.failureCode;
-        const failureMessage = existingProviderResumeAction.failureMessage;
-        await operationEvents.record({
-          attributes: {
-            providerSandboxId: existingProviderSandboxId,
-            runtimeProvider: resumableSandboxState.runtimeProvider,
-            failureCode,
-            error: failureMessage,
-          },
-          message: "Sandbox provider resume preflight failed.",
-          phase: "provider",
-          status: "failed",
-        });
-
-        let markFailedError: unknown;
-        logger.warn(
-          {
-            failureCode,
-            failureMessage,
-          },
-          "Marking sandbox instance as failed during resume workflow.",
-        );
-        try {
-          await step.run(
-            { name: "mark-sandbox-instance-failed-after-resume-preflight" },
-            async () => {
-              await markSandboxInstanceFailed(
-                {
-                  db: ctx.db,
-                  tables: ctx.tables,
-                },
-                {
-                  sandboxInstanceId: input.sandboxInstanceId,
-                  failureCode,
-                  failureMessage,
-                },
-              );
-            },
-          );
-        } catch (markError) {
-          logger.error(
-            { err: markError },
-            "Failed to mark sandbox instance as failed after resume preflight.",
-          );
-          markFailedError = markError;
-        }
-
-        throwResumeFailureHandlingErrors({
-          markFailedError,
-        });
-        throw new Error(failureMessage);
-      }
-
-      if (existingProviderResumeAction.kind === "replace_provider_compute") {
-        await operationEvents.record({
-          attributes: {
-            providerSandboxId: existingProviderSandboxId,
-            runtimeProvider: resumableSandboxState.runtimeProvider,
-            timelineKey: "sandbox",
-            timelineLabel: "Replacing sandbox",
-          },
-          message:
-            "Existing sandbox provider compute was not resumable; switching to replacement resume.",
-          phase: "provider",
-          status: "warning",
-        });
-        logger.info(
-          createResumeWorkflowLogFields({
-            sandboxInstanceId: input.sandboxInstanceId,
-            organizationId: resumableSandboxState.organizationId,
-            runtimeProvider: resumableSandboxState.runtimeProvider,
-            providerSandboxId: existingProviderSandboxId,
-            persistenceMode: resumableSandboxState.persistenceMode,
-            computeGeneration: resumableSandboxState.computeGeneration,
-          }),
-          "Existing sandbox provider compute was not resumable; switching to replacement resume.",
-        );
-      }
-    }
-
-    if (
-      resumableSandboxState.providerSandboxId !== null &&
-      existingProviderResumeAction !== null &&
-      existingProviderResumeAction.kind !== "replace_provider_compute"
-    ) {
-      const existingProviderSandboxId = resumableSandboxState.providerSandboxId;
-      const shouldResumeProvider = existingProviderResumeAction.kind === "resume_provider";
-      let existingResumeFailureHandled = false;
-      try {
-        logger.info(
-          createResumeWorkflowLogFields({
-            sandboxInstanceId: input.sandboxInstanceId,
-            organizationId: resumableSandboxState.organizationId,
-            runtimeProvider: resumableSandboxState.runtimeProvider,
-            providerSandboxId: existingProviderSandboxId,
-            persistenceMode: resumableSandboxState.persistenceMode,
-            computeGeneration: resumableSandboxState.computeGeneration,
-          }),
-          shouldResumeProvider
-            ? "Resuming existing sandbox provider compute."
-            : "Using already-active sandbox provider compute for resume.",
-        );
-        const providerResumeAttributes = {
-          providerSandboxId: existingProviderSandboxId,
-          runtimeProvider: resumableSandboxState.runtimeProvider,
-          timelineKey: "sandbox",
-          timelineLabel: shouldResumeProvider ? "Resuming sandbox" : "Reconnecting sandbox",
-        };
-        await operationEvents.record({
-          attributes: providerResumeAttributes,
-          message: shouldResumeProvider
-            ? "Sandbox provider resume started."
-            : "Sandbox provider resume skipped because provider compute is already active.",
-          phase: "provider",
-          status: shouldResumeProvider ? "started" : "completed",
-        });
-        const resumedRuntime = await step.run(
-          { name: "resume-existing-sandbox-compute" },
-          async () => {
-            if (!shouldResumeProvider) {
-              return {
-                sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
-                runtimeProvider: resumableSandboxState.runtimeProvider,
-                providerSandboxId: existingProviderSandboxId,
-              };
-            }
-
-            try {
-              return await resumeSandbox(
-                {
-                  config: ctx.config,
-                  processEnv: ctx.processEnv,
-                  sandboxAdapter: resolvedRuntime.sandboxAdapter,
-                },
-                {
-                  sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
-                  runtimeProvider: resumableSandboxState.runtimeProvider,
-                  providerSandboxId: existingProviderSandboxId,
-                },
-              );
-            } catch (error) {
-              if (
-                resumableSandboxState.persistenceMode === "persistent" &&
-                isRecoverableMissingSandboxError(error)
-              ) {
-                return null;
-              }
-
-              let postFailureResumeAction: ExistingProviderResumeAction;
-              try {
-                postFailureResumeAction = await inspectExistingProviderResumeAction(
-                  {
-                    sandboxAdapter: resolvedRuntime.sandboxAdapter,
-                  },
-                  {
-                    persistenceMode: resumableSandboxState.persistenceMode,
-                    providerSandboxId: existingProviderSandboxId,
-                  },
-                );
-              } catch (inspectError) {
-                logger.warn(
-                  {
-                    err: inspectError,
-                    originalError: error,
-                    providerSandboxId: existingProviderSandboxId,
-                    runtimeProvider: resumableSandboxState.runtimeProvider,
-                    sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
-                  },
-                  "Failed to inspect provider state after sandbox provider resume failed.",
-                );
-                await operationEvents.record({
-                  attributes: {
-                    ...providerResumeAttributes,
-                    error: error instanceof Error ? error.message : String(error),
-                    inspectError:
-                      inspectError instanceof Error ? inspectError.message : String(inspectError),
-                  },
-                  message: "Sandbox provider resume failed.",
-                  phase: "provider",
-                  status: "failed",
-                });
-                throw error;
-              }
-
-              if (postFailureResumeAction.kind === "use_active_provider") {
-                return {
-                  sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
-                  runtimeProvider: resumableSandboxState.runtimeProvider,
-                  providerSandboxId: existingProviderSandboxId,
-                };
-              }
-
-              if (postFailureResumeAction.kind === "replace_provider_compute") {
-                return null;
-              }
-
-              if (postFailureResumeAction.kind === "fail") {
-                await operationEvents.record({
-                  attributes: {
-                    ...providerResumeAttributes,
-                    error: postFailureResumeAction.failureMessage,
-                    originalError: error instanceof Error ? error.message : String(error),
-                  },
-                  message: "Sandbox provider resume failed.",
-                  phase: "provider",
-                  status: "failed",
-                });
-                throw new Error(postFailureResumeAction.failureMessage, {
-                  cause: error,
-                });
-              }
-
-              await operationEvents.record({
-                attributes: {
-                  ...providerResumeAttributes,
-                  error: error instanceof Error ? error.message : String(error),
-                },
-                message: "Sandbox provider resume failed.",
-                phase: "provider",
-                status: "failed",
-              });
-              throw error;
-            }
-          },
-        );
-        if (resumedRuntime === null) {
-          await operationEvents.record({
-            attributes: providerResumeAttributes,
-            message:
-              "Existing sandbox provider compute was missing; switching to replacement resume.",
-            phase: "provider",
-            status: "warning",
-          });
-        } else if (shouldResumeProvider) {
-          await operationEvents.record({
-            attributes: providerResumeAttributes,
-            message: "Sandbox provider resume completed.",
-            phase: "provider",
-            status: "completed",
-          });
-        }
-
-        logger.info(
-          createResumeWorkflowLogFields({
-            sandboxInstanceId: input.sandboxInstanceId,
-            organizationId: resumableSandboxState.organizationId,
-            runtimeProvider: resumableSandboxState.runtimeProvider,
-            providerSandboxId: existingProviderSandboxId,
-            persistenceMode: resumableSandboxState.persistenceMode,
-            computeGeneration: resumableSandboxState.computeGeneration,
-          }),
-          resumedRuntime === null
-            ? "Existing sandbox provider compute was missing; switching to replacement resume."
-            : "Resumed existing sandbox provider compute.",
-        );
-
-        if (resumedRuntime !== null) {
-          await step.run({ name: "mark-resumed-sandbox-instance-started" }, async () => {
-            await applySandboxLifecycleEvent(
-              {
-                db: ctx.db,
-                logger,
-                tables: ctx.tables,
-              },
-              {
-                sandboxInstanceId: input.sandboxInstanceId,
-                event: SandboxLifecycleEvents.PROVIDER_START_ACCEPTED,
-              },
-            );
-          });
-
-          try {
-            await step.run({ name: "record-sandbox-resumed-usage-event" }, async () => {
-              await recordResumeSandboxUsageEvent({
-                eventType: SandboxUsageEventTypes.SANDBOX_RESUMED,
-                providerSandboxId: resumedRuntime.providerSandboxId,
-                computeGeneration: resumableSandboxState.computeGeneration,
-              });
-            });
-          } catch (error) {
-            existingResumeFailureHandled = true;
-            throw error;
-          }
-
-          try {
-            await step.run({ name: "mark-resumed-sandbox-instance-initializing" }, async () => {
-              await applySandboxLifecycleEvent(
-                {
-                  db: ctx.db,
-                  logger,
-                  tables: ctx.tables,
-                },
-                {
-                  sandboxInstanceId: input.sandboxInstanceId,
-                  event: SandboxLifecycleEvents.PROVIDER_RUNTIME_INITIALIZATION_STARTED,
-                },
-              );
-            });
-
-            logger.info(
-              createResumeWorkflowLogFields({
-                sandboxInstanceId: input.sandboxInstanceId,
-                organizationId: resumableSandboxState.organizationId,
-                runtimeProvider: resumedRuntime.runtimeProvider,
-                providerSandboxId: resumedRuntime.providerSandboxId,
-                persistenceMode: resumableSandboxState.persistenceMode,
-                computeGeneration: resumableSandboxState.computeGeneration,
-              }),
-              "Attaching sandbox storage before resumed runtime initialization.",
-            );
-            await step.run({ name: "attach-resumed-sandbox-storage" }, async () => {
-              await attachSandboxStorage(
-                {
-                  db: ctx.db,
-                  tables: ctx.tables,
-                  controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-                  workerConfig: ctx.config.app,
-                  configuredSandboxProvider: resumableSandboxState.runtimeProvider,
-                  sandboxAdapter: resolvedRuntime.sandboxAdapter,
-                  storageBackend: ctx.config.sandbox.storage?.backend,
-                },
-                {
-                  organizationId: resumableSandboxState.organizationId,
-                  sandboxInstanceId: input.sandboxInstanceId,
-                  persistenceMode: resumableSandboxState.persistenceMode,
-                  runtimeProvider: resumedRuntime.runtimeProvider,
-                  providerSandboxId: resumedRuntime.providerSandboxId,
-                  lifecycle: "resume",
-                  operationEventRecorder: operationEvents,
-                },
-              );
-            });
-            logger.info(
-              createResumeWorkflowLogFields({
-                sandboxInstanceId: input.sandboxInstanceId,
-                organizationId: resumableSandboxState.organizationId,
-                runtimeProvider: resumedRuntime.runtimeProvider,
-                providerSandboxId: resumedRuntime.providerSandboxId,
-                persistenceMode: resumableSandboxState.persistenceMode,
-                computeGeneration: resumableSandboxState.computeGeneration,
-              }),
-              "Attached sandbox storage before resumed runtime initialization.",
-            );
-          } catch (error) {
-            rethrowResumeDurableStepErrorForRetry(error);
-            existingResumeFailureHandled = true;
-            const failureMessage = formatPersistedFailureMessage({
-              summary: "Failed to attach sandbox storage before resume runtime initialization.",
-              error,
-            });
-
-            let stopSandboxError: unknown;
-            try {
-              await step.run({ name: "stop-sandbox-after-resume-failure" }, async () => {
-                await stopSandbox(
-                  {
-                    db: ctx.db,
-                    tables: ctx.tables,
-                    controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-                    config: ctx.config,
-                    sandboxAdapter: resolvedRuntime.sandboxAdapter,
-                  },
-                  {
-                    sandboxInstanceId: input.sandboxInstanceId,
-                    persistenceMode: resumableSandboxState.persistenceMode,
-                    runtimeProvider: resumedRuntime.runtimeProvider,
-                    providerSandboxId: resumedRuntime.providerSandboxId,
-                  },
-                );
-              });
-            } catch (stopError) {
-              if (!isRecoverableMissingSandboxError(stopError)) {
-                logger.error({ err: stopError }, "Failed to stop sandbox after resume failure.");
-                stopSandboxError = stopError;
-              }
-            }
-
-            let markFailedError: unknown;
-            logger.warn(
-              {
-                failureCode: ResumeSandboxFailureCodes.SANDBOX_INIT_FAILED,
-                failureMessage,
-              },
-              "Marking sandbox instance as failed during resume workflow.",
-            );
-            try {
-              await step.run(
-                { name: "mark-sandbox-instance-failed-after-resume-failure" },
-                async () => {
-                  await markSandboxInstanceFailed(
-                    {
-                      db: ctx.db,
-                      tables: ctx.tables,
-                    },
-                    {
-                      sandboxInstanceId: input.sandboxInstanceId,
-                      failureCode: ResumeSandboxFailureCodes.SANDBOX_INIT_FAILED,
-                      failureMessage,
-                    },
-                  );
-                },
-              );
-            } catch (markError) {
-              logger.error(
-                { err: markError },
-                "Failed to mark sandbox instance as failed after resume failure.",
-              );
-              markFailedError = markError;
-            }
-
-            throwResumeFailureHandlingErrors({
-              stopSandboxError,
-              markFailedError,
-            });
-            throw error;
-          }
-
-          try {
-            logger.info(
-              createResumeWorkflowLogFields({
-                sandboxInstanceId: input.sandboxInstanceId,
-                organizationId: resumableSandboxState.organizationId,
-                runtimeProvider: resumedRuntime.runtimeProvider,
-                providerSandboxId: resumedRuntime.providerSandboxId,
-                persistenceMode: resumableSandboxState.persistenceMode,
-                computeGeneration: resumableSandboxState.computeGeneration,
-              }),
-              "Initializing resumed sandbox runtime.",
-            );
-            await step.run({ name: "initialize-resumed-sandbox-runtime" }, async () => {
-              await resumeSandboxRuntime(
-                {
-                  config: ctx.config,
-                  logger,
-                  processEnv: ctx.processEnv,
-                  sandboxAdapter: resolvedRuntime.sandboxAdapter,
-                  sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
-                  sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
-                },
-                {
-                  organizationId: resumableSandboxState.organizationId,
-                  operationId: run.id,
-                  operationKind: "resume",
-                  sandboxInstanceId: resumedRuntime.sandboxInstanceId,
-                  providerSandboxId: resumedRuntime.providerSandboxId,
-                  runtimeProvider: resumedRuntime.runtimeProvider,
-                  runtimePlan: resumableSandboxState.runtimePlan,
-                  ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
-                  ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
-                },
-              );
-            });
-            logger.info(
-              createResumeWorkflowLogFields({
-                sandboxInstanceId: input.sandboxInstanceId,
-                organizationId: resumableSandboxState.organizationId,
-                runtimeProvider: resumedRuntime.runtimeProvider,
-                providerSandboxId: resumedRuntime.providerSandboxId,
-                persistenceMode: resumableSandboxState.persistenceMode,
-                computeGeneration: resumableSandboxState.computeGeneration,
-              }),
-              "Initialized resumed sandbox runtime.",
-            );
-          } catch (error) {
-            rethrowResumeDurableStepErrorForRetry(error);
-            existingResumeFailureHandled = true;
-            const failureMessage = formatPersistedFailureMessage({
-              summary: "Failed to initialize resumed sandbox runtime.",
-              error,
-            });
-            await emitSandboxStartupDiagnostics({
-              logger,
-              sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
-              providerSandboxId: resumedRuntime.providerSandboxId,
-              sandboxInstanceId: resumedRuntime.sandboxInstanceId,
-              runtimeProvider: resumedRuntime.runtimeProvider,
-              operation: "resume",
-              persistenceMode: resumableSandboxState.persistenceMode,
-            });
-
-            let stopSandboxError: unknown;
-            try {
-              await step.run({ name: "stop-sandbox-after-resume-failure" }, async () => {
-                await stopSandbox(
-                  {
-                    db: ctx.db,
-                    tables: ctx.tables,
-                    controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-                    config: ctx.config,
-                    sandboxAdapter: resolvedRuntime.sandboxAdapter,
-                  },
-                  {
-                    sandboxInstanceId: input.sandboxInstanceId,
-                    persistenceMode: resumableSandboxState.persistenceMode,
-                    runtimeProvider: resumedRuntime.runtimeProvider,
-                    providerSandboxId: resumedRuntime.providerSandboxId,
-                  },
-                );
-              });
-            } catch (stopError) {
-              if (!isRecoverableMissingSandboxError(stopError)) {
-                logger.error({ err: stopError }, "Failed to stop sandbox after resume failure.");
-                stopSandboxError = stopError;
-              }
-            }
-
-            let markFailedError: unknown;
-            logger.warn(
-              {
-                failureCode: ResumeSandboxFailureCodes.SANDBOX_INIT_FAILED,
-                failureMessage,
-              },
-              "Marking sandbox instance as failed during resume workflow.",
-            );
-            try {
-              await step.run(
-                { name: "mark-sandbox-instance-failed-after-resume-failure" },
-                async () => {
-                  await markSandboxInstanceFailed(
-                    {
-                      db: ctx.db,
-                      tables: ctx.tables,
-                    },
-                    {
-                      sandboxInstanceId: input.sandboxInstanceId,
-                      failureCode: ResumeSandboxFailureCodes.SANDBOX_INIT_FAILED,
-                      failureMessage,
-                    },
-                  );
-                },
-              );
-            } catch (markError) {
-              logger.error(
-                { err: markError },
-                "Failed to mark sandbox instance as failed after resume failure.",
-              );
-              markFailedError = markError;
-            }
-
-            throwResumeFailureHandlingErrors({
-              stopSandboxError,
-              markFailedError,
-            });
-            throw error;
-          }
-
-          let resumedSandboxRuntimeReady: boolean;
-          try {
-            logger.info(
-              createResumeWorkflowLogFields({
-                sandboxInstanceId: input.sandboxInstanceId,
-                organizationId: resumableSandboxState.organizationId,
-                runtimeProvider: resumedRuntime.runtimeProvider,
-                providerSandboxId: resumedRuntime.providerSandboxId,
-                persistenceMode: resumableSandboxState.persistenceMode,
-                computeGeneration: resumableSandboxState.computeGeneration,
-              }),
-              "Waiting for resumed sandbox runtime readiness.",
-            );
-            const readinessAttributes = {
-              providerSandboxId: resumedRuntime.providerSandboxId,
-              runtimeProvider: resumedRuntime.runtimeProvider,
-            };
-            await operationEvents.record({
-              attributes: readinessAttributes,
-              message: "Resumed sandbox runtime readiness wait started.",
-              phase: "ready",
-              status: "started",
-            });
-            resumedSandboxRuntimeReady = await step.run(
-              { name: "wait-for-resumed-sandbox-runtime-readiness" },
-              async () => {
-                return waitForSandboxRuntimeReadiness(
-                  {
-                    runtimeStateReader: ctx.runtimeStateReader,
-                    policy: ctx.tunnelReadinessPolicy,
-                    clock: ctx.clock,
-                    sleeper: ctx.sleeper,
-                  },
-                  {
-                    sandboxInstanceId: input.sandboxInstanceId,
-                  },
-                );
-              },
-            );
-            if (resumedSandboxRuntimeReady) {
-              await operationEvents.record({
-                attributes: readinessAttributes,
-                message: "Resumed sandbox runtime readiness wait completed.",
-                phase: "ready",
-                status: "completed",
-              });
-            }
-            logger.info(
-              {
-                ...createResumeWorkflowLogFields({
-                  sandboxInstanceId: input.sandboxInstanceId,
-                  organizationId: resumableSandboxState.organizationId,
-                  runtimeProvider: resumedRuntime.runtimeProvider,
-                  providerSandboxId: resumedRuntime.providerSandboxId,
-                  persistenceMode: resumableSandboxState.persistenceMode,
-                  computeGeneration: resumableSandboxState.computeGeneration,
-                }),
-                didSandboxBecomeReady: resumedSandboxRuntimeReady,
-              },
-              "Finished waiting for resumed sandbox runtime readiness.",
-            );
-          } catch (error) {
-            rethrowResumeDurableStepErrorForRetry(error);
-            await operationEvents.record({
-              attributes: {
-                providerSandboxId: resumedRuntime.providerSandboxId,
-                runtimeProvider: resumedRuntime.runtimeProvider,
-              },
-              message: "Resumed sandbox runtime readiness wait failed.",
-              phase: "ready",
-              status: "failed",
-            });
-            existingResumeFailureHandled = true;
-            const failureMessage = formatPersistedFailureMessage({
-              summary: "Failed while waiting for resumed sandbox runtime readiness.",
-              error,
-            });
-
-            let stopSandboxError: unknown;
-            try {
-              await step.run({ name: "stop-sandbox-after-resume-failure" }, async () => {
-                await stopSandbox(
-                  {
-                    db: ctx.db,
-                    tables: ctx.tables,
-                    controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-                    config: ctx.config,
-                    sandboxAdapter: resolvedRuntime.sandboxAdapter,
-                  },
-                  {
-                    sandboxInstanceId: input.sandboxInstanceId,
-                    persistenceMode: resumableSandboxState.persistenceMode,
-                    runtimeProvider: resumedRuntime.runtimeProvider,
-                    providerSandboxId: resumedRuntime.providerSandboxId,
-                  },
-                );
-              });
-            } catch (stopError) {
-              if (!isRecoverableMissingSandboxError(stopError)) {
-                logger.error({ err: stopError }, "Failed to stop sandbox after resume failure.");
-                stopSandboxError = stopError;
-              }
-            }
-
-            let markFailedError: unknown;
-            logger.warn(
-              {
-                failureCode: ResumeSandboxFailureCodes.TUNNEL_CONNECT_ACK_WAIT_FAILED,
-                failureMessage,
-              },
-              "Marking sandbox instance as failed during resume workflow.",
-            );
-            try {
-              await step.run(
-                { name: "mark-sandbox-instance-failed-after-resume-failure" },
-                async () => {
-                  await markSandboxInstanceFailed(
-                    {
-                      db: ctx.db,
-                      tables: ctx.tables,
-                    },
-                    {
-                      sandboxInstanceId: input.sandboxInstanceId,
-                      failureCode: ResumeSandboxFailureCodes.TUNNEL_CONNECT_ACK_WAIT_FAILED,
-                      failureMessage,
-                    },
-                  );
-                },
-              );
-            } catch (markError) {
-              logger.error(
-                { err: markError },
-                "Failed to mark sandbox instance as failed after resume failure.",
-              );
-              markFailedError = markError;
-            }
-
-            throwResumeFailureHandlingErrors({
-              stopSandboxError,
-              markFailedError,
-            });
-            throw error;
-          }
-
-          if (!resumedSandboxRuntimeReady) {
-            await operationEvents.record({
-              attributes: {
-                providerSandboxId: resumedRuntime.providerSandboxId,
-                runtimeProvider: resumedRuntime.runtimeProvider,
-                timeoutMs: ctx.tunnelReadinessPolicy.timeoutMs,
-              },
-              message: "Resumed sandbox runtime readiness timed out.",
-              phase: "ready",
-              status: "failed",
-            });
-            const error = new Error("Timed out waiting for resumed sandbox runtime readiness.");
-            existingResumeFailureHandled = true;
-            let stopSandboxError: unknown;
-            try {
-              await step.run({ name: "stop-sandbox-after-resume-failure" }, async () => {
-                await stopSandbox(
-                  {
-                    db: ctx.db,
-                    tables: ctx.tables,
-                    controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-                    config: ctx.config,
-                    sandboxAdapter: resolvedRuntime.sandboxAdapter,
-                  },
-                  {
-                    sandboxInstanceId: input.sandboxInstanceId,
-                    persistenceMode: resumableSandboxState.persistenceMode,
-                    runtimeProvider: resumedRuntime.runtimeProvider,
-                    providerSandboxId: resumedRuntime.providerSandboxId,
-                  },
-                );
-              });
-            } catch (stopError) {
-              if (!isRecoverableMissingSandboxError(stopError)) {
-                logger.error({ err: stopError }, "Failed to stop sandbox after resume failure.");
-                stopSandboxError = stopError;
-              }
-            }
-
-            let markFailedError: unknown;
-            logger.warn(
-              {
-                failureCode: ResumeSandboxFailureCodes.TUNNEL_CONNECT_ACK_TIMEOUT,
-                failureMessage: error.message,
-              },
-              "Marking sandbox instance as failed during resume workflow.",
-            );
-            try {
-              await step.run(
-                { name: "mark-sandbox-instance-failed-after-resume-failure" },
-                async () => {
-                  await markSandboxInstanceFailed(
-                    {
-                      db: ctx.db,
-                      tables: ctx.tables,
-                    },
-                    {
-                      sandboxInstanceId: input.sandboxInstanceId,
-                      failureCode: ResumeSandboxFailureCodes.TUNNEL_CONNECT_ACK_TIMEOUT,
-                      failureMessage: error.message,
-                    },
-                  );
-                },
-              );
-            } catch (markError) {
-              logger.error(
-                { err: markError },
-                "Failed to mark sandbox instance as failed after resume failure.",
-              );
-              markFailedError = markError;
-            }
-
-            throwResumeFailureHandlingErrors({
-              stopSandboxError,
-              markFailedError,
-            });
-            throw error;
-          }
-
-          try {
-            logger.info(
-              createResumeWorkflowLogFields({
-                sandboxInstanceId: input.sandboxInstanceId,
-                organizationId: resumableSandboxState.organizationId,
-                runtimeProvider: resumedRuntime.runtimeProvider,
-                providerSandboxId: resumedRuntime.providerSandboxId,
-                persistenceMode: resumableSandboxState.persistenceMode,
-                computeGeneration: resumableSandboxState.computeGeneration,
-              }),
-              "Marking resumed sandbox instance as running.",
-            );
-            await recordWorkerSandboxLifecyclePhase(
-              operationEvents,
-              {
-                attributes: {
-                  providerSandboxId: resumedRuntime.providerSandboxId,
-                  runtimeProvider: resumedRuntime.runtimeProvider,
-                  timelineHidden: true,
-                },
-                completedMessage: "Resumed sandbox running status transition completed.",
-                failedMessage: "Resumed sandbox running status transition failed.",
-                phase: "running",
-                startedMessage: "Resumed sandbox running status transition started.",
-              },
-              async () => {
-                await step.run({ name: "mark-resumed-sandbox-instance-running" }, async () => {
-                  await markSandboxInstanceRunning(
-                    {
-                      db: ctx.db,
-                      tables: ctx.tables,
-                    },
-                    {
-                      sandboxInstanceId: input.sandboxInstanceId,
-                    },
-                  );
-                });
-              },
-            );
-            logger.info(
-              createResumeWorkflowLogFields({
-                sandboxInstanceId: input.sandboxInstanceId,
-                organizationId: resumableSandboxState.organizationId,
-                runtimeProvider: resumedRuntime.runtimeProvider,
-                providerSandboxId: resumedRuntime.providerSandboxId,
-                persistenceMode: resumableSandboxState.persistenceMode,
-                computeGeneration: resumableSandboxState.computeGeneration,
-              }),
-              "Sandbox resume workflow completed successfully.",
-            );
-            await emitSandboxStartupDiagnostics({
-              logger,
-              sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
-              providerSandboxId: resumedRuntime.providerSandboxId,
-              sandboxInstanceId: resumedRuntime.sandboxInstanceId,
-              runtimeProvider: resumedRuntime.runtimeProvider,
-              operation: "resume",
-              persistenceMode: resumableSandboxState.persistenceMode,
-            });
-          } catch (error) {
-            rethrowResumeDurableStepErrorForRetry(error);
-            existingResumeFailureHandled = true;
-            const failureMessage = formatPersistedFailureMessage({
-              summary: "Failed to mark resumed sandbox instance as running.",
-              error,
-            });
-
-            let stopSandboxError: unknown;
-            try {
-              await step.run({ name: "stop-sandbox-after-resume-failure" }, async () => {
-                await stopSandbox(
-                  {
-                    db: ctx.db,
-                    tables: ctx.tables,
-                    controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-                    config: ctx.config,
-                    sandboxAdapter: resolvedRuntime.sandboxAdapter,
-                  },
-                  {
-                    sandboxInstanceId: input.sandboxInstanceId,
-                    persistenceMode: resumableSandboxState.persistenceMode,
-                    runtimeProvider: resumedRuntime.runtimeProvider,
-                    providerSandboxId: resumedRuntime.providerSandboxId,
-                  },
-                );
-              });
-            } catch (stopError) {
-              if (!isRecoverableMissingSandboxError(stopError)) {
-                logger.error({ err: stopError }, "Failed to stop sandbox after resume failure.");
-                stopSandboxError = stopError;
-              }
-            }
-
-            let markFailedError: unknown;
-            logger.warn(
-              {
-                failureCode: ResumeSandboxFailureCodes.STATUS_TRANSITION_TO_RUNNING_FAILED,
-                failureMessage,
-              },
-              "Marking sandbox instance as failed during resume workflow.",
-            );
-            try {
-              await step.run(
-                { name: "mark-sandbox-instance-failed-after-resume-failure" },
-                async () => {
-                  await markSandboxInstanceFailed(
-                    {
-                      db: ctx.db,
-                      tables: ctx.tables,
-                    },
-                    {
-                      sandboxInstanceId: input.sandboxInstanceId,
-                      failureCode: ResumeSandboxFailureCodes.STATUS_TRANSITION_TO_RUNNING_FAILED,
-                      failureMessage,
-                    },
-                  );
-                },
-              );
-            } catch (markError) {
-              logger.error(
-                { err: markError },
-                "Failed to mark sandbox instance as failed after resume failure.",
-              );
-              markFailedError = markError;
-            }
-
-            throwResumeFailureHandlingErrors({
-              stopSandboxError,
-              markFailedError,
-            });
-            throw error;
-          }
-
-          try {
-            await step.run({ name: "record-resumed-sandbox-ready-usage-event" }, async () => {
-              await recordResumeSandboxUsageEvent({
-                eventType: SandboxUsageEventTypes.SANDBOX_READY,
-                providerSandboxId: resumedRuntime.providerSandboxId,
-                computeGeneration: resumableSandboxState.computeGeneration,
-                discriminator: "existing-provider",
-              });
-            });
-          } catch (error) {
-            existingResumeFailureHandled = true;
-            throw error;
-          }
-
-          return {
-            sandboxInstanceId: input.sandboxInstanceId,
-          };
-        }
-      } catch (error) {
-        rethrowResumeDurableStepErrorForRetry(error);
-        if (existingResumeFailureHandled) {
-          throw error;
-        }
-
-        if (
-          resumableSandboxState.persistenceMode !== "persistent" ||
-          !isRecoverableMissingSandboxError(error)
-        ) {
-          const failureMessage = formatPersistedFailureMessage({
-            summary: "Failed to resume sandbox runtime.",
-            error,
-          });
-
-          let markFailedError: unknown;
-          logger.warn(
-            {
-              failureCode: ResumeSandboxFailureCodes.RESUME_SANDBOX_FAILED,
-              failureMessage,
-            },
-            "Marking sandbox instance as failed during resume workflow.",
-          );
-          try {
-            await step.run(
-              { name: "mark-sandbox-instance-failed-after-resume-failure" },
-              async () => {
-                await markSandboxInstanceFailed(
-                  {
-                    db: ctx.db,
-                    tables: ctx.tables,
-                  },
-                  {
-                    sandboxInstanceId: input.sandboxInstanceId,
-                    failureCode: ResumeSandboxFailureCodes.RESUME_SANDBOX_FAILED,
-                    failureMessage,
-                  },
-                );
-              },
-            );
-          } catch (markError) {
-            logger.error(
-              { err: markError },
-              "Failed to mark sandbox instance as failed after resume failure.",
-            );
-            markFailedError = markError;
-          }
-
-          throwResumeFailureHandlingErrors({
-            markFailedError,
-          });
-          throw error;
-        }
-      }
-    } else if (resumableSandboxState.persistenceMode !== "persistent") {
-      const error = new Error(
-        `Expected resumable sandbox instance '${input.sandboxInstanceId}' to have a provider sandbox id.`,
-      );
+    async function markResumeFailed(failureCode: string, error: unknown): Promise<void> {
       const failureMessage = formatPersistedFailureMessage({
         summary: "Failed to resume sandbox runtime.",
         error,
       });
+      logger.warn(
+        {
+          failureCode,
+          failureMessage,
+        },
+        "Marking sandbox instance as failed during resume workflow.",
+      );
+      await step.run({ name: "mark-sandbox-instance-failed-after-resume-failure" }, async () => {
+        await markSandboxInstanceFailed(
+          {
+            db: ctx.db,
+            tables: ctx.tables,
+          },
+          {
+            sandboxInstanceId: input.sandboxInstanceId,
+            failureCode,
+            failureMessage,
+          },
+        );
+      });
+    }
 
+    async function stopProviderAfterResumeFailure(input: {
+      runtimeProvider: SandboxProvider;
+      providerSandboxId: string;
+    }): Promise<unknown> {
+      try {
+        await step.run({ name: "stop-sandbox-after-resume-failure" }, async () => {
+          await stopSandbox(
+            {
+              sandboxAdapter: resolvedRuntime.sandboxAdapter,
+            },
+            {
+              runtimeProvider: input.runtimeProvider,
+              providerSandboxId: input.providerSandboxId,
+            },
+          );
+        });
+        return undefined;
+      } catch (error) {
+        if (isRecoverableMissingSandboxError(error)) {
+          return undefined;
+        }
+        logger.error({ err: error }, "Failed to stop sandbox after resume failure.");
+        return error;
+      }
+    }
+
+    async function handleResumeFailure(failureInput: {
+      failureCode: string;
+      error: unknown;
+      runtimeProvider: SandboxProvider;
+      providerSandboxId: string;
+      summary: string;
+    }): Promise<void> {
+      const failureMessage = formatPersistedFailureMessage({
+        summary: failureInput.summary,
+        error: failureInput.error,
+      });
+      const stopSandboxError = await stopProviderAfterResumeFailure({
+        runtimeProvider: failureInput.runtimeProvider,
+        providerSandboxId: failureInput.providerSandboxId,
+      });
       let markFailedError: unknown;
       logger.warn(
         {
-          failureCode: ResumeSandboxFailureCodes.RESUME_SANDBOX_FAILED,
+          failureCode: failureInput.failureCode,
           failureMessage,
         },
         "Marking sandbox instance as failed during resume workflow.",
@@ -1296,979 +196,465 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             },
             {
               sandboxInstanceId: input.sandboxInstanceId,
-              failureCode: ResumeSandboxFailureCodes.RESUME_SANDBOX_FAILED,
+              failureCode: failureInput.failureCode,
               failureMessage,
             },
           );
         });
-      } catch (markError) {
-        logger.error(
-          { err: markError },
-          "Failed to mark sandbox instance as failed after resume failure.",
-        );
-        markFailedError = markError;
+      } catch (error) {
+        logger.error({ err: error }, "Failed to mark sandbox instance as failed after resume.");
+        markFailedError = error;
       }
-
       throwResumeFailureHandlingErrors({
+        stopSandboxError,
         markFailedError,
       });
+    }
+
+    async function recordResumeSandboxUsageEvent(eventInput: {
+      eventType: SandboxUsageEventType;
+      providerSandboxId: string;
+      computeGeneration: number;
+      discriminator?: string;
+      payload?: Record<string, unknown>;
+      state: ResumableSandboxInstanceState;
+    }): Promise<void> {
+      await recordWorkerSandboxUsageEvent(
+        {
+          clock: ctx.clock,
+          db: ctx.db,
+          tables: ctx.tables,
+        },
+        {
+          idempotencyKey: createSandboxUsageEventIdempotencyKey({
+            sandboxInstanceId: eventInput.state.sandboxInstanceId,
+            computeGeneration: eventInput.computeGeneration,
+            eventType: eventInput.eventType,
+            operationId: run.id,
+            ...(eventInput.discriminator === undefined
+              ? {}
+              : { discriminator: eventInput.discriminator }),
+          }),
+          organizationId: eventInput.state.organizationId,
+          sandboxInstanceId: eventInput.state.sandboxInstanceId,
+          computeGeneration: eventInput.computeGeneration,
+          eventType: eventInput.eventType,
+          runtimeProvider: eventInput.state.runtimeProvider,
+          providerSandboxId: eventInput.providerSandboxId,
+          vcpuCount: eventInput.state.sandboxVcpuCount,
+          memoryMb: eventInput.state.sandboxMemoryMb,
+          storageMb: eventInput.state.sandboxStorageMb,
+          payload: {
+            workflowRunId: run.id,
+            operationKind: "resume",
+            ...(eventInput.payload ?? {}),
+          },
+        },
+      );
+    }
+
+    logger.info(
+      createResumeWorkflowLogFields({
+        sandboxInstanceId: input.sandboxInstanceId,
+      }),
+      "Starting sandbox instance resume workflow.",
+    );
+
+    const resumableSandboxState = await step.run(
+      { name: "resolve-resumable-sandbox-instance-state" },
+      async () =>
+        resolveResumableSandboxInstanceState({
+          db: ctx.db,
+          tables: ctx.tables,
+          sandboxInstanceId: input.sandboxInstanceId,
+        }),
+    );
+
+    if (resumableSandboxState === null) {
+      logger.info(
+        createResumeWorkflowLogFields({
+          sandboxInstanceId: input.sandboxInstanceId,
+        }),
+        "Skipping sandbox instance resume workflow because sandbox is already active.",
+      );
+      return {
+        sandboxInstanceId: input.sandboxInstanceId,
+      };
+    }
+
+    const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve(
+      createResolveSandboxRuntimeInput(resumableSandboxState),
+    );
+    const existingProviderSandboxId = resumableSandboxState.providerSandboxId;
+
+    logger.info(
+      createResumeWorkflowLogFields({
+        sandboxInstanceId: input.sandboxInstanceId,
+        organizationId: resumableSandboxState.organizationId,
+        runtimeProvider: resumableSandboxState.runtimeProvider,
+        providerSandboxId: existingProviderSandboxId,
+        computeGeneration: resumableSandboxState.computeGeneration,
+      }),
+      "Resolved resumable sandbox instance state.",
+    );
+
+    await step.run({ name: "mark-sandbox-instance-starting" }, async () => {
+      await markSandboxInstanceStarting({
+        db: ctx.db,
+        logger,
+        tables: ctx.tables,
+        sandboxInstanceId: input.sandboxInstanceId,
+      });
+    });
+
+    let existingProviderResumeAction: ExistingProviderResumeAction;
+    try {
+      existingProviderResumeAction = await step.run(
+        { name: "inspect-existing-sandbox-compute-before-resume" },
+        async () =>
+          inspectExistingProviderResumeAction(
+            {
+              sandboxAdapter: resolvedRuntime.sandboxAdapter,
+            },
+            {
+              providerSandboxId: existingProviderSandboxId,
+            },
+          ),
+      );
+    } catch (error) {
+      rethrowResumeDurableStepErrorForRetry(error);
+      await operationEvents.record({
+        attributes: {
+          providerSandboxId: existingProviderSandboxId,
+          runtimeProvider: resumableSandboxState.runtimeProvider,
+          error,
+        },
+        message: "Sandbox provider resume preflight failed.",
+        phase: "provider",
+        status: "failed",
+      });
+      await handleResumeFailure({
+        failureCode: ResumeSandboxFailureCodes.RESUME_SANDBOX_FAILED,
+        error,
+        runtimeProvider: resumableSandboxState.runtimeProvider,
+        providerSandboxId: existingProviderSandboxId,
+        summary: "Failed to inspect sandbox provider runtime before resume.",
+      });
+      throw resolveDurableStepFinalError(error, ResumeDurableStepRetryOptions);
+    }
+
+    if (existingProviderResumeAction.kind === "fail") {
+      const error = new Error(existingProviderResumeAction.failureMessage);
+      await operationEvents.record({
+        attributes: {
+          providerSandboxId: existingProviderSandboxId,
+          runtimeProvider: resumableSandboxState.runtimeProvider,
+          failureCode: existingProviderResumeAction.failureCode,
+          error: existingProviderResumeAction.failureMessage,
+        },
+        message: "Sandbox provider resume preflight failed.",
+        phase: "provider",
+        status: "failed",
+      });
+      await markResumeFailed(existingProviderResumeAction.failureCode, error);
       throw error;
     }
 
-    const replacementImage = createReplacementSandboxImage({
-      runtimePlan: resumableSandboxState.runtimePlan,
+    const shouldResumeProvider = existingProviderResumeAction.kind === "resume_provider";
+    const providerResumeAttributes = {
+      providerSandboxId: existingProviderSandboxId,
       runtimeProvider: resumableSandboxState.runtimeProvider,
-    });
-    let replacementSandbox:
-      | {
-          sandboxInstanceId: string;
-          runtimeProvider: SandboxProvider;
-          providerSandboxId: string;
-        }
-      | undefined;
-    let persistedReplacement:
-      | {
-          computeGeneration: number;
-        }
-      | undefined;
-    let replacementFailureHandled = false;
+      timelineKey: "sandbox",
+      timelineLabel: shouldResumeProvider ? "Resuming sandbox" : "Reconnecting sandbox",
+    };
+    const resumeState = resumableSandboxState;
 
-    try {
-      const preparedReplacementImage = await step.run(
-        { name: "prepare-replacement-sandbox-image" },
-        async () => {
-          const imagePreparationRuntime =
-            await ctx.sandboxRuntimeProviderResolver.resolveForImagePreparation(
-              createResolveSandboxRuntimeInput(resumableSandboxState),
-            );
-
-          return prepareSandboxImage(
-            {
-              sandboxAdapter: imagePreparationRuntime.sandboxAdapter,
-            },
-            {
-              image: replacementImage,
-              runtimeProvider: resumableSandboxState.runtimeProvider,
-            },
-          );
-        },
-      );
-      const storagePreparation = await step.run(
-        { name: "prepare-replacement-sandbox-storage-for-start" },
-        async () => {
-          return prepareSandboxStorageForStart(
-            {
-              db: ctx.db,
-              tables: ctx.tables,
-              controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-              workerConfig: ctx.config.app,
-              configuredSandboxProvider: resumableSandboxState.runtimeProvider,
-              sandboxAdapter: resolvedRuntime.sandboxAdapter,
-              storageBackend: ctx.config.sandbox.storage?.backend,
-            },
-            {
-              organizationId: resumableSandboxState.organizationId,
-              sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
-              image: preparedReplacementImage,
-              persistenceMode: resumableSandboxState.persistenceMode,
-              runtimeProvider: resumableSandboxState.runtimeProvider,
-            },
-          );
-        },
-      );
-
-      const startedReplacementSandbox = await recordWorkerSandboxLifecyclePhase(
-        operationEvents,
-        {
-          attributes: {
-            runtimeProvider: resumableSandboxState.runtimeProvider,
-            timelineKey: "sandbox",
-            timelineLabel: "Creating sandbox",
-          },
-          completedMessage: "Replacement sandbox provider start completed.",
-          failedMessage: "Replacement sandbox provider start failed.",
-          phase: "provider",
-          startedMessage: "Replacement sandbox provider start started.",
-        },
-        async () => {
-          return step.run({ name: "start-replacement-sandbox-compute" }, async () => {
-            return startSandbox(
-              {
-                config: ctx.config,
-                processEnv: ctx.processEnv,
-                sandboxAdapter: resolvedRuntime.sandboxAdapter,
-              },
-              {
-                sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
-                image: preparedReplacementImage,
-                runtimeProvider: resumableSandboxState.runtimeProvider,
-                storagePreparation,
-              },
-            );
-          });
-        },
-      );
-      replacementSandbox = startedReplacementSandbox;
-      const replacementSandboxInstanceId = startedReplacementSandbox.sandboxInstanceId;
-      const replacementRuntimeProvider = startedReplacementSandbox.runtimeProvider;
-      const replacementProviderSandboxId = startedReplacementSandbox.providerSandboxId;
-
-      persistedReplacement = await step.run(
-        { name: "persist-sandbox-instance-compute-replacement" },
-        async () => {
-          return persistSandboxInstanceComputeReplacement(
-            {
-              db: ctx.db,
-              logger,
-              tables: ctx.tables,
-            },
-            {
-              sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
-              providerSandboxId: replacementProviderSandboxId,
-              previousComputeGeneration: resumableSandboxState.computeGeneration,
-            },
-          );
-        },
-      );
-      const replacementComputeGeneration = persistedReplacement.computeGeneration;
-      await step.run({ name: "record-sandbox-replaced-usage-event" }, async () => {
-        await recordResumeSandboxUsageEvent({
-          eventType: SandboxUsageEventTypes.SANDBOX_REPLACED,
-          providerSandboxId: replacementProviderSandboxId,
-          computeGeneration: replacementComputeGeneration,
-          payload: {
-            previousComputeGeneration: resumableSandboxState.computeGeneration,
-            previousProviderSandboxId: resumableSandboxState.providerSandboxId,
-          },
-        });
-      });
-
+    async function resumeExistingSandboxCompute(): Promise<{
+      sandboxInstanceId: string;
+      runtimeProvider: SandboxProvider;
+      providerSandboxId: string;
+    }> {
       try {
-        await step.run({ name: "attach-replacement-sandbox-storage" }, async () => {
-          await attachSandboxStorage(
-            {
-              db: ctx.db,
-              tables: ctx.tables,
-              controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-              workerConfig: ctx.config.app,
-              configuredSandboxProvider: resumableSandboxState.runtimeProvider,
-              sandboxAdapter: resolvedRuntime.sandboxAdapter,
-              storageBackend: ctx.config.sandbox.storage?.backend,
-            },
-            {
-              organizationId: resumableSandboxState.organizationId,
-              sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
-              persistenceMode: resumableSandboxState.persistenceMode,
-              runtimeProvider: replacementRuntimeProvider,
-              providerSandboxId: replacementProviderSandboxId,
-              lifecycle: "resume",
-              operationEventRecorder: operationEvents,
-            },
-          );
-        });
+        return await recordWorkerSandboxLifecyclePhase(
+          operationEvents,
+          {
+            attributes: providerResumeAttributes,
+            completedMessage: shouldResumeProvider
+              ? "Sandbox provider resume completed."
+              : "Sandbox provider resume skipped because provider compute is already active.",
+            failedMessage: "Sandbox provider resume failed.",
+            phase: "provider",
+            startedMessage: shouldResumeProvider
+              ? "Sandbox provider resume started."
+              : "Sandbox provider resume skipped because provider compute is already active.",
+          },
+          async () =>
+            step.run({ name: "resume-existing-sandbox-compute" }, async () => {
+              if (!shouldResumeProvider) {
+                return {
+                  sandboxInstanceId: resumeState.sandboxInstanceId,
+                  runtimeProvider: resumeState.runtimeProvider,
+                  providerSandboxId: existingProviderSandboxId,
+                };
+              }
+
+              return await resumeSandbox(
+                {
+                  config: ctx.config,
+                  processEnv: ctx.processEnv,
+                  sandboxAdapter: resolvedRuntime.sandboxAdapter,
+                },
+                {
+                  sandboxInstanceId: resumeState.sandboxInstanceId,
+                  runtimeProvider: resumeState.runtimeProvider,
+                  providerSandboxId: existingProviderSandboxId,
+                },
+              );
+            }),
+        );
       } catch (error) {
         rethrowResumeDurableStepErrorForRetry(error);
-        replacementFailureHandled = true;
-        const failureMessage = formatPersistedFailureMessage({
-          summary: "Failed to attach sandbox storage before replacement runtime initialization.",
+        await handleResumeFailure({
+          failureCode: ResumeSandboxFailureCodes.RESUME_SANDBOX_FAILED,
           error,
+          runtimeProvider: resumeState.runtimeProvider,
+          providerSandboxId: existingProviderSandboxId,
+          summary: "Failed to resume sandbox provider runtime.",
         });
-
-        let revertReplacementError: unknown;
-        try {
-          await step.run(
-            { name: "revert-sandbox-instance-compute-replacement-after-resume-failure" },
-            async () => {
-              await revertSandboxInstanceComputeReplacement(
-                {
-                  db: ctx.db,
-                  tables: ctx.tables,
-                },
-                {
-                  sandboxInstanceId: input.sandboxInstanceId,
-                  replacementProviderSandboxId,
-                  replacementComputeGeneration,
-                  previousProviderSandboxId: resumableSandboxState.providerSandboxId,
-                  previousComputeGeneration: resumableSandboxState.computeGeneration,
-                },
-              );
-            },
-          );
-        } catch (revertError) {
-          logger.error(
-            { err: revertError },
-            "Failed to revert replacement provider sandbox id after resume failure.",
-          );
-          revertReplacementError = revertError;
-        }
-
-        let destroyReplacementError: unknown;
-        try {
-          await step.run({ name: "destroy-replacement-sandbox-after-resume-failure" }, async () => {
-            await destroySandbox(
-              {
-                db: ctx.db,
-                tables: ctx.tables,
-                controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-                config: ctx.config,
-                sandboxAdapter: resolvedRuntime.sandboxAdapter,
-              },
-              {
-                sandboxInstanceId: input.sandboxInstanceId,
-                organizationId: resumableSandboxState.organizationId,
-                persistenceMode: resumableSandboxState.persistenceMode,
-                runtimeProvider: replacementRuntimeProvider,
-                providerSandboxId: replacementProviderSandboxId,
-                skipPersistentStorageDeprovision: true,
-              },
-            );
-          });
-        } catch (destroyError) {
-          if (!isRecoverableMissingSandboxError(destroyError)) {
-            logger.error(
-              { err: destroyError },
-              "Failed to destroy replacement sandbox after resume failure.",
-            );
-            destroyReplacementError = destroyError;
-          }
-        }
-
-        let markFailedError: unknown;
-        logger.warn(
-          {
-            failureCode: ResumeSandboxFailureCodes.SANDBOX_INIT_FAILED,
-            failureMessage,
-          },
-          "Marking sandbox instance as failed during resume workflow.",
-        );
-        try {
-          await step.run(
-            { name: "mark-sandbox-instance-failed-after-resume-failure" },
-            async () => {
-              await markSandboxInstanceFailed(
-                {
-                  db: ctx.db,
-                  tables: ctx.tables,
-                },
-                {
-                  sandboxInstanceId: input.sandboxInstanceId,
-                  failureCode: ResumeSandboxFailureCodes.SANDBOX_INIT_FAILED,
-                  failureMessage,
-                },
-              );
-            },
-          );
-        } catch (markError) {
-          logger.error(
-            { err: markError },
-            "Failed to mark sandbox instance as failed after replacement resume failure.",
-          );
-          markFailedError = markError;
-        }
-
-        throwReplacementFailureHandlingErrors({
-          revertReplacementError,
-          destroyReplacementError,
-          markFailedError,
-        });
-        throw error;
+        throw resolveDurableStepFinalError(error, ResumeDurableStepRetryOptions);
       }
+    }
 
-      try {
-        await step.run({ name: "mark-replacement-sandbox-instance-initializing" }, async () => {
-          await applySandboxLifecycleEvent(
+    const resumedRuntime = await resumeExistingSandboxCompute();
+
+    await step.run({ name: "mark-resumed-sandbox-instance-started" }, async () => {
+      await applySandboxLifecycleEvent(
+        {
+          db: ctx.db,
+          logger,
+          tables: ctx.tables,
+        },
+        {
+          sandboxInstanceId: input.sandboxInstanceId,
+          event: SandboxLifecycleEvents.PROVIDER_START_ACCEPTED,
+        },
+      );
+    });
+
+    await step.run({ name: "record-sandbox-resumed-usage-event" }, async () => {
+      await recordResumeSandboxUsageEvent({
+        eventType: SandboxUsageEventTypes.SANDBOX_RESUMED,
+        providerSandboxId: resumedRuntime.providerSandboxId,
+        computeGeneration: resumableSandboxState.computeGeneration,
+        state: resumableSandboxState,
+      });
+    });
+
+    try {
+      await step.run({ name: "mark-resumed-sandbox-instance-initializing" }, async () => {
+        await applySandboxLifecycleEvent(
+          {
+            db: ctx.db,
+            logger,
+            tables: ctx.tables,
+          },
+          {
+            sandboxInstanceId: input.sandboxInstanceId,
+            event: SandboxLifecycleEvents.PROVIDER_RUNTIME_INITIALIZATION_STARTED,
+          },
+        );
+      });
+
+      logger.info(
+        createResumeWorkflowLogFields({
+          sandboxInstanceId: input.sandboxInstanceId,
+          organizationId: resumableSandboxState.organizationId,
+          runtimeProvider: resumedRuntime.runtimeProvider,
+          providerSandboxId: resumedRuntime.providerSandboxId,
+          computeGeneration: resumableSandboxState.computeGeneration,
+        }),
+        "Initializing resumed sandbox runtime.",
+      );
+      await step.run({ name: "initialize-resumed-sandbox-runtime" }, async () => {
+        await resumeSandboxRuntime(
+          {
+            config: ctx.config,
+            logger,
+            processEnv: ctx.processEnv,
+            sandboxAdapter: resolvedRuntime.sandboxAdapter,
+            sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
+            sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
+          },
+          {
+            organizationId: resumableSandboxState.organizationId,
+            operationId: run.id,
+            operationKind: "resume",
+            sandboxInstanceId: resumedRuntime.sandboxInstanceId,
+            providerSandboxId: resumedRuntime.providerSandboxId,
+            runtimeProvider: resumedRuntime.runtimeProvider,
+            runtimePlan: resumableSandboxState.runtimePlan,
+            ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
+            ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
+          },
+        );
+      });
+      logger.info(
+        createResumeWorkflowLogFields({
+          sandboxInstanceId: input.sandboxInstanceId,
+          organizationId: resumableSandboxState.organizationId,
+          runtimeProvider: resumedRuntime.runtimeProvider,
+          providerSandboxId: resumedRuntime.providerSandboxId,
+          computeGeneration: resumableSandboxState.computeGeneration,
+        }),
+        "Initialized resumed sandbox runtime.",
+      );
+    } catch (error) {
+      rethrowResumeDurableStepErrorForRetry(error);
+      await emitSandboxStartupDiagnostics({
+        logger,
+        sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
+        providerSandboxId: resumedRuntime.providerSandboxId,
+        sandboxInstanceId: resumedRuntime.sandboxInstanceId,
+        runtimeProvider: resumedRuntime.runtimeProvider,
+        operation: "resume",
+      });
+      await handleResumeFailure({
+        failureCode: ResumeSandboxFailureCodes.SANDBOX_INIT_FAILED,
+        error,
+        runtimeProvider: resumedRuntime.runtimeProvider,
+        providerSandboxId: resumedRuntime.providerSandboxId,
+        summary: "Failed to initialize resumed sandbox runtime.",
+      });
+      throw resolveDurableStepFinalError(error, ResumeDurableStepRetryOptions);
+    }
+
+    let resumedSandboxRuntimeReady: boolean;
+    try {
+      const readinessAttributes = {
+        providerSandboxId: resumedRuntime.providerSandboxId,
+        runtimeProvider: resumedRuntime.runtimeProvider,
+      };
+      await operationEvents.record({
+        attributes: readinessAttributes,
+        message: "Resumed sandbox runtime readiness wait started.",
+        phase: "ready",
+        status: "started",
+      });
+      resumedSandboxRuntimeReady = await step.run(
+        { name: "wait-for-resumed-sandbox-runtime-readiness" },
+        async () =>
+          waitForSandboxRuntimeReadiness(
             {
-              db: ctx.db,
-              logger,
-              tables: ctx.tables,
+              runtimeStateReader: ctx.runtimeStateReader,
+              policy: ctx.tunnelReadinessPolicy,
+              clock: ctx.clock,
+              sleeper: ctx.sleeper,
             },
             {
               sandboxInstanceId: input.sandboxInstanceId,
-              event: SandboxLifecycleEvents.PROVIDER_RUNTIME_INITIALIZATION_STARTED,
             },
-          );
-        });
-
-        await step.run({ name: "initialize-replacement-sandbox-runtime" }, async () => {
-          await initializeSandboxRuntime(
-            {
-              config: ctx.config,
-              logger,
-              processEnv: ctx.processEnv,
-              sandboxAdapter: resolvedRuntime.sandboxAdapter,
-              sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
-              sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
-            },
-            {
-              organizationId: resumableSandboxState.organizationId,
-              operationId: run.id,
-              operationKind: "resume",
-              sandboxInstanceId: replacementSandboxInstanceId,
-              providerSandboxId: replacementProviderSandboxId,
-              startupMode: "new",
-              runtimePlan: resumableSandboxState.runtimePlan,
-              ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
-              ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
-            },
-          );
-        });
-      } catch (error) {
-        rethrowResumeDurableStepErrorForRetry(error);
-        replacementFailureHandled = true;
-        const failureMessage = formatPersistedFailureMessage({
-          summary: "Failed to initialize replacement sandbox runtime.",
-          error,
-        });
-
-        let revertReplacementError: unknown;
-        try {
-          await step.run(
-            { name: "revert-sandbox-instance-compute-replacement-after-resume-failure" },
-            async () => {
-              await revertSandboxInstanceComputeReplacement(
-                {
-                  db: ctx.db,
-                  tables: ctx.tables,
-                },
-                {
-                  sandboxInstanceId: input.sandboxInstanceId,
-                  replacementProviderSandboxId,
-                  replacementComputeGeneration,
-                  previousProviderSandboxId: resumableSandboxState.providerSandboxId,
-                  previousComputeGeneration: resumableSandboxState.computeGeneration,
-                },
-              );
-            },
-          );
-        } catch (revertError) {
-          logger.error(
-            { err: revertError },
-            "Failed to revert replacement provider sandbox id after resume failure.",
-          );
-          revertReplacementError = revertError;
-        }
-
-        let destroyReplacementError: unknown;
-        try {
-          await step.run({ name: "destroy-replacement-sandbox-after-resume-failure" }, async () => {
-            await destroySandbox(
-              {
-                db: ctx.db,
-                tables: ctx.tables,
-                controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-                config: ctx.config,
-                sandboxAdapter: resolvedRuntime.sandboxAdapter,
-              },
-              {
-                sandboxInstanceId: input.sandboxInstanceId,
-                organizationId: resumableSandboxState.organizationId,
-                persistenceMode: resumableSandboxState.persistenceMode,
-                runtimeProvider: replacementRuntimeProvider,
-                providerSandboxId: replacementProviderSandboxId,
-                skipPersistentStorageDeprovision: true,
-              },
-            );
-          });
-        } catch (destroyError) {
-          if (!isRecoverableMissingSandboxError(destroyError)) {
-            logger.error(
-              { err: destroyError },
-              "Failed to destroy replacement sandbox after resume failure.",
-            );
-            destroyReplacementError = destroyError;
-          }
-        }
-
-        let markFailedError: unknown;
-        logger.warn(
-          {
-            failureCode: ResumeSandboxFailureCodes.SANDBOX_INIT_FAILED,
-            failureMessage,
-          },
-          "Marking sandbox instance as failed during resume workflow.",
-        );
-        try {
-          await step.run(
-            { name: "mark-sandbox-instance-failed-after-resume-failure" },
-            async () => {
-              await markSandboxInstanceFailed(
-                {
-                  db: ctx.db,
-                  tables: ctx.tables,
-                },
-                {
-                  sandboxInstanceId: input.sandboxInstanceId,
-                  failureCode: ResumeSandboxFailureCodes.SANDBOX_INIT_FAILED,
-                  failureMessage,
-                },
-              );
-            },
-          );
-        } catch (markError) {
-          logger.error(
-            { err: markError },
-            "Failed to mark sandbox instance as failed after replacement resume failure.",
-          );
-          markFailedError = markError;
-        }
-
-        throwReplacementFailureHandlingErrors({
-          revertReplacementError,
-          destroyReplacementError,
-          markFailedError,
-        });
-        throw error;
-      }
-
-      let replacementSandboxRuntimeReady: boolean;
-      try {
-        const readinessAttributes = {
-          providerSandboxId: replacementProviderSandboxId,
-          runtimeProvider: replacementRuntimeProvider,
-        };
-        await operationEvents.record({
-          attributes: readinessAttributes,
-          message: "Replacement sandbox runtime readiness wait started.",
-          phase: "ready",
-          status: "started",
-        });
-        replacementSandboxRuntimeReady = await step.run(
-          { name: "wait-for-replacement-sandbox-runtime-readiness" },
-          async () => {
-            return waitForSandboxRuntimeReadiness(
-              {
-                runtimeStateReader: ctx.runtimeStateReader,
-                policy: ctx.tunnelReadinessPolicy,
-                clock: ctx.clock,
-                sleeper: ctx.sleeper,
-              },
-              {
-                sandboxInstanceId: input.sandboxInstanceId,
-              },
-            );
-          },
-        );
-        if (replacementSandboxRuntimeReady) {
-          await operationEvents.record({
-            attributes: readinessAttributes,
-            message: "Replacement sandbox runtime readiness wait completed.",
-            phase: "ready",
-            status: "completed",
-          });
-        }
-      } catch (error) {
-        rethrowResumeDurableStepErrorForRetry(error);
-        await operationEvents.record({
-          attributes: {
-            providerSandboxId: replacementProviderSandboxId,
-            runtimeProvider: replacementRuntimeProvider,
-          },
-          message: "Replacement sandbox runtime readiness wait failed.",
-          phase: "ready",
-          status: "failed",
-        });
-        replacementFailureHandled = true;
-        const failureMessage = formatPersistedFailureMessage({
-          summary: "Failed while waiting for replacement sandbox runtime readiness.",
-          error,
-        });
-
-        let revertReplacementError: unknown;
-        try {
-          await step.run(
-            { name: "revert-sandbox-instance-compute-replacement-after-resume-failure" },
-            async () => {
-              await revertSandboxInstanceComputeReplacement(
-                {
-                  db: ctx.db,
-                  tables: ctx.tables,
-                },
-                {
-                  sandboxInstanceId: input.sandboxInstanceId,
-                  replacementProviderSandboxId,
-                  replacementComputeGeneration,
-                  previousProviderSandboxId: resumableSandboxState.providerSandboxId,
-                  previousComputeGeneration: resumableSandboxState.computeGeneration,
-                },
-              );
-            },
-          );
-        } catch (revertError) {
-          logger.error(
-            { err: revertError },
-            "Failed to revert replacement provider sandbox id after resume failure.",
-          );
-          revertReplacementError = revertError;
-        }
-
-        let destroyReplacementError: unknown;
-        try {
-          await step.run({ name: "destroy-replacement-sandbox-after-resume-failure" }, async () => {
-            await destroySandbox(
-              {
-                db: ctx.db,
-                tables: ctx.tables,
-                controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-                config: ctx.config,
-                sandboxAdapter: resolvedRuntime.sandboxAdapter,
-              },
-              {
-                sandboxInstanceId: input.sandboxInstanceId,
-                organizationId: resumableSandboxState.organizationId,
-                persistenceMode: resumableSandboxState.persistenceMode,
-                runtimeProvider: replacementRuntimeProvider,
-                providerSandboxId: replacementProviderSandboxId,
-                skipPersistentStorageDeprovision: true,
-              },
-            );
-          });
-        } catch (destroyError) {
-          if (!isRecoverableMissingSandboxError(destroyError)) {
-            logger.error(
-              { err: destroyError },
-              "Failed to destroy replacement sandbox after resume failure.",
-            );
-            destroyReplacementError = destroyError;
-          }
-        }
-
-        let markFailedError: unknown;
-        logger.warn(
-          {
-            failureCode: ResumeSandboxFailureCodes.TUNNEL_CONNECT_ACK_WAIT_FAILED,
-            failureMessage,
-          },
-          "Marking sandbox instance as failed during resume workflow.",
-        );
-        try {
-          await step.run(
-            { name: "mark-sandbox-instance-failed-after-resume-failure" },
-            async () => {
-              await markSandboxInstanceFailed(
-                {
-                  db: ctx.db,
-                  tables: ctx.tables,
-                },
-                {
-                  sandboxInstanceId: input.sandboxInstanceId,
-                  failureCode: ResumeSandboxFailureCodes.TUNNEL_CONNECT_ACK_WAIT_FAILED,
-                  failureMessage,
-                },
-              );
-            },
-          );
-        } catch (markError) {
-          logger.error(
-            { err: markError },
-            "Failed to mark sandbox instance as failed after replacement resume failure.",
-          );
-          markFailedError = markError;
-        }
-
-        throwReplacementFailureHandlingErrors({
-          revertReplacementError,
-          destroyReplacementError,
-          markFailedError,
-        });
-        throw error;
-      }
-
-      if (!replacementSandboxRuntimeReady) {
-        await operationEvents.record({
-          attributes: {
-            providerSandboxId: replacementProviderSandboxId,
-            runtimeProvider: replacementRuntimeProvider,
-            timeoutMs: ctx.tunnelReadinessPolicy.timeoutMs,
-          },
-          message: "Replacement sandbox runtime readiness timed out.",
-          phase: "ready",
-          status: "failed",
-        });
-        const error = new Error("Timed out waiting for replacement sandbox runtime readiness.");
-        replacementFailureHandled = true;
-        let revertReplacementError: unknown;
-        try {
-          await step.run(
-            { name: "revert-sandbox-instance-compute-replacement-after-resume-failure" },
-            async () => {
-              await revertSandboxInstanceComputeReplacement(
-                {
-                  db: ctx.db,
-                  tables: ctx.tables,
-                },
-                {
-                  sandboxInstanceId: input.sandboxInstanceId,
-                  replacementProviderSandboxId,
-                  replacementComputeGeneration,
-                  previousProviderSandboxId: resumableSandboxState.providerSandboxId,
-                  previousComputeGeneration: resumableSandboxState.computeGeneration,
-                },
-              );
-            },
-          );
-        } catch (revertError) {
-          logger.error(
-            { err: revertError },
-            "Failed to revert replacement provider sandbox id after resume failure.",
-          );
-          revertReplacementError = revertError;
-        }
-
-        let destroyReplacementError: unknown;
-        try {
-          await step.run({ name: "destroy-replacement-sandbox-after-resume-failure" }, async () => {
-            await destroySandbox(
-              {
-                db: ctx.db,
-                tables: ctx.tables,
-                controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-                config: ctx.config,
-                sandboxAdapter: resolvedRuntime.sandboxAdapter,
-              },
-              {
-                sandboxInstanceId: input.sandboxInstanceId,
-                organizationId: resumableSandboxState.organizationId,
-                persistenceMode: resumableSandboxState.persistenceMode,
-                runtimeProvider: replacementRuntimeProvider,
-                providerSandboxId: replacementProviderSandboxId,
-                skipPersistentStorageDeprovision: true,
-              },
-            );
-          });
-        } catch (destroyError) {
-          if (!isRecoverableMissingSandboxError(destroyError)) {
-            logger.error(
-              { err: destroyError },
-              "Failed to destroy replacement sandbox after resume failure.",
-            );
-            destroyReplacementError = destroyError;
-          }
-        }
-
-        let markFailedError: unknown;
-        logger.warn(
-          {
-            failureCode: ResumeSandboxFailureCodes.TUNNEL_CONNECT_ACK_TIMEOUT,
-            failureMessage: error.message,
-          },
-          "Marking sandbox instance as failed during resume workflow.",
-        );
-        try {
-          await step.run(
-            { name: "mark-sandbox-instance-failed-after-resume-failure" },
-            async () => {
-              await markSandboxInstanceFailed(
-                {
-                  db: ctx.db,
-                  tables: ctx.tables,
-                },
-                {
-                  sandboxInstanceId: input.sandboxInstanceId,
-                  failureCode: ResumeSandboxFailureCodes.TUNNEL_CONNECT_ACK_TIMEOUT,
-                  failureMessage: error.message,
-                },
-              );
-            },
-          );
-        } catch (markError) {
-          logger.error(
-            { err: markError },
-            "Failed to mark sandbox instance as failed after replacement resume failure.",
-          );
-          markFailedError = markError;
-        }
-
-        throwReplacementFailureHandlingErrors({
-          revertReplacementError,
-          destroyReplacementError,
-          markFailedError,
-        });
-        throw error;
-      }
-
-      try {
-        await recordWorkerSandboxLifecyclePhase(
-          operationEvents,
-          {
-            attributes: {
-              providerSandboxId: replacementProviderSandboxId,
-              runtimeProvider: replacementRuntimeProvider,
-              timelineHidden: true,
-            },
-            completedMessage: "Replacement sandbox running status transition completed.",
-            failedMessage: "Replacement sandbox running status transition failed.",
-            phase: "running",
-            startedMessage: "Replacement sandbox running status transition started.",
-          },
-          async () => {
-            await step.run({ name: "mark-replacement-sandbox-instance-running" }, async () => {
-              await markSandboxInstanceRunning(
-                {
-                  db: ctx.db,
-                  tables: ctx.tables,
-                },
-                {
-                  sandboxInstanceId: input.sandboxInstanceId,
-                },
-              );
-            });
-          },
-        );
-      } catch (error) {
-        rethrowResumeDurableStepErrorForRetry(error);
-        replacementFailureHandled = true;
-        const failureMessage = formatPersistedFailureMessage({
-          summary: "Failed to mark replacement sandbox instance as running.",
-          error,
-        });
-
-        let revertReplacementError: unknown;
-        try {
-          await step.run(
-            { name: "revert-sandbox-instance-compute-replacement-after-resume-failure" },
-            async () => {
-              await revertSandboxInstanceComputeReplacement(
-                {
-                  db: ctx.db,
-                  tables: ctx.tables,
-                },
-                {
-                  sandboxInstanceId: input.sandboxInstanceId,
-                  replacementProviderSandboxId,
-                  replacementComputeGeneration,
-                  previousProviderSandboxId: resumableSandboxState.providerSandboxId,
-                  previousComputeGeneration: resumableSandboxState.computeGeneration,
-                },
-              );
-            },
-          );
-        } catch (revertError) {
-          logger.error(
-            { err: revertError },
-            "Failed to revert replacement provider sandbox id after resume failure.",
-          );
-          revertReplacementError = revertError;
-        }
-
-        let destroyReplacementError: unknown;
-        try {
-          await step.run({ name: "destroy-replacement-sandbox-after-resume-failure" }, async () => {
-            await destroySandbox(
-              {
-                db: ctx.db,
-                tables: ctx.tables,
-                controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-                config: ctx.config,
-                sandboxAdapter: resolvedRuntime.sandboxAdapter,
-              },
-              {
-                sandboxInstanceId: input.sandboxInstanceId,
-                organizationId: resumableSandboxState.organizationId,
-                persistenceMode: resumableSandboxState.persistenceMode,
-                runtimeProvider: replacementRuntimeProvider,
-                providerSandboxId: replacementProviderSandboxId,
-                skipPersistentStorageDeprovision: true,
-              },
-            );
-          });
-        } catch (destroyError) {
-          if (!isRecoverableMissingSandboxError(destroyError)) {
-            logger.error(
-              { err: destroyError },
-              "Failed to destroy replacement sandbox after resume failure.",
-            );
-            destroyReplacementError = destroyError;
-          }
-        }
-
-        let markFailedError: unknown;
-        logger.warn(
-          {
-            failureCode: ResumeSandboxFailureCodes.STATUS_TRANSITION_TO_RUNNING_FAILED,
-            failureMessage,
-          },
-          "Marking sandbox instance as failed during resume workflow.",
-        );
-        try {
-          await step.run(
-            { name: "mark-sandbox-instance-failed-after-resume-failure" },
-            async () => {
-              await markSandboxInstanceFailed(
-                {
-                  db: ctx.db,
-                  tables: ctx.tables,
-                },
-                {
-                  sandboxInstanceId: input.sandboxInstanceId,
-                  failureCode: ResumeSandboxFailureCodes.STATUS_TRANSITION_TO_RUNNING_FAILED,
-                  failureMessage,
-                },
-              );
-            },
-          );
-        } catch (markError) {
-          logger.error(
-            { err: markError },
-            "Failed to mark sandbox instance as failed after replacement resume failure.",
-          );
-          markFailedError = markError;
-        }
-
-        throwReplacementFailureHandlingErrors({
-          revertReplacementError,
-          destroyReplacementError,
-          markFailedError,
-        });
-        throw error;
-      }
+          ),
+      );
+      await operationEvents.record({
+        attributes: readinessAttributes,
+        message: resumedSandboxRuntimeReady
+          ? "Resumed sandbox runtime readiness wait completed."
+          : "Resumed sandbox runtime readiness timed out.",
+        phase: "ready",
+        status: resumedSandboxRuntimeReady ? "completed" : "failed",
+      });
     } catch (error) {
       rethrowResumeDurableStepErrorForRetry(error);
-      if (!replacementFailureHandled) {
-        const failureMessage = formatPersistedFailureMessage({
-          summary: "Failed to replace missing sandbox compute during resume.",
-          error,
-        });
+      await handleResumeFailure({
+        failureCode: ResumeSandboxFailureCodes.TUNNEL_CONNECT_ACK_WAIT_FAILED,
+        error,
+        runtimeProvider: resumedRuntime.runtimeProvider,
+        providerSandboxId: resumedRuntime.providerSandboxId,
+        summary: "Failed while waiting for resumed sandbox runtime readiness.",
+      });
+      throw resolveDurableStepFinalError(error, ResumeDurableStepRetryOptions);
+    }
 
-        let revertReplacementError: unknown;
-        if (replacementSandbox !== undefined && persistedReplacement !== undefined) {
-          const replacementProviderSandboxId = replacementSandbox.providerSandboxId;
-          const replacementComputeGeneration = persistedReplacement.computeGeneration;
-          try {
-            await step.run(
-              { name: "revert-sandbox-instance-compute-replacement-after-resume-failure" },
-              async () => {
-                await revertSandboxInstanceComputeReplacement(
-                  {
-                    db: ctx.db,
-                    tables: ctx.tables,
-                  },
-                  {
-                    sandboxInstanceId: input.sandboxInstanceId,
-                    replacementProviderSandboxId,
-                    replacementComputeGeneration,
-                    previousProviderSandboxId: resumableSandboxState.providerSandboxId,
-                    previousComputeGeneration: resumableSandboxState.computeGeneration,
-                  },
-                );
-              },
-            );
-          } catch (revertError) {
-            logger.error(
-              { err: revertError },
-              "Failed to revert replacement provider sandbox id after resume failure.",
-            );
-            revertReplacementError = revertError;
-          }
-        }
-
-        let destroyReplacementError: unknown;
-        if (replacementSandbox !== undefined) {
-          const replacementRuntimeProvider = replacementSandbox.runtimeProvider;
-          const replacementProviderSandboxId = replacementSandbox.providerSandboxId;
-          try {
-            await step.run(
-              { name: "destroy-replacement-sandbox-after-resume-failure" },
-              async () => {
-                await destroySandbox(
-                  {
-                    db: ctx.db,
-                    tables: ctx.tables,
-                    controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-                    config: ctx.config,
-                    sandboxAdapter: resolvedRuntime.sandboxAdapter,
-                  },
-                  {
-                    sandboxInstanceId: input.sandboxInstanceId,
-                    organizationId: resumableSandboxState.organizationId,
-                    persistenceMode: resumableSandboxState.persistenceMode,
-                    runtimeProvider: replacementRuntimeProvider,
-                    providerSandboxId: replacementProviderSandboxId,
-                    skipPersistentStorageDeprovision: true,
-                  },
-                );
-              },
-            );
-          } catch (destroyError) {
-            if (!isRecoverableMissingSandboxError(destroyError)) {
-              logger.error(
-                { err: destroyError },
-                "Failed to destroy replacement sandbox after resume failure.",
-              );
-              destroyReplacementError = destroyError;
-            }
-          }
-        }
-
-        let markFailedError: unknown;
-        logger.warn(
-          {
-            failureCode: ResumeSandboxFailureCodes.RESUME_SANDBOX_FAILED,
-            failureMessage,
-          },
-          "Marking sandbox instance as failed during resume workflow.",
-        );
-        try {
-          await step.run(
-            { name: "mark-sandbox-instance-failed-after-resume-failure" },
-            async () => {
-              await markSandboxInstanceFailed(
-                {
-                  db: ctx.db,
-                  tables: ctx.tables,
-                },
-                {
-                  sandboxInstanceId: input.sandboxInstanceId,
-                  failureCode: ResumeSandboxFailureCodes.RESUME_SANDBOX_FAILED,
-                  failureMessage,
-                },
-              );
-            },
-          );
-        } catch (markError) {
-          logger.error(
-            { err: markError },
-            "Failed to mark sandbox instance as failed after replacement resume failure.",
-          );
-          markFailedError = markError;
-        }
-
-        throwReplacementFailureHandlingErrors({
-          revertReplacementError,
-          destroyReplacementError,
-          markFailedError,
-        });
-      }
+    if (!resumedSandboxRuntimeReady) {
+      const error = new Error("Timed out waiting for resumed sandbox runtime readiness.");
+      await handleResumeFailure({
+        failureCode: ResumeSandboxFailureCodes.TUNNEL_CONNECT_ACK_TIMEOUT,
+        error,
+        runtimeProvider: resumedRuntime.runtimeProvider,
+        providerSandboxId: resumedRuntime.providerSandboxId,
+        summary: error.message,
+      });
       throw error;
     }
 
-    if (replacementSandbox !== undefined && persistedReplacement !== undefined) {
-      await step.run({ name: "record-replacement-sandbox-ready-usage-event" }, async () => {
-        await recordResumeSandboxUsageEvent({
-          eventType: SandboxUsageEventTypes.SANDBOX_READY,
-          providerSandboxId: replacementSandbox.providerSandboxId,
-          computeGeneration: persistedReplacement.computeGeneration,
-          discriminator: "replacement-provider",
-        });
+    try {
+      await recordWorkerSandboxLifecyclePhase(
+        operationEvents,
+        {
+          attributes: {
+            providerSandboxId: resumedRuntime.providerSandboxId,
+            runtimeProvider: resumedRuntime.runtimeProvider,
+            timelineHidden: true,
+          },
+          completedMessage: "Resumed sandbox running status transition completed.",
+          failedMessage: "Resumed sandbox running status transition failed.",
+          phase: "running",
+          startedMessage: "Resumed sandbox running status transition started.",
+        },
+        async () => {
+          await step.run({ name: "mark-resumed-sandbox-instance-running" }, async () => {
+            await markSandboxInstanceRunning(
+              {
+                db: ctx.db,
+                tables: ctx.tables,
+              },
+              {
+                sandboxInstanceId: input.sandboxInstanceId,
+              },
+            );
+          });
+        },
+      );
+      await emitSandboxStartupDiagnostics({
+        logger,
+        sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
+        providerSandboxId: resumedRuntime.providerSandboxId,
+        sandboxInstanceId: resumedRuntime.sandboxInstanceId,
+        runtimeProvider: resumedRuntime.runtimeProvider,
+        operation: "resume",
       });
+    } catch (error) {
+      rethrowResumeDurableStepErrorForRetry(error);
+      await handleResumeFailure({
+        failureCode: ResumeSandboxFailureCodes.STATUS_TRANSITION_TO_RUNNING_FAILED,
+        error,
+        runtimeProvider: resumedRuntime.runtimeProvider,
+        providerSandboxId: resumedRuntime.providerSandboxId,
+        summary: "Failed to mark resumed sandbox instance as running.",
+      });
+      throw resolveDurableStepFinalError(error, ResumeDurableStepRetryOptions);
     }
 
-    if (resumableSandboxState.providerSandboxId !== null) {
-      const replacedProviderSandboxId = resumableSandboxState.providerSandboxId;
-      try {
-        await step.run({ name: "cleanup-replaced-sandbox-compute" }, async () => {
-          await resolvedRuntime.sandboxAdapter.destroy({
-            id: replacedProviderSandboxId,
-          });
-        });
-      } catch (error) {
-        if (!isRecoverableMissingSandboxError(error)) {
-          logger.warn(
-            { err: error, providerSandboxId: replacedProviderSandboxId },
-            "Failed to clean up replaced sandbox compute after successful resume.",
-          );
-        }
-      }
-    }
+    await step.run({ name: "record-sandbox-ready-usage-event-after-resume" }, async () => {
+      await recordResumeSandboxUsageEvent({
+        eventType: SandboxUsageEventTypes.SANDBOX_READY,
+        providerSandboxId: resumedRuntime.providerSandboxId,
+        computeGeneration: resumableSandboxState.computeGeneration,
+        discriminator: "ready",
+        state: resumableSandboxState,
+      });
+    });
+
+    logger.info(
+      createResumeWorkflowLogFields({
+        sandboxInstanceId: input.sandboxInstanceId,
+        organizationId: resumableSandboxState.organizationId,
+        runtimeProvider: resumedRuntime.runtimeProvider,
+        providerSandboxId: resumedRuntime.providerSandboxId,
+        computeGeneration: resumableSandboxState.computeGeneration,
+      }),
+      "Sandbox resume workflow completed successfully.",
+    );
 
     return {
       sandboxInstanceId: input.sandboxInstanceId,
@@ -2276,154 +662,43 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
   },
 );
 
-function createReplacementSandboxImage(input: {
-  runtimePlan: ResumableSandboxInstanceState["runtimePlan"];
-  runtimeProvider: SandboxProvider;
-}): StartSandboxInstanceWorkflowImageInput {
-  return {
-    imageId: input.runtimePlan.image.imageRef,
-    createdAt: new Date().toISOString(),
-    kind: SandboxStartImageKinds.BASE,
-    provider: input.runtimeProvider,
-  };
+async function inspectExistingProviderResumeAction(
+  ctx: {
+    sandboxAdapter: SandboxAdapter;
+  },
+  input: {
+    providerSandboxId: string;
+  },
+): Promise<ExistingProviderResumeAction> {
+  try {
+    const inspectedSandbox = await ctx.sandboxAdapter.inspect({
+      id: input.providerSandboxId,
+    });
+    return determineExistingProviderResumeAction({
+      providerState: inspectedSandbox.disposition,
+    });
+  } catch (error) {
+    if (isRecoverableMissingSandboxError(error)) {
+      return determineExistingProviderResumeAction({
+        providerState: "missing",
+      });
+    }
+    throw error;
+  }
 }
 
 function isRecoverableMissingSandboxError(error: unknown): boolean {
   return isSandboxResourceNotFoundError(error);
 }
 
-async function inspectExistingProviderResumeAction(
-  ctx: {
-    sandboxAdapter: SandboxAdapter;
-  },
-  input: {
-    persistenceMode: string;
-    providerSandboxId: string;
-  },
-): Promise<ExistingProviderResumeAction> {
-  try {
-    const inspection = await ctx.sandboxAdapter.inspect({
-      id: input.providerSandboxId,
-    });
-
-    return determineExistingProviderResumeAction({
-      persistenceMode: input.persistenceMode,
-      providerState: inspection.disposition,
-    });
-  } catch (error) {
-    if (!isRecoverableMissingSandboxError(error)) {
-      throw error;
-    }
-
-    return determineExistingProviderResumeAction({
-      persistenceMode: input.persistenceMode,
-      providerState: "missing",
-    });
-  }
-}
-
 function throwResumeFailureHandlingErrors(input: {
   stopSandboxError?: unknown;
   markFailedError?: unknown;
 }): void {
-  if (input.stopSandboxError !== undefined && input.markFailedError !== undefined) {
-    throw new Error(
-      "Failed to stop sandbox and failed to mark sandbox instance as failed after resume failure.",
-      {
-        cause: {
-          stopSandboxError: input.stopSandboxError,
-          markFailedError: input.markFailedError,
-        },
-      },
+  if (input.stopSandboxError !== undefined || input.markFailedError !== undefined) {
+    throw new AggregateError(
+      [input.stopSandboxError, input.markFailedError].filter((error) => error !== undefined),
+      "Resume failure handling failed.",
     );
-  }
-
-  if (input.stopSandboxError !== undefined) {
-    throw new Error("Failed to stop sandbox after resume failure.", {
-      cause: input.stopSandboxError,
-    });
-  }
-
-  if (input.markFailedError !== undefined) {
-    throw new Error("Failed to mark sandbox instance as failed after resume failure.", {
-      cause: input.markFailedError,
-    });
-  }
-}
-
-function throwReplacementFailureHandlingErrors(input: {
-  revertReplacementError?: unknown;
-  destroyReplacementError?: unknown;
-  markFailedError?: unknown;
-}): void {
-  if (
-    input.revertReplacementError !== undefined &&
-    input.destroyReplacementError !== undefined &&
-    input.markFailedError !== undefined
-  ) {
-    throw new Error(
-      "Failed to revert replacement, failed to destroy replacement sandbox, and failed to mark sandbox instance as failed after replacement resume failure.",
-      {
-        cause: {
-          revertReplacementError: input.revertReplacementError,
-          destroyReplacementError: input.destroyReplacementError,
-          markFailedError: input.markFailedError,
-        },
-      },
-    );
-  }
-
-  if (input.revertReplacementError !== undefined && input.destroyReplacementError !== undefined) {
-    throw new Error(
-      "Failed to revert replacement and failed to destroy replacement sandbox after replacement resume failure.",
-      {
-        cause: {
-          revertReplacementError: input.revertReplacementError,
-          destroyReplacementError: input.destroyReplacementError,
-        },
-      },
-    );
-  }
-
-  if (input.revertReplacementError !== undefined && input.markFailedError !== undefined) {
-    throw new Error(
-      "Failed to revert replacement and failed to mark sandbox instance as failed after replacement resume failure.",
-      {
-        cause: {
-          revertReplacementError: input.revertReplacementError,
-          markFailedError: input.markFailedError,
-        },
-      },
-    );
-  }
-
-  if (input.destroyReplacementError !== undefined && input.markFailedError !== undefined) {
-    throw new Error(
-      "Failed to destroy replacement sandbox and failed to mark sandbox instance as failed after replacement resume failure.",
-      {
-        cause: {
-          destroyReplacementError: input.destroyReplacementError,
-          markFailedError: input.markFailedError,
-        },
-      },
-    );
-  }
-
-  if (input.revertReplacementError !== undefined) {
-    throw new Error("Failed to revert replacement sandbox compute after replacement failure.", {
-      cause: input.revertReplacementError,
-    });
-  }
-
-  if (input.destroyReplacementError !== undefined) {
-    throw new Error("Failed to destroy replacement sandbox after replacement failure.", {
-      cause: input.destroyReplacementError,
-    });
-  }
-
-  if (input.markFailedError !== undefined) {
-    throw new Error("Failed to mark sandbox instance as failed after replacement failure.", {
-      cause: input.markFailedError,
-    });
   }
 }

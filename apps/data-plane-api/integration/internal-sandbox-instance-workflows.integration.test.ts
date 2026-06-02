@@ -77,11 +77,11 @@ const UserStopWorkflowIdempotencyKeySchema = z
   })
   .strict();
 
-const DeleteSessionDestroyWorkflowIdempotencyKeySchema = z
+const DeleteSandboxDestroyWorkflowIdempotencyKeySchema = z
   .object({
     version: z.literal(1),
     sandboxInstanceId: z.string().min(1),
-    action: z.literal("delete_session_destroy"),
+    action: z.literal("delete_sandbox_destroy"),
     organizationId: z.string().min(1),
   })
   .strict();
@@ -423,14 +423,48 @@ describe.concurrent("internal sandbox instance workflow queue integration", () =
       },
     });
     expect(
-      DeleteSessionDestroyWorkflowIdempotencyKeySchema.parse(
+      DeleteSandboxDestroyWorkflowIdempotencyKeySchema.parse(
         JSON.parse(workflowRuns[0]?.idempotency_key ?? ""),
       ),
     ).toEqual({
       version: 1,
       sandboxInstanceId: "sbi_dp_api_workflow_delete_running_session",
-      action: "delete_session_destroy",
+      action: "delete_sandbox_destroy",
       organizationId: "org_dp_api_workflow_delete_running_session",
+    });
+  });
+
+  it("deletes a non-session sandbox and queues provider destruction", async ({ env }) => {
+    await insertRunningSandboxInstance(env, {
+      sandboxInstanceId: "sbi_dp_api_workflow_delete_skills_discovery",
+      organizationId: "org_dp_api_workflow_delete_skills_discovery",
+      sandboxProfileId: "sbp_dp_api_workflow_delete_skills_discovery",
+      purpose: SandboxInstancePurposes.SKILLS_DISCOVERY,
+    });
+
+    const response = await clientFor(env).deleteSandboxInstance({
+      organizationId: "org_dp_api_workflow_delete_skills_discovery",
+      sandboxInstanceId: "sbi_dp_api_workflow_delete_skills_discovery",
+    });
+
+    expect(response).toEqual({
+      status: "deleted",
+      sandboxInstanceId: "sbi_dp_api_workflow_delete_skills_discovery",
+      workflowRunId: expect.any(String),
+    });
+
+    const workflowRuns = await waitForQueuedWorkflowRuns({
+      env,
+      sandboxInstanceId: "sbi_dp_api_workflow_delete_skills_discovery",
+      workflowName: DeleteSandboxInstanceWorkflowName,
+    });
+
+    expect(workflowRuns).toHaveLength(1);
+    expect(workflowRuns[0]).toMatchObject({
+      id: response.workflowRunId,
+      input: {
+        sandboxInstanceId: "sbi_dp_api_workflow_delete_skills_discovery",
+      },
     });
   });
 
@@ -549,7 +583,8 @@ async function insertRunningSandboxInstance(
       | typeof SandboxInstancePurposes.SESSION
       | typeof SandboxInstancePurposes.SNAPSHOT
       | typeof SandboxInstancePurposes.SETUP_ASSISTANT
-      | typeof SandboxInstancePurposes.SETUP_CHECK;
+      | typeof SandboxInstancePurposes.SETUP_CHECK
+      | typeof SandboxInstancePurposes.SKILLS_DISCOVERY;
   },
 ): Promise<void> {
   await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values(
@@ -576,7 +611,8 @@ function sandboxInstanceRow(input: {
     | typeof SandboxInstancePurposes.SESSION
     | typeof SandboxInstancePurposes.SNAPSHOT
     | typeof SandboxInstancePurposes.SETUP_ASSISTANT
-    | typeof SandboxInstancePurposes.SETUP_CHECK;
+    | typeof SandboxInstancePurposes.SETUP_CHECK
+    | typeof SandboxInstancePurposes.SKILLS_DISCOVERY;
 }): DataPlaneTables["sandboxInstances"]["$inferInsert"] {
   return {
     id: input.id,

@@ -18,7 +18,6 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@archildata/client": "0.8.7",
     "@mistle/config": "workspace:*",
     "@mistle/control-plane-internal-client": "workspace:*",
     "@mistle/db": "workspace:*",

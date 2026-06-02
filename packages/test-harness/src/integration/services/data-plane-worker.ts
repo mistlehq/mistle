@@ -261,8 +261,6 @@ function createDataPlaneWorkerEnv(input: {
     MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL: input.sandboxEndpoints.gatewayWsUrl,
     ...(provider === "docker"
       ? {
-          MISTLE_SANDBOX_STORAGE_BACKEND: "docker_volume",
-          MISTLE_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX: `${input.environmentId}-`,
           MISTLE_SANDBOX_DOCKER_ENABLED: "true",
           MISTLE_SANDBOX_DOCKER_SOCKET_PATH: DockerSocketPath,
         }

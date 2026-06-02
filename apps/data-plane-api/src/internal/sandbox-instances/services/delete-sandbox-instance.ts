@@ -1,8 +1,4 @@
-import {
-  SandboxInstancePurposes,
-  type DataPlaneDatabase,
-  type DataPlaneTables,
-} from "@mistle/db/data-plane";
+import { type DataPlaneDatabase, type DataPlaneTables } from "@mistle/db/data-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
 import { DeleteSandboxInstanceWorkflowSpec } from "@mistle/workflow-registry/data-plane";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -12,7 +8,7 @@ import type { DeleteSandboxInstanceResponse } from "../delete-sandbox-instance/s
 
 type DeleteSandboxInstanceContext = {
   db: DataPlaneDatabase;
-  openWorkflow: AppRuntimeResources["openWorkflow"];
+  openWorkflow: Pick<AppRuntimeResources["openWorkflow"], "runWorkflow">;
   tables: Pick<DataPlaneTables, "sandboxInstances">;
 };
 
@@ -23,11 +19,11 @@ type DeleteSandboxInstanceInput = {
 
 export const DeleteSandboxInstanceNotFoundErrorCode = "NOT_FOUND";
 
-function createDeleteSessionDestroyIdempotencyKey(input: DeleteSandboxInstanceInput): string {
+function createDeleteSandboxDestroyIdempotencyKey(input: DeleteSandboxInstanceInput): string {
   return JSON.stringify({
     version: 1,
     sandboxInstanceId: input.sandboxInstanceId,
-    action: "delete_session_destroy",
+    action: "delete_sandbox_destroy",
     organizationId: input.organizationId,
   });
 }
@@ -45,14 +41,13 @@ export async function deleteSandboxInstance(
       whereAnd(
         whereEq(table.id, input.sandboxInstanceId),
         whereEq(table.organizationId, input.organizationId),
-        whereEq(table.purpose, SandboxInstancePurposes.SESSION),
       ),
   });
 
   if (sandboxInstance === undefined) {
     throw new NotFoundError(
       DeleteSandboxInstanceNotFoundErrorCode,
-      `Sandbox session '${input.sandboxInstanceId}' was not found.`,
+      `Sandbox instance '${input.sandboxInstanceId}' was not found.`,
     );
   }
 
@@ -70,7 +65,7 @@ export async function deleteSandboxInstance(
       sandboxInstanceId: input.sandboxInstanceId,
     },
     {
-      idempotencyKey: createDeleteSessionDestroyIdempotencyKey(input),
+      idempotencyKey: createDeleteSandboxDestroyIdempotencyKey(input),
     },
   );
 
@@ -84,7 +79,6 @@ export async function deleteSandboxInstance(
       and(
         eq(ctx.tables.sandboxInstances.id, input.sandboxInstanceId),
         eq(ctx.tables.sandboxInstances.organizationId, input.organizationId),
-        eq(ctx.tables.sandboxInstances.purpose, SandboxInstancePurposes.SESSION),
         isNull(ctx.tables.sandboxInstances.deletedAt),
       ),
     )

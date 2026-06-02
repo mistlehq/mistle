@@ -8,11 +8,7 @@ import {
   type ResumeSandboxInstanceInput,
   type StartSandboxInstanceInput,
 } from "@mistle/data-plane-internal-client";
-import {
-  SandboxInstancePersistenceModes,
-  SandboxInstancePurposes,
-  SandboxInstanceStatuses,
-} from "@mistle/db/data-plane";
+import { SandboxInstancePurposes, SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { createDataPlaneWorkflowNamespaceId } from "@mistle/db/test-environment";
 import type { CompiledRuntimePlan } from "@mistle/integrations-core";
 import {
@@ -43,10 +39,6 @@ const StartWorkflowInputSchema = z
     organizationId: z.string().min(1),
     sandboxProfileId: z.string().min(1),
     sandboxProfileVersion: z.number().int().min(1),
-    persistenceMode: z.enum([
-      SandboxInstancePersistenceModes.EPHEMERAL,
-      SandboxInstancePersistenceModes.PERSISTENT,
-    ]),
     purpose: z.enum([
       SandboxInstancePurposes.SESSION,
       SandboxInstancePurposes.SNAPSHOT,
@@ -112,7 +104,6 @@ describe.concurrent("internal sandbox instance start and resume integration", ()
       organizationId: workflowInput.organizationId,
       sandboxProfileId: workflowInput.sandboxProfileId,
       sandboxProfileVersion: workflowInput.sandboxProfileVersion,
-      persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
       purpose: SandboxInstancePurposes.SESSION,
       image: workflowInput.image,
     });
@@ -127,7 +118,6 @@ describe.concurrent("internal sandbox instance start and resume integration", ()
       sandboxVcpuCount: null,
       sandboxMemoryMb: null,
       sandboxStorageMb: null,
-      persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
       purpose: SandboxInstancePurposes.SESSION,
       status: SandboxInstanceStatuses.PENDING,
     });
@@ -167,40 +157,6 @@ describe.concurrent("internal sandbox instance start and resume integration", ()
     );
   });
 
-  it("fails before enqueueing when persistent sandboxes are enabled without durable storage", async ({
-    env,
-  }) => {
-    const workflowInput = startInput({
-      organizationId: "org_dp_api_start_persistent_without_storage",
-      sandboxProfileId: "sbp_dp_api_start_persistent_without_storage",
-      sandboxProfileVersion: 3,
-      persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
-      purpose: SandboxInstancePurposes.SESSION,
-      imageId: "im_dp_api_start_persistent_without_storage",
-    });
-
-    await expect(clientFor(env).startSandboxInstance(workflowInput)).rejects.toThrow(
-      `Persistent sandbox was requested for organization '${workflowInput.organizationId}' but no supported durable storage backend is configured for this deployment.`,
-    );
-
-    await expect(
-      countQueuedWorkflows({
-        env,
-        workflowName: StartSandboxInstanceWorkflowName,
-        inputEquals: {
-          organizationId: workflowInput.organizationId,
-          sandboxProfileId: workflowInput.sandboxProfileId,
-        },
-      }),
-    ).resolves.toBe(0);
-    await expect(
-      readSandboxInstanceByProfile(env, {
-        organizationId: workflowInput.organizationId,
-        sandboxProfileId: workflowInput.sandboxProfileId,
-      }),
-    ).resolves.toBeUndefined();
-  });
-
   it("queues setup-check launches with setup-check purpose", async ({ env }) => {
     const workflowInput = startInput({
       organizationId: "org_dp_api_start_setup_check",
@@ -224,21 +180,19 @@ describe.concurrent("internal sandbox instance start and resume integration", ()
     expect(parsedInput).toMatchObject({
       sandboxInstanceId: startedSandbox.sandboxInstanceId,
       purpose: SandboxInstancePurposes.SETUP_CHECK,
-      persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
     });
     await expect(readSandboxInstancePurpose(env, startedSandbox.sandboxInstanceId)).resolves.toBe(
       SandboxInstancePurposes.SETUP_CHECK,
     );
   });
 
-  it("queues setup-assistant launches as ephemeral startable sandboxes", async ({ env }) => {
+  it("queues setup-assistant launches as startable sandboxes", async ({ env }) => {
     const workflowInput = startInput({
       organizationId: "org_dp_api_start_setup_assistant",
       sandboxProfileId: "sbp_dp_api_start_setup_assistant",
       sandboxProfileVersion: 4,
       purpose: SandboxInstancePurposes.SETUP_ASSISTANT,
       imageId: "im_dp_api_start_setup_assistant",
-      persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
     });
 
     const startedSandbox = await clientFor(env).startSandboxInstance(workflowInput);
@@ -255,7 +209,6 @@ describe.concurrent("internal sandbox instance start and resume integration", ()
     expect(parsedInput).toMatchObject({
       sandboxInstanceId: startedSandbox.sandboxInstanceId,
       purpose: SandboxInstancePurposes.SETUP_ASSISTANT,
-      persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
     });
     await expect(readSandboxInstancePurpose(env, startedSandbox.sandboxInstanceId)).resolves.toBe(
       SandboxInstancePurposes.SETUP_ASSISTANT,
@@ -380,7 +333,6 @@ function startInput(input: {
   organizationId: string;
   sandboxProfileId: string;
   sandboxProfileVersion: number;
-  persistenceMode?: StartSandboxInstanceInput["persistenceMode"];
   purpose:
     | typeof SandboxInstancePurposes.SESSION
     | typeof SandboxInstancePurposes.SNAPSHOT
@@ -404,7 +356,6 @@ function startInput(input: {
     organizationId: input.organizationId,
     sandboxProfileId: input.sandboxProfileId,
     sandboxProfileVersion: input.sandboxProfileVersion,
-    persistenceMode: input.persistenceMode ?? SandboxInstancePersistenceModes.EPHEMERAL,
     purpose: input.purpose,
     runtimePlan: runtimePlan({
       sandboxProfileId: input.sandboxProfileId,
@@ -507,7 +458,6 @@ async function readSandboxInstance(env: IntegrationTestEnvironment, sandboxInsta
       sandboxVcpuCount: true,
       sandboxMemoryMb: true,
       sandboxStorageMb: true,
-      persistenceMode: true,
       purpose: true,
       status: true,
     },
@@ -541,25 +491,6 @@ async function countPersistedRuntimePlans(
   });
 
   return rows.length;
-}
-
-async function readSandboxInstanceByProfile(
-  env: IntegrationTestEnvironment,
-  input: {
-    organizationId: string;
-    sandboxProfileId: string;
-  },
-) {
-  return env.dataPlaneDb.query.sandboxInstances.findFirst({
-    columns: {
-      id: true,
-    },
-    where: (table, { and, eq }) =>
-      and(
-        eq(table.organizationId, input.organizationId),
-        eq(table.sandboxProfileId, input.sandboxProfileId),
-      ),
-  });
 }
 
 type WorkflowRunRow = {

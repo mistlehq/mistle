@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { MemoryRouter } from "react-router";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import { createAvailableCardsOverview } from "./organization-integrations-settings-page-story-support.js";
@@ -16,7 +17,7 @@ const ConnectedCards: readonly OrganizationIntegrationsSettingsPageCard[] = [
     configStatus: "valid",
     logoKey: "github",
     actionLabel: "View",
-    onAction: () => {},
+    actionHref: "/integrations/github-cloud",
   },
   {
     targetKey: "linear-default",
@@ -26,7 +27,7 @@ const ConnectedCards: readonly OrganizationIntegrationsSettingsPageCard[] = [
     configStatus: "invalid",
     logoKey: "linear",
     actionLabel: "View",
-    onAction: () => {},
+    actionHref: "/integrations/linear-default",
   },
 ] as const;
 
@@ -35,7 +36,14 @@ const AvailableCards = createAvailableCardsOverview();
 const meta = {
   title: "Dashboard/Integrations/Overview",
   component: OrganizationIntegrationsSettingsPageView,
-  decorators: [withDashboardPageStory],
+  decorators: [
+    (Story) => (
+      <MemoryRouter initialEntries={["/integrations"]}>
+        <Story />
+      </MemoryRouter>
+    ),
+    withDashboardPageStory,
+  ],
   args: {
     availableCards: AvailableCards,
     connectedCards: ConnectedCards,

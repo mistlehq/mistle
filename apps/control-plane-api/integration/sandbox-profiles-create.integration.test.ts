@@ -5,7 +5,6 @@
 import {
   SandboxProfileStatuses,
   SandboxProfileVersionAgentRuntimeIds,
-  SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
@@ -73,9 +72,6 @@ describe.concurrent("sandbox profiles create integration", () => {
     expect(initialVersion.sandboxProfileId).toBe(body.id);
     expect(initialVersion.version).toBe(1);
     expect(initialVersion.state).toBe(SandboxProfileVersionStates.DRAFT);
-    expect(initialVersion.defaultPersistenceMode).toBe(
-      SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
-    );
     expect(initialVersion.agentRuntimeId).toBe(SandboxProfileVersionAgentRuntimeIds.CODEX);
     expect(initialVersion.publishedAt).toBeNull();
   });

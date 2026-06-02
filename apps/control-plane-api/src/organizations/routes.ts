@@ -13,7 +13,6 @@ import * as getIdentityLinkProviderGitCommitSigningImpact from "./get-identity-l
 import * as getLogoContent from "./get-logo-content/index.js";
 import * as getLogo from "./get-logo/index.js";
 import * as getMembershipCapabilities from "./get-membership-capabilities/index.js";
-import * as getOrganizationSandboxStorageSettings from "./get-organization-sandbox-storage-settings/index.js";
 import * as listIdentityLinkProviderConfigLinks from "./list-identity-link-provider-config-links/index.js";
 import * as listIdentityLinkProviderLinks from "./list-identity-link-provider-links/index.js";
 import * as listIdentityLinkProviders from "./list-identity-link-providers/index.js";
@@ -24,7 +23,6 @@ import * as putIdentityLinkProviderConfig from "./put-identity-link-provider-con
 import * as putIdentityLinkProviderStatus from "./put-identity-link-provider-status/index.js";
 import * as putIdentityLinkProvider from "./put-identity-link-provider/index.js";
 import * as putLogo from "./put-logo/index.js";
-import * as putOrganizationSandboxStorageSettings from "./put-organization-sandbox-storage-settings/index.js";
 
 export function createOrganizationRoutes(): AppRoutes<typeof ORGANIZATION_ROUTE_BASE_PATH> {
   const routes = new OpenAPIHono<AppContextBindings>({
@@ -55,19 +53,11 @@ export function createOrganizationRoutes(): AppRoutes<typeof ORGANIZATION_ROUTE_
     listIdentityLinkProviderConfigLinks.route,
     listIdentityLinkProviderConfigLinks.handler,
   );
-  routes.openapi(
-    getOrganizationSandboxStorageSettings.route,
-    getOrganizationSandboxStorageSettings.handler,
-  );
   routes.openapi(listMembers.route, listMembers.handler);
   routes.openapi(listInvitations.route, listInvitations.handler);
   routes.openapi(putIdentityLinkProvider.route, putIdentityLinkProvider.handler);
   routes.openapi(putIdentityLinkProviderStatus.route, putIdentityLinkProviderStatus.handler);
   routes.openapi(deleteIdentityLinkProvider.route, deleteIdentityLinkProvider.handler);
-  routes.openapi(
-    putOrganizationSandboxStorageSettings.route,
-    putOrganizationSandboxStorageSettings.handler,
-  );
 
   return {
     basePath: ORGANIZATION_ROUTE_BASE_PATH,

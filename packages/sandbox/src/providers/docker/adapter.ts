@@ -6,21 +6,14 @@ import {
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
 import {
   SandboxProvider,
-  SandboxStorageBackend,
   type SandboxAdapter,
   type SandboxCaptureSnapshotRequest,
-  type SandboxDockerVolumeStartStoragePreparation,
-  type SandboxDockerVolumeStorageAttachment,
-  type SandboxAttachStorageRequest,
-  type SandboxCleanupStorageRequest,
   type SandboxDestroyRequest,
   type SandboxHandle,
   type SandboxImageHandle,
   type SandboxInspectRequest,
   type SandboxPrepareImageRequest,
-  type SandboxPrepareStorageForStartRequest,
   type SandboxResumeRequestV1,
-  type SandboxStartStoragePreparation,
   type SandboxStartRequest,
   type SandboxStopRequest,
   type SandboxTransparentProxyConfiguration,
@@ -76,53 +69,14 @@ export class DockerSandboxAdapter implements SandboxAdapter {
     return request.image;
   }
 
-  async prepareStorageForStart(
-    request: SandboxPrepareStorageForStartRequest,
-  ): Promise<SandboxStartStoragePreparation> {
-    if (request.image.provider !== SandboxProvider.DOCKER) {
-      throw new SandboxConfigurationError("Docker adapter received a non-Docker image handle.");
-    }
-
-    const storage = requireDockerVolumeStorageAttachment(request);
-    const storagePreparation: SandboxDockerVolumeStartStoragePreparation = {
-      backend: SandboxStorageBackend.DOCKER_VOLUME,
-      handle: storage.handle,
-      layout: storage.layout,
-    };
-
-    await this.#client.prepareVolumeForStart({
-      storagePreparation: {
-        backend: storagePreparation.backend,
-        handle: storagePreparation.handle,
-        layout: {
-          bindings: [...storagePreparation.layout.bindings],
-        },
-      },
-    });
-
-    return storagePreparation;
-  }
-
   async start(request: SandboxStartRequest): Promise<SandboxHandle> {
     if (request.image.provider !== SandboxProvider.DOCKER) {
       throw new SandboxConfigurationError("Docker adapter received a non-Docker image handle.");
     }
 
-    const storagePreparation = toDockerStartStoragePreparation(request);
     const response = await this.#client.startSandbox({
       imageRef: request.image.imageId,
       env: withRequiredSandboxRuntimeEnv(request.env),
-      ...(storagePreparation === undefined
-        ? {}
-        : {
-            storagePreparation: {
-              backend: storagePreparation.backend,
-              handle: storagePreparation.handle,
-              layout: {
-                bindings: [...storagePreparation.layout.bindings],
-              },
-            },
-          }),
     });
     return createSandboxHandle(response.runtimeId);
   }
@@ -185,14 +139,6 @@ export class DockerSandboxAdapter implements SandboxAdapter {
     }
   }
 
-  async attachStorage(_request: SandboxAttachStorageRequest): Promise<void> {
-    return;
-  }
-
-  async cleanupStorage(_request: SandboxCleanupStorageRequest): Promise<void> {
-    return;
-  }
-
   async stop(request: SandboxStopRequest): Promise<void> {
     if (request.id.trim().length === 0) {
       throw new SandboxConfigurationError("Runtime id is required.");
@@ -224,44 +170,6 @@ export class DockerSandboxAdapter implements SandboxAdapter {
       throw error;
     }
   }
-}
-
-function requireDockerVolumeStorageAttachment(
-  request: SandboxPrepareStorageForStartRequest,
-): SandboxDockerVolumeStorageAttachment {
-  if (request.storage === undefined) {
-    throw new SandboxConfigurationError(
-      "Docker adapter requires a Docker volume storage attachment for start preparation.",
-    );
-  }
-
-  if (request.storage.backend !== SandboxStorageBackend.DOCKER_VOLUME) {
-    throw new SandboxConfigurationError(
-      "Docker adapter expected a Docker volume storage attachment for start preparation.",
-    );
-  }
-
-  return request.storage;
-}
-
-function toDockerStartStoragePreparation(
-  request: SandboxStartRequest,
-): SandboxDockerVolumeStartStoragePreparation | undefined {
-  if (request.storagePreparation === undefined) {
-    return undefined;
-  }
-
-  if (!("backend" in request.storagePreparation)) {
-    return undefined;
-  }
-
-  if (request.storagePreparation.backend !== SandboxStorageBackend.DOCKER_VOLUME) {
-    throw new SandboxConfigurationError(
-      "Docker adapter expected Docker volume storage preparation for start.",
-    );
-  }
-
-  return request.storagePreparation;
 }
 
 export function createDockerSandboxAdapter(input: { client: DockerClient }): DockerSandboxAdapter {

@@ -1,4 +1,4 @@
-import { cp, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -225,14 +225,30 @@ const MigrationJournalSchema = z.object({
 async function createControlPlaneMigrationsFolderBeforeTriggerRename(): Promise<string> {
   const temporaryDirectory = await mkdtemp(join(tmpdir(), "mistle-control-plane-migrations-"));
   await cp(CONTROL_PLANE_MIGRATIONS_FOLDER_PATH, temporaryDirectory, { recursive: true });
-  await unlink(join(temporaryDirectory, "0032_rename-automation-to-trigger.sql"));
-  await unlink(join(temporaryDirectory, "meta", "0032_snapshot.json"));
 
   const journalPath = join(temporaryDirectory, "meta", "_journal.json");
   const journal = MigrationJournalSchema.parse(JSON.parse(await readFile(journalPath, "utf8")));
+  const triggerRenameEntryIndex = journal.entries.findIndex(
+    (entry) => entry.tag === "0032_rename-automation-to-trigger",
+  );
+  if (triggerRenameEntryIndex === -1) {
+    throw new Error("Could not find trigger rename migration entry.");
+  }
+
+  const removedEntries = journal.entries.slice(triggerRenameEntryIndex);
+  for (const entry of removedEntries) {
+    await rm(join(temporaryDirectory, `${entry.tag}.sql`), { force: true });
+    await rm(
+      join(temporaryDirectory, "meta", `${entry.idx.toString().padStart(4, "0")}_snapshot.json`),
+      {
+        force: true,
+      },
+    );
+  }
+
   const previousJournal = {
     ...journal,
-    entries: journal.entries.filter((entry) => entry.tag !== "0032_rename-automation-to-trigger"),
+    entries: journal.entries.slice(0, triggerRenameEntryIndex),
   };
   await writeFile(journalPath, `${JSON.stringify(previousJournal, null, 2)}\n`);
 

@@ -57,7 +57,6 @@ describe("TensorlakeBaseImageBuilder", () => {
     expect(dockerfileText).toContain("systemd");
     expect(dockerfileText).toContain("systemd-sysv");
     expect(dockerfileText).toContain("https://mise.run");
-    expect(dockerfileText).toContain("https://archil.com/install");
     expect(dockerfileText).toContain('ENV HOME="/root"');
     expect(dockerfileText).toContain("WORKDIR /root");
     expect(dockerfileText).toContain(

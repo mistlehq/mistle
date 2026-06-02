@@ -1,6 +1,7 @@
-import { Button, cn } from "@mistle/ui";
+import { Button, buttonVariants, cn, TextLink } from "@mistle/ui";
 import { CheckCircleIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
+import { Link as RouterLink } from "react-router";
 
 import { isSessionPageNavigableSandboxStatus } from "../sessions/session-connect-policy.js";
 import { resolveSessionTitleLabel } from "../sessions/session-title-presentation.js";
@@ -12,34 +13,24 @@ import type { HomeChecklistStep, HomeChecklistViewModel } from "./home-page-view
 type HomePageViewProps = {
   createSessionForm: ReactNode;
   onboarding: HomeChecklistViewModel;
-  onNavigate?: (href: string) => void;
   recentSessions: readonly SandboxInstanceListItem[];
 };
 
 export function HomePageView({
   createSessionForm,
   onboarding,
-  onNavigate,
   recentSessions,
 }: HomePageViewProps): React.JSX.Element {
   if (onboarding.state === "completed") {
     return (
-      <CompletedHomeView
-        createSessionForm={createSessionForm}
-        recentSessions={recentSessions}
-        {...(onNavigate === undefined ? {} : { onNavigate })}
-      />
+      <CompletedHomeView createSessionForm={createSessionForm} recentSessions={recentSessions} />
     );
   }
 
   return (
     <div className="space-y-3">
       {onboarding.steps.map((step) => (
-        <SetupStepRow
-          key={step.id}
-          step={step}
-          {...(onNavigate === undefined ? {} : { onNavigate })}
-        />
+        <SetupStepRow key={step.id} step={step} />
       ))}
     </div>
   );
@@ -47,7 +38,6 @@ export function HomePageView({
 
 function CompletedHomeView(input: {
   createSessionForm: ReactNode;
-  onNavigate?: (href: string) => void;
   recentSessions: readonly SandboxInstanceListItem[];
 }): React.JSX.Element {
   return (
@@ -60,10 +50,7 @@ function CompletedHomeView(input: {
       <section className="min-w-0 space-y-3">
         <h2 className="truncate text-xl font-semibold">Recent sessions</h2>
         <div className="rounded-lg border bg-background p-4">
-          <RecentSessionsList
-            recentSessions={input.recentSessions}
-            {...(input.onNavigate === undefined ? {} : { onNavigate: input.onNavigate })}
-          />
+          <RecentSessionsList recentSessions={input.recentSessions} />
         </div>
       </section>
     </div>
@@ -71,7 +58,6 @@ function CompletedHomeView(input: {
 }
 
 function RecentSessionsList(input: {
-  onNavigate?: (href: string) => void;
   recentSessions: readonly SandboxInstanceListItem[];
 }): React.JSX.Element {
   if (input.recentSessions.length === 0) {
@@ -86,65 +72,57 @@ function RecentSessionsList(input: {
         const sessionTitle = resolveSessionTitleLabel(session.title);
 
         return (
-          <button
-            aria-label={sessionTitle}
+          <div
             className={cn(
               "group/session-row flex w-full min-w-0 items-center justify-between gap-4 rounded-md px-0 py-2 text-left",
-              isNavigable
-                ? "cursor-pointer hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
-                : "cursor-default",
+              isNavigable ? null : "cursor-default",
             )}
-            disabled={!isNavigable}
             key={session.id}
-            onClick={() => {
-              input.onNavigate?.(sessionHref);
-            }}
-            type="button"
           >
-            <span
-              className={cn(
-                "min-w-0 truncate text-sm font-medium",
-                isNavigable
-                  ? "group-hover/session-row:underline group-focus-visible/session-row:underline"
-                  : "text-muted-foreground",
-              )}
-            >
-              {sessionTitle}
-            </span>
+            {isNavigable ? (
+              <TextLink
+                className="min-w-0 truncate text-sm font-medium"
+                render={<RouterLink to={sessionHref} />}
+                variant="listItem"
+              >
+                {sessionTitle}
+              </TextLink>
+            ) : (
+              <span className="min-w-0 truncate text-sm font-medium text-muted-foreground">
+                {sessionTitle}
+              </span>
+            )}
             <span className="text-muted-foreground flex shrink-0 items-center gap-2 text-sm">
               <span className="hidden max-w-64 truncate sm:inline">
                 {session.sandboxProfileDisplayName ?? session.sandboxProfileId}
               </span>
               <span>{formatCompactRelativeOrDate(session.createdAt)}</span>
             </span>
-          </button>
+          </div>
         );
       })}
     </div>
   );
 }
 
-function SetupStepRow(input: {
-  step: HomeChecklistStep;
-  onNavigate?: (href: string) => void;
-}): React.JSX.Element {
+function SetupStepRow(input: { step: HomeChecklistStep }): React.JSX.Element {
+  const action =
+    input.step.status === "complete" ? null : input.step.status === "current" ? (
+      <RouterLink
+        className={buttonVariants({ className: "my-auto shrink-0" })}
+        to={input.step.href}
+      >
+        {input.step.actionLabel}
+      </RouterLink>
+    ) : (
+      <Button className="my-auto shrink-0" disabled type="button" variant="outline">
+        {input.step.actionLabel}
+      </Button>
+    );
+
   return (
     <ActionTile
-      action={
-        input.step.status === "complete" ? null : (
-          <Button
-            className="my-auto shrink-0"
-            disabled={input.step.status !== "current"}
-            onClick={() => {
-              input.onNavigate?.(input.step.href);
-            }}
-            type="button"
-            variant={input.step.status === "current" ? "default" : "outline"}
-          >
-            {input.step.actionLabel}
-          </Button>
-        )
-      }
+      action={action}
       className={cn(
         input.step.status === "current" && "border-primary/40 bg-primary/5",
         input.step.status === "complete" && "border-border/60 bg-muted/15",

@@ -8,6 +8,7 @@ import * as applyRuntimeLifecycleEvent from "./sandbox-instances/apply-runtime-l
 import * as createSandboxInstance from "./sandbox-instances/create-sandbox-instance/index.js";
 import * as deleteSandboxInstanceDeadline from "./sandbox-instances/delete-sandbox-instance-deadline/index.js";
 import * as deleteSandboxInstance from "./sandbox-instances/delete-sandbox-instance/index.js";
+import * as getSandboxInstanceMetadata from "./sandbox-instances/get-sandbox-instance-metadata/index.js";
 import * as getSandboxInstance from "./sandbox-instances/get-sandbox-instance/index.js";
 import * as listSandboxInstances from "./sandbox-instances/list-sandbox-instances/index.js";
 import * as listSandboxOperationEvents from "./sandbox-instances/list-sandbox-operation-events/index.js";
@@ -36,6 +37,7 @@ export function createInternalSandboxRoutes(): AppRoutes<typeof INTERNAL_SANDBOX
   routes.openapi(createSandboxInstance.route, createSandboxInstance.handler);
   routes.openapi(listSandboxInstances.route, listSandboxInstances.handler);
   routes.openapi(searchSandboxInstances.route, searchSandboxInstances.handler);
+  routes.openapi(getSandboxInstanceMetadata.route, getSandboxInstanceMetadata.handler);
   routes.openapi(getSandboxInstance.route, getSandboxInstance.handler);
   routes.openapi(deleteSandboxInstance.route, deleteSandboxInstance.handler);
   routes.openapi(listSandboxOperationEvents.route, listSandboxOperationEvents.handler);

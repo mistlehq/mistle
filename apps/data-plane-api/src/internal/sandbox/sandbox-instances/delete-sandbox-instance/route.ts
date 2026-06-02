@@ -17,7 +17,7 @@ export const route = createRoute({
   },
   responses: {
     200: {
-      description: "Delete a sandbox session for internal callers.",
+      description: "Delete a sandbox instance for internal callers.",
       content: {
         "application/json": {
           schema: DeleteSandboxInstanceResponseSchema,

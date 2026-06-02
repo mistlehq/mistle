@@ -104,14 +104,6 @@ force_path_style = true
 access_key_id = "mistle-access-key"
 secret_access_key = "mistle-secret-key"
 
-[object_store.sandbox_storage]
-bucket_name = "mistle-sandbox-storage"
-region = "us-east-1"
-endpoint = "https://s3.example.com"
-force_path_style = true
-access_key_id = "fixture-access-key-id"
-secret_access_key = "fixture-secret-access-key"
-
 [email.smtp]
 from_address = "no-reply@mistle.local"
 from_name = "Mistle Local"
@@ -130,9 +122,6 @@ token = "fixture-service-token"
 [sandbox]
 default_base_image = "127.0.0.1:5001/mistle/sandbox-base:dev"
 publish_base_domain = "mistle.example.test"
-
-[sandbox.storage]
-backend = "archil"
 
 [sandbox.tokens.connect]
 secret = "fixture-connection-token-secret"
@@ -166,9 +155,3 @@ cookie_signing_secret = "fixture-publish-cookie-secret"
 enabled = true
 socket_path = "/var/run/docker.sock"
 network_name = "mistle-sandbox-dev"
-
-[sandbox.storage.archil]
-api_key = "fixture-archil-api-key"
-region = "gcp-us-central1"
-name_prefix = "mistle-"
-mount_object_store = "sandbox_storage"

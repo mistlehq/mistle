@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-import { GlobalSandboxStorageConfigSchema } from "../../global/schema.js";
-
 const DefaultE2BCloudDomain = "e2b.app";
 
 const HttpBaseUrlSchema = z.url().refine((value) => {
@@ -130,7 +128,6 @@ const PartialDataPlaneApiSandboxTensorlakeConfigSchema = z
 
 export const DataPlaneApiSandboxConfigSchema = z
   .object({
-    storage: GlobalSandboxStorageConfigSchema.optional(),
     docker: DataPlaneApiSandboxDockerConfigSchema.optional(),
     e2b: DataPlaneApiSandboxE2BConfigSchema.optional(),
     tensorlake: DataPlaneApiSandboxTensorlakeConfigSchema.optional(),
@@ -139,7 +136,6 @@ export const DataPlaneApiSandboxConfigSchema = z
 
 export const PartialDataPlaneApiSandboxConfigSchema = z
   .object({
-    storage: GlobalSandboxStorageConfigSchema.partial().optional(),
     docker: PartialDataPlaneApiSandboxDockerConfigSchema.optional(),
     e2b: PartialDataPlaneApiSandboxE2BConfigSchema.optional(),
     tensorlake: PartialDataPlaneApiSandboxTensorlakeConfigSchema.optional(),

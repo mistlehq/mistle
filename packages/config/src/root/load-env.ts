@@ -208,31 +208,6 @@ const RootEnvDescriptors = [
     path: ["object_store", "assets", "secret_access_key"],
   },
   {
-    envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_BUCKET_NAME",
-    path: ["object_store", "sandbox_storage", "bucket_name"],
-  },
-  {
-    envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_REGION",
-    path: ["object_store", "sandbox_storage", "region"],
-  },
-  {
-    envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ENDPOINT",
-    path: ["object_store", "sandbox_storage", "endpoint"],
-  },
-  {
-    envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_FORCE_PATH_STYLE",
-    path: ["object_store", "sandbox_storage", "force_path_style"],
-    parse: parseBooleanEnv,
-  },
-  {
-    envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ACCESS_KEY_ID",
-    path: ["object_store", "sandbox_storage", "access_key_id"],
-  },
-  {
-    envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_SECRET_ACCESS_KEY",
-    path: ["object_store", "sandbox_storage", "secret_access_key"],
-  },
-  {
     envVar: "MISTLE_EMAIL_SMTP_FROM_ADDRESS",
     path: ["email", "smtp", "from_address"],
   },
@@ -459,10 +434,6 @@ const RootEnvDescriptors = [
     path: ["sandbox", "default_base_image"],
   },
   {
-    envVar: "MISTLE_SANDBOX_STORAGE_BACKEND",
-    path: ["sandbox", "storage", "backend"],
-  },
-  {
     envVar: "MISTLE_SANDBOX_DOCKER_ENABLED",
     path: ["sandbox", "docker", "enabled"],
     parse: parseBooleanEnv,
@@ -506,26 +477,6 @@ const RootEnvDescriptors = [
     envVar: "MISTLE_SANDBOX_E2B_MEMORY_MB",
     path: ["sandbox", "e2b", "memory_mb"],
     parse: parseNumberEnv,
-  },
-  {
-    envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY",
-    path: ["sandbox", "storage", "archil", "api_key"],
-  },
-  {
-    envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_REGION",
-    path: ["sandbox", "storage", "archil", "region"],
-  },
-  {
-    envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX",
-    path: ["sandbox", "storage", "archil", "name_prefix"],
-  },
-  {
-    envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_MOUNT_OBJECT_STORE",
-    path: ["sandbox", "storage", "archil", "mount_object_store"],
-  },
-  {
-    envVar: "MISTLE_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX",
-    path: ["sandbox", "storage", "docker_volume", "name_prefix"],
   },
   {
     envVar: "MISTLE_SANDBOX_TOKENS_BOOTSTRAP_SECRET",

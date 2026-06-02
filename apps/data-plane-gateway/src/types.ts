@@ -33,6 +33,15 @@ export type DataPlaneGatewayConfig = LoadDataPlaneGatewayConfigResult["app"] & {
    * tests use it when a local simulated upstream serves TLS with an ephemeral CA.
    */
   __dangerouslyTrustDirectEgressTlsCaCertificates?: readonly string[];
+  /**
+   * Programmatic test-only delay for direct egress websocket upstream
+   * resolution.
+   *
+   * This is intentionally not part of public deployment config. Integration
+   * tests use it to make gateway restart races deterministic while preserving
+   * the production route and service stack.
+   */
+  __dangerouslyDelayDirectEgressWebSocketUpstreamResolutionMs?: number;
 };
 export type DataPlaneGatewayRuntimeConfig = {
   app: DataPlaneGatewayConfig;

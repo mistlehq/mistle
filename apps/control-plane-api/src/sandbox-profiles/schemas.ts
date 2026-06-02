@@ -2,9 +2,9 @@ import { z } from "@hono/zod-openapi";
 import {
   TriggerKinds,
   IntegrationBindingKinds,
+  skillsSourceRepos,
   SandboxProfileStatuses,
   SandboxProfileVersionAgentRuntimeIds,
-  SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
@@ -22,6 +22,7 @@ import {
   SandboxProfileTriggerImpactIssueCodes,
   SandboxProfilePublishabilityIssueCodes,
 } from "./errors.js";
+import { sandboxProfileVersionSkillsConfigSchema } from "./services/profile-version-skills-config.js";
 
 const sandboxProfileStatusSchema = z.enum([
   SandboxProfileStatuses.ACTIVE,
@@ -36,10 +37,6 @@ const integrationBindingKindSchema = z.enum([
 const sandboxProfileVersionStateSchema = z.enum([
   SandboxProfileVersionStates.DRAFT,
   SandboxProfileVersionStates.PUBLISHED,
-]);
-const sandboxProfileVersionDefaultPersistenceModeSchema = z.enum([
-  SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
-  SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
 ]);
 const sandboxProfileVersionAgentRuntimeIdSchema = z.enum([
   SandboxProfileVersionAgentRuntimeIds.CODEX,
@@ -119,6 +116,59 @@ export const sandboxProfileRepositoryOptionSchema = z
   })
   .strict();
 
+export const skillsSourceRepoSkillSchema = z
+  .object({
+    name: z.string().min(1),
+    description: z.string(),
+    relativePath: z.string().min(1),
+  })
+  .strict();
+
+export const skillsSourceRepoSchema = createSelectSchema(skillsSourceRepos, {
+  skills: z.array(skillsSourceRepoSkillSchema),
+  commitSha: z.string().min(1).nullable(),
+  lastSyncedAt: z.string().min(1).nullable(),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+})
+  .pick({
+    id: true,
+    originUrl: true,
+    commitSha: true,
+    skills: true,
+    lastSyncedAt: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .strict();
+
+export const listSkillsSourceReposQuerySchema = z
+  .object({
+    originUrl: z.url().optional(),
+  })
+  .strict();
+
+export const listSkillsSourceReposResponseSchema = z
+  .object({
+    items: z.array(skillsSourceRepoSchema),
+  })
+  .strict();
+
+export const refreshSkillsSourceRepoBodySchema = z
+  .object({
+    originUrl: z.url(),
+    idempotencyKey: z.string().min(1).optional(),
+  })
+  .strict();
+
+export const refreshSkillsSourceRepoResponseSchema = z
+  .object({
+    sandboxInstanceId: z.string().min(1),
+    workflowRunId: z.string().min(1),
+    skillsSourceRepo: skillsSourceRepoSchema,
+  })
+  .strict();
+
 export const sandboxProfileVersionIntegrationBindingSchema = createSelectSchema(
   sandboxProfileVersionIntegrationBindings,
   {
@@ -131,7 +181,6 @@ export const sandboxProfileVersionIntegrationBindingSchema = createSelectSchema(
 
 export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVersions, {
   state: sandboxProfileVersionStateSchema,
-  defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema,
   publishedAt: z.string().min(1).nullable(),
   version: z.number().int().min(1),
   agentRuntimeId: sandboxProfileVersionAgentRuntimeIdSchema,
@@ -144,7 +193,6 @@ export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVers
     version: true,
     state: true,
     publishedAt: true,
-    defaultPersistenceMode: true,
     agentRuntimeId: true,
     gitCommitSigningIntegrationConnectionId: true,
     mistleMcpEnabled: true,
@@ -156,6 +204,7 @@ export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVers
   .extend({
     maintenanceScript: z.string().nullable(),
     sandboxResources: sandboxProfileVersionResourcesSchema.nullable(),
+    skillsConfig: sandboxProfileVersionSkillsConfigSchema.nullable(),
     isActive: z.boolean(),
     usable: z.boolean(),
     refreshSchedule: sandboxProfileVersionRefreshScheduleSummarySchema.nullable(),
@@ -176,14 +225,6 @@ export const sandboxProfileVersionMaintenanceScriptSchema = z
     sandboxProfileId: z.string().min(1),
     version: z.number().int().min(1),
     maintenanceScript: z.string().min(1).nullable(),
-  })
-  .strict();
-
-export const sandboxProfileVersionPersistenceModeSchema = z
-  .object({
-    sandboxProfileId: z.string().min(1),
-    version: z.number().int().min(1),
-    defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema,
   })
   .strict();
 
@@ -336,7 +377,6 @@ export const getSandboxProfileVersionSetupScriptResponseSchema =
 export const putSandboxProfileVersionDraftBodySchema = z
   .object({
     setupScript: z.string().min(1).nullable().optional(),
-    defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema.optional(),
     agentRuntimeId: sandboxProfileVersionAgentRuntimeIdSchema.optional(),
     gitCommitSigningIntegrationConnectionId: z.string().min(1).nullable().optional(),
     mistleMcpEnabled: z.boolean().optional(),
@@ -344,13 +384,13 @@ export const putSandboxProfileVersionDraftBodySchema = z
     sandboxProvider: z.string().min(1).optional(),
     sandboxConnectionId: z.string().min(1).nullable().optional(),
     sandboxResources: sandboxProfileVersionResourcesSchema.nullable().optional(),
+    skillsConfig: sandboxProfileVersionSkillsConfigSchema.nullable().optional(),
     integrationBindings: sandboxProfileVersionIntegrationBindingsWriteBodySchema.optional(),
   })
   .strict()
   .refine(
     (value) =>
       value.setupScript !== undefined ||
-      value.defaultPersistenceMode !== undefined ||
       value.agentRuntimeId !== undefined ||
       value.gitCommitSigningIntegrationConnectionId !== undefined ||
       value.mistleMcpEnabled !== undefined ||
@@ -358,6 +398,7 @@ export const putSandboxProfileVersionDraftBodySchema = z
       value.sandboxProvider !== undefined ||
       value.sandboxConnectionId !== undefined ||
       value.sandboxResources !== undefined ||
+      value.skillsConfig !== undefined ||
       value.integrationBindings !== undefined,
     {
       message: "At least one draft field must be provided.",
@@ -369,7 +410,6 @@ export const putSandboxProfileVersionDraftResponseSchema = z
     sandboxProfileId: z.string().min(1),
     version: z.number().int().min(1),
     setupScript: z.string().nullable(),
-    defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema,
     agentRuntimeId: sandboxProfileVersionAgentRuntimeIdSchema,
     gitCommitSigningIntegrationConnectionId: z.string().min(1).nullable(),
     mistleMcpEnabled: z.boolean(),
@@ -377,6 +417,7 @@ export const putSandboxProfileVersionDraftResponseSchema = z
     sandboxProvider: z.string().min(1).nullable(),
     sandboxConnectionId: z.string().min(1).nullable(),
     sandboxResources: sandboxProfileVersionResourcesSchema.nullable(),
+    skillsConfig: sandboxProfileVersionSkillsConfigSchema.nullable(),
     integrationBindings: sandboxProfileVersionIntegrationBindingsResponseSchema,
   })
   .strict();

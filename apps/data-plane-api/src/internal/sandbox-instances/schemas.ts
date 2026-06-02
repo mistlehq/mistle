@@ -60,6 +60,15 @@ export const GetSandboxInstanceResponseSchema = z
   .strict()
   .nullable();
 
+export const SandboxInstanceMetadataResponseSchema = z
+  .object({
+    id: z.string().min(1),
+    purpose: z.enum(["session", "snapshot", "setup_assistant", "setup_check", "skills_discovery"]),
+    deletedAt: z.string().min(1).nullable(),
+  })
+  .strict()
+  .nullable();
+
 export const SandboxInstanceListItemSchema = z
   .object({
     id: z.string().min(1),
@@ -131,5 +140,6 @@ export const SandboxOperationEventsResponseSchema = z
   .strict();
 
 export type GetSandboxInstanceResponse = z.infer<typeof GetSandboxInstanceResponseSchema>;
+export type SandboxInstanceMetadataResponse = z.infer<typeof SandboxInstanceMetadataResponseSchema>;
 export type ListSandboxInstancesResponse = z.infer<typeof ListSandboxInstancesResponseSchema>;
 export type SandboxOperationEventsResponse = z.infer<typeof SandboxOperationEventsResponseSchema>;

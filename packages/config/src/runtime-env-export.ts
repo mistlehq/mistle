@@ -1,5 +1,5 @@
 import type { EnvValueFormat } from "./core/load-env.js";
-import { asObjectRecord, getValueAtPath } from "./core/record.js";
+import { getValueAtPath } from "./core/record.js";
 import type { LoadConfigResult } from "./loader.js";
 import { AppIds, type AppConfigModuleKey } from "./modules.js";
 
@@ -50,7 +50,6 @@ const GlobalResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
     path: ["sandbox", "internalGatewayWsUrl"],
     envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL",
   },
-  { path: ["sandbox", "storage", "backend"], envVar: "MISTLE_SANDBOX_STORAGE_BACKEND" },
   {
     path: ["sandbox", "bootstrap", "tokenSecret"],
     envVar: "MISTLE_SANDBOX_TOKENS_BOOTSTRAP_SECRET",
@@ -268,7 +267,6 @@ const DataPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor
     path: ["controlPlaneApi", "baseUrl"],
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL",
   },
-  { path: ["sandbox", "storage", "backend"], envVar: "MISTLE_SANDBOX_STORAGE_BACKEND" },
   { path: ["sandbox", "docker", "enabled"], envVar: "MISTLE_SANDBOX_DOCKER_ENABLED" },
   { path: ["sandbox", "docker", "socketPath"], envVar: "MISTLE_SANDBOX_DOCKER_SOCKET_PATH" },
   { path: ["sandbox", "e2b", "enabled"], envVar: "MISTLE_SANDBOX_E2B_ENABLED" },
@@ -314,20 +312,6 @@ const DataPlaneGatewayResourceRuntimeEnvExports: readonly RuntimeEnvExportDescri
   },
 ];
 
-function readFirstArchilMountField(root: unknown, field: string): unknown {
-  const mounts = getValueAtPath(root, ["sandboxStorage", "archil", "mounts"]);
-  if (!Array.isArray(mounts) || mounts.length === 0) {
-    return undefined;
-  }
-
-  return asObjectRecord(mounts[0])[field];
-}
-
-function readArchilMountObjectStore(root: unknown): "sandbox_storage" | undefined {
-  const mounts = getValueAtPath(root, ["sandboxStorage", "archil", "mounts"]);
-  return Array.isArray(mounts) && mounts.length > 0 ? "sandbox_storage" : undefined;
-}
-
 const DataPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
   { path: ["database", "url"], envVar: "MISTLE_POSTGRES_DATA_PLANE_POOLED_URL" },
   { path: ["workflow", "databaseUrl"], envVar: "MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL" },
@@ -348,7 +332,6 @@ const DataPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
     path: ["controlPlaneApi", "baseUrl"],
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL",
   },
-  { path: ["sandbox", "storage", "backend"], envVar: "MISTLE_SANDBOX_STORAGE_BACKEND" },
   {
     path: ["sandbox", "internalGatewayWsUrl"],
     envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL",
@@ -391,42 +374,6 @@ const DataPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
   { path: ["sandbox", "e2b", "memoryMb"], envVar: "MISTLE_SANDBOX_E2B_MEMORY_MB" },
   { path: ["sandbox", "tensorlake", "enabled"], envVar: "MISTLE_SANDBOX_TENSORLAKE_ENABLED" },
   { path: ["sandbox", "tensorlake", "apiKey"], envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY" },
-  {
-    path: ["sandboxStorage", "archil", "apiKey"],
-    envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY",
-  },
-  {
-    path: ["sandboxStorage", "archil", "region"],
-    envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_REGION",
-  },
-  {
-    path: ["sandboxStorage", "archil", "namePrefix"],
-    envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX",
-  },
-  {
-    envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_MOUNT_OBJECT_STORE",
-    readValue: readArchilMountObjectStore,
-  },
-  {
-    envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_BUCKET_NAME",
-    readValue: (root) => readFirstArchilMountField(root, "bucket"),
-  },
-  {
-    envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ENDPOINT",
-    readValue: (root) => readFirstArchilMountField(root, "endpoint"),
-  },
-  {
-    envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ACCESS_KEY_ID",
-    readValue: (root) => readFirstArchilMountField(root, "accessKeyId"),
-  },
-  {
-    envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_SECRET_ACCESS_KEY",
-    readValue: (root) => readFirstArchilMountField(root, "secretAccessKey"),
-  },
-  {
-    path: ["sandboxStorage", "dockerVolume", "namePrefix"],
-    envVar: "MISTLE_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX",
-  },
 ];
 
 function getAppRuntimeEnvExports(app: AppConfigModuleKey): readonly RuntimeEnvExportDescriptor[] {

@@ -33,7 +33,7 @@ settings:
 | `workflow.*`     | OpenWorkflow namespaces                                                      |
 | `email.smtp`     | SMTP delivery settings                                                       |
 | `internal_auth`  | Service-to-service authentication                                            |
-| `sandbox.*`      | Sandbox provider, storage, publish, and token settings                       |
+| `sandbox.*`      | Sandbox provider, base image, publish, and token settings                    |
 | `telemetry.*`    | OpenTelemetry export settings                                                |
 
 ## Services
@@ -84,14 +84,6 @@ key_prefix = "mistle:runtime-state"
 
 `object_store.assets` stores application assets.
 
-`object_store.sandbox_storage` is used when Archil sandbox storage should mount
-an S3-compatible bucket:
-
-```toml
-[sandbox.storage.archil]
-mount_object_store = "sandbox_storage"
-```
-
 ## Authentication
 
 Control-plane user authentication is configured under
@@ -136,20 +128,6 @@ with `sandbox.docker.enabled = true` plus its socket settings. E2B is enabled
 with `sandbox.e2b.enabled = true` plus its API credentials. A provider is
 available as a managed provider only when it is enabled and its required
 provider config is present.
-
-Sandbox storage is configured independently:
-
-| Backend         | Required section                |
-| --------------- | ------------------------------- |
-| `docker_volume` | `sandbox.storage.docker_volume` |
-| `archil`        | `sandbox.storage.archil`        |
-
-Archil-backed storage can mount `object_store.sandbox_storage` by setting:
-
-```toml
-[sandbox.storage.archil]
-mount_object_store = "sandbox_storage"
-```
 
 ## Environment Overrides
 
@@ -228,12 +206,6 @@ This table covers the operator-facing TOML keys accepted by `@mistle/config`.
 | `object_store.assets.force_path_style`                                         | No                                         | S3 path-style setting.                                                                                    |
 | `object_store.assets.access_key_id`                                            | Yes                                        | Asset object store access key.                                                                            |
 | `object_store.assets.secret_access_key`                                        | Yes                                        | Asset object store secret key.                                                                            |
-| `object_store.sandbox_storage.bucket_name`                                     | Required when mounted by Archil storage    | Sandbox storage object store bucket.                                                                      |
-| `object_store.sandbox_storage.region`                                          | No                                         | Sandbox storage object store region; not used by the current Archil mount payload.                        |
-| `object_store.sandbox_storage.endpoint`                                        | Required when mounted by Archil storage    | Sandbox storage object store endpoint.                                                                    |
-| `object_store.sandbox_storage.force_path_style`                                | No                                         | S3 path-style setting.                                                                                    |
-| `object_store.sandbox_storage.access_key_id`                                   | Required when mounted by Archil storage    | Sandbox storage access key.                                                                               |
-| `object_store.sandbox_storage.secret_access_key`                               | Required when mounted by Archil storage    | Sandbox storage secret key.                                                                               |
 | `email.smtp.from_address`                                                      | Yes                                        | SMTP sender address.                                                                                      |
 | `email.smtp.from_name`                                                         | Yes                                        | SMTP sender name.                                                                                         |
 | `email.smtp.host`                                                              | Yes                                        | SMTP host.                                                                                                |
@@ -247,12 +219,6 @@ This table covers the operator-facing TOML keys accepted by `@mistle/config`.
 | `billing.stripe.secret_key`                                                    | Required when Stripe is enabled            | Managed-cloud only. Stripe secret key for customer provisioning.                                          |
 | `sandbox.default_base_image`                                                   | Yes                                        | Sandbox base image reference.                                                                             |
 | `sandbox.publish_base_domain`                                                  | Yes                                        | Base domain for published sandbox URLs.                                                                   |
-| `sandbox.storage.backend`                                                      | Yes                                        | `archil` or `docker_volume`.                                                                              |
-| `sandbox.storage.archil.api_key`                                               | Required when storage backend is `archil`  | Archil API key.                                                                                           |
-| `sandbox.storage.archil.region`                                                | Required when storage backend is `archil`  | Archil region.                                                                                            |
-| `sandbox.storage.archil.name_prefix`                                           | No                                         | Prefix for Archil storage names.                                                                          |
-| `sandbox.storage.archil.mount_object_store`                                    | No                                         | Currently only `sandbox_storage`.                                                                         |
-| `sandbox.storage.docker_volume.name_prefix`                                    | No                                         | Prefix for Docker volume names; section required when storage backend is `docker_volume`.                 |
 | `sandbox.docker.enabled`                                                       | No                                         | Enables managed Docker sandbox provider config when Docker credentials are present.                       |
 | `sandbox.docker.socket_path`                                                   | Required when Docker is enabled            | Docker daemon socket path.                                                                                |
 | `sandbox.docker.network_name`                                                  | No                                         | Docker network name for sandbox containers.                                                               |

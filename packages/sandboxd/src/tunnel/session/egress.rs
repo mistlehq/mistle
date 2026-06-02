@@ -1,7 +1,7 @@
 //! Gateway egress-token request handling for the live tunnel session.
 
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use serde_json::Value;
@@ -38,21 +38,38 @@ struct CachedEgressToken {
 
 #[derive(Clone)]
 pub struct GatewayEgressTokenProvider {
-    request_sender: Arc<RwLock<Option<mpsc::UnboundedSender<TunnelSessionRequest>>>>,
-    cached_token: Arc<Mutex<Option<CachedEgressToken>>>,
+    state: Arc<Mutex<GatewayEgressTokenProviderState>>,
     next_request_id: Arc<AtomicU64>,
     sandbox_instance_id: String,
-    acting_user_id: Arc<Mutex<Option<String>>>,
+}
+
+struct GatewayEgressTokenProviderState {
+    generation: u64,
+    request_sender: Option<mpsc::UnboundedSender<TunnelSessionRequest>>,
+    acting_user_id: Option<String>,
+    cached_token: Option<CachedEgressToken>,
+}
+
+enum GatewayEgressTokenProviderSnapshot {
+    Cached(TunnelEgressToken),
+    Request {
+        generation: u64,
+        request_sender: mpsc::UnboundedSender<TunnelSessionRequest>,
+        acting_user_id: Option<String>,
+    },
 }
 
 impl GatewayEgressTokenProvider {
     pub fn new(sandbox_instance_id: impl Into<String>, acting_user_id: Option<String>) -> Self {
         Self {
-            request_sender: Arc::new(RwLock::new(None)),
-            cached_token: Arc::new(Mutex::new(None)),
+            state: Arc::new(Mutex::new(GatewayEgressTokenProviderState {
+                generation: 0,
+                request_sender: None,
+                acting_user_id,
+                cached_token: None,
+            })),
             next_request_id: Arc::new(AtomicU64::new(1)),
             sandbox_instance_id: sandbox_instance_id.into(),
-            acting_user_id: Arc::new(Mutex::new(acting_user_id)),
         }
     }
 
@@ -60,20 +77,17 @@ impl GatewayEgressTokenProvider {
         &self,
         acting_user_id: Option<String>,
     ) -> Result<(), TunnelSessionError> {
-        let mut current_acting_user_id = self
-            .acting_user_id
+        let mut state = self
+            .state
             .lock()
             .map_err(|error| TunnelSessionError::EgressToken(error.to_string()))?;
-        if *current_acting_user_id == acting_user_id {
+        if state.acting_user_id == acting_user_id {
             return Ok(());
         }
 
-        *current_acting_user_id = acting_user_id;
-        let mut cached_token = self
-            .cached_token
-            .lock()
-            .map_err(|error| TunnelSessionError::EgressToken(error.to_string()))?;
-        *cached_token = None;
+        state.generation = state.generation.saturating_add(1);
+        state.acting_user_id = acting_user_id;
+        state.cached_token = None;
         Ok(())
     }
 
@@ -81,40 +95,43 @@ impl GatewayEgressTokenProvider {
         &self,
         request_sender: mpsc::UnboundedSender<TunnelSessionRequest>,
     ) {
-        match self.request_sender.write() {
-            Ok(mut sender) => *sender = Some(request_sender),
+        match self.state.lock() {
+            Ok(mut state) => {
+                state.generation = state.generation.saturating_add(1);
+                state.request_sender = Some(request_sender);
+                state.cached_token = None;
+            }
             Err(error) => {
                 eprintln!("sandboxd failed to attach gateway egress token provider: {error}");
             }
         }
     }
 
-    pub fn token(&self) -> Result<TunnelEgressToken, TunnelSessionError> {
-        if let Some(token) = self.cached_token()? {
-            return Ok(token);
-        }
+    pub fn detach(&self) -> Result<(), TunnelSessionError> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|error| TunnelSessionError::EgressToken(error.to_string()))?;
+        state.generation = state.generation.saturating_add(1);
+        state.request_sender = None;
+        state.cached_token = None;
+        Ok(())
+    }
 
-        let request_sender = self
-            .request_sender
-            .read()
-            .map_err(|error| TunnelSessionError::EgressToken(error.to_string()))?
-            .clone()
-            .ok_or_else(|| {
-                TunnelSessionError::EgressToken(
-                    "gateway egress token provider is not attached to the bootstrap session"
-                        .to_string(),
-                )
-            })?;
+    pub fn token(&self) -> Result<TunnelEgressToken, TunnelSessionError> {
+        let (generation, request_sender, acting_user_id) = match self.provider_snapshot()? {
+            GatewayEgressTokenProviderSnapshot::Cached(token) => return Ok(token),
+            GatewayEgressTokenProviderSnapshot::Request {
+                generation,
+                request_sender,
+                acting_user_id,
+            } => (generation, request_sender, acting_user_id),
+        };
         let request_id = format!(
             "egress_token_req_{}",
             self.next_request_id.fetch_add(1, Ordering::Relaxed)
         );
         let (response_sender, response_receiver) = std::sync::mpsc::channel();
-        let acting_user_id = self
-            .acting_user_id
-            .lock()
-            .map_err(|error| TunnelSessionError::EgressToken(error.to_string()))?
-            .clone();
         request_sender
             .send(TunnelSessionRequest::EgressToken {
                 request_id: request_id.clone(),
@@ -125,7 +142,7 @@ impl GatewayEgressTokenProvider {
 
         match response_receiver.recv_timeout(DEFAULT_EGRESS_TOKEN_REQUEST_TIMEOUT) {
             Ok(Ok(token)) => {
-                self.store_token(token.clone(), &request_id)?;
+                self.store_token(token.clone(), &request_id, generation)?;
                 Ok(token)
             }
             Ok(Err(error)) => Err(error),
@@ -135,15 +152,32 @@ impl GatewayEgressTokenProvider {
         }
     }
 
-    fn cached_token(&self) -> Result<Option<TunnelEgressToken>, TunnelSessionError> {
-        let cached_token = self
-            .cached_token
+    fn provider_snapshot(&self) -> Result<GatewayEgressTokenProviderSnapshot, TunnelSessionError> {
+        let state = self
+            .state
             .lock()
-            .map_err(|error| TunnelSessionError::EgressToken(error.to_string()))?
-            .clone();
-        let Some(cached_token) = cached_token else {
-            return Ok(None);
-        };
+            .map_err(|error| TunnelSessionError::EgressToken(error.to_string()))?;
+        if let Some(token) = self.cached_token_from_state(&state) {
+            return Ok(GatewayEgressTokenProviderSnapshot::Cached(token));
+        }
+        let request_sender = state.request_sender.clone().ok_or_else(|| {
+            TunnelSessionError::EgressToken(
+                "gateway egress token provider is not attached to the bootstrap session"
+                    .to_string(),
+            )
+        })?;
+        Ok(GatewayEgressTokenProviderSnapshot::Request {
+            generation: state.generation,
+            request_sender,
+            acting_user_id: state.acting_user_id.clone(),
+        })
+    }
+
+    fn cached_token_from_state(
+        &self,
+        state: &GatewayEgressTokenProviderState,
+    ) -> Option<TunnelEgressToken> {
+        let cached_token = state.cached_token.as_ref()?;
         let elapsed_ms = cached_token
             .stored_at
             .elapsed()
@@ -151,7 +185,7 @@ impl GatewayEgressTokenProvider {
             .try_into()
             .unwrap_or(u64::MAX);
         if elapsed_ms >= cached_token.cache_ttl_ms {
-            return Ok(None);
+            return None;
         }
         info!(
             event = "egress_token_cache_hit",
@@ -163,19 +197,25 @@ impl GatewayEgressTokenProvider {
             elapsed_ms = elapsed_ms,
             "using cached gateway egress token"
         );
-        Ok(Some(cached_token.token))
+        Some(cached_token.token.clone())
     }
 
     fn store_token(
         &self,
         token: TunnelEgressToken,
         request_id: &str,
+        request_generation: u64,
     ) -> Result<(), TunnelSessionError> {
-        let mut cached_token = self
-            .cached_token
+        let mut state = self
+            .state
             .lock()
             .map_err(|error| TunnelSessionError::EgressToken(error.to_string()))?;
-        *cached_token = Some(CachedEgressToken {
+        if state.generation != request_generation {
+            return Err(TunnelSessionError::EgressToken(format!(
+                "egress token request {request_id} completed after provider generation changed"
+            )));
+        }
+        state.cached_token = Some(CachedEgressToken {
             cache_ttl_ms: token.ttl_ms.saturating_sub(EGRESS_TOKEN_REFRESH_SKEW_MS),
             token,
             stored_at: Instant::now(),

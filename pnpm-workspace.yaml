@@ -60,6 +60,9 @@ overrides:
   "zod@3.21.4": "3.22.3"
 
 packageExtensions:
+  drizzle-kit@*:
+    peerDependencies:
+      drizzle-orm: "*"
   "@phosphor-icons/react@*":
     peerDependencies:
       "@types/react": "*"

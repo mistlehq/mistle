@@ -7,7 +7,6 @@ import {
   type DataPlaneSandboxInstancesClient,
 } from "@mistle/data-plane-internal-client";
 import {
-  SandboxInstancePersistenceModes,
   SandboxInstancePurposes,
   SandboxStopReasons,
   SandboxInstanceStatuses,
@@ -87,7 +86,6 @@ it("returns starting sandbox instances while provider allocation is pending", as
       id: "sbi_integration_new_get_starting_without_provider",
       organizationId: "org_integration_new_get_starting_without_provider",
       sandboxProfileId: "sbp_integration_new_starting_without_provider",
-      persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
       status: SandboxInstanceStatuses.STARTING,
       providerSandboxId: null,
       title: "Waiting for provider allocation",
@@ -239,7 +237,7 @@ it("returns setup-check-purpose sandbox instances by id", async ({ env }) => {
   });
 });
 
-it("marks ephemeral starting sandbox instances failed when provider inspection misses the runtime", async ({
+it("marks starting sandbox instances failed when provider inspection misses the runtime", async ({
   env,
 }) => {
   await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values(
@@ -247,10 +245,9 @@ it("marks ephemeral starting sandbox instances failed when provider inspection m
       id: "sbi_integration_new_get_missing_starting",
       organizationId: "org_integration_new_get_missing_starting",
       sandboxProfileId: "sbp_integration_new_missing_starting",
-      persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
       status: SandboxInstanceStatuses.STARTING,
       providerSandboxId: "integration-new-missing-starting-runtime",
-      title: "Missing ephemeral runtime",
+      title: "Missing starting runtime",
     }),
   );
 
@@ -261,7 +258,7 @@ it("marks ephemeral starting sandbox instances failed when provider inspection m
     }),
   ).resolves.toMatchObject({
     id: "sbi_integration_new_get_missing_starting",
-    title: "Missing ephemeral runtime",
+    title: "Missing starting runtime",
     status: "failed",
     connectable: false,
     failureCode: "provider_runtime_missing",
@@ -283,119 +280,28 @@ it("marks ephemeral starting sandbox instances failed when provider inspection m
   });
 });
 
-it("treats persistent running sandbox instances as stopped when provider inspection misses the runtime", async ({
+it("marks running sandbox instances failed when provider inspection misses the runtime", async ({
   env,
 }) => {
   await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values(
     sandboxInstanceRow({
-      id: "sbi_integration_new_get_missing_persistent",
-      organizationId: "org_integration_new_get_missing_persistent",
-      sandboxProfileId: "sbp_integration_new_missing_persistent",
-      persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+      id: "sbi_integration_new_get_missing_running",
+      organizationId: "org_integration_new_get_missing_running",
+      sandboxProfileId: "sbp_integration_new_missing_running",
       status: SandboxInstanceStatuses.RUNNING,
-      providerSandboxId: "integration-new-missing-persistent-runtime",
-      title: "Missing persistent runtime",
+      providerSandboxId: "integration-new-missing-running-runtime",
+      title: "Missing running runtime",
     }),
   );
 
   await expect(
     clientFor(env).getSandboxInstance({
-      organizationId: "org_integration_new_get_missing_persistent",
-      instanceId: "sbi_integration_new_get_missing_persistent",
+      organizationId: "org_integration_new_get_missing_running",
+      instanceId: "sbi_integration_new_get_missing_running",
     }),
   ).resolves.toMatchObject({
-    id: "sbi_integration_new_get_missing_persistent",
-    title: "Missing persistent runtime",
-    status: "stopped",
-    connectable: false,
-    failureCode: null,
-    failureMessage: null,
-  });
-
-  const persisted = await env.dataPlaneDb.query.sandboxInstances.findFirst({
-    columns: {
-      status: true,
-      providerSandboxId: true,
-    },
-    where: (table, { eq }) => eq(table.id, "sbi_integration_new_get_missing_persistent"),
-  });
-  expect(persisted).toEqual({
-    status: SandboxInstanceStatuses.STOPPED,
-    providerSandboxId: null,
-  });
-});
-
-it("treats persistent starting sandbox instances as recoverably stopped when provider inspection misses the runtime", async ({
-  env,
-}) => {
-  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values(
-    sandboxInstanceRow({
-      id: "sbi_integration_new_get_missing_starting_persistent",
-      organizationId: "org_integration_new_get_missing_starting_persistent",
-      sandboxProfileId: "sbp_integration_new_missing_starting_persistent",
-      persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
-      status: SandboxInstanceStatuses.STARTING,
-      providerSandboxId: "integration-new-missing-starting-persistent-runtime",
-      title: "Missing starting persistent runtime",
-    }),
-  );
-
-  await expect(
-    clientFor(env).getSandboxInstance({
-      organizationId: "org_integration_new_get_missing_starting_persistent",
-      instanceId: "sbi_integration_new_get_missing_starting_persistent",
-    }),
-  ).resolves.toMatchObject({
-    id: "sbi_integration_new_get_missing_starting_persistent",
-    title: "Missing starting persistent runtime",
-    status: "stopped",
-    connectable: false,
-    failureCode: null,
-    failureMessage: null,
-  });
-
-  const persisted = await env.dataPlaneDb.query.sandboxInstances.findFirst({
-    columns: {
-      status: true,
-      providerSandboxId: true,
-      stopReason: true,
-      failureCode: true,
-      failureMessage: true,
-    },
-    where: (table, { eq }) => eq(table.id, "sbi_integration_new_get_missing_starting_persistent"),
-  });
-  expect(persisted).toEqual({
-    status: SandboxInstanceStatuses.STOPPED,
-    providerSandboxId: null,
-    stopReason: SandboxStopReasons.SYSTEM,
-    failureCode: null,
-    failureMessage: null,
-  });
-});
-
-it("marks stopped ephemeral sandbox instances failed when provider inspection misses the runtime", async ({
-  env,
-}) => {
-  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values(
-    sandboxInstanceRow({
-      id: "sbi_integration_new_get_missing_stopped_ephemeral",
-      organizationId: "org_integration_new_get_missing_stopped_ephemeral",
-      sandboxProfileId: "sbp_integration_new_missing_stopped_ephemeral",
-      persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
-      status: SandboxInstanceStatuses.STOPPED,
-      providerSandboxId: "integration-new-missing-stopped-ephemeral-runtime",
-      title: "Missing stopped ephemeral runtime",
-    }),
-  );
-
-  await expect(
-    clientFor(env).getSandboxInstance({
-      organizationId: "org_integration_new_get_missing_stopped_ephemeral",
-      instanceId: "sbi_integration_new_get_missing_stopped_ephemeral",
-    }),
-  ).resolves.toMatchObject({
-    id: "sbi_integration_new_get_missing_stopped_ephemeral",
-    title: "Missing stopped ephemeral runtime",
+    id: "sbi_integration_new_get_missing_running",
+    title: "Missing running runtime",
     status: "failed",
     connectable: false,
     failureCode: "provider_runtime_missing",
@@ -409,7 +315,7 @@ it("marks stopped ephemeral sandbox instances failed when provider inspection mi
       failureCode: true,
       failureMessage: true,
     },
-    where: (table, { eq }) => eq(table.id, "sbi_integration_new_get_missing_stopped_ephemeral"),
+    where: (table, { eq }) => eq(table.id, "sbi_integration_new_get_missing_running"),
   });
   expect(persisted).toEqual({
     status: SandboxInstanceStatuses.FAILED,
@@ -419,51 +325,48 @@ it("marks stopped ephemeral sandbox instances failed when provider inspection mi
   });
 });
 
-it("keeps persistent stopped sandbox instances recoverable when provider inspection misses the runtime", async ({
+it("marks stopped sandbox instances failed when provider inspection misses the runtime", async ({
   env,
 }) => {
   await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values(
     sandboxInstanceRow({
-      id: "sbi_integration_new_get_missing_stopped_persistent",
-      organizationId: "org_integration_new_get_missing_stopped_persistent",
-      sandboxProfileId: "sbp_integration_new_missing_stopped_persistent",
-      persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+      id: "sbi_integration_new_get_missing_stopped",
+      organizationId: "org_integration_new_get_missing_stopped",
+      sandboxProfileId: "sbp_integration_new_missing_stopped",
       status: SandboxInstanceStatuses.STOPPED,
-      providerSandboxId: "integration-new-missing-stopped-persistent-runtime",
-      title: "Missing stopped persistent runtime",
+      providerSandboxId: "integration-new-missing-stopped-runtime",
+      title: "Missing stopped runtime",
     }),
   );
 
   await expect(
     clientFor(env).getSandboxInstance({
-      organizationId: "org_integration_new_get_missing_stopped_persistent",
-      instanceId: "sbi_integration_new_get_missing_stopped_persistent",
+      organizationId: "org_integration_new_get_missing_stopped",
+      instanceId: "sbi_integration_new_get_missing_stopped",
     }),
   ).resolves.toMatchObject({
-    id: "sbi_integration_new_get_missing_stopped_persistent",
-    title: "Missing stopped persistent runtime",
-    status: "stopped",
+    id: "sbi_integration_new_get_missing_stopped",
+    title: "Missing stopped runtime",
+    status: "failed",
     connectable: false,
-    failureCode: null,
-    failureMessage: null,
+    failureCode: "provider_runtime_missing",
+    failureMessage: "Sandbox runtime was not found at the provider during inspection.",
   });
 
   const persisted = await env.dataPlaneDb.query.sandboxInstances.findFirst({
     columns: {
       status: true,
-      providerSandboxId: true,
       stopReason: true,
       failureCode: true,
       failureMessage: true,
     },
-    where: (table, { eq }) => eq(table.id, "sbi_integration_new_get_missing_stopped_persistent"),
+    where: (table, { eq }) => eq(table.id, "sbi_integration_new_get_missing_stopped"),
   });
   expect(persisted).toEqual({
-    status: SandboxInstanceStatuses.STOPPED,
-    providerSandboxId: null,
-    stopReason: null,
-    failureCode: null,
-    failureMessage: null,
+    status: SandboxInstanceStatuses.FAILED,
+    stopReason: SandboxStopReasons.FAILED,
+    failureCode: "provider_runtime_missing",
+    failureMessage: "Sandbox runtime was not found at the provider during inspection.",
   });
 });
 

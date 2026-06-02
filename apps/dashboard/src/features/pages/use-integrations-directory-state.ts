@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
-import { useNavigate } from "react-router";
 
 import { buildIntegrationCards } from "../integrations/directory-model.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
@@ -25,7 +24,6 @@ export function useIntegrationsDirectoryState(input: {
   detailTargetKey: string | null;
   detailConnectionId: string | null;
 }) {
-  const navigate = useNavigate();
   const activeDetailConnectionIdRef = useRef<string | null>(null);
   const autoRefreshStartedConnectionIdsRef = useRef<Set<string>>(new Set());
 
@@ -89,16 +87,10 @@ export function useIntegrationsDirectoryState(input: {
 
   const connectedViewCards = buildConnectedIntegrationViewCards({
     connectedCards: connectedIntegrationCards,
-    onOpenTarget: (targetKey) => {
-      void navigate(`/integrations/${targetKey}`);
-    },
   });
 
   const availableViewCards = buildAvailableIntegrationViewCards({
     cards,
-    onOpenCreatePage: (targetKey) => {
-      void navigate(`/integrations/${targetKey}/add`);
-    },
   });
 
   return {

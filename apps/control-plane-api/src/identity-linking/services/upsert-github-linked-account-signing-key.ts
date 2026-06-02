@@ -9,7 +9,7 @@ import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { and, eq, isNull, sql } from "drizzle-orm";
 
-import { encryptOrganizationBackedValue } from "../../sandbox-storage/services/credential-crypto.js";
+import { encryptOrganizationBackedValue } from "../../lib/organization-backed-value-crypto.js";
 import { IdentityLinkingBadRequestCodes, IdentityLinkingNotFoundCodes } from "../constants.js";
 import {
   GitHubProviderFamily,

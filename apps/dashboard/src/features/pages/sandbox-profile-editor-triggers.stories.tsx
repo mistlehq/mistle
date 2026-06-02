@@ -279,7 +279,6 @@ function createStoryQueryClient(input: {
         state: "published",
         isActive: true,
         publishedAt: "2026-05-01T00:00:00.000Z",
-        defaultPersistenceMode: "ephemeral",
         sandboxProvider: null,
         sandboxConnectionId: null,
         sandboxVcpuCount: null,

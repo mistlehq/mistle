@@ -3,7 +3,6 @@ import {
   SandboxInstanceStatuses,
   type DataPlaneDatabase,
   type DataPlaneTables,
-  type SandboxInstancePersistenceMode,
   type SandboxInstanceStatus,
   type SandboxInstanceProvider,
 } from "@mistle/db/data-plane";
@@ -47,7 +46,6 @@ type ActiveSandboxInstance = {
   id: string;
   organizationId: string;
   computeGeneration: number;
-  persistenceMode: SandboxInstancePersistenceMode;
   runtimeProvider: SandboxInstanceProvider;
   sandboxConnectionId: string | null;
   sandboxVcpuCount: number | null;
@@ -235,7 +233,6 @@ async function resolveActiveSandboxInstance(input: {
       id: true,
       organizationId: true,
       computeGeneration: true,
-      persistenceMode: true,
       runtimeProvider: true,
       sandboxConnectionId: true,
       sandboxVcpuCount: true,
@@ -274,7 +271,6 @@ async function resolveActiveSandboxInstance(input: {
         id: sandboxInstance.id,
         organizationId: sandboxInstance.organizationId,
         computeGeneration: sandboxInstance.computeGeneration,
-        persistenceMode: sandboxInstance.persistenceMode,
         runtimeProvider: sandboxInstance.runtimeProvider,
         sandboxConnectionId: sandboxInstance.sandboxConnectionId,
         sandboxVcpuCount: sandboxInstance.sandboxVcpuCount,
@@ -371,15 +367,9 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
   try {
     await stopSandbox(
       {
-        db: ctx.db,
-        tables: ctx.tables,
-        controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-        config: ctx.config,
         sandboxAdapter: ctx.sandboxAdapter,
       },
       {
-        sandboxInstanceId: ctx.sandboxInstance.id,
-        persistenceMode: ctx.sandboxInstance.persistenceMode,
         runtimeProvider: ctx.sandboxInstance.runtimeProvider,
         providerSandboxId: ctx.sandboxInstance.providerSandboxId,
       },
@@ -389,55 +379,14 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
       throw error;
     }
 
-    if (ctx.sandboxInstance.persistenceMode !== "persistent") {
-      const markFailedOutcome = await markSandboxInstanceFailed({
-        db: ctx.db,
-        tables: ctx.tables,
-        sandboxInstanceId: ctx.sandboxInstance.id,
-        currentStatus: ctx.sandboxInstance.status,
-        failureCode: "provider_runtime_missing",
-        failureMessage:
-          "Sandbox runtime was not found at the provider during disconnect reconciliation.",
-        stillPermitted: async () =>
-          isDisconnectReconciliationStillPermitted({
-            runtimeStateReader: ctx.runtimeStateReader,
-            clock: ctx.clock,
-            sandboxInstanceId: ctx.sandboxInstance.id,
-            expectedOwnerLeaseId: ctx.expectedOwnerLeaseId,
-          }),
-      });
-      if (markFailedOutcome === "fence_mismatch") {
-        return {
-          executed: false,
-          outcome: "runtime_state_fence_before_mark",
-        };
-      }
-
-      if (markFailedOutcome === "already_failed") {
-        return {
-          executed: false,
-          outcome: "already_failed",
-        };
-      }
-
-      return withUsageEventState({
-        result: {
-          executed: true,
-          outcome: "failed",
-          bootstrapAttachmentTerminationTarget: {
-            expectedOwnerLeaseId: ctx.expectedOwnerLeaseId,
-          },
-        },
-        sandboxInstance: ctx.sandboxInstance,
-      });
-    }
-
-    const markStoppedOutcome = await markSandboxInstanceStopped({
+    const markFailedOutcome = await markSandboxInstanceFailed({
       db: ctx.db,
       tables: ctx.tables,
       sandboxInstanceId: ctx.sandboxInstance.id,
       currentStatus: ctx.sandboxInstance.status,
-      clearProviderSandboxId: true,
+      failureCode: "provider_runtime_missing",
+      failureMessage:
+        "Sandbox runtime was not found at the provider during disconnect reconciliation.",
       stillPermitted: async () =>
         isDisconnectReconciliationStillPermitted({
           runtimeStateReader: ctx.runtimeStateReader,
@@ -446,24 +395,24 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
           expectedOwnerLeaseId: ctx.expectedOwnerLeaseId,
         }),
     });
-    if (markStoppedOutcome === "fence_mismatch") {
+    if (markFailedOutcome === "fence_mismatch") {
       return {
         executed: false,
         outcome: "runtime_state_fence_before_mark",
       };
     }
 
-    if (markStoppedOutcome === "already_stopped") {
+    if (markFailedOutcome === "already_failed") {
       return {
         executed: false,
-        outcome: "already_stopped",
+        outcome: "already_failed",
       };
     }
 
     return withUsageEventState({
       result: {
         executed: true,
-        outcome: "stopped",
+        outcome: "failed",
         bootstrapAttachmentTerminationTarget: {
           expectedOwnerLeaseId: ctx.expectedOwnerLeaseId,
         },
@@ -676,7 +625,6 @@ export async function reconcileSandboxInstance(
     providerSandboxId: sandboxInstance.providerSandboxId,
   });
   const action = determineDisconnectReconciliationAction({
-    persistenceMode: sandboxInstance.persistenceMode,
     sandboxStatus: sandboxInstance.status,
     providerState: providerInspection.disposition,
   });
@@ -847,7 +795,7 @@ export async function reconcileSandboxInstance(
         tables: ctx.tables,
         sandboxInstanceId: sandboxInstance.id,
         currentStatus: sandboxInstance.status,
-        clearProviderSandboxId: sandboxInstance.persistenceMode === "persistent",
+        clearProviderSandboxId: false,
         stillPermitted: async () =>
           isDisconnectReconciliationStillPermitted({
             runtimeStateReader: ctx.runtimeStateReader,

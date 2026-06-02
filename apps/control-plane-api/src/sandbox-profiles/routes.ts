@@ -16,11 +16,13 @@ import * as getSandboxProfileVersionSetupScript from "./get-sandbox-profile-vers
 import * as getSandboxProfileVersionTriggerConfig from "./get-sandbox-profile-version-trigger-config/index.js";
 import * as getSandboxProfile from "./get-sandbox-profile/index.js";
 import * as listLaunchableSandboxProfiles from "./list-launchable-sandbox-profiles/index.js";
+import * as listSandboxProfileVersionSkillsSourceRepos from "./list-sandbox-profile-version-skills-source-repos/index.js";
 import * as listSandboxProfileVersions from "./list-sandbox-profile-versions/index.js";
 import * as listSandboxProfiles from "./list-sandbox-profiles/index.js";
 import * as publishSandboxProfileVersion from "./publish-sandbox-profile-version/index.js";
 import * as putSandboxProfileVersionDraft from "./put-sandbox-profile-version-draft/index.js";
 import * as putSandboxProfileVersionRefreshSchedule from "./put-sandbox-profile-version-refresh-schedule/index.js";
+import * as refreshSandboxProfileVersionSkillsSourceRepo from "./refresh-sandbox-profile-version-skills-source-repo/index.js";
 import * as refreshSandboxProfileVersion from "./refresh-sandbox-profile-version/index.js";
 import * as retrySandboxProfileVersionPublishSnapshot from "./retry-sandbox-profile-version-publish-snapshot/index.js";
 import * as startActiveSandboxProfileInstance from "./start-active-sandbox-profile-instance/index.js";
@@ -63,6 +65,14 @@ export function createSandboxProfilesRoutes(): AppRoutes<typeof SANDBOX_PROFILES
   routes.openapi(
     getSandboxProfileVersionIntegrationBindings.route,
     getSandboxProfileVersionIntegrationBindings.handler,
+  );
+  routes.openapi(
+    listSandboxProfileVersionSkillsSourceRepos.route,
+    listSandboxProfileVersionSkillsSourceRepos.handler,
+  );
+  routes.openapi(
+    refreshSandboxProfileVersionSkillsSourceRepo.route,
+    refreshSandboxProfileVersionSkillsSourceRepo.handler,
   );
   routes.openapi(putSandboxProfileVersionDraft.route, putSandboxProfileVersionDraft.handler);
   routes.openapi(

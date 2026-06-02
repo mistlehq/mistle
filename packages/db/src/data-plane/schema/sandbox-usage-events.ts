@@ -10,7 +10,6 @@ import {
 import { typeid } from "typeid-js";
 
 import { dataPlaneSchema } from "./namespace.js";
-import type { SandboxStorageProvider } from "./sandbox-instance-storages.js";
 import {
   defineSandboxInstances,
   sandboxInstances,
@@ -49,7 +48,7 @@ export function defineSandboxUsageEvents(input: {
       occurredAt: timestamp("occurred_at", { withTimezone: true, mode: "string" }).notNull(),
       runtimeProvider: text("runtime_provider").$type<SandboxInstanceProvider>(),
       providerSandboxId: text("provider_sandbox_id"),
-      storageProvider: text("storage_provider").$type<SandboxStorageProvider>(),
+      storageProvider: text("storage_provider"),
       providerStorageId: text("provider_storage_id"),
       vcpuCount: bigint("vcpu_count", { mode: "number" }),
       memoryMb: bigint("memory_mb", { mode: "number" }),

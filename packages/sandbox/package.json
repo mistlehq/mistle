@@ -32,7 +32,6 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@archildata/client": "^0.8.7",
     "@mistle/time": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "dockerode": "^5.0.0",

@@ -5,10 +5,8 @@
 import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
-  SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
-import { SandboxInstancePersistenceModes } from "@mistle/db/data-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
@@ -736,7 +734,6 @@ describe.concurrent("sandbox profile version start instance integration", () => 
     });
 
     expect(queuedWorkflowInput.purpose).toBe("setup_check");
-    expect(queuedWorkflowInput.persistenceMode).toBe(SandboxInstancePersistenceModes.EPHEMERAL);
     expect(queuedWorkflowInput.image?.kind).toBe("base");
     expect(queuedWorkflowInput.runtimePlan.image.source).toBe("base");
     expect(queuedWorkflowInput.runtimePlan.agentRuntimes).toHaveLength(1);
@@ -907,27 +904,23 @@ describe.concurrent("sandbox profile version start instance integration", () => 
     });
   });
 
-  it("queues an ephemeral launch when the profile default is persistent but organization persistence is disabled", async ({
-    env,
-  }) => {
+  it("queues a launch workflow for a startable draft profile version", async ({ env }) => {
     const session = await env.auth.createSession({
-      email:
-        "integration-new-sandbox-profile-start-instance-persistent-default-disabled@example.com",
+      email: "integration-new-sandbox-profile-start-instance-draft-version@example.com",
     });
 
     await createStartableProfile({
       env,
       organizationId: session.organizationId,
-      profileId: "sbp_start_instance_persistent_default_disabled",
-      targetKey: "openai-start-instance-persistent-default-disabled",
-      connectionId: "icn_start_instance_persistent_default_disabled",
-      bindingId: "ibd_start_instance_persistent_default_disabled",
+      profileId: "sbp_start_instance_draft_version",
+      targetKey: "openai-start-instance-draft-version",
+      connectionId: "icn_start_instance_draft_version",
+      bindingId: "ibd_start_instance_draft_version",
       versionState: SandboxProfileVersionStates.DRAFT,
-      defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
     });
 
     const response = await env.controlPlaneApi.http.fetch(
-      "/v1/sandbox/profiles/sbp_start_instance_persistent_default_disabled/versions/1/instances",
+      "/v1/sandbox/profiles/sbp_start_instance_draft_version/versions/1/instances",
       {
         method: "POST",
         headers: {
@@ -942,8 +935,7 @@ describe.concurrent("sandbox profile version start instance integration", () => 
       env,
       sandboxInstanceId: body.sandboxInstanceId,
     });
-
-    expect(queuedWorkflowInput.persistenceMode).toBe(SandboxInstancePersistenceModes.EPHEMERAL);
+    expect(queuedWorkflowInput.sandboxInstanceId).toBe(body.sandboxInstanceId);
   });
 
   it("starts the session in the selected primary repository", async ({ env }) => {
@@ -1094,9 +1086,6 @@ async function createStartableProfile(input: {
   versionState:
     | typeof SandboxProfileVersionStates.DRAFT
     | typeof SandboxProfileVersionStates.PUBLISHED;
-  defaultPersistenceMode?:
-    | typeof SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL
-    | typeof SandboxProfileVersionDefaultPersistenceModes.PERSISTENT;
   agentRuntimeId?: "codex" | "opencode" | "pi";
   snapshotImageId?: string;
   snapshotImageProvider?: "docker" | "e2b" | "tensorlake";
@@ -1124,8 +1113,6 @@ async function createStartableProfile(input: {
         sandboxProfileId: input.profileId,
         version: 1,
         state: input.versionState,
-        defaultPersistenceMode:
-          input.defaultPersistenceMode ?? SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
         agentRuntimeId: input.agentRuntimeId ?? "codex",
         ...(input.runtimeColumns ?? DockerSandboxRuntimeColumns),
         publishedAt:

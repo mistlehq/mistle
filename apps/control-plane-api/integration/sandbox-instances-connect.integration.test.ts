@@ -6,7 +6,7 @@ import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
 
-import { SandboxInstancePersistenceModes, SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import {
   PtyTransportTokenRoles,
   mintBootstrapToken,
@@ -172,7 +172,6 @@ describe.concurrent("sandbox instance connect integration", () => {
       providerSandboxId,
       status: SandboxInstanceStatuses.RUNNING,
       startedById: session.userId,
-      persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
     });
     await destroyDockerSandboxContainer(providerSandboxId);
 
@@ -197,7 +196,7 @@ describe.concurrent("sandbox instance connect integration", () => {
     expect(persistedInstance?.status).toBe(SandboxInstanceStatuses.FAILED);
   });
 
-  it("returns INSTANCE_NOT_RESUMABLE for pending and stopped instances", async ({ env }) => {
+  it("returns INSTANCE_NOT_RESUMABLE for pending instances", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-connect-not-resumable@example.com",
     });
@@ -206,13 +205,6 @@ describe.concurrent("sandbox instance connect integration", () => {
       sandboxInstanceId: "sbi_cp_connect_pending_001",
       providerSandboxId: null,
       status: SandboxInstanceStatuses.PENDING,
-      startedById: session.userId,
-    });
-    await insertSandboxInstance(env, {
-      organizationId: session.organizationId,
-      sandboxInstanceId: "sbi_cp_connect_stopped_001",
-      providerSandboxId: null,
-      status: SandboxInstanceStatuses.STOPPED,
       startedById: session.userId,
     });
 
@@ -229,20 +221,6 @@ describe.concurrent("sandbox instance connect integration", () => {
     const pendingBody = SandboxInstancesConflictResponseSchema.parse(await pendingResponse.json());
     expect(pendingBody.code).toBe("INSTANCE_NOT_RESUMABLE");
     expect(pendingBody.message).toContain("is 'pending' and is not connectable");
-
-    const stoppedResponse = await env.controlPlaneApi.http.fetch(
-      "/v1/sandbox/instances/sbi_cp_connect_stopped_001/connection-tokens",
-      {
-        method: "POST",
-        headers: {
-          cookie: session.cookie,
-        },
-      },
-    );
-    expect(stoppedResponse.status).toBe(409);
-    const stoppedBody = SandboxInstancesConflictResponseSchema.parse(await stoppedResponse.json());
-    expect(stoppedBody.code).toBe("INSTANCE_NOT_RESUMABLE");
-    expect(stoppedBody.message).toContain("is 'stopped' and is not connectable");
   });
 
   it("returns INSTANCE_FAILED for failed instances", async ({ env }) => {
@@ -526,9 +504,6 @@ async function insertSandboxInstance(
     organizationId: string;
     sandboxInstanceId: string;
     providerSandboxId: string | null;
-    persistenceMode?:
-      | typeof SandboxInstancePersistenceModes.EPHEMERAL
-      | typeof SandboxInstancePersistenceModes.PERSISTENT;
     status:
       | typeof SandboxInstanceStatuses.PENDING
       | typeof SandboxInstanceStatuses.RUNNING
@@ -547,7 +522,6 @@ async function insertSandboxInstance(
     sandboxProfileVersion: 1,
     runtimeProvider: "docker",
     providerSandboxId: input.providerSandboxId,
-    persistenceMode: input.persistenceMode ?? SandboxInstancePersistenceModes.PERSISTENT,
     status: input.status,
     startedByKind: "user",
     startedById: input.startedById,

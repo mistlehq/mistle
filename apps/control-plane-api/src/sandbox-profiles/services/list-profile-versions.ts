@@ -3,7 +3,6 @@ import type {
   SandboxProfileVersionSnapshotJobState,
   SandboxProfileVersionSnapshotJobTrigger,
   SandboxProfileVersionState,
-  SandboxProfileVersionDefaultPersistenceMode,
 } from "@mistle/db/control-plane";
 import { SandboxProfileVersionStates } from "@mistle/db/control-plane";
 
@@ -16,6 +15,10 @@ import {
   mapProfileVersionRuntimeConfig,
   type SandboxProfileVersionResources,
 } from "./profile-version-runtime-config.js";
+import {
+  mapProfileVersionSkillsConfig,
+  type SandboxProfileVersionSkillsConfig,
+} from "./profile-version-skills-config.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type ListProfileVersionsInput = {
@@ -29,7 +32,6 @@ type ListProfileVersionsOutput = {
     version: number;
     state: SandboxProfileVersionState;
     publishedAt: string | null;
-    defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
     gitCommitSigningIntegrationConnectionId: string | null;
     mistleMcpEnabled: boolean;
@@ -38,6 +40,7 @@ type ListProfileVersionsOutput = {
     sandboxConnectionId: string | null;
     maintenanceScript: string | null;
     sandboxResources: SandboxProfileVersionResources | null;
+    skillsConfig: SandboxProfileVersionSkillsConfig | null;
     isActive: boolean;
     usable: boolean;
     refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
@@ -81,7 +84,6 @@ export async function listProfileVersions(
       version: true,
       state: true,
       publishedAt: true,
-      defaultPersistenceMode: true,
       agentRuntimeId: true,
       gitCommitSigningIntegrationConnectionId: true,
       mistleMcpEnabled: true,
@@ -94,6 +96,7 @@ export async function listProfileVersions(
       sandboxVcpuCount: true,
       sandboxMemoryMb: true,
       sandboxStorageMb: true,
+      skillsConfig: true,
     },
     where: (table, { eq }) => eq(table.sandboxProfileId, input.profileId),
     orderBy: (table, { desc }) => [desc(table.version)],
@@ -139,13 +142,13 @@ export async function listProfileVersions(
         version: version.version,
         state: version.state,
         publishedAt: version.publishedAt,
-        defaultPersistenceMode: version.defaultPersistenceMode,
         agentRuntimeId: version.agentRuntimeId,
         gitCommitSigningIntegrationConnectionId: version.gitCommitSigningIntegrationConnectionId,
         mistleMcpEnabled: version.mistleMcpEnabled,
         mistleMcpApiKeyId: version.mistleMcpApiKeyId,
         maintenanceScript: version.maintenanceScript,
         ...mapProfileVersionRuntimeConfig(version),
+        skillsConfig: mapProfileVersionSkillsConfig(version.skillsConfig),
         isActive: version.version === sandboxProfile.activeVersion,
         usable:
           version.state === SandboxProfileVersionStates.PUBLISHED &&
