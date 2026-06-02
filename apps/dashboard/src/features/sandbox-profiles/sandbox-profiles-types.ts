@@ -20,6 +20,12 @@ type DeleteSandboxProfileResponse =
   paths["/v1/sandbox/profiles/{profileId}"]["delete"]["responses"][202]["content"]["application/json"];
 type SandboxProfileVersionIntegrationBindingsResponse =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/integration-bindings"]["get"]["responses"][200]["content"]["application/json"];
+type ListSandboxProfileVersionSkillsSourceReposResponse =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/skills-sources"]["get"]["responses"][200]["content"]["application/json"];
+type RefreshSandboxProfileVersionSkillsSourceRepoRequest =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/skills-sources/refresh"]["post"]["requestBody"]["content"]["application/json"];
+type RefreshSandboxProfileVersionSkillsSourceRepoResponse =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/skills-sources/refresh"]["post"]["responses"][200]["content"]["application/json"];
 type PutSandboxProfileVersionRefreshScheduleRequest =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/refresh-schedule"]["put"]["requestBody"]["content"]["application/json"];
 type PutSandboxProfileVersionRefreshScheduleResponse =
@@ -113,6 +119,17 @@ export type PublishSandboxProfileVersionResult = {
 
 export type SandboxProfileVersionIntegrationBinding =
   SandboxProfileVersionIntegrationBindingsResponse["bindings"][number];
+export type SandboxProfileVersionSkillsSourceRepo =
+  ListSandboxProfileVersionSkillsSourceReposResponse["items"][number];
+export type SandboxProfileVersionSkillsSourceReposResult =
+  ListSandboxProfileVersionSkillsSourceReposResponse;
+export type RefreshSandboxProfileVersionSkillsSourceRepoInput =
+  RefreshSandboxProfileVersionSkillsSourceRepoRequest & {
+    profileId: string;
+    version: number;
+  };
+export type RefreshSandboxProfileVersionSkillsSourceRepoResult =
+  RefreshSandboxProfileVersionSkillsSourceRepoResponse;
 export type SandboxProfileVersionSetupScript =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/setup-script"]["get"]["responses"][200]["content"]["application/json"];
 export type SandboxProfileSetupScriptTestRun =

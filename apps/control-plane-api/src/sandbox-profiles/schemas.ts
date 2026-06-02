@@ -2,6 +2,7 @@ import { z } from "@hono/zod-openapi";
 import {
   TriggerKinds,
   IntegrationBindingKinds,
+  skillsSourceRepos,
   SandboxProfileStatuses,
   SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionSnapshotJobStates,
@@ -112,6 +113,59 @@ export const sandboxProfileRepositoryOptionSchema = z
     id: z.string().min(1),
     label: z.string().min(1),
     path: z.string().min(1),
+  })
+  .strict();
+
+export const skillsSourceRepoSkillSchema = z
+  .object({
+    name: z.string().min(1),
+    description: z.string(),
+    relativePath: z.string().min(1),
+  })
+  .strict();
+
+export const skillsSourceRepoSchema = createSelectSchema(skillsSourceRepos, {
+  skills: z.array(skillsSourceRepoSkillSchema),
+  commitSha: z.string().min(1).nullable(),
+  lastSyncedAt: z.string().min(1).nullable(),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+})
+  .pick({
+    id: true,
+    originUrl: true,
+    commitSha: true,
+    skills: true,
+    lastSyncedAt: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .strict();
+
+export const listSkillsSourceReposQuerySchema = z
+  .object({
+    originUrl: z.url().optional(),
+  })
+  .strict();
+
+export const listSkillsSourceReposResponseSchema = z
+  .object({
+    items: z.array(skillsSourceRepoSchema),
+  })
+  .strict();
+
+export const refreshSkillsSourceRepoBodySchema = z
+  .object({
+    originUrl: z.url(),
+    idempotencyKey: z.string().min(1).optional(),
+  })
+  .strict();
+
+export const refreshSkillsSourceRepoResponseSchema = z
+  .object({
+    sandboxInstanceId: z.string().min(1),
+    workflowRunId: z.string().min(1),
+    skillsSourceRepo: skillsSourceRepoSchema,
   })
   .strict();
 
