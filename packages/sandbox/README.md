@@ -22,7 +22,7 @@ Provider-specific documentation lives with providers that have dedicated README 
 - inspect compute and normalize provider lifecycle state
 - resume, stop, and destroy provider compute
 - capture a new provider image or snapshot handle from a running sandbox
-- initialize or resume the in-sandbox `sandboxd` runtime
+- initialize, activate, or resume the in-sandbox `sandboxd` runtime
 - read `sandboxd` version for runtime visibility
 - read `sandboxd` init/resume operation logs for startup diagnostics
 
@@ -49,6 +49,7 @@ The main entrypoints are:
 
 - `readSandboxdVersion(request)`
 - `init(request)`
+- `activate(request)`
 - `resume(request)`
 - `readOperationLog(request)`
 - `close()`
@@ -87,6 +88,10 @@ const sandbox = await adapter.start({
 });
 
 await runtimeControl.init({
+  id: sandbox.id,
+  payload: new TextEncoder().encode("{}\n"),
+});
+await runtimeControl.activate({
   id: sandbox.id,
   payload: new TextEncoder().encode("{}\n"),
 });
@@ -177,13 +182,13 @@ Use the current Docker, E2B, and Tensorlake providers as reference implementatio
 4. Implement `src/providers/<provider>/client.ts` for raw SDK/API calls.
 5. Add provider error mapping in `src/providers/<provider>/client-errors.ts`.
 6. Implement `src/providers/<provider>/adapter.ts` for the complete `SandboxAdapter` surface: image preparation, start, inspect, resume, snapshot capture, stop, and destroy.
-7. Implement `src/providers/<provider>/runtime-control.ts` for the complete `SandboxRuntimeControl` surface: sandboxd version reads, init, resume, operation-log reads, and close.
+7. Implement `src/providers/<provider>/runtime-control.ts` for the complete `SandboxRuntimeControl` surface: sandboxd version reads, init, activate, resume, operation-log reads, and close.
 8. Create `src/providers/<provider>/index.ts` with both `create<Provider>Adapter(...)` and `create<Provider>RuntimeControl(...)` constructors.
 9. Wire the provider into both `createSandboxAdapter` and `createSandboxRuntimeControl` in `src/factory.ts`.
 10. Add unit tests next to provider modules, including config, errors, factory wiring, adapter behavior, and runtime-control construction.
 11. Add provider integration tests in `integration/<provider>/`.
 
-Integration tests should cover the provider lifecycle surface, snapshot capture, runtime-control init/resume behavior, and operation-log reads.
+Integration tests should cover the provider lifecycle surface, snapshot capture, runtime-control init/activate/resume behavior, and operation-log reads.
 
 Design expectations:
 
