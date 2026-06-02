@@ -147,7 +147,17 @@ pub(super) fn record_runtime_plan_apply_failure(
     diagnostics_logger: &Option<StartupDiagnosticsLogger>,
     error: &RuntimePlanApplyError,
 ) {
-    let attributes = match error {
+    record_operation_phase_failure(
+        diagnostics_logger,
+        "apply_runtime_plan",
+        runtime_plan_apply_failure_attributes(error),
+    );
+}
+
+fn runtime_plan_apply_failure_attributes(
+    error: &RuntimePlanApplyError,
+) -> BTreeMap<String, serde_json::Value> {
+    match error {
         RuntimePlanApplyError::InvalidRuntimePlan(error) => BTreeMap::from([
             (
                 "failureKind".to_string(),
@@ -229,7 +239,7 @@ pub(super) fn record_runtime_plan_apply_failure(
             repo_path,
             error,
         } => {
-            let mut map = timeline_attributes("workspace", "Preparing workspace");
+            let mut map = timeline_attributes("skills", "Reconciling skills");
             map.extend([
                 (
                     "failureKind".to_string(),
@@ -285,9 +295,7 @@ pub(super) fn record_runtime_plan_apply_failure(
             ]);
             map
         }
-    };
-
-    record_operation_phase_failure(diagnostics_logger, "apply_runtime_plan", attributes);
+    }
 }
 
 pub(super) fn record_runtime_process_failure(
@@ -463,4 +471,36 @@ pub(super) fn record_setup_script_failure(
     }
 
     record_operation_phase_failure(diagnostics_logger, "run_setup_script", attributes);
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::Value;
+
+    use crate::runtime::RuntimePlanApplyError;
+    use crate::sandboxd_state::diagnostics::runtime_plan_apply_failure_attributes;
+
+    #[test]
+    fn skills_reconcile_failure_uses_skills_timeline_attributes() {
+        let attributes =
+            runtime_plan_apply_failure_attributes(&RuntimePlanApplyError::SkillsReconcile {
+                origin_url: "https://github.com/acme/skills.git".to_string(),
+                runtime_id: "codex".to_string(),
+                repo_path: Some("/root/acme/skills".to_string()),
+                error: "selected skill not found".to_string(),
+            });
+
+        assert_eq!(
+            attributes.get("timelineKey"),
+            Some(&Value::String("skills".to_string()))
+        );
+        assert_eq!(
+            attributes.get("timelineLabel"),
+            Some(&Value::String("Reconciling skills".to_string()))
+        );
+        assert_eq!(
+            attributes.get("failureKind"),
+            Some(&Value::String("skills_reconcile_failed".to_string()))
+        );
+    }
 }
