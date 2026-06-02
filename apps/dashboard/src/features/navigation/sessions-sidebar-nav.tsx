@@ -72,14 +72,25 @@ export function SessionsSidebarNav(input: {
 
                 return (
                   <SidebarMenuItem className="w-full" key={item.id}>
-                    <SidebarMenuButton isActive={isActive} render={<NavLink to={item.to} />}>
-                      <SessionsSidebarItemLabel
-                        label={item.label}
-                        profileName={item.profileName}
-                        status={item.status}
-                        updatedAtLabel={item.updatedAtLabel}
-                      />
-                    </SidebarMenuButton>
+                    {item.to === undefined ? (
+                      <div className="text-sidebar-foreground rounded-md p-3 text-left text-base md:p-2 md:text-sm">
+                        <SessionsSidebarItemLabel
+                          label={item.label}
+                          profileName={item.profileName}
+                          status={item.status}
+                          updatedAtLabel={item.updatedAtLabel}
+                        />
+                      </div>
+                    ) : (
+                      <SidebarMenuButton isActive={isActive} render={<NavLink to={item.to} />}>
+                        <SessionsSidebarItemLabel
+                          label={item.label}
+                          profileName={item.profileName}
+                          status={item.status}
+                          updatedAtLabel={item.updatedAtLabel}
+                        />
+                      </SidebarMenuButton>
+                    )}
                   </SidebarMenuItem>
                 );
               })}
