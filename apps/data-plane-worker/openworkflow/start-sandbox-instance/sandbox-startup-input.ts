@@ -40,6 +40,19 @@ export type SandboxStartupInput = {
   transparentProxy?: SandboxdTransparentProxyConfiguration;
 };
 
+export type SandboxActivationOperationKind = Extract<SandboxdOperationKind, "start" | "resume">;
+
+export type SandboxActivationInput = {
+  operationKind: SandboxActivationOperationKind;
+  bootstrapToken: string;
+  tunnelExchangeToken: string;
+  tunnelGatewayWsUrl: string;
+  runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
+  actingUserId?: StartSandboxInstanceWorkflowInput["actingUserId"];
+  gitIdentity?: SandboxdStartupInput["gitIdentity"];
+  transparentProxy?: SandboxdTransparentProxyConfiguration;
+};
+
 export function createSandboxTunnelGatewayWsUrl(input: {
   gatewayWebsocketUrl: string;
   operationId?: string;
@@ -55,5 +68,9 @@ export function createSandboxTunnelGatewayWsUrl(input: {
 }
 
 export function encodeSandboxStartupInput(input: SandboxStartupInput): Uint8Array {
+  return Encoder.encode(`${JSON.stringify(input)}\n`);
+}
+
+export function encodeSandboxActivationInput(input: SandboxActivationInput): Uint8Array {
   return Encoder.encode(`${JSON.stringify(input)}\n`);
 }

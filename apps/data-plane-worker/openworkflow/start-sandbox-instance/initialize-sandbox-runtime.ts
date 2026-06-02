@@ -14,26 +14,62 @@ import type { SandboxdArtifactResolver } from "../core/sandboxd-artifact-resolve
 import { DataPlaneWorkerTunnelTokenDurations } from "../core/tunnel-token-durations.js";
 import {
   createSandboxTunnelGatewayWsUrl,
+  encodeSandboxActivationInput,
   encodeSandboxStartupInput,
+  type SandboxActivationInput,
   type SandboxStartupInput,
 } from "./sandbox-startup-input.js";
 import { createSigningGrant } from "./signing-grant.js";
 import { createSandboxRuntimeEnv } from "./start-sandbox.js";
 
-export async function createSandboxStartupInput(input: {
+type SandboxRuntimeSessionInputFields = Omit<SandboxActivationInput, "operationKind"> & {
+  operationKind: SandboxStartupInput["operationKind"];
+};
+
+type CreateSandboxRuntimeSessionInputFieldsRequest = {
   config: DataPlaneWorkerRuntimeConfig;
   organizationId: string;
   operationId: string;
   operationKind: SandboxStartupInput["operationKind"];
   sandboxInstanceId: string;
-  startupMode: SandboxStartupInput["startupMode"];
-  executionMode?: SandboxStartupInput["executionMode"];
   runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
   actingUserId?: StartSandboxInstanceWorkflowInput["actingUserId"];
   gitIdentity?: StartSandboxInstanceWorkflowInput["gitIdentity"];
   sandboxAdapter?: SandboxAdapter;
   processEnv?: Readonly<Record<string, string | undefined>>;
-}): Promise<SandboxStartupInput> {
+};
+
+export async function createSandboxStartupInput(
+  input: CreateSandboxRuntimeSessionInputFieldsRequest & {
+    startupMode: SandboxStartupInput["startupMode"];
+    executionMode?: SandboxStartupInput["executionMode"];
+  },
+): Promise<SandboxStartupInput> {
+  const sessionInputFields = await createSandboxRuntimeSessionInputFields(input);
+
+  return {
+    startupMode: input.startupMode,
+    ...(input.executionMode === undefined ? {} : { executionMode: input.executionMode }),
+    ...sessionInputFields,
+  };
+}
+
+export async function createSandboxActivationInput(
+  input: Omit<CreateSandboxRuntimeSessionInputFieldsRequest, "operationKind"> & {
+    operationKind: SandboxActivationInput["operationKind"];
+  },
+): Promise<SandboxActivationInput> {
+  const sessionInputFields = await createSandboxRuntimeSessionInputFields(input);
+
+  return {
+    ...sessionInputFields,
+    operationKind: input.operationKind,
+  };
+}
+
+async function createSandboxRuntimeSessionInputFields(
+  input: CreateSandboxRuntimeSessionInputFieldsRequest,
+): Promise<SandboxRuntimeSessionInputFields> {
   const bootstrapTokenJti = randomUUID();
   const tunnelExchangeTokenJti = randomUUID();
   const tunnelGatewayWsUrl = createSandboxTunnelGatewayWsUrl({
@@ -104,8 +140,6 @@ export async function createSandboxStartupInput(input: {
   const startupActingUserId = transparentProxy === undefined ? undefined : input.actingUserId;
 
   return {
-    startupMode: input.startupMode,
-    ...(input.executionMode === undefined ? {} : { executionMode: input.executionMode }),
     operationKind: input.operationKind,
     bootstrapToken,
     tunnelExchangeToken,
@@ -216,6 +250,80 @@ export async function initializeSandboxRuntime(
       env: runtimeEnv,
     });
   }
+}
+
+export async function activateSandboxRuntime(
+  ctx: {
+    config: DataPlaneWorkerRuntimeConfig;
+    logger: MistleLogger;
+    processEnv: Readonly<Record<string, string | undefined>>;
+    sandboxAdapter: SandboxAdapter;
+    sandboxdArtifactResolver: SandboxdArtifactResolver | undefined;
+    sandboxRuntimeControl: SandboxRuntimeControl;
+  },
+  input: {
+    organizationId: string;
+    operationId: string;
+    operationKind: SandboxActivationInput["operationKind"];
+    sandboxInstanceId: string;
+    providerSandboxId: string;
+    runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
+    actingUserId?: StartSandboxInstanceWorkflowInput["actingUserId"];
+    gitIdentity?: StartSandboxInstanceWorkflowInput["gitIdentity"];
+  },
+): Promise<void> {
+  const runtimeEnv = createSandboxRuntimeEnv({
+    config: ctx.config,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
+  const sandboxdArtifact = await ctx.sandboxdArtifactResolver?.resolve();
+  if (sandboxdArtifact !== undefined) {
+    await ctx.sandboxRuntimeControl.ensureSandboxd({
+      id: input.providerSandboxId,
+      artifact: sandboxdArtifact,
+      env: runtimeEnv,
+    });
+    ctx.logger.info(
+      {
+        providerSandboxId: input.providerSandboxId,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sandboxdVersion: sandboxdArtifact.version,
+      },
+      "Ensured sandboxd artifact before runtime activation.",
+    );
+  }
+
+  const sandboxdVersion = await ctx.sandboxRuntimeControl.readSandboxdVersion({
+    id: input.providerSandboxId,
+    env: runtimeEnv,
+  });
+  ctx.logger.info(
+    {
+      providerSandboxId: input.providerSandboxId,
+      sandboxInstanceId: input.sandboxInstanceId,
+      sandboxdVersion,
+    },
+    "Read sandboxd version before runtime activation.",
+  );
+
+  const activationInput = await createSandboxActivationInput({
+    config: ctx.config,
+    organizationId: input.organizationId,
+    operationId: input.operationId,
+    operationKind: input.operationKind,
+    sandboxInstanceId: input.sandboxInstanceId,
+    runtimePlan: input.runtimePlan,
+    ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
+    ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
+    sandboxAdapter: ctx.sandboxAdapter,
+    processEnv: ctx.processEnv,
+  });
+
+  await ctx.sandboxRuntimeControl.activate({
+    id: input.providerSandboxId,
+    payload: encodeSandboxActivationInput(activationInput),
+    env: runtimeEnv,
+  });
 }
 
 function isSandboxdAlreadySubmittedError(error: unknown): boolean {

@@ -3,7 +3,10 @@ import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registr
 import { describe, expect, it } from "vitest";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
-import { createSandboxStartupInput } from "./initialize-sandbox-runtime.js";
+import {
+  createSandboxActivationInput,
+  createSandboxStartupInput,
+} from "./initialize-sandbox-runtime.js";
 import { SandboxStartupModes } from "./sandbox-startup-input.js";
 
 function createTestRuntimeConfig(): DataPlaneWorkerRuntimeConfig {
@@ -179,6 +182,65 @@ describe("createSandboxStartupInput", () => {
     });
 
     expect(startupInput.transparentProxy).toEqual({
+      passthroughBypass: {
+        kind: "socket_mark",
+        mark: 38_514,
+      },
+      exclusions: [
+        {
+          kind: "cidr",
+          value: "127.0.0.0/8",
+          reason: "loopback traffic must remain local to the sandbox",
+        },
+        {
+          kind: "cidr",
+          value: "::1/128",
+          reason: "IPv6 loopback traffic must remain local to the sandbox",
+        },
+        {
+          kind: "cidr",
+          value: "224.0.0.0/4",
+          reason: "multicast traffic is outside transparent egress scope",
+        },
+        {
+          kind: "cidr",
+          value: "255.255.255.255/32",
+          reason: "broadcast traffic is outside transparent egress scope",
+        },
+        {
+          kind: "host",
+          value: "host.docker.internal",
+          reason: "Docker host gateway traffic must not be redirected away from the host bridge",
+        },
+      ],
+    });
+  });
+});
+
+describe("createSandboxActivationInput", () => {
+  it("builds the same session configuration without legacy startup fields", async () => {
+    const activationInput = await createSandboxActivationInput({
+      config: createTestRuntimeConfig(),
+      organizationId: "org_123",
+      operationId: "op_test_001",
+      operationKind: "resume",
+      sandboxInstanceId: "sbi_123",
+      runtimePlan: createRuntimePlan(),
+      actingUserId: "usr_123",
+      sandboxAdapter: createSandboxAdapter({
+        provider: SandboxProvider.DOCKER,
+        docker: {
+          socketPath: "/var/run/docker.sock",
+          networkName: "mistle-sandbox-dev",
+        },
+      }),
+    });
+
+    expect(activationInput.operationKind).toBe("resume");
+    expect("startupMode" in activationInput).toBe(false);
+    expect("executionMode" in activationInput).toBe(false);
+    expect(activationInput.actingUserId).toBe("usr_123");
+    expect(activationInput.transparentProxy).toEqual({
       passthroughBypass: {
         kind: "socket_mark",
         mark: 38_514,
