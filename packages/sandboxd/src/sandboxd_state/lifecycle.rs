@@ -1266,10 +1266,18 @@ impl SandboxdState {
         accepted_session_input: &SessionRuntimeInput,
         candidate_session_input: &SessionRuntimeInput,
     ) -> Result<(), SandboxdStateError> {
-        if let Some(egress_proxy) = self.egress_proxy.take() {
-            egress_proxy
-                .close()
-                .map_err(|error| SandboxdStateError::StopEgressProxy(error.to_string()))?;
+        if let Some(egress_proxy) = self.egress_proxy.take()
+            && let Err(error) = egress_proxy.close()
+        {
+            let restore_error = self
+                .restore_accepted_egress_proxy(accepted_session_input)
+                .err();
+            return match restore_error {
+                Some(restore_error) => Err(SandboxdStateError::StopEgressProxy(format!(
+                    "{error}; {restore_error}"
+                ))),
+                None => Err(SandboxdStateError::StopEgressProxy(error.to_string())),
+            };
         }
 
         match self.start_egress_proxy_for_session(candidate_session_input) {
@@ -1648,13 +1656,15 @@ fn initialized_activation_egress_inputs_are_supported(
     accepted_session_input: &SessionRuntimeInput,
     candidate_session_input: &SessionRuntimeInput,
 ) -> bool {
+    let egress_policy_matches = accepted_session_input.transparent_proxy
+        == candidate_session_input.transparent_proxy
+        && runtime_plan_egress_routes(&accepted_session_input.runtime_plan)
+            == runtime_plan_egress_routes(&candidate_session_input.runtime_plan);
     if egress_proxy_is_running {
-        return session_requires_egress_proxy(candidate_session_input);
+        return egress_policy_matches && session_requires_egress_proxy(candidate_session_input);
     }
 
-    accepted_session_input.transparent_proxy == candidate_session_input.transparent_proxy
-        && runtime_plan_egress_routes(&accepted_session_input.runtime_plan)
-            == runtime_plan_egress_routes(&candidate_session_input.runtime_plan)
+    egress_policy_matches
 }
 
 fn session_requires_egress_proxy(session_input: &SessionRuntimeInput) -> bool {

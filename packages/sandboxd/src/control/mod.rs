@@ -977,6 +977,38 @@ mod tests {
         route_gateway
             .close()
             .expect("route gateway should stop cleanly");
+
+        let socket_path = test_dir.join("control-route-replacement.sock");
+        let replacement_gateway = start_bootstrap_gateway();
+        let mut startup_input = valid_startup_input(
+            StartupMode::New,
+            "bootstrap-token-value",
+            &replacement_gateway.ws_url,
+        );
+        startup_input.runtime_plan = runtime_plan_with_egress_route();
+        let mut activation_input = valid_activation_input(&replacement_gateway.ws_url);
+        activation_input.runtime_plan = runtime_plan_with_alternate_egress_route();
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        submit_init(&socket_path, &startup_input, true).expect("init submission should succeed");
+        let error = submit_activate(&socket_path, &activation_input).expect_err(
+            "activation should reject egress route replacement with active egress proxy",
+        );
+
+        assert!(
+            error
+                .to_string()
+                .contains("initialized activation cannot change egress proxy input")
+        );
+        assert!(
+            server.activation_input().is_none(),
+            "rejected activation should not become accepted"
+        );
+
+        server.close().expect("control server should stop cleanly");
+        replacement_gateway
+            .close()
+            .expect("replacement gateway should stop cleanly");
         std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
 
@@ -1499,6 +1531,22 @@ mod tests {
             "runtimeClients": [],
             "agentRuntimes": []
         })
+    }
+
+    fn runtime_plan_with_alternate_egress_route() -> serde_json::Value {
+        let mut runtime_plan = runtime_plan_with_egress_route();
+        let route = runtime_plan
+            .get_mut("egressRoutes")
+            .and_then(|routes| routes.as_array_mut())
+            .and_then(|routes| routes.first_mut())
+            .expect("runtime plan should include one egress route");
+        route["egressRuleId"] = serde_json::json!("egress-rule-2");
+        route["bindingId"] = serde_json::json!("binding-2");
+        route["familyId"] = serde_json::json!("family-2");
+        route["variantId"] = serde_json::json!("variant-2");
+        route["match"]["hosts"] = serde_json::json!(["api.anthropic.com"]);
+        route["upstream"]["baseUrl"] = serde_json::json!("https://api.anthropic.com");
+        runtime_plan
     }
 
     fn valid_signing_activation_input(
