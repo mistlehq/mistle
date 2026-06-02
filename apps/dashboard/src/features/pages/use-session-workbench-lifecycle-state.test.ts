@@ -35,26 +35,18 @@ describe("resolveInitialEntryStartupState", () => {
     ).toBe("loading_status");
   });
 
-  it("keeps a startup state while a stopped sandbox is being resumed", () => {
-    expect(
-      resolveInitialEntryStartupState({
-        mainPanelTransitionState: "stable_chat",
-        sandboxLifecycleStatus: "resuming",
-        sandboxStatusReadState: "ready",
-        sessionSnapshot: null,
-      }),
-    ).toBe("resuming_sandbox");
-  });
-
   it.each([
     ["pending", "preparing_sandbox"],
     ["starting", "running_setup"],
     ["started", "running_setup"],
     ["initializing", "running_setup"],
+    ["resuming", "resuming_sandbox"],
     ["degraded", "reconnecting_sandbox"],
     ["reconnecting", "reconnecting_sandbox"],
     ["stopping", "stopping_sandbox"],
     ["running", "connecting_chat"],
+    ["stopped", null],
+    ["failed", null],
   ] as const)(
     "maps sandbox status %s to startup state %s before chat is ready",
     (status, state) => {
