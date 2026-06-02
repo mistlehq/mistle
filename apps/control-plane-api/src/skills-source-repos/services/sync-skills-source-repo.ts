@@ -20,8 +20,8 @@ import { z } from "zod";
 
 import { mintConnectionToken } from "../../internal/sandbox-runtime/services/mint-connection-token.js";
 
-const SkillsDiscoverCommandTimeoutMs = 30_000;
-const SkillsDiscoverCommandOutputBytes = 1_000_000;
+const SkillsDiscoverCommandTimeoutMs = 60_000;
+const SkillsDiscoverCommandOutputBytes = 5_000_000;
 
 const SkillsDiscoverOutputSchema = z
   .object({
