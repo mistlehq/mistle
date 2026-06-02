@@ -73,7 +73,7 @@ export function SessionsSidebarNav(input: {
                 return (
                   <SidebarMenuItem className="w-full" key={item.id}>
                     {item.to === undefined ? (
-                      <div className="text-sidebar-foreground rounded-md p-3 text-left text-base md:p-2 md:text-sm">
+                      <div className="text-sidebar-foreground rounded-md p-3 text-left md:p-2">
                         <SessionsSidebarItemLabel
                           label={item.label}
                           profileName={item.profileName}
