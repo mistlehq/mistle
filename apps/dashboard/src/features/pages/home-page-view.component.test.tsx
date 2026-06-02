@@ -76,5 +76,8 @@ describe("HomePageView", () => {
     expect(
       screen.getByRole("link", { name: "Investigate failing build" }).getAttribute("href"),
     ).toBe("/sessions/sbi_home_recent");
+    expect(
+      screen.getByText("Investigate failing build").closest(".group\\/session-row")?.className,
+    ).not.toContain("hover:bg-muted");
   });
 });

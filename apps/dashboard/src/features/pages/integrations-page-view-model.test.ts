@@ -173,14 +173,34 @@ describe("integrations page view model", () => {
   });
 
   it("builds available integration cards with add actions and disabled invalid entries", () => {
-    const [card] = buildAvailableIntegrationViewCards({
+    const [enabledCard] = buildAvailableIntegrationViewCards({
+      cards: [
+        createCard({
+          description: "Bring GitHub into Mistle.",
+          connectionMethods: [
+            {
+              id: IntegrationConnectionMethodIds.API_KEY,
+              label: "API key",
+              kind: "form",
+              secretFields: [],
+            },
+          ],
+        }),
+      ],
+    });
+    const [disabledCard] = buildAvailableIntegrationViewCards({
       cards: [createCard({ description: "Bring GitHub into Mistle.", connectionMethods: [] })],
     });
 
-    expect(card?.actionLabel).toBe("Add");
-    expect(card?.actionDisabled).toBe(true);
-    expect(card?.actionHref).toBeUndefined();
-    expect(card?.onAction).toBeUndefined();
+    expect(enabledCard?.actionLabel).toBe("Add");
+    expect(enabledCard?.actionDisabled).toBe(false);
+    expect(enabledCard?.actionHref).toBe("/integrations/github/add");
+    expect(enabledCard?.onAction).toBeUndefined();
+
+    expect(disabledCard?.actionLabel).toBe("Add");
+    expect(disabledCard?.actionDisabled).toBe(true);
+    expect(disabledCard?.actionHref).toBeUndefined();
+    expect(disabledCard?.onAction).toBeUndefined();
   });
 
   it("builds create inputs from integration cards", () => {

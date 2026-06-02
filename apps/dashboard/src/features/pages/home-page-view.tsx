@@ -75,13 +75,13 @@ function RecentSessionsList(input: {
           <div
             className={cn(
               "group/session-row flex w-full min-w-0 items-center justify-between gap-4 rounded-md px-0 py-2 text-left",
-              isNavigable ? "hover:bg-muted/40 focus-within:bg-muted/40" : "cursor-default",
+              isNavigable ? null : "cursor-default",
             )}
             key={session.id}
           >
             {isNavigable ? (
               <TextLink
-                className="min-w-0 truncate text-sm font-medium group-hover/session-row:underline group-focus-within/session-row:underline"
+                className="min-w-0 truncate text-sm font-medium"
                 render={<RouterLink to={sessionHref} />}
                 variant="listItem"
               >
