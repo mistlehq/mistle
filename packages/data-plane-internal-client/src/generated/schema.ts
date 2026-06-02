@@ -240,7 +240,12 @@ export interface paths {
             };
             organizationId: string;
             /** @enum {string} */
-            purpose: "session" | "snapshot" | "setup_assistant" | "setup_check";
+            purpose:
+              | "session"
+              | "snapshot"
+              | "setup_assistant"
+              | "setup_check"
+              | "skills_discovery";
             runtimePlan: {
               agentRuntimes: {
                 clientId: string;

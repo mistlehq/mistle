@@ -216,7 +216,8 @@ export function isWorkflowUserStopReasonSupportedPurpose(purpose: SandboxInstanc
   return (
     purpose === SandboxInstancePurposes.SESSION ||
     purpose === SandboxInstancePurposes.SETUP_ASSISTANT ||
-    purpose === SandboxInstancePurposes.SETUP_CHECK
+    purpose === SandboxInstancePurposes.SETUP_CHECK ||
+    purpose === SandboxInstancePurposes.SKILLS_DISCOVERY
   );
 }
 

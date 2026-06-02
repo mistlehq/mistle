@@ -162,6 +162,9 @@ importers:
       '@mistle/sandbox-lifecycle':
         specifier: workspace:*
         version: link:../../packages/sandbox-lifecycle
+      '@mistle/sandbox-session-client':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-session-client
       '@mistle/sandbox-session-protocol':
         specifier: workspace:*
         version: link:../../packages/sandbox-session-protocol

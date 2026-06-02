@@ -51,7 +51,9 @@ const StartWorkflowRunInputSchema = z.looseObject({
     })
     .strict(),
   actingUserId: z.string().min(1).optional(),
-  purpose: z.enum(["session", "snapshot", "setup_assistant", "setup_check"]).optional(),
+  purpose: z
+    .enum(["session", "snapshot", "setup_assistant", "setup_check", "skills_discovery"])
+    .optional(),
   image: z
     .object({
       imageId: z.string().min(1),

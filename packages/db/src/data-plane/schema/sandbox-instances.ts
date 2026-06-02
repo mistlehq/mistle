@@ -40,6 +40,7 @@ export const SandboxInstancePurposes = {
   SNAPSHOT: "snapshot",
   SETUP_ASSISTANT: "setup_assistant",
   SETUP_CHECK: "setup_check",
+  SKILLS_DISCOVERY: "skills_discovery",
 } as const;
 
 export type SandboxInstancePurpose =
