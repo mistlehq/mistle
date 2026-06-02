@@ -5,13 +5,13 @@ import { z } from "zod";
 import { getRuntimeEnv, type RuntimeEnv } from "../../lib/runtime-env.js";
 import { HttpApiError } from "../api/http-api-error.js";
 
-type RouteErrorDisplay = {
+export type RouteErrorDisplay = {
   title: string;
   description: string;
   detail: string | null;
   primaryAction: RouteErrorPrimaryAction;
 };
-type RouteErrorPrimaryAction = "refresh" | "signIn" | null;
+export type RouteErrorPrimaryAction = "refresh" | "signIn" | null;
 type ResolveRouteErrorDisplayOptions = {
   showDiagnostics: boolean;
 };
@@ -215,21 +215,41 @@ type RouteErrorBoundaryProps = {
   runtimeEnv?: RuntimeEnv;
 };
 
+type RouteErrorBoundaryViewProps = {
+  display: RouteErrorDisplay;
+  onRefresh: () => void;
+  onSignIn: () => void;
+};
+
 export function RouteErrorBoundary({ runtimeEnv }: RouteErrorBoundaryProps): React.JSX.Element {
   const error = useRouteError();
   const navigate = useNavigate();
   const resolvedRuntimeEnv = runtimeEnv ?? getRuntimeEnv();
   const showDiagnostics = shouldRenderRouteErrorDiagnostics(resolvedRuntimeEnv);
   const display = resolveRouteErrorDisplay(error, { showDiagnostics });
+  return (
+    <RouteErrorBoundaryView
+      display={display}
+      onRefresh={() => globalThis.location.reload()}
+      onSignIn={() => void navigate("/auth/login", { replace: true })}
+    />
+  );
+}
+
+export function RouteErrorBoundaryView({
+  display,
+  onRefresh,
+  onSignIn,
+}: RouteErrorBoundaryViewProps): React.JSX.Element {
   const detail = display.detail;
   const hasDetail = detail !== null;
   const primaryAction =
     display.primaryAction === "refresh" ? (
-      <Button onClick={() => globalThis.location.reload()} type="button">
+      <Button onClick={onRefresh} type="button">
         Refresh now
       </Button>
     ) : display.primaryAction === "signIn" ? (
-      <Button onClick={() => void navigate("/auth/login", { replace: true })} type="button">
+      <Button onClick={onSignIn} type="button">
         Sign in
       </Button>
     ) : null;
