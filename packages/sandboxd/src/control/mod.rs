@@ -916,7 +916,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_initialized_activation_that_changes_egress_proxy_input_while_egress_proxy_runs() {
+    fn initialized_activation_refreshes_egress_proxy_for_fresh_gateway_input() {
         let test_dir = create_temp_test_dir("control_activate_egress_input_change");
         let socket_path = test_dir.join("control.sock");
         let init_gateway = start_bootstrap_gateway();
@@ -927,21 +927,17 @@ mod tests {
             &init_gateway.ws_url,
         );
         startup_input.runtime_plan = runtime_plan_with_egress_route();
-        let activation_input = valid_activation_input(&activation_gateway.ws_url);
+        let mut activation_input = valid_activation_input(&activation_gateway.ws_url);
+        activation_input.runtime_plan = runtime_plan_with_egress_route();
         let server = start_test_control_server(&socket_path, ThreadSleeper);
 
         submit_init(&socket_path, &startup_input, true).expect("init submission should succeed");
-        let error = submit_activate(&socket_path, &activation_input)
-            .expect_err("activation should reject gateway URL changes with active egress proxy");
+        submit_activate(&socket_path, &activation_input)
+            .expect("activation should refresh egress proxy for fresh gateway input");
 
         assert!(
-            error
-                .to_string()
-                .contains("initialized activation cannot change egress proxy input")
-        );
-        assert!(
-            server.activation_input().is_none(),
-            "rejected activation should not become accepted"
+            server.activation_input().is_some(),
+            "accepted activation should become the current accepted input"
         );
 
         server.close().expect("control server should stop cleanly");
