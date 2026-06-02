@@ -1,4 +1,5 @@
 import type { NodeWebSocket } from "@hono/node-ws";
+import { systemSleeper } from "@mistle/time";
 import type { WSContext, WSMessageReceive } from "hono/ws";
 import WebSocket, { type RawData } from "ws";
 
@@ -21,6 +22,7 @@ import {
   normalizeForwardedDirectEgressWebSocketCloseCode,
   normalizeForwardedDirectEgressWebSocketCloseReason,
 } from "./direct-egress-websocket-close.js";
+import { resolveOpenDirectEgressWebSocketUpstream } from "./direct-egress-websocket-upstream-resolution.js";
 
 type RegisterDirectEgressRoutesInput = {
   app: DataPlaneGatewayApp;
@@ -29,6 +31,7 @@ type RegisterDirectEgressRoutesInput = {
   lifecycle: GatewayLifecycle;
   trustedUpstreamCaCertificates: readonly string[] | undefined;
   upgradeWebSocket: NodeWebSocket["upgradeWebSocket"];
+  webSocketUpstreamResolutionDelayMs?: number;
 };
 
 const WebSocketCloseCodes = {
@@ -152,14 +155,25 @@ export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInpu
             event: "gateway_direct_egress_websocket_client_opened",
             startedAtMs,
           });
-          input.directEgressProxyService
-            .resolveWebSocketUpstream({
+          resolveOpenDirectEgressWebSocketUpstream({
+            ...(input.webSocketUpstreamResolutionDelayMs === undefined
+              ? {}
+              : {
+                  delayAfterResolutionMs: input.webSocketUpstreamResolutionDelayMs,
+                  sleeper: systemSleeper,
+                }),
+            isClientOpen: () => ws.readyState === WebSocket.OPEN,
+            upstream: input.directEgressProxyService.resolveWebSocketUpstream({
               admission,
               ...(ctx.get("testEnvironmentId") === undefined
                 ? {}
                 : { testEnvironmentId: ctx.get("testEnvironmentId") }),
-            })
+            }),
+          })
             .then((upstream) => {
+              if (upstream === undefined) {
+                return;
+              }
               logDirectEgressWebSocketEvent({
                 admission,
                 event: "gateway_direct_egress_websocket_upstream_connect_started",
@@ -183,8 +197,14 @@ export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInpu
                 trustedUpstreamCaCertificates: input.trustedUpstreamCaCertificates,
                 upstreamUrl: upstream.url,
               });
+              if (ws.readyState !== WebSocket.OPEN) {
+                upstreamSocket.terminate();
+              }
             })
             .catch((error: unknown) => {
+              if (ws.readyState !== WebSocket.OPEN) {
+                return;
+              }
               logDirectEgressWebSocketEvent({
                 admission,
                 error: error instanceof Error ? error : new Error(String(error)),
