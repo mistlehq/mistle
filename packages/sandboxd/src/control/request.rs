@@ -166,14 +166,10 @@ fn begin_init(
                 state_guard.startup_input = Some(startup_input.clone());
             }
             InitPhase::Initializing => {
-                return Err(ControlError::StartupRequestRejected(
-                    "sandboxd is already initializing".to_string(),
-                ));
+                return Ok(());
             }
             InitPhase::Initialized => {
-                return Err(ControlError::StartupRequestRejected(
-                    "sandboxd has already completed initialization".to_string(),
-                ));
+                return Ok(());
             }
             InitPhase::Failed(error) => {
                 return Err(ControlError::StartupRequestRejected(format!(
@@ -185,9 +181,7 @@ fn begin_init(
 
     let mut init_thread_guard = lock_init_thread(init_thread)?;
     if init_thread_guard.is_some() {
-        return Err(ControlError::StartupRequestRejected(
-            "sandboxd init worker is already running".to_string(),
-        ));
+        return Ok(());
     }
 
     let state_for_thread = state.clone();

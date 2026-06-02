@@ -382,7 +382,7 @@ mod tests {
         ControlSignRequest, DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL, DEFAULT_HEALTH_ENDPOINT_PATH,
         EGRESS_PROXY_FAULT_KILL_PATH, InitPhase, TEST_FAULTS_ENABLED_ENV,
         start_control_server_with_health_endpoint, submit_init, submit_ready, submit_resume,
-        submit_signing,
+        submit_signing, submit_wait_init,
     };
     use crate::protocol::startup::{
         GitIdentity, GitSigningConfig, StartupExecutionMode, StartupInput, StartupMode,
@@ -431,7 +431,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_second_init_requests_after_initialization_begins() {
+    fn accepts_second_init_request_after_initialization_completes() {
         let test_dir = create_temp_test_dir("control_second_init");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
@@ -440,16 +440,72 @@ mod tests {
         let server = start_test_control_server(&socket_path, ThreadSleeper);
 
         submit_init(&socket_path, &startup_input, true, false).expect("first init should succeed");
-        let error = submit_init(&socket_path, &startup_input, true, false)
-            .expect_err("second init should fail");
+        submit_init(&socket_path, &startup_input, true, false)
+            .expect("second init should be idempotent after initialization completes");
 
-        assert!(
-            error
-                .to_string()
-                .contains("sandboxd has already completed initialization")
-                || error
-                    .to_string()
-                    .contains("sandboxd is already initializing")
+        assert_eq!(server.init_phase(), InitPhase::Initialized);
+        assert_eq!(server.startup_input(), Some(startup_input));
+
+        server.close().expect("control server should stop cleanly");
+        gateway
+            .close()
+            .expect("bootstrap gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn accepts_second_init_request_while_initialization_is_running() {
+        let test_dir = create_temp_test_dir("control_second_init_running");
+        let socket_path = test_dir.join("control.sock");
+        let setup_release_path = test_dir.join("release-setup");
+        let setup_runs_path = test_dir.join("setup-runs");
+        let gateway = start_bootstrap_gateway();
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+        let mut startup_input =
+            valid_startup_input(StartupMode::New, "bootstrap-token-value", &gateway.ws_url);
+        startup_input.runtime_plan["artifacts"] = serde_json::json!([
+            {
+                "artifactKey": "hold_init",
+                "name": "hold init",
+                "lifecycle": {
+                    "install": [
+                        {
+                            "op": "exec",
+                            "command": {
+                                "args": [
+                                    "/bin/sh",
+                                    "-c",
+                                    format!(
+                                        "printf run >> {}; while ! test -f {}; do sleep 0.05; done",
+                                        setup_runs_path.display(),
+                                        setup_release_path.display()
+                                    )
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        ]);
+        let duplicate_startup_input = valid_startup_input(
+            StartupMode::New,
+            "duplicate-bootstrap-token-value",
+            &gateway.ws_url,
+        );
+
+        submit_init(&socket_path, &startup_input, false, false).expect("first init should start");
+        wait_for_init_phase(&server, InitPhase::Initializing);
+        submit_init(&socket_path, &duplicate_startup_input, false, false)
+            .expect("second init should attach to the running initialization");
+
+        std::fs::write(&setup_release_path, "release").expect("setup script should be released");
+        submit_wait_init(&socket_path).expect("wait-init should observe the original init");
+
+        assert_eq!(server.init_phase(), InitPhase::Initialized);
+        assert_eq!(server.startup_input(), Some(startup_input));
+        assert_eq!(
+            std::fs::read_to_string(&setup_runs_path).expect("setup run marker should exist"),
+            "run"
         );
 
         server.close().expect("control server should stop cleanly");
