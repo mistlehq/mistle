@@ -51,6 +51,12 @@ pub struct ReconciledSkill {
     pub target_path: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SkillsReconcileSelection {
+    pub name: String,
+    pub relative_path: String,
+}
+
 #[derive(Debug)]
 pub enum SkillsDiscoverError {
     RepoRootCanonicalize {
@@ -298,6 +304,11 @@ pub enum SkillsReconcileError {
         relative_path: String,
         path: PathBuf,
     },
+    SelectedSkillNameMismatch {
+        relative_path: String,
+        expected_name: String,
+        actual_name: String,
+    },
     DuplicateSelectedSkillPath(String),
     DuplicateSelectedSkillName {
         name: String,
@@ -456,6 +467,17 @@ impl fmt::Display for SkillsReconcileError {
                     path.display()
                 )
             }
+            Self::SelectedSkillNameMismatch {
+                relative_path,
+                expected_name,
+                actual_name,
+            } => {
+                write!(
+                    f,
+                    "selected skill path '{}' declares skill name '{}' but the runtime plan selected '{}'",
+                    relative_path, actual_name, expected_name
+                )
+            }
             Self::DuplicateSelectedSkillPath(relative_path) => {
                 write!(
                     f,
@@ -547,10 +569,17 @@ pub fn reconcile_skills(
     selected_relative_paths: &[String],
     target_root_override: Option<&Path>,
 ) -> Result<SkillsReconcileOutput, SkillsReconcileError> {
+    let selections = selected_relative_paths
+        .iter()
+        .map(|relative_path| SkillsReconcileRequest {
+            expected_name: None,
+            relative_path: relative_path.clone(),
+        })
+        .collect::<Vec<_>>();
     reconcile_skills_with_options(
         repo_root,
         runtime,
-        selected_relative_paths,
+        &selections,
         target_root_override,
         SkillsReconcileOptions {
             pull_repo: true,
@@ -562,13 +591,20 @@ pub fn reconcile_skills(
 pub fn reconcile_materialized_skills(
     repo_root: &Path,
     runtime: &SkillsRuntime,
-    selected_relative_paths: &[String],
+    selections: &[SkillsReconcileSelection],
     target_root_override: Option<&Path>,
 ) -> Result<SkillsReconcileOutput, SkillsReconcileError> {
+    let selections = selections
+        .iter()
+        .map(|selection| SkillsReconcileRequest {
+            expected_name: Some(selection.name.clone()),
+            relative_path: selection.relative_path.clone(),
+        })
+        .collect::<Vec<_>>();
     reconcile_skills_with_options(
         repo_root,
         runtime,
-        selected_relative_paths,
+        &selections,
         target_root_override,
         SkillsReconcileOptions {
             pull_repo: false,
@@ -592,7 +628,7 @@ enum SkillsTargetOwnership {
 fn reconcile_skills_with_options(
     repo_root: &Path,
     runtime: &SkillsRuntime,
-    selected_relative_paths: &[String],
+    selections: &[SkillsReconcileRequest],
     target_root_override: Option<&Path>,
     options: SkillsReconcileOptions,
 ) -> Result<SkillsReconcileOutput, SkillsReconcileError> {
@@ -613,7 +649,7 @@ fn reconcile_skills_with_options(
     if options.pull_repo {
         pull_git_repo(&repo_root)?;
     }
-    let selected_skills = read_selected_skills(&repo_root, selected_relative_paths)?;
+    let selected_skills = read_selected_skills(&repo_root, selections)?;
 
     prepare_target_root(&target_root)?;
     match options.target_ownership {
@@ -654,6 +690,12 @@ struct ManagedSkillsManifest {
     skill_names: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SkillsReconcileRequest {
+    expected_name: Option<String>,
+    relative_path: String,
+}
+
 pub fn run_skills_reconcile<W: io::Write>(
     repo_root: &Path,
     runtime: &SkillsRuntime,
@@ -680,13 +722,13 @@ struct SelectedSkill {
 
 fn read_selected_skills(
     repo_root: &Path,
-    selected_relative_paths: &[String],
+    selections: &[SkillsReconcileRequest],
 ) -> Result<Vec<SelectedSkill>, SkillsReconcileError> {
     let mut selected_skills = Vec::new();
     let mut selected_paths = BTreeMap::new();
     let mut names_to_paths = BTreeMap::new();
-    for selected_relative_path in selected_relative_paths {
-        let normalized_relative_path = normalize_selected_relative_path(selected_relative_path)?;
+    for selection in selections {
+        let normalized_relative_path = normalize_selected_relative_path(&selection.relative_path)?;
         if selected_paths
             .insert(normalized_relative_path.clone(), ())
             .is_some()
@@ -729,6 +771,15 @@ fn read_selected_skills(
         }
         let skill =
             read_skill_file(repo_root, &skill_file_path).map_err(SkillsReconcileError::Discover)?;
+        if let Some(expected_name) = &selection.expected_name
+            && skill.name != *expected_name
+        {
+            return Err(SkillsReconcileError::SelectedSkillNameMismatch {
+                relative_path: normalized_relative_path,
+                expected_name: expected_name.clone(),
+                actual_name: skill.name,
+            });
+        }
         if let Some(first_path) =
             names_to_paths.insert(skill.name.clone(), normalized_relative_path.clone())
         {
@@ -1383,8 +1434,8 @@ mod tests {
 
     use super::{
         DiscoveredSkill, ReconciledSkill, SkillsCommand, SkillsCommandError, SkillsDiscoverError,
-        SkillsReconcileError, SkillsReconcileOutput, SkillsRuntime, discover_skills,
-        parse_skills_command, reconcile_materialized_skills, reconcile_skills,
+        SkillsReconcileError, SkillsReconcileOutput, SkillsReconcileSelection, SkillsRuntime,
+        discover_skills, parse_skills_command, reconcile_materialized_skills, reconcile_skills,
     };
 
     #[test]
@@ -1756,7 +1807,10 @@ description: Local skill.
         let output = reconcile_materialized_skills(
             &repo_root,
             &SkillsRuntime::Codex,
-            &["skills/local-skill".to_string()],
+            &[SkillsReconcileSelection {
+                name: "local-skill".to_string(),
+                relative_path: "skills/local-skill".to_string(),
+            }],
             Some(&target_root),
         )
         .expect("materialized reconcile should not require a pullable origin");
@@ -1811,7 +1865,10 @@ description: New skill.
         reconcile_materialized_skills(
             &repo_root,
             &SkillsRuntime::OpenCode,
-            &["skills/old-skill".to_string()],
+            &[SkillsReconcileSelection {
+                name: "old-skill".to_string(),
+                relative_path: "skills/old-skill".to_string(),
+            }],
             Some(&target_root),
         )
         .expect("old skill should reconcile");
@@ -1819,7 +1876,10 @@ description: New skill.
         let output = reconcile_materialized_skills(
             &repo_root,
             &SkillsRuntime::OpenCode,
-            &["skills/new-skill".to_string()],
+            &[SkillsReconcileSelection {
+                name: "new-skill".to_string(),
+                relative_path: "skills/new-skill".to_string(),
+            }],
             Some(&target_root),
         )
         .expect("new skill should reconcile");
@@ -1846,6 +1906,48 @@ description: New skill.
                 .expect("new skill symlink should be created"),
             repo_root.join("skills/new-skill")
         );
+
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
+        fs::remove_dir_all(target_root).expect("target root should be removable");
+    }
+
+    #[test]
+    fn materialized_reconcile_rejects_skill_name_mismatch() {
+        let repo_root = create_git_repo("skills_materialized_reconcile_name_mismatch");
+        let target_root =
+            create_temp_test_dir("skills_materialized_reconcile_name_mismatch_target");
+        write_skill(
+            &repo_root,
+            "skills/selected-path",
+            r#"---
+name: replacement-skill
+description: Replacement skill.
+---
+"#,
+        );
+        commit_all(&repo_root);
+
+        let error = reconcile_materialized_skills(
+            &repo_root,
+            &SkillsRuntime::Codex,
+            &[SkillsReconcileSelection {
+                name: "original-skill".to_string(),
+                relative_path: "skills/selected-path".to_string(),
+            }],
+            Some(&target_root),
+        )
+        .expect_err("materialized reconcile should reject replaced skill at selected path");
+
+        assert!(matches!(
+            error,
+            SkillsReconcileError::SelectedSkillNameMismatch {
+                relative_path,
+                expected_name,
+                actual_name,
+            } if relative_path == "skills/selected-path"
+                && expected_name == "original-skill"
+                && actual_name == "replacement-skill"
+        ));
 
         fs::remove_dir_all(repo_root).expect("repo should be removable");
         fs::remove_dir_all(target_root).expect("target root should be removable");

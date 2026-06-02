@@ -75,6 +75,19 @@ export const Unsynced: Story = {
   ),
 };
 
+export const UnsavedIntegrationChanges: Story = {
+  render: () => (
+    <SkillsSectionStoryHarness
+      integrationRowsHaveUnpersistedChanges
+      skillsConfig={{
+        originUrl: SkillsOriginUrl,
+        selectedSkills: [],
+      }}
+      skillsSourceRepos={{ items: [] }}
+    />
+  ),
+};
+
 export const NoRepositoryBinding: Story = {
   render: () => (
     <SkillsSectionStoryHarness
@@ -87,6 +100,7 @@ export const NoRepositoryBinding: Story = {
 
 function SkillsSectionStoryHarness(input: {
   initialBindings?: ComponentProps<typeof SandboxProfileSkillsSection>["integrationRows"];
+  integrationRowsHaveUnpersistedChanges?: boolean;
   skillsConfig: SandboxProfileVersion["skillsConfig"];
   skillsSourceRepos: SandboxProfileVersionSkillsSourceReposResult;
 }): React.JSX.Element {
@@ -134,6 +148,9 @@ function SkillsSectionStoryHarness(input: {
                 },
               },
             ]
+          }
+          integrationRowsHaveUnpersistedChanges={
+            input.integrationRowsHaveUnpersistedChanges ?? false
           }
           isDraft
           profileId={version.sandboxProfileId}

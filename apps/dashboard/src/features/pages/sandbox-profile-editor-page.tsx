@@ -2822,6 +2822,9 @@ function SandboxProfileEditorSectionPanels(input: {
             availableTargets={input.integrationsLoader.availableTargets}
             disabled={input.draftFieldsAreReadOnly}
             integrationRows={sandboxProfileIntegrationRows}
+            integrationRowsHaveUnpersistedChanges={
+              input.integrationDraftState.hasUnpersistedChanges
+            }
             isDraft={input.mode.kind === "draft"}
             onDraftStateChange={input.onSkillsDraftStateChange}
             profileId={input.profileId}

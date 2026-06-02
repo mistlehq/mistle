@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 use crate::command::CommandOutputSink;
 use crate::protocol::startup::StartupInput;
-use crate::skills::{SkillsRuntime, reconcile_materialized_skills};
+use crate::skills::{SkillsReconcileSelection, SkillsRuntime, reconcile_materialized_skills};
 
 pub use plan::{
     CompiledAgentRuntime, CompiledEgressRoute, CompiledEgressRouteAuthInjection,
@@ -315,20 +315,18 @@ fn apply_runtime_plan_skills(
     repo_path: &str,
 ) -> Result<(), String> {
     let runtime = SkillsRuntime::parse(runtime_id).map_err(|error| error.to_string())?;
-    let selected_relative_paths = skills
+    let selected_skills = skills
         .selected_skills
         .iter()
-        .map(|skill| skill.relative_path.clone())
+        .map(|skill| SkillsReconcileSelection {
+            name: skill.name.clone(),
+            relative_path: skill.relative_path.clone(),
+        })
         .collect::<Vec<_>>();
 
-    reconcile_materialized_skills(
-        Path::new(repo_path),
-        &runtime,
-        &selected_relative_paths,
-        None,
-    )
-    .map(|_| ())
-    .map_err(|error| error.to_string())
+    reconcile_materialized_skills(Path::new(repo_path), &runtime, &selected_skills, None)
+        .map(|_| ())
+        .map_err(|error| error.to_string())
 }
 
 fn resolve_runtime_plan_skills_runtime_id(runtime_plan: &CompiledRuntimePlan) -> String {

@@ -89,6 +89,7 @@ export function SandboxProfileSkillsSection(input: {
   availableTargets: readonly IntegrationTargetSummary[];
   disabled: boolean;
   integrationRows: readonly SandboxProfileBindingEditorRow[];
+  integrationRowsHaveUnpersistedChanges: boolean;
   isDraft: boolean;
   onDraftStateChange?: (state: SandboxProfileSkillsDraftState) => void;
   profileId: string;
@@ -308,7 +309,11 @@ export function SandboxProfileSkillsSection(input: {
   }
 
   function refreshSelectedSource(): void {
-    if (selectedOriginUrl === null || refreshMutation.isPending) {
+    if (
+      selectedOriginUrl === null ||
+      input.integrationRowsHaveUnpersistedChanges ||
+      refreshMutation.isPending
+    ) {
       return;
     }
 
@@ -441,7 +446,10 @@ export function SandboxProfileSkillsSection(input: {
               </Select>
               <Button
                 disabled={
-                  selectedOriginUrl === null || fieldIsReadOnly || refreshMutation.isPending
+                  selectedOriginUrl === null ||
+                  fieldIsReadOnly ||
+                  input.integrationRowsHaveUnpersistedChanges ||
+                  refreshMutation.isPending
                 }
                 onClick={refreshSelectedSource}
                 type="button"
@@ -455,6 +463,11 @@ export function SandboxProfileSkillsSection(input: {
                 Refresh
               </Button>
             </div>
+            {input.integrationRowsHaveUnpersistedChanges && selectedOriginUrl !== null ? (
+              <p className="text-muted-foreground mt-2 text-sm">
+                Save integration changes before refreshing skills.
+              </p>
+            ) : null}
             {sourceOptions.length === 0 ? (
               <p className="text-muted-foreground mt-2 text-sm">
                 Add a Git repository binding before configuring skills.
