@@ -82,7 +82,11 @@ export function SessionsSidebarNav(input: {
                         />
                       </div>
                     ) : (
-                      <SidebarMenuButton isActive={isActive} render={<NavLink to={item.to} />}>
+                      <SidebarMenuButton
+                        className="h-auto md:h-auto"
+                        isActive={isActive}
+                        render={<NavLink to={item.to} />}
+                      >
                         <SessionsSidebarItemLabel
                           label={item.label}
                           profileName={item.profileName}
