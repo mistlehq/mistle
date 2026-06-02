@@ -4,6 +4,17 @@
 
 import { IntegrationDeviceAuthorizationAttemptStatuses } from "@mistle/db/control-plane";
 import {
+  SandboxInstanceProviders,
+  SandboxInstancePurposes,
+  SandboxInstanceSources,
+  SandboxInstanceStarterKinds,
+  SandboxInstanceStatuses,
+  SandboxOperationEventRecordKinds,
+  SandboxOperationEventSources,
+  SandboxOperationKinds,
+  type DataPlaneTables,
+} from "@mistle/db/data-plane";
+import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
@@ -12,6 +23,7 @@ import { describe, expect } from "vitest";
 
 import { pruneExpiredAuthState } from "../src/maintenance/commands/prune-expired-auth-state.js";
 import { pruneExpiredIntegrationAuthState } from "../src/maintenance/commands/prune-expired-integration-auth-state.js";
+import { pruneSandboxOperationEvents } from "../src/maintenance/commands/prune-sandbox-operation-events.js";
 
 const FixedNowMs = Date.UTC(2026, 3, 29, 0, 0, 0);
 const FixedClock: Clock = {
@@ -20,7 +32,7 @@ const FixedClock: Clock = {
 };
 
 const it = createIntegrationTest({
-  services: ["control-plane-api"],
+  services: ["control-plane-api", "data-plane-api"],
 });
 
 describe.concurrent("maintenance commands", () => {
@@ -253,6 +265,92 @@ describe.concurrent("maintenance commands", () => {
       expectedIds: [recentTerminalAttemptId, recentPendingAttemptId, pendingWithoutExpiryAttemptId],
     });
   });
+
+  it("prunes old sandbox operation events regardless of sandbox lifecycle status", async ({
+    env,
+  }) => {
+    const oldStoppedSandboxId = "sbi_maintenance_events_old_stopped";
+    const oldFailedSandboxId = "sbi_maintenance_events_old_failed";
+    const oldRunningSandboxId = "sbi_maintenance_events_old_running";
+    const recentStoppedSandboxId = "sbi_maintenance_events_recent_stopped";
+    await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values([
+      sandboxInstanceRow({
+        id: oldStoppedSandboxId,
+        status: SandboxInstanceStatuses.STOPPED,
+      }),
+      sandboxInstanceRow({
+        id: oldFailedSandboxId,
+        status: SandboxInstanceStatuses.FAILED,
+      }),
+      sandboxInstanceRow({
+        id: oldRunningSandboxId,
+        status: SandboxInstanceStatuses.RUNNING,
+      }),
+      sandboxInstanceRow({
+        id: recentStoppedSandboxId,
+        status: SandboxInstanceStatuses.STOPPED,
+      }),
+    ]);
+
+    const oldStoppedEventIds = Array.from(
+      { length: 501 },
+      (_, index) => `soe_maintenance_events_old_stopped_${String(index).padStart(3, "0")}`,
+    );
+    const oldStoppedEvents = oldStoppedEventIds.map((id, index) =>
+      sandboxOperationEventRow({
+        id,
+        sandboxInstanceId: oldStoppedSandboxId,
+        sequence: index + 1,
+        createdAt: iso(FixedNowMs - days(15)),
+        observedAt: iso(FixedNowMs - days(15)),
+      }),
+    );
+    const oldFailedEventId = "soe_maintenance_events_old_failed";
+    const oldRunningEventId = "soe_maintenance_events_old_running";
+    const recentStoppedEventId = "soe_maintenance_events_recent_stopped";
+    await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxOperationEvents).values([
+      ...oldStoppedEvents,
+      sandboxOperationEventRow({
+        id: oldFailedEventId,
+        sandboxInstanceId: oldFailedSandboxId,
+        sequence: 1,
+        createdAt: iso(FixedNowMs - days(15)),
+        observedAt: iso(FixedNowMs - days(15)),
+      }),
+      sandboxOperationEventRow({
+        id: oldRunningEventId,
+        sandboxInstanceId: oldRunningSandboxId,
+        sequence: 1,
+        createdAt: iso(FixedNowMs - days(15)),
+        observedAt: iso(FixedNowMs - days(15)),
+      }),
+      sandboxOperationEventRow({
+        id: recentStoppedEventId,
+        sandboxInstanceId: recentStoppedSandboxId,
+        sequence: 1,
+        createdAt: iso(FixedNowMs - days(13)),
+        observedAt: iso(FixedNowMs - days(13)),
+      }),
+    ]);
+
+    await expect(
+      pruneSandboxOperationEvents({
+        db: env.dataPlaneDb,
+        clock: FixedClock,
+      }),
+    ).resolves.toEqual({
+      deletedRowCounts: {
+        sandbox_operation_events: 503,
+      },
+      reachedMaxBatches: false,
+    });
+
+    await expectExistingSandboxOperationEventIds({
+      env,
+      ids: [...oldStoppedEventIds, oldFailedEventId, oldRunningEventId, recentStoppedEventId],
+      expectedIds: [recentStoppedEventId],
+    });
+  });
 });
 
 async function seedUser(env: IntegrationTestEnvironment, label: string): Promise<{ id: string }> {
@@ -384,6 +482,56 @@ async function selectExistingIds(input: {
     columns: { id: true },
     where: (table, { inArray }) => inArray(table.id, input.ids),
   });
+}
+
+function sandboxInstanceRow(
+  input: Partial<DataPlaneTables["sandboxInstances"]["$inferInsert"]> & { id: string },
+): DataPlaneTables["sandboxInstances"]["$inferInsert"] {
+  return {
+    organizationId: "org_maintenance_events",
+    sandboxProfileId: "sbp_maintenance_events",
+    sandboxProfileVersion: 1,
+    runtimeProvider: SandboxInstanceProviders.DOCKER,
+    status: SandboxInstanceStatuses.STOPPED,
+    startedByKind: SandboxInstanceStarterKinds.SYSTEM,
+    startedById: "maintenance-events",
+    source: SandboxInstanceSources.SYSTEM,
+    purpose: SandboxInstancePurposes.SESSION,
+    ...input,
+  };
+}
+
+function sandboxOperationEventRow(
+  input: Partial<DataPlaneTables["sandboxOperationEvents"]["$inferInsert"]> & {
+    id: string;
+    sandboxInstanceId: string;
+    sequence: number;
+  },
+): DataPlaneTables["sandboxOperationEvents"]["$inferInsert"] {
+  return {
+    operationKind: SandboxOperationKinds.START,
+    operationId: `op_maintenance_events_${input.sandboxInstanceId}`,
+    recordKind: SandboxOperationEventRecordKinds.LIFECYCLE,
+    observedAt: iso(FixedNowMs),
+    source: SandboxOperationEventSources.WORKER,
+    phase: "provider",
+    status: "completed",
+    message: "Maintenance event",
+    attributes: {},
+    ...input,
+  };
+}
+
+async function expectExistingSandboxOperationEventIds(input: {
+  env: IntegrationTestEnvironment;
+  ids: string[];
+  expectedIds: string[];
+}): Promise<void> {
+  const rows = await input.env.dataPlaneDb.query.sandboxOperationEvents.findMany({
+    columns: { id: true },
+    where: (table, { inArray }) => inArray(table.id, input.ids),
+  });
+  expect(rows.map((row) => row.id).sort()).toEqual(input.expectedIds.toSorted());
 }
 
 function hours(value: number): number {

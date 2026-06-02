@@ -16,10 +16,12 @@ const TerminalDeviceAttemptRetentionMs = 30 * 24 * 60 * 60 * 1_000;
 const DeleteBatchSize = 500;
 const MaxBatchesPerTable = 100;
 
-export const PruneExpiredIntegrationAuthStateCommand: MaintenanceCommandDefinition = {
-  name: PruneExpiredIntegrationAuthStateCommandName,
-  execute: pruneExpiredIntegrationAuthState,
-};
+export const PruneExpiredIntegrationAuthStateCommand: MaintenanceCommandDefinition<"control-plane"> =
+  {
+    name: PruneExpiredIntegrationAuthStateCommandName,
+    database: "control-plane",
+    execute: pruneExpiredIntegrationAuthState,
+  };
 
 export async function pruneExpiredIntegrationAuthState(input: {
   db: ControlPlaneDatabase;

@@ -324,7 +324,8 @@ export function selectControlPlaneApiMaintenanceConfig(
 ): ControlPlaneApiMaintenanceConfig {
   return {
     database: {
-      migrationUrl: config.postgres.control_plane.direct_url,
+      controlPlaneMigrationUrl: config.postgres.control_plane.direct_url,
+      dataPlaneMigrationUrl: config.postgres.data_plane.direct_url,
     },
     telemetry: projectTelemetry(config),
   };

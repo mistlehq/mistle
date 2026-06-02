@@ -141,7 +141,25 @@ describe("loadControlPlaneMaintenanceConfig", () => {
 
     expect(loadedConfig.app).toEqual({
       database: {
-        migrationUrl: "postgresql://direct.example/mistle",
+        controlPlaneMigrationUrl: "postgresql://direct.example/mistle",
+      },
+      telemetry: {
+        enabled: false,
+        debug: false,
+      },
+    });
+  });
+
+  it("loads only the data-plane direct database URL from the new env surface", () => {
+    const loadedConfig = loadControlPlaneMaintenanceConfig({
+      env: {
+        MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL: "postgresql://data-direct.example/mistle",
+      },
+    });
+
+    expect(loadedConfig.app).toEqual({
+      database: {
+        dataPlaneMigrationUrl: "postgresql://data-direct.example/mistle",
       },
       telemetry: {
         enabled: false,
@@ -197,7 +215,9 @@ describe("loadControlPlaneMaintenanceConfig", () => {
           MISTLE_UNKNOWN_CONTROL_PLANE_DIRECT_URL: "postgresql://unknown-direct.example/mistle",
         },
       }),
-    ).toThrow(/Set MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL/u);
+    ).toThrow(
+      /Set MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL or MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL/u,
+    );
   });
 
   it("loads the control-plane direct database URL from central TOML resources", () => {
@@ -207,7 +227,8 @@ describe("loadControlPlaneMaintenanceConfig", () => {
 
     expect(loadedConfig.app).toEqual({
       database: {
-        migrationUrl: "postgresql://mistle:replace-with-password@db:5432/mistle",
+        controlPlaneMigrationUrl: "postgresql://mistle:replace-with-password@db:5432/mistle",
+        dataPlaneMigrationUrl: "postgresql://mistle:replace-with-password@db:5432/mistle",
       },
       telemetry: {
         enabled: true,

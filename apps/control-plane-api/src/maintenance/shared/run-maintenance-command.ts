@@ -1,4 +1,5 @@
 import { createControlPlaneDatabase } from "@mistle/db/control-plane";
+import { createDataPlaneDatabase } from "@mistle/db/data-plane";
 import { systemClock, type Clock } from "@mistle/time";
 import type { Pool } from "pg";
 
@@ -23,10 +24,16 @@ export async function runMaintenanceCommand(input: {
     });
     lockAcquired = true;
 
-    const result = await input.command.execute({
-      db: createControlPlaneDatabase(input.pool),
-      clock,
-    });
+    const result =
+      input.command.database === "control-plane"
+        ? await input.command.execute({
+            db: createControlPlaneDatabase(input.pool),
+            clock,
+          })
+        : await input.command.execute({
+            db: createDataPlaneDatabase(input.pool),
+            clock,
+          });
 
     recordMaintenanceCommandCompleted({
       commandName: input.command.name,

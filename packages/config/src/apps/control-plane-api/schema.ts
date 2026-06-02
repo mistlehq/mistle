@@ -254,7 +254,8 @@ export const ControlPlaneApiMaintenanceConfigSchema = z
   .object({
     database: z
       .object({
-        migrationUrl: z.string().min(1),
+        controlPlaneMigrationUrl: z.string().min(1).optional(),
+        dataPlaneMigrationUrl: z.string().min(1).optional(),
       })
       .strict(),
     telemetry: GlobalTelemetryConfigSchema,

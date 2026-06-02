@@ -97,16 +97,18 @@ export function parseConfigRecord(record: unknown): RootConfig {
 function loadControlPlaneMaintenanceConfigFromEnv(
   env: NodeJS.ProcessEnv,
 ): ControlPlaneApiMaintenanceConfig {
-  const migrationUrl = env.MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL;
-  if (migrationUrl === undefined) {
+  const controlPlaneMigrationUrl = env.MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL;
+  const dataPlaneMigrationUrl = env.MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL;
+  if (controlPlaneMigrationUrl === undefined && dataPlaneMigrationUrl === undefined) {
     throw new Error(
-      "Missing control-plane maintenance database config. Set MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL.",
+      "Missing maintenance database config. Set MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL or MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL.",
     );
   }
 
   return ControlPlaneApiMaintenanceConfigSchema.parse({
     database: {
-      migrationUrl,
+      ...(controlPlaneMigrationUrl === undefined ? {} : { controlPlaneMigrationUrl }),
+      ...(dataPlaneMigrationUrl === undefined ? {} : { dataPlaneMigrationUrl }),
     },
     telemetry: loadControlPlaneMaintenanceTelemetryConfigFromEnv(env),
   });

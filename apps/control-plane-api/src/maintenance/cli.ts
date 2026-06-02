@@ -24,7 +24,18 @@ async function main(): Promise<void> {
   telemetryInitialized = true;
   const command = resolveMaintenanceCommand(commandName);
   const pool = new Pool({
-    connectionString: loadedConfig.app.database.migrationUrl,
+    connectionString:
+      command.database === "control-plane"
+        ? requireDatabaseUrl({
+            commandName: command.name,
+            database: command.database,
+            url: loadedConfig.app.database.controlPlaneMigrationUrl,
+          })
+        : requireDatabaseUrl({
+            commandName: command.name,
+            database: command.database,
+            url: loadedConfig.app.database.dataPlaneMigrationUrl,
+          }),
   });
 
   try {
@@ -61,4 +72,22 @@ async function shutdownInitializedTelemetry(): Promise<void> {
   }
 
   await shutdownTelemetry();
+}
+
+function requireDatabaseUrl(input: {
+  commandName: string;
+  database: "control-plane" | "data-plane";
+  url: string | undefined;
+}): string {
+  if (input.url !== undefined) {
+    return input.url;
+  }
+
+  const envVar =
+    input.database === "control-plane"
+      ? "MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL"
+      : "MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL";
+  throw new Error(
+    `Maintenance command '${input.commandName}' requires ${input.database} database config. Set ${envVar}.`,
+  );
 }

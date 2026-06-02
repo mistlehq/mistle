@@ -11,8 +11,9 @@ const RetentionGraceMs = 24 * 60 * 60 * 1_000;
 const DeleteBatchSize = 500;
 const MaxBatchesPerTable = 100;
 
-export const PruneExpiredAuthStateCommand: MaintenanceCommandDefinition = {
+export const PruneExpiredAuthStateCommand: MaintenanceCommandDefinition<"control-plane"> = {
   name: PruneExpiredAuthStateCommandName,
+  database: "control-plane",
   execute: pruneExpiredAuthState,
 };
 
