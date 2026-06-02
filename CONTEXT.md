@@ -140,6 +140,10 @@ _Avoid_: Jira org, Jira organization, site URL when referring only to the editab
 A live sandbox execution environment for an agent session.
 _Avoid_: Chat session when referring to runtime tools or sandbox state
 
+**Mistle sandbox provider**:
+The customer-facing **Sandbox provider** option where Mistle operates the sandbox and manages the underlying provider choice.
+_Avoid_: Managed provider, managed Docker, managed E2B, managed Tensorlake
+
 **Sandbox session title**:
 The Mistle-owned display title for a **Sandbox session**.
 _Avoid_: Conversation name, provider title

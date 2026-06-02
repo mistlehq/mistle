@@ -2878,7 +2878,7 @@ describe("SandboxProfileEditorPage", () => {
     if (agentLabel === undefined) {
       throw new Error("Expected runtime Agent label to render.");
     }
-    const sandboxRuntimeLabel = screen.getByText("Sandbox Runtime");
+    const sandboxRuntimeLabel = screen.getByText("Sandbox provider");
     const gitConnectionLabel = screen.getByText("Git Connection");
     const integrationColumnLabel = screen.getAllByText("Integration")[0];
     if (integrationColumnLabel === undefined) {
@@ -2928,7 +2928,7 @@ describe("SandboxProfileEditorPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Sandbox Profile" }));
 
     expect(screen.getByRole("heading", { name: "Runtime" })).toBeDefined();
-    expect(screen.getByRole("combobox", { name: "Sandbox Runtime" })).toBeDefined();
+    expect(screen.getByRole("combobox", { name: "Sandbox provider" })).toBeDefined();
     expect(screen.queryByText("Loading integrations and resources...")).toBeNull();
     expect(screen.queryByText("Loading integrations...")).toBeNull();
   });
@@ -2954,7 +2954,7 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(await screen.findByText("Could not load integration bindings")).toBeDefined();
     expect(screen.getByRole("heading", { name: "Runtime" })).toBeDefined();
-    expect(screen.getByRole("combobox", { name: "Sandbox Runtime" })).toBeDefined();
+    expect(screen.getByRole("combobox", { name: "Sandbox provider" })).toBeDefined();
     expect(screen.queryByText("Loading integrations...")).toBeNull();
   });
 

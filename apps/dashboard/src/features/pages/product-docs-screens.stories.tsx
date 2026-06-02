@@ -531,7 +531,7 @@ function SandboxProfileDraftStory(): React.JSX.Element {
           config: {},
         },
       ]}
-      runtimeState="e2b-managed"
+      runtimeState="mistle-provider"
     />
   );
 }

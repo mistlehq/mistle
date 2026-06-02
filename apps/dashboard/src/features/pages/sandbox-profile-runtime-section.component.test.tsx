@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -9,7 +9,11 @@ import type {
   SandboxProfileVersion,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { ApiKey } from "../settings/api-keys/api-keys-service.js";
-import { SandboxProfileRuntimeSection } from "./sandbox-profile-runtime-section.js";
+import {
+  SandboxProfileRuntimeSection,
+  type SandboxProfileRuntimeDraftState,
+  resolveManagedSandboxProvider,
+} from "./sandbox-profile-runtime-section.js";
 
 afterEach(() => {
   cleanup();
@@ -81,7 +85,7 @@ const TensorlakeProvider = {
 const OrganizationStorageE2BProvider = {
   id: "e2b",
   displayName: "E2B",
-  managed: true,
+  managed: false,
   supportsOrganizationConnection: true,
   resourceCapabilities: {
     vcpuCount: {
@@ -167,7 +171,7 @@ function createVersion(
 }
 
 describe("SandboxProfileRuntimeSection", () => {
-  it("renders managed E2B as a provider with default credentials selected", () => {
+  it("renders Mistle as a sandbox provider without exposing the underlying provider name", () => {
     render(
       <SandboxProfileRuntimeSection
         apiKeys={[]}
@@ -175,7 +179,7 @@ describe("SandboxProfileRuntimeSection", () => {
         availableTargets={[]}
         disabled={false}
         isDraft={true}
-        providers={[DockerProvider, E2BProvider]}
+        providers={[E2BProvider]}
         version={createVersion({
           sandboxProvider: "e2b",
           sandboxConnectionId: null,
@@ -187,16 +191,19 @@ describe("SandboxProfileRuntimeSection", () => {
       />,
     );
 
-    expect(screen.getByText("Sandbox Runtime")).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "Agent" })).toBeTruthy();
     expect(screen.getByText("Codex")).toBeTruthy();
-    expect(screen.getByRole("combobox", { name: "Provider" })).toBeTruthy();
-    expect(screen.getByText("E2B")).toBeTruthy();
-    expect(screen.getByRole("combobox", { name: "Credentials" })).toBeTruthy();
-    expect(screen.getByText("Managed by Mistle")).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Sandbox provider" })).toBeTruthy();
+    expect(screen.getAllByText("Mistle").length).toBeGreaterThan(0);
+    expect(
+      screen
+        .getByRole("combobox", { name: "Sandbox provider" })
+        .querySelector('img[src="/brand/logo.webp"]'),
+    ).not.toBeNull();
+    expect(screen.queryByText("E2B")).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Credentials" })).toBeNull();
     expect(screen.queryByRole("combobox", { name: "Connection" })).toBeNull();
     expect(screen.queryByText("E2B (Managed)")).toBeNull();
-    expect(screen.queryByText("Managed")).toBeNull();
   });
 
   it("renders OpenCode as the selected profile agent runtime", () => {
@@ -359,7 +366,7 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(screen.getByText("Mistle MCP key")).toBeTruthy();
   });
 
-  it("renders the Docker provider with the Docker logo", () => {
+  it("renders managed Docker as Mistle without the Docker label", () => {
     render(
       <SandboxProfileRuntimeSection
         apiKeys={[]}
@@ -376,11 +383,9 @@ describe("SandboxProfileRuntimeSection", () => {
       />,
     );
 
-    const providerLogo = screen
-      .getByRole("combobox", { name: "Provider" })
-      .querySelector('img[src="/integration-logos/docker.svg"]');
-    expect(providerLogo).not.toBeNull();
-    expect(screen.getByText("Docker")).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Sandbox provider" })).toBeTruthy();
+    expect(screen.getAllByText("Mistle").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Docker")).toBeNull();
   });
 
   it("prompts for provider selection when no sandbox provider is configured", () => {
@@ -391,7 +396,7 @@ describe("SandboxProfileRuntimeSection", () => {
         availableTargets={[]}
         disabled={false}
         isDraft={true}
-        providers={[DockerProvider, E2BProvider]}
+        providers={[DockerProvider, OrganizationE2BProvider]}
         version={createVersion({
           sandboxProvider: null,
           sandboxConnectionId: null,
@@ -400,9 +405,135 @@ describe("SandboxProfileRuntimeSection", () => {
       />,
     );
 
-    expect(screen.getByRole("combobox", { name: "Provider" })).toBeTruthy();
-    expect(screen.getByText("Select provider")).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Sandbox provider" })).toBeTruthy();
+    expect(screen.getByText("Select sandbox provider")).toBeTruthy();
     expect(screen.queryByText("Unknown provider")).toBeNull();
+  });
+
+  it("uses Tensorlake for the Mistle provider when multiple managed providers are configured", () => {
+    expect(resolveManagedSandboxProvider([DockerProvider, E2BProvider, TensorlakeProvider])).toBe(
+      TensorlakeProvider,
+    );
+  });
+
+  it("marks the runtime dirty when switching from Mistle to BYOK for the same provider", async () => {
+    let runtimeDraftState: SandboxProfileRuntimeDraftState | undefined;
+    render(
+      <MemoryRouter>
+        <SandboxProfileRuntimeSection
+          apiKeys={[]}
+          availableConnections={[E2BRuntimeConnection]}
+          availableTargets={[E2BRuntimeTarget]}
+          disabled={false}
+          isDraft={true}
+          onDraftStateChange={(nextState) => {
+            runtimeDraftState = nextState;
+          }}
+          providers={[E2BProvider]}
+          version={createVersion({
+            sandboxProvider: "e2b",
+            sandboxConnectionId: null,
+            sandboxResources: {
+              vcpuCount: 4,
+              memoryMb: 8192,
+            },
+          })}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(runtimeDraftState?.hasUnpersistedChanges).toBe(false);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Sandbox provider" }));
+    const organizationProviderOption = screen.getByRole("option", { name: "E2B" });
+    fireEvent.mouseMove(organizationProviderOption);
+    fireEvent.mouseDown(organizationProviderOption, { button: 0 });
+    fireEvent.mouseUp(organizationProviderOption, { button: 0 });
+    fireEvent.click(organizationProviderOption, { button: 0 });
+
+    await waitFor(() => {
+      expect(runtimeDraftState?.hasUnpersistedChanges).toBe(true);
+    });
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Connection" }));
+    const connectionOption = screen.getByRole("option", { name: "E2B Production" });
+    fireEvent.mouseMove(connectionOption);
+    fireEvent.mouseDown(connectionOption, { button: 0 });
+    fireEvent.mouseUp(connectionOption, { button: 0 });
+    fireEvent.click(connectionOption, { button: 0 });
+
+    await waitFor(() => {
+      if (runtimeDraftState === undefined) {
+        throw new Error("Expected runtime draft state to be available.");
+      }
+
+      if (runtimeDraftState.buildDraftChanges === undefined) {
+        throw new Error("Expected runtime draft changes builder to be available.");
+      }
+
+      expect(runtimeDraftState.buildDraftChanges()).toEqual(
+        expect.objectContaining({
+          sandboxConnectionId: E2BRuntimeConnection.id,
+          sandboxProvider: "e2b",
+          sandboxResources: {
+            vcpuCount: 4,
+            memoryMb: 8192,
+          },
+        }),
+      );
+    });
+  });
+
+  it("renders saved read-only managed resources without normalizing to the preferred provider", () => {
+    render(
+      <SandboxProfileRuntimeSection
+        apiKeys={[]}
+        availableConnections={[]}
+        availableTargets={[]}
+        disabled={false}
+        isDraft={false}
+        providers={[E2BProvider, TensorlakeProvider]}
+        version={createVersion({
+          sandboxProvider: "e2b",
+          sandboxConnectionId: null,
+          sandboxResources: {
+            vcpuCount: 2,
+            memoryMb: 4096,
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Mistle")).toBeTruthy();
+    expect(screen.getByText("2 vCPU")).toBeTruthy();
+    expect(screen.getByText("4096 MB")).toBeTruthy();
+    expect(screen.queryByText("Storage (MB)")).toBeNull();
+  });
+
+  it("renders saved read-only null-connection providers as Mistle when the catalog no longer marks the provider managed", () => {
+    render(
+      <SandboxProfileRuntimeSection
+        apiKeys={[]}
+        availableConnections={[]}
+        availableTargets={[]}
+        disabled={false}
+        isDraft={false}
+        providers={[OrganizationE2BProvider, TensorlakeProvider]}
+        version={createVersion({
+          sandboxProvider: "e2b",
+          sandboxConnectionId: null,
+          sandboxResources: {
+            vcpuCount: 2,
+            memoryMb: 4096,
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Mistle")).toBeTruthy();
+    expect(screen.queryByText("Connection")).toBeNull();
+    expect(screen.queryByText("Select connection")).toBeNull();
+    expect(screen.queryByText("E2B")).toBeNull();
   });
 
   it("marks a saved sandbox provider as unavailable when it is no longer listed", () => {
@@ -425,7 +556,7 @@ describe("SandboxProfileRuntimeSection", () => {
       />,
     );
 
-    expect(screen.getByText("Provider unavailable")).toBeTruthy();
+    expect(screen.getByText("Sandbox provider unavailable")).toBeTruthy();
     expect(screen.queryByText("Unknown provider")).toBeNull();
   });
 
@@ -437,7 +568,7 @@ describe("SandboxProfileRuntimeSection", () => {
         availableTargets={[E2BRuntimeTarget]}
         disabled={false}
         isDraft={true}
-        providers={[DockerProvider, E2BProvider]}
+        providers={[E2BProvider]}
         version={createVersion({
           sandboxProvider: "e2b",
           sandboxConnectionId: E2BRuntimeConnection.id,
@@ -449,11 +580,11 @@ describe("SandboxProfileRuntimeSection", () => {
       />,
     );
 
-    expect(screen.getByText("Use workspace API key")).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "Connection" }).hasAttribute("disabled")).toBe(
       false,
     );
     expect(screen.getByText("E2B Production")).toBeTruthy();
+    expect(screen.getByText("E2B")).toBeTruthy();
     expect(screen.queryByText("E2B (Managed)")).toBeNull();
   });
 
@@ -481,10 +612,10 @@ describe("SandboxProfileRuntimeSection", () => {
 
     expect(screen.getByText("Agent")).toBeTruthy();
     expect(screen.getByText("Codex")).toBeTruthy();
-    expect(screen.getByText("Sandbox Runtime")).toBeTruthy();
+    expect(screen.getByText("Sandbox provider")).toBeTruthy();
     expect(screen.queryByText("Provider")).toBeNull();
-    expect(screen.getByText("Credentials")).toBeTruthy();
-    expect(screen.getByText("Use workspace API key")).toBeTruthy();
+    expect(screen.queryByText("Credentials")).toBeNull();
+    expect(screen.queryByText("Use workspace API key")).toBeNull();
     expect(screen.getByText("Connection")).toBeTruthy();
     expect(screen.getByText("E2B Production")).toBeTruthy();
     expect(screen.getByText("CPU")).toBeTruthy();
@@ -496,7 +627,7 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(screen.queryByText("Resources")).toBeNull();
   });
 
-  it("requires BYOK credentials for a non-managed provider without a saved connection", () => {
+  it("requires BYOK credentials after selecting a non-managed provider without a connection", () => {
     render(
       <MemoryRouter>
         <SandboxProfileRuntimeSection
@@ -518,16 +649,20 @@ describe("SandboxProfileRuntimeSection", () => {
           isDraft={true}
           providers={[DockerProvider, OrganizationE2BProvider]}
           version={createVersion({
-            sandboxProvider: "e2b",
+            sandboxProvider: null,
             sandboxConnectionId: null,
-            sandboxResources: {
-              vcpuCount: 2,
-              memoryMb: 4096,
-            },
+            sandboxResources: null,
           })}
         />
       </MemoryRouter>,
     );
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Sandbox provider" }));
+    const organizationProviderOption = screen.getByRole("option", { name: "E2B" });
+    fireEvent.mouseMove(organizationProviderOption);
+    fireEvent.mouseDown(organizationProviderOption, { button: 0 });
+    fireEvent.mouseUp(organizationProviderOption, { button: 0 });
+    fireEvent.click(organizationProviderOption, { button: 0 });
 
     expect(screen.queryByRole("combobox", { name: "API key" })).toBeNull();
     expect(screen.getByRole("combobox", { name: "Connection" }).hasAttribute("disabled")).toBe(
