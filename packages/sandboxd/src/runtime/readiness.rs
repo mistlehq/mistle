@@ -120,6 +120,19 @@ impl RuntimeReadinessManager {
         self.ready
     }
 
+    /// Returns the initial readiness message for a newly connected tunnel.
+    pub fn take_initial_publishable_state(&mut self) -> Option<RuntimeReadyState> {
+        if !self.tunnel_connected {
+            return None;
+        }
+
+        self.last_published_ready = Some(self.ready);
+        Some(RuntimeReadyState {
+            message_type: RuntimeReadyMessageType::State,
+            ready: self.ready,
+        })
+    }
+
     /// Returns the next publishable runtime-readiness message, if any.
     pub fn take_publishable_state(&mut self) -> Option<RuntimeReadyState> {
         if !self.tunnel_connected || self.last_published_ready == Some(self.ready) {
@@ -153,10 +166,26 @@ mod tests {
         manager.on_tunnel_connected();
 
         let state = manager
-            .take_publishable_state()
+            .take_initial_publishable_state()
             .expect("tunnel connect should trigger an immediate runtime-ready publish");
         assert_eq!(state.message_type, RuntimeReadyMessageType::State);
         assert!(!state.ready);
+    }
+
+    #[test]
+    fn publishes_initial_state_for_each_connected_tunnel() {
+        let mut manager = RuntimeReadinessManager::default();
+        manager.set_ready(true);
+        manager.on_tunnel_connected();
+        let first_state = manager
+            .take_initial_publishable_state()
+            .expect("first tunnel should publish initial readiness");
+        assert!(first_state.ready);
+
+        let second_state = manager
+            .take_initial_publishable_state()
+            .expect("second tunnel should publish initial readiness even when ready is unchanged");
+        assert!(second_state.ready);
     }
 
     #[test]

@@ -6,6 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::protocol::activation::ActivationInput;
 use crate::protocol::startup::StartupInput;
 
 /// Enumerates JSON requests accepted by the local control socket.
@@ -19,11 +20,11 @@ pub(super) enum ControlRequest {
         startup_input: StartupInput,
         #[serde(default = "default_wait_for_completion")]
         wait_for_completion: bool,
-        #[serde(default)]
-        wait_for_storage_attach: bool,
     },
     #[serde(rename = "resume")]
     Resume { startup_input: StartupInput },
+    #[serde(rename = "activate")]
+    Activate { activation_input: ActivationInput },
     #[serde(rename = "waitInit")]
     WaitInit,
     #[serde(rename = "sign")]

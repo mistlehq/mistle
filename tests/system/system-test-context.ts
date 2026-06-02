@@ -60,7 +60,6 @@ export type SystemTestFixture = {
   readRequestCookie: (signInResponse: Response) => string;
   createOrganization: (input: { cookie: string; name: string; slug: string }) => Promise<string>;
   authSession: (input?: { email?: string }) => Promise<AuthenticatedSession>;
-  enableManagedPersistentSandboxes: (input: { cookie: string }) => Promise<void>;
   startSandboxAndWaitReady: () => Promise<string>;
   runSandboxPtyCommand: (input: {
     sandboxInstanceId: string;
@@ -178,16 +177,6 @@ const ResumeSandboxInstanceAcceptedResponseSchema = z
     status: z.literal("accepted"),
     sandboxInstanceId: z.string().min(1),
     workflowRunId: z.string().min(1),
-  })
-  .strict();
-
-const OrganizationSandboxStorageSettingsResponseSchema = z
-  .object({
-    persistentSandboxesEnabled: z.boolean(),
-    storageConfigSource: z.enum(["managed", "organization"]),
-    storageBackend: z.enum(["archil"]).nullable(),
-    storageConfigVersion: z.number().int().nullable(),
-    organizationStorageConfigSummary: z.unknown().nullable(),
   })
   .strict();
 
@@ -1126,27 +1115,6 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
           userId: user.id,
         };
       };
-      const enableManagedPersistentSandboxes = async (input: { cookie: string }): Promise<void> => {
-        await requestJsonOrThrow({
-          request,
-          path: "/v1/organization/sandbox-storage-settings",
-          expectedStatus: 200,
-          description: "organization sandbox storage settings update",
-          schema: OrganizationSandboxStorageSettingsResponseSchema,
-          init: {
-            method: "PUT",
-            headers: {
-              "content-type": "application/json",
-              cookie: input.cookie,
-            },
-            body: JSON.stringify({
-              persistentSandboxesEnabled: true,
-              storageConfigSource: "managed",
-              organizationStorageConfig: null,
-            }),
-          },
-        });
-      };
       const ensureSandboxControlContext = async (): Promise<SandboxControlContext> => {
         if (sandboxControlContext !== undefined) {
           return sandboxControlContext;
@@ -1702,7 +1670,6 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
             readRequestCookie,
             createOrganization,
             authSession,
-            enableManagedPersistentSandboxes,
             startSandboxAndWaitReady,
             runSandboxPtyCommand,
             openPtyAndAssertRoundTrip,

@@ -15706,515 +15706,6 @@
         }
       }
     },
-    "/v1/organization/sandbox-storage-settings": {
-      "get": {
-        "tags": ["Organizations"],
-        "responses": {
-          "200": {
-            "description": "Current sandbox storage settings for the active organization.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "persistentSandboxesEnabled": {
-                      "type": "boolean"
-                    },
-                    "storageConfigSource": {
-                      "type": "string",
-                      "enum": ["managed", "organization"]
-                    },
-                    "storageBackend": {
-                      "type": ["string", "null"],
-                      "enum": ["archil", null]
-                    },
-                    "storageConfigVersion": {
-                      "type": ["integer", "null"]
-                    },
-                    "organizationStorageConfigSummary": {
-                      "type": ["object", "null"],
-                      "properties": {
-                        "backend": {
-                          "type": "string",
-                          "enum": ["archil"]
-                        },
-                        "region": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "namePrefix": {
-                          "type": ["string", "null"],
-                          "minLength": 1
-                        },
-                        "apiKeyConfigured": {
-                          "type": "boolean"
-                        },
-                        "mounts": {
-                          "anyOf": [
-                            {
-                              "type": "array",
-                              "prefixItems": []
-                            },
-                            {
-                              "type": "array",
-                              "prefixItems": [
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "type": {
-                                      "type": "string",
-                                      "enum": ["s3-compatible"]
-                                    },
-                                    "bucket": {
-                                      "type": "string",
-                                      "minLength": 1
-                                    },
-                                    "endpoint": {
-                                      "type": "string",
-                                      "minLength": 1
-                                    },
-                                    "accessKeyId": {
-                                      "type": "string",
-                                      "minLength": 1
-                                    },
-                                    "secretAccessKeyConfigured": {
-                                      "type": "boolean"
-                                    }
-                                  },
-                                  "required": [
-                                    "type",
-                                    "bucket",
-                                    "endpoint",
-                                    "accessKeyId",
-                                    "secretAccessKeyConfigured"
-                                  ],
-                                  "additionalProperties": false
-                                }
-                              ]
-                            }
-                          ]
-                        }
-                      },
-                      "required": ["backend", "region", "namePrefix", "apiKeyConfigured", "mounts"],
-                      "additionalProperties": false
-                    }
-                  },
-                  "required": [
-                    "persistentSandboxesEnabled",
-                    "storageConfigSource",
-                    "storageBackend",
-                    "storageConfigVersion",
-                    "organizationStorageConfigSummary"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["UNAUTHORIZED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden request.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["FORBIDDEN"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Organization was not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["NOT_FOUND"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": ["Organizations"],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "oneOf": [
-                  {
-                    "type": "object",
-                    "properties": {
-                      "persistentSandboxesEnabled": {
-                        "type": "boolean"
-                      },
-                      "storageConfigSource": {
-                        "type": "string",
-                        "enum": ["managed"]
-                      },
-                      "organizationStorageConfig": {
-                        "type": "null"
-                      }
-                    },
-                    "required": [
-                      "persistentSandboxesEnabled",
-                      "storageConfigSource",
-                      "organizationStorageConfig"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "persistentSandboxesEnabled": {
-                        "type": "boolean"
-                      },
-                      "storageConfigSource": {
-                        "type": "string",
-                        "enum": ["organization"]
-                      },
-                      "organizationStorageConfig": {
-                        "type": "object",
-                        "properties": {
-                          "backend": {
-                            "type": "string",
-                            "enum": ["archil"]
-                          },
-                          "apiKey": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "region": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "namePrefix": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "mounts": {
-                            "anyOf": [
-                              {
-                                "type": "array",
-                                "prefixItems": []
-                              },
-                              {
-                                "type": "array",
-                                "prefixItems": [
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "type": {
-                                        "type": "string",
-                                        "enum": ["s3-compatible"]
-                                      },
-                                      "bucket": {
-                                        "type": "string",
-                                        "minLength": 1
-                                      },
-                                      "endpoint": {
-                                        "type": "string",
-                                        "minLength": 1
-                                      },
-                                      "accessKeyId": {
-                                        "type": "string",
-                                        "minLength": 1
-                                      },
-                                      "secretAccessKey": {
-                                        "type": "string",
-                                        "minLength": 1
-                                      }
-                                    },
-                                    "required": [
-                                      "type",
-                                      "bucket",
-                                      "endpoint",
-                                      "accessKeyId",
-                                      "secretAccessKey"
-                                    ],
-                                    "additionalProperties": false
-                                  }
-                                ]
-                              }
-                            ]
-                          }
-                        },
-                        "required": ["backend", "apiKey", "region"],
-                        "additionalProperties": false
-                      }
-                    },
-                    "required": [
-                      "persistentSandboxesEnabled",
-                      "storageConfigSource",
-                      "organizationStorageConfig"
-                    ],
-                    "additionalProperties": false
-                  }
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated sandbox storage settings for the active organization.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "persistentSandboxesEnabled": {
-                      "type": "boolean"
-                    },
-                    "storageConfigSource": {
-                      "type": "string",
-                      "enum": ["managed", "organization"]
-                    },
-                    "storageBackend": {
-                      "type": ["string", "null"],
-                      "enum": ["archil", null]
-                    },
-                    "storageConfigVersion": {
-                      "type": ["integer", "null"]
-                    },
-                    "organizationStorageConfigSummary": {
-                      "type": ["object", "null"],
-                      "properties": {
-                        "backend": {
-                          "type": "string",
-                          "enum": ["archil"]
-                        },
-                        "region": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "namePrefix": {
-                          "type": ["string", "null"],
-                          "minLength": 1
-                        },
-                        "apiKeyConfigured": {
-                          "type": "boolean"
-                        },
-                        "mounts": {
-                          "anyOf": [
-                            {
-                              "type": "array",
-                              "prefixItems": []
-                            },
-                            {
-                              "type": "array",
-                              "prefixItems": [
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "type": {
-                                      "type": "string",
-                                      "enum": ["s3-compatible"]
-                                    },
-                                    "bucket": {
-                                      "type": "string",
-                                      "minLength": 1
-                                    },
-                                    "endpoint": {
-                                      "type": "string",
-                                      "minLength": 1
-                                    },
-                                    "accessKeyId": {
-                                      "type": "string",
-                                      "minLength": 1
-                                    },
-                                    "secretAccessKeyConfigured": {
-                                      "type": "boolean"
-                                    }
-                                  },
-                                  "required": [
-                                    "type",
-                                    "bucket",
-                                    "endpoint",
-                                    "accessKeyId",
-                                    "secretAccessKeyConfigured"
-                                  ],
-                                  "additionalProperties": false
-                                }
-                              ]
-                            }
-                          ]
-                        }
-                      },
-                      "required": ["backend", "region", "namePrefix", "apiKeyConfigured", "mounts"],
-                      "additionalProperties": false
-                    }
-                  },
-                  "required": [
-                    "persistentSandboxesEnabled",
-                    "storageConfigSource",
-                    "storageBackend",
-                    "storageConfigVersion",
-                    "organizationStorageConfigSummary"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request body.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["VALIDATION_ERROR"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["UNAUTHORIZED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden request.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["FORBIDDEN"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Organization was not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["NOT_FOUND"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/organization/members": {
       "get": {
         "tags": ["Organizations"],
@@ -21356,10 +20847,6 @@
                       "type": ["string", "null"],
                       "minLength": 1
                     },
-                    "defaultPersistenceMode": {
-                      "type": "string",
-                      "enum": ["ephemeral", "persistent"]
-                    },
                     "agentRuntimeId": {
                       "type": "string",
                       "enum": ["codex", "opencode", "pi"]
@@ -21402,6 +20889,35 @@
                         }
                       },
                       "required": ["vcpuCount", "memoryMb"],
+                      "additionalProperties": false
+                    },
+                    "skillsConfig": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "originUrl": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "selectedSkills": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "relativePath": {
+                                "type": "string",
+                                "pattern": "^(?:\\.|(?=.*\\S)(?!\\/)(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!.*\\/\\/).+)$"
+                              }
+                            },
+                            "required": ["name", "relativePath"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["originUrl", "selectedSkills"],
                       "additionalProperties": false
                     },
                     "isActive": {
@@ -21506,7 +21022,6 @@
                     "version",
                     "state",
                     "publishedAt",
-                    "defaultPersistenceMode",
                     "agentRuntimeId",
                     "gitCommitSigningIntegrationConnectionId",
                     "mistleMcpEnabled",
@@ -21515,6 +21030,7 @@
                     "sandboxConnectionId",
                     "maintenanceScript",
                     "sandboxResources",
+                    "skillsConfig",
                     "isActive",
                     "usable",
                     "refreshSchedule",
@@ -21690,10 +21206,6 @@
                             "type": ["string", "null"],
                             "minLength": 1
                           },
-                          "defaultPersistenceMode": {
-                            "type": "string",
-                            "enum": ["ephemeral", "persistent"]
-                          },
                           "agentRuntimeId": {
                             "type": "string",
                             "enum": ["codex", "opencode", "pi"]
@@ -21736,6 +21248,35 @@
                               }
                             },
                             "required": ["vcpuCount", "memoryMb"],
+                            "additionalProperties": false
+                          },
+                          "skillsConfig": {
+                            "type": ["object", "null"],
+                            "properties": {
+                              "originUrl": {
+                                "type": "string",
+                                "format": "uri"
+                              },
+                              "selectedSkills": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "relativePath": {
+                                      "type": "string",
+                                      "pattern": "^(?:\\.|(?=.*\\S)(?!\\/)(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!.*\\/\\/).+)$"
+                                    }
+                                  },
+                                  "required": ["name", "relativePath"],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": ["originUrl", "selectedSkills"],
                             "additionalProperties": false
                           },
                           "isActive": {
@@ -21840,7 +21381,6 @@
                           "version",
                           "state",
                           "publishedAt",
-                          "defaultPersistenceMode",
                           "agentRuntimeId",
                           "gitCommitSigningIntegrationConnectionId",
                           "mistleMcpEnabled",
@@ -21849,6 +21389,7 @@
                           "sandboxConnectionId",
                           "maintenanceScript",
                           "sandboxResources",
+                          "skillsConfig",
                           "isActive",
                           "usable",
                           "refreshSchedule",
@@ -23406,6 +22947,519 @@
         }
       }
     },
+    "/v1/sandbox/profiles/{profileId}/versions/{version}/skills-sources": {
+      "get": {
+        "tags": ["Sandbox Profiles"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^sbp_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "profileId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "required": true,
+            "name": "version",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "required": false,
+            "name": "originUrl",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List synced skills sources for a sandbox profile version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "originUrl": {
+                            "type": "string"
+                          },
+                          "commitSha": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          },
+                          "skills": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "description": {
+                                  "type": "string"
+                                },
+                                "relativePath": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["name", "description", "relativePath"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "lastSyncedAt": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "originUrl",
+                          "commitSha",
+                          "skills",
+                          "lastSyncedAt",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sandbox profile or profile version was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROFILE_NOT_FOUND", "PROFILE_VERSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sandbox/profiles/{profileId}/versions/{version}/skills-sources/refresh": {
+      "post": {
+        "tags": ["Sandbox Profiles"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^sbp_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "profileId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "required": true,
+            "name": "version",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "originUrl": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": ["originUrl"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Refresh discovered skills for a sandbox profile version skills source.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sandboxInstanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "workflowRunId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "skillsSourceRepo": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "originUrl": {
+                          "type": "string"
+                        },
+                        "commitSha": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "skills": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "relativePath": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": ["name", "description", "relativePath"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "lastSyncedAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "originUrl",
+                        "commitSha",
+                        "skills",
+                        "lastSyncedAt",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["sandboxInstanceId", "workflowRunId", "skillsSourceRepo"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["INVALID_PRIMARY_REPOSITORY", "INVALID_SANDBOX_RUNTIME_CONFIG"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "AGENT_RUNTIME_REQUIRED",
+                            "SANDBOX_PROVIDER_REQUIRED",
+                            "INVALID_SANDBOX_PROVIDER",
+                            "INVALID_BINDING_CONNECTION_REFERENCE",
+                            "INVALID_CONNECTION_TARGET_REFERENCE",
+                            "CONNECTION_MISMATCH",
+                            "TARGET_DISABLED",
+                            "CONNECTION_NOT_ACTIVE",
+                            "KIND_MISMATCH",
+                            "INVALID_TARGET_CONFIG",
+                            "INVALID_TARGET_SECRETS",
+                            "INVALID_BINDING_CONFIG",
+                            "ROUTE_CONFLICT",
+                            "ARTIFACT_CONFLICT",
+                            "RUNTIME_CLIENT_SETUP_CONFLICT",
+                            "RUNTIME_CLIENT_SETUP_INVALID_REF"
+                          ]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sandbox profile or profile version was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROFILE_NOT_FOUND", "PROFILE_VERSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Sandbox profile version cannot refresh skills from the requested source.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROFILE_VERSION_NOT_USABLE"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/sandbox/profiles/{profileId}/versions/{version}/draft": {
       "put": {
         "tags": ["Sandbox Profiles"],
@@ -23440,10 +23494,6 @@
                   "setupScript": {
                     "type": ["string", "null"],
                     "minLength": 1
-                  },
-                  "defaultPersistenceMode": {
-                    "type": "string",
-                    "enum": ["ephemeral", "persistent"]
                   },
                   "agentRuntimeId": {
                     "type": "string",
@@ -23485,6 +23535,35 @@
                       }
                     },
                     "required": ["vcpuCount", "memoryMb"],
+                    "additionalProperties": false
+                  },
+                  "skillsConfig": {
+                    "type": ["object", "null"],
+                    "properties": {
+                      "originUrl": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "selectedSkills": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "relativePath": {
+                              "type": "string",
+                              "pattern": "^(?:\\.|(?=.*\\S)(?!\\/)(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!.*\\/\\/).+)$"
+                            }
+                          },
+                          "required": ["name", "relativePath"],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": ["originUrl", "selectedSkills"],
                     "additionalProperties": false
                   },
                   "integrationBindings": {
@@ -23549,10 +23628,6 @@
                     "setupScript": {
                       "type": ["string", "null"]
                     },
-                    "defaultPersistenceMode": {
-                      "type": "string",
-                      "enum": ["ephemeral", "persistent"]
-                    },
                     "agentRuntimeId": {
                       "type": "string",
                       "enum": ["codex", "opencode", "pi"]
@@ -23593,6 +23668,35 @@
                         }
                       },
                       "required": ["vcpuCount", "memoryMb"],
+                      "additionalProperties": false
+                    },
+                    "skillsConfig": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "originUrl": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "selectedSkills": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "relativePath": {
+                                "type": "string",
+                                "pattern": "^(?:\\.|(?=.*\\S)(?!\\/)(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!.*\\/\\/).+)$"
+                              }
+                            },
+                            "required": ["name", "relativePath"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["originUrl", "selectedSkills"],
                       "additionalProperties": false
                     },
                     "integrationBindings": {
@@ -23656,7 +23760,6 @@
                     "sandboxProfileId",
                     "version",
                     "setupScript",
-                    "defaultPersistenceMode",
                     "agentRuntimeId",
                     "gitCommitSigningIntegrationConnectionId",
                     "mistleMcpEnabled",
@@ -23664,6 +23767,7 @@
                     "sandboxProvider",
                     "sandboxConnectionId",
                     "sandboxResources",
+                    "skillsConfig",
                     "integrationBindings"
                   ],
                   "additionalProperties": false
@@ -24467,10 +24571,6 @@
                           "type": ["string", "null"],
                           "minLength": 1
                         },
-                        "defaultPersistenceMode": {
-                          "type": "string",
-                          "enum": ["ephemeral", "persistent"]
-                        },
                         "agentRuntimeId": {
                           "type": "string",
                           "enum": ["codex", "opencode", "pi"]
@@ -24513,6 +24613,35 @@
                             }
                           },
                           "required": ["vcpuCount", "memoryMb"],
+                          "additionalProperties": false
+                        },
+                        "skillsConfig": {
+                          "type": ["object", "null"],
+                          "properties": {
+                            "originUrl": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "selectedSkills": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "relativePath": {
+                                    "type": "string",
+                                    "pattern": "^(?:\\.|(?=.*\\S)(?!\\/)(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!.*\\/\\/).+)$"
+                                  }
+                                },
+                                "required": ["name", "relativePath"],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": ["originUrl", "selectedSkills"],
                           "additionalProperties": false
                         },
                         "isActive": {
@@ -24617,7 +24746,6 @@
                         "version",
                         "state",
                         "publishedAt",
-                        "defaultPersistenceMode",
                         "agentRuntimeId",
                         "gitCommitSigningIntegrationConnectionId",
                         "mistleMcpEnabled",
@@ -24626,6 +24754,7 @@
                         "sandboxConnectionId",
                         "maintenanceScript",
                         "sandboxResources",
+                        "skillsConfig",
                         "isActive",
                         "usable",
                         "refreshSchedule",
@@ -24888,10 +25017,6 @@
                           "type": ["string", "null"],
                           "minLength": 1
                         },
-                        "defaultPersistenceMode": {
-                          "type": "string",
-                          "enum": ["ephemeral", "persistent"]
-                        },
                         "agentRuntimeId": {
                           "type": "string",
                           "enum": ["codex", "opencode", "pi"]
@@ -24934,6 +25059,35 @@
                             }
                           },
                           "required": ["vcpuCount", "memoryMb"],
+                          "additionalProperties": false
+                        },
+                        "skillsConfig": {
+                          "type": ["object", "null"],
+                          "properties": {
+                            "originUrl": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "selectedSkills": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "relativePath": {
+                                    "type": "string",
+                                    "pattern": "^(?:\\.|(?=.*\\S)(?!\\/)(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!.*\\/\\/).+)$"
+                                  }
+                                },
+                                "required": ["name", "relativePath"],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": ["originUrl", "selectedSkills"],
                           "additionalProperties": false
                         },
                         "isActive": {
@@ -25038,7 +25192,6 @@
                         "version",
                         "state",
                         "publishedAt",
-                        "defaultPersistenceMode",
                         "agentRuntimeId",
                         "gitCommitSigningIntegrationConnectionId",
                         "mistleMcpEnabled",
@@ -25047,6 +25200,7 @@
                         "sandboxConnectionId",
                         "maintenanceScript",
                         "sandboxResources",
+                        "skillsConfig",
                         "isActive",
                         "usable",
                         "refreshSchedule",
@@ -25292,10 +25446,6 @@
                           "type": ["string", "null"],
                           "minLength": 1
                         },
-                        "defaultPersistenceMode": {
-                          "type": "string",
-                          "enum": ["ephemeral", "persistent"]
-                        },
                         "agentRuntimeId": {
                           "type": "string",
                           "enum": ["codex", "opencode", "pi"]
@@ -25338,6 +25488,35 @@
                             }
                           },
                           "required": ["vcpuCount", "memoryMb"],
+                          "additionalProperties": false
+                        },
+                        "skillsConfig": {
+                          "type": ["object", "null"],
+                          "properties": {
+                            "originUrl": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "selectedSkills": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "relativePath": {
+                                    "type": "string",
+                                    "pattern": "^(?:\\.|(?=.*\\S)(?!\\/)(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!.*\\/\\/).+)$"
+                                  }
+                                },
+                                "required": ["name", "relativePath"],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": ["originUrl", "selectedSkills"],
                           "additionalProperties": false
                         },
                         "isActive": {
@@ -25442,7 +25621,6 @@
                         "version",
                         "state",
                         "publishedAt",
-                        "defaultPersistenceMode",
                         "agentRuntimeId",
                         "gitCommitSigningIntegrationConnectionId",
                         "mistleMcpEnabled",
@@ -25451,6 +25629,7 @@
                         "sandboxConnectionId",
                         "maintenanceScript",
                         "sandboxResources",
+                        "skillsConfig",
                         "isActive",
                         "usable",
                         "refreshSchedule",

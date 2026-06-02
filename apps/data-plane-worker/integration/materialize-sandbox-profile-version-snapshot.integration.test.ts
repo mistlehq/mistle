@@ -274,7 +274,6 @@ describe.concurrent("data-plane worker snapshot materialization", () => {
       startedById: "ssj_snapshot_lifecycle_sequence_integration",
       source: SandboxInstanceSources.SYSTEM,
       purpose: SandboxInstancePurposes.SNAPSHOT,
-      persistenceMode: "ephemeral",
     });
 
     await markSandboxInstanceStarting({
@@ -388,9 +387,6 @@ function createWorkerConfig(env: IntegrationTestEnvironment): DataPlaneWorkerCon
       baseUrl: env.controlPlaneApi.hostBaseUrl,
     },
     sandbox: {
-      storage: {
-        backend: "docker_volume",
-      },
       internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
       bootstrap: {
         tokenSecret: "integration-new-bootstrap-token-secret",
@@ -400,11 +396,6 @@ function createWorkerConfig(env: IntegrationTestEnvironment): DataPlaneWorkerCon
       docker: {
         enabled: true,
         socketPath: DockerSocketPath,
-      },
-    },
-    sandboxStorage: {
-      dockerVolume: {
-        namePrefix: "integration-new-worker-snapshot-",
       },
     },
     internalAuth: {

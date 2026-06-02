@@ -115,8 +115,6 @@ export const ReconcileSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         sandboxInstanceId: input.sandboxInstanceId,
         runtimeProvider: inputState.usageEventState.runtimeProvider,
         providerSandboxId: inputState.usageEventState.providerSandboxId,
-        storageProvider: null,
-        providerStorageId: null,
         computeGeneration: inputState.usageEventState.computeGeneration,
         eventType: inputState.eventType,
         vcpuCount: inputState.usageEventState.vcpuCount,

@@ -12,7 +12,7 @@ use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::{Error as WebSocketError, Message};
 use url::Url;
 
-use crate::protocol::startup::StartupInput;
+use crate::protocol::session::SessionRuntimeInput;
 use crate::supervision::SupervisedComponent;
 use crate::time::Clock;
 use crate::tunnel::file_search::{FileSearchWorkerCommand, spawn_file_search_worker};

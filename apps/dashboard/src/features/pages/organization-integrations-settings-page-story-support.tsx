@@ -284,7 +284,7 @@ function createAvailableCardOverview(
     displayName: definition.displayName,
     integrationKind: definition.kind,
     ...(definition.logoKey === undefined ? {} : { logoKey: definition.logoKey }),
-    onAction: () => {},
+    actionHref: `/integrations/${definition.variantId}/add`,
     targetKey: definition.variantId,
   };
 }

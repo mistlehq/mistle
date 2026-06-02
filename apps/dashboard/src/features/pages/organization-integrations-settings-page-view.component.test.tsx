@@ -2,6 +2,7 @@
 
 import { listBrowserIntegrationDefinitions } from "@mistle/integrations-definitions/browser";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { createAvailableCardsOverview } from "./organization-integrations-settings-page-story-support.js";
@@ -31,41 +32,35 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
     }
   });
 
-  it("renders integration sections and forwards card actions", () => {
-    let selectedTargetKey: string | null = null;
-
+  it("renders integration sections with route-addressable card actions", () => {
     render(
-      <OrganizationIntegrationsSettingsPageView
-        availableCards={[
-          createOpenAiCard({
-            onAction: () => {
-              selectedTargetKey = "openai-default";
-            },
-          }),
-          createGitHubCard({
-            onAction: () => {
-              selectedTargetKey = "github-cloud";
-            },
-          }),
-        ]}
-        connectedCards={[
-          createGitHubCard({
-            targetKey: "github",
-            description: "2 connections",
-            actionLabel: "View",
-            onAction: () => {
-              selectedTargetKey = "github";
-            },
-          }),
-        ]}
-        loadErrorMessage={null}
-      />,
+      <MemoryRouter>
+        <OrganizationIntegrationsSettingsPageView
+          availableCards={[
+            createOpenAiCard({
+              actionHref: "/integrations/openai-default/add",
+            }),
+            createGitHubCard(),
+          ]}
+          connectedCards={[
+            createGitHubCard({
+              targetKey: "github",
+              description: "2 connections",
+              actionLabel: "View",
+              actionHref: "/integrations/github",
+            }),
+          ]}
+          loadErrorMessage={null}
+        />
+      </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "View" }));
-    expect(selectedTargetKey).toBe("github");
-    expect(screen.getAllByRole("button", { name: "Add" }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "View" })).toBeTruthy();
+    const viewAction = screen.getByRole("link", { name: "View" });
+    expect(viewAction.tagName).toBe("A");
+    expect(viewAction.getAttribute("href")).toBe("/integrations/github");
+    const addAction = screen.getByRole("link", { name: "Add" });
+    expect(addAction.tagName).toBe("A");
+    expect(addAction.getAttribute("href")).toBe("/integrations/openai-default/add");
     expect(screen.getByRole("tab", { name: "Models" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Git" })).toBeTruthy();
   });
@@ -85,11 +80,13 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
 
   it("filters available integrations across category tabs", () => {
     render(
-      <OrganizationIntegrationsSettingsPageView
-        availableCards={[createOpenAiCard(), createGitHubCard()]}
-        connectedCards={[]}
-        loadErrorMessage={null}
-      />,
+      <MemoryRouter>
+        <OrganizationIntegrationsSettingsPageView
+          availableCards={[createOpenAiCard(), createGitHubCard()]}
+          connectedCards={[]}
+          loadErrorMessage={null}
+        />
+      </MemoryRouter>,
     );
 
     const searchInput = screen.getByRole("textbox", { name: "Search integrations" });
@@ -108,11 +105,13 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
 
   it("keeps matching integrations visible when search removes the selected category tab", () => {
     render(
-      <OrganizationIntegrationsSettingsPageView
-        availableCards={[createOpenAiCard(), createGitHubCard()]}
-        connectedCards={[]}
-        loadErrorMessage={null}
-      />,
+      <MemoryRouter>
+        <OrganizationIntegrationsSettingsPageView
+          availableCards={[createOpenAiCard(), createGitHubCard()]}
+          connectedCards={[]}
+          loadErrorMessage={null}
+        />
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole("tab", { name: "Git" }));
@@ -128,22 +127,24 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
 
   it("hides integration directory sections when rendering a detail surface", () => {
     render(
-      <OrganizationIntegrationsSettingsPageView
-        availableCards={[createOpenAiCard()]}
-        connectedCards={[
-          createGitHubCard({
-            targetKey: "github",
-            description: "1 connection",
-            actionLabel: "View",
-          }),
-        ]}
-        detailSurface={<div>GitHub connection detail</div>}
-        loadErrorMessage={null}
-      />,
+      <MemoryRouter>
+        <OrganizationIntegrationsSettingsPageView
+          availableCards={[createOpenAiCard()]}
+          connectedCards={[
+            createGitHubCard({
+              targetKey: "github",
+              description: "1 connection",
+              actionLabel: "View",
+            }),
+          ]}
+          detailSurface={<div>GitHub connection detail</div>}
+          loadErrorMessage={null}
+        />
+      </MemoryRouter>,
     );
 
-    expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "View" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Add" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "View" })).toBeNull();
     expect(screen.getByRole("region", { name: "Integration detail" })).toBeTruthy();
   });
 });
@@ -181,8 +182,8 @@ function createSettingsPageCard(
 ): OrganizationIntegrationsSettingsPageCard {
   return {
     actionLabel: "Add",
+    actionHref: `/integrations/${input.targetKey}/add`,
     configStatus: "valid",
-    onAction: () => {},
     ...input,
   };
 }

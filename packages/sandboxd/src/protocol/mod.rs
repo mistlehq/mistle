@@ -3,6 +3,8 @@
 //! These types are intentionally serialization-focused; runtime behavior and
 //! validation live in the modules that consume startup input or tunnel traffic.
 
+pub mod activation;
 pub mod keepalive;
 pub mod runtime_state;
+pub mod session;
 pub mod startup;

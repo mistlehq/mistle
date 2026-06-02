@@ -15,6 +15,7 @@ describe("TextLink", () => {
 
     const link = screen.getByRole("link", { name: "Session title" });
     expect(link.getAttribute("href")).toBe("/sessions/example");
+    expect(link.className).toContain("cursor-default");
     expect(link.hasAttribute("target")).toBe(false);
     expect(link.hasAttribute("rel")).toBe(false);
     expect(container.querySelector('[data-icon="inline-end"]')).toBeNull();

@@ -11,7 +11,6 @@ import type {
   AppContextBindings,
   DataPlaneApiConfig,
   DataPlaneApiGlobalConfig,
-  DataPlaneApiSandboxStorageBackend,
   DataPlaneApp,
 } from "./types.js";
 
@@ -29,7 +28,6 @@ export type CreateAppInput = {
   environment: DataPlaneApiGlobalConfig["env"];
   internalAuthServiceToken: string;
   resources: AppRuntimeResources;
-  sandboxStorageBackend: DataPlaneApiSandboxStorageBackend;
 };
 
 export function createApp(input: CreateAppInput): DataPlaneApp {
@@ -41,15 +39,13 @@ export function createApp(input: CreateAppInput): DataPlaneApp {
     environment: input.environment,
     internalAuthServiceToken: input.internalAuthServiceToken,
     resources: input.resources,
-    sandboxStorageBackend: input.sandboxStorageBackend,
   });
 
   return app;
 }
 
 export function configureApp(input: CreateAppInput & { app: DataPlaneApp }): void {
-  const { app, config, environment, internalAuthServiceToken, resources, sandboxStorageBackend } =
-    input;
+  const { app, config, environment, internalAuthServiceToken, resources } = input;
 
   app.get("/__healthz", (ctx) => {
     return ctx.json({ ok: true });
@@ -71,7 +67,6 @@ export function configureApp(input: CreateAppInput & { app: DataPlaneApp }): voi
     ctx.set("internalAuthServiceToken", internalAuthServiceToken);
     ctx.set("resources", requestContext.resources);
     ctx.set("controlPlaneInternalClient", requestContext.resources.controlPlaneInternalClient);
-    ctx.set("sandboxStorageBackend", sandboxStorageBackend);
     await next();
   });
 

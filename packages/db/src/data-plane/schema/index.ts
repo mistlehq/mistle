@@ -4,7 +4,6 @@ export type { DataPlaneDbSchema } from "./factory.js";
 export {
   sandboxInstances,
   SandboxInstanceProviders,
-  SandboxInstancePersistenceModes,
   SandboxInstancePurposes,
   SandboxStopReasons,
   SandboxInstanceSources,
@@ -15,26 +14,12 @@ export type {
   InsertSandboxInstance,
   SandboxInstance,
   SandboxInstanceProvider,
-  SandboxInstancePersistenceMode,
   SandboxInstancePurpose,
   SandboxStopReason,
   SandboxInstanceSource,
   SandboxInstanceStarterKind,
   SandboxInstanceStatus,
 } from "./sandbox-instances.js";
-export {
-  sandboxInstanceStorages,
-  SandboxStorageCredentialKinds,
-  SandboxStorageProviders,
-  SandboxStorageStatuses,
-} from "./sandbox-instance-storages.js";
-export type {
-  InsertSandboxInstanceStorage,
-  SandboxInstanceStorage,
-  SandboxStorageCredentialKind,
-  SandboxStorageProvider,
-  SandboxStorageStatus,
-} from "./sandbox-instance-storages.js";
 export {
   sandboxOperationEvents,
   SandboxLifecyclePhases,

@@ -13,7 +13,7 @@ type OpenTargetRowProps = {
 export function OpenTargetRow(input: OpenTargetRowProps): React.JSX.Element {
   return (
     <button
-      className="group/open-target-row flex w-full flex-col gap-1 rounded-md px-3 py-2 text-left hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-60"
+      className="group/open-target-row flex w-full flex-col gap-1 rounded-md px-3 py-2 text-left hover:bg-muted/60 enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 [&:enabled_*]:cursor-pointer [&:disabled_*]:cursor-not-allowed"
       disabled={input.disabled}
       onClick={input.onClick}
       title={input.title}

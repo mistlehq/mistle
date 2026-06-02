@@ -7,7 +7,6 @@ import {
   IntegrationConnectionStatuses,
   OrganizationIdentityLinkProviderConfigStatus,
   SandboxProfileVersionAgentRuntimeIds,
-  SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
@@ -62,6 +61,7 @@ const EmptySandboxRuntimeConfig = {
   sandboxConnectionId: null,
   sandboxProvider: SandboxProvider.DOCKER,
   sandboxResources: null,
+  skillsConfig: null,
 };
 
 describe.concurrent("sandbox profile version draft put integration", () => {
@@ -115,7 +115,6 @@ describe.concurrent("sandbox profile version draft put integration", () => {
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
         setupScript: "pnpm install",
-        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
         sandboxProvider: SandboxProvider.DOCKER,
       }),
     );
@@ -143,7 +142,6 @@ describe.concurrent("sandbox profile version draft put integration", () => {
         body: JSON.stringify({
           setupScript: "pnpm install\npnpm dev:bootstrap",
           agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
-          defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
           integrationBindings: {
             bindings: [
               {
@@ -165,7 +163,6 @@ describe.concurrent("sandbox profile version draft put integration", () => {
       version: 1,
       setupScript: "pnpm install\npnpm dev:bootstrap",
       agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
-      defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
       ...EmptySandboxRuntimeConfig,
       integrationBindings: {
         bindings: [
@@ -187,7 +184,6 @@ describe.concurrent("sandbox profile version draft put integration", () => {
       columns: {
         setupScript: true,
         agentRuntimeId: true,
-        defaultPersistenceMode: true,
       },
       where: (table, { and, eq }) =>
         and(eq(table.sandboxProfileId, "sbp_draft_put_001"), eq(table.version, 1)),
@@ -195,7 +191,153 @@ describe.concurrent("sandbox profile version draft put integration", () => {
     expect(persistedVersion).toEqual({
       setupScript: "pnpm install\npnpm dev:bootstrap",
       agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
-      defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
+    });
+  });
+
+  it("updates the selected skills config using the source origin URL", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-draft-put-skills@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_draft_put_skills_001",
+        organizationId: session.organizationId,
+        displayName: "Draft Put Skills Profile",
+        createdAt: "2026-05-08T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_draft_put_skills_001",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const skillsConfig = {
+      originUrl: "https://github.com/mistle/skills.git",
+      selectedSkills: [
+        {
+          name: "pull-request-authoring",
+          relativePath: "skills/pull-request-authoring",
+        },
+        {
+          name: "sandbox-ops",
+          relativePath: "automation/sandbox-ops",
+        },
+      ],
+    };
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_draft_put_skills_001/versions/1/draft",
+      {
+        method: "PUT",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          skillsConfig,
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = PutSandboxProfileVersionDraftResponseSchema.parse(await response.json());
+    expect(responseBody.skillsConfig).toEqual(skillsConfig);
+
+    const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        skillsConfig: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, "sbp_draft_put_skills_001"), eq(table.version, 1)),
+    });
+    expect(persistedVersion).toEqual({
+      skillsConfig,
+    });
+  });
+
+  it("rejects malformed skills config URL and unsafe selected skill paths", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-draft-put-invalid-skills@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_draft_put_invalid_skills_001",
+        organizationId: session.organizationId,
+        displayName: "Draft Put Invalid Skills Profile",
+        createdAt: "2026-05-08T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_draft_put_invalid_skills_001",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const invalidInputs = [
+      {
+        skillsConfig: {
+          originUrl: "not-a-url",
+          selectedSkills: [
+            {
+              name: "sandbox-ops",
+              relativePath: "automation/sandbox-ops",
+            },
+          ],
+        },
+      },
+      {
+        skillsConfig: {
+          originUrl: "https://github.com/mistle/skills.git",
+          selectedSkills: [
+            {
+              name: "sandbox-ops",
+              relativePath: "../../outside",
+            },
+          ],
+        },
+      },
+    ];
+
+    for (const input of invalidInputs) {
+      const response = await env.controlPlaneApi.http.fetch(
+        "/v1/sandbox/profiles/sbp_draft_put_invalid_skills_001/versions/1/draft",
+        {
+          method: "PUT",
+          headers: {
+            cookie: session.cookie,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            skillsConfig: input.skillsConfig,
+          }),
+        },
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        code: "VALIDATION_ERROR",
+        message: "Invalid request.",
+      });
+    }
+
+    const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        skillsConfig: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, "sbp_draft_put_invalid_skills_001"), eq(table.version, 1)),
+    });
+    expect(persistedVersion).toEqual({
+      skillsConfig: null,
     });
   });
 
@@ -593,7 +735,6 @@ describe.concurrent("sandbox profile version draft put integration", () => {
         },
         body: JSON.stringify({
           setupScript: "pnpm install\npnpm test",
-          defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
         }),
       },
     );
@@ -604,20 +745,17 @@ describe.concurrent("sandbox profile version draft put integration", () => {
       sandboxProfileId: "sbp_draft_put_api_key_001",
       version: 1,
       setupScript: "pnpm install\npnpm test",
-      defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
     });
 
     const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
       columns: {
         setupScript: true,
-        defaultPersistenceMode: true,
       },
       where: (table, { and, eq }) =>
         and(eq(table.sandboxProfileId, "sbp_draft_put_api_key_001"), eq(table.version, 1)),
     });
     expect(persistedVersion).toEqual({
       setupScript: "pnpm install\npnpm test",
-      defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
     });
   });
 
@@ -1100,7 +1238,6 @@ describe.concurrent("sandbox profile version draft put integration", () => {
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
         setupScript: "pnpm install",
-        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
       }),
     );
 
@@ -1114,7 +1251,6 @@ describe.concurrent("sandbox profile version draft put integration", () => {
         },
         body: JSON.stringify({
           setupScript: "pnpm install\npnpm dev:bootstrap",
-          defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
           integrationBindings: {
             bindings: [
               {
@@ -1137,14 +1273,12 @@ describe.concurrent("sandbox profile version draft put integration", () => {
     const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
       columns: {
         setupScript: true,
-        defaultPersistenceMode: true,
       },
       where: (table, { and, eq }) =>
         and(eq(table.sandboxProfileId, "sbp_draft_put_atomicity_001"), eq(table.version, 1)),
     });
     expect(persistedVersion).toEqual({
       setupScript: "pnpm install",
-      defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
     });
 
     const persistedBindings =

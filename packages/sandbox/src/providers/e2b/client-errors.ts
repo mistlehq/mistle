@@ -77,14 +77,6 @@ export const E2BClientOperationIds = {
    * for `/opt/mistle/bin/sandboxd resume`.
    */
   RESUME: "resume",
-  /**
-   * `sandbox.commands.run(...)` for in-guest Archil mount and bind-mount orchestration.
-   */
-  ATTACH_STORAGE: "attach_storage",
-  /**
-   * `sandbox.commands.run(...)` for in-guest bind-mount and Archil unmount cleanup.
-   */
-  CLEANUP_STORAGE: "cleanup_storage",
   ENSURE_SANDBOXD: "ensure_sandboxd",
   STOP_SANDBOXD_DAEMON: "stop_sandboxd_daemon",
   RESET_TRANSPARENT_EGRESS_NFTABLES: "reset_transparent_egress_nftables",

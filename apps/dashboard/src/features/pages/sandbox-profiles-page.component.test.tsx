@@ -202,9 +202,13 @@ describe("SandboxProfilesPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole("button", { name: "Draft profile" })).toBeDefined();
+    expect(screen.getByRole("link", { name: "Draft profile" }).getAttribute("href")).toBe(
+      "/sandbox-profiles/sbp_123",
+    );
     expect(screen.getByText("Not published")).toBeDefined();
-    expect(screen.getByRole("button", { name: "Published profile" })).toBeDefined();
+    expect(screen.getByRole("link", { name: "Published profile" }).getAttribute("href")).toBe(
+      "/sandbox-profiles/sbp_456",
+    );
     expect(screen.getByText("Published v1")).toBeDefined();
     expect(screen.queryByLabelText("pagination")).toBeNull();
   });

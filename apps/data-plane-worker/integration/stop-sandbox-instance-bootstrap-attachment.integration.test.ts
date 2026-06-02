@@ -5,7 +5,6 @@
 import { randomUUID } from "node:crypto";
 
 import {
-  SandboxInstancePersistenceModes,
   SandboxInstancePurposes,
   SandboxInstanceSources,
   SandboxInstanceStatuses,
@@ -133,7 +132,6 @@ async function insertRunningSandboxInstance(
     runtimeProvider: "docker",
     providerSandboxId: `provider-${sandboxInstanceId}`,
     status: SandboxInstanceStatuses.RUNNING,
-    persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
     purpose: SandboxInstancePurposes.SESSION,
     startedByKind: "system",
     startedById: `worker_${sandboxInstanceId}`,
@@ -153,7 +151,6 @@ async function insertStoppedSandboxInstance(
     runtimeProvider: "docker",
     providerSandboxId: `provider-${sandboxInstanceId}`,
     status: SandboxInstanceStatuses.STOPPED,
-    persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
     purpose: SandboxInstancePurposes.SESSION,
     startedByKind: "system",
     startedById: `worker_${sandboxInstanceId}`,

@@ -22,7 +22,6 @@ const ControlPlaneStaticTableNames = new Set([
   "members",
   "organizationCredentialKeys",
   "organizationIdentityLinkProviderConfigs",
-  "organizationSandboxStorageSettings",
   "organizations",
   "sandboxProfileSnapshotRefreshScheduleTargets",
   "sandboxProfileVersionIntegrationBindings",
@@ -46,7 +45,6 @@ const ControlPlaneStaticTableNames = new Set([
 const DataPlaneStaticTableNames = new Set([
   "sandboxInstanceDeadlines",
   "sandboxInstanceRuntimePlans",
-  "sandboxInstanceStorages",
   "sandboxInstances",
   "sandboxTunnelTokenRedemptions",
 ]);

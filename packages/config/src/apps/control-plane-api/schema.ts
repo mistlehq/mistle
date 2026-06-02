@@ -3,7 +3,6 @@ import { z } from "zod";
 import {
   GlobalSandboxTokenConfigSchema,
   GlobalTelemetryConfigSchema,
-  SandboxStorageBackend,
 } from "../../global/schema.js";
 
 const DefaultE2BCloudDomain = "e2b.app";
@@ -188,9 +187,6 @@ export const ControlPlaneApiSandboxRuntimeConfigSchema = z
     defaultBaseImage: z.string().trim().min(1),
     gatewayWsUrl: z.string().trim().min(1),
     bootstrap: GlobalSandboxTokenConfigSchema.optional(),
-    storageBackend: z
-      .enum([SandboxStorageBackend.ARCHIL, SandboxStorageBackend.DOCKER_VOLUME])
-      .optional(),
     docker: ControlPlaneApiSandboxDockerConfigSchema.optional(),
     e2b: ControlPlaneApiSandboxE2BConfigSchema.optional(),
     tensorlake: ControlPlaneApiSandboxTensorlakeConfigSchema.optional(),

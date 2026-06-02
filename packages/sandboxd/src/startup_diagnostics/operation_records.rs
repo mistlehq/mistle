@@ -132,7 +132,6 @@ pub(super) fn operation_lifecycle_phase(phase: &str) -> Option<&'static str> {
         "start_tunnel_session" | "stop_tunnel_session" | "attach_runtime_environment" => {
             Some("operation_stream")
         }
-        "wait_storage_attach" => Some("storage_attach"),
         "ready" => Some("ready"),
         phase if phase.starts_with("stop_tunnel_session_") => Some("operation_stream"),
         phase if phase.starts_with("stop_egress_proxy") => Some("teardown"),

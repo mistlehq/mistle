@@ -7,20 +7,23 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use crate::protocol::startup::StartupInput;
+use crate::protocol::session::SessionRuntimeInput;
 
 pub fn apply_git_identity(
-    startup_input: &StartupInput,
+    session_input: &SessionRuntimeInput,
     global_config_path: &Path,
 ) -> Result<(), String> {
     ensure_global_git_config_parent_exists(global_config_path)?;
 
-    if let Some(git_identity) = startup_input.git_identity.as_ref() {
+    if let Some(git_identity) = session_input.git_identity.as_ref() {
         apply_global_git_config(global_config_path, "user.name", &git_identity.name)?;
         apply_global_git_config(global_config_path, "user.email", &git_identity.email)?;
+    } else {
+        unset_global_git_config(global_config_path, "user.name")?;
+        unset_global_git_config(global_config_path, "user.email")?;
     }
 
-    match startup_input
+    match session_input
         .git_identity
         .as_ref()
         .and_then(|git_identity| git_identity.signing.as_ref())
@@ -118,6 +121,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::{apply_git_identity, apply_global_git_config};
+    use crate::protocol::session::SessionRuntimeInput;
     use crate::protocol::startup::{GitIdentity, GitSigningConfig, StartupInput, StartupMode};
     use crate::test_support::TestEnvVarsGuard;
 
@@ -128,9 +132,9 @@ mod tests {
         let test_dir = create_temp_test_dir("git_identity");
         let global_git_config_path = global_git_config_path(&test_dir);
 
-        apply_git_identity(&StartupInput {
+        let startup_input = StartupInput {
             startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token".to_string(),
             tunnel_exchange_token: "exchange-token".to_string(),
@@ -155,7 +159,11 @@ mod tests {
                 signing: None,
             }),
             transparent_proxy: None,
-        }, &global_git_config_path)
+        };
+        apply_git_identity(
+            &SessionRuntimeInput::from_startup_input(&startup_input),
+            &global_git_config_path,
+        )
         .expect("git identity should apply successfully");
 
         let git_config_contents =
@@ -184,35 +192,36 @@ mod tests {
             ),
         ]);
 
-        apply_git_identity(
-            &StartupInput {
-                startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-                execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
-                bootstrap_token: "bootstrap-token".to_string(),
-                tunnel_exchange_token: "exchange-token".to_string(),
-                tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+            bootstrap_token: "bootstrap-token".to_string(),
+            tunnel_exchange_token: "exchange-token".to_string(),
+            tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
             acting_user_id: None,
-                runtime_plan: serde_json::json!({
-                    "sandboxProfileId": "sbp_123",
-                    "version": 1,
-                    "image": {
-                        "source": "base",
-                        "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
-                    },
-                    "egressRoutes": [],
-                    "artifacts": [],
-                    "runtimeClients": [],
-                    "workspaceSources": [],
-                    "agentRuntimes": []
-                }),
-                git_identity: Some(GitIdentity {
-                    name: "Mistle User".to_string(),
-                    email: "mistle-user@example.com".to_string(),
-                    signing: None,
-                }),
-                transparent_proxy: None,
-            },
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "runtimeClients": [],
+                "workspaceSources": [],
+                "agentRuntimes": []
+            }),
+            git_identity: Some(GitIdentity {
+                name: "Mistle User".to_string(),
+                email: "mistle-user@example.com".to_string(),
+                signing: None,
+            }),
+            transparent_proxy: None,
+        };
+        apply_git_identity(
+            &SessionRuntimeInput::from_startup_input(&startup_input),
             &explicit_git_config_path,
         )
         .expect("git identity should apply successfully");
@@ -230,9 +239,9 @@ mod tests {
         let test_dir = create_temp_test_dir("git_identity_signing");
         let global_git_config_path = global_git_config_path(&test_dir);
 
-        apply_git_identity(&StartupInput {
+        let startup_input = StartupInput {
             startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token".to_string(),
             tunnel_exchange_token: "exchange-token".to_string(),
@@ -266,7 +275,11 @@ mod tests {
                 }),
             }),
             transparent_proxy: None,
-        }, &global_git_config_path)
+        };
+        apply_git_identity(
+            &SessionRuntimeInput::from_startup_input(&startup_input),
+            &global_git_config_path,
+        )
         .expect("git identity should apply successfully");
 
         let git_config_contents =
@@ -301,9 +314,9 @@ mod tests {
         )
         .expect("precondition git config should write");
 
-        apply_git_identity(&StartupInput {
+        let startup_input = StartupInput {
             startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token".to_string(),
             tunnel_exchange_token: "exchange-token".to_string(),
@@ -328,11 +341,84 @@ mod tests {
                 signing: None,
             }),
             transparent_proxy: None,
-        }, &global_git_config_path)
+        };
+        apply_git_identity(
+            &SessionRuntimeInput::from_startup_input(&startup_input),
+            &global_git_config_path,
+        )
         .expect("git identity should apply successfully");
 
         let git_config_contents =
             fs::read_to_string(&global_git_config_path).expect("git config should be written");
+        assert!(!git_config_contents.contains("format = ssh"));
+        assert!(!git_config_contents.contains("program = /opt/mistle/bin/mistle-ssh-sign"));
+        assert!(!git_config_contents.contains("signingkey = key::ssh-ed25519"));
+
+        fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn clears_existing_git_identity_when_identity_is_absent() {
+        let test_dir = create_temp_test_dir("git_identity_clear_identity");
+        let global_git_config_path = global_git_config_path(&test_dir);
+
+        apply_global_git_config(&global_git_config_path, "user.name", "Rejected User")
+            .expect("precondition git config should write");
+        apply_global_git_config(
+            &global_git_config_path,
+            "user.email",
+            "rejected@example.com",
+        )
+        .expect("precondition git config should write");
+        apply_global_git_config(&global_git_config_path, "gpg.format", "ssh")
+            .expect("precondition git config should write");
+        apply_global_git_config(
+            &global_git_config_path,
+            "gpg.ssh.program",
+            "/opt/mistle/bin/mistle-ssh-sign",
+        )
+        .expect("precondition git config should write");
+        apply_global_git_config(
+            &global_git_config_path,
+            "user.signingkey",
+            "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE",
+        )
+        .expect("precondition git config should write");
+
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+            bootstrap_token: "bootstrap-token".to_string(),
+            tunnel_exchange_token: "exchange-token".to_string(),
+            tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
+            acting_user_id: None,
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "runtimeClients": [],
+                "workspaceSources": [],
+                "agentRuntimes": []
+            }),
+            git_identity: None,
+            transparent_proxy: None,
+        };
+        apply_git_identity(
+            &SessionRuntimeInput::from_startup_input(&startup_input),
+            &global_git_config_path,
+        )
+        .expect("absent Git identity should clear managed Git config");
+
+        let git_config_contents =
+            fs::read_to_string(&global_git_config_path).expect("git config should be written");
+        assert!(!git_config_contents.contains("Rejected User"));
+        assert!(!git_config_contents.contains("rejected@example.com"));
         assert!(!git_config_contents.contains("format = ssh"));
         assert!(!git_config_contents.contains("program = /opt/mistle/bin/mistle-ssh-sign"));
         assert!(!git_config_contents.contains("signingkey = key::ssh-ed25519"));

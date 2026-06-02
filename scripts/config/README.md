@@ -32,13 +32,8 @@ Maintainer docs for local config initialization scripts.
 
 - Generated development and integration TOML files use the resource-oriented shape.
 - `config:init:integration` expects `MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS` to be set.
-- Docker-only integration configs use `sandbox.storage.backend = "docker_volume"`.
-- Integration configs with E2B enabled use Archil-backed storage and require a fully
-  populated managed Archil profile via env, including `api_key`, `region`, and
-  one S3-compatible mount.
-- Archil-backed development and test configs should point at a real remote
-  S3-compatible bucket. Do not assume the local SeaweedFS object store is a
-  supported Archil backing store.
+- Integration configs with E2B or Tensorlake enabled require only that provider's
+  API key and a remote sandbox base image.
 
 ## Preset Modules
 

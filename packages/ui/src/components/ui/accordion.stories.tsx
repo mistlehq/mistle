@@ -22,8 +22,7 @@ export const Default: Story = {
         <AccordionItem value="runtime">
           <AccordionTrigger>Runtime details</AccordionTrigger>
           <AccordionContent>
-            The session is pinned to the `ubuntu-22.04` image with persistent workspace mounting
-            enabled for iterative review work.
+            The session is pinned to the `ubuntu-22.04` image for iterative review work.
           </AccordionContent>
         </AccordionItem>
         <AccordionItem value="bindings">

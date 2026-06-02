@@ -181,16 +181,9 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
             await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
           await destroySandbox(
             {
-              db: ctx.db,
-              tables: ctx.tables,
-              controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-              config: ctx.config,
               sandboxAdapter: resolvedRuntime.sandboxAdapter,
             },
             {
-              sandboxInstanceId: workflowInput.sandboxInstanceId,
-              organizationId: workflowInput.organizationId,
-              persistenceMode: "ephemeral",
               runtimeProvider,
               providerSandboxId,
             },
@@ -369,7 +362,6 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
           organizationId: workflowInput.organizationId,
           sandboxProfileId: workflowInput.sandboxProfileId,
           sandboxProfileVersion: workflowInput.sandboxProfileVersion,
-          persistenceMode: "ephemeral",
           purpose: SandboxInstancePurposes.SNAPSHOT,
           startedBy: {
             kind: "system",
@@ -645,16 +637,9 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
 
           await destroySandbox(
             {
-              db: ctx.db,
-              tables: ctx.tables,
-              controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-              config: ctx.config,
               sandboxAdapter: resolvedRuntime.sandboxAdapter,
             },
             {
-              sandboxInstanceId: workflowInput.sandboxInstanceId,
-              organizationId: workflowInput.organizationId,
-              persistenceMode: "ephemeral",
               runtimeProvider: startedSandbox.runtimeProvider,
               providerSandboxId: startedSandbox.providerSandboxId,
             },

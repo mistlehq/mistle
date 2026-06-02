@@ -124,9 +124,16 @@ export const PublishedOrganizationE2BRuntime: Story = {
   },
 };
 
-export const ManagedE2BRuntime: Story = {
+export const PublishedMistleProvider: Story = {
   args: {
-    runtimeState: "e2b-managed",
+    lifecycleState: "published",
+    runtimeState: "mistle-provider",
+  },
+};
+
+export const MistleProvider: Story = {
+  args: {
+    runtimeState: "mistle-provider",
   },
 };
 

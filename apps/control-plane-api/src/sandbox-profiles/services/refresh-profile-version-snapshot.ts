@@ -3,7 +3,6 @@ import {
   getControlPlaneDatabaseSchema,
   isControlPlaneUniqueViolation,
   type SandboxProfileVersionAgentRuntimeId,
-  type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
@@ -30,6 +29,10 @@ import {
   mapProfileVersionRuntimeConfig,
   type SandboxProfileVersionResources,
 } from "./profile-version-runtime-config.js";
+import {
+  mapProfileVersionSkillsConfig,
+  type SandboxProfileVersionSkillsConfig,
+} from "./profile-version-skills-config.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type RefreshProfileVersionSnapshotInput = {
@@ -57,7 +60,6 @@ type RefreshProfileVersionSnapshotOutput = {
     version: number;
     state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
     publishedAt: string | null;
-    defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
     gitCommitSigningIntegrationConnectionId: string | null;
     mistleMcpEnabled: boolean;
@@ -66,6 +68,7 @@ type RefreshProfileVersionSnapshotOutput = {
     sandboxConnectionId: string | null;
     maintenanceScript: string | null;
     sandboxResources: SandboxProfileVersionResources | null;
+    skillsConfig: SandboxProfileVersionSkillsConfig | null;
     isActive: boolean;
     usable: boolean;
     refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
@@ -174,7 +177,6 @@ async function queueProfileVersionSnapshot(
           version: tables.sandboxProfileVersions.version,
           state: tables.sandboxProfileVersions.state,
           publishedAt: tables.sandboxProfileVersions.publishedAt,
-          defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
           agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
           gitCommitSigningIntegrationConnectionId:
             tables.sandboxProfileVersions.gitCommitSigningIntegrationConnectionId,
@@ -188,6 +190,7 @@ async function queueProfileVersionSnapshot(
           sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
           sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
           sandboxStorageMb: tables.sandboxProfileVersions.sandboxStorageMb,
+          skillsConfig: tables.sandboxProfileVersions.skillsConfig,
         })
         .from(tables.sandboxProfiles)
         .leftJoin(
@@ -220,7 +223,6 @@ async function queueProfileVersionSnapshot(
 
       const resolvedSandboxProfileId = sandboxProfileVersion.sandboxProfileId;
       const resolvedSandboxProfileVersion = sandboxProfileVersion.version;
-      const resolvedDefaultPersistenceMode = sandboxProfileVersion.defaultPersistenceMode;
       const resolvedAgentRuntimeId = sandboxProfileVersion.agentRuntimeId;
       const resolvedGitCommitSigningIntegrationConnectionId =
         sandboxProfileVersion.gitCommitSigningIntegrationConnectionId;
@@ -233,9 +235,6 @@ async function queueProfileVersionSnapshot(
       const resolvedSandboxStorageMb = sandboxProfileVersion.sandboxStorageMb;
       if (resolvedSandboxProfileId === null || resolvedSandboxProfileVersion === null) {
         throw new Error("Expected joined sandbox profile version metadata to be present.");
-      }
-      if (resolvedDefaultPersistenceMode === null) {
-        throw new Error("Expected joined sandbox profile persistence mode to be present.");
       }
       if (resolvedAgentRuntimeId === null) {
         throw new Error("Expected joined sandbox profile agent runtime id to be present.");
@@ -316,7 +315,6 @@ async function queueProfileVersionSnapshot(
           version: resolvedSandboxProfileVersion,
           state: sandboxProfileVersion.state,
           publishedAt: sandboxProfileVersion.publishedAt,
-          defaultPersistenceMode: resolvedDefaultPersistenceMode,
           agentRuntimeId: resolvedAgentRuntimeId,
           gitCommitSigningIntegrationConnectionId: resolvedGitCommitSigningIntegrationConnectionId,
           mistleMcpEnabled: resolvedMistleMcpEnabled,
@@ -329,6 +327,7 @@ async function queueProfileVersionSnapshot(
             sandboxMemoryMb: resolvedSandboxMemoryMb,
             sandboxStorageMb: resolvedSandboxStorageMb,
           }),
+          skillsConfig: mapProfileVersionSkillsConfig(sandboxProfileVersion.skillsConfig),
           isActive: sandboxProfileVersion.activeVersion === input.profileVersion,
           usable: versionHasUsableSnapshot,
           refreshSchedule: refreshSchedulesByVersion.get(resolvedSandboxProfileVersion) ?? null,

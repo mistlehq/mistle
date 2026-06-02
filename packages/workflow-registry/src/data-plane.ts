@@ -1,5 +1,4 @@
 import type {
-  SandboxInstancePersistenceMode,
   SandboxInstancePurpose,
   SandboxInstanceSource,
   SandboxInstanceStarterKind,
@@ -73,7 +72,6 @@ export type StartSandboxInstanceWorkflowInput = {
   organizationId: string;
   sandboxProfileId: string;
   sandboxProfileVersion: number;
-  persistenceMode: SandboxInstancePersistenceMode;
   purpose: SandboxInstancePurpose;
   runtimePlan: CompiledRuntimePlan;
   startedBy: {

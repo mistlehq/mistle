@@ -8,7 +8,6 @@ import { promisify } from "node:util";
 
 import { PortAccessLinkCreatedByKinds } from "@mistle/db/control-plane";
 import {
-  SandboxInstancePersistenceModes,
   SandboxInstancePurposes,
   SandboxInstanceSources,
   SandboxInstanceStatuses,
@@ -59,7 +58,6 @@ it("creates sandbox port access through the real control-plane API", async ({ en
       sandboxProfileVersion: 1,
       runtimeProvider: "docker",
       providerSandboxId,
-      persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
       status: SandboxInstanceStatuses.RUNNING,
       startedByKind: "user",
       startedById: session.userId,

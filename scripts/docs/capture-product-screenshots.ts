@@ -59,7 +59,6 @@ const Screenshots = [
   }),
   screen("event-trigger", "EventTrigger"),
   screen("scheduled-trigger", "ScheduledTrigger"),
-  screen("persistent-sandboxes-organization-settings", "PersistentSandboxesOrganizationSettings"),
 ] satisfies readonly ProductScreenshot[];
 
 function screen(

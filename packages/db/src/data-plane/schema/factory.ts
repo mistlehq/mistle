@@ -2,7 +2,6 @@ import { pgSchema } from "drizzle-orm/pg-core";
 
 import { defineSandboxInstanceDeadlines } from "./sandbox-instance-deadlines.js";
 import { defineSandboxInstanceRuntimePlans } from "./sandbox-instance-runtime-plans.js";
-import { defineSandboxInstanceStorages } from "./sandbox-instance-storages.js";
 import { defineSandboxInstances } from "./sandbox-instances.js";
 import { defineSandboxOperationEvents } from "./sandbox-operation-events.js";
 import { defineSandboxTunnelTokenRedemptions } from "./sandbox-tunnel-token-redemptions.js";
@@ -25,10 +24,6 @@ export function createDataPlaneDbSchema(schemaName: string) {
       sandboxInstances,
     }),
     sandboxInstanceRuntimePlans: defineSandboxInstanceRuntimePlans({
-      schema,
-      sandboxInstances,
-    }),
-    sandboxInstanceStorages: defineSandboxInstanceStorages({
       schema,
       sandboxInstances,
     }),

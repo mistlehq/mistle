@@ -1,9 +1,10 @@
 //! `sandboxd` is the long-lived sandbox supervisor daemon.
 //!
 //! The default entrypoint runs the daemon behind the local Unix control socket.
-//! The supported lifecycle subcommands, `ready`, `init`, `resume`, and
+//! The supported lifecycle subcommands, `ready`, `activate`, `init`, `resume`, and
 //! `wait-init`, are thin local clients that submit requests to the running
 //! daemon and exit. The `egress-proxy` subcommand runs the proxy child process.
+//! The `skills` subcommands provide local repository skill helpers.
 //! The `version` subcommand prints the binary version used by release artifact
 //! validation and runtime updates.
 
@@ -19,6 +20,7 @@ use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
+pub mod activate;
 pub mod bootstrap;
 pub mod cgroups;
 pub mod codex_proxy;
@@ -40,6 +42,7 @@ pub mod runtime;
 pub mod sandboxd_state;
 pub mod security;
 pub mod sign;
+pub mod skills;
 pub mod startup_diagnostics;
 pub mod startup_payload;
 pub mod supervision;
@@ -81,6 +84,9 @@ pub enum SandboxdCommand {
         config_path: PathBuf,
     },
     Ready,
+    Activate {
+        payload_source: StartupPayloadSource,
+    },
     Init {
         detach: bool,
         payload_source: StartupPayloadSource,
@@ -89,6 +95,9 @@ pub enum SandboxdCommand {
         payload_source: StartupPayloadSource,
     },
     Sign,
+    Skills {
+        args: Vec<String>,
+    },
     Version,
     WaitInit,
 }
@@ -123,7 +132,7 @@ impl fmt::Display for ParseSandboxdCommandError {
             }
             Self::UnknownCommand(command) => write!(
                 f,
-                "unknown sandboxd subcommand '{command}' (expected 'ready', 'init', 'resume', 'wait-init', 'egress-proxy', or 'version')"
+                "unknown sandboxd subcommand '{command}' (expected 'ready', 'activate', 'init', 'resume', 'wait-init', 'egress-proxy', 'skills', or 'version')"
             ),
         }
     }
@@ -148,6 +157,10 @@ where
             return Ok(SandboxdCommand::EgressProxy { config_path });
         }
         "ready" => SandboxdCommand::Ready,
+        "activate" => {
+            let payload_source = parse_payload_source_args(parsed_args.by_ref())?;
+            return Ok(SandboxdCommand::Activate { payload_source });
+        }
         "init" => {
             let mut detach = false;
             let mut payload_source = StartupPayloadSource::StdinUntilEof;
@@ -168,6 +181,11 @@ where
         "resume" => {
             let payload_source = parse_payload_source_args(parsed_args.by_ref())?;
             return Ok(SandboxdCommand::Resume { payload_source });
+        }
+        "skills" => {
+            return Ok(SandboxdCommand::Skills {
+                args: parsed_args.collect(),
+            });
         }
         "wait-init" => SandboxdCommand::WaitInit,
         "version" => SandboxdCommand::Version,
@@ -307,6 +325,15 @@ where
                 }
             }
         }
+        SandboxdCommand::Activate { payload_source } => match activate::run_activate(
+            stdin,
+            stdout,
+            Path::new(control::DEFAULT_CONTROL_SOCKET_PATH),
+            payload_source,
+        ) {
+            Ok(()) => 0,
+            Err(_) => 1,
+        },
         SandboxdCommand::Init {
             detach,
             payload_source,
@@ -344,6 +371,13 @@ where
             }
         },
         SandboxdCommand::Sign => match sign::run_sign(parsed_args, &sign_control_socket_path()) {
+            Ok(()) => 0,
+            Err(error) => {
+                let _ = writeln!(stderr, "{error}");
+                1
+            }
+        },
+        SandboxdCommand::Skills { args } => match skills::run_skills(args, stdout) {
             Ok(()) => 0,
             Err(error) => {
                 let _ = writeln!(stderr, "{error}");
@@ -424,6 +458,30 @@ mod tests {
         let command = parse_sandboxd_command(["ready"]);
 
         assert_eq!(command, Ok(SandboxdCommand::Ready));
+    }
+
+    #[test]
+    fn parses_activate() {
+        let command = parse_sandboxd_command(["activate"]);
+
+        assert_eq!(
+            command,
+            Ok(SandboxdCommand::Activate {
+                payload_source: StartupPayloadSource::StdinUntilEof
+            })
+        );
+    }
+
+    #[test]
+    fn parses_activate_with_stdin_byte_count() {
+        let command = parse_sandboxd_command(["activate", "--stdin-bytes", "321"]);
+
+        assert_eq!(
+            command,
+            Ok(SandboxdCommand::Activate {
+                payload_source: StartupPayloadSource::StdinBytes(321)
+            })
+        );
     }
 
     #[test]
@@ -516,6 +574,22 @@ mod tests {
         let command = parse_sandboxd_command(["version"]);
 
         assert_eq!(command, Ok(SandboxdCommand::Version));
+    }
+
+    #[test]
+    fn parses_skills_subcommands() {
+        let command = parse_sandboxd_command(["skills", "discover", "--repo", "/root/org/repo"]);
+
+        assert_eq!(
+            command,
+            Ok(SandboxdCommand::Skills {
+                args: vec![
+                    "discover".to_string(),
+                    "--repo".to_string(),
+                    "/root/org/repo".to_string()
+                ]
+            })
+        );
     }
 
     #[test]

@@ -6,7 +6,6 @@ import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
   SandboxProfileVersionAgentRuntimeIds,
-  SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
@@ -38,6 +37,7 @@ const EmptySandboxRuntimeConfig = {
   sandboxConnectionId: null,
   sandboxProvider: null,
   sandboxResources: null,
+  skillsConfig: null,
 };
 
 describe.concurrent("sandbox profile versions create integration", () => {
@@ -99,8 +99,16 @@ describe.concurrent("sandbox profile versions create integration", () => {
         publishedAt: "2026-03-10T00:02:00.000Z",
         setupScript: "echo latest-version-two",
         agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
-        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
         gitCommitSigningIntegrationConnectionId: "icn_version_create_latest_git",
+        skillsConfig: {
+          originUrl: "https://github.com/mistle/skills.git",
+          selectedSkills: [
+            {
+              name: "sandbox-ops",
+              relativePath: "automation/sandbox-ops",
+            },
+          ],
+        },
       }),
     ]);
     await env.controlPlaneDb
@@ -151,10 +159,18 @@ describe.concurrent("sandbox profile versions create integration", () => {
       version: 3,
       state: SandboxProfileVersionStates.DRAFT,
       publishedAt: null,
-      defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
       agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
       ...EmptySandboxRuntimeConfig,
       gitCommitSigningIntegrationConnectionId: "icn_version_create_latest_git",
+      skillsConfig: {
+        originUrl: "https://github.com/mistle/skills.git",
+        selectedSkills: [
+          {
+            name: "sandbox-ops",
+            relativePath: "automation/sandbox-ops",
+          },
+        ],
+      },
       isActive: false,
       usable: false,
       maintenanceScript: null,
@@ -169,15 +185,21 @@ describe.concurrent("sandbox profile versions create integration", () => {
     expect(persistedDraftVersion?.state).toBe(SandboxProfileVersionStates.DRAFT);
     expect(persistedDraftVersion?.publishedAt).toBeNull();
     expect(persistedDraftVersion?.setupScript).toBe("echo latest-version-two");
-    expect(persistedDraftVersion?.defaultPersistenceMode).toBe(
-      SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
-    );
     expect(persistedDraftVersion?.agentRuntimeId).toBe(
       SandboxProfileVersionAgentRuntimeIds.OPENCODE,
     );
     expect(persistedDraftVersion?.gitCommitSigningIntegrationConnectionId).toBe(
       "icn_version_create_latest_git",
     );
+    expect(persistedDraftVersion?.skillsConfig).toEqual({
+      originUrl: "https://github.com/mistle/skills.git",
+      selectedSkills: [
+        {
+          name: "sandbox-ops",
+          relativePath: "automation/sandbox-ops",
+        },
+      ],
+    });
 
     const persistedDraftBindings =
       await env.controlPlaneDb.query.sandboxProfileVersionIntegrationBindings.findMany({

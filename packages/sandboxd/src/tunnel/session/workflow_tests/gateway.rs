@@ -547,6 +547,285 @@ fn updating_egress_token_provider_acting_user_clears_cached_token() {
 }
 
 #[test]
+fn detaching_egress_token_provider_suspends_requests_and_clears_cached_token() {
+    let bootstrap_listener =
+        TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+    let bootstrap_url = format!(
+        "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
+        bootstrap_listener
+            .local_addr()
+            .expect("bootstrap listener should expose an address")
+            .port()
+    );
+    let (gateway_close_sender, gateway_close_receiver) = mpsc::channel();
+    let gateway_thread = thread::spawn(move || {
+        let (stream, _) = bootstrap_listener
+            .accept()
+            .expect("gateway should accept the bootstrap tunnel");
+        let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
+
+        expect_tunnel_connected_publications(&mut websocket);
+        let token_request = read_json_text_message(&mut websocket);
+        assert_eq!(
+            token_request,
+            json!({
+                "type": "egress.token.request",
+                "requestId": "egress_token_req_1",
+                "actingUserId": "usr_initial"
+            })
+        );
+
+        websocket
+            .send(Message::Text(
+                json!({
+                    "type": "egress.token.response",
+                    "requestId": "egress_token_req_1",
+                    "token": "egress-jwt-usr_initial",
+                    "expiresAt": "2100-01-01T00:00:00Z",
+                    "ttlMs": 300000
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("gateway should return an egress token");
+        gateway_close_receiver
+            .recv()
+            .expect("gateway should remain open until detach is observed");
+        websocket
+            .close(None)
+            .expect("gateway websocket should close cleanly");
+    });
+
+    let startup_input = StartupInput {
+        startup_mode: StartupMode::New,
+        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+        bootstrap_token: "bootstrap-token-value".to_string(),
+        tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+        tunnel_gateway_ws_url: bootstrap_url,
+        acting_user_id: None,
+        runtime_plan: serde_json::json!({
+            "sandboxProfileId": "sbp_123",
+            "version": 1,
+            "image": {
+                "source": "base",
+                "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
+            },
+            "egressRoutes": [],
+            "artifacts": [],
+            "workspaceSources": [],
+            "runtimeClients": [],
+            "agentRuntimes": []
+        }),
+        git_identity: None,
+        transparent_proxy: None,
+    };
+
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+    let clock = Arc::new(SystemClock);
+    let tunnel_session = TunnelSession::start(
+        &startup_input,
+        keepalive_manager,
+        runtime_readiness_manager,
+        None,
+        BTreeMap::new(),
+        clock.clone(),
+        Arc::new(ThreadSleeper),
+    )
+    .expect("tunnel session should start");
+    let token_provider =
+        GatewayEgressTokenProvider::new("sbi_tunnel_session", Some("usr_initial".to_string()));
+    tunnel_session.attach_gateway_egress_token_provider(&token_provider);
+
+    let initial_token = token_provider
+        .token()
+        .expect("initial egress token request should complete");
+    assert_eq!(initial_token.token, "egress-jwt-usr_initial");
+
+    token_provider
+        .detach()
+        .expect("detaching token provider should clear sender and cache");
+    let detached_error = token_provider
+        .token()
+        .expect_err("detached token provider should not reuse cached token");
+    assert!(
+        detached_error
+            .to_string()
+            .contains("gateway egress token provider is not attached")
+    );
+
+    gateway_close_sender
+        .send(())
+        .expect("gateway should close after detach is observed");
+    tunnel_session.close();
+    gateway_thread
+        .join()
+        .expect("gateway thread should exit cleanly");
+}
+
+#[test]
+fn egress_token_provider_rejects_in_flight_response_after_actor_change() {
+    let bootstrap_listener =
+        TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+    let bootstrap_url = format!(
+        "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
+        bootstrap_listener
+            .local_addr()
+            .expect("bootstrap listener should expose an address")
+            .port()
+    );
+    let (first_request_seen_sender, first_request_seen_receiver) = mpsc::channel();
+    let (send_first_response_sender, send_first_response_receiver) = mpsc::channel();
+    let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
+    let gateway_thread = thread::spawn(move || {
+        let (stream, _) = bootstrap_listener
+            .accept()
+            .expect("gateway should accept the bootstrap tunnel");
+        let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
+
+        expect_tunnel_connected_publications(&mut websocket);
+        let first_token_request = read_json_text_message(&mut websocket);
+        assert_eq!(
+            first_token_request,
+            json!({
+                "type": "egress.token.request",
+                "requestId": "egress_token_req_1",
+                "actingUserId": "usr_initial"
+            })
+        );
+        first_request_seen_sender
+            .send(())
+            .expect("gateway should signal first request");
+        send_first_response_receiver
+            .recv()
+            .expect("test should release first response after actor change");
+        websocket
+            .send(Message::Text(
+                json!({
+                    "type": "egress.token.response",
+                    "requestId": "egress_token_req_1",
+                    "token": "egress-jwt-usr_initial",
+                    "expiresAt": "2100-01-01T00:00:00Z",
+                    "ttlMs": 300000
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("gateway should return the first egress token");
+
+        let second_token_request = read_json_text_message(&mut websocket);
+        assert_eq!(
+            second_token_request,
+            json!({
+                "type": "egress.token.request",
+                "requestId": "egress_token_req_2",
+                "actingUserId": "usr_resumed"
+            })
+        );
+        websocket
+            .send(Message::Text(
+                json!({
+                    "type": "egress.token.response",
+                    "requestId": "egress_token_req_2",
+                    "token": "egress-jwt-usr_resumed",
+                    "expiresAt": "2100-01-01T00:00:00Z",
+                    "ttlMs": 300000
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("gateway should return the resumed egress token");
+
+        gateway_done_sender
+            .send(())
+            .expect("gateway should signal both requests were observed");
+        websocket
+            .close(None)
+            .expect("gateway websocket should close cleanly");
+    });
+
+    let startup_input = StartupInput {
+        startup_mode: StartupMode::New,
+        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+        bootstrap_token: "bootstrap-token-value".to_string(),
+        tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+        tunnel_gateway_ws_url: bootstrap_url,
+        acting_user_id: None,
+        runtime_plan: serde_json::json!({
+            "sandboxProfileId": "sbp_123",
+            "version": 1,
+            "image": {
+                "source": "base",
+                "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
+            },
+            "egressRoutes": [],
+            "artifacts": [],
+            "workspaceSources": [],
+            "runtimeClients": [],
+            "agentRuntimes": []
+        }),
+        git_identity: None,
+        transparent_proxy: None,
+    };
+
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+    let clock = Arc::new(SystemClock);
+    let tunnel_session = TunnelSession::start(
+        &startup_input,
+        keepalive_manager,
+        runtime_readiness_manager,
+        None,
+        BTreeMap::new(),
+        clock.clone(),
+        Arc::new(ThreadSleeper),
+    )
+    .expect("tunnel session should start");
+    let token_provider =
+        GatewayEgressTokenProvider::new("sbi_tunnel_session", Some("usr_initial".to_string()));
+    tunnel_session.attach_gateway_egress_token_provider(&token_provider);
+
+    let first_request_provider = token_provider.clone();
+    let first_request_thread = thread::spawn(move || {
+        first_request_provider
+            .token()
+            .expect_err("in-flight token response should be rejected after actor changes")
+    });
+    first_request_seen_receiver
+        .recv()
+        .expect("first token request should reach the gateway");
+    token_provider
+        .set_acting_user_id(Some("usr_resumed".to_string()))
+        .expect("actor change should advance provider generation");
+    send_first_response_sender
+        .send(())
+        .expect("gateway should receive release for stale response");
+    let stale_error = first_request_thread
+        .join()
+        .expect("first token request thread should exit");
+    assert!(
+        stale_error
+            .to_string()
+            .contains("provider generation changed")
+    );
+
+    let resumed_token = token_provider
+        .token()
+        .expect("new generation token request should complete");
+    assert_eq!(resumed_token.token, "egress-jwt-usr_resumed");
+    gateway_done_receiver
+        .recv()
+        .expect("gateway should complete both requests");
+
+    tunnel_session.close();
+    gateway_thread
+        .join()
+        .expect("gateway thread should exit cleanly");
+}
+
+#[test]
 fn refreshes_egress_tokens_from_relative_ttl_not_expires_at_wall_time() {
     let bootstrap_listener =
         TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");

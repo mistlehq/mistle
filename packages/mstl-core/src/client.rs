@@ -478,7 +478,6 @@ pub struct SandboxProfileVersion {
     pub is_active: bool,
     pub usable: bool,
     pub agent_runtime_id: SandboxProfileVersionAgentRuntimeId,
-    pub default_persistence_mode: SandboxProfileVersionDefaultPersistenceMode,
     pub sandbox_provider: Option<String>,
     pub sandbox_connection_id: Option<String>,
 }
@@ -497,13 +496,6 @@ pub enum SandboxProfileVersionAgentRuntimeId {
     Opencode,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum SandboxProfileVersionDefaultPersistenceMode {
-    Ephemeral,
-    Persistent,
-}
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateSandboxProfileVersionDraftRequest<'a> {
@@ -517,7 +509,6 @@ pub struct UpdateSandboxProfileVersionDraftResponse {
     pub sandbox_profile_id: String,
     pub version: u32,
     pub setup_script: Option<String>,
-    pub default_persistence_mode: SandboxProfileVersionDefaultPersistenceMode,
     pub agent_runtime_id: SandboxProfileVersionAgentRuntimeId,
     pub sandbox_provider: Option<String>,
     pub sandbox_connection_id: Option<String>,
@@ -864,10 +855,10 @@ mod tests {
         SandboxInstanceSource, SandboxInstanceStartedBy, SandboxInstanceStartupOperation,
         SandboxInstanceStartupOperationKind, SandboxInstanceStatus,
         SandboxInstanceTriggerConversation, SandboxProfileVersion,
-        SandboxProfileVersionAgentRuntimeId, SandboxProfileVersionDefaultPersistenceMode,
-        SandboxProfileVersionState, StartSandboxProfileInstanceResponse,
-        StartSandboxProfileInstanceStatus, SwitchOrganizationRequest,
-        UpdateSandboxProfileVersionDraftRequest, UpdateSandboxProfileVersionDraftResponse,
+        SandboxProfileVersionAgentRuntimeId, SandboxProfileVersionState,
+        StartSandboxProfileInstanceResponse, StartSandboxProfileInstanceStatus,
+        SwitchOrganizationRequest, UpdateSandboxProfileVersionDraftRequest,
+        UpdateSandboxProfileVersionDraftResponse,
     };
 
     #[test]
@@ -1508,7 +1499,6 @@ mod tests {
                         "isActive": false,
                         "usable": false,
                         "agentRuntimeId": "codex",
-                        "defaultPersistenceMode": "persistent",
                         "sandboxProvider": "daytona",
                         "sandboxConnectionId": "icn_daytona",
                         "maintenanceScript": null,
@@ -1523,7 +1513,6 @@ mod tests {
                         "isActive": true,
                         "usable": true,
                         "agentRuntimeId": "opencode",
-                        "defaultPersistenceMode": "ephemeral",
                         "sandboxProvider": null,
                         "sandboxConnectionId": null,
                         "maintenanceScript": null,
@@ -1550,8 +1539,6 @@ mod tests {
                         is_active: false,
                         usable: false,
                         agent_runtime_id: SandboxProfileVersionAgentRuntimeId::Codex,
-                        default_persistence_mode:
-                            SandboxProfileVersionDefaultPersistenceMode::Persistent,
                         sandbox_provider: Some("daytona".to_owned()),
                         sandbox_connection_id: Some("icn_daytona".to_owned()),
                     },
@@ -1562,8 +1549,6 @@ mod tests {
                         is_active: true,
                         usable: true,
                         agent_runtime_id: SandboxProfileVersionAgentRuntimeId::Opencode,
-                        default_persistence_mode:
-                            SandboxProfileVersionDefaultPersistenceMode::Ephemeral,
                         sandbox_provider: None,
                         sandbox_connection_id: None,
                     },
@@ -1616,7 +1601,6 @@ mod tests {
                 "sandboxProfileId": "sbp_python",
                 "version": 3,
                 "setupScript": "#!/usr/bin/env bash\npnpm install",
-                "defaultPersistenceMode": "persistent",
                 "agentRuntimeId": "codex",
                 "sandboxProvider": "daytona",
                 "sandboxConnectionId": "icn_daytona",
@@ -1634,7 +1618,6 @@ mod tests {
                 sandbox_profile_id: "sbp_python".to_owned(),
                 version: 3,
                 setup_script: Some("#!/usr/bin/env bash\npnpm install".to_owned()),
-                default_persistence_mode: SandboxProfileVersionDefaultPersistenceMode::Persistent,
                 agent_runtime_id: SandboxProfileVersionAgentRuntimeId::Codex,
                 sandbox_provider: Some("daytona".to_owned()),
                 sandbox_connection_id: Some("icn_daytona".to_owned()),
@@ -1649,7 +1632,6 @@ mod tests {
                 "sandboxProfileId": "sbp_python",
                 "version": 3,
                 "setupScript": null,
-                "defaultPersistenceMode": "ephemeral",
                 "agentRuntimeId": "opencode",
                 "sandboxProvider": null,
                 "sandboxConnectionId": null,
@@ -1667,7 +1649,6 @@ mod tests {
                 sandbox_profile_id: "sbp_python".to_owned(),
                 version: 3,
                 setup_script: None,
-                default_persistence_mode: SandboxProfileVersionDefaultPersistenceMode::Ephemeral,
                 agent_runtime_id: SandboxProfileVersionAgentRuntimeId::Opencode,
                 sandbox_provider: None,
                 sandbox_connection_id: None,

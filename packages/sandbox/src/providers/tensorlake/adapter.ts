@@ -5,26 +5,18 @@ import {
 } from "../../errors.js";
 import {
   SandboxProvider,
-  SandboxStorageBackend,
   type SandboxAdapter,
-  type SandboxArchilStorageAttachment,
-  type SandboxArchilStorageCleanup,
-  type SandboxAttachStorageRequest,
   type SandboxCaptureSnapshotRequest,
-  type SandboxCleanupStorageRequest,
   type SandboxDestroyRequest,
   type SandboxHandle,
   type SandboxImageHandle,
   type SandboxInspectRequest,
   type SandboxPrepareImageRequest,
-  type SandboxPrepareStorageForStartRequest,
   type SandboxResumeRequestV1,
   type SandboxStartRequest,
-  type SandboxStartStoragePreparation,
   type SandboxStopRequest,
   type SandboxTransparentProxyConfiguration,
 } from "../../types.js";
-import { createE2BAttachStorageCommand, createE2BCleanupStorageCommand } from "../e2b/storage.js";
 import { withSandboxProviderOperationTelemetry } from "../telemetry.js";
 import {
   TensorlakeClientError,
@@ -39,10 +31,6 @@ import {
 } from "./image-handle.js";
 import { createTensorlakeTransparentProxyConfiguration } from "./transparent-proxy.js";
 import type { TensorlakeSandboxInspectResult } from "./types.js";
-
-const ArchilMountTokenEnv = "ARCHIL_MOUNT_TOKEN";
-const TensorlakeAttachStorageCommandTimeoutMs = 2 * 60 * 1000;
-const TensorlakeCleanupStorageCommandTimeoutMs = 5 * 60 * 1000;
 
 function createSandboxHandle(sandboxId: string): SandboxHandle {
   return { provider: SandboxProvider.TENSORLAKE, id: sandboxId };
@@ -60,28 +48,6 @@ function toSandboxNotFoundError(resourceId: string, error: unknown): SandboxReso
     resourceId,
     cause: error,
   });
-}
-
-function requireArchilStorageAttachment(
-  request: SandboxAttachStorageRequest,
-): SandboxArchilStorageAttachment {
-  if (request.storage.backend !== SandboxStorageBackend.ARCHIL) {
-    throw new SandboxConfigurationError(
-      "Tensorlake adapter expected an Archil storage attachment.",
-    );
-  }
-  return request.storage;
-}
-
-function requireArchilStorageCleanup(
-  request: SandboxCleanupStorageRequest,
-): SandboxArchilStorageCleanup {
-  if (request.storage.backend !== SandboxStorageBackend.ARCHIL) {
-    throw new SandboxConfigurationError(
-      "Tensorlake adapter expected an Archil storage cleanup payload.",
-    );
-  }
-  return request.storage;
 }
 
 export class TensorlakeSandboxAdapter implements SandboxAdapter {
@@ -104,12 +70,6 @@ export class TensorlakeSandboxAdapter implements SandboxAdapter {
     }
 
     return request.image;
-  }
-
-  async prepareStorageForStart(
-    _request: SandboxPrepareStorageForStartRequest,
-  ): Promise<SandboxStartStoragePreparation> {
-    return {};
   }
 
   async start(request: SandboxStartRequest): Promise<SandboxHandle> {
@@ -187,38 +147,6 @@ export class TensorlakeSandboxAdapter implements SandboxAdapter {
       }
       throw error;
     }
-  }
-
-  async attachStorage(request: SandboxAttachStorageRequest): Promise<void> {
-    const storage = requireArchilStorageAttachment(request);
-
-    await this.#client.runCommand({
-      sandboxId: request.sandbox.id,
-      command: createE2BAttachStorageCommand({ lifecycle: request.lifecycle, storage }),
-      operation: TensorlakeClientOperationIds.RUN_COMMAND,
-      commandDescription: "Tensorlake sandbox storage attach command",
-      env: { [ArchilMountTokenEnv]: storage.credential },
-      workingDir: "/",
-      timeoutMs: TensorlakeAttachStorageCommandTimeoutMs,
-    });
-  }
-
-  async cleanupStorage(request: SandboxCleanupStorageRequest): Promise<void> {
-    const storage = requireArchilStorageCleanup(request);
-    const command = createE2BCleanupStorageCommand({ request: { ...request, storage } });
-
-    if (command === null) {
-      return;
-    }
-
-    await this.#client.runCommand({
-      sandboxId: request.sandbox.id,
-      command,
-      operation: TensorlakeClientOperationIds.RUN_COMMAND,
-      commandDescription: "Tensorlake sandbox storage cleanup command",
-      workingDir: "/",
-      timeoutMs: TensorlakeCleanupStorageCommandTimeoutMs,
-    });
   }
 
   async stop(request: SandboxStopRequest): Promise<void> {

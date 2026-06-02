@@ -6,7 +6,9 @@ import { Button } from "./button.js";
 it("renders a clickable button", () => {
   render(<Button>Launch</Button>);
 
-  expect(screen.getByRole("button", { name: /launch/i })).toBeInTheDocument();
+  const button = screen.getByRole("button", { name: /launch/i });
+  expect(button).toBeInTheDocument();
+  expect(button.className).toContain("cursor-default");
 });
 
 it("supports the icon-fill button size", () => {

@@ -60,6 +60,10 @@ _Avoid_: Nested tab, child resource view
 A narrowed view of a **Collection landing page** based on user-entered criteria.
 _Avoid_: Empty state, local table filter
 
+**Routed navigation affordance**:
+A user-facing control whose primary purpose is moving to a route-addressable dashboard page.
+_Avoid_: Callback navigation, button navigation
+
 **Deleted session**:
 A sandbox session intentionally removed from ordinary user-visible session lists while its history remains available for audit and debugging.
 _Avoid_: Hard-deleted session, erased session
@@ -139,6 +143,10 @@ _Avoid_: Jira org, Jira organization, site URL when referring only to the editab
 **Sandbox session**:
 A live sandbox execution environment for an agent session.
 _Avoid_: Chat session when referring to runtime tools or sandbox state
+
+**Mistle sandbox provider**:
+The customer-facing **Sandbox provider** option where Mistle operates the sandbox and manages the underlying provider choice.
+_Avoid_: Managed provider, managed Docker, managed E2B, managed Tensorlake
 
 **Sandbox session title**:
 The Mistle-owned display title for a **Sandbox session**.
@@ -331,6 +339,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Collection landing page** may list **Sandbox profile version** families, triggers, sessions, or organization members.
 - A **Resource detail page** has one primary resource that determines whether the page is available.
 - A **Filtered collection view** narrows a **Collection landing page** without changing whether the underlying collection exists.
+- A **Routed navigation affordance** may point from a **Collection landing page** to a **Resource detail page** or another route-addressable page.
 - A **Deleted session** is excluded from ordinary session collection views but is still part of the organization's historical record.
 - Any ordinary user-visible session may become a **Deleted session**, regardless of whether it is pending, starting, running, stopped, or failed.
 - A **Deleted session** keeps its runtime lifecycle state as historical context.

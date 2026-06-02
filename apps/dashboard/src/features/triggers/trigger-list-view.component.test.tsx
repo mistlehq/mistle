@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import type { TriggerListItemViewModel } from "./trigger-list-types.js";
@@ -33,22 +34,26 @@ const ScheduleTrigger: TriggerListItemViewModel = {
 describe("TriggerListView", () => {
   it("places the GMT offset after the next scheduled time", () => {
     render(
-      <TriggerListView
-        activeFilter="all"
-        errorMessage={null}
-        hasNextPage={false}
-        hasPreviousPage={false}
-        items={[ScheduleTrigger]}
-        onFilterChange={noop}
-        onNextPage={noop}
-        onOpenTrigger={noop}
-        onPreviousPage={noop}
-        onSearchValueChange={noop}
-        searchValue=""
-        totalResults={1}
-      />,
+      <MemoryRouter>
+        <TriggerListView
+          activeFilter="all"
+          errorMessage={null}
+          hasNextPage={false}
+          hasPreviousPage={false}
+          items={[ScheduleTrigger]}
+          onFilterChange={noop}
+          onNextPage={noop}
+          onPreviousPage={noop}
+          onSearchValueChange={noop}
+          searchValue=""
+          totalResults={1}
+        />
+      </MemoryRouter>,
     );
 
+    expect(screen.getByRole("link", { name: "Daily repository triage" }).getAttribute("href")).toBe(
+      "/triggers/trg_schedule_123",
+    );
     expect(screen.getByText("27 10 * * *")).toBeDefined();
     expect(screen.getByText("Next May 4, 2026, 10:27 AM GMT+8")).toBeDefined();
   });

@@ -216,13 +216,15 @@
                     "type": "integer",
                     "minimum": 1
                   },
-                  "persistenceMode": {
-                    "type": "string",
-                    "enum": ["ephemeral", "persistent"]
-                  },
                   "purpose": {
                     "type": "string",
-                    "enum": ["session", "snapshot", "setup_assistant", "setup_check"]
+                    "enum": [
+                      "session",
+                      "snapshot",
+                      "setup_assistant",
+                      "setup_check",
+                      "skills_discovery"
+                    ]
                   },
                   "idempotencyKey": {
                     "type": "string",
@@ -1628,7 +1630,6 @@
                   "organizationId",
                   "sandboxProfileId",
                   "sandboxProfileVersion",
-                  "persistenceMode",
                   "purpose",
                   "runtimePlan",
                   "startedBy",
@@ -2361,6 +2362,120 @@
                       "additionalProperties": false
                     }
                   ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/sandbox/instances/:id/metadata": {
+      "get": {
+        "tags": ["Internal"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "organizationId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get sandbox instance metadata for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": ["object", "null"],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "purpose": {
+                      "type": "string",
+                      "enum": [
+                        "session",
+                        "snapshot",
+                        "setup_assistant",
+                        "setup_check",
+                        "skills_discovery"
+                      ]
+                    },
+                    "deletedAt": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["id", "purpose", "deletedAt"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -3858,7 +3973,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Delete a sandbox session for internal callers.",
+            "description": "Delete a sandbox instance for internal callers.",
             "content": {
               "application/json": {
                 "schema": {

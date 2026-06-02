@@ -4,7 +4,6 @@ import {
   ScheduleKinds,
   ScheduleTargetTypes,
   type SandboxProfileVersionAgentRuntimeId,
-  type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
@@ -30,6 +29,10 @@ import {
   mapProfileVersionRuntimeConfig,
   type SandboxProfileVersionResources,
 } from "./profile-version-runtime-config.js";
+import {
+  mapProfileVersionSkillsConfig,
+  type SandboxProfileVersionSkillsConfig,
+} from "./profile-version-skills-config.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type PublishProfileVersionInput = {
@@ -44,7 +47,6 @@ type PublishProfileVersionOutput = {
     version: number;
     state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
     publishedAt: string | null;
-    defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
     gitCommitSigningIntegrationConnectionId: string | null;
     mistleMcpEnabled: boolean;
@@ -53,6 +55,7 @@ type PublishProfileVersionOutput = {
     sandboxConnectionId: string | null;
     maintenanceScript: string | null;
     sandboxResources: SandboxProfileVersionResources | null;
+    skillsConfig: SandboxProfileVersionSkillsConfig | null;
     isActive: boolean;
     usable: boolean;
     refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
@@ -368,7 +371,6 @@ export async function publishProfileVersion(
         version: tables.sandboxProfileVersions.version,
         state: tables.sandboxProfileVersions.state,
         publishedAt: tables.sandboxProfileVersions.publishedAt,
-        defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
         agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
         gitCommitSigningIntegrationConnectionId:
           tables.sandboxProfileVersions.gitCommitSigningIntegrationConnectionId,
@@ -380,6 +382,7 @@ export async function publishProfileVersion(
         sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
         sandboxStorageMb: tables.sandboxProfileVersions.sandboxStorageMb,
         maintenanceScript: tables.sandboxProfileVersions.maintenanceScript,
+        skillsConfig: tables.sandboxProfileVersions.skillsConfig,
       });
 
     if (publishedVersion === undefined) {
@@ -437,7 +440,6 @@ export async function publishProfileVersion(
         version: publishedVersion.version,
         state: publishedVersion.state,
         publishedAt: publishedVersion.publishedAt,
-        defaultPersistenceMode: publishedVersion.defaultPersistenceMode,
         agentRuntimeId: publishedVersion.agentRuntimeId,
         gitCommitSigningIntegrationConnectionId:
           publishedVersion.gitCommitSigningIntegrationConnectionId,
@@ -445,6 +447,7 @@ export async function publishProfileVersion(
         mistleMcpApiKeyId: publishedVersion.mistleMcpApiKeyId,
         maintenanceScript: publishedVersion.maintenanceScript,
         ...mapProfileVersionRuntimeConfig(publishedVersion),
+        skillsConfig: mapProfileVersionSkillsConfig(publishedVersion.skillsConfig),
         isActive: false,
         usable: false,
         refreshSchedule:

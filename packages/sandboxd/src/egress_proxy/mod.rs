@@ -72,6 +72,8 @@ use crate::egress_proxy::transparent::{
     build_nftables_install_commands, build_nftables_local_destination_set_replace_script,
     build_nftables_rule_plan_with_local_destinations, parse_iproute2_link_scope_ipv4_route_cidrs,
 };
+use crate::protocol::session::SessionRuntimeInput;
+#[cfg(test)]
 use crate::protocol::startup::StartupInput;
 use crate::runtime::CompiledRuntimePlan;
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
@@ -282,12 +284,12 @@ fn start_active_loopback_proxy(
 impl EgressProxy {
     pub fn start(
         runtime_plan: &CompiledRuntimePlan,
-        startup_input: &StartupInput,
+        session_input: &SessionRuntimeInput,
         gateway_egress_token_provider: Option<GatewayEgressTokenProvider>,
         clock: Arc<dyn Clock>,
         supervisor_handle: SandboxdSupervisorHandle,
     ) -> Result<Option<Self>, EgressProxyError> {
-        if runtime_plan.egress_routes.is_empty() && startup_input.transparent_proxy.is_none() {
+        if runtime_plan.egress_routes.is_empty() && session_input.transparent_proxy.is_none() {
             return Ok(None);
         };
         let Some(token_provider) = gateway_egress_token_provider else {
@@ -297,7 +299,7 @@ impl EgressProxy {
         };
         let forwarding_mode = EgressProxyForwardingMode::DirectGateway {
             client: Arc::new(DirectGatewayEgressClient::from_bootstrap_tunnel_url(
-                &startup_input.tunnel_gateway_ws_url,
+                &session_input.tunnel_gateway_ws_url,
                 token_provider.clone(),
             )?),
         };
@@ -306,12 +308,12 @@ impl EgressProxy {
         #[cfg(not(test))]
         let loopback_runtime = EgressProxyLoopbackRuntime::ChildProcess {
             binary_path: resolve_egress_proxy_child_binary_path()?,
-            tunnel_gateway_ws_url: startup_input.tunnel_gateway_ws_url.clone(),
+            tunnel_gateway_ws_url: session_input.tunnel_gateway_ws_url.clone(),
             token_provider,
         };
         Self::start_with_loopback_runtime(
             runtime_plan,
-            startup_input,
+            session_input,
             forwarding_mode,
             EgressProxyStartOptions {
                 loopback_runtime,
@@ -341,9 +343,10 @@ impl EgressProxy {
         clock: Arc<dyn Clock>,
         supervisor_handle: SandboxdSupervisorHandle,
     ) -> Result<Option<Self>, EgressProxyError> {
+        let session_input = SessionRuntimeInput::from_startup_input(startup_input);
         Self::start_with_loopback_runtime(
             runtime_plan,
-            startup_input,
+            &session_input,
             forwarding_mode,
             EgressProxyStartOptions {
                 loopback_runtime: EgressProxyLoopbackRuntime::InProcess,
@@ -357,11 +360,11 @@ impl EgressProxy {
 
     fn start_with_loopback_runtime(
         runtime_plan: &CompiledRuntimePlan,
-        startup_input: &StartupInput,
+        session_input: &SessionRuntimeInput,
         forwarding_mode: EgressProxyForwardingMode,
         options: EgressProxyStartOptions<'_>,
     ) -> Result<Option<Self>, EgressProxyError> {
-        if runtime_plan.egress_routes.is_empty() && startup_input.transparent_proxy.is_none() {
+        if runtime_plan.egress_routes.is_empty() && session_input.transparent_proxy.is_none() {
             return Ok(None);
         }
         let EgressProxyStartOptions {
@@ -436,7 +439,7 @@ impl EgressProxy {
             clock,
             next_request_id: Arc::new(AtomicU64::new(1)),
         };
-        let transparent_listener_address = if startup_input.transparent_proxy.is_some() {
+        let transparent_listener_address = if session_input.transparent_proxy.is_some() {
             transparent_proxy_listener_address_for_forwarding_mode(&forwarding_mode)?
         } else {
             None
@@ -578,7 +581,7 @@ impl EgressProxy {
         };
 
         let transparent_packet_rules = if transparent_server.is_some() {
-            match startup_input.transparent_proxy.as_ref() {
+            match session_input.transparent_proxy.as_ref() {
                 Some(configuration) => {
                     match TransparentPacketRules::install(
                         configuration,

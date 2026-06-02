@@ -6,7 +6,6 @@ import {
   type ControlPlaneTransaction,
   type SandboxProfile,
   type SandboxProfileVersionAgentRuntimeId,
-  type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileStatuses,
   type SandboxProfileVersionState,
   SandboxProfileVersionStates,
@@ -31,6 +30,7 @@ import {
   SandboxProfilesNotFoundCodes,
   SandboxProfilesNotFoundError,
 } from "../errors.js";
+import type { SandboxProfileVersionSkillsConfig } from "./profile-version-skills-config.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 const DUPLICATED_ACTIVE_VERSION = 1;
@@ -60,7 +60,6 @@ type SourceProfileVersion = {
   snapshotImageId: string | null;
   setupScript: string | null;
   maintenanceScript: string | null;
-  defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
   sandboxProvider: string | null;
   sandboxConnectionId: string | null;
   sandboxVcpuCount: number | null;
@@ -70,6 +69,7 @@ type SourceProfileVersion = {
   gitCommitSigningIntegrationConnectionId: string | null;
   mistleMcpEnabled: boolean;
   mistleMcpApiKeyId: string | null;
+  skillsConfig: SandboxProfileVersionSkillsConfig | null;
 };
 
 type SourceIntegrationBinding = {
@@ -364,7 +364,6 @@ async function insertDuplicatedVersion(
     snapshotImageId: input.copySnapshot ? input.source.snapshotImageId : null,
     setupScript: input.source.setupScript,
     maintenanceScript: input.source.maintenanceScript,
-    defaultPersistenceMode: input.source.defaultPersistenceMode,
     sandboxProvider: input.source.sandboxProvider,
     sandboxConnectionId: input.source.sandboxConnectionId,
     sandboxVcpuCount: input.source.sandboxVcpuCount,
@@ -374,6 +373,7 @@ async function insertDuplicatedVersion(
     gitCommitSigningIntegrationConnectionId: input.source.gitCommitSigningIntegrationConnectionId,
     mistleMcpEnabled: input.source.mistleMcpEnabled,
     mistleMcpApiKeyId: input.source.mistleMcpApiKeyId,
+    skillsConfig: input.source.skillsConfig,
   });
 }
 

@@ -4,7 +4,6 @@
 
 import {
   SandboxInstanceDeadlineKinds,
-  SandboxInstancePersistenceModes,
   SandboxInstancePurposes,
   SandboxInstanceSources,
   SandboxInstanceStatuses,
@@ -53,7 +52,6 @@ describe.concurrent("data-plane worker sandbox instance deadlines", () => {
       runtimeProvider: "docker",
       providerSandboxId: "provider_integration_new_deadline_generation",
       status: SandboxInstanceStatuses.RUNNING,
-      persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
       purpose: SandboxInstancePurposes.SESSION,
       startedByKind: "system",
       startedById: "worker_integration_new_deadline_generation",
@@ -428,7 +426,6 @@ async function insertSandboxInstance(
     runtimeProvider: "docker",
     providerSandboxId: input.providerSandboxId,
     status: input.status,
-    persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
     purpose: input.purpose ?? SandboxInstancePurposes.SESSION,
     startedByKind: "system",
     startedById: `worker_${input.sandboxInstanceId}`,

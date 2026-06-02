@@ -15,6 +15,7 @@ use url::Url;
 
 use crate::cgroups::DEFAULT_CGROUP_ROOT;
 use crate::keepalive::KeepaliveManager;
+use crate::protocol::session::SessionRuntimeInput;
 use crate::protocol::startup::StartupInput;
 use crate::runtime::readiness::RuntimeReadinessManager;
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
@@ -58,7 +59,8 @@ impl TunnelSession {
         clock: Arc<dyn Clock>,
         sleeper: Arc<dyn Sleeper>,
     ) -> Result<Self, TunnelSessionError> {
-        let sandbox_instance_id = derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)?;
+        let session_input = SessionRuntimeInput::from_startup_input(startup_input);
+        let sandbox_instance_id = derive_sandbox_instance_id(&session_input.tunnel_gateway_ws_url)?;
         let supervisor_handle = SandboxdSupervisorHandle::new(
             sandbox_instance_id,
             clock.clone(),
@@ -66,7 +68,7 @@ impl TunnelSession {
         );
 
         Self::start_with_supervisor(
-            startup_input,
+            &session_input,
             keepalive_manager,
             runtime_readiness_manager,
             agent_endpoint_url,
@@ -80,7 +82,7 @@ impl TunnelSession {
     /// Starts one live bootstrap tunnel session thread using the shared supervisor boundary.
     #[allow(clippy::too_many_arguments)]
     pub fn start_with_supervisor(
-        startup_input: &StartupInput,
+        session_input: &SessionRuntimeInput,
         keepalive_manager: Arc<Mutex<KeepaliveManager>>,
         runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
         agent_endpoint_url: Option<String>,
@@ -89,12 +91,12 @@ impl TunnelSession {
         sleeper: Arc<dyn Sleeper>,
         supervisor_handle: SandboxdSupervisorHandle,
     ) -> Result<Self, TunnelSessionError> {
-        let sandbox_instance_id = derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)?;
+        let sandbox_instance_id = derive_sandbox_instance_id(&session_input.tunnel_gateway_ws_url)?;
         supervisor_handle.replace_component_details(
             SupervisedComponent::TunnelSession,
             BTreeMap::from([(
                 "gatewayWsUrl".to_string(),
-                startup_input.tunnel_gateway_ws_url.clone(),
+                session_input.tunnel_gateway_ws_url.clone(),
             )]),
         );
         supervisor_handle.mark_component_starting(SupervisedComponent::TunnelSession);
@@ -117,21 +119,21 @@ impl TunnelSession {
                 cgroup_root,
                 attachment_root,
                 sandbox_instance_id,
-                gateway_ws_url: startup_input.tunnel_gateway_ws_url.clone(),
-                operation_id: derive_startup_operation_id(&startup_input.tunnel_gateway_ws_url),
-                operation_kind: startup_operation_kind(startup_input),
+                gateway_ws_url: session_input.tunnel_gateway_ws_url.clone(),
+                operation_id: derive_startup_operation_id(&session_input.tunnel_gateway_ws_url),
+                operation_kind: startup_operation_kind(session_input),
                 transparent_passthrough_socket_mark: startup_transparent_passthrough_socket_mark(
-                    startup_input,
+                    session_input,
                 ),
                 shutdown_requested,
                 clock,
                 sleeper,
                 supervisor_handle: supervisor_handle.clone(),
             };
-            let connected_url = startup_input.tunnel_gateway_ws_url.clone();
+            let connected_url = session_input.tunnel_gateway_ws_url.clone();
             let panic_connected_url = connected_url.clone();
-            let bootstrap_token = startup_input.bootstrap_token.clone();
-            let tunnel_exchange_token = startup_input.tunnel_exchange_token.clone();
+            let bootstrap_token = session_input.bootstrap_token.clone();
+            let tunnel_exchange_token = session_input.tunnel_exchange_token.clone();
             move || match panic::catch_unwind(AssertUnwindSafe(move || {
                 let runtime_builder = Builder::new_multi_thread()
                     .worker_threads(2)
@@ -211,8 +213,27 @@ impl TunnelSession {
         sleeper: Arc<dyn Sleeper>,
         supervisor_handle: SandboxdSupervisorHandle,
     ) -> Result<Self, TunnelSessionError> {
+        let session_input = SessionRuntimeInput::from_startup_input(startup_input);
+        Self::start_minimal_session_input_with_supervisor(
+            &session_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            clock,
+            sleeper,
+            supervisor_handle,
+        )
+    }
+
+    pub fn start_minimal_session_input_with_supervisor(
+        session_input: &SessionRuntimeInput,
+        keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+        runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
+        clock: Arc<dyn Clock>,
+        sleeper: Arc<dyn Sleeper>,
+        supervisor_handle: SandboxdSupervisorHandle,
+    ) -> Result<Self, TunnelSessionError> {
         Self::start_with_supervisor(
-            startup_input,
+            session_input,
             keepalive_manager,
             runtime_readiness_manager,
             None,

@@ -621,6 +621,12 @@ export function createDataPlaneGatewayRuntime(
     lifecycle,
     trustedUpstreamCaCertificates: config.app.__dangerouslyTrustDirectEgressTlsCaCertificates,
     upgradeWebSocket: nodeWebSocket.upgradeWebSocket,
+    ...(config.app.__dangerouslyDelayDirectEgressWebSocketUpstreamResolutionMs === undefined
+      ? {}
+      : {
+          webSocketUpstreamResolutionDelayMs:
+            config.app.__dangerouslyDelayDirectEgressWebSocketUpstreamResolutionMs,
+        }),
   });
   registerPtyTransportRoutes({
     app,

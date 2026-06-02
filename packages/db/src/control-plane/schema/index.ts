@@ -241,14 +241,6 @@ export {
   type InsertOrganizationCredentialKey,
   type OrganizationCredentialKey,
 } from "./organization-credential-keys.js";
-export {
-  organizationSandboxStorageSettings,
-  SandboxStorageBackend,
-  SandboxStorageConfigSources,
-  type InsertOrganizationSandboxStorageSettings,
-  type OrganizationSandboxStorageSettings,
-  type SandboxStorageConfigSource,
-} from "./organization-sandbox-storage-settings.js";
 export { organizations } from "./organizations.js";
 export {
   portAccessLinks,
@@ -264,16 +256,21 @@ export type {
   SandboxProfileStatus,
 } from "./sandbox-profiles.js";
 export {
+  skillsSourceRepos,
+  type InsertSkillsSourceRepo,
+  type SkillsSourceRepo,
+  type SkillsSourceRepoSkill,
+} from "./skills-source-repos.js";
+export {
   sandboxProfileVersions,
   SandboxProfileVersionAgentRuntimeIds,
-  SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionStates,
 } from "./sandbox-profile-versions.js";
 export type {
   InsertSandboxProfileVersion,
   SandboxProfileVersion,
   SandboxProfileVersionAgentRuntimeId,
-  SandboxProfileVersionDefaultPersistenceMode,
+  SandboxProfileVersionSkillsConfig,
   SandboxProfileVersionState,
 } from "./sandbox-profile-versions.js";
 export {

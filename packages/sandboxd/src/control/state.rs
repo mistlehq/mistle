@@ -5,10 +5,11 @@
 //! one error path for poisoned locks.
 
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread::JoinHandle;
 
 use crate::control::{ControlError, InitPhase};
+use crate::protocol::activation::ActivationInput;
 use crate::protocol::startup::StartupInput;
 use crate::sandboxd_state::SandboxdState;
 
@@ -16,6 +17,7 @@ use crate::sandboxd_state::SandboxdState;
 pub(super) struct ControlServerState {
     pub(super) init_phase: InitPhase,
     pub(super) startup_input: Option<StartupInput>,
+    pub(super) activation_input: Option<ActivationInput>,
     pub(super) sandboxd_state: Option<SandboxdState>,
     pub(super) global_git_config_path: PathBuf,
     pub(super) shutdown_after_init: bool,
@@ -23,6 +25,7 @@ pub(super) struct ControlServerState {
 
 pub(super) type InitThread = JoinHandle<Result<(), ControlError>>;
 pub(super) type SharedInitThread = Arc<Mutex<Option<InitThread>>>;
+pub(super) type InitCompletion = Arc<Condvar>;
 
 pub(super) fn lock_control_state(
     state: &Arc<Mutex<ControlServerState>>,
@@ -49,6 +52,25 @@ pub(super) fn join_init_thread(init_thread: &SharedInitThread) -> Result<(), Con
         Ok(result) => result,
         Err(_) => Err(ControlError::InitPanicked),
     }
+}
+
+pub(super) fn notify_init_completion(init_completion: &InitCompletion) {
+    init_completion.notify_all();
+}
+
+pub(super) fn wait_for_init_completion(
+    state: &Arc<Mutex<ControlServerState>>,
+    init_completion: &InitCompletion,
+) -> Result<InitPhase, ControlError> {
+    let mut state_guard = lock_control_state(state)?;
+
+    while matches!(state_guard.init_phase, InitPhase::Initializing) {
+        state_guard = init_completion
+            .wait(state_guard)
+            .map_err(|_| ControlError::ControlStateLockPoisoned)?;
+    }
+
+    Ok(state_guard.init_phase.clone())
 }
 
 fn take_sandboxd_state(

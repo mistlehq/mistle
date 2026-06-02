@@ -1,4 +1,4 @@
-import { SandboxInstancePersistenceModes, SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { describe, expect, it } from "vitest";
 
 import { determineDisconnectReconciliationAction } from "./disconnect-reconciliation-policy.js";
@@ -7,7 +7,6 @@ describe("determineDisconnectReconciliationAction", () => {
   it("fails starting sandboxes whose provider runtime is missing", () => {
     expect(
       determineDisconnectReconciliationAction({
-        persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
         sandboxStatus: SandboxInstanceStatuses.STARTING,
         providerState: "missing",
       }),
@@ -22,7 +21,6 @@ describe("determineDisconnectReconciliationAction", () => {
   it("marks starting sandboxes stopped when the provider runtime is resumably stopped", () => {
     expect(
       determineDisconnectReconciliationAction({
-        persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
         sandboxStatus: SandboxInstanceStatuses.STARTING,
         providerState: "resumable_stopped",
       }),
@@ -34,7 +32,6 @@ describe("determineDisconnectReconciliationAction", () => {
   it("conditionally stops starting sandboxes when bootstrap disconnect is the only startup failure", () => {
     expect(
       determineDisconnectReconciliationAction({
-        persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
         sandboxStatus: SandboxInstanceStatuses.STARTING,
         providerState: "active",
       }),
@@ -49,7 +46,6 @@ describe("determineDisconnectReconciliationAction", () => {
   it("uses the startup policy for started and initializing sandboxes", () => {
     expect(
       determineDisconnectReconciliationAction({
-        persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
         sandboxStatus: SandboxInstanceStatuses.STARTED,
         providerState: "active",
       }),
@@ -61,7 +57,6 @@ describe("determineDisconnectReconciliationAction", () => {
     });
     expect(
       determineDisconnectReconciliationAction({
-        persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
         sandboxStatus: SandboxInstanceStatuses.INITIALIZING,
         providerState: "active",
       }),
@@ -76,7 +71,6 @@ describe("determineDisconnectReconciliationAction", () => {
   it("stops running sandboxes that still exist at the provider", () => {
     expect(
       determineDisconnectReconciliationAction({
-        persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
         sandboxStatus: SandboxInstanceStatuses.RUNNING,
         providerState: "active",
       }),
@@ -88,7 +82,6 @@ describe("determineDisconnectReconciliationAction", () => {
   it("stops reconnecting and stopping sandboxes that still exist at the provider", () => {
     expect(
       determineDisconnectReconciliationAction({
-        persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
         sandboxStatus: SandboxInstanceStatuses.RECONNECTING,
         providerState: "active",
       }),
@@ -97,7 +90,6 @@ describe("determineDisconnectReconciliationAction", () => {
     });
     expect(
       determineDisconnectReconciliationAction({
-        persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
         sandboxStatus: SandboxInstanceStatuses.STOPPING,
         providerState: "active",
       }),
@@ -109,7 +101,6 @@ describe("determineDisconnectReconciliationAction", () => {
   it("marks running sandboxes stopped when the provider runtime is resumably stopped", () => {
     expect(
       determineDisconnectReconciliationAction({
-        persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
         sandboxStatus: SandboxInstanceStatuses.RUNNING,
         providerState: "resumable_stopped",
       }),
@@ -121,7 +112,6 @@ describe("determineDisconnectReconciliationAction", () => {
   it("fails running sandboxes when the provider runtime is terminal", () => {
     expect(
       determineDisconnectReconciliationAction({
-        persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
         sandboxStatus: SandboxInstanceStatuses.RUNNING,
         providerState: "terminal_stopped",
       }),
@@ -133,10 +123,9 @@ describe("determineDisconnectReconciliationAction", () => {
     });
   });
 
-  it("fails stopping sandboxes when ephemeral provider runtime is terminal", () => {
+  it("fails stopping sandboxes when provider runtime is terminal", () => {
     expect(
       determineDisconnectReconciliationAction({
-        persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
         sandboxStatus: SandboxInstanceStatuses.STOPPING,
         providerState: "terminal_stopped",
       }),
@@ -148,27 +137,31 @@ describe("determineDisconnectReconciliationAction", () => {
     });
   });
 
-  it("marks persistent running sandboxes stopped when provider compute is missing", () => {
+  it("fails running sandboxes when provider compute is missing", () => {
     expect(
       determineDisconnectReconciliationAction({
-        persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
         sandboxStatus: SandboxInstanceStatuses.RUNNING,
         providerState: "missing",
       }),
     ).toEqual({
-      kind: "mark_stopped",
+      kind: "fail",
+      failureCode: "provider_runtime_missing",
+      failureMessage:
+        "Sandbox runtime was not found at the provider during disconnect reconciliation.",
     });
   });
 
-  it("marks persistent starting sandboxes stopped when provider compute is terminal", () => {
+  it("fails starting sandboxes when provider compute is terminal", () => {
     expect(
       determineDisconnectReconciliationAction({
-        persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
         sandboxStatus: SandboxInstanceStatuses.STARTING,
         providerState: "terminal_stopped",
       }),
     ).toEqual({
-      kind: "mark_stopped",
+      kind: "fail",
+      failureCode: "provider_runtime_terminal",
+      failureMessage:
+        "Sandbox runtime was terminal at the provider during disconnect reconciliation.",
     });
   });
 });

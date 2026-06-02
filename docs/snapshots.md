@@ -46,7 +46,7 @@ Control plane stores the snapshot image handle
 New sessions launch from that snapshot image
 ```
 
-Snapshot sandboxes are internal system sandboxes. They are created with the `snapshot` purpose, run ephemerally, and are destroyed after the image is captured.
+Snapshot sandboxes are internal system sandboxes. They are created with the `snapshot` purpose and destroyed after the image is captured.
 
 ## Lifecycle
 
@@ -64,4 +64,4 @@ Only one queued or running snapshot job is allowed per profile version at a time
 
 Snapshots are not per-session durable storage. They do not preserve the ongoing filesystem changes from a user's sandbox session.
 
-Use snapshots when you want many future sandboxes to start from the same prepared image. Use persistent sandboxes when you want one sandbox instance to retain selected filesystem state across compute stops, resumes, or provider expiry.
+Use snapshots when you want many future sandboxes to start from the same prepared image. Sandboxes retain their own disk state across ordinary stop/start cycles.

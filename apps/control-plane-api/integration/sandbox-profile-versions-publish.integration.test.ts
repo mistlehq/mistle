@@ -6,7 +6,6 @@ import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
   SandboxProfileVersionAgentRuntimeIds,
-  SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
@@ -40,6 +39,7 @@ const EmptySandboxRuntimeConfig = {
   sandboxConnectionId: null,
   sandboxProvider: SandboxProvider.DOCKER,
   sandboxResources: null,
+  skillsConfig: null,
 };
 
 describe.concurrent("sandbox profile versions publish integration", () => {
@@ -135,7 +135,6 @@ describe.concurrent("sandbox profile versions publish integration", () => {
         version: 2,
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: expect.any(String),
-        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
         ...EmptySandboxRuntimeConfig,
         gitCommitSigningIntegrationConnectionId: null,
         isActive: false,
