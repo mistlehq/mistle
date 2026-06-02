@@ -21,6 +21,7 @@ import {
   SandboxProfileTriggerImpactIssueCodes,
   SandboxProfilePublishabilityIssueCodes,
 } from "./errors.js";
+import { sandboxProfileVersionSkillsConfigSchema } from "./services/profile-version-skills-config.js";
 
 const sandboxProfileStatusSchema = z.enum([
   SandboxProfileStatuses.ACTIVE,
@@ -149,6 +150,7 @@ export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVers
   .extend({
     maintenanceScript: z.string().nullable(),
     sandboxResources: sandboxProfileVersionResourcesSchema.nullable(),
+    skillsConfig: sandboxProfileVersionSkillsConfigSchema.nullable(),
     isActive: z.boolean(),
     usable: z.boolean(),
     refreshSchedule: sandboxProfileVersionRefreshScheduleSummarySchema.nullable(),
@@ -328,6 +330,7 @@ export const putSandboxProfileVersionDraftBodySchema = z
     sandboxProvider: z.string().min(1).optional(),
     sandboxConnectionId: z.string().min(1).nullable().optional(),
     sandboxResources: sandboxProfileVersionResourcesSchema.nullable().optional(),
+    skillsConfig: sandboxProfileVersionSkillsConfigSchema.nullable().optional(),
     integrationBindings: sandboxProfileVersionIntegrationBindingsWriteBodySchema.optional(),
   })
   .strict()
@@ -341,6 +344,7 @@ export const putSandboxProfileVersionDraftBodySchema = z
       value.sandboxProvider !== undefined ||
       value.sandboxConnectionId !== undefined ||
       value.sandboxResources !== undefined ||
+      value.skillsConfig !== undefined ||
       value.integrationBindings !== undefined,
     {
       message: "At least one draft field must be provided.",
@@ -359,6 +363,7 @@ export const putSandboxProfileVersionDraftResponseSchema = z
     sandboxProvider: z.string().min(1).nullable(),
     sandboxConnectionId: z.string().min(1).nullable(),
     sandboxResources: sandboxProfileVersionResourcesSchema.nullable(),
+    skillsConfig: sandboxProfileVersionSkillsConfigSchema.nullable(),
     integrationBindings: sandboxProfileVersionIntegrationBindingsResponseSchema,
   })
   .strict();

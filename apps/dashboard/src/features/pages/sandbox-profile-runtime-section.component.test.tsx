@@ -162,6 +162,7 @@ function createVersion(
     sandboxConnectionId: input.sandboxConnectionId,
     maintenanceScript: null,
     sandboxResources: input.sandboxResources,
+    skillsConfig: null,
     isActive: false,
     usable: false,
     latestSnapshotJob: null,

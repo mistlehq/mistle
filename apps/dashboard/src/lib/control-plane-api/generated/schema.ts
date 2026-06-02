@@ -9996,6 +9996,14 @@ export interface paths {
                   storageMb?: number;
                   vcpuCount: number;
                 } | null;
+                skillsConfig: {
+                  /** Format: uri */
+                  originUrl: string;
+                  selectedSkills: {
+                    name: string;
+                    relativePath: string;
+                  }[];
+                } | null;
                 /** @enum {string} */
                 state: "draft" | "published";
                 usable: boolean;
@@ -10122,6 +10130,14 @@ export interface paths {
                 memoryMb: number;
                 storageMb?: number;
                 vcpuCount: number;
+              } | null;
+              skillsConfig: {
+                /** Format: uri */
+                originUrl: string;
+                selectedSkills: {
+                  name: string;
+                  relativePath: string;
+                }[];
               } | null;
               /** @enum {string} */
               state: "draft" | "published";
@@ -10376,6 +10392,14 @@ export interface paths {
               vcpuCount: number;
             } | null;
             setupScript?: string | null;
+            skillsConfig?: {
+              /** Format: uri */
+              originUrl: string;
+              selectedSkills: {
+                name: string;
+                relativePath: string;
+              }[];
+            } | null;
           };
         };
       };
@@ -10416,6 +10440,14 @@ export interface paths {
                 vcpuCount: number;
               } | null;
               setupScript: string | null;
+              skillsConfig: {
+                /** Format: uri */
+                originUrl: string;
+                selectedSkills: {
+                  name: string;
+                  relativePath: string;
+                }[];
+              } | null;
               version: number;
             };
           };
@@ -11156,6 +11188,14 @@ export interface paths {
                   storageMb?: number;
                   vcpuCount: number;
                 } | null;
+                skillsConfig: {
+                  /** Format: uri */
+                  originUrl: string;
+                  selectedSkills: {
+                    name: string;
+                    relativePath: string;
+                  }[];
+                } | null;
                 /** @enum {string} */
                 state: "draft" | "published";
                 usable: boolean;
@@ -11454,6 +11494,14 @@ export interface paths {
                   memoryMb: number;
                   storageMb?: number;
                   vcpuCount: number;
+                } | null;
+                skillsConfig: {
+                  /** Format: uri */
+                  originUrl: string;
+                  selectedSkills: {
+                    name: string;
+                    relativePath: string;
+                  }[];
                 } | null;
                 /** @enum {string} */
                 state: "draft" | "published";
@@ -11834,6 +11882,14 @@ export interface paths {
                   memoryMb: number;
                   storageMb?: number;
                   vcpuCount: number;
+                } | null;
+                skillsConfig: {
+                  /** Format: uri */
+                  originUrl: string;
+                  selectedSkills: {
+                    name: string;
+                    relativePath: string;
+                  }[];
                 } | null;
                 /** @enum {string} */
                 state: "draft" | "published";

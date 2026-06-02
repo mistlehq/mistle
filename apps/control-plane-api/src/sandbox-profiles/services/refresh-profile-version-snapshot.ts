@@ -29,6 +29,10 @@ import {
   mapProfileVersionRuntimeConfig,
   type SandboxProfileVersionResources,
 } from "./profile-version-runtime-config.js";
+import {
+  mapProfileVersionSkillsConfig,
+  type SandboxProfileVersionSkillsConfig,
+} from "./profile-version-skills-config.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type RefreshProfileVersionSnapshotInput = {
@@ -64,6 +68,7 @@ type RefreshProfileVersionSnapshotOutput = {
     sandboxConnectionId: string | null;
     maintenanceScript: string | null;
     sandboxResources: SandboxProfileVersionResources | null;
+    skillsConfig: SandboxProfileVersionSkillsConfig | null;
     isActive: boolean;
     usable: boolean;
     refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
@@ -185,6 +190,7 @@ async function queueProfileVersionSnapshot(
           sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
           sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
           sandboxStorageMb: tables.sandboxProfileVersions.sandboxStorageMb,
+          skillsConfig: tables.sandboxProfileVersions.skillsConfig,
         })
         .from(tables.sandboxProfiles)
         .leftJoin(
@@ -321,6 +327,7 @@ async function queueProfileVersionSnapshot(
             sandboxMemoryMb: resolvedSandboxMemoryMb,
             sandboxStorageMb: resolvedSandboxStorageMb,
           }),
+          skillsConfig: mapProfileVersionSkillsConfig(sandboxProfileVersion.skillsConfig),
           isActive: sandboxProfileVersion.activeVersion === input.profileVersion,
           usable: versionHasUsableSnapshot,
           refreshSchedule: refreshSchedulesByVersion.get(resolvedSandboxProfileVersion) ?? null,

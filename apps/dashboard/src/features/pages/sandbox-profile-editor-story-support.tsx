@@ -465,6 +465,7 @@ function createRuntimeStoryVersion(input: {
             vcpuCount: 2,
             memoryMb: 4096,
           },
+    skillsConfig: null,
     isActive: false,
     usable: false,
     refreshSchedule: null,

@@ -20891,6 +20891,35 @@
                       "required": ["vcpuCount", "memoryMb"],
                       "additionalProperties": false
                     },
+                    "skillsConfig": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "originUrl": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "selectedSkills": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "relativePath": {
+                                "type": "string",
+                                "pattern": "^(?:\\.|(?=.*\\S)(?!\\/)(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!.*\\/\\/).+)$"
+                              }
+                            },
+                            "required": ["name", "relativePath"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["originUrl", "selectedSkills"],
+                      "additionalProperties": false
+                    },
                     "isActive": {
                       "type": "boolean"
                     },
@@ -21001,6 +21030,7 @@
                     "sandboxConnectionId",
                     "maintenanceScript",
                     "sandboxResources",
+                    "skillsConfig",
                     "isActive",
                     "usable",
                     "refreshSchedule",
@@ -21220,6 +21250,35 @@
                             "required": ["vcpuCount", "memoryMb"],
                             "additionalProperties": false
                           },
+                          "skillsConfig": {
+                            "type": ["object", "null"],
+                            "properties": {
+                              "originUrl": {
+                                "type": "string",
+                                "format": "uri"
+                              },
+                              "selectedSkills": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "relativePath": {
+                                      "type": "string",
+                                      "pattern": "^(?:\\.|(?=.*\\S)(?!\\/)(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!.*\\/\\/).+)$"
+                                    }
+                                  },
+                                  "required": ["name", "relativePath"],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": ["originUrl", "selectedSkills"],
+                            "additionalProperties": false
+                          },
                           "isActive": {
                             "type": "boolean"
                           },
@@ -21330,6 +21389,7 @@
                           "sandboxConnectionId",
                           "maintenanceScript",
                           "sandboxResources",
+                          "skillsConfig",
                           "isActive",
                           "usable",
                           "refreshSchedule",
@@ -22964,6 +23024,35 @@
                     "required": ["vcpuCount", "memoryMb"],
                     "additionalProperties": false
                   },
+                  "skillsConfig": {
+                    "type": ["object", "null"],
+                    "properties": {
+                      "originUrl": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "selectedSkills": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "relativePath": {
+                              "type": "string",
+                              "pattern": "^(?:\\.|(?=.*\\S)(?!\\/)(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!.*\\/\\/).+)$"
+                            }
+                          },
+                          "required": ["name", "relativePath"],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": ["originUrl", "selectedSkills"],
+                    "additionalProperties": false
+                  },
                   "integrationBindings": {
                     "type": "object",
                     "properties": {
@@ -23068,6 +23157,35 @@
                       "required": ["vcpuCount", "memoryMb"],
                       "additionalProperties": false
                     },
+                    "skillsConfig": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "originUrl": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "selectedSkills": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "relativePath": {
+                                "type": "string",
+                                "pattern": "^(?:\\.|(?=.*\\S)(?!\\/)(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!.*\\/\\/).+)$"
+                              }
+                            },
+                            "required": ["name", "relativePath"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["originUrl", "selectedSkills"],
+                      "additionalProperties": false
+                    },
                     "integrationBindings": {
                       "type": "object",
                       "properties": {
@@ -23136,6 +23254,7 @@
                     "sandboxProvider",
                     "sandboxConnectionId",
                     "sandboxResources",
+                    "skillsConfig",
                     "integrationBindings"
                   ],
                   "additionalProperties": false
@@ -23983,6 +24102,35 @@
                           "required": ["vcpuCount", "memoryMb"],
                           "additionalProperties": false
                         },
+                        "skillsConfig": {
+                          "type": ["object", "null"],
+                          "properties": {
+                            "originUrl": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "selectedSkills": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "relativePath": {
+                                    "type": "string",
+                                    "pattern": "^(?:\\.|(?=.*\\S)(?!\\/)(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!.*\\/\\/).+)$"
+                                  }
+                                },
+                                "required": ["name", "relativePath"],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": ["originUrl", "selectedSkills"],
+                          "additionalProperties": false
+                        },
                         "isActive": {
                           "type": "boolean"
                         },
@@ -24093,6 +24241,7 @@
                         "sandboxConnectionId",
                         "maintenanceScript",
                         "sandboxResources",
+                        "skillsConfig",
                         "isActive",
                         "usable",
                         "refreshSchedule",
@@ -24399,6 +24548,35 @@
                           "required": ["vcpuCount", "memoryMb"],
                           "additionalProperties": false
                         },
+                        "skillsConfig": {
+                          "type": ["object", "null"],
+                          "properties": {
+                            "originUrl": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "selectedSkills": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "relativePath": {
+                                    "type": "string",
+                                    "pattern": "^(?:\\.|(?=.*\\S)(?!\\/)(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!.*\\/\\/).+)$"
+                                  }
+                                },
+                                "required": ["name", "relativePath"],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": ["originUrl", "selectedSkills"],
+                          "additionalProperties": false
+                        },
                         "isActive": {
                           "type": "boolean"
                         },
@@ -24509,6 +24687,7 @@
                         "sandboxConnectionId",
                         "maintenanceScript",
                         "sandboxResources",
+                        "skillsConfig",
                         "isActive",
                         "usable",
                         "refreshSchedule",
@@ -24798,6 +24977,35 @@
                           "required": ["vcpuCount", "memoryMb"],
                           "additionalProperties": false
                         },
+                        "skillsConfig": {
+                          "type": ["object", "null"],
+                          "properties": {
+                            "originUrl": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "selectedSkills": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "relativePath": {
+                                    "type": "string",
+                                    "pattern": "^(?:\\.|(?=.*\\S)(?!\\/)(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!.*\\/\\/).+)$"
+                                  }
+                                },
+                                "required": ["name", "relativePath"],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": ["originUrl", "selectedSkills"],
+                          "additionalProperties": false
+                        },
                         "isActive": {
                           "type": "boolean"
                         },
@@ -24908,6 +25116,7 @@
                         "sandboxConnectionId",
                         "maintenanceScript",
                         "sandboxResources",
+                        "skillsConfig",
                         "isActive",
                         "usable",
                         "refreshSchedule",

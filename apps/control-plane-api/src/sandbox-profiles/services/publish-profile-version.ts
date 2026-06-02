@@ -29,6 +29,10 @@ import {
   mapProfileVersionRuntimeConfig,
   type SandboxProfileVersionResources,
 } from "./profile-version-runtime-config.js";
+import {
+  mapProfileVersionSkillsConfig,
+  type SandboxProfileVersionSkillsConfig,
+} from "./profile-version-skills-config.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type PublishProfileVersionInput = {
@@ -51,6 +55,7 @@ type PublishProfileVersionOutput = {
     sandboxConnectionId: string | null;
     maintenanceScript: string | null;
     sandboxResources: SandboxProfileVersionResources | null;
+    skillsConfig: SandboxProfileVersionSkillsConfig | null;
     isActive: boolean;
     usable: boolean;
     refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
@@ -377,6 +382,7 @@ export async function publishProfileVersion(
         sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
         sandboxStorageMb: tables.sandboxProfileVersions.sandboxStorageMb,
         maintenanceScript: tables.sandboxProfileVersions.maintenanceScript,
+        skillsConfig: tables.sandboxProfileVersions.skillsConfig,
       });
 
     if (publishedVersion === undefined) {
@@ -441,6 +447,7 @@ export async function publishProfileVersion(
         mistleMcpApiKeyId: publishedVersion.mistleMcpApiKeyId,
         maintenanceScript: publishedVersion.maintenanceScript,
         ...mapProfileVersionRuntimeConfig(publishedVersion),
+        skillsConfig: mapProfileVersionSkillsConfig(publishedVersion.skillsConfig),
         isActive: false,
         usable: false,
         refreshSchedule:

@@ -39,6 +39,7 @@ const EmptySandboxRuntimeConfig = {
   sandboxConnectionId: null,
   sandboxProvider: SandboxProvider.DOCKER,
   sandboxResources: null,
+  skillsConfig: null,
 };
 
 describe.concurrent("sandbox profile versions publish integration", () => {

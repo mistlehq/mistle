@@ -17,6 +17,10 @@ import {
   mapProfileVersionRuntimeConfig,
   type SandboxProfileVersionResources,
 } from "./profile-version-runtime-config.js";
+import {
+  mapProfileVersionSkillsConfig,
+  type SandboxProfileVersionSkillsConfig,
+} from "./profile-version-skills-config.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type CreateProfileVersionDraftInput = {
@@ -37,6 +41,7 @@ type CreateProfileVersionDraftOutput = {
   sandboxConnectionId: string | null;
   maintenanceScript: string | null;
   sandboxResources: SandboxProfileVersionResources | null;
+  skillsConfig: SandboxProfileVersionSkillsConfig | null;
   isActive: boolean;
   usable: boolean;
   refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
@@ -98,6 +103,7 @@ export async function createProfileVersionDraft(
           sandboxVcpuCount: true,
           sandboxMemoryMb: true,
           sandboxStorageMb: true,
+          skillsConfig: true,
         },
         where: (table, { eq }) => eq(table.sandboxProfileId, input.profileId),
         orderBy: (table, { desc }) => [desc(table.version)],
@@ -143,6 +149,7 @@ export async function createProfileVersionDraft(
           sandboxVcpuCount: latestVersion.sandboxVcpuCount,
           sandboxMemoryMb: latestVersion.sandboxMemoryMb,
           sandboxStorageMb: latestVersion.sandboxStorageMb,
+          skillsConfig: latestVersion.skillsConfig,
         })
         .returning({
           sandboxProfileId: tables.sandboxProfileVersions.sandboxProfileId,
@@ -159,6 +166,7 @@ export async function createProfileVersionDraft(
           sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
           sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
           sandboxStorageMb: tables.sandboxProfileVersions.sandboxStorageMb,
+          skillsConfig: tables.sandboxProfileVersions.skillsConfig,
         });
 
       if (createdDraftVersion === undefined) {
@@ -190,6 +198,7 @@ export async function createProfileVersionDraft(
         mistleMcpEnabled: createdDraftVersion.mistleMcpEnabled,
         mistleMcpApiKeyId: createdDraftVersion.mistleMcpApiKeyId,
         ...mapProfileVersionRuntimeConfig(createdDraftVersion),
+        skillsConfig: mapProfileVersionSkillsConfig(createdDraftVersion.skillsConfig),
         maintenanceScript: latestVersion.maintenanceScript,
         isActive: false,
         usable: false,

@@ -38,6 +38,7 @@ const DockerSandboxRuntimeConfig = {
   sandboxConnectionId: null,
   sandboxProvider: "docker",
   sandboxResources: null,
+  skillsConfig: null,
 } as const;
 
 describe.concurrent("sandbox profile versions refresh integration", () => {

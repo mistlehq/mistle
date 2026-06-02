@@ -30,6 +30,7 @@ import {
   SandboxProfilesNotFoundCodes,
   SandboxProfilesNotFoundError,
 } from "../errors.js";
+import type { SandboxProfileVersionSkillsConfig } from "./profile-version-skills-config.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 const DUPLICATED_ACTIVE_VERSION = 1;
@@ -68,6 +69,7 @@ type SourceProfileVersion = {
   gitCommitSigningIntegrationConnectionId: string | null;
   mistleMcpEnabled: boolean;
   mistleMcpApiKeyId: string | null;
+  skillsConfig: SandboxProfileVersionSkillsConfig | null;
 };
 
 type SourceIntegrationBinding = {
@@ -371,6 +373,7 @@ async function insertDuplicatedVersion(
     gitCommitSigningIntegrationConnectionId: input.source.gitCommitSigningIntegrationConnectionId,
     mistleMcpEnabled: input.source.mistleMcpEnabled,
     mistleMcpApiKeyId: input.source.mistleMcpApiKeyId,
+    skillsConfig: input.source.skillsConfig,
   });
 }
 

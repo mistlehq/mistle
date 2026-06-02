@@ -270,6 +270,7 @@ export type {
   InsertSandboxProfileVersion,
   SandboxProfileVersion,
   SandboxProfileVersionAgentRuntimeId,
+  SandboxProfileVersionSkillsConfig,
   SandboxProfileVersionState,
 } from "./sandbox-profile-versions.js";
 export {

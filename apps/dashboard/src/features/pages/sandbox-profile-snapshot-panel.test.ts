@@ -77,6 +77,7 @@ describe("resolveSnapshotPanelState", () => {
         sandboxProvider: "docker",
         sandboxConnectionId: null,
         sandboxResources: null,
+        skillsConfig: null,
         maintenanceScript: null,
         isActive: true,
         usable: true,

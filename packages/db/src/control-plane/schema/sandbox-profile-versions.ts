@@ -4,6 +4,7 @@ import {
   boolean,
   check,
   foreignKey,
+  jsonb,
   primaryKey,
   text,
   timestamp,
@@ -32,6 +33,14 @@ export const SandboxProfileVersionAgentRuntimeIds = {
 
 export type SandboxProfileVersionAgentRuntimeId =
   (typeof SandboxProfileVersionAgentRuntimeIds)[keyof typeof SandboxProfileVersionAgentRuntimeIds];
+
+export type SandboxProfileVersionSkillsConfig = {
+  originUrl: string;
+  selectedSkills: Array<{
+    name: string;
+    relativePath: string;
+  }>;
+};
 
 export function defineSandboxProfileVersions(schema: PgSchema) {
   return schema.table(
@@ -62,6 +71,7 @@ export function defineSandboxProfileVersions(schema: PgSchema) {
       gitCommitSigningIntegrationConnectionId: text("git_commit_signing_integration_connection_id"),
       mistleMcpEnabled: boolean("mistle_mcp_enabled").notNull().default(false),
       mistleMcpApiKeyId: text("mistle_mcp_api_key_id"),
+      skillsConfig: jsonb("skills_config").$type<SandboxProfileVersionSkillsConfig>(),
     },
     (table) => [
       primaryKey({

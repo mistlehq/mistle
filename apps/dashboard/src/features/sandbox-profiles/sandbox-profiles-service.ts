@@ -424,6 +424,27 @@ const SandboxProfileVersionResourcesSchema = z
     ...(value.storageMb === undefined ? {} : { storageMb: value.storageMb }),
   }));
 
+const RepoRelativeSkillPathPattern =
+  /^(?:\.|(?=.*\S)(?!\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\/\/).+)$/;
+
+const RepoRelativeSkillPathSchema = z.string().regex(RepoRelativeSkillPathPattern, {
+  message: "Skill relativePath must be a repo-relative path.",
+});
+
+const SandboxProfileVersionSkillsConfigSchema = z
+  .object({
+    originUrl: z.url(),
+    selectedSkills: z.array(
+      z
+        .object({
+          name: z.string().min(1),
+          relativePath: RepoRelativeSkillPathSchema,
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
 const SandboxRuntimeResourceCapabilitySchema = z
   .object({
     default: z.number().int().min(0),
@@ -501,6 +522,7 @@ const SandboxProfileVersionSchema = z
     sandboxProfileId: z.string().min(1),
     sandboxProvider: z.string().min(1).nullable(),
     sandboxResources: SandboxProfileVersionResourcesSchema.nullable(),
+    skillsConfig: SandboxProfileVersionSkillsConfigSchema.nullable(),
     state: z.enum(["draft", "published"]),
     publishedAt: z.string().min(1).nullable(),
     usable: z.boolean(),
@@ -636,6 +658,7 @@ const PutSandboxProfileVersionDraftResultSchema = z
     sandboxConnectionId: z.string().min(1).nullable(),
     sandboxProvider: z.string().min(1).nullable(),
     sandboxResources: SandboxProfileVersionResourcesSchema.nullable(),
+    skillsConfig: SandboxProfileVersionSkillsConfigSchema.nullable(),
     integrationBindings: SandboxProfileVersionIntegrationBindingsResponseSchema,
   })
   .strict();
@@ -1231,6 +1254,7 @@ export async function putSandboxProfileVersionDraft(
         ...(input.sandboxResources === undefined
           ? {}
           : { sandboxResources: input.sandboxResources }),
+        ...(input.skillsConfig === undefined ? {} : { skillsConfig: input.skillsConfig }),
         ...(input.integrationBindings === undefined
           ? {}
           : { integrationBindings: input.integrationBindings }),

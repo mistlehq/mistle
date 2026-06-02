@@ -30,6 +30,10 @@ import {
   type SandboxProfileVersionResources,
   validateSandboxProfileVersionRuntimeConfig,
 } from "./profile-version-runtime-config.js";
+import {
+  mapProfileVersionSkillsConfig,
+  type SandboxProfileVersionSkillsConfig,
+} from "./profile-version-skills-config.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type PutProfileVersionDraftInput = {
@@ -44,6 +48,7 @@ type PutProfileVersionDraftInput = {
   sandboxProvider?: string;
   sandboxConnectionId?: string | null;
   sandboxResources?: SandboxProfileVersionResources | null;
+  skillsConfig?: SandboxProfileVersionSkillsConfig | null;
   integrationBindings?: {
     bindings: Array<{
       id?: string;
@@ -66,6 +71,7 @@ type PutProfileVersionDraftOutput = {
   sandboxProvider: string | null;
   sandboxConnectionId: string | null;
   sandboxResources: SandboxProfileVersionResources | null;
+  skillsConfig: SandboxProfileVersionSkillsConfig | null;
   integrationBindings: Awaited<ReturnType<typeof replaceProfileVersionIntegrationBindings>>;
 };
 
@@ -204,7 +210,8 @@ export async function putProfileVersionDraft(
       input.mistleMcpApiKeyId !== undefined ||
       input.sandboxProvider !== undefined ||
       input.sandboxConnectionId !== undefined ||
-      input.sandboxResources !== undefined;
+      input.sandboxResources !== undefined ||
+      input.skillsConfig !== undefined;
 
     if (hasVersionFieldUpdate) {
       const [updatedVersion] = await tx
@@ -243,6 +250,7 @@ export async function putProfileVersionDraft(
                   sandboxMemoryMb: input.sandboxResources.memoryMb,
                   sandboxStorageMb: input.sandboxResources.storageMb ?? null,
                 }),
+          ...(input.skillsConfig === undefined ? {} : { skillsConfig: input.skillsConfig }),
         })
         .where(
           and(
@@ -302,6 +310,7 @@ export async function putProfileVersionDraft(
         sandboxVcpuCount: true,
         sandboxMemoryMb: true,
         sandboxStorageMb: true,
+        skillsConfig: true,
       },
       where: (table, { and: whereAnd, eq: whereEq }) =>
         whereAnd(
@@ -327,6 +336,7 @@ export async function putProfileVersionDraft(
       mistleMcpEnabled: persistedVersion.mistleMcpEnabled,
       mistleMcpApiKeyId: persistedVersion.mistleMcpApiKeyId,
       ...mapProfileVersionRuntimeConfig(persistedVersion),
+      skillsConfig: mapProfileVersionSkillsConfig(persistedVersion.skillsConfig),
       integrationBindings,
     };
   });

@@ -37,6 +37,7 @@ const EmptySandboxRuntimeConfig = {
   sandboxConnectionId: null,
   sandboxProvider: null,
   sandboxResources: null,
+  skillsConfig: null,
 };
 
 describe.concurrent("sandbox profile versions create integration", () => {
@@ -99,6 +100,15 @@ describe.concurrent("sandbox profile versions create integration", () => {
         setupScript: "echo latest-version-two",
         agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
         gitCommitSigningIntegrationConnectionId: "icn_version_create_latest_git",
+        skillsConfig: {
+          originUrl: "https://github.com/mistle/skills.git",
+          selectedSkills: [
+            {
+              name: "sandbox-ops",
+              relativePath: "automation/sandbox-ops",
+            },
+          ],
+        },
       }),
     ]);
     await env.controlPlaneDb
@@ -152,6 +162,15 @@ describe.concurrent("sandbox profile versions create integration", () => {
       agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
       ...EmptySandboxRuntimeConfig,
       gitCommitSigningIntegrationConnectionId: "icn_version_create_latest_git",
+      skillsConfig: {
+        originUrl: "https://github.com/mistle/skills.git",
+        selectedSkills: [
+          {
+            name: "sandbox-ops",
+            relativePath: "automation/sandbox-ops",
+          },
+        ],
+      },
       isActive: false,
       usable: false,
       maintenanceScript: null,
@@ -172,6 +191,15 @@ describe.concurrent("sandbox profile versions create integration", () => {
     expect(persistedDraftVersion?.gitCommitSigningIntegrationConnectionId).toBe(
       "icn_version_create_latest_git",
     );
+    expect(persistedDraftVersion?.skillsConfig).toEqual({
+      originUrl: "https://github.com/mistle/skills.git",
+      selectedSkills: [
+        {
+          name: "sandbox-ops",
+          relativePath: "automation/sandbox-ops",
+        },
+      ],
+    });
 
     const persistedDraftBindings =
       await env.controlPlaneDb.query.sandboxProfileVersionIntegrationBindings.findMany({

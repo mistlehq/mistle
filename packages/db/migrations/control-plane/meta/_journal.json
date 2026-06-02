@@ -295,6 +295,13 @@
       "when": 1780391818472,
       "tag": "0041_add-skills-source-repos",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1780404397391,
+      "tag": "0042_add-sandbox-profile-version-skills-config",
+      "breakpoints": true
     }
   ]
 }

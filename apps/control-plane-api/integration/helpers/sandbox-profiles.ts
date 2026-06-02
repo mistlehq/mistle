@@ -1,6 +1,7 @@
 import {
   type IntegrationBindingKind,
   type IntegrationConnectionStatus,
+  type SandboxProfileVersionSkillsConfig,
   type SandboxProfileVersionAgentRuntimeId,
   SandboxProfileStatuses,
   SandboxProfileVersionStates,
@@ -41,6 +42,7 @@ export function sandboxProfileVersionRow(input: {
   sandboxStorageMb?: number | null;
   mistleMcpEnabled?: boolean;
   mistleMcpApiKeyId?: string | null;
+  skillsConfig?: SandboxProfileVersionSkillsConfig | null;
 }) {
   return {
     sandboxProfileId: input.sandboxProfileId,
@@ -71,6 +73,7 @@ export function sandboxProfileVersionRow(input: {
     ...(input.mistleMcpApiKeyId === undefined
       ? {}
       : { mistleMcpApiKeyId: input.mistleMcpApiKeyId }),
+    ...(input.skillsConfig === undefined ? {} : { skillsConfig: input.skillsConfig }),
   };
 }
 

@@ -48,6 +48,7 @@ const routeHandler = async (
           ? {}
           : { sandboxConnectionId: body.sandboxConnectionId }),
         ...(body.sandboxResources === undefined ? {} : { sandboxResources: body.sandboxResources }),
+        ...(body.skillsConfig === undefined ? {} : { skillsConfig: body.skillsConfig }),
         ...(body.integrationBindings === undefined
           ? {}
           : {
