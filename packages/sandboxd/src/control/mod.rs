@@ -707,6 +707,13 @@ mod tests {
         assert!(error.to_string().contains(
             "failed to initialize sandboxd state: failed to start bootstrap tunnel session"
         ));
+        let duplicate_error = submit_init(&socket_path, &startup_input, true, false)
+            .expect_err("duplicate init should remain rejected after initialization fails");
+        assert!(
+            duplicate_error
+                .to_string()
+                .contains("sandboxd initialization already failed")
+        );
         match server.init_phase() {
             InitPhase::Failed(message) => {
                 assert!(message.contains("failed to start bootstrap tunnel session"));

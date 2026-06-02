@@ -4,9 +4,11 @@
 //! inline, while initialization may hand work to a background thread so the
 //! daemon remains responsive to readiness, wait, and signing traffic.
 
+use std::any::Any;
 use std::collections::BTreeMap;
 use std::io::Read;
 use std::os::unix::net::UnixStream;
+use std::panic::{self, AssertUnwindSafe};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -18,7 +20,7 @@ use crate::control::state::{
 };
 use crate::control::{ControlError, InitPhase};
 use crate::protocol::startup::StartupInput;
-use crate::sandboxd_state::SandboxdState;
+use crate::sandboxd_state::{SandboxdState, SandboxdStateError};
 use crate::security;
 use crate::startup_diagnostics::{
     StartupDiagnosticsLogger, StartupOperation, startup_diagnostics_string,
@@ -222,17 +224,19 @@ fn begin_init(
     // Initialization owns the long-running sandbox state transition; running it
     // off the socket accept loop keeps local health and wait requests available.
     *init_thread_guard = Some(thread::spawn(move || {
-        let result = SandboxdState::initialize(
-            &startup_input,
-            &global_git_config_path,
-            Arc::new(SystemClock),
-            Arc::new(ThreadSleeper),
-            diagnostics_logger.clone(),
-            wait_for_storage_attach,
-        );
+        let result = catch_init_unwind(|| {
+            SandboxdState::initialize(
+                &startup_input,
+                &global_git_config_path,
+                Arc::new(SystemClock),
+                Arc::new(ThreadSleeper),
+                diagnostics_logger.clone(),
+                wait_for_storage_attach,
+            )
+        });
 
         match result {
-            Ok(sandboxd_state) => {
+            Ok(Ok(sandboxd_state)) => {
                 let mut state_guard = lock_control_state(&state_for_thread)?;
                 state_guard.shutdown_after_init = startup_input.is_snapshot();
                 state_guard.sandboxd_state = Some(sandboxd_state);
@@ -240,22 +244,21 @@ fn begin_init(
                 notify_init_completion(&init_completion_for_thread);
                 Ok(())
             }
-            Err(error) => {
+            Ok(Err(error)) => {
                 let error_text = error.to_string();
-                if let Some(logger) = &diagnostics_logger
-                    && let Err(record_error) = logger.record_failed(BTreeMap::from([(
-                        "error".to_string(),
-                        startup_diagnostics_string(error_text.clone()),
-                    )]))
-                {
-                    eprintln!(
-                        "sandboxd failed to record init diagnostics failure event: {record_error}"
-                    );
-                }
-                lock_control_state(&state_for_thread)?.init_phase =
-                    InitPhase::Failed(error_text.clone());
-                notify_init_completion(&init_completion_for_thread);
+                record_init_failure(&diagnostics_logger, error_text.clone());
+                publish_init_failure(
+                    &state_for_thread,
+                    &init_completion_for_thread,
+                    error_text.clone(),
+                )?;
                 Err(ControlError::InitializeSandboxdState(error_text))
+            }
+            Err(panic_text) => {
+                let error_text = format!("sandbox init worker panicked: {panic_text}");
+                record_init_failure(&diagnostics_logger, error_text.clone());
+                publish_init_failure(&state_for_thread, &init_completion_for_thread, error_text)?;
+                Err(ControlError::InitPanicked)
             }
         }
     }));
@@ -264,6 +267,45 @@ fn begin_init(
     if wait_for_completion {
         crate::control::state::join_init_thread(init_thread)?;
     }
+    Ok(())
+}
+
+fn catch_init_unwind<F>(initialize: F) -> Result<Result<SandboxdState, SandboxdStateError>, String>
+where
+    F: FnOnce() -> Result<SandboxdState, SandboxdStateError>,
+{
+    panic::catch_unwind(AssertUnwindSafe(initialize))
+        .map_err(|payload| format_panic_payload(payload.as_ref()))
+}
+
+fn format_panic_payload(payload: &(dyn Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        return (*message).to_string();
+    }
+    if let Some(message) = payload.downcast_ref::<String>() {
+        return message.clone();
+    }
+    "unknown panic payload".to_string()
+}
+
+fn record_init_failure(diagnostics_logger: &Option<StartupDiagnosticsLogger>, error_text: String) {
+    if let Some(logger) = diagnostics_logger
+        && let Err(record_error) = logger.record_failed(BTreeMap::from([(
+            "error".to_string(),
+            startup_diagnostics_string(error_text),
+        )]))
+    {
+        eprintln!("sandboxd failed to record init diagnostics failure event: {record_error}");
+    }
+}
+
+fn publish_init_failure(
+    state: &Arc<Mutex<crate::control::state::ControlServerState>>,
+    init_completion: &InitCompletion,
+    error_text: String,
+) -> Result<(), ControlError> {
+    lock_control_state(state)?.init_phase = InitPhase::Failed(error_text);
+    notify_init_completion(init_completion);
     Ok(())
 }
 
@@ -335,4 +377,22 @@ fn begin_resume(
     lock_control_state(state)?.sandboxd_state = Some(sandboxd_state);
 
     resume_result
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::control::request::catch_init_unwind;
+    use crate::sandboxd_state::{SandboxdState, SandboxdStateError};
+
+    #[test]
+    fn init_panic_boundary_returns_panic_payload() {
+        let result = catch_init_unwind(|| -> Result<SandboxdState, SandboxdStateError> {
+            panic!("requested init panic")
+        });
+
+        match result {
+            Ok(_) => panic!("init panic boundary should catch panics"),
+            Err(error) => assert_eq!(error, "requested init panic"),
+        }
+    }
 }
