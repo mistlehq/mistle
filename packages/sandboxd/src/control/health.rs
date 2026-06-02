@@ -188,14 +188,14 @@ fn build_health_response(
     let (daemon_phase, snapshot, init_error) = match &state.init_phase {
         InitPhase::Uninitialized => (SandboxdDaemonPhase::Uninitialized, None, None),
         InitPhase::Initializing => (SandboxdDaemonPhase::Initializing, None, None),
-        InitPhase::Initialized => (
-            SandboxdDaemonPhase::Initialized,
-            state
-                .sandboxd_state
-                .as_ref()
-                .map(SandboxdState::health_snapshot),
-            None,
-        ),
+        InitPhase::Initialized => match state.sandboxd_state.as_ref() {
+            Some(sandboxd_state) => (
+                SandboxdDaemonPhase::Initialized,
+                Some(sandboxd_state.health_snapshot()),
+                None,
+            ),
+            None => (SandboxdDaemonPhase::Initializing, None, None),
+        },
         InitPhase::Failed(error) => (SandboxdDaemonPhase::Failed, None, Some(error.clone())),
     };
 

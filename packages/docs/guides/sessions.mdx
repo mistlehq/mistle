@@ -135,9 +135,9 @@ When an agent writes back to supported external systems, Mistle adds a link back
 
 For example, Slack messages, GitHub comments or pull requests, Jira issues or comments, and Linear issues or comments can include a **View session** link. That link lets teammates open the Mistle session behind the external update and inspect the work context.
 
-## Persistence
+## Disk State
 
-Sessions are workspaces for ongoing agent work. By default, session sandboxes are ephemeral.
+Sessions are workspaces for ongoing agent work. Sandboxes retain their disk state across ordinary stop/start cycles.
 
 Use [Snapshots](/guides/snapshots) when a workflow needs a reusable prepared environment for many future sessions.
 

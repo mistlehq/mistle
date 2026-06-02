@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { HomePageStoryModels } from "./home-page-view-model.js";
@@ -10,11 +11,13 @@ import { buildSandboxInstanceListItemFixture } from "./sessions-page.story-fixtu
 describe("HomePageView", () => {
   it("renders the current step status mark in desktop and mobile title positions", () => {
     render(
-      <HomePageView
-        createSessionForm={null}
-        onboarding={HomePageStoryModels.addIntegrations}
-        recentSessions={[]}
-      />,
+      <MemoryRouter>
+        <HomePageView
+          createSessionForm={null}
+          onboarding={HomePageStoryModels.addIntegrations}
+          recentSessions={[]}
+        />
+      </MemoryRouter>,
     );
 
     const addIntegrationsTitle = screen.getByText("Add integrations", { selector: "p" });
@@ -28,44 +31,37 @@ describe("HomePageView", () => {
     expect(contentRow?.querySelectorAll(".rounded-full")).toHaveLength(2);
   });
 
-  it("keeps the current-step action enabled and forwards navigation", () => {
-    let navigatedHref: string | null = null;
-
+  it("renders the current-step action as a route-addressable link", () => {
     render(
-      <HomePageView
-        createSessionForm={null}
-        onboarding={HomePageStoryModels.addIntegrations}
-        onNavigate={(href) => {
-          navigatedHref = href;
-        }}
-        recentSessions={[]}
-      />,
+      <MemoryRouter>
+        <HomePageView
+          createSessionForm={null}
+          onboarding={HomePageStoryModels.addIntegrations}
+          recentSessions={[]}
+        />
+      </MemoryRouter>,
     );
 
-    const actionButton = screen.getByRole("button", { name: "Add integrations" });
+    const actionButton = screen.getByRole("link", { name: "Add integrations" });
 
-    expect(actionButton.hasAttribute("disabled")).toBe(false);
-    fireEvent.click(actionButton);
-    expect(navigatedHref).toBe("/integrations");
+    expect(actionButton.tagName).toBe("A");
+    expect(actionButton.getAttribute("href")).toBe("/integrations");
   });
 
   it("renders completed home content top-aligned with page-scale section headings", () => {
-    let navigatedHref: string | null = null;
-
     const { container } = render(
-      <HomePageView
-        createSessionForm={<div>Session creation form</div>}
-        onboarding={HomePageStoryModels.completed}
-        onNavigate={(href) => {
-          navigatedHref = href;
-        }}
-        recentSessions={[
-          buildSandboxInstanceListItemFixture({
-            id: "sbi_home_recent",
-            title: "Investigate failing build",
-          }),
-        ]}
-      />,
+      <MemoryRouter>
+        <HomePageView
+          createSessionForm={<div>Session creation form</div>}
+          onboarding={HomePageStoryModels.completed}
+          recentSessions={[
+            buildSandboxInstanceListItemFixture({
+              id: "sbi_home_recent",
+              title: "Investigate failing build",
+            }),
+          ]}
+        />
+      </MemoryRouter>,
     );
 
     expect(container.firstElementChild?.className).toContain("flex w-full flex-col gap-8");
@@ -77,8 +73,11 @@ describe("HomePageView", () => {
     expect(screen.getByRole("heading", { name: "Recent sessions" }).className).toContain("text-xl");
     expect(screen.getByText("Investigate failing build")).toBeDefined();
     expect(screen.getByText("Session creation form")).toBeDefined();
-
-    fireEvent.click(screen.getByRole("button", { name: "Investigate failing build" }));
-    expect(navigatedHref).toBe("/sessions/sbi_home_recent");
+    expect(
+      screen.getByRole("link", { name: "Investigate failing build" }).getAttribute("href"),
+    ).toBe("/sessions/sbi_home_recent");
+    expect(
+      screen.getByText("Investigate failing build").closest(".group\\/session-row")?.className,
+    ).not.toContain("hover:bg-muted");
   });
 });

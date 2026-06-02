@@ -147,19 +147,14 @@ describe("integrations page view model", () => {
   });
 
   it("builds connected integration cards with view actions", () => {
-    let openedTargetKey: string | null = null;
-
     const [card] = buildConnectedIntegrationViewCards({
       connectedCards: [createCard({ description: "GitHub", connectionCount: 2 })],
-      onOpenTarget: (targetKey) => {
-        openedTargetKey = targetKey;
-      },
     });
 
     expect(card?.actionLabel).toBe("View");
+    expect(card?.actionHref).toBe("/integrations/github");
     expect(card?.description).toBe("2 connections");
-    card?.onAction();
-    expect(openedTargetKey).toBe("github");
+    expect(card?.onAction).toBeUndefined();
   });
 
   it("builds connected integration cards for targets with non-active connections", () => {
@@ -170,27 +165,42 @@ describe("integrations page view model", () => {
           connectionStatuses: ["error"],
         }),
       ],
-      onOpenTarget: () => {},
     });
 
     expect(card?.description).toBe("1 connection");
     expect(card?.actionLabel).toBe("View");
+    expect(card?.actionHref).toBe("/integrations/github");
   });
 
   it("builds available integration cards with add actions and disabled invalid entries", () => {
-    let openedTargetKey: string | null = null;
-
-    const [card] = buildAvailableIntegrationViewCards({
+    const [enabledCard] = buildAvailableIntegrationViewCards({
+      cards: [
+        createCard({
+          description: "Bring GitHub into Mistle.",
+          connectionMethods: [
+            {
+              id: IntegrationConnectionMethodIds.API_KEY,
+              label: "API key",
+              kind: "form",
+              secretFields: [],
+            },
+          ],
+        }),
+      ],
+    });
+    const [disabledCard] = buildAvailableIntegrationViewCards({
       cards: [createCard({ description: "Bring GitHub into Mistle.", connectionMethods: [] })],
-      onOpenCreatePage: (targetKey) => {
-        openedTargetKey = targetKey;
-      },
     });
 
-    expect(card?.actionLabel).toBe("Add");
-    expect(card?.actionDisabled).toBe(true);
-    card?.onAction();
-    expect(openedTargetKey).toBe("github");
+    expect(enabledCard?.actionLabel).toBe("Add");
+    expect(enabledCard?.actionDisabled).toBe(false);
+    expect(enabledCard?.actionHref).toBe("/integrations/github/add");
+    expect(enabledCard?.onAction).toBeUndefined();
+
+    expect(disabledCard?.actionLabel).toBe("Add");
+    expect(disabledCard?.actionDisabled).toBe(true);
+    expect(disabledCard?.actionHref).toBeUndefined();
+    expect(disabledCard?.onAction).toBeUndefined();
   });
 
   it("builds create inputs from integration cards", () => {

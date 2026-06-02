@@ -12,7 +12,7 @@
 ## Preparing a release
 
 1. Choose the release intent.
-2. Run:
+2. Start the release PR:
 
 ```sh
 pnpm release:start stable
@@ -30,33 +30,29 @@ or, when you need an explicit override:
 pnpm release:start --release-as 0.1.0
 ```
 
-3. Review the changes to:
-   - the current branch, which will now be `release/v$(cat VERSION)`
-   - `VERSION`
-   - `packages/sandboxd/Cargo.toml`
-   - committed OpenAPI specs
-4. Run:
+`release:start` requires a clean tracked working tree on `main`. It prepares the release,
+commits the generated release changes to `release/v$(cat VERSION)`, pushes that branch,
+and opens a PR to `main` with release notes generated from `cliff.toml`.
+
+3. Review the release PR and wait for CI to pass.
+
+For additional local validation before merging, run:
 
 ```sh
-pnpm format
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm run ci
+pnpm check:fast
 ```
-
-5. Commit the release prep as:
-
-```sh
-git commit -am "chore(release): v$(cat VERSION)"
-```
-
-6. Open a PR from `release/v$(cat VERSION)` to `main`.
 
 ## Cutting the release
 
 1. Merge the release PR to `main`.
-2. Create the tag:
+2. Update local `main` to the merged release commit.
+
+```sh
+git switch main
+git pull --ff-only origin main
+```
+
+3. Create the tag:
 
 ```sh
 pnpm release:create-tag
@@ -68,13 +64,13 @@ For stable releases, you can preview the release notes locally before creating t
 pnpm release:write-notes
 ```
 
-3. Push the tag:
+4. Push the tag:
 
 ```sh
 git push origin "v$(cat VERSION)"
 ```
 
-4. The tag-based release workflow publishes the release automatically.
+5. The tag-based release workflow publishes the release automatically.
 
 The release workflow publishes:
 
@@ -90,3 +86,4 @@ The release workflow publishes:
 - Image jobs first publish commit-scoped tags, then a promotion job applies release and latest aliases by digest after all images build successfully. If a release workflow fails before promotion, rerun it; the remaining SHA tags are safe to leave in GHCR.
 - The first release note is intentionally short instead of trying to summarize the full pre-release history.
 - Stable releases get a generated GitHub release body. Alpha releases are published without a release body.
+- `pnpm release:prepare`, `pnpm release:notes`, and `pnpm release:write-notes` are lower-level maintenance commands. The normal release entrypoint is `pnpm release:start`.

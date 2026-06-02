@@ -10,10 +10,7 @@ import { dataPlaneApiConfigModule } from "./apps/data-plane-api/index.js";
 import { getDataPlaneApiSandboxProviderValidationIssue } from "./apps/data-plane-api/schema.js";
 import { dataPlaneGatewayConfigModule } from "./apps/data-plane-gateway/index.js";
 import { dataPlaneWorkerConfigModule } from "./apps/data-plane-worker/index.js";
-import {
-  getDataPlaneWorkerPersistentSandboxValidationIssue,
-  getDataPlaneWorkerSandboxProviderValidationIssue,
-} from "./apps/data-plane-worker/schema.js";
+import { getDataPlaneWorkerSandboxProviderValidationIssue } from "./apps/data-plane-worker/schema.js";
 import { mergeConfigRoots } from "./core/merge.js";
 import { asObjectRecord, setValueAtPath } from "./core/record.js";
 import { GlobalConfigSchema, GlobalSandboxConfigSchema } from "./global/schema.js";
@@ -294,10 +291,6 @@ const SandboxEnvDescriptors = [
     path: ["internalGatewayWsUrl"],
   },
   {
-    envVar: "MISTLE_SANDBOX_STORAGE_BACKEND",
-    path: ["storage", "backend"],
-  },
-  {
     envVar: "MISTLE_SANDBOX_TOKENS_CONNECT_SECRET",
     path: ["connect", "tokenSecret"],
   },
@@ -565,7 +558,6 @@ const ControlPlaneApiEnvDescriptors = [
     envVar: "MISTLE_SANDBOX_TOKENS_BOOTSTRAP_AUDIENCE",
     path: ["sandbox", "bootstrap", "tokenAudience"],
   },
-  { envVar: "MISTLE_SANDBOX_STORAGE_BACKEND", path: ["sandbox", "storageBackend"] },
   {
     envVar: "MISTLE_SANDBOX_DOCKER_ENABLED",
     path: ["sandbox", "docker", "enabled"],
@@ -668,7 +660,6 @@ const DataPlaneApiEnvDescriptors = [
     path: ["controlPlaneApi", "baseUrl"],
   },
   { envVar: "MISTLE_INTERNAL_AUTH_SHARED_TOKEN", path: ["internalAuth", "serviceToken"] },
-  { envVar: "MISTLE_SANDBOX_STORAGE_BACKEND", path: ["sandbox", "storage", "backend"] },
   {
     envVar: "MISTLE_SANDBOX_DOCKER_ENABLED",
     path: ["sandbox", "docker", "enabled"],
@@ -754,7 +745,6 @@ const DataPlaneWorkerEnvDescriptors = [
     path: ["controlPlaneApi", "baseUrl"],
   },
   { envVar: "MISTLE_INTERNAL_AUTH_SHARED_TOKEN", path: ["internalAuth", "serviceToken"] },
-  { envVar: "MISTLE_SANDBOX_STORAGE_BACKEND", path: ["sandbox", "storage", "backend"] },
   {
     envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL",
     path: ["sandbox", "internalGatewayWsUrl"],
@@ -806,71 +796,10 @@ const DataPlaneWorkerEnvDescriptors = [
     parse: parseStrictBooleanEnv,
   },
   { envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY", path: ["sandbox", "tensorlake", "apiKey"] },
-  {
-    envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY",
-    path: ["sandboxStorage", "archil", "apiKey"],
-  },
-  {
-    envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_REGION",
-    path: ["sandboxStorage", "archil", "region"],
-  },
-  {
-    envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX",
-    path: ["sandboxStorage", "archil", "namePrefix"],
-  },
-  {
-    envVar: "MISTLE_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX",
-    path: ["sandboxStorage", "dockerVolume", "namePrefix"],
-  },
 ] satisfies readonly EnvDescriptor[];
 
 function applyWorkflowRunMigrationsFalse(config: Record<string, unknown>): Record<string, unknown> {
   return setValueAtPath(config, ["workflow", "runMigrations"], false);
-}
-
-function applyDataPlaneWorkerArchilMount(config: Record<string, unknown>, env: NodeJS.ProcessEnv) {
-  if (env.MISTLE_SANDBOX_STORAGE_ARCHIL_MOUNT_OBJECT_STORE === undefined) {
-    return config;
-  }
-
-  if (env.MISTLE_SANDBOX_STORAGE_ARCHIL_MOUNT_OBJECT_STORE !== "sandbox_storage") {
-    throw new Error(
-      "MISTLE_SANDBOX_STORAGE_ARCHIL_MOUNT_OBJECT_STORE must be 'sandbox_storage' when set.",
-    );
-  }
-
-  const mount = loadEnvObject(
-    [
-      {
-        envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_BUCKET_NAME",
-        path: ["bucket"],
-      },
-      {
-        envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ENDPOINT",
-        path: ["endpoint"],
-      },
-      {
-        envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ACCESS_KEY_ID",
-        path: ["accessKeyId"],
-      },
-      {
-        envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_SECRET_ACCESS_KEY",
-        path: ["secretAccessKey"],
-      },
-    ],
-    env,
-  );
-
-  return setValueAtPath(
-    config,
-    ["sandboxStorage", "archil", "mounts"],
-    [
-      {
-        type: "s3-compatible",
-        ...mount,
-      },
-    ],
-  );
 }
 
 function selectAppConfig(
@@ -950,7 +879,6 @@ function loadDataPlaneGatewayConfigFromEnv(env: NodeJS.ProcessEnv) {
 
 function loadDataPlaneWorkerConfigFromEnv(env: NodeJS.ProcessEnv) {
   let config = applyWorkflowRunMigrationsFalse(loadEnvObject(DataPlaneWorkerEnvDescriptors, env));
-  config = applyDataPlaneWorkerArchilMount(config, env);
   config = setValueAtPath(config, ["telemetry"], loadTelemetryConfigFromEnv(env));
 
   return dataPlaneWorkerConfigModule.schema.parse(config);
@@ -985,14 +913,6 @@ function validateDataPlaneWorkerConfig(
 
   if (issue !== null) {
     throw new Error(issue.message);
-  }
-
-  const persistentIssue = getDataPlaneWorkerPersistentSandboxValidationIssue({
-    appConfig: config,
-  });
-
-  if (persistentIssue !== null) {
-    throw new Error(persistentIssue.message);
   }
 }
 

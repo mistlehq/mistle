@@ -28,15 +28,6 @@
     },
     {
       "category": {
-        "id": "package-and-environment",
-        "title": "Package and environment"
-      },
-      "command": "archil",
-      "displayName": "Archil",
-      "version": "v0.8.11-1779127948"
-    },
-    {
-      "category": {
         "id": "cli-utilities",
         "title": "CLI utilities"
       },

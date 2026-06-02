@@ -23,24 +23,6 @@ export const DockerClientOperationIds = {
    */
   START_CONTAINER: "start_container",
   /**
-   * `container.wait(...)`.
-   * Source:
-   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L569-L601
-   */
-  WAIT_CONTAINER: "wait_container",
-  /**
-   * `container.logs(...)`.
-   * Source:
-   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L771-L814
-   */
-  CONTAINER_LOGS: "container_logs",
-  /**
-   * `docker.createVolume(...)`.
-   * Source:
-   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/docker.js#L1063-L1097
-   */
-  CREATE_VOLUME: "create_volume",
-  /**
    * `container.stop(...)`.
    * Source:
    * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L422-L452
@@ -75,12 +57,6 @@ export const DockerClientOperationIds = {
    * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L815-L847
    */
   REMOVE_CONTAINER: "remove_container",
-  /**
-   * `volume.remove(...)`.
-   * Sources:
-   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/volume.js#L31-L54
-   */
-  REMOVE_VOLUME: "remove_volume",
   READ_OPERATION_LOG: "read_operation_log",
 } as const;
 export type DockerClientOperation =

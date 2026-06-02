@@ -17,7 +17,10 @@ import { OrganizationPermissions } from "../src/auth/services/organization-polic
 import { deleteSandboxInstanceResponseSchema } from "../src/sandbox-instances/delete-sandbox-instance/schema.js";
 import { SandboxInstancesNotFoundResponseSchema } from "../src/sandbox-instances/index.js";
 import { createApiKeyToken } from "./helpers/api-keys.js";
-import { waitForQueuedDeleteWorkflowRun } from "./helpers/data-plane-workflows.js";
+import {
+  countQueuedDeleteWorkflowRuns,
+  waitForQueuedDeleteWorkflowRun,
+} from "./helpers/data-plane-workflows.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api"],
@@ -152,6 +155,43 @@ describe.concurrent("sandbox instances delete integration", () => {
     expect(body.code).toBe("INSTANCE_NOT_FOUND");
   });
 
+  it("returns 404 when the public session delete route targets a non-session sandbox", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-instances-delete-non-session@example.com",
+    });
+
+    await insertSandboxInstance(env, {
+      sandboxInstanceId: "sbi_cp_delete_non_session_001",
+      organizationId: session.organizationId,
+      sandboxProfileId: "sbp_cp_delete_non_session_001",
+      status: SandboxInstanceStatuses.RUNNING,
+      purpose: SandboxInstancePurposes.SKILLS_DISCOVERY,
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/instances/sbi_cp_delete_non_session_001",
+      {
+        method: "DELETE",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(404);
+    const body = SandboxInstancesNotFoundResponseSchema.parse(await response.json());
+    expect(body.code).toBe("INSTANCE_NOT_FOUND");
+
+    await expect(
+      countQueuedDeleteWorkflowRuns({
+        env,
+        sandboxInstanceId: "sbi_cp_delete_non_session_001",
+      }),
+    ).resolves.toBe(0);
+  });
+
   it("returns 403 when an API key lacks sandbox session delete permission", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-instances-delete-api-key-forbidden@example.com",
@@ -245,6 +285,9 @@ async function insertSandboxInstance(
     organizationId: string;
     sandboxProfileId: string;
     status: typeof SandboxInstanceStatuses.RUNNING | typeof SandboxInstanceStatuses.STOPPED;
+    purpose?:
+      | typeof SandboxInstancePurposes.SESSION
+      | typeof SandboxInstancePurposes.SKILLS_DISCOVERY;
     deletedAt?: string;
   },
 ): Promise<void> {
@@ -262,7 +305,7 @@ async function insertSandboxInstance(
     startedByKind: "user",
     startedById: "usr_cp_delete",
     source: "dashboard",
-    purpose: SandboxInstancePurposes.SESSION,
+    purpose: input.purpose ?? SandboxInstancePurposes.SESSION,
     deletedAt: input.deletedAt,
   };
 

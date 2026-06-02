@@ -33,9 +33,6 @@ const routeHandler = async (
         profileId,
         profileVersion: version,
         ...(body.setupScript === undefined ? {} : { setupScript: body.setupScript }),
-        ...(body.defaultPersistenceMode === undefined
-          ? {}
-          : { defaultPersistenceMode: body.defaultPersistenceMode }),
         ...(body.agentRuntimeId === undefined ? {} : { agentRuntimeId: body.agentRuntimeId }),
         ...(body.gitCommitSigningIntegrationConnectionId === undefined
           ? {}
@@ -51,6 +48,7 @@ const routeHandler = async (
           ? {}
           : { sandboxConnectionId: body.sandboxConnectionId }),
         ...(body.sandboxResources === undefined ? {} : { sandboxResources: body.sandboxResources }),
+        ...(body.skillsConfig === undefined ? {} : { skillsConfig: body.skillsConfig }),
         ...(body.integrationBindings === undefined
           ? {}
           : {

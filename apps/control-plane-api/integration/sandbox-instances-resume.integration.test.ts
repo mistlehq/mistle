@@ -2,8 +2,11 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
 import { SandboxProfileStatuses, SandboxProfileVersionStates } from "@mistle/db/control-plane";
-import { SandboxInstancePersistenceModes, SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
@@ -31,44 +34,53 @@ const CountRowSchema = z
   })
   .strict();
 
+const execFileAsync = promisify(execFile);
+
 describe.concurrent("sandbox instance resume integration", () => {
   it("returns starting for a stopped sandbox and queues a resume workflow", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-resume-stopped@example.com",
     });
-    await insertSandboxInstance(env, {
-      organizationId: session.organizationId,
-      sandboxInstanceId: "sbi_cp_resume_stopped_001",
-      status: SandboxInstanceStatuses.STOPPED,
-      startedById: session.userId,
-    });
-    await insertRuntimePlan(env, {
-      sandboxInstanceId: "sbi_cp_resume_stopped_001",
-    });
+    const providerSandboxId = await startDockerSandboxContainer();
 
-    const response = await resumeSandbox(env, {
-      sandboxInstanceId: "sbi_cp_resume_stopped_001",
-      cookie: session.cookie,
-    });
+    try {
+      await insertSandboxInstance(env, {
+        organizationId: session.organizationId,
+        sandboxInstanceId: "sbi_cp_resume_stopped_001",
+        status: SandboxInstanceStatuses.STOPPED,
+        providerSandboxId,
+        startedById: session.userId,
+      });
+      await insertRuntimePlan(env, {
+        sandboxInstanceId: "sbi_cp_resume_stopped_001",
+      });
 
-    expect(response.status).toBe(200);
-    const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
-    expect(body).toMatchObject({
-      id: "sbi_cp_resume_stopped_001",
-      status: SandboxInstanceStatuses.STARTING,
-      connectable: false,
-      failureCode: null,
-      failureMessage: null,
-    });
+      const response = await resumeSandbox(env, {
+        sandboxInstanceId: "sbi_cp_resume_stopped_001",
+        cookie: session.cookie,
+      });
 
-    const workflowInput = await waitForQueuedResumeWorkflowInput({
-      env,
-      sandboxInstanceId: "sbi_cp_resume_stopped_001",
-    });
-    expect(workflowInput).toMatchObject({
-      sandboxInstanceId: "sbi_cp_resume_stopped_001",
-      actingUserId: session.userId,
-    });
+      expect(response.status).toBe(200);
+      const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
+      expect(body).toMatchObject({
+        id: "sbi_cp_resume_stopped_001",
+        status: SandboxInstanceStatuses.STARTING,
+        connectable: false,
+        failureCode: null,
+        failureMessage: null,
+      });
+
+      const workflowInput = await waitForQueuedResumeWorkflowInput({
+        env,
+        sandboxInstanceId: "sbi_cp_resume_stopped_001",
+      });
+      expect(workflowInput).toMatchObject({
+        sandboxInstanceId: "sbi_cp_resume_stopped_001",
+        actingUserId: session.userId,
+      });
+    } finally {
+      await destroyDockerSandboxContainer(providerSandboxId);
+    }
   });
 
   it("returns failed conflicts without queueing a resume workflow", async ({ env }) => {
@@ -127,37 +139,44 @@ describe.concurrent("sandbox instance resume integration", () => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-resume-idempotent@example.com",
     });
-    await insertSandboxInstance(env, {
-      organizationId: session.organizationId,
-      sandboxInstanceId: "sbi_cp_resume_idempotent_001",
-      status: SandboxInstanceStatuses.STOPPED,
-      startedById: session.userId,
-    });
-    await insertRuntimePlan(env, {
-      sandboxInstanceId: "sbi_cp_resume_idempotent_001",
-    });
+    const providerSandboxId = await startDockerSandboxContainer();
 
-    const request = {
-      sandboxInstanceId: "sbi_cp_resume_idempotent_001",
-      cookie: session.cookie,
-      body: {
-        idempotencyKey: "resume-stopped-idempotent-001",
-      },
-    };
-    const firstResponse = await resumeSandbox(env, request);
-    const secondResponse = await resumeSandbox(env, request);
+    try {
+      await insertSandboxInstance(env, {
+        organizationId: session.organizationId,
+        sandboxInstanceId: "sbi_cp_resume_idempotent_001",
+        status: SandboxInstanceStatuses.STOPPED,
+        providerSandboxId,
+        startedById: session.userId,
+      });
+      await insertRuntimePlan(env, {
+        sandboxInstanceId: "sbi_cp_resume_idempotent_001",
+      });
 
-    expect(firstResponse.status).toBe(200);
-    expect(secondResponse.status).toBe(200);
-    SandboxInstanceStatusResponseSchema.parse(await firstResponse.json());
-    SandboxInstanceStatusResponseSchema.parse(await secondResponse.json());
-    await waitForQueuedResumeWorkflowInput({
-      env,
-      sandboxInstanceId: "sbi_cp_resume_idempotent_001",
-    });
-    await expect(countQueuedResumeWorkflows(env, "sbi_cp_resume_idempotent_001")).resolves.toBe(
-      "1",
-    );
+      const request = {
+        sandboxInstanceId: "sbi_cp_resume_idempotent_001",
+        cookie: session.cookie,
+        body: {
+          idempotencyKey: "resume-stopped-idempotent-001",
+        },
+      };
+      const firstResponse = await resumeSandbox(env, request);
+      const secondResponse = await resumeSandbox(env, request);
+
+      expect(firstResponse.status).toBe(200);
+      expect(secondResponse.status).toBe(200);
+      SandboxInstanceStatusResponseSchema.parse(await firstResponse.json());
+      SandboxInstanceStatusResponseSchema.parse(await secondResponse.json());
+      await waitForQueuedResumeWorkflowInput({
+        env,
+        sandboxInstanceId: "sbi_cp_resume_idempotent_001",
+      });
+      await expect(countQueuedResumeWorkflows(env, "sbi_cp_resume_idempotent_001")).resolves.toBe(
+        "1",
+      );
+    } finally {
+      await destroyDockerSandboxContainer(providerSandboxId);
+    }
   });
 
   it("returns not found when the sandbox instance does not exist", async ({ env }) => {
@@ -185,37 +204,44 @@ describe.concurrent("sandbox instance resume integration", () => {
       name: "Sandbox resumer",
       permissions: [OrganizationPermissions.SANDBOX_SESSION_RESUME],
     });
-    await insertSandboxInstance(env, {
-      organizationId: session.organizationId,
-      sandboxInstanceId: "sbi_cp_resume_api_key_001",
-      status: SandboxInstanceStatuses.STOPPED,
-      startedById: session.userId,
-    });
-    await insertRuntimePlan(env, {
-      sandboxInstanceId: "sbi_cp_resume_api_key_001",
-    });
+    const providerSandboxId = await startDockerSandboxContainer();
 
-    const response = await resumeSandbox(env, {
-      sandboxInstanceId: "sbi_cp_resume_api_key_001",
-      bearerToken: token,
-    });
+    try {
+      await insertSandboxInstance(env, {
+        organizationId: session.organizationId,
+        sandboxInstanceId: "sbi_cp_resume_api_key_001",
+        status: SandboxInstanceStatuses.STOPPED,
+        providerSandboxId,
+        startedById: session.userId,
+      });
+      await insertRuntimePlan(env, {
+        sandboxInstanceId: "sbi_cp_resume_api_key_001",
+      });
 
-    expect(response.status).toBe(200);
-    const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
-    expect(body).toMatchObject({
-      id: "sbi_cp_resume_api_key_001",
-      status: SandboxInstanceStatuses.STARTING,
-      connectable: false,
-    });
+      const response = await resumeSandbox(env, {
+        sandboxInstanceId: "sbi_cp_resume_api_key_001",
+        bearerToken: token,
+      });
 
-    const workflowInput = await waitForQueuedResumeWorkflowInput({
-      env,
-      sandboxInstanceId: "sbi_cp_resume_api_key_001",
-    });
-    expect(workflowInput).toMatchObject({
-      sandboxInstanceId: "sbi_cp_resume_api_key_001",
-    });
-    expect(workflowInput).not.toHaveProperty("actingUserId");
+      expect(response.status).toBe(200);
+      const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
+      expect(body).toMatchObject({
+        id: "sbi_cp_resume_api_key_001",
+        status: SandboxInstanceStatuses.STARTING,
+        connectable: false,
+      });
+
+      const workflowInput = await waitForQueuedResumeWorkflowInput({
+        env,
+        sandboxInstanceId: "sbi_cp_resume_api_key_001",
+      });
+      expect(workflowInput).toMatchObject({
+        sandboxInstanceId: "sbi_cp_resume_api_key_001",
+      });
+      expect(workflowInput).not.toHaveProperty("actingUserId");
+    } finally {
+      await destroyDockerSandboxContainer(providerSandboxId);
+    }
   });
 
   it("returns 403 when an API key lacks sandbox resume permission", async ({ env }) => {
@@ -273,6 +299,7 @@ async function insertSandboxInstance(
       | typeof SandboxInstanceStatuses.FAILED
       | typeof SandboxInstanceStatuses.PENDING;
     startedById: string;
+    providerSandboxId?: string;
     failureCode?: string;
     failureMessage?: string;
   },
@@ -307,8 +334,7 @@ async function insertSandboxInstance(
     title: null,
     sandboxProfileVersion: 1,
     runtimeProvider: "docker",
-    providerSandboxId: null,
-    persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+    providerSandboxId: input.providerSandboxId ?? null,
     status: input.status,
     startedByKind: "user",
     startedById: input.startedById,
@@ -349,6 +375,20 @@ async function insertRuntimePlan(
 
 function resumeSandboxProfileId(sandboxInstanceId: string): string {
   return `sbp_${sandboxInstanceId}`;
+}
+
+async function startDockerSandboxContainer(): Promise<string> {
+  const { stdout } = await execFileAsync("docker", ["run", "-d", "registry:3"]);
+  const containerId = stdout.trim();
+  if (containerId.length === 0) {
+    throw new Error("Expected docker run to return a container id.");
+  }
+
+  return containerId;
+}
+
+async function destroyDockerSandboxContainer(containerId: string): Promise<void> {
+  await execFileAsync("docker", ["rm", "-f", containerId]).catch(() => undefined);
 }
 
 async function countQueuedResumeWorkflows(

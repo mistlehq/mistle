@@ -87,12 +87,6 @@ function installSandboxBaseCommon(image: Image): Image {
         "ln -sf /opt/mistle/bin/mise /usr/local/bin/mise",
       ].join(" && "),
     )
-    .run(
-      [
-        "curl -fsSL https://archil.com/install | ARCHIL_SKIP_IAM_CHECK=1 sh",
-        "ln -sf /usr/bin/archil /opt/mistle/bin/archil",
-      ].join(" && "),
-    )
     .workdir("/root");
 }
 

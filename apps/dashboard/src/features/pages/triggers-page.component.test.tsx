@@ -3,7 +3,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MemoryRouter, useLocation } from "react-router";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
@@ -65,12 +65,6 @@ function seedTriggersList(
     }),
     listResult,
   );
-}
-
-function LocationProbe(input: { onPathChange: (path: string) => void }): null {
-  const location = useLocation();
-  input.onPathChange(`${location.pathname}${location.search}`);
-  return null;
 }
 
 describe("TriggersPage", () => {
@@ -136,7 +130,12 @@ describe("TriggersPage", () => {
     expect(
       screen.getByText("Triggers run Mistle automatically from webhook events or schedules."),
     ).toBeDefined();
-    expect(screen.getAllByRole("button", { name: /Create/i })).toHaveLength(2);
+    const createActions = screen.getAllByRole("link", { name: /Create/i });
+    expect(createActions).toHaveLength(2);
+    for (const createAction of createActions) {
+      expect(createAction.tagName).toBe("A");
+      expect(createAction.getAttribute("href")).toBe("/triggers/new");
+    }
     expect(screen.queryByRole("table")).toBeNull();
   });
 
@@ -163,7 +162,9 @@ describe("TriggersPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole("button", { name: "Single trigger" })).toBeDefined();
+    expect(screen.getByRole("link", { name: "Single trigger" }).getAttribute("href")).toBe(
+      "/triggers/atm_webhook_123",
+    );
     expect(screen.queryByLabelText("pagination")).toBeNull();
   });
 
@@ -208,8 +209,8 @@ describe("TriggersPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole("button", { name: "Event trigger" })).toBeDefined();
-    expect(screen.getByRole("button", { name: "Daily schedule" })).toBeDefined();
+    expect(screen.getByRole("link", { name: "Event trigger" })).toBeDefined();
+    expect(screen.getByRole("link", { name: "Daily schedule" })).toBeDefined();
     expect(screen.getByText("0 9 * * 1-5")).toBeDefined();
     expect(screen.getAllByText("Repo Maintainer v3").length).toBeGreaterThan(0);
     expect(screen.getByText("Workspace root")).toBeDefined();
@@ -337,8 +338,8 @@ describe("TriggersPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole("button", { name: "Alpha trigger" })).toBeDefined();
-    expect(screen.getByRole("button", { name: "Backlog sync" })).toBeDefined();
+    expect(screen.getByRole("link", { name: "Alpha trigger" })).toBeDefined();
+    expect(screen.getByRole("link", { name: "Backlog sync" })).toBeDefined();
     expect(
       within(rendered.container)
         .getByRole("textbox", { name: "Search triggers" })
@@ -350,9 +351,9 @@ describe("TriggersPage", () => {
     });
 
     await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Alpha trigger" })).toBeNull();
+      expect(screen.queryByRole("link", { name: "Alpha trigger" })).toBeNull();
     });
-    expect(screen.getByRole("button", { name: "Backlog sync" })).toBeDefined();
+    expect(screen.getByRole("link", { name: "Backlog sync" })).toBeDefined();
     expect(screen.getByText("Showing 1 of 1")).toBeDefined();
   });
 
@@ -385,7 +386,7 @@ describe("TriggersPage", () => {
     });
 
     await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Alpha trigger" })).toBeNull();
+      expect(screen.queryByRole("link", { name: "Alpha trigger" })).toBeNull();
     });
     expect(
       within(rendered.container).getByRole("textbox", { name: "Search triggers" }),
@@ -433,12 +434,11 @@ describe("TriggersPage", () => {
     expect(screen.getByDisplayValue("unseeded")).toBeDefined();
   });
 
-  it("opens webhook and schedule triggers through the unified trigger detail route", () => {
+  it("renders webhook and schedule triggers as links to the unified trigger detail route", () => {
     const queryClient = createTestQueryClient({
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,
     });
-    const paths: string[] = [];
 
     seedTriggersList(
       queryClient,
@@ -464,16 +464,16 @@ describe("TriggersPage", () => {
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={["/triggers"]}>
-          <LocationProbe onPathChange={(path) => paths.push(path)} />
           <TriggersPage />
         </MemoryRouter>
       </QueryClientProvider>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Webhook trigger" }));
-    expect(paths.at(-1)).toBe("/triggers/atm_webhook_open");
-
-    fireEvent.click(screen.getByRole("button", { name: "Schedule trigger" }));
-    expect(paths.at(-1)).toBe("/triggers/atm_schedule_open");
+    expect(screen.getByRole("link", { name: "Webhook trigger" }).getAttribute("href")).toBe(
+      "/triggers/atm_webhook_open",
+    );
+    expect(screen.getByRole("link", { name: "Schedule trigger" }).getAttribute("href")).toBe(
+      "/triggers/atm_schedule_open",
+    );
   });
 });

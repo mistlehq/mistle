@@ -10,6 +10,10 @@ export {
   sandboxProfileVersionSchema as SandboxProfileVersionSchema,
   sandboxProfileVersionSetupScriptSchema as SandboxProfileVersionSetupScriptSchema,
   sandboxProfileVersionMaintenanceScriptSchema as SandboxProfileVersionMaintenanceScriptSchema,
+  listSkillsSourceReposQuerySchema as ListSkillsSourceReposQuerySchema,
+  listSkillsSourceReposResponseSchema as ListSkillsSourceReposResponseSchema,
+  refreshSkillsSourceRepoBodySchema as RefreshSkillsSourceRepoBodySchema,
+  refreshSkillsSourceRepoResponseSchema as RefreshSkillsSourceRepoResponseSchema,
   listSandboxProfileVersionsResponseSchema as ListSandboxProfileVersionsResponseSchema,
   createSandboxProfileVersionResponseSchema as CreateSandboxProfileVersionResponseSchema,
   getSandboxProfileVersionPublishabilityResponseSchema as GetSandboxProfileVersionPublishabilityResponseSchema,
@@ -53,6 +57,8 @@ export { route as getSandboxProfileVersionDraftTriggerImpactRoute } from "./get-
 export { route as getSandboxProfileVersionTriggerConfigRoute } from "./get-sandbox-profile-version-trigger-config/route.js";
 export { route as getSandboxProfileVersionSetupScriptRoute } from "./get-sandbox-profile-version-setup-script/route.js";
 export { route as getSandboxProfileVersionIntegrationBindingsRoute } from "./get-sandbox-profile-version-integration-bindings/route.js";
+export { route as listSandboxProfileVersionSkillsSourceReposRoute } from "./list-sandbox-profile-version-skills-source-repos/route.js";
+export { route as refreshSandboxProfileVersionSkillsSourceRepoRoute } from "./refresh-sandbox-profile-version-skills-source-repo/route.js";
 export { route as publishSandboxProfileVersionRoute } from "./publish-sandbox-profile-version/route.js";
 export { route as refreshSandboxProfileVersionRoute } from "./refresh-sandbox-profile-version/route.js";
 export { route as retrySandboxProfileVersionPublishSnapshotRoute } from "./retry-sandbox-profile-version-publish-snapshot/route.js";

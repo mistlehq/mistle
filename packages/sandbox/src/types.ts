@@ -95,110 +95,6 @@ export interface SandboxHandle {
   readonly id: string;
 }
 
-export const SandboxStorageBackend = {
-  ARCHIL: "archil",
-  DOCKER_VOLUME: "docker_volume",
-} as const;
-export type SandboxStorageBackend =
-  (typeof SandboxStorageBackend)[keyof typeof SandboxStorageBackend];
-
-export interface SandboxStorageAttachmentBinding {
-  readonly sourcePath: string;
-  readonly targetPath: string;
-}
-
-export interface SandboxStorageAttachmentLayout {
-  readonly bindings: readonly SandboxStorageAttachmentBinding[];
-}
-
-export const SandboxPersistentStorageLayout: SandboxStorageAttachmentLayout = {
-  bindings: [
-    {
-      sourcePath: "root",
-      targetPath: "/root",
-    },
-    {
-      sourcePath: "etc/codex",
-      targetPath: "/etc/codex",
-    },
-  ],
-};
-
-interface SandboxArchilStorageReference {
-  readonly backend: typeof SandboxStorageBackend.ARCHIL;
-  readonly handle: string;
-  readonly region: string;
-  readonly layout: SandboxStorageAttachmentLayout;
-}
-
-export interface SandboxArchilStorageAttachment extends SandboxArchilStorageReference {
-  readonly credential: string;
-}
-
-export interface SandboxDockerVolumeStorageAttachment {
-  readonly backend: typeof SandboxStorageBackend.DOCKER_VOLUME;
-  readonly handle: string;
-  readonly layout: SandboxStorageAttachmentLayout;
-}
-
-export interface SandboxDockerVolumeStartStoragePreparation extends SandboxDockerVolumeStorageAttachment {}
-
-export type SandboxStartStoragePreparation =
-  | Record<never, never>
-  | SandboxDockerVolumeStartStoragePreparation;
-
-export type SandboxStorageAttachment =
-  | SandboxArchilStorageAttachment
-  | SandboxDockerVolumeStorageAttachment;
-
-export interface SandboxArchilStorageCleanup extends SandboxArchilStorageReference {}
-
-export type SandboxStorageCleanup =
-  | SandboxArchilStorageCleanup
-  | SandboxDockerVolumeStorageAttachment;
-
-export const SandboxStorageAttachLifecycles = {
-  START: "start",
-  RESUME: "resume",
-} as const;
-export type SandboxStorageAttachLifecycle =
-  (typeof SandboxStorageAttachLifecycles)[keyof typeof SandboxStorageAttachLifecycles];
-
-export const SandboxStorageCleanupLifecycles = {
-  STOP: "stop",
-  DESTROY: "destroy",
-} as const;
-export type SandboxStorageCleanupLifecycle =
-  (typeof SandboxStorageCleanupLifecycles)[keyof typeof SandboxStorageCleanupLifecycles];
-
-export const SandboxStorageCleanupTimings = {
-  BEFORE_COMPUTE_TEARDOWN: "before_compute_teardown",
-  AFTER_COMPUTE_TEARDOWN: "after_compute_teardown",
-} as const;
-export type SandboxStorageCleanupTiming =
-  (typeof SandboxStorageCleanupTimings)[keyof typeof SandboxStorageCleanupTimings];
-
-export interface SandboxAttachStorageRequest {
-  readonly sandboxInstanceId: string;
-  readonly sandbox: SandboxHandle;
-  readonly lifecycle: SandboxStorageAttachLifecycle;
-  readonly storage: SandboxStorageAttachment;
-}
-
-export interface SandboxCleanupStorageRequest {
-  readonly sandboxInstanceId: string;
-  readonly sandbox: SandboxHandle;
-  readonly storage: SandboxStorageCleanup;
-  readonly lifecycle: SandboxStorageCleanupLifecycle;
-  readonly timing: SandboxStorageCleanupTiming;
-}
-
-export interface SandboxPrepareStorageForStartRequest {
-  readonly sandboxInstanceId: string;
-  readonly image: SandboxImageHandle;
-  readonly storage?: SandboxStorageAttachment;
-}
-
 export interface SandboxPrepareImageRequest {
   readonly image: SandboxImageHandle;
 }
@@ -341,7 +237,6 @@ export interface SandboxStartRequest {
   readonly image: SandboxImageHandle;
   readonly env?: Readonly<Record<string, string>>;
   readonly resources?: SandboxStartResources;
-  readonly storagePreparation?: SandboxStartStoragePreparation;
 }
 
 export interface SandboxResumeRequestV1 {
@@ -365,15 +260,10 @@ export interface SandboxCaptureSnapshotRequest {
 export interface SandboxAdapter {
   getTransparentProxyConfiguration(): SandboxTransparentProxyConfiguration;
   prepareImage(request: SandboxPrepareImageRequest): Promise<SandboxImageHandle>;
-  prepareStorageForStart(
-    request: SandboxPrepareStorageForStartRequest,
-  ): Promise<SandboxStartStoragePreparation>;
   start(request: SandboxStartRequest): Promise<SandboxHandle>;
   inspect(request: SandboxInspectRequest): Promise<SandboxInspectResult>;
   resume(request: SandboxResumeRequestV1): Promise<SandboxHandle>;
   captureSnapshot(request: SandboxCaptureSnapshotRequest): Promise<SandboxImageHandle>;
-  attachStorage(request: SandboxAttachStorageRequest): Promise<void>;
-  cleanupStorage(request: SandboxCleanupStorageRequest): Promise<void>;
   stop(request: SandboxStopRequest): Promise<void>;
   destroy(request: SandboxDestroyRequest): Promise<void>;
 }

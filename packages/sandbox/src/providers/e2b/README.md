@@ -40,7 +40,6 @@ const runtimeControl = createSandboxRuntimeControl({
 ## Provider Behavior
 
 - `prepareImage({ image })` resolves or builds a deterministic E2B template alias from OCI image references and returns an E2B image handle for that alias.
-- `prepareStorageForStart(...)` returns empty storage preparation. E2B persistent storage is attached after compute starts.
 - `start({ image, env })` treats `image.imageId` as a prepared template alias, injects the shared required runtime env, and creates the sandbox.
 - Created sandboxes use a one-hour timeout and `lifecycle.onTimeout: "pause"`.
 - Created sandboxes store the resolved template alias in E2B metadata as `mistle_template_alias`.
@@ -58,14 +57,6 @@ const runtimeControl = createSandboxRuntimeControl({
 - `resume({ id, payload, env })` uses the same daemon readiness path, then runs `/opt/mistle/bin/sandboxd resume` so a paused daemon can reattach its bootstrap tunnel.
 - `readOperationLog({ id, operation })` reads `/run/mistle/init.log` or `/run/mistle/resume.log` and returns `null` when the log is absent or empty.
 - `close()` is currently a no-op.
-
-## Storage Notes
-
-E2B persistent storage uses the `archil` backend. The data-plane worker provisions the Archil disk and resolves a disk token; this provider mounts the disk inside the sandbox and bind-mounts the shared persistent layout into place.
-
-`attachStorage({ lifecycle: "start" | "resume", storage })` requires an Archil storage attachment. On first start attach, it hydrates Archil storage from existing target directories when the `.mistle-init` marker is absent, then bind-mounts each layout binding. On resume attach, it skips hydration and ensures the expected bind mounts exist. The Archil mount token is passed as `ARCHIL_MOUNT_TOKEN`.
-
-`cleanupStorage(...)` currently validates the Archil cleanup payload and returns without running provider cleanup commands because current stop/destroy paths do not require in-guest Archil teardown.
 
 ## Error Surface
 

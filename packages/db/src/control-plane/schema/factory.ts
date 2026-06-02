@@ -29,7 +29,6 @@ import { defineOAuthServerStates } from "./oauth-server-states.js";
 import { defineOrganizationBillingCustomers } from "./organization-billing-customers.js";
 import { defineOrganizationCredentialKeys } from "./organization-credential-keys.js";
 import { defineOrganizationIdentityLinkProviderConfigs } from "./organization-identity-link-provider-configs.js";
-import { defineOrganizationSandboxStorageSettings } from "./organization-sandbox-storage-settings.js";
 import { defineOrganizations } from "./organizations.js";
 import { definePortAccessLinks } from "./port-access-links.js";
 import { defineSandboxProfileSnapshotRefreshScheduleTargets } from "./sandbox-profile-snapshot-refresh-schedule-targets.js";
@@ -41,6 +40,7 @@ import { defineScheduleTriggers } from "./schedule-triggers.js";
 import { defineScheduledActions } from "./scheduled-actions.js";
 import { defineSchedules } from "./schedules.js";
 import { defineSessions } from "./sessions.js";
+import { defineSkillsSourceRepos } from "./skills-source-repos.js";
 import { defineTeamMembers } from "./team-members.js";
 import { defineTeams } from "./teams.js";
 import { defineTriggerConversationDeliveryProcessors } from "./trigger-conversation-delivery-processors.js";
@@ -95,7 +95,6 @@ export function createControlPlaneDbSchema(schemaName: string) {
   const organizationCredentialKeys = defineOrganizationCredentialKeys(schema);
   const organizationIdentityLinkProviderConfigs =
     defineOrganizationIdentityLinkProviderConfigs(schema);
-  const organizationSandboxStorageSettings = defineOrganizationSandboxStorageSettings(schema);
   const organizations = defineOrganizations(schema);
   const portAccessLinks = definePortAccessLinks(schema);
   const oauthClients = defineOAuthClients(schema);
@@ -118,6 +117,7 @@ export function createControlPlaneDbSchema(schemaName: string) {
   const scheduledActions = defineScheduledActions(schema);
   const schedules = defineSchedules(schema);
   const sessions = defineSessions(schema);
+  const skillsSourceRepos = defineSkillsSourceRepos(schema);
   const teamMembers = defineTeamMembers(schema);
   const teams = defineTeams(schema);
   const userExternalPrincipalCredentialSecrets =
@@ -166,7 +166,6 @@ export function createControlPlaneDbSchema(schemaName: string) {
     organizationBillingCustomers,
     organizationCredentialKeys,
     organizationIdentityLinkProviderConfigs,
-    organizationSandboxStorageSettings,
     organizations,
     portAccessLinks,
     oauthClientGrantTypes,
@@ -187,6 +186,7 @@ export function createControlPlaneDbSchema(schemaName: string) {
     scheduledActions,
     schedules,
     sessions,
+    skillsSourceRepos,
     teamMembers,
     teams,
     userExternalPrincipalCredentialSecrets,

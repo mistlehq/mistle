@@ -40,24 +40,10 @@ const TomlConfigComments: readonly CommentedSection[] = [
     ],
   },
   {
-    heading: "[object_store.sandbox_storage]",
-    comments: [
-      '# Used when sandbox.storage.archil.mount_object_store = "sandbox_storage".',
-      "# For real Archil-backed runs, point this at a remote S3-compatible bucket.",
-    ],
-  },
-  {
     heading: "[internal_auth]",
     comments: [
       "# Service-to-service auth is currently a shared token. The method field keeps",
       "# the shape explicit if this later moves to signed workload identity/JWTs.",
-    ],
-  },
-  {
-    heading: "[sandbox.storage]",
-    comments: [
-      "# docker_volume is the lightest local storage backend. archil requires the",
-      "# sandbox.storage.archil section and, when mounted, object_store.sandbox_storage.",
     ],
   },
 ];
@@ -147,26 +133,6 @@ function deleteValueAtPath(root: ConfigRecord, path: readonly string[]): ConfigR
 
   updatedRoot[head] = updatedChild;
   return updatedRoot;
-}
-
-function readSandboxObjectStoreFromEnv(environment: NodeJS.ProcessEnv): ConfigRecord {
-  return {
-    bucket_name: readRequiredEnv(environment, "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_BUCKET_NAME"),
-    region:
-      readOptionalEnv(environment, "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_REGION") ?? "us-east-1",
-    endpoint: readRequiredEnv(environment, "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ENDPOINT"),
-    force_path_style:
-      readOptionalBooleanEnv(environment, "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_FORCE_PATH_STYLE") ??
-      true,
-    access_key_id: readRequiredEnv(
-      environment,
-      "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ACCESS_KEY_ID",
-    ),
-    secret_access_key: readRequiredEnv(
-      environment,
-      "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_SECRET_ACCESS_KEY",
-    ),
-  };
 }
 
 function upsertOptionalValueAtPath(
@@ -314,14 +280,6 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
         access_key_id: "mistle-access-key",
         secret_access_key: "mistle-secret-key",
       },
-      sandbox_storage: {
-        bucket_name: "mistle-sandbox-storage",
-        region: "us-east-1",
-        endpoint: "http://seaweedfs:8333",
-        force_path_style: true,
-        access_key_id: "replace-with-archil-mount-access-key-id",
-        secret_access_key: "replace-with-archil-mount-secret-access-key",
-      },
     },
     email: {
       smtp: {
@@ -343,15 +301,6 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
     sandbox: {
       default_base_image: getLocalDevDockerRegistrySandboxBaseImageRef(),
       publish_base_domain: "mistle.localhost",
-      storage: {
-        backend: "archil",
-        archil: {
-          api_key: "replace-with-archil-api-key",
-          region: "gcp-us-central1",
-          name_prefix: "mistle-",
-          mount_object_store: "sandbox_storage",
-        },
-      },
       tokens: {
         connect: {
           secret: createSecret(),
@@ -431,13 +380,6 @@ export function buildIntegrationTomlConfig(input: {
   }
 
   if (!remoteProviderEnabled) {
-    configRoot = setValueAtPath(configRoot, ["sandbox", "storage"], {
-      backend: "docker_volume",
-      docker_volume: {
-        name_prefix: "it-system-",
-      },
-    });
-    configRoot = deleteValueAtPath(configRoot, ["object_store", "sandbox_storage"]);
     configRoot = deleteValueAtPath(configRoot, ["sandbox", "e2b"]);
     configRoot = deleteValueAtPath(configRoot, ["sandbox", "tensorlake"]);
     return configRoot;
@@ -448,17 +390,6 @@ export function buildIntegrationTomlConfig(input: {
     ["sandbox", "default_base_image"],
     input.remoteSandboxBaseImage ?? getLocalDevDockerRegistrySandboxBaseImageRef(),
   );
-  configRoot = setValueAtPath(configRoot, ["sandbox", "storage"], {
-    backend: "archil",
-    archil: {
-      api_key: readRequiredEnv(input.environment, "MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY"),
-      region: readRequiredEnv(input.environment, "MISTLE_SANDBOX_STORAGE_ARCHIL_REGION"),
-      name_prefix:
-        readOptionalEnv(input.environment, "MISTLE_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX") ??
-        "it-system-",
-      mount_object_store: "sandbox_storage",
-    },
-  });
   if (e2bEnabled) {
     const e2bApiKey = readRequiredEnv(input.environment, "MISTLE_SANDBOX_E2B_API_KEY");
     const e2bDomain = readOptionalEnv(input.environment, "MISTLE_SANDBOX_E2B_DOMAIN") ?? "e2b.app";
@@ -480,11 +411,6 @@ export function buildIntegrationTomlConfig(input: {
   } else {
     configRoot = deleteValueAtPath(configRoot, ["sandbox", "tensorlake"]);
   }
-  configRoot = setValueAtPath(
-    configRoot,
-    ["object_store", "sandbox_storage"],
-    readSandboxObjectStoreFromEnv(input.environment),
-  );
   configRoot = setValueAtPath(
     configRoot,
     ["services", "data_plane_gateway", "sandbox_ws_public_url"],
@@ -515,12 +441,6 @@ export function applyTomlConfigEnvOverrides(input: {
     ["sandbox", "e2b", "enabled"],
     readOptionalBooleanEnv(input.environment, "MISTLE_SANDBOX_E2B_ENABLED"),
   );
-  configRoot = upsertOptionalValueAtPath(
-    configRoot,
-    ["sandbox", "storage", "backend"],
-    readOptionalEnv(input.environment, "MISTLE_SANDBOX_STORAGE_BACKEND"),
-  );
-
   const dataPlaneGatewayRuntimeStateUrl = readOptionalEnv(
     input.environment,
     "MISTLE_KV_DATA_PLANE_URL",

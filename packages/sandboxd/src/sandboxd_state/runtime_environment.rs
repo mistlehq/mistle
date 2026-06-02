@@ -7,7 +7,7 @@
 use std::collections::BTreeMap;
 
 use crate::egress_proxy::EgressProxy;
-use crate::protocol::startup::StartupInput;
+use crate::protocol::session::SessionRuntimeInput;
 use crate::runtime;
 use crate::sandboxd_state::lifecycle::{
     DEFAULT_GLOBAL_GIT_CONFIG_PATH, GLOBAL_GIT_CONFIG_ENV_NAME,
@@ -68,10 +68,10 @@ pub(super) fn merge_managed_runtime_environment(
 }
 
 pub(super) fn collect_mistle_context_runtime_environment(
-    startup_input: &StartupInput,
+    session_input: &SessionRuntimeInput,
     sandbox_instance_id: &str,
 ) -> Result<BTreeMap<String, String>, String> {
-    let Some(sandbox_profile_id) = startup_input
+    let Some(sandbox_profile_id) = session_input
         .runtime_plan
         .get("sandboxProfileId")
         .and_then(serde_json::Value::as_str)
@@ -79,7 +79,7 @@ pub(super) fn collect_mistle_context_runtime_environment(
     else {
         return Err("runtime plan sandboxProfileId is required for managed env".to_string());
     };
-    let Some(sandbox_profile_version) = startup_input
+    let Some(sandbox_profile_version) = session_input
         .runtime_plan
         .get("version")
         .and_then(serde_json::Value::as_u64)
@@ -127,6 +127,7 @@ fn insert_managed_runtime_environment(
 mod tests {
     use std::collections::BTreeMap;
 
+    use crate::protocol::session::SessionRuntimeInput;
     use crate::protocol::startup::{GitIdentity, StartupExecutionMode, StartupInput, StartupMode};
     use crate::runtime::{
         CompiledRuntimeArtifact, CompiledRuntimePlan, CompiledRuntimePlanImage,
@@ -314,9 +315,11 @@ mod tests {
             None,
         );
 
-        let runtime_env =
-            collect_mistle_context_runtime_environment(&startup_input, "sbi_context_env_001")
-                .expect("mistle context env should collect");
+        let runtime_env = collect_mistle_context_runtime_environment(
+            &SessionRuntimeInput::from_startup_input(&startup_input),
+            "sbi_context_env_001",
+        )
+        .expect("mistle context env should collect");
 
         assert_eq!(
             runtime_env,

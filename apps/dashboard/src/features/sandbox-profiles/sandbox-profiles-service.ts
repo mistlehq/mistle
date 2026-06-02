@@ -14,6 +14,8 @@ import type {
   PutSandboxProfileVersionDraftInput,
   PutSandboxProfileVersionDraftResult,
   PutSandboxProfileVersionRefreshScheduleInput,
+  RefreshSandboxProfileVersionSkillsSourceRepoInput,
+  RefreshSandboxProfileVersionSkillsSourceRepoResult,
   SandboxProfile,
   SandboxProfileVersion,
   SandboxProfileVersionDraftTriggerImpact,
@@ -21,6 +23,7 @@ import type {
   SandboxProfileVersionIntegrationBinding,
   SandboxProfileVersionTriggerConfig,
   SandboxProfileVersionRefreshSchedule,
+  SandboxProfileVersionSkillsSourceReposResult,
   SandboxProfileVersionSetupScript,
   SandboxProfileSetupScriptTestRuntimeConfig,
   SandboxProvidersResult,
@@ -424,6 +427,27 @@ const SandboxProfileVersionResourcesSchema = z
     ...(value.storageMb === undefined ? {} : { storageMb: value.storageMb }),
   }));
 
+const RepoRelativeSkillPathPattern =
+  /^(?:\.|(?=.*\S)(?!\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\/\/).+)$/;
+
+const RepoRelativeSkillPathSchema = z.string().regex(RepoRelativeSkillPathPattern, {
+  message: "Skill relativePath must be a repo-relative path.",
+});
+
+const SandboxProfileVersionSkillsConfigSchema = z
+  .object({
+    originUrl: z.url(),
+    selectedSkills: z.array(
+      z
+        .object({
+          name: z.string().min(1),
+          relativePath: RepoRelativeSkillPathSchema,
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
 const SandboxRuntimeResourceCapabilitySchema = z
   .object({
     default: z.number().int().min(0),
@@ -477,7 +501,6 @@ const SandboxProvidersResultSchema = z
 const SandboxProfileVersionSchema = z
   .object({
     agentRuntimeId: AgentRuntimeIdSchema,
-    defaultPersistenceMode: z.enum(["ephemeral", "persistent"]),
     isActive: z.boolean(),
     latestSnapshotJob: z
       .object({
@@ -502,6 +525,7 @@ const SandboxProfileVersionSchema = z
     sandboxProfileId: z.string().min(1),
     sandboxProvider: z.string().min(1).nullable(),
     sandboxResources: SandboxProfileVersionResourcesSchema.nullable(),
+    skillsConfig: SandboxProfileVersionSkillsConfigSchema.nullable(),
     state: z.enum(["draft", "published"]),
     publishedAt: z.string().min(1).nullable(),
     usable: z.boolean(),
@@ -625,6 +649,40 @@ const SandboxProfileVersionIntegrationBindingsResponseSchema = z
   })
   .strict();
 
+const SandboxProfileVersionSkillsSourceRepoSchema = z
+  .object({
+    id: z.string().min(1),
+    originUrl: z.url(),
+    commitSha: z.string().min(1).nullable(),
+    skills: z.array(
+      z
+        .object({
+          name: z.string().min(1),
+          description: z.string(),
+          relativePath: z.string().min(1),
+        })
+        .strict(),
+    ),
+    lastSyncedAt: z.string().min(1).nullable(),
+    createdAt: z.string().min(1),
+    updatedAt: z.string().min(1),
+  })
+  .strict();
+
+const SandboxProfileVersionSkillsSourceReposResponseSchema = z
+  .object({
+    items: z.array(SandboxProfileVersionSkillsSourceRepoSchema),
+  })
+  .strict();
+
+const RefreshSandboxProfileVersionSkillsSourceRepoResultSchema = z
+  .object({
+    sandboxInstanceId: z.string().min(1),
+    workflowRunId: z.string().min(1),
+    skillsSourceRepo: SandboxProfileVersionSkillsSourceRepoSchema,
+  })
+  .strict();
+
 const PutSandboxProfileVersionDraftResultSchema = z
   .object({
     sandboxProfileId: z.string().min(1),
@@ -634,10 +692,10 @@ const PutSandboxProfileVersionDraftResultSchema = z
     gitCommitSigningIntegrationConnectionId: z.string().min(1).nullable(),
     mistleMcpEnabled: z.boolean(),
     mistleMcpApiKeyId: z.string().min(1).nullable(),
-    defaultPersistenceMode: z.enum(["ephemeral", "persistent"]),
     sandboxConnectionId: z.string().min(1).nullable(),
     sandboxProvider: z.string().min(1).nullable(),
     sandboxResources: SandboxProfileVersionResourcesSchema.nullable(),
+    skillsConfig: SandboxProfileVersionSkillsConfigSchema.nullable(),
     integrationBindings: SandboxProfileVersionIntegrationBindingsResponseSchema,
   })
   .strict();
@@ -1123,6 +1181,94 @@ export async function getSandboxProfileVersionIntegrationBindings(input: {
   }
 }
 
+export async function listSandboxProfileVersionSkillsSourceRepos(input: {
+  profileId: string;
+  version: number;
+  originUrl?: string;
+  signal?: AbortSignal;
+}): Promise<SandboxProfileVersionSkillsSourceReposResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "listSandboxProfileVersionSkillsSourceRepos",
+      method: "GET",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/skills-sources`,
+      query: {
+        originUrl: input.originUrl,
+      },
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not load sandbox profile skills.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse =
+      SandboxProfileVersionSkillsSourceReposResponseSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "listSandboxProfileVersionSkillsSourceRepos",
+        status: 500,
+        body: responseBody,
+        message: "Sandbox profile skills response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "listSandboxProfileVersionSkillsSourceRepos",
+        error,
+        fallbackMessage: "Could not load sandbox profile skills.",
+      }),
+    );
+  }
+}
+
+export async function refreshSandboxProfileVersionSkillsSourceRepo(
+  input: RefreshSandboxProfileVersionSkillsSourceRepoInput & {
+    signal?: AbortSignal;
+  },
+): Promise<RefreshSandboxProfileVersionSkillsSourceRepoResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "refreshSandboxProfileVersionSkillsSourceRepo",
+      method: "POST",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/skills-sources/refresh`,
+      body: {
+        originUrl: input.originUrl,
+        ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
+      },
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not refresh sandbox profile skills.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse =
+      RefreshSandboxProfileVersionSkillsSourceRepoResultSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "refreshSandboxProfileVersionSkillsSourceRepo",
+        status: 500,
+        body: responseBody,
+        message: "Sandbox profile skills refresh response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "refreshSandboxProfileVersionSkillsSourceRepo",
+        error,
+        fallbackMessage: "Could not refresh sandbox profile skills.",
+      }),
+    );
+  }
+}
+
 export async function getSandboxProfileVersionTriggerConfig(input: {
   profileId: string;
   version: number;
@@ -1213,9 +1359,6 @@ export async function putSandboxProfileVersionDraft(
       )}/draft`,
       body: {
         ...(input.setupScript === undefined ? {} : { setupScript: input.setupScript }),
-        ...(input.defaultPersistenceMode === undefined
-          ? {}
-          : { defaultPersistenceMode: input.defaultPersistenceMode }),
         ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
         ...(input.gitCommitSigningIntegrationConnectionId === undefined
           ? {}
@@ -1236,6 +1379,7 @@ export async function putSandboxProfileVersionDraft(
         ...(input.sandboxResources === undefined
           ? {}
           : { sandboxResources: input.sandboxResources }),
+        ...(input.skillsConfig === undefined ? {} : { skillsConfig: input.skillsConfig }),
         ...(input.integrationBindings === undefined
           ? {}
           : { integrationBindings: input.integrationBindings }),

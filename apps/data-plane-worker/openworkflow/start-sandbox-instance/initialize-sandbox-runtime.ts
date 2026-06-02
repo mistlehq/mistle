@@ -135,7 +135,6 @@ export async function initializeSandboxRuntime(
     startupMode: SandboxStartupInput["startupMode"];
     executionMode?: SandboxStartupInput["executionMode"];
     waitForCompletion?: boolean;
-    waitForStorageAttach?: boolean;
     runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
     actingUserId?: StartSandboxInstanceWorkflowInput["actingUserId"];
     gitIdentity?: StartSandboxInstanceWorkflowInput["gitIdentity"];
@@ -144,9 +143,6 @@ export async function initializeSandboxRuntime(
   const runtimeEnv = createSandboxRuntimeEnv({
     config: ctx.config,
     sandboxInstanceId: input.sandboxInstanceId,
-    ...(input.waitForStorageAttach === undefined
-      ? {}
-      : { waitForStorageAttach: input.waitForStorageAttach }),
   });
   const sandboxdArtifact = await ctx.sandboxdArtifactResolver?.resolve();
   if (sandboxdArtifact !== undefined) {

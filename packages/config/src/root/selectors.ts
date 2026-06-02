@@ -5,10 +5,7 @@ import type {
 import type { ControlPlaneWorkerConfig } from "../apps/control-plane-worker/schema.js";
 import type { DataPlaneApiConfig } from "../apps/data-plane-api/schema.js";
 import type { DataPlaneGatewayConfig } from "../apps/data-plane-gateway/schema.js";
-import type {
-  DataPlaneWorkerConfig,
-  DataPlaneWorkerSandboxStorageConfig,
-} from "../apps/data-plane-worker/schema.js";
+import type { DataPlaneWorkerConfig } from "../apps/data-plane-worker/schema.js";
 import type { GlobalConfig, GlobalTelemetryConfig } from "../global/schema.js";
 import { type Config } from "./schema.js";
 
@@ -34,73 +31,6 @@ function selectControlPlaneWorkerStripeBillingConfig(
   };
 }
 
-function buildArchilMount(config: Config): DataPlaneWorkerSandboxStorageConfig {
-  const archilConfig = config.sandbox.storage?.archil;
-
-  if (archilConfig === undefined) {
-    return {};
-  }
-
-  if (archilConfig.mount_object_store === undefined) {
-    return {
-      archil: {
-        apiKey: archilConfig.api_key,
-        region: archilConfig.region,
-        namePrefix: archilConfig.name_prefix,
-      },
-    };
-  }
-
-  const sandboxObjectStore = config.object_store.sandbox_storage;
-
-  if (sandboxObjectStore === undefined) {
-    throw new Error(
-      "object_store.sandbox_storage is required when sandbox.storage.archil.mount_object_store is 'sandbox_storage'.",
-    );
-  }
-
-  if (sandboxObjectStore.endpoint === undefined) {
-    throw new Error(
-      "object_store.sandbox_storage.endpoint is required when it is mounted into Archil sandbox storage.",
-    );
-  }
-
-  return {
-    archil: {
-      apiKey: archilConfig.api_key,
-      region: archilConfig.region,
-      namePrefix: archilConfig.name_prefix,
-      mounts: [
-        {
-          type: "s3-compatible",
-          bucket: sandboxObjectStore.bucket_name,
-          endpoint: sandboxObjectStore.endpoint,
-          accessKeyId: sandboxObjectStore.access_key_id,
-          secretAccessKey: sandboxObjectStore.secret_access_key,
-        },
-      ],
-    },
-  };
-}
-
-function buildSandboxStorage(config: Config): DataPlaneWorkerSandboxStorageConfig | undefined {
-  const dockerVolumeConfig = config.sandbox.storage?.docker_volume;
-  const sandboxStorage = {
-    ...buildArchilMount(config),
-    ...(dockerVolumeConfig === undefined
-      ? {}
-      : {
-          dockerVolume: {
-            namePrefix: dockerVolumeConfig.name_prefix,
-          },
-        }),
-  };
-
-  return sandboxStorage.archil === undefined && sandboxStorage.dockerVolume === undefined
-    ? undefined
-    : sandboxStorage;
-}
-
 function projectTelemetry(config: Config): GlobalTelemetryConfig {
   if (config.telemetry.enabled) {
     return {
@@ -124,13 +54,6 @@ function projectTelemetry(config: Config): GlobalTelemetryConfig {
 }
 
 export function selectGlobalConfig(config: Config): GlobalConfig {
-  const sandboxStorage =
-    config.sandbox.storage === undefined
-      ? undefined
-      : {
-          backend: config.sandbox.storage.backend,
-        };
-
   return {
     env: config.global.env,
     telemetry: projectTelemetry(config),
@@ -138,7 +61,6 @@ export function selectGlobalConfig(config: Config): GlobalConfig {
       serviceToken: config.internal_auth.shared_token.token,
     },
     sandbox: {
-      storage: sandboxStorage,
       defaultBaseImage: config.sandbox.default_base_image,
       gatewayWsUrl: config.services.data_plane_gateway.sandbox_ws_public_url,
       internalGatewayWsUrl: config.services.data_plane_gateway.sandbox_ws_internal_url,
@@ -285,7 +207,6 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
         tokenIssuer: config.sandbox.tokens.bootstrap.issuer,
         tokenAudience: config.sandbox.tokens.bootstrap.audience,
       },
-      storageBackend: config.sandbox.storage?.backend,
       docker: {
         enabled: config.sandbox.docker?.enabled === true,
       },
@@ -396,12 +317,6 @@ export function selectDataPlaneApiConfig(config: Config): DataPlaneApiConfig {
       serviceToken: config.internal_auth.shared_token.token,
     },
     sandbox: {
-      storage:
-        config.sandbox.storage === undefined
-          ? undefined
-          : {
-              backend: config.sandbox.storage.backend,
-            },
       docker:
         config.sandbox.docker?.enabled === true
           ? {
@@ -487,13 +402,6 @@ export function selectDataPlaneGatewayConfig(config: Config): DataPlaneGatewayCo
 }
 
 export function selectDataPlaneWorkerConfig(config: Config): DataPlaneWorkerConfig {
-  const sandboxStorage =
-    config.sandbox.storage === undefined
-      ? undefined
-      : {
-          backend: config.sandbox.storage.backend,
-        };
-
   return {
     database: {
       url: config.postgres.data_plane.pooled_url,
@@ -512,7 +420,6 @@ export function selectDataPlaneWorkerConfig(config: Config): DataPlaneWorkerConf
       baseUrl: config.services.control_plane_api.internal_url,
     },
     sandbox: {
-      storage: sandboxStorage,
       internalGatewayWsUrl: config.services.data_plane_gateway.sandbox_ws_internal_url,
       bootstrap: {
         tokenSecret: config.sandbox.tokens.bootstrap.secret,
@@ -554,7 +461,6 @@ export function selectDataPlaneWorkerConfig(config: Config): DataPlaneWorkerConf
             ? { enabled: false }
             : undefined,
     },
-    sandboxStorage: buildSandboxStorage(config),
     internalAuth: {
       serviceToken: config.internal_auth.shared_token.token,
     },

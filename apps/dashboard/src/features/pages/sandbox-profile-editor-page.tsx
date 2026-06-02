@@ -104,14 +104,9 @@ import {
   listOrganizationIdentityLinkProviders,
   organizationIdentityLinkProvidersQueryKey,
 } from "../settings/identity-linking/organization-identity-linking-service.js";
-import {
-  getOrganizationSandboxStorageSettings,
-  organizationSandboxStorageSettingsQueryKey,
-} from "../settings/organization/sandbox-storage-service.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { NoLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
-import { SettingsSwitchField } from "../shared/settings-switch-field.js";
 import { UnavailableResourceState } from "../shared/unavailable-resource-state.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import {
@@ -229,14 +224,6 @@ type SandboxProfileDraftSectionState = {
   }> | null;
   integrationRows?: readonly SandboxProfileBindingEditorRow[] | null;
 };
-type SandboxProfilePersistenceDraftState = {
-  hasUnpersistedChanges: boolean;
-  applyDraftSaveError?: (error: unknown) => void;
-  applySavedPersistenceMode?: (
-    defaultPersistenceMode: SandboxProfileVersion["defaultPersistenceMode"],
-  ) => void;
-  buildDraftChanges?: () => SandboxProfileVersion["defaultPersistenceMode"];
-};
 type SandboxProfileRuntimeSettingsDraftState = SandboxProfileRuntimeDraftState;
 type SandboxProfileGitCommitSigningDraftState = {
   gitCommitSigningIntegrationConnectionId: string | null | undefined;
@@ -274,12 +261,6 @@ type SetupAssistantStartDialogState = {
 } | null;
 
 function createIdleSandboxProfileDraftSectionState(): SandboxProfileDraftSectionState {
-  return {
-    hasUnpersistedChanges: false,
-  };
-}
-
-function createIdleSandboxProfilePersistenceDraftState(): SandboxProfilePersistenceDraftState {
   return {
     hasUnpersistedChanges: false,
   };
@@ -1549,9 +1530,6 @@ function ReadySandboxProfileEditorPage(input: {
   const [setupScriptDraftState, setSetupScriptDraftState] = useState(
     createIdleSandboxProfileDraftSectionState,
   );
-  const [persistenceDraftState, setPersistenceDraftState] = useState(
-    createIdleSandboxProfilePersistenceDraftState,
-  );
   const [runtimeDraftState, setRuntimeDraftState] = useState(
     createIdleSandboxProfileRuntimeDraftState,
   );
@@ -1615,7 +1593,6 @@ function ReadySandboxProfileEditorPage(input: {
     integrationDraftState.hasUnpersistedChanges ||
     gitCommitSigningDraftState.hasUnpersistedChanges ||
     setupScriptDraftState.hasUnpersistedChanges ||
-    persistenceDraftState.hasUnpersistedChanges ||
     runtimeDraftState.hasUnpersistedChanges;
   const updateGitCommitSigningIntegrationConnectionId = useCallback(
     (connectionId: string | null) => {
@@ -1937,14 +1914,12 @@ function ReadySandboxProfileEditorPage(input: {
 
   async function saveDraftChanges(): Promise<boolean> {
     setPublishFlushError(null);
-    const shouldSavePersistence = persistenceDraftState.hasUnpersistedChanges;
     const shouldSaveRuntime = runtimeDraftState.hasUnpersistedChanges;
     const shouldSaveGitCommitSigning = gitCommitSigningDraftState.hasUnpersistedChanges;
     const shouldSaveIntegrations = integrationDraftState.hasUnpersistedChanges;
     const shouldSaveSetupScript = setupScriptDraftState.hasUnpersistedChanges;
 
     if (
-      !shouldSavePersistence &&
       !shouldSaveRuntime &&
       !shouldSaveGitCommitSigning &&
       !shouldSaveIntegrations &&
@@ -1964,9 +1939,6 @@ function ReadySandboxProfileEditorPage(input: {
       const setupScript = shouldSaveSetupScript
         ? (setupScriptDraftState.buildDraftChanges?.() ?? null)
         : undefined;
-      const defaultPersistenceMode = shouldSavePersistence
-        ? persistenceDraftState.buildDraftChanges?.()
-        : undefined;
       const runtimeChanges: SandboxProfileRuntimeDraftChanges | undefined = shouldSaveRuntime
         ? buildSandboxProfileRuntimeDraftChanges({
             currentVersion: input.currentVersion,
@@ -1984,7 +1956,6 @@ function ReadySandboxProfileEditorPage(input: {
         profileId: input.profileId,
         version: input.mode.version,
         ...(setupScript === undefined ? {} : { setupScript }),
-        ...(defaultPersistenceMode === undefined ? {} : { defaultPersistenceMode }),
         ...(runtimeChanges === undefined
           ? {}
           : {
@@ -2017,10 +1988,6 @@ function ReadySandboxProfileEditorPage(input: {
           version: input.mode.version,
         });
       }
-      if (shouldSavePersistence) {
-        persistenceDraftState.applySavedPersistenceMode?.(savedDraft.defaultPersistenceMode);
-        await input.invalidateProfileVersions(input.profileId);
-      }
       if (shouldSaveRuntime) {
         if (savedDraft.sandboxProvider === null) {
           throw new Error("Saved sandbox runtime provider is missing.");
@@ -2047,7 +2014,6 @@ function ReadySandboxProfileEditorPage(input: {
     } catch (error: unknown) {
       integrationDraftState.applyDraftSaveError?.(error);
       setupScriptDraftState.applyDraftSaveError?.(error);
-      persistenceDraftState.applyDraftSaveError?.(error);
       runtimeDraftState.applyDraftSaveError?.(error);
       setPublishFlushError(DraftSaveErrorMessage);
       return false;
@@ -2099,7 +2065,6 @@ function ReadySandboxProfileEditorPage(input: {
   const editorView = (
     <SandboxProfileEditorView
       activeSectionId={activeSectionId}
-      hasUnpersistedPersistenceChanges={persistenceDraftState.hasUnpersistedChanges}
       hasUnpersistedRuntimeChanges={runtimeDraftState.hasUnpersistedChanges}
       hasUnpersistedIntegrationChanges={
         integrationDraftState.hasUnpersistedChanges ||
@@ -2189,7 +2154,6 @@ function ReadySandboxProfileEditorPage(input: {
           integrationsLoader={integrationsLoader}
           invalidateProfileVersions={input.invalidateProfileVersions}
           mode={input.mode}
-          onPersistenceDraftStateChange={setPersistenceDraftState}
           runtimeDraftState={runtimeDraftState}
           gitCommitSigningDraftState={gitCommitSigningDraftState}
           onGitCommitSigningIntegrationConnectionChange={
@@ -2701,7 +2665,6 @@ function SandboxProfileEditorSectionPanels(input: {
   integrationsLoader: ReturnType<typeof useSandboxProfileIntegrationsLoader>;
   invalidateProfileVersions: (profileId: string) => Promise<void>;
   mode: SandboxProfileEditorVersionMode;
-  onPersistenceDraftStateChange: (state: SandboxProfilePersistenceDraftState) => void;
   runtimeDraftState: SandboxProfileRuntimeSettingsDraftState;
   gitCommitSigningDraftState: SandboxProfileGitCommitSigningDraftState;
   onGitCommitSigningIntegrationConnectionChange: (connectionId: string | null) => void;
@@ -2824,19 +2787,6 @@ function SandboxProfileEditorSectionPanels(input: {
           version={input.mode.version}
         />
       </SandboxProfilePanelSection>
-      {input.currentVersion === null ? null : (
-        <SandboxProfilePanelSection>
-          <SandboxProfilePersistenceModeSection
-            disabled={input.draftFieldsAreReadOnly}
-            invalidateProfileVersions={input.invalidateProfileVersions}
-            isDraft={input.mode.kind === "draft"}
-            key={`${input.profileId}:${String(input.mode.version)}:${String(input.draftEditorResetKey)}:persistence-mode`}
-            onDraftStateChange={input.onPersistenceDraftStateChange}
-            profileId={input.profileId}
-            version={input.currentVersion}
-          />
-        </SandboxProfilePanelSection>
-      )}
     </div>
   );
 }
@@ -2929,111 +2879,6 @@ function LoadedSandboxProfileRuntimeSection(input: {
         version={input.version}
         {...(input.sectionChrome === undefined ? {} : { sectionChrome: input.sectionChrome })}
       />
-    </div>
-  );
-}
-
-function SandboxProfilePersistenceModeSection(input: {
-  disabled: boolean;
-  invalidateProfileVersions: (profileId: string) => Promise<void>;
-  isDraft: boolean;
-  onDraftStateChange: (state: SandboxProfilePersistenceDraftState) => void;
-  profileId: string;
-  version: SandboxProfileVersion;
-}): React.JSX.Element | null {
-  const activeOrganizationId = useRequiredOrganizationId();
-  const { disabled, isDraft, onDraftStateChange, version } = input;
-  const [draftPersistenceMode, setDraftPersistenceMode] = useState(version.defaultPersistenceMode);
-  const [persistedPersistenceMode, setPersistedPersistenceMode] = useState(
-    version.defaultPersistenceMode,
-  );
-  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
-  const draftPersistenceModeRef = useRef(draftPersistenceMode);
-  const persistedPersistenceModeRef = useRef(persistedPersistenceMode);
-  draftPersistenceModeRef.current = draftPersistenceMode;
-  persistedPersistenceModeRef.current = persistedPersistenceMode;
-  const organizationSandboxStorageSettingsQuery = useQuery({
-    queryKey: organizationSandboxStorageSettingsQueryKey(activeOrganizationId),
-    queryFn: async () => getOrganizationSandboxStorageSettings(),
-  });
-  const buildDraftChanges = useCallback(
-    (): SandboxProfileVersion["defaultPersistenceMode"] => draftPersistenceModeRef.current,
-    [],
-  );
-  const applySavedPersistenceMode = useCallback(
-    (defaultPersistenceMode: SandboxProfileVersion["defaultPersistenceMode"]): void => {
-      setDraftPersistenceMode(defaultPersistenceMode);
-      setPersistedPersistenceMode(defaultPersistenceMode);
-      setSaveErrorMessage(null);
-    },
-    [],
-  );
-  const applyDraftSaveError = useCallback((error: unknown): void => {
-    setSaveErrorMessage(
-      resolveApiErrorMessage({
-        error,
-        fallbackMessage: "Could not save sandbox profile persistence mode.",
-      }),
-    );
-  }, []);
-
-  useEffect(() => {
-    setDraftPersistenceMode(version.defaultPersistenceMode);
-    setPersistedPersistenceMode(version.defaultPersistenceMode);
-    setSaveErrorMessage(null);
-  }, [version.defaultPersistenceMode, version.version]);
-
-  useEffect(() => {
-    onDraftStateChange({
-      applyDraftSaveError,
-      applySavedPersistenceMode,
-      buildDraftChanges,
-      hasUnpersistedChanges: draftPersistenceMode !== persistedPersistenceMode,
-    });
-  }, [
-    applyDraftSaveError,
-    applySavedPersistenceMode,
-    buildDraftChanges,
-    draftPersistenceMode,
-    onDraftStateChange,
-    persistedPersistenceMode,
-  ]);
-
-  const persistentModeIsEnabled = draftPersistenceMode === "persistent";
-  const fieldIsReadOnly = disabled || !isDraft;
-
-  if (organizationSandboxStorageSettingsQuery.data?.persistentSandboxesEnabled !== true) {
-    return null;
-  }
-
-  return (
-    <div className="space-y-2">
-      {saveErrorMessage === null ? null : <Notice variant="alert">{saveErrorMessage}</Notice>}
-      {fieldIsReadOnly ? (
-        <div className="flex w-fit items-center gap-2">
-          <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-            Use persistent sandboxes:
-          </span>
-          <span className="text-sm font-medium">{persistentModeIsEnabled ? "Yes" : "No"}</span>
-        </div>
-      ) : (
-        <div className="flex max-w-5xl flex-col gap-2">
-          <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-            Experimental
-          </h2>
-          <div className="rounded-md border bg-background p-4">
-            <SettingsSwitchField
-              checked={persistentModeIsEnabled}
-              id="sandbox-profile-persistent-mode"
-              label="Use persistent sandboxes"
-              onCheckedChange={(checked) => {
-                setDraftPersistenceMode(checked ? "persistent" : "ephemeral");
-                setSaveErrorMessage(null);
-              }}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -3377,7 +3222,6 @@ export function SandboxProfileEditorView(input: {
   onActiveSectionIdChange: (sectionId: SandboxProfileEditorSectionId) => void;
   renderSectionPanel: (sectionId: SandboxProfileEditorSectionId) => React.JSX.Element;
   versionActions?: React.JSX.Element;
-  hasUnpersistedPersistenceChanges?: boolean;
   hasUnpersistedRuntimeChanges?: boolean;
   hasUnpersistedIntegrationChanges?: boolean;
   hasUnpersistedSetupScriptChanges?: boolean;
@@ -3385,8 +3229,7 @@ export function SandboxProfileEditorView(input: {
 }): React.JSX.Element {
   const hasUnpersistedDraftChanges =
     input.mode.kind === "draft" &&
-    ((input.hasUnpersistedPersistenceChanges ?? false) ||
-      (input.hasUnpersistedRuntimeChanges ?? false) ||
+    ((input.hasUnpersistedRuntimeChanges ?? false) ||
       (input.hasUnpersistedIntegrationChanges ?? false) ||
       (input.hasUnpersistedSetupScriptChanges ?? false));
   const duplicateProfileIsAvailable = input.duplicateProfileIsAvailable ?? false;

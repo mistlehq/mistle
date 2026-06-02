@@ -120,6 +120,8 @@ function start(input: {
       gatewayRelay: input.dataPlaneGateway?.gatewayRelay,
       directEgressTrustedCaCertificates:
         input.dataPlaneGateway?.directEgress?.trustedCaCertificates,
+      directEgressWebSocketUpstreamResolutionDelayMs:
+        input.dataPlaneGateway?.directEgress?.webSocketUpstreamResolutionDelayMs,
       nats: startInput.infra.get(InfraIds.NATS),
       sandbox: input.sandbox,
     });
@@ -170,6 +172,7 @@ function config(input: {
   dataPlaneApiBaseUrl: string;
   controlPlaneBaseUrl: string;
   directEgressTrustedCaCertificates: readonly string[] | undefined;
+  directEgressWebSocketUpstreamResolutionDelayMs: number | undefined;
   gatewayWsUrl: string;
   gatewayRelay: IntegrationDataPlaneGatewayRelayOptions | undefined;
   nats: ResolvedTestInfra | undefined;
@@ -195,6 +198,12 @@ function config(input: {
       ? {}
       : {
           __dangerouslyTrustDirectEgressTlsCaCertificates: input.directEgressTrustedCaCertificates,
+        }),
+    ...(input.directEgressWebSocketUpstreamResolutionDelayMs === undefined
+      ? {}
+      : {
+          __dangerouslyDelayDirectEgressWebSocketUpstreamResolutionMs:
+            input.directEgressWebSocketUpstreamResolutionDelayMs,
         }),
     runtimeState: {
       backend: "valkey",

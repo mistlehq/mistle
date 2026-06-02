@@ -55,9 +55,29 @@ const AgentRuntimeRegistry = Definitions.agentRuntimeRegistry;
 const MissingProviderValue = "__missing_provider__";
 const MissingConnectionValue = "__missing_connection__";
 const DockerSandboxProviderId = "docker";
+const E2BSandboxProviderId = "e2b";
+const TensorlakeSandboxProviderId = "tensorlake";
+const ManagedSandboxRuntimeOptionValue = "__managed_sandbox_runtime__";
+const OrganizationSandboxRuntimeOptionPrefix = "organization:";
+const ManagedSandboxProviderPreference = [
+  TensorlakeSandboxProviderId,
+  E2BSandboxProviderId,
+  DockerSandboxProviderId,
+] as const;
 
 type SandboxCredentialSource = "managed" | "organization";
 type AgentRuntimeId = SandboxProfileVersion["agentRuntimeId"];
+type SandboxRuntimeOption =
+  | {
+      kind: "managed";
+      provider: SandboxProviderSummary;
+      value: typeof ManagedSandboxRuntimeOptionValue;
+    }
+  | {
+      kind: "organization";
+      provider: SandboxProviderSummary;
+      value: string;
+    };
 
 export type SandboxProfileRuntimeDraftChanges = {
   agentRuntimeId: AgentRuntimeId;
@@ -136,6 +156,15 @@ export function SandboxProfileRuntimeSection(input: {
           providerId: selectedProvider.id,
         });
   const providerOptions = createProviderOptions(input.providers);
+  const selectedProviderOption = findSelectedProviderOption({
+    options: providerOptions,
+    runtime: draftRuntime,
+  });
+  const readOnlyRuntime = persistedRuntimeState;
+  const readOnlyProvider = findProvider({
+    providerId: readOnlyRuntime.sandboxProvider,
+    providers: input.providers,
+  });
   const inlineRuntimeFields = input.sectionChrome === false;
 
   const buildDraftChanges = useCallback((): SandboxProfileRuntimeDraftChanges => {
@@ -179,14 +208,9 @@ export function SandboxProfileRuntimeSection(input: {
 
   const applySavedRuntimeConfig = useCallback(
     (runtimeConfig: SandboxProfileRuntimeDraftChanges): void => {
-      const provider = findProvider({
-        providerId: runtimeConfig.sandboxProvider,
-        providers: input.providers,
-      });
       const nextRuntime = {
         credentialSource: resolveCredentialSource({
           connectionId: runtimeConfig.sandboxConnectionId,
-          provider,
         }),
         agentRuntimeId: runtimeConfig.agentRuntimeId,
         mistleMcpEnabled: runtimeConfig.mistleMcpEnabled,
@@ -253,33 +277,24 @@ export function SandboxProfileRuntimeSection(input: {
       return;
     }
 
-    const provider = providerOptions.find((candidate) => candidate.id === choiceValue);
-    if (provider === undefined) {
+    const option = providerOptions.find((candidate) => candidate.value === choiceValue);
+    if (option === undefined) {
       return;
     }
 
+    const currentRuntime = draftRuntimeRef.current;
     setDraftRuntime({
-      agentRuntimeId: draftRuntimeRef.current.agentRuntimeId,
-      credentialSource: resolveDefaultCredentialSourceForProvider(provider),
-      mistleMcpEnabled: draftRuntimeRef.current.mistleMcpEnabled,
-      mistleMcpApiKeyId: draftRuntimeRef.current.mistleMcpApiKeyId,
-      sandboxProvider: provider.id,
+      agentRuntimeId: currentRuntime.agentRuntimeId,
+      credentialSource: option.kind,
+      mistleMcpEnabled: currentRuntime.mistleMcpEnabled,
+      mistleMcpApiKeyId: currentRuntime.mistleMcpApiKeyId,
+      sandboxProvider: option.provider.id,
       sandboxConnectionId: null,
-      sandboxResources: createDefaultResources(provider),
+      sandboxResources:
+        currentRuntime.sandboxProvider === option.provider.id
+          ? currentRuntime.sandboxResources
+          : createDefaultResources(option.provider),
     });
-    setSaveErrorMessage(null);
-  }
-
-  function updateCredentialSource(value: string | null): void {
-    if (value !== "managed" && value !== "organization") {
-      return;
-    }
-
-    setDraftRuntime((currentRuntime) => ({
-      ...currentRuntime,
-      credentialSource: value,
-      sandboxConnectionId: value === "managed" ? null : currentRuntime.sandboxConnectionId,
-    }));
     setSaveErrorMessage(null);
   }
 
@@ -354,7 +369,7 @@ export function SandboxProfileRuntimeSection(input: {
     setSaveErrorMessage(null);
   }
 
-  const providerFieldLabel = inlineRuntimeFields ? "Sandbox Runtime" : "Provider";
+  const providerFieldLabel = "Sandbox provider";
   const agentRuntimeField = (
     <Field
       contentWidth={inlineRuntimeFields ? "fill" : "fit"}
@@ -419,29 +434,42 @@ export function SandboxProfileRuntimeSection(input: {
         <FieldLabel htmlFor="sandbox-profile-runtime-provider">{providerFieldLabel}</FieldLabel>
       </FieldHeader>
       <FieldContent>
-        <Select onValueChange={updateProvider} value={selectedProvider?.id ?? MissingProviderValue}>
+        <Select
+          onValueChange={updateProvider}
+          value={selectedProviderOption?.value ?? MissingProviderValue}
+        >
           <SelectTrigger id="sandbox-profile-runtime-provider">
-            <SelectValue placeholder="Select provider">
+            <SelectValue placeholder="Select sandbox provider">
               {selectedProvider === null ? (
                 <span className="text-muted-foreground">
                   {draftRuntime.sandboxProvider === null
-                    ? "Select provider"
-                    : "Provider unavailable"}
+                    ? "Select sandbox provider"
+                    : "Sandbox provider unavailable"}
                 </span>
               ) : (
-                <ProviderOptionLabel provider={selectedProvider} />
+                <SandboxRuntimeOptionLabel
+                  option={
+                    selectedProviderOption ??
+                    createUnavailableRuntimeOption({
+                      credentialSource: draftRuntime.credentialSource,
+                      provider: selectedProvider,
+                    })
+                  }
+                />
               )}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {selectedProvider === null ? (
               <SelectItem disabled value={MissingProviderValue}>
-                {draftRuntime.sandboxProvider === null ? "Select provider" : "Provider unavailable"}
+                {draftRuntime.sandboxProvider === null
+                  ? "Select sandbox provider"
+                  : "Sandbox provider unavailable"}
               </SelectItem>
             ) : null}
-            {providerOptions.map((provider) => (
-              <SelectItem key={provider.id} value={provider.id}>
-                <ProviderOptionLabel provider={provider} />
+            {providerOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                <SandboxRuntimeOptionLabel option={option} />
               </SelectItem>
             ))}
           </SelectContent>
@@ -453,37 +481,17 @@ export function SandboxProfileRuntimeSection(input: {
   const runtimeFields = fieldIsReadOnly ? (
     <SandboxProfileRuntimeReadOnlySummary
       connection={resolveConnection({
-        connectionId: draftRuntime.sandboxConnectionId,
+        connectionId: readOnlyRuntime.sandboxConnectionId,
         connections: input.availableConnections,
       })}
-      provider={selectedProvider}
+      provider={readOnlyProvider}
       providerFieldLabel={providerFieldLabel}
-      runtime={draftRuntime}
+      runtime={readOnlyRuntime}
       horizontal={inlineRuntimeFields}
     />
   ) : (
     <div className="grid gap-4">
-      {inlineRuntimeFields ? (
-        providerField
-      ) : (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          {providerField}
-
-          <SandboxProviderCredentialSourceField
-            credentialSource={draftRuntime.credentialSource}
-            onCredentialSourceChange={updateCredentialSource}
-            provider={selectedProvider}
-          />
-        </div>
-      )}
-      {inlineRuntimeFields ? (
-        <SandboxProviderCredentialSourceField
-          credentialSource={draftRuntime.credentialSource}
-          horizontal={true}
-          onCredentialSourceChange={updateCredentialSource}
-          provider={selectedProvider}
-        />
-      ) : null}
+      {providerField}
       <SandboxProviderConnectionField
         connectionId={draftRuntime.sandboxConnectionId}
         connections={matchingConnections}
@@ -520,7 +528,7 @@ export function SandboxProfileRuntimeSection(input: {
     <div className="space-y-2">
       {saveErrorMessage === null ? null : <Notice variant="alert">{saveErrorMessage}</Notice>}
       <SectionBlock title="Agent">{agentRuntimeContent}</SectionBlock>
-      <SectionBlock title="Sandbox Runtime">{runtimeFields}</SectionBlock>
+      <SectionBlock title="Sandbox provider">{runtimeFields}</SectionBlock>
     </div>
   );
 }
@@ -592,43 +600,6 @@ function SandboxProviderConnectionField(input: {
             Add an API key in integrations
           </TextLink>
         )}
-      </FieldContent>
-    </Field>
-  );
-}
-
-function SandboxProviderCredentialSourceField(input: {
-  credentialSource: SandboxCredentialSource;
-  horizontal?: boolean | undefined;
-  onCredentialSourceChange: (value: string | null) => void;
-  provider: SandboxProviderSummary | null;
-}): React.JSX.Element | null {
-  if (
-    input.provider === null ||
-    !input.provider.managed ||
-    !input.provider.supportsOrganizationConnection
-  ) {
-    return null;
-  }
-
-  return (
-    <Field
-      contentWidth={input.horizontal === true ? "fill" : "fit"}
-      orientation={input.horizontal === true ? "horizontal" : "vertical"}
-    >
-      <FieldHeader>
-        <FieldLabel htmlFor="sandbox-profile-runtime-credential-source">Credentials</FieldLabel>
-      </FieldHeader>
-      <FieldContent>
-        <Select onValueChange={input.onCredentialSourceChange} value={input.credentialSource}>
-          <SelectTrigger id="sandbox-profile-runtime-credential-source">
-            <SelectValue>{formatCredentialSource(input.credentialSource)}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="managed">Managed by Mistle</SelectItem>
-            <SelectItem value="organization">Use workspace API key</SelectItem>
-          </SelectContent>
-        </Select>
       </FieldContent>
     </Field>
   );
@@ -846,10 +817,6 @@ function SandboxProfileRuntimeReadOnlySummary(input: {
   providerFieldLabel: string;
   runtime: RuntimeConfigState;
 }): React.JSX.Element {
-  const shouldShowCredentialSource =
-    input.provider !== null &&
-    input.provider.managed &&
-    input.provider.supportsOrganizationConnection;
   const shouldShowConnection =
     input.provider !== null &&
     input.provider.supportsOrganizationConnection &&
@@ -859,15 +826,12 @@ function SandboxProfileRuntimeReadOnlySummary(input: {
       <ReadOnlyRuntimeField horizontal={input.horizontal} label={input.providerFieldLabel}>
         {input.provider === null ? (
           input.runtime.sandboxProvider
+        ) : input.runtime.credentialSource === "managed" ? (
+          <MistleProviderLabel />
         ) : (
           <ProviderOptionLabel provider={input.provider} />
         )}
       </ReadOnlyRuntimeField>
-      {shouldShowCredentialSource ? (
-        <ReadOnlyRuntimeField horizontal={input.horizontal} label="Credentials">
-          {formatCredentialSource(input.runtime.credentialSource)}
-        </ReadOnlyRuntimeField>
-      ) : null}
       {shouldShowConnection ? (
         <ReadOnlyRuntimeField horizontal={input.horizontal} label="Connection">
           {input.connection?.displayName ??
@@ -1403,30 +1367,70 @@ function ProviderOptionLabel(input: { provider: SandboxProviderSummary }): React
   );
 }
 
-function createProviderOptions(
-  providers: readonly SandboxProviderSummary[],
-): readonly SandboxProviderSummary[] {
-  return providers.filter((provider) => {
-    if (provider.id === DockerSandboxProviderId && !provider.managed) {
-      return false;
-    }
+function SandboxRuntimeOptionLabel(input: { option: SandboxRuntimeOption }): React.JSX.Element {
+  if (input.option.kind === "managed") {
+    return <MistleProviderLabel />;
+  }
 
-    return provider.managed || provider.supportsOrganizationConnection;
-  });
+  return <ProviderOptionLabel provider={input.option.provider} />;
 }
 
-function resolveDefaultCredentialSourceForProvider(
-  provider: SandboxProviderSummary,
-): SandboxCredentialSource {
-  if (provider.managed) {
-    return "managed";
+function MistleProviderLabel(): React.JSX.Element {
+  return (
+    <span className="flex items-center gap-2">
+      <img
+        alt=""
+        aria-hidden="true"
+        className="size-4 rounded-sm object-contain"
+        src="/brand/logo.webp"
+      />
+      Mistle
+    </span>
+  );
+}
+
+function createProviderOptions(
+  providers: readonly SandboxProviderSummary[],
+): readonly SandboxRuntimeOption[] {
+  const options: SandboxRuntimeOption[] = [];
+  const managedProvider = resolveManagedSandboxProvider(providers);
+  if (managedProvider !== undefined) {
+    options.push({
+      kind: "managed",
+      provider: managedProvider,
+      value: ManagedSandboxRuntimeOptionValue,
+    });
   }
 
-  if (provider.supportsOrganizationConnection) {
-    return "organization";
+  for (const provider of providers) {
+    if (provider.id === DockerSandboxProviderId && !provider.managed) {
+      continue;
+    }
+
+    if (provider.supportsOrganizationConnection) {
+      options.push({
+        kind: "organization",
+        provider,
+        value: `${OrganizationSandboxRuntimeOptionPrefix}${provider.id}`,
+      });
+    }
   }
 
-  return "managed";
+  return options;
+}
+
+export function resolveManagedSandboxProvider(
+  providers: readonly SandboxProviderSummary[],
+): SandboxProviderSummary | undefined {
+  const managedProviders = providers.filter((provider) => provider.managed);
+  for (const providerId of ManagedSandboxProviderPreference) {
+    const provider = managedProviders.find((candidate) => candidate.id === providerId);
+    if (provider !== undefined) {
+      return provider;
+    }
+  }
+
+  return managedProviders[0];
 }
 
 function resolveSandboxProviderLogoKey(provider: SandboxProviderSummary): string | undefined {
@@ -1465,16 +1469,10 @@ function createRuntimeConfigState(input: {
   providers: readonly SandboxProviderSummary[];
   version: SandboxProfileVersion;
 }): RuntimeConfigState {
-  const provider = findProvider({
-    providerId: input.version.sandboxProvider,
-    providers: input.providers,
-  });
-
   return {
     agentRuntimeId: input.version.agentRuntimeId,
     credentialSource: resolveCredentialSource({
       connectionId: input.version.sandboxConnectionId,
-      provider,
     }),
     mistleMcpEnabled: input.version.mistleMcpEnabled,
     mistleMcpApiKeyId: input.version.mistleMcpApiKeyId,
@@ -1484,27 +1482,12 @@ function createRuntimeConfigState(input: {
   };
 }
 
-function resolveCredentialSource(input: {
-  connectionId: string | null;
-  provider: SandboxProviderSummary | null;
-}): SandboxCredentialSource {
+function resolveCredentialSource(input: { connectionId: string | null }): SandboxCredentialSource {
   if (input.connectionId !== null) {
     return "organization";
   }
 
-  if (
-    input.provider !== null &&
-    !input.provider.managed &&
-    input.provider.supportsOrganizationConnection
-  ) {
-    return "organization";
-  }
-
   return "managed";
-}
-
-function formatCredentialSource(source: SandboxCredentialSource): string {
-  return source === "managed" ? "Managed by Mistle" : "Use workspace API key";
 }
 
 function createDefaultResources(
@@ -1531,6 +1514,42 @@ function findProvider(input: {
   }
 
   return input.providers.find((provider) => provider.id === input.providerId) ?? null;
+}
+
+function findSelectedProviderOption(input: {
+  options: readonly SandboxRuntimeOption[];
+  runtime: RuntimeConfigState;
+}): SandboxRuntimeOption | null {
+  if (input.runtime.sandboxProvider === null) {
+    return null;
+  }
+
+  return (
+    input.options.find(
+      (option) =>
+        option.provider.id === input.runtime.sandboxProvider &&
+        option.kind === input.runtime.credentialSource,
+    ) ?? null
+  );
+}
+
+function createUnavailableRuntimeOption(input: {
+  credentialSource: SandboxCredentialSource;
+  provider: SandboxProviderSummary;
+}): SandboxRuntimeOption {
+  if (input.credentialSource === "managed") {
+    return {
+      kind: "managed",
+      provider: input.provider,
+      value: ManagedSandboxRuntimeOptionValue,
+    };
+  }
+
+  return {
+    kind: "organization",
+    provider: input.provider,
+    value: `${OrganizationSandboxRuntimeOptionPrefix}${input.provider.id}`,
+  };
 }
 
 function resolveConnection(input: {
@@ -1585,6 +1604,7 @@ function resolveSandboxProviderIdFromTarget(target: IntegrationTargetSummary): s
 function runtimeConfigStatesAreEqual(left: RuntimeConfigState, right: RuntimeConfigState): boolean {
   return (
     left.agentRuntimeId === right.agentRuntimeId &&
+    left.credentialSource === right.credentialSource &&
     left.mistleMcpEnabled === right.mistleMcpEnabled &&
     left.mistleMcpApiKeyId === right.mistleMcpApiKeyId &&
     left.sandboxProvider === right.sandboxProvider &&

@@ -194,8 +194,6 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             eventType: SandboxUsageEventTypes.SANDBOX_STOPPED,
             runtimeProvider: usageEventState.runtimeProvider,
             providerSandboxId: usageEventState.providerSandboxId,
-            storageProvider: null,
-            providerStorageId: null,
             vcpuCount: usageEventState.vcpuCount,
             memoryMb: usageEventState.memoryMb,
             storageMb: usageEventState.storageMb,

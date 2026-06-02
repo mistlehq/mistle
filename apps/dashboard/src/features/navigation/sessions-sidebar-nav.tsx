@@ -64,16 +64,16 @@ export function SessionsSidebarNav(input: {
         </div>
       ) : null}
       {visibleItems.length > 0 ? (
-        <SidebarGroup className="gap-0.5 pb-0.5">
+        <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu className="gap-0.5">
+            <SidebarMenu className="gap-2 md:gap-2">
               {visibleItems.map((item) => {
                 const isActive = item.to !== undefined && location.pathname === item.to;
 
                 return (
                   <SidebarMenuItem className="w-full" key={item.id}>
                     {item.to === undefined ? (
-                      <div className="text-sidebar-foreground h-auto min-h-8 rounded-md px-2 py-1.5">
+                      <div className="text-sidebar-foreground rounded-md p-3 text-left md:p-2">
                         <SessionsSidebarItemLabel
                           label={item.label}
                           profileName={item.profileName}
@@ -83,7 +83,7 @@ export function SessionsSidebarNav(input: {
                       </div>
                     ) : (
                       <SidebarMenuButton
-                        className="h-auto min-h-8 cursor-default items-center px-2 py-1.5"
+                        className="h-auto md:h-auto"
                         isActive={isActive}
                         render={<NavLink to={item.to} />}
                       >
@@ -145,12 +145,8 @@ function SessionsSidebarItemLabel(input: {
         tooltipSide="right"
         tooltipSideOffset={8}
       />
-      <div className="text-muted-foreground flex items-center gap-2 pt-px text-[10px] leading-tight font-medium">
-        {isFailed ? (
-          <span className="rounded-sm bg-destructive/10 px-1 py-0.5 font-semibold text-destructive">
-            Failed
-          </span>
-        ) : null}
+      <div className="text-muted-foreground flex items-center gap-2 text-xs leading-tight font-medium">
+        {isFailed ? <span className="text-destructive">Failed</span> : null}
         <span className="truncate">{input.profileName}</span>
         <span aria-hidden className="shrink-0">
           ·

@@ -46,7 +46,8 @@ function supportsUserRequestedStop(purpose: SandboxInstancePurpose): boolean {
   return (
     purpose === SandboxInstancePurposes.SESSION ||
     purpose === SandboxInstancePurposes.SETUP_ASSISTANT ||
-    purpose === SandboxInstancePurposes.SETUP_CHECK
+    purpose === SandboxInstancePurposes.SETUP_CHECK ||
+    purpose === SandboxInstancePurposes.SKILLS_DISCOVERY
   );
 }
 
@@ -75,7 +76,7 @@ export async function stopSandboxInstance(
     if (!supportsUserRequestedStop(sandboxInstance.purpose)) {
       throw new ConflictError(
         SandboxInstanceUserStopNotSupportedErrorCode,
-        `User-requested stop is only supported for session, setup-check, and setup-assistant sandbox instances; sandbox instance '${input.sandboxInstanceId}' has purpose '${sandboxInstance.purpose}'.`,
+        `User-requested stop is only supported for session, setup-check, setup-assistant, and skills-discovery sandbox instances; sandbox instance '${input.sandboxInstanceId}' has purpose '${sandboxInstance.purpose}'.`,
       );
     }
 

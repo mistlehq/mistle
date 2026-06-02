@@ -1,16 +1,15 @@
 import type { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
-  SandboxInstancePurposes,
   SandboxInstanceStatuses,
   SandboxStopReasons,
   type DataPlaneDatabase,
   type DataPlaneTables,
-  type SandboxInstancePersistenceMode,
   type SandboxInstanceProvider,
   type SandboxInstanceStatus,
 } from "@mistle/db/data-plane";
 import { isSandboxResourceNotFoundError } from "@mistle/sandbox";
 import { and, eq, sql } from "drizzle-orm";
+import { z } from "zod";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import {
@@ -22,7 +21,6 @@ import { destroySandbox } from "../shared/destroy-sandbox.js";
 
 type DeleteSandboxInstanceState = {
   organizationId: string;
-  persistenceMode: SandboxInstancePersistenceMode;
   runtimeProvider: SandboxInstanceProvider;
   sandboxConnectionId: string | null;
   sandboxVcpuCount: number | null;
@@ -48,6 +46,37 @@ export type DeleteSandboxInstanceResult = {
   };
 };
 
+const StartupStatuses = new Set<SandboxInstanceStatus>([
+  SandboxInstanceStatuses.PENDING,
+  SandboxInstanceStatuses.STARTING,
+  SandboxInstanceStatuses.STARTED,
+  SandboxInstanceStatuses.INITIALIZING,
+]);
+
+const LockedSandboxInstanceRowSchema = z
+  .object({
+    status: z.enum([
+      SandboxInstanceStatuses.PENDING,
+      SandboxInstanceStatuses.STARTING,
+      SandboxInstanceStatuses.STARTED,
+      SandboxInstanceStatuses.INITIALIZING,
+      SandboxInstanceStatuses.RUNNING,
+      SandboxInstanceStatuses.DEGRADED,
+      SandboxInstanceStatuses.RECONNECTING,
+      SandboxInstanceStatuses.STOPPING,
+      SandboxInstanceStatuses.STOPPED,
+      SandboxInstanceStatuses.FAILED,
+    ]),
+    provider_sandbox_id: z.string().min(1).nullable(),
+  })
+  .strict();
+
+export function shouldTransitionDeletedProviderCleanupToStopped(
+  status: SandboxInstanceStatus,
+): boolean {
+  return StartupStatuses.has(status);
+}
+
 async function resolveDeleteSandboxInstanceState(input: {
   db: DataPlaneDatabase;
   sandboxInstanceId: string;
@@ -55,7 +84,6 @@ async function resolveDeleteSandboxInstanceState(input: {
   const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
     columns: {
       organizationId: true,
-      persistenceMode: true,
       runtimeProvider: true,
       sandboxConnectionId: true,
       sandboxVcpuCount: true,
@@ -64,19 +92,12 @@ async function resolveDeleteSandboxInstanceState(input: {
       providerSandboxId: true,
       computeGeneration: true,
       status: true,
-      purpose: true,
     },
     where: (table, { eq: whereEq }) => whereEq(table.id, input.sandboxInstanceId),
   });
 
   if (sandboxInstance === undefined) {
     throw new Error(`Sandbox instance '${input.sandboxInstanceId}' was not found.`);
-  }
-
-  if (sandboxInstance.purpose !== SandboxInstancePurposes.SESSION) {
-    throw new Error(
-      `Delete sandbox instance workflow is only supported for session sandbox instances; sandbox instance '${input.sandboxInstanceId}' has purpose '${sandboxInstance.purpose}'.`,
-    );
   }
 
   return sandboxInstance;
@@ -93,14 +114,14 @@ async function markDeletedSandboxProviderComputeDestroyed(ctx: {
   return ctx.db.transaction(async (tx) => {
     const { sandboxInstances } = ctx.tables;
     const lockedRows = await tx.execute(
-      sql<{ status: SandboxInstanceStatus; provider_sandbox_id: string | null }>`
+      sql`
         select status, provider_sandbox_id
         from ${sandboxInstances}
         where id = ${ctx.sandboxInstanceId}
         for update
       `,
     );
-    const lockedRow = lockedRows.rows[0];
+    const lockedRow = LockedSandboxInstanceRowSchema.optional().parse(lockedRows.rows[0]);
 
     if (lockedRow === undefined) {
       throw new Error(`Sandbox instance '${ctx.sandboxInstanceId}' was not found.`);
@@ -129,9 +150,20 @@ async function markDeletedSandboxProviderComputeDestroyed(ctx: {
           ),
         );
     } else {
+      const shouldTransitionToStopped = shouldTransitionDeletedProviderCleanupToStopped(
+        lockedRow.status,
+      );
+
       await tx
         .update(sandboxInstances)
         .set({
+          ...(shouldTransitionToStopped
+            ? {
+                status: SandboxInstanceStatuses.STOPPED,
+                stoppedAt: sql`now()`,
+                stopReason: SandboxStopReasons.USER,
+              }
+            : {}),
           providerSandboxId: null,
           updatedAt: sql`now()`,
         })
@@ -173,6 +205,12 @@ export async function deleteSandboxInstance(
   });
 
   if (sandboxInstanceState.providerSandboxId === null) {
+    if (StartupStatuses.has(sandboxInstanceState.status)) {
+      throw new Error(
+        `Sandbox instance '${input.sandboxInstanceId}' is still starting and does not have persisted provider sandbox metadata yet.`,
+      );
+    }
+
     await clearSandboxInstanceDeadlines({
       db: ctx.db,
       tables: ctx.tables,
@@ -194,16 +232,9 @@ export async function deleteSandboxInstance(
   try {
     await destroySandbox(
       {
-        db: ctx.db,
-        tables: ctx.tables,
-        controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-        config: ctx.config,
         sandboxAdapter: resolvedRuntime.sandboxAdapter,
       },
       {
-        sandboxInstanceId: input.sandboxInstanceId,
-        organizationId: sandboxInstanceState.organizationId,
-        persistenceMode: sandboxInstanceState.persistenceMode,
         runtimeProvider: sandboxInstanceState.runtimeProvider,
         providerSandboxId,
       },

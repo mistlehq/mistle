@@ -1,6 +1,6 @@
 # @mistle/sandbox
 
-Provider-agnostic sandbox compute, storage-attachment, and runtime-control package used by Mistle services.
+Provider-agnostic sandbox compute and runtime-control package used by Mistle services.
 
 Implemented providers:
 
@@ -8,29 +8,25 @@ Implemented providers:
 - E2B
 - Tensorlake
 
-Provider-specific documentation lives with each provider:
+Provider-specific documentation lives with providers that have dedicated README files:
 
 - [`src/providers/docker/README.md`](./src/providers/docker/README.md)
 - [`src/providers/e2b/README.md`](./src/providers/e2b/README.md)
-
-Persistent sandbox behavior across data-plane workflows is documented in [`docs/experimental/persistent-sandboxes.md`](../../docs/experimental/persistent-sandboxes.md).
 
 ## What This Package Owns
 
 `@mistle/sandbox` owns the provider boundary for sandbox compute and in-provider runtime actions:
 
-- prepare provider-specific storage state before compute start
 - prepare provider-specific image/template state before compute start
 - start compute from a provider image or snapshot handle
 - inspect compute and normalize provider lifecycle state
 - resume, stop, and destroy provider compute
 - capture a new provider image or snapshot handle from a running sandbox
-- attach and clean up provider-mounted persistent storage
 - initialize or resume the in-sandbox `sandboxd` runtime
 - read `sandboxd` version for runtime visibility
 - read `sandboxd` init/resume operation logs for startup diagnostics
 
-It does not decide whether a sandbox instance is ephemeral or persistent, provision durable storage records, choose organization storage settings, compile runtime plans, mint tunnel tokens, or manage provider platform infrastructure such as autoscaling, cluster/node lifecycle, scheduling policy, and capacity management. Those decisions live in the data-plane/control-plane application layers. This package receives already-resolved provider config, image handles, runtime payloads, and storage attachment handles.
+It does not compile runtime plans, mint tunnel tokens, or manage provider platform infrastructure such as autoscaling, cluster/node lifecycle, scheduling policy, and capacity management. Those decisions live in the data-plane/control-plane application layers. This package receives already-resolved provider config, image handles, and runtime payloads.
 
 ## Public API
 
@@ -39,16 +35,13 @@ The main entrypoints are:
 - `createSandboxAdapter(...)`
 - `createSandboxRuntimeControl(...)`
 
-`SandboxAdapter` exposes provider compute and storage attachment operations:
+`SandboxAdapter` exposes provider compute operations:
 
 - `prepareImage(request)`
-- `prepareStorageForStart(request)`
 - `start(request)`
 - `inspect(request)`
 - `resume(request)`
 - `captureSnapshot(request)`
-- `attachStorage(request)`
-- `cleanupStorage(request)`
 - `stop(request)`
 - `destroy(request)`
 
@@ -60,7 +53,7 @@ The main entrypoints are:
 - `readOperationLog(request)`
 - `close()`
 
-The package root also exports provider ids, request/result types, storage backend/layout/lifecycle types, runtime env helpers, and sandbox error classes from `src/types.ts`, `src/runtime-env.ts`, and `src/errors.ts`.
+The package root also exports provider ids, request/result types, runtime env helpers, and sandbox error classes from `src/types.ts`, `src/runtime-env.ts`, and `src/errors.ts`.
 
 ```ts
 import {
@@ -127,44 +120,11 @@ Official providers inject required runtime env through `withRequiredSandboxRunti
 
 Application lifecycle policy should prefer `state` and `disposition` over provider-specific `raw` fields. Missing provider compute is represented as `SandboxResourceNotFoundError` when adapters can identify the provider not-found condition.
 
-## Storage Contract
-
-Persistent storage provisioning is outside this package. Data-plane worker storage backend adapters create or resolve durable storage and then pass provider attachment payloads into `@mistle/sandbox`.
-
-Supported storage backends:
-
-| Runtime provider | Storage backend |
-| ---------------- | --------------- |
-| `docker`         | `docker_volume` |
-| `e2b`            | `archil`        |
-
-The shared persistent layout is:
-
-| Storage path | Sandbox path |
-| ------------ | ------------ |
-| `root`       | `/root`      |
-| `etc/codex`  | `/etc/codex` |
-
-Start and resume storage flow:
-
-1. Data-plane chooses persistence mode and provisions/loads durable storage.
-2. Data-plane calls `prepareImage(...)` before compute start.
-3. Data-plane calls `prepareStorageForStart(...)` before compute start.
-4. Data-plane calls `start(...)` with the prepared image and returned `storagePreparation`.
-5. Data-plane calls `attachStorage(...)` before runtime `init(...)`.
-6. Resume calls `resume(...)`, then `attachStorage(...)`, then runtime `resume(...)`.
-7. Stop and destroy paths call `cleanupStorage(...)` before and after compute teardown; adapters may no-op when no provider cleanup is currently required.
-
-Provider differences:
-
-- Docker needs storage preparation before `start(...)` so volume subpaths can be created before container mounts are configured. Docker storage attach and cleanup are currently no-ops because the mounts are part of container creation.
-- E2B returns empty start preparation, starts compute first, then attaches Archil storage from inside the sandbox with root commands.
-
 ## Snapshots
 
 `captureSnapshot({ id })` returns a provider image handle that can later be passed to `start({ image })` for the same provider. Docker implements this with `container.commit({ pause: true })`. E2B implements this with `sandbox.createSnapshot()`.
 
-Snapshots preserve a prepared provider image. They are separate from persistent sandbox storage, which preserves selected per-instance filesystem paths across compute replacement.
+Snapshots preserve a prepared provider image. Individual sandbox instances keep their own disk state across ordinary stop/start cycles through the provider runtime.
 
 ## Data-Plane Call Paths
 
@@ -175,10 +135,10 @@ The package is used by the data-plane API and worker through provider factories 
 
 Current high-level flows:
 
-- start workflow: ensure sandbox row, provision storage when persistent, `prepareImage`, `prepareStorageForStart`, `start`, `attachStorage`, persist provider metadata, runtime `init`, wait for readiness
-- resume workflow: mark starting, try provider `resume`, attach storage, runtime `resume`, wait for readiness; persistent sandboxes may replace compute when provider state is missing
-- stop/destroy workflows: call storage cleanup around provider compute teardown
-- snapshot materialization: start an ephemeral setup sandbox, initialize runtime, capture a snapshot handle, then destroy compute
+- start workflow: ensure sandbox row, `prepareImage`, `start`, persist provider metadata, runtime `init`, wait for readiness
+- resume workflow: mark starting, try provider `resume`, runtime `resume`, wait for readiness
+- stop/destroy workflows: call provider compute teardown
+- snapshot materialization: start a setup sandbox, initialize runtime, capture a snapshot handle, then destroy compute
 - startup diagnostics: worker reads provider operation logs with `readOperationLog({ operation: "init" | "resume" })` after init/resume failures
 
 ## Integration Tests
@@ -203,32 +163,32 @@ Valid providers for `MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS`:
 
 - `docker`
 - `e2b`
+- `tensorlake`
 
 Unknown provider names fail fast during integration config parsing.
 
 ## Adding a New Provider
 
-Use the current Docker and E2B providers as reference implementations; neither provider is a complete template on its own because their storage models differ.
+Use the current Docker, E2B, and Tensorlake providers as reference implementations.
 
 1. Add provider identity in `src/types.ts`.
 2. Create `src/providers/<provider>/schemas.ts` and define config/request schemas with Zod.
 3. Create `src/providers/<provider>/config.ts` to expose validated provider config.
 4. Implement `src/providers/<provider>/client.ts` for raw SDK/API calls.
 5. Add provider error mapping in `src/providers/<provider>/client-errors.ts`.
-6. Implement `src/providers/<provider>/adapter.ts` for the complete `SandboxAdapter` surface: storage preparation, start, inspect, resume, snapshot capture, storage attach, storage cleanup, stop, and destroy.
+6. Implement `src/providers/<provider>/adapter.ts` for the complete `SandboxAdapter` surface: image preparation, start, inspect, resume, snapshot capture, stop, and destroy.
 7. Implement `src/providers/<provider>/runtime-control.ts` for the complete `SandboxRuntimeControl` surface: sandboxd version reads, init, resume, operation-log reads, and close.
 8. Create `src/providers/<provider>/index.ts` with both `create<Provider>Adapter(...)` and `create<Provider>RuntimeControl(...)` constructors.
 9. Wire the provider into both `createSandboxAdapter` and `createSandboxRuntimeControl` in `src/factory.ts`.
-10. Decide which persistent storage backend combinations the provider supports and fail fast for unsupported storage payloads.
-11. Add unit tests next to provider modules, including config, errors, factory wiring, adapter behavior, storage commands, and runtime-control construction.
-12. Add provider integration tests in `integration/<provider>/`.
+10. Add unit tests next to provider modules, including config, errors, factory wiring, adapter behavior, and runtime-control construction.
+11. Add provider integration tests in `integration/<provider>/`.
 
-Integration tests should cover the provider lifecycle surface, snapshot capture, runtime-control init/resume behavior, operation-log reads, and any provider-specific storage behavior exposed by the package.
+Integration tests should cover the provider lifecycle surface, snapshot capture, runtime-control init/resume behavior, and operation-log reads.
 
 Design expectations:
 
 - validate external inputs with Zod
-- fail fast on missing config, invalid provider/image combinations, and unsupported storage payloads
+- fail fast on missing config and invalid provider/image combinations
 - keep provider-specific concerns inside `src/providers/<provider>`
 - return provider-agnostic handles from the `SandboxAdapter` boundary
 - keep provider-specific runtime control inside `src/providers/<provider>/runtime-control.ts`

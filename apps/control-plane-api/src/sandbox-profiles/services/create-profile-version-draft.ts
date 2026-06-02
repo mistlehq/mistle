@@ -3,7 +3,6 @@ import {
   getControlPlaneDatabaseSchema,
   type SandboxProfileVersionAgentRuntimeId,
   isControlPlaneUniqueViolation,
-  type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 
@@ -18,6 +17,10 @@ import {
   mapProfileVersionRuntimeConfig,
   type SandboxProfileVersionResources,
 } from "./profile-version-runtime-config.js";
+import {
+  mapProfileVersionSkillsConfig,
+  type SandboxProfileVersionSkillsConfig,
+} from "./profile-version-skills-config.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type CreateProfileVersionDraftInput = {
@@ -30,7 +33,6 @@ type CreateProfileVersionDraftOutput = {
   version: number;
   state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
   publishedAt: string | null;
-  defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
   agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
   gitCommitSigningIntegrationConnectionId: string | null;
   mistleMcpEnabled: boolean;
@@ -39,6 +41,7 @@ type CreateProfileVersionDraftOutput = {
   sandboxConnectionId: string | null;
   maintenanceScript: string | null;
   sandboxResources: SandboxProfileVersionResources | null;
+  skillsConfig: SandboxProfileVersionSkillsConfig | null;
   isActive: boolean;
   usable: boolean;
   refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
@@ -91,7 +94,6 @@ export async function createProfileVersionDraft(
           version: true,
           setupScript: true,
           maintenanceScript: true,
-          defaultPersistenceMode: true,
           agentRuntimeId: true,
           gitCommitSigningIntegrationConnectionId: true,
           mistleMcpEnabled: true,
@@ -101,6 +103,7 @@ export async function createProfileVersionDraft(
           sandboxVcpuCount: true,
           sandboxMemoryMb: true,
           sandboxStorageMb: true,
+          skillsConfig: true,
         },
         where: (table, { eq }) => eq(table.sandboxProfileId, input.profileId),
         orderBy: (table, { desc }) => [desc(table.version)],
@@ -136,7 +139,6 @@ export async function createProfileVersionDraft(
           state: SandboxProfileVersionStates.DRAFT,
           setupScript: latestVersion.setupScript,
           maintenanceScript: latestVersion.maintenanceScript,
-          defaultPersistenceMode: latestVersion.defaultPersistenceMode,
           agentRuntimeId: latestVersion.agentRuntimeId,
           gitCommitSigningIntegrationConnectionId:
             latestVersion.gitCommitSigningIntegrationConnectionId,
@@ -147,13 +149,13 @@ export async function createProfileVersionDraft(
           sandboxVcpuCount: latestVersion.sandboxVcpuCount,
           sandboxMemoryMb: latestVersion.sandboxMemoryMb,
           sandboxStorageMb: latestVersion.sandboxStorageMb,
+          skillsConfig: latestVersion.skillsConfig,
         })
         .returning({
           sandboxProfileId: tables.sandboxProfileVersions.sandboxProfileId,
           version: tables.sandboxProfileVersions.version,
           state: tables.sandboxProfileVersions.state,
           publishedAt: tables.sandboxProfileVersions.publishedAt,
-          defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
           agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
           gitCommitSigningIntegrationConnectionId:
             tables.sandboxProfileVersions.gitCommitSigningIntegrationConnectionId,
@@ -164,6 +166,7 @@ export async function createProfileVersionDraft(
           sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
           sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
           sandboxStorageMb: tables.sandboxProfileVersions.sandboxStorageMb,
+          skillsConfig: tables.sandboxProfileVersions.skillsConfig,
         });
 
       if (createdDraftVersion === undefined) {
@@ -189,13 +192,13 @@ export async function createProfileVersionDraft(
         version: createdDraftVersion.version,
         state: createdDraftVersion.state,
         publishedAt: createdDraftVersion.publishedAt,
-        defaultPersistenceMode: createdDraftVersion.defaultPersistenceMode,
         agentRuntimeId: createdDraftVersion.agentRuntimeId,
         gitCommitSigningIntegrationConnectionId:
           createdDraftVersion.gitCommitSigningIntegrationConnectionId,
         mistleMcpEnabled: createdDraftVersion.mistleMcpEnabled,
         mistleMcpApiKeyId: createdDraftVersion.mistleMcpApiKeyId,
         ...mapProfileVersionRuntimeConfig(createdDraftVersion),
+        skillsConfig: mapProfileVersionSkillsConfig(createdDraftVersion.skillsConfig),
         maintenanceScript: latestVersion.maintenanceScript,
         isActive: false,
         usable: false,

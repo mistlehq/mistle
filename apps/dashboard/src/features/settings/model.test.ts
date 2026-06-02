@@ -50,7 +50,7 @@ describe("settings model", () => {
     expect(SETTINGS_NAV_GROUPS.find((group) => group.label === "Developer")).toBeUndefined();
   });
 
-  it("does not show sandbox storage settings while it is temporarily hidden", () => {
+  it("does not show removed sandbox settings", () => {
     const ownerOrganizationGroup = resolveSettingsNavGroups({ organizationRole: "owner" }).find(
       (group) => group.label === "Organization",
     );

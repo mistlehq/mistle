@@ -62,7 +62,6 @@ export const TensorlakeDaemonSystemdEnvironmentVariables = [
   "SANDBOX_RUNTIME_LISTEN_ADDR",
   "SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID",
   "MISTLE_SANDBOXD_ENABLE_TEST_FAULTS",
-  "MISTLE_SANDBOXD_WAIT_FOR_STORAGE_ATTACH",
   "MISTLE_SANDBOXD_OPERATION_LOG_DIR",
 ] as const;
 const StartDaemonCommandArgs = ["-lc", createTensorlakeStartDaemonShellCommand()];

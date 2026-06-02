@@ -62,12 +62,27 @@ const EgressTokenIssuer = "integration-new-data-plane-gateway";
 const EgressTokenAudience = "integration-new-gateway-egress";
 const PortAccessBaseDomain = "mistle.localhost";
 const PortAccessCookieSigningSecret = "integration-new-port-access-cookie-secret";
+const DirectEgressUpstreamResolutionDelayMs = 750;
 
 const it = createIntegrationTest({
   services: ["data-plane-api", "data-plane-gateway"],
   __dangerouslyIsolatedServices: {
     reason: "This suite intentionally stops the data-plane gateway runtime.",
     services: ["data-plane-gateway"],
+  },
+});
+const itWithDelayedDirectEgressUpstreamResolution = createIntegrationTest({
+  services: ["data-plane-api", "data-plane-gateway"],
+  __dangerouslyIsolatedServices: {
+    reason: "This suite intentionally stops the data-plane gateway runtime.",
+    services: ["data-plane-gateway"],
+  },
+  __serviceOptions: {
+    dataPlaneGateway: {
+      directEgress: {
+        webSocketUpstreamResolutionDelayMs: DirectEgressUpstreamResolutionDelayMs,
+      },
+    },
   },
 });
 
@@ -163,6 +178,57 @@ it(
         code: GatewayWebSocketCloseCodes.SERVICE_RESTART,
         reason: GatewayWebSocketCloseReasons.SERVICE_RESTART,
       });
+    } finally {
+      await closeIfOpen(socket);
+      await upstream.close();
+      if (gatewayStopped) {
+        await env.dataPlaneGateway.start();
+      }
+    }
+  },
+  TestTimeoutMs,
+);
+
+itWithDelayedDirectEgressUpstreamResolution(
+  "does not connect direct egress upstream after shutdown closes the client during upstream resolution",
+  async ({ env }) => {
+    const sandboxInstanceId = typeid("sbi").toString();
+    await insertSandboxInstanceRow({
+      env,
+      sandboxInstanceId,
+    });
+    const upstream = await startSimulatedWebSocketUpstream();
+    let socket: WebSocket | undefined;
+    let gatewayStopped = false;
+
+    try {
+      const gatewayWebSocketUrl = new URL(
+        DirectEgressWebSocketRoutePath,
+        env.dataPlaneGateway.hostBaseUrl,
+      );
+      gatewayWebSocketUrl.protocol = "ws:";
+      gatewayWebSocketUrl.searchParams.set("target", `${upstream.baseUrl}/socket`);
+      socket = await connectWebSocket(gatewayWebSocketUrl.toString(), {
+        headers: {
+          [TestEnvironmentIdHeader]: env.id,
+          [DirectEgressTokenHeaderName]: `Bearer ${await mintDirectEgressToken({
+            organizationId: "org_integration_new_gateway_shutdown",
+            sandboxInstanceId,
+          })}`,
+        },
+      });
+
+      const socketClose = waitForWebSocketClose(socket);
+      await env.dataPlaneGateway.stop();
+      gatewayStopped = true;
+      socket = undefined;
+
+      await expect(socketClose).resolves.toEqual({
+        code: GatewayWebSocketCloseCodes.SERVICE_RESTART,
+        reason: GatewayWebSocketCloseReasons.SERVICE_RESTART,
+      });
+      await systemSleeper.sleep(DirectEgressUpstreamResolutionDelayMs + 250);
+      expect(upstream.connectionCount()).toBe(0);
     } finally {
       await closeIfOpen(socket);
       await upstream.close();
@@ -485,6 +551,7 @@ async function mintDirectEgressToken(input: {
 type SimulatedWebSocketUpstream = {
   baseUrl: string;
   close: () => Promise<void>;
+  connectionCount: () => number;
   nextConnection: () => Promise<void>;
 };
 
@@ -744,6 +811,7 @@ async function startSimulatedWebSocketUpstream(): Promise<SimulatedWebSocketUpst
       await closeWebSocketServer(webSocketServer);
       await closeServer(server);
     },
+    connectionCount: () => receivedConnectionCount,
     nextConnection: async () => {
       if (receivedConnectionCount > 0) {
         receivedConnectionCount -= 1;

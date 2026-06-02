@@ -84,12 +84,7 @@ where
         }
     };
 
-    match control::submit_init(
-        control_socket_path,
-        &startup_input,
-        !detach,
-        should_wait_for_storage_attach_signal(),
-    ) {
+    match control::submit_init(control_socket_path, &startup_input, !detach) {
         Ok(()) => {
             write_response(writer, &StartupInitOkResponse { ok: true })?;
             Ok(())
@@ -106,10 +101,6 @@ where
             Err(error)
         }
     }
-}
-
-fn should_wait_for_storage_attach_signal() -> bool {
-    std::env::var("MISTLE_SANDBOXD_WAIT_FOR_STORAGE_ATTACH").is_ok_and(|value| value == "1")
 }
 
 fn write_response<W, T>(writer: &mut W, response: &T) -> Result<(), InitError>

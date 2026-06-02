@@ -9,7 +9,6 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
   const db = ctx.get("resources").db;
   const tables = ctx.get("resources").tables;
   const openWorkflow = ctx.get("resources").openWorkflow;
-  const sandboxStorageBackend = ctx.get("sandboxStorageBackend");
   const body = ctx.req.valid("json");
 
   const response = await startSandboxInstance(
@@ -17,7 +16,6 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
       db,
       tables,
       openWorkflow,
-      sandboxStorageBackend,
     },
     body,
   );

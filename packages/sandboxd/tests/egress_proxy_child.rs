@@ -130,7 +130,6 @@ fn process_supervisor_restarts_child_after_the_active_proxy_exits() {
         &control_socket_path,
         &startup_input_with_egress_route(&bootstrap_gateway.ws_url),
         true,
-        false,
     )
     .expect("init submission should succeed");
     wait_for_initialized(&server);

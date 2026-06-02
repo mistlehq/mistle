@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { MemoryRouter } from "react-router";
 
 import { IntegrationTile } from "./integration-tile.js";
 
@@ -9,6 +10,13 @@ const meta = {
   parameters: {
     layout: "padded",
   },
+  decorators: [
+    (Story) => (
+      <MemoryRouter initialEntries={["/integrations"]}>
+        <Story />
+      </MemoryRouter>
+    ),
+  ],
 } satisfies Meta<typeof IntegrationTile>;
 
 export default meta;
@@ -22,7 +30,7 @@ export const Connected: Story = {
     description: "Connected to the organization and ready for sandbox bindings.",
     displayName: "GitHub",
     logoKey: "github",
-    onAction: function onAction() {},
+    actionHref: "/integrations/github-cloud",
     statusBadge: "Connected",
   },
 };
@@ -34,7 +42,7 @@ export const InvalidConfig: Story = {
     description: "The target exists, but required credentials or scopes are missing.",
     displayName: "OpenAI",
     logoKey: "openai",
-    onAction: function onAction() {},
+    actionHref: "/integrations/openai-default/add",
     statusBadge: "Invalid config",
   },
 };

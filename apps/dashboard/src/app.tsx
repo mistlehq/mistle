@@ -29,7 +29,6 @@ import { OrganizationGeneralSettingsPage } from "./features/pages/organization-g
 import { OrganizationIdentityLinkingSettingsPage } from "./features/pages/organization-identity-linking-settings-page.js";
 import { OrganizationIntegrationsSettingsPage } from "./features/pages/organization-integrations-settings-page.js";
 import { OrganizationMembersSettingsPage } from "./features/pages/organization-members-settings-page.js";
-// import { OrganizationSandboxStorageSettingsPage } from "./features/pages/organization-sandbox-storage-settings-page.js";
 import { PortAccessRedirectPage } from "./features/pages/port-access-redirect-page.js";
 import { ProfileSettingsPage } from "./features/pages/profile-settings-page.js";
 import {
@@ -182,11 +181,6 @@ export const APP_ROUTES = createRoutesFromElements(
               handle={ROUTE_HANDLES.settingsOrganizationIdentityLinking}
               path="identity-linking"
             />
-            {/* <Route
-                element={<OrganizationSandboxStorageSettingsPage />}
-                handle={ROUTE_HANDLES.settingsOrganizationSandboxes}
-                path="sandboxes"
-              /> */}
             <Route
               element={<OrganizationBillingSettingsPage />}
               handle={ROUTE_HANDLES.settingsOrganizationBilling}

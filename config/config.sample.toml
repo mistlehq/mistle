@@ -148,15 +148,6 @@ force_path_style = true
 access_key_id = "replace-with-object-store-access-key"
 secret_access_key = "replace-with-object-store-secret-key"
 
-# Used when sandbox.storage.archil.mount_object_store = "sandbox_storage".
-[object_store.sandbox_storage]
-bucket_name = "mistle-sandbox-storage"
-region = "us-east-1"
-endpoint = "https://s3.example.com"
-force_path_style = true
-access_key_id = "replace-with-sandbox-storage-access-key"
-secret_access_key = "replace-with-sandbox-storage-secret-key"
-
 [email.smtp]
 from_address = "no-reply@mistle.example"
 from_name = "Mistle"
@@ -178,16 +169,6 @@ token = "replace-with-internal-service-token"
 default_base_image = "registry.example.com/mistle/sandbox-base:prod"
 publish_base_domain = "mistle.example"
 
-[sandbox.storage]
-backend = "archil"
-
-[sandbox.storage.archil]
-api_key = "replace-with-archil-api-key"
-# Region availability: https://docs.archil.com/reference/regions
-region = "gcp-us-central1"
-name_prefix = "mistle-"
-mount_object_store = "sandbox_storage"
-
 [sandbox.e2b]
 enabled = true
 api_key = "replace-with-e2b-api-key"
@@ -203,10 +184,6 @@ api_key = "replace-with-tensorlake-api-key"
 #enabled = true
 #socket_path = "/var/run/docker.sock"
 #network_name = "mistle-sandbox"
-
-# Required when sandbox.storage.backend = "docker_volume".
-#[sandbox.storage.docker_volume]
-#name_prefix = "mistle-"
 
 [sandbox.tokens.connect]
 secret = "replace-with-connect-token-secret"

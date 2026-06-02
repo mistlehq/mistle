@@ -131,7 +131,7 @@ export type SandboxProfileEditorPageStoryArgs = {
   setupAssistantErrorMessage?: string;
   setupAssistantState?: "available" | "starting" | "disabled";
   setupScriptTestStatus?: SetupScriptTestStatus;
-  runtimeState?: "docker" | "e2b-managed" | "e2b-connection" | "e2b-missing-connection";
+  runtimeState?: "docker" | "mistle-provider" | "e2b-connection" | "e2b-missing-connection";
   apiKeys?: readonly ApiKey[];
   mistleMcpEnabled?: boolean;
   mistleMcpApiKeyId?: string | null;
@@ -244,43 +244,52 @@ const StoryE2BSandboxTarget = {
   },
 } satisfies IntegrationTargetSummary;
 
-const StorySandboxProviders = [
-  {
-    id: "docker",
-    displayName: "Docker",
-    managed: true,
-    supportsOrganizationConnection: false,
-    resourceCapabilities: null,
-  },
-  {
-    id: "e2b",
-    displayName: "E2B",
-    managed: true,
-    supportsOrganizationConnection: true,
-    resourceCapabilities: {
-      vcpuCount: {
-        min: 1,
-        max: 8,
-        step: 1,
-        default: 2,
-      },
-      memoryMb: {
-        min: 1024,
-        max: 16_384,
-        step: 1024,
-        default: 4096,
-      },
+const StoryDockerSandboxProvider = {
+  id: "docker",
+  displayName: "Docker",
+  managed: true,
+  supportsOrganizationConnection: false,
+  resourceCapabilities: null,
+} satisfies SandboxProviderSummary;
+
+const StoryE2BSandboxProvider = {
+  id: "e2b",
+  displayName: "E2B",
+  managed: true,
+  supportsOrganizationConnection: true,
+  resourceCapabilities: {
+    vcpuCount: {
+      min: 1,
+      max: 8,
+      step: 1,
+      default: 2,
     },
+    memoryMb: {
+      min: 1024,
+      max: 16_384,
+      step: 1024,
+      default: 4096,
+    },
+  },
+} satisfies SandboxProviderSummary;
+
+const StorySandboxProviders = [
+  StoryDockerSandboxProvider,
+  {
+    ...StoryE2BSandboxProvider,
+    managed: false,
   },
 ] satisfies readonly SandboxProviderSummary[];
 
 function createStorySandboxProviders(input: {
   runtimeState: SandboxProfileEditorPageStoryArgs["runtimeState"];
 }): readonly SandboxProviderSummary[] {
+  if (input.runtimeState === "mistle-provider") {
+    return [StoryE2BSandboxProvider];
+  }
+
   if (input.runtimeState === "e2b-missing-connection") {
-    return StorySandboxProviders.map((provider) =>
-      provider.id === "e2b" ? { ...provider, managed: false } : provider,
-    );
+    return StorySandboxProviders;
   }
 
   return StorySandboxProviders;
@@ -446,7 +455,6 @@ function createRuntimeStoryVersion(input: {
     gitCommitSigningIntegrationConnectionId: input.gitCommitSigningIntegrationConnectionId,
     mistleMcpEnabled: input.mistleMcpEnabled,
     mistleMcpApiKeyId: input.mistleMcpApiKeyId,
-    defaultPersistenceMode: "ephemeral",
     sandboxProvider: runtimeState === "docker" ? "docker" : "e2b",
     sandboxConnectionId: runtimeState === "e2b-connection" ? StoryE2BSandboxConnection.id : null,
     maintenanceScript: null,
@@ -457,6 +465,7 @@ function createRuntimeStoryVersion(input: {
             vcpuCount: 2,
             memoryMb: 4096,
           },
+    skillsConfig: null,
     isActive: false,
     usable: false,
     refreshSchedule: null,

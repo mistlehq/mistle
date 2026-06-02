@@ -1,9 +1,8 @@
 import {
   type IntegrationBindingKind,
   type IntegrationConnectionStatus,
+  type SandboxProfileVersionSkillsConfig,
   type SandboxProfileVersionAgentRuntimeId,
-  type SandboxProfileVersionDefaultPersistenceMode,
-  SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileStatuses,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
@@ -36,7 +35,6 @@ export function sandboxProfileVersionRow(input: {
   maintenanceScript?: string | null;
   agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
   gitCommitSigningIntegrationConnectionId?: string | null;
-  defaultPersistenceMode?: SandboxProfileVersionDefaultPersistenceMode;
   sandboxProvider?: string | null;
   sandboxConnectionId?: string | null;
   sandboxVcpuCount?: number | null;
@@ -44,6 +42,7 @@ export function sandboxProfileVersionRow(input: {
   sandboxStorageMb?: number | null;
   mistleMcpEnabled?: boolean;
   mistleMcpApiKeyId?: string | null;
+  skillsConfig?: SandboxProfileVersionSkillsConfig | null;
 }) {
   return {
     sandboxProfileId: input.sandboxProfileId,
@@ -63,8 +62,6 @@ export function sandboxProfileVersionRow(input: {
     ...(input.gitCommitSigningIntegrationConnectionId === undefined
       ? {}
       : { gitCommitSigningIntegrationConnectionId: input.gitCommitSigningIntegrationConnectionId }),
-    defaultPersistenceMode:
-      input.defaultPersistenceMode ?? SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
     ...(input.sandboxProvider === undefined ? {} : { sandboxProvider: input.sandboxProvider }),
     ...(input.sandboxConnectionId === undefined
       ? {}
@@ -76,6 +73,7 @@ export function sandboxProfileVersionRow(input: {
     ...(input.mistleMcpApiKeyId === undefined
       ? {}
       : { mistleMcpApiKeyId: input.mistleMcpApiKeyId }),
+    ...(input.skillsConfig === undefined ? {} : { skillsConfig: input.skillsConfig }),
   };
 }
 

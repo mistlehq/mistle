@@ -18,7 +18,6 @@ export async function ensureSandboxInstance(
     organizationId: string;
     sandboxProfileId: string;
     sandboxProfileVersion: number;
-    persistenceMode: "ephemeral" | "persistent";
     purpose: SandboxInstancePurpose;
     startedBy: {
       kind: "user" | "api_key" | "system";
@@ -49,7 +48,6 @@ export async function ensureSandboxInstance(
       startedById: input.startedBy.id,
       source: input.source,
       purpose: input.purpose,
-      persistenceMode: input.persistenceMode,
     })
     .onConflictDoUpdate({
       target: [sandboxInstances.id],

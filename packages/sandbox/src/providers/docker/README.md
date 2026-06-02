@@ -39,12 +39,10 @@ const runtimeControl = createSandboxRuntimeControl({
 ## Provider Behavior
 
 - `prepareImage({ image })` pulls non-local image references and returns the same Docker image handle.
-- `prepareStorageForStart({ image, storage })` requires a Docker image handle and a `docker_volume` storage attachment. It runs a short-lived `alpine:3.20` init container that creates the configured volume subpaths before the sandbox container starts.
-- `start({ image, env, storagePreparation })` injects the shared required runtime env, mounts Docker volume subpaths when provided, binds `/sys/fs/cgroup` read-write, uses the host cgroup namespace, optionally joins `networkName`, and starts a container from `image.imageId`.
+- `start({ image, env })` injects the shared required runtime env, binds `/sys/fs/cgroup` read-write, uses the host cgroup namespace, optionally joins `networkName`, and starts a container from `image.imageId`.
 - `inspect({ id })` returns normalized lifecycle fields plus the raw Docker `container.inspect()` payload.
 - `resume({ id })` starts the existing stopped container and returns the same runtime id.
 - `captureSnapshot({ id })` commits the container with `pause: true` and returns a Docker image handle whose `imageId` is the commit id.
-- `attachStorage(...)` and `cleanupStorage(...)` are currently no-ops for Docker because persistent storage is attached as Docker volume mounts during container creation.
 - `stop({ id })` stops the container without removing it.
 - `destroy({ id })` force-removes the container.
 
@@ -55,12 +53,6 @@ const runtimeControl = createSandboxRuntimeControl({
 - `resume({ id, payload })` currently delegates to `init(...)`; the worker passes Docker resume startup mode as a new runtime startup.
 - `readOperationLog({ id, operation })` reads `/run/mistle/init.log` or `/run/mistle/resume.log` from the container and returns `null` when the log is absent or empty.
 - `close()` is currently a no-op.
-
-## Storage Notes
-
-Docker persistent storage uses the `docker_volume` backend. The data-plane worker provisions and records the Docker volume; this provider prepares the volume subpaths and mounts them into the sandbox container according to `SandboxPersistentStorageLayout`.
-
-`prepareStorageForStart(...)` fails fast when persistent Docker startup does not include a Docker volume attachment. `start(...)` fails fast when it receives a non-Docker storage preparation payload.
 
 ## Error Surface
 

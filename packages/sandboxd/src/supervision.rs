@@ -279,6 +279,13 @@ impl SandboxdSupervisorHandle {
             .cloned()
     }
 
+    /// Restores one tracked component snapshot without emitting lifecycle events.
+    pub fn restore_component_snapshot(&self, snapshot: ComponentHealthSnapshot) {
+        self.update_component(snapshot.component, |current_snapshot, _observed_at| {
+            *current_snapshot = snapshot;
+        });
+    }
+
     /// Marks the initial startup sequence for a tracked component as active.
     pub fn mark_component_starting(&self, component: SupervisedComponent) {
         let Some((is_restart_attempt, snapshot, _previous_state, observed_at)) = self
@@ -993,6 +1000,45 @@ mod tests {
             snapshot.last_error.as_deref(),
             Some("listener socket stopped accepting connections")
         );
+    }
+
+    #[test]
+    fn restores_component_snapshot_without_rewriting_health_metadata() {
+        let clock = Arc::new(MutableClock::new(100));
+        let handle = SandboxdSupervisorHandle::new(
+            "sandbox-123",
+            clock.clone(),
+            BTreeSet::from([SupervisedComponent::TunnelSession]),
+        );
+
+        handle.replace_component_details(
+            SupervisedComponent::TunnelSession,
+            BTreeMap::from([("gatewayWsUrl".to_string(), "ws://accepted".to_string())]),
+        );
+        handle.mark_component_starting(SupervisedComponent::TunnelSession);
+        clock.advance_ms(10);
+        handle.mark_component_healthy(SupervisedComponent::TunnelSession);
+        clock.advance_ms(10);
+        handle.mark_component_restarting(
+            SupervisedComponent::TunnelSession,
+            "accepted tunnel reconnecting",
+        );
+        let accepted_snapshot = handle
+            .component_snapshot(SupervisedComponent::TunnelSession)
+            .expect("tunnel session should be tracked");
+
+        clock.advance_ms(10);
+        handle.replace_component_details(
+            SupervisedComponent::TunnelSession,
+            BTreeMap::from([("gatewayWsUrl".to_string(), "ws://candidate".to_string())]),
+        );
+        handle.mark_component_healthy(SupervisedComponent::TunnelSession);
+        handle.restore_component_snapshot(accepted_snapshot.clone());
+
+        let restored_snapshot = handle
+            .component_snapshot(SupervisedComponent::TunnelSession)
+            .expect("tunnel session should remain tracked");
+        assert_eq!(restored_snapshot, accepted_snapshot);
     }
 
     #[test]
