@@ -54,6 +54,8 @@ const DetachedInitCommandArgs = ["init", "--detach"];
 const WaitInitCommandArgs = ["wait-init"];
 const ResumeCommand = SandboxdCommand;
 const ResumeCommandArgs = ["resume"];
+const ActivateCommand = SandboxdCommand;
+export const ActivateCommandArgs = ["activate"] as const;
 const ReadyCommand = SandboxdCommand;
 const ReadyCommandArgs = ["ready"];
 const StartDaemonCommand = "sh";
@@ -128,6 +130,7 @@ export interface TensorlakeClient {
   init(request: TensorlakeRuntimeControlRequest): Promise<void>;
   beginInit(request: TensorlakeRuntimeControlRequest): Promise<void>;
   waitInit(request: Omit<TensorlakeRuntimeControlRequest, "payload">): Promise<void>;
+  activate(request: TensorlakeRuntimeControlRequest): Promise<void>;
   resume(request: TensorlakeRuntimeControlRequest): Promise<void>;
   runCommand(request: {
     sandboxId: string;
@@ -608,6 +611,27 @@ export class TensorlakeApiClient implements TensorlakeClient {
     }
   }
 
+  async activate(request: TensorlakeRuntimeControlRequest): Promise<void> {
+    const parsedRequest = TensorlakeRuntimeControlRequestSchema.parse(request);
+
+    try {
+      const sandbox = await this.#connect(parsedRequest.sandboxId);
+      await this.#ensureDaemonReady({
+        env: parsedRequest.env,
+        operation: TensorlakeClientOperationIds.ACTIVATE,
+        sandbox,
+      });
+      await this.#runStartupCommand(sandbox, {
+        operation: TensorlakeClientOperationIds.ACTIVATE,
+        command: ActivateCommand,
+        args: ActivateCommandArgs,
+        payload: parsedRequest.payload,
+      });
+    } catch (error) {
+      throw mapTensorlakeClientError(TensorlakeClientOperationIds.ACTIVATE, error);
+    }
+  }
+
   async runCommand(request: {
     sandboxId: string;
     command: string;
@@ -673,7 +697,8 @@ export class TensorlakeApiClient implements TensorlakeClient {
     env: Readonly<Record<string, string>> | undefined;
     operation:
       | typeof TensorlakeClientOperationIds.INIT
-      | typeof TensorlakeClientOperationIds.RESUME;
+      | typeof TensorlakeClientOperationIds.RESUME
+      | typeof TensorlakeClientOperationIds.ACTIVATE;
   }): Promise<void> {
     const startedAtMs = systemClock.nowMs();
     let pollAttempts = 0;
@@ -790,7 +815,8 @@ export class TensorlakeApiClient implements TensorlakeClient {
     input: {
       operation:
         | typeof TensorlakeClientOperationIds.INIT
-        | typeof TensorlakeClientOperationIds.RESUME;
+        | typeof TensorlakeClientOperationIds.RESUME
+        | typeof TensorlakeClientOperationIds.ACTIVATE;
       command: string;
       args: readonly string[];
       payload: Uint8Array<ArrayBufferLike>;
@@ -810,7 +836,8 @@ export class TensorlakeApiClient implements TensorlakeClient {
     input: {
       operation:
         | typeof TensorlakeClientOperationIds.INIT
-        | typeof TensorlakeClientOperationIds.RESUME;
+        | typeof TensorlakeClientOperationIds.RESUME
+        | typeof TensorlakeClientOperationIds.ACTIVATE;
       commandDescription: string;
       command: string;
       args: readonly string[];

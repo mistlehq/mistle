@@ -15,6 +15,7 @@ export const TensorlakeClientOperationIds = {
   TERMINATE_SANDBOX: "terminate_sandbox",
   INIT: "init",
   RESUME: "resume",
+  ACTIVATE: "activate",
   ENSURE_SANDBOXD: "ensure_sandboxd",
   STOP_SANDBOXD_DAEMON: "stop_sandboxd_daemon",
   RESET_TRANSPARENT_EGRESS_NFTABLES: "reset_transparent_egress_nftables",

@@ -176,6 +176,7 @@ export interface SandboxRuntimeControl {
   beginInit(input: SandboxRuntimeControlRequest): Promise<void>;
   init(input: SandboxRuntimeControlRequest): Promise<void>;
   waitInit(input: { id: string; env?: Readonly<Record<string, string>> }): Promise<void>;
+  activate(input: SandboxRuntimeControlRequest): Promise<void>;
   resume(input: SandboxRuntimeControlRequest): Promise<void>;
   readOperationLog(input: { id: string; operation: "init" | "resume" }): Promise<string | null>;
   close(): Promise<void>;

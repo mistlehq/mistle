@@ -253,6 +253,32 @@ export class TensorlakeSandboxRuntimeControl implements SandboxRuntimeControl {
     });
   }
 
+  async activate(input: SandboxRuntimeControlRequest): Promise<void> {
+    requireSandboxId(input.id);
+
+    await withSandboxProviderOperationTelemetry({
+      provider: "tensorlake",
+      operation: TensorlakeClientOperationIds.ACTIVATE,
+      fn: async () => {
+        try {
+          await this.#client.activate({
+            sandboxId: input.id,
+            payload: input.payload,
+            ...(input.env === undefined ? {} : { env: input.env }),
+          });
+        } catch (error) {
+          if (
+            error instanceof TensorlakeClientError &&
+            error.code === TensorlakeClientErrorCodes.NOT_FOUND
+          ) {
+            throw toSandboxNotFoundError(input.id, error);
+          }
+          throw error;
+        }
+      },
+    });
+  }
+
   async readOperationLog(input: {
     id: string;
     operation: "init" | "resume";

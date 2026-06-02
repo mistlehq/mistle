@@ -31,6 +31,7 @@ import type { DockerSandboxConfig } from "./config.js";
 const InitCommand = ["/opt/mistle/bin/sandboxd", "init"];
 const DetachedInitCommand = ["/opt/mistle/bin/sandboxd", "init", "--detach"];
 const WaitInitCommand = ["/opt/mistle/bin/sandboxd", "wait-init"];
+export const ActivateCommand = ["/opt/mistle/bin/sandboxd", "activate"] as const;
 const VersionCommand = ["/opt/mistle/bin/sandboxd", "version"];
 const StopSandboxdCommand = ["sh", "-euc", SandboxdStopDaemonCommand];
 const ResetTransparentEgressNftablesCommand = [
@@ -288,9 +289,40 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
     }
   }
 
+  async activate(input: SandboxRuntimeControlRequest): Promise<void> {
+    await this.#runPayloadCommand({
+      ...input,
+      command: ActivateCommand,
+      operation: DockerClientOperationIds.ACTIVATE,
+      failureDescription: "Docker sandbox activate command",
+      execFailureDescription: "Docker sandbox activate exec",
+      timeoutMs: DockerLongRunningExecExitTimeoutMs,
+      waitForCompletion: true,
+    });
+  }
+
   async #runInitCommand(
     input: SandboxRuntimeControlRequest & {
       command: string[];
+      waitForCompletion: boolean;
+    },
+  ): Promise<void> {
+    await this.#runPayloadCommand({
+      ...input,
+      operation: DockerClientOperationIds.INIT,
+      failureDescription: "Docker sandbox init command",
+      execFailureDescription: "Docker sandbox init exec",
+      timeoutMs: DockerLongRunningExecExitTimeoutMs,
+    });
+  }
+
+  async #runPayloadCommand(
+    input: SandboxRuntimeControlRequest & {
+      command: readonly string[];
+      operation: typeof DockerClientOperationIds.INIT | typeof DockerClientOperationIds.ACTIVATE;
+      failureDescription: string;
+      execFailureDescription: string;
+      timeoutMs: number;
       waitForCompletion: boolean;
     },
   ): Promise<void> {
@@ -300,18 +332,18 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
 
     try {
       const container = this.#docker.getContainer(input.id);
-      const exec = await this.#runDockerOperation(DockerClientOperationIds.INIT, () =>
+      const exec = await this.#runDockerOperation(input.operation, () =>
         container.exec({
           AttachStdin: true,
           AttachStdout: true,
           AttachStderr: true,
-          Cmd: input.command,
+          Cmd: [...input.command],
           ...(input.env === undefined ? {} : { Env: toDockerEnv(input.env) }),
           Tty: false,
           User: "root",
         }),
       );
-      const execStream = await this.#runDockerOperation(DockerClientOperationIds.INIT, () =>
+      const execStream = await this.#runDockerOperation(input.operation, () =>
         exec.start({
           hijack: true,
           stdin: true,
@@ -333,11 +365,11 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
         return;
       }
 
-      const exitCode = await this.#runDockerOperation(DockerClientOperationIds.INIT, () =>
+      const exitCode = await this.#runDockerOperation(input.operation, () =>
         waitForDockerExecExitCode({
           exec,
-          failureDescription: "Docker sandbox init exec",
-          timeoutMs: DockerLongRunningExecExitTimeoutMs,
+          failureDescription: input.execFailureDescription,
+          timeoutMs: input.timeoutMs,
         }),
       );
       const stdoutText = capturedStdout.read();
@@ -347,7 +379,7 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
 
       if (exitCode !== 0) {
         throw new Error(
-          `Docker sandbox init command exited with code ${String(exitCode)}.${formatCommandOutput({
+          `${input.failureDescription} exited with code ${String(exitCode)}.${formatCommandOutput({
             stdout: stdoutText,
             stderr: stderrText,
           })}`,

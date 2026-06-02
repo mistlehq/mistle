@@ -58,6 +58,7 @@ const InitCommand = "/opt/mistle/bin/sandboxd init";
 const DetachedInitCommand = "/opt/mistle/bin/sandboxd init --detach";
 const WaitInitCommand = "/opt/mistle/bin/sandboxd wait-init";
 const ResumeCommand = "/opt/mistle/bin/sandboxd resume";
+export const ActivateCommand = "/opt/mistle/bin/sandboxd activate";
 export const E2BDaemonSystemdEnvironmentVariables = [
   "SANDBOX_RUNTIME_LISTEN_ADDR",
   "SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID",
@@ -118,6 +119,7 @@ export interface E2BClient {
   beginInit(request: E2BInitRequest): Promise<void>;
   init(request: E2BInitRequest): Promise<void>;
   waitInit(request: Omit<E2BInitRequest, "payload">): Promise<void>;
+  activate(request: E2BInitRequest): Promise<void>;
   resume(request: E2BInitRequest): Promise<void>;
   runCommand(request: {
     sandboxId: string;
@@ -687,6 +689,34 @@ export class E2BApiClient implements E2BClient {
       }
 
       throw mapE2BClientError(E2BClientOperationIds.RESUME, error);
+    }
+  }
+
+  async activate(request: E2BInitRequest): Promise<void> {
+    const parsedRequest = E2BInitRequestSchema.parse(request);
+
+    try {
+      const sandbox = await runE2BOperationWithTransientRetries({
+        operation: E2BClientOperationIds.CONNECT_SANDBOX,
+        run: async () => Sandbox.connect(parsedRequest.sandboxId, this.#connectionOptions),
+      });
+      await this.#ensureDaemonReady(sandbox, parsedRequest.env);
+      await this.#runStartupCommand(sandbox, {
+        command: ActivateCommand,
+        ...(parsedRequest.env === undefined ? {} : { env: parsedRequest.env }),
+        payload: parsedRequest.payload,
+        waitForCompletion: true,
+      });
+    } catch (error) {
+      if (error instanceof CommandExitError) {
+        throw createCommandExitError({
+          operation: E2BClientOperationIds.ACTIVATE,
+          error,
+          commandDescription: "E2B sandbox activate command",
+        });
+      }
+
+      throw mapE2BClientError(E2BClientOperationIds.ACTIVATE, error);
     }
   }
 
