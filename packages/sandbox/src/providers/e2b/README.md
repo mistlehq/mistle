@@ -52,8 +52,11 @@ const runtimeControl = createSandboxRuntimeControl({
 
 ## Runtime Control
 
+- `ensureSandboxd({ id, artifact, env })` installs sandboxd from the requested artifact when needed, then ensures `sandboxd.service` is running and ready.
 - `readSandboxdVersion({ id, env })` runs `/opt/mistle/bin/sandboxd version` as `root` and returns trimmed stdout.
+- `beginInit({ id, payload, env })` connects to the sandbox, ensures `sandboxd.service` is running, waits for daemon readiness, then runs `/opt/mistle/bin/sandboxd init --detach` with `payload` on stdin.
 - `init({ id, payload, env })` connects to the sandbox, ensures `sandboxd.service` is running, waits for daemon readiness, then runs `/opt/mistle/bin/sandboxd init` with `payload` on stdin.
+- `waitInit({ id, env })` connects to the sandbox, ensures `sandboxd.service` is running, waits for daemon readiness, then runs `/opt/mistle/bin/sandboxd wait-init`.
 - `activate({ id, payload, env })` uses the same daemon readiness path, then runs `/opt/mistle/bin/sandboxd activate` with `payload` on stdin.
 - `resume({ id, payload, env })` uses the same daemon readiness path, then runs `/opt/mistle/bin/sandboxd resume` so a paused daemon can reattach its bootstrap tunnel.
 - `readOperationLog({ id, operation })` reads `/run/mistle/init.log` or `/run/mistle/resume.log` and returns `null` when the log is absent or empty.
