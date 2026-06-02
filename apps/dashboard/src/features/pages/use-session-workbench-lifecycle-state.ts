@@ -29,6 +29,7 @@ import {
   resolveTrustedSandboxStatus,
   resolveWorkbenchEntryPhase,
   shouldWaitForTriggerSessionThread,
+  type WorkbenchSandboxLifecycleStatus,
 } from "./session-workbench-state.js";
 import { useSessionWorkbenchRecovery } from "./use-session-workbench-recovery.js";
 
@@ -521,7 +522,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   });
   const initialEntryStartupState = resolveInitialEntryStartupState({
     mainPanelTransitionState: input.mainPanelTransitionState,
-    rawSandboxStatus: sandboxStatus?.status ?? null,
+    sandboxLifecycleStatus: displaySandboxLifecycleStatus,
     sandboxStatusReadState,
     sessionSnapshot,
   });
@@ -541,7 +542,7 @@ export function useSessionWorkbenchLifecycleState(input: {
 
 export function resolveInitialEntryStartupState(input: {
   mainPanelTransitionState: MainPanelTransitionState;
-  rawSandboxStatus: SandboxInstanceStatusResult["status"] | null;
+  sandboxLifecycleStatus: WorkbenchSandboxLifecycleStatus;
   sandboxStatusReadState: "error" | "loading" | "ready";
   sessionSnapshot: SessionSnapshotForWorkbench | null;
 }): SessionStartupState | null {
@@ -557,16 +558,35 @@ export function resolveInitialEntryStartupState(input: {
     return null;
   }
 
-  if (input.rawSandboxStatus === "pending") {
+  if (input.sandboxLifecycleStatus === "pending") {
     return "preparing_sandbox";
   }
 
-  if (input.rawSandboxStatus === "starting") {
+  if (
+    input.sandboxLifecycleStatus === "starting" ||
+    input.sandboxLifecycleStatus === "started" ||
+    input.sandboxLifecycleStatus === "initializing"
+  ) {
     return "running_setup";
   }
 
+  if (input.sandboxLifecycleStatus === "resuming") {
+    return "resuming_sandbox";
+  }
+
   if (
-    input.rawSandboxStatus === "running" &&
+    input.sandboxLifecycleStatus === "reconnecting" ||
+    input.sandboxLifecycleStatus === "degraded"
+  ) {
+    return "reconnecting_sandbox";
+  }
+
+  if (input.sandboxLifecycleStatus === "stopping") {
+    return "stopping_sandbox";
+  }
+
+  if (
+    input.sandboxLifecycleStatus === "running" &&
     (input.sessionSnapshot === null || input.mainPanelTransitionState !== "stable_chat")
   ) {
     return "connecting_chat";

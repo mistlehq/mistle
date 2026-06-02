@@ -11,7 +11,7 @@ describe("resolveInitialEntryStartupState", () => {
     expect(
       resolveInitialEntryStartupState({
         mainPanelTransitionState: "stable_chat",
-        rawSandboxStatus: null,
+        sandboxLifecycleStatus: null,
         sandboxStatusReadState: "loading",
         sessionSnapshot: {
           activeRuntimeConversationId: "thread_test",
@@ -28,12 +28,46 @@ describe("resolveInitialEntryStartupState", () => {
     expect(
       resolveInitialEntryStartupState({
         mainPanelTransitionState: "stable_chat",
-        rawSandboxStatus: null,
+        sandboxLifecycleStatus: null,
         sandboxStatusReadState: "loading",
         sessionSnapshot: null,
       }),
     ).toBe("loading_status");
   });
+
+  it("keeps a startup state while a stopped sandbox is being resumed", () => {
+    expect(
+      resolveInitialEntryStartupState({
+        mainPanelTransitionState: "stable_chat",
+        sandboxLifecycleStatus: "resuming",
+        sandboxStatusReadState: "ready",
+        sessionSnapshot: null,
+      }),
+    ).toBe("resuming_sandbox");
+  });
+
+  it.each([
+    ["pending", "preparing_sandbox"],
+    ["starting", "running_setup"],
+    ["started", "running_setup"],
+    ["initializing", "running_setup"],
+    ["degraded", "reconnecting_sandbox"],
+    ["reconnecting", "reconnecting_sandbox"],
+    ["stopping", "stopping_sandbox"],
+    ["running", "connecting_chat"],
+  ] as const)(
+    "maps sandbox status %s to startup state %s before chat is ready",
+    (status, state) => {
+      expect(
+        resolveInitialEntryStartupState({
+          mainPanelTransitionState: "stable_chat",
+          sandboxLifecycleStatus: status,
+          sandboxStatusReadState: "ready",
+          sessionSnapshot: null,
+        }),
+      ).toBe(state);
+    },
+  );
 });
 
 describe("resolveSandboxStatusRefetchInterval", () => {
