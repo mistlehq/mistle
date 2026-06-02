@@ -11,8 +11,6 @@ import type { ConnectedCodexSession } from "../codex-session-types.js";
 import { describeCodexSessionStepError } from "./codex-session-errors.js";
 import { selectCodexConnectionThreadStrategy } from "./codex-session-lifecycle-policy.js";
 
-const DefaultCodexModel = "gpt-5.3-codex";
-
 function isMissingPersistedThreadError(error: unknown): boolean {
   if (!(error instanceof CodexJsonRpcRequestError)) {
     return false;
@@ -135,7 +133,6 @@ export async function establishCodexThread(input: {
             ? {}
             : { cwd: input.initialCwd }),
           rpcClient: input.rpcClient,
-          model: DefaultCodexModel,
         });
         input.ensureCurrentGeneration(input.generation);
 
@@ -166,7 +163,6 @@ export async function establishCodexThread(input: {
       ? {}
       : { cwd: input.initialCwd }),
     rpcClient: input.rpcClient,
-    model: DefaultCodexModel,
   });
   input.ensureCurrentGeneration(input.generation);
 

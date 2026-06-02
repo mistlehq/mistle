@@ -650,7 +650,6 @@ export function useCodexSessionState(input: {
       const threadStart = await startCodexThread({
         ...(input?.cwd === undefined ? {} : { cwd: input.cwd }),
         rpcClient,
-        model: "gpt-5.3-codex",
       });
       return threadStart;
     },
@@ -1209,7 +1208,6 @@ export function useCodexSessionState(input: {
         const startedThread = await startCodexThread({
           rpcClient,
           cwd: activeThreadCwd,
-          model: "gpt-5.3-codex",
           sessionStartSource: "clear",
         });
         setClearContextImplementationThreadId(startedThread.threadId);
