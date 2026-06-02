@@ -1143,6 +1143,7 @@ export interface paths {
       parameters: {
         query: {
           organizationId: string;
+          startupWorkflowRunId?: string;
         };
         header?: never;
         path: {
@@ -1152,7 +1153,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Delete a sandbox session for internal callers. */
+        /** @description Delete a sandbox instance for internal callers. */
         200: {
           headers: {
             [name: string]: unknown;
@@ -1287,104 +1288,6 @@ export interface paths {
         };
       };
     };
-    trace?: never;
-  };
-  "/internal/sandbox/instances/:id/cleanup-skills-discovery": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          id: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          "application/json": {
-            idempotencyKey: string;
-            organizationId: string;
-            startWorkflowRunId: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Clean up a one-shot skills discovery sandbox instance. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              sandboxInstanceId: string;
-              /** @enum {string} */
-              status:
-                | "accepted"
-                | "already_stopped"
-                | "already_terminal"
-                | "stopped_before_provider_start";
-              workflowRunId: string | null;
-            };
-          };
-        };
-        /** @description Invalid request body. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "VALIDATION_ERROR";
-              message: string;
-            };
-          };
-        };
-        /** @description Internal service authentication failed. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Skills discovery sandbox instance cannot be cleaned up from its current state. */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "text/plain": string;
-          };
-        };
-        /** @description Internal server error. */
-        500: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "text/plain": string;
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
     trace?: never;
   };
   "/internal/sandbox/instances/:id/deadlines/:kind": {

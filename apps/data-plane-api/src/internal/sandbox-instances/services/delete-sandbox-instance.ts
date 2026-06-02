@@ -1,7 +1,8 @@
 import {
-  SandboxInstancePurposes,
+  SandboxInstanceStatuses,
   type DataPlaneDatabase,
   type DataPlaneTables,
+  type SandboxInstanceStatus,
 } from "@mistle/db/data-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
 import { DeleteSandboxInstanceWorkflowSpec } from "@mistle/workflow-registry/data-plane";
@@ -12,24 +13,34 @@ import type { DeleteSandboxInstanceResponse } from "../delete-sandbox-instance/s
 
 type DeleteSandboxInstanceContext = {
   db: DataPlaneDatabase;
-  openWorkflow: AppRuntimeResources["openWorkflow"];
+  openWorkflow: Pick<AppRuntimeResources["openWorkflow"], "cancelWorkflowRun" | "runWorkflow">;
   tables: Pick<DataPlaneTables, "sandboxInstances">;
 };
 
 type DeleteSandboxInstanceInput = {
   organizationId: string;
   sandboxInstanceId: string;
+  startupWorkflowRunId?: string;
 };
 
 export const DeleteSandboxInstanceNotFoundErrorCode = "NOT_FOUND";
 
-function createDeleteSessionDestroyIdempotencyKey(input: DeleteSandboxInstanceInput): string {
+function createDeleteSandboxDestroyIdempotencyKey(input: DeleteSandboxInstanceInput): string {
   return JSON.stringify({
     version: 1,
     sandboxInstanceId: input.sandboxInstanceId,
-    action: "delete_session_destroy",
+    action: "delete_sandbox_destroy",
     organizationId: input.organizationId,
   });
+}
+
+function isStartupStatus(status: SandboxInstanceStatus): boolean {
+  return (
+    status === SandboxInstanceStatuses.PENDING ||
+    status === SandboxInstanceStatuses.STARTING ||
+    status === SandboxInstanceStatuses.STARTED ||
+    status === SandboxInstanceStatuses.INITIALIZING
+  );
 }
 
 export async function deleteSandboxInstance(
@@ -40,19 +51,19 @@ export async function deleteSandboxInstance(
     columns: {
       id: true,
       deletedAt: true,
+      status: true,
     },
     where: (table, { and: whereAnd, eq: whereEq }) =>
       whereAnd(
         whereEq(table.id, input.sandboxInstanceId),
         whereEq(table.organizationId, input.organizationId),
-        whereEq(table.purpose, SandboxInstancePurposes.SESSION),
       ),
   });
 
   if (sandboxInstance === undefined) {
     throw new NotFoundError(
       DeleteSandboxInstanceNotFoundErrorCode,
-      `Sandbox session '${input.sandboxInstanceId}' was not found.`,
+      `Sandbox instance '${input.sandboxInstanceId}' was not found.`,
     );
   }
 
@@ -64,13 +75,17 @@ export async function deleteSandboxInstance(
     };
   }
 
+  if (input.startupWorkflowRunId !== undefined && isStartupStatus(sandboxInstance.status)) {
+    await ctx.openWorkflow.cancelWorkflowRun(input.startupWorkflowRunId);
+  }
+
   const workflowRunHandle = await ctx.openWorkflow.runWorkflow(
     DeleteSandboxInstanceWorkflowSpec,
     {
       sandboxInstanceId: input.sandboxInstanceId,
     },
     {
-      idempotencyKey: createDeleteSessionDestroyIdempotencyKey(input),
+      idempotencyKey: createDeleteSandboxDestroyIdempotencyKey(input),
     },
   );
 
@@ -84,7 +99,6 @@ export async function deleteSandboxInstance(
       and(
         eq(ctx.tables.sandboxInstances.id, input.sandboxInstanceId),
         eq(ctx.tables.sandboxInstances.organizationId, input.organizationId),
-        eq(ctx.tables.sandboxInstances.purpose, SandboxInstancePurposes.SESSION),
         isNull(ctx.tables.sandboxInstances.deletedAt),
       ),
     )

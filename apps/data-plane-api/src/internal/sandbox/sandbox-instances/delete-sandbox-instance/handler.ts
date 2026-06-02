@@ -21,6 +21,9 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
     {
       organizationId: query.organizationId,
       sandboxInstanceId: params.id,
+      ...(query.startupWorkflowRunId === undefined
+        ? {}
+        : { startupWorkflowRunId: query.startupWorkflowRunId }),
     },
   );
 

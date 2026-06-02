@@ -44,7 +44,7 @@ export type SyncSkillsSourceRepoServiceInput = {
   db: ControlPlaneDatabase;
   dataPlaneClient: Pick<
     DataPlaneSandboxInstancesClient,
-    | "cleanupSkillsDiscoverySandboxInstance"
+    | "deleteSandboxInstance"
     | "getSandboxInstance"
     | "resumeSandboxInstance"
     | "startSandboxInstance"
@@ -148,11 +148,10 @@ export async function syncSkillsSourceRepo(
 
   let cleanupError: unknown;
   try {
-    await serviceInput.dataPlaneClient.cleanupSkillsDiscoverySandboxInstance({
+    await serviceInput.dataPlaneClient.deleteSandboxInstance({
       organizationId: input.organizationId,
       sandboxInstanceId: startedSandbox.sandboxInstanceId,
-      startWorkflowRunId: startedSandbox.workflowRunId,
-      idempotencyKey: `${input.idempotencyKey}:cleanup`,
+      startupWorkflowRunId: startedSandbox.workflowRunId,
     });
   } catch (error) {
     cleanupError = error;

@@ -117,30 +117,10 @@ const StopSandboxInstanceResponseSchema = z
     workflowRunId: z.string().min(1).nullable(),
   })
   .strict();
-export type CleanupSkillsDiscoverySandboxInstanceInput = {
-  organizationId: string;
-  sandboxInstanceId: string;
-  startWorkflowRunId: string;
-  idempotencyKey: string;
-};
-const CleanupSkillsDiscoverySandboxInstanceResponseSchema = z
-  .object({
-    status: z.enum([
-      "accepted",
-      "already_stopped",
-      "already_terminal",
-      "stopped_before_provider_start",
-    ]),
-    sandboxInstanceId: z.string().min(1),
-    workflowRunId: z.string().min(1).nullable(),
-  })
-  .strict();
-export type CleanupSkillsDiscoverySandboxInstanceResponse = z.infer<
-  typeof CleanupSkillsDiscoverySandboxInstanceResponseSchema
->;
 export type DeleteSandboxInstanceInput = {
   organizationId: string;
   sandboxInstanceId: string;
+  startupWorkflowRunId?: string;
 };
 const DeleteSandboxInstanceResponseSchema = z
   .object({
@@ -340,9 +320,6 @@ export type DataPlaneSandboxInstancesClient = {
   stopSandboxInstance: (
     input: StopSandboxInstanceInput,
   ) => Promise<StopSandboxInstanceAcceptedResponse>;
-  cleanupSkillsDiscoverySandboxInstance: (
-    input: CleanupSkillsDiscoverySandboxInstanceInput,
-  ) => Promise<CleanupSkillsDiscoverySandboxInstanceResponse>;
   deleteSandboxInstance: (
     input: DeleteSandboxInstanceInput,
   ) => Promise<DeleteSandboxInstanceResponse>;
@@ -405,7 +382,6 @@ function createClientError(input: {
     | "materialize"
     | "resume"
     | "stop"
-    | "cleanupSkillsDiscovery"
     | "delete"
     | "reconcile"
     | "putDeadline"
@@ -422,7 +398,6 @@ function createClientError(input: {
     materialize: "materialize",
     resume: "resume",
     stop: "stop",
-    cleanupSkillsDiscovery: "cleanup skills discovery",
     delete: "delete",
     reconcile: "reconcile",
     putDeadline: "put deadline",
@@ -693,54 +668,19 @@ export function createDataPlaneSandboxInstancesClient(
       });
     },
 
-    async cleanupSkillsDiscoverySandboxInstance(cleanupInput) {
-      const response = await fetch(
-        createSandboxInstanceMemberUrl({
-          baseUrl: internalClient.baseUrl,
-          instanceId: cleanupInput.sandboxInstanceId,
-          suffix: "/cleanup-skills-discovery",
-        }),
-        {
-          method: "POST",
-          headers: createTestHeaders({
-            serviceToken: internalClient.serviceToken,
-            ...(internalClient.testEnvironmentId === undefined
-              ? {}
-              : { testEnvironmentId: internalClient.testEnvironmentId }),
-            ...(internalClient.testEnvironmentIdHeader === undefined
-              ? {}
-              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
-          }),
-          body: JSON.stringify({
-            organizationId: cleanupInput.organizationId,
-            startWorkflowRunId: cleanupInput.startWorkflowRunId,
-            idempotencyKey: cleanupInput.idempotencyKey,
-          }),
-          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
-        },
-      );
-
-      if (response.status === 200) {
-        return CleanupSkillsDiscoverySandboxInstanceResponseSchema.parse(await response.json());
+    async deleteSandboxInstance(deleteInput) {
+      const query: Record<string, string> = {
+        organizationId: deleteInput.organizationId,
+      };
+      if (deleteInput.startupWorkflowRunId !== undefined) {
+        query.startupWorkflowRunId = deleteInput.startupWorkflowRunId;
       }
 
-      const errorBody = await readResponseBody(response);
-
-      throw createClientError({
-        status: response.status,
-        error: errorBody,
-        operation: "cleanupSkillsDiscovery",
-      });
-    },
-
-    async deleteSandboxInstance(deleteInput) {
       const response = await fetch(
         createSandboxInstanceMemberUrl({
           baseUrl: internalClient.baseUrl,
           instanceId: deleteInput.sandboxInstanceId,
-          query: {
-            organizationId: deleteInput.organizationId,
-          },
+          query,
         }),
         {
           method: "DELETE",

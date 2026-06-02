@@ -5,7 +5,6 @@ import { createRequireInternalAuthMiddleware } from "../../middleware/require-in
 import type { AppContextBindings, AppRoutes } from "../../types.js";
 import { INTERNAL_SANDBOX_ROUTE_BASE_PATH } from "./constants.js";
 import * as applyRuntimeLifecycleEvent from "./sandbox-instances/apply-runtime-lifecycle-event/index.js";
-import * as cleanupSkillsDiscoverySandboxInstance from "./sandbox-instances/cleanup-skills-discovery-sandbox-instance/index.js";
 import * as createSandboxInstance from "./sandbox-instances/create-sandbox-instance/index.js";
 import * as deleteSandboxInstanceDeadline from "./sandbox-instances/delete-sandbox-instance-deadline/index.js";
 import * as deleteSandboxInstance from "./sandbox-instances/delete-sandbox-instance/index.js";
@@ -45,10 +44,6 @@ export function createInternalSandboxRoutes(): AppRoutes<typeof INTERNAL_SANDBOX
   routes.openapi(reconcileSandboxInstance.route, reconcileSandboxInstance.handler);
   routes.openapi(resumeSandboxInstance.route, resumeSandboxInstance.handler);
   routes.openapi(stopSandboxInstance.route, stopSandboxInstance.handler);
-  routes.openapi(
-    cleanupSkillsDiscoverySandboxInstance.route,
-    cleanupSkillsDiscoverySandboxInstance.handler,
-  );
   routes.openapi(putSandboxInstanceDeadline.route, putSandboxInstanceDeadline.handler);
   routes.openapi(deleteSandboxInstanceDeadline.route, deleteSandboxInstanceDeadline.handler);
 

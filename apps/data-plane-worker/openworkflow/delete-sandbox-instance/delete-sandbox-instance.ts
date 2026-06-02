@@ -1,6 +1,5 @@
 import type { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
-  SandboxInstancePurposes,
   SandboxInstanceStatuses,
   SandboxStopReasons,
   type DataPlaneDatabase,
@@ -61,19 +60,12 @@ async function resolveDeleteSandboxInstanceState(input: {
       providerSandboxId: true,
       computeGeneration: true,
       status: true,
-      purpose: true,
     },
     where: (table, { eq: whereEq }) => whereEq(table.id, input.sandboxInstanceId),
   });
 
   if (sandboxInstance === undefined) {
     throw new Error(`Sandbox instance '${input.sandboxInstanceId}' was not found.`);
-  }
-
-  if (sandboxInstance.purpose !== SandboxInstancePurposes.SESSION) {
-    throw new Error(
-      `Delete sandbox instance workflow is only supported for session sandbox instances; sandbox instance '${input.sandboxInstanceId}' has purpose '${sandboxInstance.purpose}'.`,
-    );
   }
 
   return sandboxInstance;
