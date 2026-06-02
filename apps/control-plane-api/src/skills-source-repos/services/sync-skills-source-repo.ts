@@ -11,7 +11,7 @@ import {
   type SandboxInstanceStarterKind,
 } from "@mistle/db/data-plane";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
-import type { CompiledRuntimePlan } from "@mistle/integrations-core";
+import type { CompiledRuntimePlan, EgressCredentialRoute } from "@mistle/integrations-core";
 import type { SandboxProvider } from "@mistle/sandbox";
 import { ExecStreamClient, SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { createNodeSandboxSessionRuntime } from "@mistle/sandbox-session-client/node";
@@ -44,7 +44,10 @@ export type SyncSkillsSourceRepoServiceInput = {
   db: ControlPlaneDatabase;
   dataPlaneClient: Pick<
     DataPlaneSandboxInstancesClient,
-    "getSandboxInstance" | "resumeSandboxInstance" | "startSandboxInstance" | "stopSandboxInstance"
+    | "cleanupSkillsDiscoverySandboxInstance"
+    | "getSandboxInstance"
+    | "resumeSandboxInstance"
+    | "startSandboxInstance"
   >;
   gatewayWebsocketUrl: string;
   connectionTokenConfig: ConnectionTokenConfig;
@@ -115,6 +118,8 @@ export async function syncSkillsSourceRepo(
     sandboxRuntime: input.sandboxRuntime,
   });
 
+  let primaryError: unknown;
+  let output: SyncSkillsSourceRepoOutput | undefined;
   try {
     const discoverOutput = await discoverSkillsInSandbox(serviceInput, {
       organizationId: input.organizationId,
@@ -132,19 +137,38 @@ export async function syncSkillsSourceRepo(
       },
     );
 
-    return {
+    output = {
       sandboxInstanceId: startedSandbox.sandboxInstanceId,
       workflowRunId: startedSandbox.workflowRunId,
       skillsSourceRepo,
     };
-  } finally {
-    await serviceInput.dataPlaneClient.stopSandboxInstance({
-      stopReason: "user",
+  } catch (error) {
+    primaryError = error;
+  }
+
+  let cleanupError: unknown;
+  try {
+    await serviceInput.dataPlaneClient.cleanupSkillsDiscoverySandboxInstance({
       organizationId: input.organizationId,
       sandboxInstanceId: startedSandbox.sandboxInstanceId,
-      idempotencyKey: `${input.idempotencyKey}:stop`,
+      startWorkflowRunId: startedSandbox.workflowRunId,
+      idempotencyKey: `${input.idempotencyKey}:cleanup`,
     });
+  } catch (error) {
+    cleanupError = error;
   }
+
+  if (primaryError !== undefined) {
+    throw primaryError;
+  }
+  if (cleanupError !== undefined) {
+    throw cleanupError;
+  }
+  if (output === undefined) {
+    throw new Error("Skills source repo sync did not produce a result.");
+  }
+
+  return output;
 }
 
 export function buildSkillsSourceRepoDiscoveryRuntimePlan(input: {
@@ -165,12 +189,61 @@ export function buildSkillsSourceRepoDiscoveryRuntimePlan(input: {
     sandboxProfileId: input.runtimePlan.sandboxProfileId,
     version: input.runtimePlan.version,
     image: input.runtimePlan.image,
-    egressRoutes: input.runtimePlan.egressRoutes,
+    egressRoutes: filterSkillsSourceRepoEgressRoutes({
+      egressRoutes: input.runtimePlan.egressRoutes,
+      originUrl: input.originUrl,
+    }),
     artifacts: [],
     workspaceSources,
     runtimeClients: [],
     agentRuntimes: [],
   };
+}
+
+export function filterSkillsSourceRepoEgressRoutes(input: {
+  egressRoutes: ReadonlyArray<EgressCredentialRoute>;
+  originUrl: string;
+}): ReadonlyArray<EgressCredentialRoute> {
+  const origin = new URL(input.originUrl);
+  const selectedRoutes: EgressCredentialRoute[] = [];
+
+  for (const route of input.egressRoutes) {
+    if (!route.match.hosts.includes(origin.host)) {
+      continue;
+    }
+
+    const selectedPathPrefixes = route.match.pathPrefixes?.filter((pathPrefix) =>
+      repoPathMatchesRoutePathPrefix({
+        repoPath: origin.pathname,
+        pathPrefix,
+      }),
+    );
+    if (selectedPathPrefixes === undefined || selectedPathPrefixes.length === 0) {
+      continue;
+    }
+
+    selectedRoutes.push({
+      ...route,
+      match: {
+        ...route.match,
+        pathPrefixes: selectedPathPrefixes,
+      },
+    });
+  }
+
+  return selectedRoutes;
+}
+
+function repoPathMatchesRoutePathPrefix(input: { repoPath: string; pathPrefix: string }): boolean {
+  if (input.repoPath === input.pathPrefix) {
+    return true;
+  }
+
+  if (input.pathPrefix.endsWith("/")) {
+    return input.repoPath.startsWith(input.pathPrefix);
+  }
+
+  return input.repoPath.startsWith(`${input.pathPrefix}/`);
 }
 
 export function parseSkillsDiscoverCommandOutput(stdout: string): SkillsDiscoverOutput {

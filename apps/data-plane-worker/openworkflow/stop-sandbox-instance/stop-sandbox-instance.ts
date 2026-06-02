@@ -6,6 +6,7 @@ import {
   type DataPlaneTables,
   type SandboxInstancePurpose,
   type SandboxInstanceProvider,
+  type SandboxInstanceStatus,
 } from "@mistle/db/data-plane";
 import type { MistleLogger } from "@mistle/logging";
 import { isSandboxResourceNotFoundError } from "@mistle/sandbox";
@@ -73,6 +74,18 @@ function includeExpectedOwnerLeaseId(input: { expectedOwnerLeaseId: string | und
     : { expectedOwnerLeaseId: input.expectedOwnerLeaseId };
 }
 
+function isStartupSkillsDiscoveryStopState(input: {
+  purpose: SandboxInstancePurpose;
+  status: SandboxInstanceStatus;
+}): boolean {
+  return (
+    input.purpose === SandboxInstancePurposes.SKILLS_DISCOVERY &&
+    (input.status === SandboxInstanceStatuses.STARTING ||
+      input.status === SandboxInstanceStatuses.STARTED ||
+      input.status === SandboxInstanceStatuses.INITIALIZING)
+  );
+}
+
 /**
  * Returns `true` when the current runtime-state snapshot still permits the
  * requested fenced stop.
@@ -126,13 +139,19 @@ async function resolveStoppableSandboxInstanceStopState(input: {
     return null;
   }
 
+  const startupSkillsDiscoveryStopState = isStartupSkillsDiscoveryStopState({
+    purpose: sandboxInstance.purpose,
+    status: sandboxInstance.status,
+  });
+
   if (
     sandboxInstance.status !== SandboxInstanceStatuses.RUNNING &&
     sandboxInstance.status !== SandboxInstanceStatuses.RECONNECTING &&
-    sandboxInstance.status !== SandboxInstanceStatuses.STOPPING
+    sandboxInstance.status !== SandboxInstanceStatuses.STOPPING &&
+    !startupSkillsDiscoveryStopState
   ) {
     throw new Error(
-      `Expected sandbox instance '${input.sandboxInstanceId}' to be running, reconnecting, stopping, or stopped before stop execution.`,
+      `Expected sandbox instance '${input.sandboxInstanceId}' to be running, reconnecting, stopping, stopped, or a startup skills-discovery sandbox before stop execution.`,
     );
   }
 

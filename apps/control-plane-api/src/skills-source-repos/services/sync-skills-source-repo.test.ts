@@ -37,6 +37,90 @@ describe("skills source repo sync service", () => {
     });
   });
 
+  it("keeps only selected repository credential egress for skills discovery", () => {
+    const runtimePlan = createRuntimePlan({
+      egressRoutes: [
+        {
+          egressRuleId: "egress_rule_github_git",
+          bindingId: "ibd_github",
+          familyId: "github",
+          variantId: "github-cloud",
+          match: {
+            hosts: ["github.com"],
+            pathPrefixes: ["/acme/skills.git", "/acme/app.git"],
+            methods: ["GET", "POST"],
+          },
+          upstream: {
+            baseUrl: "https://github.com",
+          },
+          authInjection: {
+            type: "basic",
+            target: "authorization",
+            username: "x-access-token",
+          },
+          credentialResolver: {
+            kind: "integration_connection",
+            connectionId: "icn_github",
+            secretType: "github.installation-token",
+          },
+        },
+        {
+          egressRuleId: "egress_rule_github_api",
+          bindingId: "ibd_github_api",
+          familyId: "github",
+          variantId: "github-cloud",
+          match: {
+            hosts: ["api.github.com"],
+          },
+          upstream: {
+            baseUrl: "https://api.github.com",
+          },
+          authInjection: {
+            type: "bearer",
+            target: "authorization",
+          },
+          credentialResolver: {
+            kind: "integration_connection",
+            connectionId: "icn_github",
+            secretType: "github.installation-token",
+          },
+        },
+      ],
+    });
+
+    const discoveryPlan = buildSkillsSourceRepoDiscoveryRuntimePlan({
+      runtimePlan,
+      originUrl: "https://github.com/acme/skills.git",
+    });
+
+    expect(discoveryPlan.egressRoutes).toEqual([
+      {
+        egressRuleId: "egress_rule_github_git",
+        bindingId: "ibd_github",
+        familyId: "github",
+        variantId: "github-cloud",
+        match: {
+          hosts: ["github.com"],
+          pathPrefixes: ["/acme/skills.git"],
+          methods: ["GET", "POST"],
+        },
+        upstream: {
+          baseUrl: "https://github.com",
+        },
+        authInjection: {
+          type: "basic",
+          target: "authorization",
+          username: "x-access-token",
+        },
+        credentialResolver: {
+          kind: "integration_connection",
+          connectionId: "icn_github",
+          secretType: "github.installation-token",
+        },
+      },
+    ]);
+  });
+
   it("fails when the selected skills source repository is absent from the runtime plan", () => {
     expect(() =>
       buildSkillsSourceRepoDiscoveryRuntimePlan({
@@ -75,7 +159,9 @@ describe("skills source repo sync service", () => {
   });
 });
 
-function createRuntimePlan(): CompiledRuntimePlan {
+function createRuntimePlan(
+  input: { egressRoutes?: CompiledRuntimePlan["egressRoutes"] } = {},
+): CompiledRuntimePlan {
   return {
     sandboxProfileId: "sbp_skills_sync",
     version: 1,
@@ -83,7 +169,7 @@ function createRuntimePlan(): CompiledRuntimePlan {
       source: "base",
       imageRef: "ubuntu:24.04",
     },
-    egressRoutes: [
+    egressRoutes: input.egressRoutes ?? [
       {
         egressRuleId: "egress_rule_github_git",
         bindingId: "ibd_github",
