@@ -5,7 +5,6 @@
 import { randomUUID } from "node:crypto";
 
 import {
-  SandboxInstancePersistenceModes,
   SandboxInstancePurposes,
   SandboxInstanceSources,
   SandboxInstanceStatuses,
@@ -115,7 +114,6 @@ async function insertStoppedSandboxInstance(
     runtimeProvider: "docker",
     providerSandboxId: `provider-${sandboxInstanceId}`,
     status: SandboxInstanceStatuses.STOPPED,
-    persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
     purpose: SandboxInstancePurposes.SESSION,
     startedByKind: "system",
     startedById: `worker_${sandboxInstanceId}`,

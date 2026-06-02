@@ -19,8 +19,6 @@ pub(super) enum ControlRequest {
         startup_input: StartupInput,
         #[serde(default = "default_wait_for_completion")]
         wait_for_completion: bool,
-        #[serde(default)]
-        wait_for_storage_attach: bool,
     },
     #[serde(rename = "resume")]
     Resume { startup_input: StartupInput },

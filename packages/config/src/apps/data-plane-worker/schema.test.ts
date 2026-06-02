@@ -4,8 +4,6 @@ import {
   DataPlaneWorkerConfigSchema,
   type DataPlaneWorkerConfig,
   DataPlaneWorkerSandboxConfigSchema,
-  DataPlaneWorkerSandboxStorageArchilConfigSchema,
-  getDataPlaneWorkerPersistentSandboxValidationIssue,
   getDataPlaneWorkerSandboxProviderValidationIssue,
 } from "./schema.js";
 
@@ -19,41 +17,6 @@ const DisabledTelemetryConfig: DataPlaneWorkerConfig["telemetry"] = {
   enabled: false,
   debug: false,
 };
-
-function createWorkerConfig(input: {
-  sandbox?: Partial<DataPlaneWorkerConfig["sandbox"]>;
-  sandboxStorage?: DataPlaneWorkerConfig["sandboxStorage"];
-}): DataPlaneWorkerConfig {
-  return {
-    database: {
-      url: "postgresql://127.0.0.1/mistle",
-    },
-    workflow: {
-      databaseUrl: "postgresql://127.0.0.1/mistle",
-      namespaceId: "development",
-      runMigrations: true,
-      concurrency: 1,
-      databasePoolMax: 2,
-    },
-    runtimeState: {
-      gatewayBaseUrl: "http://127.0.0.1:5202",
-    },
-    controlPlaneApi: {
-      baseUrl: "http://127.0.0.1:5100",
-    },
-    sandbox: {
-      storage: undefined,
-      internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
-      bootstrap: SandboxTokenConfig,
-      ...input.sandbox,
-    },
-    sandboxStorage: input.sandboxStorage,
-    internalAuth: {
-      serviceToken: "internal-service-token",
-    },
-    telemetry: DisabledTelemetryConfig,
-  };
-}
 
 describe("DataPlaneWorkerSandboxConfigSchema", () => {
   it("defaults the E2B domain to the hosted cloud domain", () => {
@@ -168,65 +131,6 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
   });
 });
 
-describe("DataPlaneWorkerSandboxStorageArchilConfigSchema", () => {
-  it("parses the managed Archil config shape", () => {
-    const parsed = DataPlaneWorkerSandboxStorageArchilConfigSchema.parse({
-      apiKey: "archil-api-key",
-      region: "gcp-us-central1",
-      namePrefix: "mistle-",
-      mounts: [
-        {
-          type: "s3-compatible",
-          bucket: "mistle-archil-workspaces",
-          endpoint: "https://s3.example.com",
-          accessKeyId: "access-key-id",
-          secretAccessKey: "secret-access-key",
-        },
-      ],
-    });
-
-    expect(parsed).toEqual({
-      apiKey: "archil-api-key",
-      region: "gcp-us-central1",
-      namePrefix: "mistle-",
-      mounts: [
-        {
-          type: "s3-compatible",
-          bucket: "mistle-archil-workspaces",
-          endpoint: "https://s3.example.com",
-          accessKeyId: "access-key-id",
-          secretAccessKey: "secret-access-key",
-        },
-      ],
-    });
-  });
-
-  it("rejects more than one configured Archil mount", () => {
-    expect(() =>
-      DataPlaneWorkerSandboxStorageArchilConfigSchema.parse({
-        apiKey: "archil-api-key",
-        region: "gcp-us-central1",
-        mounts: [
-          {
-            type: "s3-compatible",
-            bucket: "bucket-a",
-            endpoint: "https://s3-a.example.com",
-            accessKeyId: "access-key-id-a",
-            secretAccessKey: "secret-access-key-a",
-          },
-          {
-            type: "s3-compatible",
-            bucket: "bucket-b",
-            endpoint: "https://s3-b.example.com",
-            accessKeyId: "access-key-id-b",
-            secretAccessKey: "secret-access-key-b",
-          },
-        ],
-      }),
-    ).toThrow(/Too big: expected array to have <=1 items/);
-  });
-});
-
 describe("getDataPlaneWorkerSandboxProviderValidationIssue", () => {
   it("does not require a singleton sandbox provider", () => {
     const issue = getDataPlaneWorkerSandboxProviderValidationIssue({
@@ -248,42 +152,5 @@ describe("getDataPlaneWorkerSandboxProviderValidationIssue", () => {
     });
 
     expect(issue).toBeNull();
-  });
-});
-
-describe("getDataPlaneWorkerPersistentSandboxValidationIssue", () => {
-  it("requires Archil worker config when Archil storage is enabled", () => {
-    const issue = getDataPlaneWorkerPersistentSandboxValidationIssue({
-      appConfig: createWorkerConfig({
-        sandbox: {
-          storage: {
-            backend: "archil",
-          },
-        },
-      }),
-    });
-
-    expect(issue).toEqual({
-      path: ["sandboxStorage", "archil"],
-      message: "sandboxStorage.archil is required when sandbox.storage.backend is 'archil'.",
-    });
-  });
-
-  it("requires docker volume worker config when Docker volume storage is enabled", () => {
-    const issue = getDataPlaneWorkerPersistentSandboxValidationIssue({
-      appConfig: createWorkerConfig({
-        sandbox: {
-          storage: {
-            backend: "docker_volume",
-          },
-        },
-      }),
-    });
-
-    expect(issue).toEqual({
-      path: ["sandboxStorage", "dockerVolume"],
-      message:
-        "sandboxStorage.dockerVolume is required when sandbox.storage.backend is 'docker_volume'.",
-    });
   });
 });

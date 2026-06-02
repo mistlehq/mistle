@@ -15,7 +15,6 @@ import {
   CodexFixtureSessionEntriesWithExploringGroup,
   SessionComposerFixtureProps,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
-import type { OrganizationSandboxStorageFormState } from "../settings/organization/sandbox-storage-model.js";
 import {
   ExistingScheduledTriggerValues,
   ScheduledTriggerFormStoryHarness,
@@ -42,7 +41,6 @@ import {
   createDraftSlackConnection,
   SlackAppSetupPageStory,
 } from "./organization-integrations-settings-slack-app-flows.stories.js";
-import { OrganizationSandboxStorageSettingsPageView } from "./organization-sandbox-storage-settings-page-view.js";
 import {
   ProfileSettingsLinkedAccountsSection,
   type ProfileSettingsLinkedAccountsSectionProps,
@@ -121,20 +119,6 @@ const IdentityLinkingProviders: OrganizationIdentityLinkingProviderRow[] = [
 const ProfileLinkedAccountsProps: ProfileSettingsLinkedAccountsSectionProps = {
   ...DefaultProfileSettingsLinkedAccountsSectionProps,
   linkedAccountCards: [GitHubLinkedWithSigningNotConfiguredCard, SlackNotLinkedCard],
-};
-
-const OrganizationSandboxStorageState: OrganizationSandboxStorageFormState = {
-  persistentSandboxesEnabled: true,
-  storageConfigSource: "organization",
-  region: "aws-us-east-1",
-  namePrefix: "mistle",
-  apiKey: "archil-api-key",
-  apiKeyConfigured: false,
-  bucket: "mistle-sandboxes",
-  endpoint: "https://storage.archil.example.com",
-  accessKeyId: "AKIAIOSFODNN7EXAMPLE",
-  secretAccessKey: "secret-access-key",
-  secretAccessKeyConfigured: false,
 };
 
 function DocsProductScreen(input: { children: React.ReactNode }): React.JSX.Element {
@@ -642,22 +626,6 @@ function ScheduledTriggerStory(): React.JSX.Element {
   );
 }
 
-function PersistentSandboxesOrganizationSettingsStory(): React.JSX.Element {
-  return (
-    <DocsProductScreen>
-      <OrganizationSandboxStorageSettingsPageView
-        state={OrganizationSandboxStorageState}
-        isSaving={false}
-        loadErrorMessage={null}
-        saveErrorMessage={null}
-        visibleErrors={{}}
-        onPersistentSandboxesEnabledChange={async () => {}}
-        onStateChange={() => {}}
-      />
-    </DocsProductScreen>
-  );
-}
-
 /**
  * Public docs screenshot source. Capture these stories when updating the Mintlify
  * guides so docs images stay grounded in real dashboard page components and stable
@@ -745,8 +713,4 @@ export const EventTrigger: Story = {
 
 export const ScheduledTrigger: Story = {
   render: ScheduledTriggerStory,
-};
-
-export const PersistentSandboxesOrganizationSettings: Story = {
-  render: PersistentSandboxesOrganizationSettingsStory,
 };

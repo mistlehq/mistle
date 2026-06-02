@@ -67,7 +67,7 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
     "profile_setup_script_test_start",
     {
       title: "Start sandbox profile setup script test",
-      description: "Start an ephemeral sandbox to test a sandbox profile setup script",
+      description: "Start a sandbox to test a sandbox profile setup script",
       inputSchema: profileSetupScriptTestStartInputSchema,
       outputSchema: startSandboxProfileSetupScriptTestRunResponseSchema,
       annotations: {
@@ -138,7 +138,7 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
     {
       title: "Start sandbox profile maintenance script test",
       description:
-        "Start an ephemeral sandbox from the current snapshot to test a sandbox profile maintenance script",
+        "Start a sandbox from the current snapshot to test a sandbox profile maintenance script",
       inputSchema: profileMaintenanceScriptTestStartInputSchema,
       outputSchema: startSandboxProfileSetupScriptTestRunResponseSchema,
       annotations: {

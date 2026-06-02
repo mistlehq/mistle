@@ -2,8 +2,6 @@ import {
   type IntegrationBindingKind,
   type IntegrationConnectionStatus,
   type SandboxProfileVersionAgentRuntimeId,
-  type SandboxProfileVersionDefaultPersistenceMode,
-  SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileStatuses,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
@@ -36,7 +34,6 @@ export function sandboxProfileVersionRow(input: {
   maintenanceScript?: string | null;
   agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
   gitCommitSigningIntegrationConnectionId?: string | null;
-  defaultPersistenceMode?: SandboxProfileVersionDefaultPersistenceMode;
   sandboxProvider?: string | null;
   sandboxConnectionId?: string | null;
   sandboxVcpuCount?: number | null;
@@ -63,8 +60,6 @@ export function sandboxProfileVersionRow(input: {
     ...(input.gitCommitSigningIntegrationConnectionId === undefined
       ? {}
       : { gitCommitSigningIntegrationConnectionId: input.gitCommitSigningIntegrationConnectionId }),
-    defaultPersistenceMode:
-      input.defaultPersistenceMode ?? SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
     ...(input.sandboxProvider === undefined ? {} : { sandboxProvider: input.sandboxProvider }),
     ...(input.sandboxConnectionId === undefined
       ? {}

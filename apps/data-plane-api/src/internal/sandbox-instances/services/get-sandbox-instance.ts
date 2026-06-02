@@ -1,6 +1,5 @@
 import {
   SandboxOperationKinds,
-  SandboxInstancePersistenceModes,
   SandboxInstancePurposes,
   SandboxInstanceStatuses,
   SandboxStopReasons,
@@ -52,7 +51,6 @@ type SandboxInstanceRuntimeSelection = {
 type InspectableSandboxInstance = SandboxInstanceRuntimeSelection & {
   id: string;
   title: string | null;
-  persistenceMode: string;
   providerSandboxId: string | null;
   status: SandboxInstanceStatus;
   failureCode: string | null;
@@ -169,37 +167,6 @@ async function markRunningSandboxInstanceStopped(
   throw new Error("Failed to transition sandbox instance status from runtime-active to stopped.");
 }
 
-async function clearStoppedSandboxInstanceProviderSandboxId(
-  ctx: Pick<GetSandboxInstanceContext, "db" | "tables">,
-  input: {
-    sandboxInstanceId: string;
-  },
-): Promise<void> {
-  const { sandboxInstances } = ctx.tables;
-
-  const updatedRows = await ctx.db
-    .update(sandboxInstances)
-    .set({
-      providerSandboxId: null,
-      updatedAt: sql`now()`,
-    })
-    .where(
-      and(
-        eq(sandboxInstances.id, input.sandboxInstanceId),
-        eq(sandboxInstances.status, SandboxInstanceStatuses.STOPPED),
-      ),
-    )
-    .returning({
-      id: sandboxInstances.id,
-    });
-
-  if (updatedRows[0] !== undefined) {
-    return;
-  }
-
-  throw new Error("Failed to clear provider sandbox id while sandbox instance remained stopped.");
-}
-
 const InspectionFailureCodes = {
   PROVIDER_RUNTIME_MISSING: "provider_runtime_missing",
 } as const;
@@ -239,44 +206,6 @@ async function markStartingSandboxInstanceFailed(
   }
 
   throw new Error("Failed to transition sandbox instance status from startup-active to failed.");
-}
-
-async function markStartingSandboxInstanceStopped(
-  ctx: Pick<GetSandboxInstanceContext, "db" | "tables">,
-  input: {
-    sandboxInstanceId: string;
-    clearProviderSandboxId?: boolean;
-  },
-): Promise<void> {
-  const { sandboxInstances } = ctx.tables;
-
-  const updatedRows = await ctx.db
-    .update(sandboxInstances)
-    .set({
-      status: SandboxInstanceStatuses.STOPPED,
-      ...(input.clearProviderSandboxId === true ? { providerSandboxId: null } : {}),
-      stoppedAt: sql`now()`,
-      stopReason: SandboxStopReasons.SYSTEM,
-      failedAt: null,
-      failureCode: null,
-      failureMessage: null,
-      updatedAt: sql`now()`,
-    })
-    .where(
-      and(
-        eq(sandboxInstances.id, input.sandboxInstanceId),
-        inArray(sandboxInstances.status, StartupInspectionStatuses),
-      ),
-    )
-    .returning({
-      status: sandboxInstances.status,
-    });
-
-  if (updatedRows[0]?.status === SandboxInstanceStatuses.STOPPED) {
-    return;
-  }
-
-  throw new Error("Failed to transition sandbox instance status from startup-active to stopped.");
 }
 
 async function markRunningSandboxInstanceFailed(
@@ -383,23 +312,6 @@ async function inspectStartingSandboxInstance(
   );
 
   if (inspection === null) {
-    if (sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
-      await markStartingSandboxInstanceStopped(ctx, {
-        sandboxInstanceId: sandboxInstance.id,
-        clearProviderSandboxId: true,
-      });
-      return {
-        id: sandboxInstance.id,
-        title: sandboxInstance.title,
-        status: SandboxInstanceStatuses.STOPPED,
-        connectable: false,
-        failureCode: null,
-        failureMessage: null,
-        runtimePlan: sandboxInstance.runtimePlan,
-        startupOperation: null,
-      };
-    }
-
     await markStartingSandboxInstanceFailed(ctx, {
       sandboxInstanceId: sandboxInstance.id,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
@@ -439,23 +351,6 @@ async function inspectStartingSandboxInstance(
       connectable: status === "running",
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
-      runtimePlan: sandboxInstance.runtimePlan,
-      startupOperation: null,
-    };
-  }
-
-  if (sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
-    await markStartingSandboxInstanceStopped(ctx, {
-      sandboxInstanceId: sandboxInstance.id,
-      clearProviderSandboxId: true,
-    });
-    return {
-      id: sandboxInstance.id,
-      title: sandboxInstance.title,
-      status: SandboxInstanceStatuses.STOPPED,
-      connectable: false,
-      failureCode: null,
-      failureMessage: null,
       runtimePlan: sandboxInstance.runtimePlan,
       startupOperation: null,
     };
@@ -502,22 +397,6 @@ async function inspectStoppedSandboxInstance(
   ctx: GetSandboxInstanceContext,
   sandboxInstance: InspectableSandboxInstance,
 ): Promise<SandboxInstanceInspectionResponse> {
-  if (
-    sandboxInstance.providerSandboxId === null &&
-    sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT
-  ) {
-    return {
-      id: sandboxInstance.id,
-      title: sandboxInstance.title,
-      status: SandboxInstanceStatuses.STOPPED,
-      connectable: false,
-      failureCode: sandboxInstance.failureCode,
-      failureMessage: sandboxInstance.failureMessage,
-      runtimePlan: sandboxInstance.runtimePlan,
-      startupOperation: null,
-    };
-  }
-
   if (sandboxInstance.providerSandboxId === null) {
     throw new Error(
       `Expected stopped sandbox instance '${sandboxInstance.id}' to have a providerSandboxId.`,
@@ -530,22 +409,6 @@ async function inspectStoppedSandboxInstance(
     sandboxInstance.providerSandboxId,
   );
   if (inspection === null) {
-    if (sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
-      await clearStoppedSandboxInstanceProviderSandboxId(ctx, {
-        sandboxInstanceId: sandboxInstance.id,
-      });
-      return {
-        id: sandboxInstance.id,
-        title: sandboxInstance.title,
-        status: SandboxInstanceStatuses.STOPPED,
-        connectable: false,
-        failureCode: sandboxInstance.failureCode,
-        failureMessage: sandboxInstance.failureMessage,
-        runtimePlan: sandboxInstance.runtimePlan,
-        startupOperation: null,
-      };
-    }
-
     await markStoppedSandboxInstanceFailed(ctx, {
       sandboxInstanceId: sandboxInstance.id,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
@@ -567,22 +430,6 @@ async function inspectStoppedSandboxInstance(
     inspection.disposition === SandboxInspectDispositions.RESUMABLE_STOPPED ||
     inspection.disposition === SandboxInspectDispositions.ACTIVE
   ) {
-    return {
-      id: sandboxInstance.id,
-      title: sandboxInstance.title,
-      status: SandboxInstanceStatuses.STOPPED,
-      connectable: false,
-      failureCode: sandboxInstance.failureCode,
-      failureMessage: sandboxInstance.failureMessage,
-      runtimePlan: sandboxInstance.runtimePlan,
-      startupOperation: null,
-    };
-  }
-
-  if (sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
-    await clearStoppedSandboxInstanceProviderSandboxId(ctx, {
-      sandboxInstanceId: sandboxInstance.id,
-    });
     return {
       id: sandboxInstance.id,
       title: sandboxInstance.title,
@@ -628,23 +475,6 @@ async function inspectRunningSandboxInstance(
     sandboxInstance.providerSandboxId,
   );
   if (inspection === null) {
-    if (sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
-      await markRunningSandboxInstanceStopped(ctx, {
-        sandboxInstanceId: sandboxInstance.id,
-        clearProviderSandboxId: true,
-      });
-      return {
-        id: sandboxInstance.id,
-        title: sandboxInstance.title,
-        status: SandboxInstanceStatuses.STOPPED,
-        connectable: false,
-        failureCode: sandboxInstance.failureCode,
-        failureMessage: sandboxInstance.failureMessage,
-        runtimePlan: sandboxInstance.runtimePlan,
-        startupOperation: null,
-      };
-    }
-
     await markRunningSandboxInstanceFailed(ctx, {
       sandboxInstanceId: sandboxInstance.id,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
@@ -780,7 +610,6 @@ export async function getSandboxInstance(
       sandboxProfileId: true,
       sandboxProfileVersion: true,
       title: true,
-      persistenceMode: true,
       runtimeProvider: true,
       sandboxConnectionId: true,
       sandboxVcpuCount: true,

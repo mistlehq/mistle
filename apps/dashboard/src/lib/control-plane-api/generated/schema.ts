@@ -7818,255 +7818,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/organization/sandbox-storage-settings": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Current sandbox storage settings for the active organization. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              organizationStorageConfigSummary: {
-                apiKeyConfigured: boolean;
-                /** @enum {string} */
-                backend: "archil";
-                mounts:
-                  | []
-                  | [
-                      {
-                        accessKeyId: string;
-                        bucket: string;
-                        endpoint: string;
-                        secretAccessKeyConfigured: boolean;
-                        /** @enum {string} */
-                        type: "s3-compatible";
-                      },
-                    ];
-                namePrefix: string | null;
-                region: string;
-              } | null;
-              persistentSandboxesEnabled: boolean;
-              /** @enum {string|null} */
-              storageBackend: "archil" | null;
-              /** @enum {string} */
-              storageConfigSource: "managed" | "organization";
-              storageConfigVersion: number | null;
-            };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Forbidden request. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-        /** @description Organization was not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-        /** @description Internal server error. */
-        500: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "text/plain": string;
-          };
-        };
-      };
-    };
-    put: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          "application/json":
-            | {
-                organizationStorageConfig: null;
-                persistentSandboxesEnabled: boolean;
-                /** @enum {string} */
-                storageConfigSource: "managed";
-              }
-            | {
-                organizationStorageConfig: {
-                  apiKey: string;
-                  /** @enum {string} */
-                  backend: "archil";
-                  mounts?:
-                    | []
-                    | [
-                        {
-                          accessKeyId: string;
-                          bucket: string;
-                          endpoint: string;
-                          secretAccessKey: string;
-                          /** @enum {string} */
-                          type: "s3-compatible";
-                        },
-                      ];
-                  namePrefix?: string;
-                  region: string;
-                };
-                persistentSandboxesEnabled: boolean;
-                /** @enum {string} */
-                storageConfigSource: "organization";
-              };
-        };
-      };
-      responses: {
-        /** @description Updated sandbox storage settings for the active organization. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              organizationStorageConfigSummary: {
-                apiKeyConfigured: boolean;
-                /** @enum {string} */
-                backend: "archil";
-                mounts:
-                  | []
-                  | [
-                      {
-                        accessKeyId: string;
-                        bucket: string;
-                        endpoint: string;
-                        secretAccessKeyConfigured: boolean;
-                        /** @enum {string} */
-                        type: "s3-compatible";
-                      },
-                    ];
-                namePrefix: string | null;
-                region: string;
-              } | null;
-              persistentSandboxesEnabled: boolean;
-              /** @enum {string|null} */
-              storageBackend: "archil" | null;
-              /** @enum {string} */
-              storageConfigSource: "managed" | "organization";
-              storageConfigVersion: number | null;
-            };
-          };
-        };
-        /** @description Invalid request body. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "VALIDATION_ERROR";
-              message: string;
-            };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Forbidden request. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-        /** @description Organization was not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-        /** @description Internal server error. */
-        500: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "text/plain": string;
-          };
-        };
-      };
-    };
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/v1/sandbox/instances": {
     parameters: {
       query?: never;
@@ -10210,8 +9961,6 @@ export interface paths {
               versions: {
                 /** @enum {string} */
                 agentRuntimeId: "codex" | "opencode" | "pi";
-                /** @enum {string} */
-                defaultPersistenceMode: "ephemeral" | "persistent";
                 gitCommitSigningIntegrationConnectionId: string | null;
                 isActive: boolean;
                 latestSnapshotJob: {
@@ -10339,8 +10088,6 @@ export interface paths {
             "application/json": {
               /** @enum {string} */
               agentRuntimeId: "codex" | "opencode" | "pi";
-              /** @enum {string} */
-              defaultPersistenceMode: "ephemeral" | "persistent";
               gitCommitSigningIntegrationConnectionId: string | null;
               isActive: boolean;
               latestSnapshotJob: {
@@ -10606,8 +10353,6 @@ export interface paths {
           "application/json": {
             /** @enum {string} */
             agentRuntimeId?: "codex" | "opencode" | "pi";
-            /** @enum {string} */
-            defaultPersistenceMode?: "ephemeral" | "persistent";
             gitCommitSigningIntegrationConnectionId?: string | null;
             integrationBindings?: {
               bindings: {
@@ -10644,8 +10389,6 @@ export interface paths {
             "application/json": {
               /** @enum {string} */
               agentRuntimeId: "codex" | "opencode" | "pi";
-              /** @enum {string} */
-              defaultPersistenceMode: "ephemeral" | "persistent";
               gitCommitSigningIntegrationConnectionId: string | null;
               integrationBindings: {
                 bindings: {
@@ -11378,8 +11121,6 @@ export interface paths {
               version: {
                 /** @enum {string} */
                 agentRuntimeId: "codex" | "opencode" | "pi";
-                /** @enum {string} */
-                defaultPersistenceMode: "ephemeral" | "persistent";
                 gitCommitSigningIntegrationConnectionId: string | null;
                 isActive: boolean;
                 latestSnapshotJob: {
@@ -11679,8 +11420,6 @@ export interface paths {
               version: {
                 /** @enum {string} */
                 agentRuntimeId: "codex" | "opencode" | "pi";
-                /** @enum {string} */
-                defaultPersistenceMode: "ephemeral" | "persistent";
                 gitCommitSigningIntegrationConnectionId: string | null;
                 isActive: boolean;
                 latestSnapshotJob: {
@@ -12061,8 +11800,6 @@ export interface paths {
               version: {
                 /** @enum {string} */
                 agentRuntimeId: "codex" | "opencode" | "pi";
-                /** @enum {string} */
-                defaultPersistenceMode: "ephemeral" | "persistent";
                 gitCommitSigningIntegrationConnectionId: string | null;
                 isActive: boolean;
                 latestSnapshotJob: {

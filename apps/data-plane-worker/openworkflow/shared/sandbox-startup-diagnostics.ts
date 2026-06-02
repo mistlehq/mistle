@@ -1,4 +1,3 @@
-import type { SandboxInstancePersistenceMode } from "@mistle/db/data-plane";
 import type { MistleLogger } from "@mistle/logging";
 import type { SandboxProvider, SandboxRuntimeControl } from "@mistle/sandbox";
 import { SpanStatusCode, trace, type Attributes, type Span } from "@opentelemetry/api";
@@ -187,18 +186,12 @@ export async function emitSandboxStartupDiagnosticPhaseTimings(input: {
   sandboxInstanceId: string;
   runtimeProvider: SandboxProvider;
   operation: "init" | "resume";
-  persistenceMode?: SandboxInstancePersistenceMode;
 }): Promise<void> {
   const baseAttributes = {
     "mistle.sandbox.instance_id": input.sandboxInstanceId,
     "mistle.sandbox.provider_sandbox_id": input.providerSandboxId,
     "mistle.sandbox.runtime_provider": input.runtimeProvider,
     "mistle.sandbox.startup_operation": input.operation,
-    ...(input.persistenceMode === undefined
-      ? {}
-      : {
-          "mistle.sandbox.persistence_mode": input.persistenceMode,
-        }),
   };
 
   try {
@@ -268,18 +261,12 @@ export async function emitSandboxStartupDiagnostics(input: {
   sandboxInstanceId: string;
   runtimeProvider: SandboxProvider;
   operation: "init" | "resume";
-  persistenceMode?: SandboxInstancePersistenceMode;
 }): Promise<void> {
   const initialAttributes: Attributes = {
     "mistle.sandbox.instance_id": input.sandboxInstanceId,
     "mistle.sandbox.provider_sandbox_id": input.providerSandboxId,
     "mistle.sandbox.runtime_provider": input.runtimeProvider,
     "mistle.sandbox.startup_operation": input.operation,
-    ...(input.persistenceMode === undefined
-      ? {}
-      : {
-          "mistle.sandbox.persistence_mode": input.persistenceMode,
-        }),
   };
 
   await StartupDiagnosticsTracer.startActiveSpan(

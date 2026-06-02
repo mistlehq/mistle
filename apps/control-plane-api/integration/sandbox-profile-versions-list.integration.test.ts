@@ -6,7 +6,6 @@ import {
   SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
-  SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
@@ -68,7 +67,6 @@ describe.concurrent("sandbox profile versions list integration", () => {
         sandboxProfileId: "sbp_versions_list_001",
         version: 3,
         state: SandboxProfileVersionStates.DRAFT,
-        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
       }),
     ]);
     await env.controlPlaneDb
@@ -116,7 +114,6 @@ describe.concurrent("sandbox profile versions list integration", () => {
         version: 3,
         state: SandboxProfileVersionStates.DRAFT,
         publishedAt: null,
-        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
         ...EmptySandboxRuntimeConfig,
         isActive: false,
         usable: false,
@@ -129,7 +126,6 @@ describe.concurrent("sandbox profile versions list integration", () => {
         version: 2,
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: "2026-01-01 00:00:00+00",
-        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
         ...EmptySandboxRuntimeConfig,
         isActive: true,
         usable: true,
@@ -152,7 +148,6 @@ describe.concurrent("sandbox profile versions list integration", () => {
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: "2026-01-01 00:00:00+00",
-        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
         ...EmptySandboxRuntimeConfig,
         isActive: false,
         usable: false,
@@ -212,7 +207,6 @@ describe.concurrent("sandbox profile versions list integration", () => {
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
         publishedAt: null,
-        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
         ...EmptySandboxRuntimeConfig,
         isActive: false,
         usable: false,
@@ -349,7 +343,6 @@ describe.concurrent("sandbox profile versions list integration", () => {
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: "2026-01-01 00:00:00+00",
-        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
         ...EmptySandboxRuntimeConfig,
         isActive: false,
         usable: false,

@@ -46,29 +46,19 @@ function buildCommonEnv(): NodeJS.ProcessEnv {
 function buildDockerSandboxEnv(): NodeJS.ProcessEnv {
   return {
     ...buildCommonEnv(),
-    MISTLE_SANDBOX_STORAGE_BACKEND: "docker_volume",
     MISTLE_SANDBOX_DOCKER_ENABLED: "true",
     MISTLE_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
     MISTLE_SANDBOX_DOCKER_NETWORK_NAME: "mistle-single-container-network",
     MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL:
       "ws://mistle-single-container:5202/tunnel/sandbox",
-    MISTLE_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX: "mistle-",
   };
 }
 
 function buildRemoteSandboxEnv(): NodeJS.ProcessEnv {
   return {
     ...buildCommonEnv(),
-    MISTLE_SANDBOX_STORAGE_BACKEND: "archil",
     MISTLE_SANDBOX_E2B_ENABLED: "true",
     MISTLE_SANDBOX_E2B_API_KEY: "e2b-key",
-    MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY: "archil-key",
-    MISTLE_SANDBOX_STORAGE_ARCHIL_REGION: "gcp-us-central1",
-    MISTLE_SANDBOX_STORAGE_ARCHIL_MOUNT_OBJECT_STORE: "sandbox_storage",
-    MISTLE_OBJECT_STORE_SANDBOX_STORAGE_BUCKET_NAME: "sandbox-storage",
-    MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ENDPOINT: "https://sandbox-storage.example.test",
-    MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ACCESS_KEY_ID: "sandbox-access-key",
-    MISTLE_OBJECT_STORE_SANDBOX_STORAGE_SECRET_ACCESS_KEY: "sandbox-secret-key",
   };
 }
 
@@ -83,7 +73,6 @@ describe("generateContainerRuntimeConfig", () => {
       });
 
       expect(getValueAtPath(config, ["sandbox", "docker", "enabled"])).toBe(true);
-      expect(getValueAtPath(config, ["sandbox", "storage", "backend"])).toBe("docker_volume");
       expect(getValueAtPath(config, ["sandbox", "docker", "socket_path"])).toBe(
         "/var/run/docker.sock",
       );
@@ -108,10 +97,6 @@ describe("generateContainerRuntimeConfig", () => {
       });
 
       expect(getValueAtPath(config, ["sandbox", "e2b", "enabled"])).toBe(true);
-      expect(getValueAtPath(config, ["sandbox", "storage", "backend"])).toBe("archil");
-      expect(getValueAtPath(config, ["sandbox", "storage", "archil", "mount_object_store"])).toBe(
-        "sandbox_storage",
-      );
       expect(
         getValueAtPath(config, ["services", "data_plane_gateway", "sandbox_ws_internal_url"]),
       ).toBe("wss://gateway.example.test/tunnel/sandbox");

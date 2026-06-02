@@ -24,14 +24,6 @@ export const SandboxProfileVersionStates = {
 export type SandboxProfileVersionState =
   (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
 
-export const SandboxProfileVersionDefaultPersistenceModes = {
-  EPHEMERAL: "ephemeral",
-  PERSISTENT: "persistent",
-} as const;
-
-export type SandboxProfileVersionDefaultPersistenceMode =
-  (typeof SandboxProfileVersionDefaultPersistenceModes)[keyof typeof SandboxProfileVersionDefaultPersistenceModes];
-
 export const SandboxProfileVersionAgentRuntimeIds = {
   CODEX: "codex",
   OPENCODE: "opencode",
@@ -58,10 +50,6 @@ export function defineSandboxProfileVersions(schema: PgSchema) {
       snapshotImageId: text("snapshot_image_id"),
       setupScript: text("setup_script"),
       maintenanceScript: text("maintenance_script"),
-      defaultPersistenceMode: text("default_persistence_mode")
-        .notNull()
-        .$type<SandboxProfileVersionDefaultPersistenceMode>()
-        .default(SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL),
       sandboxProvider: text("sandbox_provider"),
       sandboxConnectionId: text("sandbox_connection_id"),
       sandboxVcpuCount: bigint("sandbox_vcpu_count", { mode: "number" }),

@@ -477,7 +477,6 @@ const SandboxProvidersResultSchema = z
 const SandboxProfileVersionSchema = z
   .object({
     agentRuntimeId: AgentRuntimeIdSchema,
-    defaultPersistenceMode: z.enum(["ephemeral", "persistent"]),
     isActive: z.boolean(),
     latestSnapshotJob: z
       .object({
@@ -634,7 +633,6 @@ const PutSandboxProfileVersionDraftResultSchema = z
     gitCommitSigningIntegrationConnectionId: z.string().min(1).nullable(),
     mistleMcpEnabled: z.boolean(),
     mistleMcpApiKeyId: z.string().min(1).nullable(),
-    defaultPersistenceMode: z.enum(["ephemeral", "persistent"]),
     sandboxConnectionId: z.string().min(1).nullable(),
     sandboxProvider: z.string().min(1).nullable(),
     sandboxResources: SandboxProfileVersionResourcesSchema.nullable(),
@@ -1213,9 +1211,6 @@ export async function putSandboxProfileVersionDraft(
       )}/draft`,
       body: {
         ...(input.setupScript === undefined ? {} : { setupScript: input.setupScript }),
-        ...(input.defaultPersistenceMode === undefined
-          ? {}
-          : { defaultPersistenceMode: input.defaultPersistenceMode }),
         ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
         ...(input.gitCommitSigningIntegrationConnectionId === undefined
           ? {}

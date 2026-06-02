@@ -70,7 +70,6 @@ describe("resolveSnapshotPanelState", () => {
         version: 1,
         state: "published",
         publishedAt: "2026-05-21T09:30:00.000Z",
-        defaultPersistenceMode: "ephemeral",
         agentRuntimeId: "codex",
         gitCommitSigningIntegrationConnectionId: null,
         mistleMcpEnabled: false,

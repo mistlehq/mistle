@@ -1,7 +1,6 @@
 import {
   type DataPlaneDatabase,
   type DataPlaneTables,
-  type SandboxInstancePersistenceMode,
   SandboxInstanceStatuses,
 } from "@mistle/db/data-plane";
 import { CompiledRuntimePlanSchema, type CompiledRuntimePlan } from "@mistle/integrations-core";
@@ -11,13 +10,12 @@ import { and, eq, isNull } from "drizzle-orm";
 export type ResumableSandboxInstanceState = {
   sandboxInstanceId: string;
   organizationId: string;
-  persistenceMode: SandboxInstancePersistenceMode;
   runtimeProvider: SandboxProvider;
   sandboxConnectionId: string | null;
   sandboxVcpuCount: number | null;
   sandboxMemoryMb: number | null;
   sandboxStorageMb: number | null;
-  providerSandboxId: string | null;
+  providerSandboxId: string;
   computeGeneration: number;
   runtimePlan: CompiledRuntimePlan;
 };
@@ -33,7 +31,6 @@ export async function resolveResumableSandboxInstanceState(input: {
   const [sandboxInstance] = await input.db
     .select({
       organizationId: sandboxInstances.organizationId,
-      persistenceMode: sandboxInstances.persistenceMode,
       runtimeProvider: sandboxInstances.runtimeProvider,
       sandboxConnectionId: sandboxInstances.sandboxConnectionId,
       sandboxVcpuCount: sandboxInstances.sandboxVcpuCount,
@@ -77,10 +74,7 @@ export async function resolveResumableSandboxInstanceState(input: {
     );
   }
 
-  if (
-    sandboxInstance.providerSandboxId === null &&
-    sandboxInstance.persistenceMode !== "persistent"
-  ) {
+  if (sandboxInstance.providerSandboxId === null) {
     throw new Error(
       `Expected resumable sandbox instance '${input.sandboxInstanceId}' to have a provider sandbox id.`,
     );
@@ -95,7 +89,6 @@ export async function resolveResumableSandboxInstanceState(input: {
   return {
     sandboxInstanceId: input.sandboxInstanceId,
     organizationId: sandboxInstance.organizationId,
-    persistenceMode: sandboxInstance.persistenceMode,
     runtimeProvider: sandboxInstance.runtimeProvider,
     sandboxConnectionId: sandboxInstance.sandboxConnectionId,
     sandboxVcpuCount: sandboxInstance.sandboxVcpuCount,

@@ -55,14 +55,6 @@ export const SandboxStopReasons = {
 
 export type SandboxStopReason = (typeof SandboxStopReasons)[keyof typeof SandboxStopReasons];
 
-export const SandboxInstancePersistenceModes = {
-  EPHEMERAL: "ephemeral",
-  PERSISTENT: "persistent",
-} as const;
-
-export type SandboxInstancePersistenceMode =
-  (typeof SandboxInstancePersistenceModes)[keyof typeof SandboxInstancePersistenceModes];
-
 export function defineSandboxInstances(schema: PgSchema) {
   return schema.table(
     "sandbox_instances",
@@ -92,10 +84,6 @@ export function defineSandboxInstances(schema: PgSchema) {
         .$type<SandboxInstancePurpose>()
         .default(SandboxInstancePurposes.SESSION),
       title: text("title"),
-      persistenceMode: text("persistence_mode")
-        .notNull()
-        .$type<SandboxInstancePersistenceMode>()
-        .default(SandboxInstancePersistenceModes.EPHEMERAL),
       startedAt: timestamp("started_at", { withTimezone: true, mode: "string" }),
       stoppedAt: timestamp("stopped_at", { withTimezone: true, mode: "string" }),
       stopReason: text("stop_reason").$type<SandboxStopReason>(),

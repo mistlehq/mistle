@@ -5,8 +5,8 @@ use std::path::Path;
 use mstl_core::client::{
     ListSandboxProfileVersionsResponse, ListSandboxProfilesResponse, SandboxProfile,
     SandboxProfileStatus, SandboxProfileVersion, SandboxProfileVersionAgentRuntimeId,
-    SandboxProfileVersionDefaultPersistenceMode, SandboxProfileVersionState,
-    UpdateSandboxProfileVersionDraftRequest, UpdateSandboxProfileVersionDraftResponse,
+    SandboxProfileVersionState, UpdateSandboxProfileVersionDraftRequest,
+    UpdateSandboxProfileVersionDraftResponse,
 };
 
 use crate::config::mistle_client;
@@ -280,13 +280,12 @@ fn render_sandbox_profile_versions(response: &ListSandboxProfileVersionsResponse
     let mut output = String::new();
 
     output.push_str(&format!(
-        "{:<version_width$}  {:<state_width$}  {:<active_width$}  {:<usable_width$}  {:<runtime_width$}  {:<persistence_width$}  {:<provider_width$}  {}\n",
+        "{:<version_width$}  {:<state_width$}  {:<active_width$}  {:<usable_width$}  {:<runtime_width$}  {:<provider_width$}  {}\n",
         "VERSION",
         "STATE",
         "ACTIVE",
         "USABLE",
         "RUNTIME",
-        "PERSISTENCE",
         "PROVIDER",
         "CONNECTION",
         version_width = widths.version,
@@ -294,19 +293,17 @@ fn render_sandbox_profile_versions(response: &ListSandboxProfileVersionsResponse
         active_width = widths.active,
         usable_width = widths.usable,
         runtime_width = widths.runtime,
-        persistence_width = widths.persistence,
         provider_width = widths.provider,
     ));
 
     for row in rows {
         output.push_str(&format!(
-            "{:<version_width$}  {:<state_width$}  {:<active_width$}  {:<usable_width$}  {:<runtime_width$}  {:<persistence_width$}  {:<provider_width$}  {}\n",
+            "{:<version_width$}  {:<state_width$}  {:<active_width$}  {:<usable_width$}  {:<runtime_width$}  {:<provider_width$}  {}\n",
             row.version,
             row.state,
             row.active,
             row.usable,
             row.runtime,
-            row.persistence,
             row.provider,
             row.connection,
             version_width = widths.version,
@@ -314,7 +311,6 @@ fn render_sandbox_profile_versions(response: &ListSandboxProfileVersionsResponse
             active_width = widths.active,
             usable_width = widths.usable,
             runtime_width = widths.runtime,
-            persistence_width = widths.persistence,
             provider_width = widths.provider,
         ));
     }
@@ -384,7 +380,6 @@ struct SandboxProfileVersionRow {
     active: &'static str,
     usable: &'static str,
     runtime: &'static str,
-    persistence: &'static str,
     provider: String,
     connection: String,
 }
@@ -397,7 +392,6 @@ impl SandboxProfileVersionRow {
             active: format_bool(version.is_active),
             usable: format_bool(version.usable),
             runtime: profile_version_agent_runtime_label(&version.agent_runtime_id),
-            persistence: profile_version_persistence_mode_label(&version.default_persistence_mode),
             provider: format_optional_value(version.sandbox_provider.as_deref()).to_owned(),
             connection: format_optional_value(version.sandbox_connection_id.as_deref()).to_owned(),
         }
@@ -410,7 +404,6 @@ struct SandboxProfileVersionTableWidths {
     active: usize,
     usable: usize,
     runtime: usize,
-    persistence: usize,
     provider: usize,
 }
 
@@ -422,7 +415,6 @@ impl SandboxProfileVersionTableWidths {
             active: "ACTIVE".len(),
             usable: "USABLE".len(),
             runtime: "RUNTIME".len(),
-            persistence: "PERSISTENCE".len(),
             provider: "PROVIDER".len(),
         };
 
@@ -432,7 +424,6 @@ impl SandboxProfileVersionTableWidths {
             widths.active = widths.active.max(row.active.len());
             widths.usable = widths.usable.max(row.usable.len());
             widths.runtime = widths.runtime.max(row.runtime.len());
-            widths.persistence = widths.persistence.max(row.persistence.len());
             widths.provider = widths.provider.max(row.provider.len());
         }
 
@@ -463,15 +454,6 @@ fn profile_version_agent_runtime_label(
     }
 }
 
-fn profile_version_persistence_mode_label(
-    persistence_mode: &SandboxProfileVersionDefaultPersistenceMode,
-) -> &'static str {
-    match persistence_mode {
-        SandboxProfileVersionDefaultPersistenceMode::Ephemeral => "ephemeral",
-        SandboxProfileVersionDefaultPersistenceMode::Persistent => "persistent",
-    }
-}
-
 fn format_active_version(active_version: Option<u32>) -> String {
     match active_version {
         Some(active_version) => active_version.to_string(),
@@ -484,8 +466,7 @@ mod tests {
     use mstl_core::client::{
         ListSandboxProfileVersionsResponse, ListSandboxProfilesResponse, SandboxProfile,
         SandboxProfileStatus, SandboxProfileVersion, SandboxProfileVersionAgentRuntimeId,
-        SandboxProfileVersionDefaultPersistenceMode, SandboxProfileVersionState,
-        UpdateSandboxProfileVersionDraftResponse,
+        SandboxProfileVersionState, UpdateSandboxProfileVersionDraftResponse,
     };
 
     use crate::profile::{
@@ -589,8 +570,6 @@ mod tests {
                     is_active: false,
                     usable: false,
                     agent_runtime_id: SandboxProfileVersionAgentRuntimeId::Codex,
-                    default_persistence_mode:
-                        SandboxProfileVersionDefaultPersistenceMode::Persistent,
                     sandbox_provider: Some("daytona".to_owned()),
                     sandbox_connection_id: Some("icn_daytona".to_owned()),
                 },
@@ -601,8 +580,6 @@ mod tests {
                     is_active: true,
                     usable: true,
                     agent_runtime_id: SandboxProfileVersionAgentRuntimeId::Opencode,
-                    default_persistence_mode:
-                        SandboxProfileVersionDefaultPersistenceMode::Ephemeral,
                     sandbox_provider: None,
                     sandbox_connection_id: None,
                 },
@@ -612,9 +589,9 @@ mod tests {
         assert_eq!(
             render_sandbox_profile_versions(&response),
             concat!(
-                "VERSION  STATE      ACTIVE  USABLE  RUNTIME   PERSISTENCE  PROVIDER  CONNECTION\n",
-                "3        draft      no      no      codex     persistent   daytona   icn_daytona\n",
-                "2        published  yes     yes     opencode  ephemeral    -         -\n",
+                "VERSION  STATE      ACTIVE  USABLE  RUNTIME   PROVIDER  CONNECTION\n",
+                "3        draft      no      no      codex     daytona   icn_daytona\n",
+                "2        published  yes     yes     opencode  -         -\n",
             ),
         );
     }
@@ -625,7 +602,6 @@ mod tests {
             sandbox_profile_id: "sbp_python".to_owned(),
             version: 3,
             setup_script: Some("#!/usr/bin/env bash\npnpm install".to_owned()),
-            default_persistence_mode: SandboxProfileVersionDefaultPersistenceMode::Persistent,
             agent_runtime_id: SandboxProfileVersionAgentRuntimeId::Codex,
             sandbox_provider: Some("daytona".to_owned()),
             sandbox_connection_id: Some("icn_daytona".to_owned()),

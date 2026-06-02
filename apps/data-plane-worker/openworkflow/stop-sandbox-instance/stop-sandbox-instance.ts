@@ -4,7 +4,6 @@ import {
   SandboxInstanceStatuses,
   type DataPlaneDatabase,
   type DataPlaneTables,
-  type SandboxInstancePersistenceMode,
   type SandboxInstancePurpose,
   type SandboxInstanceProvider,
 } from "@mistle/db/data-plane";
@@ -29,7 +28,6 @@ import { markSandboxInstanceStopped } from "./mark-sandbox-instance-stopped.js";
 
 type StoppableSandboxInstanceStopState = {
   organizationId: string;
-  persistenceMode: SandboxInstancePersistenceMode;
   purpose: SandboxInstancePurpose;
   runtimeProvider: SandboxInstanceProvider;
   sandboxConnectionId: string | null;
@@ -107,7 +105,6 @@ async function resolveStoppableSandboxInstanceStopState(input: {
   const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
     columns: {
       organizationId: true,
-      persistenceMode: true,
       purpose: true,
       runtimeProvider: true,
       sandboxConnectionId: true,
@@ -147,7 +144,6 @@ async function resolveStoppableSandboxInstanceStopState(input: {
 
   return {
     organizationId: sandboxInstance.organizationId,
-    persistenceMode: sandboxInstance.persistenceMode,
     purpose: sandboxInstance.purpose,
     runtimeProvider: sandboxInstance.runtimeProvider,
     sandboxConnectionId: sandboxInstance.sandboxConnectionId,
@@ -344,15 +340,9 @@ export async function stopSandboxInstance(
   try {
     await stopSandbox(
       {
-        db: ctx.db,
-        tables: ctx.tables,
-        controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-        config: ctx.config,
         sandboxAdapter: resolvedRuntime.sandboxAdapter,
       },
       {
-        sandboxInstanceId: input.sandboxInstanceId,
-        persistenceMode: sandboxInstanceState.persistenceMode,
         runtimeProvider: sandboxInstanceState.runtimeProvider,
         providerSandboxId: sandboxInstanceState.providerSandboxId,
       },

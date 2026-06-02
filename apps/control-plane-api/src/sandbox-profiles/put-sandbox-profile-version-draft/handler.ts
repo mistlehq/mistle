@@ -33,9 +33,6 @@ const routeHandler = async (
         profileId,
         profileVersion: version,
         ...(body.setupScript === undefined ? {} : { setupScript: body.setupScript }),
-        ...(body.defaultPersistenceMode === undefined
-          ? {}
-          : { defaultPersistenceMode: body.defaultPersistenceMode }),
         ...(body.agentRuntimeId === undefined ? {} : { agentRuntimeId: body.agentRuntimeId }),
         ...(body.gitCommitSigningIntegrationConnectionId === undefined
           ? {}

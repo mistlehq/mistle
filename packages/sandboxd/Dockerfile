@@ -115,8 +115,6 @@ RUN apt-get update \
     procps \
     rsync \
     zip \
-  && curl -fsSL https://archil.com/install | ARCHIL_SKIP_IAM_CHECK=1 sh \
-  && ln -sf /usr/bin/archil /opt/mistle/bin/archil \
   && rm -rf /var/lib/apt/lists/*
 
 FROM sandbox-base-tooling AS sandbox-base

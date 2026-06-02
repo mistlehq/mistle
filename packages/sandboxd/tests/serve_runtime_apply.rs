@@ -75,7 +75,7 @@ fn daemon_applies_startup_input_after_init_submission() {
         &global_git_config_path,
     )
     .expect("daemon should start");
-    control::submit_init(&control_socket_path, &startup_input, true, false)
+    control::submit_init(&control_socket_path, &startup_input, true)
         .expect("init submission should succeed");
 
     wait_for_file_contents_or_init_failure(&server, &startup_output_path, "startup");

@@ -1,7 +1,5 @@
 import type { SandboxInspectDisposition } from "@mistle/sandbox";
 
-const PersistentSandboxPersistenceMode = "persistent";
-
 export type ProviderResumeInspectionState = SandboxInspectDisposition | "missing";
 
 export type ExistingProviderResumeAction =
@@ -12,16 +10,12 @@ export type ExistingProviderResumeAction =
       kind: "use_active_provider";
     }
   | {
-      kind: "replace_provider_compute";
-    }
-  | {
       kind: "fail";
       failureCode: string;
       failureMessage: string;
     };
 
 export function determineExistingProviderResumeAction(input: {
-  persistenceMode: string;
   providerState: ProviderResumeInspectionState;
 }): ExistingProviderResumeAction {
   switch (input.providerState) {
@@ -34,24 +28,12 @@ export function determineExistingProviderResumeAction(input: {
         kind: "resume_provider",
       };
     case "missing":
-      if (input.persistenceMode === PersistentSandboxPersistenceMode) {
-        return {
-          kind: "replace_provider_compute",
-        };
-      }
-
       return {
         kind: "fail",
         failureCode: "provider_runtime_missing",
         failureMessage: "Sandbox runtime was not found at the provider before resume.",
       };
     case "terminal_stopped":
-      if (input.persistenceMode === PersistentSandboxPersistenceMode) {
-        return {
-          kind: "replace_provider_compute",
-        };
-      }
-
       return {
         kind: "fail",
         failureCode: "provider_runtime_not_resumable",

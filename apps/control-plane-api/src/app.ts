@@ -21,7 +21,6 @@ import { createInternalIntegrationConnectionsRoutes } from "./internal/integrati
 import { createInternalIntegrationCredentialsRoutes } from "./internal/integration-credentials/index.js";
 import { createInternalSandboxProfileVersionSnapshotJobRoutes } from "./internal/sandbox-profile-version-snapshot-jobs/index.js";
 import { createInternalSandboxRuntimeRoutes } from "./internal/sandbox-runtime/index.js";
-import { createInternalSandboxStorageRoutes } from "./internal/sandbox-storage/index.js";
 import { createInternalSchedulesRoutes } from "./internal/schedules/index.js";
 import { createMcpRoutes } from "./mcp/index.js";
 import { createCurrentActorMeRoutes, createMeRoutes } from "./me/index.js";
@@ -222,7 +221,6 @@ export function registerInternalApiRouteModules(app: ControlPlaneApp): void {
   const internalSchedulesRoutes = createInternalSchedulesRoutes();
   const internalSandboxProfileVersionSnapshotJobRoutes =
     createInternalSandboxProfileVersionSnapshotJobRoutes();
-  const internalSandboxStorageRoutes = createInternalSandboxStorageRoutes();
   const internalSandboxRuntimeRoutes = createInternalSandboxRuntimeRoutes();
 
   app.route(
@@ -239,6 +237,5 @@ export function registerInternalApiRouteModules(app: ControlPlaneApp): void {
     internalSandboxProfileVersionSnapshotJobRoutes.basePath,
     internalSandboxProfileVersionSnapshotJobRoutes.routes,
   );
-  app.route(internalSandboxStorageRoutes.basePath, internalSandboxStorageRoutes.routes);
   app.route(internalSandboxRuntimeRoutes.basePath, internalSandboxRuntimeRoutes.routes);
 }

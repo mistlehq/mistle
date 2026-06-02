@@ -241,14 +241,6 @@ export {
   type InsertOrganizationCredentialKey,
   type OrganizationCredentialKey,
 } from "./organization-credential-keys.js";
-export {
-  organizationSandboxStorageSettings,
-  SandboxStorageBackend,
-  SandboxStorageConfigSources,
-  type InsertOrganizationSandboxStorageSettings,
-  type OrganizationSandboxStorageSettings,
-  type SandboxStorageConfigSource,
-} from "./organization-sandbox-storage-settings.js";
 export { organizations } from "./organizations.js";
 export {
   portAccessLinks,
@@ -266,14 +258,12 @@ export type {
 export {
   sandboxProfileVersions,
   SandboxProfileVersionAgentRuntimeIds,
-  SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionStates,
 } from "./sandbox-profile-versions.js";
 export type {
   InsertSandboxProfileVersion,
   SandboxProfileVersion,
   SandboxProfileVersionAgentRuntimeId,
-  SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionState,
 } from "./sandbox-profile-versions.js";
 export {

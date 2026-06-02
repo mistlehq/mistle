@@ -5,7 +5,6 @@
 import {
   TriggerKinds,
   SandboxProfileVersionAgentRuntimeIds,
-  SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
@@ -95,7 +94,6 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
         version: 2,
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: "2026-04-24 00:02:00+00",
-        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
         ...DockerSandboxRuntimeConfig,
         gitCommitSigningIntegrationConnectionId: null,
         isActive: true,
@@ -326,7 +324,6 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: "2026-04-25 00:01:00+00",
-        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
         ...DockerSandboxRuntimeConfig,
         gitCommitSigningIntegrationConnectionId: null,
         isActive: false,

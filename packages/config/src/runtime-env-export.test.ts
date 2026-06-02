@@ -241,13 +241,5 @@ describe("exportServiceConfigToEnv", () => {
       name: "MISTLE_SANDBOX_E2B_MEMORY_MB",
       value: 8192,
     });
-    expectEntry(entries, {
-      name: "MISTLE_SANDBOX_STORAGE_ARCHIL_MOUNT_OBJECT_STORE",
-      value: "sandbox_storage",
-    });
-    expectEntry(entries, {
-      name: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_SECRET_ACCESS_KEY",
-      value: "replace-with-sandbox-storage-secret-key",
-    });
   });
 });

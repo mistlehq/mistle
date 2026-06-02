@@ -1,9 +1,4 @@
-import type {
-  SandboxAdapter,
-  SandboxImageHandle,
-  SandboxProvider,
-  SandboxStartStoragePreparation,
-} from "@mistle/sandbox";
+import type { SandboxAdapter, SandboxImageHandle, SandboxProvider } from "@mistle/sandbox";
 import type {
   StartSandboxInstanceWorkflowImageInput,
   SandboxRuntimeResourceInput,
@@ -13,16 +8,13 @@ import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 
 const SandboxRuntimeSandboxInstanceIDEnv = "SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID";
 const SandboxdTestFaultsEnabledEnv = "MISTLE_SANDBOXD_ENABLE_TEST_FAULTS";
-export const SandboxdWaitForStorageAttachEnv = "MISTLE_SANDBOXD_WAIT_FOR_STORAGE_ATTACH";
 
 export function createSandboxRuntimeEnv(input: {
   config: DataPlaneWorkerRuntimeConfig;
   sandboxInstanceId: string;
-  waitForStorageAttach?: boolean;
 }): Record<string, string> {
   return {
     [SandboxRuntimeSandboxInstanceIDEnv]: input.sandboxInstanceId,
-    ...(input.waitForStorageAttach === true ? { [SandboxdWaitForStorageAttachEnv]: "1" } : {}),
     ...(input.config.app.sandbox.sandboxdTestFaultsEnabled === true
       ? {
           [SandboxdTestFaultsEnabledEnv]: "1",
@@ -84,7 +76,6 @@ export async function startSandbox(
     image: StartSandboxInstanceWorkflowImageInput;
     runtimeProvider: SandboxProvider;
     resources?: SandboxRuntimeResourceInput;
-    storagePreparation?: SandboxStartStoragePreparation;
   },
 ): Promise<{
   sandboxInstanceId: string;
@@ -106,9 +97,6 @@ export async function startSandbox(
       sandboxInstanceId: input.sandboxInstanceId,
     }),
     ...(input.resources === undefined ? {} : { resources: input.resources }),
-    ...(input.storagePreparation === undefined
-      ? {}
-      : { storagePreparation: input.storagePreparation }),
   });
 
   if (startedSandbox.provider !== input.runtimeProvider) {

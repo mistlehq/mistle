@@ -3,7 +3,6 @@ import {
   getControlPlaneDatabaseSchema,
   type SandboxProfileVersionAgentRuntimeId,
   isControlPlaneUniqueViolation,
-  type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 
@@ -30,7 +29,6 @@ type CreateProfileVersionDraftOutput = {
   version: number;
   state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
   publishedAt: string | null;
-  defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
   agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
   gitCommitSigningIntegrationConnectionId: string | null;
   mistleMcpEnabled: boolean;
@@ -91,7 +89,6 @@ export async function createProfileVersionDraft(
           version: true,
           setupScript: true,
           maintenanceScript: true,
-          defaultPersistenceMode: true,
           agentRuntimeId: true,
           gitCommitSigningIntegrationConnectionId: true,
           mistleMcpEnabled: true,
@@ -136,7 +133,6 @@ export async function createProfileVersionDraft(
           state: SandboxProfileVersionStates.DRAFT,
           setupScript: latestVersion.setupScript,
           maintenanceScript: latestVersion.maintenanceScript,
-          defaultPersistenceMode: latestVersion.defaultPersistenceMode,
           agentRuntimeId: latestVersion.agentRuntimeId,
           gitCommitSigningIntegrationConnectionId:
             latestVersion.gitCommitSigningIntegrationConnectionId,
@@ -153,7 +149,6 @@ export async function createProfileVersionDraft(
           version: tables.sandboxProfileVersions.version,
           state: tables.sandboxProfileVersions.state,
           publishedAt: tables.sandboxProfileVersions.publishedAt,
-          defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
           agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
           gitCommitSigningIntegrationConnectionId:
             tables.sandboxProfileVersions.gitCommitSigningIntegrationConnectionId,
@@ -189,7 +184,6 @@ export async function createProfileVersionDraft(
         version: createdDraftVersion.version,
         state: createdDraftVersion.state,
         publishedAt: createdDraftVersion.publishedAt,
-        defaultPersistenceMode: createdDraftVersion.defaultPersistenceMode,
         agentRuntimeId: createdDraftVersion.agentRuntimeId,
         gitCommitSigningIntegrationConnectionId:
           createdDraftVersion.gitCommitSigningIntegrationConnectionId,

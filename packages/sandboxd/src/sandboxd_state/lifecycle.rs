@@ -55,7 +55,6 @@ use crate::sandboxd_state::setup_script::run_setup_script_with_output_sink;
 use crate::sandboxd_state::snapshot::scrub_snapshot_runtime_artifacts;
 use crate::startup_diagnostics::{
     StartupDiagnosticsLogger, StartupTranscriptStream, startup_diagnostics_string,
-    startup_diagnostics_u64,
 };
 use crate::supervision::{SandboxdHealthSnapshot, SandboxdSupervisorHandle};
 use crate::time::{Clock, Sleeper};
@@ -131,9 +130,6 @@ pub(crate) const GLOBAL_GIT_CONFIG_ENV_NAME: &str = "GIT_CONFIG_GLOBAL";
 pub(crate) const DEFAULT_GLOBAL_GIT_CONFIG_PATH: &str = "/root/.gitconfig";
 pub(crate) const SETUP_SCRIPT_WORKING_DIRECTORY: &str = "/root";
 pub(crate) const SETUP_SCRIPT_FILE_MODE: u32 = 0o700;
-const STORAGE_ATTACH_SIGNAL_PATH: &str = "/run/mistle/storage-attached";
-const STORAGE_ATTACH_SIGNAL_POLL_INTERVAL: std::time::Duration =
-    std::time::Duration::from_millis(100);
 
 /// Owns the initialized sandbox runtime resources for one daemon process.
 pub struct SandboxdState {
@@ -169,7 +165,6 @@ impl SandboxdState {
         clock: Arc<dyn Clock>,
         sleeper: Arc<dyn Sleeper>,
         diagnostics_logger: Option<StartupDiagnosticsLogger>,
-        wait_for_storage_attach: bool,
     ) -> Result<Self, SandboxdStateError> {
         let runtime_plan: runtime::CompiledRuntimePlan =
             serde_json::from_value(startup_input.runtime_plan.clone()).map_err(|error| {
@@ -226,9 +221,6 @@ impl SandboxdState {
                 "start_tunnel_session",
                 timeline_attributes("tunnel", "Connecting tunnel"),
             );
-        }
-        if wait_for_storage_attach {
-            wait_for_storage_attach_signal(clock.as_ref(), sleeper.as_ref(), &diagnostics_logger);
         }
         record_operation_phase_started_with_attributes(
             &diagnostics_logger,
@@ -454,10 +446,8 @@ impl SandboxdState {
             }
         }
         if startup_input.is_snapshot() {
-            // Snapshot materialization captures image-layer state only. Later session launches may
-            // mount persistent storage at paths like /root and /etc/codex, which would shadow any
-            // image contents there, so snapshot workflows must stop here and run on ephemeral
-            // sandboxes without session runtime resources or persistent mounts.
+            // Snapshot materialization captures image-layer state only, so snapshot workflows stop
+            // here before starting session runtime resources.
             record_operation_phase_started(&diagnostics_logger, "stop_egress_proxy");
             if let Some(egress_proxy) = egress_proxy.take() {
                 egress_proxy.close().map_err(|error| {
@@ -954,26 +944,6 @@ impl SandboxdState {
             .force_current_server_shutdown_for_test()
             .map_err(|error| error.to_string())
     }
-}
-
-fn wait_for_storage_attach_signal(
-    clock: &dyn Clock,
-    sleeper: &dyn Sleeper,
-    diagnostics_logger: &Option<StartupDiagnosticsLogger>,
-) {
-    record_operation_phase_started(diagnostics_logger, "wait_storage_attach");
-    let started_at_ms = clock.now_ms();
-    while !Path::new(STORAGE_ATTACH_SIGNAL_PATH).exists() {
-        sleeper.sleep(STORAGE_ATTACH_SIGNAL_POLL_INTERVAL);
-    }
-    record_operation_phase_completed_with_attributes(
-        diagnostics_logger,
-        "wait_storage_attach",
-        BTreeMap::from([(
-            "durationMs".to_string(),
-            startup_diagnostics_u64(clock.now_ms().saturating_sub(started_at_ms)),
-        )]),
-    );
 }
 
 #[derive(Clone)]

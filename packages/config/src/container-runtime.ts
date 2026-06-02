@@ -56,16 +56,6 @@ const E2BSandboxRequiredEnvVars = ["MISTLE_SANDBOX_E2B_API_KEY"];
 
 const TensorlakeSandboxRequiredEnvVars = ["MISTLE_SANDBOX_TENSORLAKE_API_KEY"];
 
-const ArchilStorageRequiredEnvVars = [
-  "MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY",
-  "MISTLE_SANDBOX_STORAGE_ARCHIL_REGION",
-  "MISTLE_SANDBOX_STORAGE_ARCHIL_MOUNT_OBJECT_STORE",
-  "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_BUCKET_NAME",
-  "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ENDPOINT",
-  "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ACCESS_KEY_ID",
-  "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_SECRET_ACCESS_KEY",
-];
-
 function createSecret(): string {
   return randomBytes(32).toString("base64url");
 }
@@ -106,7 +96,6 @@ function requireRuntimeEnv(env: NodeJS.ProcessEnv): void {
   const e2bEnabled = readOptionalBooleanEnv(env, "MISTLE_SANDBOX_E2B_ENABLED") === true;
   const tensorlakeEnabled =
     readOptionalBooleanEnv(env, "MISTLE_SANDBOX_TENSORLAKE_ENABLED") === true;
-  const storageBackend = readRequiredEnv(env, "MISTLE_SANDBOX_STORAGE_BACKEND");
   const requiredEnvVars = [...CommonRequiredEnvVars];
 
   if (!dockerEnabled && !e2bEnabled && !tensorlakeEnabled) {
@@ -125,14 +114,6 @@ function requireRuntimeEnv(env: NodeJS.ProcessEnv): void {
 
   if (tensorlakeEnabled) {
     requiredEnvVars.push(...TensorlakeSandboxRequiredEnvVars);
-  }
-
-  if (storageBackend === "archil") {
-    requiredEnvVars.push(...ArchilStorageRequiredEnvVars);
-  } else if (storageBackend !== "docker_volume") {
-    throw new Error(
-      `Unsupported MISTLE_SANDBOX_STORAGE_BACKEND '${storageBackend}'. Expected 'archil' or 'docker_volume'.`,
-    );
   }
 
   for (const envVar of requiredEnvVars) {

@@ -369,7 +369,7 @@ const MarketingHeroSessions = [
   }),
   buildSandboxInstanceListItemFixture({
     id: "sbi_storage_audit",
-    title: "Audit sandbox storage cleanup",
+    title: "Audit sandbox teardown logs",
     sandboxProfileDisplayName: "Security Reviewer",
     status: "stopped",
     createdAt: "2026-04-28T11:15:00.000Z",

@@ -1,13 +1,5 @@
 import { z } from "zod";
 
-export const SandboxStorageBackend = {
-  ARCHIL: "archil",
-  DOCKER_VOLUME: "docker_volume",
-} as const;
-
-export type SandboxStorageBackend =
-  (typeof SandboxStorageBackend)[keyof typeof SandboxStorageBackend];
-
 const GlobalTelemetryEndpointSchema = z
   .url()
   .refine((value) => {
@@ -105,18 +97,6 @@ export const PartialGlobalSandboxPublishConfigSchema = z
   })
   .strict();
 
-export const GlobalSandboxStorageConfigSchema = z
-  .object({
-    backend: z.enum([SandboxStorageBackend.ARCHIL, SandboxStorageBackend.DOCKER_VOLUME]).optional(),
-  })
-  .strict();
-
-export const PartialGlobalSandboxStorageConfigSchema = z
-  .object({
-    backend: z.enum([SandboxStorageBackend.ARCHIL, SandboxStorageBackend.DOCKER_VOLUME]).optional(),
-  })
-  .strict();
-
 export const GlobalSandboxConfigSchema = z
   .object({
     defaultBaseImage: z.string().trim().min(1),
@@ -127,7 +107,6 @@ export const GlobalSandboxConfigSchema = z
     egress: GlobalSandboxTokenConfigSchema,
     ptyTransport: GlobalSandboxTokenConfigSchema,
     publish: GlobalSandboxPublishConfigSchema,
-    storage: GlobalSandboxStorageConfigSchema.optional(),
   })
   .strict();
 
@@ -141,7 +120,6 @@ export const PartialGlobalSandboxConfigSchema = z
     egress: GlobalSandboxTokenConfigSchema.partial().optional(),
     ptyTransport: GlobalSandboxTokenConfigSchema.partial().optional(),
     publish: PartialGlobalSandboxPublishConfigSchema.optional(),
-    storage: PartialGlobalSandboxStorageConfigSchema.optional(),
   })
   .strict();
 

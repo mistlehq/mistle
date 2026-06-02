@@ -198,7 +198,6 @@ fn snapshot_materialization_initialization_applies_runtime_plan_and_skips_sessio
             Arc::new(SystemClock),
             Arc::new(ThreadSleeper),
             None,
-            false,
         )
         .expect("snapshot materialization init should succeed after static runtime-plan setup");
     gateway_thread
@@ -290,7 +289,6 @@ fn snapshot_materialization_gateway_egress_uses_common_minimal_bootstrap_tunnel_
                 StartupDiagnosticsLogger::initialize(StartupOperation::Init, &bootstrap_url)
                     .expect("startup diagnostics logger should initialize"),
             ),
-            false,
         )
         .expect("snapshot materialization init should use temporary gateway tunnel for setup");
 
@@ -411,7 +409,6 @@ fn session_start_from_snapshot_skips_setup_script() {
         Arc::new(SystemClock),
         Arc::new(ThreadSleeper),
         None,
-        false,
     )
     .expect("session start from snapshot should initialize");
 
@@ -545,7 +542,6 @@ fn session_initialization_uses_common_minimal_bootstrap_tunnel_phase() {
             StartupDiagnosticsLogger::initialize(StartupOperation::Init, &bootstrap_url)
                 .expect("startup diagnostics logger should initialize"),
         ),
-        false,
     )
     .expect("session initialization should use common gateway tunnel");
 
@@ -636,7 +632,6 @@ fn resume_reopens_minimal_bootstrap_tunnel_with_initial_runtime_not_ready() {
             StartupDiagnosticsLogger::initialize(StartupOperation::Init, &bootstrap_url)
                 .expect("startup diagnostics logger should initialize"),
         ),
-        false,
     )
     .expect("session initialization should succeed");
     wait_for_runtime_ready_value(
@@ -706,7 +701,6 @@ fn snapshot_materialization_state_rejects_resume() {
         Arc::new(SystemClock),
         Arc::new(ThreadSleeper),
         None,
-        false,
     )
     .expect("snapshot materialization init should succeed");
     gateway_thread

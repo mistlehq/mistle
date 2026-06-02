@@ -4,17 +4,13 @@ import type Docker from "dockerode";
 import { describe, expect } from "vitest";
 
 import {
-  createDockerClient,
-  SandboxPersistentStorageLayout,
   SandboxProvider,
   SandboxResourceNotFoundError,
   SandboxRuntimeEnv,
   SandboxRuntimeEnvDefaults,
-  SandboxStorageBackend,
 } from "../../src/index.js";
 import { createDockerAdapter } from "../../src/providers/docker/index.js";
 import {
-  createBaseImageHandle,
   dockerAdapterIntegrationEnabled,
   dockerAdapterIntegrationSettings,
   it,
@@ -23,7 +19,6 @@ import {
 const describeDockerAdapterIntegration = dockerAdapterIntegrationEnabled ? describe : describe.skip;
 const START_MARKER_FILE_PATH = "/tmp/mistle-start-marker.txt";
 const INJECTED_ENV_KEY = "MISTLE_SANDBOX_INJECTED_ENV";
-const SandboxBaseImageReference = "ghcr.io/mistlehq/sandbox-base:latest";
 
 type ContainerCommandResult = {
   exitCode: number;
@@ -58,24 +53,6 @@ async function readUtf8Stream(stream: NodeJS.ReadableStream): Promise<string> {
   }
 
   return output;
-}
-
-async function pullDockerImage(input: {
-  dockerClient: Docker;
-  imageReference: string;
-}): Promise<void> {
-  const stream = await input.dockerClient.pull(input.imageReference, {});
-
-  await new Promise<void>((resolve, reject) => {
-    input.dockerClient.modem.followProgress(stream, (error: unknown) => {
-      if (error instanceof Error) {
-        reject(error);
-        return;
-      }
-
-      resolve();
-    });
-  });
 }
 
 async function runContainerCommand(input: {
@@ -154,32 +131,6 @@ async function removeDockerImage(input: { dockerClient: Docker; imageId: string 
 }
 
 describeDockerAdapterIntegration("docker adapter integration", () => {
-  it("creates and deletes a named Docker volume", async ({ fixture }) => {
-    if (!dockerAdapterIntegrationSettings.enabled) {
-      throw new Error("Docker integration settings are required for the volume lifecycle test.");
-    }
-
-    const volumeName = `mistle-pr12-${randomUUID()}`;
-    const dockerClient = createDockerClient({
-      socketPath: dockerAdapterIntegrationSettings.socketPath,
-    });
-
-    await dockerClient.createVolume({
-      volumeName,
-    });
-
-    const inspectBeforeDelete = await fixture.dockerClient.getVolume(volumeName).inspect();
-    expect(inspectBeforeDelete.Name).toBe(volumeName);
-
-    await dockerClient.deleteVolume({
-      volumeName,
-    });
-
-    await expect(fixture.dockerClient.getVolume(volumeName).inspect()).rejects.toBeInstanceOf(
-      Error,
-    );
-  }, 300_000);
-
   it("starts a sandbox from a base image and exposes its filesystem", async ({ fixture }) => {
     const startMarker = `mistle-docker-start-${randomUUID()}`;
     let id: string | undefined;
@@ -391,192 +342,6 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
       if (id !== undefined) {
         await fixture.adapter.destroy({ id });
       }
-    }
-  }, 300_000);
-
-  it("starts persistent sandboxes with docker volume subpath mounts", async ({ fixture }) => {
-    if (!dockerAdapterIntegrationSettings.enabled) {
-      throw new Error("Docker integration settings are required for the persistent storage test.");
-    }
-
-    const dockerClient = createDockerClient({
-      socketPath: dockerAdapterIntegrationSettings.socketPath,
-    });
-    const volumeName = `mistle-pr13-${randomUUID()}`;
-    const rootMarkerPath = "/root/.mistle-durable-root.txt";
-    const codexMarkerPath = "/etc/codex/.mistle-durable-codex.txt";
-    const rootMarker = `root-${randomUUID()}`;
-    const codexMarker = `codex-${randomUUID()}`;
-    let firstSandboxId: string | undefined;
-    let secondSandboxId: string | undefined;
-
-    try {
-      await dockerClient.createVolume({
-        volumeName,
-      });
-
-      const storagePreparation = await fixture.adapter.prepareStorageForStart({
-        sandboxInstanceId: `sbi_${randomUUID().replaceAll("-", "").slice(0, 26)}`,
-        image: fixture.baseImage,
-        storage: {
-          backend: SandboxStorageBackend.DOCKER_VOLUME,
-          handle: volumeName,
-          layout: SandboxPersistentStorageLayout,
-        },
-      });
-
-      const firstSandbox = await fixture.adapter.start({
-        image: fixture.baseImage,
-        storagePreparation,
-      });
-      firstSandboxId = firstSandbox.id;
-
-      const firstInspection = await fixture.adapter.inspect({ id: firstSandbox.id });
-      if (firstInspection.provider !== SandboxProvider.DOCKER) {
-        throw new Error("Expected Docker sandbox inspection result for persistent sandbox.");
-      }
-
-      expect(firstInspection.raw.Mounts).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            Type: "volume",
-            Name: volumeName,
-            Destination: "/root",
-          }),
-          expect.objectContaining({
-            Type: "volume",
-            Name: volumeName,
-            Destination: "/etc/codex",
-          }),
-        ]),
-      );
-
-      await writeSandboxFile({
-        dockerClient: fixture.dockerClient,
-        id: firstSandbox.id,
-        path: rootMarkerPath,
-        fileContents: rootMarker,
-      });
-      await writeSandboxFile({
-        dockerClient: fixture.dockerClient,
-        id: firstSandbox.id,
-        path: codexMarkerPath,
-        fileContents: codexMarker,
-      });
-
-      await fixture.adapter.destroy({ id: firstSandbox.id });
-      firstSandboxId = undefined;
-
-      const secondPreparation = await fixture.adapter.prepareStorageForStart({
-        sandboxInstanceId: `sbi_${randomUUID().replaceAll("-", "").slice(0, 26)}`,
-        image: fixture.baseImage,
-        storage: {
-          backend: SandboxStorageBackend.DOCKER_VOLUME,
-          handle: volumeName,
-          layout: SandboxPersistentStorageLayout,
-        },
-      });
-
-      const secondSandbox = await fixture.adapter.start({
-        image: fixture.baseImage,
-        storagePreparation: secondPreparation,
-      });
-      secondSandboxId = secondSandbox.id;
-
-      await expect(
-        readSandboxFile({
-          dockerClient: fixture.dockerClient,
-          id: secondSandbox.id,
-          path: rootMarkerPath,
-        }),
-      ).resolves.toBe(rootMarker);
-      await expect(
-        readSandboxFile({
-          dockerClient: fixture.dockerClient,
-          id: secondSandbox.id,
-          path: codexMarkerPath,
-        }),
-      ).resolves.toBe(codexMarker);
-    } finally {
-      if (firstSandboxId !== undefined) {
-        await fixture.adapter.destroy({ id: firstSandboxId });
-      }
-      if (secondSandboxId !== undefined) {
-        await fixture.adapter.destroy({ id: secondSandboxId });
-      }
-      try {
-        await dockerClient.deleteVolume({
-          volumeName,
-        });
-      } catch {}
-    }
-  }, 300_000);
-
-  it("prepares Docker volumes for start with a lightweight helper image even when the sandbox image is the real base image", async ({
-    fixture,
-  }) => {
-    if (!dockerAdapterIntegrationSettings.enabled) {
-      throw new Error(
-        "Docker integration settings are required for the volume initialization test.",
-      );
-    }
-
-    const dockerClient = createDockerClient({
-      socketPath: dockerAdapterIntegrationSettings.socketPath,
-    });
-    const volumeName = `mistle-pr13-init-${randomUUID()}`;
-    let inspectorContainerId: string | undefined;
-
-    try {
-      await pullDockerImage({
-        dockerClient: fixture.dockerClient,
-        imageReference: "alpine:3.20",
-      });
-      await dockerClient.createVolume({
-        volumeName,
-      });
-
-      await fixture.adapter.prepareStorageForStart({
-        sandboxInstanceId: `sbi_${randomUUID().replaceAll("-", "").slice(0, 26)}`,
-        image: createBaseImageHandle(SandboxBaseImageReference),
-        storage: {
-          backend: SandboxStorageBackend.DOCKER_VOLUME,
-          handle: volumeName,
-          layout: SandboxPersistentStorageLayout,
-        },
-      });
-
-      const inspectorContainer = await fixture.dockerClient.createContainer({
-        Image: "alpine:3.20",
-        Cmd: ["sh", "-lc", "test -d /mnt/root && test -d /mnt/etc/codex"],
-        HostConfig: {
-          Mounts: [
-            {
-              Type: "volume",
-              Source: volumeName,
-              Target: "/mnt",
-            },
-          ],
-        },
-      });
-      inspectorContainerId = inspectorContainer.id;
-
-      await inspectorContainer.start();
-      await expect(inspectorContainer.wait()).resolves.toMatchObject({
-        StatusCode: 0,
-      });
-    } finally {
-      if (inspectorContainerId !== undefined) {
-        await fixture.dockerClient.getContainer(inspectorContainerId).remove({
-          force: true,
-        });
-      }
-
-      try {
-        await dockerClient.deleteVolume({
-          volumeName,
-        });
-      } catch {}
     }
   }, 300_000);
 

@@ -1,4 +1,3 @@
-import { getValueAtPath } from "../../../../packages/config/src/core/record.js";
 import { resolveLatestPublishedSandboxBaseImageRef } from "../../../../packages/config/src/sandbox-base-images.js";
 
 export const IntegrationSandboxProvider = {
@@ -18,33 +17,6 @@ type RequiredConfigValue = {
   path: readonly string[];
   envVar: string;
 };
-
-const ArchilIntegrationRequiredConfigValues = [
-  {
-    path: ["sandbox", "storage", "archil", "api_key"],
-    envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY",
-  },
-  {
-    path: ["sandbox", "storage", "archil", "region"],
-    envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_REGION",
-  },
-  {
-    path: ["object_store", "sandbox_storage", "bucket_name"],
-    envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_BUCKET_NAME",
-  },
-  {
-    path: ["object_store", "sandbox_storage", "endpoint"],
-    envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ENDPOINT",
-  },
-  {
-    path: ["object_store", "sandbox_storage", "access_key_id"],
-    envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ACCESS_KEY_ID",
-  },
-  {
-    path: ["object_store", "sandbox_storage", "secret_access_key"],
-    envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_SECRET_ACCESS_KEY",
-  },
-] as const satisfies readonly RequiredConfigValue[];
 
 export type IntegrationProviderPreset = {
   requiredConfigValues: readonly RequiredConfigValue[];
@@ -91,12 +63,6 @@ export function getRequiredIntegrationConfigValues(input: {
   if (input.providers.includes(IntegrationSandboxProvider.TENSORLAKE)) {
     presetRequiredConfigValues.push(...TENSORLAKE_REQUIRED_CONFIG_VALUES);
   }
-  const storageBackend = getValueAtPath(input.configRoot, ["sandbox", "storage", "backend"]);
-
-  if (storageBackend === "archil") {
-    return [...presetRequiredConfigValues, ...ArchilIntegrationRequiredConfigValues];
-  }
-
   return presetRequiredConfigValues;
 }
 

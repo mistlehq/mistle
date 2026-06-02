@@ -4,7 +4,6 @@ import {
   IntegrationBindingKinds,
   SandboxProfileStatuses,
   SandboxProfileVersionAgentRuntimeIds,
-  SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
@@ -36,10 +35,6 @@ const integrationBindingKindSchema = z.enum([
 const sandboxProfileVersionStateSchema = z.enum([
   SandboxProfileVersionStates.DRAFT,
   SandboxProfileVersionStates.PUBLISHED,
-]);
-const sandboxProfileVersionDefaultPersistenceModeSchema = z.enum([
-  SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
-  SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
 ]);
 const sandboxProfileVersionAgentRuntimeIdSchema = z.enum([
   SandboxProfileVersionAgentRuntimeIds.CODEX,
@@ -131,7 +126,6 @@ export const sandboxProfileVersionIntegrationBindingSchema = createSelectSchema(
 
 export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVersions, {
   state: sandboxProfileVersionStateSchema,
-  defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema,
   publishedAt: z.string().min(1).nullable(),
   version: z.number().int().min(1),
   agentRuntimeId: sandboxProfileVersionAgentRuntimeIdSchema,
@@ -144,7 +138,6 @@ export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVers
     version: true,
     state: true,
     publishedAt: true,
-    defaultPersistenceMode: true,
     agentRuntimeId: true,
     gitCommitSigningIntegrationConnectionId: true,
     mistleMcpEnabled: true,
@@ -176,14 +169,6 @@ export const sandboxProfileVersionMaintenanceScriptSchema = z
     sandboxProfileId: z.string().min(1),
     version: z.number().int().min(1),
     maintenanceScript: z.string().min(1).nullable(),
-  })
-  .strict();
-
-export const sandboxProfileVersionPersistenceModeSchema = z
-  .object({
-    sandboxProfileId: z.string().min(1),
-    version: z.number().int().min(1),
-    defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema,
   })
   .strict();
 
@@ -336,7 +321,6 @@ export const getSandboxProfileVersionSetupScriptResponseSchema =
 export const putSandboxProfileVersionDraftBodySchema = z
   .object({
     setupScript: z.string().min(1).nullable().optional(),
-    defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema.optional(),
     agentRuntimeId: sandboxProfileVersionAgentRuntimeIdSchema.optional(),
     gitCommitSigningIntegrationConnectionId: z.string().min(1).nullable().optional(),
     mistleMcpEnabled: z.boolean().optional(),
@@ -350,7 +334,6 @@ export const putSandboxProfileVersionDraftBodySchema = z
   .refine(
     (value) =>
       value.setupScript !== undefined ||
-      value.defaultPersistenceMode !== undefined ||
       value.agentRuntimeId !== undefined ||
       value.gitCommitSigningIntegrationConnectionId !== undefined ||
       value.mistleMcpEnabled !== undefined ||
@@ -369,7 +352,6 @@ export const putSandboxProfileVersionDraftResponseSchema = z
     sandboxProfileId: z.string().min(1),
     version: z.number().int().min(1),
     setupScript: z.string().nullable(),
-    defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema,
     agentRuntimeId: sandboxProfileVersionAgentRuntimeIdSchema,
     gitCommitSigningIntegrationConnectionId: z.string().min(1).nullable(),
     mistleMcpEnabled: z.boolean(),

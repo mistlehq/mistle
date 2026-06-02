@@ -4,7 +4,6 @@
 
 import {
   insertSandboxOperationEvent,
-  SandboxInstancePersistenceModes,
   SandboxInstancePurposes,
   SandboxInstanceSources,
   SandboxInstanceStatuses,
@@ -133,7 +132,6 @@ async function insertSandboxInstance(
     runtimeProvider: "docker",
     providerSandboxId: `provider_${sandboxInstanceId}`,
     status: SandboxInstanceStatuses.STARTING,
-    persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
     purpose: SandboxInstancePurposes.SESSION,
     startedByKind: "system",
     startedById: `worker_${sandboxInstanceId}`,

@@ -3,7 +3,6 @@ import type {
   SandboxProfileVersionSnapshotJobState,
   SandboxProfileVersionSnapshotJobTrigger,
   SandboxProfileVersionState,
-  SandboxProfileVersionDefaultPersistenceMode,
 } from "@mistle/db/control-plane";
 import { SandboxProfileVersionStates } from "@mistle/db/control-plane";
 
@@ -29,7 +28,6 @@ type ListProfileVersionsOutput = {
     version: number;
     state: SandboxProfileVersionState;
     publishedAt: string | null;
-    defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
     gitCommitSigningIntegrationConnectionId: string | null;
     mistleMcpEnabled: boolean;
@@ -81,7 +79,6 @@ export async function listProfileVersions(
       version: true,
       state: true,
       publishedAt: true,
-      defaultPersistenceMode: true,
       agentRuntimeId: true,
       gitCommitSigningIntegrationConnectionId: true,
       mistleMcpEnabled: true,
@@ -139,7 +136,6 @@ export async function listProfileVersions(
         version: version.version,
         state: version.state,
         publishedAt: version.publishedAt,
-        defaultPersistenceMode: version.defaultPersistenceMode,
         agentRuntimeId: version.agentRuntimeId,
         gitCommitSigningIntegrationConnectionId: version.gitCommitSigningIntegrationConnectionId,
         mistleMcpEnabled: version.mistleMcpEnabled,

@@ -2,18 +2,20 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
-import {
-  SandboxInstancePersistenceModes,
-  SandboxInstanceStatuses,
-  type SandboxInstanceStatus,
-} from "@mistle/db/data-plane";
+import { SandboxInstanceStatuses, type SandboxInstanceStatus } from "@mistle/db/data-plane";
 import {
   TestEnvironmentIdHeader,
   createIntegrationTest,
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
-import { ResumeSandboxInstanceWorkflowSpec } from "@mistle/workflow-registry/data-plane";
+import {
+  ResumeSandboxInstanceWorkflowSpec,
+  type StartSandboxInstanceWorkflowInput,
+} from "@mistle/workflow-registry/data-plane";
 import { sql } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
@@ -25,6 +27,7 @@ import type {
 import { TriggerRunFailureCodes } from "../openworkflow/shared/trigger-run.js";
 
 const InternalServiceToken = "integration-new-internal-service-token";
+const execFileAsync = promisify(execFile);
 
 const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api"],
@@ -77,52 +80,61 @@ describe.concurrent("control-plane worker trigger connection acquisition", () =>
     await expectResumeWorkflowRunCount(env, ensuredTriggerSandbox.sandboxInstanceId, "0");
   });
 
-  it("requests resume once for a stopped sandbox while waiting for it to become running", async ({
+  it("requests resume once for a stopped sandbox before reporting terminal resume failure", async ({
     env,
   }) => {
     const preparedTriggerRun = createPreparedTriggerRun({
-      suffix: "stopped_sandbox",
-      organizationId: "org_acquire_connection_stopped_sandbox",
+      suffix: "stopped_sandbox_resume",
+      organizationId: "org_acquire_connection_stopped_sandbox_resume",
     });
     const ensuredTriggerSandbox: EnsuredTriggerSandbox = {
-      sandboxInstanceId: "sbi_acquire_connection_stopped_sandbox",
+      sandboxInstanceId: "sbi_acquire_connection_stopped_sandbox_resume",
       startupWorkflowRunId: null,
     };
 
-    await insertSandboxInstance(env, {
-      preparedTriggerRun,
-      sandboxInstanceId: ensuredTriggerSandbox.sandboxInstanceId,
-      status: SandboxInstanceStatuses.STOPPED,
-      persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
-      providerSandboxId: null,
-    });
+    const providerSandboxId = await startDockerSandboxContainer();
 
-    await expect(
-      acquireTriggerConnection(
-        {
-          controlPlaneInternalClient: createControlPlaneInternalClient(env),
-        },
-        {
-          preparedTriggerRun,
-          ensuredTriggerSandbox,
-          deliveryTaskId: "cdt_acquire_connection_stopped_sandbox",
-          workflowRunId: "owfr_acquire_connection_stopped_sandbox",
-          timing: {
-            timeoutMs: 150,
-            pollIntervalMs: 25,
+    try {
+      await insertSandboxInstance(env, {
+        preparedTriggerRun,
+        sandboxInstanceId: ensuredTriggerSandbox.sandboxInstanceId,
+        status: SandboxInstanceStatuses.STOPPED,
+        providerSandboxId,
+      });
+      await insertRuntimePlan(env, {
+        preparedTriggerRun,
+        sandboxInstanceId: ensuredTriggerSandbox.sandboxInstanceId,
+      });
+
+      await expect(
+        acquireTriggerConnection(
+          {
+            controlPlaneInternalClient: createControlPlaneInternalClient(env),
           },
+          {
+            preparedTriggerRun,
+            ensuredTriggerSandbox,
+            deliveryTaskId: "cdt_acquire_connection_stopped_sandbox_resume",
+            workflowRunId: "owfr_acquire_connection_stopped_sandbox_resume",
+            timing: {
+              timeoutMs: 150,
+              pollIntervalMs: 25,
+            },
+          },
+        ),
+      ).rejects.toMatchObject({
+        code: TriggerRunFailureCodes.TRIGGER_RUN_EXECUTION_FAILED,
+        message: `Sandbox instance '${ensuredTriggerSandbox.sandboxInstanceId}' did not become ready before the trigger timeout elapsed.`,
+        metadata: {
+          "mistle.sandbox.instance_id": ensuredTriggerSandbox.sandboxInstanceId,
+          "mistle.sandbox.status": SandboxInstanceStatuses.STOPPED,
+          "mistle.sandbox.wait_phase": "resume",
         },
-      ),
-    ).rejects.toMatchObject({
-      code: TriggerRunFailureCodes.TRIGGER_RUN_EXECUTION_FAILED,
-      message: `Sandbox instance '${ensuredTriggerSandbox.sandboxInstanceId}' did not become ready before the trigger timeout elapsed.`,
-      metadata: {
-        "mistle.sandbox.instance_id": ensuredTriggerSandbox.sandboxInstanceId,
-        "mistle.sandbox.status": SandboxInstanceStatuses.STOPPED,
-        "mistle.sandbox.wait_phase": "resume",
-      },
-    });
-    await expectResumeWorkflowRunCount(env, ensuredTriggerSandbox.sandboxInstanceId, "1");
+      });
+      await expectResumeWorkflowRunCount(env, ensuredTriggerSandbox.sandboxInstanceId, "1");
+    } finally {
+      await destroyDockerSandboxContainer(providerSandboxId);
+    }
   });
 
   it("fails through the real control-plane internal API when the sandbox is terminal", async ({
@@ -177,9 +189,6 @@ async function insertSandboxInstance(
     preparedTriggerRun: PreparedTriggerRun;
     sandboxInstanceId: string;
     status: SandboxInstanceStatus;
-    persistenceMode?:
-      | typeof SandboxInstancePersistenceModes.EPHEMERAL
-      | typeof SandboxInstancePersistenceModes.PERSISTENT;
     providerSandboxId?: string | null;
     failureCode?: string;
     failureMessage?: string;
@@ -191,14 +200,32 @@ async function insertSandboxInstance(
     sandboxProfileId: input.preparedTriggerRun.sandboxProfileId,
     sandboxProfileVersion: input.preparedTriggerRun.sandboxProfileVersion,
     runtimeProvider: "docker",
-    providerSandboxId: input.providerSandboxId ?? `provider-${input.sandboxInstanceId}`,
+    providerSandboxId:
+      input.providerSandboxId === undefined
+        ? `provider-${input.sandboxInstanceId}`
+        : input.providerSandboxId,
     status: input.status,
-    persistenceMode: input.persistenceMode ?? SandboxInstancePersistenceModes.EPHEMERAL,
     startedByKind: "system",
     startedById: `workflow_${input.sandboxInstanceId}`,
     source: "webhook",
     ...(input.failureCode === undefined ? {} : { failureCode: input.failureCode }),
     ...(input.failureMessage === undefined ? {} : { failureMessage: input.failureMessage }),
+  });
+}
+
+async function insertRuntimePlan(
+  env: IntegrationTestEnvironment,
+  input: {
+    preparedTriggerRun: PreparedTriggerRun;
+    sandboxInstanceId: string;
+  },
+): Promise<void> {
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstanceRuntimePlans).values({
+    sandboxInstanceId: input.sandboxInstanceId,
+    revision: 1,
+    compiledRuntimePlan: createRuntimePlan(input.preparedTriggerRun),
+    compiledFromProfileId: input.preparedTriggerRun.sandboxProfileId,
+    compiledFromProfileVersion: input.preparedTriggerRun.sandboxProfileVersion,
   });
 }
 
@@ -217,6 +244,38 @@ async function expectResumeWorkflowRunCount(
   );
 
   expect(result.rows).toEqual([{ count: expectedCount }]);
+}
+
+async function startDockerSandboxContainer(): Promise<string> {
+  const { stdout } = await execFileAsync("docker", ["run", "-d", "registry:3"]);
+  const containerId = stdout.trim();
+  if (containerId.length === 0) {
+    throw new Error("Expected docker run to return a container id.");
+  }
+
+  return containerId;
+}
+
+async function destroyDockerSandboxContainer(containerId: string): Promise<void> {
+  await execFileAsync("docker", ["rm", "-f", containerId]).catch(() => undefined);
+}
+
+function createRuntimePlan(
+  preparedTriggerRun: PreparedTriggerRun,
+): StartSandboxInstanceWorkflowInput["runtimePlan"] {
+  return {
+    sandboxProfileId: preparedTriggerRun.sandboxProfileId,
+    version: preparedTriggerRun.sandboxProfileVersion,
+    image: {
+      source: "base",
+      imageRef: "registry:acquire-trigger-connection",
+    },
+    egressRoutes: [],
+    artifacts: [],
+    runtimeClients: [],
+    workspaceSources: [],
+    agentRuntimes: [],
+  };
 }
 
 function createControlPlaneInternalClient(

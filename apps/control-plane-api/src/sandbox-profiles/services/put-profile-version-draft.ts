@@ -6,7 +6,6 @@ import {
   type IntegrationBindingKind,
   type ControlPlaneTransaction,
   type SandboxProfileVersionAgentRuntimeId,
-  type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import { and, eq, inArray } from "drizzle-orm";
@@ -38,7 +37,6 @@ type PutProfileVersionDraftInput = {
   profileId: string;
   profileVersion: number;
   setupScript?: string | null;
-  defaultPersistenceMode?: SandboxProfileVersionDefaultPersistenceMode;
   agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
   gitCommitSigningIntegrationConnectionId?: string | null;
   mistleMcpEnabled?: boolean;
@@ -61,7 +59,6 @@ type PutProfileVersionDraftOutput = {
   sandboxProfileId: string;
   version: number;
   setupScript: string | null;
-  defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
   agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
   gitCommitSigningIntegrationConnectionId: string | null;
   mistleMcpEnabled: boolean;
@@ -201,7 +198,6 @@ export async function putProfileVersionDraft(
 
     const hasVersionFieldUpdate =
       input.setupScript !== undefined ||
-      input.defaultPersistenceMode !== undefined ||
       input.agentRuntimeId !== undefined ||
       input.gitCommitSigningIntegrationConnectionId !== undefined ||
       input.mistleMcpEnabled !== undefined ||
@@ -215,9 +211,6 @@ export async function putProfileVersionDraft(
         .update(tables.sandboxProfileVersions)
         .set({
           ...(input.setupScript === undefined ? {} : { setupScript: input.setupScript }),
-          ...(input.defaultPersistenceMode === undefined
-            ? {}
-            : { defaultPersistenceMode: input.defaultPersistenceMode }),
           ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
           ...(input.gitCommitSigningIntegrationConnectionId === undefined
             ? {}
@@ -261,7 +254,6 @@ export async function putProfileVersionDraft(
           sandboxProfileId: tables.sandboxProfileVersions.sandboxProfileId,
           version: tables.sandboxProfileVersions.version,
           setupScript: tables.sandboxProfileVersions.setupScript,
-          defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
           agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
           gitCommitSigningIntegrationConnectionId:
             tables.sandboxProfileVersions.gitCommitSigningIntegrationConnectionId,
@@ -301,7 +293,6 @@ export async function putProfileVersionDraft(
         sandboxProfileId: true,
         version: true,
         setupScript: true,
-        defaultPersistenceMode: true,
         agentRuntimeId: true,
         gitCommitSigningIntegrationConnectionId: true,
         mistleMcpEnabled: true,
@@ -330,7 +321,6 @@ export async function putProfileVersionDraft(
       sandboxProfileId: persistedVersion.sandboxProfileId,
       version: persistedVersion.version,
       setupScript: persistedVersion.setupScript,
-      defaultPersistenceMode: persistedVersion.defaultPersistenceMode,
       agentRuntimeId: persistedVersion.agentRuntimeId,
       gitCommitSigningIntegrationConnectionId:
         persistedVersion.gitCommitSigningIntegrationConnectionId,

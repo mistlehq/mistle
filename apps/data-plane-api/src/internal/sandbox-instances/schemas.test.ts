@@ -103,7 +103,6 @@ describe("StartSandboxInstanceInputSchema", () => {
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       sandboxProfileVersion: 1,
-      persistenceMode: "ephemeral",
       purpose: "session",
       idempotencyKey: "req_123",
       runtimePlan,
@@ -144,7 +143,6 @@ describe("StartSandboxInstanceInputSchema", () => {
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       sandboxProfileVersion: 1,
-      persistenceMode: "ephemeral",
       purpose: "session",
       runtimePlan: createRuntimePlan(),
       startedBy: {
@@ -171,7 +169,6 @@ describe("StartSandboxInstanceInputSchema", () => {
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       sandboxProfileVersion: 1,
-      persistenceMode: "ephemeral",
       purpose: "session",
       runtimePlan: createRuntimePlan(),
       startedBy: {
@@ -198,7 +195,6 @@ describe("StartSandboxInstanceInputSchema", () => {
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       sandboxProfileVersion: 1,
-      persistenceMode: "ephemeral",
       purpose: "session",
       runtimePlan: {
         ...createRuntimePlan(),
@@ -234,7 +230,6 @@ describe("StartSandboxInstanceInputSchema", () => {
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       sandboxProfileVersion: 1,
-      persistenceMode: "ephemeral",
       runtimePlan: createRuntimePlan(),
       startedBy: {
         kind: "user",
@@ -286,13 +281,7 @@ describe("StartSandboxInstanceInputSchema", () => {
       throw new Error("Expected persistence mode validation to fail.");
     }
 
-    expect(result.error.issues).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          path: ["persistenceMode"],
-        }),
-      ]),
-    );
+    expect(result.error.issues).toEqual(expect.arrayContaining([expect.objectContaining({})]));
   });
 });
 

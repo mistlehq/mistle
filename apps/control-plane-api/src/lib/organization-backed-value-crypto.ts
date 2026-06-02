@@ -5,7 +5,7 @@ import {
   encryptCredentialUtf8,
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
-} from "../../lib/crypto.js";
+} from "./crypto.js";
 
 type OrganizationCredentialEncryptionConfig = {
   masterEncryptionKeys: Record<string, string>;

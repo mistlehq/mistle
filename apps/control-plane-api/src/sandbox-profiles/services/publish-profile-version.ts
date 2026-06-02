@@ -4,7 +4,6 @@ import {
   ScheduleKinds,
   ScheduleTargetTypes,
   type SandboxProfileVersionAgentRuntimeId,
-  type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
@@ -44,7 +43,6 @@ type PublishProfileVersionOutput = {
     version: number;
     state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
     publishedAt: string | null;
-    defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
     gitCommitSigningIntegrationConnectionId: string | null;
     mistleMcpEnabled: boolean;
@@ -368,7 +366,6 @@ export async function publishProfileVersion(
         version: tables.sandboxProfileVersions.version,
         state: tables.sandboxProfileVersions.state,
         publishedAt: tables.sandboxProfileVersions.publishedAt,
-        defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
         agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
         gitCommitSigningIntegrationConnectionId:
           tables.sandboxProfileVersions.gitCommitSigningIntegrationConnectionId,
@@ -437,7 +434,6 @@ export async function publishProfileVersion(
         version: publishedVersion.version,
         state: publishedVersion.state,
         publishedAt: publishedVersion.publishedAt,
-        defaultPersistenceMode: publishedVersion.defaultPersistenceMode,
         agentRuntimeId: publishedVersion.agentRuntimeId,
         gitCommitSigningIntegrationConnectionId:
           publishedVersion.gitCommitSigningIntegrationConnectionId,

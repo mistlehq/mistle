@@ -1,16 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import {
-  SandboxInstancePersistenceModes,
-  type SandboxInstancePersistenceMode,
-  SandboxInstancePurposes,
-  type SandboxInstancePurpose,
   SandboxInstanceStatuses,
   type DataPlaneDatabase,
   type DataPlaneTables,
 } from "@mistle/db/data-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
-import { SandboxProvider } from "@mistle/sandbox";
 import {
   type SandboxRuntimeProviderInput,
   StartSandboxInstanceWorkflowSpec,
@@ -19,7 +14,6 @@ import { typeid } from "typeid-js";
 import { z } from "zod";
 
 import type { AppRuntimeResources } from "../../../resources.js";
-import type { DataPlaneApiSandboxStorageBackend } from "../../../types.js";
 import type {
   StartSandboxInstanceAcceptedResponse,
   StartSandboxInstanceInput,
@@ -35,7 +29,6 @@ type StartSandboxInstanceContext = {
   db: DataPlaneDatabase;
   tables: Pick<DataPlaneTables, "sandboxInstances">;
   openWorkflow: AppRuntimeResources["openWorkflow"];
-  sandboxStorageBackend: DataPlaneApiSandboxStorageBackend;
 };
 
 function createStartSandboxIdempotencyKey(input: StartSandboxInstanceInput): string {
@@ -77,44 +70,6 @@ function createWorkflowSandboxRuntime(
   };
 }
 
-export function resolveSandboxInstancePersistenceMode(input: {
-  organizationId: string;
-  purpose: SandboxInstancePurpose;
-  effectivePersistenceMode: SandboxInstancePersistenceMode;
-  sandboxProvider: SandboxProvider;
-  configuredStorageBackend: DataPlaneApiSandboxStorageBackend;
-}): SandboxInstancePersistenceMode {
-  if (
-    input.purpose === SandboxInstancePurposes.SETUP_ASSISTANT ||
-    input.purpose === SandboxInstancePurposes.SETUP_CHECK
-  ) {
-    return SandboxInstancePersistenceModes.EPHEMERAL;
-  }
-
-  if (input.effectivePersistenceMode === SandboxInstancePersistenceModes.EPHEMERAL) {
-    return SandboxInstancePersistenceModes.EPHEMERAL;
-  }
-
-  if (
-    input.sandboxProvider === SandboxProvider.E2B &&
-    input.configuredStorageBackend === "archil"
-  ) {
-    return SandboxInstancePersistenceModes.PERSISTENT;
-  }
-
-  if (
-    input.sandboxProvider === SandboxProvider.DOCKER &&
-    input.configuredStorageBackend === "docker_volume"
-  ) {
-    return SandboxInstancePersistenceModes.PERSISTENT;
-  }
-
-  throw new BadRequestError(
-    "INVALID_SANDBOX_STORAGE_CONFIGURATION",
-    `Persistent sandbox was requested for organization '${input.organizationId}' but no supported durable storage backend is configured for this deployment.`,
-  );
-}
-
 export function resolveWorkflowSandboxInstanceId(input: {
   workflowRunId: string;
   workflowRunInput: unknown;
@@ -140,20 +95,11 @@ export async function startSandboxInstance(
     );
   }
 
-  const persistenceMode = resolveSandboxInstancePersistenceMode({
-    organizationId: input.organizationId,
-    purpose: input.purpose,
-    effectivePersistenceMode: input.persistenceMode,
-    sandboxProvider: sandboxRuntime.provider,
-    configuredStorageBackend: ctx.sandboxStorageBackend,
-  });
-
   const workflowInput = {
     sandboxInstanceId: createSandboxInstanceId(),
     organizationId: input.organizationId,
     sandboxProfileId: input.sandboxProfileId,
     sandboxProfileVersion: input.sandboxProfileVersion,
-    persistenceMode,
     purpose: input.purpose,
     runtimePlan: input.runtimePlan,
     startedBy: input.startedBy,
@@ -196,7 +142,6 @@ export async function startSandboxInstance(
       startedById: input.startedBy.id,
       source: input.source,
       purpose: input.purpose,
-      persistenceMode,
     })
     .onConflictDoNothing({
       target: [sandboxInstances.id],

@@ -216,10 +216,6 @@
                     "type": "integer",
                     "minimum": 1
                   },
-                  "persistenceMode": {
-                    "type": "string",
-                    "enum": ["ephemeral", "persistent"]
-                  },
                   "purpose": {
                     "type": "string",
                     "enum": ["session", "snapshot", "setup_assistant", "setup_check"]
@@ -1628,7 +1624,6 @@
                   "organizationId",
                   "sandboxProfileId",
                   "sandboxProfileVersion",
-                  "persistenceMode",
                   "purpose",
                   "runtimePlan",
                   "startedBy",

@@ -6,7 +6,6 @@ import {
   type ControlPlaneTransaction,
   type SandboxProfile,
   type SandboxProfileVersionAgentRuntimeId,
-  type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileStatuses,
   type SandboxProfileVersionState,
   SandboxProfileVersionStates,
@@ -60,7 +59,6 @@ type SourceProfileVersion = {
   snapshotImageId: string | null;
   setupScript: string | null;
   maintenanceScript: string | null;
-  defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
   sandboxProvider: string | null;
   sandboxConnectionId: string | null;
   sandboxVcpuCount: number | null;
@@ -364,7 +362,6 @@ async function insertDuplicatedVersion(
     snapshotImageId: input.copySnapshot ? input.source.snapshotImageId : null,
     setupScript: input.source.setupScript,
     maintenanceScript: input.source.maintenanceScript,
-    defaultPersistenceMode: input.source.defaultPersistenceMode,
     sandboxProvider: input.source.sandboxProvider,
     sandboxConnectionId: input.source.sandboxConnectionId,
     sandboxVcpuCount: input.source.sandboxVcpuCount,

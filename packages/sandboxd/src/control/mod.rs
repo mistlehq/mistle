@@ -407,8 +407,7 @@ mod tests {
             valid_startup_input(StartupMode::New, "bootstrap-token-value", &gateway.ws_url);
         let server = start_test_control_server(&socket_path, ThreadSleeper);
 
-        submit_init(&socket_path, &startup_input, true, false)
-            .expect("init submission should succeed");
+        submit_init(&socket_path, &startup_input, true).expect("init submission should succeed");
 
         wait_for_init_phase(&server, InitPhase::Initialized);
         assert_eq!(server.startup_input(), Some(startup_input));
@@ -448,8 +447,8 @@ mod tests {
         );
         let server = start_test_control_server(&socket_path, ThreadSleeper);
 
-        submit_init(&socket_path, &startup_input, true, false).expect("first init should succeed");
-        submit_init(&socket_path, &duplicate_startup_input, true, false)
+        submit_init(&socket_path, &startup_input, true).expect("first init should succeed");
+        submit_init(&socket_path, &duplicate_startup_input, true)
             .expect("second init should be idempotent after initialization completes");
 
         assert_eq!(server.init_phase(), InitPhase::Initialized);
@@ -502,9 +501,9 @@ mod tests {
             &gateway.ws_url,
         );
 
-        submit_init(&socket_path, &startup_input, false, false).expect("first init should start");
+        submit_init(&socket_path, &startup_input, false).expect("first init should start");
         wait_for_init_phase(&server, InitPhase::Initializing);
-        submit_init(&socket_path, &duplicate_startup_input, false, false)
+        submit_init(&socket_path, &duplicate_startup_input, false)
             .expect("second init should attach to the running initialization");
         let duplicate_waiter_count = 4;
         let (started_sender, started_receiver) = mpsc::channel();
@@ -519,7 +518,7 @@ mod tests {
                 started_sender
                     .send(())
                     .expect("duplicate waiter should report it started");
-                let result = submit_init(&socket_path, &duplicate_startup_input, true, false)
+                let result = submit_init(&socket_path, &duplicate_startup_input, true)
                     .map_err(|error| error.to_string());
                 done_sender
                     .send(result)
@@ -580,7 +579,7 @@ mod tests {
         );
         let server = start_test_control_server(&socket_path, ThreadSleeper);
 
-        submit_init(&socket_path, &init_startup_input, true, false)
+        submit_init(&socket_path, &init_startup_input, true)
             .expect("init submission should succeed");
         submit_resume(&socket_path, &resume_startup_input)
             .expect("resume submission should succeed after init");
@@ -632,8 +631,7 @@ mod tests {
             valid_signing_startup_input(&gateway.ws_url, format!("key::{TEST_PUBLIC_KEY}"));
         let server = start_test_control_server(&socket_path, ThreadSleeper);
 
-        submit_init(&socket_path, &startup_input, true, false)
-            .expect("init submission should succeed");
+        submit_init(&socket_path, &startup_input, true).expect("init submission should succeed");
         wait_for_init_phase(&server, InitPhase::Initialized);
 
         let signature_base64 = submit_signing(
@@ -666,8 +664,7 @@ mod tests {
             valid_signing_startup_input(&gateway.ws_url, format!("key::{TEST_PUBLIC_KEY}"));
         let server = start_test_control_server(&socket_path, ThreadSleeper);
 
-        submit_init(&socket_path, &startup_input, true, false)
-            .expect("init submission should succeed");
+        submit_init(&socket_path, &startup_input, true).expect("init submission should succeed");
         wait_for_init_phase(&server, InitPhase::Initialized);
 
         let error = submit_signing(
@@ -701,13 +698,13 @@ mod tests {
         );
         let server = start_test_control_server(&socket_path, ThreadSleeper);
 
-        let error = submit_init(&socket_path, &startup_input, true, false)
+        let error = submit_init(&socket_path, &startup_input, true)
             .expect_err("init submission should fail when bootstrap tunnel cannot connect");
 
         assert!(error.to_string().contains(
             "failed to initialize sandboxd state: failed to start bootstrap tunnel session"
         ));
-        let duplicate_error = submit_init(&socket_path, &startup_input, true, false)
+        let duplicate_error = submit_init(&socket_path, &startup_input, true)
             .expect_err("duplicate init should remain rejected after initialization fails");
         assert!(
             duplicate_error
@@ -793,8 +790,7 @@ mod tests {
             valid_startup_input(StartupMode::New, "bootstrap-token-value", &gateway.ws_url);
         let server = start_test_control_server(&socket_path, ThreadSleeper);
 
-        submit_init(&socket_path, &startup_input, true, false)
-            .expect("init submission should succeed");
+        submit_init(&socket_path, &startup_input, true).expect("init submission should succeed");
         wait_for_init_phase(&server, InitPhase::Initialized);
 
         let (status_code, body) = fetch_health_response(server.health_endpoint_addr());
@@ -896,7 +892,7 @@ mod tests {
             transparent_proxy: None,
         };
 
-        submit_init(&socket_path, &startup_input, true, false)
+        submit_init(&socket_path, &startup_input, true)
             .expect("snapshot materialization init submission should succeed");
 
         server

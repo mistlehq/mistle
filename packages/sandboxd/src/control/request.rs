@@ -53,7 +53,6 @@ pub(super) fn handle_connection(
         ControlRequest::Init {
             startup_input,
             wait_for_completion,
-            wait_for_storage_attach,
         } => {
             begin_init(
                 startup_input,
@@ -61,7 +60,6 @@ pub(super) fn handle_connection(
                 init_thread,
                 init_completion,
                 wait_for_completion,
-                wait_for_storage_attach,
             )?;
             Ok(ControlResponse::ok(None))
         }
@@ -181,7 +179,6 @@ fn begin_init(
     init_thread: &SharedInitThread,
     init_completion: &InitCompletion,
     wait_for_completion: bool,
-    wait_for_storage_attach: bool,
 ) -> Result<(), ControlError> {
     {
         let mut state_guard = lock_control_state(state)?;
@@ -248,7 +245,6 @@ fn begin_init(
                 Arc::new(SystemClock),
                 Arc::new(ThreadSleeper),
                 diagnostics_logger.clone(),
-                wait_for_storage_attach,
             )
         });
 

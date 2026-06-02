@@ -64,10 +64,6 @@ const ObjectStoreSchema = z
   })
   .strict();
 
-const SandboxObjectStoreSchema = ObjectStoreSchema.extend({
-  region: z.string().trim().min(1).optional(),
-}).strict();
-
 const AuthMethodSchema = z.enum(["otp", "google"]);
 
 const ControlPlaneApiWelcomeEmailSchema = z
@@ -119,21 +115,6 @@ const GatewayRelaySchema = z
       .strict(),
   ])
   .default({ backend: "memory" });
-
-const SandboxStorageArchilSchema = z
-  .object({
-    api_key: z.string().trim().min(1),
-    region: z.string().trim().min(1),
-    name_prefix: z.string().trim().min(1).optional(),
-    mount_object_store: z.enum(["sandbox_storage"]).optional(),
-  })
-  .strict();
-
-const SandboxStorageDockerVolumeSchema = z
-  .object({
-    name_prefix: z.string().trim().min(1).optional(),
-  })
-  .strict();
 
 const SandboxDockerProviderConfigSchema = z.discriminatedUnion("enabled", [
   z
@@ -369,7 +350,6 @@ export const ConfigSchema = z
     object_store: z
       .object({
         assets: ObjectStoreSchema,
-        sandbox_storage: SandboxObjectStoreSchema.optional(),
       })
       .strict(),
     email: z
@@ -407,33 +387,6 @@ export const ConfigSchema = z
       .object({
         default_base_image: z.string().trim().min(1),
         publish_base_domain: z.string().trim().min(1),
-        storage: z
-          .object({
-            backend: z.enum(["archil", "docker_volume"]),
-            archil: SandboxStorageArchilSchema.optional(),
-            docker_volume: SandboxStorageDockerVolumeSchema.optional(),
-          })
-          .strict()
-          .superRefine((value, ctx) => {
-            if (value.backend === "archil" && value.archil === undefined) {
-              ctx.addIssue({
-                code: "custom",
-                path: ["archil"],
-                message:
-                  "sandbox.storage.archil is required when sandbox.storage.backend is 'archil'.",
-              });
-            }
-
-            if (value.backend === "docker_volume" && value.docker_volume === undefined) {
-              ctx.addIssue({
-                code: "custom",
-                path: ["docker_volume"],
-                message:
-                  "sandbox.storage.docker_volume is required when sandbox.storage.backend is 'docker_volume'.",
-              });
-            }
-          })
-          .optional(),
         tokens: z
           .object({
             connect: TokenConfigSchema,

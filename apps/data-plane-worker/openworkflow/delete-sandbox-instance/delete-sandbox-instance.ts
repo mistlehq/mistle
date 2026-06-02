@@ -5,7 +5,6 @@ import {
   SandboxStopReasons,
   type DataPlaneDatabase,
   type DataPlaneTables,
-  type SandboxInstancePersistenceMode,
   type SandboxInstanceProvider,
   type SandboxInstanceStatus,
 } from "@mistle/db/data-plane";
@@ -22,7 +21,6 @@ import { destroySandbox } from "../shared/destroy-sandbox.js";
 
 type DeleteSandboxInstanceState = {
   organizationId: string;
-  persistenceMode: SandboxInstancePersistenceMode;
   runtimeProvider: SandboxInstanceProvider;
   sandboxConnectionId: string | null;
   sandboxVcpuCount: number | null;
@@ -55,7 +53,6 @@ async function resolveDeleteSandboxInstanceState(input: {
   const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
     columns: {
       organizationId: true,
-      persistenceMode: true,
       runtimeProvider: true,
       sandboxConnectionId: true,
       sandboxVcpuCount: true,
@@ -194,16 +191,9 @@ export async function deleteSandboxInstance(
   try {
     await destroySandbox(
       {
-        db: ctx.db,
-        tables: ctx.tables,
-        controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-        config: ctx.config,
         sandboxAdapter: resolvedRuntime.sandboxAdapter,
       },
       {
-        sandboxInstanceId: input.sandboxInstanceId,
-        organizationId: sandboxInstanceState.organizationId,
-        persistenceMode: sandboxInstanceState.persistenceMode,
         runtimeProvider: sandboxInstanceState.runtimeProvider,
         providerSandboxId,
       },

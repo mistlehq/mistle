@@ -17,14 +17,12 @@ pub fn submit_init(
     socket_path: &Path,
     startup_input: &StartupInput,
     wait_for_completion: bool,
-    wait_for_storage_attach: bool,
 ) -> Result<(), ControlError> {
     submit_startup_request(
         socket_path,
         ControlRequest::Init {
             startup_input: startup_input.clone(),
             wait_for_completion,
-            wait_for_storage_attach,
         },
     )
 }

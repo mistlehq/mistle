@@ -158,7 +158,6 @@ function createVersion(
     gitCommitSigningIntegrationConnectionId: null,
     mistleMcpEnabled: input.mistleMcpEnabled ?? false,
     mistleMcpApiKeyId: input.mistleMcpApiKeyId ?? null,
-    defaultPersistenceMode: "ephemeral",
     sandboxProvider: input.sandboxProvider,
     sandboxConnectionId: input.sandboxConnectionId,
     maintenanceScript: null,

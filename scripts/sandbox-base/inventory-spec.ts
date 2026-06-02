@@ -90,17 +90,6 @@ export const SandboxBaseInventorySpec = {
       versionParser: parseFirstToken,
     },
     {
-      category: SandboxBaseToolCategories.PACKAGE_AND_ENVIRONMENT,
-      command: "archil",
-      displayName: "Archil",
-      dockerfileAssertions: [
-        runContains(SandboxBaseToolingStage, "https://archil.com/install"),
-        symlink("/usr/bin/archil", "/opt/mistle/bin/archil", SandboxBaseToolingStage),
-      ],
-      versionCommand: ["archil", "--version"],
-      versionParser: parseArchilVersion,
-    },
-    {
       category: SandboxBaseToolCategories.CLI_UTILITIES,
       command: "cat",
       displayName: "cat",
@@ -300,20 +289,4 @@ function parseGawkVersion(output: string): string {
   }
 
   return versionMatch[1].replace(/,$/u, "");
-}
-
-function parseArchilVersion(output: string): string {
-  const versionMatch = /^Archil Client:\s*(\S+)/u.exec(parseFirstLine(output));
-
-  if (versionMatch === null) {
-    throw new Error(`Could not parse Archil version from output: ${output}`);
-  }
-
-  const version = versionMatch[1];
-
-  if (version === undefined) {
-    throw new Error(`Could not parse Archil version from output: ${output}`);
-  }
-
-  return version.replace(/,$/u, "");
 }

@@ -3,7 +3,6 @@ import {
   getControlPlaneDatabaseSchema,
   isControlPlaneUniqueViolation,
   type SandboxProfileVersionAgentRuntimeId,
-  type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
@@ -57,7 +56,6 @@ type RefreshProfileVersionSnapshotOutput = {
     version: number;
     state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
     publishedAt: string | null;
-    defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
     gitCommitSigningIntegrationConnectionId: string | null;
     mistleMcpEnabled: boolean;
@@ -174,7 +172,6 @@ async function queueProfileVersionSnapshot(
           version: tables.sandboxProfileVersions.version,
           state: tables.sandboxProfileVersions.state,
           publishedAt: tables.sandboxProfileVersions.publishedAt,
-          defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
           agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
           gitCommitSigningIntegrationConnectionId:
             tables.sandboxProfileVersions.gitCommitSigningIntegrationConnectionId,
@@ -220,7 +217,6 @@ async function queueProfileVersionSnapshot(
 
       const resolvedSandboxProfileId = sandboxProfileVersion.sandboxProfileId;
       const resolvedSandboxProfileVersion = sandboxProfileVersion.version;
-      const resolvedDefaultPersistenceMode = sandboxProfileVersion.defaultPersistenceMode;
       const resolvedAgentRuntimeId = sandboxProfileVersion.agentRuntimeId;
       const resolvedGitCommitSigningIntegrationConnectionId =
         sandboxProfileVersion.gitCommitSigningIntegrationConnectionId;
@@ -233,9 +229,6 @@ async function queueProfileVersionSnapshot(
       const resolvedSandboxStorageMb = sandboxProfileVersion.sandboxStorageMb;
       if (resolvedSandboxProfileId === null || resolvedSandboxProfileVersion === null) {
         throw new Error("Expected joined sandbox profile version metadata to be present.");
-      }
-      if (resolvedDefaultPersistenceMode === null) {
-        throw new Error("Expected joined sandbox profile persistence mode to be present.");
       }
       if (resolvedAgentRuntimeId === null) {
         throw new Error("Expected joined sandbox profile agent runtime id to be present.");
@@ -316,7 +309,6 @@ async function queueProfileVersionSnapshot(
           version: resolvedSandboxProfileVersion,
           state: sandboxProfileVersion.state,
           publishedAt: sandboxProfileVersion.publishedAt,
-          defaultPersistenceMode: resolvedDefaultPersistenceMode,
           agentRuntimeId: resolvedAgentRuntimeId,
           gitCommitSigningIntegrationConnectionId: resolvedGitCommitSigningIntegrationConnectionId,
           mistleMcpEnabled: resolvedMistleMcpEnabled,

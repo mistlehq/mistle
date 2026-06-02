@@ -3,7 +3,6 @@ import type {
   ControlPlaneDatabase,
   SandboxProfile,
   SandboxProfileVersionAgentRuntimeId,
-  SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionState,
   SandboxProfileVersionIntegrationBinding,
 } from "@mistle/db/control-plane";
@@ -48,7 +47,6 @@ export type SandboxProfilesService = {
     sandboxProfileId: string;
     version: number;
     state: SandboxProfileVersionState;
-    defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
     gitCommitSigningIntegrationConnectionId: string | null;
     mistleMcpEnabled: boolean;
@@ -72,7 +70,6 @@ export type SandboxProfilesService = {
       sandboxProfileId: string;
       version: number;
       state: SandboxProfileVersionState;
-      defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
       agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
       gitCommitSigningIntegrationConnectionId: string | null;
       mistleMcpEnabled: boolean;
@@ -134,7 +131,6 @@ export type SandboxProfilesService = {
       sandboxProfileId: string;
       version: number;
       state: SandboxProfileVersionState;
-      defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
       agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
       gitCommitSigningIntegrationConnectionId: string | null;
       mistleMcpEnabled: boolean;

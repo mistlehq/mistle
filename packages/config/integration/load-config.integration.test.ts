@@ -55,9 +55,6 @@ const globalDevelopmentConfig = {
     serviceToken,
   },
   sandbox: {
-    storage: {
-      backend: "archil",
-    },
     defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
     gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -115,9 +112,6 @@ const globalProductionConfig = {
     serviceToken,
   },
   sandbox: {
-    storage: {
-      backend: "archil",
-    },
     defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
     gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -233,7 +227,6 @@ const controlPlaneApiEnvConfig = {
     defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
     gatewayWsUrl: globalDevelopmentConfig.sandbox.gatewayWsUrl,
     bootstrap: globalDevelopmentConfig.sandbox.bootstrap,
-    storageBackend: "archil",
     docker: {
       enabled: true,
     },
@@ -343,9 +336,6 @@ const dataPlaneApiEnvConfig = {
     serviceToken,
   },
   sandbox: {
-    storage: {
-      backend: "archil",
-    },
     docker: {
       enabled: true,
       socketPath: "/var/run/docker.sock",
@@ -441,9 +431,6 @@ const dataPlaneWorkerEnvConfig = {
     baseUrl: "http://127.0.0.1:5000",
   },
   sandbox: {
-    storage: {
-      backend: "archil",
-    },
     internalGatewayWsUrl: globalDevelopmentConfig.sandbox.internalGatewayWsUrl,
     bootstrap: globalDevelopmentConfig.sandbox.bootstrap,
     docker: {
@@ -456,22 +443,6 @@ const dataPlaneWorkerEnvConfig = {
     serviceToken,
   },
   telemetry: globalDevelopmentConfig.telemetry,
-  sandboxStorage: {
-    archil: {
-      apiKey: "fixture-archil-api-key",
-      region: "gcp-us-central1",
-      namePrefix: "mistle-",
-      mounts: [
-        {
-          type: "s3-compatible",
-          bucket: "mistle-sandbox-storage",
-          endpoint: "https://s3.example.com",
-          accessKeyId: "fixture-access-key-id",
-          secretAccessKey: "fixture-secret-access-key",
-        },
-      ],
-    },
-  },
 } as const;
 
 const dataPlaneWorkerBaseFixtureConfig = {
@@ -508,9 +479,6 @@ const dataPlaneWorkerDockerFixtureConfig = {
     baseUrl: "http://127.0.0.1:5100",
   },
   sandbox: {
-    storage: {
-      backend: "archil",
-    },
     internalGatewayWsUrl: globalDevelopmentConfig.sandbox.internalGatewayWsUrl,
     bootstrap: globalDevelopmentConfig.sandbox.bootstrap,
     sandboxdTestFaultsEnabled: true,
@@ -524,22 +492,6 @@ const dataPlaneWorkerDockerFixtureConfig = {
     serviceToken,
   },
   telemetry: globalDevelopmentConfig.telemetry,
-  sandboxStorage: {
-    archil: {
-      apiKey: "fixture-archil-api-key",
-      region: "gcp-us-central1",
-      namePrefix: "mistle-",
-      mounts: [
-        {
-          type: "s3-compatible",
-          bucket: "mistle-sandbox-storage",
-          endpoint: "https://s3.example.com",
-          accessKeyId: "fixture-access-key-id",
-          secretAccessKey: "fixture-secret-access-key",
-        },
-      ],
-    },
-  },
 } as const;
 
 const pooledPostgresUrl = "postgresql://mistle:mistle@127.0.0.1:6432/mistle";
@@ -1185,49 +1137,19 @@ describe("loadConfig integrations", () => {
     ).toThrow(/controlPlaneApi/is);
   });
 
-  it("rejects data-plane-worker config when Archil storage is enabled but worker Archil config is missing", () => {
-    expect(() =>
-      loadConfig({
-        app: AppIds.DATA_PLANE_WORKER,
-        env: createIntegrationEnv({
-          MISTLE_SANDBOX_STORAGE_BACKEND: "archil",
-          MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY: undefined,
-          MISTLE_SANDBOX_STORAGE_ARCHIL_REGION: undefined,
-          MISTLE_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX: undefined,
-          MISTLE_SANDBOX_STORAGE_ARCHIL_MOUNT_OBJECT_STORE: undefined,
-        }),
-      }),
-    ).toThrow(/sandboxStorage\.archil is required when sandbox\.storage\.backend is 'archil'/);
-  });
-
-  it("loads data-plane-worker config when provider-specific durable storage is omitted and worker storage config is omitted", () => {
+  it("loads data-plane-worker config without sandbox storage config", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_WORKER,
-      env: createIntegrationEnv({
-        MISTLE_SANDBOX_STORAGE_BACKEND: undefined,
-        MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY: undefined,
-        MISTLE_SANDBOX_STORAGE_ARCHIL_REGION: undefined,
-        MISTLE_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX: undefined,
-        MISTLE_SANDBOX_STORAGE_ARCHIL_MOUNT_OBJECT_STORE: undefined,
-        MISTLE_OBJECT_STORE_SANDBOX_STORAGE_BUCKET_NAME: undefined,
-        MISTLE_OBJECT_STORE_SANDBOX_STORAGE_REGION: undefined,
-        MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ENDPOINT: undefined,
-        MISTLE_OBJECT_STORE_SANDBOX_STORAGE_FORCE_PATH_STYLE: undefined,
-        MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ACCESS_KEY_ID: undefined,
-        MISTLE_OBJECT_STORE_SANDBOX_STORAGE_SECRET_ACCESS_KEY: undefined,
-        MISTLE_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX: undefined,
-      }),
+      env: createIntegrationEnv(),
     });
 
     if (config.global === undefined) {
       throw new Error("Expected global config to be present.");
     }
 
-    expect(config.global.sandbox.storage).toBeUndefined();
     expect(config.app.controlPlaneApi).toEqual({
       baseUrl: "http://127.0.0.1:5000",
     });
-    expect(config.app.sandboxStorage).toBeUndefined();
   });
 
   it("returns only data-plane-worker app config when includeGlobal is false", () => {

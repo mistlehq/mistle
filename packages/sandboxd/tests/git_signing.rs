@@ -90,7 +90,6 @@ fn git_commit_s_succeeds_via_the_real_sandboxd_signer_alias() {
                 .expect("signer path should be representable as utf-8"),
         ),
         true,
-        false,
     )
     .expect("init submission should succeed");
     wait_for_init_phase(&server, control::InitPhase::Initialized);
@@ -188,7 +187,7 @@ fn snapshot_materialization_init_does_not_write_global_git_identity_config() {
         valid_signing_startup_input(&bootstrap_gateway.ws_url, "/opt/mistle/bin/mistle-ssh-sign");
     startup_input.execution_mode = sandboxd::protocol::startup::StartupExecutionMode::Snapshot;
 
-    control::submit_init(&control_socket_path, &startup_input, true, false)
+    control::submit_init(&control_socket_path, &startup_input, true)
         .expect("snapshot materialization init submission should succeed");
 
     server

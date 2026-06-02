@@ -455,7 +455,6 @@ function createRuntimeStoryVersion(input: {
     gitCommitSigningIntegrationConnectionId: input.gitCommitSigningIntegrationConnectionId,
     mistleMcpEnabled: input.mistleMcpEnabled,
     mistleMcpApiKeyId: input.mistleMcpApiKeyId,
-    defaultPersistenceMode: "ephemeral",
     sandboxProvider: runtimeState === "docker" ? "docker" : "e2b",
     sandboxConnectionId: runtimeState === "e2b-connection" ? StoryE2BSandboxConnection.id : null,
     maintenanceScript: null,
