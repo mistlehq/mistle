@@ -12,7 +12,10 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use crate::control::protocol::{ControlRequest, ControlResponse, ControlSignRequest};
-use crate::control::state::{SharedInitThread, lock_control_state, lock_init_thread};
+use crate::control::state::{
+    InitCompletion, SharedInitThread, lock_control_state, lock_init_thread, notify_init_completion,
+    wait_for_init_completion,
+};
 use crate::control::{ControlError, InitPhase};
 use crate::protocol::startup::StartupInput;
 use crate::sandboxd_state::SandboxdState;
@@ -31,6 +34,7 @@ pub(super) fn handle_connection(
     stream: &mut UnixStream,
     state: &Arc<Mutex<crate::control::state::ControlServerState>>,
     init_thread: &SharedInitThread,
+    init_completion: &InitCompletion,
 ) -> Result<ControlResponse, ControlError> {
     security::ensure_unix_socket_peer_matches_current_process_uid(stream)
         .map_err(|error| ControlError::VerifyPeer(error.to_string()))?;
@@ -53,6 +57,7 @@ pub(super) fn handle_connection(
                 startup_input,
                 state,
                 init_thread,
+                init_completion,
                 wait_for_completion,
                 wait_for_storage_attach,
             )?;
@@ -155,6 +160,7 @@ fn begin_init(
     startup_input: StartupInput,
     state: &Arc<Mutex<crate::control::state::ControlServerState>>,
     init_thread: &SharedInitThread,
+    init_completion: &InitCompletion,
     wait_for_completion: bool,
     wait_for_storage_attach: bool,
 ) -> Result<(), ControlError> {
@@ -168,7 +174,19 @@ fn begin_init(
             InitPhase::Initializing => {
                 drop(state_guard);
                 if wait_for_completion {
-                    crate::control::state::join_init_thread(init_thread)?;
+                    match wait_for_init_completion(state, init_completion)? {
+                        InitPhase::Initialized | InitPhase::Uninitialized => {}
+                        InitPhase::Failed(error) => {
+                            return Err(ControlError::StartupRequestRejected(format!(
+                                "sandboxd initialization already failed: {error}"
+                            )));
+                        }
+                        InitPhase::Initializing => {
+                            return Err(ControlError::StartupRequestRejected(
+                                "sandboxd is still initializing after completion wait".to_string(),
+                            ));
+                        }
+                    }
                 }
                 return Ok(());
             }
@@ -189,6 +207,7 @@ fn begin_init(
     }
 
     let state_for_thread = state.clone();
+    let init_completion_for_thread = init_completion.clone();
     let global_git_config_path = lock_control_state(state)?.global_git_config_path.clone();
     let diagnostics_logger = StartupDiagnosticsLogger::initialize(
         StartupOperation::Init,
@@ -218,6 +237,7 @@ fn begin_init(
                 state_guard.shutdown_after_init = startup_input.is_snapshot();
                 state_guard.sandboxd_state = Some(sandboxd_state);
                 state_guard.init_phase = InitPhase::Initialized;
+                notify_init_completion(&init_completion_for_thread);
                 Ok(())
             }
             Err(error) => {
@@ -234,6 +254,7 @@ fn begin_init(
                 }
                 lock_control_state(&state_for_thread)?.init_phase =
                     InitPhase::Failed(error_text.clone());
+                notify_init_completion(&init_completion_for_thread);
                 Err(ControlError::InitializeSandboxdState(error_text))
             }
         }

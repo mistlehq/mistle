@@ -12,7 +12,7 @@ use std::os::unix::fs::FileTypeExt;
 use std::os::unix::net::UnixListener;
 use std::path::Path;
 use std::sync::mpsc;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -35,7 +35,7 @@ use crate::control::protocol::ControlResponse;
 pub use crate::control::protocol::ControlSignRequest;
 use crate::control::request::handle_connection;
 use crate::control::state::{
-    ControlServerState, SharedInitThread, close_sandboxd_state, join_init_thread,
+    ControlServerState, InitCompletion, SharedInitThread, close_sandboxd_state, join_init_thread,
     lock_control_state,
 };
 
@@ -257,11 +257,13 @@ where
         shutdown_after_init: false,
     }));
     let init_thread: SharedInitThread = Arc::new(Mutex::new(None));
+    let init_completion: InitCompletion = Arc::new(Condvar::new());
     let (shutdown_sender, shutdown_receiver) = mpsc::channel::<()>();
     let (health_shutdown_sender, health_shutdown_receiver) = mpsc::channel::<()>();
     let sleeper = Arc::new(sleeper);
     let state_for_thread = state.clone();
     let init_thread_for_loop = init_thread.clone();
+    let init_completion_for_loop = init_completion;
     let socket_path_for_thread = socket_path.to_path_buf();
     let sleeper_for_control = sleeper.clone();
     let sleeper_for_health = sleeper;
@@ -271,6 +273,7 @@ where
             listener,
             &state_for_thread,
             &init_thread_for_loop,
+            &init_completion_for_loop,
             &shutdown_receiver,
             sleeper_for_control.as_ref(),
             accept_poll_interval,
@@ -304,6 +307,7 @@ fn run_control_server_loop(
     listener: UnixListener,
     state: &Arc<Mutex<ControlServerState>>,
     init_thread: &SharedInitThread,
+    init_completion: &InitCompletion,
     shutdown_receiver: &mpsc::Receiver<()>,
     sleeper: &impl Sleeper,
     accept_poll_interval: Duration,
@@ -321,7 +325,7 @@ fn run_control_server_loop(
                 stream
                     .set_nonblocking(false)
                     .map_err(ControlError::ConfigureConnection)?;
-                let response = handle_connection(&mut stream, state, init_thread)
+                let response = handle_connection(&mut stream, state, init_thread, init_completion)
                     .unwrap_or_else(|error| ControlResponse::error(error.to_string()));
                 let response_bytes =
                     serde_json::to_vec(&response).map_err(ControlError::SerializeResponse)?;
@@ -502,11 +506,52 @@ mod tests {
         wait_for_init_phase(&server, InitPhase::Initializing);
         submit_init(&socket_path, &duplicate_startup_input, false, false)
             .expect("second init should attach to the running initialization");
+        let duplicate_waiter_count = 4;
+        let (started_sender, started_receiver) = mpsc::channel();
+        let (done_sender, done_receiver) = mpsc::channel();
+        let mut duplicate_waiters = Vec::new();
+        for _ in 0..duplicate_waiter_count {
+            let socket_path = socket_path.clone();
+            let duplicate_startup_input = duplicate_startup_input.clone();
+            let started_sender = started_sender.clone();
+            let done_sender = done_sender.clone();
+            duplicate_waiters.push(thread::spawn(move || {
+                started_sender
+                    .send(())
+                    .expect("duplicate waiter should report it started");
+                let result = submit_init(&socket_path, &duplicate_startup_input, true, false)
+                    .map_err(|error| error.to_string());
+                done_sender
+                    .send(result)
+                    .expect("duplicate waiter should report completion");
+            }));
+        }
+        drop(started_sender);
+        drop(done_sender);
+        for _ in 0..duplicate_waiter_count {
+            started_receiver
+                .recv_timeout(Duration::from_secs(2))
+                .expect("duplicate waiter should start before setup is released");
+        }
+        assert!(
+            done_receiver
+                .recv_timeout(Duration::from_millis(100))
+                .is_err(),
+            "waiting duplicate init should not complete while original initialization is running"
+        );
 
         std::fs::write(&setup_release_path, "release").expect("setup script should be released");
-        submit_init(&socket_path, &duplicate_startup_input, true, false)
-            .expect("waiting duplicate init should join the original initialization");
-
+        for _ in 0..duplicate_waiter_count {
+            done_receiver
+                .recv_timeout(Duration::from_secs(5))
+                .expect("duplicate waiter should complete after setup is released")
+                .expect("waiting duplicate init should observe original initialization success");
+        }
+        for duplicate_waiter in duplicate_waiters {
+            duplicate_waiter
+                .join()
+                .expect("duplicate waiter thread should not panic");
+        }
         assert_eq!(server.init_phase(), InitPhase::Initialized);
         assert_eq!(server.startup_input(), Some(startup_input));
         assert_eq!(
