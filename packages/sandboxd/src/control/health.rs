@@ -314,8 +314,11 @@ fn component_name(component: SupervisedComponent) -> &'static str {
         SupervisedComponent::CodexAppServer => "codex_app_server",
         SupervisedComponent::OpenCodeProxy => "opencode_proxy",
         SupervisedComponent::OpenCodeServer => "opencode_server",
+        SupervisedComponent::OpenCodeProxyConnectivity => "opencode_proxy_connectivity",
         SupervisedComponent::PiProxy => "pi_proxy",
         SupervisedComponent::PiRpcProcess => "pi_rpc_process",
+        SupervisedComponent::PiProxyConnectivity => "pi_proxy_connectivity",
+        SupervisedComponent::RuntimeAgentEndpoint => "runtime_agent_endpoint",
     }
 }
 

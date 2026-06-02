@@ -26,24 +26,35 @@ pub enum RuntimeReadinessMode {
 pub fn derive_runtime_ready(snapshot: &SandboxdHealthSnapshot, mode: RuntimeReadinessMode) -> bool {
     match mode {
         RuntimeReadinessMode::NoAgentRuntime => true,
-        RuntimeReadinessMode::CodexProxyOnly => codex_proxy_is_ready(snapshot),
+        RuntimeReadinessMode::CodexProxyOnly => {
+            codex_proxy_is_ready(snapshot) && runtime_agent_endpoint_is_ready(snapshot)
+        }
         RuntimeReadinessMode::Codex => {
             codex_proxy_is_ready(snapshot)
                 && component_is_healthy(snapshot, SupervisedComponent::CodexAppServer)
+                && runtime_agent_endpoint_is_ready(snapshot)
         }
         RuntimeReadinessMode::OpenCodeProxyOnly => {
             component_is_healthy(snapshot, SupervisedComponent::OpenCodeProxy)
+                && component_is_healthy(snapshot, SupervisedComponent::OpenCodeProxyConnectivity)
+                && runtime_agent_endpoint_is_ready(snapshot)
         }
         RuntimeReadinessMode::OpenCode => {
             component_is_healthy(snapshot, SupervisedComponent::OpenCodeProxy)
                 && component_is_healthy(snapshot, SupervisedComponent::OpenCodeServer)
+                && component_is_healthy(snapshot, SupervisedComponent::OpenCodeProxyConnectivity)
+                && runtime_agent_endpoint_is_ready(snapshot)
         }
         RuntimeReadinessMode::Pi => {
             component_is_healthy(snapshot, SupervisedComponent::PiProxy)
                 && component_is_healthy(snapshot, SupervisedComponent::PiRpcProcess)
+                && component_is_healthy(snapshot, SupervisedComponent::PiProxyConnectivity)
+                && runtime_agent_endpoint_is_ready(snapshot)
         }
         RuntimeReadinessMode::PiProxyOnly => {
             component_is_healthy(snapshot, SupervisedComponent::PiProxy)
+                && component_is_healthy(snapshot, SupervisedComponent::PiProxyConnectivity)
+                && runtime_agent_endpoint_is_ready(snapshot)
         }
     }
 }
@@ -72,6 +83,18 @@ fn codex_proxy_is_ready(snapshot: &SandboxdHealthSnapshot) -> bool {
                     .get("rawConnectivityState")
                     .is_some_and(|state| state == "Connected")
         })
+}
+
+fn runtime_agent_endpoint_is_ready(snapshot: &SandboxdHealthSnapshot) -> bool {
+    if snapshot
+        .components
+        .iter()
+        .all(|candidate| candidate.component != SupervisedComponent::RuntimeAgentEndpoint)
+    {
+        return true;
+    }
+
+    component_is_healthy(snapshot, SupervisedComponent::RuntimeAgentEndpoint)
 }
 
 /// Wire shape for one runtime-readiness control message sent to the gateway.
@@ -236,6 +259,10 @@ mod tests {
                     SupervisedComponent::CodexAppServer,
                     ComponentHealthState::Healthy,
                 ),
+                component_snapshot(
+                    SupervisedComponent::RuntimeAgentEndpoint,
+                    ComponentHealthState::Healthy,
+                ),
             ],
         };
 
@@ -252,6 +279,10 @@ mod tests {
                     SupervisedComponent::CodexAppServer,
                     ComponentHealthState::Healthy,
                 ),
+                component_snapshot(
+                    SupervisedComponent::RuntimeAgentEndpoint,
+                    ComponentHealthState::Healthy,
+                ),
             ],
         };
 
@@ -265,10 +296,13 @@ mod tests {
     fn derives_proxy_only_runtime_as_ready_when_codex_proxy_is_healthy() {
         let snapshot = SandboxdHealthSnapshot {
             observed_at: SystemTime::UNIX_EPOCH,
-            components: vec![codex_proxy_snapshot(
-                ComponentHealthState::Healthy,
-                "Connected",
-            )],
+            components: vec![
+                codex_proxy_snapshot(ComponentHealthState::Healthy, "Connected"),
+                component_snapshot(
+                    SupervisedComponent::RuntimeAgentEndpoint,
+                    ComponentHealthState::Healthy,
+                ),
+            ],
         };
 
         assert!(derive_runtime_ready(
@@ -281,10 +315,13 @@ mod tests {
     fn derives_proxy_only_runtime_as_not_ready_when_proxy_connectivity_is_not_connected() {
         let snapshot = SandboxdHealthSnapshot {
             observed_at: SystemTime::UNIX_EPOCH,
-            components: vec![codex_proxy_snapshot(
-                ComponentHealthState::Healthy,
-                "Disconnected",
-            )],
+            components: vec![
+                codex_proxy_snapshot(ComponentHealthState::Healthy, "Disconnected"),
+                component_snapshot(
+                    SupervisedComponent::RuntimeAgentEndpoint,
+                    ComponentHealthState::Healthy,
+                ),
+            ],
         };
 
         assert!(!derive_runtime_ready(
@@ -304,6 +341,14 @@ mod tests {
                 ),
                 component_snapshot(
                     SupervisedComponent::OpenCodeServer,
+                    ComponentHealthState::Healthy,
+                ),
+                component_snapshot(
+                    SupervisedComponent::OpenCodeProxyConnectivity,
+                    ComponentHealthState::Healthy,
+                ),
+                component_snapshot(
+                    SupervisedComponent::RuntimeAgentEndpoint,
                     ComponentHealthState::Healthy,
                 ),
             ],
@@ -328,6 +373,14 @@ mod tests {
                     SupervisedComponent::OpenCodeServer,
                     ComponentHealthState::Restarting,
                 ),
+                component_snapshot(
+                    SupervisedComponent::OpenCodeProxyConnectivity,
+                    ComponentHealthState::Healthy,
+                ),
+                component_snapshot(
+                    SupervisedComponent::RuntimeAgentEndpoint,
+                    ComponentHealthState::Healthy,
+                ),
             ],
         };
 
@@ -347,6 +400,14 @@ mod tests {
                     SupervisedComponent::PiRpcProcess,
                     ComponentHealthState::Healthy,
                 ),
+                component_snapshot(
+                    SupervisedComponent::PiProxyConnectivity,
+                    ComponentHealthState::Healthy,
+                ),
+                component_snapshot(
+                    SupervisedComponent::RuntimeAgentEndpoint,
+                    ComponentHealthState::Healthy,
+                ),
             ],
         };
 
@@ -362,6 +423,87 @@ mod tests {
                 component_snapshot(
                     SupervisedComponent::PiRpcProcess,
                     ComponentHealthState::Restarting,
+                ),
+                component_snapshot(
+                    SupervisedComponent::PiProxyConnectivity,
+                    ComponentHealthState::Healthy,
+                ),
+                component_snapshot(
+                    SupervisedComponent::RuntimeAgentEndpoint,
+                    ComponentHealthState::Healthy,
+                ),
+            ],
+        };
+
+        assert!(!derive_runtime_ready(&snapshot, RuntimeReadinessMode::Pi));
+    }
+
+    #[test]
+    fn derives_runtime_as_not_ready_when_agent_endpoint_probe_is_not_healthy() {
+        let snapshot = SandboxdHealthSnapshot {
+            observed_at: SystemTime::UNIX_EPOCH,
+            components: vec![
+                codex_proxy_snapshot(ComponentHealthState::Healthy, "Connected"),
+                component_snapshot(
+                    SupervisedComponent::RuntimeAgentEndpoint,
+                    ComponentHealthState::Restarting,
+                ),
+            ],
+        };
+
+        assert!(!derive_runtime_ready(
+            &snapshot,
+            RuntimeReadinessMode::CodexProxyOnly,
+        ));
+    }
+
+    #[test]
+    fn derives_opencode_runtime_as_not_ready_when_proxy_connectivity_probe_is_not_healthy() {
+        let snapshot = SandboxdHealthSnapshot {
+            observed_at: SystemTime::UNIX_EPOCH,
+            components: vec![
+                component_snapshot(
+                    SupervisedComponent::OpenCodeProxy,
+                    ComponentHealthState::Healthy,
+                ),
+                component_snapshot(
+                    SupervisedComponent::OpenCodeServer,
+                    ComponentHealthState::Healthy,
+                ),
+                component_snapshot(
+                    SupervisedComponent::OpenCodeProxyConnectivity,
+                    ComponentHealthState::Restarting,
+                ),
+                component_snapshot(
+                    SupervisedComponent::RuntimeAgentEndpoint,
+                    ComponentHealthState::Healthy,
+                ),
+            ],
+        };
+
+        assert!(!derive_runtime_ready(
+            &snapshot,
+            RuntimeReadinessMode::OpenCode,
+        ));
+    }
+
+    #[test]
+    fn derives_pi_runtime_as_not_ready_when_proxy_connectivity_probe_is_not_healthy() {
+        let snapshot = SandboxdHealthSnapshot {
+            observed_at: SystemTime::UNIX_EPOCH,
+            components: vec![
+                component_snapshot(SupervisedComponent::PiProxy, ComponentHealthState::Healthy),
+                component_snapshot(
+                    SupervisedComponent::PiRpcProcess,
+                    ComponentHealthState::Healthy,
+                ),
+                component_snapshot(
+                    SupervisedComponent::PiProxyConnectivity,
+                    ComponentHealthState::Restarting,
+                ),
+                component_snapshot(
+                    SupervisedComponent::RuntimeAgentEndpoint,
+                    ComponentHealthState::Healthy,
                 ),
             ],
         };

@@ -49,6 +49,7 @@ pub(super) fn collect_tracked_components(
     {
         tracked_components.insert(SupervisedComponent::CodexProxy);
         tracked_components.insert(SupervisedComponent::CodexAppServer);
+        tracked_components.insert(SupervisedComponent::RuntimeAgentEndpoint);
     }
 
     if runtime_plan
@@ -58,6 +59,8 @@ pub(super) fn collect_tracked_components(
     {
         tracked_components.insert(SupervisedComponent::OpenCodeProxy);
         tracked_components.insert(SupervisedComponent::OpenCodeServer);
+        tracked_components.insert(SupervisedComponent::OpenCodeProxyConnectivity);
+        tracked_components.insert(SupervisedComponent::RuntimeAgentEndpoint);
     }
 
     if runtime_plan
@@ -67,6 +70,8 @@ pub(super) fn collect_tracked_components(
     {
         tracked_components.insert(SupervisedComponent::PiProxy);
         tracked_components.insert(SupervisedComponent::PiRpcProcess);
+        tracked_components.insert(SupervisedComponent::PiProxyConnectivity);
+        tracked_components.insert(SupervisedComponent::RuntimeAgentEndpoint);
     }
 
     tracked_components
