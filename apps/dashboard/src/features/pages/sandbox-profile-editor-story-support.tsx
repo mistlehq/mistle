@@ -7,10 +7,12 @@ import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } f
 import type { ChatEntry } from "../chat/chat-types.js";
 import { ChatComposer } from "../chat/components/chat-composer.js";
 import { noopRespondToServerRequest } from "../chat/components/chat-story-support.js";
+import { sandboxProfileVersionSkillsSourceReposQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type { SandboxProfileVersionDraftTriggerImpactTrigger } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type {
   SandboxProviderSummary,
   SandboxProfileVersion,
+  SandboxProfileVersionSkillsSourceReposResult,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { SessionComposerFixtureProps } from "../session-agents/codex/fixtures/session-fixtures.js";
 import { sandboxOperationEventsQueryKey } from "../sessions/sessions-query-keys.js";
@@ -58,6 +60,7 @@ import {
   SandboxProfileSetupScriptTestPanel,
   type SetupScriptTestStatus,
 } from "./sandbox-profile-setup-script-test.js";
+import { SandboxProfileSkillsSection } from "./sandbox-profile-skills-section.js";
 import {
   SandboxProfileSnapshotPanelView,
   SandboxProfileSnapshotRefreshScheduleForm,
@@ -161,6 +164,42 @@ const StorySetupAssistantOperationId = "owfr_story_setup_assistant";
 const StorySetupAssistantSandboxInstanceId = "sbi_story_setup_assistant";
 const StorySnapshotOperationId = "ssj_story_creating_snapshot";
 const StorySnapshotSandboxInstanceId = "sbi_story_creating_snapshot";
+const StorySkillsOriginUrl = "https://github.com/mistle/main-dashboard.git";
+
+const StorySkillsConfig = {
+  originUrl: StorySkillsOriginUrl,
+  selectedSkills: [
+    {
+      name: "pr-review",
+      relativePath: ".agents/skills/pr-review",
+    },
+  ],
+} satisfies NonNullable<SandboxProfileVersion["skillsConfig"]>;
+
+const StorySkillsSourceRepos = {
+  items: [
+    {
+      id: "ksr_story_skills",
+      originUrl: StorySkillsOriginUrl,
+      commitSha: "8f7c7a1",
+      lastSyncedAt: "2026-05-28T14:05:00.000Z",
+      createdAt: "2026-05-28T14:05:00.000Z",
+      updatedAt: "2026-05-28T14:05:00.000Z",
+      skills: [
+        {
+          name: "pr-review",
+          description: "Review pull requests and request a follow-up review.",
+          relativePath: ".agents/skills/pr-review",
+        },
+        {
+          name: "release-notes",
+          description: "Draft release notes from merged changes.",
+          relativePath: ".agents/skills/release-notes",
+        },
+      ],
+    },
+  ],
+} satisfies SandboxProfileVersionSkillsSourceReposResult;
 
 export const StoryMistleApiKey = {
   id: "apk_story_mistle_agent",
@@ -443,6 +482,7 @@ function createRuntimeStoryVersion(input: {
   mistleMcpApiKeyId: string | null;
   mistleMcpEnabled: boolean;
   runtimeState: SandboxProfileEditorPageStoryArgs["runtimeState"];
+  skillsConfig?: SandboxProfileVersion["skillsConfig"];
   version: number;
 }): SandboxProfileVersion {
   const runtimeState = input.runtimeState ?? "docker";
@@ -465,7 +505,7 @@ function createRuntimeStoryVersion(input: {
             vcpuCount: 2,
             memoryMb: 4096,
           },
-    skillsConfig: null,
+    skillsConfig: input.skillsConfig ?? null,
     isActive: false,
     usable: false,
     refreshSchedule: null,
@@ -779,6 +819,16 @@ function SandboxProfileEditorPageStoryView(
         },
       );
     }
+    for (const version of [1, 2]) {
+      client.setQueryData(
+        sandboxProfileVersionSkillsSourceReposQueryKey({
+          profileId: "sandbox-profile-story",
+          version,
+          originUrl: StorySkillsOriginUrl,
+        }),
+        StorySkillsSourceRepos,
+      );
+    }
     return client;
   });
   const [profileName, setProfileName] = useState(input.displayName);
@@ -863,6 +913,15 @@ function SandboxProfileEditorPageStoryView(
     StoryE2BSandboxTarget,
   ];
   const agentRuntimeId = input.agentRuntimeId ?? "codex";
+  const storyVersion = createRuntimeStoryVersion({
+    agentRuntimeId,
+    gitCommitSigningIntegrationConnectionId,
+    mistleMcpApiKeyId: input.mistleMcpApiKeyId === undefined ? null : input.mistleMcpApiKeyId,
+    mistleMcpEnabled: input.mistleMcpEnabled === true,
+    runtimeState: input.runtimeState,
+    skillsConfig: StorySkillsConfig,
+    version: mode.version,
+  });
   function handleToggleSetupAssistant(): void {
     if (setupAssistantPanelOpen) {
       setSetupAssistantCloseDialogOpen(true);
@@ -1027,15 +1086,7 @@ function SandboxProfileEditorPageStoryView(
                           runtimeState: input.runtimeState,
                         })}
                         sectionChrome={false}
-                        version={createRuntimeStoryVersion({
-                          agentRuntimeId,
-                          gitCommitSigningIntegrationConnectionId,
-                          mistleMcpApiKeyId:
-                            input.mistleMcpApiKeyId === undefined ? null : input.mistleMcpApiKeyId,
-                          mistleMcpEnabled: input.mistleMcpEnabled === true,
-                          runtimeState: input.runtimeState,
-                          version: mode.version,
-                        })}
+                        version={storyVersion}
                       />
                     }
                     disabled={!isEditable}
@@ -1075,6 +1126,21 @@ function SandboxProfileEditorPageStoryView(
                   state: input.integrationsSectionState,
                 })
               )}
+              {input.integrationsSectionState === undefined ? (
+                <SandboxProfilePanelSection>
+                  <SandboxProfileSkillsSection
+                    availableConnections={storyConnections}
+                    availableTargets={storyTargets}
+                    disabled={!isEditable}
+                    integrationRows={integrationRows}
+                    integrationRowsHaveUnpersistedChanges={false}
+                    isDraft={mode.kind === "draft"}
+                    profileId={storyVersion.sandboxProfileId}
+                    readOnly={!isEditable}
+                    version={storyVersion}
+                  />
+                </SandboxProfilePanelSection>
+              ) : null}
               <SandboxProfilePanelSection>
                 <div className="flex flex-col gap-4">
                   {input.setupAssistantErrorMessage === undefined ? null : (

@@ -1435,6 +1435,7 @@ fn runtime_plan_timeline_step(step: RuntimePlanApplyLifecycleStep) -> (&'static 
             ("runtime-artifacts", "Installing runtime artifacts")
         }
         RuntimePlanApplyLifecycleStep::WorkspaceSources => ("workspace", "Preparing workspace"),
+        RuntimePlanApplyLifecycleStep::Skills => ("skills", "Reconciling skills"),
         RuntimePlanApplyLifecycleStep::RuntimeFiles => ("runtime-files", "Writing runtime files"),
     }
 }

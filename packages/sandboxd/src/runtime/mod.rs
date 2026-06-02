@@ -134,6 +134,7 @@ impl std::error::Error for RuntimePlanApplyError {}
 pub enum RuntimePlanApplyLifecycleStep {
     RuntimeArtifacts,
     WorkspaceSources,
+    Skills,
     RuntimeFiles,
 }
 
@@ -257,6 +258,9 @@ pub fn apply_compiled_runtime_plan_with_output_sink_and_observer(
     }
 
     if let Some(skills) = &runtime_plan.skills {
+        if let Some(observer) = observer {
+            observer.record_step_started(RuntimePlanApplyLifecycleStep::Skills);
+        }
         let runtime_id = resolve_runtime_plan_skills_runtime_id(runtime_plan);
         let repo_path = resolve_runtime_plan_skills_repo_path(runtime_plan, &skills.origin_url)
             .map_err(|error| RuntimePlanApplyError::SkillsReconcile {
@@ -273,6 +277,9 @@ pub fn apply_compiled_runtime_plan_with_output_sink_and_observer(
                 error,
             }
         })?;
+        if let Some(observer) = observer {
+            observer.record_step_completed(RuntimePlanApplyLifecycleStep::Skills);
+        }
     }
 
     if runtime_plan
