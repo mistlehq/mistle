@@ -151,7 +151,6 @@ export async function syncSkillsSourceRepo(
     await serviceInput.dataPlaneClient.deleteSandboxInstance({
       organizationId: input.organizationId,
       sandboxInstanceId: startedSandbox.sandboxInstanceId,
-      startupWorkflowRunId: startedSandbox.workflowRunId,
     });
   } catch (error) {
     cleanupError = error;

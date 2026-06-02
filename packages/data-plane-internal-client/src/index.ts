@@ -120,7 +120,6 @@ const StopSandboxInstanceResponseSchema = z
 export type DeleteSandboxInstanceInput = {
   organizationId: string;
   sandboxInstanceId: string;
-  startupWorkflowRunId?: string;
 };
 const DeleteSandboxInstanceResponseSchema = z
   .object({
@@ -238,6 +237,16 @@ export type GetSandboxInstanceInput = {
   organizationId: string;
   instanceId: string;
 };
+export type GetSandboxInstanceMetadataInput = GetSandboxInstanceInput;
+const SandboxInstanceMetadataResponseSchema = z
+  .object({
+    id: z.string().min(1),
+    purpose: z.enum(["session", "snapshot", "setup_assistant", "setup_check", "skills_discovery"]),
+    deletedAt: z.string().min(1).nullable(),
+  })
+  .strict()
+  .nullable();
+export type SandboxInstanceMetadataResponse = z.infer<typeof SandboxInstanceMetadataResponseSchema>;
 const GetSandboxInstanceResponseSchema = z
   .object({
     id: z.string().min(1),
@@ -341,6 +350,9 @@ export type DataPlaneSandboxInstancesClient = {
   materializeSandboxProfileVersionSnapshotJob: (
     input: MaterializeSandboxProfileVersionSnapshotJobInput,
   ) => Promise<MaterializeSandboxProfileVersionSnapshotJobAcceptedResponse>;
+  getSandboxInstanceMetadata: (
+    input: GetSandboxInstanceMetadataInput,
+  ) => Promise<SandboxInstanceMetadataResponse>;
   getSandboxInstance: (input: GetSandboxInstanceInput) => Promise<GetSandboxInstanceResponse>;
   listSandboxInstances: (input: ListSandboxInstancesInput) => Promise<ListSandboxInstancesResponse>;
   listSandboxOperationEvents: (
@@ -672,9 +684,6 @@ export function createDataPlaneSandboxInstancesClient(
       const query: Record<string, string> = {
         organizationId: deleteInput.organizationId,
       };
-      if (deleteInput.startupWorkflowRunId !== undefined) {
-        query.startupWorkflowRunId = deleteInput.startupWorkflowRunId;
-      }
 
       const response = await fetch(
         createSandboxInstanceMemberUrl({
@@ -1000,6 +1009,46 @@ export function createDataPlaneSandboxInstancesClient(
       if (response.status === 200) {
         const responseBody = await response.json();
         const parsedResponse = GetSandboxInstanceResponseSchema.parse(responseBody);
+
+        return parsedResponse;
+      }
+
+      const errorBody = await readResponseBody(response);
+
+      throw createClientError({
+        status: response.status,
+        error: errorBody,
+        operation: "read",
+      });
+    },
+
+    async getSandboxInstanceMetadata(getInput) {
+      const response = await fetch(
+        createSandboxInstanceMemberUrl({
+          baseUrl: internalClient.baseUrl,
+          instanceId: getInput.instanceId,
+          suffix: "/metadata",
+          query: {
+            organizationId: getInput.organizationId,
+          },
+        }),
+        {
+          headers: createAuthedHeaders({
+            serviceToken: internalClient.serviceToken,
+            ...(internalClient.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: internalClient.testEnvironmentId }),
+            ...(internalClient.testEnvironmentIdHeader === undefined
+              ? {}
+              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
+          }),
+          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+        },
+      );
+
+      if (response.status === 200) {
+        const responseBody = await response.json();
+        const parsedResponse = SandboxInstanceMetadataResponseSchema.parse(responseBody);
 
         return parsedResponse;
       }

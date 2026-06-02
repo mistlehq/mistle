@@ -1,9 +1,4 @@
-import {
-  SandboxInstanceStatuses,
-  type DataPlaneDatabase,
-  type DataPlaneTables,
-  type SandboxInstanceStatus,
-} from "@mistle/db/data-plane";
+import { type DataPlaneDatabase, type DataPlaneTables } from "@mistle/db/data-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
 import { DeleteSandboxInstanceWorkflowSpec } from "@mistle/workflow-registry/data-plane";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -13,14 +8,13 @@ import type { DeleteSandboxInstanceResponse } from "../delete-sandbox-instance/s
 
 type DeleteSandboxInstanceContext = {
   db: DataPlaneDatabase;
-  openWorkflow: Pick<AppRuntimeResources["openWorkflow"], "cancelWorkflowRun" | "runWorkflow">;
+  openWorkflow: Pick<AppRuntimeResources["openWorkflow"], "runWorkflow">;
   tables: Pick<DataPlaneTables, "sandboxInstances">;
 };
 
 type DeleteSandboxInstanceInput = {
   organizationId: string;
   sandboxInstanceId: string;
-  startupWorkflowRunId?: string;
 };
 
 export const DeleteSandboxInstanceNotFoundErrorCode = "NOT_FOUND";
@@ -34,15 +28,6 @@ function createDeleteSandboxDestroyIdempotencyKey(input: DeleteSandboxInstanceIn
   });
 }
 
-function isStartupStatus(status: SandboxInstanceStatus): boolean {
-  return (
-    status === SandboxInstanceStatuses.PENDING ||
-    status === SandboxInstanceStatuses.STARTING ||
-    status === SandboxInstanceStatuses.STARTED ||
-    status === SandboxInstanceStatuses.INITIALIZING
-  );
-}
-
 export async function deleteSandboxInstance(
   ctx: DeleteSandboxInstanceContext,
   input: DeleteSandboxInstanceInput,
@@ -51,7 +36,6 @@ export async function deleteSandboxInstance(
     columns: {
       id: true,
       deletedAt: true,
-      status: true,
     },
     where: (table, { and: whereAnd, eq: whereEq }) =>
       whereAnd(
@@ -73,10 +57,6 @@ export async function deleteSandboxInstance(
       sandboxInstanceId: input.sandboxInstanceId,
       workflowRunId: null,
     };
-  }
-
-  if (input.startupWorkflowRunId !== undefined && isStartupStatus(sandboxInstance.status)) {
-    await ctx.openWorkflow.cancelWorkflowRun(input.startupWorkflowRunId);
   }
 
   const workflowRunHandle = await ctx.openWorkflow.runWorkflow(

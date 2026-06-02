@@ -45,6 +45,13 @@ export type DeleteSandboxInstanceResult = {
   };
 };
 
+const StartupStatuses = new Set<SandboxInstanceStatus>([
+  SandboxInstanceStatuses.PENDING,
+  SandboxInstanceStatuses.STARTING,
+  SandboxInstanceStatuses.STARTED,
+  SandboxInstanceStatuses.INITIALIZING,
+]);
+
 async function resolveDeleteSandboxInstanceState(input: {
   db: DataPlaneDatabase;
   sandboxInstanceId: string;
@@ -162,6 +169,12 @@ export async function deleteSandboxInstance(
   });
 
   if (sandboxInstanceState.providerSandboxId === null) {
+    if (StartupStatuses.has(sandboxInstanceState.status)) {
+      throw new Error(
+        `Sandbox instance '${input.sandboxInstanceId}' is still starting and does not have persisted provider sandbox metadata yet.`,
+      );
+    }
+
     await clearSandboxInstanceDeadlines({
       db: ctx.db,
       tables: ctx.tables,

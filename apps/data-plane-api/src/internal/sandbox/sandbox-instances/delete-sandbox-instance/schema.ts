@@ -11,7 +11,6 @@ export const DeleteSandboxInstanceParamsSchema = z
 export const DeleteSandboxInstanceQuerySchema = z
   .object({
     organizationId: z.string().min(1),
-    startupWorkflowRunId: z.string().min(1).optional(),
   })
   .strict();
 
