@@ -209,7 +209,7 @@ pub enum SkillsRuntime {
 }
 
 impl SkillsRuntime {
-    fn parse(value: &str) -> Result<Self, SkillsReconcileError> {
+    pub fn parse(value: &str) -> Result<Self, SkillsReconcileError> {
         match value {
             "codex" => Ok(Self::Codex),
             "opencode" => Ok(Self::OpenCode),

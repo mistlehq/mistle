@@ -1401,6 +1401,7 @@ fn sample_runtime_plan() -> CompiledRuntimePlan {
         }],
         artifacts: Vec::new(),
         workspace_sources: Vec::new(),
+        skills: None,
         runtime_clients: Vec::new(),
         agent_runtimes: Vec::new(),
     }

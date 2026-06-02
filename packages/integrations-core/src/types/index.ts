@@ -1984,6 +1984,16 @@ export type CompileBindingWorkspaceSource = GitCloneWorkspaceSourceBase;
 
 export type CompiledWorkspaceSource = GitCloneWorkspaceSourceBase;
 
+export type CompiledSkillSelection = {
+  name: string;
+  relativePath: string;
+};
+
+export type CompiledRuntimePlanSkills = {
+  originUrl: string;
+  selectedSkills: ReadonlyArray<CompiledSkillSelection>;
+};
+
 export type CompileBindingResult = {
   egressRoutes: ReadonlyArray<CompileBindingEgressRoute>;
   artifacts: ReadonlyArray<RuntimeArtifactSpec>;
@@ -2666,6 +2676,7 @@ export type CompiledRuntimePlan = {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   workspaceSources: ReadonlyArray<CompiledWorkspaceSource>;
+  skills?: CompiledRuntimePlanSkills;
   runtimeClients: ReadonlyArray<RuntimeClient>;
   agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
 };

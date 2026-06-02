@@ -9,6 +9,7 @@ import {
   IntegrationConnectionStatuses,
   SandboxProfileVersionAgentRuntimeIds,
   type SandboxProfileVersionAgentRuntimeId,
+  type SandboxProfileVersionSkillsConfig,
 } from "@mistle/db/control-plane";
 import {
   IntegrationConnectionMethodIds,
@@ -189,6 +190,55 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
     });
 
     expect(runtimePlan.setupScript).toBeUndefined();
+  });
+
+  it("includes selected skills when the source repository is in the runtime plan", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-compile-skills@example.com",
+    });
+
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_skills",
+      skillsConfig: {
+        originUrl: "https://github.com/mistlehq/mistle.git",
+        selectedSkills: [
+          {
+            name: "github-pr-authoring",
+            relativePath: ".agents/skills/github-pr-authoring",
+          },
+        ],
+      },
+    });
+    await seedConnectorBindings(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_skills",
+      bindings: [
+        githubBinding({
+          targetKey: "github-cloud-compile-skills",
+          connectionId: "icn_compile_skills_github",
+          bindingId: "ibd_compile_skills_github",
+          tools: [],
+        }),
+      ],
+    });
+
+    const runtimePlan = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_skills",
+    });
+
+    expect(runtimePlan.skills).toEqual({
+      originUrl: "https://github.com/mistlehq/mistle.git",
+      selectedSkills: [
+        {
+          name: "github-pr-authoring",
+          relativePath: ".agents/skills/github-pr-authoring",
+        },
+      ],
+    });
   });
 
   it("uses the ChatGPT responses base URL for chatgpt-device-code connections", async ({ env }) => {
@@ -828,6 +878,7 @@ async function createProfileVersion(
     setupScript?: string;
     agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
     mistleMcpApiKeyId?: string;
+    skillsConfig?: SandboxProfileVersionSkillsConfig | null;
   },
 ): Promise<void> {
   await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
@@ -847,6 +898,7 @@ async function createProfileVersion(
       ...(input.mistleMcpApiKeyId === undefined
         ? {}
         : { mistleMcpEnabled: true, mistleMcpApiKeyId: input.mistleMcpApiKeyId }),
+      ...(input.skillsConfig === undefined ? {} : { skillsConfig: input.skillsConfig }),
     }),
   );
 }

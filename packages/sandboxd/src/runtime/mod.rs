@@ -14,21 +14,24 @@ mod workspace_source;
 
 use std::collections::BTreeMap;
 use std::fmt;
+use std::path::Path;
 use std::sync::Arc;
 
 use crate::command::CommandOutputSink;
 use crate::protocol::startup::StartupInput;
+use crate::skills::{SkillsRuntime, reconcile_skills};
 
 pub use plan::{
     CompiledAgentRuntime, CompiledEgressRoute, CompiledEgressRouteAuthInjection,
     CompiledEgressRouteAuthInjectionType, CompiledEgressRouteCredentialHeaderInjection,
     CompiledEgressRouteCredentialResolver, CompiledEgressRouteMatch, CompiledEgressRouteUpstream,
     CompiledRuntimeArtifact, CompiledRuntimePlan, CompiledRuntimePlanImage,
-    CompiledRuntimePlanImageSource, CompiledWorkspaceSource, RuntimeArtifactInstallStep,
-    RuntimeArtifactLifecycle, RuntimeClient, RuntimeClientConnectionMode, RuntimeClientEndpoint,
-    RuntimeClientEndpointTransport, RuntimeClientProcess, RuntimeClientProcessReadiness,
-    RuntimeClientProcessStopPolicy, RuntimeClientProcessStopSignal, RuntimeClientSetup,
-    RuntimeClientSetupFile, RuntimeExecCommand, WorkspaceSourceResourceKind,
+    CompiledRuntimePlanImageSource, CompiledRuntimePlanSkills, CompiledSkillSelection,
+    CompiledWorkspaceSource, RuntimeArtifactInstallStep, RuntimeArtifactLifecycle, RuntimeClient,
+    RuntimeClientConnectionMode, RuntimeClientEndpoint, RuntimeClientEndpointTransport,
+    RuntimeClientProcess, RuntimeClientProcessReadiness, RuntimeClientProcessStopPolicy,
+    RuntimeClientProcessStopSignal, RuntimeClientSetup, RuntimeClientSetupFile, RuntimeExecCommand,
+    WorkspaceSourceResourceKind,
 };
 
 /// Describes why one runtime-plan setup step failed while applying startup input.
@@ -48,6 +51,12 @@ pub enum RuntimePlanApplyError {
         path: String,
         origin_url: String,
         clone_url: Option<String>,
+        error: String,
+    },
+    SkillsReconcile {
+        origin_url: String,
+        runtime_id: String,
+        repo_path: Option<String>,
         error: String,
     },
     RuntimeFile {
@@ -89,6 +98,19 @@ impl fmt::Display for RuntimePlanApplyError {
                 clone_url
                     .as_ref()
                     .map(|value| format!(" cloneUrl={value}"))
+                    .unwrap_or_default()
+            ),
+            Self::SkillsReconcile {
+                origin_url,
+                runtime_id,
+                repo_path,
+                error,
+            } => write!(
+                f,
+                "runtime plan skills reconciliation failed (originUrl={origin_url} runtimeId={runtime_id}{}): {error}",
+                repo_path
+                    .as_ref()
+                    .map(|value| format!(" repoPath={value}"))
                     .unwrap_or_default()
             ),
             Self::RuntimeFile {
@@ -234,6 +256,25 @@ pub fn apply_compiled_runtime_plan_with_output_sink_and_observer(
         observer.record_step_completed(RuntimePlanApplyLifecycleStep::WorkspaceSources);
     }
 
+    if let Some(skills) = &runtime_plan.skills {
+        let runtime_id = resolve_runtime_plan_skills_runtime_id(runtime_plan);
+        let repo_path = resolve_runtime_plan_skills_repo_path(runtime_plan, &skills.origin_url)
+            .map_err(|error| RuntimePlanApplyError::SkillsReconcile {
+                origin_url: skills.origin_url.clone(),
+                runtime_id: runtime_id.clone(),
+                repo_path: None,
+                error,
+            })?;
+        apply_runtime_plan_skills(skills, &runtime_id, &repo_path).map_err(|error| {
+            RuntimePlanApplyError::SkillsReconcile {
+                origin_url: skills.origin_url.clone(),
+                runtime_id,
+                repo_path: Some(repo_path),
+                error,
+            }
+        })?;
+    }
+
     if runtime_plan
         .runtime_clients
         .iter()
@@ -266,4 +307,72 @@ pub fn apply_compiled_runtime_plan_with_output_sink_and_observer(
     }
 
     Ok(())
+}
+
+fn apply_runtime_plan_skills(
+    skills: &CompiledRuntimePlanSkills,
+    runtime_id: &str,
+    repo_path: &str,
+) -> Result<(), String> {
+    let runtime = SkillsRuntime::parse(runtime_id).map_err(|error| error.to_string())?;
+    let selected_relative_paths = skills
+        .selected_skills
+        .iter()
+        .map(|skill| skill.relative_path.clone())
+        .collect::<Vec<_>>();
+
+    reconcile_skills(
+        Path::new(repo_path),
+        &runtime,
+        &selected_relative_paths,
+        None,
+    )
+    .map(|_| ())
+    .map_err(|error| error.to_string())
+}
+
+fn resolve_runtime_plan_skills_runtime_id(runtime_plan: &CompiledRuntimePlan) -> String {
+    runtime_plan
+        .agent_runtimes
+        .first()
+        .map(|agent_runtime| agent_runtime.runtime_id.clone())
+        .unwrap_or_default()
+}
+
+fn resolve_runtime_plan_skills_repo_path(
+    runtime_plan: &CompiledRuntimePlan,
+    origin_url: &str,
+) -> Result<String, String> {
+    let mut matching_paths = runtime_plan
+        .workspace_sources
+        .iter()
+        .filter_map(|workspace_source| match workspace_source {
+            plan::CompiledWorkspaceSource::GitClone {
+                origin_url: workspace_origin_url,
+                path,
+                ..
+            } if workspace_origin_url == origin_url => Some(path.clone()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    if matching_paths.is_empty() {
+        return Err(format!(
+            "skills source '{origin_url}' was not found in runtime plan workspace sources"
+        ));
+    }
+
+    if matching_paths.len() > 1 {
+        return Err(format!(
+            "skills source '{origin_url}' matched multiple runtime plan workspace sources"
+        ));
+    }
+
+    let Some(path) = matching_paths.pop() else {
+        return Err(format!(
+            "skills source '{origin_url}' was not found in runtime plan workspace sources"
+        ));
+    };
+
+    Ok(path)
 }

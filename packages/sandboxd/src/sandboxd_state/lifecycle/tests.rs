@@ -60,6 +60,7 @@ fn run_setup_script_writes_stdout_and_stderr_transcript_records() {
         egress_routes: Vec::new(),
         artifacts: Vec::new(),
         workspace_sources: Vec::new(),
+        skills: None,
         runtime_clients: Vec::new(),
         agent_runtimes: Vec::new(),
     };

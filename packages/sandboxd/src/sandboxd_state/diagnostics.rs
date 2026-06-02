@@ -223,6 +223,39 @@ pub(super) fn record_runtime_plan_apply_failure(
             }
             map
         }
+        RuntimePlanApplyError::SkillsReconcile {
+            origin_url,
+            runtime_id,
+            repo_path,
+            error,
+        } => {
+            let mut map = timeline_attributes("workspace", "Preparing workspace");
+            map.extend([
+                (
+                    "failureKind".to_string(),
+                    startup_diagnostics_string("skills_reconcile_failed"),
+                ),
+                (
+                    "originUrl".to_string(),
+                    startup_diagnostics_string(origin_url.clone()),
+                ),
+                (
+                    "runtimeId".to_string(),
+                    startup_diagnostics_string(runtime_id.clone()),
+                ),
+                (
+                    "error".to_string(),
+                    startup_diagnostics_string(error.clone()),
+                ),
+            ]);
+            if let Some(repo_path) = repo_path {
+                map.insert(
+                    "repoPath".to_string(),
+                    startup_diagnostics_string(repo_path.clone()),
+                );
+            }
+            map
+        }
         RuntimePlanApplyError::RuntimeFile {
             client_id,
             file_id,

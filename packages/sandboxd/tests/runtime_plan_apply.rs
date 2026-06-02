@@ -186,6 +186,64 @@ fn preserves_existing_non_git_workspace_source_target() {
 }
 
 #[test]
+fn fails_skills_reconciliation_when_source_is_not_a_workspace_source() {
+    let startup_input = StartupInput {
+        startup_mode: StartupMode::New,
+        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
+        execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
+        bootstrap_token: "bootstrap-token-value".to_string(),
+        tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+        tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
+        acting_user_id: None,
+        runtime_plan: serde_json::json!({
+          "sandboxProfileId": "sbp_123",
+          "version": 1,
+          "image": {
+            "source": "base",
+            "imageRef": sandboxd::test_support::local_prepared_runtime_sandbox_base_image_ref()
+          },
+          "egressRoutes": [],
+          "artifacts": [],
+          "runtimeClients": [],
+          "workspaceSources": [],
+          "skills": {
+            "originUrl": "https://github.com/acme/skills.git",
+            "selectedSkills": [
+              {
+                "name": "triage",
+                "relativePath": "triage"
+              }
+            ]
+          },
+          "agentRuntimes": [
+            {
+              "runtimeId": "codex",
+              "runtimeKey": "codex",
+              "clientId": "codex-cli",
+              "endpointKey": "app-server",
+              "ptyLaunch": {}
+            }
+          ]
+        }),
+        git_identity: None,
+        transparent_proxy: None,
+    };
+
+    let error = runtime::apply_runtime_plan(&startup_input)
+        .expect_err("skills source absent from workspace sources should fail startup");
+
+    assert!(matches!(
+        error,
+        runtime::RuntimePlanApplyError::SkillsReconcile { .. }
+    ));
+    assert!(
+        error
+            .to_string()
+            .contains("skills source 'https://github.com/acme/skills.git' was not found")
+    );
+}
+
+#[test]
 fn preserves_existing_workspace_source_target_inside_another_repository() {
     let test_dir = create_temp_test_dir("runtime_plan_nested_non_git_workspace");
     let clone_source_path = test_dir.join("source-repo");

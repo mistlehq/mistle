@@ -416,6 +416,20 @@ const CompiledWorkspaceSourceSchema = z.discriminatedUnion("sourceKind", [
     .strict(),
 ]);
 
+const CompiledSkillSelectionSchema = z
+  .object({
+    name: z.string().min(1),
+    relativePath: z.string().min(1),
+  })
+  .strict();
+
+const CompiledRuntimePlanSkillsSchema = z
+  .object({
+    originUrl: z.url(),
+    selectedSkills: z.array(CompiledSkillSelectionSchema).readonly(),
+  })
+  .strict();
+
 type RuntimePlanRoute = CompiledRuntimePlan["egressRoutes"][number];
 type RuntimePlanArtifact = CompiledRuntimePlan["artifacts"][number];
 type RuntimePlanExecCommand =
@@ -425,6 +439,7 @@ type RuntimePlanRuntimeClientProcess = RuntimePlanRuntimeClient["processes"][num
 type RuntimePlanRuntimeClientEndpoint = RuntimePlanRuntimeClient["endpoints"][number];
 type RuntimePlanRuntimeClientFile = RuntimePlanRuntimeClient["setup"]["files"][number];
 type RuntimePlanWorkspaceSource = CompiledRuntimePlan["workspaceSources"][number];
+type RuntimePlanSkills = NonNullable<CompiledRuntimePlan["skills"]>;
 type RuntimePlanAgentRuntime = CompiledRuntimePlan["agentRuntimes"][number];
 
 function sortRecord(input: Record<string, string>): Record<string, string> {
@@ -877,6 +892,18 @@ function normalizeWorkspaceSource(
   };
 }
 
+function normalizeSkills(
+  skills: z.output<typeof CompiledRuntimePlanSkillsSchema>,
+): RuntimePlanSkills {
+  return {
+    originUrl: skills.originUrl,
+    selectedSkills: skills.selectedSkills.map((skill) => ({
+      name: skill.name,
+      relativePath: skill.relativePath,
+    })),
+  };
+}
+
 function normalizeAgentRuntime(
   agentRuntime: z.output<typeof CompiledAgentRuntimeSchema>,
 ): RuntimePlanAgentRuntime {
@@ -921,6 +948,7 @@ const CompiledRuntimePlanValidationSchema = z
     egressRoutes: z.array(EgressCredentialRouteSchema).readonly(),
     artifacts: z.array(CompiledRuntimeArtifactSpecSchema).readonly(),
     workspaceSources: z.array(CompiledWorkspaceSourceSchema).readonly(),
+    skills: CompiledRuntimePlanSkillsSchema.optional(),
     runtimeClients: z.array(RuntimeClientSchema).readonly(),
     agentRuntimes: z.array(CompiledAgentRuntimeSchema).readonly(),
   })
@@ -935,6 +963,7 @@ export const CompiledRuntimePlanSchema = CompiledRuntimePlanValidationSchema.tra
     egressRoutes: runtimePlan.egressRoutes.map(normalizeRoute),
     artifacts: runtimePlan.artifacts.map(normalizeArtifact),
     workspaceSources: runtimePlan.workspaceSources.map(normalizeWorkspaceSource),
+    ...(runtimePlan.skills === undefined ? {} : { skills: normalizeSkills(runtimePlan.skills) }),
     runtimeClients: runtimePlan.runtimeClients.map(normalizeRuntimeClient),
     agentRuntimes: runtimePlan.agentRuntimes.map(normalizeAgentRuntime),
   }),

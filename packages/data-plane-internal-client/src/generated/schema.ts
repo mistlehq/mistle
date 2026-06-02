@@ -595,6 +595,14 @@ export interface paths {
               }[];
               sandboxProfileId: string;
               setupScript?: string;
+              skills?: {
+                /** Format: uri */
+                originUrl: string;
+                selectedSkills: {
+                  name: string;
+                  relativePath: string;
+                }[];
+              };
               version: number;
               workspaceSources: {
                 /** Format: uri */
@@ -1066,6 +1074,14 @@ export interface paths {
                 }[];
                 sandboxProfileId: string;
                 setupScript?: string;
+                skills?: {
+                  /** Format: uri */
+                  originUrl: string;
+                  selectedSkills: {
+                    name: string;
+                    relativePath: string;
+                  }[];
+                };
                 version: number;
                 workspaceSources: {
                   /** Format: uri */

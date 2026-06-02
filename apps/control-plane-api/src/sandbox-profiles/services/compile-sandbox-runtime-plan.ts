@@ -1,5 +1,6 @@
 import type {
   ControlPlaneDatabase,
+  SandboxProfileVersionSkillsConfig,
   SandboxProfileVersionAgentRuntimeId,
 } from "@mistle/db/control-plane";
 import {
@@ -8,6 +9,7 @@ import {
   IntegrationMcpTransports,
   compileRuntimePlan,
   type CompiledRuntimePlan,
+  type CompiledRuntimePlanSkills,
   type EgressCredentialRoute,
   type EgressCredentialResolverRef,
   type IntegrationDefinitionsBundle,
@@ -411,6 +413,7 @@ export async function compileSandboxRuntimePlan(
       mistleMcpApiKeyId: true,
       setupScript: true,
       maintenanceScript: true,
+      skillsConfig: true,
     },
     where: (table, { and, eq }) =>
       and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),
@@ -456,6 +459,10 @@ export async function compileSandboxRuntimePlan(
         url: input.mcpConfig.url,
       }),
     });
+    const skills = resolveRuntimePlanSkills({
+      runtimePlan,
+      skillsConfig: sandboxProfileVersion.skillsConfig,
+    });
 
     const snapshotPreparationScriptKind = input.snapshotPreparationScriptKind ?? "setup";
     const snapshotPreparationScript = normalizeSnapshotPreparationScript(
@@ -466,6 +473,7 @@ export async function compileSandboxRuntimePlan(
 
     return {
       ...runtimePlan,
+      ...(skills === undefined ? {} : { skills }),
       ...(snapshotPreparationScript === undefined
         ? {}
         : { setupScript: snapshotPreparationScript }),
@@ -481,4 +489,38 @@ export async function compileSandboxRuntimePlan(
 
     throw error;
   }
+}
+
+function resolveRuntimePlanSkills(input: {
+  runtimePlan: CompiledRuntimePlan;
+  skillsConfig: SandboxProfileVersionSkillsConfig | null;
+}): CompiledRuntimePlanSkills | undefined {
+  if (input.skillsConfig === null) {
+    return undefined;
+  }
+
+  const skillsConfig = input.skillsConfig;
+  const matchingSources = input.runtimePlan.workspaceSources.filter(
+    (workspaceSource) => workspaceSource.originUrl === skillsConfig.originUrl,
+  );
+  if (matchingSources.length === 0) {
+    throw new SandboxRuntimePlanCompilerError({
+      code: SandboxRuntimePlanCompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+      message: `Sandbox profile version skills source '${skillsConfig.originUrl}' is not included in the runtime plan workspace sources.`,
+    });
+  }
+  if (matchingSources.length > 1) {
+    throw new SandboxRuntimePlanCompilerError({
+      code: SandboxRuntimePlanCompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+      message: `Sandbox profile version skills source '${skillsConfig.originUrl}' is included more than once in the runtime plan workspace sources.`,
+    });
+  }
+
+  return {
+    originUrl: skillsConfig.originUrl,
+    selectedSkills: skillsConfig.selectedSkills.map((skill) => ({
+      name: skill.name,
+      relativePath: skill.relativePath,
+    })),
+  };
 }

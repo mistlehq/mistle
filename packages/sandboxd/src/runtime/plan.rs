@@ -17,6 +17,8 @@ pub struct CompiledRuntimePlan {
     pub egress_routes: Vec<CompiledEgressRoute>,
     pub artifacts: Vec<CompiledRuntimeArtifact>,
     pub workspace_sources: Vec<CompiledWorkspaceSource>,
+    #[serde(default)]
+    pub skills: Option<CompiledRuntimePlanSkills>,
     pub runtime_clients: Vec<RuntimeClient>,
     pub agent_runtimes: Vec<CompiledAgentRuntime>,
 }
@@ -627,6 +629,22 @@ pub struct CompiledAgentRuntime {
     pub client_id: String,
     pub endpoint_key: String,
     pub pty_launch: serde_json::Value,
+}
+
+/// Selected repository-backed skills to activate for the configured agent runtime.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CompiledRuntimePlanSkills {
+    pub origin_url: String,
+    pub selected_skills: Vec<CompiledSkillSelection>,
+}
+
+/// One selected skill from a repository-backed skill source.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CompiledSkillSelection {
+    pub name: String,
+    pub relative_path: String,
 }
 
 /// The workspace sources `sandboxd` knows how to materialize today.

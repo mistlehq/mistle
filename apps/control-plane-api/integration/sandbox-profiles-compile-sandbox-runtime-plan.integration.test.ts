@@ -142,4 +142,56 @@ describe.concurrent("sandbox profile internal runtime plan compiler integration"
       code: SandboxRuntimePlanCompilerErrorCodes.INVALID_TARGET_SECRETS,
     });
   });
+
+  it("fails when the configured skills source is not a runtime plan workspace source", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-compile-internal-missing-skills-source@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_compile_internal_missing_skills_source",
+        organizationId: session.organizationId,
+        displayName: "Missing Skills Source Profile",
+        createdAt: "2026-05-28T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_compile_internal_missing_skills_source",
+        version: 1,
+        skillsConfig: {
+          originUrl: "https://github.com/acme/skills.git",
+          selectedSkills: [
+            {
+              name: "triage",
+              relativePath: "triage",
+            },
+          ],
+        },
+      }),
+    );
+
+    await expect(
+      compileSandboxRuntimePlan({
+        db: env.controlPlaneDb,
+        integrationDefinitions: Definitions,
+        resolveTargetSecrets: async () => [],
+        mcpConfig: {
+          url: "https://mcp.example.test/mcp",
+        },
+        organizationId: session.organizationId,
+        profileId: "sbp_compile_internal_missing_skills_source",
+        profileVersion: 1,
+        image: {
+          source: "base",
+          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: SandboxRuntimePlanCompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+    });
+  });
 });

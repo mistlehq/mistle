@@ -230,6 +230,7 @@ mod tests {
             egress_routes: Vec::new(),
             artifacts: Vec::new(),
             workspace_sources: Vec::new(),
+            skills: None,
             runtime_clients: Vec::new(),
             agent_runtimes: Vec::new(),
         };
@@ -247,6 +248,7 @@ mod tests {
             egress_routes: Vec::new(),
             artifacts: Vec::new(),
             workspace_sources: Vec::new(),
+            skills: None,
             runtime_clients: Vec::new(),
             agent_runtimes: Vec::new(),
         };
@@ -277,6 +279,7 @@ mod tests {
             egress_routes: Vec::new(),
             artifacts: Vec::new(),
             workspace_sources: Vec::new(),
+            skills: None,
             runtime_clients: Vec::new(),
             agent_runtimes: Vec::new(),
         };
@@ -325,6 +328,7 @@ mod tests {
             egress_routes: Vec::new(),
             artifacts: Vec::new(),
             workspace_sources: Vec::new(),
+            skills: None,
             runtime_clients: Vec::new(),
             agent_runtimes: Vec::new(),
         };
@@ -380,6 +384,7 @@ mod tests {
             egress_routes: Vec::new(),
             artifacts: Vec::new(),
             workspace_sources: Vec::new(),
+            skills: None,
             runtime_clients: Vec::new(),
             agent_runtimes: Vec::new(),
         };

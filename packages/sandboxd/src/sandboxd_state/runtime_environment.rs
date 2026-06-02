@@ -174,6 +174,7 @@ mod tests {
                 },
             ],
             workspace_sources: Vec::new(),
+            skills: None,
             runtime_clients: Vec::new(),
             agent_runtimes: Vec::new(),
         };
@@ -224,6 +225,7 @@ mod tests {
                 },
             ],
             workspace_sources: Vec::new(),
+            skills: None,
             runtime_clients: Vec::new(),
             agent_runtimes: Vec::new(),
         };

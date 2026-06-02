@@ -1062,6 +1062,35 @@
                           ]
                         }
                       },
+                      "skills": {
+                        "type": "object",
+                        "properties": {
+                          "originUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "selectedSkills": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "relativePath": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["name", "relativePath"],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": ["originUrl", "selectedSkills"],
+                        "additionalProperties": false
+                      },
                       "runtimeClients": {
                         "type": "array",
                         "items": {
@@ -3423,6 +3452,35 @@
                               }
                             ]
                           }
+                        },
+                        "skills": {
+                          "type": "object",
+                          "properties": {
+                            "originUrl": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "selectedSkills": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "relativePath": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": ["name", "relativePath"],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": ["originUrl", "selectedSkills"],
+                          "additionalProperties": false
                         },
                         "runtimeClients": {
                           "type": "array",
