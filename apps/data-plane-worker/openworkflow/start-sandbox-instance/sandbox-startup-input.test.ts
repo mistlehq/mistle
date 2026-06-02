@@ -6,6 +6,7 @@ import {
   SandboxExecutionModes,
   SandboxStartupModes,
   createSandboxTunnelGatewayWsUrl,
+  encodeSandboxActivationInput,
   encodeSandboxStartupInput,
 } from "./sandbox-startup-input.js";
 
@@ -291,6 +292,13 @@ const SandboxStartupInputSchema = z.object({
       ),
     })
     .optional(),
+});
+
+const SandboxActivationInputSchema = SandboxStartupInputSchema.omit({
+  startupMode: true,
+  executionMode: true,
+}).extend({
+  operationKind: z.enum(["start", "resume"]),
 });
 
 function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
@@ -579,6 +587,60 @@ describe("encodeSandboxStartupInput", () => {
       actingUserRequired: true,
       resolutionMode: "required",
       credentialKind: "github_app_user_access_token",
+    });
+  });
+});
+
+describe("encodeSandboxActivationInput", () => {
+  it("encodes session activation input without legacy startup fields", () => {
+    const encoded = encodeSandboxActivationInput({
+      operationKind: "resume",
+      bootstrapToken: "bootstrap-token-value",
+      tunnelExchangeToken: "tunnel-exchange-token-value",
+      tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      runtimePlan: createRuntimePlan(),
+      transparentProxy: {
+        passthroughBypass: {
+          kind: "socket_mark",
+          mark: 38_514,
+        },
+        exclusions: [
+          {
+            kind: "cidr",
+            value: "169.254.0.0/16",
+            reason: "provider metadata traffic must stay direct",
+          },
+        ],
+      },
+    });
+
+    const encodedText = Decoder.decode(encoded);
+    expect(encodedText.endsWith("\n")).toBe(true);
+
+    const decodedJson = JSON.parse(encodedText.trimEnd());
+    expect("startupMode" in decodedJson).toBe(false);
+    expect("executionMode" in decodedJson).toBe(false);
+
+    const decoded = SandboxActivationInputSchema.parse(decodedJson);
+    expect(decoded).toEqual({
+      operationKind: "resume",
+      bootstrapToken: "bootstrap-token-value",
+      tunnelExchangeToken: "tunnel-exchange-token-value",
+      tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      runtimePlan: createRuntimePlan(),
+      transparentProxy: {
+        passthroughBypass: {
+          kind: "socket_mark",
+          mark: 38_514,
+        },
+        exclusions: [
+          {
+            kind: "cidr",
+            value: "169.254.0.0/16",
+            reason: "provider metadata traffic must stay direct",
+          },
+        ],
+      },
     });
   });
 });

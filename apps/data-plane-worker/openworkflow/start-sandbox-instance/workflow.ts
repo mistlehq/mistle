@@ -35,12 +35,12 @@ import {
 import { stopSandbox } from "../shared/stop-sandbox.js";
 import { markSandboxInstanceStopped } from "../stop-sandbox-instance/mark-sandbox-instance-stopped.js";
 import { ensureSandboxInstance } from "./ensure-sandbox-instance.js";
-import { initializeSandboxRuntime } from "./initialize-sandbox-runtime.js";
+import { activateSandboxRuntime, initializeSandboxRuntime } from "./initialize-sandbox-runtime.js";
 import { markSandboxInstanceFailed } from "./mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "./mark-sandbox-instance-running.js";
 import { persistSandboxInstanceProvisioning } from "./persist-sandbox-instance-provisioning.js";
 import { SandboxExecutionModes, SandboxStartupModes } from "./sandbox-startup-input.js";
-import { createSandboxRuntimeEnv, prepareSandboxImage, startSandbox } from "./start-sandbox.js";
+import { prepareSandboxImage, startSandbox } from "./start-sandbox.js";
 import { waitForSandboxBootstrapAttachment } from "./wait-for-sandbox-bootstrap-attachment.js";
 import { waitForSandboxRuntimeReadiness } from "./wait-for-sandbox-runtime-readiness.js";
 
@@ -775,40 +775,49 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           },
           "Initializing sandbox runtime.",
         );
-        await initializeSandboxRuntime(
-          {
-            config: ctx.config,
-            logger,
-            processEnv: ctx.processEnv,
-            sandboxAdapter: resolvedRuntime.sandboxAdapter,
-            sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
-            sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
-          },
-          {
-            organizationId: workflowInput.organizationId,
-            operationId: run.id,
+        const runtimeControlContext = {
+          config: ctx.config,
+          logger,
+          processEnv: ctx.processEnv,
+          sandboxAdapter: resolvedRuntime.sandboxAdapter,
+          sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
+          sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
+        };
+        const runtimeControlInputFields = {
+          organizationId: workflowInput.organizationId,
+          operationId: run.id,
+          sandboxInstanceId: startedSandbox.sandboxInstanceId,
+          providerSandboxId: startedSandbox.providerSandboxId,
+          runtimePlan: workflowInput.runtimePlan,
+          ...(workflowInput.actingUserId === undefined
+            ? {}
+            : { actingUserId: workflowInput.actingUserId }),
+          ...(workflowInput.gitIdentity === undefined
+            ? {}
+            : { gitIdentity: workflowInput.gitIdentity }),
+        };
+
+        if (usesActivationForStartRuntimeInitialization(operationKind)) {
+          await activateSandboxRuntime(runtimeControlContext, {
+            ...runtimeControlInputFields,
             operationKind,
-            sandboxInstanceId: startedSandbox.sandboxInstanceId,
-            providerSandboxId: startedSandbox.providerSandboxId,
-            startupMode: SandboxStartupModes.NEW,
-            executionMode: SandboxExecutionModes.SESSION,
-            waitForCompletion: false,
-            runtimePlan: workflowInput.runtimePlan,
-            ...(workflowInput.actingUserId === undefined
-              ? {}
-              : { actingUserId: workflowInput.actingUserId }),
-            ...(workflowInput.gitIdentity === undefined
-              ? {}
-              : { gitIdentity: workflowInput.gitIdentity }),
-          },
-        );
+          });
+          return;
+        }
+
+        await initializeSandboxRuntime(runtimeControlContext, {
+          ...runtimeControlInputFields,
+          operationKind,
+          startupMode: SandboxStartupModes.NEW,
+          executionMode: SandboxExecutionModes.SESSION,
+        });
       });
 
       logger.info(
         {
           providerSandboxId: startedSandbox.providerSandboxId,
         },
-        "Started sandbox runtime initialization.",
+        "Completed sandbox runtime initialization step.",
       );
     } catch (error) {
       rethrowDurableStepErrorForRetry(error);
@@ -965,69 +974,14 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       );
     }
 
-    try {
-      await step.run({ name: "wait-for-sandbox-runtime-initialization" }, async () => {
-        logger.info("Waiting for sandbox runtime initialization.");
-        const resolvedRuntime =
-          await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
-        await resolvedRuntime.sandboxRuntimeControl.waitInit({
-          id: startedSandbox.providerSandboxId,
-          env: createSandboxRuntimeEnv({
-            config: ctx.config,
-            sandboxInstanceId: workflowInput.sandboxInstanceId,
-          }),
-        });
-      });
-      logger.info(
-        {
-          providerSandboxId: startedSandbox.providerSandboxId,
-        },
-        "Initialized sandbox runtime.",
-      );
-    } catch (error) {
-      rethrowDurableStepErrorForRetry(error);
-      logger.error(
-        {
-          err: error,
-          providerSandboxId: startedSandbox.providerSandboxId,
-        },
-        "Failed to initialize sandbox runtime.",
-      );
-      await emitStartupDiagnostics({
+    logger.info(
+      {
         providerSandboxId: startedSandbox.providerSandboxId,
-        sandboxInstanceId: startedSandbox.sandboxInstanceId,
-        runtimeProvider: startedSandbox.runtimeProvider,
-      });
-      try {
-        await handleFailedStartup({
-          sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
-          runtimeProvider: startedSandbox.runtimeProvider,
-          providerSandboxId: startedSandbox.providerSandboxId,
-          failureCode: StartSandboxFailureCodes.SANDBOX_INIT_FAILED,
-          failureMessage: formatPersistedFailureMessage({
-            summary: "Failed to initialize sandbox runtime.",
-            error,
-          }),
-        });
-      } catch (cleanupError) {
-        throw new Error(
-          "Failed to initialize sandbox runtime and failed cleanup after startup failure.",
-          {
-            cause: {
-              startupConfigurationError: error,
-              cleanupError,
-            },
-          },
-        );
-      }
-
-      throw new Error(
-        "Failed to initialize sandbox runtime. Sandbox was stopped and sandbox instance was marked as failed.",
-        {
-          cause: error,
-        },
-      );
-    }
+      },
+      usesActivationForStartRuntimeInitialization(operationKind)
+        ? "Activated sandbox runtime."
+        : "Initialized sandbox runtime.",
+    );
 
     await emitStartupPhaseTimings({
       providerSandboxId: startedSandbox.providerSandboxId,
@@ -1396,6 +1350,12 @@ function resolveStartSandboxOperationKind(
   return assertUnsupportedSandboxInstancePurpose(purpose);
 }
 
+function usesActivationForStartRuntimeInitialization(
+  operationKind: SandboxdOperationKind,
+): operationKind is typeof SandboxOperationKinds.START {
+  return operationKind === SandboxOperationKinds.START;
+}
+
 function assertUnsupportedSandboxInstancePurpose(_purpose: never): never {
   throw new Error("Unsupported sandbox instance purpose.");
 }
@@ -1410,4 +1370,5 @@ function formatLifecycleEventError(error: unknown): string {
 
 export const startSandboxWorkflowTestInternals = {
   resolveStartSandboxOperationKind,
+  usesActivationForStartRuntimeInitialization,
 };
