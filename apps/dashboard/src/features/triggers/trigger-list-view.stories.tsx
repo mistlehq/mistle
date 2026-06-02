@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { MemoryRouter } from "react-router";
 
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import { createTriggerListEvent, createTriggerListIssue } from "./trigger-list-test-fixtures.js";
@@ -158,7 +159,14 @@ const ScheduleWithoutNextRunItem: TriggerListItemViewModel = {
 const meta = {
   title: "Dashboard/Triggers/ListView",
   component: TriggerListView,
-  decorators: [withDashboardCenteredStory],
+  decorators: [
+    (Story) => (
+      <MemoryRouter>
+        <Story />
+      </MemoryRouter>
+    ),
+    withDashboardCenteredStory,
+  ],
   parameters: {
     layout: "fullscreen",
   },
@@ -176,7 +184,6 @@ const meta = {
     onPreviousPage: function onPreviousPage() {},
     onFilterChange: function onFilterChange() {},
     onSearchValueChange: function onSearchValueChange() {},
-    onOpenTrigger: function onOpenTrigger() {},
   },
 } satisfies Meta<typeof TriggerListView>;
 

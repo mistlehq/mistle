@@ -72,7 +72,11 @@ const meta = {
     recentSessions: [],
   },
   render: function RenderStory(args): React.JSX.Element {
-    return <HomePageStoryFrame {...args} />;
+    return (
+      <MemoryRouter initialEntries={["/"]}>
+        <HomePageStoryFrame {...args} />
+      </MemoryRouter>
+    );
   },
 } satisfies Meta<typeof HomePageView>;
 

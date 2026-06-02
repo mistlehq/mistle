@@ -2,7 +2,7 @@ import { Button } from "@mistle/ui";
 import { PlusIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { Link as RouterLink, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { CollectionEmptyState } from "../shared/collection-empty-state.js";
@@ -21,7 +21,6 @@ import { listTriggers } from "../triggers/triggers-service.js";
 const TRIGGERS_LIST_LIMIT = 25;
 
 export function TriggersPage(): React.JSX.Element {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeFilter, setActiveFilter] = useState<TriggerListFilter>("all");
   const [searchValue, setSearchValue] = useState("");
@@ -83,10 +82,6 @@ export function TriggersPage(): React.JSX.Element {
     resetPagination();
   }
 
-  function createTrigger(): void {
-    void navigate("/triggers/new");
-  }
-
   const hasActiveListQuery = activeFilter !== "all" || normalizedSearch !== undefined;
   const canShowSummary = triggersQuery.data !== undefined && !triggersQuery.isError;
   const hasNoTriggers = !hasActiveListQuery && triggersQuery.data?.totalResults === 0;
@@ -95,7 +90,7 @@ export function TriggersPage(): React.JSX.Element {
   return (
     <PageFrame
       headerActions={
-        <Button onClick={createTrigger} type="button">
+        <Button nativeButton={false} render={<RouterLink to="/triggers/new" />}>
           Create trigger
         </Button>
       }
@@ -104,7 +99,7 @@ export function TriggersPage(): React.JSX.Element {
       {isLoadingInitialList ? null : hasNoTriggers && errorMessage === null ? (
         <CollectionEmptyState
           action={
-            <Button onClick={createTrigger} type="button">
+            <Button nativeButton={false} render={<RouterLink to="/triggers/new" />}>
               <PlusIcon aria-hidden className="size-4" />
               Create trigger
             </Button>
@@ -131,9 +126,6 @@ export function TriggersPage(): React.JSX.Element {
               nextAfter: nextPage.after,
               nextBefore: null,
             });
-          }}
-          onOpenTrigger={(triggerId) => {
-            void navigate(`/triggers/${triggerId}`);
           }}
           onPreviousPage={() => {
             const previousPage = triggersQuery.data?.previousPage;

@@ -6,8 +6,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  textLinkVariants,
+  TextLink,
 } from "@mistle/ui";
+import { Link as RouterLink } from "react-router";
 
 import { IntegrationLogo } from "../integrations/integration-logo.js";
 import { formatCompactSandboxProfileVersion } from "../sandbox-profiles/sandbox-profile-version-labels.js";
@@ -61,7 +62,6 @@ type TriggerListViewProps = {
   onPreviousPage: () => void;
   onFilterChange: (nextValue: TriggerListFilter) => void;
   onSearchValueChange: (nextValue: string) => void;
-  onOpenTrigger: (triggerId: string) => void;
 };
 
 function EventSummaryCell(input: {
@@ -123,26 +123,18 @@ function SourceDetailsCell(input: { item: TriggerListItemViewModel }): React.JSX
   return <ScheduleSummaryCell item={input.item.source} />;
 }
 
-function TriggerIdentityCell(input: {
-  item: TriggerListItemViewModel;
-  onOpenTrigger: TriggerListViewProps["onOpenTrigger"];
-}): React.JSX.Element {
+function TriggerIdentityCell(input: { item: TriggerListItemViewModel }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-2">
         <TriggerIssueIndicator enabled={input.item.enabled} issue={input.item.issue} />
-        <button
-          className={textLinkVariants({
-            variant: "listItem",
-            className: "text-left break-words",
-          })}
-          onClick={() => {
-            input.onOpenTrigger(input.item.id);
-          }}
-          type="button"
+        <TextLink
+          className="text-left break-words"
+          render={<RouterLink to={`/triggers/${input.item.id}`} />}
+          variant="listItem"
         >
           {input.item.name}
-        </button>
+        </TextLink>
       </div>
     </div>
   );
@@ -216,7 +208,7 @@ export function TriggerListView(input: TriggerListViewProps): React.JSX.Element 
               {input.items.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="whitespace-normal">
-                    <TriggerIdentityCell item={item} onOpenTrigger={input.onOpenTrigger} />
+                    <TriggerIdentityCell item={item} />
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm whitespace-normal">
                     <SourceDetailsCell item={item} />

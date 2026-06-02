@@ -1,6 +1,5 @@
 import { Notice } from "@mistle/ui";
 import * as React from "react";
-import { useNavigate } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useDashboardCapabilitiesQuery } from "../dashboard/dashboard-capabilities-query.js";
@@ -12,7 +11,6 @@ import { HomePageView } from "./home-page-view.js";
 import { NewSessionForm } from "./new-session-form.js";
 
 export function HomePage(): React.JSX.Element {
-  const navigate = useNavigate();
   const homeSummaryQuery = useHomeSummary();
   const dashboardCapabilitiesQuery = useDashboardCapabilitiesQuery();
 
@@ -47,9 +45,6 @@ export function HomePage(): React.JSX.Element {
       <HomePageView
         createSessionForm={<NewSessionForm />}
         onboarding={onboarding}
-        onNavigate={(href) => {
-          void navigate(href);
-        }}
         recentSessions={homeSummaryQuery.data.recentSessions}
       />
     </HomePageFrame>

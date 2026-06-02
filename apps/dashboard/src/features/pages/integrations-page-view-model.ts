@@ -33,7 +33,6 @@ export function toConnectionMethods(
 
 export function buildConnectedIntegrationViewCards(input: {
   connectedCards: readonly IntegrationCardViewModel[];
-  onOpenTarget: (targetKey: string) => void;
 }): readonly OrganizationIntegrationsSettingsPageCard[] {
   return input.connectedCards.map((card) => ({
     targetKey: card.target.targetKey,
@@ -43,15 +42,12 @@ export function buildConnectedIntegrationViewCards(input: {
     configStatus: card.configStatus,
     ...(card.target.logoKey === undefined ? {} : { logoKey: card.target.logoKey }),
     actionLabel: "View",
-    onAction: () => {
-      input.onOpenTarget(card.target.targetKey);
-    },
+    actionHref: `/integrations/${card.target.targetKey}`,
   }));
 }
 
 export function buildAvailableIntegrationViewCards(input: {
   cards: readonly IntegrationCardViewModel[];
-  onOpenCreatePage: (targetKey: string) => void;
 }): readonly OrganizationIntegrationsSettingsPageCard[] {
   return input.cards.map((card) => {
     const methods = toConnectionMethods(card.target.connectionMethods);
@@ -64,10 +60,8 @@ export function buildAvailableIntegrationViewCards(input: {
       configStatus: card.configStatus,
       ...(card.target.logoKey === undefined ? {} : { logoKey: card.target.logoKey }),
       actionDisabled: methods.length === 0,
+      ...(methods.length === 0 ? {} : { actionHref: `/integrations/${card.target.targetKey}/add` }),
       actionLabel: "Add",
-      onAction: () => {
-        input.onOpenCreatePage(card.target.targetKey);
-      },
     };
   });
 }

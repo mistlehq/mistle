@@ -9,13 +9,14 @@ import { ToolbarSearchInput } from "../shared/toolbar-search-input.js";
 
 export type OrganizationIntegrationsSettingsPageCard = {
   actionDisabled?: boolean;
+  actionHref?: string;
   actionLabel: string;
   configStatus: "valid" | "invalid";
   description: string;
   displayName: string;
   integrationKind: IntegrationKind;
   logoKey?: string;
-  onAction: () => void;
+  onAction?: () => void;
   targetKey: string;
 };
 
@@ -255,7 +256,8 @@ function renderIntegrationSettingsTile(
       {...(card.actionDisabled === undefined ? {} : { actionDisabled: card.actionDisabled })}
       {...(card.logoKey === undefined ? {} : { logoKey: card.logoKey })}
       {...(card.configStatus === "invalid" ? { statusBadge: "Invalid config" } : {})}
-      onAction={card.onAction}
+      {...(card.actionHref === undefined ? {} : { actionHref: card.actionHref })}
+      {...(card.onAction === undefined ? {} : { onAction: card.onAction })}
     />
   );
 }

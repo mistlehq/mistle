@@ -1,4 +1,5 @@
 import { Button } from "@mistle/ui";
+import { Link as RouterLink } from "react-router";
 
 import { ActionTile } from "../shared/action-tile.js";
 import { IntegrationLogo } from "./integration-logo.js";
@@ -6,12 +7,13 @@ import { IntegrationLogo } from "./integration-logo.js";
 type IntegrationTileProps = {
   actionLabel: string;
   actionDisabled?: boolean;
+  actionHref?: string;
   actionVariant?: "default" | "outline";
   description: string;
   displayName: string;
   logoKey?: string;
   statusBadge?: string;
-  onAction: () => void;
+  onAction?: () => void;
 };
 
 export function IntegrationTile(props: IntegrationTileProps) {
@@ -31,14 +33,24 @@ export function IntegrationTile(props: IntegrationTileProps) {
   return (
     <ActionTile
       action={
-        <Button
-          disabled={props.actionDisabled ?? false}
-          onClick={props.onAction}
-          type="button"
-          variant={props.actionVariant}
-        >
-          {props.actionLabel}
-        </Button>
+        props.actionHref === undefined || props.actionDisabled === true ? (
+          <Button
+            disabled={props.actionDisabled ?? false}
+            {...(props.onAction === undefined ? {} : { onClick: props.onAction })}
+            type="button"
+            variant={props.actionVariant}
+          >
+            {props.actionLabel}
+          </Button>
+        ) : (
+          <Button
+            nativeButton={false}
+            render={<RouterLink to={props.actionHref} />}
+            variant={props.actionVariant}
+          >
+            {props.actionLabel}
+          </Button>
+        )
       }
       actionContainerClassName="gap-2"
       badge={statusBadge}

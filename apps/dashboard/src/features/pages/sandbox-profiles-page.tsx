@@ -18,13 +18,13 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  textLinkVariants,
+  TextLink,
 } from "@mistle/ui";
 import { PlusIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SyntheticEvent } from "react";
 import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { Link as RouterLink, useNavigate, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { formatPublishedSandboxProfileVersionBadge } from "../sandbox-profiles/sandbox-profile-version-labels.js";
@@ -151,10 +151,6 @@ export function SandboxProfilesPage(): React.JSX.Element {
   function handleCreateProfileSubmit(event: SyntheticEvent<HTMLFormElement>): void {
     event.preventDefault();
     createProfile();
-  }
-
-  function navigateToProfileDetail(profileId: string): void {
-    void navigate(`/sandbox-profiles/${profileId}`);
   }
 
   function updatePagination(input: {
@@ -315,18 +311,13 @@ export function SandboxProfilesPage(): React.JSX.Element {
                 {items.map((profile) => (
                   <TableRow key={profile.id}>
                     <TableCell className="whitespace-normal">
-                      <button
-                        className={textLinkVariants({
-                          variant: "listItem",
-                          className: "text-left break-words",
-                        })}
-                        onClick={() => {
-                          navigateToProfileDetail(profile.id);
-                        }}
-                        type="button"
+                      <TextLink
+                        className="text-left break-words"
+                        render={<RouterLink to={`/sandbox-profiles/${profile.id}`} />}
+                        variant="listItem"
                       >
                         {profile.displayName}
-                      </button>
+                      </TextLink>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
                       <Badge
