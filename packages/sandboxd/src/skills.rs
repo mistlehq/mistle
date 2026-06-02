@@ -296,6 +296,11 @@ pub enum SkillsReconcileError {
         path: PathBuf,
         error: io::Error,
     },
+    SelectedSkillPathNotFound {
+        relative_path: String,
+        expected_name: String,
+        path: PathBuf,
+    },
     SelectedSkillNotDirectory {
         relative_path: String,
         path: PathBuf,
@@ -441,6 +446,19 @@ impl fmt::Display for SkillsReconcileError {
                 write!(
                     f,
                     "failed to resolve selected skill path '{}' at {}: {error}",
+                    relative_path,
+                    path.display()
+                )
+            }
+            Self::SelectedSkillPathNotFound {
+                relative_path,
+                expected_name,
+                path,
+            } => {
+                write!(
+                    f,
+                    "selected skill '{}' at path '{}' was not found at {}",
+                    expected_name,
                     relative_path,
                     path.display()
                 )
@@ -741,7 +759,16 @@ fn read_selected_skills(
         let source_path = repo_root.join(repo_relative_path_to_path(&normalized_relative_path));
         let source_path = match source_path.canonicalize() {
             Ok(source_path) => source_path,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                if let Some(expected_name) = &selection.expected_name {
+                    return Err(SkillsReconcileError::SelectedSkillPathNotFound {
+                        relative_path: normalized_relative_path,
+                        expected_name: expected_name.clone(),
+                        path: source_path,
+                    });
+                }
+                continue;
+            }
             Err(error) => {
                 return Err(SkillsReconcileError::SelectedSkillPathCanonicalize {
                     relative_path: normalized_relative_path.clone(),
@@ -1947,6 +1974,36 @@ description: Replacement skill.
             } if relative_path == "skills/selected-path"
                 && expected_name == "original-skill"
                 && actual_name == "replacement-skill"
+        ));
+
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
+        fs::remove_dir_all(target_root).expect("target root should be removable");
+    }
+
+    #[test]
+    fn materialized_reconcile_rejects_missing_selected_skill_path() {
+        let repo_root = create_git_repo("skills_materialized_reconcile_missing_selected_path");
+        let target_root =
+            create_temp_test_dir("skills_materialized_reconcile_missing_selected_path_target");
+
+        let error = reconcile_materialized_skills(
+            &repo_root,
+            &SkillsRuntime::Codex,
+            &[SkillsReconcileSelection {
+                name: "removed-skill".to_string(),
+                relative_path: "skills/removed-skill".to_string(),
+            }],
+            Some(&target_root),
+        )
+        .expect_err("materialized reconcile should reject missing selected skill paths");
+
+        assert!(matches!(
+            error,
+            SkillsReconcileError::SelectedSkillPathNotFound {
+                relative_path,
+                expected_name,
+                ..
+            } if relative_path == "skills/removed-skill" && expected_name == "removed-skill"
         ));
 
         fs::remove_dir_all(repo_root).expect("repo should be removable");
