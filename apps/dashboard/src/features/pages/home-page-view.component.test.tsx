@@ -42,7 +42,7 @@ describe("HomePageView", () => {
       </MemoryRouter>,
     );
 
-    const actionButton = screen.getByRole("button", { name: "Add integrations" });
+    const actionButton = screen.getByRole("link", { name: "Add integrations" });
 
     expect(actionButton.tagName).toBe("A");
     expect(actionButton.getAttribute("href")).toBe("/integrations");

@@ -130,7 +130,7 @@ describe("TriggersPage", () => {
     expect(
       screen.getByText("Triggers run Mistle automatically from webhook events or schedules."),
     ).toBeDefined();
-    const createActions = screen.getAllByRole("button", { name: /Create/i });
+    const createActions = screen.getAllByRole("link", { name: /Create/i });
     expect(createActions).toHaveLength(2);
     for (const createAction of createActions) {
       expect(createAction.tagName).toBe("A");

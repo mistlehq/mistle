@@ -1,4 +1,4 @@
-import { Button } from "@mistle/ui";
+import { buttonVariants } from "@mistle/ui";
 import { PlusIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -90,19 +90,19 @@ export function TriggersPage(): React.JSX.Element {
   return (
     <PageFrame
       headerActions={
-        <Button nativeButton={false} render={<RouterLink to="/triggers/new" />}>
+        <RouterLink className={buttonVariants()} to="/triggers/new">
           Create trigger
-        </Button>
+        </RouterLink>
       }
       title="Triggers"
     >
       {isLoadingInitialList ? null : hasNoTriggers && errorMessage === null ? (
         <CollectionEmptyState
           action={
-            <Button nativeButton={false} render={<RouterLink to="/triggers/new" />}>
+            <RouterLink className={buttonVariants()} to="/triggers/new">
               <PlusIcon aria-hidden className="size-4" />
               Create trigger
-            </Button>
+            </RouterLink>
           }
           description="Triggers run Mistle automatically from webhook events or schedules."
           title="Create your first trigger"

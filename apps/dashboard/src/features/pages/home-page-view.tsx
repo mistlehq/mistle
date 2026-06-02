@@ -1,4 +1,4 @@
-import { Button, cn, TextLink } from "@mistle/ui";
+import { Button, buttonVariants, cn, TextLink } from "@mistle/ui";
 import { CheckCircleIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { Link as RouterLink } from "react-router";
@@ -108,13 +108,12 @@ function RecentSessionsList(input: {
 function SetupStepRow(input: { step: HomeChecklistStep }): React.JSX.Element {
   const action =
     input.step.status === "complete" ? null : input.step.status === "current" ? (
-      <Button
-        className="my-auto shrink-0"
-        nativeButton={false}
-        render={<RouterLink to={input.step.href} />}
+      <RouterLink
+        className={buttonVariants({ className: "my-auto shrink-0" })}
+        to={input.step.href}
       >
         {input.step.actionLabel}
-      </Button>
+      </RouterLink>
     ) : (
       <Button className="my-auto shrink-0" disabled type="button" variant="outline">
         {input.step.actionLabel}

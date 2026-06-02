@@ -55,10 +55,10 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
       </MemoryRouter>,
     );
 
-    const viewAction = screen.getByRole("button", { name: "View" });
+    const viewAction = screen.getByRole("link", { name: "View" });
     expect(viewAction.tagName).toBe("A");
     expect(viewAction.getAttribute("href")).toBe("/integrations/github");
-    const addAction = screen.getByRole("button", { name: "Add" });
+    const addAction = screen.getByRole("link", { name: "Add" });
     expect(addAction.tagName).toBe("A");
     expect(addAction.getAttribute("href")).toBe("/integrations/openai-default/add");
     expect(screen.getByRole("tab", { name: "Models" })).toBeTruthy();
@@ -143,8 +143,8 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "View" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Add" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "View" })).toBeNull();
     expect(screen.getByRole("region", { name: "Integration detail" })).toBeTruthy();
   });
 });
@@ -182,8 +182,8 @@ function createSettingsPageCard(
 ): OrganizationIntegrationsSettingsPageCard {
   return {
     actionLabel: "Add",
+    actionHref: `/integrations/${input.targetKey}/add`,
     configStatus: "valid",
-    onAction: () => {},
     ...input,
   };
 }
