@@ -36,24 +36,36 @@ pub fn derive_runtime_ready(snapshot: &SandboxdHealthSnapshot, mode: RuntimeRead
         }
         RuntimeReadinessMode::OpenCodeProxyOnly => {
             component_is_healthy(snapshot, SupervisedComponent::OpenCodeProxy)
-                && component_is_healthy(snapshot, SupervisedComponent::OpenCodeProxyConnectivity)
+                && component_is_ready_when_tracked(
+                    snapshot,
+                    SupervisedComponent::OpenCodeProxyConnectivity,
+                )
                 && runtime_agent_endpoint_is_ready(snapshot)
         }
         RuntimeReadinessMode::OpenCode => {
             component_is_healthy(snapshot, SupervisedComponent::OpenCodeProxy)
                 && component_is_healthy(snapshot, SupervisedComponent::OpenCodeServer)
-                && component_is_healthy(snapshot, SupervisedComponent::OpenCodeProxyConnectivity)
+                && component_is_ready_when_tracked(
+                    snapshot,
+                    SupervisedComponent::OpenCodeProxyConnectivity,
+                )
                 && runtime_agent_endpoint_is_ready(snapshot)
         }
         RuntimeReadinessMode::Pi => {
             component_is_healthy(snapshot, SupervisedComponent::PiProxy)
                 && component_is_healthy(snapshot, SupervisedComponent::PiRpcProcess)
-                && component_is_healthy(snapshot, SupervisedComponent::PiProxyConnectivity)
+                && component_is_ready_when_tracked(
+                    snapshot,
+                    SupervisedComponent::PiProxyConnectivity,
+                )
                 && runtime_agent_endpoint_is_ready(snapshot)
         }
         RuntimeReadinessMode::PiProxyOnly => {
             component_is_healthy(snapshot, SupervisedComponent::PiProxy)
-                && component_is_healthy(snapshot, SupervisedComponent::PiProxyConnectivity)
+                && component_is_ready_when_tracked(
+                    snapshot,
+                    SupervisedComponent::PiProxyConnectivity,
+                )
                 && runtime_agent_endpoint_is_ready(snapshot)
         }
     }
@@ -65,6 +77,21 @@ fn component_is_healthy(snapshot: &SandboxdHealthSnapshot, component: Supervised
         .iter()
         .find(|candidate| candidate.component == component)
         .is_some_and(|candidate| candidate.state == ComponentHealthState::Healthy)
+}
+
+fn component_is_ready_when_tracked(
+    snapshot: &SandboxdHealthSnapshot,
+    component: SupervisedComponent,
+) -> bool {
+    if snapshot
+        .components
+        .iter()
+        .all(|candidate| candidate.component != component)
+    {
+        return true;
+    }
+
+    component_is_healthy(snapshot, component)
 }
 
 fn codex_proxy_is_ready(snapshot: &SandboxdHealthSnapshot) -> bool {
@@ -391,6 +418,22 @@ mod tests {
     }
 
     #[test]
+    fn derives_opencode_proxy_only_runtime_as_ready_when_connectivity_probe_is_not_tracked() {
+        let snapshot = SandboxdHealthSnapshot {
+            observed_at: SystemTime::UNIX_EPOCH,
+            components: vec![component_snapshot(
+                SupervisedComponent::OpenCodeProxy,
+                ComponentHealthState::Healthy,
+            )],
+        };
+
+        assert!(derive_runtime_ready(
+            &snapshot,
+            RuntimeReadinessMode::OpenCodeProxyOnly,
+        ));
+    }
+
+    #[test]
     fn derives_pi_runtime_as_ready_only_when_proxy_and_rpc_process_are_healthy() {
         let snapshot = SandboxdHealthSnapshot {
             observed_at: SystemTime::UNIX_EPOCH,
@@ -436,6 +479,22 @@ mod tests {
         };
 
         assert!(!derive_runtime_ready(&snapshot, RuntimeReadinessMode::Pi));
+    }
+
+    #[test]
+    fn derives_pi_proxy_only_runtime_as_ready_when_connectivity_probe_is_not_tracked() {
+        let snapshot = SandboxdHealthSnapshot {
+            observed_at: SystemTime::UNIX_EPOCH,
+            components: vec![component_snapshot(
+                SupervisedComponent::PiProxy,
+                ComponentHealthState::Healthy,
+            )],
+        };
+
+        assert!(derive_runtime_ready(
+            &snapshot,
+            RuntimeReadinessMode::PiProxyOnly,
+        ));
     }
 
     #[test]
