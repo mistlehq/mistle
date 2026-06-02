@@ -28,8 +28,11 @@ pub enum SupervisedComponent {
     CodexAppServer,
     OpenCodeProxy,
     OpenCodeServer,
+    OpenCodeProxyConnectivity,
     PiProxy,
     PiRpcProcess,
+    PiProxyConnectivity,
+    RuntimeAgentEndpoint,
 }
 
 impl SupervisedComponent {
@@ -42,8 +45,11 @@ impl SupervisedComponent {
             Self::CodexAppServer => "CodexAppServer",
             Self::OpenCodeProxy => "OpenCodeProxy",
             Self::OpenCodeServer => "OpenCodeServer",
+            Self::OpenCodeProxyConnectivity => "OpenCodeProxyConnectivity",
             Self::PiProxy => "PiProxy",
             Self::PiRpcProcess => "PiRpcProcess",
+            Self::PiProxyConnectivity => "PiProxyConnectivity",
+            Self::RuntimeAgentEndpoint => "RuntimeAgentEndpoint",
         }
     }
 }
@@ -811,6 +817,23 @@ fn snapshot_detail_field_names_for_event(
             &["processKey", "pid"]
         }
         (
+            SupervisedComponent::OpenCodeProxyConnectivity,
+            LifecycleEventName::ComponentStarting
+            | LifecycleEventName::ComponentStarted
+            | LifecycleEventName::ComponentHealthcheckFailed
+            | LifecycleEventName::ComponentRestartScheduled
+            | LifecycleEventName::ComponentRestartSucceeded,
+        ) => &[
+            "proxyUrl",
+            "healthPath",
+            "expectedStatus",
+            "observedStatus",
+            "connectivityState",
+        ],
+        (SupervisedComponent::OpenCodeProxyConnectivity, LifecycleEventName::ComponentExited) => {
+            &["proxyUrl", "healthPath"]
+        }
+        (
             SupervisedComponent::PiProxy,
             LifecycleEventName::ComponentStarting
             | LifecycleEventName::ComponentStarted
@@ -831,6 +854,28 @@ fn snapshot_detail_field_names_for_event(
             | LifecycleEventName::ComponentRestartSucceeded
             | LifecycleEventName::ComponentHealthcheckFailed,
         ) => &["cliPath", "pid"],
+        (
+            SupervisedComponent::PiProxyConnectivity,
+            LifecycleEventName::ComponentStarting
+            | LifecycleEventName::ComponentStarted
+            | LifecycleEventName::ComponentHealthcheckFailed
+            | LifecycleEventName::ComponentRestartScheduled
+            | LifecycleEventName::ComponentRestartSucceeded,
+        ) => &["proxyUrl", "requestMethod", "connectivityState"],
+        (SupervisedComponent::PiProxyConnectivity, LifecycleEventName::ComponentExited) => {
+            &["proxyUrl", "requestMethod"]
+        }
+        (
+            SupervisedComponent::RuntimeAgentEndpoint,
+            LifecycleEventName::ComponentStarting
+            | LifecycleEventName::ComponentStarted
+            | LifecycleEventName::ComponentHealthcheckFailed
+            | LifecycleEventName::ComponentRestartScheduled
+            | LifecycleEventName::ComponentRestartSucceeded,
+        ) => &["endpointUrl", "connectivityState"],
+        (SupervisedComponent::RuntimeAgentEndpoint, LifecycleEventName::ComponentExited) => {
+            &["endpointUrl"]
+        }
         (
             SupervisedComponent::CodexAppServer,
             LifecycleEventName::ComponentStarting | LifecycleEventName::ComponentRestartScheduled,

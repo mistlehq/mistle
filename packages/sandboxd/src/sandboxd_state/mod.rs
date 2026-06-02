@@ -5,6 +5,7 @@
 //! diagnostics, readiness projection, setup scripts, and runtime environment
 //! assembly scoped behind the facade.
 
+mod agent_endpoint_probe;
 mod components;
 mod diagnostics;
 mod lifecycle;

@@ -32,7 +32,13 @@ use crate::runtime::adapters::{
     RuntimeAdapters,
 };
 use crate::runtime::readiness::RuntimeReadinessManager;
-use crate::runtime::{RuntimePlanApplyError, RuntimePlanApplyLifecycleStep};
+use crate::runtime::{
+    CompiledRuntimePlan, RuntimeClientProcessReadiness, RuntimePlanApplyError,
+    RuntimePlanApplyLifecycleStep,
+};
+use crate::sandboxd_state::agent_endpoint_probe::{
+    RuntimeAgentProbeHandle, RuntimeAgentProbePlan, RuntimeSpecificProbe,
+};
 use crate::sandboxd_state::components::{
     collect_tracked_components, determine_runtime_readiness_mode,
 };
@@ -149,6 +155,7 @@ pub struct SandboxdState {
     runtime_coordination_thread: Option<JoinHandle<()>>,
     runtime_readiness_shutdown_requested: Arc<AtomicBool>,
     runtime_readiness_thread: Option<JoinHandle<()>>,
+    runtime_agent_probe_handle: Option<RuntimeAgentProbeHandle>,
     daemon_liveness_monitor: Option<DaemonLivenessMonitor>,
     supervisor_handle: SandboxdSupervisorHandle,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
@@ -571,6 +578,7 @@ impl SandboxdState {
                 runtime_coordination_thread: None,
                 runtime_readiness_shutdown_requested: Arc::new(AtomicBool::new(false)),
                 runtime_readiness_thread: None,
+                runtime_agent_probe_handle: None,
                 daemon_liveness_monitor: None,
                 supervisor_handle,
                 keepalive_manager: Arc::new(Mutex::new(KeepaliveManager::default())),
@@ -744,6 +752,12 @@ impl SandboxdState {
             "attach_runtime_agent_endpoint",
             hidden_timeline_attributes(),
         );
+        let runtime_agent_probe_handle = build_runtime_agent_probe_plan(
+            &runtime_plan,
+            &runtime_adapters,
+            agent_endpoint_url.as_deref(),
+        )?
+        .map(|probe_plan| RuntimeAgentProbeHandle::start(probe_plan, supervisor_handle.clone()));
         let runtime_readiness_mode = determine_runtime_readiness_mode(&supervisor_handle);
         sync_runtime_readiness_from_snapshot(
             &supervisor_handle,
@@ -793,6 +807,7 @@ impl SandboxdState {
             runtime_coordination_thread,
             runtime_readiness_shutdown_requested,
             runtime_readiness_thread,
+            runtime_agent_probe_handle,
             daemon_liveness_monitor,
             supervisor_handle,
             keepalive_manager,
@@ -1302,6 +1317,9 @@ impl SandboxdState {
         if let Some(runtime_readiness_thread) = self.runtime_readiness_thread.take() {
             let _ = runtime_readiness_thread.join();
         }
+        if let Some(runtime_agent_probe_handle) = self.runtime_agent_probe_handle.take() {
+            runtime_agent_probe_handle.close();
+        }
         self.runtime_adapters
             .close()
             .map_err(|error| SandboxdStateError::StopRuntimeAdapters(error.to_string()))?;
@@ -1700,6 +1718,100 @@ fn attach_runtime_environment_to_tunnel(
     record_operation_phase_completed(diagnostics_logger, "attach_runtime_environment");
 
     Ok(())
+}
+
+fn build_runtime_agent_probe_plan(
+    runtime_plan: &CompiledRuntimePlan,
+    runtime_adapters: &RuntimeAdapters,
+    agent_endpoint_url: Option<&str>,
+) -> Result<Option<RuntimeAgentProbePlan>, SandboxdStateError> {
+    let Some(agent_endpoint_url) = agent_endpoint_url else {
+        return Ok(None);
+    };
+    let [adapter] = runtime_adapters.adapters() else {
+        return Ok(None);
+    };
+
+    let runtime_probe = match adapter.runtime_id() {
+        "codex" => RuntimeSpecificProbe::Codex,
+        "opencode" => build_opencode_runtime_specific_probe(runtime_plan, adapter.listen_url())?,
+        "pi" => RuntimeSpecificProbe::Pi {
+            proxy_url: adapter.listen_url().to_string(),
+        },
+        runtime_id => {
+            return Err(SandboxdStateError::StartRuntimeAdapters(format!(
+                "unsupported runtime adapter id for runtime probe: {runtime_id}"
+            )));
+        }
+    };
+
+    Ok(Some(RuntimeAgentProbePlan {
+        agent_endpoint_url: agent_endpoint_url.to_string(),
+        runtime_probe,
+    }))
+}
+
+fn build_opencode_runtime_specific_probe(
+    runtime_plan: &CompiledRuntimePlan,
+    proxy_url: &str,
+) -> Result<RuntimeSpecificProbe, SandboxdStateError> {
+    let agent_runtime = runtime_plan
+        .agent_runtimes
+        .iter()
+        .find(|agent_runtime| agent_runtime.runtime_id == "opencode")
+        .ok_or_else(|| {
+            SandboxdStateError::StartRuntimeAdapters(
+                "OpenCode runtime probe requires an OpenCode agent runtime".to_string(),
+            )
+        })?;
+    let runtime_client = runtime_plan
+        .runtime_clients
+        .iter()
+        .find(|runtime_client| runtime_client.client_id == agent_runtime.client_id)
+        .ok_or_else(|| {
+            SandboxdStateError::StartRuntimeAdapters(format!(
+                "OpenCode runtime probe could not find runtime client '{}'",
+                agent_runtime.client_id
+            ))
+        })?;
+    let process = runtime_client
+        .processes
+        .iter()
+        .find(|process| process.process_key == agent_runtime.runtime_key)
+        .ok_or_else(|| {
+            SandboxdStateError::StartRuntimeAdapters(format!(
+                "OpenCode runtime probe could not find process '{}'",
+                agent_runtime.runtime_key
+            ))
+        })?;
+    let RuntimeClientProcessReadiness::Http {
+        url,
+        expected_status,
+        ..
+    } = &process.readiness
+    else {
+        return Err(SandboxdStateError::StartRuntimeAdapters(format!(
+            "OpenCode runtime probe requires HTTP readiness for process '{}'",
+            process.process_key
+        )));
+    };
+    let health_url = url::Url::parse(url).map_err(|error| {
+        SandboxdStateError::StartRuntimeAdapters(format!(
+            "OpenCode runtime probe readiness URL is invalid: {error}"
+        ))
+    })?;
+    let health_path = health_url.path().to_string();
+    if health_path.trim().is_empty() {
+        return Err(SandboxdStateError::StartRuntimeAdapters(
+            "OpenCode runtime probe readiness URL must include a path".to_string(),
+        ));
+    }
+
+    Ok(RuntimeSpecificProbe::OpenCode {
+        proxy_url: proxy_url.to_string(),
+        health_path,
+        expected_status: *expected_status,
+    })
 }
 
 fn close_tunnel_session(

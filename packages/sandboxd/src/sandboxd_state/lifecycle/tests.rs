@@ -1430,6 +1430,7 @@ fn activation_failure_restore_derives_runtime_readiness_from_restored_health_sna
             SupervisedComponent::TunnelSession,
             SupervisedComponent::CodexProxy,
             SupervisedComponent::CodexAppServer,
+            SupervisedComponent::RuntimeAgentEndpoint,
         ]),
     );
     let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -1457,6 +1458,7 @@ fn activation_failure_restore_derives_runtime_readiness_from_restored_health_sna
     );
     supervisor_handle.mark_component_healthy(SupervisedComponent::CodexProxy);
     supervisor_handle.mark_component_healthy(SupervisedComponent::CodexAppServer);
+    supervisor_handle.mark_component_healthy(SupervisedComponent::RuntimeAgentEndpoint);
     {
         let mut runtime_readiness = runtime_readiness_manager
             .lock()
@@ -1486,6 +1488,7 @@ fn activation_failure_restore_derives_runtime_readiness_from_restored_health_sna
         runtime_coordination_thread: None,
         runtime_readiness_shutdown_requested: Arc::new(AtomicBool::new(false)),
         runtime_readiness_thread: None,
+        runtime_agent_probe_handle: None,
         daemon_liveness_monitor: None,
         supervisor_handle: supervisor_handle.clone(),
         keepalive_manager,
