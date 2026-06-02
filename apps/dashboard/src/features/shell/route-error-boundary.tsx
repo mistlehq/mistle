@@ -1,5 +1,4 @@
-import { Button } from "@mistle/ui";
-import { CopyableValue } from "@mistle/ui";
+import { Button, cn, CopyableValue } from "@mistle/ui";
 import { isRouteErrorResponse, useNavigate, useRouteError } from "react-router";
 import { z } from "zod";
 
@@ -10,8 +9,9 @@ type RouteErrorDisplay = {
   title: string;
   description: string;
   detail: string | null;
-  showSignInAction: boolean;
+  primaryAction: RouteErrorPrimaryAction;
 };
+type RouteErrorPrimaryAction = "refresh" | "signIn" | null;
 type ResolveRouteErrorDisplayOptions = {
   showDiagnostics: boolean;
 };
@@ -92,7 +92,7 @@ function resolveHttpApiErrorDisplay(
       title: "Sign in required",
       description: error.message,
       detail,
-      showSignInAction: true,
+      primaryAction: "signIn",
     };
   }
 
@@ -101,7 +101,7 @@ function resolveHttpApiErrorDisplay(
       title: "Access denied",
       description: error.message,
       detail,
-      showSignInAction: false,
+      primaryAction: null,
     };
   }
 
@@ -110,7 +110,7 @@ function resolveHttpApiErrorDisplay(
       title: "Page not found",
       description: error.message,
       detail,
-      showSignInAction: false,
+      primaryAction: null,
     };
   }
 
@@ -118,7 +118,28 @@ function resolveHttpApiErrorDisplay(
     title: "Request failed",
     description: error.message,
     detail,
-    showSignInAction: false,
+    primaryAction: null,
+  };
+}
+
+function resolveUnexpectedApplicationErrorDisplay(input: {
+  detail: string | null;
+  showDiagnostics: boolean;
+}): RouteErrorDisplay {
+  if (input.showDiagnostics) {
+    return {
+      title: "Unexpected application error",
+      description: "Something went wrong while loading this page.",
+      detail: input.detail,
+      primaryAction: null,
+    };
+  }
+
+  return {
+    title: "Refresh dashboard",
+    description: "Something changed while this tab was open. Refresh to continue.",
+    detail: null,
+    primaryAction: "refresh",
   };
 }
 
@@ -135,7 +156,7 @@ export function resolveRouteErrorDisplay(
         title: "Sign in required",
         description: routeMessage ?? "Your session has expired. Sign in again to continue.",
         detail,
-        showSignInAction: true,
+        primaryAction: "signIn",
       };
     }
 
@@ -144,7 +165,7 @@ export function resolveRouteErrorDisplay(
         title: "Access denied",
         description: routeMessage ?? "You do not have permission to view this page.",
         detail,
-        showSignInAction: false,
+        primaryAction: null,
       };
     }
 
@@ -153,7 +174,7 @@ export function resolveRouteErrorDisplay(
         title: "Page not found",
         description: routeMessage ?? "The requested page could not be found.",
         detail,
-        showSignInAction: false,
+        primaryAction: null,
       };
     }
 
@@ -165,7 +186,7 @@ export function resolveRouteErrorDisplay(
           ? error.statusText
           : "The dashboard could not load this page right now."),
       detail,
-      showSignInAction: false,
+      primaryAction: null,
     };
   }
 
@@ -174,20 +195,16 @@ export function resolveRouteErrorDisplay(
   }
 
   if (error instanceof Error) {
-    return {
-      title: "Unexpected application error",
-      description: "Something went wrong while loading this page.",
+    return resolveUnexpectedApplicationErrorDisplay({
       detail: options.showDiagnostics ? buildThrownErrorDetail(error) : null,
-      showSignInAction: false,
-    };
+      showDiagnostics: options.showDiagnostics,
+    });
   }
 
-  return {
-    title: "Unexpected application error",
-    description: "Something went wrong while loading this page.",
+  return resolveUnexpectedApplicationErrorDisplay({
     detail: options.showDiagnostics ? `Unknown error value:\n${stringifyUnknown(error)}` : null,
-    showSignInAction: false,
-  };
+    showDiagnostics: options.showDiagnostics,
+  });
 }
 
 export function shouldRenderRouteErrorDiagnostics(runtimeEnv: RuntimeEnv): boolean {
@@ -204,36 +221,49 @@ export function RouteErrorBoundary({ runtimeEnv }: RouteErrorBoundaryProps): Rea
   const resolvedRuntimeEnv = runtimeEnv ?? getRuntimeEnv();
   const showDiagnostics = shouldRenderRouteErrorDiagnostics(resolvedRuntimeEnv);
   const display = resolveRouteErrorDisplay(error, { showDiagnostics });
+  const detail = display.detail;
+  const hasDetail = detail !== null;
+  const primaryAction =
+    display.primaryAction === "refresh" ? (
+      <Button onClick={() => globalThis.location.reload()} type="button">
+        Refresh now
+      </Button>
+    ) : display.primaryAction === "signIn" ? (
+      <Button onClick={() => void navigate("/auth/login", { replace: true })} type="button">
+        Sign in
+      </Button>
+    ) : null;
 
   return (
     <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
       <section className="mx-auto flex min-h-svh w-full max-w-6xl items-center px-4 py-8">
-        <div className="bg-card text-card-foreground flex h-[72svh] w-full max-h-[72svh] flex-col rounded-lg border shadow-sm">
-          <header className="p-6">
-            <h1 className="text-xl font-semibold">{display.title}</h1>
-            <p className="text-muted-foreground mt-2 text-sm">{display.description}</p>
+        <div
+          className={cn(
+            "bg-card text-card-foreground flex w-full flex-col rounded-lg border shadow-sm",
+            hasDetail ? "h-[72svh] max-h-[72svh]" : "min-h-40",
+          )}
+        >
+          <header className="flex flex-col gap-4 p-6 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <h1 className="text-xl font-semibold">{display.title}</h1>
+              <p className="text-muted-foreground mt-2 text-sm">{display.description}</p>
+            </div>
+            {primaryAction !== null ? (
+              <div className="shrink-0 sm:pt-1">{primaryAction}</div>
+            ) : null}
           </header>
-          <div className="flex min-h-0 flex-1 flex-col gap-3 px-6 pb-6">
-            {display.detail !== null ? (
+          {hasDetail ? (
+            <div className="flex min-h-0 flex-1 flex-col gap-3 px-6 pb-6">
               <CopyableValue
                 copiedTitle="Copied"
                 copyAriaLabel="Copy error details"
                 copyTitle="Copy details"
                 failureMessage="Could not copy details automatically. Select and copy manually."
-                value={display.detail}
+                value={detail}
                 variant="panel"
               />
-            ) : null}
-            {display.showSignInAction ? (
-              <Button
-                onClick={() => void navigate("/auth/login", { replace: true })}
-                type="button"
-                variant="secondary"
-              >
-                Sign in
-              </Button>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
       </section>
     </main>

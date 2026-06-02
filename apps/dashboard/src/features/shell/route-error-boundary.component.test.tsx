@@ -23,7 +23,7 @@ describe("resolveRouteErrorDisplay", () => {
 
     expect(display.title).toBe("Sign in required");
     expect(display.description).toBe("Session expired.");
-    expect(display.showSignInAction).toBe(true);
+    expect(display.primaryAction).toBe("signIn");
     expect(display.detail).toContain("Route error: 401 Unauthorized");
     expect(display.detail).toContain("Session expired.");
   });
@@ -41,7 +41,7 @@ describe("resolveRouteErrorDisplay", () => {
 
     expect(display.title).toBe("Page not found");
     expect(display.description).toBe("The requested page could not be found.");
-    expect(display.showSignInAction).toBe(false);
+    expect(display.primaryAction).toBeNull();
     expect(display.detail).toContain("Route error: 404 Not Found");
   });
 
@@ -62,7 +62,7 @@ describe("resolveRouteErrorDisplay", () => {
 
     expect(display.title).toBe("Request failed");
     expect(display.description).toBe("Sandbox instance is not connectable.");
-    expect(display.showSignInAction).toBe(false);
+    expect(display.primaryAction).toBeNull();
     expect(display.detail).toContain("Route error: 409 Sandbox instance is not connectable.");
     expect(display.detail).toContain("INSTANCE_NOT_RESUMABLE");
   });
@@ -80,26 +80,45 @@ describe("resolveRouteErrorDisplay", () => {
 
     expect(display.title).toBe("Request failed");
     expect(display.description).toBe("Service Unavailable");
-    expect(display.showSignInAction).toBe(false);
+    expect(display.primaryAction).toBeNull();
     expect(display.detail).toContain("Route error: 503 Service Unavailable");
   });
 
-  it("includes error detail for regular thrown Error objects", () => {
+  it("includes error detail for regular thrown Error objects in development", () => {
     const display = resolveRouteErrorDisplay(new Error("Context missing"), {
       showDiagnostics: true,
     });
 
     expect(display.title).toBe("Unexpected application error");
     expect(display.description).toBe("Something went wrong while loading this page.");
-    expect(display.showSignInAction).toBe(false);
+    expect(display.primaryAction).toBeNull();
     expect(display.detail).toContain("Error: Error");
     expect(display.detail).toContain("Message: Context missing");
   });
 
-  it("does not generate diagnostic detail when diagnostics are disabled", () => {
+  it("returns refresh guidance for regular thrown Error objects in production", () => {
     const display = resolveRouteErrorDisplay(new Error("Context missing"), {
       showDiagnostics: false,
     });
+
+    expect(display.title).toBe("Refresh dashboard");
+    expect(display.description).toBe(
+      "Something changed while this tab was open. Refresh to continue.",
+    );
+    expect(display.primaryAction).toBe("refresh");
+    expect(display.detail).toBeNull();
+  });
+
+  it("returns refresh guidance for unknown errors in production", () => {
+    const display = resolveRouteErrorDisplay("Unknown render failure", {
+      showDiagnostics: false,
+    });
+
+    expect(display.title).toBe("Refresh dashboard");
+    expect(display.description).toBe(
+      "Something changed while this tab was open. Refresh to continue.",
+    );
+    expect(display.primaryAction).toBe("refresh");
     expect(display.detail).toBeNull();
   });
 
@@ -131,7 +150,9 @@ describe("RouteErrorBoundary rendering", () => {
 
     const productionMarkup = renderToStaticMarkup(<RouterProvider router={productionRouter} />);
     expect(productionMarkup).not.toContain("<pre");
-    expect(productionMarkup).toContain("Unexpected application error");
+    expect(productionMarkup).toContain("Refresh dashboard");
+    expect(productionMarkup).toContain("Something changed while this tab was open.");
+    expect(productionMarkup).toContain("Refresh now");
 
     const developmentRouter = createMemoryRouter(
       [
@@ -150,6 +171,7 @@ describe("RouteErrorBoundary rendering", () => {
 
     const developmentMarkup = renderToStaticMarkup(<RouterProvider router={developmentRouter} />);
     expect(developmentMarkup).toContain("<pre");
+    expect(developmentMarkup).toContain("Unexpected application error");
     expect(developmentMarkup).toContain("Sensitive route error detail");
   });
 });
