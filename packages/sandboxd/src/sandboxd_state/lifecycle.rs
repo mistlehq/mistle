@@ -999,7 +999,9 @@ impl SandboxdState {
                 "snapshot materialization sandboxes do not support activation".to_string(),
             ));
         }
-        if !initialized_activation_egress_inputs_match(
+        let egress_proxy_refresh_required = self.egress_proxy.is_some()
+            && !egress_proxy_inputs_match(accepted_session_input, &session_input);
+        if !initialized_activation_egress_inputs_are_supported(
             self.egress_proxy.is_some(),
             accepted_session_input,
             &session_input,
@@ -1205,6 +1207,30 @@ impl SandboxdState {
             }
             tunnel_session.attach_gateway_egress_token_provider(provider);
         }
+        if egress_proxy_refresh_required
+            && let Err(error) =
+                self.restart_egress_proxy_for_activation(accepted_session_input, &session_input)
+        {
+            close_tunnel_session(
+                tunnel_session,
+                &diagnostics_logger,
+                "stop_tunnel_session_after_egress_proxy_refresh_failure",
+            );
+            self.restore_previous_tunnel_session_after_activation_failure(
+                previous_tunnel_session,
+                previous_tunnel_health_snapshot,
+            );
+            restore_accepted_activation_runtime_mutations_after_failure(
+                &self.gateway_egress_token_provider,
+                accepted_session_input,
+                true,
+                gateway_egress_provider_detached,
+                self.tunnel_session.as_ref(),
+                global_git_config_path,
+                "refresh egress proxy",
+            )?;
+            return Err(error);
+        }
         record_operation_phase_started(&diagnostics_logger, "ready");
         close_operation_stream(&diagnostics_logger);
         if let Some(previous_tunnel_session) = previous_tunnel_session {
@@ -1233,6 +1259,75 @@ impl SandboxdState {
         self.mark_accepted_tunnel_connected();
 
         Ok(())
+    }
+
+    fn restart_egress_proxy_for_activation(
+        &mut self,
+        accepted_session_input: &SessionRuntimeInput,
+        candidate_session_input: &SessionRuntimeInput,
+    ) -> Result<(), SandboxdStateError> {
+        if let Some(egress_proxy) = self.egress_proxy.take() {
+            egress_proxy
+                .close()
+                .map_err(|error| SandboxdStateError::StopEgressProxy(error.to_string()))?;
+        }
+
+        match self.start_egress_proxy_for_session(candidate_session_input) {
+            Ok(Some(egress_proxy)) => {
+                self.egress_proxy = Some(egress_proxy);
+                Ok(())
+            }
+            Ok(None) => {
+                let restore_error = self
+                    .restore_accepted_egress_proxy(accepted_session_input)
+                    .err();
+                let message =
+                    "initialized activation candidate no longer configures an egress proxy"
+                        .to_string();
+                match restore_error {
+                    Some(error) => Err(SandboxdStateError::StartEgressProxy(format!(
+                        "{message}; {error}"
+                    ))),
+                    None => Err(SandboxdStateError::StartEgressProxy(message)),
+                }
+            }
+            Err(error) => {
+                let restore_error = self
+                    .restore_accepted_egress_proxy(accepted_session_input)
+                    .err();
+                match restore_error {
+                    Some(restore_error) => Err(SandboxdStateError::StartEgressProxy(format!(
+                        "{error}; {restore_error}"
+                    ))),
+                    None => Err(error),
+                }
+            }
+        }
+    }
+
+    fn restore_accepted_egress_proxy(
+        &mut self,
+        accepted_session_input: &SessionRuntimeInput,
+    ) -> Result<(), SandboxdStateError> {
+        self.egress_proxy = self.start_egress_proxy_for_session(accepted_session_input)?;
+        Ok(())
+    }
+
+    fn start_egress_proxy_for_session(
+        &self,
+        session_input: &SessionRuntimeInput,
+    ) -> Result<Option<EgressProxy>, SandboxdStateError> {
+        let runtime_plan: CompiledRuntimePlan =
+            serde_json::from_value(session_input.runtime_plan.clone())
+                .map_err(|error| SandboxdStateError::ApplyRuntimePlan(error.to_string()))?;
+        EgressProxy::start(
+            &runtime_plan,
+            session_input,
+            self.gateway_egress_token_provider.clone(),
+            self.clock.clone(),
+            self.supervisor_handle.clone(),
+        )
+        .map_err(|error| SandboxdStateError::StartEgressProxy(error.to_string()))
     }
 
     fn restore_previous_tunnel_session_after_activation_failure(
@@ -1548,18 +1643,27 @@ fn egress_proxy_inputs_match(
             == runtime_plan_egress_routes(&candidate_session_input.runtime_plan)
 }
 
-fn initialized_activation_egress_inputs_match(
+fn initialized_activation_egress_inputs_are_supported(
     egress_proxy_is_running: bool,
     accepted_session_input: &SessionRuntimeInput,
     candidate_session_input: &SessionRuntimeInput,
 ) -> bool {
     if egress_proxy_is_running {
-        return egress_proxy_inputs_match(accepted_session_input, candidate_session_input);
+        return session_requires_egress_proxy(candidate_session_input);
     }
 
     accepted_session_input.transparent_proxy == candidate_session_input.transparent_proxy
         && runtime_plan_egress_routes(&accepted_session_input.runtime_plan)
             == runtime_plan_egress_routes(&candidate_session_input.runtime_plan)
+}
+
+fn session_requires_egress_proxy(session_input: &SessionRuntimeInput) -> bool {
+    session_input.transparent_proxy.is_some()
+        || runtime_plan_egress_routes(&session_input.runtime_plan).is_some_and(|routes| {
+            routes
+                .as_array()
+                .is_some_and(|route_array| !route_array.is_empty())
+        })
 }
 
 fn runtime_plan_egress_routes(runtime_plan: &serde_json::Value) -> Option<&serde_json::Value> {
