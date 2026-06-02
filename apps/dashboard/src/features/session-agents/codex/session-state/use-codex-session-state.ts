@@ -1,3 +1,4 @@
+import type { SkillMentionDescriptor } from "@mistle/integrations-core";
 import {
   archiveCodexThread,
   clearCodexThreadGoal,
@@ -20,8 +21,6 @@ import {
   type CodexThreadGoalStatus,
   type CodexThreadSummary,
   type CodexReviewTarget,
-  type CodexTurnCollaborationModeKind,
-  type CodexTurnCollaborationModeSettings,
   type CodexTurnInputLocalImageItem,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
@@ -38,7 +37,10 @@ import {
 
 import type { ChatAttachment, ChatEntry, ChatPlanEntry } from "../../../chat/chat-types.js";
 import type { ChatComposerCommandPanel } from "../../../chat/components/chat-composer.js";
-import { hasComposerCommand } from "../../../pages/session-composer/session-composer-trigger-detection.js";
+import {
+  hasComposerCommand,
+  listSkillMentions,
+} from "../../../pages/session-composer/session-composer-trigger-detection.js";
 import {
   createInitialCodexApprovalRequestsState,
   reduceCodexApprovalRequestsState,
@@ -85,7 +87,11 @@ import {
   resolveCodexCliLaunchTarget,
   type CodexCliLaunchTarget,
 } from "./session-thread-authority.js";
-import { useCodexChatController, type CodexChatState } from "./use-codex-chat-controller.js";
+import {
+  useCodexChatController,
+  type CodexChatState,
+  type CodexStartTurnInput,
+} from "./use-codex-chat-controller.js";
 import { useCodexThreadCollections } from "./use-codex-thread-collections.js";
 
 export type { ConnectedCodexSession, StartSessionStep };
@@ -200,15 +206,7 @@ type CodexSessionChatState = {
   canInterruptTurn: boolean;
   canSteerTurn: boolean;
   hydrateChatFromThread: () => Promise<void>;
-  startTurn: (input: {
-    submittedPrompt: string;
-    submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
-    transcriptPrompt?: string;
-    displayAttachments?: readonly ChatAttachment[];
-    cwd?: string;
-    collaborationMode?: CodexTurnCollaborationModeKind | undefined;
-    collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
-  }) => Promise<void>;
+  startTurn: (input: CodexStartTurnInput) => Promise<void>;
   interruptTurn: () => void;
   dismissUserMessageAction: (actionId: string) => void;
   steerTurn: (input: {
@@ -291,6 +289,7 @@ export function useCodexSessionState(input: {
   const rpcClientRef = input.rpcClientRef;
   const sessionSnapshotRef = useRef<ConnectedCodexSession | null>(null);
   const threadIdRef = useRef<string | null>(null);
+  const skillMentionsRef = useRef<readonly SkillMentionDescriptor[]>([]);
   const connectionGenerationRef = useRef(0);
   const threadNavigationMutationRequestRef = useRef(0);
   const reviewTargetLoadRequestRef = useRef(0);
@@ -390,6 +389,7 @@ export function useCodexSessionState(input: {
   } = useCodexChatController({
     rpcClientRef: input.rpcClientRef,
     threadIdRef,
+    skillMentionsRef,
     onTurnCwdCommitted: (turnCwd) => {
       updateActiveThread(turnCwd);
     },
@@ -523,6 +523,7 @@ export function useCodexSessionState(input: {
     readConfigAsync,
     rpcClientRef: input.rpcClientRef,
   });
+  skillMentionsRef.current = listSkillMentions(bootstrap.composerCapabilities);
 
   const codexGoalsEnabled = useMemo(
     () =>

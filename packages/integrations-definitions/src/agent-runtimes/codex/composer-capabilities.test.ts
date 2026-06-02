@@ -77,6 +77,7 @@ describe("Codex composer capabilities", () => {
           {
             name: "grill-with-docs",
             description: "Stress test a plan against docs",
+            sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
           },
         ],
       }).find((capability) => capability.kind === "skillMention"),
@@ -89,6 +90,7 @@ describe("Codex composer capabilities", () => {
         {
           name: "grill-with-docs",
           description: "Stress test a plan against docs",
+          sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
         },
       ],
     });

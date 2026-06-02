@@ -124,14 +124,17 @@ const CodexSkillMentionCapability: React.ComponentProps<
     {
       name: "grill-with-docs",
       description: "Stress test a plan against docs",
+      sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
     },
     {
       name: "writing-sharpen",
       description: "Tighten a draft while preserving voice",
+      sourcePath: "/root/.codex/skills/writing-sharpen/SKILL.md",
     },
     {
       name: "codex-review",
       description: "Review code changes with Codex",
+      sourcePath: "/root/.codex/skills/codex-review/SKILL.md",
     },
   ],
 };

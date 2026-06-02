@@ -69,6 +69,7 @@ type ListFeaturesResult = {
 
 type ListSkillsResult = {
   data: readonly CodexSkillsListEntry[];
+  skillMentions: readonly SkillMentionDescriptor[];
   response: unknown;
 };
 
@@ -111,7 +112,7 @@ function featureIsEnabled(input: {
   return input.features.some((feature) => feature.name === input.name && feature.enabled === true);
 }
 
-function resolveEnabledSkillMentions(input: {
+export function resolveEnabledSkillMentions(input: {
   cwd: string;
   entries: readonly CodexSkillsListEntry[];
 }): readonly SkillMentionDescriptor[] {
@@ -129,6 +130,7 @@ function resolveEnabledSkillMentions(input: {
     .map((skill) => ({
       name: skill.name,
       description: skill.shortDescription ?? skill.description,
+      sourcePath: skill.path,
     }));
 }
 
@@ -231,11 +233,14 @@ export function useSessionBootstrap(input: {
       }
 
       const result = await input.listSkillsAsync({ cwd: activeThreadCwd });
-      resolveEnabledSkillMentions({
+      const skillMentions = resolveEnabledSkillMentions({
         cwd: activeThreadCwd,
         entries: result.data,
       });
-      return result;
+      return {
+        ...result,
+        skillMentions,
+      };
     },
     enabled: activeConnectionKey !== null && activeThreadCwd !== null,
     retry: false,
@@ -368,10 +373,7 @@ export function useSessionBootstrap(input: {
       return EmptySkills;
     }
 
-    return resolveEnabledSkillMentions({
-      cwd: activeThreadCwd,
-      entries: cachedSkills.data,
-    });
+    return cachedSkills.skillMentions;
   }, [activeThreadCwd, establishedConnectionKey, queryClient]);
 
   const availableModels = useMemo(() => {
@@ -399,15 +401,12 @@ export function useSessionBootstrap(input: {
   }, [establishedFeatures, featuresQuery.data?.features]);
 
   const skillMentions = useMemo(() => {
-    if (skillsQuery.data === undefined || activeThreadCwd === null) {
+    if (skillsQuery.data === undefined) {
       return establishedSkills;
     }
 
-    return resolveEnabledSkillMentions({
-      cwd: activeThreadCwd,
-      entries: skillsQuery.data.data,
-    });
-  }, [activeThreadCwd, establishedSkills, skillsQuery.data]);
+    return skillsQuery.data.skillMentions;
+  }, [establishedSkills, skillsQuery.data]);
 
   const composerCapabilities = useMemo(
     () =>

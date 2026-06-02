@@ -63,7 +63,19 @@ export type SkillMentionCapability = {
 export type SkillMentionDescriptor = {
   name: string;
   description?: string;
+  sourcePath: string;
 };
+
+const SkillMentionQueryPattern = /^[a-z0-9-]*$/;
+const SkillMentionNamePattern = /^[a-z0-9-]+$/;
+
+export function isSkillMentionQuery(value: string): boolean {
+  return SkillMentionQueryPattern.test(value);
+}
+
+export function isSkillMentionName(value: string): boolean {
+  return SkillMentionNamePattern.test(value);
+}
 
 export type ComposerCommandDescriptor = {
   id: string;

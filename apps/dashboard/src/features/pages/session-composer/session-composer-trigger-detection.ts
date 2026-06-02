@@ -3,6 +3,7 @@ import type {
   ComposerCommandDescriptor,
   SkillMentionDescriptor,
 } from "@mistle/integrations-core";
+import { isSkillMentionQuery } from "@mistle/integrations-core";
 
 const SlashCommandQueryPattern = /^[a-z0-9-]*$/;
 const WhitespacePattern = /\s/;
@@ -100,7 +101,7 @@ function detectSkillMentionTrigger(input: {
   }
 
   const skillToken = tokenText.slice(1);
-  if (!isSlashCommandQuery(skillToken)) {
+  if (!isSkillMentionQuery(skillToken)) {
     return null;
   }
 

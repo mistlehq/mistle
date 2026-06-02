@@ -1,3 +1,4 @@
+import type { SkillMentionDescriptor } from "@mistle/integrations-core";
 import {
   buildCodexTurnInputItems,
   interruptCodexTurn,
@@ -29,7 +30,7 @@ type QueuedSteerRequest = {
   entryId: string;
   threadId: string;
   turnId: string;
-  request: ReturnType<typeof buildTurnRequest>;
+  request: TurnRequest;
   status: "queued" | "sending";
 };
 
@@ -52,7 +53,7 @@ export function resolveTurnCwdCommit(input: {
   };
 }
 
-function buildTurnRequest(input: {
+type BuildTurnRequestInput = {
   submittedPrompt: string;
   submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
   transcriptPrompt?: string;
@@ -60,7 +61,13 @@ function buildTurnRequest(input: {
   cwd?: string;
   collaborationMode?: CodexTurnCollaborationModeKind | undefined;
   collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
-}): {
+};
+
+export type CodexStartTurnInput = BuildTurnRequestInput & {
+  resolveSkillMentions?: boolean;
+};
+
+type TurnRequest = {
   submittedPrompt: string;
   transcriptPrompt: string;
   submittedAttachments: readonly CodexTurnInputLocalImageItem[];
@@ -69,7 +76,20 @@ function buildTurnRequest(input: {
   cwd?: string;
   collaborationMode?: CodexTurnCollaborationModeKind | undefined;
   collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
-} {
+};
+
+function buildTurnRequest(
+  input: BuildTurnRequestInput & {
+    skillResolution:
+      | {
+          kind: "enabled";
+          skills: readonly SkillMentionDescriptor[];
+        }
+      | {
+          kind: "disabled";
+        };
+  },
+): TurnRequest {
   const submittedPrompt = input.submittedPrompt.trim();
   const transcriptPrompt = (input.transcriptPrompt ?? input.submittedPrompt).trim();
   const submittedAttachments = input.submittedAttachments ?? [];
@@ -85,6 +105,7 @@ function buildTurnRequest(input: {
     items: buildCodexTurnInputItems({
       text: submittedPrompt,
       attachments: submittedAttachments,
+      ...(input.skillResolution.kind === "enabled" ? { skills: input.skillResolution.skills } : {}),
     }),
     ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
     ...(input.collaborationMode === undefined
@@ -96,9 +117,33 @@ function buildTurnRequest(input: {
   };
 }
 
+export function buildStartTurnRequest(
+  input: BuildTurnRequestInput & {
+    skills: readonly SkillMentionDescriptor[];
+  },
+): TurnRequest {
+  return buildTurnRequest({
+    ...input,
+    skillResolution: {
+      kind: "enabled",
+      skills: input.skills,
+    },
+  });
+}
+
+export function buildTextOnlyTurnRequest(input: BuildTurnRequestInput): TurnRequest {
+  return buildTurnRequest({
+    ...input,
+    skillResolution: {
+      kind: "disabled",
+    },
+  });
+}
+
 export function useCodexChatController(input: {
   rpcClientRef: RefObject<CodexJsonRpcClient | null>;
   threadIdRef: RefObject<string | null>;
+  skillMentionsRef: RefObject<readonly SkillMentionDescriptor[]>;
   onTurnCwdCommitted: (input: TurnCwdCommit) => void;
   setSessionErrorMessage: (message: string | null) => void;
 }) {
@@ -204,15 +249,7 @@ export function useCodexChatController(input: {
   }, [hydrateThreadStateFromRead]);
 
   const startTurnMutation = useMutation({
-    mutationFn: async (turnInput: {
-      submittedPrompt: string;
-      submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
-      transcriptPrompt?: string;
-      displayAttachments?: readonly ChatAttachment[];
-      cwd?: string;
-      collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
-      collaborationMode?: CodexTurnCollaborationModeKind | undefined;
-    }) => {
+    mutationFn: async (turnInput: CodexStartTurnInput) => {
       const rpcClient = input.rpcClientRef.current;
       const threadId = input.threadIdRef.current;
 
@@ -220,7 +257,13 @@ export function useCodexChatController(input: {
         throw new Error("Choose a thread before starting a turn.");
       }
 
-      const turnRequest = buildTurnRequest(turnInput);
+      const turnRequest =
+        turnInput.resolveSkillMentions === false
+          ? buildTextOnlyTurnRequest(turnInput)
+          : buildStartTurnRequest({
+              ...turnInput,
+              skills: input.skillMentionsRef.current,
+            });
 
       const startedTurn = await startCodexTurn({
         rpcClient,
@@ -398,14 +441,7 @@ export function useCodexChatController(input: {
     canInterruptTurn,
     canSteerTurn,
     startTurn: useCallback(
-      async (turnInput: {
-        submittedPrompt: string;
-        submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
-        transcriptPrompt?: string;
-        displayAttachments?: readonly ChatAttachment[];
-        collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
-        collaborationMode?: CodexTurnCollaborationModeKind | undefined;
-      }): Promise<void> => {
+      async (turnInput: CodexStartTurnInput): Promise<void> => {
         await startTurnMutation.mutateAsync(turnInput);
       },
       [startTurnMutation],
@@ -457,7 +493,7 @@ export function useCodexChatController(input: {
           throw new Error("No active turn is available to steer.");
         }
 
-        const turnRequest = buildTurnRequest(turnInput);
+        const turnRequest = buildTextOnlyTurnRequest(turnInput);
         const steerEntryId = createSteerEntryId();
 
         dispatchChatAction({

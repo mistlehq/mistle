@@ -44,6 +44,7 @@ const SkillMentionCapabilityFixture: ComposerCapability = {
     {
       name: "grill-with-docs",
       description: "Stress test a plan against docs",
+      sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
     },
   ],
 };

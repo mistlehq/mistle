@@ -99,6 +99,7 @@ function SessionComposerStateHarness(input: {
   const [queuedPrompt, setQueuedPrompt] = useState<string | null>(null);
   const [nativeQueueSubmissionCount, setNativeQueueSubmissionCount] = useState(0);
   const [transcriptPrompt, setTranscriptPrompt] = useState<string | null>(null);
+  const [resolveSkillMentions, setResolveSkillMentions] = useState<boolean | null>(null);
   const [collaborationModeSettings, setCollaborationModeSettings] =
     useState<SessionComposerCollaborationModeSettings | null>(null);
   const [collaborationMode, setCollaborationMode] = useState<"default" | "plan" | null>(null);
@@ -184,6 +185,7 @@ function SessionComposerStateHarness(input: {
           transcriptPrompt,
           collaborationMode,
           collaborationModeSettings,
+          resolveSkillMentions,
         }) => {
           if (input.shouldFailSubmit) {
             throw new Error("Could not submit chat message.");
@@ -191,6 +193,7 @@ function SessionComposerStateHarness(input: {
 
           setSubmittedPrompt(submittedPrompt);
           setTranscriptPrompt(transcriptPrompt ?? null);
+          setResolveSkillMentions(resolveSkillMentions ?? null);
           setCollaborationMode(collaborationMode ?? null);
           setCollaborationModeSettings(collaborationModeSettings ?? null);
           if (input.deferSubmit) {
@@ -296,6 +299,9 @@ function SessionComposerStateHarness(input: {
       <div data-testid="queued-prompt">{queuedPrompt ?? ""}</div>
       <div data-testid="native-queue-submission-count">{String(nativeQueueSubmissionCount)}</div>
       <div data-testid="transcript-prompt">{transcriptPrompt ?? ""}</div>
+      <div data-testid="resolve-skill-mentions">
+        {resolveSkillMentions === null ? "" : String(resolveSkillMentions)}
+      </div>
       <div data-testid="collaboration-mode-settings">
         {collaborationModeSettings === null ? "" : JSON.stringify(collaborationModeSettings)}
       </div>
@@ -983,6 +989,35 @@ describe("useSessionComposerState", () => {
       expect(screen.getByTestId("submitted-prompt").textContent).toBe("Queue after current task");
     });
     expect(screen.getByTestId("queued-prompt-count").textContent).toBe("0");
+  });
+
+  it("drains local queued prompts as text-only starts", async () => {
+    const { rerender } = render(
+      <SessionComposerStateHarness
+        activeTurnState="running"
+        composerText="$grill-with-docs follow up after current task"
+        pendingDiffComments={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+
+    expect(screen.getByTestId("queued-prompt-count").textContent).toBe("1");
+
+    rerender(
+      <SessionComposerStateHarness
+        activeTurnState="idle"
+        composerText=""
+        pendingDiffComments={[]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("submitted-prompt").textContent).toBe(
+        "$grill-with-docs follow up after current task",
+      );
+    });
+    expect(screen.getByTestId("resolve-skill-mentions").textContent).toBe("false");
   });
 
   it("submits developer instructions with the selected model for scoped conversations", async () => {

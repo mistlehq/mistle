@@ -76,10 +76,12 @@ const SkillMentionCapabilityFixture: React.ComponentProps<
     {
       name: "grill-with-docs",
       description: "Stress test a plan against docs",
+      sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
     },
     {
       name: "write-a-skill",
       description: "Create a reusable skill",
+      sourcePath: "/root/.codex/skills/write-a-skill/SKILL.md",
     },
   ],
 };

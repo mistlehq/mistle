@@ -1,3 +1,4 @@
+import { isSkillMentionName, type SkillMentionDescriptor } from "@mistle/integrations-core";
 import { z } from "zod";
 
 import { CodexJsonRpcClient } from "./codex-json-rpc.js";
@@ -161,6 +162,7 @@ const SkillsListResponseSchema = z.object({
             })
             .nullable()
             .optional(),
+          path: z.string().min(1),
           enabled: z.boolean(),
         }),
       ),
@@ -236,6 +238,7 @@ export type CodexSkillSummary = {
   name: string;
   description: string;
   shortDescription: string | null;
+  path: string;
   enabled: boolean;
 };
 
@@ -268,7 +271,16 @@ export type CodexTurnInputLocalImageItem = {
   path: string;
 };
 
-export type CodexTurnInputItem = CodexTurnInputLocalImageItem | CodexTurnInputTextItem;
+export type CodexTurnInputSkillItem = {
+  type: "skill";
+  name: string;
+  path: string;
+};
+
+export type CodexTurnInputItem =
+  | CodexTurnInputLocalImageItem
+  | CodexTurnInputSkillItem
+  | CodexTurnInputTextItem;
 
 export type CodexTurnCollaborationModeSettings = {
   model: string;
@@ -324,8 +336,16 @@ type CodexTurnStartRequest = {
 export function buildCodexTurnInputItems(input: {
   text: string;
   attachments: readonly CodexTurnInputLocalImageItem[];
+  skills?: readonly SkillMentionDescriptor[];
 }): readonly CodexTurnInputItem[] {
   const trimmedText = input.text.trim();
+  const skillItems =
+    trimmedText.length === 0
+      ? []
+      : resolveCodexTurnInputSkillItems({
+          text: trimmedText,
+          skills: input.skills ?? [],
+        });
   const items: CodexTurnInputItem[] = [
     ...(trimmedText.length === 0
       ? []
@@ -335,6 +355,7 @@ export function buildCodexTurnInputItems(input: {
             text: trimmedText,
           },
         ]),
+    ...skillItems,
     ...input.attachments,
   ];
 
@@ -343,6 +364,63 @@ export function buildCodexTurnInputItems(input: {
   }
 
   return items;
+}
+
+function resolveCodexTurnInputSkillItems(input: {
+  text: string;
+  skills: readonly SkillMentionDescriptor[];
+}): readonly CodexTurnInputSkillItem[] {
+  const selectedItems: CodexTurnInputSkillItem[] = [];
+  const selectedPaths = new Set<string>();
+  const skillsByName = buildUniqueCodexSkillMentionByName(input.skills);
+
+  for (const token of input.text.split(/\s+/)) {
+    if (!token.startsWith("$")) {
+      continue;
+    }
+
+    const skillName = token.slice(1);
+    if (!isSkillMentionName(skillName)) {
+      continue;
+    }
+
+    const skill = skillsByName.get(skillName);
+    if (skill === undefined || selectedPaths.has(skill.sourcePath)) {
+      continue;
+    }
+
+    selectedPaths.add(skill.sourcePath);
+    selectedItems.push({
+      type: "skill",
+      name: skill.name,
+      path: skill.sourcePath,
+    });
+  }
+
+  return selectedItems;
+}
+
+function buildUniqueCodexSkillMentionByName(
+  skills: readonly SkillMentionDescriptor[],
+): ReadonlyMap<string, SkillMentionDescriptor> {
+  const skillsByName = new Map<string, SkillMentionDescriptor>();
+  const ambiguousNames = new Set<string>();
+
+  for (const skill of skills) {
+    if (ambiguousNames.has(skill.name)) {
+      continue;
+    }
+
+    if (skillsByName.has(skill.name)) {
+      skillsByName.delete(skill.name);
+      ambiguousNames.add(skill.name);
+      continue;
+    }
+
+    skillsByName.set(skill.name, skill);
+  }
+
+  return skillsByName;
 }
 
 export function buildCodexTurnStartRequest(input: {
@@ -896,6 +974,7 @@ export function parseCodexSkillsListResponse(response: unknown): {
         name: skill.name,
         description: skill.description,
         shortDescription: skill.interface?.shortDescription ?? skill.shortDescription ?? null,
+        path: skill.path,
         enabled: skill.enabled,
       })),
       errors: entry.errors.map((errorInfo) => ({

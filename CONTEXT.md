@@ -225,8 +225,16 @@ A **Composer command** that can be inserted as editable prompt text away from th
 _Avoid_: Runtime command, start-only command
 
 **Codex skill mention**:
-A Codex **Composer capability** selected with `$` or from the **Codex slash palette** that inserts a skill from Codex app-server `skills/list` into the composer as prompt text.
-_Avoid_: Hardcoded skill, dashboard skill, slash command
+A `$skill-name` token in Codex composer text that may resolve to an enabled Codex runtime skill when submitted.
+_Avoid_: Hardcoded skill, dashboard skill, slash command, selected skill
+
+**Structured Codex skill input**:
+A non-visible Codex turn input item that invokes the enabled runtime skill resolved from a submitted **Codex skill mention**.
+_Avoid_: Skill mention text, selected skill, dashboard skill
+
+**Skill source path**:
+The runtime-provided file path that identifies the skill definition behind a **Codex skill mention**.
+_Avoid_: Context path, inserted path, attachment path
 
 **Codex slash palette**:
 The Codex composer palette opened with `/`, listing **Composer commands** before runtime-discovered **Codex skill mentions**.
@@ -492,6 +500,17 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Composer command** declares its editing representation separately from whether submission becomes inline prompt text or a typed runtime command.
 - A **Composer command** that depends on an optional runtime feature is available only when the **Agent runtime** confirms that feature is enabled.
 - A **Composer command** entered before an **Active Codex thread** exists remains a command action until the **Agent runtime** can handle it; it does not become ordinary prompt text.
+- A **Codex skill mention** is represented as editable prompt text whether the user typed it manually or inserted it from the composer UI.
+- A **Codex skill mention** uses the same conservative whitespace-delimited token shape as the Codex skill mention autocomplete.
+- A **Codex skill mention** resolves to a **Structured Codex skill input** only when the submitted token identifies exactly one enabled Codex runtime skill.
+- A **Skill source path** is required runtime metadata for Codex skill mentions; Codex `skills/list` entries without one are not exposed as mentionable composer skills.
+- A **Structured Codex skill input** is derived from submitted **Codex skill mention** text, not from how that text was inserted into the composer.
+- A submitted prompt may produce at most one **Structured Codex skill input** for each distinct resolved Codex runtime skill path.
+- The Codex submission path resolves **Codex skill mentions** into **Structured Codex skill inputs**; the generic composer only edits and submits prompt text.
+- Codex skill resolution uses the current dashboard **Composer capability** state at submission time rather than calling `skills/list` during submission.
+- First-pass **Structured Codex skill input** submission applies to Codex `turn/start`, not Codex steer or queued message submission.
+- **Structured Codex skill inputs** do not change the user-visible submitted prompt or transcript text.
+- Codex turn submission orders text input first, then any **Structured Codex skill inputs**, then attachments.
 - Replacing an existing Codex goal is a confirmed **Composer command** action.
 - Editing an existing Codex goal preserves goal state unless the current goal has already reached a terminal state.
 - Bare `/review` for the **Codex review command** opens a picker for what to review, not for review style.

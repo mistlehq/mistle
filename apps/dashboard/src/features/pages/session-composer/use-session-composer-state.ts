@@ -93,6 +93,7 @@ export type SessionTurnControl = {
     displayAttachments?: readonly ChatAttachment[];
     collaborationMode?: SessionComposerCollaborationModeSettings["mode"] | undefined;
     collaborationModeSettings?: SessionComposerCollaborationModeSettings | undefined;
+    resolveSkillMentions?: boolean;
   }) => Promise<void>;
   steerTurn: (input: {
     submittedPrompt: string;
@@ -534,6 +535,7 @@ export function useSessionComposerState(input: {
           uploadedAttachments: preparedAttachments.uploadedAttachments,
           displayAttachments: preparedAttachments.displayAttachments,
           transcriptPrompt: submittedPrompt,
+          resolveSkillMentions: false,
           ...(turnCollaborationModeSettings === undefined
             ? {}
             : { collaborationMode: turnCollaborationModeSettings.mode }),

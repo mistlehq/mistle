@@ -1,0 +1,5 @@
+# Codex Skill Mentions Resolve At Turn Start
+
+Codex skill mentions remain ordinary editable composer text, and Mistle resolves conservative `$skill-name` tokens only when starting a Codex turn. At `turn/start`, Mistle uses the current runtime-discovered skill metadata to emit one structured skill input for each distinct enabled skill path that is identified by exactly one submitted token match; unresolved or ambiguous tokens remain text-only. Codex `skills/list` skill metadata requires a concrete path, and Mistle treats that path as required for mentionable composer skills.
+
+We choose submit-time text resolution because the composer is a plain textarea and should not pretend to preserve rich token identity through edits, copy/paste, undo, or mobile input behavior. Structured skill inputs are protocol metadata for Codex turn startup, not user-visible transcript content, and the first pass does not apply them to Codex steer or queued message submission because Codex currently injects skill instructions from the initial turn input path.
