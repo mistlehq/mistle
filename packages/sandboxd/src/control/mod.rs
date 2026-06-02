@@ -382,7 +382,7 @@ mod tests {
         ControlSignRequest, DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL, DEFAULT_HEALTH_ENDPOINT_PATH,
         EGRESS_PROXY_FAULT_KILL_PATH, InitPhase, TEST_FAULTS_ENABLED_ENV,
         start_control_server_with_health_endpoint, submit_init, submit_ready, submit_resume,
-        submit_signing, submit_wait_init,
+        submit_signing,
     };
     use crate::protocol::startup::{
         GitIdentity, GitSigningConfig, StartupExecutionMode, StartupInput, StartupMode,
@@ -437,10 +437,15 @@ mod tests {
         let gateway = start_bootstrap_gateway();
         let startup_input =
             valid_startup_input(StartupMode::New, "bootstrap-token-value", &gateway.ws_url);
+        let duplicate_startup_input = valid_startup_input(
+            StartupMode::New,
+            "duplicate-bootstrap-token-value",
+            &gateway.ws_url,
+        );
         let server = start_test_control_server(&socket_path, ThreadSleeper);
 
         submit_init(&socket_path, &startup_input, true, false).expect("first init should succeed");
-        submit_init(&socket_path, &startup_input, true, false)
+        submit_init(&socket_path, &duplicate_startup_input, true, false)
             .expect("second init should be idempotent after initialization completes");
 
         assert_eq!(server.init_phase(), InitPhase::Initialized);
@@ -499,7 +504,8 @@ mod tests {
             .expect("second init should attach to the running initialization");
 
         std::fs::write(&setup_release_path, "release").expect("setup script should be released");
-        submit_wait_init(&socket_path).expect("wait-init should observe the original init");
+        submit_init(&socket_path, &duplicate_startup_input, true, false)
+            .expect("waiting duplicate init should join the original initialization");
 
         assert_eq!(server.init_phase(), InitPhase::Initialized);
         assert_eq!(server.startup_input(), Some(startup_input));

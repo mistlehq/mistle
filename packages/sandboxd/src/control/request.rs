@@ -166,6 +166,10 @@ fn begin_init(
                 state_guard.startup_input = Some(startup_input.clone());
             }
             InitPhase::Initializing => {
+                drop(state_guard);
+                if wait_for_completion {
+                    crate::control::state::join_init_thread(init_thread)?;
+                }
                 return Ok(());
             }
             InitPhase::Initialized => {
