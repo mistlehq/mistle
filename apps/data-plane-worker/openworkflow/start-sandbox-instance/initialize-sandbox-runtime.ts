@@ -15,22 +15,20 @@ import { DataPlaneWorkerTunnelTokenDurations } from "../core/tunnel-token-durati
 import {
   createSandboxTunnelGatewayWsUrl,
   encodeSandboxActivationInput,
-  encodeSandboxStartupInput,
   type SandboxActivationInput,
-  type SandboxStartupInput,
 } from "./sandbox-startup-input.js";
 import { createSigningGrant } from "./signing-grant.js";
 import { createSandboxRuntimeEnv } from "./start-sandbox.js";
 
 type SandboxRuntimeSessionInputFields = Omit<SandboxActivationInput, "operationKind"> & {
-  operationKind: SandboxStartupInput["operationKind"];
+  operationKind: SandboxActivationInput["operationKind"];
 };
 
 type CreateSandboxRuntimeSessionInputFieldsRequest = {
   config: DataPlaneWorkerRuntimeConfig;
   organizationId: string;
   operationId: string;
-  operationKind: SandboxStartupInput["operationKind"];
+  operationKind: SandboxActivationInput["operationKind"];
   sandboxInstanceId: string;
   runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
   actingUserId?: StartSandboxInstanceWorkflowInput["actingUserId"];
@@ -38,21 +36,6 @@ type CreateSandboxRuntimeSessionInputFieldsRequest = {
   sandboxAdapter?: SandboxAdapter;
   processEnv?: Readonly<Record<string, string | undefined>>;
 };
-
-export async function createSandboxStartupInput(
-  input: CreateSandboxRuntimeSessionInputFieldsRequest & {
-    startupMode: SandboxStartupInput["startupMode"];
-    executionMode?: SandboxStartupInput["executionMode"];
-  },
-): Promise<SandboxStartupInput> {
-  const sessionInputFields = await createSandboxRuntimeSessionInputFields(input);
-
-  return {
-    startupMode: input.startupMode,
-    ...(input.executionMode === undefined ? {} : { executionMode: input.executionMode }),
-    ...sessionInputFields,
-  };
-}
 
 export async function createSandboxActivationInput(
   input: Omit<CreateSandboxRuntimeSessionInputFieldsRequest, "operationKind"> & {
@@ -108,7 +91,7 @@ async function createSandboxRuntimeSessionInputFields(
     }),
   ]);
 
-  let gitIdentity: SandboxStartupInput["gitIdentity"];
+  let gitIdentity: SandboxActivationInput["gitIdentity"];
   if (input.gitIdentity === undefined) {
     gitIdentity = undefined;
   } else if (input.gitIdentity.signing === undefined) {
@@ -134,7 +117,7 @@ async function createSandboxRuntimeSessionInputFields(
   const transparentProxy =
     input.sandboxAdapter === undefined
       ? undefined
-      : createTransparentProxyStartupConfiguration({
+      : createTransparentProxyActivationConfiguration({
           sandboxAdapter: input.sandboxAdapter,
         });
   const startupActingUserId = transparentProxy === undefined ? undefined : input.actingUserId;
@@ -149,107 +132,6 @@ async function createSandboxRuntimeSessionInputFields(
     ...(gitIdentity === undefined ? {} : { gitIdentity }),
     ...(transparentProxy === undefined ? {} : { transparentProxy }),
   };
-}
-
-export async function initializeSandboxRuntime(
-  ctx: {
-    config: DataPlaneWorkerRuntimeConfig;
-    logger: MistleLogger;
-    processEnv: Readonly<Record<string, string | undefined>>;
-    sandboxAdapter: SandboxAdapter;
-    sandboxdArtifactResolver: SandboxdArtifactResolver | undefined;
-    sandboxRuntimeControl: SandboxRuntimeControl;
-  },
-  input: {
-    organizationId: string;
-    operationId: string;
-    operationKind: SandboxStartupInput["operationKind"];
-    sandboxInstanceId: string;
-    providerSandboxId: string;
-    startupMode: SandboxStartupInput["startupMode"];
-    executionMode?: SandboxStartupInput["executionMode"];
-    waitForCompletion?: boolean;
-    runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
-    actingUserId?: StartSandboxInstanceWorkflowInput["actingUserId"];
-    gitIdentity?: StartSandboxInstanceWorkflowInput["gitIdentity"];
-  },
-): Promise<void> {
-  const runtimeEnv = createSandboxRuntimeEnv({
-    config: ctx.config,
-    sandboxInstanceId: input.sandboxInstanceId,
-  });
-  const sandboxdArtifact = await ctx.sandboxdArtifactResolver?.resolve();
-  if (sandboxdArtifact !== undefined) {
-    await ctx.sandboxRuntimeControl.ensureSandboxd({
-      id: input.providerSandboxId,
-      artifact: sandboxdArtifact,
-      env: runtimeEnv,
-    });
-    ctx.logger.info(
-      {
-        providerSandboxId: input.providerSandboxId,
-        sandboxInstanceId: input.sandboxInstanceId,
-        sandboxdVersion: sandboxdArtifact.version,
-      },
-      "Ensured sandboxd artifact before runtime initialization.",
-    );
-  }
-
-  const sandboxdVersion = await ctx.sandboxRuntimeControl.readSandboxdVersion({
-    id: input.providerSandboxId,
-    env: runtimeEnv,
-  });
-  ctx.logger.info(
-    {
-      providerSandboxId: input.providerSandboxId,
-      sandboxInstanceId: input.sandboxInstanceId,
-      sandboxdVersion,
-    },
-    "Read sandboxd version before runtime initialization.",
-  );
-
-  const startupInput = await createSandboxStartupInput({
-    config: ctx.config,
-    organizationId: input.organizationId,
-    operationId: input.operationId,
-    operationKind: input.operationKind,
-    sandboxInstanceId: input.sandboxInstanceId,
-    startupMode: input.startupMode,
-    ...(input.executionMode === undefined ? {} : { executionMode: input.executionMode }),
-    runtimePlan: input.runtimePlan,
-    ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
-    ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
-    sandboxAdapter: ctx.sandboxAdapter,
-    processEnv: ctx.processEnv,
-  });
-
-  const initRequest = {
-    id: input.providerSandboxId,
-    payload: encodeSandboxStartupInput(startupInput),
-    env: runtimeEnv,
-  };
-  try {
-    await ctx.sandboxRuntimeControl.beginInit(initRequest);
-  } catch (error) {
-    if (!isSandboxdAlreadySubmittedError(error)) {
-      throw error;
-    }
-
-    ctx.logger.info(
-      {
-        providerSandboxId: input.providerSandboxId,
-        sandboxInstanceId: input.sandboxInstanceId,
-      },
-      "Sandboxd initialization was already submitted before retry.",
-    );
-  }
-
-  if (input.waitForCompletion !== false) {
-    await ctx.sandboxRuntimeControl.waitInit({
-      id: input.providerSandboxId,
-      env: runtimeEnv,
-    });
-  }
 }
 
 export async function activateSandboxRuntime(
@@ -326,16 +208,7 @@ export async function activateSandboxRuntime(
   });
 }
 
-function isSandboxdAlreadySubmittedError(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    (error.message.includes("sandboxd has already completed initialization") ||
-      error.message.includes("sandboxd is already initializing") ||
-      error.message.includes("sandboxd init worker is already running"))
-  );
-}
-
-function createTransparentProxyStartupConfiguration(input: {
+function createTransparentProxyActivationConfiguration(input: {
   sandboxAdapter: SandboxAdapter;
 }): SandboxdTransparentProxyConfiguration | undefined {
   const providerConfiguration = input.sandboxAdapter.getTransparentProxyConfiguration();

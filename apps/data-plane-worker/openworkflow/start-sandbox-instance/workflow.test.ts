@@ -36,20 +36,3 @@ describe("StartSandboxInstanceWorkflow operation kind", () => {
     ).toBe("snapshot");
   });
 });
-
-describe("StartSandboxInstanceWorkflow runtime initialization path", () => {
-  it("uses activation only for interactive start operation streams", () => {
-    expect(
-      startSandboxWorkflowTestInternals.usesActivationForStartRuntimeInitialization("start"),
-    ).toBe(true);
-    expect(
-      startSandboxWorkflowTestInternals.usesActivationForStartRuntimeInitialization("setup_check"),
-    ).toBe(false);
-    expect(
-      startSandboxWorkflowTestInternals.usesActivationForStartRuntimeInitialization("snapshot"),
-    ).toBe(false);
-    expect(
-      startSandboxWorkflowTestInternals.usesActivationForStartRuntimeInitialization("resume"),
-    ).toBe(false);
-  });
-});

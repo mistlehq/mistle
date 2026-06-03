@@ -11,7 +11,8 @@ const SandboxStartupDiagnosticRecordSchema = z
     level: z.enum(["info", "error"]),
     event: z.string(),
     sandboxInstanceId: z.string(),
-    operation: z.enum(["init", "resume"]),
+    operation: z.enum(["init", "resume", "activate"]),
+    operationKind: z.enum(["start", "resume", "setup_check", "snapshot"]).optional(),
     phase: z.string().optional(),
   })
   .catchall(z.unknown());
@@ -30,6 +31,11 @@ export function toDiagnosticAttributes(record: SandboxStartupDiagnosticRecord): 
     "mistle.sandbox.instance_id": record.sandboxInstanceId,
     "mistle.sandbox.startup_operation": record.operation,
     "mistle.sandbox.startup_event": record.event,
+    ...(record.operationKind === undefined
+      ? {}
+      : {
+          "mistle.sandbox.startup_operation_kind": record.operationKind,
+        }),
     ...(record.phase === undefined
       ? {}
       : {
@@ -62,7 +68,11 @@ export function summarizeStartupDiagnosticPhaseTimings(
       continue;
     }
 
-    const eventPrefix = record.operation === "init" ? "sandbox_init" : "sandbox_resume";
+    const eventPrefix = diagnosticEventPrefix(record);
+    if (eventPrefix === null) {
+      skippedRecords.push(`phase ${phase} activation record is missing operationKind`);
+      continue;
+    }
     const startedEvent = `${eventPrefix}_phase_started`;
     const completedEvent = `${eventPrefix}_phase_completed`;
     if (record.event !== startedEvent && record.event !== completedEvent) {
@@ -110,6 +120,17 @@ export function summarizeStartupDiagnosticPhaseTimings(
     phaseTimings,
     skippedRecords,
   };
+}
+
+function diagnosticEventPrefix(record: SandboxStartupDiagnosticRecord): string | null {
+  if (record.operation === "activate") {
+    if (record.operationKind === undefined) {
+      return null;
+    }
+    return `sandbox_${record.operationKind}`;
+  }
+
+  return record.operation === "init" ? "sandbox_init" : "sandbox_resume";
 }
 
 function parseStartupDiagnosticTimestampMs(timestamp: string): number | null {
@@ -185,13 +206,17 @@ export async function emitSandboxStartupDiagnosticPhaseTimings(input: {
   providerSandboxId: string;
   sandboxInstanceId: string;
   runtimeProvider: SandboxProvider;
-  operation: "init" | "resume";
+  operation: "activate";
+  operationKind: SandboxStartupDiagnosticRecord["operationKind"];
 }): Promise<void> {
   const baseAttributes = {
     "mistle.sandbox.instance_id": input.sandboxInstanceId,
     "mistle.sandbox.provider_sandbox_id": input.providerSandboxId,
     "mistle.sandbox.runtime_provider": input.runtimeProvider,
     "mistle.sandbox.startup_operation": input.operation,
+    ...(input.operationKind === undefined
+      ? {}
+      : { "mistle.sandbox.startup_operation_kind": input.operationKind }),
   };
 
   try {
@@ -260,13 +285,17 @@ export async function emitSandboxStartupDiagnostics(input: {
   providerSandboxId: string;
   sandboxInstanceId: string;
   runtimeProvider: SandboxProvider;
-  operation: "init" | "resume";
+  operation: "activate";
+  operationKind: SandboxStartupDiagnosticRecord["operationKind"];
 }): Promise<void> {
   const initialAttributes: Attributes = {
     "mistle.sandbox.instance_id": input.sandboxInstanceId,
     "mistle.sandbox.provider_sandbox_id": input.providerSandboxId,
     "mistle.sandbox.runtime_provider": input.runtimeProvider,
     "mistle.sandbox.startup_operation": input.operation,
+    ...(input.operationKind === undefined
+      ? {}
+      : { "mistle.sandbox.startup_operation_kind": input.operationKind }),
   };
 
   await StartupDiagnosticsTracer.startActiveSpan(

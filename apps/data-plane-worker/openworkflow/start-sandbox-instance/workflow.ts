@@ -35,11 +35,10 @@ import {
 import { stopSandbox } from "../shared/stop-sandbox.js";
 import { markSandboxInstanceStopped } from "../stop-sandbox-instance/mark-sandbox-instance-stopped.js";
 import { ensureSandboxInstance } from "./ensure-sandbox-instance.js";
-import { activateSandboxRuntime, initializeSandboxRuntime } from "./initialize-sandbox-runtime.js";
+import { activateSandboxRuntime } from "./initialize-sandbox-runtime.js";
 import { markSandboxInstanceFailed } from "./mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "./mark-sandbox-instance-running.js";
 import { persistSandboxInstanceProvisioning } from "./persist-sandbox-instance-provisioning.js";
-import { SandboxExecutionModes, SandboxStartupModes } from "./sandbox-startup-input.js";
 import { prepareSandboxImage, startSandbox } from "./start-sandbox.js";
 import { waitForSandboxBootstrapAttachment } from "./wait-for-sandbox-bootstrap-attachment.js";
 import { waitForSandboxRuntimeReadiness } from "./wait-for-sandbox-runtime-readiness.js";
@@ -245,7 +244,8 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           providerSandboxId: input.providerSandboxId,
           sandboxInstanceId: input.sandboxInstanceId,
           runtimeProvider: input.runtimeProvider,
-          operation: "init",
+          operation: "activate",
+          operationKind,
         });
       } catch (error) {
         logger.warn(
@@ -273,7 +273,8 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           providerSandboxId: input.providerSandboxId,
           sandboxInstanceId: input.sandboxInstanceId,
           runtimeProvider: input.runtimeProvider,
-          operation: "init",
+          operation: "activate",
+          operationKind,
         });
       } catch (error) {
         logger.warn(
@@ -797,19 +798,9 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             : { gitIdentity: workflowInput.gitIdentity }),
         };
 
-        if (usesActivationForStartRuntimeInitialization(operationKind)) {
-          await activateSandboxRuntime(runtimeControlContext, {
-            ...runtimeControlInputFields,
-            operationKind,
-          });
-          return;
-        }
-
-        await initializeSandboxRuntime(runtimeControlContext, {
+        await activateSandboxRuntime(runtimeControlContext, {
           ...runtimeControlInputFields,
           operationKind,
-          startupMode: SandboxStartupModes.NEW,
-          executionMode: SandboxExecutionModes.SESSION,
         });
       });
 
@@ -978,9 +969,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       {
         providerSandboxId: startedSandbox.providerSandboxId,
       },
-      usesActivationForStartRuntimeInitialization(operationKind)
-        ? "Activated sandbox runtime."
-        : "Initialized sandbox runtime.",
+      "Activated sandbox runtime.",
     );
 
     await emitStartupPhaseTimings({
@@ -1350,12 +1339,6 @@ function resolveStartSandboxOperationKind(
   return assertUnsupportedSandboxInstancePurpose(purpose);
 }
 
-function usesActivationForStartRuntimeInitialization(
-  operationKind: SandboxdOperationKind,
-): operationKind is typeof SandboxOperationKinds.START {
-  return operationKind === SandboxOperationKinds.START;
-}
-
 function assertUnsupportedSandboxInstancePurpose(_purpose: never): never {
   throw new Error("Unsupported sandbox instance purpose.");
 }
@@ -1370,5 +1353,4 @@ function formatLifecycleEventError(error: unknown): string {
 
 export const startSandboxWorkflowTestInternals = {
   resolveStartSandboxOperationKind,
-  usesActivationForStartRuntimeInitialization,
 };

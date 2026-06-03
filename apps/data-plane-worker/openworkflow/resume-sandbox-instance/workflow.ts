@@ -516,7 +516,8 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         providerSandboxId: resumedRuntime.providerSandboxId,
         sandboxInstanceId: resumedRuntime.sandboxInstanceId,
         runtimeProvider: resumedRuntime.runtimeProvider,
-        operation: "resume",
+        operation: "activate",
+        operationKind: "resume",
       });
       await handleResumeFailure({
         failureCode: ResumeSandboxFailureCodes.SANDBOX_INIT_FAILED,
@@ -621,7 +622,8 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         providerSandboxId: resumedRuntime.providerSandboxId,
         sandboxInstanceId: resumedRuntime.sandboxInstanceId,
         runtimeProvider: resumedRuntime.runtimeProvider,
-        operation: "resume",
+        operation: "activate",
+        operationKind: "resume",
       });
     } catch (error) {
       rethrowResumeDurableStepErrorForRetry(error);

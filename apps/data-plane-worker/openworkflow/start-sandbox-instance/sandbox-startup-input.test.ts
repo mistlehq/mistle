@@ -3,11 +3,8 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
-  SandboxExecutionModes,
-  SandboxStartupModes,
   createSandboxTunnelGatewayWsUrl,
   encodeSandboxActivationInput,
-  encodeSandboxStartupInput,
 } from "./sandbox-startup-input.js";
 
 const Decoder = new TextDecoder();
@@ -244,9 +241,7 @@ const RuntimePlanSchema = z.object({
   ),
 });
 
-const SandboxStartupInputSchema = z.object({
-  startupMode: z.enum([SandboxStartupModes.NEW, SandboxStartupModes.EXISTING]),
-  executionMode: z.enum([SandboxExecutionModes.SESSION, SandboxExecutionModes.SNAPSHOT]).optional(),
+const SandboxActivationInputSchema = z.object({
   operationKind: z.enum(["start", "resume", "setup_check", "snapshot"]),
   bootstrapToken: z.string().min(1),
   tunnelExchangeToken: z.string().min(1),
@@ -294,13 +289,6 @@ const SandboxStartupInputSchema = z.object({
     .optional(),
 });
 
-const SandboxActivationInputSchema = SandboxStartupInputSchema.omit({
-  startupMode: true,
-  executionMode: true,
-}).extend({
-  operationKind: z.enum(["start", "resume", "setup_check", "snapshot"]),
-});
-
 function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
   return {
     sandboxProfileId: "sbp_runtime_plan_001",
@@ -342,7 +330,7 @@ function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
   };
 }
 
-describe("encodeSandboxStartupInput", () => {
+describe("createSandboxTunnelGatewayWsUrl", () => {
   it("appends sandbox instance id to the tunnel gateway ws url path", () => {
     const url = createSandboxTunnelGatewayWsUrl({
       gatewayWebsocketUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -371,223 +359,6 @@ describe("encodeSandboxStartupInput", () => {
     expect(url).toBe(
       "ws://127.0.0.1:5003/tunnel/sandbox/sbi_example_001?x-mistle-test-environment-id=test&operation_id=op_start_001",
     );
-  });
-
-  it("encodes the startup input as newline-delimited json", () => {
-    const encoded = encodeSandboxStartupInput({
-      startupMode: SandboxStartupModes.NEW,
-      operationKind: "start",
-      bootstrapToken: "bootstrap-token-value",
-      tunnelExchangeToken: "tunnel-exchange-token-value",
-      tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
-      runtimePlan: createRuntimePlan(),
-    });
-
-    const encodedText = Decoder.decode(encoded);
-    expect(encodedText.endsWith("\n")).toBe(true);
-
-    const decoded = SandboxStartupInputSchema.parse(JSON.parse(encodedText.trimEnd()));
-    expect(decoded).toEqual({
-      startupMode: SandboxStartupModes.NEW,
-      operationKind: "start",
-      bootstrapToken: "bootstrap-token-value",
-      tunnelExchangeToken: "tunnel-exchange-token-value",
-      tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
-      runtimePlan: createRuntimePlan(),
-    });
-  });
-
-  it("encodes optional git identity when present", () => {
-    const encoded = encodeSandboxStartupInput({
-      startupMode: SandboxStartupModes.NEW,
-      operationKind: "start",
-      bootstrapToken: "bootstrap-token-value",
-      tunnelExchangeToken: "tunnel-exchange-token-value",
-      tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
-      runtimePlan: createRuntimePlan(),
-      gitIdentity: {
-        name: "Mistle User",
-        email: "mistle-user@example.com",
-      },
-    });
-
-    const decoded = SandboxStartupInputSchema.parse(JSON.parse(Decoder.decode(encoded).trimEnd()));
-    expect(decoded.gitIdentity).toEqual({
-      name: "Mistle User",
-      email: "mistle-user@example.com",
-    });
-  });
-
-  it("encodes optional snapshot execution mode when present", () => {
-    const encoded = encodeSandboxStartupInput({
-      startupMode: SandboxStartupModes.NEW,
-      executionMode: SandboxExecutionModes.SNAPSHOT,
-      operationKind: "snapshot",
-      bootstrapToken: "bootstrap-token-value",
-      tunnelExchangeToken: "tunnel-exchange-token-value",
-      tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
-      runtimePlan: createRuntimePlan(),
-    });
-
-    const decoded = SandboxStartupInputSchema.parse(JSON.parse(Decoder.decode(encoded).trimEnd()));
-    expect(decoded.executionMode).toBe(SandboxExecutionModes.SNAPSHOT);
-  });
-
-  it("encodes optional git signing config when present", () => {
-    const encoded = encodeSandboxStartupInput({
-      startupMode: SandboxStartupModes.NEW,
-      operationKind: "start",
-      bootstrapToken: "bootstrap-token-value",
-      tunnelExchangeToken: "tunnel-exchange-token-value",
-      tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
-      runtimePlan: createRuntimePlan(),
-      gitIdentity: {
-        name: "Mistle User",
-        email: "mistle-user@example.com",
-        signing: {
-          format: "ssh",
-          program: "/opt/mistle/bin/mistle-ssh-sign",
-          keyRef: "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE",
-          organizationId: "org_123",
-          providerFamily: "github",
-          integrationConnectionId: "icn_github",
-          actingUserId: "usr_123",
-          grant: "grant-token-value",
-        },
-      },
-    });
-
-    const decoded = SandboxStartupInputSchema.parse(JSON.parse(Decoder.decode(encoded).trimEnd()));
-    expect(decoded.gitIdentity).toEqual({
-      name: "Mistle User",
-      email: "mistle-user@example.com",
-      signing: {
-        format: "ssh",
-        program: "/opt/mistle/bin/mistle-ssh-sign",
-        keyRef: "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE",
-        organizationId: "org_123",
-        providerFamily: "github",
-        integrationConnectionId: "icn_github",
-        actingUserId: "usr_123",
-        grant: "grant-token-value",
-      },
-    });
-  });
-
-  it("encodes optional transparent proxy configuration when present", () => {
-    const encoded = encodeSandboxStartupInput({
-      startupMode: SandboxStartupModes.NEW,
-      operationKind: "start",
-      bootstrapToken: "bootstrap-token-value",
-      tunnelExchangeToken: "tunnel-exchange-token-value",
-      tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
-      runtimePlan: createRuntimePlan(),
-      transparentProxy: {
-        passthroughBypass: {
-          kind: "socket_mark",
-          mark: 38_514,
-        },
-        exclusions: [
-          {
-            kind: "cidr",
-            value: "169.254.0.0/16",
-            reason: "provider metadata traffic must stay direct",
-          },
-          {
-            kind: "host",
-            value: "host.docker.internal",
-            reason: "Docker host traffic must stay direct",
-          },
-        ],
-      },
-    });
-
-    const decoded = SandboxStartupInputSchema.parse(JSON.parse(Decoder.decode(encoded).trimEnd()));
-    expect(decoded.transparentProxy).toEqual({
-      passthroughBypass: {
-        kind: "socket_mark",
-        mark: 38_514,
-      },
-      exclusions: [
-        {
-          kind: "cidr",
-          value: "169.254.0.0/16",
-          reason: "provider metadata traffic must stay direct",
-        },
-        {
-          kind: "host",
-          value: "host.docker.internal",
-          reason: "Docker host traffic must stay direct",
-        },
-      ],
-    });
-  });
-
-  it("preserves an optional setup script in the encoded runtime plan", () => {
-    const encoded = encodeSandboxStartupInput({
-      startupMode: SandboxStartupModes.NEW,
-      operationKind: "start",
-      bootstrapToken: "bootstrap-token-value",
-      tunnelExchangeToken: "tunnel-exchange-token-value",
-      tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
-      runtimePlan: {
-        ...createRuntimePlan(),
-        setupScript: "printf 'setup script ran\\n'",
-      },
-    });
-
-    const decoded = SandboxStartupInputSchema.parse(JSON.parse(Decoder.decode(encoded).trimEnd()));
-    expect(decoded.runtimePlan.setupScript).toBe("printf 'setup script ran\\n'");
-  });
-
-  it("preserves linked-principal credential resolvers in the encoded runtime plan", () => {
-    const encoded = encodeSandboxStartupInput({
-      startupMode: SandboxStartupModes.NEW,
-      operationKind: "start",
-      bootstrapToken: "bootstrap-token-value",
-      tunnelExchangeToken: "tunnel-exchange-token-value",
-      tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
-      runtimePlan: {
-        ...createRuntimePlan(),
-        egressRoutes: [
-          {
-            egressRuleId: "egress_rule_github",
-            bindingId: "binding_github",
-            familyId: "github",
-            variantId: "github-cloud",
-            match: {
-              hosts: ["api.github.com"],
-              methods: ["POST"],
-            },
-            upstream: {
-              baseUrl: "https://api.github.com",
-            },
-            authInjection: {
-              type: "bearer",
-              target: "authorization",
-            },
-            credentialResolver: {
-              kind: "linked_principal",
-              providerFamily: "github",
-              integrationConnectionId: "icn_github",
-              actingUserRequired: true,
-              resolutionMode: "required",
-              credentialKind: "github_app_user_access_token",
-            },
-          },
-        ],
-      },
-    });
-
-    const decoded = SandboxStartupInputSchema.parse(JSON.parse(Decoder.decode(encoded).trimEnd()));
-    expect(decoded.runtimePlan.egressRoutes[0]?.credentialResolver).toEqual({
-      kind: "linked_principal",
-      providerFamily: "github",
-      integrationConnectionId: "icn_github",
-      actingUserRequired: true,
-      resolutionMode: "required",
-      credentialKind: "github_app_user_access_token",
-    });
   });
 });
 
