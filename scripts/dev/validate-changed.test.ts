@@ -144,6 +144,25 @@ describe("validate-changed", () => {
     expect(turboCommand).toContain("--filter @mistle/dashboard");
   });
 
+  it("keeps full package tests when affected package integration tests change with supported source files", () => {
+    const commands = getDryRunCommands(
+      [
+        "apps/dashboard/integration/auth-session.integration.test.ts",
+        "apps/dashboard/src/main.tsx",
+      ].join(","),
+    );
+    const integrationCommand = getRequiredCommand(
+      commands,
+      "pnpm --dir apps/dashboard exec vitest run -c vitest.integration.config.ts --passWithNoTests",
+    );
+    const turboCommand = getRequiredCommand(commands, "turbo run test");
+
+    expect(integrationCommand).toContain(
+      "apps/dashboard/integration/auth-session.integration.test.ts",
+    );
+    expect(turboCommand).toContain("--filter @mistle/dashboard");
+  });
+
   it("falls back to full package tests when affected package integration test files are deleted", () => {
     const commands = getDryRunCommands("apps/dashboard/integration/deleted.integration.test.ts");
     const turboCommand = getRequiredCommand(commands, "turbo run test");
@@ -155,6 +174,25 @@ describe("validate-changed", () => {
     const commands = getDryRunCommands("apps/dashboard/src/deleted.test.ts");
     const turboCommand = getRequiredCommand(commands, "turbo run test");
 
+    expect(turboCommand).toContain("--filter @mistle/dashboard");
+  });
+
+  it("runs existing affected package integration tests when another changed integration test was deleted", () => {
+    const commands = getDryRunCommands(
+      [
+        "apps/dashboard/integration/auth-session.integration.test.ts",
+        "apps/dashboard/integration/deleted.integration.test.ts",
+      ].join(","),
+    );
+    const integrationCommand = getRequiredCommand(
+      commands,
+      "pnpm --dir apps/dashboard exec vitest run -c vitest.integration.config.ts --passWithNoTests",
+    );
+    const turboCommand = getRequiredCommand(commands, "turbo run test");
+
+    expect(integrationCommand).toContain(
+      "apps/dashboard/integration/auth-session.integration.test.ts",
+    );
     expect(turboCommand).toContain("--filter @mistle/dashboard");
   });
 });

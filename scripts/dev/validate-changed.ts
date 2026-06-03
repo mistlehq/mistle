@@ -699,6 +699,22 @@ function getChangedFileReason(workspacePackage: WorkspacePackage): string {
   return `changed file in ${workspacePackage.relativePath}`;
 }
 
+function shouldRunFullPackageTestWithChangedIntegrationFiles(
+  workspacePackage: WorkspacePackage,
+  packageChangedFiles: readonly string[],
+  changedPackageIntegrationTestFiles: readonly string[],
+  reasons: readonly string[],
+): boolean {
+  const hasOtherPackageChangedFiles = packageChangedFiles.some(
+    (filePath) => changedPackageIntegrationTestFiles.includes(filePath) === false,
+  );
+  const hasSelectionReasonOutsidePackageFiles = reasons.some(
+    (reason) => reason !== getChangedFileReason(workspacePackage),
+  );
+
+  return hasOtherPackageChangedFiles || hasSelectionReasonOutsidePackageFiles;
+}
+
 function isRustIntegrationTargetFilePath(
   workspacePackage: WorkspacePackage,
   filePath: string,
@@ -842,41 +858,41 @@ function buildAffectedTestCommands(
       workspacePackage,
       packageChangedFiles,
     );
-    if (AFFECTED_TEST_PACKAGE_NAMES.has(workspacePackage.name) === false) {
-      if (changedPackageIntegrationTestFiles.length > 0) {
-        affectedCommands.push(
-          buildAffectedIntegrationVitestCommand(
-            workspacePackage,
-            changedPackageIntegrationTestFiles,
-          ),
-        );
-      }
+    if (changedPackageIntegrationTestFiles.length > 0) {
+      affectedCommands.push(
+        buildAffectedIntegrationVitestCommand(workspacePackage, changedPackageIntegrationTestFiles),
+      );
+    }
 
-      const hasOtherPackageChangedFiles = packageChangedFiles.some(
-        (filePath) => changedPackageIntegrationTestFiles.includes(filePath) === false,
-      );
-      const hasSelectionReasonOutsidePackageFiles = reasons.some(
-        (reason) => reason !== getChangedFileReason(workspacePackage),
-      );
+    if (AFFECTED_TEST_PACKAGE_NAMES.has(workspacePackage.name) === false) {
       if (
         changedPackageIntegrationTestFiles.length === 0 ||
-        hasOtherPackageChangedFiles ||
-        hasSelectionReasonOutsidePackageFiles
+        shouldRunFullPackageTestWithChangedIntegrationFiles(
+          workspacePackage,
+          packageChangedFiles,
+          changedPackageIntegrationTestFiles,
+          reasons,
+        )
       ) {
         turboPackages.push(workspacePackage);
       }
       continue;
     }
 
+    if (
+      changedPackageIntegrationTestFiles.length > 0 &&
+      shouldRunFullPackageTestWithChangedIntegrationFiles(
+        workspacePackage,
+        packageChangedFiles,
+        changedPackageIntegrationTestFiles,
+        reasons,
+      )
+    ) {
+      turboPackages.push(workspacePackage);
+      continue;
+    }
+
     if (reasons.includes(ALL_PACKAGES_REASON)) {
-      if (changedPackageIntegrationTestFiles.length > 0) {
-        affectedCommands.push(
-          buildAffectedIntegrationVitestCommand(
-            workspacePackage,
-            changedPackageIntegrationTestFiles,
-          ),
-        );
-      }
       turboPackages.push(workspacePackage);
       continue;
     }
@@ -921,12 +937,6 @@ function buildAffectedTestCommands(
     const hasUnsupportedRelevantFile = relatedFiles.some(
       (filePath) => isSupportedAffectedTestInputFilePath(filePath) === false,
     );
-
-    if (changedIntegrationTestFiles.length > 0) {
-      affectedCommands.push(
-        buildAffectedIntegrationVitestCommand(workspacePackage, changedIntegrationTestFiles),
-      );
-    }
 
     if (hasUnsupportedRelevantFile) {
       turboPackages.push(workspacePackage);
