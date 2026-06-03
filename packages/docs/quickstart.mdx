@@ -1,0 +1,99 @@
+---
+title: Quickstart
+description: Create your first sandbox instance in Mistle.
+---
+
+## Overview
+
+Use this guide to connect OpenAI and GitHub, publish a sandbox profile, wait for its snapshot, and start your first session.
+
+## Prerequisites
+
+- Access to a Mistle workspace
+- An OpenAI API key or ChatGPT subscription
+- A GitHub account with access to the repositories the agent should work in
+
+## Connect OpenAI
+
+Open **Integrations**, choose **OpenAI**, and create a connection.
+
+For a simple first run, use **API key** and enter the OpenAI API key Mistle should use for model access.
+If your workspace uses interactive ChatGPT access instead, choose **ChatGPT subscription** and complete the device-authorization flow.
+
+Read [OpenAI](/guides/openai-integration-setup) for the full connection options.
+
+## Connect GitHub
+
+Open **Integrations**, choose **GitHub**, and create a connection.
+
+For a simple first run, use **GitHub App installation** with **Create from manifest**. Mistle builds the GitHub App manifest, sends you to GitHub to create and install the app, then returns you to Mistle to complete the connection.
+
+<Frame>
+  <img
+    src="/images/product-screens/github-create-from-manifest.png"
+    alt="Mistle GitHub App setup page with Create from manifest selected and an editable GitHub App manifest"
+  />
+</Frame>
+
+Read [GitHub](/guides/github-integration-setup) for existing-app setup, API-key setup, and GitHub Enterprise Server notes.
+
+## Create A Sandbox Profile
+
+Open **Sandbox Profiles** and create a new profile.
+
+Configure the draft profile with:
+
+- **Agent**: choose Codex for an OpenAI-backed first session.
+- **Git Connection**: choose the GitHub connection you created.
+- **Model provider**: choose the OpenAI connection you created.
+- **Setup script**: add the setup commands the agent's sandbox should run before sessions start.
+
+<Frame>
+  <img
+    src="/images/product-screens/sandbox-profile-draft.png"
+    alt="Sandbox profile draft editor showing runtime, Git connection, model provider, connector integrations, and tools"
+  />
+</Frame>
+
+Save the draft when your profile settings are ready.
+
+## Publish And Wait For The Snapshot
+
+Select **Publish** on the draft profile version.
+
+Publishing makes the profile version available for new sessions and queues snapshot creation. The snapshot prepares the sandbox image by applying the published runtime plan and setup script.
+
+Wait until the snapshot status is ready before starting a session. If snapshot creation fails, inspect the snapshot output, update the draft profile, and publish a new version.
+
+<Frame>
+  <img
+    src="/images/product-screens/sandbox-profile-snapshot-ready.png"
+    alt="Published sandbox profile snapshot panel showing a ready snapshot and refresh schedule"
+  />
+</Frame>
+
+Read [Snapshots](/guides/snapshots) for the snapshot lifecycle.
+
+## Start A Session
+
+Open **Sessions**, create a new session, and select:
+
+- **Sandbox profile**: the profile you just published.
+- **Primary repository**: the GitHub repository where the agent should start.
+
+Select **Start session**. Mistle starts a sandbox instance from the published profile snapshot and opens the session workbench.
+
+<Frame>
+  <img
+    src="/images/product-screens/new-session-creation.png"
+    alt="New session page with sandbox profile, repository selection, and Start session action"
+  />
+</Frame>
+
+After the workbench opens, send the agent a small first task so you can confirm the profile, repository, and model connection are working together.
+
+## Next steps
+
+- Read [Sandbox Profiles](/guides/sandbox-profiles) to understand how sandbox environments are configured.
+- Read [Sessions](/guides/sessions) to learn how to use the session workbench.
+- Add connector integrations when the agent needs access to Slack, Jira, Linear, Datadog, or other external systems.

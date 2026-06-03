@@ -19,7 +19,7 @@
         "groups": [
           {
             "group": "Getting Started",
-            "pages": ["index"]
+            "pages": ["index", "quickstart"]
           },
           {
             "group": "Core Concepts",
@@ -53,6 +53,7 @@
       },
       {
         "tab": "Self-Hosting",
+        "hidden": true,
         "groups": [
           {
             "group": "Quickstart",
