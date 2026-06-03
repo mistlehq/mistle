@@ -281,11 +281,11 @@ export class TensorlakeSandboxRuntimeControl implements SandboxRuntimeControl {
 
   async readOperationLog(input: {
     id: string;
-    operation: "init" | "resume";
+    operation: "activate" | "init" | "resume";
   }): Promise<string | null> {
     requireSandboxId(input.id);
 
-    const path = input.operation === "init" ? "/run/mistle/init.log" : "/run/mistle/resume.log";
+    const path = sandboxdOperationLogPath(input.operation);
 
     return await withSandboxProviderOperationTelemetry({
       provider: "tensorlake",
@@ -317,6 +317,17 @@ export class TensorlakeSandboxRuntimeControl implements SandboxRuntimeControl {
 
   async close(): Promise<void> {
     this.#client.close();
+  }
+}
+
+function sandboxdOperationLogPath(operation: "activate" | "init" | "resume"): string {
+  switch (operation) {
+    case "activate":
+      return "/run/mistle/activate.log";
+    case "init":
+      return "/run/mistle/init.log";
+    case "resume":
+      return "/run/mistle/resume.log";
   }
 }
 

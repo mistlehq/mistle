@@ -24,14 +24,10 @@ import {
   recordWorkerSandboxLifecyclePhase,
 } from "../shared/sandbox-operation-events.js";
 import { ensureSandboxInstance } from "../start-sandbox-instance/ensure-sandbox-instance.js";
-import { initializeSandboxRuntime } from "../start-sandbox-instance/initialize-sandbox-runtime.js";
+import { activateSandboxRuntime } from "../start-sandbox-instance/initialize-sandbox-runtime.js";
 import { markSandboxInstanceFailed } from "../start-sandbox-instance/mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "../start-sandbox-instance/mark-sandbox-instance-running.js";
 import { persistSandboxInstanceProvisioning } from "../start-sandbox-instance/persist-sandbox-instance-provisioning.js";
-import {
-  SandboxExecutionModes,
-  SandboxStartupModes,
-} from "../start-sandbox-instance/sandbox-startup-input.js";
 import { prepareSandboxImage, startSandbox } from "../start-sandbox-instance/start-sandbox.js";
 import { markSandboxInstanceStopped } from "../stop-sandbox-instance/mark-sandbox-instance-stopped.js";
 
@@ -501,7 +497,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     await step.run({ name: "initialize-snapshot-sandbox-runtime" }, async () => {
       const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
 
-      await initializeSandboxRuntime(
+      await activateSandboxRuntime(
         {
           config: ctx.config,
           logger,
@@ -516,8 +512,6 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
           operationKind: "snapshot",
           sandboxInstanceId: workflowInput.sandboxInstanceId,
           providerSandboxId: startedSandbox.providerSandboxId,
-          startupMode: SandboxStartupModes.NEW,
-          executionMode: SandboxExecutionModes.SNAPSHOT,
           runtimePlan: compiledRuntimePlan,
         },
       );

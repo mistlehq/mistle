@@ -3,11 +3,7 @@ import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registr
 import { describe, expect, it } from "vitest";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
-import {
-  createSandboxActivationInput,
-  createSandboxStartupInput,
-} from "./initialize-sandbox-runtime.js";
-import { SandboxStartupModes } from "./sandbox-startup-input.js";
+import { createSandboxActivationInput } from "./initialize-sandbox-runtime.js";
 
 function createTestRuntimeConfig(): DataPlaneWorkerRuntimeConfig {
   const sandbox: DataPlaneWorkerRuntimeConfig["sandbox"] = {
@@ -75,15 +71,14 @@ function createRuntimePlan(input?: {
   };
 }
 
-describe("createSandboxStartupInput", () => {
+describe("createSandboxActivationInput", () => {
   it("includes transparent proxy configuration when the sandbox provider supports it", async () => {
-    const startupInput = await createSandboxStartupInput({
+    const activationInput = await createSandboxActivationInput({
       config: createTestRuntimeConfig(),
       organizationId: "org_123",
       operationId: "op_test_001",
       operationKind: "start",
       sandboxInstanceId: "sbi_123",
-      startupMode: SandboxStartupModes.NEW,
       runtimePlan: createRuntimePlan(),
       sandboxAdapter: createSandboxAdapter({
         provider: SandboxProvider.DOCKER,
@@ -94,20 +89,19 @@ describe("createSandboxStartupInput", () => {
       }),
     });
 
-    expect(startupInput.transparentProxy?.passthroughBypass).toEqual({
+    expect(activationInput.transparentProxy?.passthroughBypass).toEqual({
       kind: "socket_mark",
       mark: 38_514,
     });
   });
 
-  it("keeps acting-user context out of sandbox startup input when no sandbox adapter is available", async () => {
-    const startupInput = await createSandboxStartupInput({
+  it("keeps acting-user context out of sandbox activation input when no sandbox adapter is available", async () => {
+    const activationInput = await createSandboxActivationInput({
       config: createTestRuntimeConfig(),
       organizationId: "org_123",
       operationId: "op_test_001",
       operationKind: "resume",
       sandboxInstanceId: "sbi_123",
-      startupMode: SandboxStartupModes.EXISTING,
       runtimePlan: createRuntimePlan({
         egressRoutes: [
           {
@@ -138,17 +132,16 @@ describe("createSandboxStartupInput", () => {
       actingUserId: "usr_123",
     });
 
-    expect(startupInput.actingUserId).toBeUndefined();
+    expect(activationInput.actingUserId).toBeUndefined();
   });
 
-  it("includes acting-user context in sandbox startup input when the workflow has one", async () => {
-    const startupInput = await createSandboxStartupInput({
+  it("includes acting-user context in sandbox activation input when the workflow has one", async () => {
+    const activationInput = await createSandboxActivationInput({
       config: createTestRuntimeConfig(),
       organizationId: "org_123",
       operationId: "op_test_001",
       operationKind: "resume",
       sandboxInstanceId: "sbi_123",
-      startupMode: SandboxStartupModes.EXISTING,
       runtimePlan: createRuntimePlan(),
       actingUserId: "usr_123",
       sandboxAdapter: createSandboxAdapter({
@@ -160,17 +153,16 @@ describe("createSandboxStartupInput", () => {
       }),
     });
 
-    expect(startupInput.actingUserId).toBe("usr_123");
+    expect(activationInput.actingUserId).toBe("usr_123");
   });
 
   it("includes provider and runtime transparent proxy exclusions", async () => {
-    const startupInput = await createSandboxStartupInput({
+    const activationInput = await createSandboxActivationInput({
       config: createTestRuntimeConfig(),
       organizationId: "org_123",
       operationId: "op_test_001",
       operationKind: "start",
       sandboxInstanceId: "sbi_123",
-      startupMode: SandboxStartupModes.NEW,
       runtimePlan: createRuntimePlan(),
       sandboxAdapter: createSandboxAdapter({
         provider: SandboxProvider.DOCKER,
@@ -181,7 +173,7 @@ describe("createSandboxStartupInput", () => {
       }),
     });
 
-    expect(startupInput.transparentProxy).toEqual({
+    expect(activationInput.transparentProxy).toEqual({
       passthroughBypass: {
         kind: "socket_mark",
         mark: 38_514,
@@ -215,9 +207,7 @@ describe("createSandboxStartupInput", () => {
       ],
     });
   });
-});
 
-describe("createSandboxActivationInput", () => {
   it("builds the same session configuration without legacy startup fields", async () => {
     const activationInput = await createSandboxActivationInput({
       config: createTestRuntimeConfig(),

@@ -404,13 +404,13 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
 
   async readOperationLog(input: {
     id: string;
-    operation: "init" | "resume";
+    operation: "activate" | "init" | "resume";
   }): Promise<string | null> {
     if (input.id.trim().length === 0) {
       throw new SandboxConfigurationError("Sandbox id is required.");
     }
 
-    const path = input.operation === "init" ? "/run/mistle/init.log" : "/run/mistle/resume.log";
+    const path = sandboxdOperationLogPath(input.operation);
 
     try {
       const output = await this.#runExecCommand({
@@ -512,6 +512,17 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
     } catch (error) {
       throw mapDockerClientError(operation, error);
     }
+  }
+}
+
+function sandboxdOperationLogPath(operation: "activate" | "init" | "resume"): string {
+  switch (operation) {
+    case "activate":
+      return "/run/mistle/activate.log";
+    case "init":
+      return "/run/mistle/init.log";
+    case "resume":
+      return "/run/mistle/resume.log";
   }
 }
 

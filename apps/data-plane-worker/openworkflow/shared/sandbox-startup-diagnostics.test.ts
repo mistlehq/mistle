@@ -39,6 +39,38 @@ describe("parseStartupDiagnostics", () => {
     expect(result.records[1]?.originUrl).toBe("https://github.com/acme/abc.git");
   });
 
+  it("parses activation diagnostic records with operation kind details", () => {
+    const logText = [
+      JSON.stringify({
+        timestamp: "2026-04-21T01:02:03.000Z",
+        level: "info",
+        event: "sandbox_setup_check_started",
+        sandboxInstanceId: "sbi_123",
+        operation: "activate",
+        operationKind: "setup_check",
+      }),
+      JSON.stringify({
+        timestamp: "2026-04-21T01:02:05.000Z",
+        level: "error",
+        event: "sandbox_setup_check_phase_failed",
+        sandboxInstanceId: "sbi_123",
+        operation: "activate",
+        operationKind: "setup_check",
+        phase: "apply_runtime_plan",
+        failureKind: "workspace_source_failed",
+        originUrl: "https://github.com/acme/abc.git",
+      }),
+    ].join("\n");
+
+    const result = parseStartupDiagnostics(logText);
+
+    expect(result.parseErrors).toEqual([]);
+    expect(result.records).toHaveLength(2);
+    expect(result.records[0]?.operation).toBe("activate");
+    expect(result.records[0]?.operationKind).toBe("setup_check");
+    expect(result.records[1]?.event).toBe("sandbox_setup_check_phase_failed");
+  });
+
   it("reports invalid json and schema mismatches", () => {
     const result = parseStartupDiagnostics(
       [
@@ -88,6 +120,27 @@ describe("toDiagnosticAttributes", () => {
       "mistle.sandbox.startup_detail.stderrCaptured": true,
     });
   });
+
+  it("maps activation operation kind into OTEL-compatible attributes", () => {
+    const attributes = toDiagnosticAttributes({
+      timestamp: "2026-04-21T01:02:05.000Z",
+      level: "error",
+      event: "sandbox_snapshot_phase_failed",
+      sandboxInstanceId: "sbi_123",
+      operation: "activate",
+      operationKind: "snapshot",
+      phase: "apply_runtime_plan",
+    });
+
+    expect(attributes).toMatchObject({
+      "mistle.sandbox.instance_id": "sbi_123",
+      "mistle.sandbox.startup_operation": "activate",
+      "mistle.sandbox.startup_operation_kind": "snapshot",
+      "mistle.sandbox.startup_event": "sandbox_snapshot_phase_failed",
+      "mistle.sandbox.startup_phase": "apply_runtime_plan",
+      "mistle.sandbox.startup_detail.operationKind": "snapshot",
+    });
+  });
 });
 
 describe("summarizeStartupDiagnosticPhaseTimings", () => {
@@ -131,6 +184,63 @@ describe("summarizeStartupDiagnosticPhaseTimings", () => {
         phase: "start_tunnel_session",
         startedAt: "2026-05-25T08:16:46.100123456Z",
       },
+    ]);
+  });
+
+  it("summarizes activation phase durations from operation-kind-specific events", () => {
+    const { records } = parseStartupDiagnostics(
+      [
+        JSON.stringify({
+          timestamp: "2026-05-25T08:16:46.100Z",
+          level: "info",
+          event: "sandbox_setup_check_phase_started",
+          sandboxInstanceId: "sbi_123",
+          operation: "activate",
+          operationKind: "setup_check",
+          phase: "apply_runtime_plan",
+        }),
+        JSON.stringify({
+          timestamp: "2026-05-25T08:16:46.350Z",
+          level: "info",
+          event: "sandbox_setup_check_phase_completed",
+          sandboxInstanceId: "sbi_123",
+          operation: "activate",
+          operationKind: "setup_check",
+          phase: "apply_runtime_plan",
+        }),
+      ].join("\n"),
+    );
+
+    const summary = summarizeStartupDiagnosticPhaseTimings(records);
+
+    expect(summary.skippedRecords).toEqual([]);
+    expect(summary.phaseTimings).toEqual([
+      {
+        completedAt: "2026-05-25T08:16:46.350Z",
+        durationMs: 250,
+        phase: "apply_runtime_plan",
+        startedAt: "2026-05-25T08:16:46.100Z",
+      },
+    ]);
+  });
+
+  it("skips activation phase records that do not identify the operation kind", () => {
+    const { records } = parseStartupDiagnostics(
+      JSON.stringify({
+        timestamp: "2026-05-25T08:16:46.100Z",
+        level: "info",
+        event: "sandbox_setup_check_phase_started",
+        sandboxInstanceId: "sbi_123",
+        operation: "activate",
+        phase: "apply_runtime_plan",
+      }),
+    );
+
+    const summary = summarizeStartupDiagnosticPhaseTimings(records);
+
+    expect(summary.phaseTimings).toEqual([]);
+    expect(summary.skippedRecords).toEqual([
+      "phase apply_runtime_plan activation record is missing operationKind",
     ]);
   });
 
