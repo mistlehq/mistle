@@ -108,6 +108,22 @@ describe("validate-changed", () => {
     );
     expect(turboCommand).toContain("--filter @mistle/control-plane-api");
   });
+
+  it("keeps affected package integration tests when repo-wide changes select the package", () => {
+    const commands = getDryRunCommands(
+      ["package.json", "apps/dashboard/integration/auth-session.integration.test.ts"].join(","),
+    );
+    const integrationCommand = getRequiredCommand(
+      commands,
+      "pnpm --dir apps/dashboard exec vitest run -c vitest.integration.config.ts --passWithNoTests",
+    );
+    const turboCommand = getRequiredCommand(commands, "turbo run test");
+
+    expect(integrationCommand).toContain(
+      "apps/dashboard/integration/auth-session.integration.test.ts",
+    );
+    expect(turboCommand).toContain("--filter @mistle/dashboard");
+  });
 });
 
 function getDryRunCommands(files: string): string[] {

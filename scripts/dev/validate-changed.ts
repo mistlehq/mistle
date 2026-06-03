@@ -869,6 +869,14 @@ function buildAffectedTestCommands(
     }
 
     if (reasons.includes(ALL_PACKAGES_REASON)) {
+      if (changedPackageIntegrationTestFiles.length > 0) {
+        affectedCommands.push(
+          buildAffectedIntegrationVitestCommand(
+            workspacePackage,
+            changedPackageIntegrationTestFiles,
+          ),
+        );
+      }
       turboPackages.push(workspacePackage);
       continue;
     }
