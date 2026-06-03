@@ -151,6 +151,7 @@ fn activation_input(operation_kind: ActivationOperationKind) -> ActivationInput 
 fn minimal_initialized_state(execution_mode: SandboxdExecutionMode) -> SandboxdState {
     let clock = Arc::new(SystemClock);
     SandboxdState {
+        sandbox_instance_id: "sbi_test".to_string(),
         egress_proxy: None,
         process_manager: None,
         runtime_adapters: RuntimeAdapters::default(),

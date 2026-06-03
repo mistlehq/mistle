@@ -115,6 +115,7 @@ describe("createSandboxRuntimeControl", () => {
     expect(typeof runtimeControl.ensureSandboxd).toBe("function");
     expect(typeof runtimeControl.readSandboxdVersion).toBe("function");
     expect(typeof runtimeControl.activate).toBe("function");
+    expect(typeof runtimeControl.shutdown).toBe("function");
     expect(typeof runtimeControl.readOperationLog).toBe("function");
     expect(typeof runtimeControl.close).toBe("function");
   });
@@ -138,6 +139,7 @@ describe("createSandboxRuntimeControl", () => {
     expect(typeof runtimeControl.ensureSandboxd).toBe("function");
     expect(typeof runtimeControl.readSandboxdVersion).toBe("function");
     expect(typeof runtimeControl.activate).toBe("function");
+    expect(typeof runtimeControl.shutdown).toBe("function");
     expect(typeof runtimeControl.readOperationLog).toBe("function");
     expect(typeof runtimeControl.close).toBe("function");
   });
@@ -161,6 +163,7 @@ describe("createSandboxRuntimeControl", () => {
     expect(typeof runtimeControl.ensureSandboxd).toBe("function");
     expect(typeof runtimeControl.readSandboxdVersion).toBe("function");
     expect(typeof runtimeControl.activate).toBe("function");
+    expect(typeof runtimeControl.shutdown).toBe("function");
     expect(typeof runtimeControl.readOperationLog).toBe("function");
     expect(typeof runtimeControl.close).toBe("function");
   });

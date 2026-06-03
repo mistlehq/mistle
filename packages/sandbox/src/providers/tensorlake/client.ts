@@ -50,6 +50,7 @@ const SandboxdCommand = "/opt/mistle/bin/sandboxd";
 export const TensorlakeRootProcessUser = "root";
 const ActivateCommand = SandboxdCommand;
 export const ActivateCommandArgs = ["activate"] as const;
+export const ShutdownCommandArgs = ["shutdown"] as const;
 const ReadyCommand = SandboxdCommand;
 const ReadyCommandArgs = ["ready"];
 const StartDaemonCommand = "sh";

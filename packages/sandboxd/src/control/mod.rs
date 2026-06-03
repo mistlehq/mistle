@@ -26,7 +26,7 @@ mod protocol;
 mod request;
 mod state;
 
-pub use crate::control::client::{submit_activate, submit_ready, submit_signing};
+pub use crate::control::client::{submit_activate, submit_ready, submit_shutdown, submit_signing};
 pub use crate::control::error::ControlError;
 use crate::control::health::run_health_server_loop;
 use crate::control::protocol::ControlResponse;
@@ -383,7 +383,7 @@ mod tests {
     use crate::control::{
         ActivationPhase, ControlSignRequest, DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
         DEFAULT_HEALTH_ENDPOINT_PATH, start_control_server_with_health_endpoint, submit_activate,
-        submit_ready, submit_signing,
+        submit_ready, submit_shutdown, submit_signing,
     };
     use crate::protocol::activation::ActivationInput;
     use crate::protocol::startup::{ActivationOperationKind, GitIdentity, GitSigningConfig};
@@ -427,6 +427,44 @@ mod tests {
 
         server.close().expect("control server should stop cleanly");
         gateway.close().expect("gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn shutdown_gracefully_clears_initialized_daemon_state() {
+        let test_dir = create_temp_test_dir("control_shutdown");
+        let socket_path = test_dir.join("control.sock");
+        let gateway = start_bootstrap_gateway();
+        let activation_input = valid_activation_input(&gateway.ws_url);
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        submit_activate(&socket_path, &activation_input).expect("activation should succeed");
+        wait_for_activation_phase(&server, ActivationPhase::Activated);
+
+        submit_shutdown(&socket_path).expect("shutdown should succeed");
+        submit_shutdown(&socket_path).expect("duplicate shutdown should succeed");
+
+        assert_eq!(server.activation_phase(), ActivationPhase::Unactivated);
+        assert_eq!(server.activation_input(), None);
+
+        server.close().expect("control server should stop cleanly");
+        gateway.close().expect("gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn shutdown_is_idempotent_before_activation() {
+        let test_dir = create_temp_test_dir("control_shutdown_unactivated");
+        let socket_path = test_dir.join("control.sock");
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        submit_shutdown(&socket_path).expect("shutdown should succeed");
+        submit_shutdown(&socket_path).expect("duplicate shutdown should succeed");
+
+        assert_eq!(server.activation_phase(), ActivationPhase::Unactivated);
+        assert_eq!(server.activation_input(), None);
+
+        server.close().expect("control server should stop cleanly");
         std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
 

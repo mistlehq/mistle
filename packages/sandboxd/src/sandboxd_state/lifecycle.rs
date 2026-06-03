@@ -11,6 +11,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 
+use crate::cgroups::{DEFAULT_CGROUP_ROOT, kill_sandbox_user_scopes};
 use crate::codex_proxy::CodexProxyControlHandle;
 use crate::command::{CommandOutputSink, CommandOutputStream};
 use crate::daemon_liveness::DaemonLivenessMonitor;
@@ -147,6 +148,7 @@ enum SandboxdExecutionMode {
 
 /// Owns the initialized sandbox runtime resources for one daemon process.
 pub struct SandboxdState {
+    sandbox_instance_id: String,
     egress_proxy: Option<EgressProxy>,
     process_manager: Option<process::RuntimeClientProcessManager>,
     runtime_adapters: RuntimeAdapters,
@@ -256,7 +258,7 @@ impl SandboxdState {
             collect_tracked_components(&runtime_plan),
         );
         let gateway_egress_token_provider = Some(GatewayEgressTokenProvider::new(
-            sandbox_instance_id,
+            sandbox_instance_id.clone(),
             session_input.acting_user_id.clone(),
         ));
         let execution_mode = input.execution_mode;
@@ -533,6 +535,7 @@ impl SandboxdState {
             }
 
             return Ok(Self {
+                sandbox_instance_id,
                 execution_mode,
                 egress_proxy: None,
                 process_manager: None,
@@ -762,6 +765,7 @@ impl SandboxdState {
         ));
 
         Ok(Self {
+            sandbox_instance_id,
             execution_mode,
             egress_proxy,
             process_manager,
@@ -1252,6 +1256,8 @@ impl SandboxdState {
             .map(EgressProxy::close)
             .transpose()
             .map_err(|error| SandboxdStateError::StopEgressProxy(error.to_string()))?;
+        kill_sandbox_user_scopes(Path::new(DEFAULT_CGROUP_ROOT), &self.sandbox_instance_id)
+            .map_err(|error| SandboxdStateError::StopRuntimeProcesses(error.to_string()))?;
         if self.execution_mode == SandboxdExecutionMode::Snapshot {
             scrub_snapshot_runtime_artifacts().map_err(SandboxdStateError::StopEgressProxy)?;
         }

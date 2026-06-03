@@ -339,6 +339,16 @@ export async function stopSandboxInstance(
   );
 
   try {
+    await resolvedRuntime.sandboxRuntimeControl.shutdown({
+      id: sandboxInstanceState.providerSandboxId,
+    });
+  } catch (error) {
+    if (!isSandboxResourceNotFoundError(error)) {
+      throw error;
+    }
+  }
+
+  try {
     await stopSandbox(
       {
         sandboxAdapter: resolvedRuntime.sandboxAdapter,

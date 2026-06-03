@@ -176,6 +176,7 @@ export interface SandboxRuntimeControl {
   }): Promise<string>;
   ensureSandboxd(input: SandboxRuntimeEnsureSandboxdRequest): Promise<void>;
   activate(input: SandboxRuntimeControlRequest): Promise<void>;
+  shutdown(input: { id: string; env?: Readonly<Record<string, string>> }): Promise<void>;
   readOperationLog(input: { id: string; operation: "activate" }): Promise<string | null>;
   close(): Promise<void>;
 }

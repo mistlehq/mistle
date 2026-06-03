@@ -12,6 +12,7 @@ pub(in crate::tunnel::session) fn handle_tunnel_session_request(
     session_state: &mut TunnelSessionMutableState,
 ) -> Result<TunnelSessionControlFlow, TunnelSessionError> {
     match request {
+        TunnelSessionRequest::Shutdown => Ok(TunnelSessionControlFlow::ShutdownRequested),
         TunnelSessionRequest::SetAgentEndpoint {
             agent_endpoint_url,
             response_sender,

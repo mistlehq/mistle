@@ -54,6 +54,7 @@ import {
 import type { E2BSandboxInspectResult } from "./types.js";
 
 export const ActivateCommand = "/opt/mistle/bin/sandboxd activate";
+export const ShutdownCommand = "/opt/mistle/bin/sandboxd shutdown";
 export const E2BDaemonSystemdEnvironmentVariables = [
   "SANDBOX_RUNTIME_LISTEN_ADDR",
   "SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID",

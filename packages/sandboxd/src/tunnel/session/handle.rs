@@ -320,6 +320,7 @@ impl TunnelSession {
     /// Stops the live bootstrap tunnel session and waits for its thread to exit.
     pub fn close(mut self) {
         self.shutdown_requested.store(true, Ordering::Relaxed);
+        let _ = self.request_sender.send(TunnelSessionRequest::Shutdown);
         let Some(thread) = self.thread.take() else {
             self.supervisor_handle.mark_component_restarting(
                 SupervisedComponent::TunnelSession,

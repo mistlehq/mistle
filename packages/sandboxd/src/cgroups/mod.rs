@@ -160,6 +160,49 @@ pub fn create_user_scope(
     })
 }
 
+/// Requests kernel teardown for every user process scope under one sandbox tree.
+pub fn kill_sandbox_user_scopes(
+    cgroup_root: &Path,
+    sandbox_instance_id: &str,
+) -> Result<(), CgroupError> {
+    validate_segment(sandbox_instance_id, CgroupError::InvalidSandboxInstanceId)?;
+    let user_root = cgroup_root.join(sandbox_instance_id).join("user");
+    let entries = match fs::read_dir(&user_root) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(CgroupError::ReadFile {
+                path: user_root,
+                error,
+            });
+        }
+    };
+
+    for entry_result in entries {
+        let entry = entry_result.map_err(|error| CgroupError::ReadFile {
+            path: user_root.clone(),
+            error,
+        })?;
+        let entry_type = entry.file_type().map_err(|error| CgroupError::ReadFile {
+            path: entry.path(),
+            error,
+        })?;
+        if !entry_type.is_dir() {
+            continue;
+        }
+
+        let scope_root = entry.path();
+        kill_scope(&UserScopePaths {
+            procs_file: scope_root.join("cgroup.procs"),
+            events_file: scope_root.join("cgroup.events"),
+            kill_file: scope_root.join("cgroup.kill"),
+            scope_root,
+        })?;
+    }
+
+    Ok(())
+}
+
 /// Attaches one pid to a user scope by writing it to `cgroup.procs`.
 pub fn attach_pid_to_scope(scope_paths: &UserScopePaths, pid: u32) -> Result<(), CgroupError> {
     fs::write(&scope_paths.procs_file, format!("{pid}\n")).map_err(|error| CgroupError::WriteFile {
@@ -229,7 +272,7 @@ mod tests {
 
     use crate::cgroups::{
         CgroupError, attach_pid_to_scope, create_user_scope, ensure_sandbox_cgroup_tree,
-        is_scope_populated, kill_scope,
+        is_scope_populated, kill_sandbox_user_scopes, kill_scope,
     };
 
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -266,6 +309,45 @@ mod tests {
             fs::read_to_string(&scope_paths.kill_file).expect("cgroup.kill should exist"),
             "1\n"
         );
+
+        fs::remove_dir_all(temp_root).expect("temp dir should be removable");
+    }
+
+    #[test]
+    fn kills_every_user_scope_for_a_sandbox() {
+        let temp_root = create_temp_test_dir("cgroups_kill_sandbox_user");
+        let first_scope =
+            create_user_scope(&temp_root, "sbi_123", "scope_1").expect("first scope should exist");
+        let second_scope =
+            create_user_scope(&temp_root, "sbi_123", "scope_2").expect("second scope should exist");
+        let other_scope = create_user_scope(&temp_root, "sbi_other", "scope_3")
+            .expect("other scope should exist");
+        fs::write(&other_scope.kill_file, "").expect("other kill file should be writable");
+
+        kill_sandbox_user_scopes(&temp_root, "sbi_123").expect("sandbox scopes should be killed");
+
+        assert_eq!(
+            fs::read_to_string(&first_scope.kill_file).expect("first kill file should exist"),
+            "1\n"
+        );
+        assert_eq!(
+            fs::read_to_string(&second_scope.kill_file).expect("second kill file should exist"),
+            "1\n"
+        );
+        assert_eq!(
+            fs::read_to_string(&other_scope.kill_file).expect("other kill file should exist"),
+            ""
+        );
+
+        fs::remove_dir_all(temp_root).expect("temp dir should be removable");
+    }
+
+    #[test]
+    fn killing_user_scopes_is_idempotent_when_sandbox_tree_is_missing() {
+        let temp_root = create_temp_test_dir("cgroups_kill_missing_sandbox_user");
+
+        kill_sandbox_user_scopes(&temp_root, "sbi_missing")
+            .expect("missing sandbox scopes should be treated as already clean");
 
         fs::remove_dir_all(temp_root).expect("temp dir should be removable");
     }

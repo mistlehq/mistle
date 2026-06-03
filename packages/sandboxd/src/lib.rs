@@ -1,8 +1,8 @@
 //! `sandboxd` is the long-lived sandbox supervisor daemon.
 //!
 //! The default entrypoint runs the daemon behind the local Unix control socket.
-//! The supported lifecycle subcommands, `ready` and `activate`, are thin local
-//! clients that submit requests to the running daemon and exit. The
+//! The supported lifecycle subcommands, `ready`, `activate`, and `shutdown`, are
+//! thin local clients that submit requests to the running daemon and exit. The
 //! `egress-proxy` subcommand runs the proxy child process.
 //! The `skills` subcommands provide local repository skill helpers.
 //! The `version` subcommand prints the binary version used by release artifact
@@ -81,6 +81,7 @@ pub enum SandboxdCommand {
         config_path: PathBuf,
     },
     Ready,
+    Shutdown,
     Activate {
         payload_source: StartupPayloadSource,
     },
@@ -121,7 +122,7 @@ impl fmt::Display for ParseSandboxdCommandError {
             }
             Self::UnknownCommand(command) => write!(
                 f,
-                "unknown sandboxd subcommand '{command}' (expected 'ready', 'activate', 'egress-proxy', 'skills', or 'version')"
+                "unknown sandboxd subcommand '{command}' (expected 'ready', 'activate', 'shutdown', 'egress-proxy', 'skills', or 'version')"
             ),
         }
     }
@@ -146,6 +147,7 @@ where
             return Ok(SandboxdCommand::EgressProxy { config_path });
         }
         "ready" => SandboxdCommand::Ready,
+        "shutdown" => SandboxdCommand::Shutdown,
         "activate" => {
             let payload_source = parse_payload_source_args(parsed_args.by_ref())?;
             return Ok(SandboxdCommand::Activate { payload_source });
@@ -292,6 +294,15 @@ where
                 }
             }
         }
+        SandboxdCommand::Shutdown => {
+            match control::submit_shutdown(Path::new(control::DEFAULT_CONTROL_SOCKET_PATH)) {
+                Ok(()) => 0,
+                Err(error) => {
+                    let _ = writeln!(stderr, "{error}");
+                    1
+                }
+            }
+        }
         SandboxdCommand::Activate { payload_source } => match activate::run_activate(
             stdin,
             stdout,
@@ -369,6 +380,13 @@ mod tests {
         let command = parse_sandboxd_command(["ready"]);
 
         assert_eq!(command, Ok(SandboxdCommand::Ready));
+    }
+
+    #[test]
+    fn parses_shutdown() {
+        let command = parse_sandboxd_command(["shutdown"]);
+
+        assert_eq!(command, Ok(SandboxdCommand::Shutdown));
     }
 
     #[test]

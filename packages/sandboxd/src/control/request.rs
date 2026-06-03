@@ -52,6 +52,10 @@ pub(super) fn handle_connection(
 
     match request {
         ControlRequest::Ready => Ok(ControlResponse::ok(None)),
+        ControlRequest::Shutdown => {
+            begin_shutdown(state, activation_thread, activation_completion)?;
+            Ok(ControlResponse::ok(None))
+        }
         ControlRequest::Activate { activation_input } => {
             begin_activate(
                 *activation_input,
@@ -64,6 +68,48 @@ pub(super) fn handle_connection(
         ControlRequest::Sign { sign_request } => {
             begin_sign(sign_request, state).map(|signature| ControlResponse::ok(Some(signature)))
         }
+    }
+}
+
+fn begin_shutdown(
+    state: &Arc<Mutex<crate::control::state::ControlServerState>>,
+    activation_thread: &SharedActivationThread,
+    activation_completion: &ActivationCompletion,
+) -> Result<(), ControlError> {
+    loop {
+        let sandboxd_state = {
+            let mut state_guard = lock_control_state(state)?;
+            match &state_guard.activation_phase {
+                ActivationPhase::Unactivated => {
+                    state_guard.activation_input = None;
+                    return Ok(());
+                }
+                ActivationPhase::Activating => {
+                    drop(state_guard);
+                    crate::control::state::join_activation_thread(activation_thread)?;
+                    let _ = wait_for_activation_completion(state, activation_completion)?;
+                    continue;
+                }
+                ActivationPhase::Activated | ActivationPhase::Failed(_) => {
+                    state_guard.activation_input = None;
+                    state_guard.activation_phase = ActivationPhase::Unactivated;
+                    state_guard.sandboxd_state.take()
+                }
+            }
+        };
+
+        let Some(sandboxd_state) = sandboxd_state else {
+            return Ok(());
+        };
+
+        if let Err(error) = sandboxd_state.close() {
+            let error_text = error.to_string();
+            lock_control_state(state)?.activation_phase =
+                ActivationPhase::Failed(format!("sandboxd shutdown failed: {error_text}"));
+            return Err(ControlError::CloseSandboxdState(error_text));
+        }
+
+        return Ok(());
     }
 }
 

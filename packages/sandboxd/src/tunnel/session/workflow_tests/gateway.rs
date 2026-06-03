@@ -163,6 +163,118 @@ fn drops_invalid_bootstrap_messages_and_keeps_tunnel_alive() {
 }
 
 #[test]
+fn close_wakes_idle_connected_tunnel_session() {
+    let bootstrap_listener =
+        TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+    let bootstrap_url = format!(
+        "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
+        bootstrap_listener
+            .local_addr()
+            .expect("bootstrap listener should expose an address")
+            .port()
+    );
+    let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
+    let gateway_thread = thread::spawn(move || {
+        let (stream, _) = bootstrap_listener
+            .accept()
+            .expect("gateway should accept the bootstrap tunnel");
+        let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
+
+        let telemetry_open = read_json_text_message(&mut websocket);
+        assert_eq!(telemetry_open["type"], "telemetry.open");
+        websocket
+            .send(Message::Text(
+                json!({
+                    "type": "telemetry.open.ok",
+                    "streamId": telemetry_open["streamId"],
+                    "initialWindowBytes": 1024
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("gateway should acknowledge telemetry.open");
+
+        loop {
+            match websocket.read() {
+                Ok(message) => match message {
+                    Message::Close(_) => break,
+                    Message::Text(_) | Message::Binary(_) | Message::Ping(_) | Message::Pong(_) => {
+                    }
+                    Message::Frame(_) => {}
+                },
+                Err(WebSocketError::ConnectionClosed) => break,
+                Err(WebSocketError::Io(error))
+                    if error.kind() == std::io::ErrorKind::ConnectionReset =>
+                {
+                    break;
+                }
+                Err(error) => panic!("gateway websocket should only terminate on close: {error}"),
+            }
+        }
+        gateway_done_sender
+            .send(())
+            .expect("gateway should observe tunnel termination");
+    });
+
+    let startup_input = SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
+        bootstrap_token: "bootstrap-token-value".to_string(),
+        tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+        tunnel_gateway_ws_url: bootstrap_url,
+        acting_user_id: None,
+        runtime_plan: serde_json::json!({
+            "sandboxProfileId": "sbp_123",
+            "version": 1,
+            "image": {
+                "source": "base",
+                "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
+            },
+            "egressRoutes": [],
+            "artifacts": [],
+            "workspaceSources": [],
+            "runtimeClients": [],
+            "agentRuntimes": []
+        }),
+        git_identity: None,
+        transparent_proxy: None,
+    };
+
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+    let tunnel_session = TunnelSession::start(
+        &startup_input,
+        keepalive_manager,
+        runtime_readiness_manager,
+        None,
+        BTreeMap::new(),
+        Arc::new(SystemClock),
+        Arc::new(ThreadSleeper),
+    )
+    .expect("tunnel session should start");
+
+    let (close_done_sender, close_done_receiver) = mpsc::channel();
+    let close_thread = thread::spawn(move || {
+        tunnel_session.close();
+        close_done_sender
+            .send(())
+            .expect("close completion should be observable");
+    });
+    close_done_receiver
+        .recv_timeout(Duration::from_secs(2))
+        .expect("close should wake the idle connected tunnel and return promptly");
+    gateway_done_receiver
+        .recv_timeout(Duration::from_secs(2))
+        .expect("gateway should observe tunnel termination");
+
+    close_thread
+        .join()
+        .expect("close thread should exit cleanly");
+    gateway_thread
+        .join()
+        .expect("gateway thread should exit cleanly");
+}
+
+#[test]
 fn forwards_signing_requests_over_the_bootstrap_tunnel_and_returns_gateway_results() {
     let bootstrap_listener =
         TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");

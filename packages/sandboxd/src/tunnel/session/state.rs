@@ -81,6 +81,7 @@ pub(in crate::tunnel::session) enum TunnelSessionEvent {
 }
 
 pub(in crate::tunnel::session) enum TunnelSessionRequest {
+    Shutdown,
     SetAgentEndpoint {
         agent_endpoint_url: Option<String>,
         response_sender: std::sync::mpsc::Sender<Result<(), TunnelSessionError>>,

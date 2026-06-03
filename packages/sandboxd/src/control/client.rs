@@ -17,6 +17,11 @@ pub fn submit_ready(socket_path: &Path) -> Result<(), ControlError> {
     submit_control_request(socket_path, ControlRequest::Ready).map(|_| ())
 }
 
+/// Gracefully shuts down initialized daemon-owned runtime resources.
+pub fn submit_shutdown(socket_path: &Path) -> Result<(), ControlError> {
+    submit_control_request(socket_path, ControlRequest::Shutdown).map(|_| ())
+}
+
 /// Activates a sandbox, initializing or refreshing runtime resources as needed.
 pub fn submit_activate(
     socket_path: &Path,

@@ -78,4 +78,20 @@ describe("provider runtime-control activation migration", () => {
     expect(e2bClientSource).toContain('"/opt/mistle/bin/sandboxd activate"');
     expect(tensorlakeClientSource).toContain('["activate"]');
   });
+
+  it("keeps each provider constructing sandboxd shutdown", async () => {
+    const dockerRuntimeControlSource = await readFile(
+      new URL("./docker/runtime-control.ts", import.meta.url),
+      "utf8",
+    );
+    const e2bClientSource = await readFile(new URL("./e2b/client.ts", import.meta.url), "utf8");
+    const tensorlakeClientSource = await readFile(
+      new URL("./tensorlake/client.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(dockerRuntimeControlSource).toContain('["/opt/mistle/bin/sandboxd", "shutdown"]');
+    expect(e2bClientSource).toContain('"/opt/mistle/bin/sandboxd shutdown"');
+    expect(tensorlakeClientSource).toContain('["shutdown"]');
+  });
 });

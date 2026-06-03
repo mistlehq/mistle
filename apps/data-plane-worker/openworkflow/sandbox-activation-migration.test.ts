@@ -40,4 +40,17 @@ describe("sandbox runtime activation migration", () => {
     expect(source).not.toContain("SandboxStartupModes");
     expect(source).not.toContain("SandboxExecutionModes");
   });
+
+  it("shuts down sandboxd before provider stop during sandbox stop", async () => {
+    const source = await readFile(
+      new URL("./stop-sandbox-instance/stop-sandbox-instance.ts", import.meta.url),
+      "utf8",
+    );
+
+    const shutdownIndex = source.indexOf("sandboxRuntimeControl.shutdown");
+    const providerStopIndex = source.indexOf("stopSandbox(");
+
+    expect(shutdownIndex).toBeGreaterThanOrEqual(0);
+    expect(providerStopIndex).toBeGreaterThan(shutdownIndex);
+  });
 });

@@ -20,7 +20,7 @@ import {
   TensorlakeClientErrorCodes,
   TensorlakeClientOperationIds,
 } from "./client-errors.js";
-import { TensorlakeRootProcessUser, type TensorlakeClient } from "./client.js";
+import { ShutdownCommandArgs, TensorlakeRootProcessUser, type TensorlakeClient } from "./client.js";
 
 const SandboxdEnsureTimeoutMs = 120_000;
 export const SandboxdStopDaemonTimeoutMs = 30_000;
@@ -28,6 +28,17 @@ export const SandboxdResetTransparentEgressNftablesTimeoutMs = 10_000;
 export const SandboxdReadOperationLogTimeoutMs = 60_000;
 const TensorlakeRootShellCommand = "sh";
 const TensorlakeRootShellCommandArgs = ["-euc"];
+
+function reportGracefulShutdownFailure(input: {
+  provider: "tensorlake";
+  sandboxId: string;
+  error: unknown;
+}): void {
+  const message = input.error instanceof Error ? input.error.message : String(input.error);
+  process.stderr.write(
+    `Mistle ${input.provider} sandbox '${input.sandboxId}' graceful sandboxd shutdown failed before hard daemon stop: ${message}\n`,
+  );
+}
 
 export function createTensorlakeRootShellCommand(input: { script: string }): {
   command: string;
@@ -163,6 +174,59 @@ export class TensorlakeSandboxRuntimeControl implements SandboxRuntimeControl {
             payload: input.payload,
             ...(input.env === undefined ? {} : { env: input.env }),
           });
+        } catch (error) {
+          if (
+            error instanceof TensorlakeClientError &&
+            error.code === TensorlakeClientErrorCodes.NOT_FOUND
+          ) {
+            throw toSandboxNotFoundError(input.id, error);
+          }
+          throw error;
+        }
+      },
+    });
+  }
+
+  async shutdown(input: { id: string; env?: Readonly<Record<string, string>> }): Promise<void> {
+    requireSandboxId(input.id);
+
+    await withSandboxProviderOperationTelemetry({
+      provider: "tensorlake",
+      operation: TensorlakeClientOperationIds.SHUTDOWN_SANDBOXD,
+      fn: async () => {
+        try {
+          let gracefulShutdownError: unknown;
+          try {
+            await this.#client.runCommand({
+              sandboxId: input.id,
+              operation: TensorlakeClientOperationIds.SHUTDOWN_SANDBOXD,
+              commandDescription: "Gracefully shutdown sandboxd",
+              command: "/opt/mistle/bin/sandboxd",
+              args: ShutdownCommandArgs,
+              ...(input.env === undefined ? {} : { env: { ...input.env } }),
+              user: TensorlakeRootProcessUser,
+              timeoutMs: SandboxdStopDaemonTimeoutMs,
+            });
+          } catch (error) {
+            gracefulShutdownError = error;
+          }
+
+          await this.#client.runCommand({
+            sandboxId: input.id,
+            operation: TensorlakeClientOperationIds.STOP_SANDBOXD_DAEMON,
+            commandDescription: "Stop sandboxd daemon",
+            ...createTensorlakeRootShellCommand({ script: SandboxdStopDaemonCommand }),
+            user: TensorlakeRootProcessUser,
+            timeoutMs: SandboxdStopDaemonTimeoutMs,
+          });
+
+          if (gracefulShutdownError !== undefined) {
+            reportGracefulShutdownFailure({
+              provider: "tensorlake",
+              sandboxId: input.id,
+              error: gracefulShutdownError,
+            });
+          }
         } catch (error) {
           if (
             error instanceof TensorlakeClientError &&

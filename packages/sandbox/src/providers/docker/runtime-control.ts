@@ -29,6 +29,7 @@ import {
 import type { DockerSandboxConfig } from "./config.js";
 
 export const ActivateCommand = ["/opt/mistle/bin/sandboxd", "activate"] as const;
+export const ShutdownCommand = ["/opt/mistle/bin/sandboxd", "shutdown"] as const;
 const VersionCommand = ["/opt/mistle/bin/sandboxd", "version"];
 const StopSandboxdCommand = ["sh", "-euc", SandboxdStopDaemonCommand];
 const ResetTransparentEgressNftablesCommand = [
@@ -42,6 +43,17 @@ export const DockerExecExitTimeoutMs = 120_000;
 export const DockerLongRunningExecExitTimeoutMs = 60 * 60 * 1000;
 export const SandboxdStopDaemonTimeoutMs = 30_000;
 export const SandboxdResetTransparentEgressNftablesTimeoutMs = 10_000;
+
+function reportGracefulShutdownFailure(input: {
+  provider: "docker";
+  sandboxId: string;
+  error: unknown;
+}): void {
+  const message = input.error instanceof Error ? input.error.message : String(input.error);
+  process.stderr.write(
+    `Mistle ${input.provider} sandbox '${input.sandboxId}' graceful sandboxd shutdown failed before hard daemon stop: ${message}\n`,
+  );
+}
 
 async function sleep(ms: number): Promise<void> {
   await systemSleeper.sleep(ms);
@@ -253,6 +265,54 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
       timeoutMs: DockerLongRunningExecExitTimeoutMs,
       waitForCompletion: true,
     });
+  }
+
+  async shutdown(input: { id: string; env?: Readonly<Record<string, string>> }): Promise<void> {
+    if (input.id.trim().length === 0) {
+      throw new SandboxConfigurationError("Sandbox id is required.");
+    }
+
+    try {
+      let gracefulShutdownError: unknown;
+      try {
+        await this.#runExecCommand({
+          id: input.id,
+          operation: DockerClientOperationIds.SHUTDOWN_SANDBOXD,
+          command: ShutdownCommand,
+          ...(input.env === undefined ? {} : { env: input.env }),
+          failureDescription: "Docker sandboxd graceful shutdown command",
+          timeoutMs: SandboxdStopDaemonTimeoutMs,
+        });
+      } catch (error) {
+        gracefulShutdownError = error;
+      }
+
+      await this.#runExecCommand({
+        id: input.id,
+        operation: DockerClientOperationIds.STOP_SANDBOXD_DAEMON,
+        command: StopSandboxdCommand,
+        failureDescription: "Docker sandboxd daemon stop command",
+        timeoutMs: SandboxdStopDaemonTimeoutMs,
+      });
+
+      if (gracefulShutdownError !== undefined) {
+        reportGracefulShutdownFailure({
+          provider: "docker",
+          sandboxId: input.id,
+          error: gracefulShutdownError,
+        });
+      }
+    } catch (error) {
+      if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
+        throw new SandboxResourceNotFoundError({
+          resourceType: "sandbox",
+          resourceId: input.id,
+          cause: error,
+        });
+      }
+
+      throw error;
+    }
   }
 
   async #runPayloadCommand(

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ActivateCommand } from "./client.js";
+import { ActivateCommand, ShutdownCommand } from "./client.js";
 import {
   SandboxdReadOperationLogTimeoutMs as RuntimeControlSandboxdReadOperationLogTimeoutMs,
   SandboxdStopDaemonTimeoutMs as RuntimeControlSandboxdStopDaemonTimeoutMs,
@@ -16,5 +16,11 @@ describe("E2B sandbox runtime control timeouts", () => {
 describe("E2B sandbox runtime control activate command", () => {
   it("invokes sandboxd activate", () => {
     expect(ActivateCommand).toBe("/opt/mistle/bin/sandboxd activate");
+  });
+});
+
+describe("E2B sandbox runtime control shutdown command", () => {
+  it("invokes sandboxd shutdown", () => {
+    expect(ShutdownCommand).toBe("/opt/mistle/bin/sandboxd shutdown");
   });
 });

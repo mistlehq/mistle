@@ -14,6 +14,8 @@ use crate::protocol::activation::ActivationInput;
 pub(super) enum ControlRequest {
     #[serde(rename = "ready")]
     Ready,
+    #[serde(rename = "shutdown")]
+    Shutdown,
     #[serde(rename = "activate")]
     Activate {
         activation_input: Box<ActivationInput>,

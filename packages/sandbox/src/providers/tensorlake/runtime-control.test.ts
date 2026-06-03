@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ActivateCommandArgs } from "./client.js";
+import { ActivateCommandArgs, ShutdownCommandArgs } from "./client.js";
 import {
   SandboxdResetTransparentEgressNftablesTimeoutMs,
   SandboxdReadOperationLogTimeoutMs,
@@ -19,6 +19,12 @@ describe("Tensorlake sandbox runtime control timeouts", () => {
 describe("Tensorlake sandbox runtime control activate command", () => {
   it("invokes sandboxd activate", () => {
     expect(ActivateCommandArgs).toEqual(["activate"]);
+  });
+});
+
+describe("Tensorlake sandbox runtime control shutdown command", () => {
+  it("invokes sandboxd shutdown", () => {
+    expect(ShutdownCommandArgs).toEqual(["shutdown"]);
   });
 });
 

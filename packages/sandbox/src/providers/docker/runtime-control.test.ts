@@ -6,6 +6,7 @@ import {
   DockerLongRunningExecExitTimeoutMs,
   SandboxdResetTransparentEgressNftablesTimeoutMs,
   SandboxdStopDaemonTimeoutMs,
+  ShutdownCommand,
 } from "./runtime-control.js";
 
 describe("Docker sandbox runtime control timeouts", () => {
@@ -26,5 +27,11 @@ describe("Docker sandbox runtime control timeouts", () => {
 describe("Docker sandbox runtime control activate command", () => {
   it("invokes sandboxd activate", () => {
     expect(ActivateCommand).toEqual(["/opt/mistle/bin/sandboxd", "activate"]);
+  });
+});
+
+describe("Docker sandbox runtime control shutdown command", () => {
+  it("invokes sandboxd shutdown", () => {
+    expect(ShutdownCommand).toEqual(["/opt/mistle/bin/sandboxd", "shutdown"]);
   });
 });
