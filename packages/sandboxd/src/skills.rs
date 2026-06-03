@@ -784,7 +784,27 @@ fn read_selected_skills(
         }
 
         let skill_file_path = source_path.join(SKILL_FILE_NAME);
-        if !skill_file_path.is_file() {
+        let skill_file_metadata = match fs::metadata(&skill_file_path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                if selection.expected_name.is_some() {
+                    continue;
+                }
+                return Err(SkillsReconcileError::SelectedSkillMissingSkillFile {
+                    relative_path: normalized_relative_path,
+                    path: source_path,
+                });
+            }
+            Err(error) => {
+                return Err(SkillsReconcileError::Discover(
+                    SkillsDiscoverError::ReadSkillFile {
+                        path: skill_file_path,
+                        error,
+                    },
+                ));
+            }
+        };
+        if !skill_file_metadata.is_file() {
             if selection.expected_name.is_some() {
                 continue;
             }
@@ -2215,6 +2235,53 @@ description: Valid skill.
             Some(&target_root),
         )
         .expect_err("materialized reconcile should reject selected skill file read errors");
+
+        assert!(matches!(
+            error,
+            SkillsReconcileError::Discover(SkillsDiscoverError::ReadSkillFile { .. })
+        ));
+
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
+        fs::remove_dir_all(target_root).expect("target root should be removable");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn materialized_reconcile_rejects_selected_skill_file_metadata_errors() {
+        let repo_root = create_git_repo("skills_materialized_reconcile_metadata_error");
+        let target_root =
+            create_temp_test_dir("skills_materialized_reconcile_metadata_error_target");
+        fs::create_dir_all(repo_root.join("skills/loop-skill"))
+            .expect("loop skill directory should be created");
+        std::os::unix::fs::symlink("SKILL.md", repo_root.join("skills/loop-skill/SKILL.md"))
+            .expect("looping skill file symlink should be created");
+        write_skill(
+            &repo_root,
+            "skills/valid-skill",
+            r#"---
+name: valid-skill
+description: Valid skill.
+---
+"#,
+        );
+        commit_all(&repo_root);
+
+        let error = reconcile_materialized_skills(
+            &repo_root,
+            &SkillsRuntime::Codex,
+            &[
+                SkillsReconcileSelection {
+                    name: "loop-skill".to_string(),
+                    relative_path: "skills/loop-skill".to_string(),
+                },
+                SkillsReconcileSelection {
+                    name: "valid-skill".to_string(),
+                    relative_path: "skills/valid-skill".to_string(),
+                },
+            ],
+            Some(&target_root),
+        )
+        .expect_err("materialized reconcile should reject selected skill file metadata errors");
 
         assert!(matches!(
             error,
