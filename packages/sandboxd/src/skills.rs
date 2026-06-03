@@ -759,16 +759,7 @@ fn read_selected_skills(
         let source_path = repo_root.join(repo_relative_path_to_path(&normalized_relative_path));
         let source_path = match source_path.canonicalize() {
             Ok(source_path) => source_path,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {
-                if let Some(expected_name) = &selection.expected_name {
-                    return Err(SkillsReconcileError::SelectedSkillPathNotFound {
-                        relative_path: normalized_relative_path,
-                        expected_name: expected_name.clone(),
-                        path: source_path,
-                    });
-                }
-                continue;
-            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
             Err(error) => {
                 return Err(SkillsReconcileError::SelectedSkillPathCanonicalize {
                     relative_path: normalized_relative_path.clone(),
@@ -783,6 +774,9 @@ fn read_selected_skills(
             ));
         }
         if !source_path.is_dir() {
+            if selection.expected_name.is_some() {
+                continue;
+            }
             return Err(SkillsReconcileError::SelectedSkillNotDirectory {
                 relative_path: normalized_relative_path,
                 path: source_path,
@@ -791,21 +785,27 @@ fn read_selected_skills(
 
         let skill_file_path = source_path.join(SKILL_FILE_NAME);
         if !skill_file_path.is_file() {
+            if selection.expected_name.is_some() {
+                continue;
+            }
             return Err(SkillsReconcileError::SelectedSkillMissingSkillFile {
                 relative_path: normalized_relative_path,
                 path: source_path,
             });
         }
-        let skill =
-            read_skill_file(repo_root, &skill_file_path).map_err(SkillsReconcileError::Discover)?;
+        let skill = match read_skill_file(repo_root, &skill_file_path) {
+            Ok(skill) => skill,
+            Err(error) => {
+                if selection.expected_name.is_some() {
+                    continue;
+                }
+                return Err(SkillsReconcileError::Discover(error));
+            }
+        };
         if let Some(expected_name) = &selection.expected_name
             && skill.name != *expected_name
         {
-            return Err(SkillsReconcileError::SelectedSkillNameMismatch {
-                relative_path: normalized_relative_path,
-                expected_name: expected_name.clone(),
-                actual_name: skill.name,
-            });
+            continue;
         }
         if let Some(first_path) =
             names_to_paths.insert(skill.name.clone(), normalized_relative_path.clone())
@@ -1939,7 +1939,7 @@ description: New skill.
     }
 
     #[test]
-    fn materialized_reconcile_rejects_skill_name_mismatch() {
+    fn materialized_reconcile_skips_skill_name_mismatch() {
         let repo_root = create_git_repo("skills_materialized_reconcile_name_mismatch");
         let target_root =
             create_temp_test_dir("skills_materialized_reconcile_name_mismatch_target");
@@ -1952,59 +1952,151 @@ description: Replacement skill.
 ---
 "#,
         );
+        write_skill(
+            &repo_root,
+            "skills/valid-skill",
+            r#"---
+name: valid-skill
+description: Valid skill.
+---
+"#,
+        );
         commit_all(&repo_root);
 
-        let error = reconcile_materialized_skills(
+        let output = reconcile_materialized_skills(
             &repo_root,
             &SkillsRuntime::Codex,
-            &[SkillsReconcileSelection {
-                name: "original-skill".to_string(),
-                relative_path: "skills/selected-path".to_string(),
-            }],
+            &[
+                SkillsReconcileSelection {
+                    name: "original-skill".to_string(),
+                    relative_path: "skills/selected-path".to_string(),
+                },
+                SkillsReconcileSelection {
+                    name: "valid-skill".to_string(),
+                    relative_path: "skills/valid-skill".to_string(),
+                },
+            ],
             Some(&target_root),
         )
-        .expect_err("materialized reconcile should reject replaced skill at selected path");
+        .expect("materialized reconcile should skip replaced skill at selected path");
 
-        assert!(matches!(
-            error,
-            SkillsReconcileError::SelectedSkillNameMismatch {
-                relative_path,
-                expected_name,
-                actual_name,
-            } if relative_path == "skills/selected-path"
-                && expected_name == "original-skill"
-                && actual_name == "replacement-skill"
-        ));
+        assert_eq!(
+            output.skills,
+            vec![ReconciledSkill {
+                name: "valid-skill".to_string(),
+                relative_path: "skills/valid-skill".to_string(),
+                source_path: repo_root.join("skills/valid-skill").display().to_string(),
+                target_path: target_root.join("valid-skill").display().to_string(),
+            }]
+        );
+        assert!(
+            !target_root.join("original-skill").exists(),
+            "renamed selected skill should not be linked"
+        );
 
         fs::remove_dir_all(repo_root).expect("repo should be removable");
         fs::remove_dir_all(target_root).expect("target root should be removable");
     }
 
     #[test]
-    fn materialized_reconcile_rejects_missing_selected_skill_path() {
+    fn materialized_reconcile_skips_missing_selected_skill_path() {
         let repo_root = create_git_repo("skills_materialized_reconcile_missing_selected_path");
         let target_root =
             create_temp_test_dir("skills_materialized_reconcile_missing_selected_path_target");
+        write_skill(
+            &repo_root,
+            "skills/valid-skill",
+            r#"---
+name: valid-skill
+description: Valid skill.
+---
+"#,
+        );
+        commit_all(&repo_root);
 
-        let error = reconcile_materialized_skills(
+        let output = reconcile_materialized_skills(
             &repo_root,
             &SkillsRuntime::Codex,
-            &[SkillsReconcileSelection {
-                name: "removed-skill".to_string(),
-                relative_path: "skills/removed-skill".to_string(),
-            }],
+            &[
+                SkillsReconcileSelection {
+                    name: "removed-skill".to_string(),
+                    relative_path: "skills/removed-skill".to_string(),
+                },
+                SkillsReconcileSelection {
+                    name: "valid-skill".to_string(),
+                    relative_path: "skills/valid-skill".to_string(),
+                },
+            ],
             Some(&target_root),
         )
-        .expect_err("materialized reconcile should reject missing selected skill paths");
+        .expect("materialized reconcile should skip missing selected skill paths");
 
-        assert!(matches!(
-            error,
-            SkillsReconcileError::SelectedSkillPathNotFound {
-                relative_path,
-                expected_name,
-                ..
-            } if relative_path == "skills/removed-skill" && expected_name == "removed-skill"
-        ));
+        assert_eq!(
+            output.skills,
+            vec![ReconciledSkill {
+                name: "valid-skill".to_string(),
+                relative_path: "skills/valid-skill".to_string(),
+                source_path: repo_root.join("skills/valid-skill").display().to_string(),
+                target_path: target_root.join("valid-skill").display().to_string(),
+            }]
+        );
+        assert!(
+            !target_root.join("removed-skill").exists(),
+            "missing selected skill should not be linked"
+        );
+
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
+        fs::remove_dir_all(target_root).expect("target root should be removable");
+    }
+
+    #[test]
+    fn materialized_reconcile_skips_selected_directory_without_skill_file() {
+        let repo_root = create_git_repo("skills_materialized_reconcile_missing_skill_file");
+        let target_root =
+            create_temp_test_dir("skills_materialized_reconcile_missing_skill_file_target");
+        fs::create_dir_all(repo_root.join("skills/stale-skill"))
+            .expect("stale skill directory should be created");
+        write_skill(
+            &repo_root,
+            "skills/valid-skill",
+            r#"---
+name: valid-skill
+description: Valid skill.
+---
+"#,
+        );
+        commit_all(&repo_root);
+
+        let output = reconcile_materialized_skills(
+            &repo_root,
+            &SkillsRuntime::Codex,
+            &[
+                SkillsReconcileSelection {
+                    name: "stale-skill".to_string(),
+                    relative_path: "skills/stale-skill".to_string(),
+                },
+                SkillsReconcileSelection {
+                    name: "valid-skill".to_string(),
+                    relative_path: "skills/valid-skill".to_string(),
+                },
+            ],
+            Some(&target_root),
+        )
+        .expect("materialized reconcile should skip selected directories without SKILL.md");
+
+        assert_eq!(
+            output.skills,
+            vec![ReconciledSkill {
+                name: "valid-skill".to_string(),
+                relative_path: "skills/valid-skill".to_string(),
+                source_path: repo_root.join("skills/valid-skill").display().to_string(),
+                target_path: target_root.join("valid-skill").display().to_string(),
+            }]
+        );
+        assert!(
+            !target_root.join("stale-skill").exists(),
+            "selected directory without SKILL.md should not be linked"
+        );
 
         fs::remove_dir_all(repo_root).expect("repo should be removable");
         fs::remove_dir_all(target_root).expect("target root should be removable");
