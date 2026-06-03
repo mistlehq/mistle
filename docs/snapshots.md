@@ -2,7 +2,7 @@
 
 Snapshots are prepared sandbox images for published sandbox profile versions.
 
-They make new sessions start from a profile-specific image instead of rebuilding everything from the shared base image every time. A snapshot captures the result of applying a published profile version's runtime plan and snapshot preparation script to a one-off sandbox, then stores the resulting provider image handle on that profile version. Initial snapshots use the setup script; maintenance refresh snapshots use the saved snapshot maintenance script when one is configured.
+They make new sessions start from a profile-specific image instead of rebuilding everything from the shared base image every time. A snapshot captures the result of applying a published profile version's runtime plan and snapshot preparation script to a one-off sandbox, then stores the resulting provider image handle on that profile version. Initial snapshots and setup refreshes use the setup script; maintenance refresh snapshots use the saved snapshot maintenance script when one is configured.
 
 ## What snapshots are for
 
