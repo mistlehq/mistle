@@ -124,6 +124,25 @@ describe("validate-changed", () => {
     );
     expect(turboCommand).toContain("--filter @mistle/dashboard");
   });
+
+  it("keeps affected package integration tests when unsupported package files require full tests", () => {
+    const commands = getDryRunCommands(
+      [
+        "apps/dashboard/integration/auth-session.integration.test.ts",
+        "apps/dashboard/src/index.css",
+      ].join(","),
+    );
+    const integrationCommand = getRequiredCommand(
+      commands,
+      "pnpm --dir apps/dashboard exec vitest run -c vitest.integration.config.ts --passWithNoTests",
+    );
+    const turboCommand = getRequiredCommand(commands, "turbo run test");
+
+    expect(integrationCommand).toContain(
+      "apps/dashboard/integration/auth-session.integration.test.ts",
+    );
+    expect(turboCommand).toContain("--filter @mistle/dashboard");
+  });
 });
 
 function getDryRunCommands(files: string): string[] {

@@ -921,6 +921,12 @@ function buildAffectedTestCommands(
       (filePath) => isSupportedAffectedTestInputFilePath(filePath) === false,
     );
 
+    if (changedIntegrationTestFiles.length > 0) {
+      affectedCommands.push(
+        buildAffectedIntegrationVitestCommand(workspacePackage, changedIntegrationTestFiles),
+      );
+    }
+
     if (hasUnsupportedRelevantFile) {
       turboPackages.push(workspacePackage);
       continue;
@@ -935,12 +941,6 @@ function buildAffectedTestCommands(
     if (changedComponentTestFiles.length > 0) {
       affectedCommands.push(
         buildAffectedComponentVitestCommand(workspacePackage, "run", changedComponentTestFiles),
-      );
-    }
-
-    if (changedIntegrationTestFiles.length > 0) {
-      affectedCommands.push(
-        buildAffectedIntegrationVitestCommand(workspacePackage, changedIntegrationTestFiles),
       );
     }
 
