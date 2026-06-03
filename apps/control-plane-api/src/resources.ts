@@ -1,4 +1,12 @@
 import {
+  Cache,
+  InMemoryCacheAdapter,
+  ValkeyCacheAdapter,
+  closeValkeyClient,
+  connectValkeyClient,
+  createValkeyClient,
+} from "@mistle/cache";
+import {
   createControlPlaneDatabase,
   createControlPlaneDbSchema,
   type ControlPlaneDatabase,
@@ -13,6 +21,7 @@ import { S3CompatibleObjectStore } from "@mistle/object-store";
 import { Pool } from "pg";
 
 import { createControlPlaneAuth, type ControlPlaneAuthConfig } from "./auth/index.js";
+import { logger } from "./logger.js";
 import { createControlPlaneBackend, createControlPlaneOpenWorkflow } from "./openworkflow.js";
 import type { ControlPlaneApiConfig } from "./types.js";
 
@@ -25,6 +34,8 @@ export type AppRequestContext = {
 export type AppRuntimeResources = {
   db: ControlPlaneDatabase;
   dbPool: Pool;
+  cache: Cache;
+  closeCache: () => Promise<void>;
   objectStore: S3CompatibleObjectStore;
   integrationRegistry: IntegrationRegistry;
   workflowBackend: Awaited<ReturnType<typeof createControlPlaneBackend>>;
@@ -54,6 +65,7 @@ export async function createAppResources(
   });
   const db = createControlPlaneDatabase(dbPool);
   const testDbsByEnvironmentId = new Map<string, ControlPlaneDatabase>();
+  const cacheResources = await createControlPlaneCacheResources(config);
   let auth: ReturnType<typeof createControlPlaneAuth> | undefined;
   const testAuthByEnvironmentId = new Map<string, ReturnType<typeof createControlPlaneAuth>>();
   const testWorkflowsByEnvironmentId = new Map<
@@ -92,6 +104,7 @@ export async function createAppResources(
       databasePoolMax: config.workflow.databasePoolMax,
     });
   } catch (error) {
+    await cacheResources.close();
     objectStore.destroy();
     await dbPool.end();
     throw error;
@@ -102,6 +115,8 @@ export async function createAppResources(
   return {
     db,
     dbPool,
+    cache: cacheResources.cache,
+    closeCache: cacheResources.close,
     objectStore,
     integrationRegistry,
     workflowBackend,
@@ -198,9 +213,59 @@ export async function stopAppResources(resources: AppRuntimeResources): Promise<
   const testWorkflows = await Promise.all(resources.testWorkflowsByEnvironmentId.values());
   await Promise.all([
     resources.dbPool.end(),
+    resources.closeCache(),
     resources.workflowBackend.stop(),
     ...testWorkflows.map((workflow) => workflow.backend.stop()),
   ]);
+}
+
+async function createControlPlaneCacheResources(
+  config: ControlPlaneApiConfig,
+): Promise<{ cache: Cache; close: () => Promise<void> }> {
+  if (config.cache.backend === "memory") {
+    return {
+      cache: new Cache({
+        adapter: new InMemoryCacheAdapter(),
+      }),
+      close: () => Promise.resolve(),
+    };
+  }
+
+  const valkeyConfig = config.cache.valkey;
+  if (valkeyConfig === undefined) {
+    throw new Error(
+      "Expected control-plane API cache.valkey config when cache.backend is 'valkey'.",
+    );
+  }
+
+  const valkeyClient = createValkeyClient({
+    onError: (error) => {
+      logger.error(
+        {
+          err: error,
+        },
+        "Control-plane API Valkey cache client error",
+      );
+    },
+    url: valkeyConfig.url,
+  });
+  const cache = new Cache({
+    adapter: new ValkeyCacheAdapter(valkeyClient, valkeyConfig.keyPrefix),
+  });
+
+  try {
+    await connectValkeyClient(valkeyClient);
+  } catch (error) {
+    await closeValkeyClient(valkeyClient);
+    throw error;
+  }
+
+  return {
+    cache,
+    close: async () => {
+      await closeValkeyClient(valkeyClient);
+    },
+  };
 }
 
 async function createTestControlPlaneWorkflow(input: {

@@ -34,6 +34,7 @@ export async function createControlPlaneApiRuntime(
       environment: runtimeConfig.global.env,
       sandboxConfig: config.sandbox,
       internalAuthServiceToken: config.internalAuth.serviceToken,
+      cache: resources.cache,
       db: appContext.db,
       objectStore: resources.objectStore,
       integrationRegistry: resources.integrationRegistry,

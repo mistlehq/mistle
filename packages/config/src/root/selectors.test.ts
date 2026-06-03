@@ -18,6 +18,7 @@ function createRootConfig(input: {
     client_id: string;
     client_secret: string;
   };
+  kvControlPlane?: Config["kv"]["control_plane"];
   sandbox?: Partial<Config["sandbox"]>;
   welcomeEmail?: Config["services"]["control_plane_api"]["auth"]["welcome_email"];
 }): Config {
@@ -115,6 +116,7 @@ function createRootConfig(input: {
       },
     },
     kv: {
+      ...(input.kvControlPlane === undefined ? {} : { control_plane: input.kvControlPlane }),
       data_plane: {
         backend: "valkey",
         url: "redis://data-valkey:6379",
@@ -205,6 +207,34 @@ function createRootConfig(input: {
 }
 
 describe("selectControlPlaneApiConfig", () => {
+  it("uses an in-memory cache when control-plane KV config is omitted", () => {
+    const config = selectControlPlaneApiConfig(createRootConfig({}));
+
+    expect(config.cache).toEqual({
+      backend: "memory",
+    });
+  });
+
+  it("projects control-plane Valkey config into the API cache config", () => {
+    const config = selectControlPlaneApiConfig(
+      createRootConfig({
+        kvControlPlane: {
+          backend: "valkey",
+          url: "redis://control-valkey:6379",
+          key_prefix: "mistle:control",
+        },
+      }),
+    );
+
+    expect(config.cache).toEqual({
+      backend: "valkey",
+      valkey: {
+        url: "redis://control-valkey:6379",
+        keyPrefix: "mistle:control",
+      },
+    });
+  });
+
   it("omits Google auth when credentials are configured but google is not enabled", () => {
     const config = selectControlPlaneApiConfig(
       createRootConfig({

@@ -65,6 +65,7 @@ export type CreateAppInput = {
   environment: ControlPlaneApiGlobalConfig["env"];
   sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
   internalAuthServiceToken: string;
+  cache: AppContextVariables["cache"];
   db: ControlPlaneDatabase;
   objectStore: AppContextVariables["objectStore"];
   integrationRegistry: IntegrationRegistry;
@@ -91,6 +92,7 @@ export function createApp(input: CreateAppInput): ControlPlaneApp {
     environment: input.environment,
     sandboxConfig: input.sandboxConfig,
     internalAuthServiceToken: input.internalAuthServiceToken,
+    cache: input.cache,
     db: input.db,
     objectStore: input.objectStore,
     integrationRegistry: input.integrationRegistry,
@@ -123,6 +125,7 @@ export function configureApp(input: CreateAppInput & { app: ControlPlaneApp }): 
       config,
       sandboxConfig: input.sandboxConfig,
       internalAuthServiceToken: input.internalAuthServiceToken,
+      cache: input.cache,
       db,
       objectStore: input.objectStore,
       integrationRegistry: input.integrationRegistry,

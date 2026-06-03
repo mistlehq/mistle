@@ -123,6 +123,9 @@ importers:
       '@hono/zod-openapi':
         specifier: ^1.4.0
         version: 1.4.0(hono@4.12.18)(zod@4.4.3)
+      '@mistle/cache':
+        specifier: workspace:*
+        version: link:../../packages/cache
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config

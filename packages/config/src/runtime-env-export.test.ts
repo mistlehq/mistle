@@ -46,6 +46,18 @@ describe("exportServiceConfigToEnv", () => {
       value: "postgresql://mistle:replace-with-password@db:5432/mistle",
     });
     expectEntry(entries, {
+      name: "MISTLE_KV_CONTROL_PLANE_BACKEND",
+      value: "valkey",
+    });
+    expectEntry(entries, {
+      name: "MISTLE_KV_CONTROL_PLANE_URL",
+      value: "redis://valkey:6379",
+    });
+    expectEntry(entries, {
+      name: "MISTLE_KV_CONTROL_PLANE_KEY_PREFIX",
+      value: "mistle:control",
+    });
+    expectEntry(entries, {
       name: "MISTLE_OBJECT_STORE_ASSETS_SECRET_ACCESS_KEY",
       value: "replace-with-object-store-secret-key",
     });

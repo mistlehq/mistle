@@ -7,6 +7,52 @@ import {
 
 const DefaultE2BCloudDomain = "e2b.app";
 
+const ValkeyUrlSchema = z.url().refine((value) => {
+  const parsedUrl = new URL(value);
+  return parsedUrl.protocol === "redis:" || parsedUrl.protocol === "rediss:";
+}, "Expected a redis or rediss URL.");
+
+export const ControlPlaneApiCacheValkeyConfigSchema = z
+  .object({
+    url: ValkeyUrlSchema,
+    keyPrefix: z.string().min(1),
+  })
+  .strict();
+
+export const PartialControlPlaneApiCacheValkeyConfigSchema =
+  ControlPlaneApiCacheValkeyConfigSchema.partial();
+
+export const ControlPlaneApiCacheConfigSchema = z
+  .object({
+    backend: z.enum(["memory", "valkey"]),
+    valkey: ControlPlaneApiCacheValkeyConfigSchema.optional(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.backend === "memory" && value.valkey !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["valkey"],
+        message: "cache.valkey must be omitted when cache.backend is 'memory'.",
+      });
+    }
+
+    if (value.backend === "valkey" && value.valkey === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["valkey"],
+        message: "cache.valkey is required when cache.backend is 'valkey'.",
+      });
+    }
+  });
+
+export const PartialControlPlaneApiCacheConfigSchema = z
+  .object({
+    backend: z.enum(["memory", "valkey"]).optional(),
+    valkey: PartialControlPlaneApiCacheValkeyConfigSchema.optional(),
+  })
+  .strict();
+
 const ControlPlaneApiSandboxDockerConfigSchema = z
   .object({
     enabled: z.boolean(),
@@ -229,6 +275,7 @@ export const ControlPlaneApiConfigSchema = z
   .object({
     server: ControlPlaneApiServerConfigSchema,
     database: ControlPlaneApiDatabaseConfigSchema,
+    cache: ControlPlaneApiCacheConfigSchema.default({ backend: "memory" }),
     objectStore: ControlPlaneApiObjectStoreConfigSchema,
     auth: ControlPlaneApiAuthConfigSchema,
     mcp: ControlPlaneApiMcpConfigSchema,
@@ -262,6 +309,7 @@ export const PartialControlPlaneApiConfigSchema = z
   .object({
     server: ControlPlaneApiServerConfigSchema.partial().optional(),
     database: ControlPlaneApiDatabaseConfigSchema.partial().optional(),
+    cache: PartialControlPlaneApiCacheConfigSchema.optional(),
     objectStore: ControlPlaneApiObjectStoreConfigSchema.partial().optional(),
     auth: ControlPlaneApiAuthConfigSchema.partial().optional(),
     mcp: ControlPlaneApiMcpConfigSchema.partial()

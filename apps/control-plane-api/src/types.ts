@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import type { ServerType } from "@hono/node-server";
 import type { OpenAPIHono } from "@hono/zod-openapi";
+import type { Cache } from "@mistle/cache";
 import { AppIds, type loadConfig } from "@mistle/config";
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
@@ -26,6 +27,7 @@ export type ControlPlaneApiConfig = LoadControlPlaneApiConfigResult["app"] & {
 };
 export type ControlPlaneApiGlobalConfig = NonNullable<LoadControlPlaneApiConfigResult["global"]>;
 export type ControlPlaneApiConnectionTokenConfig = ControlPlaneApiConfig["connectionToken"];
+export type ControlPlaneApiCacheConfig = ControlPlaneApiConfig["cache"];
 export type ControlPlaneApiMcpConfig = ControlPlaneApiConfig["mcp"];
 export type ControlPlaneApiPortAccessConfig = ControlPlaneApiConfig["portAccess"];
 export type ControlPlaneApiPtyTransportConfig = ControlPlaneApiConfig["ptyTransport"];
@@ -130,6 +132,7 @@ export type AppContextVariables = {
   config: ControlPlaneApiConfig;
   sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
   internalAuthServiceToken: string;
+  cache: Cache;
   db: ControlPlaneDatabase;
   objectStore: S3CompatibleObjectStore;
   integrationRegistry: IntegrationRegistry;

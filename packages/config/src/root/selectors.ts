@@ -113,6 +113,18 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
       url: config.postgres.control_plane.pooled_url,
       migrationUrl: config.postgres.control_plane.direct_url,
     },
+    cache:
+      config.kv.control_plane === undefined
+        ? {
+            backend: "memory",
+          }
+        : {
+            backend: "valkey",
+            valkey: {
+              url: config.kv.control_plane.url,
+              keyPrefix: config.kv.control_plane.key_prefix,
+            },
+          },
     objectStore: {
       bucketName: config.object_store.assets.bucket_name,
       region: config.object_store.assets.region,

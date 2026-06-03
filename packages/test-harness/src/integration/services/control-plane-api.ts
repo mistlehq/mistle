@@ -259,6 +259,9 @@ function config(input: {
       url: hostPooledUrl,
       migrationUrl: hostDirectUrl,
     },
+    cache: {
+      backend: "memory",
+    },
     objectStore: {
       bucketName:
         input.seaweedfs === undefined

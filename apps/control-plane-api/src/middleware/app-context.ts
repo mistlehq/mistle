@@ -26,6 +26,7 @@ export function createAppContextMiddleware(
     ctx.set("config", appContext.config);
     ctx.set("sandboxConfig", appContext.sandboxConfig);
     ctx.set("internalAuthServiceToken", appContext.internalAuthServiceToken);
+    ctx.set("cache", appContext.cache);
     ctx.set("db", dynamicContext.db);
     ctx.set("objectStore", appContext.objectStore);
     ctx.set("integrationRegistry", appContext.integrationRegistry);

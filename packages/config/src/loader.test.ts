@@ -294,6 +294,9 @@ describe("loadConfig", () => {
       url: "postgresql://pooled.example/mistle",
       migrationUrl: "postgresql://direct.example/mistle",
     });
+    expect(loadedConfig.app.cache).toEqual({
+      backend: "memory",
+    });
     expect(loadedConfig.app.workflow).toEqual({
       databaseUrl: "postgresql://direct.example/mistle",
       migrationUrl: "postgresql://direct.example/mistle",
@@ -308,6 +311,27 @@ describe("loadConfig", () => {
     expect(loadedConfig.app.sandbox.tensorlake).toEqual({
       enabled: true,
       apiKey: "shared-tensorlake-secret",
+    });
+  });
+
+  it("loads env control-plane API Valkey cache config", () => {
+    const loadedConfig = loadConfig({
+      app: AppIds.CONTROL_PLANE_API,
+      includeGlobal: false,
+      env: {
+        ...buildControlPlaneApiServiceEnv(),
+        MISTLE_KV_CONTROL_PLANE_BACKEND: "valkey",
+        MISTLE_KV_CONTROL_PLANE_URL: "redis://control-valkey:6379",
+        MISTLE_KV_CONTROL_PLANE_KEY_PREFIX: "mistle:control",
+      },
+    });
+
+    expect(loadedConfig.app.cache).toEqual({
+      backend: "valkey",
+      valkey: {
+        url: "redis://control-valkey:6379",
+        keyPrefix: "mistle:control",
+      },
     });
   });
 

@@ -392,6 +392,18 @@ const ControlPlaneApiEnvDescriptors = [
     path: ["database", "migrationUrl"],
   },
   {
+    envVar: "MISTLE_KV_CONTROL_PLANE_BACKEND",
+    path: ["cache", "backend"],
+  },
+  {
+    envVar: "MISTLE_KV_CONTROL_PLANE_URL",
+    path: ["cache", "valkey", "url"],
+  },
+  {
+    envVar: "MISTLE_KV_CONTROL_PLANE_KEY_PREFIX",
+    path: ["cache", "valkey", "keyPrefix"],
+  },
+  {
     envVar: "MISTLE_OBJECT_STORE_ASSETS_BUCKET_NAME",
     path: ["objectStore", "bucketName"],
   },
