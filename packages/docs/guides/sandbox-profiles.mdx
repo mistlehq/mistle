@@ -77,16 +77,18 @@ Keep setup scripts deterministic and explicit. A session should not depend on ma
 
 ## Use Setup Assistant
 
-Setup Assistant opens an agent workspace beside the setup script editor so you can draft or fix the script with the same profile context visible.
+Setup Assistant opens an agent workspace beside the setup script editor so you can ask an agent to build or fix the draft setup script for the current profile.
+
+The assistant sandbox automatically has Mistle MCP enabled for the selected draft profile version. That lets the assistant read the profile context, update the draft setup script, and start setup-script test runs from inside its workspace.
 
 To use Setup Assistant:
 
 1. Open a sandbox profile draft.
 2. Make sure the profile includes a model provider connection for the selected agent runtime.
 3. Select **Setup Assistant** from the setup script controls.
-4. Ask the assistant to write a new setup script or fix the current script.
-5. Update the setup script field with the final script.
-6. Run **Test setup script** before publishing the profile version.
+4. Tell the assistant what the setup script needs to accomplish.
+5. Let the assistant write the script, run setup-script tests, and update the draft setup script.
+6. Review the updated setup script and test output before publishing the profile version.
 
 <Frame>
   <img
@@ -95,7 +97,7 @@ To use Setup Assistant:
   />
 </Frame>
 
-Setup Assistant is only available while editing a draft profile version, and it requires a model provider connection for the selected agent runtime. The assistant sandbox starts from the base image so the recommended script does not depend on state created only inside the assistant session.
+Setup Assistant is only available while editing a draft profile version, and it requires a model provider connection for the selected agent runtime. The assistant sandbox starts from the base image so the saved script does not depend on state created only inside the assistant session.
 
 ## Experiment With Setup Scripts
 
