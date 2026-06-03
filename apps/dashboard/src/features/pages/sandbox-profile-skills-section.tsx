@@ -1,10 +1,17 @@
 import {
   Button,
   Checkbox,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Field,
   FieldContent,
   FieldHeader,
   FieldLabel,
+  Input,
   Notice,
   SectionBlock,
   Select,
@@ -14,7 +21,7 @@ import {
   SelectValue,
   Spinner,
 } from "@mistle/ui";
-import { ArrowsClockwiseIcon } from "@phosphor-icons/react";
+import { ArrowClockwiseIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -34,6 +41,7 @@ import type {
   IntegrationTargetSummary,
   SandboxProfileBindingEditorRow,
 } from "./sandbox-profile-binding-config-editor.js";
+import { SandboxProfileSectionCard } from "./sandbox-profile-section-card.js";
 
 type SandboxProfileSkillsConfig = SandboxProfileVersion["skillsConfig"];
 type SelectedSkill = NonNullable<SandboxProfileSkillsConfig>["selectedSkills"][number];
@@ -88,9 +96,11 @@ export function SandboxProfileSkillsSection(input: {
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
   disabled: boolean;
+  automaticLoadingEnabled?: boolean;
   integrationRows: readonly SandboxProfileBindingEditorRow[];
   integrationRowsHaveUnpersistedChanges: boolean;
   isDraft: boolean;
+  onSaveDraftBeforeSkillsReload?: () => Promise<boolean>;
   onDraftStateChange?: (state: SandboxProfileSkillsDraftState) => void;
   profileId: string;
   readOnly: boolean;
@@ -110,7 +120,11 @@ export function SandboxProfileSkillsSection(input: {
   const [draftConfig, setDraftConfig] = useState<SandboxProfileSkillsConfig>(persistedConfig);
   const [persistedDraftConfig, setPersistedDraftConfig] =
     useState<SandboxProfileSkillsConfig>(persistedConfig);
+  const [skillsSearchQuery, setSkillsSearchQuery] = useState("");
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
+  const [saveAndReloadDialogIsOpen, setSaveAndReloadDialogIsOpen] = useState(false);
+  const [saveAndReloadIsPending, setSaveAndReloadIsPending] = useState(false);
+  const attemptedAutoLoadKeysRef = useRef(new Set<string>());
   const draftConfigRef = useRef(draftConfig);
   draftConfigRef.current = draftConfig;
 
@@ -178,15 +192,46 @@ export function SandboxProfileSkillsSection(input: {
   });
 
   const skillsSourceRepo = resolveSkillsSourceRepo(skillsSourceQuery.data, selectedOriginUrl);
+  const selectedSkills = draftConfig?.selectedSkills ?? [];
   const skillOptions = createSkillOptions({
-    selectedSkills: draftConfig?.selectedSkills ?? [],
+    selectedSkills,
     skillsSourceRepo,
   });
-  const selectedSkillPaths = new Set(
-    (draftConfig?.selectedSkills ?? []).map((skill) => skill.relativePath),
+  const availableSkillOptions = skillOptions.filter((skill) => skill.available);
+  const visibleAvailableSkillOptions = availableSkillOptions.filter((skill) =>
+    skillMatchesSearchQuery(skill, skillsSearchQuery),
   );
+  const unavailableSelectedSkills =
+    skillsSourceRepo === null ? [] : skillOptions.filter((skill) => !skill.available);
+  const selectedSkillIdentities = new Set(selectedSkills.map(createSelectedSkillIdentity));
+  const allVisibleDiscoveredSkillsSelected =
+    visibleAvailableSkillOptions.length > 0 &&
+    visibleAvailableSkillOptions.every((skill) =>
+      selectedSkillIdentities.has(createSelectedSkillIdentity(skill)),
+    );
+  const someVisibleDiscoveredSkillsSelected =
+    !allVisibleDiscoveredSkillsSelected &&
+    visibleAvailableSkillOptions.some((skill) =>
+      selectedSkillIdentities.has(createSelectedSkillIdentity(skill)),
+    );
   const fieldIsReadOnly = input.disabled || input.readOnly || !input.isDraft;
+  const automaticLoadingIsEnabled = input.automaticLoadingEnabled !== false;
+  const queryLoadIsPending = selectedOriginUrl !== null && skillsSourceQuery.isPending;
+  const loadIsPending = queryLoadIsPending || refreshMutation.isPending;
+  const actionIsPending = refreshMutation.isPending || saveAndReloadIsPending;
+  const sourceControlIsDisabled =
+    fieldIsReadOnly || loadIsPending || (sourceOptions.length === 0 && selectedOriginUrl === null);
   const selectedSourceValue = selectedOriginUrl ?? NoSkillsSourceValue;
+  const savedSelectedOriginUrl = persistedDraftConfig?.originUrl ?? null;
+  const selectedSourceHasUnpersistedChanges =
+    selectedOriginUrl !== null &&
+    (selectedOriginUrl !== savedSelectedOriginUrl || input.integrationRowsHaveUnpersistedChanges);
+  const autoLoadKey =
+    selectedOriginUrl === null
+      ? null
+      : `${input.profileId}:${String(input.version.version)}:${selectedOriginUrl}`;
+  const autoLoadHasBeenAttempted =
+    autoLoadKey !== null && attemptedAutoLoadKeysRef.current.has(autoLoadKey);
 
   const buildDraftChanges = useCallback((): SandboxProfileSkillsConfig => {
     return normalizeSkillsConfig(draftConfigRef.current);
@@ -211,7 +256,9 @@ export function SandboxProfileSkillsSection(input: {
   useEffect(() => {
     setDraftConfig(persistedConfig);
     setPersistedDraftConfig(persistedConfig);
+    setSkillsSearchQuery("");
     setSaveErrorMessage(null);
+    setSaveAndReloadDialogIsOpen(false);
   }, [input.version.sandboxProfileId, input.version.version, persistedConfig]);
 
   useEffect(() => {
@@ -235,6 +282,46 @@ export function SandboxProfileSkillsSection(input: {
     input.version,
     persistedDraftConfig,
     saveBlockedMessage,
+  ]);
+
+  useEffect(() => {
+    if (
+      autoLoadKey === null ||
+      selectedOriginUrl === null ||
+      !input.isDraft ||
+      input.readOnly ||
+      input.disabled ||
+      !automaticLoadingIsEnabled ||
+      sourceIsUnavailable ||
+      selectedOriginUrl !== savedSelectedOriginUrl ||
+      selectedSourceHasUnpersistedChanges ||
+      skillsSourceQuery.isPending ||
+      skillsSourceQuery.isError ||
+      refreshMutation.isPending ||
+      skillsSourceRepo !== null ||
+      attemptedAutoLoadKeysRef.current.has(autoLoadKey)
+    ) {
+      return;
+    }
+
+    // Synchronizes the editor with the server-side skills catalog after the query confirms
+    // this saved source has no loaded record yet.
+    attemptedAutoLoadKeysRef.current.add(autoLoadKey);
+    refreshMutation.mutate(selectedOriginUrl);
+  }, [
+    autoLoadKey,
+    automaticLoadingIsEnabled,
+    input.disabled,
+    input.isDraft,
+    input.readOnly,
+    refreshMutation,
+    savedSelectedOriginUrl,
+    selectedOriginUrl,
+    selectedSourceHasUnpersistedChanges,
+    skillsSourceQuery.isError,
+    skillsSourceQuery.isPending,
+    skillsSourceRepo,
+    sourceIsUnavailable,
   ]);
 
   function updateSelectedSource(value: string | null): void {
@@ -279,113 +366,180 @@ export function SandboxProfileSkillsSection(input: {
     setSaveErrorMessage(null);
   }
 
-  function selectAllDiscoveredSkills(): void {
+  function toggleAllVisibleDiscoveredSkills(): void {
     if (draftConfigRef.current === null || skillsSourceRepo === null) {
       return;
     }
 
-    setDraftConfig({
-      originUrl: draftConfigRef.current.originUrl,
-      selectedSkills: skillsSourceRepo.skills
-        .map((skill) => ({
-          name: skill.name,
-          relativePath: skill.relativePath,
-        }))
-        .sort(compareSelectedSkills),
-    });
+    setDraftConfig(
+      createNextVisibleDiscoveredSkillsSelection({
+        allVisibleDiscoveredSkillsSelected,
+        currentConfig: draftConfigRef.current,
+        visibleSkills: visibleAvailableSkillOptions,
+      }),
+    );
     setSaveErrorMessage(null);
   }
 
-  function clearSelectedSkills(): void {
-    if (draftConfigRef.current === null) {
+  function reloadSelectedSource(): void {
+    if (selectedOriginUrl === null || fieldIsReadOnly || actionIsPending) {
       return;
     }
 
-    setDraftConfig({
-      originUrl: draftConfigRef.current.originUrl,
-      selectedSkills: [],
-    });
-    setSaveErrorMessage(null);
-  }
-
-  function refreshSelectedSource(): void {
-    if (
-      selectedOriginUrl === null ||
-      input.integrationRowsHaveUnpersistedChanges ||
-      refreshMutation.isPending
-    ) {
+    if (selectedSourceHasUnpersistedChanges) {
+      setSaveAndReloadDialogIsOpen(true);
       return;
     }
 
     refreshMutation.mutate(selectedOriginUrl);
   }
 
-  const skillsContent =
-    selectedOriginUrl === null ? (
-      <p className="text-muted-foreground text-sm">No skills source selected.</p>
-    ) : skillsSourceQuery.isPending ? (
-      <div className="text-muted-foreground flex items-center gap-2 text-sm">
-        <Spinner aria-hidden className="size-4" />
-        Loading skills...
-      </div>
-    ) : skillsSourceQuery.isError ? (
-      <Notice title="Could not load skills" variant="alert">
-        {resolveApiErrorMessage({
+  async function saveDraftAndReloadSelectedSource(): Promise<void> {
+    if (selectedOriginUrl === null || input.onSaveDraftBeforeSkillsReload === undefined) {
+      return;
+    }
+
+    setSaveAndReloadIsPending(true);
+    try {
+      const draftSaved = await input.onSaveDraftBeforeSkillsReload();
+      if (!draftSaved) {
+        return;
+      }
+
+      setSaveAndReloadDialogIsOpen(false);
+      refreshMutation.mutate(selectedOriginUrl);
+    } finally {
+      setSaveAndReloadIsPending(false);
+    }
+  }
+
+  const loadErrorMessage =
+    skillsSourceQuery.isError && selectedOriginUrl !== null
+      ? resolveApiErrorMessage({
           error: skillsSourceQuery.error,
           fallbackMessage: "Could not load sandbox profile skills.",
-        })}
-      </Notice>
-    ) : skillsSourceRepo === null ? (
-      <p className="text-muted-foreground text-sm">Refresh this repository to discover skills.</p>
-    ) : skillOptions.length === 0 ? (
-      <p className="text-muted-foreground text-sm">No skills were discovered in this repository.</p>
+        })
+      : null;
+  const sourceNotLoadedMessage =
+    selectedOriginUrl !== null &&
+    !loadIsPending &&
+    !skillsSourceQuery.isError &&
+    skillsSourceRepo === null &&
+    !selectedSourceHasUnpersistedChanges &&
+    (autoLoadHasBeenAttempted || !automaticLoadingIsEnabled)
+      ? "Skills have not been loaded for this repository yet."
+      : null;
+  const sourceNeedsSavedDraftMessage =
+    selectedOriginUrl !== null &&
+    !loadIsPending &&
+    !skillsSourceQuery.isError &&
+    skillsSourceRepo === null &&
+    selectedSourceHasUnpersistedChanges
+      ? "Save this draft to load skills from the selected repository."
+      : null;
+  const unavailableSelectedSkillsMessage =
+    unavailableSelectedSkills.length === 0
+      ? null
+      : "Remove skills that are no longer found before publishing this sandbox profile.";
+  const selectedCountText =
+    unavailableSelectedSkills.length === 0
+      ? `${String(selectedSkills.length)} selected`
+      : `${String(selectedSkills.length)} selected, ${String(unavailableSelectedSkills.length)} no longer found`;
+  const reloadButtonIsVisible =
+    selectedOriginUrl !== null &&
+    !sourceIsUnavailable &&
+    (skillsSourceRepo !== null ||
+      refreshMutation.isError ||
+      loadErrorMessage !== null ||
+      sourceNotLoadedMessage !== null ||
+      sourceNeedsSavedDraftMessage !== null);
+  const skillsContent =
+    selectedOriginUrl === null ||
+    loadIsPending ||
+    skillsSourceRepo === null ? null : skillOptions.length === 0 ? (
+      <p className="text-muted-foreground text-sm">No skills found in this repository.</p>
     ) : (
       <div className="grid gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            disabled={fieldIsReadOnly || skillsSourceRepo.skills.length === 0}
-            onClick={selectAllDiscoveredSkills}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            Select all
-          </Button>
-          <Button
-            disabled={fieldIsReadOnly || selectedSkillPaths.size === 0}
-            onClick={clearSelectedSkills}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            Clear
-          </Button>
-          <span className="text-muted-foreground text-sm">{selectedSkillPaths.size} selected</span>
-        </div>
         <div className="divide-y rounded-md border">
+          <div className="flex flex-col gap-2 px-3 py-2.5 text-sm transition-colors hover:bg-muted/60 focus-within:bg-muted/50 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <label className="inline-flex min-w-0 items-center gap-2">
+                <Checkbox
+                  checked={allVisibleDiscoveredSkillsSelected}
+                  disabled={fieldIsReadOnly || visibleAvailableSkillOptions.length === 0}
+                  indeterminate={someVisibleDiscoveredSkillsSelected}
+                  onCheckedChange={toggleAllVisibleDiscoveredSkills}
+                />
+                <span>Select all</span>
+              </label>
+              <span className="text-muted-foreground text-sm">{selectedCountText}</span>
+            </div>
+            <div className="min-w-0">
+              <Input
+                aria-label="Search skills"
+                className="h-8 w-full sm:w-64"
+                onChange={(event) => {
+                  setSkillsSearchQuery(event.target.value);
+                }}
+                placeholder="Search skills"
+                value={skillsSearchQuery}
+              />
+            </div>
+          </div>
           {skillOptions.map((skill) => {
-            const checked = selectedSkillPaths.has(skill.relativePath);
+            if (!skill.available) {
+              return (
+                <div
+                  className="flex items-start gap-3 bg-destructive/5 px-3 py-3 text-sm transition-colors hover:bg-destructive/10 focus-within:bg-destructive/10"
+                  key={`${skill.relativePath}:${skill.name}:missing`}
+                >
+                  <Checkbox checked disabled className="mt-0.5" />
+                  <span className="-mt-0.5 grid min-w-0 flex-1 gap-1">
+                    <span className="flex min-w-0 flex-wrap items-center gap-2">
+                      <span className="truncate font-medium">{skill.name}</span>
+                      <span className="rounded border border-destructive/30 bg-background px-1.5 py-0.5 text-xs font-medium text-destructive">
+                        No longer found
+                      </span>
+                    </span>
+                    <span className="text-muted-foreground font-mono text-xs">
+                      {skill.relativePath}
+                    </span>
+                  </span>
+                  <Button
+                    disabled={fieldIsReadOnly}
+                    onClick={() => {
+                      updateSkillSelection(skill, false);
+                    }}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    Remove
+                  </Button>
+                </div>
+              );
+            }
+
+            if (!skillMatchesSearchQuery(skill, skillsSearchQuery)) {
+              return null;
+            }
+
+            const checked = selectedSkillIdentities.has(createSelectedSkillIdentity(skill));
             return (
               <label
-                className="flex cursor-pointer items-start gap-3 px-3 py-3 text-sm"
+                className="flex items-start gap-3 px-3 py-3 text-sm transition-colors hover:bg-muted/60 focus-within:bg-muted/50"
                 key={skill.relativePath}
               >
                 <Checkbox
                   checked={checked}
+                  className="mt-0.5"
                   disabled={fieldIsReadOnly}
                   onCheckedChange={(nextChecked) => {
                     updateSkillSelection(skill, nextChecked === true);
                   }}
                 />
-                <span className="grid min-w-0 gap-1">
-                  <span className="flex flex-wrap items-center gap-2 font-medium">
-                    {skill.name}
-                    {skill.available ? null : (
-                      <span className="rounded border px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
-                        unavailable
-                      </span>
-                    )}
-                  </span>
+                <span className="-mt-0.5 grid min-w-0 gap-1">
+                  <span className="font-medium">{skill.name}</span>
                   {skill.description.length === 0 ? null : (
                     <span className="text-muted-foreground">{skill.description}</span>
                   )}
@@ -396,87 +550,141 @@ export function SandboxProfileSkillsSection(input: {
               </label>
             );
           })}
+          {visibleAvailableSkillOptions.length === 0 ? (
+            <p className="text-muted-foreground px-3 py-3 text-sm">
+              No matching discovered skills.
+            </p>
+          ) : null}
         </div>
       </div>
     );
 
   return (
     <SectionBlock title="Skills">
-      <div className="grid gap-4">
-        {saveErrorMessage === null ? null : <Notice variant="alert">{saveErrorMessage}</Notice>}
-        {sourceIsUnavailable ? (
-          <Notice title="Skills source unavailable" variant="alert">
-            Add this repository back to the Git integration bindings, or choose another skills
-            source.
-          </Notice>
-        ) : null}
-        <Field contentWidth="fill">
-          <FieldHeader>
-            <FieldLabel htmlFor="sandbox-profile-skills-source">Source repository</FieldLabel>
-          </FieldHeader>
-          <FieldContent>
-            <div className="flex flex-wrap gap-2">
-              <Select
-                disabled={
-                  fieldIsReadOnly || (sourceOptions.length === 0 && selectedOriginUrl === null)
-                }
-                onValueChange={updateSelectedSource}
-                value={selectedSourceValue}
-              >
-                <SelectTrigger className="min-w-72" id="sandbox-profile-skills-source">
-                  <SelectValue placeholder="Select repository">
-                    {selectedOriginUrl === null
-                      ? "None"
-                      : (selectedSourceOption?.label ?? "Unavailable repository")}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NoSkillsSourceValue}>None</SelectItem>
-                  {sourceIsUnavailable ? (
-                    <SelectItem disabled value={selectedOriginUrl}>
-                      Unavailable repository
-                    </SelectItem>
-                  ) : null}
-                  {sourceOptions.map((sourceOption) => (
-                    <SelectItem key={sourceOption.originUrl} value={sourceOption.originUrl}>
-                      {sourceOption.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                disabled={
-                  selectedOriginUrl === null ||
-                  fieldIsReadOnly ||
-                  input.integrationRowsHaveUnpersistedChanges ||
-                  refreshMutation.isPending
-                }
-                onClick={refreshSelectedSource}
-                type="button"
-                variant="outline"
-              >
-                {refreshMutation.isPending ? (
-                  <Spinner aria-hidden className="size-4" />
-                ) : (
-                  <ArrowsClockwiseIcon aria-hidden className="size-4" />
-                )}
-                Refresh
-              </Button>
-            </div>
-            {input.integrationRowsHaveUnpersistedChanges && selectedOriginUrl !== null ? (
-              <p className="text-muted-foreground mt-2 text-sm">
-                Save integration changes before refreshing skills.
-              </p>
-            ) : null}
-            {sourceOptions.length === 0 ? (
-              <p className="text-muted-foreground mt-2 text-sm">
-                Add a Git repository binding before configuring skills.
-              </p>
-            ) : null}
-          </FieldContent>
-        </Field>
-        {skillsContent}
-      </div>
+      <SandboxProfileSectionCard>
+        <div className="grid gap-4">
+          {saveErrorMessage === null ? null : <Notice variant="alert">{saveErrorMessage}</Notice>}
+          {loadErrorMessage === null ? null : (
+            <Notice title="Could not load skills" variant="alert">
+              {loadErrorMessage}
+            </Notice>
+          )}
+          {sourceNotLoadedMessage === null ? null : (
+            <Notice title="Skills not loaded">{sourceNotLoadedMessage}</Notice>
+          )}
+          {sourceNeedsSavedDraftMessage === null ? null : (
+            <Notice title="Save draft to load skills">{sourceNeedsSavedDraftMessage}</Notice>
+          )}
+          {sourceIsUnavailable ? (
+            <Notice title="Skills source unavailable" variant="alert">
+              Add this repository back to the Git integration bindings, or choose another skills
+              source.
+            </Notice>
+          ) : null}
+          {sourceOptions.length === 0 && selectedOriginUrl === null ? (
+            <Notice title="Git repository binding required">
+              Add a Git repository binding before configuring skills.
+            </Notice>
+          ) : null}
+          {unavailableSelectedSkillsMessage === null ? null : (
+            <Notice title="Selected skills no longer found" variant="alert">
+              {unavailableSelectedSkillsMessage}
+            </Notice>
+          )}
+          <Field contentWidth="fill" orientation="horizontal">
+            <FieldHeader>
+              <FieldLabel htmlFor="sandbox-profile-skills-source">Source repository</FieldLabel>
+            </FieldHeader>
+            <FieldContent>
+              <div className="flex flex-wrap gap-2">
+                <Select
+                  disabled={sourceControlIsDisabled}
+                  onValueChange={updateSelectedSource}
+                  value={selectedSourceValue}
+                >
+                  <SelectTrigger className="min-w-72" id="sandbox-profile-skills-source">
+                    <SelectValue placeholder="Select repository">
+                      {selectedOriginUrl === null
+                        ? "None"
+                        : (selectedSourceOption?.label ?? "Unavailable repository")}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NoSkillsSourceValue}>None</SelectItem>
+                    {sourceIsUnavailable ? (
+                      <SelectItem disabled value={selectedOriginUrl}>
+                        Unavailable repository
+                      </SelectItem>
+                    ) : null}
+                    {sourceOptions.map((sourceOption) => (
+                      <SelectItem key={sourceOption.originUrl} value={sourceOption.originUrl}>
+                        {sourceOption.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {reloadButtonIsVisible ? (
+                  <Button
+                    disabled={fieldIsReadOnly || actionIsPending || loadIsPending}
+                    onClick={reloadSelectedSource}
+                    title="Reload skills from this repository"
+                    type="button"
+                    variant="outline"
+                  >
+                    {actionIsPending || queryLoadIsPending ? (
+                      <Spinner aria-hidden className="size-4" />
+                    ) : (
+                      <ArrowClockwiseIcon aria-hidden className="size-4" />
+                    )}
+                    Reload
+                  </Button>
+                ) : null}
+              </div>
+            </FieldContent>
+          </Field>
+          {skillsContent}
+        </div>
+      </SandboxProfileSectionCard>
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open && !saveAndReloadIsPending) {
+            setSaveAndReloadDialogIsOpen(false);
+          }
+        }}
+        open={saveAndReloadDialogIsOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save and reload skills?</DialogTitle>
+            <DialogDescription>
+              Reloading skills uses the latest saved draft. Save this draft first so the selected
+              source is available to the skills loader.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              disabled={saveAndReloadIsPending}
+              onClick={() => {
+                setSaveAndReloadDialogIsOpen(false);
+              }}
+              type="button"
+              variant="outline"
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={saveAndReloadIsPending}
+              onClick={() => {
+                void saveDraftAndReloadSelectedSource();
+              }}
+              type="button"
+            >
+              {saveAndReloadIsPending ? <Spinner aria-hidden className="size-4" /> : null}
+              Save and reload
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SectionBlock>
   );
 }
@@ -582,10 +790,13 @@ export function createSkillOptions(input: {
   selectedSkills: readonly SelectedSkill[];
   skillsSourceRepo: SandboxProfileVersionSkillsSourceRepo | null;
 }): readonly SkillOption[] {
-  const optionsByPath = new Map<string, SkillOption>();
+  const loadedSkillsByPath = new Map(
+    (input.skillsSourceRepo?.skills ?? []).map((skill) => [skill.relativePath, skill]),
+  );
+  const options: SkillOption[] = [];
 
   for (const skill of input.skillsSourceRepo?.skills ?? []) {
-    optionsByPath.set(skill.relativePath, {
+    options.push({
       name: skill.name,
       description: skill.description,
       relativePath: skill.relativePath,
@@ -594,11 +805,12 @@ export function createSkillOptions(input: {
   }
 
   for (const skill of input.selectedSkills) {
-    if (optionsByPath.has(skill.relativePath)) {
+    const loadedSkill = loadedSkillsByPath.get(skill.relativePath);
+    if (loadedSkill?.name === skill.name) {
       continue;
     }
 
-    optionsByPath.set(skill.relativePath, {
+    options.push({
       name: skill.name,
       description: "",
       relativePath: skill.relativePath,
@@ -606,10 +818,35 @@ export function createSkillOptions(input: {
     });
   }
 
-  return [...optionsByPath.values()].sort(
+  return options.sort(
     (left, right) =>
       left.name.localeCompare(right.name) || left.relativePath.localeCompare(right.relativePath),
   );
+}
+
+export function createNextVisibleDiscoveredSkillsSelection(input: {
+  allVisibleDiscoveredSkillsSelected: boolean;
+  currentConfig: NonNullable<SandboxProfileSkillsConfig>;
+  visibleSkills: readonly SelectedSkill[];
+}): NonNullable<SandboxProfileSkillsConfig> {
+  const visibleSkillPaths = new Set(input.visibleSkills.map((skill) => skill.relativePath));
+  const retainedSelectedSkills = input.currentConfig.selectedSkills.filter(
+    (skill) => !visibleSkillPaths.has(skill.relativePath),
+  );
+  const nextSelectedSkills = input.allVisibleDiscoveredSkillsSelected
+    ? retainedSelectedSkills
+    : [
+        ...retainedSelectedSkills,
+        ...input.visibleSkills.map((skill) => ({
+          name: skill.name,
+          relativePath: skill.relativePath,
+        })),
+      ];
+
+  return {
+    originUrl: input.currentConfig.originUrl,
+    selectedSkills: nextSelectedSkills.sort(compareSelectedSkills),
+  };
 }
 
 function upsertSelectedSkill(
@@ -643,6 +880,21 @@ export function normalizeSkillsConfig(
 
 function compareSelectedSkills(left: SelectedSkill, right: SelectedSkill): number {
   return left.relativePath.localeCompare(right.relativePath) || left.name.localeCompare(right.name);
+}
+
+function createSelectedSkillIdentity(skill: SelectedSkill): string {
+  return `${skill.relativePath}\u0000${skill.name}`;
+}
+
+function skillMatchesSearchQuery(skill: SkillOption, query: string): boolean {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  if (normalizedQuery.length === 0) {
+    return true;
+  }
+
+  return [skill.name, skill.description, skill.relativePath].some((value) =>
+    value.toLocaleLowerCase().includes(normalizedQuery),
+  );
 }
 
 export function skillsConfigsAreEqual(

@@ -311,6 +311,129 @@ describe.concurrent("sandbox profile version publishability get integration", ()
     });
   });
 
+  it("returns a skills source issue when selected skills have not been loaded", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publishability-skills-unloaded@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_publishability_skills_unloaded",
+        organizationId: session.organizationId,
+        displayName: "Publishability Skills Unloaded Profile",
+        activeVersion: null,
+        createdAt: "2026-06-03T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_publishability_skills_unloaded",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+        skillsConfig: {
+          originUrl: "https://github.com/acme/skills.git",
+          selectedSkills: [],
+        },
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_publishability_skills_unloaded/versions/1/publishability",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = GetSandboxProfileVersionPublishabilityResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody).toEqual({
+      publishable: false,
+      issues: [
+        {
+          code: "SKILLS_SOURCE_NOT_LOADED",
+          message: "Load skills before publishing this sandbox profile.",
+        },
+      ],
+    });
+  });
+
+  it("returns a selected skills issue when a saved skill was renamed upstream", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publishability-skills-missing@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_publishability_skills_missing",
+        organizationId: session.organizationId,
+        displayName: "Publishability Skills Missing Profile",
+        activeVersion: null,
+        createdAt: "2026-06-03T00:05:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_publishability_skills_missing",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+        skillsConfig: {
+          originUrl: "https://github.com/acme/skills.git",
+          selectedSkills: [
+            {
+              name: "removed",
+              relativePath: ".agents/skills/available",
+            },
+          ],
+        },
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.skillsSourceRepos).values({
+      id: "skr_publishability_skills_missing",
+      organizationId: session.organizationId,
+      originUrl: "https://github.com/acme/skills.git",
+      commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      skills: [
+        {
+          name: "available",
+          description: "Available skill.",
+          relativePath: ".agents/skills/available",
+        },
+      ],
+      lastSyncedAt: "2026-06-03T00:06:00.000Z",
+      createdAt: "2026-06-03T00:06:00.000Z",
+      updatedAt: "2026-06-03T00:06:00.000Z",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_publishability_skills_missing/versions/1/publishability",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = GetSandboxProfileVersionPublishabilityResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody).toEqual({
+      publishable: false,
+      issues: [
+        {
+          code: "SELECTED_SKILLS_NOT_FOUND",
+          message: "Remove skills that are no longer found before publishing this sandbox profile.",
+        },
+      ],
+    });
+  });
+
   it("returns 404 when the profile version is outside the authenticated organization", async ({
     env,
   }) => {

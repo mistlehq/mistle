@@ -11328,7 +11328,9 @@ export interface paths {
                   | "SANDBOX_CONNECTION_NOT_ACTIVE"
                   | "SANDBOX_CONNECTION_KIND_MISMATCH"
                   | "SANDBOX_CONNECTION_PROVIDER_MISMATCH"
-                  | "INVALID_SANDBOX_RESOURCES";
+                  | "INVALID_SANDBOX_RESOURCES"
+                  | "SKILLS_SOURCE_NOT_LOADED"
+                  | "SELECTED_SKILLS_NOT_FOUND";
                 connectionId?: string;
                 message: string;
                 targetKey?: string;

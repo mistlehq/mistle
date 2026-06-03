@@ -138,6 +138,15 @@ export type SandboxProfileEditorPageStoryArgs = {
   apiKeys?: readonly ApiKey[];
   mistleMcpEnabled?: boolean;
   mistleMcpApiKeyId?: string | null;
+  skillsIntegrationRowsHaveUnpersistedChanges?: boolean;
+  skillsState?:
+    | "configured"
+    | "searchable"
+    | "no-source"
+    | "undiscovered"
+    | "no-discovered-skills"
+    | "unavailable-source"
+    | "unavailable-selected-skill";
 };
 
 type IntegrationsSectionState = NonNullable<
@@ -200,6 +209,136 @@ const StorySkillsSourceRepos = {
     },
   ],
 } satisfies SandboxProfileVersionSkillsSourceReposResult;
+
+const StorySearchableSkillsSourceRepos = {
+  items: [
+    {
+      id: "ksr_story_searchable_skills",
+      originUrl: StorySkillsOriginUrl,
+      commitSha: "8f7c7a1",
+      lastSyncedAt: "2026-05-28T14:05:00.000Z",
+      createdAt: "2026-05-28T14:05:00.000Z",
+      updatedAt: "2026-05-28T14:05:00.000Z",
+      skills: [
+        {
+          name: "pr-review",
+          description: "Review pull requests and request a follow-up review.",
+          relativePath: ".agents/skills/pr-review",
+        },
+        {
+          name: "release-notes",
+          description: "Draft release notes from merged changes.",
+          relativePath: ".agents/skills/release-notes",
+        },
+        {
+          name: "incident-triage",
+          description: "Summarize incident reports and identify follow-up owners.",
+          relativePath: ".agents/skills/incident-triage",
+        },
+        {
+          name: "docs-update",
+          description: "Update product and engineering docs after implementation changes.",
+          relativePath: ".agents/skills/docs-update",
+        },
+        {
+          name: "dependency-audit",
+          description: "Review package updates and note migration risks.",
+          relativePath: ".agents/skills/dependency-audit",
+        },
+        {
+          name: "migration-plan",
+          description: "Plan data migrations and rollout sequencing.",
+          relativePath: ".agents/skills/migration-plan",
+        },
+        {
+          name: "qa-checklist",
+          description: "Prepare focused QA checks for a changed workflow.",
+          relativePath: ".agents/skills/qa-checklist",
+        },
+      ],
+    },
+  ],
+} satisfies SandboxProfileVersionSkillsSourceReposResult;
+
+const StoryUnavailableSkillsOriginUrl = "https://github.com/mistle/retired-skills.git";
+
+function createStorySkillsState(input: {
+  skillsState: SandboxProfileEditorPageStoryArgs["skillsState"];
+}): {
+  config: SandboxProfileVersion["skillsConfig"];
+  sourceRepos: SandboxProfileVersionSkillsSourceReposResult | null;
+} {
+  switch (input.skillsState ?? "configured") {
+    case "configured":
+      return {
+        config: StorySkillsConfig,
+        sourceRepos: StorySkillsSourceRepos,
+      };
+    case "searchable":
+      return {
+        config: StorySkillsConfig,
+        sourceRepos: StorySearchableSkillsSourceRepos,
+      };
+    case "no-source":
+      return {
+        config: null,
+        sourceRepos: null,
+      };
+    case "undiscovered":
+      return {
+        config: {
+          originUrl: StorySkillsOriginUrl,
+          selectedSkills: [],
+        },
+        sourceRepos: {
+          items: [],
+        },
+      };
+    case "no-discovered-skills":
+      return {
+        config: {
+          originUrl: StorySkillsOriginUrl,
+          selectedSkills: [],
+        },
+        sourceRepos: {
+          items: [
+            {
+              id: "ksr_story_empty_skills",
+              originUrl: StorySkillsOriginUrl,
+              commitSha: "8f7c7a1",
+              lastSyncedAt: "2026-05-28T14:05:00.000Z",
+              createdAt: "2026-05-28T14:05:00.000Z",
+              updatedAt: "2026-05-28T14:05:00.000Z",
+              skills: [],
+            },
+          ],
+        },
+      };
+    case "unavailable-source":
+      return {
+        config: {
+          originUrl: StoryUnavailableSkillsOriginUrl,
+          selectedSkills: [],
+        },
+        sourceRepos: {
+          items: [],
+        },
+      };
+    case "unavailable-selected-skill":
+      return {
+        config: {
+          originUrl: StorySkillsOriginUrl,
+          selectedSkills: [
+            {
+              name: "legacy-maintenance",
+              relativePath: ".agents/skills/legacy-maintenance",
+            },
+          ],
+        },
+        sourceRepos: StorySkillsSourceRepos,
+      };
+  }
+}
 
 export const StoryMistleApiKey = {
   id: "apk_story_mistle_agent",
@@ -801,6 +940,9 @@ function renderUnavailableIntegrationsSectionPanel(input: {
 function SandboxProfileEditorPageStoryView(
   input: SandboxProfileEditorPageStoryArgs,
 ): React.JSX.Element {
+  const skillsState = createStorySkillsState({
+    skillsState: input.skillsState,
+  });
   const [queryClient] = useState(() => {
     const client = createIntegrationsEditorSectionStoryQueryClient();
     seedStoryIntegrationResources({
@@ -819,15 +961,17 @@ function SandboxProfileEditorPageStoryView(
         },
       );
     }
-    for (const version of [1, 2]) {
-      client.setQueryData(
-        sandboxProfileVersionSkillsSourceReposQueryKey({
-          profileId: "sandbox-profile-story",
-          version,
-          originUrl: StorySkillsOriginUrl,
-        }),
-        StorySkillsSourceRepos,
-      );
+    if (skillsState.config !== null && skillsState.sourceRepos !== null) {
+      for (const version of [1, 2]) {
+        client.setQueryData(
+          sandboxProfileVersionSkillsSourceReposQueryKey({
+            profileId: "sandbox-profile-story",
+            version,
+            originUrl: skillsState.config.originUrl,
+          }),
+          skillsState.sourceRepos,
+        );
+      }
     }
     return client;
   });
@@ -919,7 +1063,7 @@ function SandboxProfileEditorPageStoryView(
     mistleMcpApiKeyId: input.mistleMcpApiKeyId === undefined ? null : input.mistleMcpApiKeyId,
     mistleMcpEnabled: input.mistleMcpEnabled === true,
     runtimeState: input.runtimeState,
-    skillsConfig: StorySkillsConfig,
+    skillsConfig: skillsState.config,
     version: mode.version,
   });
   function handleToggleSetupAssistant(): void {
@@ -1131,10 +1275,14 @@ function SandboxProfileEditorPageStoryView(
                   <SandboxProfileSkillsSection
                     availableConnections={storyConnections}
                     availableTargets={storyTargets}
+                    automaticLoadingEnabled={input.skillsState !== "undiscovered"}
                     disabled={!isEditable}
                     integrationRows={integrationRows}
-                    integrationRowsHaveUnpersistedChanges={false}
+                    integrationRowsHaveUnpersistedChanges={
+                      input.skillsIntegrationRowsHaveUnpersistedChanges === true
+                    }
                     isDraft={mode.kind === "draft"}
+                    onSaveDraftBeforeSkillsReload={async () => true}
                     profileId={storyVersion.sandboxProfileId}
                     readOnly={!isEditable}
                     version={storyVersion}

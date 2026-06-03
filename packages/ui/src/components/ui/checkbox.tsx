@@ -1,7 +1,7 @@
 "use client";
 
 import { Checkbox as CheckboxPrimitive } from "@base-ui/react/checkbox";
-import { CheckIcon } from "@phosphor-icons/react";
+import { CheckIcon, MinusIcon } from "@phosphor-icons/react";
 
 import { cn } from "../../lib/utils.js";
 
@@ -17,9 +17,10 @@ function Checkbox({ className, ...props }: CheckboxPrimitive.Root.Props) {
     >
       <CheckboxPrimitive.Indicator
         data-slot="checkbox-indicator"
-        className="[&>svg]:size-3.5 grid place-content-center text-current transition-none"
+        className="grid place-content-center text-current transition-none [&>svg]:size-3.5 data-[indeterminate]:[&_.checkbox-check-icon]:hidden data-[checked]:[&_.checkbox-check-icon]:block data-[indeterminate]:[&_.checkbox-minus-icon]:block"
       >
-        <CheckIcon />
+        <CheckIcon className="checkbox-check-icon hidden" />
+        <MinusIcon className="checkbox-minus-icon hidden" />
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
   );

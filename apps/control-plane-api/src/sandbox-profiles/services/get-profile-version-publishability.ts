@@ -63,6 +63,7 @@ export async function getProfileVersionPublishability(
       sandboxVcpuCount: true,
       sandboxMemoryMb: true,
       sandboxStorageMb: true,
+      skillsConfig: true,
     },
     where: (table, { and, eq }) =>
       and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),
@@ -95,10 +96,72 @@ export async function getProfileVersionPublishability(
         runtimeConfig: mapProfileVersionRuntimeConfig(sandboxProfileVersion),
       },
     )),
+    ...(await validateSandboxProfileVersionSkillsConfig(
+      { db },
+      {
+        organizationId: input.organizationId,
+        skillsConfig: sandboxProfileVersion.skillsConfig,
+      },
+    )),
   ];
 
   return {
     publishable: issues.length === 0,
     issues,
   };
+}
+
+async function validateSandboxProfileVersionSkillsConfig(
+  { db }: Pick<GetProfileVersionPublishabilityContext, "db">,
+  input: Pick<GetProfileVersionPublishabilityInput, "organizationId"> & {
+    skillsConfig: {
+      originUrl: string;
+      selectedSkills: Array<{
+        name: string;
+        relativePath: string;
+      }>;
+    } | null;
+  },
+): Promise<SandboxProfilePublishabilityIssue[]> {
+  if (input.skillsConfig === null) {
+    return [];
+  }
+
+  const skillsConfig = input.skillsConfig;
+  const skillsSourceRepo = await db.query.skillsSourceRepos.findFirst({
+    columns: {
+      skills: true,
+    },
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.organizationId, input.organizationId),
+        eq(table.originUrl, skillsConfig.originUrl),
+      ),
+  });
+
+  if (skillsSourceRepo === undefined) {
+    return [
+      {
+        code: SandboxProfilePublishabilityIssueCodes.SKILLS_SOURCE_NOT_LOADED,
+        message: "Load skills before publishing this sandbox profile.",
+      },
+    ];
+  }
+
+  const loadedSkillNamesByPath = new Map(
+    skillsSourceRepo.skills.map((skill) => [skill.relativePath, skill.name]),
+  );
+  const hasMissingSelectedSkill = skillsConfig.selectedSkills.some(
+    (skill) => loadedSkillNamesByPath.get(skill.relativePath) !== skill.name,
+  );
+  if (!hasMissingSelectedSkill) {
+    return [];
+  }
+
+  return [
+    {
+      code: SandboxProfilePublishabilityIssueCodes.SELECTED_SKILLS_NOT_FOUND,
+      message: "Remove skills that are no longer found before publishing this sandbox profile.",
+    },
+  ];
 }

@@ -6,6 +6,7 @@ import type {
   SandboxProfileBindingEditorRow,
 } from "./sandbox-profile-binding-config-editor.js";
 import {
+  createNextVisibleDiscoveredSkillsSelection,
   createSkillOptions,
   normalizeSkillsConfig,
   resolveSkillsConfigSaveBlockedMessage,
@@ -139,6 +140,113 @@ describe("sandbox profile skills section model", () => {
         available: false,
       },
     ]);
+  });
+
+  it("keeps selected skills visible when the loaded skill at the path has been renamed", () => {
+    expect(
+      createSkillOptions({
+        skillsSourceRepo: {
+          id: "ksr_1",
+          originUrl: "https://github.com/mistlehq/skills.git",
+          commitSha: "abc123",
+          lastSyncedAt: "2026-05-28T00:00:00.000Z",
+          createdAt: "2026-05-28T00:00:00.000Z",
+          updatedAt: "2026-05-28T00:00:00.000Z",
+          skills: [
+            {
+              name: "review-renamed",
+              description: "Review pull requests.",
+              relativePath: "review",
+            },
+          ],
+        },
+        selectedSkills: [
+          {
+            name: "review",
+            relativePath: "review",
+          },
+        ],
+      }),
+    ).toEqual([
+      {
+        name: "review",
+        description: "",
+        relativePath: "review",
+        available: false,
+      },
+      {
+        name: "review-renamed",
+        description: "Review pull requests.",
+        relativePath: "review",
+        available: true,
+      },
+    ]);
+  });
+
+  it("replaces a selected skill when bulk selecting a renamed discovered skill at the same path", () => {
+    expect(
+      createNextVisibleDiscoveredSkillsSelection({
+        allVisibleDiscoveredSkillsSelected: false,
+        currentConfig: {
+          originUrl: "https://github.com/mistlehq/skills.git",
+          selectedSkills: [
+            {
+              name: "review",
+              relativePath: "review",
+            },
+          ],
+        },
+        visibleSkills: [
+          {
+            name: "review-renamed",
+            relativePath: "review",
+          },
+        ],
+      }),
+    ).toEqual({
+      originUrl: "https://github.com/mistlehq/skills.git",
+      selectedSkills: [
+        {
+          name: "review-renamed",
+          relativePath: "review",
+        },
+      ],
+    });
+  });
+
+  it("removes visible discovered skills by path when bulk unselecting", () => {
+    expect(
+      createNextVisibleDiscoveredSkillsSelection({
+        allVisibleDiscoveredSkillsSelected: true,
+        currentConfig: {
+          originUrl: "https://github.com/mistlehq/skills.git",
+          selectedSkills: [
+            {
+              name: "review",
+              relativePath: "review",
+            },
+            {
+              name: "triage",
+              relativePath: "triage",
+            },
+          ],
+        },
+        visibleSkills: [
+          {
+            name: "review-renamed",
+            relativePath: "review",
+          },
+        ],
+      }),
+    ).toEqual({
+      originUrl: "https://github.com/mistlehq/skills.git",
+      selectedSkills: [
+        {
+          name: "triage",
+          relativePath: "triage",
+        },
+      ],
+    });
   });
 
   it("compares skills configs independent of selected skill order", () => {

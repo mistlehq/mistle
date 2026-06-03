@@ -522,6 +522,50 @@ describe.concurrent("sandbox profile versions publish integration", () => {
     expect(responseBody.code).toBe("PROFILE_VERSION_NOT_PUBLISHABLE");
   });
 
+  it("returns 409 when the draft selected skills have not been loaded", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publish-skills-unloaded@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_version_publish_skills_unloaded",
+        organizationId: session.organizationId,
+        displayName: "Publish Skills Unloaded Profile",
+        activeVersion: null,
+        createdAt: "2026-06-03T00:10:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_version_publish_skills_unloaded",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+        skillsConfig: {
+          originUrl: "https://github.com/acme/skills.git",
+          selectedSkills: [],
+        },
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_version_publish_skills_unloaded/versions/1/publish",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(409);
+    const responseBody = PublishSandboxProfileVersionConflictResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody.code).toBe("PROFILE_VERSION_NOT_PUBLISHABLE");
+  });
+
   it("returns 404 when the version does not exist", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-version-publish-missing-version@example.com",

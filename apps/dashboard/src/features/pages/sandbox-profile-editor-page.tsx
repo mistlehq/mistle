@@ -1806,6 +1806,17 @@ function ReadySandboxProfileEditorPage(input: {
     });
   }
 
+  async function saveDraftBeforeSkillsReload(): Promise<boolean> {
+    setSaveDraftRequestIsPending(true);
+    setDraftTriggerImpactAffectedTriggers(null);
+    setDraftTriggerImpactError(null);
+    try {
+      return await saveDraftChanges();
+    } finally {
+      setSaveDraftRequestIsPending(false);
+    }
+  }
+
   const setupAssistantDisabledReason =
     input.mode.kind !== "draft"
       ? "Setup Assistant is only available while editing a draft."
@@ -2209,6 +2220,7 @@ function ReadySandboxProfileEditorPage(input: {
           onSetupScriptDraftStateChange={setSetupScriptDraftState}
           setupAssistantControl={setupAssistantControl}
           maintenanceAssistantControl={maintenanceAssistantControl}
+          onSaveDraftBeforeSkillsReload={saveDraftBeforeSkillsReload}
           profileId={input.profileId}
           publishSuccessMessage={showPublishSuccessMessage}
           publishSuccessMessageKey={publishSuccessNoticeKey}
@@ -2711,6 +2723,7 @@ function SandboxProfileEditorSectionPanels(input: {
   onGitCommitSigningIntegrationConnectionChange: (connectionId: string | null) => void;
   onRuntimeDraftStateChange: (state: SandboxProfileRuntimeSettingsDraftState) => void;
   onSkillsDraftStateChange: (state: SandboxProfileSkillsSettingsDraftState) => void;
+  onSaveDraftBeforeSkillsReload: () => Promise<boolean>;
   onIntegrationDraftStateChange: (state: SandboxProfileDraftSectionState) => void;
   buildSetupScriptTestRuntimeConfig?: () => SandboxProfileRuntimeDraftChanges;
   onPublishSuccessMessageDismiss: () => void;
@@ -2827,6 +2840,7 @@ function SandboxProfileEditorSectionPanels(input: {
             }
             isDraft={input.mode.kind === "draft"}
             onDraftStateChange={input.onSkillsDraftStateChange}
+            onSaveDraftBeforeSkillsReload={input.onSaveDraftBeforeSkillsReload}
             profileId={input.profileId}
             readOnly={input.draftFieldsAreReadOnly}
             version={input.currentVersion}

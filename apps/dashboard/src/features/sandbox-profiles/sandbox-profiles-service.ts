@@ -559,6 +559,8 @@ const SandboxProfileVersionPublishabilitySchema = z
             "SANDBOX_CONNECTION_KIND_MISMATCH",
             "SANDBOX_CONNECTION_PROVIDER_MISMATCH",
             "INVALID_SANDBOX_RESOURCES",
+            "SKILLS_SOURCE_NOT_LOADED",
+            "SELECTED_SKILLS_NOT_FOUND",
           ]),
           message: z.string().min(1),
           bindingId: z.string().min(1).optional(),

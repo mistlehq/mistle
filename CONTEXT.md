@@ -244,6 +244,18 @@ _Avoid_: Skill mention text, selected skill, dashboard skill
 The runtime-provided file path that identifies the skill definition behind a **Codex skill mention**.
 _Avoid_: Context path, inserted path, attachment path
 
+**Sandbox profile skills source**:
+A Git repository selected on a **Sandbox profile version** as the source of skills that may be made available to agent runtimes.
+_Avoid_: Codex skill mention, skill picker source
+
+**Skills loading**:
+The operation that scans a **Sandbox profile skills source** and records the skills found for that **Mistle organization** and repository. Skills loading may happen automatically for the first load or manually when a user reloads an already-loaded source.
+_Avoid_: Refresh when speaking about the product intent, auto-refresh
+
+**Missing selected skill**:
+A skill selected on a **Sandbox profile version** whose name and **Skill source path** are not both present in the loaded **Sandbox profile skills source**.
+_Avoid_: Unavailable skill, unavailable source
+
 **Codex slash palette**:
 The Codex composer palette opened with `/`, listing **Composer commands** before runtime-discovered **Codex skill mentions**.
 _Avoid_: Skill picker, command-only palette
