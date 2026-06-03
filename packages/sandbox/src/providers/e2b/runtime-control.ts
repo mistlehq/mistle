@@ -128,101 +128,6 @@ export class E2BSandboxRuntimeControl implements SandboxRuntimeControl {
     });
   }
 
-  async init(input: SandboxRuntimeControlRequest): Promise<void> {
-    requireSandboxId(input.id);
-
-    await withSandboxProviderOperationTelemetry({
-      provider: "e2b",
-      operation: E2BClientOperationIds.INIT,
-      fn: async () => {
-        try {
-          await this.#client.init({
-            sandboxId: input.id,
-            payload: input.payload,
-            ...(input.env === undefined ? {} : { env: input.env }),
-          });
-        } catch (error) {
-          if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
-            throw toSandboxNotFoundError(input.id, error);
-          }
-
-          throw error;
-        }
-      },
-    });
-  }
-
-  async beginInit(input: SandboxRuntimeControlRequest): Promise<void> {
-    requireSandboxId(input.id);
-
-    await withSandboxProviderOperationTelemetry({
-      provider: "e2b",
-      operation: "begin_init",
-      fn: async () => {
-        try {
-          await this.#client.beginInit({
-            sandboxId: input.id,
-            payload: input.payload,
-            ...(input.env === undefined ? {} : { env: input.env }),
-          });
-        } catch (error) {
-          if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
-            throw toSandboxNotFoundError(input.id, error);
-          }
-
-          throw error;
-        }
-      },
-    });
-  }
-
-  async waitInit(input: { id: string; env?: Readonly<Record<string, string>> }): Promise<void> {
-    requireSandboxId(input.id);
-
-    await withSandboxProviderOperationTelemetry({
-      provider: "e2b",
-      operation: "wait_init",
-      fn: async () => {
-        try {
-          await this.#client.waitInit({
-            sandboxId: input.id,
-            ...(input.env === undefined ? {} : { env: input.env }),
-          });
-        } catch (error) {
-          if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
-            throw toSandboxNotFoundError(input.id, error);
-          }
-
-          throw error;
-        }
-      },
-    });
-  }
-
-  async resume(input: SandboxRuntimeControlRequest): Promise<void> {
-    requireSandboxId(input.id);
-
-    await withSandboxProviderOperationTelemetry({
-      provider: "e2b",
-      operation: E2BClientOperationIds.RESUME,
-      fn: async () => {
-        try {
-          await this.#client.resume({
-            sandboxId: input.id,
-            payload: input.payload,
-            ...(input.env === undefined ? {} : { env: input.env }),
-          });
-        } catch (error) {
-          if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
-            throw toSandboxNotFoundError(input.id, error);
-          }
-
-          throw error;
-        }
-      },
-    });
-  }
-
   async activate(input: SandboxRuntimeControlRequest): Promise<void> {
     requireSandboxId(input.id);
 
@@ -247,13 +152,8 @@ export class E2BSandboxRuntimeControl implements SandboxRuntimeControl {
     });
   }
 
-  async readOperationLog(input: {
-    id: string;
-    operation: "activate" | "init" | "resume";
-  }): Promise<string | null> {
+  async readOperationLog(input: { id: string; operation: "activate" }): Promise<string | null> {
     requireSandboxId(input.id);
-
-    const path = sandboxdOperationLogPath(input.operation);
 
     return await withSandboxProviderOperationTelemetry({
       provider: "e2b",
@@ -264,7 +164,8 @@ export class E2BSandboxRuntimeControl implements SandboxRuntimeControl {
             sandboxId: input.id,
             operation: E2BClientOperationIds.READ_OPERATION_LOG,
             commandDescription: `Read sandbox ${input.operation} operation log`,
-            command: `if test -f '${path}'; then cat -- '${path}'; fi`,
+            command:
+              "if test -f '/run/mistle/activate.log'; then cat -- '/run/mistle/activate.log'; fi",
             user: "root",
             timeoutMs: SandboxdReadOperationLogTimeoutMs,
           });
@@ -282,17 +183,6 @@ export class E2BSandboxRuntimeControl implements SandboxRuntimeControl {
   }
 
   async close(): Promise<void> {}
-}
-
-function sandboxdOperationLogPath(operation: "activate" | "init" | "resume"): string {
-  switch (operation) {
-    case "activate":
-      return "/run/mistle/activate.log";
-    case "init":
-      return "/run/mistle/init.log";
-    case "resume":
-      return "/run/mistle/resume.log";
-  }
 }
 
 export function createE2BSandboxRuntimeControl(client: E2BClient): SandboxRuntimeControl {

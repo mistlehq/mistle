@@ -13,7 +13,7 @@ describe("Docker sandbox runtime control timeouts", () => {
     expect(DockerExecExitTimeoutMs).toBe(120_000);
   });
 
-  it("allows long-running sandboxd initialization commands to run for one hour when requested", () => {
+  it("allows long-running sandboxd activation commands to run for one hour when requested", () => {
     expect(DockerLongRunningExecExitTimeoutMs).toBe(60 * 60 * 1000);
   });
 

@@ -86,17 +86,17 @@ describe("mapE2BClientError", () => {
 
   it("maps command exit errors", () => {
     const mapped = mapE2BClientError(
-      E2BClientOperationIds.INIT,
+      E2BClientOperationIds.ACTIVATE,
       new CommandExitError({
         exitCode: 17,
-        error: "init failed",
+        error: "activate failed",
         stdout: "out",
         stderr: "err",
       }),
     );
 
     expect(mapped.code).toBe(E2BClientErrorCodes.COMMAND_EXIT);
-    expect(mapped.operation).toBe(E2BClientOperationIds.INIT);
+    expect(mapped.operation).toBe(E2BClientOperationIds.ACTIVATE);
     expect(mapped.retryable).toBe(false);
   });
 

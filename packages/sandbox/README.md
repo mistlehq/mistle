@@ -22,9 +22,9 @@ Provider-specific documentation lives with providers that have dedicated README 
 - inspect compute and normalize provider lifecycle state
 - resume, stop, and destroy provider compute
 - capture a new provider image or snapshot handle from a running sandbox
-- initialize, activate, or resume the in-sandbox `sandboxd` runtime
+- activate the in-sandbox `sandboxd` runtime
 - read `sandboxd` version for runtime visibility
-- read `sandboxd` init/resume operation logs for startup diagnostics
+- read `sandboxd` activation operation logs for startup diagnostics
 
 It does not compile runtime plans, mint tunnel tokens, or manage provider platform infrastructure such as autoscaling, cluster/node lifecycle, scheduling policy, and capacity management. Those decisions live in the data-plane/control-plane application layers. This package receives already-resolved provider config, image handles, and runtime payloads.
 
@@ -49,11 +49,7 @@ The main entrypoints are:
 
 - `ensureSandboxd(request)`
 - `readSandboxdVersion(request)`
-- `beginInit(request)`
-- `init(request)`
-- `waitInit(request)`
 - `activate(request)`
-- `resume(request)`
 - `readOperationLog(request)`
 - `close()`
 
@@ -90,10 +86,6 @@ const sandbox = await adapter.start({
   },
 });
 
-await runtimeControl.init({
-  id: sandbox.id,
-  payload: new TextEncoder().encode("{}\n"),
-});
 await runtimeControl.activate({
   id: sandbox.id,
   payload: new TextEncoder().encode("{}\n"),
@@ -143,11 +135,11 @@ The package is used by the data-plane API and worker through provider factories 
 
 Current high-level flows:
 
-- start workflow: ensure sandbox row, `prepareImage`, `start`, persist provider metadata, runtime `init`, wait for readiness
-- resume workflow: mark starting, try provider `resume`, runtime `resume`, wait for readiness
+- start workflow: ensure sandbox row, `prepareImage`, `start`, persist provider metadata, runtime `activate`, wait for readiness
+- resume workflow: mark starting, try provider compute `resume`, runtime `activate`, wait for readiness
 - stop/destroy workflows: call provider compute teardown
-- snapshot materialization: start a setup sandbox, initialize runtime, capture a snapshot handle, then destroy compute
-- startup diagnostics: worker reads provider operation logs with `readOperationLog({ operation: "init" | "resume" })` after init/resume failures
+- snapshot materialization: start a setup sandbox, activate runtime, capture a snapshot handle, then destroy compute
+- startup diagnostics: worker reads provider operation logs with `readOperationLog({ operation: "activate" })` after activation failures
 
 ## Integration Tests
 
@@ -185,13 +177,13 @@ Use the current Docker, E2B, and Tensorlake providers as reference implementatio
 4. Implement `src/providers/<provider>/client.ts` for raw SDK/API calls.
 5. Add provider error mapping in `src/providers/<provider>/client-errors.ts`.
 6. Implement `src/providers/<provider>/adapter.ts` for the complete `SandboxAdapter` surface: image preparation, start, inspect, resume, snapshot capture, stop, and destroy.
-7. Implement `src/providers/<provider>/runtime-control.ts` for the complete `SandboxRuntimeControl` surface: daemon startup, sandboxd version reads, begin-init, init, wait-init, activate, resume, operation-log reads, and close.
+7. Implement `src/providers/<provider>/runtime-control.ts` for the complete `SandboxRuntimeControl` surface: daemon startup, sandboxd version reads, activate, activation-log reads, and close.
 8. Create `src/providers/<provider>/index.ts` with both `create<Provider>Adapter(...)` and `create<Provider>RuntimeControl(...)` constructors.
 9. Wire the provider into both `createSandboxAdapter` and `createSandboxRuntimeControl` in `src/factory.ts`.
 10. Add unit tests next to provider modules, including config, errors, factory wiring, adapter behavior, and runtime-control construction.
 11. Add provider integration tests in `integration/<provider>/`.
 
-Integration tests should cover the provider lifecycle surface, snapshot capture, runtime-control init/activate/resume behavior, and operation-log reads.
+Integration tests should cover the provider lifecycle surface, provider compute resume, snapshot capture, runtime-control activation, and activation-log reads.
 
 Design expectations:
 

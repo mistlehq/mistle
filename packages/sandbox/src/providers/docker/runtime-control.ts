@@ -28,9 +28,6 @@ import {
 } from "./client-errors.js";
 import type { DockerSandboxConfig } from "./config.js";
 
-const InitCommand = ["/opt/mistle/bin/sandboxd", "init"];
-const DetachedInitCommand = ["/opt/mistle/bin/sandboxd", "init", "--detach"];
-const WaitInitCommand = ["/opt/mistle/bin/sandboxd", "wait-init"];
 export const ActivateCommand = ["/opt/mistle/bin/sandboxd", "activate"] as const;
 const VersionCommand = ["/opt/mistle/bin/sandboxd", "version"];
 const StopSandboxdCommand = ["sh", "-euc", SandboxdStopDaemonCommand];
@@ -246,49 +243,6 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
     }
   }
 
-  async beginInit(input: SandboxRuntimeControlRequest): Promise<void> {
-    await this.#runInitCommand({
-      ...input,
-      command: DetachedInitCommand,
-      waitForCompletion: true,
-    });
-  }
-
-  async init(input: SandboxRuntimeControlRequest): Promise<void> {
-    await this.#runInitCommand({
-      ...input,
-      command: InitCommand,
-      waitForCompletion: true,
-    });
-  }
-
-  async waitInit(input: { id: string; env?: Readonly<Record<string, string>> }): Promise<void> {
-    if (input.id.trim().length === 0) {
-      throw new SandboxConfigurationError("Sandbox id is required.");
-    }
-
-    try {
-      await this.#runExecCommand({
-        id: input.id,
-        operation: DockerClientOperationIds.INIT,
-        command: WaitInitCommand,
-        ...(input.env === undefined ? {} : { env: input.env }),
-        failureDescription: "Docker sandbox wait-init command",
-        timeoutMs: DockerLongRunningExecExitTimeoutMs,
-      });
-    } catch (error) {
-      if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
-        throw new SandboxResourceNotFoundError({
-          resourceType: "sandbox",
-          resourceId: input.id,
-          cause: error,
-        });
-      }
-
-      throw error;
-    }
-  }
-
   async activate(input: SandboxRuntimeControlRequest): Promise<void> {
     await this.#runPayloadCommand({
       ...input,
@@ -301,25 +255,10 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
     });
   }
 
-  async #runInitCommand(
-    input: SandboxRuntimeControlRequest & {
-      command: string[];
-      waitForCompletion: boolean;
-    },
-  ): Promise<void> {
-    await this.#runPayloadCommand({
-      ...input,
-      operation: DockerClientOperationIds.INIT,
-      failureDescription: "Docker sandbox init command",
-      execFailureDescription: "Docker sandbox init exec",
-      timeoutMs: DockerLongRunningExecExitTimeoutMs,
-    });
-  }
-
   async #runPayloadCommand(
     input: SandboxRuntimeControlRequest & {
       command: readonly string[];
-      operation: typeof DockerClientOperationIds.INIT | typeof DockerClientOperationIds.ACTIVATE;
+      operation: typeof DockerClientOperationIds.ACTIVATE;
       failureDescription: string;
       execFailureDescription: string;
       timeoutMs: number;
@@ -398,25 +337,20 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
     }
   }
 
-  async resume(input: SandboxRuntimeControlRequest): Promise<void> {
-    await this.init(input);
-  }
-
-  async readOperationLog(input: {
-    id: string;
-    operation: "activate" | "init" | "resume";
-  }): Promise<string | null> {
+  async readOperationLog(input: { id: string; operation: "activate" }): Promise<string | null> {
     if (input.id.trim().length === 0) {
       throw new SandboxConfigurationError("Sandbox id is required.");
     }
-
-    const path = sandboxdOperationLogPath(input.operation);
 
     try {
       const output = await this.#runExecCommand({
         id: input.id,
         operation: DockerClientOperationIds.READ_OPERATION_LOG,
-        command: ["sh", "-euc", `if test -f '${path}'; then cat -- '${path}'; fi`],
+        command: [
+          "sh",
+          "-euc",
+          "if test -f '/run/mistle/activate.log'; then cat -- '/run/mistle/activate.log'; fi",
+        ],
         failureDescription: "Docker sandbox operation log read",
       });
       const logText = output.stdout.trim();
@@ -512,17 +446,6 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
     } catch (error) {
       throw mapDockerClientError(operation, error);
     }
-  }
-}
-
-function sandboxdOperationLogPath(operation: "activate" | "init" | "resume"): string {
-  switch (operation) {
-    case "activate":
-      return "/run/mistle/activate.log";
-    case "init":
-      return "/run/mistle/init.log";
-    case "resume":
-      return "/run/mistle/resume.log";
   }
 }
 

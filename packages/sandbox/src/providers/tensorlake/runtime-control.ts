@@ -150,109 +150,6 @@ export class TensorlakeSandboxRuntimeControl implements SandboxRuntimeControl {
     });
   }
 
-  async init(input: SandboxRuntimeControlRequest): Promise<void> {
-    requireSandboxId(input.id);
-
-    await withSandboxProviderOperationTelemetry({
-      provider: "tensorlake",
-      operation: TensorlakeClientOperationIds.INIT,
-      fn: async () => {
-        try {
-          await this.#client.init({
-            sandboxId: input.id,
-            payload: input.payload,
-            ...(input.env === undefined ? {} : { env: input.env }),
-          });
-        } catch (error) {
-          if (
-            error instanceof TensorlakeClientError &&
-            error.code === TensorlakeClientErrorCodes.NOT_FOUND
-          ) {
-            throw toSandboxNotFoundError(input.id, error);
-          }
-          throw error;
-        }
-      },
-    });
-  }
-
-  async beginInit(input: SandboxRuntimeControlRequest): Promise<void> {
-    requireSandboxId(input.id);
-
-    await withSandboxProviderOperationTelemetry({
-      provider: "tensorlake",
-      operation: "begin_init",
-      fn: async () => {
-        try {
-          await this.#client.beginInit({
-            sandboxId: input.id,
-            payload: input.payload,
-            ...(input.env === undefined ? {} : { env: input.env }),
-          });
-        } catch (error) {
-          if (
-            error instanceof TensorlakeClientError &&
-            error.code === TensorlakeClientErrorCodes.NOT_FOUND
-          ) {
-            throw toSandboxNotFoundError(input.id, error);
-          }
-          throw error;
-        }
-      },
-    });
-  }
-
-  async waitInit(input: { id: string; env?: Readonly<Record<string, string>> }): Promise<void> {
-    requireSandboxId(input.id);
-
-    await withSandboxProviderOperationTelemetry({
-      provider: "tensorlake",
-      operation: "wait_init",
-      fn: async () => {
-        try {
-          await this.#client.waitInit({
-            sandboxId: input.id,
-            ...(input.env === undefined ? {} : { env: input.env }),
-          });
-        } catch (error) {
-          if (
-            error instanceof TensorlakeClientError &&
-            error.code === TensorlakeClientErrorCodes.NOT_FOUND
-          ) {
-            throw toSandboxNotFoundError(input.id, error);
-          }
-          throw error;
-        }
-      },
-    });
-  }
-
-  async resume(input: SandboxRuntimeControlRequest): Promise<void> {
-    requireSandboxId(input.id);
-
-    await withSandboxProviderOperationTelemetry({
-      provider: "tensorlake",
-      operation: TensorlakeClientOperationIds.RESUME,
-      fn: async () => {
-        try {
-          await this.#client.resume({
-            sandboxId: input.id,
-            payload: input.payload,
-            ...(input.env === undefined ? {} : { env: input.env }),
-          });
-        } catch (error) {
-          if (
-            error instanceof TensorlakeClientError &&
-            error.code === TensorlakeClientErrorCodes.NOT_FOUND
-          ) {
-            throw toSandboxNotFoundError(input.id, error);
-          }
-          throw error;
-        }
-      },
-    });
-  }
-
   async activate(input: SandboxRuntimeControlRequest): Promise<void> {
     requireSandboxId(input.id);
 
@@ -279,13 +176,8 @@ export class TensorlakeSandboxRuntimeControl implements SandboxRuntimeControl {
     });
   }
 
-  async readOperationLog(input: {
-    id: string;
-    operation: "activate" | "init" | "resume";
-  }): Promise<string | null> {
+  async readOperationLog(input: { id: string; operation: "activate" }): Promise<string | null> {
     requireSandboxId(input.id);
-
-    const path = sandboxdOperationLogPath(input.operation);
 
     return await withSandboxProviderOperationTelemetry({
       provider: "tensorlake",
@@ -297,7 +189,10 @@ export class TensorlakeSandboxRuntimeControl implements SandboxRuntimeControl {
             operation: TensorlakeClientOperationIds.READ_OPERATION_LOG,
             commandDescription: `Read sandbox ${input.operation} operation log`,
             command: "sh",
-            args: ["-c", `if test -f '${path}'; then cat -- '${path}'; fi`],
+            args: [
+              "-c",
+              "if test -f '/run/mistle/activate.log'; then cat -- '/run/mistle/activate.log'; fi",
+            ],
             timeoutMs: SandboxdReadOperationLogTimeoutMs,
           });
           const logText = result.stdout.trim();
@@ -317,17 +212,6 @@ export class TensorlakeSandboxRuntimeControl implements SandboxRuntimeControl {
 
   async close(): Promise<void> {
     this.#client.close();
-  }
-}
-
-function sandboxdOperationLogPath(operation: "activate" | "init" | "resume"): string {
-  switch (operation) {
-    case "activate":
-      return "/run/mistle/activate.log";
-    case "init":
-      return "/run/mistle/init.log";
-    case "resume":
-      return "/run/mistle/resume.log";
   }
 }
 
