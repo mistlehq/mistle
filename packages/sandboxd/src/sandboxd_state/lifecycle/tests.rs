@@ -53,6 +53,8 @@ fn run_setup_script_writes_stdout_and_stderr_transcript_records() {
         StartupDiagnosticsLogger::initialize(StartupOperation::Init, bootstrap_url)
             .expect("startup diagnostics logger should initialize");
     let runtime_plan = CompiledRuntimePlan {
+        sandbox_profile_id: "sbp_lifecycle".to_string(),
+        version: 1,
         image: test_runtime_plan_image(crate::runtime::CompiledRuntimePlanImageSource::Base),
         setup_script: Some(
             "printf setup-script-stdout; printf setup-script-stderr >&2".to_string(),

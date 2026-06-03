@@ -10,8 +10,10 @@ use serde::{Deserialize, Deserializer};
 
 /// The subset of the compiled runtime plan that `sandboxd` currently understands.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CompiledRuntimePlan {
+    pub sandbox_profile_id: String,
+    pub version: u32,
     pub image: CompiledRuntimePlanImage,
     pub setup_script: Option<String>,
     pub egress_routes: Vec<CompiledEgressRoute>,
@@ -677,10 +679,36 @@ mod tests {
     use super::{
         CompiledEgressRoute, CompiledEgressRouteAuthInjectionType,
         CompiledEgressRouteCredentialResolver,
-        CompiledLinkedPrincipalEgressCredentialResolutionMode,
+        CompiledLinkedPrincipalEgressCredentialResolutionMode, CompiledRuntimePlan,
         RuntimeArtifactGitHubReleaseInstallAsset, RuntimeArtifactGitHubReleaseSelector,
         RuntimeArtifactInstallStep,
     };
+
+    #[test]
+    fn rejects_unknown_top_level_runtime_plan_fields() {
+        let error = serde_json::from_value::<CompiledRuntimePlan>(serde_json::json!({
+          "sandboxProfileId": "sbp_01k00000000000000000000000",
+          "version": 1,
+          "image": {
+            "source": "base",
+            "imageRef": "registry.example.test/base:latest"
+          },
+          "egressRoutes": [],
+          "artifacts": [],
+          "workspaceSources": [],
+          "runtimeClients": [],
+          "agentRuntimes": [],
+          "futureRuntimePlanField": true
+        }))
+        .expect_err("runtime plan decoder should reject unknown top-level fields");
+
+        assert!(
+            error
+                .to_string()
+                .contains("unknown field `futureRuntimePlanField`"),
+            "unexpected error: {error}"
+        );
+    }
 
     #[test]
     fn decodes_github_release_selector_exact_tag_shape() {

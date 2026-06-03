@@ -146,6 +146,8 @@ mod tests {
     #[test]
     fn collects_runtime_environment_from_artifacts() {
         let runtime_plan = CompiledRuntimePlan {
+            sandbox_profile_id: "sbp_runtime_env".to_string(),
+            version: 1,
             image: test_runtime_plan_image(CompiledRuntimePlanImageSource::Base),
             setup_script: None,
             egress_routes: Vec::new(),
@@ -197,6 +199,8 @@ mod tests {
     #[test]
     fn rejects_conflicting_runtime_environment_values() {
         let runtime_plan = CompiledRuntimePlan {
+            sandbox_profile_id: "sbp_runtime_env".to_string(),
+            version: 1,
             image: test_runtime_plan_image(CompiledRuntimePlanImageSource::Base),
             setup_script: None,
             egress_routes: Vec::new(),

@@ -225,6 +225,8 @@ mod tests {
     fn run_setup_script_skips_missing_or_blank_scripts() {
         let runtime_env = BTreeMap::new();
         let missing_setup_script_plan = CompiledRuntimePlan {
+            sandbox_profile_id: "sbp_setup_script".to_string(),
+            version: 1,
             image: test_runtime_plan_image(CompiledRuntimePlanImageSource::Base),
             setup_script: None,
             egress_routes: Vec::new(),
@@ -243,6 +245,8 @@ mod tests {
         .expect("missing setup script should be a no-op");
 
         let blank_setup_script_plan = CompiledRuntimePlan {
+            sandbox_profile_id: "sbp_setup_script".to_string(),
+            version: 1,
             image: test_runtime_plan_image(CompiledRuntimePlanImageSource::Base),
             setup_script: Some("   \n\t  ".to_string()),
             egress_routes: Vec::new(),
@@ -271,6 +275,8 @@ mod tests {
                 .as_nanos()
         ));
         let runtime_plan = CompiledRuntimePlan {
+            sandbox_profile_id: "sbp_setup_script".to_string(),
+            version: 1,
             image: test_runtime_plan_image(CompiledRuntimePlanImageSource::Base),
             setup_script: Some(format!(
                 "#!/bin/false\nprintf 'script body ran' > {path}",
@@ -320,6 +326,8 @@ mod tests {
                 .as_nanos()
         ));
         let runtime_plan = CompiledRuntimePlan {
+            sandbox_profile_id: "sbp_setup_script".to_string(),
+            version: 1,
             image: test_runtime_plan_image(CompiledRuntimePlanImageSource::Base),
             setup_script: Some(format!(
                 "printf '%s\\n' \"$TERM\" > {path}; printf '%s\\n' \"$MISTLE_TEST_ENV\" >> {path}; pwd >> {path}; printf '%s\\n' \"$0\" >> {path}; test -x \"$0\" && printf 'executable\\n' >> {path}",
@@ -377,6 +385,8 @@ mod tests {
     #[test]
     fn run_setup_script_captures_stdout_and_stderr_on_failure() {
         let runtime_plan = CompiledRuntimePlan {
+            sandbox_profile_id: "sbp_setup_script".to_string(),
+            version: 1,
             image: test_runtime_plan_image(CompiledRuntimePlanImageSource::Base),
             setup_script: Some(
                 "printf '%s\\nstdout-line' \"$0\"; printf 'stderr-line' >&2; exit 17".to_string(),

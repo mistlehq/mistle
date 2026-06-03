@@ -179,8 +179,7 @@ impl fmt::Display for SkillsDiscoverError {
             } => {
                 write!(
                     f,
-                    "duplicate skill name '{}' discovered at '{}' and '{}'",
-                    name, first_path, second_path
+                    "duplicate skill name '{name}' discovered at '{first_path}' and '{second_path}'"
                 )
             }
             Self::SkillPathOutsideRepo(path) => {
@@ -492,8 +491,7 @@ impl fmt::Display for SkillsReconcileError {
             } => {
                 write!(
                     f,
-                    "selected skill path '{}' declares skill name '{}' but the runtime plan selected '{}'",
-                    relative_path, actual_name, expected_name
+                    "selected skill path '{relative_path}' declares skill name '{actual_name}' but the runtime plan selected '{expected_name}'"
                 )
             }
             Self::DuplicateSelectedSkillPath(relative_path) => {
@@ -509,8 +507,7 @@ impl fmt::Display for SkillsReconcileError {
             } => {
                 write!(
                     f,
-                    "selected skills '{}' and '{}' both declare skill name '{}'",
-                    first_path, second_path, name
+                    "selected skills '{first_path}' and '{second_path}' both declare skill name '{name}'"
                 )
             }
             Self::UnknownRuntime(runtime) => {

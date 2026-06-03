@@ -1364,6 +1364,8 @@ fn send_proxy_websocket_handshake(proxy_address: SocketAddr, target_url: &str) -
 
 fn sample_runtime_plan() -> CompiledRuntimePlan {
     CompiledRuntimePlan {
+        sandbox_profile_id: "sbp_egress_proxy".to_string(),
+        version: 1,
         image: crate::runtime::CompiledRuntimePlanImage {
             source: crate::runtime::CompiledRuntimePlanImageSource::Base,
             image_ref: "registry.example.test/base:latest".to_string(),
