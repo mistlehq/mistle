@@ -9,7 +9,7 @@ use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use sandboxd::control;
-use sandboxd::protocol::startup::{StartupInput, StartupMode};
+use sandboxd::protocol::activation::ActivationInput;
 use sandboxd::test_support::TestAttachmentRootGuard;
 use sandboxd::time::{Duration, Sleeper, ThreadSleeper};
 use tungstenite::{Message, accept};
@@ -17,7 +17,7 @@ use tungstenite::{Message, accept};
 static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[test]
-fn daemon_applies_startup_input_after_init_submission() {
+fn daemon_applies_activation_input_after_activation_submission() {
     let test_dir = create_temp_test_dir("serve_runtime_apply");
     let _attachment_root_guard = TestAttachmentRootGuard::set(test_dir.join("attachments"));
     let control_socket_path = test_dir.join("control.sock");
@@ -25,10 +25,8 @@ fn daemon_applies_startup_input_after_init_submission() {
     let startup_output_path = test_dir.join("startup-output.txt");
     let bootstrap_gateway = start_bootstrap_gateway();
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
-        execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
+    let activation_input = ActivationInput {
+        operation_kind: sandboxd::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: bootstrap_gateway.ws_url.clone(),
@@ -75,14 +73,14 @@ fn daemon_applies_startup_input_after_init_submission() {
         &global_git_config_path,
     )
     .expect("daemon should start");
-    control::submit_init(&control_socket_path, &startup_input, true)
-        .expect("init submission should succeed");
+    control::submit_activate(&control_socket_path, &activation_input)
+        .expect("activation submission should succeed");
 
     wait_for_file_contents_or_init_failure(&server, &startup_output_path, "startup");
     assert_eq!(
         server
-            .startup_input()
-            .expect("daemon should retain the accepted startup input")
+            .activation_input()
+            .expect("daemon should retain the accepted activation input")
             .bootstrap_token,
         "bootstrap-token-value"
     );
@@ -106,13 +104,13 @@ fn wait_for_file_contents_or_init_failure(
             return;
         }
 
-        match server.init_phase() {
-            control::InitPhase::Failed(error) => {
-                panic!("sandboxd init failed before startup output was observed: {error}");
+        match server.activation_phase() {
+            control::ActivationPhase::Failed(error) => {
+                panic!("sandboxd activation failed before startup output was observed: {error}");
             }
-            control::InitPhase::Initialized
-            | control::InitPhase::Initializing
-            | control::InitPhase::Uninitialized => {}
+            control::ActivationPhase::Activated
+            | control::ActivationPhase::Activating
+            | control::ActivationPhase::Unactivated => {}
         }
 
         ThreadSleeper.sleep(Duration::from_millis(10));

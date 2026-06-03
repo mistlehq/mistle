@@ -7,10 +7,10 @@ use serde_json::Value;
 use tokio::sync::mpsc;
 
 use super::{
-    ACTIVATE_LOG_PATH, INIT_LOG_PATH, RESUME_LOG_PATH, StartupDiagnosticsLogger, StartupOperation,
-    StartupTranscriptStream, send_lifecycle_operation_record_with_timeout,
+    ACTIVATE_LOG_PATH, ActivationDiagnosticsLogger, ActivationOperation,
+    ActivationTranscriptStream, send_lifecycle_operation_record_with_timeout,
 };
-use crate::protocol::startup::StartupOperationKind;
+use crate::protocol::startup::ActivationOperationKind;
 use crate::test_support::TestEnvVarGuard;
 use crate::time::Clock;
 use crate::tunnel::session::OperationStreamMessage;
@@ -40,16 +40,18 @@ fn initializes_and_appends_operation_log_lines() {
     let _log_dir_guard =
         TestEnvVarGuard::set(super::TEST_LOG_DIR_ENV, temp_dir.to_string_lossy().as_ref());
 
-    let logger = StartupDiagnosticsLogger::initialize(
-        StartupOperation::Init,
+    let logger = ActivationDiagnosticsLogger::initialize(
+        ActivationOperation::Activation {
+            operation_kind: ActivationOperationKind::Start,
+        },
         "ws://127.0.0.1:4000/tunnel/sandbox/sbi_test",
     )
     .expect("logger should initialize");
     logger
         .record_with_clock(
             &FixedClock,
-            super::StartupDiagnosticLevel::Info,
-            "sandbox_init_started",
+            super::ActivationDiagnosticLevel::Info,
+            "sandbox_start_started",
             BTreeMap::new(),
         )
         .expect("started record should append");
@@ -62,15 +64,15 @@ fn initializes_and_appends_operation_log_lines() {
     logger
         .record_transcript(
             Some("apply_runtime_plan"),
-            StartupTranscriptStream::Stdout,
+            ActivationTranscriptStream::Stdout,
             b"installing dependencies",
         )
         .expect("transcript record should append");
     logger
         .record_with_clock(
             &FixedClock,
-            super::StartupDiagnosticLevel::Error,
-            "sandbox_init_phase_failed",
+            super::ActivationDiagnosticLevel::Error,
+            "sandbox_start_phase_failed",
             BTreeMap::from([
                 (
                     "phase".to_string(),
@@ -84,7 +86,7 @@ fn initializes_and_appends_operation_log_lines() {
         )
         .expect("failure record should append");
 
-    let log_path = temp_dir.join("init.log");
+    let log_path = temp_dir.join("activate.log");
     let log_text = fs::read_to_string(&log_path).expect("log file should be readable");
     let lines = log_text.lines().collect::<Vec<_>>();
     assert!(lines.len() >= 4);
@@ -93,30 +95,29 @@ fn initializes_and_appends_operation_log_lines() {
         .map(|line| serde_json::from_str::<Value>(line).expect("log line should be valid json"))
         .collect::<Vec<_>>();
     assert!(records.iter().any(|record| {
-        record["event"] == "sandbox_init_started" && record["sandboxInstanceId"] == "sbi_test"
+        record["event"] == "sandbox_start_started" && record["sandboxInstanceId"] == "sbi_test"
     }));
     assert!(records.iter().any(|record| {
-        record["event"] == "sandbox_init_phase_started" && record["phase"] == "apply_runtime_plan"
+        record["event"] == "sandbox_start_phase_started" && record["phase"] == "apply_runtime_plan"
     }));
     assert!(records.iter().any(|record| {
-        record["event"] == "sandbox_init_phase_completed" && record["phase"] == "apply_runtime_plan"
+        record["event"] == "sandbox_start_phase_completed"
+            && record["phase"] == "apply_runtime_plan"
     }));
     assert!(records.iter().any(|record| {
-        record["event"] == "sandbox_init_transcript"
+        record["event"] == "sandbox_start_transcript"
             && record["phase"] == "apply_runtime_plan"
             && record["stream"] == "stdout"
             && record["message"] == "installing dependencies"
             && record["payloadBase64"] == "aW5zdGFsbGluZyBkZXBlbmRlbmNpZXM="
     }));
     assert!(records.iter().any(|record| {
-        record["event"] == "sandbox_init_phase_failed"
+        record["event"] == "sandbox_start_phase_failed"
             && record["phase"] == "apply_runtime_plan"
             && record["error"] == "workspace clone failed"
     }));
 
     let _ = fs::remove_dir_all(&temp_dir);
-    assert_eq!(INIT_LOG_PATH, "/run/mistle/init.log");
-    assert_eq!(RESUME_LOG_PATH, "/run/mistle/resume.log");
     assert_eq!(ACTIVATE_LOG_PATH, "/run/mistle/activate.log");
 }
 
@@ -132,9 +133,9 @@ fn activation_diagnostics_use_operation_kind_records() {
     let _log_dir_guard =
         TestEnvVarGuard::set(super::TEST_LOG_DIR_ENV, temp_dir.to_string_lossy().as_ref());
 
-    let logger = StartupDiagnosticsLogger::initialize(
-        StartupOperation::Activation {
-            operation_kind: StartupOperationKind::SetupCheck,
+    let logger = ActivationDiagnosticsLogger::initialize(
+        ActivationOperation::Activation {
+            operation_kind: ActivationOperationKind::SetupCheck,
         },
         "ws://127.0.0.1:4000/tunnel/sandbox/sbi_test",
     )
@@ -148,7 +149,7 @@ fn activation_diagnostics_use_operation_kind_records() {
     logger
         .record_transcript(
             Some("apply_runtime_plan"),
-            StartupTranscriptStream::Stdout,
+            ActivationTranscriptStream::Stdout,
             b"installing dependencies",
         )
         .expect("activation transcript record should append");
@@ -230,8 +231,10 @@ fn publishes_lifecycle_records_buffered_before_operation_sender_attachment() {
     let _log_dir_guard =
         TestEnvVarGuard::set(super::TEST_LOG_DIR_ENV, temp_dir.to_string_lossy().as_ref());
 
-    let logger = StartupDiagnosticsLogger::initialize(
-        StartupOperation::Init,
+    let logger = ActivationDiagnosticsLogger::initialize(
+        ActivationOperation::Activation {
+            operation_kind: ActivationOperationKind::Start,
+        },
         "ws://127.0.0.1:4000/tunnel/sandbox/sbi_test",
     )
     .expect("logger should initialize");
@@ -292,9 +295,9 @@ fn publishes_activation_lifecycle_records_with_activation_operation_kind() {
     let _log_dir_guard =
         TestEnvVarGuard::set(super::TEST_LOG_DIR_ENV, temp_dir.to_string_lossy().as_ref());
 
-    let logger = StartupDiagnosticsLogger::initialize(
-        StartupOperation::Activation {
-            operation_kind: StartupOperationKind::Snapshot,
+    let logger = ActivationDiagnosticsLogger::initialize(
+        ActivationOperation::Activation {
+            operation_kind: ActivationOperationKind::Snapshot,
         },
         "ws://127.0.0.1:4000/tunnel/sandbox/sbi_test",
     )
@@ -349,30 +352,34 @@ fn maps_cleanup_phases_to_the_resource_being_cleaned_up() {
 #[test]
 fn does_not_publish_top_level_sandboxd_lifecycle_operation_records() {
     let started_record = super::operation_record_line(
-        StartupOperation::Init,
+        ActivationOperation::Activation {
+            operation_kind: ActivationOperationKind::Start,
+        },
         "2026-05-21T00:00:00Z".to_string(),
-        "sandbox_init_started",
+        "sandbox_start_started",
         &serde_json::json!({
             "timestamp": "2026-05-21T00:00:00Z",
             "level": "info",
-            "event": "sandbox_init_started",
+            "event": "sandbox_start_started",
             "sandboxInstanceId": "sbi_test",
-            "operation": "init"
+            "operation": "activate"
         }),
     )
     .expect("started event should be processed");
     assert_eq!(started_record, None);
 
     let failed_record = super::operation_record_line(
-        StartupOperation::Init,
+        ActivationOperation::Activation {
+            operation_kind: ActivationOperationKind::Start,
+        },
         "2026-05-21T00:00:01Z".to_string(),
-        "sandbox_init_failed",
+        "sandbox_activation_failed",
         &serde_json::json!({
             "timestamp": "2026-05-21T00:00:01Z",
             "level": "error",
-            "event": "sandbox_init_failed",
+            "event": "sandbox_activation_failed",
             "sandboxInstanceId": "sbi_test",
-            "operation": "init",
+            "operation": "activate",
             "error": "runtime plan failed"
         }),
     )
@@ -388,15 +395,17 @@ fn does_not_attribute_unknown_lifecycle_phases_to_sandboxd() {
     );
 
     let operation_record = super::operation_record_line(
-        StartupOperation::Init,
+        ActivationOperation::Activation {
+            operation_kind: ActivationOperationKind::Start,
+        },
         "2026-05-21T00:00:00Z".to_string(),
-        "sandbox_init_phase_failed",
+        "sandbox_start_phase_failed",
         &serde_json::json!({
             "timestamp": "2026-05-21T00:00:00Z",
             "level": "error",
-            "event": "sandbox_init_phase_failed",
+            "event": "sandbox_start_phase_failed",
             "sandboxInstanceId": "sbi_test",
-            "operation": "init",
+            "operation": "activate",
             "phase": "unexpected_internal_phase",
             "error": "failed"
         }),

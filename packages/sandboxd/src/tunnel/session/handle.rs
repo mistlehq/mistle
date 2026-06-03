@@ -16,7 +16,6 @@ use url::Url;
 use crate::cgroups::DEFAULT_CGROUP_ROOT;
 use crate::keepalive::KeepaliveManager;
 use crate::protocol::session::SessionRuntimeInput;
-use crate::protocol::startup::StartupInput;
 use crate::runtime::readiness::RuntimeReadinessManager;
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
 use crate::time::{Clock, Sleeper};
@@ -51,7 +50,7 @@ pub struct TunnelSession {
 impl TunnelSession {
     /// Starts one live bootstrap tunnel session thread for the initialized daemon.
     pub fn start(
-        startup_input: &StartupInput,
+        session_input: &SessionRuntimeInput,
         keepalive_manager: Arc<Mutex<KeepaliveManager>>,
         runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
         agent_endpoint_url: Option<String>,
@@ -59,7 +58,6 @@ impl TunnelSession {
         clock: Arc<dyn Clock>,
         sleeper: Arc<dyn Sleeper>,
     ) -> Result<Self, TunnelSessionError> {
-        let session_input = SessionRuntimeInput::from_startup_input(startup_input);
         let sandbox_instance_id = derive_sandbox_instance_id(&session_input.tunnel_gateway_ws_url)?;
         let supervisor_handle = SandboxdSupervisorHandle::new(
             sandbox_instance_id,
@@ -68,7 +66,7 @@ impl TunnelSession {
         );
 
         Self::start_with_supervisor(
-            &session_input,
+            session_input,
             keepalive_manager,
             runtime_readiness_manager,
             agent_endpoint_url,
@@ -206,16 +204,15 @@ impl TunnelSession {
 
     /// Starts a bootstrap tunnel with no runtime capabilities attached yet.
     pub fn start_minimal_with_supervisor(
-        startup_input: &StartupInput,
+        session_input: &SessionRuntimeInput,
         keepalive_manager: Arc<Mutex<KeepaliveManager>>,
         runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
         clock: Arc<dyn Clock>,
         sleeper: Arc<dyn Sleeper>,
         supervisor_handle: SandboxdSupervisorHandle,
     ) -> Result<Self, TunnelSessionError> {
-        let session_input = SessionRuntimeInput::from_startup_input(startup_input);
         Self::start_minimal_session_input_with_supervisor(
-            &session_input,
+            session_input,
             keepalive_manager,
             runtime_readiness_manager,
             clock,

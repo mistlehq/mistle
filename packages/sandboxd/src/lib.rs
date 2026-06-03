@@ -1,9 +1,9 @@
 //! `sandboxd` is the long-lived sandbox supervisor daemon.
 //!
 //! The default entrypoint runs the daemon behind the local Unix control socket.
-//! The supported lifecycle subcommands, `ready`, `activate`, `init`, `resume`, and
-//! `wait-init`, are thin local clients that submit requests to the running
-//! daemon and exit. The `egress-proxy` subcommand runs the proxy child process.
+//! The supported lifecycle subcommands, `ready` and `activate`, are thin local
+//! clients that submit requests to the running daemon and exit. The
+//! `egress-proxy` subcommand runs the proxy child process.
 //! The `skills` subcommands provide local repository skill helpers.
 //! The `version` subcommand prints the binary version used by release artifact
 //! validation and runtime updates.
@@ -29,7 +29,6 @@ pub mod control;
 pub mod daemon_liveness;
 pub mod egress_proxy;
 pub mod idempotency;
-pub mod init;
 pub mod keepalive;
 pub mod opencode_proxy;
 pub mod pi_proxy;
@@ -37,7 +36,6 @@ pub mod process;
 pub mod protocol;
 pub mod proxy_ca;
 pub mod pty;
-pub mod resume;
 pub mod runtime;
 pub mod sandboxd_state;
 pub mod security;
@@ -50,7 +48,6 @@ pub mod supervision;
 pub mod test_support;
 pub mod time;
 pub mod tunnel;
-pub mod wait_init;
 
 use crate::time::ThreadSleeper;
 use startup_payload::StartupPayloadSource;
@@ -87,19 +84,11 @@ pub enum SandboxdCommand {
     Activate {
         payload_source: StartupPayloadSource,
     },
-    Init {
-        detach: bool,
-        payload_source: StartupPayloadSource,
-    },
-    Resume {
-        payload_source: StartupPayloadSource,
-    },
     Sign,
     Skills {
         args: Vec<String>,
     },
     Version,
-    WaitInit,
 }
 
 /// Describes why CLI argument parsing failed before any command-specific work ran.
@@ -132,7 +121,7 @@ impl fmt::Display for ParseSandboxdCommandError {
             }
             Self::UnknownCommand(command) => write!(
                 f,
-                "unknown sandboxd subcommand '{command}' (expected 'ready', 'activate', 'init', 'resume', 'wait-init', 'egress-proxy', 'skills', or 'version')"
+                "unknown sandboxd subcommand '{command}' (expected 'ready', 'activate', 'egress-proxy', 'skills', or 'version')"
             ),
         }
     }
@@ -161,33 +150,11 @@ where
             let payload_source = parse_payload_source_args(parsed_args.by_ref())?;
             return Ok(SandboxdCommand::Activate { payload_source });
         }
-        "init" => {
-            let mut detach = false;
-            let mut payload_source = StartupPayloadSource::StdinUntilEof;
-            while let Some(argument) = parsed_args.next() {
-                match argument.as_str() {
-                    "--detach" => detach = true,
-                    "--stdin-bytes" => {
-                        payload_source = parse_stdin_bytes(parsed_args.next())?;
-                    }
-                    _ => return Err(ParseSandboxdCommandError::UnexpectedArgument(argument)),
-                }
-            }
-            return Ok(SandboxdCommand::Init {
-                detach,
-                payload_source,
-            });
-        }
-        "resume" => {
-            let payload_source = parse_payload_source_args(parsed_args.by_ref())?;
-            return Ok(SandboxdCommand::Resume { payload_source });
-        }
         "skills" => {
             return Ok(SandboxdCommand::Skills {
                 args: parsed_args.collect(),
             });
         }
-        "wait-init" => SandboxdCommand::WaitInit,
         "version" => SandboxdCommand::Version,
         _ => {
             return Err(ParseSandboxdCommandError::UnknownCommand(command));
@@ -334,35 +301,6 @@ where
             Ok(()) => 0,
             Err(_) => 1,
         },
-        SandboxdCommand::Init {
-            detach,
-            payload_source,
-        } => match init::run_init(
-            stdin,
-            stdout,
-            Path::new(control::DEFAULT_CONTROL_SOCKET_PATH),
-            detach,
-            payload_source,
-        ) {
-            Ok(()) => 0,
-            Err(_) => 1,
-        },
-        SandboxdCommand::Resume { payload_source } => match resume::run_resume(
-            stdin,
-            stdout,
-            Path::new(control::DEFAULT_CONTROL_SOCKET_PATH),
-            payload_source,
-        ) {
-            Ok(()) => 0,
-            Err(_) => 1,
-        },
-        SandboxdCommand::WaitInit => {
-            match wait_init::run_wait_init(stdout, Path::new(control::DEFAULT_CONTROL_SOCKET_PATH))
-            {
-                Ok(()) => 0,
-                Err(_) => 1,
-            }
-        }
         SandboxdCommand::Version => match writeln!(stdout, "{}", env!("CARGO_PKG_VERSION")) {
             Ok(()) => 0,
             Err(error) => {
@@ -415,41 +353,14 @@ mod tests {
     }
 
     #[test]
-    fn parses_init() {
+    fn rejects_legacy_init_command() {
         let command = parse_sandboxd_command(["init"]);
 
         assert_eq!(
             command,
-            Ok(SandboxdCommand::Init {
-                detach: false,
-                payload_source: StartupPayloadSource::StdinUntilEof
-            })
-        );
-    }
-
-    #[test]
-    fn parses_detached_init() {
-        let command = parse_sandboxd_command(["init", "--detach"]);
-
-        assert_eq!(
-            command,
-            Ok(SandboxdCommand::Init {
-                detach: true,
-                payload_source: StartupPayloadSource::StdinUntilEof
-            })
-        );
-    }
-
-    #[test]
-    fn parses_init_with_stdin_byte_count() {
-        let command = parse_sandboxd_command(["init", "--stdin-bytes", "123", "--detach"]);
-
-        assert_eq!(
-            command,
-            Ok(SandboxdCommand::Init {
-                detach: true,
-                payload_source: StartupPayloadSource::StdinBytes(123)
-            })
+            Err(ParseSandboxdCommandError::UnknownCommand(
+                "init".to_string()
+            ))
         );
     }
 
@@ -517,32 +428,8 @@ mod tests {
     }
 
     #[test]
-    fn parses_resume() {
-        let command = parse_sandboxd_command(["resume"]);
-
-        assert_eq!(
-            command,
-            Ok(SandboxdCommand::Resume {
-                payload_source: StartupPayloadSource::StdinUntilEof
-            })
-        );
-    }
-
-    #[test]
-    fn parses_resume_with_stdin_byte_count() {
-        let command = parse_sandboxd_command(["resume", "--stdin-bytes", "456"]);
-
-        assert_eq!(
-            command,
-            Ok(SandboxdCommand::Resume {
-                payload_source: StartupPayloadSource::StdinBytes(456)
-            })
-        );
-    }
-
-    #[test]
     fn rejects_missing_stdin_byte_count() {
-        let command = parse_sandboxd_command(["init", "--stdin-bytes"]);
+        let command = parse_sandboxd_command(["activate", "--stdin-bytes"]);
 
         assert_eq!(
             command,
@@ -552,7 +439,7 @@ mod tests {
 
     #[test]
     fn rejects_invalid_stdin_byte_count() {
-        let command = parse_sandboxd_command(["resume", "--stdin-bytes", "abc"]);
+        let command = parse_sandboxd_command(["activate", "--stdin-bytes", "abc"]);
 
         assert_eq!(
             command,
@@ -563,10 +450,61 @@ mod tests {
     }
 
     #[test]
-    fn parses_wait_init() {
+    fn rejects_legacy_wait_init_command() {
         let command = parse_sandboxd_command(["wait-init"]);
 
-        assert_eq!(command, Ok(SandboxdCommand::WaitInit));
+        assert_eq!(
+            command,
+            Err(ParseSandboxdCommandError::UnknownCommand(
+                "wait-init".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn rejects_legacy_resume_command() {
+        let command = parse_sandboxd_command(["resume"]);
+
+        assert_eq!(
+            command,
+            Err(ParseSandboxdCommandError::UnknownCommand(
+                "resume".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn production_sources_do_not_reference_removed_lifecycle_contracts() {
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let source_dir = manifest_dir.join("src");
+        let removed_patterns = [
+            concat!("Startup", "Input"),
+            concat!("Startup", "Mode"),
+            concat!("Startup", "Execution", "Mode"),
+            concat!("submit_", "init"),
+            concat!("submit_", "resume"),
+            concat!("submit_", "wait_", "init"),
+            concat!("sandboxd ", "init"),
+            concat!("sandboxd ", "wait-init"),
+            concat!("sandboxd ", "resume"),
+            concat!("Startup", "Init"),
+            concat!("INIT", "_LOG", "_PATH"),
+            concat!("RESUME", "_LOG", "_PATH"),
+            concat!("Startup", "Diagnostics", "Logger"),
+            concat!("Startup", "Operation"),
+        ];
+
+        let mut violations = Vec::new();
+        collect_removed_lifecycle_contract_violations(
+            &source_dir,
+            &removed_patterns,
+            &mut violations,
+        );
+
+        assert!(
+            violations.is_empty(),
+            "removed sandboxd lifecycle contracts remain in production sources: {violations:?}"
+        );
     }
 
     #[test]
@@ -628,7 +566,7 @@ mod tests {
 
     #[test]
     fn rejects_extra_arguments() {
-        let command = parse_sandboxd_command(["init", "--verbose"]);
+        let command = parse_sandboxd_command(["activate", "--verbose"]);
 
         assert_eq!(
             command,
@@ -636,6 +574,35 @@ mod tests {
                 "--verbose".to_string()
             ))
         );
+    }
+
+    fn collect_removed_lifecycle_contract_violations(
+        directory: &std::path::Path,
+        removed_patterns: &[&str],
+        violations: &mut Vec<String>,
+    ) {
+        for entry in std::fs::read_dir(directory).expect("source directory should be readable") {
+            let entry = entry.expect("source directory entry should be readable");
+            let path = entry.path();
+            if path.is_dir() {
+                collect_removed_lifecycle_contract_violations(&path, removed_patterns, violations);
+                continue;
+            }
+            if path.extension().and_then(|extension| extension.to_str()) != Some("rs") {
+                continue;
+            }
+            if path.file_name().and_then(|file_name| file_name.to_str()) == Some("tests.rs") {
+                continue;
+            }
+
+            let contents =
+                std::fs::read_to_string(&path).expect("source file should be readable as utf8");
+            for pattern in removed_patterns {
+                if contents.contains(pattern) {
+                    violations.push(format!("{} contains {pattern}", path.display()));
+                }
+            }
+        }
     }
 
     #[test]

@@ -2,30 +2,6 @@ import { z } from "zod";
 
 import { CompiledRuntimePlanSchema } from "./runtime-plan.js";
 
-export const SandboxdStartupModes = {
-  NEW: "new",
-  EXISTING: "existing",
-} as const;
-
-export const SandboxdStartupModeSchema = z.enum([
-  SandboxdStartupModes.NEW,
-  SandboxdStartupModes.EXISTING,
-]);
-
-export type SandboxdStartupMode = z.infer<typeof SandboxdStartupModeSchema>;
-
-export const SandboxdExecutionModes = {
-  SESSION: "session",
-  SNAPSHOT: "snapshot",
-} as const;
-
-export const SandboxdExecutionModeSchema = z.enum([
-  SandboxdExecutionModes.SESSION,
-  SandboxdExecutionModes.SNAPSHOT,
-]);
-
-export type SandboxdExecutionMode = z.infer<typeof SandboxdExecutionModeSchema>;
-
 export const SandboxdOperationKinds = {
   START: "start",
   RESUME: "resume",
@@ -123,26 +99,7 @@ export const SandboxdActivationInputSchema = z
 
 export type SandboxdActivationInput = z.infer<typeof SandboxdActivationInputSchema>;
 
-// Legacy compatibility schema for callers that still use sandboxd init/resume.
-// PR9 removes this after worker and provider callers migrate to activation.
-export const SandboxdStartupInputSchema = z
-  .object({
-    startupMode: SandboxdStartupModeSchema,
-    executionMode: SandboxdExecutionModeSchema.optional(),
-    operationKind: SandboxdOperationKindSchema,
-    bootstrapToken: z.string().min(1),
-    tunnelExchangeToken: z.string().min(1),
-    tunnelGatewayWsUrl: z.string().min(1),
-    runtimePlan: CompiledRuntimePlanSchema,
-    actingUserId: z.string().min(1).optional(),
-    gitIdentity: SandboxdGitIdentitySchema.optional(),
-    transparentProxy: SandboxdTransparentProxyConfigurationSchema.optional(),
-  })
-  .strict();
-
-export type SandboxdStartupInput = z.infer<typeof SandboxdStartupInputSchema>;
-
-export const SandboxdInitResponseSchema = z.discriminatedUnion("ok", [
+export const SandboxdActivationResponseSchema = z.discriminatedUnion("ok", [
   z
     .object({
       ok: z.literal(true),
@@ -156,4 +113,4 @@ export const SandboxdInitResponseSchema = z.discriminatedUnion("ok", [
     .strict(),
 ]);
 
-export type SandboxdInitResponse = z.infer<typeof SandboxdInitResponseSchema>;
+export type SandboxdActivationResponse = z.infer<typeof SandboxdActivationResponseSchema>;

@@ -11,36 +11,10 @@ use std::path::Path;
 use crate::control::error::ControlError;
 use crate::control::protocol::{ControlRequest, ControlResponse, ControlSignRequest};
 use crate::protocol::activation::ActivationInput;
-use crate::protocol::startup::StartupInput;
-
-/// Submits one startup payload to the running daemon over the local control socket.
-pub fn submit_init(
-    socket_path: &Path,
-    startup_input: &StartupInput,
-    wait_for_completion: bool,
-) -> Result<(), ControlError> {
-    submit_startup_request(
-        socket_path,
-        ControlRequest::Init {
-            startup_input: startup_input.clone(),
-            wait_for_completion,
-        },
-    )
-}
 
 /// Checks that the daemon's local control socket is reachable.
 pub fn submit_ready(socket_path: &Path) -> Result<(), ControlError> {
     submit_control_request(socket_path, ControlRequest::Ready).map(|_| ())
-}
-
-/// Submits a resume payload to an already initialized daemon.
-pub fn submit_resume(socket_path: &Path, startup_input: &StartupInput) -> Result<(), ControlError> {
-    submit_startup_request(
-        socket_path,
-        ControlRequest::Resume {
-            startup_input: startup_input.clone(),
-        },
-    )
 }
 
 /// Activates a sandbox, initializing or refreshing runtime resources as needed.
@@ -51,17 +25,12 @@ pub fn submit_activate(
     submit_startup_request(
         socket_path,
         ControlRequest::Activate {
-            activation_input: activation_input.clone(),
+            activation_input: Box::new(activation_input.clone()),
         },
     )
 }
 
-/// Waits for the daemon's current initialization worker to complete.
-pub fn submit_wait_init(socket_path: &Path) -> Result<(), ControlError> {
-    submit_startup_request(socket_path, ControlRequest::WaitInit)
-}
-
-/// Submits one signing request to an initialized daemon and returns the signature.
+/// Submits one signing request to an activated daemon and returns the signature.
 pub fn submit_signing(
     socket_path: &Path,
     sign_request: &ControlSignRequest,

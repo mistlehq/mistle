@@ -995,9 +995,10 @@ pub(in crate::tunnel::session) fn write_tunnel_close(
 mod tests {
     use serde_json::json;
 
+    use crate::protocol::session::SessionRuntimeInput;
     use crate::protocol::startup::{
-        StartupExecutionMode, StartupInput, StartupMode, StartupOperationKind,
-        TransparentProxyBypass, TransparentProxyBypassKind, TransparentProxyConfiguration,
+        ActivationOperationKind, TransparentProxyBypass, TransparentProxyBypassKind,
+        TransparentProxyConfiguration,
     };
     use crate::tunnel::session::bootstrap::{
         GATEWAY_SERVICE_RESTART_CLOSE_CODE, GATEWAY_SERVICE_RESTART_CLOSE_REASON,
@@ -1092,10 +1093,8 @@ mod tests {
 
     #[test]
     fn derives_transparent_passthrough_socket_mark_for_bootstrap_tunnel() {
-        let startup_input = StartupInput {
-            startup_mode: StartupMode::New,
-            operation_kind: StartupOperationKind::Start,
-            execution_mode: StartupExecutionMode::Session,
+        let startup_input = SessionRuntimeInput {
+            operation_kind: ActivationOperationKind::Start,
             bootstrap_token: "bootstrap-token".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token".to_string(),
             tunnel_gateway_ws_url: "wss://gateway.example.test/tunnel/sandbox/sbi_123".to_string(),
@@ -1112,9 +1111,7 @@ mod tests {
         };
 
         assert_eq!(
-            startup_transparent_passthrough_socket_mark(
-                &crate::protocol::session::SessionRuntimeInput::from_startup_input(&startup_input)
-            ),
+            startup_transparent_passthrough_socket_mark(&startup_input),
             Some(38_514)
         );
     }

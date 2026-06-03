@@ -6,12 +6,14 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::protocol::startup::{GitIdentity, StartupOperationKind, TransparentProxyConfiguration};
+use crate::protocol::startup::{
+    ActivationOperationKind, GitIdentity, TransparentProxyConfiguration,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ActivationInput {
-    pub operation_kind: StartupOperationKind,
+    pub operation_kind: ActivationOperationKind,
     pub bootstrap_token: String,
     pub tunnel_exchange_token: String,
     pub tunnel_gateway_ws_url: String,
@@ -27,7 +29,7 @@ mod tests {
     use serde_json::json;
 
     use crate::protocol::activation::ActivationInput;
-    use crate::protocol::startup::StartupOperationKind;
+    use crate::protocol::startup::ActivationOperationKind;
 
     #[test]
     fn deserializes_activation_without_startup_mode() {
@@ -45,7 +47,7 @@ mod tests {
         }))
         .expect("activation input should deserialize");
 
-        assert_eq!(input.operation_kind, StartupOperationKind::Start);
+        assert_eq!(input.operation_kind, ActivationOperationKind::Start);
         assert_eq!(input.tunnel_exchange_token, "exchange-token");
     }
 

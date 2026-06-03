@@ -247,7 +247,8 @@ mod tests {
     use tungstenite::{Message, accept};
 
     use crate::control;
-    use crate::protocol::startup::{GitIdentity, GitSigningConfig, StartupInput, StartupMode};
+    use crate::protocol::activation::ActivationInput;
+    use crate::protocol::startup::{GitIdentity, GitSigningConfig};
     use crate::test_support::TestEnvVarGuard;
     use crate::time::{Sleeper, ThreadSleeper};
 
@@ -296,12 +297,11 @@ mod tests {
             control::DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
         );
 
-        control::submit_init(
+        control::submit_activate(
             &control_socket_path,
-            &valid_startup_input(&gateway.ws_url, true),
-            true,
+            &valid_activation_input(&gateway.ws_url, true),
         )
-        .expect("init submission should succeed");
+        .expect("activation submission should succeed");
 
         let key_file_path = test_dir.join("key.pub");
         let payload_path = test_dir.join("payload");
@@ -396,12 +396,11 @@ mod tests {
             control::DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
         );
 
-        control::submit_init(
+        control::submit_activate(
             &control_socket_path,
-            &valid_startup_input(&gateway.ws_url, false),
-            true,
+            &valid_activation_input(&gateway.ws_url, false),
         )
-        .expect("init submission should succeed");
+        .expect("activation submission should succeed");
 
         let key_file_path = test_dir.join("key.pub");
         let payload_path = test_dir.join("payload");
@@ -438,11 +437,12 @@ mod tests {
         fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
 
-    fn valid_startup_input(tunnel_gateway_ws_url: &str, include_signing: bool) -> StartupInput {
-        StartupInput {
-            startup_mode: StartupMode::New,
-            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+    fn valid_activation_input(
+        tunnel_gateway_ws_url: &str,
+        include_signing: bool,
+    ) -> ActivationInput {
+        ActivationInput {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),

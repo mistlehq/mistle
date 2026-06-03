@@ -33,7 +33,7 @@ use crate::egress_proxy::{
     build_nftables_local_destination_set_replace_script,
     build_nftables_rule_plan_with_local_destinations, parse_iproute2_link_scope_ipv4_route_cidrs,
 };
-use crate::protocol::startup::{StartupInput, StartupMode};
+use crate::protocol::session::SessionRuntimeInput;
 use crate::protocol::startup::{
     TransparentProxyBypass, TransparentProxyBypassKind, TransparentProxyConfiguration,
     TransparentProxyExclusion, TransparentProxyExclusionKind,
@@ -1409,11 +1409,9 @@ fn sample_runtime_plan() -> CompiledRuntimePlan {
     }
 }
 
-fn sample_startup_input() -> StartupInput {
-    StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+fn sample_startup_input() -> SessionRuntimeInput {
+    SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token".to_string(),
         tunnel_exchange_token: "exchange-token".to_string(),
         tunnel_gateway_ws_url: "ws://127.0.0.1:4500/tunnel/sandbox/sandbox-123".to_string(),

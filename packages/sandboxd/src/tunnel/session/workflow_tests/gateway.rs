@@ -116,10 +116,8 @@ fn drops_invalid_bootstrap_messages_and_keeps_tunnel_alive() {
             .expect("gateway should signal the tunnel session finished");
     });
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: bootstrap_url,
@@ -229,10 +227,8 @@ fn forwards_signing_requests_over_the_bootstrap_tunnel_and_returns_gateway_resul
             .expect("gateway websocket should close cleanly");
     });
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: bootstrap_url,
@@ -360,10 +356,8 @@ fn requests_and_caches_egress_tokens_over_the_bootstrap_tunnel() {
             .expect("gateway websocket should close cleanly");
     });
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: bootstrap_url,
@@ -482,10 +476,8 @@ fn updating_egress_token_provider_acting_user_clears_cached_token() {
             .expect("gateway websocket should close cleanly");
     });
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: bootstrap_url,
@@ -596,10 +588,8 @@ fn detaching_egress_token_provider_suspends_requests_and_clears_cached_token() {
             .expect("gateway websocket should close cleanly");
     });
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: bootstrap_url,
@@ -745,10 +735,8 @@ fn egress_token_provider_rejects_in_flight_response_after_actor_change() {
             .expect("gateway websocket should close cleanly");
     });
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: bootstrap_url,
@@ -878,10 +866,8 @@ fn refreshes_egress_tokens_from_relative_ttl_not_expires_at_wall_time() {
             .expect("gateway websocket should close cleanly");
     });
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: bootstrap_url,
@@ -1020,10 +1006,8 @@ fn operation_stream_opens_records_and_closes_over_the_reserved_stream() {
             .expect("gateway websocket should close cleanly");
     });
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: bootstrap_url,
@@ -1172,10 +1156,8 @@ fn operation_stream_flushes_pending_records_before_close_after_open_ack() {
             .expect("gateway websocket should close cleanly");
     });
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: bootstrap_url,
@@ -1300,10 +1282,8 @@ fn returns_authorization_failures_from_gateway_signing_results() {
             .expect("gateway websocket should close cleanly");
     });
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: bootstrap_url,

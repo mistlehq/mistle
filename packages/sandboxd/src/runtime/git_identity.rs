@@ -122,7 +122,7 @@ mod tests {
 
     use super::{apply_git_identity, apply_global_git_config};
     use crate::protocol::session::SessionRuntimeInput;
-    use crate::protocol::startup::{GitIdentity, GitSigningConfig, StartupInput, StartupMode};
+    use crate::protocol::startup::{GitIdentity, GitSigningConfig};
     use crate::test_support::TestEnvVarsGuard;
 
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -132,10 +132,8 @@ mod tests {
         let test_dir = create_temp_test_dir("git_identity");
         let global_git_config_path = global_git_config_path(&test_dir);
 
-        let startup_input = StartupInput {
-            startup_mode: StartupMode::New,
-            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+        let startup_input = SessionRuntimeInput {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
             bootstrap_token: "bootstrap-token".to_string(),
             tunnel_exchange_token: "exchange-token".to_string(),
             tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
@@ -160,11 +158,8 @@ mod tests {
             }),
             transparent_proxy: None,
         };
-        apply_git_identity(
-            &SessionRuntimeInput::from_startup_input(&startup_input),
-            &global_git_config_path,
-        )
-        .expect("git identity should apply successfully");
+        apply_git_identity(&startup_input, &global_git_config_path)
+            .expect("git identity should apply successfully");
 
         let git_config_contents =
             fs::read_to_string(&global_git_config_path).expect("git config should be written");
@@ -192,10 +187,8 @@ mod tests {
             ),
         ]);
 
-        let startup_input = StartupInput {
-            startup_mode: StartupMode::New,
-            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+        let startup_input = SessionRuntimeInput {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
             bootstrap_token: "bootstrap-token".to_string(),
             tunnel_exchange_token: "exchange-token".to_string(),
             tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
@@ -220,11 +213,8 @@ mod tests {
             }),
             transparent_proxy: None,
         };
-        apply_git_identity(
-            &SessionRuntimeInput::from_startup_input(&startup_input),
-            &explicit_git_config_path,
-        )
-        .expect("git identity should apply successfully");
+        apply_git_identity(&startup_input, &explicit_git_config_path)
+            .expect("git identity should apply successfully");
 
         let explicit_git_config_contents = fs::read_to_string(&explicit_git_config_path)
             .expect("explicit git config should exist");
@@ -239,10 +229,8 @@ mod tests {
         let test_dir = create_temp_test_dir("git_identity_signing");
         let global_git_config_path = global_git_config_path(&test_dir);
 
-        let startup_input = StartupInput {
-            startup_mode: StartupMode::New,
-            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+        let startup_input = SessionRuntimeInput {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
             bootstrap_token: "bootstrap-token".to_string(),
             tunnel_exchange_token: "exchange-token".to_string(),
             tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
@@ -276,11 +264,8 @@ mod tests {
             }),
             transparent_proxy: None,
         };
-        apply_git_identity(
-            &SessionRuntimeInput::from_startup_input(&startup_input),
-            &global_git_config_path,
-        )
-        .expect("git identity should apply successfully");
+        apply_git_identity(&startup_input, &global_git_config_path)
+            .expect("git identity should apply successfully");
 
         let git_config_contents =
             fs::read_to_string(&global_git_config_path).expect("git config should be written");
@@ -314,10 +299,8 @@ mod tests {
         )
         .expect("precondition git config should write");
 
-        let startup_input = StartupInput {
-            startup_mode: StartupMode::New,
-            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+        let startup_input = SessionRuntimeInput {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
             bootstrap_token: "bootstrap-token".to_string(),
             tunnel_exchange_token: "exchange-token".to_string(),
             tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
@@ -342,11 +325,8 @@ mod tests {
             }),
             transparent_proxy: None,
         };
-        apply_git_identity(
-            &SessionRuntimeInput::from_startup_input(&startup_input),
-            &global_git_config_path,
-        )
-        .expect("git identity should apply successfully");
+        apply_git_identity(&startup_input, &global_git_config_path)
+            .expect("git identity should apply successfully");
 
         let git_config_contents =
             fs::read_to_string(&global_git_config_path).expect("git config should be written");
@@ -385,10 +365,8 @@ mod tests {
         )
         .expect("precondition git config should write");
 
-        let startup_input = StartupInput {
-            startup_mode: StartupMode::New,
-            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+        let startup_input = SessionRuntimeInput {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
             bootstrap_token: "bootstrap-token".to_string(),
             tunnel_exchange_token: "exchange-token".to_string(),
             tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
@@ -409,11 +387,8 @@ mod tests {
             git_identity: None,
             transparent_proxy: None,
         };
-        apply_git_identity(
-            &SessionRuntimeInput::from_startup_input(&startup_input),
-            &global_git_config_path,
-        )
-        .expect("absent Git identity should clear managed Git config");
+        apply_git_identity(&startup_input, &global_git_config_path)
+            .expect("absent Git identity should clear managed Git config");
 
         let git_config_contents =
             fs::read_to_string(&global_git_config_path).expect("git config should be written");

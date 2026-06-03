@@ -78,21 +78,21 @@ impl ComponentHealthState {
     }
 }
 
-/// Daemon-global initialization phase used by the later health endpoint.
+/// Daemon-global activation phase used by the later health endpoint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SandboxdDaemonPhase {
-    Uninitialized,
-    Initializing,
-    Initialized,
+    Unactivated,
+    Activating,
+    Activated,
     Failed,
 }
 
 impl SandboxdDaemonPhase {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::Uninitialized => "Uninitialized",
-            Self::Initializing => "Initializing",
-            Self::Initialized => "Initialized",
+            Self::Unactivated => "Unactivated",
+            Self::Activating => "Activating",
+            Self::Activated => "Activated",
             Self::Failed => "Failed",
         }
     }

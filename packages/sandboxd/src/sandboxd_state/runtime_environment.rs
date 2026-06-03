@@ -1,6 +1,6 @@
 //! Environment construction for runtime client processes.
 //!
-//! This module combines startup input, compiled runtime-plan values, egress
+//! This module combines session input, compiled runtime-plan values, egress
 //! proxy settings, and sandbox identity variables into the environment passed to
 //! supervised child processes.
 
@@ -128,7 +128,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use crate::protocol::session::SessionRuntimeInput;
-    use crate::protocol::startup::{GitIdentity, StartupExecutionMode, StartupInput, StartupMode};
+    use crate::protocol::startup::GitIdentity;
     use crate::runtime::{
         CompiledRuntimeArtifact, CompiledRuntimePlan, CompiledRuntimePlanImage,
         CompiledRuntimePlanImageSource, RuntimeArtifactLifecycle,
@@ -312,20 +312,16 @@ mod tests {
     }
 
     #[test]
-    fn extracts_mistle_context_runtime_environment_from_startup_input() {
+    fn extracts_mistle_context_runtime_environment_from_session_input() {
         let startup_input = build_startup_input(
-            StartupMode::New,
-            StartupExecutionMode::Session,
             "ws://gateway.example.test/sbi_context_env_001",
             minimal_runtime_plan_json(),
             None,
         );
 
-        let runtime_env = collect_mistle_context_runtime_environment(
-            &SessionRuntimeInput::from_startup_input(&startup_input),
-            "sbi_context_env_001",
-        )
-        .expect("mistle context env should collect");
+        let runtime_env =
+            collect_mistle_context_runtime_environment(&startup_input, "sbi_context_env_001")
+                .expect("mistle context env should collect");
 
         assert_eq!(
             runtime_env,
@@ -371,16 +367,12 @@ mod tests {
     }
 
     fn build_startup_input(
-        startup_mode: StartupMode,
-        execution_mode: StartupExecutionMode,
         tunnel_gateway_ws_url: &str,
         runtime_plan: serde_json::Value,
         git_identity: Option<GitIdentity>,
-    ) -> StartupInput {
-        StartupInput {
-            startup_mode,
-            execution_mode,
-            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+    ) -> SessionRuntimeInput {
+        SessionRuntimeInput {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),

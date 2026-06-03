@@ -1,31 +1,29 @@
 //! Shared mutable state for the local control server.
 //!
-//! This module owns the lock helpers for daemon initialization state and the
-//! optional initialization worker, so request handling and health projection use
+//! This module owns the lock helpers for daemon activation state and the
+//! optional activation worker, so request handling and health projection use
 //! one error path for poisoned locks.
 
 use std::path::PathBuf;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread::JoinHandle;
 
-use crate::control::{ControlError, InitPhase};
+use crate::control::{ActivationPhase, ControlError};
 use crate::protocol::activation::ActivationInput;
-use crate::protocol::startup::StartupInput;
 use crate::sandboxd_state::SandboxdState;
 
-/// Tracks accepted startup input, live sandbox state, init phase, and snapshot shutdown behavior.
+/// Tracks accepted activation input, live sandbox state, init phase, and snapshot shutdown behavior.
 pub(super) struct ControlServerState {
-    pub(super) init_phase: InitPhase,
-    pub(super) startup_input: Option<StartupInput>,
+    pub(super) activation_phase: ActivationPhase,
     pub(super) activation_input: Option<ActivationInput>,
     pub(super) sandboxd_state: Option<SandboxdState>,
     pub(super) global_git_config_path: PathBuf,
-    pub(super) shutdown_after_init: bool,
+    pub(super) shutdown_after_activation: bool,
 }
 
 pub(super) type InitThread = JoinHandle<Result<(), ControlError>>;
-pub(super) type SharedInitThread = Arc<Mutex<Option<InitThread>>>;
-pub(super) type InitCompletion = Arc<Condvar>;
+pub(super) type SharedActivationThread = Arc<Mutex<Option<InitThread>>>;
+pub(super) type ActivationCompletion = Arc<Condvar>;
 
 pub(super) fn lock_control_state(
     state: &Arc<Mutex<ControlServerState>>,
@@ -35,16 +33,18 @@ pub(super) fn lock_control_state(
         .map_err(|_| ControlError::ControlStateLockPoisoned)
 }
 
-pub(super) fn lock_init_thread(
-    init_thread: &SharedInitThread,
+pub(super) fn lock_activation_thread(
+    activation_thread: &SharedActivationThread,
 ) -> Result<MutexGuard<'_, Option<InitThread>>, ControlError> {
-    init_thread
+    activation_thread
         .lock()
         .map_err(|_| ControlError::InitThreadLockPoisoned)
 }
 
-pub(super) fn join_init_thread(init_thread: &SharedInitThread) -> Result<(), ControlError> {
-    let Some(thread) = lock_init_thread(init_thread)?.take() else {
+pub(super) fn join_activation_thread(
+    activation_thread: &SharedActivationThread,
+) -> Result<(), ControlError> {
+    let Some(thread) = lock_activation_thread(activation_thread)?.take() else {
         return Ok(());
     };
 
@@ -54,23 +54,23 @@ pub(super) fn join_init_thread(init_thread: &SharedInitThread) -> Result<(), Con
     }
 }
 
-pub(super) fn notify_init_completion(init_completion: &InitCompletion) {
-    init_completion.notify_all();
+pub(super) fn notify_activation_completion(activation_completion: &ActivationCompletion) {
+    activation_completion.notify_all();
 }
 
-pub(super) fn wait_for_init_completion(
+pub(super) fn wait_for_activation_completion(
     state: &Arc<Mutex<ControlServerState>>,
-    init_completion: &InitCompletion,
-) -> Result<InitPhase, ControlError> {
+    activation_completion: &ActivationCompletion,
+) -> Result<ActivationPhase, ControlError> {
     let mut state_guard = lock_control_state(state)?;
 
-    while matches!(state_guard.init_phase, InitPhase::Initializing) {
-        state_guard = init_completion
+    while matches!(state_guard.activation_phase, ActivationPhase::Activating) {
+        state_guard = activation_completion
             .wait(state_guard)
             .map_err(|_| ControlError::ControlStateLockPoisoned)?;
     }
 
-    Ok(state_guard.init_phase.clone())
+    Ok(state_guard.activation_phase.clone())
 }
 
 fn take_sandboxd_state(

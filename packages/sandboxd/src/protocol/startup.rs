@@ -1,36 +1,17 @@
-//! Startup input protocol accepted by `sandboxd init` and resume flows.
-//!
-//! The control socket persists this data as the daemon's initialization source
-//! of truth; downstream modules derive runtime plans, environment, identities,
-//! and tunnel configuration from it.
+//! Shared activation protocol types.
 
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum StartupMode {
-    New,
-    Existing,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum StartupExecutionMode {
-    #[default]
-    Session,
-    Snapshot,
-}
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum StartupOperationKind {
+pub enum ActivationOperationKind {
     Start,
     Resume,
     SetupCheck,
     Snapshot,
 }
 
-impl StartupOperationKind {
+impl ActivationOperationKind {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Start => "start",
@@ -99,154 +80,64 @@ pub struct TransparentProxyConfiguration {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct StartupInput {
-    pub startup_mode: StartupMode,
-    #[serde(default)]
-    pub execution_mode: StartupExecutionMode,
-    pub operation_kind: StartupOperationKind,
-    pub bootstrap_token: String,
-    pub tunnel_exchange_token: String,
-    pub tunnel_gateway_ws_url: String,
-    pub runtime_plan: serde_json::Value,
-    pub acting_user_id: Option<String>,
-    pub git_identity: Option<GitIdentity>,
-    #[serde(default)]
-    pub transparent_proxy: Option<TransparentProxyConfiguration>,
-}
-
-impl StartupInput {
-    pub fn is_snapshot(&self) -> bool {
-        matches!(self.execution_mode, StartupExecutionMode::Snapshot)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct StartupInitOkResponse {
+pub struct ActivationOkResponse {
+    #[serde(deserialize_with = "deserialize_ok_true")]
     pub ok: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct StartupInitErrorResponse {
+pub struct ActivationErrorResponse {
+    #[serde(deserialize_with = "deserialize_ok_false")]
     pub ok: bool,
+    #[serde(deserialize_with = "deserialize_non_empty_error")]
     pub error: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum StartupInitResponse {
-    Ok(StartupInitOkResponse),
-    Error(StartupInitErrorResponse),
+pub enum ActivationResponse {
+    Ok(ActivationOkResponse),
+    Error(ActivationErrorResponse),
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{StartupExecutionMode, StartupInput, StartupMode, StartupOperationKind};
-
-    #[test]
-    fn defaults_execution_mode_to_session_when_missing() {
-        let startup_input: StartupInput = serde_json::from_value(serde_json::json!({
-            "startupMode": "new",
-            "operationKind": "start",
-            "bootstrapToken": "bootstrap-token",
-            "tunnelExchangeToken": "exchange-token",
-            "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox/sbi_123",
-            "runtimePlan": {
-                "sandboxProfileId": "sbp_123",
-                "version": 1,
-                "image": {
-                    "source": "base",
-                    "imageRef": "registry.example.test/base:latest"
-                },
-                "egressRoutes": [],
-                "artifacts": [],
-                "workspaceSources": [],
-                "runtimeClients": [],
-                "agentRuntimes": []
-            }
-        }))
-        .expect("startup input should deserialize");
-
-        assert_eq!(startup_input.startup_mode, StartupMode::New);
-        assert_eq!(startup_input.execution_mode, StartupExecutionMode::Session);
-        assert_eq!(startup_input.operation_kind, StartupOperationKind::Start);
-        assert!(!startup_input.is_snapshot());
+fn deserialize_ok_true<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let ok = bool::deserialize(deserializer)?;
+    if ok {
+        Ok(ok)
+    } else {
+        Err(serde::de::Error::custom(
+            "activation success response must contain ok: true",
+        ))
     }
+}
 
-    #[test]
-    fn parses_snapshot_execution_mode() {
-        let startup_input: StartupInput = serde_json::from_value(serde_json::json!({
-            "startupMode": "new",
-            "executionMode": "snapshot",
-            "operationKind": "snapshot",
-            "bootstrapToken": "bootstrap-token",
-            "tunnelExchangeToken": "exchange-token",
-            "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox/sbi_123",
-            "runtimePlan": {
-                "sandboxProfileId": "sbp_123",
-                "version": 1,
-                "image": {
-                    "source": "base",
-                    "imageRef": "registry.example.test/base:latest"
-                },
-                "egressRoutes": [],
-                "artifacts": [],
-                "workspaceSources": [],
-                "runtimeClients": [],
-                "agentRuntimes": []
-            }
-        }))
-        .expect("startup input should deserialize");
-
-        assert_eq!(startup_input.execution_mode, StartupExecutionMode::Snapshot);
-        assert_eq!(startup_input.operation_kind, StartupOperationKind::Snapshot);
-        assert!(startup_input.is_snapshot());
+fn deserialize_ok_false<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let ok = bool::deserialize(deserializer)?;
+    if ok {
+        Err(serde::de::Error::custom(
+            "activation error response must contain ok: false",
+        ))
+    } else {
+        Ok(ok)
     }
+}
 
-    #[test]
-    fn parses_git_signing_config_without_integration_connection_id() {
-        let startup_input: StartupInput = serde_json::from_value(serde_json::json!({
-            "startupMode": "new",
-            "operationKind": "start",
-            "bootstrapToken": "bootstrap-token",
-            "tunnelExchangeToken": "exchange-token",
-            "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox/sbi_123",
-            "runtimePlan": {
-                "sandboxProfileId": "sbp_123",
-                "version": 1,
-                "image": {
-                    "source": "base",
-                    "imageRef": "registry.example.test/base:latest"
-                },
-                "egressRoutes": [],
-                "artifacts": [],
-                "workspaceSources": [],
-                "runtimeClients": [],
-                "agentRuntimes": []
-            },
-            "gitIdentity": {
-                "name": "Mistle User",
-                "email": "mistle-user@example.com",
-                "signing": {
-                    "format": "ssh",
-                    "program": "/opt/mistle/bin/mistle-ssh-sign",
-                    "keyRef": "key::ssh-ed25519 AAAA",
-                    "organizationId": "org_123",
-                    "providerFamily": "github",
-                    "actingUserId": "usr_123",
-                    "grant": "grant-token"
-                }
-            }
-        }))
-        .expect("startup input should deserialize");
-
-        assert_eq!(
-            startup_input
-                .git_identity
-                .and_then(|identity| identity.signing)
-                .and_then(|signing| signing.integration_connection_id),
-            None
-        );
+fn deserialize_non_empty_error<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let error = String::deserialize(deserializer)?;
+    if error.is_empty() {
+        return Err(serde::de::Error::custom(
+            "activation error response must contain a non-empty error",
+        ));
     }
+    Ok(error)
 }

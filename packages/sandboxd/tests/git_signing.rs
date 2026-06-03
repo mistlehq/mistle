@@ -23,7 +23,9 @@ use base64::engine::general_purpose::STANDARD as Base64;
 #[cfg(target_os = "linux")]
 use sandboxd::control;
 #[cfg(target_os = "linux")]
-use sandboxd::protocol::startup::{GitIdentity, GitSigningConfig, StartupInput, StartupMode};
+use sandboxd::protocol::activation::ActivationInput;
+#[cfg(target_os = "linux")]
+use sandboxd::protocol::startup::{ActivationOperationKind, GitIdentity, GitSigningConfig};
 #[cfg(target_os = "linux")]
 use sandboxd::test_support::TestAttachmentRootGuard;
 #[cfg(target_os = "linux")]
@@ -81,7 +83,7 @@ fn git_commit_s_succeeds_via_the_real_sandboxd_signer_alias() {
         &global_git_config_path,
     )
     .expect("control server should start");
-    control::submit_init(
+    control::submit_activate(
         &control_socket_path,
         &valid_signing_startup_input(
             &gateway.ws_url,
@@ -89,10 +91,9 @@ fn git_commit_s_succeeds_via_the_real_sandboxd_signer_alias() {
                 .to_str()
                 .expect("signer path should be representable as utf-8"),
         ),
-        true,
     )
-    .expect("init submission should succeed");
-    wait_for_init_phase(&server, control::InitPhase::Initialized);
+    .expect("activation submission should succeed");
+    wait_for_activation_phase(&server, control::ActivationPhase::Activated);
 
     run_git(
         [
@@ -185,10 +186,10 @@ fn snapshot_materialization_init_does_not_write_global_git_identity_config() {
     let bootstrap_gateway = start_signing_gateway();
     let mut startup_input =
         valid_signing_startup_input(&bootstrap_gateway.ws_url, "/opt/mistle/bin/mistle-ssh-sign");
-    startup_input.execution_mode = sandboxd::protocol::startup::StartupExecutionMode::Snapshot;
+    startup_input.operation_kind = ActivationOperationKind::Snapshot;
 
-    control::submit_init(&control_socket_path, &startup_input, true)
-        .expect("snapshot materialization init submission should succeed");
+    control::submit_activate(&control_socket_path, &startup_input)
+        .expect("snapshot activation submission should succeed");
 
     server
         .wait()
@@ -441,19 +442,17 @@ fn run_git<const N: usize>(
 }
 
 #[cfg(target_os = "linux")]
-fn wait_for_init_phase(server: &control::ControlServer, expected: control::InitPhase) {
+fn wait_for_activation_phase(server: &control::ControlServer, expected: control::ActivationPhase) {
     for _ in 0..100 {
-        match server.init_phase() {
+        match server.activation_phase() {
             phase if phase == expected => return,
-            control::InitPhase::Failed(error) => {
-                panic!("sandboxd init failed while waiting for {expected:?}: {error}")
+            control::ActivationPhase::Failed(error) => {
+                panic!("sandboxd activation failed while waiting for {expected:?}: {error}")
             }
-            control::InitPhase::Initialized => {
-                panic!(
-                    "sandboxd reached initialized while waiting for different phase {expected:?}"
-                )
+            control::ActivationPhase::Activated => {
+                panic!("sandboxd reached activated while waiting for different phase {expected:?}")
             }
-            control::InitPhase::Initializing | control::InitPhase::Uninitialized => {}
+            control::ActivationPhase::Activating | control::ActivationPhase::Unactivated => {}
         }
 
         ThreadSleeper.sleep(Duration::from_millis(10));
@@ -463,11 +462,12 @@ fn wait_for_init_phase(server: &control::ControlServer, expected: control::InitP
 }
 
 #[cfg(target_os = "linux")]
-fn valid_signing_startup_input(tunnel_gateway_ws_url: &str, signer_program: &str) -> StartupInput {
-    StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
-        execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
+fn valid_signing_startup_input(
+    tunnel_gateway_ws_url: &str,
+    signer_program: &str,
+) -> ActivationInput {
+    ActivationInput {
+        operation_kind: ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),

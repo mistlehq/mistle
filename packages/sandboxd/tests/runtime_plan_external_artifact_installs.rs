@@ -4,17 +4,15 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use sandboxd::protocol::startup::{StartupInput, StartupMode};
+use sandboxd::protocol::session::SessionRuntimeInput;
 use sandboxd::runtime;
 
 static TEMP_TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[test]
 fn applies_typed_mise_install_steps() {
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
-        execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: sandboxd::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
@@ -68,10 +66,8 @@ fn applies_github_release_artifact_install_steps_from_pinned_public_release() {
         ),
         other => panic!("unsupported test architecture: {other}"),
     };
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
-        execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: sandboxd::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),

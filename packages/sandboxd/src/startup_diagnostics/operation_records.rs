@@ -1,4 +1,4 @@
-//! Asynchronous operation-record delivery for startup diagnostics.
+//! Asynchronous operation-record delivery for activation diagnostics.
 //!
 //! Initialization paths enqueue lifecycle records here so network delivery can
 //! retry briefly without blocking the main startup flow indefinitely.
@@ -9,8 +9,8 @@ use serde_json::{Map, Value, json};
 use tokio::sync::mpsc;
 
 use crate::startup_diagnostics::{
-    LIFECYCLE_OPERATION_RECORD_SEND_RETRY_INTERVAL, LIFECYCLE_OPERATION_RECORD_SEND_TIMEOUT,
-    StartupOperation,
+    ActivationOperation, LIFECYCLE_OPERATION_RECORD_SEND_RETRY_INTERVAL,
+    LIFECYCLE_OPERATION_RECORD_SEND_TIMEOUT,
 };
 use crate::tunnel::session::OperationStreamMessage;
 
@@ -39,7 +39,7 @@ pub(super) fn send_lifecycle_operation_record_with_timeout(
 }
 
 pub(super) fn operation_record_line(
-    operation: StartupOperation,
+    operation: ActivationOperation,
     observed_at: String,
     event: &str,
     payload: &Value,
@@ -155,116 +155,104 @@ pub(super) fn lifecycle_attributes(payload: &Value) -> Value {
     Value::Object(attributes)
 }
 
-pub(super) fn started_event_name(operation: StartupOperation) -> &'static str {
+pub(super) fn started_event_name(operation: ActivationOperation) -> &'static str {
     match operation {
-        StartupOperation::Init => "sandbox_init_started",
-        StartupOperation::Resume => "sandbox_resume_started",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         } => "sandbox_start_started",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::Resume,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Resume,
         } => "sandbox_resume_started",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::SetupCheck,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::SetupCheck,
         } => "sandbox_setup_check_started",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::Snapshot,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Snapshot,
         } => "sandbox_snapshot_started",
     }
 }
 
-pub(super) fn phase_failed_event_name(operation: StartupOperation) -> &'static str {
+pub(super) fn phase_failed_event_name(operation: ActivationOperation) -> &'static str {
     match operation {
-        StartupOperation::Init => "sandbox_init_phase_failed",
-        StartupOperation::Resume => "sandbox_resume_phase_failed",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         } => "sandbox_start_phase_failed",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::Resume,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Resume,
         } => "sandbox_resume_phase_failed",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::SetupCheck,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::SetupCheck,
         } => "sandbox_setup_check_phase_failed",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::Snapshot,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Snapshot,
         } => "sandbox_snapshot_phase_failed",
     }
 }
 
-pub(super) fn phase_started_event_name(operation: StartupOperation) -> &'static str {
+pub(super) fn phase_started_event_name(operation: ActivationOperation) -> &'static str {
     match operation {
-        StartupOperation::Init => "sandbox_init_phase_started",
-        StartupOperation::Resume => "sandbox_resume_phase_started",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         } => "sandbox_start_phase_started",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::Resume,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Resume,
         } => "sandbox_resume_phase_started",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::SetupCheck,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::SetupCheck,
         } => "sandbox_setup_check_phase_started",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::Snapshot,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Snapshot,
         } => "sandbox_snapshot_phase_started",
     }
 }
 
-pub(super) fn phase_completed_event_name(operation: StartupOperation) -> &'static str {
+pub(super) fn phase_completed_event_name(operation: ActivationOperation) -> &'static str {
     match operation {
-        StartupOperation::Init => "sandbox_init_phase_completed",
-        StartupOperation::Resume => "sandbox_resume_phase_completed",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         } => "sandbox_start_phase_completed",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::Resume,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Resume,
         } => "sandbox_resume_phase_completed",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::SetupCheck,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::SetupCheck,
         } => "sandbox_setup_check_phase_completed",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::Snapshot,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Snapshot,
         } => "sandbox_snapshot_phase_completed",
     }
 }
 
-pub(super) fn failed_event_name(operation: StartupOperation) -> &'static str {
+pub(super) fn failed_event_name(operation: ActivationOperation) -> &'static str {
     match operation {
-        StartupOperation::Init => "sandbox_init_failed",
-        StartupOperation::Resume => "sandbox_resume_failed",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         } => "sandbox_start_failed",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::Resume,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Resume,
         } => "sandbox_resume_failed",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::SetupCheck,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::SetupCheck,
         } => "sandbox_setup_check_failed",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::Snapshot,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Snapshot,
         } => "sandbox_snapshot_failed",
     }
 }
 
-pub(super) fn transcript_event_name(operation: StartupOperation) -> &'static str {
+pub(super) fn transcript_event_name(operation: ActivationOperation) -> &'static str {
     match operation {
-        StartupOperation::Init => "sandbox_init_transcript",
-        StartupOperation::Resume => "sandbox_resume_transcript",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         } => "sandbox_start_transcript",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::Resume,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Resume,
         } => "sandbox_resume_transcript",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::SetupCheck,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::SetupCheck,
         } => "sandbox_setup_check_transcript",
-        StartupOperation::Activation {
-            operation_kind: crate::protocol::startup::StartupOperationKind::Snapshot,
+        ActivationOperation::Activation {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Snapshot,
         } => "sandbox_snapshot_transcript",
     }
 }

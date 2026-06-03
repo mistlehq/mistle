@@ -73,8 +73,6 @@ use crate::egress_proxy::transparent::{
     build_nftables_rule_plan_with_local_destinations, parse_iproute2_link_scope_ipv4_route_cidrs,
 };
 use crate::protocol::session::SessionRuntimeInput;
-#[cfg(test)]
-use crate::protocol::startup::StartupInput;
 use crate::runtime::CompiledRuntimePlan;
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
 use crate::time::{Clock, SystemClock};
@@ -336,17 +334,16 @@ impl EgressProxy {
     #[cfg(test)]
     fn start_with_options(
         runtime_plan: &CompiledRuntimePlan,
-        startup_input: &StartupInput,
+        session_input: &SessionRuntimeInput,
         forwarding_mode: EgressProxyForwardingMode,
         listener_address: SocketAddr,
         proxy_ca_config: ProxyCaConfig<'_>,
         clock: Arc<dyn Clock>,
         supervisor_handle: SandboxdSupervisorHandle,
     ) -> Result<Option<Self>, EgressProxyError> {
-        let session_input = SessionRuntimeInput::from_startup_input(startup_input);
         Self::start_with_loopback_runtime(
             runtime_plan,
-            &session_input,
+            session_input,
             forwarding_mode,
             EgressProxyStartOptions {
                 loopback_runtime: EgressProxyLoopbackRuntime::InProcess,

@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use sandboxd::protocol::startup::{StartupInput, StartupMode};
+use sandboxd::protocol::session::SessionRuntimeInput;
 use sandboxd::runtime;
 
 static TEMP_TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -58,10 +58,8 @@ fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
     fs::write(&if_absent_path, "keep-me").expect("if-absent fixture file should be writable");
     create_git_repository(&clone_source_path);
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
-        execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: sandboxd::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
@@ -631,10 +629,8 @@ fn applies_typed_exec_artifact_install_steps() {
     let test_dir = create_temp_test_dir("runtime_plan_typed_exec");
     let artifact_output_path = test_dir.join("typed-exec-output.txt");
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
-        execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: sandboxd::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
@@ -684,10 +680,8 @@ fn applies_typed_exec_artifact_install_steps() {
 
 #[test]
 fn accepts_runtime_plan_egress_routes_with_additional_headers_and_slot_key_credential_resolvers() {
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
-        execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: sandboxd::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
@@ -758,11 +752,9 @@ fn create_git_repository(path: &Path) {
 fn create_runtime_plan_apply_input(
     clone_source_path: &Path,
     clone_target_path: &Path,
-) -> StartupInput {
-    StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
-        execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
+) -> SessionRuntimeInput {
+    SessionRuntimeInput {
+        operation_kind: sandboxd::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),

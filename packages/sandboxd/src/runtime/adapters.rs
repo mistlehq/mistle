@@ -20,7 +20,6 @@ use crate::opencode_proxy::{
 };
 use crate::pi_proxy::{PiProxy, PiProxyConfig, PiProxyError, start_pi_proxy_with_supervisor};
 use crate::protocol::session::SessionRuntimeInput;
-use crate::protocol::startup::StartupInput;
 use crate::runtime::plan::{
     CompiledAgentRuntime, CompiledRuntimePlan, RuntimeClientConnectionMode,
     RuntimeClientEndpointTransport, RuntimeClientProcessReadiness,
@@ -29,7 +28,7 @@ use crate::runtime::readiness::RuntimeReadinessManager;
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
 use crate::time::SystemClock;
 use crate::tunnel::session::derive_sandbox_instance_id;
-/// Starts the runtime-specific platform-activity adapters declared by one startup input.
+/// Starts the runtime-specific platform-activity adapters declared by one activation input.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RuntimeAdapterRegistry;
 
@@ -210,7 +209,7 @@ impl RuntimeAdapter {
     }
 }
 
-/// Groups the runtime adapters started for one accepted startup input.
+/// Groups the runtime adapters started for one accepted session input.
 #[derive(Default)]
 pub struct RuntimeAdapters {
     adapters: Vec<RuntimeAdapter>,
@@ -238,14 +237,13 @@ impl RuntimeAdapters {
 }
 
 impl RuntimeAdapterRegistry {
-    /// Starts all runtime-specific adapters declared by one startup input.
+    /// Starts all runtime-specific adapters declared by one activation input.
     pub fn start(
         &self,
-        startup_input: &StartupInput,
+        session_input: &SessionRuntimeInput,
         keepalive_manager: Arc<Mutex<KeepaliveManager>>,
         runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     ) -> Result<RuntimeAdapters, RuntimeAdapterRegistryError> {
-        let session_input = SessionRuntimeInput::from_startup_input(startup_input);
         let sandbox_instance_id = derive_sandbox_instance_id(&session_input.tunnel_gateway_ws_url)
             .map_err(|error| {
                 RuntimeAdapterRegistryError::StartCodexProxy(CodexProxyError::ConfigureRuntime(
@@ -262,7 +260,7 @@ impl RuntimeAdapterRegistry {
         );
 
         self.start_with_supervisor(
-            &session_input,
+            session_input,
             keepalive_manager,
             runtime_readiness_manager,
             supervisor_handle,
@@ -593,7 +591,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use crate::keepalive::KeepaliveManager;
-    use crate::protocol::startup::{StartupInput, StartupMode};
+    use crate::protocol::session::SessionRuntimeInput;
     use crate::runtime::adapters::{
         RuntimeAdapterRegistry, RuntimeAdapterRegistryError, collect_runtime_adapter_components,
     };
@@ -603,10 +601,8 @@ mod tests {
 
     #[test]
     fn rejects_unknown_runtime_ids() {
-        let startup_input = StartupInput {
-            startup_mode: StartupMode::New,
-            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+        let startup_input = SessionRuntimeInput {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: "ws://127.0.0.1:5000/tunnel/sandbox".to_string(),
