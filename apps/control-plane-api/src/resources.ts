@@ -65,7 +65,13 @@ export async function createAppResources(
   });
   const db = createControlPlaneDatabase(dbPool);
   const testDbsByEnvironmentId = new Map<string, ControlPlaneDatabase>();
-  const cacheResources = await createControlPlaneCacheResources(config);
+  let cacheResources: Awaited<ReturnType<typeof createControlPlaneCacheResources>>;
+  try {
+    cacheResources = await createControlPlaneCacheResources(config);
+  } catch (error) {
+    await dbPool.end();
+    throw error;
+  }
   let auth: ReturnType<typeof createControlPlaneAuth> | undefined;
   const testAuthByEnvironmentId = new Map<string, ReturnType<typeof createControlPlaneAuth>>();
   const testWorkflowsByEnvironmentId = new Map<

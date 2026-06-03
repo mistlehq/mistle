@@ -125,11 +125,17 @@ const ControlPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
     path: ["database", "migrationUrl"],
     envVar: "MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL",
   },
-  { path: ["cache", "backend"], envVar: "MISTLE_KV_CONTROL_PLANE_BACKEND" },
-  { path: ["cache", "valkey", "url"], envVar: "MISTLE_KV_CONTROL_PLANE_URL" },
   {
-    path: ["cache", "valkey", "keyPrefix"],
+    envVar: "MISTLE_KV_CONTROL_PLANE_BACKEND",
+    readValue: readControlPlaneApiValkeyCacheBackend,
+  },
+  {
+    envVar: "MISTLE_KV_CONTROL_PLANE_URL",
+    readValue: readControlPlaneApiValkeyCacheUrl,
+  },
+  {
     envVar: "MISTLE_KV_CONTROL_PLANE_KEY_PREFIX",
+    readValue: readControlPlaneApiValkeyCacheKeyPrefix,
   },
   { path: ["objectStore", "bucketName"], envVar: "MISTLE_OBJECT_STORE_ASSETS_BUCKET_NAME" },
   { path: ["objectStore", "region"], envVar: "MISTLE_OBJECT_STORE_ASSETS_REGION" },
@@ -426,6 +432,31 @@ function exportDescriptor(
     value,
     ...(descriptor.valueFormat === undefined ? {} : { valueFormat: descriptor.valueFormat }),
   };
+}
+
+function readControlPlaneApiValkeyCacheBackend(root: unknown): unknown {
+  const backend = getValueAtPath(root, ["cache", "backend"]);
+  if (backend !== "valkey") {
+    return undefined;
+  }
+
+  return backend;
+}
+
+function readControlPlaneApiValkeyCacheUrl(root: unknown): unknown {
+  if (getValueAtPath(root, ["cache", "backend"]) !== "valkey") {
+    return undefined;
+  }
+
+  return getValueAtPath(root, ["cache", "valkey", "url"]);
+}
+
+function readControlPlaneApiValkeyCacheKeyPrefix(root: unknown): unknown {
+  if (getValueAtPath(root, ["cache", "backend"]) !== "valkey") {
+    return undefined;
+  }
+
+  return getValueAtPath(root, ["cache", "valkey", "keyPrefix"]);
 }
 
 function appendEntry(entries: RuntimeEnvExportEntry[], entry: RuntimeEnvExportEntry): void {
