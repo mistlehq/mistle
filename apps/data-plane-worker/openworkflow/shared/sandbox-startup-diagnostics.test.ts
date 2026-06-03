@@ -7,23 +7,25 @@ import {
 } from "./sandbox-startup-diagnostics.js";
 
 describe("parseStartupDiagnostics", () => {
-  it("parses valid startup diagnostic records and skips blank lines", () => {
+  it("parses valid activation diagnostic records and skips blank lines", () => {
     const logText = [
       "",
       JSON.stringify({
         timestamp: "2026-04-21T01:02:03.000Z",
         level: "info",
-        event: "sandbox_init_started",
+        event: "sandbox_start_started",
         sandboxInstanceId: "sbi_123",
-        operation: "init",
+        operation: "activate",
+        operationKind: "start",
       }),
       "   ",
       JSON.stringify({
         timestamp: "2026-04-21T01:02:05.000Z",
         level: "error",
-        event: "sandbox_init_phase_failed",
+        event: "sandbox_start_phase_failed",
         sandboxInstanceId: "sbi_123",
-        operation: "init",
+        operation: "activate",
+        operationKind: "start",
         phase: "apply_runtime_plan",
         failureKind: "workspace_source_failed",
         originUrl: "https://github.com/acme/abc.git",
@@ -34,7 +36,7 @@ describe("parseStartupDiagnostics", () => {
 
     expect(result.parseErrors).toEqual([]);
     expect(result.records).toHaveLength(2);
-    expect(result.records[0]?.event).toBe("sandbox_init_started");
+    expect(result.records[0]?.event).toBe("sandbox_start_started");
     expect(result.records[1]?.phase).toBe("apply_runtime_plan");
     expect(result.records[1]?.originUrl).toBe("https://github.com/acme/abc.git");
   });
@@ -78,9 +80,9 @@ describe("parseStartupDiagnostics", () => {
         JSON.stringify({
           timestamp: "2026-04-21T01:02:05.000Z",
           level: "warn",
-          event: "sandbox_init_phase_failed",
+          event: "sandbox_start_phase_failed",
           sandboxInstanceId: "sbi_123",
-          operation: "init",
+          operation: "activate",
         }),
       ].join("\n"),
     );
@@ -97,9 +99,10 @@ describe("toDiagnosticAttributes", () => {
     const attributes = toDiagnosticAttributes({
       timestamp: "2026-04-21T01:02:05.000Z",
       level: "error",
-      event: "sandbox_init_phase_failed",
+      event: "sandbox_start_phase_failed",
       sandboxInstanceId: "sbi_123",
-      operation: "init",
+      operation: "activate",
+      operationKind: "start",
       phase: "start_runtime_processes",
       processKey: "codex-app-server",
       timeoutMs: 5_000,
@@ -110,8 +113,9 @@ describe("toDiagnosticAttributes", () => {
 
     expect(attributes).toMatchObject({
       "mistle.sandbox.instance_id": "sbi_123",
-      "mistle.sandbox.startup_operation": "init",
-      "mistle.sandbox.startup_event": "sandbox_init_phase_failed",
+      "mistle.sandbox.startup_operation": "activate",
+      "mistle.sandbox.startup_operation_kind": "start",
+      "mistle.sandbox.startup_event": "sandbox_start_phase_failed",
       "mistle.sandbox.startup_phase": "start_runtime_processes",
       "mistle.sandbox.startup_detail.processKey": "codex-app-server",
       "mistle.sandbox.startup_detail.timeoutMs": 5_000,
@@ -150,25 +154,28 @@ describe("summarizeStartupDiagnosticPhaseTimings", () => {
         JSON.stringify({
           timestamp: "2026-05-25T08:16:46.100123456Z",
           level: "info",
-          event: "sandbox_init_phase_started",
+          event: "sandbox_start_phase_started",
           sandboxInstanceId: "sbi_123",
-          operation: "init",
+          operation: "activate",
+          operationKind: "start",
           phase: "start_tunnel_session",
         }),
         JSON.stringify({
           timestamp: "2026-05-25T08:16:46.350987654Z",
           level: "info",
-          event: "sandbox_init_phase_completed",
+          event: "sandbox_start_phase_completed",
           sandboxInstanceId: "sbi_123",
-          operation: "init",
+          operation: "activate",
+          operationKind: "start",
           phase: "start_tunnel_session",
         }),
         JSON.stringify({
           timestamp: "2026-05-25T08:16:47.000000001Z",
           level: "info",
-          event: "sandbox_init_transcript",
+          event: "sandbox_start_transcript",
           sandboxInstanceId: "sbi_123",
-          operation: "init",
+          operation: "activate",
+          operationKind: "start",
           phase: "start_tunnel_session",
         }),
       ].join("\n"),
@@ -224,8 +231,8 @@ describe("summarizeStartupDiagnosticPhaseTimings", () => {
     ]);
   });
 
-  it("skips activation phase records that do not identify the operation kind", () => {
-    const { records } = parseStartupDiagnostics(
+  it("rejects activation phase records that do not identify the operation kind", () => {
+    const { records, parseErrors } = parseStartupDiagnostics(
       JSON.stringify({
         timestamp: "2026-05-25T08:16:46.100Z",
         level: "info",
@@ -236,12 +243,9 @@ describe("summarizeStartupDiagnosticPhaseTimings", () => {
       }),
     );
 
-    const summary = summarizeStartupDiagnosticPhaseTimings(records);
-
-    expect(summary.phaseTimings).toEqual([]);
-    expect(summary.skippedRecords).toEqual([
-      "phase apply_runtime_plan activation record is missing operationKind",
-    ]);
+    expect(records).toEqual([]);
+    expect(parseErrors).toHaveLength(1);
+    expect(parseErrors[0]).toContain("does not match startup diagnostic schema");
   });
 
   it("reports completed phases that do not have matching start records", () => {
@@ -251,7 +255,8 @@ describe("summarizeStartupDiagnosticPhaseTimings", () => {
         level: "info",
         event: "sandbox_resume_phase_completed",
         sandboxInstanceId: "sbi_123",
-        operation: "resume",
+        operation: "activate",
+        operationKind: "resume",
         phase: "start_tunnel_session",
       }),
     );
@@ -270,25 +275,28 @@ describe("summarizeStartupDiagnosticPhaseTimings", () => {
         JSON.stringify({
           timestamp: "2026-05-25T08:16:46.100Z",
           level: "info",
-          event: "sandbox_init_phase_started",
+          event: "sandbox_start_phase_started",
           sandboxInstanceId: "sbi_123",
-          operation: "init",
+          operation: "activate",
+          operationKind: "start",
           phase: "start_tunnel_session",
         }),
         JSON.stringify({
           timestamp: "2026-05-25T08:16:46.350Z",
           level: "info",
-          event: "sandbox_init_phase_completed",
+          event: "sandbox_start_phase_completed",
           sandboxInstanceId: "sbi_123",
-          operation: "init",
+          operation: "activate",
+          operationKind: "start",
           phase: "start_tunnel_session",
         }),
         JSON.stringify({
           timestamp: "2026-05-25T08:16:46.500Z",
           level: "info",
-          event: "sandbox_init_phase_completed",
+          event: "sandbox_start_phase_completed",
           sandboxInstanceId: "sbi_123",
-          operation: "init",
+          operation: "activate",
+          operationKind: "start",
           phase: "start_tunnel_session",
         }),
       ].join("\n"),

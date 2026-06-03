@@ -11,8 +11,8 @@ const SandboxStartupDiagnosticRecordSchema = z
     level: z.enum(["info", "error"]),
     event: z.string(),
     sandboxInstanceId: z.string(),
-    operation: z.enum(["init", "resume", "activate"]),
-    operationKind: z.enum(["start", "resume", "setup_check", "snapshot"]).optional(),
+    operation: z.literal("activate"),
+    operationKind: z.enum(["start", "resume", "setup_check", "snapshot"]),
     phase: z.string().optional(),
   })
   .catchall(z.unknown());
@@ -69,10 +69,6 @@ export function summarizeStartupDiagnosticPhaseTimings(
     }
 
     const eventPrefix = diagnosticEventPrefix(record);
-    if (eventPrefix === null) {
-      skippedRecords.push(`phase ${phase} activation record is missing operationKind`);
-      continue;
-    }
     const startedEvent = `${eventPrefix}_phase_started`;
     const completedEvent = `${eventPrefix}_phase_completed`;
     if (record.event !== startedEvent && record.event !== completedEvent) {
@@ -122,15 +118,8 @@ export function summarizeStartupDiagnosticPhaseTimings(
   };
 }
 
-function diagnosticEventPrefix(record: SandboxStartupDiagnosticRecord): string | null {
-  if (record.operation === "activate") {
-    if (record.operationKind === undefined) {
-      return null;
-    }
-    return `sandbox_${record.operationKind}`;
-  }
-
-  return record.operation === "init" ? "sandbox_init" : "sandbox_resume";
+function diagnosticEventPrefix(record: SandboxStartupDiagnosticRecord): string {
+  return `sandbox_${record.operationKind}`;
 }
 
 function parseStartupDiagnosticTimestampMs(timestamp: string): number | null {
