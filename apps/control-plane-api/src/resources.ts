@@ -25,6 +25,8 @@ import { logger } from "./logger.js";
 import { createControlPlaneBackend, createControlPlaneOpenWorkflow } from "./openworkflow.js";
 import type { ControlPlaneApiConfig } from "./types.js";
 
+type ResourceStartupCleanupTask = () => Promise<void> | void;
+
 export type AppRequestContext = {
   db: ControlPlaneDatabase;
   openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>;
@@ -69,7 +71,7 @@ export async function createAppResources(
   try {
     cacheResources = await createControlPlaneCacheResources(config);
   } catch (error) {
-    await dbPool.end();
+    await runResourceStartupCleanup([() => dbPool.end()]);
     throw error;
   }
   let auth: ReturnType<typeof createControlPlaneAuth> | undefined;
@@ -110,9 +112,11 @@ export async function createAppResources(
       databasePoolMax: config.workflow.databasePoolMax,
     });
   } catch (error) {
-    await cacheResources.close();
-    objectStore.destroy();
-    await dbPool.end();
+    await runResourceStartupCleanup([
+      cacheResources.close,
+      () => objectStore.destroy(),
+      () => dbPool.end(),
+    ]);
     throw error;
   }
 
@@ -223,6 +227,27 @@ export async function stopAppResources(resources: AppRuntimeResources): Promise<
     resources.workflowBackend.stop(),
     ...testWorkflows.map((workflow) => workflow.backend.stop()),
   ]);
+}
+
+async function runResourceStartupCleanup(
+  cleanupTasks: readonly ResourceStartupCleanupTask[],
+): Promise<void> {
+  const results = await Promise.allSettled(cleanupTasks.map(runResourceStartupCleanupTask));
+
+  for (const result of results) {
+    if (result.status === "rejected") {
+      logger.warn(
+        {
+          err: result.reason,
+        },
+        "Control-plane API resource startup cleanup failed",
+      );
+    }
+  }
+}
+
+async function runResourceStartupCleanupTask(task: ResourceStartupCleanupTask): Promise<void> {
+  await task();
 }
 
 async function createControlPlaneCacheResources(
