@@ -8,6 +8,7 @@ import { describe, expect } from "vitest";
 import {
   connectCodexAgentSession,
   prepareCodexSandbox,
+  readSandboxHealthz,
   resumeSandboxInstance,
   stopSandboxInstanceByUserRequest,
   waitForRuntimeReadyValue,
@@ -151,6 +152,20 @@ describe("runtime system sandbox stop resume restores runtime readiness", () => 
         operation: async () => await fixture.readSandboxRuntimeState(sandboxInstanceId),
       });
       expect(runtimeStateWhenRunning.runtime.ready).toBe(true);
+
+      const sandboxdHealthAfterResume = await timeSystemRuntimePhase({
+        event: "system_runtime.sandbox_stop_resume.phase_timing",
+        phase: "read_sandboxd_health_after_resume",
+        attributes: timingAttributes,
+        operation: async () =>
+          await readSandboxHealthz({
+            fixture,
+            authenticatedSession,
+            sandboxInstanceId,
+          }),
+      });
+      expect(sandboxdHealthAfterResume.daemon_phase).toBe("activated");
+      expect(sandboxdHealthAfterResume.snapshot).not.toBeNull();
 
       const resumedSandboxStatus = await timeSystemRuntimePhase({
         event: "system_runtime.sandbox_stop_resume.phase_timing",
