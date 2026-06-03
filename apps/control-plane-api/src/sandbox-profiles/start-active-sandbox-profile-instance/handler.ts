@@ -12,6 +12,7 @@ const routeHandler = async (
   organizationActor: AppOrganizationActor,
 ) => {
   const db = ctx.get("db");
+  const cache = ctx.get("cache");
   const dataPlaneClient = ctx.get("dataPlaneClient");
   const { integrations: integrationsConfig, mcp: mcpConfig } = ctx.get("config");
   const sandboxConfig = ctx.get("sandboxConfig");
@@ -21,6 +22,7 @@ const routeHandler = async (
   const startedSandboxInstance = await startActiveProfileInstance(
     {
       db,
+      cache,
       integrationsConfig,
       mcpConfig,
       dataPlaneClient,

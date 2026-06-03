@@ -15,3 +15,4 @@ export {
   type GitHubAppManifestConversion,
   type GitHubAppManifestOwner,
 } from "./shared/app-manifest.js";
+export { GitHubAppInstallationCredentialResolver } from "./shared/credential-resolver.server.js";

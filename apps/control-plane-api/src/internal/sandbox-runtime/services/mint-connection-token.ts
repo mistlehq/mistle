@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 
+import type { Cache } from "@mistle/cache";
 import type {
   DataPlaneSandboxInstancesClient,
   GetSandboxInstanceResponse,
 } from "@mistle/data-plane-internal-client";
-import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { IntegrationBindingKinds, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import { mintConnectionToken as mintGatewayConnectionToken } from "@mistle/gateway-connection-auth";
 import {
@@ -182,12 +183,18 @@ async function waitForRunningSandboxInstance(
 export async function mintConnectionToken(
   {
     db,
+    cache,
+    integrationsConfig,
     dataPlaneClient,
     gatewayWebsocketUrl,
     tokenTtlSeconds,
     tokenConfig,
   }: {
     db: ControlPlaneDatabase;
+    cache: Cache;
+    integrationsConfig: {
+      masterEncryptionKeys: Record<string, string>;
+    };
     dataPlaneClient: Pick<
       DataPlaneSandboxInstancesClient,
       "getSandboxInstance" | "resumeSandboxInstance"
@@ -273,14 +280,18 @@ export async function mintConnectionToken(
               "Requested sandbox resume while minting a connection token",
             );
 
-            const gitIdentity =
-              input.actingUserId === undefined
-                ? undefined
-                : await resolveActingUserGitIdentityForSandboxInstance(db, {
-                    actingUserId: input.actingUserId,
-                    organizationId: input.organizationId,
-                    sandboxInstance,
-                  });
+            const gitIdentity = await resolveActingUserGitIdentityForSandboxInstance(
+              {
+                db,
+                cache,
+                integrationsConfig,
+              },
+              {
+                organizationId: input.organizationId,
+                sandboxInstance,
+                ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
+              },
+            );
 
             await dataPlaneClient.resumeSandboxInstance({
               organizationId: input.organizationId,
@@ -410,24 +421,67 @@ function isTriggerDeliveryConnectionMint(input: {
 }
 
 async function resolveActingUserGitIdentityForSandboxInstance(
-  db: ControlPlaneDatabase,
+  ctx: {
+    db: ControlPlaneDatabase;
+    cache: Cache;
+    integrationsConfig: {
+      masterEncryptionKeys: Record<string, string>;
+    };
+  },
   input: {
     organizationId: string;
-    actingUserId: string;
+    actingUserId?: string;
     sandboxInstance: Pick<ExistingSandboxInstance, "sandboxProfileId" | "sandboxProfileVersion">;
   },
 ) {
+  const gitIntegrationConnectionId = await readProfileVersionGitIntegrationConnectionId(ctx.db, {
+    profileId: input.sandboxInstance.sandboxProfileId,
+    profileVersion: input.sandboxInstance.sandboxProfileVersion,
+  });
+  if (gitIntegrationConnectionId === null) {
+    return undefined;
+  }
   const gitCommitSigningIntegrationConnectionId =
-    await readProfileVersionGitCommitSigningIntegrationConnectionId(db, {
+    await readProfileVersionGitCommitSigningIntegrationConnectionId(ctx.db, {
       profileId: input.sandboxInstance.sandboxProfileId,
       profileVersion: input.sandboxInstance.sandboxProfileVersion,
     });
 
-  return await resolveActingUserGitIdentity(db, {
+  return await resolveActingUserGitIdentity(ctx.db, {
+    cache: ctx.cache,
+    integrationsConfig: ctx.integrationsConfig,
     organizationId: input.organizationId,
+    gitIntegrationConnectionId,
     gitCommitSigningIntegrationConnectionId,
-    actingUser: {
-      userId: input.actingUserId,
-    },
+    ...(input.actingUserId === undefined
+      ? {}
+      : {
+          actingUser: {
+            userId: input.actingUserId,
+          },
+        }),
   });
+}
+
+async function readProfileVersionGitIntegrationConnectionId(
+  db: ControlPlaneDatabase,
+  input: {
+    profileId: string;
+    profileVersion: number;
+  },
+): Promise<string | null> {
+  const gitBinding = await db.query.sandboxProfileVersionIntegrationBindings.findFirst({
+    columns: {
+      connectionId: true,
+    },
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.sandboxProfileId, input.profileId),
+        eq(table.sandboxProfileVersion, input.profileVersion),
+        eq(table.kind, IntegrationBindingKinds.GIT),
+      ),
+    orderBy: (table, { asc }) => [asc(table.id)],
+  });
+
+  return gitBinding?.connectionId ?? null;
 }

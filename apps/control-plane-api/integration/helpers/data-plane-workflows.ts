@@ -67,7 +67,7 @@ const StartWorkflowRunInputSchema = z.looseObject({
   gitIdentity: z
     .object({
       name: z.string().min(1),
-      email: z.email(),
+      email: z.string().min(1),
       signing: z
         .object({
           format: z.literal("ssh"),

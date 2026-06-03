@@ -12,13 +12,17 @@ const routeHandler = async (
   organizationActor: AppOrganizationActor,
 ) => {
   const db = ctx.get("db");
+  const cache = ctx.get("cache");
   const dataPlaneClient = ctx.get("dataPlaneClient");
+  const { integrations: integrationsConfig } = ctx.get("config");
   const { instanceId } = ctx.req.valid("param");
   const body = ctx.req.valid("json");
 
   const sandboxInstance = await resumeInstance(
     {
       db,
+      cache,
+      integrationsConfig,
       dataPlaneClient,
     },
     {

@@ -215,7 +215,6 @@ export interface paths {
           "application/json": {
             actingUserId?: string;
             gitIdentity?: {
-              /** Format: email */
               email: string;
               name: string;
               signing?: {
@@ -1776,7 +1775,6 @@ export interface paths {
           "application/json": {
             actingUserId?: string;
             gitIdentity?: {
-              /** Format: email */
               email: string;
               name: string;
               signing?: {

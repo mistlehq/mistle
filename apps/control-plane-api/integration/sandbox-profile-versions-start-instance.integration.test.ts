@@ -2,12 +2,16 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+
 import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
+  IntegrationCredentialSecretKinds,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import { GitHubCredentialSlotKeys } from "@mistle/integrations-definitions";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
@@ -22,6 +26,7 @@ import {
 } from "../src/sandbox-profiles/index.js";
 import { createApiKeyToken } from "./helpers/api-keys.js";
 import { waitForQueuedStartWorkflowInput } from "./helpers/data-plane-workflows.js";
+import { seedConnectionCredential } from "./helpers/integration-connections.js";
 import {
   integrationConnectionRow,
   integrationTargetRow,
@@ -943,49 +948,67 @@ describe.concurrent("sandbox profile version start instance integration", () => 
       email: "integration-new-sandbox-profile-start-instance-primary-repository@example.com",
     });
 
-    await createStartableProfile({
-      env,
-      organizationId: session.organizationId,
-      profileId: "sbp_start_instance_primary_repository",
-      targetKey: "openai-start-instance-primary-repository",
-      connectionId: "icn_start_instance_primary_repository_agent",
-      bindingId: "ibd_start_instance_primary_repository_agent",
-      versionState: SandboxProfileVersionStates.DRAFT,
-      git: {
-        targetKey: "github-start-instance-primary-repository",
-        connectionId: "icn_start_instance_primary_repository_git",
-        bindingId: "ibd_start_instance_primary_repository_git",
-        repositories: ["mistlehq/mistle", "mistlehq/platform"],
-      },
-    });
-
-    const response = await env.controlPlaneApi.http.fetch(
-      "/v1/sandbox/profiles/sbp_start_instance_primary_repository/versions/1/instances",
-      {
-        method: "POST",
-        headers: {
-          cookie: session.cookie,
-          "content-type": "application/json",
+    const simulatedGitHub = await startSimulatedGitHubActorApi();
+    try {
+      await createStartableProfile({
+        env,
+        organizationId: session.organizationId,
+        profileId: "sbp_start_instance_primary_repository",
+        targetKey: "openai-start-instance-primary-repository",
+        connectionId: "icn_start_instance_primary_repository_agent",
+        bindingId: "ibd_start_instance_primary_repository_agent",
+        versionState: SandboxProfileVersionStates.DRAFT,
+        git: {
+          targetKey: "github-start-instance-primary-repository",
+          connectionId: "icn_start_instance_primary_repository_git",
+          bindingId: "ibd_start_instance_primary_repository_git",
+          repositories: ["mistlehq/mistle", "mistlehq/platform"],
+          apiBaseUrl: simulatedGitHub.baseUrl,
         },
-        body: JSON.stringify({
-          primaryRepositoryId: "mistlehq/platform",
-        }),
-      },
-    );
+      });
+      await seedConnectionCredential({
+        env,
+        organizationId: session.organizationId,
+        connectionId: "icn_start_instance_primary_repository_git",
+        slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_API_KEY,
+        secretKind: IntegrationCredentialSecretKinds.API_KEY,
+        plaintext: "ghp_start_instance_primary_repository",
+      });
 
-    expect(response.status).toBe(201);
-    const body = StartSandboxProfileInstanceResponseSchema.parse(await response.json());
-    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
-      env,
-      sandboxInstanceId: body.sandboxInstanceId,
-    });
+      const response = await env.controlPlaneApi.http.fetch(
+        "/v1/sandbox/profiles/sbp_start_instance_primary_repository/versions/1/instances",
+        {
+          method: "POST",
+          headers: {
+            cookie: session.cookie,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            primaryRepositoryId: "mistlehq/platform",
+          }),
+        },
+      );
 
-    expect(queuedWorkflowInput.runtimePlan.agentRuntimes[0]?.ptyLaunch.newLaunch.cwd).toBe(
-      "/root/mistlehq/platform",
-    );
-    expect(queuedWorkflowInput.runtimePlan.agentRuntimes[0]?.ptyLaunch.resumeLaunch.cwd).toBe(
-      "/root/mistlehq/platform",
-    );
+      expect(response.status).toBe(201);
+      const body = StartSandboxProfileInstanceResponseSchema.parse(await response.json());
+      const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+        env,
+        sandboxInstanceId: body.sandboxInstanceId,
+      });
+
+      expect(queuedWorkflowInput.runtimePlan.agentRuntimes[0]?.ptyLaunch.newLaunch.cwd).toBe(
+        "/root/mistlehq/platform",
+      );
+      expect(queuedWorkflowInput.runtimePlan.agentRuntimes[0]?.ptyLaunch.resumeLaunch.cwd).toBe(
+        "/root/mistlehq/platform",
+      );
+      expect(queuedWorkflowInput.gitIdentity).toEqual({
+        name: "Git Connection Owner",
+        email: "git-connection-owner@example.com",
+      });
+    } finally {
+      await simulatedGitHub.stop();
+    }
   });
 
   it("starts the session at the workspace root when no primary repository is selected", async ({
@@ -1095,6 +1118,7 @@ async function createStartableProfile(input: {
     connectionId: string;
     bindingId: string;
     repositories: string[];
+    apiBaseUrl?: string;
   };
 }) {
   await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.sandboxProfiles).values(
@@ -1143,7 +1167,7 @@ async function createStartableProfile(input: {
             variantId: "github-cloud",
             enabled: true,
             config: {
-              api_base_url: "https://api.github.com",
+              api_base_url: input.git.apiBaseUrl ?? "https://api.github.com",
               web_base_url: "https://github.com",
             },
           },
@@ -1204,4 +1228,67 @@ async function createStartableProfile(input: {
             }),
           ]),
     ]);
+}
+
+async function startSimulatedGitHubActorApi(): Promise<{
+  baseUrl: string;
+  stop: () => Promise<void>;
+}> {
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
+    response.setHeader("content-type", "application/json");
+
+    // GitHub REST "Get the authenticated user": https://docs.github.com/en/rest/users/users#get-the-authenticated-user
+    if (requestUrl.pathname === "/user") {
+      response.end(
+        JSON.stringify({
+          id: 1_234_567,
+          login: "git-connection-owner",
+          name: "Git Connection Owner",
+          email: "git-connection-owner@example.com",
+        }),
+      );
+      return;
+    }
+
+    response.statusCode = 404;
+    response.end(JSON.stringify({ message: "Not Found" }));
+  });
+
+  await listen(server);
+
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("Expected simulated GitHub actor API to listen on a TCP address.");
+  }
+
+  return {
+    baseUrl: `http://127.0.0.1:${String(address.port)}`,
+    stop: async () => {
+      await closeServer(server);
+    },
+  };
+}
+
+async function listen(server: Server): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.on("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+}
+
+async function closeServer(server: Server): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => {
+      if (error === undefined) {
+        resolve();
+        return;
+      }
+
+      reject(error);
+    });
+  });
 }

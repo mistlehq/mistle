@@ -15,6 +15,7 @@ const routeHandler = async (
   organizationActor: AppOrganizationActor,
 ) => {
   const db = ctx.get("db");
+  const cache = ctx.get("cache");
   const dataPlaneClient = ctx.get("dataPlaneClient");
   const sandboxConfig = ctx.get("sandboxConfig");
   const connectionTokenConfig = ctx.get("connectionTokenConfig");
@@ -25,6 +26,7 @@ const routeHandler = async (
   const result = await refreshProfileVersionSkillsSourceRepo(
     {
       db,
+      cache,
       dataPlaneClient,
       integrationsConfig,
       mcpConfig,

@@ -90,7 +90,10 @@ export async function listProfileVersionSkillsSourceRepos(
 }
 
 export async function refreshProfileVersionSkillsSourceRepo(
-  context: Pick<CreateSandboxProfilesServiceInput, "db" | "integrationsConfig" | "mcpConfig"> & {
+  context: Pick<
+    CreateSandboxProfilesServiceInput,
+    "cache" | "db" | "integrationsConfig" | "mcpConfig"
+  > & {
     connectionTokenConfig: ConnectionTokenConfig;
     dataPlaneClient: Pick<
       DataPlaneSandboxInstancesClient,
@@ -130,10 +133,12 @@ export async function refreshProfileVersionSkillsSourceRepo(
   const output = await syncSkillsSourceRepo(
     {
       db: context.db,
+      cache: context.cache,
       dataPlaneClient: context.dataPlaneClient,
       gatewayWebsocketUrl: context.gatewayWebsocketUrl,
       connectionTokenConfig: context.connectionTokenConfig,
       connectionTokenTtlSeconds: SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS,
+      integrationsConfig: context.integrationsConfig,
     },
     {
       organizationId: input.organizationId,

@@ -2,6 +2,8 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+
 import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
@@ -407,7 +409,9 @@ describe.concurrent("internal sandbox runtime integration", () => {
 
     await seedGitIdentityProvider(env, {
       organizationId: session.organizationId,
+      profileId: "sbp_internal_start_git_identity",
       userId: session.userId,
+      createGitBinding: false,
     });
     await seedProfileWithAgent(env, {
       organizationId: session.organizationId,
@@ -416,6 +420,11 @@ describe.concurrent("internal sandbox runtime integration", () => {
       openAiConnectionId: "icn_internal_start_git_identity_agent",
       agentBindingId: "ibd_internal_start_git_identity_agent",
       gitCommitSigningIntegrationConnectionId: "icn_internal_start_git_identity_provider",
+    });
+    await insertSandboxGitBinding(env, {
+      profileId: "sbp_internal_start_git_identity",
+      connectionId: "icn_internal_start_git_identity_provider",
+      gitBindingId: "ibd_internal_start_git_identity_git",
     });
 
     const response = await internalSandboxRuntimeRequest(env, {
@@ -457,6 +466,62 @@ describe.concurrent("internal sandbox runtime integration", () => {
     });
   });
 
+  it("starts a profile instance with linked-user git identity when commit signing is disabled", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-internal-start-profile-instance-linked-git-actor@example.com",
+    });
+
+    await seedProfileWithAgent(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_internal_start_linked_git_actor",
+      openAiTargetKey: "openai-internal-start-linked-git-actor",
+      openAiConnectionId: "icn_internal_start_linked_git_actor_agent",
+      agentBindingId: "ibd_internal_start_linked_git_actor_agent",
+    });
+    await seedGitIdentityProvider(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_internal_start_linked_git_actor",
+      userId: session.userId,
+      targetKey: "github-internal-start-linked-git-actor",
+      connectionId: "icn_internal_start_linked_git_actor_provider",
+      providerConfigId: "ilp_internal_start_linked_git_actor",
+      principalId: "uep_internal_start_linked_git_actor",
+      signingCredentialId: "upc_internal_start_linked_git_actor_signing",
+      gitBindingId: "ibd_internal_start_linked_git_actor_git",
+    });
+
+    const response = await internalSandboxRuntimeRequest(env, {
+      path: "/start-profile-instance",
+      body: {
+        organizationId: session.organizationId,
+        profileId: "sbp_internal_start_linked_git_actor",
+        profileVersion: 1,
+        startedBy: {
+          kind: "user",
+          id: session.userId,
+        },
+        actingUser: {
+          userId: session.userId,
+        },
+        source: "dashboard",
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const body = StartProfileInstanceResponseSchema.parse(await response.json());
+
+    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+      env,
+      sandboxInstanceId: body.sandboxInstanceId,
+    });
+    expect(queuedWorkflowInput.gitIdentity).toEqual({
+      name: "Mistle User",
+      email: "mistle-user@example.com",
+    });
+  });
+
   it("starts the sandbox in the selected primary repository for internal callers", async ({
     env,
   }) => {
@@ -471,54 +536,65 @@ describe.concurrent("internal sandbox runtime integration", () => {
       openAiConnectionId: "icn_internal_start_primary_repository_agent",
       agentBindingId: "ibd_internal_start_primary_repository_agent",
     });
-    await seedGitBinding(env, {
-      organizationId: session.organizationId,
-      profileId: "sbp_internal_start_primary_repository",
-    });
-
-    const response = await internalSandboxRuntimeRequest(env, {
-      path: "/start-profile-instance",
-      body: {
+    const simulatedGitHub = await startSimulatedGitHubActorApi();
+    try {
+      await seedGitBinding(env, {
         organizationId: session.organizationId,
         profileId: "sbp_internal_start_primary_repository",
-        profileVersion: 1,
-        primaryRepositoryId: "mistlehq/platform",
-        startedBy: {
-          kind: "system",
-          id: "aru_internal_start_primary_repository",
+        apiBaseUrl: simulatedGitHub.baseUrl,
+        apiKey: "ghp_internal_start_primary_repository",
+      });
+
+      const response = await internalSandboxRuntimeRequest(env, {
+        path: "/start-profile-instance",
+        body: {
+          organizationId: session.organizationId,
+          profileId: "sbp_internal_start_primary_repository",
+          profileVersion: 1,
+          primaryRepositoryId: "mistlehq/platform",
+          startedBy: {
+            kind: "system",
+            id: "aru_internal_start_primary_repository",
+          },
+          source: "webhook",
         },
-        source: "webhook",
-      },
-    });
+      });
 
-    expect(response.status).toBe(200);
-    const body = StartProfileInstanceResponseSchema.parse(await response.json());
+      expect(response.status).toBe(200);
+      const body = StartProfileInstanceResponseSchema.parse(await response.json());
 
-    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
-      env,
-      sandboxInstanceId: body.sandboxInstanceId,
-    });
-    const runtimePlan = z
-      .object({
-        agentRuntimes: z.array(
-          z.object({
-            ptyLaunch: z.object({
-              newLaunch: z.object({
-                cwd: z.string().min(1),
-              }),
-              resumeLaunch: z.object({
-                cwd: z.string().min(1),
+      const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+        env,
+        sandboxInstanceId: body.sandboxInstanceId,
+      });
+      const runtimePlan = z
+        .object({
+          agentRuntimes: z.array(
+            z.object({
+              ptyLaunch: z.object({
+                newLaunch: z.object({
+                  cwd: z.string().min(1),
+                }),
+                resumeLaunch: z.object({
+                  cwd: z.string().min(1),
+                }),
               }),
             }),
-          }),
-        ),
-      })
-      .parse(queuedWorkflowInput.runtimePlan);
+          ),
+        })
+        .parse(queuedWorkflowInput.runtimePlan);
 
-    expect(runtimePlan.agentRuntimes[0]?.ptyLaunch.newLaunch.cwd).toBe("/root/mistlehq/platform");
-    expect(runtimePlan.agentRuntimes[0]?.ptyLaunch.resumeLaunch.cwd).toBe(
-      "/root/mistlehq/platform",
-    );
+      expect(runtimePlan.agentRuntimes[0]?.ptyLaunch.newLaunch.cwd).toBe("/root/mistlehq/platform");
+      expect(runtimePlan.agentRuntimes[0]?.ptyLaunch.resumeLaunch.cwd).toBe(
+        "/root/mistlehq/platform",
+      );
+      expect(queuedWorkflowInput.gitIdentity).toEqual({
+        name: "Git Connection Owner",
+        email: "git-connection-owner@example.com",
+      });
+    } finally {
+      await simulatedGitHub.stop();
+    }
   });
 });
 
@@ -605,11 +681,27 @@ async function seedGitIdentityProvider(
   env: IntegrationTestEnvironment,
   input: {
     organizationId: string;
+    profileId: string;
     userId: string;
+    targetKey?: string;
+    connectionId?: string;
+    providerConfigId?: string;
+    principalId?: string;
+    signingCredentialId?: string;
+    gitBindingId?: string;
+    createGitBinding?: boolean;
   },
 ): Promise<void> {
+  const targetKey = input.targetKey ?? "github-internal-start-git-identity";
+  const connectionId = input.connectionId ?? "icn_internal_start_git_identity_provider";
+  const providerConfigId = input.providerConfigId ?? "ilp_internal_start_git_identity";
+  const principalId = input.principalId ?? "uep_internal_start_git_identity";
+  const signingCredentialId =
+    input.signingCredentialId ?? "upc_internal_start_git_identity_signing";
+  const gitBindingId = input.gitBindingId ?? "ibd_internal_start_git_identity_git";
+
   await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values({
-    targetKey: "github-internal-start-git-identity",
+    targetKey,
     familyId: "github",
     variantId: "github-cloud",
     enabled: true,
@@ -619,9 +711,9 @@ async function seedGitIdentityProvider(
     },
   });
   await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
-    id: "icn_internal_start_git_identity_provider",
+    id: connectionId,
     organizationId: input.organizationId,
-    targetKey: "github-internal-start-git-identity",
+    targetKey,
     displayName: "Internal start git identity provider connection",
     status: IntegrationConnectionStatuses.ACTIVE,
     config: {
@@ -629,17 +721,18 @@ async function seedGitIdentityProvider(
       app_id: "123",
       app_slug: "mistle-github-app",
       client_id: "Iv1.internalStartGitIdentity",
+      installation_id: "456",
     },
   });
   await env.controlPlaneDb
     .insert(env.controlPlaneTables.organizationIdentityLinkProviderConfigs)
     .values({
-      id: "ilp_internal_start_git_identity",
+      id: providerConfigId,
       organizationId: input.organizationId,
       providerFamily: "github",
       status: "active",
-      integrationTargetKey: "github-internal-start-git-identity",
-      integrationConnectionId: "icn_internal_start_git_identity_provider",
+      integrationTargetKey: targetKey,
+      integrationConnectionId: connectionId,
       createdByUserId: input.userId,
       updatedByUserId: input.userId,
       policy: {
@@ -647,13 +740,13 @@ async function seedGitIdentityProvider(
       },
     });
   await env.controlPlaneDb.insert(env.controlPlaneTables.userExternalPrincipals).values({
-    id: "uep_internal_start_git_identity",
+    id: principalId,
     organizationId: input.organizationId,
     userId: input.userId,
     providerFamily: "github",
     providerSubjectId: "12345",
-    organizationProviderConfigId: "ilp_internal_start_git_identity",
-    integrationConnectionId: "icn_internal_start_git_identity_provider",
+    organizationProviderConfigId: providerConfigId,
+    integrationConnectionId: connectionId,
     status: UserExternalPrincipalStatuses.ACTIVE,
     profile: {
       login: "mistle-user",
@@ -662,16 +755,16 @@ async function seedGitIdentityProvider(
     },
   });
   await env.controlPlaneDb.insert(env.controlPlaneTables.userExternalPrincipalCredentials).values({
-    id: "upc_internal_start_git_identity_signing",
+    id: signingCredentialId,
     organizationId: input.organizationId,
-    principalId: "uep_internal_start_git_identity",
+    principalId,
     providerFamily: "github",
     credentialKind: "git_ssh_signing_key",
     status: UserExternalPrincipalCredentialStatuses.ACTIVE,
   });
   await insertPrincipalCredentialSecret(env, {
     organizationId: input.organizationId,
-    credentialId: "upc_internal_start_git_identity_signing",
+    credentialId: signingCredentialId,
     secretKind: UserExternalPrincipalCredentialSecretKinds.GIT_SSH_PRIVATE_KEY,
     plaintext: "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----",
     metadata: {
@@ -679,6 +772,36 @@ async function seedGitIdentityProvider(
       publicKeyFingerprint: "SHA256:test-internal-start-signing-key",
     },
   });
+  if (input.createGitBinding ?? true) {
+    await insertSandboxGitBinding(env, {
+      profileId: input.profileId,
+      connectionId,
+      gitBindingId,
+    });
+  }
+}
+
+async function insertSandboxGitBinding(
+  env: IntegrationTestEnvironment,
+  input: {
+    profileId: string;
+    connectionId: string;
+    gitBindingId: string;
+  },
+): Promise<void> {
+  await env.controlPlaneDb
+    .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+    .values({
+      id: input.gitBindingId,
+      sandboxProfileId: input.profileId,
+      sandboxProfileVersion: 1,
+      connectionId: input.connectionId,
+      kind: IntegrationBindingKinds.GIT,
+      config: {
+        repositories: ["mistlehq/mistle"],
+        tools: [],
+      },
+    });
 }
 
 async function seedGitBinding(
@@ -686,6 +809,8 @@ async function seedGitBinding(
   input: {
     organizationId: string;
     profileId: string;
+    apiBaseUrl: string;
+    apiKey: string;
   },
 ): Promise<void> {
   await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values({
@@ -694,7 +819,7 @@ async function seedGitBinding(
     variantId: "github-cloud",
     enabled: true,
     config: {
-      api_base_url: "https://api.github.com",
+      api_base_url: input.apiBaseUrl,
       web_base_url: "https://github.com",
     },
   });
@@ -707,6 +832,13 @@ async function seedGitBinding(
     config: {
       connection_method: IntegrationConnectionMethodIds.API_KEY,
     },
+  });
+  await insertIntegrationConnectionCredential(env, {
+    organizationId: input.organizationId,
+    connectionId: "icn_internal_start_primary_repository_git",
+    slotKey: "github.github-cloud.api-key.api-key",
+    secretKind: IntegrationCredentialSecretKinds.API_KEY,
+    plaintext: input.apiKey,
   });
   await env.controlPlaneDb
     .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
@@ -721,6 +853,46 @@ async function seedGitBinding(
         tools: [],
       },
     });
+}
+
+async function startSimulatedGitHubActorApi(): Promise<{
+  baseUrl: string;
+  stop: () => Promise<void>;
+}> {
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
+    response.setHeader("content-type", "application/json");
+
+    // GitHub REST "Get the authenticated user": https://docs.github.com/en/rest/users/users#get-the-authenticated-user
+    if (requestUrl.pathname === "/user") {
+      response.end(
+        JSON.stringify({
+          id: 1_234_567,
+          login: "git-connection-owner",
+          name: "Git Connection Owner",
+          email: "git-connection-owner@example.com",
+        }),
+      );
+      return;
+    }
+
+    response.statusCode = 404;
+    response.end(JSON.stringify({ message: "Not Found" }));
+  });
+
+  await listen(server);
+
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("Expected simulated GitHub actor API to listen on a TCP address.");
+  }
+
+  return {
+    baseUrl: `http://127.0.0.1:${String(address.port)}`,
+    stop: async () => {
+      await closeServer(server);
+    },
+  };
 }
 
 async function insertPrincipalCredentialSecret(
@@ -770,4 +942,90 @@ async function insertPrincipalCredentialSecret(
   } finally {
     organizationCredentialKeyMaterial.fill(0);
   }
+}
+
+async function insertIntegrationConnectionCredential(
+  env: IntegrationTestEnvironment,
+  input: {
+    organizationId: string;
+    connectionId: string;
+    slotKey: string;
+    secretKind: typeof IntegrationCredentialSecretKinds.API_KEY;
+    plaintext: string;
+  },
+): Promise<void> {
+  const organizationCredentialKey =
+    await env.controlPlaneDb.query.organizationCredentialKeys.findFirst({
+      where: (table, { eq }) => eq(table.organizationId, input.organizationId),
+    });
+  if (organizationCredentialKey === undefined) {
+    throw new Error("Expected organization credential key.");
+  }
+
+  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+    masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+    masterEncryptionKeys: IntegrationMasterEncryptionKeys,
+  });
+  const organizationCredentialKeyMaterial = unwrapOrganizationCredentialKey({
+    wrappedCiphertext: organizationCredentialKey.ciphertext,
+    masterEncryptionKeyMaterial,
+  });
+
+  try {
+    const encryptedSecret = encryptCredentialUtf8({
+      plaintext: input.plaintext,
+      organizationCredentialKey: organizationCredentialKeyMaterial,
+    });
+
+    const [credential] = await env.controlPlaneDb
+      .insert(env.controlPlaneTables.integrationCredentials)
+      .values({
+        organizationId: input.organizationId,
+        secretKind: input.secretKind,
+        ciphertext: encryptedSecret.ciphertext,
+        nonce: encryptedSecret.nonce,
+        organizationCredentialKeyVersion: organizationCredentialKey.version,
+        intendedFamilyId: "github",
+      })
+      .returning({
+        id: env.controlPlaneTables.integrationCredentials.id,
+      });
+
+    if (credential === undefined) {
+      throw new Error("Expected inserted integration credential.");
+    }
+
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.integrationConnectionCredentials)
+      .values({
+        connectionId: input.connectionId,
+        credentialId: credential.id,
+        slotKey: input.slotKey,
+      });
+  } finally {
+    organizationCredentialKeyMaterial.fill(0);
+  }
+}
+
+async function listen(server: Server): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+}
+
+async function closeServer(server: Server): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => {
+      if (error === undefined) {
+        resolve();
+        return;
+      }
+
+      reject(error);
+    });
+  });
 }

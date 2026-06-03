@@ -9,6 +9,10 @@ Account linking lets users connect their Mistle account to their identity in a s
 
 Organizations can enable supported integrations as account-linking providers. Once linked, Mistle can map provider activity back to the correct Mistle user, so actions, workflow runs, and agent work are attributed to the right person.
 
+For GitHub-backed Sandbox profiles, account linking also gives Mistle a user-specific Git actor when the linked user starts or resumes a sandbox. If the acting user has not linked GitHub for that connection, Mistle still configures Git commits with the Git connection's own identity, such as the GitHub App bot account or API-key owner.
+
+Git commit signing is configured separately on Sandbox profiles. Account linking can supply the user identity and signing material required for signing, but setting `git user.name` and `git user.email` does not enable signing by itself.
+
 ## Example Flow
 
 In this example, a user asks an agent to do work from Slack. The agent completes the work and opens a pull request in GitHub.

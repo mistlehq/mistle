@@ -6,6 +6,10 @@ Organizations can enable supported integrations as OAuth account-linking provide
 
 Once linked, Mistle can map provider activity back to the correct Mistle user, so actions, workflow runs, and agent work are attributed to the right person. Resolution is scoped to the configured integration connection, not only the provider family. A Slack webhook from one workspace must resolve only linked principals for that workspace's provider configuration, even if another workspace has the same Slack user ID.
 
+For GitHub-backed Sandbox profiles, account linking is not the only source of Git commit actor metadata. When a Sandbox profile has a Git connection, Mistle configures `git user.name` and `git user.email` from the acting user's linked GitHub account when available. If the acting user does not have a linked GitHub account for that connection, Mistle uses the Git connection's own identity instead, such as the GitHub App bot account or API-key owner.
+
+Git commit signing is a separate Sandbox profile setting. Enabling signing lets the sandbox ask the control plane to sign commits for a linked GitHub user. Setting the Git user name and email does not by itself enable commit signing.
+
 ## Example Flow
 
 In this example, a user asks an agent to do work from Slack. The agent completes the work and opens a pull request in GitHub. Account linking lets Mistle connect the Slack message, the Mistle user, and the GitHub identity involved in the resulting work.

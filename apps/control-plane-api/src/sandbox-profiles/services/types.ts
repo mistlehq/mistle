@@ -1,3 +1,4 @@
+import type { Cache } from "@mistle/cache";
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import type {
   ControlPlaneDatabase,
@@ -24,6 +25,7 @@ export type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenW
 
 export type CreateSandboxProfilesServiceInput = {
   db: ControlPlaneDatabase;
+  cache: Cache;
   integrationRegistry: IntegrationRegistry;
   sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
   openWorkflow: ControlPlaneOpenWorkflow;

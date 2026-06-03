@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  IntegrationBindingKinds,
   SandboxProfileVersionStates,
   type SandboxProfileVersionState,
   getControlPlaneDatabaseSchema,
@@ -62,6 +63,7 @@ type StartActiveProfileInstanceInput = Omit<StartProfileInstanceInput, "profileV
 
 type ResolvedLaunchImage = {
   versionState: SandboxProfileVersionState;
+  gitIntegrationConnectionId: string | null;
   gitCommitSigningIntegrationConnectionId: string | null;
   compileImage: ResolvedSandboxImage;
   workflowImage: StartSandboxInstanceWorkflowImageInput;
@@ -151,6 +153,18 @@ async function resolveLaunchImage(
   },
 ): Promise<ResolvedLaunchImage> {
   const tables = getControlPlaneDatabaseSchema(db);
+  const gitBinding = await db.query.sandboxProfileVersionIntegrationBindings.findFirst({
+    columns: {
+      connectionId: true,
+    },
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.sandboxProfileId, input.profileId),
+        eq(table.sandboxProfileVersion, input.profileVersion),
+        eq(table.kind, IntegrationBindingKinds.GIT),
+      ),
+    orderBy: (table, { asc }) => [asc(table.id)],
+  });
 
   const [sandboxProfileVersion] = await db
     .select({
@@ -228,6 +242,7 @@ async function resolveLaunchImage(
 
     return {
       versionState: sandboxProfileVersion.state,
+      gitIntegrationConnectionId: gitBinding?.connectionId ?? null,
       gitCommitSigningIntegrationConnectionId:
         sandboxProfileVersion.gitCommitSigningIntegrationConnectionId,
       compileImage: {
@@ -245,6 +260,7 @@ async function resolveLaunchImage(
 
   return {
     versionState: sandboxProfileVersion.state,
+    gitIntegrationConnectionId: gitBinding?.connectionId ?? null,
     gitCommitSigningIntegrationConnectionId:
       sandboxProfileVersion.gitCommitSigningIntegrationConnectionId,
     compileImage: {
@@ -264,13 +280,14 @@ async function resolveLaunchImage(
 export async function startProfileInstance(
   {
     db,
+    cache,
     integrationsConfig,
     mcpConfig,
     dataPlaneClient,
     defaultBaseImage,
   }: Pick<
     CreateSandboxProfilesServiceInput,
-    "db" | "integrationsConfig" | "mcpConfig" | "dataPlaneClient"
+    "db" | "cache" | "integrationsConfig" | "mcpConfig" | "dataPlaneClient"
   > & {
     defaultBaseImage: string;
   },
@@ -322,7 +339,10 @@ export async function startProfileInstance(
     },
   );
   const gitIdentity = await resolveActingUserGitIdentity(db, {
+    cache,
+    integrationsConfig,
     organizationId: serviceInput.organizationId,
+    gitIntegrationConnectionId: launchImage.gitIntegrationConnectionId,
     gitCommitSigningIntegrationConnectionId: launchImage.gitCommitSigningIntegrationConnectionId,
     ...(serviceInput.actingUser === undefined ? {} : { actingUser: serviceInput.actingUser }),
   });
@@ -353,7 +373,7 @@ export async function startProfileInstance(
 export async function startActiveProfileInstance(
   context: Pick<
     CreateSandboxProfilesServiceInput,
-    "db" | "integrationsConfig" | "mcpConfig" | "dataPlaneClient"
+    "db" | "cache" | "integrationsConfig" | "mcpConfig" | "dataPlaneClient"
   > & {
     defaultBaseImage: string;
   },

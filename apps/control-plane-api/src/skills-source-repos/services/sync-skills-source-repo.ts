@@ -1,3 +1,4 @@
+import type { Cache } from "@mistle/cache";
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import {
   getControlPlaneDatabaseSchema,
@@ -42,6 +43,7 @@ export type SkillsDiscoverOutput = z.infer<typeof SkillsDiscoverOutputSchema>;
 
 export type SyncSkillsSourceRepoServiceInput = {
   db: ControlPlaneDatabase;
+  cache: Cache;
   dataPlaneClient: Pick<
     DataPlaneSandboxInstancesClient,
     | "deleteSandboxInstance"
@@ -52,6 +54,9 @@ export type SyncSkillsSourceRepoServiceInput = {
   gatewayWebsocketUrl: string;
   connectionTokenConfig: ConnectionTokenConfig;
   connectionTokenTtlSeconds: number;
+  integrationsConfig: {
+    masterEncryptionKeys: Record<string, string>;
+  };
 };
 
 export type SyncSkillsSourceRepoInput = {
@@ -300,6 +305,8 @@ async function discoverSkillsInSandbox(
   const connectionToken = await mintConnectionToken(
     {
       db: serviceInput.db,
+      cache: serviceInput.cache,
+      integrationsConfig: serviceInput.integrationsConfig,
       dataPlaneClient: serviceInput.dataPlaneClient,
       gatewayWebsocketUrl: serviceInput.gatewayWebsocketUrl,
       tokenTtlSeconds: serviceInput.connectionTokenTtlSeconds,

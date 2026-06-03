@@ -7,12 +7,16 @@ import { route } from "./route.js";
 
 const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
   const db = ctx.get("db");
+  const cache = ctx.get("cache");
   const dataPlaneClient = ctx.get("dataPlaneClient");
+  const { integrations: integrationsConfig } = ctx.get("config");
   const body = ctx.req.valid("json");
 
   const response = await resumeSandboxInstanceForConnection(
     {
       db,
+      cache,
+      integrationsConfig,
       dataPlaneClient,
     },
     {

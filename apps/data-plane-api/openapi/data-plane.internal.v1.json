@@ -1544,7 +1544,7 @@
                       },
                       "email": {
                         "type": "string",
-                        "format": "email"
+                        "minLength": 1
                       },
                       "signing": {
                         "type": "object",
@@ -4818,7 +4818,7 @@
                       },
                       "email": {
                         "type": "string",
-                        "format": "email"
+                        "minLength": 1
                       },
                       "signing": {
                         "type": "object",

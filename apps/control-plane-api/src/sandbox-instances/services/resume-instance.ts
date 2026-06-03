@@ -1,5 +1,6 @@
+import type { Cache } from "@mistle/cache";
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
-import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { IntegrationBindingKinds, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 
 import { readProfileVersionGitCommitSigningIntegrationConnectionId } from "../../sandbox-profiles/services/profile-version-git-signing-selector.js";
 import {
@@ -13,9 +14,15 @@ import type { SandboxInstanceStatus } from "./types.js";
 export async function resumeInstance(
   {
     db,
+    cache,
+    integrationsConfig,
     dataPlaneClient,
   }: {
     db: ControlPlaneDatabase;
+    cache: Cache;
+    integrationsConfig: {
+      masterEncryptionKeys: Record<string, string>;
+    };
     dataPlaneClient: Pick<
       DataPlaneSandboxInstancesClient,
       "getSandboxInstance" | "resumeSandboxInstance"
@@ -56,8 +63,15 @@ export async function resumeInstance(
       profileId: sandboxInstance.sandboxProfileId,
       profileVersion: sandboxInstance.sandboxProfileVersion,
     });
+  const gitIntegrationConnectionId = await readProfileVersionGitIntegrationConnectionId(db, {
+    profileId: sandboxInstance.sandboxProfileId,
+    profileVersion: sandboxInstance.sandboxProfileVersion,
+  });
   const gitIdentity = await resolveActingUserGitIdentity(db, {
+    cache,
+    integrationsConfig,
     organizationId: input.organizationId,
+    gitIntegrationConnectionId,
     gitCommitSigningIntegrationConnectionId,
     ...(input.actingUser === undefined ? {} : { actingUser: input.actingUser }),
   });
@@ -77,6 +91,29 @@ export async function resumeInstance(
     failureCode: null,
     failureMessage: null,
   };
+}
+
+async function readProfileVersionGitIntegrationConnectionId(
+  db: ControlPlaneDatabase,
+  input: {
+    profileId: string;
+    profileVersion: number;
+  },
+): Promise<string | null> {
+  const gitBinding = await db.query.sandboxProfileVersionIntegrationBindings.findFirst({
+    columns: {
+      connectionId: true,
+    },
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.sandboxProfileId, input.profileId),
+        eq(table.sandboxProfileVersion, input.profileVersion),
+        eq(table.kind, IntegrationBindingKinds.GIT),
+      ),
+    orderBy: (table, { asc }) => [asc(table.id)],
+  });
+
+  return gitBinding?.connectionId ?? null;
 }
 
 function createResumeNotResumableError(

@@ -20,12 +20,14 @@ type StartProfileInstanceInput = {
 export async function startProfileInstance(
   {
     db,
+    cache,
     integrationsConfig,
     mcpConfig,
     dataPlaneClient,
     defaultBaseImage,
   }: {
     db: AppContext["var"]["db"];
+    cache: AppContext["var"]["cache"];
     integrationsConfig: AppContext["var"]["config"]["integrations"];
     mcpConfig: AppContext["var"]["config"]["mcp"];
     dataPlaneClient: AppContext["var"]["dataPlaneClient"];
@@ -40,6 +42,7 @@ export async function startProfileInstance(
   return startSandboxProfileInstance(
     {
       db,
+      cache,
       integrationsConfig,
       mcpConfig,
       dataPlaneClient,

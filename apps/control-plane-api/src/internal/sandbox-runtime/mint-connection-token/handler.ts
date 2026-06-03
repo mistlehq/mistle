@@ -8,7 +8,9 @@ import { route } from "./route.js";
 
 const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
   const db = ctx.get("db");
+  const cache = ctx.get("cache");
   const dataPlaneClient = ctx.get("dataPlaneClient");
+  const { integrations: integrationsConfig } = ctx.get("config");
   const sandboxConfig = ctx.get("sandboxConfig");
   const connectionTokenConfig = ctx.get("connectionTokenConfig");
   const body = ctx.req.valid("json");
@@ -16,6 +18,8 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
   const mintedToken = await mintConnectionToken(
     {
       db,
+      cache,
+      integrationsConfig,
       dataPlaneClient,
       gatewayWebsocketUrl: sandboxConfig.gatewayWsUrl,
       tokenTtlSeconds: SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS,

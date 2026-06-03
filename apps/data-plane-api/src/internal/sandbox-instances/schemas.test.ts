@@ -138,6 +138,35 @@ describe("StartSandboxInstanceInputSchema", () => {
     expect(StartSandboxInstanceInputSchema.parse(input)).toEqual(input);
   });
 
+  it("accepts GitHub App bot noreply addresses as Git identity metadata", () => {
+    const input = {
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      sandboxProfileVersion: 1,
+      purpose: "session",
+      runtimePlan: createRuntimePlan(),
+      startedBy: {
+        kind: "user",
+        id: "usr_123",
+      },
+      gitIdentity: {
+        name: "mistle-github-app[bot]",
+        email: "99+mistle-github-app[bot]@users.noreply.github.com",
+      },
+      source: "dashboard",
+      image: {
+        imageId: "img_123",
+        kind: "base",
+        provider: "docker",
+      },
+      sandboxRuntime: {
+        provider: "docker",
+      },
+    };
+
+    expect(StartSandboxInstanceInputSchema.parse(input)).toEqual(input);
+  });
+
   it("accepts omitted start request ids for server-generated defaults", () => {
     const input = {
       organizationId: "org_123",

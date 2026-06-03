@@ -45,7 +45,7 @@ export type SandboxdOperationKind = z.infer<typeof SandboxdOperationKindSchema>;
 export const SandboxdGitIdentitySchema = z
   .object({
     name: z.string().min(1),
-    email: z.email(),
+    email: z.string().min(1),
     signing: z
       .object({
         format: z.literal("ssh"),

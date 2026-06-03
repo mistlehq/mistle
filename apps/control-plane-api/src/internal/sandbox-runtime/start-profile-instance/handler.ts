@@ -7,6 +7,7 @@ import { route } from "./route.js";
 
 const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
   const db = ctx.get("db");
+  const cache = ctx.get("cache");
   const dataPlaneClient = ctx.get("dataPlaneClient");
   const { integrations: integrationsConfig, mcp: mcpConfig } = ctx.get("config");
   const sandboxConfig = ctx.get("sandboxConfig");
@@ -15,6 +16,7 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
   const startedSandboxInstance = await startProfileInstance(
     {
       db,
+      cache,
       integrationsConfig,
       mcpConfig,
       dataPlaneClient,
