@@ -12,7 +12,7 @@ Callers should not choose a separate sandboxd init, wait-init, or resume path. P
 
 `setup_check` activates a sandbox used to verify setup behavior for a profile version. It uses the activation path so setup checks exercise the same runtime-plan materialization and runtime readiness contract as session startup.
 
-`snapshot` activates a one-off snapshot materialization sandbox. Sandboxd applies the compiled snapshot preparation runtime plan and preparation script for image capture, then the caller captures the provider image and destroys the sandbox. Initial snapshots and setup refreshes prepare from the setup script; maintenance refresh snapshots prepare from the saved snapshot maintenance script when one is configured.
+`snapshot` activates a one-off snapshot materialization sandbox. Sandboxd applies the compiled snapshot preparation runtime plan and preparation script for image capture, then the caller captures the provider image and destroys the sandbox. Initial snapshots and setup refreshes prepare from the setup script; maintenance refresh snapshots prepare from the saved snapshot maintenance script when one is configured and a usable current snapshot exists. Scheduled refresh uses setup preparation from the base image when those maintenance prerequisites are not met.
 
 ## Runtime Plan Changes
 
