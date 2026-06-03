@@ -298,7 +298,7 @@ const SandboxActivationInputSchema = SandboxStartupInputSchema.omit({
   startupMode: true,
   executionMode: true,
 }).extend({
-  operationKind: z.enum(["start", "resume"]),
+  operationKind: z.enum(["start", "resume", "setup_check", "snapshot"]),
 });
 
 function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {

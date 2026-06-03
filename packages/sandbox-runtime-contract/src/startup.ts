@@ -108,6 +108,23 @@ export type SandboxdTransparentProxyConfiguration = z.infer<
   typeof SandboxdTransparentProxyConfigurationSchema
 >;
 
+export const SandboxdActivationInputSchema = z
+  .object({
+    operationKind: SandboxdOperationKindSchema,
+    bootstrapToken: z.string().min(1),
+    tunnelExchangeToken: z.string().min(1),
+    tunnelGatewayWsUrl: z.string().min(1),
+    runtimePlan: CompiledRuntimePlanSchema,
+    actingUserId: z.string().min(1).optional(),
+    gitIdentity: SandboxdGitIdentitySchema.optional(),
+    transparentProxy: SandboxdTransparentProxyConfigurationSchema.optional(),
+  })
+  .strict();
+
+export type SandboxdActivationInput = z.infer<typeof SandboxdActivationInputSchema>;
+
+// Legacy compatibility schema for callers that still use sandboxd init/resume.
+// PR9 removes this after worker and provider callers migrate to activation.
 export const SandboxdStartupInputSchema = z
   .object({
     startupMode: SandboxdStartupModeSchema,

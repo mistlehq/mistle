@@ -527,6 +527,10 @@ fn activation_start_from_snapshot_skips_materialization_setup() {
         true,
         crate::protocol::startup::StartupOperationKind::SetupCheck
     ));
+    assert!(super::should_apply_runtime_plan_for_activation(
+        true,
+        crate::protocol::startup::StartupOperationKind::Snapshot
+    ));
 }
 
 #[test]

@@ -13,6 +13,7 @@ pub(super) fn operation_log_path(operation: StartupOperation) -> PathBuf {
         return test_dir.join(match operation {
             StartupOperation::Init => "init.log",
             StartupOperation::Resume => "resume.log",
+            StartupOperation::Activation { .. } => "activate.log",
         });
     }
 

@@ -96,6 +96,13 @@ impl ControlServer {
             .and_then(|state| state.activation_input.clone())
     }
 
+    #[cfg(test)]
+    fn shutdown_after_init(&self) -> bool {
+        lock_control_state(&self.state)
+            .map(|state| state.shutdown_after_init)
+            .unwrap_or(false)
+    }
+
     /// Returns the loopback socket address bound by the local health endpoint.
     pub fn health_endpoint_addr(&self) -> SocketAddr {
         self.health_endpoint_addr
@@ -885,33 +892,100 @@ mod tests {
     }
 
     #[test]
-    fn rejects_snapshot_preparation_operation_kinds_for_activation() {
+    fn accepts_setup_check_and_snapshot_operation_kinds_for_activation() {
         let test_dir = create_temp_test_dir("control_activate_snapshot_operation_kind");
         let socket_path = test_dir.join("control.sock");
+        let setup_check_gateway = start_bootstrap_gateway();
         let server = start_test_control_server(&socket_path, ThreadSleeper);
+        let mut setup_check_activation_input = valid_activation_input(&setup_check_gateway.ws_url);
+        setup_check_activation_input.operation_kind =
+            crate::protocol::startup::StartupOperationKind::SetupCheck;
 
-        for operation_kind in [
-            crate::protocol::startup::StartupOperationKind::SetupCheck,
-            crate::protocol::startup::StartupOperationKind::Snapshot,
-        ] {
-            let mut activation_input =
-                valid_activation_input("ws://127.0.0.1:1/bootstrap?operation_id=rejected");
-            activation_input.operation_kind = operation_kind;
+        submit_activate(&socket_path, &setup_check_activation_input)
+            .expect("setup-check activation should initialize sandboxd");
 
-            let error = submit_activate(&socket_path, &activation_input)
-                .expect_err("activation should reject snapshot materialization operation kinds");
-
-            assert!(error.to_string().contains(
-                "sandboxd activate does not support snapshot materialization operationKind"
-            ));
-            assert_eq!(server.init_phase(), InitPhase::Uninitialized);
-            assert!(
-                server.activation_input().is_none(),
-                "rejected activation should not become accepted"
-            );
-        }
+        assert_eq!(server.init_phase(), InitPhase::Initialized);
+        assert_eq!(
+            server
+                .activation_input()
+                .expect("setup-check activation should be accepted")
+                .operation_kind,
+            crate::protocol::startup::StartupOperationKind::SetupCheck
+        );
+        assert!(
+            !server.shutdown_after_init(),
+            "setup-check activation should keep sandboxd running for worker cleanup"
+        );
 
         server.close().expect("control server should stop cleanly");
+        setup_check_gateway
+            .close()
+            .expect("setup-check gateway should stop cleanly");
+
+        let socket_path = test_dir.join("snapshot-control.sock");
+        let snapshot_gateway = start_bootstrap_gateway();
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+        let mut snapshot_activation_input = valid_activation_input(&snapshot_gateway.ws_url);
+        snapshot_activation_input.operation_kind =
+            crate::protocol::startup::StartupOperationKind::Snapshot;
+
+        submit_activate(&socket_path, &snapshot_activation_input)
+            .expect("snapshot activation should initialize sandboxd");
+
+        assert_eq!(server.init_phase(), InitPhase::Initialized);
+        assert_eq!(
+            server
+                .activation_input()
+                .expect("snapshot activation should be accepted")
+                .operation_kind,
+            crate::protocol::startup::StartupOperationKind::Snapshot
+        );
+        assert!(
+            server.shutdown_after_init(),
+            "snapshot activation should request daemon shutdown after materialization"
+        );
+
+        server
+            .wait()
+            .expect("snapshot activation control server should exit after initialization");
+        snapshot_gateway
+            .close()
+            .expect("snapshot gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn initialized_live_session_rejects_snapshot_activation() {
+        let test_dir = create_temp_test_dir("control_activate_initialized_snapshot");
+        let socket_path = test_dir.join("control.sock");
+        let init_gateway = start_bootstrap_gateway();
+        let startup_input = valid_startup_input(
+            StartupMode::New,
+            "bootstrap-token-value",
+            &init_gateway.ws_url,
+        );
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        submit_init(&socket_path, &startup_input, true).expect("init submission should succeed");
+
+        let mut snapshot_activation_input = valid_activation_input(&init_gateway.ws_url);
+        snapshot_activation_input.operation_kind =
+            crate::protocol::startup::StartupOperationKind::Snapshot;
+        let error = submit_activate(&socket_path, &snapshot_activation_input)
+            .expect_err("initialized live session should reject snapshot activation");
+
+        assert!(error.to_string().contains(
+            "snapshot materialization activation is only supported before sandboxd is initialized"
+        ));
+        assert!(
+            server.activation_input().is_none(),
+            "rejected snapshot activation should not become accepted"
+        );
+
+        server.close().expect("control server should stop cleanly");
+        init_gateway
+            .close()
+            .expect("init gateway should stop cleanly");
         std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
 

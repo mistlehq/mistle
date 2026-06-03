@@ -40,7 +40,7 @@ export type SandboxStartupInput = {
   transparentProxy?: SandboxdTransparentProxyConfiguration;
 };
 
-export type SandboxActivationOperationKind = Extract<SandboxdOperationKind, "start" | "resume">;
+export type SandboxActivationOperationKind = SandboxdOperationKind;
 
 export type SandboxActivationInput = {
   operationKind: SandboxActivationOperationKind;
