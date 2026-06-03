@@ -2043,7 +2043,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "USER_STOP_NOT_SUPPORTED";
+              code: "USER_STOP_NOT_SUPPORTED" | "STALE_STOP_REQUEST";
               message: string;
             };
           };

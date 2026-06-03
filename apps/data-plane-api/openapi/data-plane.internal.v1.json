@@ -5108,7 +5108,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["USER_STOP_NOT_SUPPORTED"]
+                      "enum": ["USER_STOP_NOT_SUPPORTED", "STALE_STOP_REQUEST"]
                     },
                     "message": {
                       "type": "string",

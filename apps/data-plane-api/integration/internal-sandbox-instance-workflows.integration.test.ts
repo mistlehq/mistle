@@ -11,6 +11,7 @@ import {
   type StopSandboxInstanceInput,
 } from "@mistle/data-plane-internal-client";
 import {
+  SandboxInstanceDeadlineKinds,
   SandboxInstancePurposes,
   SandboxInstanceStatuses,
   type DataPlaneTables,
@@ -108,6 +109,10 @@ describe.concurrent("internal sandbox instance workflow queue integration", () =
       organizationId: "org_dp_api_workflow_stop",
       sandboxProfileId: "sbp_dp_api_workflow_stop",
     });
+    await insertIdleDeadline(env, {
+      sandboxInstanceId: workflowInput.sandboxInstanceId,
+      ownerLeaseId: workflowInput.expectedOwnerLeaseId,
+    });
 
     const firstResponse = await clientFor(env).stopSandboxInstance(workflowInput);
     const secondResponse = await clientFor(env).stopSandboxInstance(workflowInput);
@@ -118,6 +123,11 @@ describe.concurrent("internal sandbox instance workflow queue integration", () =
       workflowRunId: expect.any(String),
     });
     expect(secondResponse).toEqual(firstResponse);
+    await expectSandboxStatus(
+      env,
+      workflowInput.sandboxInstanceId,
+      SandboxInstanceStatuses.STOPPING,
+    );
 
     const workflowRuns = await waitForQueuedWorkflowRuns({
       env,
@@ -155,6 +165,39 @@ describe.concurrent("internal sandbox instance workflow queue integration", () =
       expectedOwnerLeaseId: workflowInput.expectedOwnerLeaseId,
       idempotencyKey: workflowInput.idempotencyKey,
     });
+  });
+
+  it("rejects a stale idle stop without queueing workflow work or marking stopping", async ({
+    env,
+  }) => {
+    const workflowInput: IdleStopSandboxInstanceInput = {
+      sandboxInstanceId: "sbi_dp_api_workflow_stale_idle_stop",
+      stopReason: "idle",
+      expectedOwnerLeaseId: "sol_dp_api_workflow_stale_idle_stop",
+      idempotencyKey: "gateway-stale-idle-stop-integration-new",
+    };
+
+    await insertRunningSandboxInstance(env, {
+      sandboxInstanceId: workflowInput.sandboxInstanceId,
+      organizationId: "org_dp_api_workflow_stale_idle_stop",
+      sandboxProfileId: "sbp_dp_api_workflow_stale_idle_stop",
+    });
+
+    await expect(clientFor(env).stopSandboxInstance(workflowInput)).rejects.toMatchObject({
+      status: 409,
+    });
+    await expectSandboxStatus(
+      env,
+      workflowInput.sandboxInstanceId,
+      SandboxInstanceStatuses.RUNNING,
+    );
+    await expect(
+      countQueuedWorkflowRuns({
+        env,
+        sandboxInstanceIds: [workflowInput.sandboxInstanceId],
+        workflowName: StopSandboxInstanceWorkflowName,
+      }),
+    ).resolves.toBe(0);
   });
 
   it("queues a reconcile workflow with the request payload and idempotency key", async ({
@@ -596,6 +639,36 @@ async function insertRunningSandboxInstance(
       ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
     }),
   );
+}
+
+async function insertIdleDeadline(
+  env: IntegrationTestEnvironment,
+  input: {
+    sandboxInstanceId: string;
+    ownerLeaseId: string;
+  },
+): Promise<void> {
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstanceDeadlines).values({
+    sandboxInstanceId: input.sandboxInstanceId,
+    kind: SandboxInstanceDeadlineKinds.IDLE,
+    ownerLeaseId: input.ownerLeaseId,
+    dueAt: "2026-05-16T00:00:00.000Z",
+  });
+}
+
+async function expectSandboxStatus(
+  env: IntegrationTestEnvironment,
+  sandboxInstanceId: string,
+  status: string,
+): Promise<void> {
+  const persisted = await env.dataPlaneDb.query.sandboxInstances.findFirst({
+    columns: {
+      status: true,
+    },
+    where: (table, { eq }) => eq(table.id, sandboxInstanceId),
+  });
+
+  expect(persisted?.status).toBe(status);
 }
 
 function sandboxInstanceRow(input: {

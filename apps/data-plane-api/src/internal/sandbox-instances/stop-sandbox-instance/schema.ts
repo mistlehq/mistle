@@ -20,7 +20,7 @@ export const StopSandboxInstanceInputSchema = z.discriminatedUnion("stopReason",
 ]);
 
 export const StopSandboxInstanceConflictResponseSchema = createCodeMessageErrorSchema(
-  z.literal("USER_STOP_NOT_SUPPORTED"),
+  z.enum(["USER_STOP_NOT_SUPPORTED", "STALE_STOP_REQUEST"]),
 );
 
 export const StopSandboxInstanceResponseSchema = z
