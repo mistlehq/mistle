@@ -246,25 +246,25 @@ fn runtime_plan_apply_failure_attributes(
             map.extend([
                 (
                     "failureKind".to_string(),
-                    startup_diagnostics_string("skills_reconcile_failed"),
+                    activation_diagnostics_string("skills_reconcile_failed"),
                 ),
                 (
                     "originUrl".to_string(),
-                    startup_diagnostics_string(origin_url.clone()),
+                    activation_diagnostics_string(origin_url.clone()),
                 ),
                 (
                     "runtimeId".to_string(),
-                    startup_diagnostics_string(runtime_id.clone()),
+                    activation_diagnostics_string(runtime_id.clone()),
                 ),
                 (
                     "error".to_string(),
-                    startup_diagnostics_string(error.clone()),
+                    activation_diagnostics_string(error.clone()),
                 ),
             ]);
             if let Some(repo_path) = repo_path {
                 map.insert(
                     "repoPath".to_string(),
-                    startup_diagnostics_string(repo_path.clone()),
+                    activation_diagnostics_string(repo_path.clone()),
                 );
             }
             map
