@@ -2102,6 +2102,68 @@ description: Valid skill.
         fs::remove_dir_all(target_root).expect("target root should be removable");
     }
 
+    #[test]
+    fn materialized_reconcile_skips_selected_skill_with_invalid_metadata() {
+        let repo_root = create_git_repo("skills_materialized_reconcile_invalid_metadata");
+        let target_root =
+            create_temp_test_dir("skills_materialized_reconcile_invalid_metadata_target");
+        fs::create_dir_all(repo_root.join("skills/stale-skill"))
+            .expect("stale skill directory should be created");
+        fs::write(
+            repo_root.join("skills/stale-skill/SKILL.md"),
+            r#"---
+name: Invalid Skill
+description: Invalid name.
+---
+"#,
+        )
+        .expect("stale skill file should be written");
+        write_skill(
+            &repo_root,
+            "skills/valid-skill",
+            r#"---
+name: valid-skill
+description: Valid skill.
+---
+"#,
+        );
+        commit_all(&repo_root);
+
+        let output = reconcile_materialized_skills(
+            &repo_root,
+            &SkillsRuntime::Codex,
+            &[
+                SkillsReconcileSelection {
+                    name: "stale-skill".to_string(),
+                    relative_path: "skills/stale-skill".to_string(),
+                },
+                SkillsReconcileSelection {
+                    name: "valid-skill".to_string(),
+                    relative_path: "skills/valid-skill".to_string(),
+                },
+            ],
+            Some(&target_root),
+        )
+        .expect("materialized reconcile should skip selected skills with invalid metadata");
+
+        assert_eq!(
+            output.skills,
+            vec![ReconciledSkill {
+                name: "valid-skill".to_string(),
+                relative_path: "skills/valid-skill".to_string(),
+                source_path: repo_root.join("skills/valid-skill").display().to_string(),
+                target_path: target_root.join("valid-skill").display().to_string(),
+            }]
+        );
+        assert!(
+            !target_root.join("stale-skill").exists(),
+            "selected skill with invalid metadata should not be linked"
+        );
+
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
+        fs::remove_dir_all(target_root).expect("target root should be removable");
+    }
+
     #[cfg(unix)]
     #[test]
     fn rejects_symlinked_reconcile_target_root_without_pruning_destination() {
