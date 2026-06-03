@@ -899,6 +899,7 @@ function buildAffectedTestCommands(
     const changedExistingTestFiles = changedTestFiles.filter((filePath) =>
       existsSync(resolve(REPO_ROOT, filePath)),
     );
+    const hasDeletedChangedTestFile = changedExistingTestFiles.length !== changedTestFiles.length;
     const changedIntegrationTestFiles = changedExistingTestFiles.filter(
       (filePath) =>
         isIntegrationTestFilePath(filePath) &&
@@ -928,6 +929,11 @@ function buildAffectedTestCommands(
     }
 
     if (hasUnsupportedRelevantFile) {
+      turboPackages.push(workspacePackage);
+      continue;
+    }
+
+    if (hasDeletedChangedTestFile) {
       turboPackages.push(workspacePackage);
       continue;
     }

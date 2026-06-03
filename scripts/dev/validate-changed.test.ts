@@ -143,6 +143,20 @@ describe("validate-changed", () => {
     );
     expect(turboCommand).toContain("--filter @mistle/dashboard");
   });
+
+  it("falls back to full package tests when affected package integration test files are deleted", () => {
+    const commands = getDryRunCommands("apps/dashboard/integration/deleted.integration.test.ts");
+    const turboCommand = getRequiredCommand(commands, "turbo run test");
+
+    expect(turboCommand).toContain("--filter @mistle/dashboard");
+  });
+
+  it("falls back to full package tests when affected package unit test files are deleted", () => {
+    const commands = getDryRunCommands("apps/dashboard/src/deleted.test.ts");
+    const turboCommand = getRequiredCommand(commands, "turbo run test");
+
+    expect(turboCommand).toContain("--filter @mistle/dashboard");
+  });
 });
 
 function getDryRunCommands(files: string): string[] {
