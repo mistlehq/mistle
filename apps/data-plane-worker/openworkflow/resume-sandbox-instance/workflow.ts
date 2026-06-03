@@ -147,6 +147,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           await stopSandbox(
             {
               sandboxAdapter: resolvedRuntime.sandboxAdapter,
+              sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
             },
             {
               runtimeProvider: input.runtimeProvider,

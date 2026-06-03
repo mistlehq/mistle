@@ -11,6 +11,7 @@ import {
   isSandboxResourceNotFoundError,
   type SandboxAdapter,
   type SandboxInspectDisposition,
+  type SandboxRuntimeControl,
 } from "@mistle/sandbox";
 import {
   isSandboxDisconnectReconciliationCandidate,
@@ -357,6 +358,7 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
   config: DataPlaneWorkerRuntimeConfig;
   controlPlaneInternalClient: ControlPlaneInternalClient;
   sandboxAdapter: SandboxAdapter;
+  sandboxRuntimeControl: SandboxRuntimeControl;
   db: DataPlaneDatabase;
   tables: DataPlaneTables;
   runtimeStateReader: SandboxRuntimeStateReader;
@@ -368,6 +370,7 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
     await stopSandbox(
       {
         sandboxAdapter: ctx.sandboxAdapter,
+        sandboxRuntimeControl: ctx.sandboxRuntimeControl,
       },
       {
         runtimeProvider: ctx.sandboxInstance.runtimeProvider,
@@ -467,6 +470,7 @@ async function stopActiveProviderSandboxDuringDisconnect(ctx: {
   config: DataPlaneWorkerRuntimeConfig;
   controlPlaneInternalClient: ControlPlaneInternalClient;
   sandboxAdapter: SandboxAdapter;
+  sandboxRuntimeControl: SandboxRuntimeControl;
   db: DataPlaneDatabase;
   tables: DataPlaneTables;
   runtimeStateReader: SandboxRuntimeStateReader;
@@ -519,6 +523,7 @@ async function stopActiveProviderSandboxDuringDisconnect(ctx: {
     config: ctx.config,
     controlPlaneInternalClient: ctx.controlPlaneInternalClient,
     sandboxAdapter: ctx.sandboxAdapter,
+    sandboxRuntimeControl: ctx.sandboxRuntimeControl,
     db: ctx.db,
     tables: ctx.tables,
     runtimeStateReader: ctx.runtimeStateReader,
@@ -714,6 +719,7 @@ export async function reconcileSandboxInstance(
           config: ctx.config,
           controlPlaneInternalClient: ctx.controlPlaneInternalClient,
           sandboxAdapter: resolvedRuntime.sandboxAdapter,
+          sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
           db: ctx.db,
           tables: ctx.tables,
           runtimeStateReader: ctx.runtimeStateReader,
@@ -837,6 +843,7 @@ export async function reconcileSandboxInstance(
         config: ctx.config,
         controlPlaneInternalClient: ctx.controlPlaneInternalClient,
         sandboxAdapter: resolvedRuntime.sandboxAdapter,
+        sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
         db: ctx.db,
         tables: ctx.tables,
         runtimeStateReader: ctx.runtimeStateReader,

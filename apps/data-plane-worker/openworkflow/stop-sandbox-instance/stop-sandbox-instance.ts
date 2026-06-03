@@ -469,32 +469,10 @@ export async function stopSandboxInstance(
 
   if (initialProviderAction.kind === "shutdown_stop_then_inspect") {
     try {
-      await resolvedRuntime.sandboxRuntimeControl.shutdown({
-        id: sandboxInstanceState.providerSandboxId,
-      });
-    } catch (error) {
-      if (!isSandboxResourceNotFoundError(error)) {
-        throw error;
-      }
-
-      return await markStopProviderFailureOrThrow(ctx, {
-        sandboxInstanceId: input.sandboxInstanceId,
-        currentStatus: stopRequestedStatus,
-        stopReason: input.stopReason,
-        ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
-        usageEventState: createStopSandboxUsageEventState(sandboxInstanceState),
-        action: {
-          kind: "fail",
-          failureCode: "provider_runtime_missing",
-          failureMessage: "Sandbox runtime was not found at the provider during sandboxd shutdown.",
-        },
-      });
-    }
-
-    try {
       await stopSandbox(
         {
           sandboxAdapter: resolvedRuntime.sandboxAdapter,
+          sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
         },
         {
           runtimeProvider: sandboxInstanceState.runtimeProvider,
@@ -515,7 +493,7 @@ export async function stopSandboxInstance(
         action: {
           kind: "fail",
           failureCode: "provider_runtime_missing",
-          failureMessage: "Sandbox runtime was not found at the provider during provider stop.",
+          failureMessage: "Sandbox runtime was not found at the provider during sandbox stop.",
         },
       });
     }
