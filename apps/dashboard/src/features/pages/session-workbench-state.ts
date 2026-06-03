@@ -30,6 +30,7 @@ export type WorkbenchEntryPhase =
 export type SessionWorkbenchStatusAlert = {
   title: string;
   description: string;
+  variant?: "alert" | "default";
 };
 
 export type SessionWorkbenchStatus =
@@ -288,6 +289,7 @@ export function resolveSessionWorkbenchStatus(input: {
         alert: {
           title: "Reconnecting session",
           description: input.reconnectMessage,
+          variant: "default",
         },
       };
     }
@@ -297,6 +299,7 @@ export function resolveSessionWorkbenchStatus(input: {
       alert: {
         title: "Reconnecting session",
         description: input.reconnectMessage,
+        variant: "default",
       },
     };
   }

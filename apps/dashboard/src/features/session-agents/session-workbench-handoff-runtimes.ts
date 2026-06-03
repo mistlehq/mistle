@@ -41,7 +41,13 @@ function toCodexConnectSessionInput(
     };
   }
 
+  const missingTargetThreadAction =
+    "missingTargetRuntimeConversationAction" in connectInput
+      ? connectInput.missingTargetRuntimeConversationAction
+      : undefined;
+
   return {
+    ...(missingTargetThreadAction === undefined ? {} : { missingTargetThreadAction }),
     ...(connectInput.providerConversationId === undefined
       ? {}
       : { providerThreadId: connectInput.providerConversationId }),

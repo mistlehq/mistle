@@ -149,16 +149,34 @@ describe("session primary repository policy", () => {
     ).toBe("/root/acme/repo-2");
   });
 
-  it("restores None when the active Codex thread cwd is the workspace root", () => {
+  it("falls back to the launch primary repository when the active Codex thread cwd is the workspace root", () => {
     expect(
       resolveInitialSelectedRepositoryPath({
         activeThreadCwd: DefaultSandboxWorkspaceDir,
         runtimePrimaryRepositoryRoot: "/root/acme/repo-1",
       }),
+    ).toBe("/root/acme/repo-1");
+  });
+
+  it("restores None when the active Codex thread cwd is the workspace root and no launch primary repository exists", () => {
+    expect(
+      resolveInitialSelectedRepositoryPath({
+        activeThreadCwd: DefaultSandboxWorkspaceDir,
+        runtimePrimaryRepositoryRoot: null,
+      }),
     ).toBeNull();
   });
 
-  it("restores None when the active Codex thread cwd is outside the workspace root", () => {
+  it("restores None when the active Codex thread cwd is outside the workspace root despite a launch primary repository", () => {
+    expect(
+      resolveInitialSelectedRepositoryPath({
+        activeThreadCwd: "/",
+        runtimePrimaryRepositoryRoot: "/root/acme/repo-1",
+      }),
+    ).toBeNull();
+  });
+
+  it("restores None when the active Codex thread cwd is outside the workspace root and no launch primary repository exists", () => {
     expect(
       resolveInitialSelectedRepositoryPath({
         activeThreadCwd: "/",

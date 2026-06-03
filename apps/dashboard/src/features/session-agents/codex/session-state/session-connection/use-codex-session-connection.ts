@@ -25,7 +25,10 @@ import {
   getCodexSessionErrorMessage,
   isStaleConnectionAttemptError,
 } from "./codex-session-errors.js";
-import { resolveCodexConnectionStateTransition } from "./codex-session-lifecycle-policy.js";
+import {
+  resolveCodexConnectionStateTransition,
+  resolveCodexStreamResetRecoveryStrategy,
+} from "./codex-session-lifecycle-policy.js";
 
 type CodexThreadCollectionsRefreshResult = {
   availableThreads: readonly CodexThreadSummary[];
@@ -41,6 +44,7 @@ export type ConnectCodexSessionInput =
       sandboxInstanceId: string;
       targetThreadId: string;
       initialCwd?: never;
+      missingTargetThreadAction?: "start_new";
       providerThreadId?: string | null;
       selectionPolicy?: never;
     }
@@ -109,6 +113,19 @@ export function updateConnectedCodexSessionActiveThread(
   };
 }
 
+export function resolveCodexProviderThreadIdAfterThreadEstablishment(input: {
+  providerThreadId: string | null | undefined;
+  startedNewAfterMissingTarget: boolean;
+}): string | null {
+  return input.startedNewAfterMissingTarget ? null : (input.providerThreadId ?? null);
+}
+
+export function shouldRecordEstablishedThreadAsOriginal(input: {
+  startedNewAfterMissingTarget: boolean;
+}): boolean {
+  return input.startedNewAfterMissingTarget;
+}
+
 export function useCodexSessionConnection(input: {
   connectionGenerationRef: RefObject<number>;
   ensureCurrentGeneration: (generation: number) => void;
@@ -125,6 +142,7 @@ export function useCodexSessionConnection(input: {
     generation: number;
     threadId: string;
   }) => void;
+  recordThreadAsOriginal: (input: { generation: number; threadId: string }) => void;
   ensureTransportConnected: (input: { sandboxInstanceId: string }) => Promise<{
     sandboxInstanceId: string;
     transport: SandboxSessionTransport;
@@ -298,7 +316,9 @@ export function useCodexSessionConnection(input: {
               isGatewayServiceRestart: false,
               message: `Sandbox session stream reset (${event.resetInfo.code}): ${event.resetInfo.message}`,
               targetThreadId,
-              recoveryStrategy: "reopen_stream",
+              recoveryStrategy: resolveCodexStreamResetRecoveryStrategy({
+                code: event.resetInfo.code,
+              }),
             });
             setStep("idle");
             setAgentConnectionState("connected_socket");
@@ -413,6 +433,10 @@ export function useCodexSessionConnection(input: {
         targetThreadId: connectInput.targetThreadId,
         availableThreads: threadCollections.availableThreads,
         loadedThreadIds: threadCollections.loadedThreadIds,
+        ...(connectInput.targetThreadId === null ||
+        connectInput.missingTargetThreadAction === undefined
+          ? {}
+          : { missingTargetThreadAction: connectInput.missingTargetThreadAction }),
         ...(connectInput.selectionPolicy === undefined
           ? {}
           : { selectionPolicy: connectInput.selectionPolicy }),
@@ -421,6 +445,16 @@ export function useCodexSessionConnection(input: {
         ensureCurrentGeneration: input.ensureCurrentGeneration,
       });
       reconnectTargetThreadIdRef.current = establishedThread.resolvedThreadId;
+      if (
+        shouldRecordEstablishedThreadAsOriginal({
+          startedNewAfterMissingTarget: establishedThread.startedNewAfterMissingTarget,
+        })
+      ) {
+        input.recordThreadAsOriginal({
+          generation,
+          threadId: establishedThread.threadId,
+        });
+      }
       if (
         threadCollections.originalThreadId === null &&
         establishedThread.resolvedThreadId === null
@@ -433,7 +467,10 @@ export function useCodexSessionConnection(input: {
 
       return {
         ...establishedThread,
-        providerThreadId: connectInput.providerThreadId ?? null,
+        providerThreadId: resolveCodexProviderThreadIdAfterThreadEstablishment({
+          providerThreadId: connectInput.providerThreadId,
+          startedNewAfterMissingTarget: establishedThread.startedNewAfterMissingTarget,
+        }),
       };
     },
     onSuccess: (result) => {
@@ -522,11 +559,22 @@ export function useCodexSessionConnection(input: {
         targetThreadId: recoverInput.targetThreadId,
         availableThreads: threadCollections.availableThreads,
         loadedThreadIds: threadCollections.loadedThreadIds,
+        missingTargetThreadAction: "start_new",
         generation,
         sandboxInstanceId: recoverInput.sandboxInstanceId,
         ensureCurrentGeneration: input.ensureCurrentGeneration,
       });
       reconnectTargetThreadIdRef.current = recoveredThread.resolvedThreadId;
+      if (
+        shouldRecordEstablishedThreadAsOriginal({
+          startedNewAfterMissingTarget: recoveredThread.startedNewAfterMissingTarget,
+        })
+      ) {
+        input.recordThreadAsOriginal({
+          generation,
+          threadId: recoveredThread.threadId,
+        });
+      }
 
       return {
         previousConnectedSession,
@@ -545,6 +593,10 @@ export function useCodexSessionConnection(input: {
       const nextConnectedSession = {
         ...result.previousConnectedSession,
         connectedAtIso: new Date().toISOString(),
+        providerThreadId: resolveCodexProviderThreadIdAfterThreadEstablishment({
+          providerThreadId: result.previousConnectedSession.providerThreadId,
+          startedNewAfterMissingTarget: result.recoveredThread.startedNewAfterMissingTarget,
+        }),
         activeThreadId: result.recoveredThread.threadId,
         activeThreadCwd: result.recoveredThread.cwd,
       };

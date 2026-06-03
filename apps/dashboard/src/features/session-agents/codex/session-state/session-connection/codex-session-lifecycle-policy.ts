@@ -16,6 +16,7 @@ export type CodexConnectionThreadStrategy =
   | {
       type: "start_new";
     };
+export type CodexStreamResetRecoveryStrategy = "reconnect_transport" | "reopen_stream";
 
 export function resolveCodexConnectionStateTransition(input: {
   hasConnectedSession: boolean;
@@ -49,6 +50,12 @@ export function resolveCodexConnectionStateTransition(input: {
     recoverableDisconnectMessage: null,
     recoverableDisconnectStrategy: null,
   };
+}
+
+export function resolveCodexStreamResetRecoveryStrategy(input: {
+  code: string;
+}): CodexStreamResetRecoveryStrategy {
+  return input.code === "bootstrap_disconnected" ? "reconnect_transport" : "reopen_stream";
 }
 
 export function selectCodexConnectionThreadStrategy(input: {

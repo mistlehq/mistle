@@ -156,10 +156,18 @@ export function resolveInitialSelectedRepositoryPath(input: {
   workspaceRoot?: string;
 }): string | null {
   if (input.activeThreadCwd !== undefined) {
-    return resolveSelectedRepositoryPathFromCwd({
+    const selectedRepositoryPath = resolveSelectedRepositoryPathFromCwd({
       cwd: input.activeThreadCwd,
       ...(input.workspaceRoot === undefined ? {} : { workspaceRoot: input.workspaceRoot }),
     });
+    if (selectedRepositoryPath !== null) {
+      return selectedRepositoryPath;
+    }
+
+    const workspaceRoot = input.workspaceRoot ?? DefaultSandboxWorkspaceDir;
+    return input.activeThreadCwd === workspaceRoot
+      ? (input.runtimePrimaryRepositoryRoot ?? null)
+      : null;
   }
 
   return input.runtimePrimaryRepositoryRoot ?? null;

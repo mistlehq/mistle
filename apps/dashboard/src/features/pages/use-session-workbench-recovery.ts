@@ -57,6 +57,7 @@ export type SessionWorkbenchRecoveryEvent =
     }
   | {
       type: "reconnect_attempt_started";
+      reconnectCommand: SessionRecoveryReconnectCommand;
     }
   | {
       type: "sandbox_changed";
@@ -102,6 +103,15 @@ export function reduceSessionWorkbenchRecoveryState(
       switch (event.type) {
         case "recoverable_disconnect_observed": {
           if (state.recoverableDisconnectId === event.disconnect.id) {
+            if (
+              state.baseMessage === event.disconnect.message &&
+              state.isGatewayServiceRestart === event.disconnect.isGatewayServiceRestart &&
+              state.targetRuntimeConversationId === event.disconnect.targetRuntimeConversationId &&
+              state.recoveryStrategy === event.disconnect.recoveryStrategy
+            ) {
+              return state;
+            }
+
             return {
               ...state,
               baseMessage: event.disconnect.message,
@@ -115,7 +125,7 @@ export function reduceSessionWorkbenchRecoveryState(
         }
 
         case "reconnect_attempt_started": {
-          if (state.reconnectCommand === "none") {
+          if (event.reconnectCommand === "none") {
             return state;
           }
 
@@ -306,6 +316,7 @@ export function useSessionWorkbenchRecovery(input: {
   requestRecoveryStatusRefresh: () => void;
   recoverSession: SessionRecoveryLifecycle["recoverSession"];
   recoverableDisconnect: SessionRecoveryLifecycle["recoverableDisconnect"];
+  resetSessionTransport: () => void;
   sandboxInstanceId: string | null;
   sandboxStatus: WorkbenchSandboxLifecycleStatus;
   sessionConnectionState: SessionRecoveryLifecycle["sessionConnectionState"];
@@ -362,7 +373,13 @@ export function useSessionWorkbenchRecovery(input: {
       type: "recoverable_disconnect_observed",
       disconnect: input.recoverableDisconnect,
     });
-  }, [input.recoverableDisconnect]);
+  }, [
+    input.recoverableDisconnect?.id,
+    input.recoverableDisconnect?.isGatewayServiceRestart,
+    input.recoverableDisconnect?.message,
+    input.recoverableDisconnect?.targetRuntimeConversationId,
+    input.recoverableDisconnect?.recoveryStrategy,
+  ]);
 
   useEffect(() => {
     if (input.recoverableDisconnect === null) {
@@ -406,6 +423,7 @@ export function useSessionWorkbenchRecovery(input: {
 
     dispatchSessionWorkbenchRecoveryEvent({
       type: "reconnect_attempt_started",
+      reconnectCommand: sessionRecoveryState.reconnectCommand,
     });
     const recoveryInput = {
       sandboxInstanceId: input.sandboxInstanceId,
@@ -417,11 +435,13 @@ export function useSessionWorkbenchRecovery(input: {
       return;
     }
 
+    input.resetSessionTransport();
     input.connectSession(
       recoveryInput.targetRuntimeConversationId === null
         ? recoveryInput
         : {
             sandboxInstanceId: recoveryInput.sandboxInstanceId,
+            missingTargetRuntimeConversationAction: "start_new",
             targetRuntimeConversationId: recoveryInput.targetRuntimeConversationId,
           },
     );
@@ -430,6 +450,7 @@ export function useSessionWorkbenchRecovery(input: {
     input.connectSession,
     input.mainPanelTransitionState,
     input.recoverSession,
+    input.resetSessionTransport,
     input.sandboxInstanceId,
   ]);
 

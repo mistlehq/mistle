@@ -4,7 +4,7 @@ import type {
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRef } from "react";
+import { useCallback, useRef } from "react";
 
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import { useOpenCodeSessionState } from "../session-agents/opencode/session-state/index.js";
@@ -113,6 +113,9 @@ export function useSessionWorkbenchController(input: {
   const transportManager = useSessionWorkbenchTransport({
     sandboxInstanceId: input.sandboxInstanceId,
   });
+  const resetSessionTransport = useCallback((): void => {
+    transportManager.disconnectTransport("Reconnecting sandbox session transport.");
+  }, [transportManager.disconnectTransport]);
   const sessionClientRef = useRef<AgentStreamClient | null>(null);
   const rpcClientRef = useRef<CodexJsonRpcClient | null>(null);
   const sessionEventUnsubscribersRef = useRef<(() => void)[]>([]);
@@ -145,6 +148,7 @@ export function useSessionWorkbenchController(input: {
     sandboxInstanceId: input.sandboxInstanceId,
     mainPanelTransitionState: handoff.transitionState,
     requestedRuntimeConversationId: input.requestedRuntimeConversationId ?? null,
+    resetSessionTransport,
     resolveLifecycle: resolveLifecycleForWorkbench,
     queryClient,
   });

@@ -6,6 +6,7 @@ export const MissingConnectableRuntimeContextMessage =
 export type InitialSessionConnectInput =
   | {
       initialCwd?: never;
+      missingTargetRuntimeConversationAction?: "start_new";
       providerConversationId?: string | null;
       sandboxInstanceId: string;
       targetRuntimeConversationId: string;

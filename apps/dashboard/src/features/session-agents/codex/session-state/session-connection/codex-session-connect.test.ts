@@ -6,7 +6,11 @@ import {
   resolveInitialCodexThreadAction,
   resolveReconnectResumeFailureAction,
 } from "./codex-session-connect.js";
-import { updateConnectedCodexSessionActiveThread } from "./use-codex-session-connection.js";
+import {
+  resolveCodexProviderThreadIdAfterThreadEstablishment,
+  shouldRecordEstablishedThreadAsOriginal,
+  updateConnectedCodexSessionActiveThread,
+} from "./use-codex-session-connection.js";
 
 describe("codex session connect", () => {
   it("resumes the oldest created existing thread on reconnect", () => {
@@ -162,6 +166,37 @@ describe("codex session connect", () => {
     ).toBe("error_broken_persisted");
   });
 
+  it("starts a new thread when recovery permits a missing target thread", () => {
+    expect(
+      resolveReconnectResumeFailureAction({
+        error: new CodexJsonRpcRequestError({
+          method: "thread/resume",
+          id: 7,
+          code: -32600,
+          message: "invalid thread id: thread_persisted",
+        }),
+        missingTargetThreadAction: "start_new",
+        targetThreadId: "thread_persisted",
+        selectedThreadId: "thread_persisted",
+      }),
+    ).toBe("start_new");
+  });
+
+  it("keeps the explicit error for ordinary missing target-thread connects", () => {
+    expect(
+      resolveReconnectResumeFailureAction({
+        error: new CodexJsonRpcRequestError({
+          method: "thread/resume",
+          id: 9,
+          code: -32600,
+          message: "thread not found: thread_requested",
+        }),
+        targetThreadId: "thread_requested",
+        selectedThreadId: "thread_requested",
+      }),
+    ).toBe("error_broken_persisted");
+  });
+
   it("keeps the explicit error when the persisted linked thread has no rollout", () => {
     expect(
       resolveReconnectResumeFailureAction({
@@ -193,6 +228,36 @@ describe("codex session connect", () => {
       activeThreadId: "thread_123",
       activeThreadCwd: "/root/acme/repo-2",
     });
+  });
+
+  it("clears provider linkage when recovery starts a replacement thread", () => {
+    expect(
+      resolveCodexProviderThreadIdAfterThreadEstablishment({
+        providerThreadId: "thread_missing_provider",
+        startedNewAfterMissingTarget: true,
+      }),
+    ).toBeNull();
+
+    expect(
+      resolveCodexProviderThreadIdAfterThreadEstablishment({
+        providerThreadId: "thread_existing_provider",
+        startedNewAfterMissingTarget: false,
+      }),
+    ).toBe("thread_existing_provider");
+  });
+
+  it("records a recovery replacement thread as the original conversation", () => {
+    expect(
+      shouldRecordEstablishedThreadAsOriginal({
+        startedNewAfterMissingTarget: true,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldRecordEstablishedThreadAsOriginal({
+        startedNewAfterMissingTarget: false,
+      }),
+    ).toBe(false);
   });
 
   it("preserves the active thread cwd when a thread update does not return cwd", () => {

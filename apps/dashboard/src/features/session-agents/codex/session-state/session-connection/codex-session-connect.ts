@@ -37,6 +37,10 @@ export type ReconnectResumeFailureAction = "error_broken_persisted" | "start_new
 
 export function resolveReconnectResumeFailureAction(input: {
   error: unknown;
+  missingTargetThreadAction?: Extract<
+    ReconnectResumeFailureAction,
+    "error_broken_persisted" | "start_new"
+  >;
   targetThreadId: string | null;
   selectedThreadId: string;
 }): ReconnectResumeFailureAction {
@@ -45,7 +49,7 @@ export function resolveReconnectResumeFailureAction(input: {
     input.selectedThreadId === input.targetThreadId &&
     (isMissingPersistedThreadError(input.error) || isNoRolloutPersistedThreadError(input.error))
   ) {
-    return "error_broken_persisted";
+    return input.missingTargetThreadAction ?? "error_broken_persisted";
   }
 
   if (isMissingPersistedThreadError(input.error) || isNoRolloutPersistedThreadError(input.error)) {
@@ -59,6 +63,7 @@ export type CodexConnectionBootstrapResult = {
   generation: number;
   sandboxInstanceId: string;
   resolvedThreadId: string | null;
+  startedNewAfterMissingTarget: boolean;
   threadId: string;
   cwd: string;
 };
@@ -67,6 +72,7 @@ export type EstablishedCodexThreadResult = {
   generation: number;
   sandboxInstanceId: string;
   resolvedThreadId: string | null;
+  startedNewAfterMissingTarget: boolean;
   threadId: string;
   cwd: string;
 };
@@ -91,6 +97,10 @@ export async function establishCodexThread(input: {
   targetThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
+  missingTargetThreadAction?: Extract<
+    ReconnectResumeFailureAction,
+    "error_broken_persisted" | "start_new"
+  >;
   selectionPolicy?: ThreadSelectionPolicy;
   generation: number;
   sandboxInstanceId: string;
@@ -114,6 +124,9 @@ export async function establishCodexThread(input: {
     } catch (error) {
       const failureAction = resolveReconnectResumeFailureAction({
         error,
+        ...(input.missingTargetThreadAction === undefined
+          ? {}
+          : { missingTargetThreadAction: input.missingTargetThreadAction }),
         targetThreadId: input.targetThreadId,
         selectedThreadId: action.threadId,
       });
@@ -140,6 +153,7 @@ export async function establishCodexThread(input: {
           generation: input.generation,
           sandboxInstanceId: input.sandboxInstanceId,
           resolvedThreadId,
+          startedNewAfterMissingTarget: true,
           threadId: startedThread.threadId,
           cwd: startedThread.cwd,
         };
@@ -153,6 +167,7 @@ export async function establishCodexThread(input: {
       generation: input.generation,
       sandboxInstanceId: input.sandboxInstanceId,
       resolvedThreadId,
+      startedNewAfterMissingTarget: false,
       threadId: resumedThread.threadId,
       cwd: resumedThread.cwd,
     };
@@ -170,6 +185,7 @@ export async function establishCodexThread(input: {
     generation: input.generation,
     sandboxInstanceId: input.sandboxInstanceId,
     resolvedThreadId,
+    startedNewAfterMissingTarget: false,
     threadId: startedThread.threadId,
     cwd: startedThread.cwd,
   };
@@ -181,6 +197,10 @@ export async function establishInitialCodexThread(input: {
   targetThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
+  missingTargetThreadAction?: Extract<
+    ReconnectResumeFailureAction,
+    "error_broken_persisted" | "start_new"
+  >;
   selectionPolicy?: ThreadSelectionPolicy;
   generation: number;
   sandboxInstanceId: string;

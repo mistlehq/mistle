@@ -363,6 +363,7 @@ export function useCodexSessionState(input: {
     refreshLoadedThreadList,
     refreshThreadCollections,
     recordStartedThreadAsOriginalAfterEmptyScan,
+    recordThreadAsOriginal,
   } = useCodexThreadCollections({
     rpcClientRef: input.rpcClientRef,
     ensureCurrentGeneration,
@@ -469,6 +470,7 @@ export function useCodexSessionState(input: {
     onServerRequestReceived: handleServerRequestReceived,
     refreshThreadCollections,
     recordStartedThreadAsOriginalAfterEmptyScan,
+    recordThreadAsOriginal,
     ensureTransportConnected: input.ensureTransportConnected,
     rpcClientRef: input.rpcClientRef,
     sessionClientRef: input.sessionClientRef,

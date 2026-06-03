@@ -4,6 +4,8 @@ import { HttpApiError } from "../api/http-api-error.js";
 import {
   resolveInitialEntryStartupState,
   resolveSandboxStatusRefetchInterval,
+  shouldResetAutoResumeAttemptAfterClear,
+  shouldClearAutoResumeInFlightState,
 } from "./use-session-workbench-lifecycle-state.js";
 
 describe("resolveInitialEntryStartupState", () => {
@@ -92,5 +94,97 @@ describe("resolveSandboxStatusRefetchInterval", () => {
         status: "pending",
       }),
     ).toBe(1_000);
+  });
+
+  it("keeps polling while a queued auto-resume still reads as stopped", () => {
+    expect(
+      resolveSandboxStatusRefetchInterval({
+        triggerConversation: null,
+        connectable: null,
+        error: null,
+        isAutoResumingStoppedSandbox: true,
+        status: "stopped",
+      }),
+    ).toBe(1_000);
+  });
+});
+
+describe("shouldClearAutoResumeInFlightState", () => {
+  it("keeps auto-resume pending while a resume request has not produced a connectable sandbox", () => {
+    expect(
+      shouldClearAutoResumeInFlightState({
+        resumeStartedSessionConnectedAtIso: null,
+        sessionConnectedAtIso: null,
+        sandboxStatus: "stopped",
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldClearAutoResumeInFlightState({
+        resumeStartedSessionConnectedAtIso: null,
+        sessionConnectedAtIso: null,
+        sandboxStatus: "starting",
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps auto-resume pending while the sandbox is connectable but chat is not connected", () => {
+    expect(
+      shouldClearAutoResumeInFlightState({
+        resumeStartedSessionConnectedAtIso: null,
+        sessionConnectedAtIso: null,
+        sandboxStatus: "running",
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps auto-resume pending while only the stale pre-resume chat session is connected", () => {
+    expect(
+      shouldClearAutoResumeInFlightState({
+        resumeStartedSessionConnectedAtIso: "2026-06-03T09:45:00.000Z",
+        sessionConnectedAtIso: "2026-06-03T09:45:00.000Z",
+        sandboxStatus: "running",
+      }),
+    ).toBe(false);
+  });
+
+  it("clears auto-resume pending once a new chat session is connected", () => {
+    expect(
+      shouldClearAutoResumeInFlightState({
+        resumeStartedSessionConnectedAtIso: "2026-06-03T09:45:00.000Z",
+        sessionConnectedAtIso: "2026-06-03T09:45:15.000Z",
+        sandboxStatus: "running",
+      }),
+    ).toBe(true);
+  });
+
+  it("clears auto-resume pending when the sandbox fails", () => {
+    expect(
+      shouldClearAutoResumeInFlightState({
+        resumeStartedSessionConnectedAtIso: "2026-06-03T09:45:00.000Z",
+        sessionConnectedAtIso: null,
+        sandboxStatus: "failed",
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("shouldResetAutoResumeAttemptAfterClear", () => {
+  it("keeps the one-shot guard when clearing because the sandbox failed", () => {
+    expect(
+      shouldResetAutoResumeAttemptAfterClear({
+        resumeStartedSessionConnectedAtIso: "2026-06-03T09:45:00.000Z",
+        sessionConnectedAtIso: null,
+      }),
+    ).toBe(false);
+  });
+
+  it("resets the one-shot guard after a new connected session completes resume", () => {
+    expect(
+      shouldResetAutoResumeAttemptAfterClear({
+        resumeStartedSessionConnectedAtIso: "2026-06-03T09:45:00.000Z",
+        sessionConnectedAtIso: "2026-06-03T09:45:15.000Z",
+      }),
+    ).toBe(true);
   });
 });

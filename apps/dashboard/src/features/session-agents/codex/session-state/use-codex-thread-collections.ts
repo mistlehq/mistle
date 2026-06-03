@@ -155,6 +155,16 @@ export function useCodexThreadCollections(input: {
     [updateOriginalThreadIdSnapshot],
   );
 
+  const recordThreadAsOriginal = useCallback(
+    (recordInput: { generation: number; threadId: string }): void => {
+      updateOriginalThreadIdSnapshot({
+        generation: recordInput.generation,
+        threadId: recordInput.threadId,
+      });
+    },
+    [updateOriginalThreadIdSnapshot],
+  );
+
   const refreshThreadCollections = useCallback(
     async (refreshInput?: ThreadCollectionsRefreshInput) => {
       const requestedOriginalThreadId = refreshInput?.originalThreadId;
@@ -225,6 +235,7 @@ export function useCodexThreadCollections(input: {
     refreshArchivedThreadList,
     refreshLoadedThreadList,
     recordStartedThreadAsOriginalAfterEmptyScan,
+    recordThreadAsOriginal,
     refreshThreadCollections,
   };
 }

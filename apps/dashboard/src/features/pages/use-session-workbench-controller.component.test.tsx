@@ -185,8 +185,12 @@ describe("useSessionWorkbenchController", () => {
         sandboxStatus: "running",
       },
     });
+    if (sameDisconnectReconnect.kind !== "recovering") {
+      throw new Error("Expected reconnect state to remain recovering.");
+    }
     const reconnectAttemptStarted = reduceSessionWorkbenchRecoveryState(sameDisconnectReconnect, {
       type: "reconnect_attempt_started",
+      reconnectCommand: sameDisconnectReconnect.reconnectCommand,
     });
 
     expect(reconnectAttemptStarted).toEqual({
@@ -223,6 +227,74 @@ describe("useSessionWorkbenchController", () => {
       reconnectCommand: "none",
       recoverableDisconnectId: 1,
     });
+  });
+
+  it("counts reconnect attempts from render-derived reconnect commands", () => {
+    const baseRecovery = {
+      kind: "recovering" as const,
+      baseMessage: "Sandbox session stream reset.",
+      errorMessage: null,
+      isGatewayServiceRestart: false,
+      targetRuntimeConversationId: "thread_123",
+      recoveryStrategy: "reopen_stream" as const,
+      reconnectAttemptCount: 0,
+      reconnectCommand: "none" as const,
+      recoverableDisconnectId: 1,
+    };
+    const recoveryForRender = resolveSessionWorkbenchRecoveryStateForRender({
+      baseState: baseRecovery,
+      canConnect: true,
+      hasLifecycleError: false,
+      isStartingSession: false,
+      isWaitingForTriggerThread: false,
+      previousSandboxInstanceId: "sbi_123",
+      sandboxInstanceId: "sbi_123",
+      sandboxStatus: "running",
+      sessionConnectionState: "detached",
+    });
+
+    expect(recoveryForRender).toEqual({
+      ...baseRecovery,
+      reconnectCommand: "reopen_stream",
+    });
+
+    expect(
+      reduceSessionWorkbenchRecoveryState(baseRecovery, {
+        type: "reconnect_attempt_started",
+        reconnectCommand:
+          recoveryForRender.kind === "recovering" ? recoveryForRender.reconnectCommand : "none",
+      }),
+    ).toEqual({
+      ...baseRecovery,
+      reconnectAttemptCount: 1,
+    });
+  });
+
+  it("keeps recovery state unchanged when the same disconnect is observed with unchanged details", () => {
+    const recoveryState = {
+      kind: "recovering" as const,
+      baseMessage: "Sandbox session stream reset.",
+      errorMessage: null,
+      isGatewayServiceRestart: false,
+      targetRuntimeConversationId: "thread_123",
+      recoveryStrategy: "reopen_stream" as const,
+      reconnectAttemptCount: 1,
+      reconnectCommand: "none" as const,
+      recoverableDisconnectId: 1,
+    };
+
+    expect(
+      reduceSessionWorkbenchRecoveryState(recoveryState, {
+        type: "recoverable_disconnect_observed",
+        disconnect: {
+          id: 1,
+          isGatewayServiceRestart: false,
+          message: "Sandbox session stream reset.",
+          targetRuntimeConversationId: "thread_123",
+          recoveryStrategy: "reopen_stream",
+        },
+      }),
+    ).toBe(recoveryState);
   });
 
   it("issues reconnect commands only when the recovered sandbox is connectable again", () => {
@@ -479,6 +551,71 @@ describe("useSessionWorkbenchController", () => {
     ).toBe(true);
   });
 
+  it("does not redispatch recovery when a rerender passes a fresh object for the same disconnect", async () => {
+    type RecoverableDisconnectForTest = {
+      id: number;
+      isGatewayServiceRestart: boolean;
+      message: string;
+      targetRuntimeConversationId: string | null;
+      recoveryStrategy: "reopen_stream";
+    };
+    type RecoveryHookProps = {
+      liveRecoverableDisconnect: RecoverableDisconnectForTest | null;
+    };
+    const runSessionAction = (): void => {};
+    const createRecoverableDisconnect = (): RecoverableDisconnectForTest => ({
+      id: 24,
+      isGatewayServiceRestart: false,
+      message: "Sandbox session stream reset.",
+      targetRuntimeConversationId: "thread_recovered",
+      recoveryStrategy: "reopen_stream",
+    });
+    const initialHookProps: RecoveryHookProps = {
+      liveRecoverableDisconnect: null,
+    };
+    const { result, rerender } = renderHook(
+      ({ liveRecoverableDisconnect }: RecoveryHookProps) =>
+        useSessionWorkbenchRecovery({
+          canConnect: false,
+          connectSession: runSessionAction,
+          hasLifecycleError: false,
+          isStartingSession: false,
+          isWaitingForTriggerThread: false,
+          mainPanelTransitionState: "stable_chat",
+          requestRecoveryStatusRefresh: runSessionAction,
+          recoverSession: runSessionAction,
+          recoverableDisconnect: liveRecoverableDisconnect,
+          resetSessionTransport: runSessionAction,
+          sandboxInstanceId: "sbi_recovering",
+          sandboxStatus: "reconnecting",
+          sessionConnectionState: "recovering",
+        }),
+      {
+        initialProps: initialHookProps,
+      },
+    );
+
+    rerender({
+      liveRecoverableDisconnect: createRecoverableDisconnect(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.sessionReconnectState.message).toBe(
+        "Sandbox session stream reset. Waiting for the sandbox to become ready again.",
+      );
+    });
+
+    rerender({
+      liveRecoverableDisconnect: createRecoverableDisconnect(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.sessionReconnectState.message).toBe(
+        "Sandbox session stream reset. Waiting for the sandbox to become ready again.",
+      );
+    });
+  });
+
   it("shows delayed gateway restart messaging after reconnect clears the live disconnect prop", async () => {
     type RecoverableDisconnectForTest = {
       id: number;
@@ -513,6 +650,7 @@ describe("useSessionWorkbenchController", () => {
           requestRecoveryStatusRefresh: noopSessionAction,
           recoverSession: noopSessionAction,
           recoverableDisconnect: liveRecoverableDisconnect,
+          resetSessionTransport: noopSessionAction,
           sandboxInstanceId: "sbi_recovering",
           sandboxStatus: "running",
           sessionConnectionState: "recovering",

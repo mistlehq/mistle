@@ -79,6 +79,29 @@ describe("SessionWorkbenchPageView", () => {
     expect(screen.getByText("Terminal workspace")).toBeDefined();
   });
 
+  it("renders neutral reconnect alerts as polite status updates", () => {
+    render(
+      <SessionWorkbenchPageView
+        alert={{
+          title: "Reconnecting session",
+          description: "Waiting for the sandbox to become ready again.",
+          variant: "default",
+        }}
+        bottomPanel={<div>Terminal workspace</div>}
+        isBottomPanelVisible={false}
+        isSecondaryPanelVisible={false}
+        mainContent={<div>Conversation body</div>}
+        primaryBottomPanel={<div>Composer</div>}
+        sandboxInstanceId="sbi_test"
+        secondaryPanel={<div>Secondary</div>}
+      />,
+    );
+
+    const status = screen.getByRole("status");
+    expect(status.getAttribute("aria-live")).toBe("polite");
+    expect(within(status).getByText("Reconnecting session")).toBeTruthy();
+  });
+
   it("keeps the outer horizontal group mounted when the secondary panel is hidden", () => {
     const { container } = render(
       <SessionWorkbenchPageView

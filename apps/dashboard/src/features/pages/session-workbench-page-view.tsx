@@ -4,6 +4,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
   Notice,
+  Spinner,
   useDefaultLayout,
 } from "@mistle/ui";
 import { useLayoutEffect, useRef } from "react";
@@ -25,6 +26,7 @@ const SecondaryPanelId = "session-workbench-secondary-panel";
 type SessionWorkbenchAlert = {
   title: string;
   description: string;
+  variant?: "alert" | "default";
 };
 
 type SessionWorkbenchMainContentLayout = {
@@ -212,7 +214,18 @@ export function SessionWorkbenchPageView({
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {alert === null ? null : (
         <div className="mx-auto flex w-full max-w-3xl flex-none flex-col gap-4 px-4 py-6">
-          <Notice key={`${alert.title}:${alert.description}`} title={alert.title} variant="alert">
+          <Notice
+            aria-live={alert.variant === "default" ? "polite" : undefined}
+            key={`${alert.title}:${alert.description}`}
+            role={alert.variant === "default" ? "status" : undefined}
+            title={alert.title}
+            variant={alert.variant ?? "alert"}
+            icon={
+              alert.variant === "default" ? (
+                <Spinner aria-hidden className="size-4 shrink-0" />
+              ) : undefined
+            }
+          >
             {alert.description}
           </Notice>
         </div>
