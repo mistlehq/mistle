@@ -548,9 +548,109 @@ describe.concurrent("sandbox profile versions publish integration", () => {
         },
       }),
     );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "github-version-publish-skills-unloaded",
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
+        },
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_version_publish_skills_unloaded",
+        organizationId: session.organizationId,
+        targetKey: "github-version-publish-skills-unloaded",
+        displayName: "GitHub",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      }),
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "spb_version_publish_skills_unloaded",
+          sandboxProfileId: "sbp_version_publish_skills_unloaded",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_version_publish_skills_unloaded",
+          kind: IntegrationBindingKinds.GIT,
+          config: {
+            repositories: ["acme/skills"],
+          },
+        }),
+      );
 
     const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_version_publish_skills_unloaded/versions/1/publish",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(409);
+    const responseBody = PublishSandboxProfileVersionConflictResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody.code).toBe("PROFILE_VERSION_NOT_PUBLISHABLE");
+  });
+
+  it("returns 409 when the draft skills source was loaded but is not bound", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publish-skills-unbound@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_version_publish_skills_unbound",
+        organizationId: session.organizationId,
+        displayName: "Publish Skills Unbound Profile",
+        activeVersion: null,
+        createdAt: "2026-06-03T00:15:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_version_publish_skills_unbound",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+        skillsConfig: {
+          originUrl: "https://github.com/acme/skills.git",
+          selectedSkills: [
+            {
+              name: "available",
+              relativePath: ".agents/skills/available",
+            },
+          ],
+        },
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.skillsSourceRepos).values({
+      id: "skr_version_publish_skills_unbound",
+      organizationId: session.organizationId,
+      originUrl: "https://github.com/acme/skills.git",
+      commitSha: "cccccccccccccccccccccccccccccccccccccccc",
+      skills: [
+        {
+          name: "available",
+          description: "Available skill.",
+          relativePath: ".agents/skills/available",
+        },
+      ],
+      lastSyncedAt: "2026-06-03T00:16:00.000Z",
+      createdAt: "2026-06-03T00:16:00.000Z",
+      updatedAt: "2026-06-03T00:16:00.000Z",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_version_publish_skills_unbound/versions/1/publish",
       {
         method: "POST",
         headers: {

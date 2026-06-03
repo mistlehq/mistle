@@ -560,6 +560,7 @@ const SandboxProfileVersionPublishabilitySchema = z
             "SANDBOX_CONNECTION_PROVIDER_MISMATCH",
             "INVALID_SANDBOX_RESOURCES",
             "SKILLS_SOURCE_NOT_LOADED",
+            "SKILLS_SOURCE_NOT_BOUND",
             "SELECTED_SKILLS_NOT_FOUND",
           ]),
           message: z.string().min(1),

@@ -255,6 +255,7 @@ export const getSandboxProfileVersionPublishabilityResponseSchema = z
             SandboxProfilePublishabilityIssueCodes.SANDBOX_CONNECTION_PROVIDER_MISMATCH,
             SandboxProfilePublishabilityIssueCodes.INVALID_SANDBOX_RESOURCES,
             SandboxProfilePublishabilityIssueCodes.SKILLS_SOURCE_NOT_LOADED,
+            SandboxProfilePublishabilityIssueCodes.SKILLS_SOURCE_NOT_BOUND,
             SandboxProfilePublishabilityIssueCodes.SELECTED_SKILLS_NOT_FOUND,
           ]),
           message: z.string().min(1),

@@ -3,6 +3,8 @@
  */
 
 import {
+  IntegrationBindingKinds,
+  IntegrationConnectionStatuses,
   SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
@@ -14,7 +16,13 @@ import {
   GetSandboxProfileVersionPublishabilityNotFoundResponseSchema,
   GetSandboxProfileVersionPublishabilityResponseSchema,
 } from "../src/sandbox-profiles/index.js";
-import { sandboxProfileRow, sandboxProfileVersionRow } from "./helpers/sandbox-profiles.js";
+import {
+  integrationConnectionRow,
+  integrationTargetRow,
+  sandboxProfileRow,
+  sandboxProfileVersionIntegrationBindingRow,
+  sandboxProfileVersionRow,
+} from "./helpers/sandbox-profiles.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api"],
@@ -337,6 +345,41 @@ describe.concurrent("sandbox profile version publishability get integration", ()
         },
       }),
     );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "github-publishability-skills-unloaded",
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
+        },
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_publishability_skills_unloaded",
+        organizationId: session.organizationId,
+        targetKey: "github-publishability-skills-unloaded",
+        displayName: "GitHub",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      }),
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "spb_publishability_skills_unloaded",
+          sandboxProfileId: "sbp_publishability_skills_unloaded",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_publishability_skills_unloaded",
+          kind: IntegrationBindingKinds.GIT,
+          config: {
+            repositories: ["acme/skills"],
+          },
+        }),
+      );
 
     const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_publishability_skills_unloaded/versions/1/publishability",
@@ -409,6 +452,41 @@ describe.concurrent("sandbox profile version publishability get integration", ()
       createdAt: "2026-06-03T00:06:00.000Z",
       updatedAt: "2026-06-03T00:06:00.000Z",
     });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "github-publishability-skills-missing",
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
+        },
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_publishability_skills_missing",
+        organizationId: session.organizationId,
+        targetKey: "github-publishability-skills-missing",
+        displayName: "GitHub",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      }),
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "spb_publishability_skills_missing",
+          sandboxProfileId: "sbp_publishability_skills_missing",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_publishability_skills_missing",
+          kind: IntegrationBindingKinds.GIT,
+          config: {
+            repositories: ["acme/skills"],
+          },
+        }),
+      );
 
     const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_publishability_skills_missing/versions/1/publishability",
@@ -429,6 +507,81 @@ describe.concurrent("sandbox profile version publishability get integration", ()
         {
           code: "SELECTED_SKILLS_NOT_FOUND",
           message: "Remove skills that are no longer found before publishing this sandbox profile.",
+        },
+      ],
+    });
+  });
+
+  it("returns a skills source issue when a loaded source is not bound to the draft", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publishability-skills-unbound@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_publishability_skills_unbound",
+        organizationId: session.organizationId,
+        displayName: "Publishability Skills Unbound Profile",
+        activeVersion: null,
+        createdAt: "2026-06-03T00:07:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_publishability_skills_unbound",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+        skillsConfig: {
+          originUrl: "https://github.com/acme/skills.git",
+          selectedSkills: [
+            {
+              name: "available",
+              relativePath: ".agents/skills/available",
+            },
+          ],
+        },
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.skillsSourceRepos).values({
+      id: "skr_publishability_skills_unbound",
+      organizationId: session.organizationId,
+      originUrl: "https://github.com/acme/skills.git",
+      commitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      skills: [
+        {
+          name: "available",
+          description: "Available skill.",
+          relativePath: ".agents/skills/available",
+        },
+      ],
+      lastSyncedAt: "2026-06-03T00:08:00.000Z",
+      createdAt: "2026-06-03T00:08:00.000Z",
+      updatedAt: "2026-06-03T00:08:00.000Z",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_publishability_skills_unbound/versions/1/publishability",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = GetSandboxProfileVersionPublishabilityResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody).toEqual({
+      publishable: false,
+      issues: [
+        {
+          code: "SKILLS_SOURCE_NOT_BOUND",
+          message:
+            "Add this repository to the Git integration bindings before publishing this sandbox profile.",
         },
       ],
     });
