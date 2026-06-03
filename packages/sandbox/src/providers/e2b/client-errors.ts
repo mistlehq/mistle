@@ -62,21 +62,6 @@ export const E2BClientOperationIds = {
    * https://github.com/e2b-dev/E2B/blob/a240f99db52396306857b7fc9a07c225ac7d5221/packages/js-sdk/src/sandbox/commands/commandHandle.ts#L193-L203
    */
   ENSURE_DAEMON_READY: "ensure_daemon_ready",
-  /**
-   * `sandbox.commands.run(...)`, `sendStdin(...)`, `closeStdin(...)`, and `handle.wait()`
-   * for `/opt/mistle/bin/sandboxd init`.
-   * Sources:
-   * https://github.com/e2b-dev/E2B/blob/a240f99db52396306857b7fc9a07c225ac7d5221/packages/js-sdk/src/sandbox/commands/index.ts#L411-L469
-   * https://github.com/e2b-dev/E2B/blob/a240f99db52396306857b7fc9a07c225ac7d5221/packages/js-sdk/src/sandbox/commands/index.ts#L187-L210
-   * https://github.com/e2b-dev/E2B/blob/a240f99db52396306857b7fc9a07c225ac7d5221/packages/js-sdk/src/sandbox/commands/index.ts#L224-L240
-   * https://github.com/e2b-dev/E2B/blob/a240f99db52396306857b7fc9a07c225ac7d5221/packages/js-sdk/src/sandbox/commands/commandHandle.ts#L193-L203
-   */
-  INIT: "init",
-  /**
-   * `sandbox.commands.run(...)`, `sendStdin(...)`, `closeStdin(...)`, and `handle.wait()`
-   * for `/opt/mistle/bin/sandboxd resume`.
-   */
-  RESUME: "resume",
   ACTIVATE: "activate",
   ENSURE_SANDBOXD: "ensure_sandboxd",
   STOP_SANDBOXD_DAEMON: "stop_sandboxd_daemon",

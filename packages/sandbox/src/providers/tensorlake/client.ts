@@ -48,12 +48,6 @@ import type { TensorlakeSandboxInspectResult } from "./types.js";
 
 const SandboxdCommand = "/opt/mistle/bin/sandboxd";
 export const TensorlakeRootProcessUser = "root";
-const InitCommand = SandboxdCommand;
-const InitCommandArgs = ["init"];
-const DetachedInitCommandArgs = ["init", "--detach"];
-const WaitInitCommandArgs = ["wait-init"];
-const ResumeCommand = SandboxdCommand;
-const ResumeCommandArgs = ["resume"];
 const ActivateCommand = SandboxdCommand;
 export const ActivateCommandArgs = ["activate"] as const;
 const ReadyCommand = SandboxdCommand;
@@ -127,11 +121,7 @@ export interface TensorlakeClient {
   ): Promise<TensorlakeCaptureSandboxSnapshotResponse>;
   stopSandbox(request: TensorlakeSandboxIdRequest): Promise<void>;
   destroySandbox(request: TensorlakeSandboxIdRequest): Promise<void>;
-  init(request: TensorlakeRuntimeControlRequest): Promise<void>;
-  beginInit(request: TensorlakeRuntimeControlRequest): Promise<void>;
-  waitInit(request: Omit<TensorlakeRuntimeControlRequest, "payload">): Promise<void>;
   activate(request: TensorlakeRuntimeControlRequest): Promise<void>;
-  resume(request: TensorlakeRuntimeControlRequest): Promise<void>;
   runCommand(request: {
     sandboxId: string;
     command: string;
@@ -521,96 +511,6 @@ export class TensorlakeApiClient implements TensorlakeClient {
     }
   }
 
-  async init(request: TensorlakeRuntimeControlRequest): Promise<void> {
-    const parsedRequest = TensorlakeRuntimeControlRequestSchema.parse(request);
-
-    try {
-      const sandbox = await this.#connect(parsedRequest.sandboxId);
-      await this.#ensureDaemonReady({
-        env: parsedRequest.env,
-        operation: TensorlakeClientOperationIds.INIT,
-        sandbox,
-      });
-      await this.#runStartupCommand(sandbox, {
-        operation: TensorlakeClientOperationIds.INIT,
-        command: InitCommand,
-        args: InitCommandArgs,
-        payload: parsedRequest.payload,
-      });
-    } catch (error) {
-      throw mapTensorlakeClientError(TensorlakeClientOperationIds.INIT, error);
-    }
-  }
-
-  async beginInit(request: TensorlakeRuntimeControlRequest): Promise<void> {
-    const parsedRequest = TensorlakeRuntimeControlRequestSchema.parse(request);
-
-    try {
-      const sandbox = await this.#connect(parsedRequest.sandboxId);
-      await this.#ensureDaemonReady({
-        env: parsedRequest.env,
-        operation: TensorlakeClientOperationIds.INIT,
-        sandbox,
-      });
-      await this.#runStartupCommand(sandbox, {
-        operation: TensorlakeClientOperationIds.INIT,
-        command: InitCommand,
-        args: DetachedInitCommandArgs,
-        payload: parsedRequest.payload,
-      });
-    } catch (error) {
-      throw mapTensorlakeClientError(TensorlakeClientOperationIds.INIT, error);
-    }
-  }
-
-  async waitInit(request: Omit<TensorlakeRuntimeControlRequest, "payload">): Promise<void> {
-    const parsedRequest = TensorlakeRuntimeControlRequestSchema.omit({ payload: true }).parse(
-      request,
-    );
-
-    try {
-      const sandbox = await this.#connect(parsedRequest.sandboxId);
-      await this.#ensureDaemonReady({
-        env: parsedRequest.env,
-        operation: TensorlakeClientOperationIds.INIT,
-        sandbox,
-      });
-      // Tensorlake's foreground run stream can close before sandboxd init
-      // finishes. Track wait-init as a background process and poll status
-      // instead, matching the init/resume startup command path.
-      await this.#runProcessToCompletion(sandbox, {
-        operation: TensorlakeClientOperationIds.INIT,
-        commandDescription: "Tensorlake sandbox wait-init command",
-        command: InitCommand,
-        args: WaitInitCommandArgs,
-        ...(parsedRequest.env === undefined ? {} : { env: parsedRequest.env }),
-      });
-    } catch (error) {
-      throw mapTensorlakeClientError(TensorlakeClientOperationIds.INIT, error);
-    }
-  }
-
-  async resume(request: TensorlakeRuntimeControlRequest): Promise<void> {
-    const parsedRequest = TensorlakeRuntimeControlRequestSchema.parse(request);
-
-    try {
-      const sandbox = await this.#connect(parsedRequest.sandboxId);
-      await this.#ensureDaemonReady({
-        env: parsedRequest.env,
-        operation: TensorlakeClientOperationIds.RESUME,
-        sandbox,
-      });
-      await this.#runStartupCommand(sandbox, {
-        operation: TensorlakeClientOperationIds.RESUME,
-        command: ResumeCommand,
-        args: ResumeCommandArgs,
-        payload: parsedRequest.payload,
-      });
-    } catch (error) {
-      throw mapTensorlakeClientError(TensorlakeClientOperationIds.RESUME, error);
-    }
-  }
-
   async activate(request: TensorlakeRuntimeControlRequest): Promise<void> {
     const parsedRequest = TensorlakeRuntimeControlRequestSchema.parse(request);
 
@@ -695,10 +595,7 @@ export class TensorlakeApiClient implements TensorlakeClient {
   async #ensureDaemonReady(input: {
     sandbox: Sandbox;
     env: Readonly<Record<string, string>> | undefined;
-    operation:
-      | typeof TensorlakeClientOperationIds.INIT
-      | typeof TensorlakeClientOperationIds.RESUME
-      | typeof TensorlakeClientOperationIds.ACTIVATE;
+    operation: typeof TensorlakeClientOperationIds.ACTIVATE;
   }): Promise<void> {
     const startedAtMs = systemClock.nowMs();
     let pollAttempts = 0;
@@ -813,10 +710,7 @@ export class TensorlakeApiClient implements TensorlakeClient {
   async #runStartupCommand(
     sandbox: Sandbox,
     input: {
-      operation:
-        | typeof TensorlakeClientOperationIds.INIT
-        | typeof TensorlakeClientOperationIds.RESUME
-        | typeof TensorlakeClientOperationIds.ACTIVATE;
+      operation: typeof TensorlakeClientOperationIds.ACTIVATE;
       command: string;
       args: readonly string[];
       payload: Uint8Array<ArrayBufferLike>;
@@ -834,10 +728,7 @@ export class TensorlakeApiClient implements TensorlakeClient {
   async #runProcessToCompletion(
     sandbox: Sandbox,
     input: {
-      operation:
-        | typeof TensorlakeClientOperationIds.INIT
-        | typeof TensorlakeClientOperationIds.RESUME
-        | typeof TensorlakeClientOperationIds.ACTIVATE;
+      operation: typeof TensorlakeClientOperationIds.ACTIVATE;
       commandDescription: string;
       command: string;
       args: readonly string[];
