@@ -159,6 +159,18 @@ pub(super) fn started_event_name(operation: StartupOperation) -> &'static str {
     match operation {
         StartupOperation::Init => "sandbox_init_started",
         StartupOperation::Resume => "sandbox_resume_started",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+        } => "sandbox_start_started",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::Resume,
+        } => "sandbox_resume_started",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::SetupCheck,
+        } => "sandbox_setup_check_started",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::Snapshot,
+        } => "sandbox_snapshot_started",
     }
 }
 
@@ -166,6 +178,18 @@ pub(super) fn phase_failed_event_name(operation: StartupOperation) -> &'static s
     match operation {
         StartupOperation::Init => "sandbox_init_phase_failed",
         StartupOperation::Resume => "sandbox_resume_phase_failed",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+        } => "sandbox_start_phase_failed",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::Resume,
+        } => "sandbox_resume_phase_failed",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::SetupCheck,
+        } => "sandbox_setup_check_phase_failed",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::Snapshot,
+        } => "sandbox_snapshot_phase_failed",
     }
 }
 
@@ -173,6 +197,18 @@ pub(super) fn phase_started_event_name(operation: StartupOperation) -> &'static 
     match operation {
         StartupOperation::Init => "sandbox_init_phase_started",
         StartupOperation::Resume => "sandbox_resume_phase_started",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+        } => "sandbox_start_phase_started",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::Resume,
+        } => "sandbox_resume_phase_started",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::SetupCheck,
+        } => "sandbox_setup_check_phase_started",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::Snapshot,
+        } => "sandbox_snapshot_phase_started",
     }
 }
 
@@ -180,6 +216,18 @@ pub(super) fn phase_completed_event_name(operation: StartupOperation) -> &'stati
     match operation {
         StartupOperation::Init => "sandbox_init_phase_completed",
         StartupOperation::Resume => "sandbox_resume_phase_completed",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+        } => "sandbox_start_phase_completed",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::Resume,
+        } => "sandbox_resume_phase_completed",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::SetupCheck,
+        } => "sandbox_setup_check_phase_completed",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::Snapshot,
+        } => "sandbox_snapshot_phase_completed",
     }
 }
 
@@ -187,6 +235,18 @@ pub(super) fn failed_event_name(operation: StartupOperation) -> &'static str {
     match operation {
         StartupOperation::Init => "sandbox_init_failed",
         StartupOperation::Resume => "sandbox_resume_failed",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+        } => "sandbox_start_failed",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::Resume,
+        } => "sandbox_resume_failed",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::SetupCheck,
+        } => "sandbox_setup_check_failed",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::Snapshot,
+        } => "sandbox_snapshot_failed",
     }
 }
 
@@ -194,5 +254,17 @@ pub(super) fn transcript_event_name(operation: StartupOperation) -> &'static str
     match operation {
         StartupOperation::Init => "sandbox_init_transcript",
         StartupOperation::Resume => "sandbox_resume_transcript",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+        } => "sandbox_start_transcript",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::Resume,
+        } => "sandbox_resume_transcript",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::SetupCheck,
+        } => "sandbox_setup_check_transcript",
+        StartupOperation::Activation {
+            operation_kind: crate::protocol::startup::StartupOperationKind::Snapshot,
+        } => "sandbox_snapshot_transcript",
     }
 }

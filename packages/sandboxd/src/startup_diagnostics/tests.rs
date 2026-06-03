@@ -7,9 +7,10 @@ use serde_json::Value;
 use tokio::sync::mpsc;
 
 use super::{
-    INIT_LOG_PATH, RESUME_LOG_PATH, StartupDiagnosticsLogger, StartupOperation,
+    ACTIVATE_LOG_PATH, INIT_LOG_PATH, RESUME_LOG_PATH, StartupDiagnosticsLogger, StartupOperation,
     StartupTranscriptStream, send_lifecycle_operation_record_with_timeout,
 };
+use crate::protocol::startup::StartupOperationKind;
 use crate::test_support::TestEnvVarGuard;
 use crate::time::Clock;
 use crate::tunnel::session::OperationStreamMessage;
@@ -116,6 +117,67 @@ fn initializes_and_appends_operation_log_lines() {
     let _ = fs::remove_dir_all(&temp_dir);
     assert_eq!(INIT_LOG_PATH, "/run/mistle/init.log");
     assert_eq!(RESUME_LOG_PATH, "/run/mistle/resume.log");
+    assert_eq!(ACTIVATE_LOG_PATH, "/run/mistle/activate.log");
+}
+
+#[test]
+fn activation_diagnostics_use_operation_kind_records() {
+    let temp_dir = std::env::temp_dir().join(format!(
+        "sandboxd-activation-diagnostics-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    let _ = fs::remove_dir_all(&temp_dir);
+    fs::create_dir_all(&temp_dir).expect("temp dir should be creatable");
+    let _log_dir_guard =
+        TestEnvVarGuard::set(super::TEST_LOG_DIR_ENV, temp_dir.to_string_lossy().as_ref());
+
+    let logger = StartupDiagnosticsLogger::initialize(
+        StartupOperation::Activation {
+            operation_kind: StartupOperationKind::SetupCheck,
+        },
+        "ws://127.0.0.1:4000/tunnel/sandbox/sbi_test",
+    )
+    .expect("logger should initialize");
+    logger
+        .record_started()
+        .expect("activation started record should append");
+    logger
+        .record_phase_started("apply_runtime_plan")
+        .expect("activation phase start record should append");
+    logger
+        .record_transcript(
+            Some("apply_runtime_plan"),
+            StartupTranscriptStream::Stdout,
+            b"installing dependencies",
+        )
+        .expect("activation transcript record should append");
+
+    let log_path = temp_dir.join("activate.log");
+    let log_text = fs::read_to_string(&log_path).expect("log file should be readable");
+    let records = log_text
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).expect("log line should be valid json"))
+        .collect::<Vec<_>>();
+    assert!(records.iter().any(|record| {
+        record["event"] == "sandbox_setup_check_started"
+            && record["operation"] == "activate"
+            && record["operationKind"] == "setup_check"
+    }));
+    assert!(records.iter().any(|record| {
+        record["event"] == "sandbox_setup_check_phase_started"
+            && record["operation"] == "activate"
+            && record["operationKind"] == "setup_check"
+            && record["phase"] == "apply_runtime_plan"
+    }));
+    assert!(records.iter().any(|record| {
+        record["event"] == "sandbox_setup_check_transcript"
+            && record["operation"] == "activate"
+            && record["operationKind"] == "setup_check"
+            && record["payloadBase64"] == "aW5zdGFsbGluZyBkZXBlbmRlbmNpZXM="
+    }));
+
+    let _ = fs::remove_dir_all(&temp_dir);
 }
 
 #[test]
@@ -214,6 +276,48 @@ fn publishes_lifecycle_records_buffered_before_operation_sender_attachment() {
         completed_record["attributes"]["phase"],
         "start_tunnel_session"
     );
+
+    let _ = fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn publishes_activation_lifecycle_records_with_activation_operation_kind() {
+    let temp_dir = std::env::temp_dir().join(format!(
+        "sandboxd-activation-diagnostics-records-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    let _ = fs::remove_dir_all(&temp_dir);
+    fs::create_dir_all(&temp_dir).expect("temp dir should be creatable");
+    let _log_dir_guard =
+        TestEnvVarGuard::set(super::TEST_LOG_DIR_ENV, temp_dir.to_string_lossy().as_ref());
+
+    let logger = StartupDiagnosticsLogger::initialize(
+        StartupOperation::Activation {
+            operation_kind: StartupOperationKind::Snapshot,
+        },
+        "ws://127.0.0.1:4000/tunnel/sandbox/sbi_test",
+    )
+    .expect("logger should initialize");
+    let (sender, mut receiver) = mpsc::channel(8);
+    logger.attach_operation_sender(sender);
+    logger
+        .record_phase_started("apply_runtime_plan")
+        .expect("activation phase start record should append");
+
+    let operation_record = receiver
+        .blocking_recv()
+        .expect("activation phase start should publish a lifecycle record");
+    let OperationStreamMessage::Record(operation_record) = operation_record else {
+        panic!("expected lifecycle record");
+    };
+    let operation_record =
+        serde_json::from_str::<Value>(&operation_record).expect("record should be valid json");
+
+    assert_eq!(operation_record["kind"], "lifecycle");
+    assert_eq!(operation_record["phase"], "runtime_plan");
+    assert_eq!(operation_record["status"], "started");
+    assert_eq!(operation_record["attributes"]["operationKind"], "snapshot");
 
     let _ = fs::remove_dir_all(&temp_dir);
 }

@@ -445,7 +445,6 @@ fn begin_activate(
     init_thread: &SharedInitThread,
     init_completion: &InitCompletion,
 ) -> Result<(), ControlError> {
-    validate_activation_operation_kind(activation_input.operation_kind)?;
     loop {
         {
             let mut state_guard = lock_control_state(state)?;
@@ -520,20 +519,6 @@ fn begin_activate(
     }
 }
 
-fn validate_activation_operation_kind(
-    operation_kind: StartupOperationKind,
-) -> Result<(), ControlError> {
-    match operation_kind {
-        StartupOperationKind::Start | StartupOperationKind::Resume => Ok(()),
-        StartupOperationKind::SetupCheck | StartupOperationKind::Snapshot => {
-            Err(ControlError::StartupRequestRejected(format!(
-                "sandboxd activate does not support snapshot materialization operationKind `{}`; use sandboxd init for snapshot materialization",
-                operation_kind.as_str()
-            )))
-        }
-    }
-}
-
 fn accepted_session_input_from_control_state(
     state_guard: &crate::control::state::ControlServerState,
 ) -> Result<SessionRuntimeInput, ControlError> {
@@ -556,7 +541,9 @@ fn refresh_initialized_activation(
 ) -> Result<(), ControlError> {
     let global_git_config_path = lock_control_state(state)?.global_git_config_path.clone();
     let diagnostics_logger = StartupDiagnosticsLogger::initialize(
-        StartupOperation::Resume,
+        StartupOperation::Activation {
+            operation_kind: activation_input.operation_kind,
+        },
         &activation_input.tunnel_gateway_ws_url,
     )
     .ok();
@@ -611,7 +598,9 @@ fn start_activation_init_worker(
     let init_completion_for_thread = init_completion.clone();
     let global_git_config_path = lock_control_state(state)?.global_git_config_path.clone();
     let diagnostics_logger = StartupDiagnosticsLogger::initialize(
-        StartupOperation::Init,
+        StartupOperation::Activation {
+            operation_kind: activation_input.operation_kind,
+        },
         &activation_input.tunnel_gateway_ws_url,
     )
     .ok();
@@ -635,7 +624,8 @@ fn start_activation_init_worker(
         match result {
             Ok(Ok(sandboxd_state)) => {
                 let mut state_guard = lock_control_state(&state_for_thread)?;
-                state_guard.shutdown_after_init = false;
+                state_guard.shutdown_after_init =
+                    activation_input.operation_kind == StartupOperationKind::Snapshot;
                 state_guard.sandboxd_state = Some(sandboxd_state);
                 state_guard.init_phase = InitPhase::Initialized;
                 notify_init_completion(&init_completion_for_thread);

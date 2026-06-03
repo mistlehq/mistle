@@ -15,6 +15,7 @@ use base64::engine::general_purpose::STANDARD as Base64Standard;
 use serde_json::{Map, Number, Value};
 use tokio::sync::mpsc;
 
+use crate::protocol::startup::StartupOperationKind;
 use crate::time::{Clock, SystemClock, format_rfc3339_timestamp};
 use crate::tunnel::session::{OperationStreamMessage, derive_sandbox_instance_id};
 
@@ -26,6 +27,7 @@ use paths::*;
 
 pub const INIT_LOG_PATH: &str = "/run/mistle/init.log";
 pub const RESUME_LOG_PATH: &str = "/run/mistle/resume.log";
+pub const ACTIVATE_LOG_PATH: &str = "/run/mistle/activate.log";
 
 const TEST_LOG_DIR_ENV: &str = "MISTLE_SANDBOXD_OPERATION_LOG_DIR";
 const OPERATION_STREAM_CLOSE_TIMEOUT: Duration = Duration::from_secs(2);
@@ -36,6 +38,9 @@ const LIFECYCLE_OPERATION_RECORD_SEND_RETRY_INTERVAL: Duration = Duration::from_
 pub enum StartupOperation {
     Init,
     Resume,
+    Activation {
+        operation_kind: StartupOperationKind,
+    },
 }
 
 impl StartupOperation {
@@ -43,6 +48,14 @@ impl StartupOperation {
         match self {
             Self::Init => "init",
             Self::Resume => "resume",
+            Self::Activation { .. } => "activate",
+        }
+    }
+
+    pub fn operation_kind(self) -> Option<StartupOperationKind> {
+        match self {
+            Self::Activation { operation_kind } => Some(operation_kind),
+            Self::Init | Self::Resume => None,
         }
     }
 
@@ -50,6 +63,7 @@ impl StartupOperation {
         match self {
             Self::Init => INIT_LOG_PATH,
             Self::Resume => RESUME_LOG_PATH,
+            Self::Activation { .. } => ACTIVATE_LOG_PATH,
         }
     }
 }
@@ -328,6 +342,12 @@ impl StartupDiagnosticsLogger {
             "operation".to_string(),
             Value::String(self.inner.operation.as_str().to_string()),
         );
+        if let Some(operation_kind) = self.inner.operation.operation_kind() {
+            payload.insert(
+                "operationKind".to_string(),
+                Value::String(operation_kind.as_str().to_string()),
+            );
+        }
 
         for (key, value) in attributes {
             payload.insert(key, value);

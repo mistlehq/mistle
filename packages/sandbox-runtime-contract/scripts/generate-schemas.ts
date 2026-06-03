@@ -2,13 +2,21 @@ import { writeFile } from "node:fs/promises";
 
 import { SandboxKeepaliveStateSchema } from "../src/keepalive.js";
 import { SandboxRuntimeStateSnapshotSchema } from "../src/runtime-state.js";
-import { SandboxdInitResponseSchema, SandboxdStartupInputSchema } from "../src/startup.js";
+import {
+  SandboxdActivationInputSchema,
+  SandboxdInitResponseSchema,
+  SandboxdStartupInputSchema,
+} from "../src/startup.js";
 
 const StartupJsonSchemaParams = {
   io: "input",
 } as const;
 
 const SchemaOutputs = [
+  {
+    outputPath: new URL("../schemas/sandboxd-activation-input.schema.json", import.meta.url),
+    schema: SandboxdActivationInputSchema.toJSONSchema(StartupJsonSchemaParams),
+  },
   {
     outputPath: new URL("../schemas/sandboxd-startup-input.schema.json", import.meta.url),
     schema: SandboxdStartupInputSchema.toJSONSchema(StartupJsonSchemaParams),

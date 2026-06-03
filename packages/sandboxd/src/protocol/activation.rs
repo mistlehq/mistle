@@ -50,6 +50,27 @@ mod tests {
     }
 
     #[test]
+    fn deserializes_all_operation_kinds_without_execution_mode() {
+        for operation_kind in ["start", "resume", "setup_check", "snapshot"] {
+            let input: ActivationInput = serde_json::from_value(json!({
+                "operationKind": operation_kind,
+                "bootstrapToken": "bootstrap-token",
+                "tunnelExchangeToken": "exchange-token",
+                "tunnelGatewayWsUrl": "ws://127.0.0.1/tunnel",
+                "runtimePlan": {
+                    "version": 1,
+                    "sandboxProfileId": "profile"
+                },
+                "actingUserId": null,
+                "gitIdentity": null
+            }))
+            .expect("activation input should deserialize every operation kind");
+
+            assert_eq!(input.operation_kind.as_str(), operation_kind);
+        }
+    }
+
+    #[test]
     fn rejects_legacy_startup_mode() {
         let error = serde_json::from_value::<ActivationInput>(json!({
             "startupMode": "new",
@@ -67,5 +88,25 @@ mod tests {
         .expect_err("activation input should reject startupMode");
 
         assert!(error.to_string().contains("unknown field `startupMode`"));
+    }
+
+    #[test]
+    fn rejects_legacy_execution_mode() {
+        let error = serde_json::from_value::<ActivationInput>(json!({
+            "operationKind": "snapshot",
+            "executionMode": "snapshot",
+            "bootstrapToken": "bootstrap-token",
+            "tunnelExchangeToken": "exchange-token",
+            "tunnelGatewayWsUrl": "ws://127.0.0.1/tunnel",
+            "runtimePlan": {
+                "version": 1,
+                "sandboxProfileId": "profile"
+            },
+            "actingUserId": null,
+            "gitIdentity": null
+        }))
+        .expect_err("activation input should reject executionMode");
+
+        assert!(error.to_string().contains("unknown field `executionMode`"));
     }
 }

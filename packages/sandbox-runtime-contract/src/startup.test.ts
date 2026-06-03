@@ -2,17 +2,26 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import activationInputFixture from "../tests/fixtures/activation-input.valid.json" with { type: "json" };
 import startupInitResponseErrorFixture from "../tests/fixtures/startup-init-response.error.valid.json" with { type: "json" };
 import startupInitResponseOkFixture from "../tests/fixtures/startup-init-response.ok.valid.json" with { type: "json" };
 import startupInputFixture from "../tests/fixtures/startup-input.valid.json" with { type: "json" };
 import {
+  SandboxdActivationInputSchema,
   SandboxdExecutionModes,
   SandboxdInitResponseSchema,
+  SandboxdOperationKinds,
   SandboxdStartupInputSchema,
   SandboxdTransparentProxyBypassKinds,
   SandboxdTransparentProxyExclusionKinds,
 } from "./startup.js";
 
+const activationInputSchemaJson: unknown = JSON.parse(
+  readFileSync(
+    new URL("../schemas/sandboxd-activation-input.schema.json", import.meta.url),
+    "utf8",
+  ),
+);
 const startupInitResponseSchemaJson: unknown = JSON.parse(
   readFileSync(new URL("../schemas/sandboxd-init-response.schema.json", import.meta.url), "utf8"),
 );
@@ -25,6 +34,46 @@ const StartupJsonSchemaParams = {
 } as const;
 
 describe("startup contracts", () => {
+  it("parses the checked-in activation input fixture", () => {
+    expect(SandboxdActivationInputSchema.parse(activationInputFixture)).toEqual(
+      activationInputFixture,
+    );
+  });
+
+  it("accepts activation input for every sandboxd operation kind", () => {
+    for (const operationKind of [
+      SandboxdOperationKinds.START,
+      SandboxdOperationKinds.RESUME,
+      SandboxdOperationKinds.SETUP_CHECK,
+      SandboxdOperationKinds.SNAPSHOT,
+    ]) {
+      expect(
+        SandboxdActivationInputSchema.parse({
+          ...activationInputFixture,
+          operationKind,
+        }),
+      ).toEqual({
+        ...activationInputFixture,
+        operationKind,
+      });
+    }
+  });
+
+  it("rejects activation input with legacy lifecycle fields", () => {
+    expect(() =>
+      SandboxdActivationInputSchema.parse({
+        ...activationInputFixture,
+        startupMode: "new",
+      }),
+    ).toThrow("Unrecognized key");
+    expect(() =>
+      SandboxdActivationInputSchema.parse({
+        ...activationInputFixture,
+        executionMode: SandboxdExecutionModes.SNAPSHOT,
+      }),
+    ).toThrow("Unrecognized key");
+  });
+
   it("parses the checked-in startup input fixture", () => {
     expect(SandboxdStartupInputSchema.parse(startupInputFixture)).toEqual(startupInputFixture);
   });
@@ -171,6 +220,9 @@ describe("startup contracts", () => {
   });
 
   it("matches the checked-in startup json schemas", () => {
+    expect(SandboxdActivationInputSchema.toJSONSchema(StartupJsonSchemaParams)).toEqual(
+      activationInputSchemaJson,
+    );
     expect(SandboxdStartupInputSchema.toJSONSchema(StartupJsonSchemaParams)).toEqual(
       startupInputSchemaJson,
     );

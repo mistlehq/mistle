@@ -203,11 +203,17 @@ impl SandboxdState {
         );
         let should_run_setup_script =
             should_run_setup_script_for_activation(should_apply_runtime_plan);
+        let is_snapshot = activation_input.operation_kind == StartupOperationKind::Snapshot;
+        let execution_mode = if is_snapshot {
+            StartupExecutionMode::Snapshot
+        } else {
+            StartupExecutionMode::Session
+        };
         Self::initialize_session(
             InitializeSessionInput {
                 session_input: &session_input,
-                execution_mode: StartupExecutionMode::Session,
-                is_snapshot: false,
+                execution_mode,
+                is_snapshot,
                 should_apply_runtime_plan,
                 should_run_setup_script,
             },
@@ -994,6 +1000,12 @@ impl SandboxdState {
         diagnostics_logger: Option<StartupDiagnosticsLogger>,
     ) -> Result<(), SandboxdStateError> {
         let session_input = SessionRuntimeInput::from_activation_input(activation_input);
+        if activation_input.operation_kind == StartupOperationKind::Snapshot {
+            return Err(SandboxdStateError::StartTunnelSession(
+                "snapshot materialization activation is only supported before sandboxd is initialized"
+                    .to_string(),
+            ));
+        }
         if self.execution_mode == StartupExecutionMode::Snapshot {
             return Err(SandboxdStateError::StartTunnelSession(
                 "snapshot materialization sandboxes do not support activation".to_string(),
