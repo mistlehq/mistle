@@ -98,6 +98,31 @@ describe("determineDisconnectReconciliationAction", () => {
     });
   });
 
+  it("handles provider stop-in-progress explicitly during runtime reconciliation", () => {
+    expect(
+      determineDisconnectReconciliationAction({
+        sandboxStatus: SandboxInstanceStatuses.STOPPING,
+        providerState: "stopping",
+      }),
+    ).toEqual({
+      kind: "stop_then_mark_stopped",
+    });
+  });
+
+  it("handles provider stop-in-progress explicitly during startup reconciliation", () => {
+    expect(
+      determineDisconnectReconciliationAction({
+        sandboxStatus: SandboxInstanceStatuses.STARTING,
+        providerState: "stopping",
+      }),
+    ).toEqual({
+      kind: "fail_if_startup_failure_evidence_else_stop",
+      failureCode: "bootstrap_disconnected_during_startup",
+      failureMessage:
+        "Sandbox bootstrap tunnel did not recover before disconnect grace expired during startup.",
+    });
+  });
+
   it("marks running sandboxes stopped when the provider runtime is resumably stopped", () => {
     expect(
       determineDisconnectReconciliationAction({

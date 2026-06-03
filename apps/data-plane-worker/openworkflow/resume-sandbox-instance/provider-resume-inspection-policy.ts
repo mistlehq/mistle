@@ -34,6 +34,7 @@ export function determineExistingProviderResumeAction(input: {
         failureMessage: "Sandbox runtime was not found at the provider before resume.",
       };
     case "terminal_stopped":
+    case "stopping":
       return {
         kind: "fail",
         failureCode: "provider_runtime_not_resumable",

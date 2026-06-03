@@ -1,6 +1,7 @@
 import { SandboxStatus, type SandboxInfo } from "tensorlake";
 import { describe, expect, it } from "vitest";
 
+import { SandboxInspectDispositions } from "../../types.js";
 import {
   DaemonReadinessPollAttempts,
   DaemonReadinessPollTimeoutMs,
@@ -14,6 +15,7 @@ import {
   createTensorlakeSandboxName,
   createTensorlakeSnapshotAndWaitOptions,
   createTensorlakeStartDaemonShellCommand,
+  normalizeTensorlakeInspectDisposition,
   resolveTensorlakeClaimedSandboxStartResponse,
 } from "./client.js";
 
@@ -98,6 +100,14 @@ describe("createTensorlakeSandboxdControlCommand", () => {
 describe("TensorlakeRootProcessUser", () => {
   it("selects root for SDK process execution", () => {
     expect(TensorlakeRootProcessUser).toBe("root");
+  });
+});
+
+describe("normalizeTensorlakeInspectDisposition", () => {
+  it("maps Tensorlake suspending sandboxes to provider stop-in-progress", () => {
+    expect(normalizeTensorlakeInspectDisposition(SandboxStatus.SUSPENDING)).toBe(
+      SandboxInspectDispositions.STOPPING,
+    );
   });
 });
 

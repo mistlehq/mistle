@@ -24,6 +24,7 @@ export function determineStartingSandboxInspectionOutcome(input: {
 }): StartingSandboxInspectionOutcome {
   switch (input.providerDisposition) {
     case SandboxInspectDispositions.ACTIVE:
+    case SandboxInspectDispositions.STOPPING:
     case SandboxInspectDispositions.RESUMABLE_STOPPED:
       return {
         kind: StartingSandboxInspectionOutcomes.KEEP_STARTING,

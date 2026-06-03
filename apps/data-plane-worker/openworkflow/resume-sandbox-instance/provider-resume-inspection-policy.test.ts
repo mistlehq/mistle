@@ -46,4 +46,16 @@ describe("determineExistingProviderResumeAction", () => {
       failureMessage: "Sandbox runtime was not resumable at the provider before resume.",
     });
   });
+
+  it("fails sandboxes when provider compute is still stopping", () => {
+    expect(
+      determineExistingProviderResumeAction({
+        providerState: "stopping",
+      }),
+    ).toEqual({
+      kind: "fail",
+      failureCode: "provider_runtime_not_resumable",
+      failureMessage: "Sandbox runtime was not resumable at the provider before resume.",
+    });
+  });
 });

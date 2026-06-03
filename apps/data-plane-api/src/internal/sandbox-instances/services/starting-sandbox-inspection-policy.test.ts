@@ -17,6 +17,16 @@ describe("determineStartingSandboxInspectionOutcome", () => {
     });
   });
 
+  it("keeps starting sandboxes in starting when the provider runtime is stopping", () => {
+    expect(
+      determineStartingSandboxInspectionOutcome({
+        providerDisposition: SandboxInspectDispositions.STOPPING,
+      }),
+    ).toEqual({
+      kind: StartingSandboxInspectionOutcomes.KEEP_STARTING,
+    });
+  });
+
   it("keeps starting sandboxes in starting when the provider runtime is resumably stopped", () => {
     expect(
       determineStartingSandboxInspectionOutcome({

@@ -11,7 +11,6 @@ import {
 import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 import {
   isSandboxResourceNotFoundError,
-  SandboxInspectDispositions,
   SandboxInspectStates,
   type SandboxAdapter,
 } from "@mistle/sandbox";
@@ -30,6 +29,7 @@ import {
   determineStartingSandboxInspectionOutcome,
   StartingSandboxInspectionOutcomes,
 } from "./starting-sandbox-inspection-policy.js";
+import { isStoppedSandboxProviderDispositionRecoverable } from "./stopped-sandbox-inspection-policy.js";
 
 type GetSandboxInstanceContext = {
   config: DataPlaneApiRuntimeConfig;
@@ -426,10 +426,7 @@ async function inspectStoppedSandboxInstance(
     };
   }
 
-  if (
-    inspection.disposition === SandboxInspectDispositions.RESUMABLE_STOPPED ||
-    inspection.disposition === SandboxInspectDispositions.ACTIVE
-  ) {
+  if (isStoppedSandboxProviderDispositionRecoverable(inspection.disposition)) {
     return {
       id: sandboxInstance.id,
       title: sandboxInstance.title,

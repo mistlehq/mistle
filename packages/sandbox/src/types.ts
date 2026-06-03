@@ -107,6 +107,7 @@ export type SandboxInspectState = (typeof SandboxInspectStates)[keyof typeof San
 
 export const SandboxInspectDispositions = {
   ACTIVE: "active",
+  STOPPING: "stopping",
   RESUMABLE_STOPPED: "resumable_stopped",
   TERMINAL_STOPPED: "terminal_stopped",
 } as const;
@@ -133,6 +134,7 @@ export interface SandboxInspectResult<
    * across providers. `disposition` carries the stronger semantic distinction that
    * data-plane lifecycle code actually needs:
    * - `active`: runtime still exists and is actively running
+   * - `stopping`: runtime still exists and provider stop/suspend is in progress
    * - `resumable_stopped`: runtime still exists and may be resumed
    * - `terminal_stopped`: runtime still exists but is terminal/dead
    */

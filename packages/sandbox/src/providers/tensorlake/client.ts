@@ -157,15 +157,16 @@ function normalizeTensorlakeInspectState(
   }
 }
 
-function normalizeTensorlakeInspectDisposition(
+export function normalizeTensorlakeInspectDisposition(
   status: SandboxStatus,
 ): TensorlakeSandboxInspectResult["disposition"] {
   switch (status) {
     case SandboxStatus.PENDING:
     case SandboxStatus.RUNNING:
     case SandboxStatus.SNAPSHOTTING:
-    case SandboxStatus.SUSPENDING:
       return SandboxInspectDispositions.ACTIVE;
+    case SandboxStatus.SUSPENDING:
+      return SandboxInspectDispositions.STOPPING;
     case SandboxStatus.SUSPENDED:
       return SandboxInspectDispositions.RESUMABLE_STOPPED;
     case SandboxStatus.TERMINATED:

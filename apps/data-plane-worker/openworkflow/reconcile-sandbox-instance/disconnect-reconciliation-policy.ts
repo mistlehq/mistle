@@ -69,6 +69,7 @@ export function determineDisconnectReconciliationAction(input: {
               "Sandbox runtime was terminal at the provider during disconnect reconciliation.",
           };
         case "active":
+        case "stopping":
           return {
             kind: "fail_if_startup_failure_evidence_else_stop",
             failureCode: "bootstrap_disconnected_during_startup",
@@ -99,6 +100,7 @@ export function determineDisconnectReconciliationAction(input: {
               "Sandbox runtime was terminal at the provider during disconnect reconciliation.",
           };
         case "active":
+        case "stopping":
           return {
             kind: "stop_then_mark_stopped",
           };
