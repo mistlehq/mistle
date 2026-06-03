@@ -252,8 +252,14 @@ fn begin_activate(
                     if state_guard.activation_input.as_ref() == Some(&activation_input) {
                         return Ok(());
                     }
+                    let accepted_activation_input =
+                        accepted_activation_input_from_control_state(&state_guard)?;
+                    reject_unsupported_activated_activation_input(
+                        accepted_activation_input,
+                        &activation_input,
+                    )?;
                     let accepted_session_input =
-                        accepted_session_input_from_control_state(&state_guard)?;
+                        SessionRuntimeInput::from_activation_input(accepted_activation_input);
                     let sandboxd_state = state_guard.sandboxd_state.take().ok_or_else(|| {
                         ControlError::ResumeSandboxdState(
                             "sandboxd state is missing for an activated daemon".to_string(),
@@ -277,15 +283,27 @@ fn begin_activate(
     }
 }
 
-fn accepted_session_input_from_control_state(
+fn accepted_activation_input_from_control_state(
     state_guard: &crate::control::state::ControlServerState,
-) -> Result<SessionRuntimeInput, ControlError> {
+) -> Result<&ActivationInput, ControlError> {
     if let Some(activation_input) = state_guard.activation_input.as_ref() {
-        return Ok(SessionRuntimeInput::from_activation_input(activation_input));
+        return Ok(activation_input);
     }
     Err(ControlError::StartupRequestRejected(
         "sandboxd is activated without accepted session input".to_string(),
     ))
+}
+
+fn reject_unsupported_activated_activation_input(
+    accepted_activation_input: &ActivationInput,
+    candidate_activation_input: &ActivationInput,
+) -> Result<(), ControlError> {
+    if accepted_activation_input.runtime_plan != candidate_activation_input.runtime_plan {
+        return Err(ControlError::ResumeSandboxdState(
+            "initialized activation cannot change runtime plan".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn refresh_activated_activation(

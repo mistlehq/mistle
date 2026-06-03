@@ -431,6 +431,38 @@ mod tests {
     }
 
     #[test]
+    fn activated_daemon_rejects_runtime_plan_changes_without_clearing_health_snapshot() {
+        let test_dir = create_temp_test_dir("control_activate_plan_reject");
+        let socket_path = test_dir.join("control.sock");
+        let gateway = start_bootstrap_gateway();
+        let activation_input = valid_activation_input(&gateway.ws_url);
+        let mut candidate_activation_input = activation_input.clone();
+        candidate_activation_input.runtime_plan["sandboxProfileId"] =
+            serde_json::json!("sbp_replacement");
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        submit_activate(&socket_path, &activation_input).expect("activation should succeed");
+        let error = submit_activate(&socket_path, &candidate_activation_input)
+            .expect_err("runtime plan change should be rejected");
+        let (status_code, body) = fetch_health_response(server.health_endpoint_addr());
+
+        assert!(
+            error
+                .to_string()
+                .contains("initialized activation cannot change runtime plan")
+        );
+        assert_eq!(server.activation_phase(), ActivationPhase::Activated);
+        assert_eq!(server.activation_input(), Some(activation_input));
+        assert_eq!(status_code, 200);
+        assert_eq!(body["daemon_phase"], "activated");
+        assert!(body["snapshot"].is_object());
+
+        server.close().expect("control server should stop cleanly");
+        gateway.close().expect("gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
     fn ready_request_does_not_initialize_the_daemon() {
         let test_dir = create_temp_test_dir("control_ready");
         let socket_path = test_dir.join("control.sock");

@@ -90,6 +90,7 @@ pub struct ActivationOkResponse {
 pub struct ActivationErrorResponse {
     #[serde(deserialize_with = "deserialize_ok_false")]
     pub ok: bool,
+    #[serde(deserialize_with = "deserialize_non_empty_error")]
     pub error: String,
 }
 
@@ -126,4 +127,17 @@ where
     } else {
         Ok(ok)
     }
+}
+
+fn deserialize_non_empty_error<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let error = String::deserialize(deserializer)?;
+    if error.is_empty() {
+        return Err(serde::de::Error::custom(
+            "activation error response must contain a non-empty error",
+        ));
+    }
+    Ok(error)
 }

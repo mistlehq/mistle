@@ -62,3 +62,9 @@ fn rejects_activation_error_response_with_true_discriminant() {
     )
     .expect_err("ok true with an error should not decode as failure");
 }
+
+#[test]
+fn rejects_activation_error_response_with_empty_error() {
+    serde_json::from_str::<ActivationResponse>(r#"{"ok":false,"error":""}"#)
+        .expect_err("activation error response should require a non-empty error");
+}
