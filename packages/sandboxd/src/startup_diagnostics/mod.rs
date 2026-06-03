@@ -1,7 +1,7 @@
-//! Startup diagnostics logging for long-running sandbox initialization.
+//! Activation diagnostics logging for long-running sandbox activation.
 //!
 //! Diagnostics records are emitted alongside transcripts so control clients and
-//! operators can inspect where initialization is spending time or failing.
+//! operators can inspect where activation is spending time or failing.
 
 use std::collections::BTreeMap;
 use std::fs::{self, OpenOptions};
@@ -15,7 +15,7 @@ use base64::engine::general_purpose::STANDARD as Base64Standard;
 use serde_json::{Map, Number, Value};
 use tokio::sync::mpsc;
 
-use crate::protocol::startup::StartupOperationKind;
+use crate::protocol::startup::ActivationOperationKind;
 use crate::time::{Clock, SystemClock, format_rfc3339_timestamp};
 use crate::tunnel::session::{OperationStreamMessage, derive_sandbox_instance_id};
 
@@ -25,8 +25,6 @@ mod paths;
 use operation_records::*;
 use paths::*;
 
-pub const INIT_LOG_PATH: &str = "/run/mistle/init.log";
-pub const RESUME_LOG_PATH: &str = "/run/mistle/resume.log";
 pub const ACTIVATE_LOG_PATH: &str = "/run/mistle/activate.log";
 
 const TEST_LOG_DIR_ENV: &str = "MISTLE_SANDBOXD_OPERATION_LOG_DIR";
@@ -35,46 +33,39 @@ const LIFECYCLE_OPERATION_RECORD_SEND_TIMEOUT: Duration = Duration::from_millis(
 const LIFECYCLE_OPERATION_RECORD_SEND_RETRY_INTERVAL: Duration = Duration::from_millis(5);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StartupOperation {
-    Init,
-    Resume,
+pub enum ActivationOperation {
     Activation {
-        operation_kind: StartupOperationKind,
+        operation_kind: ActivationOperationKind,
     },
 }
 
-impl StartupOperation {
+impl ActivationOperation {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::Init => "init",
-            Self::Resume => "resume",
             Self::Activation { .. } => "activate",
         }
     }
 
-    pub fn operation_kind(self) -> Option<StartupOperationKind> {
+    pub fn operation_kind(self) -> Option<ActivationOperationKind> {
         match self {
             Self::Activation { operation_kind } => Some(operation_kind),
-            Self::Init | Self::Resume => None,
         }
     }
 
     fn default_log_path(self) -> &'static str {
         match self {
-            Self::Init => INIT_LOG_PATH,
-            Self::Resume => RESUME_LOG_PATH,
             Self::Activation { .. } => ACTIVATE_LOG_PATH,
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StartupDiagnosticLevel {
+pub enum ActivationDiagnosticLevel {
     Info,
     Error,
 }
 
-impl StartupDiagnosticLevel {
+impl ActivationDiagnosticLevel {
     fn as_str(self) -> &'static str {
         match self {
             Self::Info => "info",
@@ -84,13 +75,13 @@ impl StartupDiagnosticLevel {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StartupTranscriptStream {
+pub enum ActivationTranscriptStream {
     Stdout,
     Stderr,
     System,
 }
 
-impl StartupTranscriptStream {
+impl ActivationTranscriptStream {
     fn as_str(self) -> &'static str {
         match self {
             Self::Stdout => "stdout",
@@ -101,13 +92,13 @@ impl StartupTranscriptStream {
 }
 
 #[derive(Clone)]
-pub struct StartupDiagnosticsLogger {
-    inner: Arc<StartupDiagnosticsLoggerInner>,
+pub struct ActivationDiagnosticsLogger {
+    inner: Arc<ActivationDiagnosticsLoggerInner>,
 }
 
-struct StartupDiagnosticsLoggerInner {
+struct ActivationDiagnosticsLoggerInner {
     sandbox_instance_id: String,
-    operation: StartupOperation,
+    operation: ActivationOperation,
     path: PathBuf,
     operation_publisher: Mutex<OperationPublisherState>,
 }
@@ -122,9 +113,9 @@ struct PendingOperationRecord {
     operation_record: String,
 }
 
-impl StartupDiagnosticsLogger {
+impl ActivationDiagnosticsLogger {
     pub fn initialize(
-        operation: StartupOperation,
+        operation: ActivationOperation,
         tunnel_gateway_ws_url: &str,
     ) -> Result<Self, String> {
         let sandbox_instance_id = derive_sandbox_instance_id(tunnel_gateway_ws_url)
@@ -155,7 +146,7 @@ impl StartupDiagnosticsLogger {
             })?;
 
         Ok(Self {
-            inner: Arc::new(StartupDiagnosticsLoggerInner {
+            inner: Arc::new(ActivationDiagnosticsLoggerInner {
                 sandbox_instance_id,
                 operation,
                 path,
@@ -169,11 +160,10 @@ impl StartupDiagnosticsLogger {
 
     pub fn attach_operation_sender(&self, sender: mpsc::Sender<OperationStreamMessage>) {
         let pending_records = {
-            let mut operation_publisher = self
-                .inner
-                .operation_publisher
-                .lock()
-                .expect("startup diagnostics operation publisher lock should not be poisoned");
+            let mut operation_publisher =
+                self.inner.operation_publisher.lock().expect(
+                    "activation diagnostics operation publisher lock should not be poisoned",
+                );
             operation_publisher.sender = Some(sender.clone());
             std::mem::take(&mut operation_publisher.pending_records)
         };
@@ -190,11 +180,10 @@ impl StartupDiagnosticsLogger {
 
     pub fn close_operation_stream(&self) {
         let sender = {
-            let mut operation_publisher = self
-                .inner
-                .operation_publisher
-                .lock()
-                .expect("startup diagnostics operation publisher lock should not be poisoned");
+            let mut operation_publisher =
+                self.inner.operation_publisher.lock().expect(
+                    "activation diagnostics operation publisher lock should not be poisoned",
+                );
             operation_publisher.pending_records.clear();
             operation_publisher.sender.take()
         };
@@ -220,7 +209,7 @@ impl StartupDiagnosticsLogger {
     pub fn record_started(&self) -> Result<(), String> {
         self.record_with_clock(
             &SystemClock,
-            StartupDiagnosticLevel::Info,
+            ActivationDiagnosticLevel::Info,
             started_event_name(self.inner.operation),
             BTreeMap::new(),
         )
@@ -234,7 +223,7 @@ impl StartupDiagnosticsLogger {
         attributes.insert("phase".to_string(), Value::String(phase.to_string()));
         self.record_with_clock(
             &SystemClock,
-            StartupDiagnosticLevel::Error,
+            ActivationDiagnosticLevel::Error,
             phase_failed_event_name(self.inner.operation),
             attributes,
         )
@@ -252,7 +241,7 @@ impl StartupDiagnosticsLogger {
         attributes.insert("phase".to_string(), Value::String(phase.to_string()));
         self.record_with_clock(
             &SystemClock,
-            StartupDiagnosticLevel::Info,
+            ActivationDiagnosticLevel::Info,
             phase_started_event_name(self.inner.operation),
             attributes,
         )
@@ -270,7 +259,7 @@ impl StartupDiagnosticsLogger {
         attributes.insert("phase".to_string(), Value::String(phase.to_string()));
         self.record_with_clock(
             &SystemClock,
-            StartupDiagnosticLevel::Info,
+            ActivationDiagnosticLevel::Info,
             phase_completed_event_name(self.inner.operation),
             attributes,
         )
@@ -279,7 +268,7 @@ impl StartupDiagnosticsLogger {
     pub fn record_failed(&self, mut attributes: BTreeMap<String, Value>) -> Result<(), String> {
         self.record_with_clock(
             &SystemClock,
-            StartupDiagnosticLevel::Error,
+            ActivationDiagnosticLevel::Error,
             failed_event_name(self.inner.operation),
             {
                 attributes.remove("operation");
@@ -291,7 +280,7 @@ impl StartupDiagnosticsLogger {
     pub fn record_transcript(
         &self,
         phase: Option<&str>,
-        stream: StartupTranscriptStream,
+        stream: ActivationTranscriptStream,
         payload: &[u8],
     ) -> Result<(), String> {
         let message = String::from_utf8_lossy(payload);
@@ -312,7 +301,7 @@ impl StartupDiagnosticsLogger {
 
         self.record_with_clock(
             &SystemClock,
-            StartupDiagnosticLevel::Info,
+            ActivationDiagnosticLevel::Info,
             transcript_event_name(self.inner.operation),
             attributes,
         )
@@ -321,7 +310,7 @@ impl StartupDiagnosticsLogger {
     fn record_with_clock(
         &self,
         clock: &dyn Clock,
-        level: StartupDiagnosticLevel,
+        level: ActivationDiagnosticLevel,
         event: &str,
         attributes: BTreeMap<String, Value>,
     ) -> Result<(), String> {
@@ -386,11 +375,10 @@ impl StartupDiagnosticsLogger {
 
     fn publish_operation_record(&self, event: &str, operation_record: String) {
         let sender = {
-            let mut operation_publisher = self
-                .inner
-                .operation_publisher
-                .lock()
-                .expect("startup diagnostics operation publisher lock should not be poisoned");
+            let mut operation_publisher =
+                self.inner.operation_publisher.lock().expect(
+                    "activation diagnostics operation publisher lock should not be poisoned",
+                );
             let Some(sender) = operation_publisher.sender.clone() else {
                 operation_publisher
                     .pending_records
@@ -407,7 +395,7 @@ impl StartupDiagnosticsLogger {
     }
 
     fn send_operation_record(
-        operation: StartupOperation,
+        operation: ActivationOperation,
         event: &str,
         sender: mpsc::Sender<OperationStreamMessage>,
         operation_record: String,
@@ -424,19 +412,19 @@ impl StartupDiagnosticsLogger {
     }
 }
 
-pub fn startup_diagnostics_string(value: impl Into<String>) -> Value {
+pub fn activation_diagnostics_string(value: impl Into<String>) -> Value {
     Value::String(value.into())
 }
 
-pub fn startup_diagnostics_u64(value: u64) -> Value {
+pub fn activation_diagnostics_u64(value: u64) -> Value {
     Value::Number(Number::from(value))
 }
 
-pub fn startup_diagnostics_u32(value: u32) -> Value {
+pub fn activation_diagnostics_u32(value: u32) -> Value {
     Value::Number(Number::from(value))
 }
 
-pub fn startup_diagnostics_bool(value: bool) -> Value {
+pub fn activation_diagnostics_bool(value: bool) -> Value {
     Value::Bool(value)
 }
 

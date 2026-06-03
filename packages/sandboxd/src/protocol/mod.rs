@@ -1,7 +1,7 @@
 //! Wire protocol DTOs exchanged between `sandboxd` and Mistle services.
 //!
 //! These types are intentionally serialization-focused; runtime behavior and
-//! validation live in the modules that consume startup input or tunnel traffic.
+//! validation live in the modules that consume session input or tunnel traffic.
 
 pub mod activation;
 pub mod keepalive;

@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 #[cfg(target_os = "linux")]
 use sandboxd::control;
 #[cfg(target_os = "linux")]
-use sandboxd::protocol::startup::{StartupInput, StartupMode};
+use sandboxd::protocol::activation::ActivationInput;
 #[cfg(target_os = "linux")]
 use sandboxd::test_support::TestEnvVarsGuard;
 #[cfg(target_os = "linux")]
@@ -126,13 +126,12 @@ fn process_supervisor_restarts_child_after_the_active_proxy_exits() {
     )
     .expect("control server should start");
 
-    control::submit_init(
+    control::submit_activate(
         &control_socket_path,
         &startup_input_with_egress_route(&bootstrap_gateway.ws_url),
-        true,
     )
-    .expect("init submission should succeed");
-    wait_for_initialized(&server);
+    .expect("activation submission should succeed");
+    wait_for_activated(&server);
     let initial_component = wait_for_egress_proxy_restart_count(server.health_endpoint_addr(), 0);
     let proxy_addr: SocketAddr = initial_component["details"]["listenAddr"]
         .as_str()
@@ -208,11 +207,9 @@ fn clear_close_on_exec(fd: RawFd) {
 }
 
 #[cfg(target_os = "linux")]
-fn startup_input_with_egress_route(tunnel_gateway_ws_url: &str) -> StartupInput {
-    StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
-        execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
+fn startup_input_with_egress_route(tunnel_gateway_ws_url: &str) -> ActivationInput {
+    ActivationInput {
+        operation_kind: sandboxd::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),
@@ -401,19 +398,19 @@ fn start_single_request_http_server() -> SingleRequestHttpServer {
 }
 
 #[cfg(target_os = "linux")]
-fn wait_for_initialized(server: &control::ControlServer) {
+fn wait_for_activated(server: &control::ControlServer) {
     let deadline = Instant::now() + Duration::from_secs(15);
     loop {
-        match server.init_phase() {
-            control::InitPhase::Initialized => return,
-            control::InitPhase::Failed(error) => {
-                panic!("sandboxd init failed before egress proxy became available: {error}");
+        match server.activation_phase() {
+            control::ActivationPhase::Activated => return,
+            control::ActivationPhase::Failed(error) => {
+                panic!("sandboxd activation failed before egress proxy became available: {error}");
             }
-            control::InitPhase::Initializing | control::InitPhase::Uninitialized => {}
+            control::ActivationPhase::Activating | control::ActivationPhase::Unactivated => {}
         }
 
         if Instant::now() >= deadline {
-            panic!("timed out waiting for sandboxd init");
+            panic!("timed out waiting for sandboxd activation");
         }
         ThreadSleeper.sleep(sandboxd::time::Duration::from_millis(25));
     }

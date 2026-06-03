@@ -434,10 +434,8 @@ fn starts_live_tunnel_session_for_agent_and_file_upload_streams() {
             .expect("gateway should report the persisted path");
     });
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: bootstrap_url,
@@ -792,10 +790,8 @@ fn keeps_large_agent_responses_open_when_the_response_fits_within_the_stream_win
             .expect("gateway should signal the tunnel session finished");
     });
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: bootstrap_url,

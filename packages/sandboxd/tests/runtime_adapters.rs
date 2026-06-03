@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use tungstenite::{Message, WebSocket, accept, connect};
 
 use sandboxd::keepalive::KeepaliveManager;
-use sandboxd::protocol::startup::{StartupInput, StartupMode};
+use sandboxd::protocol::session::SessionRuntimeInput;
 use sandboxd::runtime::adapters::RuntimeAdapterRegistry;
 use sandboxd::runtime::readiness::RuntimeReadinessManager;
 use sandboxd::time::{Duration, Sleeper, ThreadSleeper};
@@ -143,10 +143,8 @@ fn runtime_adapter_registry_starts_codex_proxy_adapter() {
         .recv()
         .expect("raw server should report readiness");
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
-        execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: sandboxd::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: "ws://127.0.0.1:5000/tunnel/sandbox".to_string(),
@@ -348,10 +346,8 @@ fn runtime_adapter_registry_starts_opencode_proxy_adapter() {
         }
     });
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
-        execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: sandboxd::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: "ws://127.0.0.1:5000/tunnel/sandbox".to_string(),

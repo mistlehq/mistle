@@ -52,10 +52,8 @@ fn bootstrap_disconnect_leaves_publish_managers_disconnected_until_explicit_clos
             .expect("gateway should signal the bootstrap disconnect");
     });
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: bootstrap_url,
@@ -142,10 +140,8 @@ fn start_returns_error_when_initial_bootstrap_session_never_establishes() {
         drop(stream);
     });
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: bootstrap_url,
@@ -287,10 +283,8 @@ fn reconnects_after_gateway_service_restart_close_and_rolls_exchange_token_forwa
         }
     });
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-initial".to_string(),
         tunnel_exchange_token: "exchange-token-initial".to_string(),
         tunnel_gateway_ws_url: bootstrap_url,
@@ -404,10 +398,8 @@ fn does_not_reconnect_after_near_miss_bootstrap_service_restart_close() {
             .expect("gateway should report near-miss observation completion");
     });
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-initial".to_string(),
         tunnel_exchange_token: "exchange-token-initial".to_string(),
         tunnel_gateway_ws_url: bootstrap_url,
@@ -666,10 +658,8 @@ fn retries_when_token_exchange_response_body_read_fails() {
         }
     });
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-initial".to_string(),
         tunnel_exchange_token: "exchange-token-initial".to_string(),
         tunnel_gateway_ws_url: bootstrap_url,
@@ -780,10 +770,8 @@ fn stops_retrying_when_token_exchange_returns_terminal_status() {
                 .expect("gateway should report the terminal exchange case finished");
         });
 
-        let startup_input = StartupInput {
-            startup_mode: StartupMode::New,
-            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+        let startup_input = SessionRuntimeInput {
+            operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
             bootstrap_token: "bootstrap-token-initial".to_string(),
             tunnel_exchange_token: "exchange-token-initial".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -988,10 +976,8 @@ fn refresh_style_agent_open_cancels_slow_prior_dial() {
             .expect("gateway should signal the tunnel session finished");
     });
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: bootstrap_url,
@@ -1133,10 +1119,8 @@ fn agent_dial_failure_returns_stream_open_error_without_dropping_tunnel() {
             .expect("gateway should signal the tunnel session finished");
     });
 
-    let startup_input = StartupInput {
-        startup_mode: StartupMode::New,
-        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
-        execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+    let startup_input = SessionRuntimeInput {
+        operation_kind: crate::protocol::startup::ActivationOperationKind::Start,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: bootstrap_url,

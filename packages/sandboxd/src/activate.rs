@@ -10,7 +10,7 @@ use std::path::Path;
 
 use crate::control;
 use crate::protocol::activation::ActivationInput;
-use crate::protocol::startup::{StartupInitErrorResponse, StartupInitOkResponse};
+use crate::protocol::startup::{ActivationErrorResponse, ActivationOkResponse};
 use crate::startup_payload::{StartupPayloadReadError, StartupPayloadSource, read_startup_payload};
 
 #[derive(Debug)]
@@ -63,7 +63,7 @@ where
                 let error = ActivateError::InvalidRequest(error);
                 write_response(
                     writer,
-                    &StartupInitErrorResponse {
+                    &ActivationErrorResponse {
                         ok: false,
                         error: error.to_string(),
                     },
@@ -75,7 +75,7 @@ where
             let error = ActivateError::ReadRequest(error);
             write_response(
                 writer,
-                &StartupInitErrorResponse {
+                &ActivationErrorResponse {
                     ok: false,
                     error: error.to_string(),
                 },
@@ -86,14 +86,14 @@ where
 
     match control::submit_activate(control_socket_path, &activation_input) {
         Ok(()) => {
-            write_response(writer, &StartupInitOkResponse { ok: true })?;
+            write_response(writer, &ActivationOkResponse { ok: true })?;
             Ok(())
         }
         Err(error) => {
             let error = ActivateError::SubmitActivate(error.to_string());
             write_response(
                 writer,
-                &StartupInitErrorResponse {
+                &ActivationErrorResponse {
                     ok: false,
                     error: error.to_string(),
                 },
@@ -132,7 +132,7 @@ mod tests {
     use crate::activate::run_activate;
     use crate::control;
     use crate::protocol::activation::ActivationInput;
-    use crate::protocol::startup::{StartupInitResponse, StartupOperationKind};
+    use crate::protocol::startup::{ActivationOperationKind, ActivationResponse};
     use crate::startup_payload::StartupPayloadSource;
     use crate::time::{Sleeper, ThreadSleeper};
 
@@ -160,21 +160,16 @@ mod tests {
         )
         .expect("activate should submit a valid activation input");
 
-        let response: StartupInitResponse =
+        let response: ActivationResponse =
             serde_json::from_slice(&stdout).expect("activate should write a valid response");
-        assert!(matches!(response, StartupInitResponse::Ok(_)));
+        assert!(matches!(response, ActivationResponse::Ok(_)));
         assert_eq!(
             server
                 .activation_input()
                 .expect("server should store activation input")
                 .operation_kind,
-            StartupOperationKind::Start
+            ActivationOperationKind::Start
         );
-        assert!(
-            server.startup_input().is_none(),
-            "activation should not require caller-provided startup input"
-        );
-
         server.close().expect("control server should stop cleanly");
         gateway
             .close()
@@ -196,13 +191,13 @@ mod tests {
         )
         .expect_err("invalid activation request should fail");
 
-        let response: StartupInitResponse =
+        let response: ActivationResponse =
             serde_json::from_slice(&stdout).expect("activate should write an error response");
         assert!(matches!(
             error,
             crate::activate::ActivateError::InvalidRequest(_)
         ));
-        assert!(matches!(response, StartupInitResponse::Error(_)));
+        assert!(matches!(response, ActivationResponse::Error(_)));
 
         fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
@@ -252,7 +247,7 @@ mod tests {
 
     fn valid_activation_input(tunnel_gateway_ws_url: &str) -> ActivationInput {
         ActivationInput {
-            operation_kind: StartupOperationKind::Start,
+            operation_kind: ActivationOperationKind::Start,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),
@@ -326,6 +321,11 @@ mod tests {
                                     .expect("bootstrap gateway should write pong"),
                                 Ok(_) => {}
                                 Err(WebSocketError::ConnectionClosed) => return,
+                                Err(WebSocketError::Io(error))
+                                    if error.kind() == std::io::ErrorKind::WouldBlock =>
+                                {
+                                    std::thread::sleep(std::time::Duration::from_millis(5));
+                                }
                                 Err(error) => {
                                     panic!("bootstrap gateway websocket failed: {error}");
                                 }

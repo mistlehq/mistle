@@ -64,7 +64,7 @@ pub trait RuntimeClientProcessObserver {
     fn record_process_completed(&self, process_spec: &RuntimeClientProcessSpec);
 }
 
-/// Owns the set of runtime client processes started for the current startup input.
+/// Owns the set of runtime client processes started for the current session input.
 #[derive(Debug)]
 pub struct RuntimeClientProcessManager {
     processes: Vec<RunningRuntimeClientProcess>,

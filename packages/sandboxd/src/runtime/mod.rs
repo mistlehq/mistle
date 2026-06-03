@@ -17,7 +17,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use crate::command::CommandOutputSink;
-use crate::protocol::startup::StartupInput;
+use crate::protocol::session::SessionRuntimeInput;
 
 pub use plan::{
     CompiledAgentRuntime, CompiledEgressRoute, CompiledEgressRouteAuthInjection,
@@ -31,7 +31,7 @@ pub use plan::{
     RuntimeClientSetupFile, RuntimeExecCommand, WorkspaceSourceResourceKind,
 };
 
-/// Describes why one runtime-plan setup step failed while applying startup input.
+/// Describes why one runtime-plan setup step failed while applying session input.
 #[derive(Debug)]
 pub enum RuntimePlanApplyError {
     InvalidRuntimePlan(serde_json::Error),
@@ -121,11 +121,12 @@ pub trait RuntimePlanApplyObserver {
     fn record_step_completed(&self, step: RuntimePlanApplyLifecycleStep);
 }
 
-/// Applies the artifact, workspace-source, and setup-file portions of one startup input's runtime
-/// plan.
-pub fn apply_runtime_plan(startup_input: &StartupInput) -> Result<(), RuntimePlanApplyError> {
+/// Applies the artifact, workspace-source, and setup-file portions of one session runtime plan.
+pub fn apply_runtime_plan(
+    session_input: &SessionRuntimeInput,
+) -> Result<(), RuntimePlanApplyError> {
     let runtime_plan: CompiledRuntimePlan =
-        serde_json::from_value(startup_input.runtime_plan.clone())
+        serde_json::from_value(session_input.runtime_plan.clone())
             .map_err(RuntimePlanApplyError::InvalidRuntimePlan)?;
     apply_compiled_runtime_plan(&runtime_plan, None)
 }

@@ -1,4 +1,4 @@
-//! Filesystem paths for startup diagnostics logs.
+//! Filesystem paths for activation diagnostics logs.
 //!
 //! Production writes to the fixed daemon log locations, while tests can set an
 //! explicit directory override to keep diagnostics artifacts isolated.
@@ -6,14 +6,12 @@
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 
-use crate::startup_diagnostics::{StartupOperation, TEST_LOG_DIR_ENV};
+use crate::startup_diagnostics::{ActivationOperation, TEST_LOG_DIR_ENV};
 
-pub(super) fn operation_log_path(operation: StartupOperation) -> PathBuf {
+pub(super) fn operation_log_path(operation: ActivationOperation) -> PathBuf {
     if let Some(test_dir) = test_log_dir_override() {
         return test_dir.join(match operation {
-            StartupOperation::Init => "init.log",
-            StartupOperation::Resume => "resume.log",
-            StartupOperation::Activation { .. } => "activate.log",
+            ActivationOperation::Activation { .. } => "activate.log",
         });
     }
 

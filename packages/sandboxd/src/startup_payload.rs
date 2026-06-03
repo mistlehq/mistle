@@ -1,4 +1,4 @@
-//! Startup payload reading shared by `sandboxd init` and `sandboxd resume`.
+//! Activation payload reading for `sandboxd activate`.
 
 use std::fmt;
 use std::io::{Read, Take};

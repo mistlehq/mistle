@@ -1,6 +1,6 @@
 //! Loopback health endpoint for the local control server.
 //!
-//! The endpoint projects the same initialization state that the Unix socket
+//! The endpoint projects the same activation state that the Unix socket
 //! mutates, so container health checks can observe readiness without sending
 //! control protocol requests.
 
@@ -13,7 +13,7 @@ use std::time::Duration;
 use serde::Serialize;
 
 use crate::control::state::{ControlServerState, lock_control_state};
-use crate::control::{ControlError, DEFAULT_HEALTH_ENDPOINT_PATH, InitPhase};
+use crate::control::{ActivationPhase, ControlError, DEFAULT_HEALTH_ENDPOINT_PATH};
 #[cfg(any(test, debug_assertions))]
 use crate::control::{EGRESS_PROXY_FAULT_KILL_PATH, TEST_FAULTS_ENABLED_ENV};
 use crate::sandboxd_state::SandboxdState;
@@ -150,7 +150,7 @@ fn build_fault_injection_response(
     let fault_result = lock_control_state(state)?
         .sandboxd_state
         .as_ref()
-        .ok_or_else(|| "sandboxd is not initialized".to_string())
+        .ok_or_else(|| "sandboxd is not activated".to_string())
         .and_then(SandboxdState::force_egress_proxy_shutdown_for_test);
 
     match fault_result {
@@ -185,18 +185,18 @@ fn build_health_response(
     let observed_at = SystemClock.now_system_time();
     let state = lock_control_state(state)?;
 
-    let (daemon_phase, snapshot, init_error) = match &state.init_phase {
-        InitPhase::Uninitialized => (SandboxdDaemonPhase::Uninitialized, None, None),
-        InitPhase::Initializing => (SandboxdDaemonPhase::Initializing, None, None),
-        InitPhase::Initialized => match state.sandboxd_state.as_ref() {
+    let (daemon_phase, snapshot, init_error) = match &state.activation_phase {
+        ActivationPhase::Unactivated => (SandboxdDaemonPhase::Unactivated, None, None),
+        ActivationPhase::Activating => (SandboxdDaemonPhase::Activating, None, None),
+        ActivationPhase::Activated => match state.sandboxd_state.as_ref() {
             Some(sandboxd_state) => (
-                SandboxdDaemonPhase::Initialized,
+                SandboxdDaemonPhase::Activated,
                 Some(sandboxd_state.health_snapshot()),
                 None,
             ),
-            None => (SandboxdDaemonPhase::Initializing, None, None),
+            None => (SandboxdDaemonPhase::Activating, None, None),
         },
-        InitPhase::Failed(error) => (SandboxdDaemonPhase::Failed, None, Some(error.clone())),
+        ActivationPhase::Failed(error) => (SandboxdDaemonPhase::Failed, None, Some(error.clone())),
     };
 
     Ok(SandboxdHealthResponse {
@@ -298,9 +298,9 @@ fn serialize_timestamp(timestamp: std::time::SystemTime) -> Result<String, serde
 
 fn daemon_phase_name(phase: SandboxdDaemonPhase) -> &'static str {
     match phase {
-        SandboxdDaemonPhase::Uninitialized => "uninitialized",
-        SandboxdDaemonPhase::Initializing => "initializing",
-        SandboxdDaemonPhase::Initialized => "initialized",
+        SandboxdDaemonPhase::Unactivated => "unactivated",
+        SandboxdDaemonPhase::Activating => "activating",
+        SandboxdDaemonPhase::Activated => "activated",
         SandboxdDaemonPhase::Failed => "failed",
     }
 }

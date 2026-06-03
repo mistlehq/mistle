@@ -49,7 +49,7 @@ use tungstenite::{
 };
 
 use crate::keepalive::KeepaliveManager;
-use crate::protocol::startup::{StartupInput, StartupMode};
+use crate::protocol::session::SessionRuntimeInput;
 use crate::runtime::adapters::RuntimeAdapterRegistry;
 use crate::runtime::readiness::RuntimeReadinessManager;
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};

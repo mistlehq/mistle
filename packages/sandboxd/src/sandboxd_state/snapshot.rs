@@ -73,7 +73,7 @@ mod tests {
                 .expect("trust store path should have a parent"),
         )
         .expect("trust store directory should be creatable");
-        std::fs::write(runtime_directory.join("init.log"), "diagnostics")
+        std::fs::write(runtime_directory.join("activate.log"), "diagnostics")
             .expect("runtime diagnostics file should be writable");
         std::fs::write(&trust_store_certificate_path, "cert")
             .expect("trust store certificate should be writable");
