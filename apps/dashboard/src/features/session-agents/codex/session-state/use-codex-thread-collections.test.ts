@@ -11,11 +11,23 @@ function createThread(input: {
   id: string;
   createdAt: number | null;
   updatedAt?: number | null;
+  parentThreadId?: string | null;
+  threadSource?: string | null;
+  isSubagent?: boolean;
 }): CodexThreadSummary {
+  const hasParent = input.parentThreadId !== undefined && input.parentThreadId !== null;
+  const threadSource = input.threadSource ?? (hasParent ? "subagent" : null);
+  const hasSubagentThreadSource =
+    threadSource === "subagent" || (threadSource?.startsWith("subAgent") ?? false);
   return {
     id: input.id,
     name: null,
     preview: null,
+    parentThreadId: input.parentThreadId ?? null,
+    threadSource,
+    isSubagent: input.isSubagent ?? (hasParent || hasSubagentThreadSource),
+    agentNickname: null,
+    agentRole: null,
     cwd: "/workspace/repo",
     createdAt: input.createdAt,
     updatedAt: input.updatedAt ?? null,
@@ -40,6 +52,44 @@ describe("resolveOriginalCodexThreadId", () => {
         createThread({ id: "thread_a", createdAt: 10 }),
       ]),
     ).toBe("thread_a");
+  });
+
+  it("excludes Codex subagent threads from original thread inference", () => {
+    expect(
+      resolveOriginalCodexThreadId([
+        createThread({
+          id: "thread_subagent",
+          createdAt: 1,
+          parentThreadId: "thread_parent",
+        }),
+        createThread({ id: "thread_root", createdAt: 10 }),
+      ]),
+    ).toBe("thread_root");
+  });
+
+  it("returns null when every candidate is a Codex subagent thread", () => {
+    expect(
+      resolveOriginalCodexThreadId([
+        createThread({
+          id: "thread_subagent",
+          createdAt: 1,
+          parentThreadId: "thread_parent",
+        }),
+      ]),
+    ).toBeNull();
+  });
+
+  it("excludes source-only Codex subagent threads from original thread inference", () => {
+    expect(
+      resolveOriginalCodexThreadId([
+        createThread({
+          id: "thread_subagent",
+          createdAt: 1,
+          threadSource: "subagent",
+        }),
+        createThread({ id: "thread_root", createdAt: 10 }),
+      ]),
+    ).toBe("thread_root");
   });
 });
 

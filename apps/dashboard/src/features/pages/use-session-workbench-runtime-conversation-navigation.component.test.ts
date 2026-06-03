@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 
+import type { CodexThreadSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { RuntimeConversationSummary } from "../session-agents/runtime-conversations/runtime-conversation-navigator-model.js";
 import type { MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import type { SessionConversationPaneState } from "./use-session-workbench-conversation-runtime.js";
+import { mapCodexThreadToRuntimeConversationSummary } from "./use-session-workbench-conversation-runtime.js";
 import { useSessionWorkbenchRuntimeConversationNavigation } from "./use-session-workbench-runtime-conversation-navigation.js";
 
 function createConversation(input: { id: string; cwd?: string }): RuntimeConversationSummary {
@@ -15,6 +17,7 @@ function createConversation(input: { id: string; cwd?: string }): RuntimeConvers
     cwd: input.cwd ?? "/workspace/repo",
     updatedAt: null,
     createdAt: null,
+    lineage: null,
   };
 }
 
@@ -90,6 +93,35 @@ function renderConversationNavigation(input: {
 }
 
 describe("useSessionWorkbenchRuntimeConversationNavigation", () => {
+  it("maps parentless Codex subagent threads to navigator lineage", () => {
+    const thread = {
+      id: "thread_memory_consolidation",
+      name: "Condense context",
+      preview: null,
+      parentThreadId: null,
+      threadSource: "memory_consolidation",
+      isSubagent: true,
+      agentNickname: null,
+      agentRole: null,
+      cwd: "/workspace/repo",
+      createdAt: 1,
+      updatedAt: 2,
+    } satisfies CodexThreadSummary;
+
+    expect(mapCodexThreadToRuntimeConversationSummary(thread)).toEqual({
+      id: "thread_memory_consolidation",
+      title: "Condense context",
+      cwd: "/workspace/repo",
+      createdAt: 1,
+      updatedAt: 2,
+      lineage: {
+        parentConversationId: null,
+        label: "Memory Consolidation",
+        detail: null,
+      },
+    });
+  });
+
   it("opens runtime conversation navigation by default when multiple unarchived conversations are available", () => {
     const sandboxInstanceId = "sbi_conversation_navigation_default_open";
 

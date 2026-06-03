@@ -75,7 +75,7 @@ function resolveCodexConversationTitle(
   return "Untitled conversation";
 }
 
-function mapCodexThreadToRuntimeConversationSummary(
+export function mapCodexThreadToRuntimeConversationSummary(
   thread: UseCodexSessionStateResult["threads"]["availableThreads"][number],
 ): RuntimeConversationSummary {
   return {
@@ -84,7 +84,42 @@ function mapCodexThreadToRuntimeConversationSummary(
     cwd: thread.cwd,
     createdAt: thread.createdAt,
     updatedAt: thread.updatedAt,
+    lineage: !thread.isSubagent
+      ? null
+      : {
+          parentConversationId: thread.parentThreadId,
+          label: resolveCodexThreadLineageLabel(thread),
+          detail: resolveCodexThreadLineageDetail(thread),
+        },
   };
+}
+
+function resolveCodexThreadLineageLabel(
+  thread: UseCodexSessionStateResult["threads"]["availableThreads"][number],
+): string | null {
+  const threadSource = thread.threadSource?.trim();
+  if (threadSource === undefined || threadSource.length === 0) {
+    return null;
+  }
+
+  return threadSource
+    .replace(/^subAgent/, "subagent")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .split(/[_\s-]+/)
+    .filter((segment) => segment.length > 0)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
+function resolveCodexThreadLineageDetail(
+  thread: UseCodexSessionStateResult["threads"]["availableThreads"][number],
+): string | null {
+  const details = [thread.agentRole, thread.agentNickname].flatMap((detail) => {
+    const trimmedDetail = detail?.trim();
+    return trimmedDetail === undefined || trimmedDetail.length === 0 ? [] : [trimmedDetail];
+  });
+
+  return details.length === 0 ? null : details.join(" · ");
 }
 
 function mapOpenCodeSessionToRuntimeConversationSummary(
@@ -96,6 +131,7 @@ function mapOpenCodeSessionToRuntimeConversationSummary(
     cwd: session.directory,
     createdAt: session.time.created,
     updatedAt: session.time.updated,
+    lineage: null,
   };
 }
 
@@ -117,6 +153,7 @@ function mapPiConversationToRuntimeConversationSummary(
     cwd: conversation.cwd,
     createdAt: parseOptionalIsoDateTimeMs(conversation.createdAt),
     updatedAt: conversation.updatedAt,
+    lineage: null,
   };
 }
 

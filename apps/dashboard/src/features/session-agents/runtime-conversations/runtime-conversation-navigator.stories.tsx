@@ -2,7 +2,10 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 
 import { withDashboardWorkspaceStory } from "../../../storybook/decorators.js";
-import { createRuntimeConversationNavigatorStoryProps } from "./runtime-conversation-navigator-story-support.js";
+import {
+  createRuntimeConversationNavigatorStoryProps,
+  RuntimeConversationNavigatorSubagentLineageStoryRows,
+} from "./runtime-conversation-navigator-story-support.js";
 import {
   RuntimeConversationNavigator,
   RuntimeConversationNavigatorSheet,
@@ -31,6 +34,18 @@ function LimitedToLatest20Story(): React.JSX.Element {
     <div className="h-screen bg-background">
       <RuntimeConversationNavigator
         {...createRuntimeConversationNavigatorStoryProps({ isConversationListLimited: true })}
+      />
+    </div>
+  );
+}
+
+function SubagentLineageStory(): React.JSX.Element {
+  return (
+    <div className="h-screen bg-background">
+      <RuntimeConversationNavigator
+        {...createRuntimeConversationNavigatorStoryProps({
+          rows: RuntimeConversationNavigatorSubagentLineageStoryRows,
+        })}
       />
     </div>
   );
@@ -75,6 +90,11 @@ export const EmptyConversationList: Story = {
 export const LimitedToLatest20: Story = {
   name: "Limited to latest 20",
   render: () => <LimitedToLatest20Story />,
+};
+
+export const SubagentLineage: Story = {
+  name: "Subagent lineage",
+  render: () => <SubagentLineageStory />,
 };
 
 export const MobileSheet: Story = {

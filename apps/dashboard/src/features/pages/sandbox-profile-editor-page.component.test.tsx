@@ -1747,7 +1747,7 @@ describe("SandboxProfileEditorPage", () => {
     });
   });
 
-  it("keeps local maintenance script edits when the assistant saves a newer version", async () => {
+  it("keeps local maintenance script edits when a newer version is saved externally", async () => {
     const { profileId, queryClient } = renderSandboxProfileEditor({
       maintenanceScript: "pnpm update",
       routeSection: "snapshot",
@@ -1761,14 +1761,6 @@ describe("SandboxProfileEditorPage", () => {
       editor,
       value: "pnpm update\npnpm lint",
     });
-
-    fireEvent.click(screen.getByRole("button", { name: "Setup Assistant" }));
-
-    expect(
-      await screen.findByRole("button", {
-        name: "Close Setup Assistant panel",
-      }),
-    ).toBeDefined();
 
     act(() => {
       queryClient.setQueryData(sandboxProfileVersionsQueryKey(profileId), {

@@ -1,4 +1,7 @@
-import type { CodexThreadSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
+import {
+  isCodexSubagentThread,
+  type CodexThreadSummary,
+} from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 
 export type ThreadSelectionPolicy = "oldest" | "most_recently_updated";
 
@@ -44,6 +47,18 @@ function collectLoadedAvailableThreads(input: {
   });
 }
 
+function collectLoadedThreadIdsWithoutAvailableDetails(input: {
+  availableThreads: readonly CodexThreadSummary[];
+  loadedThreadIds: readonly string[];
+}): readonly string[] {
+  const availableThreadIds = new Set(input.availableThreads.map((thread) => thread.id));
+  return input.loadedThreadIds.filter((threadId) => !availableThreadIds.has(threadId));
+}
+
+function collectRootThreads(threads: readonly CodexThreadSummary[]): readonly CodexThreadSummary[] {
+  return threads.filter((thread) => !isCodexSubagentThread(thread));
+}
+
 export function selectPreferredThreadId(input: {
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
@@ -54,7 +69,7 @@ export function selectPreferredThreadId(input: {
     selectionPolicy === "most_recently_updated"
       ? compareNewestThreadActivity
       : compareThreadCreation;
-  const loadedAvailableThreads = collectLoadedAvailableThreads(input);
+  const loadedAvailableThreads = collectRootThreads(collectLoadedAvailableThreads(input));
 
   if (loadedAvailableThreads.length > 0) {
     const selectedLoadedThread = [...loadedAvailableThreads].sort(compareThread)[0];
@@ -65,22 +80,24 @@ export function selectPreferredThreadId(input: {
     return selectedLoadedThread.id;
   }
 
-  if (input.loadedThreadIds.length > 0) {
-    if (selectionPolicy === "most_recently_updated") {
-      return null;
+  const availableRootThreads = collectRootThreads(input.availableThreads);
+  const loadedThreadIdsWithoutAvailableDetails =
+    collectLoadedThreadIdsWithoutAvailableDetails(input);
+
+  const selectedLoadedThreadIdWithoutAvailableDetails =
+    loadedThreadIdsWithoutAvailableDetails.at(0);
+  if (selectedLoadedThreadIdWithoutAvailableDetails !== undefined) {
+    return selectedLoadedThreadIdWithoutAvailableDetails;
+  }
+
+  if (availableRootThreads.length > 0) {
+    const selectedAvailableThread = [...availableRootThreads].sort(compareThread)[0];
+    if (selectedAvailableThread === undefined) {
+      throw new Error("Available thread selection requires at least one thread.");
     }
 
-    return input.loadedThreadIds[0] ?? null;
+    return selectedAvailableThread.id;
   }
 
-  if (input.availableThreads.length === 0) {
-    return null;
-  }
-
-  const selectedAvailableThread = [...input.availableThreads].sort(compareThread)[0];
-  if (selectedAvailableThread === undefined) {
-    throw new Error("Available thread selection requires at least one thread.");
-  }
-
-  return selectedAvailableThread.id;
+  return null;
 }

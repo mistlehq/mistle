@@ -1,4 +1,5 @@
 import {
+  isCodexSubagentThread,
   listCodexThreads,
   listLoadedCodexThreads,
   type CodexJsonRpcClient,
@@ -258,6 +259,10 @@ export function resolveOriginalCodexThreadId(
   let originalCreatedAt: number | null = null;
 
   for (const thread of threads) {
+    if (isCodexSubagentThread(thread)) {
+      continue;
+    }
+
     if (thread.createdAt === null) {
       continue;
     }

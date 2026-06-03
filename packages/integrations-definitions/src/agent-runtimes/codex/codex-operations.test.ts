@@ -4,6 +4,7 @@ import {
   buildCodexReviewStartRequest,
   buildCodexTurnInputItems,
   buildCodexTurnStartRequest,
+  parseCodexThreadListResponse,
   parseCodexSkillsListResponse,
   parseCodexThreadSessionResponse,
 } from "./codex-operations.js";
@@ -362,6 +363,186 @@ describe("parseCodexThreadSessionResponse", () => {
         },
       }),
     ).toThrow("thread/start response payload is invalid.");
+  });
+});
+
+describe("parseCodexThreadListResponse", () => {
+  it("preserves Codex thread lineage metadata from thread list responses", () => {
+    expect(
+      parseCodexThreadListResponse({
+        data: [
+          {
+            id: "thread_subagent",
+            name: "Review sidebar hierarchy",
+            preview: "Review the implementation",
+            threadSource: "subagent",
+            source: {
+              subAgent: {
+                thread_spawn: {
+                  parent_thread_id: "thread_parent",
+                  depth: 1,
+                  agent_path: null,
+                  agent_nickname: "atlas",
+                  agent_role: "reviewer",
+                },
+              },
+            },
+            cwd: "/workspace/repo",
+            createdAt: 1,
+            updatedAt: 2,
+          },
+        ],
+        nextCursor: "cursor_next",
+      }),
+    ).toEqual({
+      threads: [
+        {
+          id: "thread_subagent",
+          name: "Review sidebar hierarchy",
+          preview: "Review the implementation",
+          parentThreadId: "thread_parent",
+          threadSource: "subagent",
+          isSubagent: true,
+          agentNickname: "atlas",
+          agentRole: "reviewer",
+          cwd: "/workspace/repo",
+          createdAt: 1000,
+          updatedAt: 2000,
+        },
+      ],
+      nextCursor: "cursor_next",
+    });
+  });
+
+  it("uses top-level Codex lineage fields while nested subagent source drives classification", () => {
+    expect(
+      parseCodexThreadListResponse({
+        data: [
+          {
+            id: "thread_subagent",
+            name: null,
+            preview: undefined,
+            parentThreadId: "thread_parent_current",
+            threadSource: "memory_consolidation",
+            agentNickname: "current-atlas",
+            agentRole: "current-reviewer",
+            source: {
+              subAgent: {
+                thread_spawn: {
+                  parent_thread_id: "thread_parent_nested",
+                  agent_nickname: "nested-atlas",
+                  agent_role: "nested-reviewer",
+                },
+              },
+            },
+            cwd: "/workspace/repo",
+          },
+        ],
+      }),
+    ).toEqual({
+      threads: [
+        {
+          id: "thread_subagent",
+          name: null,
+          preview: null,
+          parentThreadId: "thread_parent_current",
+          threadSource: "memory_consolidation",
+          isSubagent: true,
+          agentNickname: "current-atlas",
+          agentRole: "current-reviewer",
+          cwd: "/workspace/repo",
+          createdAt: null,
+          updatedAt: null,
+        },
+      ],
+      nextCursor: null,
+    });
+  });
+
+  it("marks non-thread-spawn Codex subagent source variants as subagent threads", () => {
+    expect(
+      parseCodexThreadListResponse({
+        data: [
+          {
+            id: "thread_review",
+            source: {
+              subAgent: "review",
+            },
+            cwd: "/workspace/repo",
+          },
+          {
+            id: "thread_other",
+            source: {
+              subAgent: {
+                other: "custom",
+              },
+            },
+            cwd: "/workspace/repo",
+          },
+        ],
+      }),
+    ).toEqual({
+      threads: [
+        {
+          id: "thread_review",
+          name: null,
+          preview: null,
+          parentThreadId: null,
+          threadSource: "review",
+          isSubagent: true,
+          agentNickname: null,
+          agentRole: null,
+          cwd: "/workspace/repo",
+          createdAt: null,
+          updatedAt: null,
+        },
+        {
+          id: "thread_other",
+          name: null,
+          preview: null,
+          parentThreadId: null,
+          threadSource: "custom",
+          isSubagent: true,
+          agentNickname: null,
+          agentRole: null,
+          cwd: "/workspace/repo",
+          createdAt: null,
+          updatedAt: null,
+        },
+      ],
+      nextCursor: null,
+    });
+  });
+
+  it("marks top-level memory-consolidation thread sources as subagent threads", () => {
+    expect(
+      parseCodexThreadListResponse({
+        data: [
+          {
+            id: "thread_memory_consolidation",
+            threadSource: "memory_consolidation",
+            cwd: "/workspace/repo",
+          },
+        ],
+      }),
+    ).toEqual({
+      threads: [
+        {
+          id: "thread_memory_consolidation",
+          name: null,
+          preview: null,
+          parentThreadId: null,
+          threadSource: "memory_consolidation",
+          isSubagent: true,
+          agentNickname: null,
+          agentRole: null,
+          cwd: "/workspace/repo",
+          createdAt: null,
+          updatedAt: null,
+        },
+      ],
+      nextCursor: null,
+    });
   });
 });
 

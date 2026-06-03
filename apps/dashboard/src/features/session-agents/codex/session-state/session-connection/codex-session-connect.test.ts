@@ -1,4 +1,7 @@
-import { CodexJsonRpcRequestError } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
+import {
+  CodexJsonRpcRequestError,
+  type CodexThreadSummary,
+} from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -8,28 +11,42 @@ import {
 } from "./codex-session-connect.js";
 import { updateConnectedCodexSessionActiveThread } from "./use-codex-session-connection.js";
 
+function createThread(input: {
+  id: string;
+  createdAt: number;
+  updatedAt: number;
+}): CodexThreadSummary {
+  return {
+    id: input.id,
+    name: null,
+    preview: null,
+    parentThreadId: null,
+    threadSource: null,
+    isSubagent: false,
+    agentNickname: null,
+    agentRole: null,
+    cwd: "/root",
+    createdAt: input.createdAt,
+    updatedAt: input.updatedAt,
+  };
+}
+
 describe("codex session connect", () => {
   it("resumes the oldest created existing thread on reconnect", () => {
     expect(
       resolveInitialCodexThreadAction({
         targetThreadId: null,
         availableThreads: [
-          {
+          createThread({
             id: "thread_old",
-            name: null,
-            preview: null,
-            cwd: "/root",
             createdAt: 10,
             updatedAt: 10,
-          },
-          {
+          }),
+          createThread({
             id: "thread_new",
-            name: null,
-            preview: null,
-            cwd: "/root",
             createdAt: 20,
             updatedAt: 20,
-          },
+          }),
         ],
         loadedThreadIds: [],
       }),
@@ -57,14 +74,11 @@ describe("codex session connect", () => {
       resolveInitialCodexThreadAction({
         targetThreadId: "thread_persisted",
         availableThreads: [
-          {
+          createThread({
             id: "thread_persisted",
-            name: null,
-            preview: null,
-            cwd: "/root",
             createdAt: 5,
             updatedAt: 5,
-          },
+          }),
         ],
         loadedThreadIds: ["thread_loaded_only"],
       }),
@@ -91,22 +105,16 @@ describe("codex session connect", () => {
       resolveInitialCodexThreadAction({
         targetThreadId: null,
         availableThreads: [
-          {
+          createThread({
             id: "thread_old_but_active",
-            name: null,
-            preview: null,
-            cwd: "/root",
             createdAt: 10,
             updatedAt: 30,
-          },
-          {
+          }),
+          createThread({
             id: "thread_newer_but_stale",
-            name: null,
-            preview: null,
-            cwd: "/root",
             createdAt: 20,
             updatedAt: 20,
-          },
+          }),
         ],
         loadedThreadIds: [],
         selectionPolicy: "most_recently_updated",

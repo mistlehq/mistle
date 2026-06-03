@@ -4,6 +4,13 @@ export type RuntimeConversationSummary = {
   cwd: string;
   createdAt: number | null;
   updatedAt: number | null;
+  lineage: RuntimeConversationLineage | null;
+};
+
+export type RuntimeConversationLineage = {
+  parentConversationId: string | null;
+  label: string | null;
+  detail: string | null;
 };
 
 export type RuntimeConversationNavigatorState = {
@@ -33,6 +40,12 @@ export type RuntimeConversationNavigatorRow = {
   isOriginal: boolean;
   isPinnedCurrent: boolean;
   pendingServerRequestCount: number;
+  lineage: RuntimeConversationNavigatorRowLineage | null;
+};
+
+export type RuntimeConversationNavigatorRowLineage = RuntimeConversationLineage & {
+  depth: number;
+  parentTitle: string | null;
 };
 
 export type RuntimeConversationNavigatorActiveConversation = {
@@ -80,6 +93,7 @@ function createNavigatorRow(input: {
   activeConversationId: string | null;
   pendingConversationId: string | null;
   pendingServerRequestCountsByConversationId: ReadonlyMap<string, number>;
+  conversationsById: ReadonlyMap<string, RuntimeConversationSummary>;
   conversation: RuntimeConversationSummary;
   originalConversationId: string | null;
 }): RuntimeConversationNavigatorRow {
@@ -95,6 +109,10 @@ function createNavigatorRow(input: {
     isPinnedCurrent: false,
     pendingServerRequestCount:
       input.pendingServerRequestCountsByConversationId.get(input.conversation.id) ?? 0,
+    lineage: resolveNavigatorRowLineage({
+      conversationsById: input.conversationsById,
+      conversation: input.conversation,
+    }),
   };
 }
 
@@ -116,7 +134,67 @@ function createPinnedActiveConversationRow(input: {
     isPinnedCurrent: true,
     pendingServerRequestCount:
       input.pendingServerRequestCountsByConversationId.get(input.activeConversation.id) ?? 0,
+    lineage: null,
   };
+}
+
+function resolveNavigatorRowLineage(input: {
+  conversationsById: ReadonlyMap<string, RuntimeConversationSummary>;
+  conversation: RuntimeConversationSummary;
+}): RuntimeConversationNavigatorRowLineage | null {
+  const lineage = input.conversation.lineage;
+  if (lineage === null) {
+    return null;
+  }
+
+  const parentConversation =
+    lineage.parentConversationId === null
+      ? null
+      : (input.conversationsById.get(lineage.parentConversationId) ?? null);
+  return {
+    ...lineage,
+    depth: resolveVisibleLineageDepth({
+      conversationsById: input.conversationsById,
+      conversation: input.conversation,
+      visitedConversationIds: new Set(),
+    }),
+    parentTitle: parentConversation === null ? null : resolveConversationTitle(parentConversation),
+  };
+}
+
+function resolveVisibleLineageDepth(input: {
+  conversationsById: ReadonlyMap<string, RuntimeConversationSummary>;
+  conversation: RuntimeConversationSummary;
+  visitedConversationIds: Set<string>;
+}): number {
+  const lineage = input.conversation.lineage;
+  if (lineage === null) {
+    return 0;
+  }
+
+  if (input.visitedConversationIds.has(input.conversation.id)) {
+    return 1;
+  }
+
+  input.visitedConversationIds.add(input.conversation.id);
+  if (lineage.parentConversationId === null) {
+    return 1;
+  }
+
+  const parentConversation = input.conversationsById.get(lineage.parentConversationId);
+  if (parentConversation === undefined) {
+    return 1;
+  }
+
+  return Math.min(
+    2,
+    1 +
+      resolveVisibleLineageDepth({
+        conversationsById: input.conversationsById,
+        conversation: parentConversation,
+        visitedConversationIds: input.visitedConversationIds,
+      }),
+  );
 }
 
 function countPendingServerRequestsByConversationId(
@@ -145,12 +223,16 @@ export function projectRuntimeConversationNavigatorRows(input: {
     input.pendingServerRequestConversationIds,
   );
   const sortedConversations = [...input.availableConversations].sort(compareConversationActivity);
+  const conversationsById = new Map(
+    input.availableConversations.map((conversation) => [conversation.id, conversation]),
+  );
 
   const rows = sortedConversations.map((conversation) =>
     createNavigatorRow({
       activeConversationId: input.activeConversationId,
       pendingConversationId: input.pendingConversationId,
       pendingServerRequestCountsByConversationId,
+      conversationsById,
       conversation,
       originalConversationId: input.originalConversationId,
     }),

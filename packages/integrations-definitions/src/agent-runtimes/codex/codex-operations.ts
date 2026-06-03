@@ -2,6 +2,7 @@ import { isSkillMentionName, type SkillMentionDescriptor } from "@mistle/integra
 import { z } from "zod";
 
 import { CodexJsonRpcClient } from "./codex-json-rpc.js";
+import { isRecord } from "./is-record.js";
 
 const AllCodexThreadSourceKinds = [
   "cli",
@@ -60,6 +61,11 @@ const ThreadListResponseSchema = z.looseObject({
       id: z.string().min(1),
       name: z.string().nullable().optional(),
       preview: z.string().optional(),
+      parentThreadId: z.string().nullable().optional(),
+      threadSource: z.string().nullable().optional(),
+      agentNickname: z.string().nullable().optional(),
+      agentRole: z.string().nullable().optional(),
+      source: z.unknown().optional(),
       cwd: z.string().min(1),
       updatedAt: z
         .number()
@@ -208,10 +214,28 @@ export type CodexThreadSummary = {
   id: string;
   name: string | null;
   preview: string | null;
+  parentThreadId: string | null;
+  threadSource: string | null;
+  isSubagent: boolean;
+  agentNickname: string | null;
+  agentRole: string | null;
   cwd: string;
   updatedAt: number | null;
   createdAt: number | null;
 };
+
+export function isCodexSubagentThread(thread: CodexThreadSummary): boolean {
+  return thread.isSubagent;
+}
+
+function isCodexSubagentThreadSource(threadSource: string | null): boolean {
+  return (
+    threadSource !== null &&
+    (threadSource === "subagent" ||
+      threadSource === "memory_consolidation" ||
+      threadSource.startsWith("subAgent"))
+  );
+}
 
 export type CodexModelSummary = {
   id: string;
@@ -629,6 +653,18 @@ export async function listCodexThreads(input: {
     sourceKinds: AllCodexThreadSourceKinds,
   });
 
+  const parsedThreadList = parseCodexThreadListResponse(response);
+  return {
+    threads: parsedThreadList.threads,
+    nextCursor: parsedThreadList.nextCursor,
+    response,
+  };
+}
+
+export function parseCodexThreadListResponse(response: unknown): {
+  threads: readonly CodexThreadSummary[];
+  nextCursor: string | null;
+} {
   const parsedResponse = ThreadListResponseSchema.safeParse(response);
   if (!parsedResponse.success) {
     throw new Error(
@@ -641,13 +677,106 @@ export async function listCodexThreads(input: {
       id: thread.id,
       name: thread.name ?? null,
       preview: thread.preview ?? null,
+      parentThreadId: resolveCodexThreadListParentThreadId(thread),
+      threadSource: resolveCodexThreadListThreadSource(thread),
+      isSubagent: resolveCodexThreadListIsSubagent(thread),
+      agentNickname: thread.agentNickname ?? resolveCodexThreadListSourceAgentNickname(thread),
+      agentRole: thread.agentRole ?? resolveCodexThreadListSourceAgentRole(thread),
       cwd: thread.cwd,
       updatedAt: thread.updatedAt ?? null,
       createdAt: thread.createdAt ?? null,
     })),
     nextCursor: parsedResponse.data.nextCursor ?? null,
-    response,
   };
+}
+
+function resolveCodexThreadListThreadSource(input: {
+  threadSource?: string | null | undefined;
+  source?: unknown;
+}): string | null {
+  return input.threadSource ?? resolveCodexThreadListSourceThreadSource(input.source);
+}
+
+function resolveCodexThreadListIsSubagent(input: {
+  parentThreadId?: string | null | undefined;
+  threadSource?: string | null | undefined;
+  source?: unknown;
+}): boolean {
+  return (
+    resolveCodexThreadListParentThreadId(input) !== null ||
+    hasCodexThreadListSubAgentSource(input.source) ||
+    isCodexSubagentThreadSource(input.threadSource ?? null)
+  );
+}
+
+function resolveCodexThreadListParentThreadId(input: {
+  parentThreadId?: string | null | undefined;
+  source?: unknown;
+}): string | null {
+  return (
+    input.parentThreadId ??
+    readCodexThreadListSourceThreadSpawnString(input.source, "parent_thread_id")
+  );
+}
+
+function resolveCodexThreadListSourceAgentNickname(input: { source?: unknown }): string | null {
+  return readCodexThreadListSourceThreadSpawnString(input.source, "agent_nickname");
+}
+
+function resolveCodexThreadListSourceAgentRole(input: { source?: unknown }): string | null {
+  return readCodexThreadListSourceThreadSpawnString(input.source, "agent_role");
+}
+
+function hasCodexThreadListSubAgentSource(source: unknown): boolean {
+  if (!isRecord(source)) {
+    return false;
+  }
+
+  return source["subAgent"] !== undefined;
+}
+
+function resolveCodexThreadListSourceThreadSource(source: unknown): string | null {
+  if (!isRecord(source)) {
+    return null;
+  }
+
+  const subAgentSource = source["subAgent"];
+  if (typeof subAgentSource === "string") {
+    return subAgentSource.length > 0 ? subAgentSource : "subagent";
+  }
+
+  if (!isRecord(subAgentSource)) {
+    return null;
+  }
+
+  const otherSource = subAgentSource["other"];
+  if (typeof otherSource === "string" && otherSource.length > 0) {
+    return otherSource;
+  }
+
+  return "subagent";
+}
+
+function readCodexThreadListSourceThreadSpawnString(
+  source: unknown,
+  fieldName: string,
+): string | null {
+  if (!isRecord(source)) {
+    return null;
+  }
+
+  const subAgentSource = source["subAgent"];
+  if (!isRecord(subAgentSource)) {
+    return null;
+  }
+
+  const threadSpawnSource = subAgentSource["thread_spawn"];
+  if (!isRecord(threadSpawnSource)) {
+    return null;
+  }
+
+  const value = threadSpawnSource[fieldName];
+  return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 export async function resumeCodexThread(input: {

@@ -22,6 +22,7 @@ const Rows = [
     isOriginal: true,
     isPinnedCurrent: false,
     pendingServerRequestCount: 1,
+    lineage: null,
   },
   {
     id: "conversation_other",
@@ -34,6 +35,7 @@ const Rows = [
     isOriginal: false,
     isPinnedCurrent: false,
     pendingServerRequestCount: 0,
+    lineage: null,
   },
 ] satisfies readonly RuntimeConversationNavigatorRow[];
 
@@ -88,6 +90,7 @@ describe("RuntimeConversationNavigator", () => {
             isOriginal: false,
             isPinnedCurrent: true,
             pendingServerRequestCount: 0,
+            lineage: null,
           },
         ]}
       />,
@@ -113,6 +116,124 @@ describe("RuntimeConversationNavigator", () => {
 
     const navigator = screen.getByRole("complementary", { name: "Conversations" });
     expect(within(navigator).getByText("Showing latest 20 only")).toBeTruthy();
+  });
+
+  it("renders child conversation lineage as secondary row metadata", () => {
+    render(
+      <RuntimeConversationNavigator
+        isConversationListLimited={false}
+        isStartingConversation={false}
+        onRefreshConversations={function onRefreshConversations() {}}
+        onSelectConversation={function onSelectConversation() {}}
+        onStartConversation={function onStartConversation() {}}
+        rows={[
+          {
+            id: "conversation_subagent",
+            title: "Review sidebar hierarchy",
+            cwd: "/workspace/repo-a",
+            cwdSectionLabel: "repo-a",
+            lastActivityAt: Date.UTC(2026, 4, 21, 9),
+            isActive: false,
+            isOpening: false,
+            isOriginal: false,
+            isPinnedCurrent: false,
+            pendingServerRequestCount: 0,
+            lineage: {
+              parentConversationId: "conversation_parent",
+              label: "Subagent",
+              detail: "reviewer",
+              depth: 1,
+              parentTitle: "Implement sidebar hierarchy",
+            },
+          },
+        ]}
+      />,
+    );
+
+    const navigator = screen.getByRole("complementary", { name: "Conversations" });
+    const row = within(navigator).getByRole("button", { name: /Review sidebar hierarchy/ });
+    expect(row.className).toContain("pl-4");
+    expect(within(row).getByText("Subagent")).toBeTruthy();
+    expect(within(row).getByText("reviewer")).toBeTruthy();
+    expect(row.getAttribute("title")).toContain("Parent: Implement sidebar hierarchy");
+  });
+
+  it("renders child conversation detail when the provider does not supply a lineage label", () => {
+    render(
+      <RuntimeConversationNavigator
+        isConversationListLimited={false}
+        isStartingConversation={false}
+        onRefreshConversations={function onRefreshConversations() {}}
+        onSelectConversation={function onSelectConversation() {}}
+        onStartConversation={function onStartConversation() {}}
+        rows={[
+          {
+            id: "conversation_child",
+            title: "Inspect lineage metadata",
+            cwd: "/workspace/repo-a",
+            cwdSectionLabel: "repo-a",
+            lastActivityAt: Date.UTC(2026, 4, 21, 9),
+            isActive: false,
+            isOpening: false,
+            isOriginal: false,
+            isPinnedCurrent: false,
+            pendingServerRequestCount: 0,
+            lineage: {
+              parentConversationId: "conversation_parent",
+              label: null,
+              detail: "reviewer",
+              depth: 1,
+              parentTitle: null,
+            },
+          },
+        ]}
+      />,
+    );
+
+    const navigator = screen.getByRole("complementary", { name: "Conversations" });
+    const row = within(navigator).getByRole("button", { name: /Inspect lineage metadata/ });
+    expect(within(row).getByText("reviewer")).toBeTruthy();
+    expect(within(row).queryByText("Subagent")).toBeNull();
+  });
+
+  it("keeps child rows without lineage metadata to single-line visual height", () => {
+    render(
+      <RuntimeConversationNavigator
+        isConversationListLimited={false}
+        isStartingConversation={false}
+        onRefreshConversations={function onRefreshConversations() {}}
+        onSelectConversation={function onSelectConversation() {}}
+        onStartConversation={function onStartConversation() {}}
+        rows={[
+          {
+            id: "conversation_child",
+            title: "Inspect child without metadata",
+            cwd: "/workspace/repo-a",
+            cwdSectionLabel: "repo-a",
+            lastActivityAt: Date.UTC(2026, 4, 21, 9),
+            isActive: false,
+            isOpening: false,
+            isOriginal: false,
+            isPinnedCurrent: false,
+            pendingServerRequestCount: 0,
+            lineage: {
+              parentConversationId: "conversation_parent",
+              label: null,
+              detail: null,
+              depth: 1,
+              parentTitle: null,
+            },
+          },
+        ]}
+      />,
+    );
+
+    const navigator = screen.getByRole("complementary", { name: "Conversations" });
+    const row = within(navigator).getByRole("button", { name: /Inspect child without metadata/ });
+    const lineageGuide = row.querySelector(".h-4");
+    expect(lineageGuide).toBeInstanceOf(HTMLSpanElement);
+    expect(within(row).queryByText("Subagent")).toBeNull();
+    expect(within(row).queryByText("reviewer")).toBeNull();
   });
 
   it("renders the same conversation list inside the mobile sheet", () => {

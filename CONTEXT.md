@@ -116,6 +116,18 @@ _Avoid_: Default conversation, currently active conversation, most recently upda
 The **Session workbench** side panel for listing, selecting, and starting **Runtime conversations**.
 _Avoid_: Thread navigator when speaking across providers
 
+**Runtime conversation lineage**:
+The parent-child relationship between **Runtime conversations** when one runtime conversation starts another.
+_Avoid_: Thread hierarchy, agent hierarchy
+
+**Parent runtime conversation**:
+A **Runtime conversation** that starts another **Runtime conversation**.
+_Avoid_: Parent agent, source thread
+
+**Child runtime conversation**:
+A **Runtime conversation** started by another **Runtime conversation**.
+_Avoid_: Child thread, nested agent
+
 **Billing customer**:
 The external billing-provider customer associated with a Mistle organization.
 _Avoid_: Billing org
@@ -155,6 +167,10 @@ _Avoid_: Conversation name, provider title
 **Codex thread**:
 A Codex **Runtime conversation**.
 _Avoid_: Session, chat tab
+
+**Codex subagent thread**:
+A **Codex thread** that is a **Child runtime conversation** spawned by another **Codex thread**.
+_Avoid_: Child thread, agent thread, nested conversation
 
 **Codex Plan mode**:
 A Codex collaboration mode that changes how the next Codex turn plans work before implementation. Bare `/plan` switches the active **Codex thread** composer into this mode for future submissions; `/plan <prompt>` submits `<prompt>` immediately in this mode. Plan mode is unavailable during active turns, is scoped to the active **Codex thread**, and remains active until an explicit implementation or mode-switch action returns the thread to Default mode.
@@ -209,11 +225,11 @@ The **Codex thread** selected as the **Active runtime conversation**.
 _Avoid_: Current session, selected sandbox
 
 **Default Codex thread**:
-The **Codex thread** selected by a **Session workbench** when no explicit **Active Codex thread** is requested.
+The non-subagent **Codex thread** selected by a **Session workbench** when no explicit **Active Codex thread** is requested.
 _Avoid_: Main thread
 
 **Original Codex thread**:
-The **Codex thread** that anchors how a **Session workbench** was opened. For a trigger-started **Session workbench**, this is the **Codex thread** associated with the **Trigger conversation**. For a dashboard-started **Session workbench**, this is the earliest-created **Codex thread** known for the **Sandbox session**.
+The **Codex thread** that anchors how a **Session workbench** was opened. For a trigger-started **Session workbench**, this is the **Codex thread** associated with the **Trigger conversation**. For a dashboard-started **Session workbench**, this is the earliest-created non-subagent **Codex thread** known for the **Sandbox session**.
 _Avoid_: Trigger thread, default thread, main thread, first visible thread
 
 **Session workbench**:
@@ -446,10 +462,12 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Opening the **Runtime conversation navigator** does not change the **Session bottom panel** state.
 - Opening **Codex thread** navigation does not change the **Session bottom panel** state.
 - A **Default Codex thread** is used only when the **Session workbench** has no explicit **Active Codex thread** request.
+- A **Codex subagent thread** can be selected by explicit **Active Codex thread** request, but is not inferred as the **Default Codex thread**.
 - The **Original Codex thread** and **Default Codex thread** may be different **Codex threads**.
 - In a trigger-started **Session workbench**, the **Original Codex thread** may differ from the earliest-created **Codex thread** in the **Sandbox session**.
 - A trigger-started **Session workbench** resolves its **Original Codex thread** from the **Trigger conversation**, not from **Codex thread** creation order.
 - A trigger-started **Session workbench** without a known **Trigger conversation** **Codex thread** has no **Original Codex thread** inferred from creation order.
+- A dashboard-started **Session workbench** excludes **Codex subagent threads** when inferring the **Original Codex thread** from creation order.
 - The **Original Codex thread** remains stable when the **Active Codex thread** changes within a **Session workbench**.
 - An explicit **Active Codex thread** request does not redefine the **Original Codex thread**.
 - Ports, terminal access, runtime status, repository filesystem state, and sandbox-level diffs belong to the **Sandbox session**.
@@ -480,14 +498,24 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - The **Original runtime conversation** may be omitted when the current runtime conversation list is incomplete and no explicit provider conversation was supplied.
 - A **Runtime conversation navigator** uses provider-neutral product language while preserving provider-owned object names in source-specific code and metadata.
 - A **Runtime conversation navigator** is labeled as conversations in shared user-facing workbench controls.
+- A **Runtime conversation navigator** may use provider-specific row labels when an **Agent runtime** has precise user-facing lineage language.
 - A **Runtime conversation navigator** should list real **Runtime conversations** from the active **Agent runtime** rather than presenting a partial active-only placeholder.
+- **Runtime conversation lineage** labels are secondary to the **Runtime conversation** title in the **Runtime conversation navigator**.
 - The default **Runtime conversation navigator** scope is the selected primary repository path when one is selected.
 - **Original runtime conversation** detection is scoped to the **Sandbox session**, not to the current **Runtime conversation navigator** filter.
 - First-pass **Runtime conversation** navigation is ordered by recent conversation activity unless the user chooses another view.
 - First-pass **Runtime conversation** navigation is flat even when a provider exposes parent-child conversation relationships.
+- A flat **Runtime conversation navigator** may still show **Runtime conversation lineage** through visual row cues.
+- A **Child runtime conversation** may appear in a **Runtime conversation navigator** even when its **Parent runtime conversation** is not visible.
+- **Runtime conversation lineage** requires explicit parent conversation metadata from the **Agent runtime**.
+- Visible **Parent runtime conversation** context is optional secondary context for a **Child runtime conversation** row.
+- Archived **Parent runtime conversations** are not fetched only to decorate visible **Child runtime conversation** rows.
+- A **Runtime conversation navigator** may derive visible lineage depth from currently listed **Runtime conversations**, but visual indentation is capped.
+- **Runtime conversation lineage** does not change **Active runtime conversation** selection or **Session workbench** URL behavior.
 - A repository-scoped **Runtime conversation navigator** may be empty while the chat pane still shows an **Active runtime conversation** from another path.
 - When the **Active runtime conversation** is outside the **Runtime conversation navigator** scope, the UI should make the path mismatch visible.
 - Approval requests for non-active **Runtime conversations** may be indicated in navigation when the request has explicit runtime-conversation attribution, but responses happen only after the conversation becomes the **Active runtime conversation**.
+- **Child runtime conversation** request indicators are shown on the child row and are not bubbled to the **Parent runtime conversation** row in first-pass navigation.
 - First-pass **Runtime conversation** navigation is visible beside the chat pane on desktop and collapses into a drawer on narrow screens.
 - First-pass **Runtime conversation** navigation is opened from the **Session workbench** header and occupies the resizable right-side workbench panel.
 - Diff review and **Runtime conversation** navigation share the **Session workbench** right-side panel slot.

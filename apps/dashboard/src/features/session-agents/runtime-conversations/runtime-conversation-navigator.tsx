@@ -242,6 +242,9 @@ function RuntimeConversationNavigatorRowView(input: {
 }): React.JSX.Element {
   const row = input.row;
   const activity = resolveConversationActivityDisplay(row.lastActivityAt);
+  const lineageIndentClass = resolveConversationLineageIndentClass(row.lineage?.depth ?? 0);
+  const hasLineageMetadata =
+    row.lineage !== null && (row.lineage.label !== null || row.lineage.detail !== null);
   const showOpeningIndicator = useDelayedMinimumVisibleFlag({
     active: row.isOpening,
     minimumVisibleMs: ConversationOpeningIndicatorMinimumVisibleMs,
@@ -251,17 +254,25 @@ function RuntimeConversationNavigatorRowView(input: {
   return (
     <button
       aria-current={row.isActive ? "page" : undefined}
-      className={`w-full rounded-md px-2 py-2 text-left transition-colors ${
+      className={`w-full rounded-md py-2 pr-2 text-left transition-colors ${lineageIndentClass} ${
         row.isActive
           ? "bg-muted text-foreground"
           : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
       }`}
       disabled={row.isOpening || showOpeningIndicator}
       onClick={() => input.onSelectConversation(row.id)}
-      title={row.cwd}
+      title={resolveConversationRowTitle(row)}
       type="button"
     >
       <div className="flex min-w-0 items-start gap-2">
+        {row.lineage === null ? null : (
+          <span
+            aria-hidden
+            className={`mt-0.5 w-px shrink-0 rounded-full bg-border ${
+              hasLineageMetadata ? "h-8" : "h-4"
+            }`}
+          />
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-start gap-2">
             <div className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -292,10 +303,58 @@ function RuntimeConversationNavigatorRowView(input: {
               </span>
             )}
           </div>
+          {hasLineageMetadata && row.lineage !== null ? (
+            <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] leading-tight text-muted-foreground">
+              {row.lineage.label === null ? null : (
+                <span className="shrink-0">{row.lineage.label}</span>
+              )}
+              {row.lineage.detail === null ? null : (
+                <>
+                  {row.lineage.label === null ? null : (
+                    <span aria-hidden className="shrink-0">
+                      ·
+                    </span>
+                  )}
+                  <OverflowTooltipText
+                    className="min-w-0"
+                    text={row.lineage.detail}
+                    tooltipSide="right"
+                    tooltipSideOffset={8}
+                  />
+                </>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
     </button>
   );
+}
+
+function resolveConversationLineageIndentClass(depth: number): string {
+  if (depth >= 2) {
+    return "pl-6";
+  }
+
+  if (depth === 1) {
+    return "pl-4";
+  }
+
+  return "pl-2";
+}
+
+function resolveConversationRowTitle(row: RuntimeConversationNavigatorRow): string {
+  if (row.lineage === null) {
+    return row.cwd;
+  }
+
+  const lineageParts = [row.lineage.label, row.lineage.detail].filter(
+    (part) => part !== null && part.length > 0,
+  );
+  const parentTitle =
+    row.lineage.parentTitle === null ? null : `Parent: ${row.lineage.parentTitle}`;
+  const metadata = [...lineageParts, parentTitle].filter((part) => part !== null).join("\n");
+  return metadata.length === 0 ? row.cwd : `${row.cwd}\n${metadata}`;
 }
 
 function RuntimeConversationNavigatorRowIndicator(input: {

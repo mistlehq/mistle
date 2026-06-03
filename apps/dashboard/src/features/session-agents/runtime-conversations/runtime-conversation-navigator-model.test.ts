@@ -1,29 +1,43 @@
 import { describe, expect, it } from "vitest";
 
-import { projectRuntimeConversationNavigatorRows } from "./runtime-conversation-navigator-model.js";
+import {
+  projectRuntimeConversationNavigatorRows,
+  type RuntimeConversationSummary,
+} from "./runtime-conversation-navigator-model.js";
+
+function createConversation(
+  input: Omit<RuntimeConversationSummary, "lineage"> & {
+    lineage?: RuntimeConversationSummary["lineage"];
+  },
+): RuntimeConversationSummary {
+  return {
+    ...input,
+    lineage: input.lineage ?? null,
+  };
+}
 
 const Conversations = [
-  {
+  createConversation({
     id: "conversation_old",
     title: "Old work",
     cwd: "/workspace/repo-a",
     createdAt: 10,
     updatedAt: 20,
-  },
-  {
+  }),
+  createConversation({
     id: "conversation_new",
     title: "New work",
     cwd: "/workspace/repo-a",
     createdAt: 30,
     updatedAt: 50,
-  },
-  {
+  }),
+  createConversation({
     id: "conversation_other_repo",
     title: "",
     cwd: "/workspace/repo-b",
     createdAt: 40,
     updatedAt: 60,
-  },
+  }),
 ];
 
 describe("projectRuntimeConversationNavigatorRows", () => {
@@ -52,6 +66,7 @@ describe("projectRuntimeConversationNavigatorRows", () => {
         isOriginal: false,
         isPinnedCurrent: false,
         pendingServerRequestCount: 0,
+        lineage: null,
       },
       {
         id: "conversation_new",
@@ -64,6 +79,7 @@ describe("projectRuntimeConversationNavigatorRows", () => {
         isOriginal: false,
         isPinnedCurrent: false,
         pendingServerRequestCount: 2,
+        lineage: null,
       },
       {
         id: "conversation_old",
@@ -76,8 +92,97 @@ describe("projectRuntimeConversationNavigatorRows", () => {
         isOriginal: true,
         isPinnedCurrent: false,
         pendingServerRequestCount: 0,
+        lineage: null,
       },
     ]);
+  });
+
+  it("keeps child conversations activity-sorted while projecting lineage metadata", () => {
+    const rows = projectRuntimeConversationNavigatorRows({
+      activeConversationId: "conversation_child",
+      activeConversation: {
+        id: "conversation_child",
+        cwd: "/workspace/repo-a",
+      },
+      availableConversations: [
+        createConversation({
+          id: "conversation_parent",
+          title: "Parent work",
+          cwd: "/workspace/repo-a",
+          createdAt: 10,
+          updatedAt: 20,
+        }),
+        createConversation({
+          id: "conversation_child",
+          title: "Child work",
+          cwd: "/workspace/repo-a",
+          createdAt: 30,
+          updatedAt: 70,
+          lineage: {
+            parentConversationId: "conversation_parent",
+            label: "Subagent",
+            detail: "reviewer",
+          },
+        }),
+      ],
+      originalConversationId: null,
+      pendingConversationId: null,
+      pendingServerRequestConversationIds: [],
+    });
+
+    expect(
+      rows.map((row) => ({
+        id: row.id,
+        lineage: row.lineage,
+      })),
+    ).toEqual([
+      {
+        id: "conversation_child",
+        lineage: {
+          parentConversationId: "conversation_parent",
+          label: "Subagent",
+          detail: "reviewer",
+          depth: 1,
+          parentTitle: "Parent work",
+        },
+      },
+      {
+        id: "conversation_parent",
+        lineage: null,
+      },
+    ]);
+  });
+
+  it("shows child conversation lineage even when the parent is outside the row set", () => {
+    const rows = projectRuntimeConversationNavigatorRows({
+      activeConversationId: null,
+      activeConversation: null,
+      availableConversations: [
+        createConversation({
+          id: "conversation_child",
+          title: "Child work",
+          cwd: "/workspace/repo-a",
+          createdAt: 30,
+          updatedAt: 70,
+          lineage: {
+            parentConversationId: "conversation_parent",
+            label: "Subagent",
+            detail: null,
+          },
+        }),
+      ],
+      originalConversationId: null,
+      pendingConversationId: null,
+      pendingServerRequestConversationIds: [],
+    });
+
+    expect(rows[0]?.lineage).toEqual({
+      parentConversationId: "conversation_parent",
+      label: "Subagent",
+      detail: null,
+      depth: 1,
+      parentTitle: null,
+    });
   });
 
   it("does not need to pin the active conversation because all conversations are visible", () => {
@@ -213,6 +318,7 @@ describe("projectRuntimeConversationNavigatorRows", () => {
         cwd: "/workspace/repo-a",
         createdAt: 70,
         updatedAt: null,
+        lineage: null,
       },
       {
         id: "conversation_updated",
@@ -220,6 +326,7 @@ describe("projectRuntimeConversationNavigatorRows", () => {
         cwd: "/workspace/repo-a",
         createdAt: 10,
         updatedAt: 50,
+        lineage: null,
       },
     ];
     const rows = projectRuntimeConversationNavigatorRows({
