@@ -31,7 +31,7 @@ Control plane creates a snapshot job
 Data plane worker starts a one-off snapshot sandbox
       │
       ▼
-Worker initializes the sandbox in snapshot mode
+Worker activates sandboxd with the snapshot operation kind
       │
       ▼
 Provider captures an image from the sandbox
