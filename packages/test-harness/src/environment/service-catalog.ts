@@ -413,6 +413,10 @@ export function createDockerSandboxProviderInfra(): readonly TestInfraRequiremen
   return [createSandboxBaseImageRequirement(), createSandboxDockerNetworkRequirement()];
 }
 
+export function createDockerSandboxNetworkInfra(): readonly TestInfraRequirement[] {
+  return [createSandboxDockerNetworkRequirement()];
+}
+
 export async function prewarmDockerSandboxBaseImageRegistry(
   input: { forceTiming?: boolean } = {},
 ): Promise<void> {

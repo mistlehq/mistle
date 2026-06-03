@@ -6,9 +6,10 @@ import {
   type DataPlaneTables,
   type SandboxInstancePurpose,
   type SandboxInstanceProvider,
+  type SandboxInstanceStatus,
 } from "@mistle/db/data-plane";
 import type { MistleLogger } from "@mistle/logging";
-import { isSandboxResourceNotFoundError } from "@mistle/sandbox";
+import { isSandboxResourceNotFoundError, type SandboxAdapter } from "@mistle/sandbox";
 import { SandboxLifecycleEvents } from "@mistle/sandbox-lifecycle";
 import type { Clock } from "@mistle/time";
 import type { SandboxStopReason } from "@mistle/workflow-registry/data-plane";
@@ -22,9 +23,15 @@ import {
   createResolveSandboxRuntimeInput,
   type SandboxRuntimeProviderResolver,
 } from "../core/sandbox-runtime-resolver.js";
+import { markSandboxInstanceFailed } from "../reconcile-sandbox-instance/mark-sandbox-instance-failed.js";
 import { applySandboxLifecycleEvent } from "../shared/apply-sandbox-lifecycle-event.js";
 import { stopSandbox } from "../shared/stop-sandbox.js";
 import { markSandboxInstanceStopped } from "./mark-sandbox-instance-stopped.js";
+import {
+  determineStopProviderAction,
+  type StopProviderAction,
+  type StopProviderState,
+} from "./stop-provider-policy.js";
 
 type StoppableSandboxInstanceStopState = {
   organizationId: string;
@@ -36,6 +43,7 @@ type StoppableSandboxInstanceStopState = {
   sandboxStorageMb: number | null;
   providerSandboxId: string;
   computeGeneration: number;
+  status: SandboxInstanceStatus;
 };
 
 export type BootstrapAttachmentTerminationTarget = {
@@ -45,6 +53,7 @@ export type BootstrapAttachmentTerminationTarget = {
 
 export type StopSandboxInstanceOutcome =
   | "stopped"
+  | "failed"
   | "already_stopped"
   | "runtime_state_fence_before_load"
   | "runtime_state_fence_before_stop"
@@ -54,6 +63,10 @@ export type StopSandboxInstanceResult = {
   executed: boolean;
   outcome: StopSandboxInstanceOutcome;
   bootstrapAttachmentTerminationTarget?: BootstrapAttachmentTerminationTarget;
+  terminalFailure?: {
+    failureCode: string;
+    failureMessage: string;
+  };
   usageEventState?: {
     organizationId: string;
     runtimeProvider: SandboxInstanceProvider;
@@ -65,12 +78,53 @@ export type StopSandboxInstanceResult = {
   };
 };
 
+type StopSandboxInstanceUsageEventState = NonNullable<StopSandboxInstanceResult["usageEventState"]>;
+
+function createStopSandboxUsageEventState(
+  state: StoppableSandboxInstanceStopState,
+): StopSandboxInstanceUsageEventState {
+  return {
+    organizationId: state.organizationId,
+    runtimeProvider: state.runtimeProvider,
+    providerSandboxId: state.providerSandboxId,
+    computeGeneration: state.computeGeneration,
+    vcpuCount: state.sandboxVcpuCount,
+    memoryMb: state.sandboxMemoryMb,
+    storageMb: state.sandboxStorageMb,
+  };
+}
+
 function includeExpectedOwnerLeaseId(input: { expectedOwnerLeaseId: string | undefined }): {
   expectedOwnerLeaseId?: string;
 } {
   return input.expectedOwnerLeaseId === undefined
     ? {}
     : { expectedOwnerLeaseId: input.expectedOwnerLeaseId };
+}
+
+function throwStopProviderRetry(
+  action: Extract<StopProviderAction, { kind: "retry_provider_stop_in_progress" }>,
+): never {
+  throw new Error(action.reason);
+}
+
+async function inspectStopProviderStateOrMissing(ctx: {
+  sandboxAdapter: SandboxAdapter;
+  providerSandboxId: string;
+}): Promise<StopProviderState> {
+  try {
+    const inspection = await ctx.sandboxAdapter.inspect({
+      id: ctx.providerSandboxId,
+    });
+
+    return inspection.disposition;
+  } catch (error) {
+    if (!isSandboxResourceNotFoundError(error)) {
+      throw error;
+    }
+
+    return "missing";
+  }
 }
 
 /**
@@ -152,6 +206,58 @@ async function resolveStoppableSandboxInstanceStopState(input: {
     sandboxStorageMb: sandboxInstance.sandboxStorageMb,
     providerSandboxId: sandboxInstance.providerSandboxId,
     computeGeneration: sandboxInstance.computeGeneration,
+    status: sandboxInstance.status,
+  };
+}
+
+async function markStopProviderFailureOrThrow(
+  ctx: {
+    db: DataPlaneDatabase;
+    tables: DataPlaneTables;
+    runtimeStateReader: SandboxRuntimeStateReader;
+    clock: Clock;
+  },
+  input: {
+    sandboxInstanceId: string;
+    currentStatus: SandboxInstanceStatus;
+    stopReason: SandboxStopReason;
+    expectedOwnerLeaseId?: string;
+    action: Extract<StopProviderAction, { kind: "fail" }>;
+    usageEventState: StopSandboxInstanceUsageEventState;
+  },
+): Promise<StopSandboxInstanceResult> {
+  const markOutcome = await markSandboxInstanceFailed({
+    db: ctx.db,
+    tables: ctx.tables,
+    sandboxInstanceId: input.sandboxInstanceId,
+    currentStatus: input.currentStatus,
+    failureCode: input.action.failureCode,
+    failureMessage: input.action.failureMessage,
+    stillPermitted: async () =>
+      isSandboxStopStillPermitted({
+        runtimeStateReader: ctx.runtimeStateReader,
+        clock: ctx.clock,
+        sandboxInstanceId: input.sandboxInstanceId,
+        stopReason: input.stopReason,
+        ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
+      }),
+  });
+
+  if (markOutcome === "fence_mismatch") {
+    return {
+      executed: false,
+      outcome: "runtime_state_fence_before_mark",
+    };
+  }
+
+  return {
+    executed: markOutcome === "failed",
+    outcome: "failed",
+    terminalFailure: {
+      failureCode: input.action.failureCode,
+      failureMessage: input.action.failureMessage,
+    },
+    ...(markOutcome === "failed" ? { usageEventState: input.usageEventState } : {}),
   };
 }
 
@@ -312,6 +418,29 @@ export async function stopSandboxInstance(
   const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve(
     createResolveSandboxRuntimeInput(sandboxInstanceState),
   );
+  const initialProviderState = await inspectStopProviderStateOrMissing({
+    sandboxAdapter: resolvedRuntime.sandboxAdapter,
+    providerSandboxId: sandboxInstanceState.providerSandboxId,
+  });
+  const initialProviderAction = determineStopProviderAction({
+    providerState: initialProviderState,
+  });
+  switch (initialProviderAction.kind) {
+    case "fail":
+      return await markStopProviderFailureOrThrow(ctx, {
+        sandboxInstanceId: input.sandboxInstanceId,
+        currentStatus: sandboxInstanceState.status,
+        stopReason: input.stopReason,
+        ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
+        action: initialProviderAction,
+        usageEventState: createStopSandboxUsageEventState(sandboxInstanceState),
+      });
+    case "retry_provider_stop_in_progress":
+      throwStopProviderRetry(initialProviderAction);
+    case "mark_stopped":
+    case "shutdown_stop_then_inspect":
+      break;
+  }
 
   const beforeMarkPermission = await readSandboxStopPermission({
     runtimeStateReader: ctx.runtimeStateReader,
@@ -326,7 +455,7 @@ export async function stopSandboxInstance(
       outcome: "runtime_state_fence_before_mark",
     };
   }
-  await applySandboxLifecycleEvent(
+  const stopRequestedStatus = await applySandboxLifecycleEvent(
     {
       db: ctx.db,
       logger: ctx.logger,
@@ -338,29 +467,82 @@ export async function stopSandboxInstance(
     },
   );
 
-  try {
-    await resolvedRuntime.sandboxRuntimeControl.shutdown({
-      id: sandboxInstanceState.providerSandboxId,
-    });
-  } catch (error) {
-    if (!isSandboxResourceNotFoundError(error)) {
-      throw error;
-    }
-  }
+  if (initialProviderAction.kind === "shutdown_stop_then_inspect") {
+    try {
+      await resolvedRuntime.sandboxRuntimeControl.shutdown({
+        id: sandboxInstanceState.providerSandboxId,
+      });
+    } catch (error) {
+      if (!isSandboxResourceNotFoundError(error)) {
+        throw error;
+      }
 
-  try {
-    await stopSandbox(
-      {
-        sandboxAdapter: resolvedRuntime.sandboxAdapter,
-      },
-      {
-        runtimeProvider: sandboxInstanceState.runtimeProvider,
-        providerSandboxId: sandboxInstanceState.providerSandboxId,
-      },
-    );
-  } catch (error) {
-    if (!isSandboxResourceNotFoundError(error)) {
-      throw error;
+      return await markStopProviderFailureOrThrow(ctx, {
+        sandboxInstanceId: input.sandboxInstanceId,
+        currentStatus: stopRequestedStatus,
+        stopReason: input.stopReason,
+        ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
+        usageEventState: createStopSandboxUsageEventState(sandboxInstanceState),
+        action: {
+          kind: "fail",
+          failureCode: "provider_runtime_missing",
+          failureMessage: "Sandbox runtime was not found at the provider during sandboxd shutdown.",
+        },
+      });
+    }
+
+    try {
+      await stopSandbox(
+        {
+          sandboxAdapter: resolvedRuntime.sandboxAdapter,
+        },
+        {
+          runtimeProvider: sandboxInstanceState.runtimeProvider,
+          providerSandboxId: sandboxInstanceState.providerSandboxId,
+        },
+      );
+    } catch (error) {
+      if (!isSandboxResourceNotFoundError(error)) {
+        throw error;
+      }
+
+      return await markStopProviderFailureOrThrow(ctx, {
+        sandboxInstanceId: input.sandboxInstanceId,
+        currentStatus: stopRequestedStatus,
+        stopReason: input.stopReason,
+        ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
+        usageEventState: createStopSandboxUsageEventState(sandboxInstanceState),
+        action: {
+          kind: "fail",
+          failureCode: "provider_runtime_missing",
+          failureMessage: "Sandbox runtime was not found at the provider during provider stop.",
+        },
+      });
+    }
+
+    const afterStopProviderState = await inspectStopProviderStateOrMissing({
+      sandboxAdapter: resolvedRuntime.sandboxAdapter,
+      providerSandboxId: sandboxInstanceState.providerSandboxId,
+    });
+    const afterStopProviderAction = determineStopProviderAction({
+      providerState: afterStopProviderState,
+    });
+    switch (afterStopProviderAction.kind) {
+      case "fail":
+        return await markStopProviderFailureOrThrow(ctx, {
+          sandboxInstanceId: input.sandboxInstanceId,
+          currentStatus: stopRequestedStatus,
+          stopReason: input.stopReason,
+          ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
+          action: afterStopProviderAction,
+          usageEventState: createStopSandboxUsageEventState(sandboxInstanceState),
+        });
+      case "retry_provider_stop_in_progress":
+        throwStopProviderRetry(afterStopProviderAction);
+      case "shutdown_stop_then_inspect":
+        throw new Error("Sandbox runtime remained active at the provider after provider stop.");
+      case "mark_stopped":
+        break;
     }
   }
 
@@ -399,15 +581,7 @@ export async function stopSandboxInstance(
   return {
     executed: true,
     outcome: "stopped",
-    usageEventState: {
-      organizationId: sandboxInstanceState.organizationId,
-      runtimeProvider: sandboxInstanceState.runtimeProvider,
-      providerSandboxId: sandboxInstanceState.providerSandboxId,
-      computeGeneration: sandboxInstanceState.computeGeneration,
-      vcpuCount: sandboxInstanceState.sandboxVcpuCount,
-      memoryMb: sandboxInstanceState.sandboxMemoryMb,
-      storageMb: sandboxInstanceState.sandboxStorageMb,
-    },
+    usageEventState: createStopSandboxUsageEventState(sandboxInstanceState),
     ...(bootstrapAttachmentTerminationTarget === undefined
       ? {}
       : { bootstrapAttachmentTerminationTarget }),

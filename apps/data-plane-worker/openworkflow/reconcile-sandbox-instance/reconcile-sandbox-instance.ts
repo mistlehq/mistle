@@ -845,6 +845,8 @@ export async function reconcileSandboxInstance(
         sandboxInstance,
         logger: ctx.logger,
       });
+    case "retry_provider_stop_in_progress":
+      throw new Error(action.reason);
   }
 }
 

@@ -18,6 +18,10 @@ export type DisconnectReconciliationAction =
       kind: "stop_then_mark_stopped";
     }
   | {
+      kind: "retry_provider_stop_in_progress";
+      reason: string;
+    }
+  | {
       kind: "fail_if_startup_failure_evidence_else_stop";
       failureCode: string;
       failureMessage: string;
@@ -68,8 +72,13 @@ export function determineDisconnectReconciliationAction(input: {
             failureMessage:
               "Sandbox runtime was terminal at the provider during disconnect reconciliation.",
           };
-        case "active":
         case "stopping":
+          return {
+            kind: "retry_provider_stop_in_progress",
+            reason:
+              "Sandbox runtime stop is still in progress at the provider during disconnect reconciliation.",
+          };
+        case "active":
           return {
             kind: "fail_if_startup_failure_evidence_else_stop",
             failureCode: "bootstrap_disconnected_during_startup",
@@ -99,8 +108,13 @@ export function determineDisconnectReconciliationAction(input: {
             failureMessage:
               "Sandbox runtime was terminal at the provider during disconnect reconciliation.",
           };
-        case "active":
         case "stopping":
+          return {
+            kind: "retry_provider_stop_in_progress",
+            reason:
+              "Sandbox runtime stop is still in progress at the provider during disconnect reconciliation.",
+          };
+        case "active":
           return {
             kind: "stop_then_mark_stopped",
           };

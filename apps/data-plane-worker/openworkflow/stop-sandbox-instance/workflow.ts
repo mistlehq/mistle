@@ -4,7 +4,11 @@ import {
   type StopSandboxInstanceWorkflowInput,
   type StopSandboxInstanceWorkflowOutput,
 } from "@mistle/workflow-registry/data-plane";
-import { rethrowDurableStepErrorForRetry } from "@mistle/workflow-registry/durable-step-retry.js";
+import {
+  type DurableStepRetryOptions,
+  resolveDurableStepFinalError,
+  rethrowDurableStepErrorForRetry,
+} from "@mistle/workflow-registry/durable-step-retry.js";
 import { trace } from "@opentelemetry/api";
 
 import {
@@ -19,6 +23,10 @@ import {
   recordWorkerSandboxUsageEvent,
 } from "../shared/sandbox-usage-events.js";
 import { stopSandboxInstance, type StopSandboxInstanceResult } from "./stop-sandbox-instance.js";
+
+const StopDurableStepRetryOptions: DurableStepRetryOptions = {
+  finalizeNonRetryableOriginalError: true,
+};
 
 function resolveExpectedOwnerLeaseId(input: StopSandboxInstanceWorkflowInput): {
   expectedOwnerLeaseId?: string;
@@ -64,14 +72,18 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
 
     let result: StopSandboxInstanceResult;
     function rethrowStopDurableStepErrorForRetry(error: unknown): void {
-      rethrowDurableStepErrorForRetry(error, {
-        attributes: {
-          sandboxInstanceId: input.sandboxInstanceId,
+      rethrowDurableStepErrorForRetry(
+        error,
+        {
+          attributes: {
+            sandboxInstanceId: input.sandboxInstanceId,
+          },
+          eventName: "sandbox_instance.stop_step_retry",
+          logger,
+          message: "Retrying sandbox stop workflow after durable step failure.",
         },
-        eventName: "sandbox_instance.stop_step_retry",
-        logger,
-        message: "Retrying sandbox stop workflow after durable step failure.",
-      });
+        StopDurableStepRetryOptions,
+      );
     }
 
     async function terminateBootstrapAttachmentStep(
@@ -158,9 +170,10 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       });
     } catch (error) {
       rethrowStopDurableStepErrorForRetry(error);
+      const finalError = resolveDurableStepFinalError(error, StopDurableStepRetryOptions);
       await operationEvents.record({
         attributes: {
-          error: formatLifecycleEventError(error),
+          error: formatLifecycleEventError(finalError),
           stopReason: input.stopReason,
           timelineKey: "stop",
           timelineLabel: "Stopping sandbox",
@@ -169,12 +182,16 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         phase: "stop",
         status: "failed",
       });
-      throw error;
+      throw finalError;
     }
 
     if (result.executed && result.usageEventState !== undefined) {
       const usageEventState = result.usageEventState;
-      await step.run({ name: "record-sandbox-stopped-usage-event" }, async () => {
+      const usageEventType =
+        result.outcome === "failed"
+          ? SandboxUsageEventTypes.SANDBOX_FAILED
+          : SandboxUsageEventTypes.SANDBOX_STOPPED;
+      await step.run({ name: "record-sandbox-terminal-usage-event" }, async () => {
         await recordWorkerSandboxUsageEvent(
           {
             clock: ctx.clock,
@@ -185,13 +202,13 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             idempotencyKey: createSandboxUsageEventIdempotencyKey({
               sandboxInstanceId: input.sandboxInstanceId,
               computeGeneration: usageEventState.computeGeneration,
-              eventType: SandboxUsageEventTypes.SANDBOX_STOPPED,
+              eventType: usageEventType,
               operationId: run.id,
             }),
             organizationId: usageEventState.organizationId,
             sandboxInstanceId: input.sandboxInstanceId,
             computeGeneration: usageEventState.computeGeneration,
-            eventType: SandboxUsageEventTypes.SANDBOX_STOPPED,
+            eventType: usageEventType,
             runtimeProvider: usageEventState.runtimeProvider,
             providerSandboxId: usageEventState.providerSandboxId,
             vcpuCount: usageEventState.vcpuCount,
@@ -209,6 +226,31 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
     }
 
     const terminationResult = await terminateBootstrapAttachmentStep(result);
+
+    if (result.outcome === "failed") {
+      const terminalFailure = result.terminalFailure;
+      const failureMessage =
+        terminalFailure === undefined
+          ? "Sandbox stop failed."
+          : `${terminalFailure.failureCode}: ${terminalFailure.failureMessage}`;
+      await operationEvents.record({
+        attributes: {
+          error: failureMessage,
+          executed: result.executed,
+          outcome: result.outcome,
+          stopReason: input.stopReason,
+          timelineKey: "stop",
+          timelineLabel: "Stopping sandbox",
+          ...(terminationResult === undefined
+            ? {}
+            : { bootstrapAttachmentTerminationOutcome: terminationResult.outcome }),
+        },
+        message: "Sandbox stop failed.",
+        phase: "stop",
+        status: "failed",
+      });
+      throw new Error(failureMessage);
+    }
 
     await operationEvents.record({
       attributes: {
