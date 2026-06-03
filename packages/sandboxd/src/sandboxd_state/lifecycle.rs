@@ -808,6 +808,11 @@ impl SandboxdState {
                 "snapshot materialization sandboxes do not support activation".to_string(),
             ));
         }
+        if accepted_session_input.runtime_plan != session_input.runtime_plan {
+            return Err(SandboxdStateError::StartTunnelSession(
+                "initialized activation cannot change runtime plan".to_string(),
+            ));
+        }
         let egress_proxy_refresh_required = self.egress_proxy.is_some()
             && !egress_proxy_inputs_match(accepted_session_input, &session_input);
         if !initialized_activation_egress_inputs_are_supported(

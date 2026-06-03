@@ -96,6 +96,32 @@ fn initialized_snapshot_state_rejects_activation_refresh() {
     );
 }
 
+#[test]
+fn initialized_live_session_rejects_runtime_plan_changes() {
+    let mut state = minimal_initialized_state(SandboxdExecutionMode::Session);
+    let accepted_activation_input = activation_input(ActivationOperationKind::Start);
+    let accepted_session_input =
+        SessionRuntimeInput::from_activation_input(&accepted_activation_input);
+    let mut candidate_activation_input = accepted_activation_input;
+    candidate_activation_input.runtime_plan["sandboxProfileId"] =
+        serde_json::json!("sbp_replacement");
+
+    let error = state
+        .activate_initialized(
+            &candidate_activation_input,
+            &accepted_session_input,
+            std::path::Path::new("/tmp/test-gitconfig"),
+            None,
+        )
+        .expect_err("initialized activation should reject runtime plan changes");
+
+    assert!(
+        error
+            .to_string()
+            .contains("initialized activation cannot change runtime plan")
+    );
+}
+
 fn activation_input(operation_kind: ActivationOperationKind) -> ActivationInput {
     ActivationInput {
         operation_kind,

@@ -48,3 +48,17 @@ fn decodes_activation_error_response() {
         })
     );
 }
+
+#[test]
+fn rejects_activation_success_response_with_false_discriminant() {
+    serde_json::from_str::<ActivationResponse>(r#"{"ok":false}"#)
+        .expect_err("ok false without an error should not decode as success");
+}
+
+#[test]
+fn rejects_activation_error_response_with_true_discriminant() {
+    serde_json::from_str::<ActivationResponse>(
+        r#"{"ok":true,"error":"sandbox activation failed"}"#,
+    )
+    .expect_err("ok true with an error should not decode as failure");
+}

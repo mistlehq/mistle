@@ -1,6 +1,6 @@
 //! Shared activation protocol types.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -81,12 +81,14 @@ pub struct TransparentProxyConfiguration {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ActivationOkResponse {
+    #[serde(deserialize_with = "deserialize_ok_true")]
     pub ok: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ActivationErrorResponse {
+    #[serde(deserialize_with = "deserialize_ok_false")]
     pub ok: bool,
     pub error: String,
 }
@@ -96,4 +98,32 @@ pub struct ActivationErrorResponse {
 pub enum ActivationResponse {
     Ok(ActivationOkResponse),
     Error(ActivationErrorResponse),
+}
+
+fn deserialize_ok_true<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let ok = bool::deserialize(deserializer)?;
+    if ok {
+        Ok(ok)
+    } else {
+        Err(serde::de::Error::custom(
+            "activation success response must contain ok: true",
+        ))
+    }
+}
+
+fn deserialize_ok_false<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let ok = bool::deserialize(deserializer)?;
+    if ok {
+        Err(serde::de::Error::custom(
+            "activation error response must contain ok: false",
+        ))
+    } else {
+        Ok(ok)
+    }
 }
