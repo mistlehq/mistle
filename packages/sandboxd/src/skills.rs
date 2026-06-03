@@ -796,7 +796,7 @@ fn read_selected_skills(
         let skill = match read_skill_file(repo_root, &skill_file_path) {
             Ok(skill) => skill,
             Err(error) => {
-                if selection.expected_name.is_some() {
+                if selection.expected_name.is_some() && is_selected_skill_metadata_drift(&error) {
                     continue;
                 }
                 return Err(SkillsReconcileError::Discover(error));
@@ -825,6 +825,19 @@ fn read_selected_skills(
     }
     selected_skills.sort_by(|left, right| left.name.cmp(&right.name));
     Ok(selected_skills)
+}
+
+fn is_selected_skill_metadata_drift(error: &SkillsDiscoverError) -> bool {
+    matches!(
+        error,
+        SkillsDiscoverError::MissingFrontmatter(_)
+            | SkillsDiscoverError::UnterminatedFrontmatter(_)
+            | SkillsDiscoverError::InvalidFrontmatterYaml { .. }
+            | SkillsDiscoverError::FrontmatterNotMapping(_)
+            | SkillsDiscoverError::MissingFrontmatterField { .. }
+            | SkillsDiscoverError::InvalidFrontmatterFieldType { .. }
+            | SkillsDiscoverError::InvalidSkillName { .. }
+    )
 }
 
 fn normalize_selected_relative_path(relative_path: &str) -> Result<String, SkillsReconcileError> {
@@ -2159,6 +2172,54 @@ description: Valid skill.
             !target_root.join("stale-skill").exists(),
             "selected skill with invalid metadata should not be linked"
         );
+
+        fs::remove_dir_all(repo_root).expect("repo should be removable");
+        fs::remove_dir_all(target_root).expect("target root should be removable");
+    }
+
+    #[test]
+    fn materialized_reconcile_rejects_selected_skill_file_read_errors() {
+        let repo_root = create_git_repo("skills_materialized_reconcile_read_error");
+        let target_root = create_temp_test_dir("skills_materialized_reconcile_read_error_target");
+        fs::create_dir_all(repo_root.join("skills/unreadable-skill"))
+            .expect("unreadable skill directory should be created");
+        fs::write(
+            repo_root.join("skills/unreadable-skill/SKILL.md"),
+            [0xff, 0xfe, 0xfd],
+        )
+        .expect("unreadable skill file should be written");
+        write_skill(
+            &repo_root,
+            "skills/valid-skill",
+            r#"---
+name: valid-skill
+description: Valid skill.
+---
+"#,
+        );
+        commit_all(&repo_root);
+
+        let error = reconcile_materialized_skills(
+            &repo_root,
+            &SkillsRuntime::Codex,
+            &[
+                SkillsReconcileSelection {
+                    name: "unreadable-skill".to_string(),
+                    relative_path: "skills/unreadable-skill".to_string(),
+                },
+                SkillsReconcileSelection {
+                    name: "valid-skill".to_string(),
+                    relative_path: "skills/valid-skill".to_string(),
+                },
+            ],
+            Some(&target_root),
+        )
+        .expect_err("materialized reconcile should reject selected skill file read errors");
+
+        assert!(matches!(
+            error,
+            SkillsReconcileError::Discover(SkillsDiscoverError::ReadSkillFile { .. })
+        ));
 
         fs::remove_dir_all(repo_root).expect("repo should be removable");
         fs::remove_dir_all(target_root).expect("target root should be removable");
