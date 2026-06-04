@@ -24,17 +24,15 @@ import {
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
 import { systemSleeper } from "@mistle/time";
-import { StopSandboxInstanceWorkflowSpec } from "@mistle/workflow-registry/data-plane";
-import { typeid } from "typeid-js";
-import { describe, expect } from "vitest";
+import { expect } from "vitest";
 
 import {
   closeWebSocket,
   connectSandboxTunnelWebSocket,
-  waitForWebSocketClose,
 } from "../../data-plane-gateway/integration/websocket-test-helpers.js";
 
-const TestTimeoutMs = 30_000;
+export const TestTimeoutMs = 30_000;
+
 const WebSocketOpenReadyState = 1;
 const RuntimeStateReadTimeoutMs = 5_000;
 const RuntimeStateReadPollIntervalMs = 50;
@@ -49,181 +47,97 @@ const SandboxDockerNetworkNameValue = "network.name";
 const ProviderRuntimeImageRef = "nginx:1.27-alpine";
 const ProviderImageCreatedAt = "2026-05-16T00:00:00.000Z";
 
-const it = createIntegrationTest({
-  services: ["data-plane-api", "data-plane-gateway", "data-plane-worker"],
-  __internalInfra: createDockerSandboxNetworkInfra(),
-  __afterStart: async ({ environment }) => {
-    sandboxProviderRuntimeFixture = {
-      baseImageRef: ProviderRuntimeImageRef,
-      dockerNetworkName: readRequiredInfraValue({
-        infra: environment.infra,
-        infraId: SandboxDockerNetworkInfraId,
-        valueKey: SandboxDockerNetworkNameValue,
-      }),
-    };
-  },
-});
-
 type ConnectedWebSocket = Awaited<ReturnType<typeof connectSandboxTunnelWebSocket>>;
 type SandboxProviderRuntimeFixture = {
   baseImageRef: string;
   dockerNetworkName: string;
 };
 
-let sandboxProviderRuntimeFixture: SandboxProviderRuntimeFixture | undefined;
+export function createStopSandboxBootstrapAttachmentTestHarness() {
+  let sandboxProviderRuntimeFixture: SandboxProviderRuntimeFixture | undefined;
 
-describe.concurrent("data-plane worker stop sandbox bootstrap attachment cleanup", () => {
-  it(
-    "finalizes a running sandbox through the stop workflow",
-    async ({ env }) => {
-      const sandboxInstanceId = typeid("sbi").toString();
-      await insertRunningSandboxInstance(env, sandboxInstanceId);
-
-      const handle = await env.dataPlaneWorkflow.runWorkflow(StopSandboxInstanceWorkflowSpec, {
-        sandboxInstanceId,
-        stopReason: SandboxStopReasons.USER,
-      });
-      await expect(handle.result({ timeoutMs: 15_000 })).resolves.toEqual({
-        sandboxInstanceId,
-        executed: true,
-        outcome: "stopped",
-      });
-
-      await expectSandboxStopped(env, sandboxInstanceId, SandboxStopReasons.USER);
-    },
-    TestTimeoutMs,
-  );
-
-  it(
-    "fails a running sandbox stop when the provider runtime is missing",
-    async ({ env }) => {
-      const sandboxInstanceId = typeid("sbi").toString();
-      await insertRunningSandboxInstance(env, sandboxInstanceId, {
-        providerSandboxId: `missing-${sandboxInstanceId}`,
-      });
-
-      const handle = await env.dataPlaneWorkflow.runWorkflow(StopSandboxInstanceWorkflowSpec, {
-        sandboxInstanceId,
-        stopReason: SandboxStopReasons.USER,
-      });
-      await expect(handle.result({ timeoutMs: 15_000 })).rejects.toThrow(
-        "provider_runtime_missing",
-      );
-      await expectSandboxFailed(env, sandboxInstanceId, {
-        failureCode: "provider_runtime_missing",
-        failureMessage: "Sandbox runtime was not found at the provider during stop execution.",
-      });
-      await expectSandboxFailedUsageEvent(env, sandboxInstanceId, {
-        providerSandboxId: `missing-${sandboxInstanceId}`,
-      });
-    },
-    TestTimeoutMs,
-  );
-
-  it(
-    "terminates a stale bootstrap attachment when the stop workflow observes an already-stopped sandbox",
-    async ({ env }) => {
-      const sandboxInstanceId = typeid("sbi").toString();
-      await insertStoppedSandboxInstance(env, sandboxInstanceId);
-
-      const bootstrapSocket = await connectBootstrapSocket({
-        env,
-        sandboxInstanceId,
-      });
-      try {
-        const attached = await waitForRuntimeState({
-          env,
-          sandboxInstanceId,
-          predicate: (snapshot) => snapshot.ownerLeaseId !== null && snapshot.attachment !== null,
-        });
-        if (attached.attachment === null) {
-          throw new Error("Expected bootstrap attachment before running stop workflow.");
-        }
-
-        const closeEvent = waitForWebSocketClose(bootstrapSocket);
-        const handle = await env.dataPlaneWorkflow.runWorkflow(StopSandboxInstanceWorkflowSpec, {
-          sandboxInstanceId,
-          stopReason: SandboxStopReasons.IDLE,
-          expectedOwnerLeaseId: attached.attachment.ownerLeaseId,
-        });
-        await expect(handle.result({ timeoutMs: 15_000 })).resolves.toEqual({
-          sandboxInstanceId,
-          executed: false,
-          outcome: "already_stopped",
-        });
-        await expect(closeEvent).resolves.toEqual({
-          code: 1012,
-          reason: "Sandbox stopped.",
-        });
-
-        const cleared = await waitForRuntimeState({
-          env,
-          sandboxInstanceId,
-          predicate: (snapshot) => snapshot.ownerLeaseId === null && snapshot.attachment === null,
-        });
-        expect(cleared.ownerLeaseId).toBeNull();
-        expect(cleared.attachment).toBeNull();
-      } finally {
-        await closeIfOpen(bootstrapSocket);
-      }
-    },
-    TestTimeoutMs,
-  );
-});
-
-async function insertRunningSandboxInstance(
-  env: IntegrationTestEnvironment,
-  sandboxInstanceId: string,
-  input: {
-    providerSandboxId?: string;
-  } = {},
-): Promise<void> {
-  const providerSandboxId = input.providerSandboxId ?? (await startDockerProviderSandboxRuntime());
-
-  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
-    id: sandboxInstanceId,
-    organizationId: `org_${sandboxInstanceId}`,
-    sandboxProfileId: `sbp_${sandboxInstanceId}`,
-    sandboxProfileVersion: 1,
-    runtimeProvider: "docker",
-    providerSandboxId,
-    status: SandboxInstanceStatuses.RUNNING,
-    purpose: SandboxInstancePurposes.SESSION,
-    startedByKind: "system",
-    startedById: `worker_${sandboxInstanceId}`,
-    source: SandboxInstanceSources.DASHBOARD,
-  });
-}
-
-async function startDockerProviderSandboxRuntime(): Promise<string> {
-  const fixture = readSandboxProviderRuntimeFixture();
-  const sandboxAdapter = createSandboxAdapter({
-    provider: SandboxProvider.DOCKER,
-    docker: {
-      socketPath: DockerSocketPath,
-      networkName: fixture.dockerNetworkName,
+  const it = createIntegrationTest({
+    services: ["data-plane-api", "data-plane-gateway", "data-plane-worker"],
+    __internalInfra: createDockerSandboxNetworkInfra(),
+    __afterStart: async ({ environment }) => {
+      sandboxProviderRuntimeFixture = {
+        baseImageRef: ProviderRuntimeImageRef,
+        dockerNetworkName: readRequiredInfraValue({
+          infra: environment.infra,
+          infraId: SandboxDockerNetworkInfraId,
+          valueKey: SandboxDockerNetworkNameValue,
+        }),
+      };
     },
   });
-  const image = await sandboxAdapter.prepareImage({
-    image: {
-      provider: SandboxProvider.DOCKER,
-      imageId: fixture.baseImageRef,
-      createdAt: ProviderImageCreatedAt,
-    },
-  });
-  const handle = await sandboxAdapter.start({
-    image,
-  });
 
-  return handle.id;
-}
+  async function insertRunningSandboxInstance(
+    env: IntegrationTestEnvironment,
+    sandboxInstanceId: string,
+    input: {
+      providerSandboxId?: string;
+    } = {},
+  ): Promise<void> {
+    const providerSandboxId =
+      input.providerSandboxId ?? (await startDockerProviderSandboxRuntime());
 
-function readSandboxProviderRuntimeFixture(): SandboxProviderRuntimeFixture {
-  if (sandboxProviderRuntimeFixture === undefined) {
-    throw new Error("Sandbox provider runtime fixture was not initialized.");
+    await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
+      id: sandboxInstanceId,
+      organizationId: `org_${sandboxInstanceId}`,
+      sandboxProfileId: `sbp_${sandboxInstanceId}`,
+      sandboxProfileVersion: 1,
+      runtimeProvider: "docker",
+      providerSandboxId,
+      status: SandboxInstanceStatuses.RUNNING,
+      purpose: SandboxInstancePurposes.SESSION,
+      startedByKind: "system",
+      startedById: `worker_${sandboxInstanceId}`,
+      source: SandboxInstanceSources.DASHBOARD,
+    });
   }
 
-  return sandboxProviderRuntimeFixture;
+  async function startDockerProviderSandboxRuntime(): Promise<string> {
+    const fixture = readSandboxProviderRuntimeFixture();
+    const sandboxAdapter = createSandboxAdapter({
+      provider: SandboxProvider.DOCKER,
+      docker: {
+        socketPath: DockerSocketPath,
+        networkName: fixture.dockerNetworkName,
+      },
+    });
+    const image = await sandboxAdapter.prepareImage({
+      image: {
+        provider: SandboxProvider.DOCKER,
+        imageId: fixture.baseImageRef,
+        createdAt: ProviderImageCreatedAt,
+      },
+    });
+    const handle = await sandboxAdapter.start({
+      image,
+    });
+
+    return handle.id;
+  }
+
+  function readSandboxProviderRuntimeFixture(): SandboxProviderRuntimeFixture {
+    if (sandboxProviderRuntimeFixture === undefined) {
+      throw new Error("Sandbox provider runtime fixture was not initialized.");
+    }
+
+    return sandboxProviderRuntimeFixture;
+  }
+
+  return {
+    it,
+    insertRunningSandboxInstance,
+    insertStoppedSandboxInstance,
+    expectSandboxStopped,
+    expectSandboxFailed,
+    expectSandboxFailedUsageEvent,
+    connectBootstrapSocket,
+    waitForRuntimeState,
+    closeIfOpen,
+  };
 }
 
 function readRequiredInfraValue(input: {
