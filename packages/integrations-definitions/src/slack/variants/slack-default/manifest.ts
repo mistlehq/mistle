@@ -26,9 +26,13 @@ export const SlackAppManifestTemplate = {
     background_color: "#2f855a",
   },
   features: {
+    assistant_view: {
+      assistant_description:
+        "Ask Mistle to help with workspace operations and follow along in Slack threads.",
+    },
     bot_user: {
       display_name: "mistle",
-      always_online: false,
+      always_online: true,
     },
   },
   settings: {

@@ -22,6 +22,16 @@ import { SlackAppManifestTemplate } from "./manifest.js";
 describe("SlackAppManifestTemplate", () => {
   it("includes the default Slack app permissions and event subscriptions", () => {
     expect(SlackAppManifestTemplate).toMatchObject({
+      features: {
+        assistant_view: {
+          assistant_description:
+            "Ask Mistle to help with workspace operations and follow along in Slack threads.",
+        },
+        bot_user: {
+          display_name: "mistle",
+          always_online: true,
+        },
+      },
       settings: {
         event_subscriptions: {
           request_url: "https://mistle.example.com/api/integrations/slack/webhook",
@@ -157,6 +167,15 @@ describe("buildSlackAppManifestDraft", () => {
     });
 
     expect(manifest).toMatchObject({
+      features: {
+        assistant_view: {
+          assistant_description:
+            "Ask Mistle to help with workspace operations and follow along in Slack threads.",
+        },
+        bot_user: {
+          always_online: true,
+        },
+      },
       settings: {
         event_subscriptions: {
           request_url:
