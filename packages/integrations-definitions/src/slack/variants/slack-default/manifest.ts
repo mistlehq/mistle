@@ -26,15 +26,23 @@ export const SlackAppManifestTemplate = {
     background_color: "#2f855a",
   },
   features: {
+    assistant_view: {
+      assistant_description:
+        "Ask Mistle to help with workspace operations and follow along in Slack threads.",
+    },
     bot_user: {
       display_name: "mistle",
-      always_online: false,
+      always_online: true,
     },
   },
   settings: {
     event_subscriptions: {
       request_url: "https://mistle.example.com/api/integrations/slack/webhook",
       bot_events: SlackAppManifestBotEvents,
+    },
+    interactivity: {
+      is_enabled: true,
+      request_url: "https://mistle.example.com/api/integrations/slack/webhook",
     },
     socket_mode_enabled: false,
     token_rotation_enabled: false,
