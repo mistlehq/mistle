@@ -31,7 +31,7 @@ import { InMemoryRelayTransportAdapter } from "../relay-transport/adapters/in-me
 import { InMemoryTunnelSessionRegistryAdapter } from "../tunnel-session/adapters/in-memory-tunnel-session-registry-adapter.js";
 import { TunnelSessionRegistry } from "../tunnel-session/index.js";
 import type { RelayPeerSocket } from "../types.js";
-import { TunnelSessionService } from "./tunnel-session-service.js";
+import { BootstrapTunnelCloseCauses, TunnelSessionService } from "./tunnel-session-service.js";
 
 const GatewayNodeId = "dpg_test";
 const SandboxInstanceId = "sbi_test";
@@ -460,6 +460,226 @@ function createBootstrapHealthTestHarness() {
 }
 
 describe("TunnelSessionService", () => {
+  it("summarizes bootstrap close cause and heartbeat state for close logs", async () => {
+    const { clock, rawSocket, service } = createBootstrapHealthTestHarness();
+    const openedAtMs = clock.nowMs();
+    const attachedPeer = service.attachBootstrapPeer({
+      leaseId: OwnerLeaseId,
+      onFatalError: () => {
+        throw new Error("Bootstrap attach should not fail in this test.");
+      },
+      onLeaseLost: () => {
+        throw new Error("Bootstrap lease should not be lost in this test.");
+      },
+      onTransportUnhealthy: () => {
+        throw new Error("Bootstrap transport should remain healthy in this test.");
+      },
+      openedAtMs,
+      ownerLeaseTtlMs: 60_000,
+      relaySessionId: BootstrapSessionId,
+      sandboxInstanceId: SandboxInstanceId,
+      socket: createFakePeerSocket(rawSocket),
+    });
+    await attachedPeer.activationPromise;
+
+    clock.advanceMs(1_250);
+    service.markBootstrapCloseInitiated({
+      attachedPeer,
+      cause: BootstrapTunnelCloseCauses.GATEWAY_PROTOCOL_ERROR,
+      reason: "protocol violation",
+    });
+
+    expect(service.bootstrapCloseDiagnostics(attachedPeer)).toEqual({
+      closeCause: BootstrapTunnelCloseCauses.GATEWAY_PROTOCOL_ERROR,
+      closeCauseReason: "protocol violation",
+      closeInitiatedAtMs: clock.nowMs(),
+      gatewayInitiatedClose: true,
+      health: {
+        consecutiveMissedPongs: 0,
+        healthy: true,
+        lastPongAgeMs: 1_250,
+        pingInFlight: false,
+      },
+      socketAgeMs: 1_250,
+    });
+  });
+
+  it("preserves the first bootstrap close cause when later paths report transport errors", async () => {
+    const { clock, rawSocket, service } = createBootstrapHealthTestHarness();
+    const attachedPeer = service.attachBootstrapPeer({
+      leaseId: OwnerLeaseId,
+      onFatalError: () => {
+        throw new Error("Bootstrap attach should not fail in this test.");
+      },
+      onLeaseLost: () => {
+        throw new Error("Bootstrap lease should not be lost in this test.");
+      },
+      onTransportUnhealthy: () => {
+        throw new Error("Bootstrap transport should remain healthy in this test.");
+      },
+      ownerLeaseTtlMs: 60_000,
+      relaySessionId: BootstrapSessionId,
+      sandboxInstanceId: SandboxInstanceId,
+      socket: createFakePeerSocket(rawSocket),
+    });
+    await attachedPeer.activationPromise;
+
+    service.markBootstrapCloseInitiated({
+      attachedPeer,
+      cause: BootstrapTunnelCloseCauses.GATEWAY_PRESENCE_DEADLINE_FAILED,
+      reason: "Failed to persist sandbox presence lease.",
+    });
+    const firstInitiatedAtMs = clock.nowMs();
+    clock.advanceMs(250);
+    service.markBootstrapCloseInitiated({
+      attachedPeer,
+      cause: BootstrapTunnelCloseCauses.TRANSPORT_ERROR,
+      reason: "Bootstrap websocket emitted transport error.",
+    });
+
+    expect(service.bootstrapCloseDiagnostics(attachedPeer)).toMatchObject({
+      closeCause: BootstrapTunnelCloseCauses.GATEWAY_PRESENCE_DEADLINE_FAILED,
+      closeCauseReason: "Failed to persist sandbox presence lease.",
+      closeInitiatedAtMs: firstInitiatedAtMs,
+      gatewayInitiatedClose: true,
+    });
+  });
+
+  it("prefers session close context over later direct peer close context writes", async () => {
+    const { clock, rawSocket, service } = createBootstrapHealthTestHarness();
+    const attachedPeer = service.attachBootstrapPeer({
+      leaseId: OwnerLeaseId,
+      onFatalError: () => {
+        throw new Error("Bootstrap attach should not fail in this test.");
+      },
+      onLeaseLost: () => {
+        throw new Error("Bootstrap lease should not be lost in this test.");
+      },
+      onTransportUnhealthy: () => {
+        throw new Error("Bootstrap transport should remain healthy in this test.");
+      },
+      ownerLeaseTtlMs: 60_000,
+      relaySessionId: BootstrapSessionId,
+      sandboxInstanceId: SandboxInstanceId,
+      socket: createFakePeerSocket(rawSocket),
+    });
+    await attachedPeer.activationPromise;
+
+    service.markBootstrapCloseInitiated({
+      attachedPeer,
+      cause: BootstrapTunnelCloseCauses.GATEWAY_PRESENCE_DEADLINE_FAILED,
+      reason: "Failed to persist sandbox presence lease.",
+    });
+    const firstInitiatedAtMs = clock.nowMs();
+    clock.advanceMs(250);
+    attachedPeer.bootstrapCloseContext = {
+      cause: BootstrapTunnelCloseCauses.GATEWAY_HEALTH_MISSED_PONGS,
+      gatewayInitiated: true,
+      initiatedAtMs: clock.nowMs(),
+      reason: "Sandbox bootstrap websocket stopped responding to ping.",
+    };
+
+    expect(service.bootstrapCloseDiagnostics(attachedPeer)).toMatchObject({
+      closeCause: BootstrapTunnelCloseCauses.GATEWAY_PRESENCE_DEADLINE_FAILED,
+      closeCauseReason: "Failed to persist sandbox presence lease.",
+      closeInitiatedAtMs: firstInitiatedAtMs,
+      gatewayInitiatedClose: true,
+    });
+  });
+
+  it("adopts peer-only close context before later close attempts", async () => {
+    const { clock, rawSocket, service } = createBootstrapHealthTestHarness();
+    const attachedPeer = service.attachBootstrapPeer({
+      leaseId: OwnerLeaseId,
+      onFatalError: () => {
+        throw new Error("Bootstrap attach should not fail in this test.");
+      },
+      onLeaseLost: () => {
+        throw new Error("Bootstrap lease should not be lost in this test.");
+      },
+      onTransportUnhealthy: () => {
+        throw new Error("Bootstrap transport should remain healthy in this test.");
+      },
+      ownerLeaseTtlMs: 60_000,
+      relaySessionId: BootstrapSessionId,
+      sandboxInstanceId: SandboxInstanceId,
+      socket: createFakePeerSocket(rawSocket),
+    });
+    await attachedPeer.activationPromise;
+
+    attachedPeer.bootstrapCloseContext = {
+      cause: BootstrapTunnelCloseCauses.GATEWAY_HEALTH_MISSED_PONGS,
+      gatewayInitiated: true,
+      initiatedAtMs: clock.nowMs(),
+      reason: "Sandbox bootstrap websocket stopped responding to ping.",
+    };
+    const firstInitiatedAtMs = clock.nowMs();
+    clock.advanceMs(250);
+    service.markBootstrapCloseInitiated({
+      attachedPeer,
+      cause: BootstrapTunnelCloseCauses.TRANSPORT_ERROR,
+      reason: "Bootstrap websocket emitted transport error.",
+    });
+    clock.advanceMs(250);
+    attachedPeer.bootstrapCloseContext = {
+      cause: BootstrapTunnelCloseCauses.GATEWAY_ATTACH_FATAL_ERROR,
+      gatewayInitiated: true,
+      initiatedAtMs: clock.nowMs(),
+      reason: "Failed to refresh sandbox runtime attachment.",
+    };
+
+    expect(service.bootstrapCloseDiagnostics(attachedPeer)).toMatchObject({
+      closeCause: BootstrapTunnelCloseCauses.GATEWAY_HEALTH_MISSED_PONGS,
+      closeCauseReason: "Sandbox bootstrap websocket stopped responding to ping.",
+      closeInitiatedAtMs: firstInitiatedAtMs,
+      gatewayInitiatedClose: true,
+    });
+  });
+
+  it("classifies bootstrap websocket close frames separately from abnormal transport closes", async () => {
+    const { clock, rawSocket, service } = createBootstrapHealthTestHarness();
+    const openedAtMs = clock.nowMs();
+    const attachedPeer = service.attachBootstrapPeer({
+      leaseId: OwnerLeaseId,
+      onFatalError: () => {
+        throw new Error("Bootstrap attach should not fail in this test.");
+      },
+      onLeaseLost: () => {
+        throw new Error("Bootstrap lease should not be lost in this test.");
+      },
+      onTransportUnhealthy: () => {
+        throw new Error("Bootstrap transport should remain healthy in this test.");
+      },
+      openedAtMs,
+      ownerLeaseTtlMs: 60_000,
+      relaySessionId: BootstrapSessionId,
+      sandboxInstanceId: SandboxInstanceId,
+      socket: createFakePeerSocket(rawSocket),
+    });
+    await attachedPeer.activationPromise;
+
+    clock.advanceMs(375);
+
+    expect(
+      service.bootstrapCloseDiagnostics(attachedPeer, {
+        closeCode: 1000,
+        closeReason: "sandbox process exited",
+      }),
+    ).toEqual({
+      closeCause: BootstrapTunnelCloseCauses.PEER_CLOSE_FRAME,
+      closeCauseReason: "sandbox process exited",
+      closeInitiatedAtMs: null,
+      gatewayInitiatedClose: false,
+      health: {
+        consecutiveMissedPongs: 0,
+        healthy: true,
+        lastPongAgeMs: 375,
+        pingInFlight: false,
+      },
+      socketAgeMs: 375,
+    });
+  });
+
   it("marks bootstrap sessions degraded on missed pong and recovered on the next pong", async () => {
     const { clock, lifecycleEvents, rawSocket, scheduler, service } =
       createBootstrapHealthTestHarness();

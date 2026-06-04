@@ -106,6 +106,7 @@ function toPeerSocket(socket: WebSocket): RelayPeerSocket {
 
 class FakeRawSocket extends EventEmitter {
   public pingCallCount = 0;
+  public socketReadyState: 0 | 1 | 2 | 3 = WebSocket.OPEN;
 
   public ping(
     _data: Buffer | undefined,
@@ -122,7 +123,7 @@ function createFakePeerSocket(rawSocket: FakeRawSocket): RelayPeerSocket {
     send: () => undefined,
     close: () => undefined,
     get readyState() {
-      return WebSocket.OPEN;
+      return rawSocket.socketReadyState;
     },
     raw: rawSocket as unknown as WebSocket,
   } as unknown as RelayPeerSocket;
@@ -227,7 +228,7 @@ describe("startWebSocketHealthMonitor", () => {
     handle.stop();
   });
 
-  it("marks sockets unhealthy once the peer disconnects before the next ping", async () => {
+  it("stops monitoring without marking unhealthy once the peer disconnects before the next ping", async () => {
     const pair = await createWebSocketPair();
     openPairs.add(pair);
     const clock = createMutableClock(2_000);
@@ -255,8 +256,43 @@ describe("startWebSocketHealthMonitor", () => {
     clock.advanceMs(10);
     scheduler.runDue();
 
-    expect(handle.isHealthy()).toBe(false);
-    expect(unhealthyCount).toBe(1);
+    expect(handle.isHealthy()).toBe(true);
+    expect(unhealthyCount).toBe(0);
+  });
+
+  it("stops monitoring without marking unhealthy when the peer disconnects before pong timeout", () => {
+    const clock = createMutableClock(2_500);
+    const scheduler = createManualScheduler(clock);
+    const rawSocket = new FakeRawSocket();
+    const missedPongCounts: number[] = [];
+    let unhealthyCount = 0;
+
+    const handle = startWebSocketHealthMonitor({
+      clock,
+      socketKind: "bootstrap",
+      tokenKind: "bootstrap",
+      socket: createFakePeerSocket(rawSocket),
+      scheduler,
+      pingIntervalMs: 10,
+      pongTimeoutMs: 10,
+      maxConsecutiveMissedPongs: 1,
+      onMissedPong: ({ consecutiveMissedPongs }) => {
+        missedPongCounts.push(consecutiveMissedPongs);
+      },
+      onUnhealthy: () => {
+        unhealthyCount += 1;
+      },
+    });
+
+    clock.advanceMs(10);
+    scheduler.runDue();
+    rawSocket.socketReadyState = WebSocket.CLOSING;
+    clock.advanceMs(10);
+    scheduler.runDue();
+
+    expect(handle.isHealthy()).toBe(true);
+    expect(unhealthyCount).toBe(0);
+    expect(missedPongCounts).toEqual([]);
   });
 
   it("keeps sockets healthy through a transient missed pong and resets after recovery", () => {

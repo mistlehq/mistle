@@ -4,6 +4,7 @@ import {
   ActivateCommand,
   DockerExecExitTimeoutMs,
   DockerLongRunningExecExitTimeoutMs,
+  SandboxdOperationLogPaths,
   SandboxdResetTransparentEgressNftablesTimeoutMs,
   SandboxdStopDaemonTimeoutMs,
   ShutdownCommand,
@@ -21,6 +22,15 @@ describe("Docker sandbox runtime control timeouts", () => {
   it("uses bounded daemon-stop and nftables-reset timeouts during sandboxd refresh", () => {
     expect(SandboxdStopDaemonTimeoutMs).toBe(30_000);
     expect(SandboxdResetTransparentEgressNftablesTimeoutMs).toBe(10_000);
+  });
+});
+
+describe("Docker sandbox runtime control operation logs", () => {
+  it("can read activation and bootstrap tunnel diagnostics from sandboxd log files", () => {
+    expect(SandboxdOperationLogPaths).toEqual({
+      activate: "/run/mistle/activate.log",
+      bootstrap_tunnel: "/run/mistle/bootstrap-tunnel.log",
+    });
   });
 });
 

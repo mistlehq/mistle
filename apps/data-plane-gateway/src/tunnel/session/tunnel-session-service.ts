@@ -24,12 +24,48 @@ import {
 } from "../tunnel-peer-notifier.js";
 import type { TunnelSessionRegistry } from "../tunnel-session/index.js";
 import type { RelayPeerSocket, RelayTarget } from "../types.js";
-import { startWebSocketHealthMonitor } from "./websocket-health-monitor.js";
+import {
+  startWebSocketHealthMonitor,
+  type WebSocketHealthHandle,
+  type WebSocketHealthSnapshot,
+} from "./websocket-health-monitor.js";
 
 const ConnectionPresenceLeaseSource = "dashboard";
 
 type LeaseRenewalHandle = {
   stop: () => void;
+};
+
+export const BootstrapTunnelCloseCauses = {
+  GATEWAY_ATTACH_FATAL_ERROR: "gateway_attach_fatal_error",
+  GATEWAY_HEALTH_MISSED_PONGS: "gateway_health_missed_pongs",
+  GATEWAY_MESSAGE_HANDLER_ERROR: "gateway_message_handler_error",
+  GATEWAY_OWNER_LEASE_LOST: "gateway_owner_lease_lost",
+  GATEWAY_PRESENCE_DEADLINE_FAILED: "gateway_presence_deadline_failed",
+  GATEWAY_PROTOCOL_ERROR: "gateway_protocol_error",
+  GATEWAY_UNSUPPORTED_MESSAGE_TYPE: "gateway_unsupported_message_type",
+  PEER_CLOSE_FRAME: "peer_close_frame",
+  TRANSPORT_ABNORMAL_CLOSE: "transport_abnormal_close",
+  TRANSPORT_ERROR: "transport_error",
+} as const;
+
+export type BootstrapTunnelCloseCause =
+  (typeof BootstrapTunnelCloseCauses)[keyof typeof BootstrapTunnelCloseCauses];
+
+export type BootstrapTunnelCloseContext = {
+  cause: BootstrapTunnelCloseCause;
+  gatewayInitiated: boolean;
+  initiatedAtMs?: number;
+  reason: string;
+};
+
+export type BootstrapTunnelCloseDiagnostics = {
+  closeCause: BootstrapTunnelCloseCause;
+  gatewayInitiatedClose: boolean;
+  closeInitiatedAtMs: number | null;
+  closeCauseReason: string;
+  socketAgeMs: number;
+  health: WebSocketHealthSnapshot | null;
 };
 
 /**
@@ -38,15 +74,14 @@ type LeaseRenewalHandle = {
  */
 export type AttachedTunnelPeer = {
   activationPromise?: Promise<void>;
+  bootstrapCloseContext?: BootstrapTunnelCloseContext;
+  openedAtMs?: number;
   relayTarget: RelayTarget;
   leaseHeartbeatHandle?: LeaseRenewalHandle;
   presenceLeaseRenewalHandle?: {
     stop: () => void;
   };
-  websocketHealthHandle?: {
-    stop: () => void;
-    isHealthy: () => boolean;
-  };
+  websocketHealthHandle?: WebSocketHealthHandle;
 };
 
 /**
@@ -76,6 +111,11 @@ export type TunnelSessionTransportUnhealthy = {
 };
 
 export class TunnelSessionService {
+  private readonly bootstrapCloseContextsBySessionId = new Map<
+    string,
+    BootstrapTunnelCloseContext
+  >();
+
   public constructor(
     private readonly gatewayNodeId: string,
     private readonly interactiveStreamRouter: InteractiveStreamRouter,
@@ -99,6 +139,7 @@ export class TunnelSessionService {
     onLeaseLost: (failure: TunnelSessionLeaseLost) => void;
     onRoundTripTimeObserved?: (roundTripTimeMs: number) => void;
     onTransportUnhealthy: (failure: TunnelSessionTransportUnhealthy) => void;
+    openedAtMs?: number;
     ownerLeaseTtlMs: number;
     relaySessionId: string;
     sandboxInstanceId: string;
@@ -114,14 +155,11 @@ export class TunnelSessionService {
     const attachResult = this.tunnelSessionRegistry.attachBootstrapSession(relayTarget);
 
     const runtimeAttachmentAttachedAtMs = this.clock.nowMs();
-    let websocketHealthHandle:
-      | {
-          stop: () => void;
-          isHealthy: () => boolean;
-        }
-      | undefined;
+    const openedAtMs = input.openedAtMs ?? runtimeAttachmentAttachedAtMs;
+    let websocketHealthHandle: WebSocketHealthHandle | undefined;
 
     const attachedPeer: AttachedTunnelPeer = {
+      openedAtMs,
       relayTarget,
     };
 
@@ -213,8 +251,16 @@ export class TunnelSessionService {
             });
         },
         onUnhealthy: () => {
+          this.recordBootstrapCloseContext({
+            attachedPeer,
+            cause: BootstrapTunnelCloseCauses.GATEWAY_HEALTH_MISSED_PONGS,
+            gatewayInitiated: true,
+            reason: "Sandbox bootstrap websocket stopped responding to ping.",
+          });
           logger.error(
             {
+              eventName: "gateway.bootstrap.close.initiated",
+              ...this.bootstrapCloseDiagnostics(attachedPeer),
               sandboxInstanceId: input.sandboxInstanceId,
               leaseId: input.leaseId,
               maxConsecutiveMissedPongs: BOOTSTRAP_WEBSOCKET_MAX_CONSECUTIVE_MISSED_PONGS,
@@ -231,9 +277,17 @@ export class TunnelSessionService {
           : { onRoundTripTimeObserved: input.onRoundTripTimeObserved }),
       });
     } catch (error) {
+      this.recordBootstrapCloseContext({
+        attachedPeer,
+        cause: BootstrapTunnelCloseCauses.GATEWAY_ATTACH_FATAL_ERROR,
+        gatewayInitiated: true,
+        reason: "Failed to initialize bootstrap websocket health checks.",
+      });
       logger.error(
         {
           err: error,
+          eventName: "gateway.bootstrap.close.initiated",
+          ...this.bootstrapCloseDiagnostics(attachedPeer),
           sandboxInstanceId: input.sandboxInstanceId,
         },
         "Failed to initialize bootstrap websocket health checks",
@@ -266,9 +320,17 @@ export class TunnelSessionService {
       releasedBindings: attachResult.releasedBindings,
       sandboxInstanceId: input.sandboxInstanceId,
     }).catch((error: unknown) => {
+      this.recordBootstrapCloseContext({
+        attachedPeer,
+        cause: BootstrapTunnelCloseCauses.GATEWAY_ATTACH_FATAL_ERROR,
+        gatewayInitiated: true,
+        reason: "Failed notifying connection peer about released interactive streams.",
+      });
       logger.error(
         {
           err: error,
+          eventName: "gateway.bootstrap.close.initiated",
+          ...this.bootstrapCloseDiagnostics(attachedPeer),
           sandboxInstanceId: input.sandboxInstanceId,
         },
         "Failed notifying connection peer about released interactive streams",
@@ -306,12 +368,7 @@ export class TunnelSessionService {
       socket: input.socket,
     });
 
-    let websocketHealthHandle:
-      | {
-          stop: () => void;
-          isHealthy: () => boolean;
-        }
-      | undefined;
+    let websocketHealthHandle: WebSocketHealthHandle | undefined;
     let presenceLeaseRenewalHandle:
       | {
           stop: () => void;
@@ -406,6 +463,7 @@ export class TunnelSessionService {
         );
         void this.closeCurrentBootstrapPeer({
           sandboxInstanceId: input.sandboxInstanceId,
+          cause: BootstrapTunnelCloseCauses.GATEWAY_PRESENCE_DEADLINE_FAILED,
           closeReason: "Failed to persist sandbox presence lease.",
           statusMessage: "Failed to persist sandbox presence lease.",
         }).catch((closeError: unknown) => {
@@ -449,6 +507,10 @@ export class TunnelSessionService {
       logger.info(
         {
           eventName: "gateway.bootstrap.detach.skipped",
+          ...this.bootstrapCloseDiagnostics(input.attachedPeer, {
+            closeCode: input.closeCode,
+            closeReason: input.closeReason,
+          }),
           closeCode: input.closeCode,
           closeReason: input.closeReason,
           ownerLeaseId: input.leaseId,
@@ -461,6 +523,7 @@ export class TunnelSessionService {
         target: input.attachedPeer.relayTarget,
         notifyOppositePeer: false,
       });
+      this.bootstrapCloseContextsBySessionId.delete(input.attachedPeer.relayTarget.sessionId);
       return;
     }
 
@@ -471,6 +534,10 @@ export class TunnelSessionService {
           logger.info(
             {
               eventName: "gateway.bootstrap.detach.skipped",
+              ...this.bootstrapCloseDiagnostics(input.attachedPeer, {
+                closeCode: input.closeCode,
+                closeReason: input.closeReason,
+              }),
               closeCode: input.closeCode,
               closeReason: input.closeReason,
               ownerLeaseId: input.leaseId,
@@ -504,6 +571,10 @@ export class TunnelSessionService {
         logger.info(
           {
             eventName: "gateway.bootstrap.detach.recorded",
+            ...this.bootstrapCloseDiagnostics(input.attachedPeer, {
+              closeCode: input.closeCode,
+              closeReason: input.closeReason,
+            }),
             closeCode: input.closeCode,
             closeReason: input.closeReason,
             ownerLeaseId: input.leaseId,
@@ -543,6 +614,7 @@ export class TunnelSessionService {
         );
       });
     }
+    this.bootstrapCloseContextsBySessionId.delete(input.attachedPeer.relayTarget.sessionId);
   }
 
   /**
@@ -679,8 +751,16 @@ export class TunnelSessionService {
         attachedAtMs: input.attachedAtMs,
         leaseId: input.leaseId,
         onLeaseLost: () => {
+          this.recordBootstrapCloseContext({
+            attachedPeer: input.attachedPeer,
+            cause: BootstrapTunnelCloseCauses.GATEWAY_OWNER_LEASE_LOST,
+            gatewayInitiated: true,
+            reason: "Sandbox active attachment was replaced.",
+          });
           logger.error(
             {
+              eventName: "gateway.bootstrap.close.initiated",
+              ...this.bootstrapCloseDiagnostics(input.attachedPeer),
               sandboxInstanceId: input.sandboxInstanceId,
               leaseId: input.leaseId,
             },
@@ -692,9 +772,17 @@ export class TunnelSessionService {
           });
         },
         onRefreshFailed: (error) => {
+          this.recordBootstrapCloseContext({
+            attachedPeer: input.attachedPeer,
+            cause: BootstrapTunnelCloseCauses.GATEWAY_ATTACH_FATAL_ERROR,
+            gatewayInitiated: true,
+            reason: "Failed to refresh sandbox runtime attachment.",
+          });
           logger.error(
             {
               err: error,
+              eventName: "gateway.bootstrap.close.initiated",
+              ...this.bootstrapCloseDiagnostics(input.attachedPeer),
               sandboxInstanceId: input.sandboxInstanceId,
             },
             "Failed to refresh sandbox runtime attachment",
@@ -711,9 +799,17 @@ export class TunnelSessionService {
         ttlMs: input.ownerLeaseTtlMs,
       });
     } catch (error) {
+      this.recordBootstrapCloseContext({
+        attachedPeer: input.attachedPeer,
+        cause: BootstrapTunnelCloseCauses.GATEWAY_ATTACH_FATAL_ERROR,
+        gatewayInitiated: true,
+        reason: "Failed to activate sandbox runtime attachment for attached bootstrap tunnel.",
+      });
       logger.error(
         {
           err: error,
+          eventName: "gateway.bootstrap.close.initiated",
+          ...this.bootstrapCloseDiagnostics(input.attachedPeer),
           sandboxInstanceId: input.sandboxInstanceId,
           ownerLeaseId: input.leaseId,
         },
@@ -894,6 +990,7 @@ export class TunnelSessionService {
 
   private async closeCurrentBootstrapPeer(input: {
     sandboxInstanceId: string;
+    cause: BootstrapTunnelCloseCause;
     closeReason: string;
     statusMessage: string;
   }): Promise<void> {
@@ -905,6 +1002,15 @@ export class TunnelSessionService {
         `Expected current bootstrap peer for sandbox '${input.sandboxInstanceId}' while closing the session.`,
       );
     }
+    const initiatedAtMs = this.clock.nowMs();
+    if (!this.bootstrapCloseContextsBySessionId.has(bootstrapPeer.sessionId)) {
+      this.bootstrapCloseContextsBySessionId.set(bootstrapPeer.sessionId, {
+        cause: input.cause,
+        gatewayInitiated: true,
+        initiatedAtMs,
+        reason: input.closeReason,
+      });
+    }
 
     await this.relayCoordinator.closePeer({
       target: bootstrapPeer,
@@ -913,10 +1019,99 @@ export class TunnelSessionService {
     });
     logger.error(
       {
+        eventName: "gateway.bootstrap.close.initiated",
+        closeCause: input.cause,
+        closeCauseReason: input.closeReason,
+        closeInitiatedAtMs: initiatedAtMs,
+        gatewayInitiatedClose: true,
+        relaySessionId: bootstrapPeer.sessionId,
         sandboxInstanceId: input.sandboxInstanceId,
         closeReason: input.closeReason,
       },
       input.statusMessage,
     );
+  }
+
+  public markBootstrapCloseInitiated(input: {
+    attachedPeer: AttachedTunnelPeer;
+    cause: BootstrapTunnelCloseCause;
+    reason: string;
+  }): void {
+    this.recordBootstrapCloseContext({
+      attachedPeer: input.attachedPeer,
+      cause: input.cause,
+      gatewayInitiated: true,
+      reason: input.reason,
+    });
+  }
+
+  private recordBootstrapCloseContext(input: {
+    attachedPeer: AttachedTunnelPeer;
+    cause: BootstrapTunnelCloseCause;
+    gatewayInitiated: boolean;
+    reason: string;
+  }): BootstrapTunnelCloseContext {
+    const existingCloseContext =
+      this.bootstrapCloseContextsBySessionId.get(input.attachedPeer.relayTarget.sessionId) ??
+      input.attachedPeer.bootstrapCloseContext;
+    if (existingCloseContext !== undefined) {
+      input.attachedPeer.bootstrapCloseContext = existingCloseContext;
+      this.bootstrapCloseContextsBySessionId.set(
+        input.attachedPeer.relayTarget.sessionId,
+        existingCloseContext,
+      );
+      return existingCloseContext;
+    }
+
+    const closeContext: BootstrapTunnelCloseContext = {
+      cause: input.cause,
+      gatewayInitiated: input.gatewayInitiated,
+      initiatedAtMs: this.clock.nowMs(),
+      reason: input.reason,
+    };
+    input.attachedPeer.bootstrapCloseContext = closeContext;
+    this.bootstrapCloseContextsBySessionId.set(
+      input.attachedPeer.relayTarget.sessionId,
+      closeContext,
+    );
+    return closeContext;
+  }
+
+  public bootstrapCloseDiagnostics(
+    attachedPeer: AttachedTunnelPeer,
+    closeEvent?: {
+      closeCode: number | undefined;
+      closeReason: string | undefined;
+    },
+  ): BootstrapTunnelCloseDiagnostics {
+    const nowMs = this.clock.nowMs();
+    const closeContext =
+      this.bootstrapCloseContextsBySessionId.get(attachedPeer.relayTarget.sessionId) ??
+      attachedPeer.bootstrapCloseContext;
+    const health = attachedPeer.websocketHealthHandle?.getSnapshot() ?? null;
+    const hasPeerCloseFrame =
+      closeContext === undefined &&
+      closeEvent?.closeCode !== undefined &&
+      closeEvent.closeCode !== 1005 &&
+      closeEvent.closeCode !== 1006;
+    const peerCloseReason = closeEvent?.closeReason?.trim() ?? "";
+    return {
+      closeCause:
+        closeContext?.cause ??
+        (hasPeerCloseFrame ? BootstrapTunnelCloseCauses.PEER_CLOSE_FRAME : undefined) ??
+        (health?.healthy === false
+          ? BootstrapTunnelCloseCauses.GATEWAY_HEALTH_MISSED_PONGS
+          : BootstrapTunnelCloseCauses.TRANSPORT_ABNORMAL_CLOSE),
+      gatewayInitiatedClose: closeContext?.gatewayInitiated ?? false,
+      closeInitiatedAtMs: closeContext?.initiatedAtMs ?? null,
+      closeCauseReason:
+        closeContext?.reason ??
+        (hasPeerCloseFrame
+          ? peerCloseReason || "Bootstrap websocket peer sent close frame."
+          : "Bootstrap websocket closed without gateway cause."),
+      socketAgeMs:
+        attachedPeer.openedAtMs === undefined ? 0 : Math.max(0, nowMs - attachedPeer.openedAtMs),
+      health,
+    };
   }
 }

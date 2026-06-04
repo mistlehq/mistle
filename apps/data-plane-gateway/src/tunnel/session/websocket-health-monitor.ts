@@ -19,6 +19,7 @@ const TunnelWebSocketRoundTripTimeMs = TunnelTelemetryMeter.createHistogram(
 export type WebSocketHealthHandle = {
   stop: () => void;
   isHealthy: () => boolean;
+  getSnapshot: () => WebSocketHealthSnapshot;
 };
 
 export type WebSocketHealthMissedPong = {
@@ -30,6 +31,13 @@ export type WebSocketHealthMissedPong = {
 export type WebSocketHealthRecovered = {
   consecutiveMissedPongs: number;
   lastPongAgeMs: number;
+};
+
+export type WebSocketHealthSnapshot = {
+  healthy: boolean;
+  consecutiveMissedPongs: number;
+  lastPongAgeMs: number;
+  pingInFlight: boolean;
 };
 
 /**
@@ -123,6 +131,16 @@ export function startWebSocketHealthMonitor(input: {
     input.onUnhealthy();
   };
 
+  const stopForClosedSocket = (): void => {
+    if (stopped) {
+      return;
+    }
+
+    stopped = true;
+    cleanupTimers();
+    rawSocket.off("pong", onPong);
+  };
+
   const scheduleNextPing = (): void => {
     if (stopped || !healthy) {
       return;
@@ -138,12 +156,16 @@ export function startWebSocketHealthMonitor(input: {
         return;
       }
       if (input.socket.readyState !== WebSocket.OPEN) {
-        markUnhealthy();
+        stopForClosedSocket();
         return;
       }
 
       pongTimeoutHandle = input.scheduler.schedule(() => {
         pongTimeoutHandle = undefined;
+        if (input.socket.readyState !== WebSocket.OPEN) {
+          stopForClosedSocket();
+          return;
+        }
         pingSentAtMs = undefined;
         consecutiveMissedPongs += 1;
         input.onMissedPong?.({
@@ -161,6 +183,10 @@ export function startWebSocketHealthMonitor(input: {
       pingSentAtMs = input.clock.nowMs();
       rawSocket.ping(undefined, false, (error: Error | null | undefined) => {
         if (error != null) {
+          if (input.socket.readyState !== WebSocket.OPEN) {
+            stopForClosedSocket();
+            return;
+          }
           markUnhealthy();
         }
       });
@@ -181,6 +207,12 @@ export function startWebSocketHealthMonitor(input: {
       rawSocket.off("pong", onPong);
     },
     isHealthy: () => healthy,
+    getSnapshot: () => ({
+      healthy,
+      consecutiveMissedPongs,
+      lastPongAgeMs: input.clock.nowMs() - lastPongAtMs,
+      pingInFlight: pingSentAtMs !== undefined,
+    }),
   };
 }
 

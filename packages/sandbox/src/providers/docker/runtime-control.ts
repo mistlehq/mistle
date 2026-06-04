@@ -8,6 +8,10 @@ import {
   SandboxProviderNotImplementedError,
   SandboxResourceNotFoundError,
 } from "../../errors.js";
+import {
+  resolveSandboxdOperationLogPath,
+  SandboxdOperationLogPaths,
+} from "../../operation-log-paths.js";
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
 import {
   SandboxdInstallCommand,
@@ -19,6 +23,7 @@ import type {
   SandboxRuntimeControl,
   SandboxRuntimeControlRequest,
   SandboxRuntimeEnsureSandboxdRequest,
+  SandboxRuntimeOperationLog,
 } from "../../types.js";
 import {
   DockerClientError,
@@ -27,6 +32,8 @@ import {
   mapDockerClientError,
 } from "./client-errors.js";
 import type { DockerSandboxConfig } from "./config.js";
+
+export { SandboxdOperationLogPaths };
 
 export const ActivateCommand = ["/opt/mistle/bin/sandboxd", "activate"] as const;
 export const ShutdownCommand = ["/opt/mistle/bin/sandboxd", "shutdown"] as const;
@@ -397,10 +404,14 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
     }
   }
 
-  async readOperationLog(input: { id: string; operation: "activate" }): Promise<string | null> {
+  async readOperationLog(input: {
+    id: string;
+    operation: SandboxRuntimeOperationLog;
+  }): Promise<string | null> {
     if (input.id.trim().length === 0) {
       throw new SandboxConfigurationError("Sandbox id is required.");
     }
+    const operationLogPath = resolveSandboxdOperationLogPath(input.operation);
 
     try {
       const output = await this.#runExecCommand({
@@ -409,7 +420,7 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
         command: [
           "sh",
           "-euc",
-          "if test -f '/run/mistle/activate.log'; then cat -- '/run/mistle/activate.log'; fi",
+          `if test -f '${operationLogPath}'; then cat -- '${operationLogPath}'; fi`,
         ],
         failureDescription: "Docker sandbox operation log read",
       });

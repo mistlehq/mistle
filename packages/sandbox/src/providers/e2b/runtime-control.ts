@@ -4,6 +4,10 @@ import {
   SandboxResourceNotFoundError,
 } from "../../errors.js";
 import {
+  resolveSandboxdOperationLogPath,
+  SandboxdOperationLogPaths,
+} from "../../operation-log-paths.js";
+import {
   SandboxdInstallCommand,
   SandboxdInstallEnvVars,
   SandboxdResetTransparentEgressNftablesCommand,
@@ -13,10 +17,13 @@ import type {
   SandboxRuntimeControl,
   SandboxRuntimeControlRequest,
   SandboxRuntimeEnsureSandboxdRequest,
+  SandboxRuntimeOperationLog,
 } from "../../types.js";
 import { withSandboxProviderOperationTelemetry } from "../telemetry.js";
 import { E2BClientError, E2BClientErrorCodes, E2BClientOperationIds } from "./client-errors.js";
 import { ShutdownCommand, type E2BClient } from "./client.js";
+
+export { SandboxdOperationLogPaths };
 
 const SandboxdEnsureTimeoutMs = 120_000;
 export const SandboxdStopDaemonTimeoutMs = 30_000;
@@ -213,8 +220,12 @@ export class E2BSandboxRuntimeControl implements SandboxRuntimeControl {
     });
   }
 
-  async readOperationLog(input: { id: string; operation: "activate" }): Promise<string | null> {
+  async readOperationLog(input: {
+    id: string;
+    operation: SandboxRuntimeOperationLog;
+  }): Promise<string | null> {
     requireSandboxId(input.id);
+    const operationLogPath = resolveSandboxdOperationLogPath(input.operation);
 
     return await withSandboxProviderOperationTelemetry({
       provider: "e2b",
@@ -225,8 +236,7 @@ export class E2BSandboxRuntimeControl implements SandboxRuntimeControl {
             sandboxId: input.id,
             operation: E2BClientOperationIds.READ_OPERATION_LOG,
             commandDescription: `Read sandbox ${input.operation} operation log`,
-            command:
-              "if test -f '/run/mistle/activate.log'; then cat -- '/run/mistle/activate.log'; fi",
+            command: `if test -f '${operationLogPath}'; then cat -- '${operationLogPath}'; fi`,
             user: "root",
             timeoutMs: SandboxdReadOperationLogTimeoutMs,
           });

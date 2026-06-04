@@ -139,6 +139,7 @@ export const AppendSessionLinkToSlackTextRequestMiddleware: IntegrationEgressReq
     if (
       currentBlocks !== undefined ||
       typeof currentText !== "string" ||
+      currentText.length < 1 ||
       currentText.length > SlackMaximumSectionTextLength
     ) {
       return request;

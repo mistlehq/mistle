@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { ActivateCommandArgs, ShutdownCommandArgs } from "./client.js";
 import {
+  SandboxdOperationLogPaths,
   SandboxdResetTransparentEgressNftablesTimeoutMs,
   SandboxdReadOperationLogTimeoutMs,
   SandboxdStopDaemonTimeoutMs,
@@ -13,6 +14,15 @@ describe("Tensorlake sandbox runtime control timeouts", () => {
     expect(SandboxdReadOperationLogTimeoutMs).toBe(60_000);
     expect(SandboxdStopDaemonTimeoutMs).toBe(30_000);
     expect(SandboxdResetTransparentEgressNftablesTimeoutMs).toBe(10_000);
+  });
+});
+
+describe("Tensorlake sandbox runtime control operation logs", () => {
+  it("can read activation and bootstrap tunnel diagnostics from sandboxd log files", () => {
+    expect(SandboxdOperationLogPaths).toEqual({
+      activate: "/run/mistle/activate.log",
+      bootstrap_tunnel: "/run/mistle/bootstrap-tunnel.log",
+    });
   });
 });
 
