@@ -259,6 +259,7 @@ const GetSandboxInstanceResponseSchema = z
       SandboxInstanceStatuses.STARTED,
       SandboxInstanceStatuses.INITIALIZING,
       SandboxInstanceStatuses.RUNNING,
+      SandboxInstanceStatuses.DEGRADED,
       SandboxInstanceStatuses.RECONNECTING,
       SandboxInstanceStatuses.STOPPING,
       SandboxInstanceStatuses.STOPPED,
@@ -279,6 +280,9 @@ const GetSandboxInstanceResponseSchema = z
   .strict()
   .nullable();
 export type GetSandboxInstanceResponse = z.infer<typeof GetSandboxInstanceResponseSchema>;
+export function parseGetSandboxInstanceResponse(input: unknown): GetSandboxInstanceResponse {
+  return GetSandboxInstanceResponseSchema.parse(input);
+}
 export type ListSandboxInstancesInput =
   paths["/internal/sandbox/instances"]["get"]["parameters"]["query"];
 export type ListSandboxInstancesResponse =
@@ -1008,7 +1012,7 @@ export function createDataPlaneSandboxInstancesClient(
 
       if (response.status === 200) {
         const responseBody = await response.json();
-        const parsedResponse = GetSandboxInstanceResponseSchema.parse(responseBody);
+        const parsedResponse = parseGetSandboxInstanceResponse(responseBody);
 
         return parsedResponse;
       }

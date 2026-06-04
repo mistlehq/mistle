@@ -33,7 +33,7 @@
     "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "lint": "oxlint --type-aware --deny-warnings .",
     "typecheck": "tsgo --noEmit",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run -c vitest.config.ts --passWithNoTests",
     "openapi:generate": "tsx scripts/generate-client.ts",
     "openapi:check": "tsx scripts/check-client-drift.ts",
     "format": "oxfmt .",
