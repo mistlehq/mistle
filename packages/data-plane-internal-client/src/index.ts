@@ -280,9 +280,6 @@ const GetSandboxInstanceResponseSchema = z
   .strict()
   .nullable();
 export type GetSandboxInstanceResponse = z.infer<typeof GetSandboxInstanceResponseSchema>;
-export function parseGetSandboxInstanceResponse(input: unknown): GetSandboxInstanceResponse {
-  return GetSandboxInstanceResponseSchema.parse(input);
-}
 export type ListSandboxInstancesInput =
   paths["/internal/sandbox/instances"]["get"]["parameters"]["query"];
 export type ListSandboxInstancesResponse =
@@ -1012,7 +1009,7 @@ export function createDataPlaneSandboxInstancesClient(
 
       if (response.status === 200) {
         const responseBody = await response.json();
-        const parsedResponse = parseGetSandboxInstanceResponse(responseBody);
+        const parsedResponse = GetSandboxInstanceResponseSchema.parse(responseBody);
 
         return parsedResponse;
       }
