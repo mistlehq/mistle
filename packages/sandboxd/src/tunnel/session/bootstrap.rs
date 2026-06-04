@@ -5,6 +5,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, JoinHandle};
+use std::time::Instant;
 
 use bytes::Bytes;
 use futures_util::{Sink, SinkExt, StreamExt};
@@ -73,7 +74,12 @@ pub(in crate::tunnel::session) enum TunnelWriterMessage {
 }
 
 enum BootstrapWriterControlMessage {
-    Pong(Vec<u8>),
+    Pong(BootstrapPongControlMessage),
+}
+
+struct BootstrapPongControlMessage {
+    payload: Vec<u8>,
+    ping_received_at: Instant,
 }
 
 #[derive(Deserialize)]
@@ -777,13 +783,28 @@ pub(super) fn spawn_bootstrap_socket_task(
                         }
                         Some(Ok(Message::Ping(payload))) => {
                             let payload_len = payload.len();
+                            let ping_received_at = Instant::now();
+                            let ping_attributes = bootstrap_ping_payload_attributes(&payload);
+                            record_bootstrap_tunnel_diagnostic_event(
+                                "bootstrap_tunnel.ping_received",
+                                ping_attributes.clone(),
+                            );
                             info!(
                                 event = "bootstrap_tunnel.ping_received",
                                 payload_len,
                             );
                             control_sender
-                                .send(BootstrapWriterControlMessage::Pong(payload.to_vec()))
+                                .send(BootstrapWriterControlMessage::Pong(
+                                    BootstrapPongControlMessage {
+                                        payload: payload.to_vec(),
+                                        ping_received_at,
+                                    },
+                                ))
                                 .map_err(|_| {
+                                    record_bootstrap_tunnel_diagnostic_event(
+                                        "bootstrap_tunnel.pong_queue_failed",
+                                        ping_attributes.clone(),
+                                    );
                                     warn!(
                                         event = "bootstrap_tunnel.pong_queue_failed",
                                         payload_len,
@@ -792,6 +813,10 @@ pub(super) fn spawn_bootstrap_socket_task(
                                         "bootstrap tunnel writer is closed".to_string(),
                                     )
                                 })?;
+                            record_bootstrap_tunnel_diagnostic_event(
+                                "bootstrap_tunnel.pong_queued",
+                                ping_attributes,
+                            );
                             info!(
                                 event = "bootstrap_tunnel.pong_queued",
                                 payload_len,
@@ -863,6 +888,111 @@ pub(in crate::tunnel::session) fn record_bootstrap_tunnel_diagnostic_event(
     }
 }
 
+fn bootstrap_ping_payload_attributes(payload: &[u8]) -> BTreeMap<String, Value> {
+    let mut attributes = BTreeMap::from([("payloadLen".to_string(), usize_value(payload.len()))]);
+    if let Ok(parsed) = serde_json::from_slice::<Value>(payload)
+        && parsed
+            .get("type")
+            .and_then(Value::as_str)
+            .is_some_and(|message_type| message_type == "mistle.tunnel.health_ping")
+    {
+        if let Some(ping_seq) = parsed.get("pingSeq").and_then(Value::as_u64) {
+            attributes.insert("pingSeq".to_string(), Value::from(ping_seq));
+        }
+        if let Some(sent_at_ms) = parsed.get("sentAtMs").and_then(Value::as_u64) {
+            attributes.insert("gatewaySentAtMs".to_string(), Value::from(sent_at_ms));
+        }
+    }
+    attributes
+}
+
+fn bootstrap_pong_diagnostic_attributes(
+    payload: &[u8],
+    queue_delay_ms: Option<u64>,
+    write_duration_ms: Option<u64>,
+) -> BTreeMap<String, Value> {
+    let mut attributes = bootstrap_payload_diagnostic_attributes(
+        payload.len(),
+        serde_json::from_slice(payload).ok(),
+    );
+    if let Some(queue_delay_ms) = queue_delay_ms {
+        attributes.insert("queueDelayMs".to_string(), Value::from(queue_delay_ms));
+    }
+    if let Some(write_duration_ms) = write_duration_ms {
+        attributes.insert(
+            "writeDurationMs".to_string(),
+            Value::from(write_duration_ms),
+        );
+    }
+    attributes
+}
+
+fn bootstrap_pong_diagnostic_attributes_from_parts(
+    payload_len: usize,
+    parsed_payload: Option<Value>,
+    ping_received_at: Option<Instant>,
+    write_started_at: Instant,
+) -> BTreeMap<String, Value> {
+    let mut attributes = bootstrap_payload_diagnostic_attributes(payload_len, parsed_payload);
+    if let Some(ping_received_at) = ping_received_at {
+        attributes.insert(
+            "queueDelayMs".to_string(),
+            Value::from(
+                u64::try_from(
+                    write_started_at
+                        .duration_since(ping_received_at)
+                        .as_millis(),
+                )
+                .unwrap_or(u64::MAX),
+            ),
+        );
+    }
+    attributes.insert(
+        "writeDurationMs".to_string(),
+        Value::from(u64::try_from(write_started_at.elapsed().as_millis()).unwrap_or(u64::MAX)),
+    );
+    attributes
+}
+
+fn bootstrap_payload_diagnostic_attributes(
+    payload_len: usize,
+    parsed_payload: Option<Value>,
+) -> BTreeMap<String, Value> {
+    let mut attributes = BTreeMap::from([("payloadLen".to_string(), usize_value(payload_len))]);
+    if let Some(parsed) = parsed_payload
+        && parsed
+            .get("type")
+            .and_then(Value::as_str)
+            .is_some_and(|message_type| message_type == "mistle.tunnel.health_ping")
+    {
+        if let Some(ping_seq) = parsed.get("pingSeq").and_then(Value::as_u64) {
+            attributes.insert("pingSeq".to_string(), Value::from(ping_seq));
+        }
+        if let Some(sent_at_ms) = parsed.get("sentAtMs").and_then(Value::as_u64) {
+            attributes.insert("gatewaySentAtMs".to_string(), Value::from(sent_at_ms));
+        }
+    }
+    attributes
+}
+
+fn with_pending_outbound_len(
+    mut attributes: BTreeMap<String, Value>,
+    pending_outbound_len: usize,
+) -> BTreeMap<String, Value> {
+    attributes.insert(
+        "pendingOutboundLen".to_string(),
+        usize_value(pending_outbound_len),
+    );
+    attributes
+}
+
+fn usize_value(value: usize) -> Value {
+    match u64::try_from(value) {
+        Ok(value) => Value::from(value),
+        Err(_) => Value::String(value.to_string()),
+    }
+}
+
 async fn run_bootstrap_writer<W>(
     mut writer: W,
     mut receiver: mpsc::UnboundedReceiver<TunnelWriterMessage>,
@@ -910,7 +1040,8 @@ where
         while let Ok(message) = receiver.try_recv() {
             match message {
                 TunnelWriterMessage::Pong(payload) => {
-                    write_bootstrap_pong(&mut writer, payload, &notify_bootstrap_closed).await?;
+                    write_bootstrap_pong(&mut writer, payload, None, &notify_bootstrap_closed)
+                        .await?;
                 }
                 TunnelWriterMessage::Close => {
                     write_bootstrap_close(&mut writer, &notify_bootstrap_closed).await?;
@@ -966,12 +1097,28 @@ where
 {
     match message {
         BootstrapWriterControlMessage::Pong(payload) => {
-            info!(
-                event = "bootstrap_tunnel.pong_write_started",
-                payload_len = payload.len(),
+            let queue_delay_ms =
+                u64::try_from(payload.ping_received_at.elapsed().as_millis()).unwrap_or(u64::MAX);
+            let diagnostic_attributes = with_pending_outbound_len(
+                bootstrap_pong_diagnostic_attributes(&payload.payload, Some(queue_delay_ms), None),
                 pending_outbound_len,
             );
-            write_bootstrap_pong(writer, payload, notify_bootstrap_closed).await
+            record_bootstrap_tunnel_diagnostic_event(
+                "bootstrap_tunnel.pong_write_started",
+                diagnostic_attributes,
+            );
+            info!(
+                event = "bootstrap_tunnel.pong_write_started",
+                payload_len = payload.payload.len(),
+                pending_outbound_len,
+            );
+            write_bootstrap_pong(
+                writer,
+                payload.payload,
+                Some(payload.ping_received_at),
+                notify_bootstrap_closed,
+            )
+            .await
         }
     }
 }
@@ -1004,7 +1151,7 @@ where
             Ok(false)
         }
         TunnelWriterMessage::Pong(payload) => {
-            write_bootstrap_pong(writer, payload, notify_bootstrap_closed).await?;
+            write_bootstrap_pong(writer, payload, None, notify_bootstrap_closed).await?;
             Ok(false)
         }
         TunnelWriterMessage::Flush { response_sender } => {
@@ -1021,24 +1168,24 @@ where
 async fn write_bootstrap_pong<W>(
     writer: &mut W,
     payload: Vec<u8>,
+    ping_received_at: Option<Instant>,
     notify_bootstrap_closed: &impl Fn(Option<String>),
 ) -> Result<(), TunnelSessionError>
 where
     W: Sink<Message, Error = WebSocketError> + Unpin,
 {
     let payload_len = payload.len();
+    let parsed_payload = serde_json::from_slice::<Value>(&payload).ok();
+    let write_started_at = Instant::now();
     if let Err(error) = writer.send(Message::Pong(payload.into())).await {
-        let payload_len_value = match u64::try_from(payload_len) {
-            Ok(value) => Value::from(value),
-            Err(_) => Value::String(payload_len.to_string()),
-        };
-        record_bootstrap_tunnel_diagnostic_event(
-            "bootstrap_tunnel.pong_write_failed",
-            BTreeMap::from([
-                ("payloadLen".to_string(), payload_len_value),
-                ("error".to_string(), Value::String(error.to_string())),
-            ]),
+        let mut attributes = bootstrap_pong_diagnostic_attributes_from_parts(
+            payload_len,
+            parsed_payload.clone(),
+            ping_received_at,
+            write_started_at,
         );
+        attributes.insert("error".to_string(), Value::String(error.to_string()));
+        record_bootstrap_tunnel_diagnostic_event("bootstrap_tunnel.pong_write_failed", attributes);
         warn!(
             event = "bootstrap_tunnel.pong_write_failed",
             payload_len,
@@ -1049,6 +1196,15 @@ where
         )));
         return Err(TunnelSessionError::WriteTunnelText(error.to_string()));
     }
+    record_bootstrap_tunnel_diagnostic_event(
+        "bootstrap_tunnel.pong_write_completed",
+        bootstrap_pong_diagnostic_attributes_from_parts(
+            payload_len,
+            parsed_payload,
+            ping_received_at,
+            write_started_at,
+        ),
+    );
     info!(event = "bootstrap_tunnel.pong_write_completed", payload_len,);
     Ok(())
 }
@@ -1231,9 +1387,10 @@ mod tests {
     };
     use crate::tunnel::session::bootstrap::{
         GATEWAY_SERVICE_RESTART_CLOSE_CODE, GATEWAY_SERVICE_RESTART_CLOSE_REASON,
-        bootstrap_close_frame_disconnect_reason, is_gateway_service_restart_close_frame,
+        bootstrap_close_frame_disconnect_reason, bootstrap_ping_payload_attributes,
+        bootstrap_pong_diagnostic_attributes, is_gateway_service_restart_close_frame,
         prioritize_ipv4_socket_addresses, record_bootstrap_tunnel_diagnostic_event,
-        resolve_tunnel_exchange_url, startup_transparent_passthrough_socket_mark,
+        resolve_tunnel_exchange_url, startup_transparent_passthrough_socket_mark, usize_value,
     };
 
     #[test]
@@ -1260,6 +1417,51 @@ mod tests {
             .expect("bootstrap tunnel diagnostic log should be readable");
         assert!(log_text.contains(r#""event":"bootstrap_tunnel.shutdown_requested""#));
         assert!(log_text.contains(r#""closeSource":"tunnel_session_handle""#));
+    }
+
+    #[test]
+    fn extracts_gateway_health_ping_payload_fields_for_bootstrap_diagnostics() {
+        let payload =
+            br#"{"type":"mistle.tunnel.health_ping","pingSeq":7,"sentAtMs":1780590000000}"#;
+
+        assert_eq!(
+            bootstrap_ping_payload_attributes(payload),
+            std::collections::BTreeMap::from([
+                ("gatewaySentAtMs".to_string(), json!(1780590000000_u64)),
+                ("payloadLen".to_string(), usize_value(payload.len())),
+                ("pingSeq".to_string(), json!(7_u64)),
+            ])
+        );
+        assert_eq!(
+            bootstrap_pong_diagnostic_attributes(payload, Some(12), Some(3)),
+            std::collections::BTreeMap::from([
+                ("gatewaySentAtMs".to_string(), json!(1780590000000_u64)),
+                ("payloadLen".to_string(), usize_value(payload.len())),
+                ("pingSeq".to_string(), json!(7_u64)),
+                ("queueDelayMs".to_string(), json!(12_u64)),
+                ("writeDurationMs".to_string(), json!(3_u64)),
+            ])
+        );
+    }
+
+    #[test]
+    fn keeps_bootstrap_ping_payload_diagnostics_compatible_with_unknown_payloads() {
+        let payload = b"legacy-ping";
+
+        assert_eq!(
+            bootstrap_ping_payload_attributes(payload),
+            std::collections::BTreeMap::from([(
+                "payloadLen".to_string(),
+                usize_value(payload.len())
+            )])
+        );
+        assert_eq!(
+            bootstrap_pong_diagnostic_attributes(payload, Some(5), None),
+            std::collections::BTreeMap::from([
+                ("payloadLen".to_string(), usize_value(payload.len())),
+                ("queueDelayMs".to_string(), json!(5_u64)),
+            ])
+        );
     }
 
     #[test]

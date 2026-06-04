@@ -1,6 +1,6 @@
 import type { Clock, Scheduler, TimerHandle } from "@mistle/time";
 import { metrics, type Attributes } from "@opentelemetry/api";
-import { WebSocket } from "ws";
+import { WebSocket, type RawData } from "ws";
 
 import { getSandboxTunnelDeliveryCorrelationScope } from "../telemetry.js";
 import type { RelayPeerSide, RelayPeerSocket } from "../types.js";
@@ -26,11 +26,14 @@ export type WebSocketHealthMissedPong = {
   consecutiveMissedPongs: number;
   lastPongAgeMs: number;
   maxConsecutiveMissedPongs: number;
+  pingSentAtMs: number;
+  pingSeq: number;
 };
 
 export type WebSocketHealthRecovered = {
   consecutiveMissedPongs: number;
   lastPongAgeMs: number;
+  pingSeq: number | null;
 };
 
 export type WebSocketHealthSnapshot = {
@@ -38,6 +41,7 @@ export type WebSocketHealthSnapshot = {
   consecutiveMissedPongs: number;
   lastPongAgeMs: number;
   pingInFlight: boolean;
+  pingSeq: number | null;
 };
 
 /**
@@ -72,16 +76,19 @@ export function startWebSocketHealthMonitor(input: {
   let pongTimeoutHandle: TimerHandle | undefined;
   let consecutiveMissedPongs = 0;
   let lastPongAtMs = input.clock.nowMs();
+  let nextPingSeq = 1;
+  let pingSeq: number | undefined;
   const maxConsecutiveMissedPongs = input.maxConsecutiveMissedPongs ?? 1;
 
   if (maxConsecutiveMissedPongs < 1) {
     throw new Error("Expected websocket health monitor missed pong threshold to be positive.");
   }
 
-  const onPong = (): void => {
+  const onPong = (data: RawData): void => {
     if (stopped) {
       return;
     }
+    const pongPayload = parseHealthPingPayload(data);
     if (pingSentAtMs !== undefined) {
       const roundTripTimeMs = input.clock.nowMs() - pingSentAtMs;
       TunnelWebSocketRoundTripTimeMs.record(
@@ -99,10 +106,12 @@ export function startWebSocketHealthMonitor(input: {
       input.onRecovered?.({
         consecutiveMissedPongs,
         lastPongAgeMs: nowMs - lastPongAtMs,
+        pingSeq: pongPayload?.pingSeq ?? pingSeq ?? null,
       });
     }
     consecutiveMissedPongs = 0;
     lastPongAtMs = nowMs;
+    pingSeq = undefined;
     if (pongTimeoutHandle !== undefined) {
       input.scheduler.cancel(pongTimeoutHandle);
       pongTimeoutHandle = undefined;
@@ -166,12 +175,17 @@ export function startWebSocketHealthMonitor(input: {
           stopForClosedSocket();
           return;
         }
+        const timedOutPingSentAtMs = pingSentAtMs ?? input.clock.nowMs();
+        const timedOutPingSeq = pingSeq ?? 0;
         pingSentAtMs = undefined;
+        pingSeq = undefined;
         consecutiveMissedPongs += 1;
         input.onMissedPong?.({
           consecutiveMissedPongs,
           lastPongAgeMs: input.clock.nowMs() - lastPongAtMs,
           maxConsecutiveMissedPongs,
+          pingSentAtMs: timedOutPingSentAtMs,
+          pingSeq: timedOutPingSeq,
         });
         if (consecutiveMissedPongs >= maxConsecutiveMissedPongs) {
           markUnhealthy();
@@ -181,15 +195,24 @@ export function startWebSocketHealthMonitor(input: {
       }, input.pongTimeoutMs);
 
       pingSentAtMs = input.clock.nowMs();
-      rawSocket.ping(undefined, false, (error: Error | null | undefined) => {
-        if (error != null) {
-          if (input.socket.readyState !== WebSocket.OPEN) {
-            stopForClosedSocket();
-            return;
+      pingSeq = nextPingSeq;
+      nextPingSeq += 1;
+      rawSocket.ping(
+        createHealthPingPayload({
+          pingSeq,
+          sentAtMs: pingSentAtMs,
+        }),
+        false,
+        (error: Error | null | undefined) => {
+          if (error != null) {
+            if (input.socket.readyState !== WebSocket.OPEN) {
+              stopForClosedSocket();
+              return;
+            }
+            markUnhealthy();
           }
-          markUnhealthy();
-        }
-      });
+        },
+      );
     }, input.pingIntervalMs);
   };
 
@@ -212,8 +235,56 @@ export function startWebSocketHealthMonitor(input: {
       consecutiveMissedPongs,
       lastPongAgeMs: input.clock.nowMs() - lastPongAtMs,
       pingInFlight: pingSentAtMs !== undefined,
+      pingSeq: pingSeq ?? null,
     }),
   };
+}
+
+function createHealthPingPayload(input: { pingSeq: number; sentAtMs: number }): Buffer {
+  return Buffer.from(
+    JSON.stringify({
+      type: "mistle.tunnel.health_ping",
+      pingSeq: input.pingSeq,
+      sentAtMs: input.sentAtMs,
+    }),
+  );
+}
+
+function parseHealthPingPayload(data: RawData): { pingSeq: number; sentAtMs: number } | null {
+  const buffer = rawDataToBuffer(data);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(buffer.toString("utf8"));
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) {
+    return null;
+  }
+  const type = Reflect.get(parsed, "type");
+  const pingSeq = Reflect.get(parsed, "pingSeq");
+  const sentAtMs = Reflect.get(parsed, "sentAtMs");
+  if (
+    type !== "mistle.tunnel.health_ping" ||
+    typeof pingSeq !== "number" ||
+    typeof sentAtMs !== "number"
+  ) {
+    return null;
+  }
+  return {
+    pingSeq,
+    sentAtMs,
+  };
+}
+
+function rawDataToBuffer(data: RawData): Buffer {
+  if (Buffer.isBuffer(data)) {
+    return data;
+  }
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(data);
+  }
+  return Buffer.concat(data);
 }
 
 function buildRoundTripAttributes(input: {

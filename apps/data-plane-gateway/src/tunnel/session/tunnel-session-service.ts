@@ -173,7 +173,13 @@ export class TunnelSessionService {
         pingIntervalMs: WEBSOCKET_PING_INTERVAL_MS,
         pongTimeoutMs: WEBSOCKET_PONG_TIMEOUT_MS,
         maxConsecutiveMissedPongs: BOOTSTRAP_WEBSOCKET_MAX_CONSECUTIVE_MISSED_PONGS,
-        onMissedPong: ({ consecutiveMissedPongs, lastPongAgeMs, maxConsecutiveMissedPongs }) => {
+        onMissedPong: ({
+          consecutiveMissedPongs,
+          lastPongAgeMs,
+          maxConsecutiveMissedPongs,
+          pingSentAtMs,
+          pingSeq,
+        }) => {
           logger.warn(
             {
               sandboxInstanceId: input.sandboxInstanceId,
@@ -181,6 +187,8 @@ export class TunnelSessionService {
               consecutiveMissedPongs,
               lastPongAgeMs,
               maxConsecutiveMissedPongs,
+              pingSentAtMs,
+              pingSeq,
             },
             "Bootstrap websocket missed pong health check",
           );
@@ -212,13 +220,14 @@ export class TunnelSessionService {
               );
             });
         },
-        onRecovered: ({ consecutiveMissedPongs, lastPongAgeMs }) => {
+        onRecovered: ({ consecutiveMissedPongs, lastPongAgeMs, pingSeq }) => {
           logger.info(
             {
               sandboxInstanceId: input.sandboxInstanceId,
               leaseId: input.leaseId,
               consecutiveMissedPongs,
               lastPongAgeMs,
+              pingSeq,
             },
             "Bootstrap websocket recovered after missed pong health check",
           );

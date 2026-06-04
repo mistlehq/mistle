@@ -424,9 +424,7 @@ fn bypasses_nat_rewritten_bridge_destinations_before_redirect() {
         "ip".to_string(),
         "daddr".to_string(),
         "@local_destinations".to_string(),
-        "log".to_string(),
-        "prefix".to_string(),
-        "\"mistle-tproxy-bypass=local\"".to_string(),
+        "counter".to_string(),
         "return".to_string(),
     ]));
     assert!(commands.contains(&vec![
@@ -438,11 +436,16 @@ fn bypasses_nat_rewritten_bridge_destinations_before_redirect() {
         "ip".to_string(),
         "daddr".to_string(),
         "192.0.2.0/24".to_string(),
-        "log".to_string(),
-        "prefix".to_string(),
-        "\"mistle-tproxy-bypass=excluded:192.0.2.0/24\"".to_string(),
+        "counter".to_string(),
         "return".to_string(),
     ]));
+    assert!(
+        commands
+            .iter()
+            .flatten()
+            .all(|argument| argument.as_str() != "log"),
+        "transparent nftables rules should not emit per-packet kernel logs"
+    );
     assert_eq!(
         commands
             .last()
@@ -456,6 +459,7 @@ fn bypasses_nat_rewritten_bridge_destinations_before_redirect() {
             "tcp".to_string(),
             "dport".to_string(),
             "1-65535".to_string(),
+            "counter".to_string(),
             "redirect".to_string(),
             "to".to_string(),
             ":38514".to_string(),
@@ -553,11 +557,16 @@ fn installs_local_destination_bypasses_as_interval_set_before_redirect() {
         "ip".to_string(),
         "daddr".to_string(),
         "@local_destinations".to_string(),
-        "log".to_string(),
-        "prefix".to_string(),
-        "\"mistle-tproxy-bypass=local\"".to_string(),
+        "counter".to_string(),
         "return".to_string(),
     ]));
+    assert!(
+        commands
+            .iter()
+            .flatten()
+            .all(|argument| argument.as_str() != "log"),
+        "local destination bypasses should be counted without kernel logging"
+    );
 }
 
 #[test]

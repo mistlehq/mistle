@@ -106,14 +106,18 @@ function toPeerSocket(socket: WebSocket): RelayPeerSocket {
 
 class FakeRawSocket extends EventEmitter {
   public pingCallCount = 0;
+  public pingPayloads: Buffer[] = [];
   public socketReadyState: 0 | 1 | 2 | 3 = WebSocket.OPEN;
 
   public ping(
-    _data: Buffer | undefined,
+    data: Buffer | undefined,
     _mask: boolean,
     callback?: (error: Error | null | undefined) => void,
   ): void {
     this.pingCallCount += 1;
+    if (data !== undefined) {
+      this.pingPayloads.push(data);
+    }
     callback?.(null);
   }
 }
@@ -221,9 +225,15 @@ describe("startWebSocketHealthMonitor", () => {
     clock.advanceMs(10);
     const pongPromise = waitForPong(pair.serverSocket);
     scheduler.runDue();
-    await pongPromise;
+    const pongPayload = await pongPromise;
+    const parsedPongPayload: unknown = JSON.parse(pongPayload.toString("utf8"));
 
     expect(handle.isHealthy()).toBe(true);
+    expect(parsedPongPayload).toEqual({
+      type: "mistle.tunnel.health_ping",
+      pingSeq: 1,
+      sentAtMs: 1_010,
+    });
     expect(unhealthyCount).toBe(0);
     handle.stop();
   });
@@ -333,8 +343,9 @@ describe("startWebSocketHealthMonitor", () => {
     expect(missedPongCounts).toEqual([1]);
     expect(recoveredMissedPongCounts).toEqual([]);
 
-    rawSocket.emit("pong", Buffer.alloc(0));
+    rawSocket.emit("pong", rawSocket.pingPayloads[0]);
     expect(recoveredMissedPongCounts).toEqual([1]);
+    expect(handle.getSnapshot().pingSeq).toBe(null);
 
     clock.advanceMs(10);
     scheduler.runDue();
@@ -382,5 +393,22 @@ describe("startWebSocketHealthMonitor", () => {
     expect(handle.isHealthy()).toBe(false);
     expect(unhealthyCount).toBe(1);
     expect(missedPongCounts).toEqual([1, 2, 3]);
+    expect(rawSocket.pingPayloads.map((payload) => JSON.parse(payload.toString("utf8")))).toEqual([
+      {
+        type: "mistle.tunnel.health_ping",
+        pingSeq: 1,
+        sentAtMs: 4_010,
+      },
+      {
+        type: "mistle.tunnel.health_ping",
+        pingSeq: 2,
+        sentAtMs: 4_030,
+      },
+      {
+        type: "mistle.tunnel.health_ping",
+        pingSeq: 3,
+        sentAtMs: 4_050,
+      },
+    ]);
   });
 });

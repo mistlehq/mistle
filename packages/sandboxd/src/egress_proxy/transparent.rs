@@ -588,9 +588,7 @@ pub(super) fn build_nftables_install_commands(plan: &NftablesRulePlan) -> Vec<Ve
             "meta".to_string(),
             "mark".to_string(),
             plan.passthrough_mark.to_string(),
-            "log".to_string(),
-            "prefix".to_string(),
-            nft_string_literal("mistle-tproxy-bypass=mark"),
+            "counter".to_string(),
             "return".to_string(),
         ],
         vec![
@@ -602,9 +600,7 @@ pub(super) fn build_nftables_install_commands(plan: &NftablesRulePlan) -> Vec<Ve
             "ip".to_string(),
             "daddr".to_string(),
             format!("@{LOCAL_DESTINATION_SET_NAME}"),
-            "log".to_string(),
-            "prefix".to_string(),
-            nft_string_literal("mistle-tproxy-bypass=local"),
+            "counter".to_string(),
             "return".to_string(),
         ],
     ];
@@ -619,9 +615,7 @@ pub(super) fn build_nftables_install_commands(plan: &NftablesRulePlan) -> Vec<Ve
             "ip".to_string(),
             "daddr".to_string(),
             cidr.clone(),
-            "log".to_string(),
-            "prefix".to_string(),
-            nft_string_literal(&format!("mistle-tproxy-bypass=excluded:{cidr}")),
+            "counter".to_string(),
             "return".to_string(),
         ]
     }));
@@ -635,6 +629,7 @@ pub(super) fn build_nftables_install_commands(plan: &NftablesRulePlan) -> Vec<Ve
         "tcp".to_string(),
         "dport".to_string(),
         "1-65535".to_string(),
+        "counter".to_string(),
         "redirect".to_string(),
         "to".to_string(),
         format!(":{}", plan.listener_port),
@@ -1026,10 +1021,6 @@ fn emit_transparent_reconciler_log(
 #[cfg(target_os = "linux")]
 fn string_array_value(values: &[String]) -> Value {
     Value::Array(values.iter().cloned().map(Value::String).collect())
-}
-
-fn nft_string_literal(value: &str) -> String {
-    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 fn run_nft_command(arguments: &[String]) -> Result<(), EgressProxyError> {
