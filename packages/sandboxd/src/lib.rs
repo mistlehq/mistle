@@ -22,6 +22,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 
 pub mod activate;
 pub mod bootstrap;
+pub mod bootstrap_tunnel_diagnostics;
 pub mod cgroups;
 pub mod codex_proxy;
 pub mod command;

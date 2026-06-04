@@ -477,6 +477,7 @@ export async function stopSandboxInstance(
         {
           runtimeProvider: sandboxInstanceState.runtimeProvider,
           providerSandboxId: sandboxInstanceState.providerSandboxId,
+          sandboxInstanceId: input.sandboxInstanceId,
         },
       );
     } catch (error) {

@@ -29,7 +29,11 @@ import { TunnelProtocolTranslator } from "./protocol/tunnel-protocol-translator.
 import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
 import { SandboxKeepaliveRepository } from "./sandbox-keepalive-repository.js";
 import { SandboxRuntimeReadinessRepository } from "./sandbox-runtime-readiness-repository.js";
-import { type AttachedTunnelPeer, TunnelSessionService } from "./session/tunnel-session-service.js";
+import {
+  type AttachedTunnelPeer,
+  BootstrapTunnelCloseCauses,
+  TunnelSessionService,
+} from "./session/tunnel-session-service.js";
 import { SandboxSigningRequestService } from "./signing/sandbox-signing-request-service.js";
 import type { SandboxTelemetryIngressService } from "./telemetry-ingress/index.js";
 import {
@@ -238,6 +242,13 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 attachedPeer = tunnelSessionService.attachBootstrapPeer({
                   leaseId: admittedRequest.ownerLeaseId,
                   onFatalError: (failure) => {
+                    if (attachedPeer !== undefined) {
+                      tunnelSessionService.markBootstrapCloseInitiated({
+                        attachedPeer,
+                        cause: BootstrapTunnelCloseCauses.GATEWAY_ATTACH_FATAL_ERROR,
+                        reason: failure.closeReason,
+                      });
+                    }
                     recordTunnelSessionError({
                       tunnelSessionSpan,
                       error: failure.error,
@@ -246,6 +257,13 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                     ws.close(CloseCodes.INTERNAL_ERROR, failure.closeReason);
                   },
                   onLeaseLost: (failure) => {
+                    if (attachedPeer !== undefined) {
+                      tunnelSessionService.markBootstrapCloseInitiated({
+                        attachedPeer,
+                        cause: BootstrapTunnelCloseCauses.GATEWAY_OWNER_LEASE_LOST,
+                        reason: failure.closeReason,
+                      });
+                    }
                     tunnelSessionSpan?.addEvent("sandbox.tunnel.owner_lease.lost");
                     tunnelSessionSpan?.setStatus({
                       code: SpanStatusCode.ERROR,
@@ -254,6 +272,13 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                     ws.close(CloseCodes.INTERNAL_ERROR, failure.closeReason);
                   },
                   onTransportUnhealthy: (failure) => {
+                    if (attachedPeer !== undefined) {
+                      tunnelSessionService.markBootstrapCloseInitiated({
+                        attachedPeer,
+                        cause: BootstrapTunnelCloseCauses.GATEWAY_HEALTH_MISSED_PONGS,
+                        reason: failure.closeReason,
+                      });
+                    }
                     tunnelSessionSpan?.addEvent("sandbox.tunnel.transport_health.lost");
                     tunnelSessionSpan?.setStatus({
                       code: SpanStatusCode.ERROR,
@@ -266,6 +291,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                       "mistle.sandbox.tunnel.websocket_rtt_ms": roundTripTimeMs,
                     });
                   },
+                  openedAtMs: tunnelOpenedAtMs,
                   ownerLeaseTtlMs: OWNER_LEASE_TTL_MS,
                   relaySessionId,
                   sandboxInstanceId,
@@ -317,6 +343,14 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
           onMessage: (event, ws) => {
             const relayTarget = attachedPeer?.relayTarget;
             if (relayTarget === undefined) {
+              if (admittedRequest.kind === "bootstrap" && attachedPeer !== undefined) {
+                tunnelSessionService.markBootstrapCloseInitiated({
+                  attachedPeer,
+                  cause: BootstrapTunnelCloseCauses.GATEWAY_ATTACH_FATAL_ERROR,
+                  reason:
+                    "Sandbox tunnel relay target was not initialized for websocket connection.",
+                });
+              }
               ws.close(
                 CloseCodes.INTERNAL_ERROR,
                 "Sandbox tunnel relay target was not initialized for websocket connection.",
@@ -330,6 +364,13 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
 
             const payload = toTunnelForwardPayload(event.data);
             if (payload === undefined) {
+              if (admittedRequest.kind === "bootstrap" && attachedPeer !== undefined) {
+                tunnelSessionService.markBootstrapCloseInitiated({
+                  attachedPeer,
+                  cause: BootstrapTunnelCloseCauses.GATEWAY_UNSUPPORTED_MESSAGE_TYPE,
+                  reason: "Unsupported websocket message type.",
+                });
+              }
               ws.close(CloseCodes.INTERNAL_ERROR, "Unsupported websocket message type.");
               return;
             }
@@ -408,6 +449,13 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 });
               })().catch((error: unknown) => {
                 if (error instanceof TunnelProtocolViolationError) {
+                  if (admittedRequest.kind === "bootstrap" && attachedPeer !== undefined) {
+                    tunnelSessionService.markBootstrapCloseInitiated({
+                      attachedPeer,
+                      cause: BootstrapTunnelCloseCauses.GATEWAY_PROTOCOL_ERROR,
+                      reason: error.message,
+                    });
+                  }
                   logger.info(
                     {
                       instanceId: sandboxInstanceId,
@@ -432,6 +480,13 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                   },
                   "Failed handling sandbox tunnel websocket message",
                 );
+                if (admittedRequest.kind === "bootstrap" && attachedPeer !== undefined) {
+                  tunnelSessionService.markBootstrapCloseInitiated({
+                    attachedPeer,
+                    cause: BootstrapTunnelCloseCauses.GATEWAY_MESSAGE_HANDLER_ERROR,
+                    reason: "Failed handling sandbox tunnel websocket message.",
+                  });
+                }
                 ws.close(
                   CloseCodes.INTERNAL_ERROR,
                   "Failed handling sandbox tunnel websocket message.",
@@ -448,6 +503,10 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 logger.info(
                   {
                     eventName: "gateway.bootstrap.close.observed",
+                    ...tunnelSessionService.bootstrapCloseDiagnostics(attachedPeer, {
+                      closeCode: event.code,
+                      closeReason: event.reason,
+                    }),
                     closeCode: event.code,
                     closeReason: event.reason,
                     ownerLeaseId: admittedRequest.ownerLeaseId,
@@ -598,6 +657,13 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               },
               "Sandbox tunnel websocket emitted an error event",
             );
+            if (sourceTokenKind === "bootstrap" && attachedPeer !== undefined) {
+              tunnelSessionService.markBootstrapCloseInitiated({
+                attachedPeer,
+                cause: BootstrapTunnelCloseCauses.TRANSPORT_ERROR,
+                reason: error.message,
+              });
+            }
             ws.close(CloseCodes.INTERNAL_ERROR, error.message);
           },
         };

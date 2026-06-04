@@ -44,10 +44,33 @@ describe("sandbox runtime activation migration", () => {
   it("keeps clean sandboxd shutdown inside the shared provider stop helper", async () => {
     const source = await readFile(new URL("./shared/stop-sandbox.ts", import.meta.url), "utf8");
 
-    const shutdownIndex = source.indexOf("sandboxRuntimeControl.shutdown");
-    const providerStopIndex = source.indexOf("sandboxAdapter.stop");
+    const bootstrapLogReadIndex = source.indexOf('operation: "bootstrap_tunnel"');
+    const bootstrapLogEmitIndex = source.indexOf("await emitBootstrapTunnelOperationLog");
+    const shutdownIndex = source.indexOf("await ctx.sandboxRuntimeControl.shutdown");
+    const providerStopIndex = source.indexOf("await ctx.sandboxAdapter.stop");
 
+    expect(bootstrapLogReadIndex).toBeGreaterThanOrEqual(0);
+    expect(bootstrapLogEmitIndex).toBeGreaterThanOrEqual(0);
     expect(shutdownIndex).toBeGreaterThanOrEqual(0);
+    expect(shutdownIndex).toBeGreaterThan(bootstrapLogEmitIndex);
     expect(providerStopIndex).toBeGreaterThan(shutdownIndex);
+  });
+
+  it("reads bootstrap tunnel diagnostics before destroying provider sandboxes after start failure", async () => {
+    const source = await readFile(
+      new URL("./start-sandbox-instance/workflow.ts", import.meta.url),
+      "utf8",
+    );
+
+    const destroyStepIndex = source.indexOf('name: "destroy-sandbox-after-start-failure"');
+    const bootstrapLogEmitIndex = source.indexOf(
+      "await emitBootstrapTunnelOperationLog",
+      destroyStepIndex,
+    );
+    const destroySandboxIndex = source.indexOf("await destroySandbox", destroyStepIndex);
+
+    expect(destroyStepIndex).toBeGreaterThanOrEqual(0);
+    expect(bootstrapLogEmitIndex).toBeGreaterThan(destroyStepIndex);
+    expect(destroySandboxIndex).toBeGreaterThan(bootstrapLogEmitIndex);
   });
 });

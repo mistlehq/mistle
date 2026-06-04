@@ -32,7 +32,7 @@ import {
   createSandboxUsageEventIdempotencyKey,
   recordWorkerSandboxUsageEvent,
 } from "../shared/sandbox-usage-events.js";
-import { stopSandbox } from "../shared/stop-sandbox.js";
+import { emitBootstrapTunnelOperationLog, stopSandbox } from "../shared/stop-sandbox.js";
 import { markSandboxInstanceStopped } from "../stop-sandbox-instance/mark-sandbox-instance-stopped.js";
 import { ensureSandboxInstance } from "./ensure-sandbox-instance.js";
 import { activateSandboxRuntime } from "./initialize-sandbox-runtime.js";
@@ -144,6 +144,12 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             const resolvedRuntime =
               await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
 
+            await emitBootstrapTunnelOperationLog({
+              sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
+              runtimeProvider,
+              providerSandboxId,
+              sandboxInstanceId: input.sandboxInstanceId,
+            });
             await destroySandbox(
               {
                 sandboxAdapter: resolvedRuntime.sandboxAdapter,
@@ -369,6 +375,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               {
                 runtimeProvider: input.runtimeProvider,
                 providerSandboxId: input.providerSandboxId,
+                sandboxInstanceId: input.sandboxInstanceId,
               },
             );
           } catch (error) {

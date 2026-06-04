@@ -1,6 +1,6 @@
 //! Bootstrap tunnel connection and writer plumbing for the live session.
 
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -27,6 +27,7 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use tracing::{field, info, warn};
 use url::Url;
 
+use crate::bootstrap_tunnel_diagnostics::record_bootstrap_tunnel_event;
 use crate::protocol::session::SessionRuntimeInput;
 use crate::protocol::startup::TransparentProxyBypassKind;
 use crate::supervision::SupervisedComponent;
@@ -545,6 +546,19 @@ pub(super) fn spawn_bootstrap_socket_task(
                         Some(Ok(Message::Close(frame))) => {
                             let close_code = frame.as_ref().map(|frame| frame.code.to_string());
                             let close_reason = frame.as_ref().map(|frame| frame.reason.to_string());
+                            let mut attributes = BTreeMap::new();
+                            attributes.insert("closeSource".to_string(), Value::String("reader".to_string()));
+                            attributes.insert("closeKind".to_string(), Value::String("close_frame".to_string()));
+                            if let Some(close_code) = close_code.as_ref() {
+                                attributes.insert("closeCode".to_string(), Value::String(close_code.clone()));
+                            }
+                            if let Some(close_reason) = close_reason.as_ref() {
+                                attributes.insert("closeReason".to_string(), Value::String(close_reason.clone()));
+                            }
+                            record_bootstrap_tunnel_close_event(
+                                "bootstrap_tunnel.reader_closed",
+                                attributes,
+                            );
                             let is_gateway_service_restart = is_gateway_service_restart_close_frame(
                                 close_code.as_deref(),
                                 close_reason.as_deref(),
@@ -565,6 +579,16 @@ pub(super) fn spawn_bootstrap_socket_task(
                             return Ok(());
                         }
                         Some(Err(WebSocketError::ConnectionClosed)) => {
+                            record_bootstrap_tunnel_close_event(
+                                "bootstrap_tunnel.reader_closed",
+                                BTreeMap::from([
+                                    ("closeSource".to_string(), Value::String("reader".to_string())),
+                                    (
+                                        "closeKind".to_string(),
+                                        Value::String("connection_closed".to_string()),
+                                    ),
+                                ]),
+                            );
                             info!(
                                 event = "bootstrap_tunnel.reader_closed",
                                 close_source = "reader",
@@ -578,6 +602,13 @@ pub(super) fn spawn_bootstrap_socket_task(
                             return Ok(());
                         }
                         None => {
+                            record_bootstrap_tunnel_close_event(
+                                "bootstrap_tunnel.reader_closed",
+                                BTreeMap::from([
+                                    ("closeSource".to_string(), Value::String("reader".to_string())),
+                                    ("closeKind".to_string(), Value::String("stream_ended".to_string())),
+                                ]),
+                            );
                             info!(
                                 event = "bootstrap_tunnel.reader_closed",
                                 close_source = "reader",
@@ -616,6 +647,14 @@ pub(super) fn spawn_bootstrap_socket_task(
                             let _ = event_sender.send(TunnelSessionEvent::BootstrapMessage(message));
                         }
                         Some(Err(error)) => {
+                            record_bootstrap_tunnel_close_event(
+                                "bootstrap_tunnel.reader_closed",
+                                BTreeMap::from([
+                                    ("closeSource".to_string(), Value::String("reader".to_string())),
+                                    ("closeKind".to_string(), Value::String("read_error".to_string())),
+                                    ("error".to_string(), Value::String(error.to_string())),
+                                ]),
+                            );
                             warn!(
                                 event = "bootstrap_tunnel.reader_closed",
                                 close_source = "reader",
@@ -657,6 +696,16 @@ fn is_gateway_service_restart_close_frame(
         && close_reason == Some(GATEWAY_SERVICE_RESTART_CLOSE_REASON)
 }
 
+fn record_bootstrap_tunnel_close_event(event: &str, attributes: BTreeMap<String, Value>) {
+    if let Err(error) = record_bootstrap_tunnel_event(event, attributes) {
+        warn!(
+            event = "bootstrap_tunnel.diagnostic_record_failed",
+            diagnostic_event = event,
+            error = %error,
+        );
+    }
+}
+
 async fn run_bootstrap_writer<W>(
     mut writer: W,
     mut receiver: mpsc::UnboundedReceiver<TunnelWriterMessage>,
@@ -667,6 +716,15 @@ where
     W: Sink<Message, Error = WebSocketError> + Unpin,
 {
     let notify_bootstrap_closed = |reason: Option<String>| {
+        let mut attributes = BTreeMap::new();
+        attributes.insert(
+            "closeSource".to_string(),
+            Value::String("writer".to_string()),
+        );
+        if let Some(reason) = reason.as_ref() {
+            attributes.insert("reason".to_string(), Value::String(reason.clone()));
+        }
+        record_bootstrap_tunnel_close_event("bootstrap_tunnel.writer_observed_closed", attributes);
         info!(
             event = "bootstrap_tunnel.writer_observed_closed",
             close_source = "writer",
@@ -810,6 +868,17 @@ where
 {
     let payload_len = payload.len();
     if let Err(error) = writer.send(Message::Pong(payload.into())).await {
+        let payload_len_value = match u64::try_from(payload_len) {
+            Ok(value) => Value::from(value),
+            Err(_) => Value::String(payload_len.to_string()),
+        };
+        record_bootstrap_tunnel_close_event(
+            "bootstrap_tunnel.pong_write_failed",
+            BTreeMap::from([
+                ("payloadLen".to_string(), payload_len_value),
+                ("error".to_string(), Value::String(error.to_string())),
+            ]),
+        );
         warn!(
             event = "bootstrap_tunnel.pong_write_failed",
             payload_len,

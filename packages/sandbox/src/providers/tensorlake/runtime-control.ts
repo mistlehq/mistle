@@ -4,6 +4,10 @@ import {
   SandboxResourceNotFoundError,
 } from "../../errors.js";
 import {
+  resolveSandboxdOperationLogPath,
+  SandboxdOperationLogPaths,
+} from "../../operation-log-paths.js";
+import {
   SandboxdInstallCommand,
   SandboxdInstallEnvVars,
   SandboxdResetTransparentEgressNftablesCommand,
@@ -13,6 +17,7 @@ import type {
   SandboxRuntimeControl,
   SandboxRuntimeControlRequest,
   SandboxRuntimeEnsureSandboxdRequest,
+  SandboxRuntimeOperationLog,
 } from "../../types.js";
 import { withSandboxProviderOperationTelemetry } from "../telemetry.js";
 import {
@@ -21,6 +26,8 @@ import {
   TensorlakeClientOperationIds,
 } from "./client-errors.js";
 import { ShutdownCommandArgs, TensorlakeRootProcessUser, type TensorlakeClient } from "./client.js";
+
+export { SandboxdOperationLogPaths };
 
 const SandboxdEnsureTimeoutMs = 120_000;
 export const SandboxdStopDaemonTimeoutMs = 30_000;
@@ -240,8 +247,12 @@ export class TensorlakeSandboxRuntimeControl implements SandboxRuntimeControl {
     });
   }
 
-  async readOperationLog(input: { id: string; operation: "activate" }): Promise<string | null> {
+  async readOperationLog(input: {
+    id: string;
+    operation: SandboxRuntimeOperationLog;
+  }): Promise<string | null> {
     requireSandboxId(input.id);
+    const operationLogPath = resolveSandboxdOperationLogPath(input.operation);
 
     return await withSandboxProviderOperationTelemetry({
       provider: "tensorlake",
@@ -253,10 +264,7 @@ export class TensorlakeSandboxRuntimeControl implements SandboxRuntimeControl {
             operation: TensorlakeClientOperationIds.READ_OPERATION_LOG,
             commandDescription: `Read sandbox ${input.operation} operation log`,
             command: "sh",
-            args: [
-              "-c",
-              "if test -f '/run/mistle/activate.log'; then cat -- '/run/mistle/activate.log'; fi",
-            ],
+            args: ["-c", `if test -f '${operationLogPath}'; then cat -- '${operationLogPath}'; fi`],
             timeoutMs: SandboxdReadOperationLogTimeoutMs,
           });
           const logText = result.stdout.trim();
