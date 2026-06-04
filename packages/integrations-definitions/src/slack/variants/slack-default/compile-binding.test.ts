@@ -159,13 +159,13 @@ describe("compileSlackBinding", () => {
           release: {
             kind: "tag",
             match: "exact",
-            tag: "slack/v0.4.0",
+            tag: "slack/v0.5.0",
           },
           asset: {
             kind: "exact",
             fileName: "slack-linux-amd64",
             format: "binary",
-            sha256: "1424d32aad0e8f5cd82bdbbeb47f112b1ecd84a78caaea9bf1dff77744647424",
+            sha256: "cc58352f84465513951008eccfacaa82a5a6be68bddb25d73e32e3e27addb418",
           },
           installPath: "/usr/local/bin/slack",
           timeoutMs: 120_000,

@@ -27,8 +27,8 @@ const SlackMcpProcessStopTimeoutMs = 10_000;
 const SlackMcpProcessStopGracePeriodMs = 2_000;
 // Pin exact release tags for sandbox startup to avoid live upstream version
 // resolution and the associated rate-limit / availability failures.
-const SlackCliReleaseTag = "slack/v0.4.0";
-const SlackCliLinuxAmd64Sha256 = "1424d32aad0e8f5cd82bdbbeb47f112b1ecd84a78caaea9bf1dff77744647424";
+const SlackCliReleaseTag = "slack/v0.5.0";
+const SlackCliLinuxAmd64Sha256 = "cc58352f84465513951008eccfacaa82a5a6be68bddb25d73e32e3e27addb418";
 
 function createSlackCliArtifact(
   upstreamBaseUrl: string,
