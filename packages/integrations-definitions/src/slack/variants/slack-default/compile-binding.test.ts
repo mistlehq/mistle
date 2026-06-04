@@ -13,7 +13,7 @@ import {
 } from "./auth.js";
 import { compileSlackBinding } from "./compile-binding.js";
 import { SlackRequestMiddlewareIds } from "./egress-request-middleware.js";
-import { SlackCliToolId } from "./tool-ids.js";
+import { SlackCliToolId, SlackMcpToolId } from "./tool-ids.js";
 
 function artifactBinPath(name: string): string {
   return `/usr/local/bin/${name}`;
@@ -173,6 +173,82 @@ describe("compileSlackBinding", () => {
       ],
     });
     expect(compiled.runtimeClients).toEqual([]);
+  });
+
+  it("installs the Slack binary and starts a local MCP server when Slack MCP is selected", () => {
+    const compiled = compileSlackBinding({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      targetKey: "slack-default",
+      target: {
+        familyId: "slack",
+        variantId: "slack-default",
+        enabled: true,
+        config: {
+          apiBaseUrl: "https://slack.com/api",
+        },
+        secrets: {},
+      },
+      connection: {
+        id: "icn_slack",
+        status: "active",
+        config: {
+          connection_method: SlackConnectionMethodId,
+        },
+      },
+      binding: {
+        id: "ibd_123",
+        kind: "connector",
+        config: {
+          tools: [SlackMcpToolId],
+        },
+      },
+      refs: {
+        sandboxPaths: SandboxPaths,
+        artifactBinPath,
+      },
+    });
+
+    expect(compiled.artifacts).toHaveLength(1);
+    expect(compiled.artifacts[0]?.artifactKey).toBe("slack-cli");
+    expect(compiled.runtimeClients).toEqual([
+      {
+        clientId: "slack-mcp",
+        setup: {
+          env: {},
+          files: [],
+        },
+        processes: [
+          {
+            processKey: "slack-mcp-server",
+            command: {
+              args: [
+                "/usr/local/bin/slack",
+                "mcp",
+                "serve",
+                "--addr",
+                "127.0.0.1:7346",
+                "--endpoint",
+                "/mcp",
+              ],
+            },
+            readiness: {
+              type: "tcp",
+              host: "127.0.0.1",
+              port: 7346,
+              timeoutMs: 60_000,
+            },
+            stop: {
+              signal: "sigterm",
+              timeoutMs: 10_000,
+              gracePeriodMs: 2_000,
+            },
+          },
+        ],
+        endpoints: [],
+      },
+    ]);
   });
 
   it("omits the Slack CLI artifact when the tool is not selected", () => {

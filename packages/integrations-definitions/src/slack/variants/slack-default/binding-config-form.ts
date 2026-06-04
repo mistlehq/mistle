@@ -15,7 +15,7 @@ export function resolveSlackBindingConfigForm(
           default: [SlackToolIds.SLACK_CLI],
           items: {
             type: "string",
-            enum: [SlackToolIds.SLACK_CLI],
+            enum: [SlackToolIds.SLACK_CLI, SlackToolIds.SLACK_MCP],
           },
           type: "array",
           uniqueItems: true,
@@ -24,7 +24,7 @@ export function resolveSlackBindingConfigForm(
     },
     uiSchema: {
       tools: {
-        "ui:enumNames": ["Slack CLI"],
+        "ui:enumNames": ["Slack CLI", "Slack MCP"],
         "ui:widget": "checkboxes",
         "ui:options": {
           inline: false,

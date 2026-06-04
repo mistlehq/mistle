@@ -387,6 +387,133 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
     expectGitHubReleaseInstallStep(slackArtifact.lifecycle.install[0]);
   });
 
+  it("configures selected Jira and Slack MCP tools as local runtime processes", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-compile-jira-slack-mcp@example.com",
+    });
+
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_jira_slack_mcp",
+    });
+    await seedOpenAiAgentBinding(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_jira_slack_mcp",
+      targetKey: "openai-default-compile-jira-slack-mcp",
+      connectionId: "icn_compile_jira_slack_mcp_openai",
+      bindingId: "ibd_compile_jira_slack_mcp_openai",
+    });
+    await seedConnectorBindings(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_jira_slack_mcp",
+      bindings: [
+        jiraBinding({
+          targetKey: "jira-default-compile-mcp",
+          connectionId: "icn_compile_jira_mcp",
+          bindingId: "ibd_compile_jira_mcp",
+          tools: ["jira-mcp"],
+        }),
+        slackBinding({
+          targetKey: "slack-default-compile-mcp",
+          connectionId: "icn_compile_slack_mcp",
+          bindingId: "ibd_compile_slack_mcp",
+          tools: ["slack-mcp"],
+        }),
+      ],
+      includeAgent: false,
+    });
+
+    const runtimePlan = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_jira_slack_mcp",
+    });
+
+    expect(runtimePlan.artifacts.map((artifact) => artifact.artifactKey)).toEqual([
+      "codex-cli",
+      "jira-cli",
+      "slack-cli",
+    ]);
+    const configContent = readSetupFileContent(runtimePlan, "codex_config");
+    expect(configContent).toContain("[mcp_servers.jira]");
+    expect(configContent).toContain('url = "http://127.0.0.1:7345/mcp"');
+    expect(configContent).toContain("[mcp_servers.slack]");
+    expect(configContent).toContain('url = "http://127.0.0.1:7346/mcp"');
+    expect(runtimePlan.runtimeClients).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          clientId: "jira-mcp",
+          setup: {
+            env: {},
+            files: [],
+          },
+          processes: [
+            {
+              processKey: "jira-mcp-server",
+              command: {
+                args: [
+                  "/usr/local/bin/jira",
+                  "mcp",
+                  "serve",
+                  "--addr",
+                  "127.0.0.1:7345",
+                  "--endpoint",
+                  "/mcp",
+                ],
+              },
+              readiness: {
+                type: "tcp",
+                host: "127.0.0.1",
+                port: 7345,
+                timeoutMs: 60_000,
+              },
+              stop: {
+                signal: "sigterm",
+                timeoutMs: 10_000,
+                gracePeriodMs: 2_000,
+              },
+            },
+          ],
+          endpoints: [],
+        }),
+        expect.objectContaining({
+          clientId: "slack-mcp",
+          setup: {
+            env: {},
+            files: [],
+          },
+          processes: [
+            {
+              processKey: "slack-mcp-server",
+              command: {
+                args: [
+                  "/usr/local/bin/slack",
+                  "mcp",
+                  "serve",
+                  "--addr",
+                  "127.0.0.1:7346",
+                  "--endpoint",
+                  "/mcp",
+                ],
+              },
+              readiness: {
+                type: "tcp",
+                host: "127.0.0.1",
+                port: 7346,
+                timeoutMs: 60_000,
+              },
+              stop: {
+                signal: "sigterm",
+                timeoutMs: 10_000,
+                gracePeriodMs: 2_000,
+              },
+            },
+          ],
+          endpoints: [],
+        }),
+      ]),
+    );
+  });
+
   it("includes Linear API egress without MCP config when Linear MCP is not selected", async ({
     env,
   }) => {
