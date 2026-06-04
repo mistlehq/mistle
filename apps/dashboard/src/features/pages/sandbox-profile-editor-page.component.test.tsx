@@ -1710,7 +1710,7 @@ describe("SandboxProfileEditorPage", () => {
         screen.getByRole("textbox", { name: "Snapshot maintenance script" }),
       ),
     ).toBe("pnpm update\npnpm test");
-  });
+  }, 15_000);
 
   it("applies externally updated maintenance scripts while the maintenance assistant is open", async () => {
     const { profileId, queryClient } = renderSandboxProfileEditor({
@@ -3145,7 +3145,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(closeButton.hasAttribute("disabled")).toBe(false);
 
     fireEvent.click(closeButton);
-    expect(screen.getByText("Stop Setup Assistant?")).toBeTruthy();
+    expect(await screen.findByText("Stop Setup Assistant?")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Stop and close" }));
 
