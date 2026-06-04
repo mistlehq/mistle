@@ -17,10 +17,7 @@ import {
   SandboxRuntimeStateSnapshotSchema,
   type SandboxRuntimeStateSnapshot,
 } from "@mistle/sandbox-runtime-contract";
-import {
-  createDockerSandboxNetworkInfra,
-  getSystemTestSandboxBaseImageRef,
-} from "@mistle/test-harness";
+import { createDockerSandboxNetworkInfra } from "@mistle/test-harness";
 import {
   createIntegrationTest,
   TestEnvironmentIdHeader,
@@ -49,6 +46,7 @@ const GatewayTokenAudience = "integration-new-data-plane-gateway";
 const DockerSocketPath = "/var/run/docker.sock";
 const SandboxDockerNetworkInfraId = "sandbox-docker-network";
 const SandboxDockerNetworkNameValue = "network.name";
+const ProviderRuntimeImageRef = "nginx:1.27-alpine";
 const ProviderImageCreatedAt = "2026-05-16T00:00:00.000Z";
 
 const it = createIntegrationTest({
@@ -56,7 +54,7 @@ const it = createIntegrationTest({
   __internalInfra: createDockerSandboxNetworkInfra(),
   __afterStart: async ({ environment }) => {
     sandboxProviderRuntimeFixture = {
-      baseImageRef: await getSystemTestSandboxBaseImageRef(),
+      baseImageRef: ProviderRuntimeImageRef,
       dockerNetworkName: readRequiredInfraValue({
         infra: environment.infra,
         infraId: SandboxDockerNetworkInfraId,
