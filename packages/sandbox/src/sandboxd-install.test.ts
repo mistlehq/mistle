@@ -49,18 +49,36 @@ describe("SandboxdStopDaemonCommand", () => {
   it("requires process tools and removes the stale control socket after stopping sandboxd", () => {
     expect(SandboxdStopDaemonCommand).toContain("command -v pgrep");
     expect(SandboxdStopDaemonCommand).toContain("command -v pkill");
+    expect(SandboxdStopDaemonCommand).toContain("command -v timeout");
     expect(SandboxdStopDaemonCommand).toContain('rm -f "$socket_path"');
   });
 
-  it("stops the systemd unit before killing leftover sandboxd processes", () => {
-    const systemdStopIndex = SandboxdStopDaemonCommand.indexOf("systemctl stop sandboxd.service");
+  it("uses bounded systemd stop before forcing the service cgroup and leftover sandboxd processes down", () => {
+    const stopFailureCaptureIndex = SandboxdStopDaemonCommand.indexOf("systemd_stop_failed=0");
+    const systemdStopIndex = SandboxdStopDaemonCommand.indexOf(
+      "if ! timeout 20s systemctl stop sandboxd.service; then",
+    );
+    const stopFailedAssignmentIndex = SandboxdStopDaemonCommand.indexOf("systemd_stop_failed=1");
+    const cgroupKillConditionIndex = SandboxdStopDaemonCommand.indexOf(
+      'if test "$systemd_stop_failed" -ne 0 || systemctl is-active --quiet sandboxd.service; then',
+    );
+    const systemdKillIndex = SandboxdStopDaemonCommand.indexOf(
+      "systemctl kill --kill-who=all --signal=TERM sandboxd.service",
+    );
     const processKillIndex = SandboxdStopDaemonCommand.indexOf(
       'pkill -TERM -f "^/opt/mistle/bin/sandboxd( |$)"',
     );
 
-    expect(systemdStopIndex).toBeGreaterThanOrEqual(0);
+    expect(stopFailureCaptureIndex).toBeGreaterThanOrEqual(0);
+    expect(systemdStopIndex).toBeGreaterThan(stopFailureCaptureIndex);
+    expect(stopFailedAssignmentIndex).toBeGreaterThan(systemdStopIndex);
+    expect(cgroupKillConditionIndex).toBeGreaterThan(stopFailedAssignmentIndex);
+    expect(systemdKillIndex).toBeGreaterThan(cgroupKillConditionIndex);
     expect(processKillIndex).toBeGreaterThan(systemdStopIndex);
     expect(SandboxdStopDaemonCommand).toContain("systemctl is-active --quiet sandboxd.service");
+    expect(SandboxdStopDaemonCommand).toContain(
+      "systemctl kill --kill-who=all --signal=KILL sandboxd.service",
+    );
   });
 });
 

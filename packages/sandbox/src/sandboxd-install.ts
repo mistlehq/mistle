@@ -71,12 +71,23 @@ command -v pkill >/dev/null 2>&1 || {
   echo "pkill is required to stop sandboxd" >&2
   exit 1
 }
+command -v timeout >/dev/null 2>&1 || {
+  echo "timeout is required to stop sandboxd" >&2
+  exit 1
+}
 
 if command -v systemctl >/dev/null 2>&1; then
-  systemctl stop sandboxd.service || true
-  if systemctl is-active --quiet sandboxd.service; then
-    echo "failed to stop sandboxd.service" >&2
-    exit 1
+  systemd_stop_failed=0
+  if ! timeout 20s systemctl stop sandboxd.service; then
+    systemd_stop_failed=1
+  fi
+  if test "$systemd_stop_failed" -ne 0 || systemctl is-active --quiet sandboxd.service; then
+    echo "sandboxd.service did not stop cleanly; forcing service cgroup shutdown" >&2
+    systemctl kill --kill-who=all --signal=TERM sandboxd.service || true
+    sleep 1
+    if test "$systemd_stop_failed" -ne 0 || systemctl is-active --quiet sandboxd.service; then
+      systemctl kill --kill-who=all --signal=KILL sandboxd.service || true
+    fi
   fi
 fi
 

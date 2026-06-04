@@ -10,6 +10,7 @@ import {
   TensorlakeRootProcessUser,
   TensorlakeSandboxTimeoutSecs,
   createTensorlakeDaemonEnv,
+  createTensorlakeRunOptions,
   createTensorlakeSandboxOptions,
   createTensorlakeSandboxdControlCommand,
   createTensorlakeSandboxName,
@@ -47,6 +48,27 @@ describe("createTensorlakeSnapshotAndWaitOptions", () => {
     ).toEqual({
       snapshotType: "filesystem",
       timeout: 60 * 60,
+    });
+  });
+});
+
+describe("createTensorlakeRunOptions", () => {
+  it("passes command timeouts to Tensorlake in seconds", () => {
+    expect(
+      createTensorlakeRunOptions({
+        args: ["shutdown"],
+        timeoutMs: 30_000,
+      }),
+    ).toEqual({
+      args: ["shutdown"],
+      user: TensorlakeRootProcessUser,
+      timeout: 30,
+    });
+  });
+
+  it("omits SDK timeout when Mistle does not provide one", () => {
+    expect(createTensorlakeRunOptions({})).toEqual({
+      user: TensorlakeRootProcessUser,
     });
   });
 });

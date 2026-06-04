@@ -109,6 +109,22 @@ export function createTensorlakeSnapshotAndWaitOptions(input: {
   };
 }
 
+export function createTensorlakeRunOptions(input: {
+  args?: readonly string[];
+  env?: Record<string, string>;
+  user?: RunOptions["user"];
+  workingDir?: string;
+  timeoutMs?: number;
+}): RunOptions {
+  return {
+    ...(input.args === undefined ? {} : { args: [...input.args] }),
+    ...(input.env === undefined ? {} : { env: input.env }),
+    user: input.user ?? TensorlakeRootProcessUser,
+    ...(input.workingDir === undefined ? {} : { workingDir: input.workingDir }),
+    ...(input.timeoutMs === undefined ? {} : { timeout: input.timeoutMs / 1000 }),
+  };
+}
+
 export type TensorlakeStartSandboxResponse = { sandboxId: string };
 export type TensorlakeCaptureSandboxSnapshotResponse = { snapshotId: string };
 
@@ -545,13 +561,7 @@ export class TensorlakeApiClient implements TensorlakeClient {
   }): Promise<{ stdout: string; stderr: string }> {
     try {
       const sandbox = await this.#connect(request.sandboxId);
-      const result = await sandbox.run(request.command, {
-        ...(request.args === undefined ? {} : { args: [...request.args] }),
-        ...(request.env === undefined ? {} : { env: request.env }),
-        user: request.user ?? TensorlakeRootProcessUser,
-        ...(request.workingDir === undefined ? {} : { workingDir: request.workingDir }),
-        ...(request.timeoutMs === undefined ? {} : { timeout: request.timeoutMs }),
-      });
+      const result = await sandbox.run(request.command, createTensorlakeRunOptions(request));
       ensureCommandSucceeded({
         operation: request.operation,
         commandDescription: request.commandDescription,
