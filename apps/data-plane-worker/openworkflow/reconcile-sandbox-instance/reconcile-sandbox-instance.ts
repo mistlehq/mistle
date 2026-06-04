@@ -375,6 +375,7 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
       {
         runtimeProvider: ctx.sandboxInstance.runtimeProvider,
         providerSandboxId: ctx.sandboxInstance.providerSandboxId,
+        sandboxInstanceId: ctx.sandboxInstance.id,
       },
     );
   } catch (error) {

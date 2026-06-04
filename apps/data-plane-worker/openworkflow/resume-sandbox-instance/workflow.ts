@@ -138,7 +138,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       });
     }
 
-    async function stopProviderAfterResumeFailure(input: {
+    async function stopProviderAfterResumeFailure(providerInput: {
       runtimeProvider: SandboxProvider;
       providerSandboxId: string;
     }): Promise<unknown> {
@@ -150,8 +150,9 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
             },
             {
-              runtimeProvider: input.runtimeProvider,
-              providerSandboxId: input.providerSandboxId,
+              runtimeProvider: providerInput.runtimeProvider,
+              providerSandboxId: providerInput.providerSandboxId,
+              sandboxInstanceId: input.sandboxInstanceId,
             },
           );
         });

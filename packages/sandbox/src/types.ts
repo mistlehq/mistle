@@ -169,6 +169,8 @@ export interface SandboxRuntimeEnsureSandboxdRequest {
   readonly env?: Readonly<Record<string, string>>;
 }
 
+export type SandboxRuntimeOperationLog = "activate" | "bootstrap_tunnel";
+
 export interface SandboxRuntimeControl {
   readSandboxdVersion(input: {
     id: string;
@@ -177,7 +179,10 @@ export interface SandboxRuntimeControl {
   ensureSandboxd(input: SandboxRuntimeEnsureSandboxdRequest): Promise<void>;
   activate(input: SandboxRuntimeControlRequest): Promise<void>;
   shutdown(input: { id: string; env?: Readonly<Record<string, string>> }): Promise<void>;
-  readOperationLog(input: { id: string; operation: "activate" }): Promise<string | null>;
+  readOperationLog(input: {
+    id: string;
+    operation: SandboxRuntimeOperationLog;
+  }): Promise<string | null>;
   close(): Promise<void>;
 }
 
