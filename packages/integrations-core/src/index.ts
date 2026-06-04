@@ -15,3 +15,4 @@ export * from "./method-metadata-schemas/index.js";
 export * from "./agent/index.js";
 export * from "./capabilities/index.js";
 export * from "./agent-runtimes/index.js";
+export * from "./middleware/index.js";

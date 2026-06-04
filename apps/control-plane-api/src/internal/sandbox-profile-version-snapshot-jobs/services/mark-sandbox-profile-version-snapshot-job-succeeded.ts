@@ -1,7 +1,5 @@
 import {
-  type SandboxProfileVersionSnapshotJobTrigger,
   SandboxProfileVersionSnapshotJobStates,
-  SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
   type ControlPlaneDatabase,
   getControlPlaneDatabaseSchema,
@@ -35,7 +33,6 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
       .select({
         state: tables.sandboxProfileVersionSnapshotJobs.state,
         workflowRunId: tables.sandboxProfileVersionSnapshotJobs.workflowRunId,
-        trigger: tables.sandboxProfileVersionSnapshotJobs.trigger,
         candidateImageProvider: tables.sandboxProfileVersionSnapshotJobs.candidateImageProvider,
         candidateImageId: tables.sandboxProfileVersionSnapshotJobs.candidateImageId,
         sandboxProfileId: tables.sandboxProfileVersionSnapshotJobs.sandboxProfileId,
@@ -72,7 +69,6 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
 
     const actualState = lockedRow.state;
     const workflowRunId = lockedRow.workflowRunId;
-    const trigger = lockedRow.trigger;
     const candidateImageProvider = lockedRow.candidateImageProvider;
     const candidateImageId = lockedRow.candidateImageId;
     const sandboxProfileId = lockedRow.sandboxProfileId;
@@ -98,7 +94,6 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
     ) {
       return {
         shouldAdvanceTriggerTargets: shouldAdvanceTriggerTargetsForSnapshot({
-          trigger,
           activeVersion,
           sandboxProfileVersion,
         }),
@@ -197,7 +192,6 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
 
     return {
       shouldAdvanceTriggerTargets: shouldAdvanceTriggerTargetsForSnapshot({
-        trigger,
         activeVersion,
         sandboxProfileVersion,
         shouldActivateVersion,
@@ -221,18 +215,16 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
 }
 
 function shouldAdvanceTriggerTargetsForSnapshot(input: {
-  trigger: SandboxProfileVersionSnapshotJobTrigger;
   activeVersion: number | null;
   sandboxProfileVersion: number;
   shouldActivateVersion?: boolean;
 }): boolean {
   return (
-    input.trigger === SandboxProfileVersionSnapshotJobTriggers.PUBLISH &&
-    (input.activeVersion === input.sandboxProfileVersion || input.shouldActivateVersion === true)
+    input.activeVersion === input.sandboxProfileVersion || input.shouldActivateVersion === true
   );
 }
 
-async function tryAdvanceTriggerTargetsToPublishedProfileVersion(
+export async function tryAdvanceTriggerTargetsToPublishedProfileVersion(
   ctx: {
     db: ControlPlaneDatabase;
   },
@@ -250,7 +242,17 @@ async function tryAdvanceTriggerTargetsToPublishedProfileVersion(
         sandboxProfileVersion: input.sandboxProfileVersion,
         updatedAt: sql`now()`,
       })
-      .where(eq(tables.triggerTargets.sandboxProfileId, input.sandboxProfileId));
+      .where(
+        and(
+          eq(tables.triggerTargets.sandboxProfileId, input.sandboxProfileId),
+          sql`exists (
+            select 1
+            from ${tables.sandboxProfiles}
+            where ${tables.sandboxProfiles.id} = ${tables.triggerTargets.sandboxProfileId}
+              and ${tables.sandboxProfiles.activeVersion} = ${input.sandboxProfileVersion}
+          )`,
+        ),
+      );
   } catch (error) {
     logger.error(
       {

@@ -8,4 +8,14 @@ describe("JiraBindingConfigSchema", () => {
       tools: [],
     });
   });
+
+  it("accepts Jira CLI and MCP tool selections", () => {
+    expect(
+      JiraBindingConfigSchema.parse({
+        tools: ["jira-cli", "jira-mcp"],
+      }),
+    ).toEqual({
+      tools: ["jira-cli", "jira-mcp"],
+    });
+  });
 });

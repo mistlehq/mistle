@@ -1,6 +1,7 @@
 import {
   IntegrationFormConnectionMethodCreateBehaviors,
   IntegrationKinds,
+  IntegrationMcpTransports,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 
@@ -14,7 +15,7 @@ import {
 } from "./auth.js";
 import { resolveSlackBindingConfigForm } from "./binding-config-form.js";
 import { SlackBindingConfigSchema } from "./binding-config-schema.js";
-import { compileSlackBinding } from "./compile-binding.js";
+import { compileSlackBinding, SlackMcpUrl } from "./compile-binding.js";
 import { SlackConnectionConfigForm } from "./connection-config-form.js";
 import {
   SlackProviderAppSetup,
@@ -25,6 +26,7 @@ import {
 import { SlackSupportedWebhookEvents } from "./supported-webhook-events.js";
 import { SlackTargetConfigSchema } from "./target-config-schema.js";
 import { SlackTargetSecretSchema } from "./target-secret-schema.js";
+import { SlackToolIds } from "./tool-ids.js";
 
 export type SlackBaseIntegrationDefinition = IntegrationDefinition<
   typeof SlackTargetConfigSchema,
@@ -140,5 +142,17 @@ export const SlackBaseDefinition: SlackBaseIntegrationDefinition = {
       ],
     },
   },
+  mcp: (input) =>
+    input.binding.config.tools.includes(SlackToolIds.SLACK_MCP)
+      ? [
+          {
+            serverId: SlackToolIds.SLACK_MCP,
+            serverName: "slack",
+            transport: IntegrationMcpTransports.STREAMABLE_HTTP,
+            url: SlackMcpUrl,
+            description: "Slack MCP",
+          },
+        ]
+      : [],
   compileBinding: compileSlackBinding,
 };

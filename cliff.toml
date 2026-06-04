@@ -35,8 +35,9 @@ commit_parsers = [
   { message = "^perf", group = "<!-- 3 -->Performance" },
   { message = "^docs", group = "<!-- 4 -->Documentation" },
   { message = "^test", group = "<!-- 5 -->Tests" },
-  { message = "^build", group = "<!-- 6 -->Build" },
-  { message = "^ci", group = "<!-- 7 -->CI" },
-  { message = "^chore", group = "<!-- 8 -->Chores" },
-  { message = "^deps", group = "<!-- 9 -->Dependencies" },
+  { message = "^style", group = "<!-- 6 -->Style" },
+  { message = "^build", group = "<!-- 7 -->Build" },
+  { message = "^ci", group = "<!-- 8 -->CI" },
+  { message = "^chore", group = "<!-- 9 -->Chores" },
+  { message = "^deps", group = "<!-- 10 -->Dependencies" },
 ]

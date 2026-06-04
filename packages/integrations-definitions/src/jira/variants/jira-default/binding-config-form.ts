@@ -15,7 +15,7 @@ export function resolveJiraBindingConfigForm(
           default: [JiraToolIds.JIRA_CLI],
           items: {
             type: "string",
-            enum: [JiraToolIds.JIRA_CLI],
+            enum: [JiraToolIds.JIRA_CLI, JiraToolIds.JIRA_MCP],
           },
           type: "array",
           uniqueItems: true,
@@ -24,7 +24,7 @@ export function resolveJiraBindingConfigForm(
     },
     uiSchema: {
       tools: {
-        "ui:enumNames": ["Jira CLI"],
+        "ui:enumNames": ["Jira CLI", "Jira MCP"],
         "ui:widget": "checkboxes",
         "ui:options": {
           inline: false,
