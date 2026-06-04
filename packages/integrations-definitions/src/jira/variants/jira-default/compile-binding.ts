@@ -2,6 +2,7 @@ import {
   resolveRoutePathPrefixFromBaseUrl,
   type CompileBindingInput,
   type CompileBindingResult,
+  type RuntimeClient,
 } from "@mistle/integrations-core";
 
 import {
@@ -22,6 +23,15 @@ export type JiraCompileBindingInput = CompileBindingInput<JiraTargetConfig, Jira
 const JiraCliArtifactKey = "jira-cli";
 const JiraCliArtifactName = "Jira CLI";
 const ArtifactCommandTimeoutMs = 120_000;
+export const JiraMcpHost = "127.0.0.1";
+export const JiraMcpPort = 7345;
+export const JiraMcpEndpoint = "/mcp";
+export const JiraMcpUrl = `http://${JiraMcpHost}:${String(JiraMcpPort)}${JiraMcpEndpoint}`;
+const JiraMcpClientId = "jira-mcp";
+const JiraMcpProcessKey = "jira-mcp-server";
+const JiraMcpReadinessTimeoutMs = 60_000;
+const JiraMcpProcessStopTimeoutMs = 10_000;
+const JiraMcpProcessStopGracePeriodMs = 2_000;
 // Pin exact release tags for sandbox startup to avoid live upstream version
 // resolution and the associated rate-limit / availability failures.
 const JiraCliReleaseTag = "jira/v0.6.0";
@@ -57,6 +67,44 @@ function createJiraCliArtifact(upstreamBaseUrl: string): CompileBindingResult["a
   };
 }
 
+function createJiraMcpRuntimeClient(jiraCliInstallPath: string): RuntimeClient {
+  return {
+    clientId: JiraMcpClientId,
+    setup: {
+      env: {},
+      files: [],
+    },
+    processes: [
+      {
+        processKey: JiraMcpProcessKey,
+        command: {
+          args: [
+            jiraCliInstallPath,
+            "mcp",
+            "serve",
+            "--addr",
+            `${JiraMcpHost}:${String(JiraMcpPort)}`,
+            "--endpoint",
+            JiraMcpEndpoint,
+          ],
+        },
+        readiness: {
+          type: "tcp",
+          host: JiraMcpHost,
+          port: JiraMcpPort,
+          timeoutMs: JiraMcpReadinessTimeoutMs,
+        },
+        stop: {
+          signal: "sigterm",
+          timeoutMs: JiraMcpProcessStopTimeoutMs,
+          gracePeriodMs: JiraMcpProcessStopGracePeriodMs,
+        },
+      },
+    ],
+    endpoints: [],
+  };
+}
+
 function resolveMatchFromBaseUrl(baseUrl: string): {
   hosts: string[];
   pathPrefixes?: string[];
@@ -80,6 +128,11 @@ export function compileJiraBinding(input: JiraCompileBindingInput): CompileBindi
   const parsedConnectionConfig = JiraConnectionConfigSchema.parse(input.connection.config);
   const credentialSecretType = resolveJiraCredentialSecretType(input.connection.config);
   const includesJiraCli = input.binding.config.tools.includes(JiraToolIds.JIRA_CLI);
+  const includesJiraMcp = input.binding.config.tools.includes(JiraToolIds.JIRA_MCP);
+  const includesJiraToolArtifact = includesJiraCli || includesJiraMcp;
+  const runtimeClients = includesJiraMcp
+    ? [createJiraMcpRuntimeClient(input.refs.artifactBinPath("jira"))]
+    : [];
 
   if (parsedConnectionConfig.connection_method === JiraConnectionMethodIds.PERSONAL_API_TOKEN) {
     const upstreamBaseUrl = normalizeJiraBaseUrl(parsedConnectionConfig.site_url);
@@ -105,8 +158,8 @@ export function compileJiraBinding(input: JiraCompileBindingInput): CompileBindi
           requestMiddleware: [JiraRequestMiddlewareIds.APPEND_SESSION_LINK_TO_DOCUMENT],
         },
       ],
-      artifacts: includesJiraCli ? [createJiraCliArtifact(upstreamBaseUrl)] : [],
-      runtimeClients: [],
+      artifacts: includesJiraToolArtifact ? [createJiraCliArtifact(upstreamBaseUrl)] : [],
+      runtimeClients,
     };
   }
 
@@ -136,8 +189,8 @@ export function compileJiraBinding(input: JiraCompileBindingInput): CompileBindi
           requestMiddleware: [JiraRequestMiddlewareIds.APPEND_SESSION_LINK_TO_DOCUMENT],
         },
       ],
-      artifacts: includesJiraCli ? [createJiraCliArtifact(upstreamBaseUrl)] : [],
-      runtimeClients: [],
+      artifacts: includesJiraToolArtifact ? [createJiraCliArtifact(upstreamBaseUrl)] : [],
+      runtimeClients,
     };
   }
 
@@ -161,7 +214,7 @@ export function compileJiraBinding(input: JiraCompileBindingInput): CompileBindi
         requestMiddleware: [JiraRequestMiddlewareIds.APPEND_SESSION_LINK_TO_DOCUMENT],
       },
     ],
-    artifacts: includesJiraCli ? [createJiraCliArtifact(upstreamBaseUrl)] : [],
-    runtimeClients: [],
+    artifacts: includesJiraToolArtifact ? [createJiraCliArtifact(upstreamBaseUrl)] : [],
+    runtimeClients,
   };
 }

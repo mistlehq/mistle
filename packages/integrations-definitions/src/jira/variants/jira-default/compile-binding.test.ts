@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { JiraConnectionMethodIds, JiraCredentialSlotKeys } from "./auth.js";
 import { compileJiraBinding } from "./compile-binding.js";
 import { JiraRequestMiddlewareIds } from "./egress-request-middleware.js";
+import { JiraToolIds } from "./tool-ids.js";
 
 function artifactBinPath(name: string): string {
   return `/usr/local/bin/${name}`;
@@ -103,7 +104,7 @@ describe("compileJiraBinding", () => {
         id: "ibd_123",
         kind: "connector",
         config: {
-          tools: ["jira-cli"],
+          tools: [JiraToolIds.JIRA_CLI],
         },
       },
       refs: {
@@ -168,6 +169,82 @@ describe("compileJiraBinding", () => {
     expect(compiled.runtimeClients).toEqual([]);
   });
 
+  it("installs the Jira binary and starts a local MCP server when Jira MCP is selected", () => {
+    const compiled = compileJiraBinding({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      targetKey: "jira-default",
+      target: {
+        familyId: "jira",
+        variantId: "jira-default",
+        enabled: true,
+        config: {},
+        secrets: {},
+      },
+      connection: {
+        id: "icn_personal",
+        status: "active",
+        config: {
+          connection_method: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
+          site_url: "https://mistle.atlassian.net",
+          email: "user@example.com",
+        },
+      },
+      binding: {
+        id: "ibd_123",
+        kind: "connector",
+        config: {
+          tools: [JiraToolIds.JIRA_MCP],
+        },
+      },
+      refs: {
+        sandboxPaths: SandboxPaths,
+        artifactBinPath,
+      },
+    });
+
+    expect(compiled.artifacts).toHaveLength(1);
+    expect(compiled.artifacts[0]?.artifactKey).toBe("jira-cli");
+    expect(compiled.runtimeClients).toEqual([
+      {
+        clientId: "jira-mcp",
+        setup: {
+          env: {},
+          files: [],
+        },
+        processes: [
+          {
+            processKey: "jira-mcp-server",
+            command: {
+              args: [
+                "/usr/local/bin/jira",
+                "mcp",
+                "serve",
+                "--addr",
+                "127.0.0.1:7345",
+                "--endpoint",
+                "/mcp",
+              ],
+            },
+            readiness: {
+              type: "tcp",
+              host: "127.0.0.1",
+              port: 7345,
+              timeoutMs: 60_000,
+            },
+            stop: {
+              signal: "sigterm",
+              timeoutMs: 10_000,
+              gracePeriodMs: 2_000,
+            },
+          },
+        ],
+        endpoints: [],
+      },
+    ]);
+  });
+
   it("builds the expected Jira service account token egress route and jira artifact env", () => {
     const compiled = compileJiraBinding({
       organizationId: "org_123",
@@ -193,7 +270,7 @@ describe("compileJiraBinding", () => {
         id: "ibd_123",
         kind: "connector",
         config: {
-          tools: ["jira-cli"],
+          tools: [JiraToolIds.JIRA_CLI],
         },
       },
       refs: {
@@ -257,7 +334,7 @@ describe("compileJiraBinding", () => {
         id: "ibd_123",
         kind: "connector",
         config: {
-          tools: ["jira-cli"],
+          tools: [JiraToolIds.JIRA_CLI],
         },
       },
       refs: {

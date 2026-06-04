@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { JiraToolIds } from "./tool-ids.js";
 
-const JiraToolSchema = z.enum([JiraToolIds.JIRA_CLI]);
+const JiraToolSchema = z.enum([JiraToolIds.JIRA_CLI, JiraToolIds.JIRA_MCP]);
 
 export const JiraBindingConfigSchema = z
   .object({

@@ -1,17 +1,17 @@
 import { resolveIntegrationForm } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
-import { resolveJiraBindingConfigForm } from "./binding-config-form.js";
-import { JiraBindingConfigSchema } from "./binding-config-schema.js";
+import { resolveSlackBindingConfigForm } from "./binding-config-form.js";
+import { SlackBindingConfigSchema } from "./binding-config-schema.js";
 
-describe("jira binding config forms", () => {
-  it("resolves optional Jira CLI tool selection", () => {
+describe("slack binding config forms", () => {
+  it("resolves optional Slack CLI and MCP tool selections", () => {
     const resolvedForm = resolveIntegrationForm({
-      schema: JiraBindingConfigSchema,
-      form: resolveJiraBindingConfigForm,
+      schema: SlackBindingConfigSchema,
+      form: resolveSlackBindingConfigForm,
       context: {
-        familyId: "jira",
-        variantId: "jira-default",
+        familyId: "slack",
+        variantId: "slack-default",
         kind: "connector",
       },
     });
@@ -20,10 +20,10 @@ describe("jira binding config forms", () => {
       properties: {
         tools: {
           title: "Tools",
-          default: ["jira-cli"],
+          default: ["slack-cli"],
           items: {
             type: "string",
-            enum: ["jira-cli", "jira-mcp"],
+            enum: ["slack-cli", "slack-mcp"],
           },
           type: "array",
           uniqueItems: true,
@@ -32,7 +32,7 @@ describe("jira binding config forms", () => {
     });
     expect(resolvedForm.uiSchema).toEqual({
       tools: {
-        "ui:enumNames": ["Jira CLI", "Jira MCP"],
+        "ui:enumNames": ["Slack CLI", "Slack MCP"],
         "ui:widget": "checkboxes",
         "ui:options": {
           inline: false,

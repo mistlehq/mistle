@@ -1,4 +1,8 @@
-import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
+import {
+  IntegrationKinds,
+  IntegrationMcpTransports,
+  type IntegrationDefinition,
+} from "@mistle/integrations-core";
 
 import {
   JiraConnectionMethodIds,
@@ -11,7 +15,7 @@ import {
 } from "./auth.js";
 import { resolveJiraBindingConfigForm } from "./binding-config-form.js";
 import { JiraBindingConfigSchema } from "./binding-config-schema.js";
-import { compileJiraBinding } from "./compile-binding.js";
+import { compileJiraBinding, JiraMcpUrl } from "./compile-binding.js";
 import {
   JiraPersonalApiTokenConnectionConfigForm,
   JiraServiceAccountApiTokenConnectionConfigForm,
@@ -20,6 +24,7 @@ import {
 import { JiraSupportedWebhookEvents } from "./supported-webhook-events.js";
 import { JiraTargetConfigSchema } from "./target-config-schema.js";
 import { JiraTargetSecretSchema } from "./target-secret-schema.js";
+import { JiraToolIds } from "./tool-ids.js";
 
 export type JiraBaseIntegrationDefinition = IntegrationDefinition<
   typeof JiraTargetConfigSchema,
@@ -100,5 +105,17 @@ export const JiraBaseDefinition: JiraBaseIntegrationDefinition = {
     },
   ],
   supportedWebhookEvents: JiraSupportedWebhookEvents,
+  mcp: (input) =>
+    input.binding.config.tools.includes(JiraToolIds.JIRA_MCP)
+      ? [
+          {
+            serverId: JiraToolIds.JIRA_MCP,
+            serverName: "jira",
+            transport: IntegrationMcpTransports.STREAMABLE_HTTP,
+            url: JiraMcpUrl,
+            description: "Jira MCP",
+          },
+        ]
+      : [],
   compileBinding: compileJiraBinding,
 };

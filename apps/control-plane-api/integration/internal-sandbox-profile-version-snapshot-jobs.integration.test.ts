@@ -16,6 +16,7 @@ import { describe, expect } from "vitest";
 
 import { CONTROL_PLANE_INTERNAL_AUTH_HEADER } from "../src/internal/index.js";
 import { INTERNAL_SANDBOX_PROFILE_VERSION_SNAPSHOT_JOBS_ROUTE_BASE_PATH } from "../src/internal/sandbox-profile-version-snapshot-jobs/index.js";
+import { tryAdvanceTriggerTargetsToPublishedProfileVersion } from "../src/internal/sandbox-profile-version-snapshot-jobs/services/mark-sandbox-profile-version-snapshot-job-succeeded.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api"],
@@ -154,9 +155,7 @@ describe.concurrent("internal sandbox profile version snapshot jobs integration"
     expect(persistedProfile?.activeVersion).toBe(1);
   });
 
-  it("promotes refresh snapshots without changing the active version or trigger targets", async ({
-    env,
-  }) => {
+  it("promotes active refresh snapshots and advances stale trigger targets", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-internal-snapshot-job-refresh-success@example.com",
     });
@@ -166,9 +165,10 @@ describe.concurrent("internal sandbox profile version snapshot jobs integration"
       profileId: "sbp_internal_snapshot_refresh_success",
       jobId: "ssj_internal_snapshot_refresh_success",
       workflowRunId: "wf_internal_snapshot_refresh_success",
-      trigger: SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH,
+      trigger: SandboxProfileVersionSnapshotJobTriggers.SCHEDULED_REFRESH,
       state: SandboxProfileVersionSnapshotJobStates.RUNNING,
       activeVersion: 3,
+      profileVersion: 3,
       existingSnapshotImageId: "sha256:old-snapshot",
     });
     await seedTriggerTarget(env, {
@@ -176,7 +176,7 @@ describe.concurrent("internal sandbox profile version snapshot jobs integration"
       triggerId: "aut_internal_snapshot_refresh_target",
       targetId: "atg_internal_snapshot_refresh_target",
       sandboxProfileId: "sbp_internal_snapshot_refresh_success",
-      sandboxProfileVersion: 3,
+      sandboxProfileVersion: 1,
       enabled: true,
     });
 
@@ -196,6 +196,7 @@ describe.concurrent("internal sandbox profile version snapshot jobs integration"
 
     const persistedVersion = await readSnapshotVersion(env, {
       profileId: "sbp_internal_snapshot_refresh_success",
+      version: 3,
     });
     const persistedProfile = await readSnapshotProfile(env, {
       profileId: "sbp_internal_snapshot_refresh_success",
@@ -331,6 +332,57 @@ describe.concurrent("internal sandbox profile version snapshot jobs integration"
     await expect(
       readTriggerTargetVersion(env, "atg_internal_snapshot_older_publish"),
     ).resolves.toBe(3);
+  });
+
+  it("skips stale trigger target advancement when the profile active version changed after the advance was scheduled", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-internal-snapshot-job-stale-advance-after-active-change@example.com",
+    });
+
+    await seedSnapshotJob(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_internal_snapshot_stale_advance",
+      jobId: "ssj_internal_snapshot_stale_advance_v3",
+      workflowRunId: "wf_internal_snapshot_stale_advance_v3",
+      trigger: SandboxProfileVersionSnapshotJobTriggers.SCHEDULED_REFRESH,
+      state: SandboxProfileVersionSnapshotJobStates.RUNNING,
+      activeVersion: 4,
+      profileVersion: 3,
+      existingSnapshotImageId: "sha256:stale-advance-v3",
+    });
+    await seedSnapshotJobForExistingProfile(env, {
+      profileId: "sbp_internal_snapshot_stale_advance",
+      jobId: "ssj_internal_snapshot_stale_advance_v4",
+      trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+      state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+      profileVersion: 4,
+      existingSnapshotImageId: "sha256:stale-advance-v4",
+    });
+    await seedTriggerTarget(env, {
+      organizationId: session.organizationId,
+      triggerId: "aut_internal_snapshot_stale_advance",
+      targetId: "atg_internal_snapshot_stale_advance",
+      sandboxProfileId: "sbp_internal_snapshot_stale_advance",
+      sandboxProfileVersion: 4,
+      enabled: true,
+    });
+
+    await tryAdvanceTriggerTargetsToPublishedProfileVersion(
+      {
+        db: env.controlPlaneDb,
+      },
+      {
+        snapshotJobId: "ssj_internal_snapshot_stale_advance_v3",
+        sandboxProfileId: "sbp_internal_snapshot_stale_advance",
+        sandboxProfileVersion: 3,
+      },
+    );
+
+    await expect(
+      readTriggerTargetVersion(env, "atg_internal_snapshot_stale_advance"),
+    ).resolves.toBe(4);
   });
 
   it("keeps trigger targets on the newer version when publish snapshots complete out of order", async ({
@@ -521,7 +573,8 @@ async function seedSnapshotJob(
     jobId: string;
     trigger:
       | typeof SandboxProfileVersionSnapshotJobTriggers.PUBLISH
-      | typeof SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH;
+      | typeof SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH
+      | typeof SandboxProfileVersionSnapshotJobTriggers.SCHEDULED_REFRESH;
     state:
       | typeof SandboxProfileVersionSnapshotJobStates.QUEUED
       | typeof SandboxProfileVersionSnapshotJobStates.RUNNING;
@@ -558,7 +611,8 @@ async function seedSnapshotJobForExistingProfile(
     jobId: string;
     trigger:
       | typeof SandboxProfileVersionSnapshotJobTriggers.PUBLISH
-      | typeof SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH;
+      | typeof SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH
+      | typeof SandboxProfileVersionSnapshotJobTriggers.SCHEDULED_REFRESH;
     state:
       | typeof SandboxProfileVersionSnapshotJobStates.QUEUED
       | typeof SandboxProfileVersionSnapshotJobStates.RUNNING;
@@ -648,6 +702,7 @@ async function readSnapshotVersion(
   env: IntegrationTestEnvironment,
   input: {
     profileId: string;
+    version?: number;
   },
 ) {
   return await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
@@ -656,7 +711,7 @@ async function readSnapshotVersion(
       snapshotImageId: true,
     },
     where: (table, { and, eq }) =>
-      and(eq(table.sandboxProfileId, input.profileId), eq(table.version, 1)),
+      and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.version ?? 1)),
   });
 }
 

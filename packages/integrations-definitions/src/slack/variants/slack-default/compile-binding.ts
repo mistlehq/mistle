@@ -2,6 +2,7 @@ import {
   resolveRoutePathPrefixFromBaseUrl,
   type CompileBindingInput,
   type CompileBindingResult,
+  type RuntimeClient,
 } from "@mistle/integrations-core";
 
 import { SlackCredentialSecretTypes, SlackCredentialSlotKeys } from "./auth.js";
@@ -15,6 +16,15 @@ export type SlackCompileBindingInput = CompileBindingInput<SlackTargetConfig, Sl
 const SlackCliArtifactKey = "slack-cli";
 const SlackCliArtifactName = "Slack CLI";
 const ArtifactCommandTimeoutMs = 120_000;
+export const SlackMcpHost = "127.0.0.1";
+export const SlackMcpPort = 7346;
+export const SlackMcpEndpoint = "/mcp";
+export const SlackMcpUrl = `http://${SlackMcpHost}:${String(SlackMcpPort)}${SlackMcpEndpoint}`;
+const SlackMcpClientId = "slack-mcp";
+const SlackMcpProcessKey = "slack-mcp-server";
+const SlackMcpReadinessTimeoutMs = 60_000;
+const SlackMcpProcessStopTimeoutMs = 10_000;
+const SlackMcpProcessStopGracePeriodMs = 2_000;
 // Pin exact release tags for sandbox startup to avoid live upstream version
 // resolution and the associated rate-limit / availability failures.
 const SlackCliReleaseTag = "slack/v0.4.0";
@@ -52,6 +62,44 @@ function createSlackCliArtifact(
   };
 }
 
+function createSlackMcpRuntimeClient(slackCliInstallPath: string): RuntimeClient {
+  return {
+    clientId: SlackMcpClientId,
+    setup: {
+      env: {},
+      files: [],
+    },
+    processes: [
+      {
+        processKey: SlackMcpProcessKey,
+        command: {
+          args: [
+            slackCliInstallPath,
+            "mcp",
+            "serve",
+            "--addr",
+            `${SlackMcpHost}:${String(SlackMcpPort)}`,
+            "--endpoint",
+            SlackMcpEndpoint,
+          ],
+        },
+        readiness: {
+          type: "tcp",
+          host: SlackMcpHost,
+          port: SlackMcpPort,
+          timeoutMs: SlackMcpReadinessTimeoutMs,
+        },
+        stop: {
+          signal: "sigterm",
+          timeoutMs: SlackMcpProcessStopTimeoutMs,
+          gracePeriodMs: SlackMcpProcessStopGracePeriodMs,
+        },
+      },
+    ],
+    endpoints: [],
+  };
+}
+
 function resolveMatchFromBaseUrl(baseUrl: string): {
   hosts: string[];
   pathPrefixes?: string[];
@@ -73,6 +121,8 @@ function resolveMatchFromBaseUrl(baseUrl: string): {
 
 export function compileSlackBinding(input: SlackCompileBindingInput): CompileBindingResult {
   const includesSlackCli = input.binding.config.tools.includes(SlackToolIds.SLACK_CLI);
+  const includesSlackMcp = input.binding.config.tools.includes(SlackToolIds.SLACK_MCP);
+  const includesSlackToolArtifact = includesSlackCli || includesSlackMcp;
   const upstreamBaseUrl = input.target.config.apiBaseUrl;
 
   return {
@@ -95,7 +145,9 @@ export function compileSlackBinding(input: SlackCompileBindingInput): CompileBin
         requestMiddleware: [SlackRequestMiddlewareIds.APPEND_SESSION_LINK_TO_TEXT],
       },
     ],
-    artifacts: includesSlackCli ? [createSlackCliArtifact(upstreamBaseUrl)] : [],
-    runtimeClients: [],
+    artifacts: includesSlackToolArtifact ? [createSlackCliArtifact(upstreamBaseUrl)] : [],
+    runtimeClients: includesSlackMcp
+      ? [createSlackMcpRuntimeClient(input.refs.artifactBinPath("slack"))]
+      : [],
   };
 }
