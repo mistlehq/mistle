@@ -22,7 +22,16 @@ const SlackTimestampHeaderName = "x-slack-request-timestamp";
 const SlackSignatureVersion = "v0";
 const SlackTimestampToleranceSeconds = 300;
 const SlackConversationsRepliesPath = "conversations.replies";
+const SlackAssistantThreadsSetStatusPath = "assistant.threads.setStatus";
 const SlackWebhookPayloadStateKey = "slack.webhook.payload";
+const SlackAssistantStatus = "Working...";
+const SlackAssistantLoadingMessages = [
+  "Working through it...",
+  "Keeping at it...",
+  "Making progress...",
+  "Still on it...",
+  "On the case...",
+] satisfies readonly string[];
 
 type SlackWebhookConnectionSecrets = {
   botToken?: string;
@@ -37,6 +46,10 @@ function cloneSlackRecord(input: object): Record<string, unknown> {
 
 function parseSlackJsonPayload(input: Uint8Array): Record<string, unknown> {
   const decodedBody = new TextDecoder().decode(input);
+  return parseSlackDecodedJsonPayload(decodedBody);
+}
+
+function parseSlackDecodedJsonPayload(decodedBody: string): Record<string, unknown> {
   let parsedPayload: unknown;
 
   try {
@@ -50,6 +63,12 @@ function parseSlackJsonPayload(input: Uint8Array): Record<string, unknown> {
   }
 
   return Object.fromEntries(Object.entries(parsedPayload));
+}
+
+function parseSlackPayload(input: Uint8Array): Record<string, unknown> {
+  const decodedBody = new TextDecoder().decode(input);
+  const formPayload = new URLSearchParams(decodedBody).get("payload");
+  return parseSlackDecodedJsonPayload(formPayload ?? decodedBody);
 }
 
 function resolveSlackWebhookPayloadState(
@@ -105,6 +124,19 @@ function resolveOptionalSlackStringField(
 
 function resolveSlackMessageSubtype(event: Record<string, unknown>): string | undefined {
   return resolveOptionalSlackStringField(event, "subtype");
+}
+
+function resolveSlackMiddlewareApiBaseUrl(config: unknown): string | null {
+  if (typeof config !== "object" || config === null || Array.isArray(config)) {
+    return null;
+  }
+
+  const apiBaseUrl = cloneSlackRecord(config).apiBaseUrl;
+  if (typeof apiBaseUrl !== "string" || apiBaseUrl.trim().length === 0) {
+    return null;
+  }
+
+  return apiBaseUrl;
 }
 
 function resolveSlackEventClassification(input: {
@@ -240,6 +272,10 @@ function buildSlackConversationsRepliesUrl(input: {
   return apiUrl;
 }
 
+function buildSlackAssistantThreadsSetStatusUrl(input: { apiBaseUrl: string }): string {
+  return buildUrlWithPath(input.apiBaseUrl, SlackAssistantThreadsSetStatusPath);
+}
+
 async function fetchSlackConversationThreadRootTimestamp(input: {
   apiBaseUrl: string;
   botToken: string;
@@ -299,6 +335,85 @@ async function fetchSlackConversationThreadRootTimestamp(input: {
   }
 
   return threadRootTimestamp;
+}
+
+async function setSlackAssistantThreadStatus(input: {
+  apiBaseUrl: string;
+  botToken: string;
+  channelId: string;
+  threadTs: string;
+}): Promise<void> {
+  const response = await fetch(
+    buildSlackAssistantThreadsSetStatusUrl({
+      apiBaseUrl: input.apiBaseUrl,
+    }),
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${input.botToken}`,
+        accept: "application/json",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        channel_id: input.channelId,
+        thread_ts: input.threadTs,
+        status: SlackAssistantStatus,
+        loading_messages: SlackAssistantLoadingMessages,
+      }),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      `Slack assistant.threads.setStatus request failed with status ${String(response.status)}.`,
+    );
+  }
+
+  const parsedResponse: unknown = await response.json();
+  if (
+    typeof parsedResponse !== "object" ||
+    parsedResponse === null ||
+    Array.isArray(parsedResponse)
+  ) {
+    throw new Error("Slack assistant.threads.setStatus response must be a JSON object.");
+  }
+
+  const responseRecord = cloneSlackRecord(parsedResponse);
+  if (responseRecord.ok !== true) {
+    const error = resolveOptionalSlackStringField(responseRecord, "error") ?? "unknown_error";
+    throw new Error(`Slack assistant.threads.setStatus request failed: ${error}.`);
+  }
+}
+
+function resolveSlackAssistantStatusThread(payload: Readonly<Record<string, unknown>>): {
+  channelId: string;
+  threadTs: string;
+} | null {
+  if (resolveSlackRequestType(payload) !== "event_callback") {
+    return null;
+  }
+
+  const event = resolveSlackEnvelopeEvent(cloneSlackRecord(payload));
+  const providerEventType = resolveSlackProviderEventTypeFromEvent(event);
+  if (providerEventType !== "app_mention") {
+    return null;
+  }
+
+  const channelId = resolveOptionalSlackStringField(event, "channel");
+  if (channelId === undefined) {
+    return null;
+  }
+
+  const threadTs =
+    resolveOptionalSlackStringField(event, "thread_ts") ??
+    resolveOptionalSlackStringField(event, "ts");
+  if (threadTs === undefined) {
+    return null;
+  }
+
+  return {
+    channelId,
+    threadTs,
+  };
 }
 
 async function enrichSlackReactionEvent(input: {
@@ -538,7 +653,7 @@ export const ParseSlackWebhookPayloadMiddleware: IntegrationWebhookMiddleware = 
   context,
   next,
 ) => {
-  context.state.set(SlackWebhookPayloadStateKey, parseSlackJsonPayload(context.request.rawBody));
+  context.state.set(SlackWebhookPayloadStateKey, parseSlackPayload(context.request.rawBody));
   await next();
 };
 
@@ -580,9 +695,103 @@ export const HandleSlackUrlVerificationWebhookMiddleware: IntegrationWebhookMidd
   });
 };
 
+export const HandleSlackBlockActionsWebhookMiddleware: IntegrationWebhookMiddleware = async (
+  context,
+  next,
+) => {
+  const rawPayload = resolveSlackWebhookPayloadState(context.state);
+  const requestType = resolveSlackRequestType(rawPayload);
+  if (requestType !== "block_actions") {
+    await next();
+    return;
+  }
+
+  const signingSecret = context.connection.secrets.signingSecret;
+  if (typeof signingSecret !== "string" || signingSecret.length === 0) {
+    throwSlackWebhookVerificationError({
+      ok: false,
+      code: "invalid-signature",
+      message: "Slack signing secret is missing for the resolved connection.",
+    });
+  }
+
+  verifySlackMiddlewareRequestOrThrow({
+    headers: context.request.headers,
+    rawBody: context.request.rawBody,
+    signingSecret,
+  });
+
+  context.respond({
+    status: 200,
+    contentType: "text/plain",
+    body: "",
+  });
+};
+
+export const SetSlackAssistantStatusWebhookMiddleware: IntegrationWebhookMiddleware = async (
+  context,
+  next,
+) => {
+  let statusInput:
+    | {
+        apiBaseUrl: string;
+        botToken: string;
+        channelId: string;
+        threadTs: string;
+      }
+    | undefined;
+
+  try {
+    const rawPayload = resolveSlackWebhookPayloadState(context.state);
+    const thread = resolveSlackAssistantStatusThread(rawPayload);
+    const botToken = context.connection.secrets.botToken;
+    const apiBaseUrl = resolveSlackMiddlewareApiBaseUrl(context.target.config);
+    if (thread !== null && botToken !== undefined && botToken.length > 0 && apiBaseUrl !== null) {
+      statusInput = {
+        apiBaseUrl,
+        botToken,
+        channelId: thread.channelId,
+        threadTs: thread.threadTs,
+      };
+    }
+  } catch {
+    // Assistant status is a best-effort Slack UX hint and must not block webhook processing.
+    await next();
+    return;
+  }
+
+  if (statusInput === undefined) {
+    await next();
+    return;
+  }
+
+  const signingSecret = context.connection.secrets.signingSecret;
+  if (typeof signingSecret !== "string" || signingSecret.length === 0) {
+    throwSlackWebhookVerificationError({
+      ok: false,
+      code: "invalid-signature",
+      message: "Slack signing secret is missing for the resolved connection.",
+    });
+  }
+
+  verifySlackMiddlewareRequestOrThrow({
+    headers: context.request.headers,
+    rawBody: context.request.rawBody,
+    signingSecret,
+  });
+
+  void setSlackAssistantThreadStatus(statusInput).catch(() => {
+    // Assistant status is a best-effort Slack UX hint and must not block webhook processing.
+  });
+
+  await next();
+};
+
 export const SlackWebhookMiddlewares = [
   ParseSlackWebhookPayloadMiddleware,
   HandleSlackUrlVerificationWebhookMiddleware,
+  HandleSlackBlockActionsWebhookMiddleware,
+  SetSlackAssistantStatusWebhookMiddleware,
 ];
 
 export const SlackWebhookHandler: IntegrationWebhookHandler<

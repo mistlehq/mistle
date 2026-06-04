@@ -91,7 +91,7 @@
     "@types/react-dom": "^19.2.2",
     "@typescript/native-preview": "latest",
     "knip": "^6.11.0",
-    "lefthook": "^2.1.6",
+    "lefthook": "^2.1.8",
     "lint-staged": "^16.4.0",
     "oxfmt": "^0.47.0",
     "oxlint": "^1.66.0",
