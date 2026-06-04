@@ -40,7 +40,7 @@ export async function ensureSandboxInstance(
       sandboxConnectionId: ctx.sandboxRuntime.connectionId ?? null,
       sandboxVcpuCount: ctx.sandboxRuntime.resources?.vcpuCount ?? null,
       sandboxMemoryMb: ctx.sandboxRuntime.resources?.memoryMb ?? null,
-      sandboxStorageMb: ctx.sandboxRuntime.resources?.storageMb ?? null,
+      sandboxDiskMb: ctx.sandboxRuntime.resources?.diskMb ?? null,
       providerSandboxId: null,
       computeGeneration: 1,
       status: SandboxInstanceStatuses.PENDING,
@@ -56,7 +56,7 @@ export async function ensureSandboxInstance(
         sandboxConnectionId: ctx.sandboxRuntime.connectionId ?? null,
         sandboxVcpuCount: ctx.sandboxRuntime.resources?.vcpuCount ?? null,
         sandboxMemoryMb: ctx.sandboxRuntime.resources?.memoryMb ?? null,
-        sandboxStorageMb: ctx.sandboxRuntime.resources?.storageMb ?? null,
+        sandboxDiskMb: ctx.sandboxRuntime.resources?.diskMb ?? null,
       },
     })
     .returning({

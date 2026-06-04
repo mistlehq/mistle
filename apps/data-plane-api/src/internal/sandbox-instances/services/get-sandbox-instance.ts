@@ -45,7 +45,7 @@ type SandboxInstanceRuntimeSelection = {
   sandboxConnectionId: string | null;
   sandboxVcpuCount: number | null;
   sandboxMemoryMb: number | null;
-  sandboxStorageMb: number | null;
+  sandboxDiskMb: number | null;
 };
 
 type InspectableSandboxInstance = SandboxInstanceRuntimeSelection & {
@@ -552,13 +552,13 @@ function createPersistedSandboxResources(input: SandboxInstanceRuntimeSelection)
   | {
       vcpuCount: number;
       memoryMb: number;
-      storageMb?: number;
+      diskMb?: number;
     }
   | undefined {
   if (
     input.sandboxVcpuCount === null &&
     input.sandboxMemoryMb === null &&
-    input.sandboxStorageMb === null
+    input.sandboxDiskMb === null
   ) {
     return undefined;
   }
@@ -570,7 +570,7 @@ function createPersistedSandboxResources(input: SandboxInstanceRuntimeSelection)
   return {
     vcpuCount: input.sandboxVcpuCount,
     memoryMb: input.sandboxMemoryMb,
-    ...(input.sandboxStorageMb === null ? {} : { storageMb: input.sandboxStorageMb }),
+    ...(input.sandboxDiskMb === null ? {} : { diskMb: input.sandboxDiskMb }),
   };
 }
 
@@ -611,7 +611,7 @@ export async function getSandboxInstance(
       sandboxConnectionId: true,
       sandboxVcpuCount: true,
       sandboxMemoryMb: true,
-      sandboxStorageMb: true,
+      sandboxDiskMb: true,
       providerSandboxId: true,
       status: true,
       failureCode: true,

@@ -39,7 +39,7 @@ export function sandboxProfileVersionRow(input: {
   sandboxConnectionId?: string | null;
   sandboxVcpuCount?: number | null;
   sandboxMemoryMb?: number | null;
-  sandboxStorageMb?: number | null;
+  sandboxDiskMb?: number | null;
   mistleMcpEnabled?: boolean;
   mistleMcpApiKeyId?: string | null;
   skillsConfig?: SandboxProfileVersionSkillsConfig | null;
@@ -68,7 +68,7 @@ export function sandboxProfileVersionRow(input: {
       : { sandboxConnectionId: input.sandboxConnectionId }),
     ...(input.sandboxVcpuCount === undefined ? {} : { sandboxVcpuCount: input.sandboxVcpuCount }),
     ...(input.sandboxMemoryMb === undefined ? {} : { sandboxMemoryMb: input.sandboxMemoryMb }),
-    ...(input.sandboxStorageMb === undefined ? {} : { sandboxStorageMb: input.sandboxStorageMb }),
+    ...(input.sandboxDiskMb === undefined ? {} : { sandboxDiskMb: input.sandboxDiskMb }),
     ...(input.mistleMcpEnabled === undefined ? {} : { mistleMcpEnabled: input.mistleMcpEnabled }),
     ...(input.mistleMcpApiKeyId === undefined
       ? {}

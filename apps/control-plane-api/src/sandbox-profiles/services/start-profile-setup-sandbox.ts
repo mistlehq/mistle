@@ -80,7 +80,7 @@ async function resolveSetupSandboxRuntimeConfig(
       sandboxConnectionId: tables.sandboxProfileVersions.sandboxConnectionId,
       sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
       sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
-      sandboxStorageMb: tables.sandboxProfileVersions.sandboxStorageMb,
+      sandboxDiskMb: tables.sandboxProfileVersions.sandboxDiskMb,
     })
     .from(tables.sandboxProfiles)
     .leftJoin(

@@ -64,7 +64,7 @@ type SourceProfileVersion = {
   sandboxConnectionId: string | null;
   sandboxVcpuCount: number | null;
   sandboxMemoryMb: number | null;
-  sandboxStorageMb: number | null;
+  sandboxDiskMb: number | null;
   agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
   gitCommitSigningIntegrationConnectionId: string | null;
   mistleMcpEnabled: boolean;
@@ -368,7 +368,7 @@ async function insertDuplicatedVersion(
     sandboxConnectionId: input.source.sandboxConnectionId,
     sandboxVcpuCount: input.source.sandboxVcpuCount,
     sandboxMemoryMb: input.source.sandboxMemoryMb,
-    sandboxStorageMb: input.source.sandboxStorageMb,
+    sandboxDiskMb: input.source.sandboxDiskMb,
     agentRuntimeId: input.source.agentRuntimeId,
     gitCommitSigningIntegrationConnectionId: input.source.gitCommitSigningIntegrationConnectionId,
     mistleMcpEnabled: input.source.mistleMcpEnabled,

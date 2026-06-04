@@ -317,7 +317,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           providerSandboxId: input.providerSandboxId,
           vcpuCount: workflowInput.sandboxRuntime.resources?.vcpuCount ?? null,
           memoryMb: workflowInput.sandboxRuntime.resources?.memoryMb ?? null,
-          storageMb: workflowInput.sandboxRuntime.resources?.storageMb ?? null,
+          diskMb: workflowInput.sandboxRuntime.resources?.diskMb ?? null,
           payload: {
             workflowRunId: run.id,
             operationKind,

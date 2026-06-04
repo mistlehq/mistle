@@ -4,8 +4,8 @@ const TensorlakeMinVcpuCount = 1;
 const TensorlakeMaxVcpuCount = 8;
 const TensorlakeMinMemoryMbPerVcpu = 1024;
 const TensorlakeMaxMemoryMbPerVcpu = 8192;
-const TensorlakeMinStorageMb = 10240;
-const TensorlakeMaxStorageMb = 102400;
+const TensorlakeMinDiskMb = 10240;
+const TensorlakeMaxDiskMb = 102400;
 
 export const TensorlakeSandboxRuntimeResourceCapabilities: SandboxRuntimeResourceCapabilities = {
   // Source: Tensorlake sandbox lifecycle docs describe create-time CPU/memory
@@ -27,10 +27,10 @@ export const TensorlakeSandboxRuntimeResourceCapabilities: SandboxRuntimeResourc
     minPerVcpu: TensorlakeMinMemoryMbPerVcpu,
     maxPerVcpu: TensorlakeMaxMemoryMbPerVcpu,
   },
-  storageMb: {
-    min: TensorlakeMinStorageMb,
-    max: TensorlakeMaxStorageMb,
+  diskMb: {
+    min: TensorlakeMinDiskMb,
+    max: TensorlakeMaxDiskMb,
     step: 1024,
-    default: TensorlakeMinStorageMb,
+    default: TensorlakeMinDiskMb,
   },
 };

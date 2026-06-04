@@ -23,7 +23,7 @@ export async function lockProfileVersionForUpdateOrThrow(input: {
       sandboxConnectionId: sandboxProfileVersions.sandboxConnectionId,
       sandboxVcpuCount: sandboxProfileVersions.sandboxVcpuCount,
       sandboxMemoryMb: sandboxProfileVersions.sandboxMemoryMb,
-      sandboxStorageMb: sandboxProfileVersions.sandboxStorageMb,
+      sandboxDiskMb: sandboxProfileVersions.sandboxDiskMb,
     })
     .from(sandboxProfileVersions)
     .where(

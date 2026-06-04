@@ -165,7 +165,7 @@ describe.concurrent("sandbox profile Setup Assistant integration", () => {
         sandboxConnectionId: null,
         sandboxVcpuCount: null,
         sandboxMemoryMb: null,
-        sandboxStorageMb: null,
+        sandboxDiskMb: null,
       }),
     );
 
@@ -240,7 +240,7 @@ async function createAssistantProfile(input: {
         sandboxConnectionId: null,
         sandboxVcpuCount: null,
         sandboxMemoryMb: null,
-        sandboxStorageMb: null,
+        sandboxDiskMb: null,
       }),
       ...(input.snapshotImageId === undefined
         ? {}

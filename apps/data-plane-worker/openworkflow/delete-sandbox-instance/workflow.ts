@@ -63,7 +63,7 @@ export const DeleteSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               providerSandboxId: usageEventState.providerSandboxId,
               vcpuCount: usageEventState.vcpuCount,
               memoryMb: usageEventState.memoryMb,
-              storageMb: usageEventState.storageMb,
+              diskMb: usageEventState.diskMb,
               payload: {
                 workflowRunId: run.id,
                 operationKind: "delete",

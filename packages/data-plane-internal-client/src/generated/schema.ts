@@ -620,8 +620,8 @@ export interface paths {
               /** @enum {string} */
               provider: "docker" | "e2b" | "tensorlake";
               resources?: {
+                diskMb?: number;
                 memoryMb: number;
-                storageMb?: number;
                 vcpuCount: number;
               };
             };
@@ -2238,8 +2238,8 @@ export interface paths {
               /** @enum {string} */
               provider: "docker" | "e2b" | "tensorlake";
               resources?: {
+                diskMb?: number;
                 memoryMb: number;
-                storageMb?: number;
                 vcpuCount: number;
               };
             };

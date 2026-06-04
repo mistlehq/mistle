@@ -33,7 +33,7 @@ describe("profile version runtime config", () => {
       sandboxConnectionId: null,
       sandboxVcpuCount: null,
       sandboxMemoryMb: null,
-      sandboxStorageMb: null,
+      sandboxDiskMb: null,
     });
   });
 
@@ -45,7 +45,7 @@ describe("profile version runtime config", () => {
         sandboxResources: {
           vcpuCount: 2,
           memoryMb: 4096,
-          storageMb: 20480,
+          diskMb: 20480,
         },
       }),
     ).toEqual({
@@ -53,7 +53,7 @@ describe("profile version runtime config", () => {
       resources: {
         vcpuCount: 2,
         memoryMb: 4096,
-        storageMb: 20480,
+        diskMb: 20480,
       },
     });
   });

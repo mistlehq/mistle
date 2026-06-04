@@ -418,13 +418,13 @@ const SandboxProfileVersionResourcesSchema = z
   .object({
     vcpuCount: z.number().int().min(1),
     memoryMb: z.number().int().min(1),
-    storageMb: z.number().int().min(1).optional(),
+    diskMb: z.number().int().min(1).optional(),
   })
   .strict()
   .transform((value) => ({
     vcpuCount: value.vcpuCount,
     memoryMb: value.memoryMb,
-    ...(value.storageMb === undefined ? {} : { storageMb: value.storageMb }),
+    ...(value.diskMb === undefined ? {} : { diskMb: value.diskMb }),
   }));
 
 const RepoRelativeSkillPathPattern =
@@ -472,13 +472,13 @@ const SandboxRuntimeMemoryResourceCapabilitySchema = SandboxRuntimeResourceCapab
 const SandboxRuntimeResourceCapabilitiesSchema = z
   .object({
     memoryMb: SandboxRuntimeMemoryResourceCapabilitySchema,
-    storageMb: SandboxRuntimeResourceCapabilitySchema.optional(),
+    diskMb: SandboxRuntimeResourceCapabilitySchema.optional(),
     vcpuCount: SandboxRuntimeResourceCapabilitySchema,
   })
   .strict()
   .transform((capabilities) => ({
     memoryMb: capabilities.memoryMb,
-    ...(capabilities.storageMb === undefined ? {} : { storageMb: capabilities.storageMb }),
+    ...(capabilities.diskMb === undefined ? {} : { diskMb: capabilities.diskMb }),
     vcpuCount: capabilities.vcpuCount,
   }));
 

@@ -172,7 +172,7 @@ async function loadSnapshotRefreshMaterializationTarget(
       maintenanceScript: tables.sandboxProfileVersions.maintenanceScript,
       sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
       sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
-      sandboxStorageMb: tables.sandboxProfileVersions.sandboxStorageMb,
+      sandboxDiskMb: tables.sandboxProfileVersions.sandboxDiskMb,
     })
     .from(tables.sandboxProfiles)
     .innerJoin(
@@ -219,9 +219,9 @@ async function loadSnapshotRefreshMaterializationTarget(
           resources: {
             vcpuCount: sandboxProfileVersion.sandboxVcpuCount,
             memoryMb: sandboxProfileVersion.sandboxMemoryMb,
-            ...(sandboxProfileVersion.sandboxStorageMb === null
+            ...(sandboxProfileVersion.sandboxDiskMb === null
               ? {}
-              : { storageMb: sandboxProfileVersion.sandboxStorageMb }),
+              : { diskMb: sandboxProfileVersion.sandboxDiskMb }),
           },
         }),
   };

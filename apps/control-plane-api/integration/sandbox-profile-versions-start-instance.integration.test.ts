@@ -44,7 +44,7 @@ const DockerSandboxRuntimeColumns = {
   sandboxConnectionId: null,
   sandboxVcpuCount: null,
   sandboxMemoryMb: null,
-  sandboxStorageMb: null,
+  sandboxDiskMb: null,
 } as const;
 
 const TensorlakeSandboxRuntimeColumns = {
@@ -52,7 +52,7 @@ const TensorlakeSandboxRuntimeColumns = {
   sandboxConnectionId: null,
   sandboxVcpuCount: 2,
   sandboxMemoryMb: 4096,
-  sandboxStorageMb: null,
+  sandboxDiskMb: null,
 } as const;
 
 describe.concurrent("sandbox profile version start instance integration", () => {

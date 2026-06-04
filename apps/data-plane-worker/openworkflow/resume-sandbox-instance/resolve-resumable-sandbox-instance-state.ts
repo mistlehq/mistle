@@ -14,7 +14,7 @@ export type ResumableSandboxInstanceState = {
   sandboxConnectionId: string | null;
   sandboxVcpuCount: number | null;
   sandboxMemoryMb: number | null;
-  sandboxStorageMb: number | null;
+  sandboxDiskMb: number | null;
   providerSandboxId: string;
   computeGeneration: number;
   runtimePlan: CompiledRuntimePlan;
@@ -35,7 +35,7 @@ export async function resolveResumableSandboxInstanceState(input: {
       sandboxConnectionId: sandboxInstances.sandboxConnectionId,
       sandboxVcpuCount: sandboxInstances.sandboxVcpuCount,
       sandboxMemoryMb: sandboxInstances.sandboxMemoryMb,
-      sandboxStorageMb: sandboxInstances.sandboxStorageMb,
+      sandboxDiskMb: sandboxInstances.sandboxDiskMb,
       providerSandboxId: sandboxInstances.providerSandboxId,
       computeGeneration: sandboxInstances.computeGeneration,
       status: sandboxInstances.status,
@@ -93,7 +93,7 @@ export async function resolveResumableSandboxInstanceState(input: {
     sandboxConnectionId: sandboxInstance.sandboxConnectionId,
     sandboxVcpuCount: sandboxInstance.sandboxVcpuCount,
     sandboxMemoryMb: sandboxInstance.sandboxMemoryMb,
-    sandboxStorageMb: sandboxInstance.sandboxStorageMb,
+    sandboxDiskMb: sandboxInstance.sandboxDiskMb,
     providerSandboxId: sandboxInstance.providerSandboxId,
     computeGeneration: sandboxInstance.computeGeneration,
     runtimePlan: CompiledRuntimePlanSchema.parse(sandboxInstance.compiledRuntimePlan),

@@ -244,7 +244,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           providerSandboxId: eventInput.providerSandboxId,
           vcpuCount: eventInput.state.sandboxVcpuCount,
           memoryMb: eventInput.state.sandboxMemoryMb,
-          storageMb: eventInput.state.sandboxStorageMb,
+          diskMb: eventInput.state.sandboxDiskMb,
           payload: {
             workflowRunId: run.id,
             operationKind: "resume",

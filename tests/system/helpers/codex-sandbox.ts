@@ -179,7 +179,7 @@ export type SandboxProfileRuntimeConfigUpdate =
       sandboxResources: {
         vcpuCount: number;
         memoryMb: number;
-        storageMb: number;
+        diskMb: number;
       };
     };
 
@@ -220,7 +220,7 @@ export function createSandboxProfileRuntimeConfigUpdate(
         sandboxResources: {
           vcpuCount: 2,
           memoryMb: 4096,
-          storageMb: 20_480,
+          diskMb: 20_480,
         },
       };
   }

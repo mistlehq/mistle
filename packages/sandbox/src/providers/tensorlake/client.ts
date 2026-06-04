@@ -198,9 +198,7 @@ export function createTensorlakeSandboxOptions(
       : {
           cpus: request.resources.vcpuCount,
           memoryMb: request.resources.memoryMb,
-          ...(request.resources.storageMb === undefined
-            ? {}
-            : { diskMb: request.resources.storageMb }),
+          ...(request.resources.diskMb === undefined ? {} : { diskMb: request.resources.diskMb }),
         }),
   };
 }

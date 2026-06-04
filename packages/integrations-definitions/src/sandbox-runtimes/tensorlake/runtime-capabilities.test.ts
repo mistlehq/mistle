@@ -19,7 +19,7 @@ describe("Tensorlake sandbox runtime capabilities", () => {
         minPerVcpu: 1024,
         maxPerVcpu: 8192,
       },
-      storageMb: {
+      diskMb: {
         min: 10240,
         max: 102400,
         step: 1024,

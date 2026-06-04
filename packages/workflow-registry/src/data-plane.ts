@@ -44,7 +44,7 @@ export type StartSandboxInstanceWorkflowImageInput = Pick<SandboxImageHandle, "i
 export type SandboxRuntimeResourceInput = {
   vcpuCount: number;
   memoryMb: number;
-  storageMb?: number;
+  diskMb?: number;
 };
 
 export type SandboxRuntimeProviderInput = {

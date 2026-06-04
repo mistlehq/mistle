@@ -102,7 +102,7 @@ export async function createProfileVersionDraft(
           sandboxConnectionId: true,
           sandboxVcpuCount: true,
           sandboxMemoryMb: true,
-          sandboxStorageMb: true,
+          sandboxDiskMb: true,
           skillsConfig: true,
         },
         where: (table, { eq }) => eq(table.sandboxProfileId, input.profileId),
@@ -148,7 +148,7 @@ export async function createProfileVersionDraft(
           sandboxConnectionId: latestVersion.sandboxConnectionId,
           sandboxVcpuCount: latestVersion.sandboxVcpuCount,
           sandboxMemoryMb: latestVersion.sandboxMemoryMb,
-          sandboxStorageMb: latestVersion.sandboxStorageMb,
+          sandboxDiskMb: latestVersion.sandboxDiskMb,
           skillsConfig: latestVersion.skillsConfig,
         })
         .returning({
@@ -165,7 +165,7 @@ export async function createProfileVersionDraft(
           sandboxConnectionId: tables.sandboxProfileVersions.sandboxConnectionId,
           sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
           sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
-          sandboxStorageMb: tables.sandboxProfileVersions.sandboxStorageMb,
+          sandboxDiskMb: tables.sandboxProfileVersions.sandboxDiskMb,
           skillsConfig: tables.sandboxProfileVersions.skillsConfig,
         });
 

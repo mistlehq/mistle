@@ -37,7 +37,7 @@ type ProfileVersionRuntimeColumns = {
   sandboxConnectionId: string | null;
   sandboxVcpuCount: number | null;
   sandboxMemoryMb: number | null;
-  sandboxStorageMb: number | null;
+  sandboxDiskMb: number | null;
 };
 
 export type ListProfileVersionSkillsSourceReposInput = {
@@ -238,7 +238,7 @@ async function getProfileVersionRuntimeColumns(
       sandboxConnectionId: true,
       sandboxVcpuCount: true,
       sandboxMemoryMb: true,
-      sandboxStorageMb: true,
+      sandboxDiskMb: true,
     },
     where: (table, { and, eq }) =>
       and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),

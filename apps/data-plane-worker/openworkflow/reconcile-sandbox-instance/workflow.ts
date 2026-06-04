@@ -119,7 +119,7 @@ export const ReconcileSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         eventType: inputState.eventType,
         vcpuCount: inputState.usageEventState.vcpuCount,
         memoryMb: inputState.usageEventState.memoryMb,
-        storageMb: inputState.usageEventState.storageMb,
+        diskMb: inputState.usageEventState.diskMb,
         payload: {
           workflowRunId: run.id,
           operationKind: "reconcile",

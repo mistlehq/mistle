@@ -63,7 +63,7 @@ export function defineSandboxProfileVersions(schema: PgSchema) {
       sandboxConnectionId: text("sandbox_connection_id"),
       sandboxVcpuCount: bigint("sandbox_vcpu_count", { mode: "number" }),
       sandboxMemoryMb: bigint("sandbox_memory_mb", { mode: "number" }),
-      sandboxStorageMb: bigint("sandbox_storage_mb", { mode: "number" }),
+      sandboxDiskMb: bigint("sandbox_disk_mb", { mode: "number" }),
       agentRuntimeId: text("agent_runtime_id")
         .notNull()
         .$type<SandboxProfileVersionAgentRuntimeId>()

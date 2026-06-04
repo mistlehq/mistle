@@ -638,7 +638,7 @@ describe.concurrent("control-plane worker schedule dispatch child batches", () =
       sandboxProvider: "tensorlake",
       sandboxVcpuCount: 2,
       sandboxMemoryMb: 4096,
-      sandboxStorageMb: 8192,
+      sandboxDiskMb: 8192,
       maintenanceScript: "echo maintain",
       snapshotImageProvider: "tensorlake",
       snapshotImageId: "tensorlake:snapshot:stale-refresh-retry",
@@ -707,7 +707,7 @@ describe.concurrent("control-plane worker schedule dispatch child batches", () =
             resources: {
               vcpuCount: 2,
               memoryMb: 4096,
-              storageMb: 8192,
+              diskMb: 8192,
             },
           },
         }),
@@ -881,7 +881,7 @@ async function seedSnapshotRefreshScheduledAction(input: {
   sandboxProvider?: "docker" | "e2b" | "tensorlake";
   sandboxVcpuCount?: number | null;
   sandboxMemoryMb?: number | null;
-  sandboxStorageMb?: number | null;
+  sandboxDiskMb?: number | null;
   maintenanceScript?: string | null;
   snapshotImageProvider?: "docker" | "e2b" | "tensorlake" | null;
   snapshotImageId?: string | null;
@@ -909,7 +909,7 @@ async function seedSnapshotRefreshScheduledAction(input: {
       sandboxConnectionId: null,
       sandboxVcpuCount: input.sandboxVcpuCount ?? null,
       sandboxMemoryMb: input.sandboxMemoryMb ?? null,
-      sandboxStorageMb: input.sandboxStorageMb ?? null,
+      sandboxDiskMb: input.sandboxDiskMb ?? null,
       ...(input.maintenanceScript === undefined
         ? {}
         : { maintenanceScript: input.maintenanceScript }),

@@ -651,16 +651,16 @@ function SandboxProviderResourceFields(input: {
         }}
         value={clampResourceValue(input.resources.memoryMb, memoryCapability)}
       />
-      {capabilities.storageMb === undefined ? null : (
+      {capabilities.diskMb === undefined ? null : (
         <ResourceNumberField
-          capability={capabilities.storageMb}
+          capability={capabilities.diskMb}
           disabled={input.disabled}
-          id="sandbox-profile-runtime-storage"
-          label="Storage (MB)"
+          id="sandbox-profile-runtime-disk"
+          label="Disk (MB)"
           onChange={(value) => {
-            input.onResourceFieldChange("storageMb", value);
+            input.onResourceFieldChange("diskMb", value);
           }}
-          value={input.resources.storageMb ?? capabilities.storageMb.default}
+          value={input.resources.diskMb ?? capabilities.diskMb.default}
         />
       )}
     </>
@@ -1325,9 +1325,9 @@ function SandboxProviderReadOnlyResourceFields(input: {
       <ReadOnlyRuntimeField horizontal={input.horizontal} label="Memory (MB)">
         {formatMemoryResourceValue(input.resources.memoryMb)}
       </ReadOnlyRuntimeField>
-      {capabilities.storageMb === undefined ? null : (
-        <ReadOnlyRuntimeField horizontal={input.horizontal} label="Storage (MB)">
-          {formatMemoryResourceValue(input.resources.storageMb ?? capabilities.storageMb.default)}
+      {capabilities.diskMb === undefined ? null : (
+        <ReadOnlyRuntimeField horizontal={input.horizontal} label="Disk (MB)">
+          {formatMemoryResourceValue(input.resources.diskMb ?? capabilities.diskMb.default)}
         </ReadOnlyRuntimeField>
       )}
     </>
@@ -1501,7 +1501,7 @@ function createDefaultResources(
   return {
     vcpuCount: capabilities.vcpuCount.default,
     memoryMb: capabilities.memoryMb.default,
-    ...(capabilities.storageMb === undefined ? {} : { storageMb: capabilities.storageMb.default }),
+    ...(capabilities.diskMb === undefined ? {} : { diskMb: capabilities.diskMb.default }),
   };
 }
 
@@ -1624,7 +1624,7 @@ function resourcesAreEqual(
   return (
     left.vcpuCount === right.vcpuCount &&
     left.memoryMb === right.memoryMb &&
-    left.storageMb === right.storageMb
+    left.diskMb === right.diskMb
   );
 }
 

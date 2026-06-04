@@ -178,7 +178,7 @@ async function resolveLaunchImage(
       sandboxConnectionId: tables.sandboxProfileVersions.sandboxConnectionId,
       sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
       sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
-      sandboxStorageMb: tables.sandboxProfileVersions.sandboxStorageMb,
+      sandboxDiskMb: tables.sandboxProfileVersions.sandboxDiskMb,
     })
     .from(tables.sandboxProfiles)
     .leftJoin(
@@ -215,7 +215,7 @@ async function resolveLaunchImage(
       sandboxConnectionId: sandboxProfileVersion.sandboxConnectionId,
       sandboxVcpuCount: sandboxProfileVersion.sandboxVcpuCount,
       sandboxMemoryMb: sandboxProfileVersion.sandboxMemoryMb,
-      sandboxStorageMb: sandboxProfileVersion.sandboxStorageMb,
+      sandboxDiskMb: sandboxProfileVersion.sandboxDiskMb,
     }),
   );
 

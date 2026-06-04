@@ -19,7 +19,7 @@ const WorkerSandboxUsageEventInputSchema = z
     providerSandboxId: z.string().min(1).nullable(),
     vcpuCount: z.number().int().positive().nullable(),
     memoryMb: z.number().int().positive().nullable(),
-    storageMb: z.number().int().positive().nullable(),
+    diskMb: z.number().int().positive().nullable(),
     payload: z.record(z.string(), z.unknown()).default({}),
   })
   .strict();
@@ -70,7 +70,7 @@ export async function recordWorkerSandboxUsageEvent(
       providerSandboxId: parsedInput.providerSandboxId,
       vcpuCount: parsedInput.vcpuCount,
       memoryMb: parsedInput.memoryMb,
-      storageMb: parsedInput.storageMb,
+      diskMb: parsedInput.diskMb,
       payload: parsedInput.payload,
     })
     .onConflictDoNothing({

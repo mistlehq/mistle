@@ -117,7 +117,7 @@ describe.concurrent("internal sandbox instance start and resume integration", ()
       sandboxConnectionId: null,
       sandboxVcpuCount: null,
       sandboxMemoryMb: null,
-      sandboxStorageMb: null,
+      sandboxDiskMb: null,
       purpose: SandboxInstancePurposes.SESSION,
       status: SandboxInstanceStatuses.PENDING,
     });
@@ -152,7 +152,7 @@ describe.concurrent("internal sandbox instance start and resume integration", ()
         sandboxConnectionId: "icn_dp_api_start_runtime_config",
         sandboxVcpuCount: 4,
         sandboxMemoryMb: 8192,
-        sandboxStorageMb: null,
+        sandboxDiskMb: null,
       },
     );
   });
@@ -346,7 +346,7 @@ function startInput(input: {
   runtimeResources?: {
     vcpuCount: number;
     memoryMb: number;
-    storageMb?: number;
+    diskMb?: number;
   };
 }): StartSandboxInstanceInput {
   const imageKind = input.imageKind ?? "base";
@@ -457,7 +457,7 @@ async function readSandboxInstance(env: IntegrationTestEnvironment, sandboxInsta
       sandboxConnectionId: true,
       sandboxVcpuCount: true,
       sandboxMemoryMb: true,
-      sandboxStorageMb: true,
+      sandboxDiskMb: true,
       purpose: true,
       status: true,
     },

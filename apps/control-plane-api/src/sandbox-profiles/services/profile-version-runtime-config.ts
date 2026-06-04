@@ -19,7 +19,7 @@ import {
 export type SandboxProfileVersionResources = {
   vcpuCount: number;
   memoryMb: number;
-  storageMb?: number | undefined;
+  diskMb?: number | undefined;
 };
 
 export type SandboxProfileVersionRuntimeConfig = {
@@ -33,7 +33,7 @@ export type SandboxProfileVersionRuntimeConfigColumns = {
   sandboxConnectionId: string | null;
   sandboxVcpuCount: number | null;
   sandboxMemoryMb: number | null;
-  sandboxStorageMb: number | null;
+  sandboxDiskMb: number | null;
 };
 
 export type SandboxRuntimeConfigValidationIssue = {
@@ -53,9 +53,9 @@ export function createWorkflowSandboxRuntime(
       : {
           vcpuCount: runtimeConfig.sandboxResources.vcpuCount,
           memoryMb: runtimeConfig.sandboxResources.memoryMb,
-          ...(runtimeConfig.sandboxResources.storageMb === undefined
+          ...(runtimeConfig.sandboxResources.diskMb === undefined
             ? {}
-            : { storageMb: runtimeConfig.sandboxResources.storageMb }),
+            : { diskMb: runtimeConfig.sandboxResources.diskMb }),
         };
 
   return {
@@ -95,7 +95,7 @@ export function createDefaultProfileVersionRuntimeConfig(input: {
     sandboxConnectionId: null,
     sandboxVcpuCount: null,
     sandboxMemoryMb: null,
-    sandboxStorageMb: null,
+    sandboxDiskMb: null,
   };
 }
 
@@ -163,7 +163,7 @@ export function mapProfileVersionRuntimeConfig(
 function mapProfileVersionResources(
   columns: Pick<
     SandboxProfileVersionRuntimeConfigColumns,
-    "sandboxVcpuCount" | "sandboxMemoryMb" | "sandboxStorageMb"
+    "sandboxVcpuCount" | "sandboxMemoryMb" | "sandboxDiskMb"
   >,
 ): SandboxProfileVersionResources | null {
   if (columns.sandboxVcpuCount === null || columns.sandboxMemoryMb === null) {
@@ -173,7 +173,7 @@ function mapProfileVersionResources(
   return {
     vcpuCount: columns.sandboxVcpuCount,
     memoryMb: columns.sandboxMemoryMb,
-    ...(columns.sandboxStorageMb === null ? {} : { storageMb: columns.sandboxStorageMb }),
+    ...(columns.sandboxDiskMb === null ? {} : { diskMb: columns.sandboxDiskMb }),
   };
 }
 
@@ -346,11 +346,11 @@ function validateSandboxResources(input: {
     });
   }
 
-  if (input.resourceCapabilities.storageMb === undefined) {
-    if (input.resources.storageMb !== undefined) {
+  if (input.resourceCapabilities.diskMb === undefined) {
+    if (input.resources.diskMb !== undefined) {
       issues.push({
         code: SandboxProfilePublishabilityIssueCodes.INVALID_SANDBOX_RESOURCES,
-        message: `Sandbox provider '${input.providerId}' does not support configurable storage.`,
+        message: `Sandbox provider '${input.providerId}' does not support configurable disk.`,
       });
     }
 
@@ -358,12 +358,12 @@ function validateSandboxResources(input: {
   }
 
   if (
-    input.resources.storageMb !== undefined &&
-    !isValidCapabilityValue(input.resources.storageMb, input.resourceCapabilities.storageMb)
+    input.resources.diskMb !== undefined &&
+    !isValidCapabilityValue(input.resources.diskMb, input.resourceCapabilities.diskMb)
   ) {
     issues.push({
       code: SandboxProfilePublishabilityIssueCodes.INVALID_SANDBOX_RESOURCES,
-      message: `Sandbox provider '${input.providerId}' storage is outside supported limits.`,
+      message: `Sandbox provider '${input.providerId}' disk is outside supported limits.`,
     });
   }
 

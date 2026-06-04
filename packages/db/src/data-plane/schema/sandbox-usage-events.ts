@@ -48,11 +48,9 @@ export function defineSandboxUsageEvents(input: {
       occurredAt: timestamp("occurred_at", { withTimezone: true, mode: "string" }).notNull(),
       runtimeProvider: text("runtime_provider").$type<SandboxInstanceProvider>(),
       providerSandboxId: text("provider_sandbox_id"),
-      storageProvider: text("storage_provider"),
-      providerStorageId: text("provider_storage_id"),
       vcpuCount: bigint("vcpu_count", { mode: "number" }),
       memoryMb: bigint("memory_mb", { mode: "number" }),
-      storageMb: bigint("storage_mb", { mode: "number" }),
+      diskMb: bigint("disk_mb", { mode: "number" }),
       payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
       createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
         .notNull()

@@ -9992,8 +9992,8 @@ export interface paths {
                 sandboxProfileId: string;
                 sandboxProvider: string | null;
                 sandboxResources: {
+                  diskMb?: number;
                   memoryMb: number;
-                  storageMb?: number;
                   vcpuCount: number;
                 } | null;
                 skillsConfig: {
@@ -10127,8 +10127,8 @@ export interface paths {
               sandboxProfileId: string;
               sandboxProvider: string | null;
               sandboxResources: {
+                diskMb?: number;
                 memoryMb: number;
-                storageMb?: number;
                 vcpuCount: number;
               } | null;
               skillsConfig: {
@@ -10387,8 +10387,8 @@ export interface paths {
             sandboxConnectionId?: string | null;
             sandboxProvider?: string;
             sandboxResources?: {
+              diskMb?: number;
               memoryMb: number;
-              storageMb?: number;
               vcpuCount: number;
             } | null;
             setupScript?: string | null;
@@ -10435,8 +10435,8 @@ export interface paths {
               sandboxProfileId: string;
               sandboxProvider: string | null;
               sandboxResources: {
+                diskMb?: number;
                 memoryMb: number;
-                storageMb?: number;
                 vcpuCount: number;
               } | null;
               setupScript: string | null;
@@ -10977,8 +10977,8 @@ export interface paths {
             sandboxConnectionId?: string | null;
             sandboxProvider?: string;
             sandboxResources?: {
+              diskMb?: number;
               memoryMb: number;
-              storageMb?: number;
               vcpuCount: number;
             } | null;
           };
@@ -11184,8 +11184,8 @@ export interface paths {
                 sandboxProfileId: string;
                 sandboxProvider: string | null;
                 sandboxResources: {
+                  diskMb?: number;
                   memoryMb: number;
-                  storageMb?: number;
                   vcpuCount: number;
                 } | null;
                 skillsConfig: {
@@ -11494,8 +11494,8 @@ export interface paths {
                 sandboxProfileId: string;
                 sandboxProvider: string | null;
                 sandboxResources: {
+                  diskMb?: number;
                   memoryMb: number;
-                  storageMb?: number;
                   vcpuCount: number;
                 } | null;
                 skillsConfig: {
@@ -11882,8 +11882,8 @@ export interface paths {
                 sandboxProfileId: string;
                 sandboxProvider: string | null;
                 sandboxResources: {
+                  diskMb?: number;
                   memoryMb: number;
-                  storageMb?: number;
                   vcpuCount: number;
                 } | null;
                 skillsConfig: {
@@ -12267,8 +12267,8 @@ export interface paths {
             sandboxConnectionId?: string | null;
             sandboxProvider?: string;
             sandboxResources?: {
+              diskMb?: number;
               memoryMb: number;
-              storageMb?: number;
               vcpuCount: number;
             } | null;
             setupScript: string;
@@ -12897,18 +12897,18 @@ export interface paths {
                 id: string;
                 managed: boolean;
                 resourceCapabilities: {
+                  diskMb?: {
+                    default: number;
+                    max: number;
+                    min: number;
+                    step: number;
+                  };
                   memoryMb: {
                     default: number;
                     max: number;
                     maxPerVcpu?: number;
                     min: number;
                     minPerVcpu?: number;
-                    step: number;
-                  };
-                  storageMb?: {
-                    default: number;
-                    max: number;
-                    min: number;
                     step: number;
                   };
                   vcpuCount: {

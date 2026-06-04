@@ -20,7 +20,7 @@ describe("E2B sandbox runtime capabilities", () => {
     });
   });
 
-  it("does not advertise configurable storage yet", () => {
-    expect(E2BSandboxRuntimeResourceCapabilities.storageMb).toBeUndefined();
+  it("does not advertise configurable disk yet", () => {
+    expect(E2BSandboxRuntimeResourceCapabilities.diskMb).toBeUndefined();
   });
 });

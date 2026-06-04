@@ -156,7 +156,7 @@ describe("createTensorlakeSandboxOptions", () => {
         resources: {
           vcpuCount: 4,
           memoryMb: 16_384,
-          storageMb: 30_720,
+          diskMb: 30_720,
         },
       }),
     ).toMatchObject({

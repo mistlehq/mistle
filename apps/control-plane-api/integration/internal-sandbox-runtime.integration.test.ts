@@ -643,7 +643,7 @@ async function seedProfileWithAgent(
     sandboxConnectionId: null,
     sandboxVcpuCount: null,
     sandboxMemoryMb: null,
-    sandboxStorageMb: null,
+    sandboxDiskMb: null,
     gitCommitSigningIntegrationConnectionId: input.gitCommitSigningIntegrationConnectionId ?? null,
   });
   await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values({

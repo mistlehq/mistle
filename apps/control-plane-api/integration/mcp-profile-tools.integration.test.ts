@@ -77,7 +77,7 @@ const DockerSandboxRuntimeColumns = {
   sandboxConnectionId: null,
   sandboxVcpuCount: null,
   sandboxMemoryMb: null,
-  sandboxStorageMb: null,
+  sandboxDiskMb: null,
 } as const;
 
 describe.concurrent("MCP profile tools integration", () => {

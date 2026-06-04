@@ -178,7 +178,7 @@ describe.concurrent("data-plane worker snapshot materialization", () => {
       sandboxConnectionId: null,
       sandboxVcpuCount: 2,
       sandboxMemoryMb: 4096,
-      sandboxStorageMb: null,
+      sandboxDiskMb: null,
     });
     await env.controlPlaneDb
       .insert(env.controlPlaneTables.sandboxProfileVersionSnapshotJobs)

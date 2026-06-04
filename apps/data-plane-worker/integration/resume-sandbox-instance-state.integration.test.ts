@@ -127,7 +127,7 @@ describe.concurrent("data-plane worker resume sandbox instance state", () => {
       sandboxConnectionId: null,
       sandboxVcpuCount: null,
       sandboxMemoryMb: null,
-      sandboxStorageMb: null,
+      sandboxDiskMb: null,
       providerSandboxId: "provider-runtime-plan-new",
       computeGeneration: 1,
       runtimePlan: createRuntimePlan({

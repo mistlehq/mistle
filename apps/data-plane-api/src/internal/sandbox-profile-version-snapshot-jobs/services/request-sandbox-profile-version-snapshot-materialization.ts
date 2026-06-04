@@ -25,9 +25,7 @@ function createWorkflowSandboxRuntime(
       : {
           vcpuCount: input.resources.vcpuCount,
           memoryMb: input.resources.memoryMb,
-          ...(input.resources.storageMb === undefined
-            ? {}
-            : { storageMb: input.resources.storageMb }),
+          ...(input.resources.diskMb === undefined ? {} : { diskMb: input.resources.diskMb }),
         };
 
   return {

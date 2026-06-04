@@ -24,7 +24,7 @@ export type ResolveSandboxRuntimeInput = {
   resources?: {
     vcpuCount: number;
     memoryMb: number;
-    storageMb?: number;
+    diskMb?: number;
   };
 };
 
@@ -45,7 +45,7 @@ export type PersistedSandboxSelection = {
   sandboxConnectionId: string | null;
   sandboxVcpuCount: number | null;
   sandboxMemoryMb: number | null;
-  sandboxStorageMb: number | null;
+  sandboxDiskMb: number | null;
 };
 
 export function createResolveSandboxRuntimeInput(
@@ -165,12 +165,12 @@ export function createSandboxRuntimeProviderResolver(input: {
 function createPersistedSandboxResources(input: {
   sandboxVcpuCount: number | null;
   sandboxMemoryMb: number | null;
-  sandboxStorageMb: number | null;
+  sandboxDiskMb: number | null;
 }): ResolveSandboxRuntimeInput["resources"] | undefined {
   if (
     input.sandboxVcpuCount === null &&
     input.sandboxMemoryMb === null &&
-    input.sandboxStorageMb === null
+    input.sandboxDiskMb === null
   ) {
     return undefined;
   }
@@ -182,7 +182,7 @@ function createPersistedSandboxResources(input: {
   return {
     vcpuCount: input.sandboxVcpuCount,
     memoryMb: input.sandboxMemoryMb,
-    ...(input.sandboxStorageMb === null ? {} : { storageMb: input.sandboxStorageMb }),
+    ...(input.sandboxDiskMb === null ? {} : { diskMb: input.sandboxDiskMb }),
   };
 }
 
@@ -207,8 +207,8 @@ export function createE2BSandboxProviderConfig(input: {
   credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "e2b" }>;
   resources?: ResolveSandboxRuntimeInput["resources"];
 }): CreateSandboxAdapterInput {
-  if (input.resources?.storageMb !== undefined) {
-    throw new Error("E2B sandbox runtime does not support configurable storage.");
+  if (input.resources?.diskMb !== undefined) {
+    throw new Error("E2B sandbox runtime does not support configurable disk.");
   }
 
   return {

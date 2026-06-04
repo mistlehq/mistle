@@ -40,7 +40,7 @@ type StoppableSandboxInstanceStopState = {
   sandboxConnectionId: string | null;
   sandboxVcpuCount: number | null;
   sandboxMemoryMb: number | null;
-  sandboxStorageMb: number | null;
+  sandboxDiskMb: number | null;
   providerSandboxId: string;
   computeGeneration: number;
   status: SandboxInstanceStatus;
@@ -74,7 +74,7 @@ export type StopSandboxInstanceResult = {
     computeGeneration: number;
     vcpuCount: number | null;
     memoryMb: number | null;
-    storageMb: number | null;
+    diskMb: number | null;
   };
 };
 
@@ -90,7 +90,7 @@ function createStopSandboxUsageEventState(
     computeGeneration: state.computeGeneration,
     vcpuCount: state.sandboxVcpuCount,
     memoryMb: state.sandboxMemoryMb,
-    storageMb: state.sandboxStorageMb,
+    diskMb: state.sandboxDiskMb,
   };
 }
 
@@ -164,7 +164,7 @@ async function resolveStoppableSandboxInstanceStopState(input: {
       sandboxConnectionId: true,
       sandboxVcpuCount: true,
       sandboxMemoryMb: true,
-      sandboxStorageMb: true,
+      sandboxDiskMb: true,
       providerSandboxId: true,
       computeGeneration: true,
       status: true,
@@ -203,7 +203,7 @@ async function resolveStoppableSandboxInstanceStopState(input: {
     sandboxConnectionId: sandboxInstance.sandboxConnectionId,
     sandboxVcpuCount: sandboxInstance.sandboxVcpuCount,
     sandboxMemoryMb: sandboxInstance.sandboxMemoryMb,
-    sandboxStorageMb: sandboxInstance.sandboxStorageMb,
+    sandboxDiskMb: sandboxInstance.sandboxDiskMb,
     providerSandboxId: sandboxInstance.providerSandboxId,
     computeGeneration: sandboxInstance.computeGeneration,
     status: sandboxInstance.status,

@@ -62,7 +62,7 @@ export async function getProfileVersionPublishability(
       sandboxConnectionId: true,
       sandboxVcpuCount: true,
       sandboxMemoryMb: true,
-      sandboxStorageMb: true,
+      sandboxDiskMb: true,
       skillsConfig: true,
     },
     where: (table, { and, eq }) =>

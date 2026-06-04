@@ -25,7 +25,7 @@ type DeleteSandboxInstanceState = {
   sandboxConnectionId: string | null;
   sandboxVcpuCount: number | null;
   sandboxMemoryMb: number | null;
-  sandboxStorageMb: number | null;
+  sandboxDiskMb: number | null;
   providerSandboxId: string | null;
   computeGeneration: number;
   status: SandboxInstanceStatus;
@@ -42,7 +42,7 @@ export type DeleteSandboxInstanceResult = {
     computeGeneration: number;
     vcpuCount: number | null;
     memoryMb: number | null;
-    storageMb: number | null;
+    diskMb: number | null;
   };
 };
 
@@ -88,7 +88,7 @@ async function resolveDeleteSandboxInstanceState(input: {
       sandboxConnectionId: true,
       sandboxVcpuCount: true,
       sandboxMemoryMb: true,
-      sandboxStorageMb: true,
+      sandboxDiskMb: true,
       providerSandboxId: true,
       computeGeneration: true,
       status: true,
@@ -265,7 +265,7 @@ export async function deleteSandboxInstance(
             computeGeneration: sandboxInstanceState.computeGeneration,
             vcpuCount: sandboxInstanceState.sandboxVcpuCount,
             memoryMb: sandboxInstanceState.sandboxMemoryMb,
-            storageMb: sandboxInstanceState.sandboxStorageMb,
+            diskMb: sandboxInstanceState.sandboxDiskMb,
           },
         }
       : {}),

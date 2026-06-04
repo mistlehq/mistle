@@ -51,7 +51,7 @@ type ActiveSandboxInstance = {
   sandboxConnectionId: string | null;
   sandboxVcpuCount: number | null;
   sandboxMemoryMb: number | null;
-  sandboxStorageMb: number | null;
+  sandboxDiskMb: number | null;
   providerSandboxId: string;
   status: SandboxInstanceStatus;
 };
@@ -84,7 +84,7 @@ export type ReconcileSandboxUsageEventState = {
   computeGeneration: number;
   vcpuCount: number | null;
   memoryMb: number | null;
-  storageMb: number | null;
+  diskMb: number | null;
 };
 
 export type ReconcileSandboxInstanceResult = {
@@ -153,7 +153,7 @@ function withUsageEventState(input: {
       computeGeneration: input.sandboxInstance.computeGeneration,
       vcpuCount: input.sandboxInstance.sandboxVcpuCount,
       memoryMb: input.sandboxInstance.sandboxMemoryMb,
-      storageMb: input.sandboxInstance.sandboxStorageMb,
+      diskMb: input.sandboxInstance.sandboxDiskMb,
     },
   };
 }
@@ -238,7 +238,7 @@ async function resolveActiveSandboxInstance(input: {
       sandboxConnectionId: true,
       sandboxVcpuCount: true,
       sandboxMemoryMb: true,
-      sandboxStorageMb: true,
+      sandboxDiskMb: true,
       providerSandboxId: true,
       status: true,
     },
@@ -276,7 +276,7 @@ async function resolveActiveSandboxInstance(input: {
         sandboxConnectionId: sandboxInstance.sandboxConnectionId,
         sandboxVcpuCount: sandboxInstance.sandboxVcpuCount,
         sandboxMemoryMb: sandboxInstance.sandboxMemoryMb,
-        sandboxStorageMb: sandboxInstance.sandboxStorageMb,
+        sandboxDiskMb: sandboxInstance.sandboxDiskMb,
         providerSandboxId: sandboxInstance.providerSandboxId,
         status: sandboxInstance.status,
       };

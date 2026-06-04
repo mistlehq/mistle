@@ -189,7 +189,7 @@ async function queueProfileVersionSnapshot(
           sandboxConnectionId: tables.sandboxProfileVersions.sandboxConnectionId,
           sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
           sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
-          sandboxStorageMb: tables.sandboxProfileVersions.sandboxStorageMb,
+          sandboxDiskMb: tables.sandboxProfileVersions.sandboxDiskMb,
           skillsConfig: tables.sandboxProfileVersions.skillsConfig,
         })
         .from(tables.sandboxProfiles)
@@ -232,7 +232,7 @@ async function queueProfileVersionSnapshot(
       const resolvedSandboxConnectionId = sandboxProfileVersion.sandboxConnectionId;
       const resolvedSandboxVcpuCount = sandboxProfileVersion.sandboxVcpuCount;
       const resolvedSandboxMemoryMb = sandboxProfileVersion.sandboxMemoryMb;
-      const resolvedSandboxStorageMb = sandboxProfileVersion.sandboxStorageMb;
+      const resolvedSandboxDiskMb = sandboxProfileVersion.sandboxDiskMb;
       if (resolvedSandboxProfileId === null || resolvedSandboxProfileVersion === null) {
         throw new Error("Expected joined sandbox profile version metadata to be present.");
       }
@@ -325,7 +325,7 @@ async function queueProfileVersionSnapshot(
             sandboxConnectionId: resolvedSandboxConnectionId,
             sandboxVcpuCount: resolvedSandboxVcpuCount,
             sandboxMemoryMb: resolvedSandboxMemoryMb,
-            sandboxStorageMb: resolvedSandboxStorageMb,
+            sandboxDiskMb: resolvedSandboxDiskMb,
           }),
           skillsConfig: mapProfileVersionSkillsConfig(sandboxProfileVersion.skillsConfig),
           isActive: sandboxProfileVersion.activeVersion === input.profileVersion,

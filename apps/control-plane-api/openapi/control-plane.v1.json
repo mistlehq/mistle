@@ -19926,7 +19926,7 @@
                                 "required": ["min", "max", "step", "default"],
                                 "additionalProperties": false
                               },
-                              "storageMb": {
+                              "diskMb": {
                                 "type": "object",
                                 "properties": {
                                   "min": {
@@ -20883,7 +20883,7 @@
                           "type": "integer",
                           "minimum": 1
                         },
-                        "storageMb": {
+                        "diskMb": {
                           "type": "integer",
                           "minimum": 1
                         }
@@ -21242,7 +21242,7 @@
                                 "type": "integer",
                                 "minimum": 1
                               },
-                              "storageMb": {
+                              "diskMb": {
                                 "type": "integer",
                                 "minimum": 1
                               }
@@ -23532,7 +23532,7 @@
                         "type": "integer",
                         "minimum": 1
                       },
-                      "storageMb": {
+                      "diskMb": {
                         "type": "integer",
                         "minimum": 1
                       }
@@ -23665,7 +23665,7 @@
                           "type": "integer",
                           "minimum": 1
                         },
-                        "storageMb": {
+                        "diskMb": {
                           "type": "integer",
                           "minimum": 1
                         }
@@ -24610,7 +24610,7 @@
                               "type": "integer",
                               "minimum": 1
                             },
-                            "storageMb": {
+                            "diskMb": {
                               "type": "integer",
                               "minimum": 1
                             }
@@ -25056,7 +25056,7 @@
                               "type": "integer",
                               "minimum": 1
                             },
-                            "storageMb": {
+                            "diskMb": {
                               "type": "integer",
                               "minimum": 1
                             }
@@ -25485,7 +25485,7 @@
                               "type": "integer",
                               "minimum": 1
                             },
-                            "storageMb": {
+                            "diskMb": {
                               "type": "integer",
                               "minimum": 1
                             }
@@ -25891,7 +25891,7 @@
                         "type": "integer",
                         "minimum": 1
                       },
-                      "storageMb": {
+                      "diskMb": {
                         "type": "integer",
                         "minimum": 1
                       }
@@ -26149,7 +26149,7 @@
                         "type": "integer",
                         "minimum": 1
                       },
-                      "storageMb": {
+                      "diskMb": {
                         "type": "integer",
                         "minimum": 1
                       }

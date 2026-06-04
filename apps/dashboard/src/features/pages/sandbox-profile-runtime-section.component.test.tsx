@@ -73,7 +73,7 @@ const TensorlakeProvider = {
       minPerVcpu: 1024,
       maxPerVcpu: 8192,
     },
-    storageMb: {
+    diskMb: {
       min: 10240,
       max: 102400,
       step: 1024,
@@ -100,7 +100,7 @@ const OrganizationStorageE2BProvider = {
       step: 1024,
       default: 8192,
     },
-    storageMb: {
+    diskMb: {
       min: 10240,
       max: 102400,
       step: 1024,
@@ -507,7 +507,7 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(screen.getByText("Mistle")).toBeTruthy();
     expect(screen.getByText("2 vCPU")).toBeTruthy();
     expect(screen.getByText("4096 MB")).toBeTruthy();
-    expect(screen.queryByText("Storage (MB)")).toBeNull();
+    expect(screen.queryByText("Disk (MB)")).toBeNull();
   });
 
   it("renders saved read-only null-connection providers as Mistle when the catalog no longer marks the provider managed", () => {
@@ -604,7 +604,7 @@ describe("SandboxProfileRuntimeSection", () => {
           sandboxResources: {
             vcpuCount: 4,
             memoryMb: 8192,
-            storageMb: 20480,
+            diskMb: 20480,
           },
         })}
       />,
@@ -622,7 +622,7 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(screen.getByText("4 vCPU")).toBeTruthy();
     expect(screen.getByText("Memory (MB)")).toBeTruthy();
     expect(screen.getByText("8192 MB")).toBeTruthy();
-    expect(screen.getByText("Storage (MB)")).toBeTruthy();
+    expect(screen.getByText("Disk (MB)")).toBeTruthy();
     expect(screen.getByText("20480 MB")).toBeTruthy();
     expect(screen.queryByText("Resources")).toBeNull();
   });
@@ -697,7 +697,7 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(screen.getByLabelText("Memory (MB)")).toBeTruthy();
     expect(screen.getByText("2 vCPU")).toBeTruthy();
     expect(screen.getByText("4096 MB")).toBeTruthy();
-    expect(screen.queryByLabelText("Storage (MB)")).toBeNull();
+    expect(screen.queryByLabelText("Disk (MB)")).toBeNull();
   });
 
   it("scales per-vCPU memory controls for providers with ratio-based memory limits", () => {
@@ -721,11 +721,11 @@ describe("SandboxProfileRuntimeSection", () => {
     );
 
     expect(screen.getByLabelText("Memory (MB)")).toBeTruthy();
-    expect(screen.getByLabelText("Storage (MB)")).toBeTruthy();
+    expect(screen.getByLabelText("Disk (MB)")).toBeTruthy();
     expect(screen.getByText("32768 MB")).toBeTruthy();
   });
 
-  it("renders storage when the selected provider advertises storage capabilities", () => {
+  it("renders disk when the selected provider advertises disk capabilities", () => {
     render(
       <SandboxProfileRuntimeSection
         apiKeys={[]}
@@ -740,7 +740,7 @@ describe("SandboxProfileRuntimeSection", () => {
           sandboxResources: {
             vcpuCount: 4,
             memoryMb: 8192,
-            storageMb: 20480,
+            diskMb: 20480,
           },
         })}
       />,
@@ -748,6 +748,6 @@ describe("SandboxProfileRuntimeSection", () => {
 
     expect(screen.getByLabelText("CPU")).toBeTruthy();
     expect(screen.getByLabelText("Memory (MB)")).toBeTruthy();
-    expect(screen.getByLabelText("Storage (MB)")).toBeTruthy();
+    expect(screen.getByLabelText("Disk (MB)")).toBeTruthy();
   });
 });

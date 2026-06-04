@@ -19,7 +19,7 @@ export type ResolveSandboxRuntimeAdapterInput = {
   resources?: {
     vcpuCount: number;
     memoryMb: number;
-    storageMb?: number;
+    diskMb?: number;
   };
 };
 
@@ -93,8 +93,8 @@ function createE2BSandboxProviderConfig(input: {
   credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "e2b" }>;
   resources?: ResolveSandboxRuntimeAdapterInput["resources"];
 }): CreateSandboxAdapterInput {
-  if (input.resources?.storageMb !== undefined) {
-    throw new Error("E2B sandbox runtime does not support configurable storage.");
+  if (input.resources?.diskMb !== undefined) {
+    throw new Error("E2B sandbox runtime does not support configurable disk.");
   }
 
   return {

@@ -56,7 +56,7 @@ export const TensorlakeStartSandboxRequestSchema = z
       .object({
         vcpuCount: z.number().int().min(1),
         memoryMb: z.number().int().min(1),
-        storageMb: z.number().int().min(1).optional(),
+        diskMb: z.number().int().min(1).optional(),
       })
       .strict()
       .optional(),

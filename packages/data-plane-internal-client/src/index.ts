@@ -67,7 +67,7 @@ export type StartSandboxInstanceInput = {
     resources?: {
       vcpuCount: number;
       memoryMb: number;
-      storageMb?: number;
+      diskMb?: number;
     };
   };
   idempotencyKey?: string;

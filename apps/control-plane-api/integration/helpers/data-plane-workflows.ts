@@ -33,7 +33,7 @@ const MaterializeWorkflowRunInputSchema = z.looseObject({
         .object({
           vcpuCount: z.number().int(),
           memoryMb: z.number().int(),
-          storageMb: z.number().int().optional(),
+          diskMb: z.number().int().optional(),
         })
         .strict()
         .optional(),

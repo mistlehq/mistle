@@ -18,7 +18,7 @@ export const SandboxRuntimeResourceCapabilitiesSchema = z
   .object({
     vcpuCount: SandboxRuntimeResourceFieldSchema,
     memoryMb: SandboxRuntimeMemoryResourceFieldSchema,
-    storageMb: SandboxRuntimeResourceFieldSchema.optional(),
+    diskMb: SandboxRuntimeResourceFieldSchema.optional(),
   })
   .strict();
 

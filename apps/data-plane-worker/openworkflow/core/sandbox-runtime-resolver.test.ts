@@ -32,7 +32,7 @@ describe("createE2BSandboxProviderConfig", () => {
     });
   });
 
-  it("rejects storage because E2B does not advertise configurable storage", () => {
+  it("rejects disk because E2B does not advertise configurable disk", () => {
     expect(() =>
       createE2BSandboxProviderConfig({
         credentials: {
@@ -43,15 +43,15 @@ describe("createE2BSandboxProviderConfig", () => {
         resources: {
           vcpuCount: 2,
           memoryMb: 4096,
-          storageMb: 1024,
+          diskMb: 1024,
         },
       }),
-    ).toThrow("E2B sandbox runtime does not support configurable storage.");
+    ).toThrow("E2B sandbox runtime does not support configurable disk.");
   });
 });
 
 describe("createTensorlakeSandboxProviderConfig", () => {
-  it("accepts profile-version storage resources", () => {
+  it("accepts profile-version disk resources", () => {
     expect(
       createTensorlakeSandboxProviderConfig({
         credentials: {
@@ -62,7 +62,7 @@ describe("createTensorlakeSandboxProviderConfig", () => {
         resources: {
           vcpuCount: 4,
           memoryMb: 16384,
-          storageMb: 20480,
+          diskMb: 20480,
         },
       }),
     ).toEqual({
@@ -83,7 +83,7 @@ describe("createResolveSandboxRuntimeInput", () => {
         sandboxConnectionId: "icn_runtime_selection",
         sandboxVcpuCount: 4,
         sandboxMemoryMb: 8192,
-        sandboxStorageMb: null,
+        sandboxDiskMb: null,
       }),
     ).toEqual({
       organizationId: "org_runtime_selection",
@@ -104,7 +104,7 @@ describe("createResolveSandboxRuntimeInput", () => {
         sandboxConnectionId: null,
         sandboxVcpuCount: 4,
         sandboxMemoryMb: null,
-        sandboxStorageMb: null,
+        sandboxDiskMb: null,
       }),
     ).toThrow("Persisted sandbox resources are incomplete.");
   });

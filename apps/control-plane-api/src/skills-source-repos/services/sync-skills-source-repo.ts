@@ -71,7 +71,7 @@ export type SyncSkillsSourceRepoInput = {
     resources?: {
       vcpuCount: number;
       memoryMb: number;
-      storageMb?: number;
+      diskMb?: number;
     };
   };
   image: {

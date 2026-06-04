@@ -229,7 +229,7 @@ export interface SandboxTransparentProxyConfiguration {
 export interface SandboxStartResources {
   readonly vcpuCount: number;
   readonly memoryMb: number;
-  readonly storageMb?: number;
+  readonly diskMb?: number;
 }
 
 export interface SandboxStartRequest {

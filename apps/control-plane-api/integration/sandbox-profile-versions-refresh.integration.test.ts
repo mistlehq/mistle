@@ -28,7 +28,7 @@ const DockerSandboxRuntimeColumns = {
   sandboxConnectionId: null,
   sandboxVcpuCount: null,
   sandboxMemoryMb: null,
-  sandboxStorageMb: null,
+  sandboxDiskMb: null,
 } as const;
 
 const DockerSandboxRuntimeConfig = {

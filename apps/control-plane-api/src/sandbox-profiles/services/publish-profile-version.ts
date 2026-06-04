@@ -380,7 +380,7 @@ export async function publishProfileVersion(
         sandboxConnectionId: tables.sandboxProfileVersions.sandboxConnectionId,
         sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
         sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
-        sandboxStorageMb: tables.sandboxProfileVersions.sandboxStorageMb,
+        sandboxDiskMb: tables.sandboxProfileVersions.sandboxDiskMb,
         maintenanceScript: tables.sandboxProfileVersions.maintenanceScript,
         skillsConfig: tables.sandboxProfileVersions.skillsConfig,
       });

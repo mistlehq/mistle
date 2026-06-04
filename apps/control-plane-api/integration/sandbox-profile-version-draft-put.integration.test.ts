@@ -1134,7 +1134,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
         sandboxProvider: true,
         sandboxVcpuCount: true,
         sandboxMemoryMb: true,
-        sandboxStorageMb: true,
+        sandboxDiskMb: true,
       },
       where: (table, { and, eq }) =>
         and(eq(table.sandboxProfileId, "sbp_draft_put_resource_clear_001"), eq(table.version, 1)),
@@ -1144,7 +1144,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
       sandboxConnectionId: null,
       sandboxVcpuCount: null,
       sandboxMemoryMb: null,
-      sandboxStorageMb: null,
+      sandboxDiskMb: null,
     });
   });
 
@@ -1203,7 +1203,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
           sandboxResources: {
             vcpuCount: 2,
             memoryMb: 4096,
-            storageMb: 1024,
+            diskMb: 1024,
           },
         }),
       },
@@ -1215,7 +1215,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
     );
     expect(responseBody).toEqual({
       code: "INVALID_SANDBOX_RUNTIME_CONFIG",
-      message: "Sandbox provider 'e2b' does not support configurable storage.",
+      message: "Sandbox provider 'e2b' does not support configurable disk.",
     });
   });
 

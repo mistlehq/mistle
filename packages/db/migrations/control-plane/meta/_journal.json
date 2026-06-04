@@ -302,6 +302,13 @@
       "when": 1780404397391,
       "tag": "0042_add-sandbox-profile-version-skills-config",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1780556683790,
+      "tag": "0043_rename-sandbox-disk-resource",
+      "breakpoints": true
     }
   ]
 }

@@ -58,9 +58,7 @@ function createWorkflowSandboxRuntime(
       : {
           vcpuCount: input.resources.vcpuCount,
           memoryMb: input.resources.memoryMb,
-          ...(input.resources.storageMb === undefined
-            ? {}
-            : { storageMb: input.resources.storageMb }),
+          ...(input.resources.diskMb === undefined ? {} : { diskMb: input.resources.diskMb }),
         };
 
   return {
@@ -134,7 +132,7 @@ export async function startSandboxInstance(
       sandboxConnectionId: sandboxRuntime.connectionId ?? null,
       sandboxVcpuCount: sandboxRuntime.resources?.vcpuCount ?? null,
       sandboxMemoryMb: sandboxRuntime.resources?.memoryMb ?? null,
-      sandboxStorageMb: sandboxRuntime.resources?.storageMb ?? null,
+      sandboxDiskMb: sandboxRuntime.resources?.diskMb ?? null,
       providerSandboxId: null,
       computeGeneration: 1,
       status: SandboxInstanceStatuses.PENDING,

@@ -34,7 +34,7 @@ export type SandboxRuntimeMemoryResourceField = SandboxRuntimeResourceField & {
 export type SandboxRuntimeResourceCapabilities = {
   vcpuCount: SandboxRuntimeResourceField;
   memoryMb: SandboxRuntimeMemoryResourceField;
-  storageMb?: SandboxRuntimeResourceField;
+  diskMb?: SandboxRuntimeResourceField;
 };
 
 export type IntegrationSandboxRuntimeDefinition = {

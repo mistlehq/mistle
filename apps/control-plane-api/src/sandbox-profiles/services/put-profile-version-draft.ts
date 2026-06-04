@@ -144,10 +144,10 @@ export async function putProfileVersionDraft(
         input.sandboxResources === undefined
           ? lockedVersion.sandboxMemoryMb
           : (input.sandboxResources?.memoryMb ?? null),
-      sandboxStorageMb:
+      sandboxDiskMb:
         input.sandboxResources === undefined
-          ? lockedVersion.sandboxStorageMb
-          : (input.sandboxResources?.storageMb ?? null),
+          ? lockedVersion.sandboxDiskMb
+          : (input.sandboxResources?.diskMb ?? null),
     });
 
     const runtimeConfigIssues = await validateSandboxProfileVersionRuntimeConfig(
@@ -243,12 +243,12 @@ export async function putProfileVersionDraft(
               ? {
                   sandboxVcpuCount: null,
                   sandboxMemoryMb: null,
-                  sandboxStorageMb: null,
+                  sandboxDiskMb: null,
                 }
               : {
                   sandboxVcpuCount: input.sandboxResources.vcpuCount,
                   sandboxMemoryMb: input.sandboxResources.memoryMb,
-                  sandboxStorageMb: input.sandboxResources.storageMb ?? null,
+                  sandboxDiskMb: input.sandboxResources.diskMb ?? null,
                 }),
           ...(input.skillsConfig === undefined ? {} : { skillsConfig: input.skillsConfig }),
         })
@@ -309,7 +309,7 @@ export async function putProfileVersionDraft(
         sandboxConnectionId: true,
         sandboxVcpuCount: true,
         sandboxMemoryMb: true,
-        sandboxStorageMb: true,
+        sandboxDiskMb: true,
         skillsConfig: true,
       },
       where: (table, { and: whereAnd, eq: whereEq }) =>

@@ -95,7 +95,7 @@ export async function listProfileVersions(
       sandboxConnectionId: true,
       sandboxVcpuCount: true,
       sandboxMemoryMb: true,
-      sandboxStorageMb: true,
+      sandboxDiskMb: true,
       skillsConfig: true,
     },
     where: (table, { eq }) => eq(table.sandboxProfileId, input.profileId),

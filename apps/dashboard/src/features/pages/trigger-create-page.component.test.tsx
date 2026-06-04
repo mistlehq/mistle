@@ -234,7 +234,7 @@ function renderCreatePage(input: {
           sandboxConnectionId: null,
           sandboxVcpuCount: null,
           sandboxMemoryMb: null,
-          sandboxStorageMb: null,
+          sandboxDiskMb: null,
           snapshotImageProvider: null,
           snapshotImageId: null,
           latestSnapshotJob: null,
