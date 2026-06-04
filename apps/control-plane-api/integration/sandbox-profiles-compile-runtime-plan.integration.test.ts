@@ -94,7 +94,7 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
       release: {
         kind: "tag",
         match: "exact",
-        tag: "rust-v0.136.0",
+        tag: "rust-v0.137.0",
       },
       installPath: "/usr/local/bin/codex",
       timeoutMs: 120_000,
