@@ -315,6 +315,32 @@ describe("AppendSessionLinkToSlackTextRequestMiddleware", () => {
     );
   });
 
+  it("does not convert empty text into an invalid Slack section block", async () => {
+    const payload = {
+      channel: "C123",
+      text: "",
+      attachments: [
+        {
+          fallback: "Attachment fallback",
+          text: "Attachment body",
+        },
+      ],
+    };
+    const request = createSlackRequest({
+      body: JSON.stringify(payload),
+    });
+
+    const result = await AppendSessionLinkToSlackTextRequestMiddleware.handle({
+      ctx: {
+        sandboxInstanceId: "sandbox_123",
+        sessionUrl: SessionUrl,
+      },
+      request,
+    });
+
+    expect(new TextDecoder().decode(result.body)).toBe(JSON.stringify(payload));
+  });
+
   it("no-ops for non-target Slack endpoints and payloads without text or blocks", async () => {
     const nonTargetRequest = createSlackRequest({
       pathname: "/api/conversations.create",
