@@ -28,6 +28,10 @@ import { PortsTargetAuthorizeService } from "../../publishing/ports-target-autho
 import { BootstrapTunnelNotConnectedError } from "../bootstrap-tunnel-not-connected-error.js";
 import type { InteractiveStreamRouter } from "../gateway-forwarding/index.js";
 import {
+  GatewayForwardingPortAccessAuthorizationError,
+  GatewayForwardingPortAccessAuthorizationErrorCodes,
+} from "../gateway-forwarding/types.js";
+import {
   TunnelSessionBindingLimitExceededError,
   type ClientStreamBinding,
 } from "../tunnel-session/index.js";
@@ -258,7 +262,12 @@ function createInvalidStreamDataResetPayload(input: {
 }
 
 function toStreamOpenErrorPayload(input: { error: Error; streamId: number }): string {
-  if (input.error instanceof BootstrapTunnelNotConnectedError) {
+  if (
+    input.error instanceof BootstrapTunnelNotConnectedError ||
+    (input.error instanceof GatewayForwardingPortAccessAuthorizationError &&
+      input.error.code ===
+        GatewayForwardingPortAccessAuthorizationErrorCodes.BOOTSTRAP_NOT_CONNECTED)
+  ) {
     return createStreamOpenErrorPayload({
       code: "bootstrap_not_connected",
       message: input.error.message,

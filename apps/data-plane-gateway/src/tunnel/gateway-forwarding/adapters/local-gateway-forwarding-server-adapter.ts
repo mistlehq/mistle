@@ -192,6 +192,9 @@ export class LocalGatewayForwardingServerAdapter implements GatewayForwardingSer
         `Resolved bootstrap session is no longer current for sandbox '${sandboxInstanceId}'.`,
       );
     }
+    if (!this.tunnelSessionRegistry.isBootstrapSessionAvailable(bootstrapTarget)) {
+      throw new BootstrapTunnelNotConnectedError(sandboxInstanceId);
+    }
 
     return bootstrapTarget;
   }

@@ -366,6 +366,40 @@ describe("TunnelProtocolTranslator", () => {
     });
   });
 
+  it("rejects stream.open immediately when the current bootstrap session is unavailable", async () => {
+    const { registry, translator } = await createTranslatorHarness();
+    registry.setBootstrapSessionAvailability({
+      sandboxInstanceId: SandboxInstanceId,
+      sessionId: BootstrapSessionId,
+      isAvailable: () => false,
+    });
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: "conn_1",
+        payload: JSON.stringify({
+          type: "stream.open",
+          streamId: 41,
+          channel: {
+            kind: "agent",
+          },
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "connection",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "respond",
+        payload: JSON.stringify({
+          type: "stream.open.error",
+          streamId: 41,
+          code: "bootstrap_not_connected",
+          message: "Sandbox bootstrap tunnel is not connected for sandbox 'sbi_test'.",
+        }),
+      },
+    });
+  });
+
   it("allows multiple concurrent stream.open messages from the same client session", async () => {
     const { translator } = await createTranslatorHarness();
 

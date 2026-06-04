@@ -27,6 +27,38 @@ describe("LocalGatewayForwardingServerAdapter", () => {
     ).rejects.toThrow(BootstrapTunnelNotConnectedError);
   });
 
+  it("fails opening a stream when the current bootstrap tunnel is unavailable", async () => {
+    const registry = new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter(1));
+    registry.attachBootstrapSession({
+      sandboxInstanceId: "sbi_test",
+      side: "bootstrap",
+      nodeId: "dpg_test",
+      sessionId: "sess_bootstrap",
+    });
+    registry.setBootstrapSessionAvailability({
+      sandboxInstanceId: "sbi_test",
+      sessionId: "sess_bootstrap",
+      isAvailable: () => false,
+    });
+    const adapter = new LocalGatewayForwardingServerAdapter(registry);
+
+    await expect(
+      adapter.openInteractiveStream(
+        {
+          sourceNodeId: "dpg_test",
+          targetNodeId: "dpg_test",
+          targetBootstrapSessionId: "sess_bootstrap",
+        },
+        {
+          sandboxInstanceId: "sbi_test",
+          channelKind: "agent",
+          clientSessionId: "conn_1",
+          clientStreamId: 7,
+        },
+      ),
+    ).rejects.toThrow(BootstrapTunnelNotConnectedError);
+  });
+
   it("opens, looks up, closes, and releases interactive streams against the local registry", async () => {
     const registry = new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter(2));
     registry.attachBootstrapSession({
