@@ -113,10 +113,24 @@ pub(super) async fn reconnect_bootstrap_tunnel(
 
     loop {
         if runtime.shutdown_requested.load(Ordering::Relaxed) {
+            record_bootstrap_tunnel_diagnostic_event(
+                "bootstrap_tunnel.reconnect_stopped",
+                BTreeMap::from([(
+                    "reason".to_string(),
+                    Value::String("shutdown_requested".to_string()),
+                )]),
+            );
             return Ok(None);
         }
 
         let attempt_number = attempt_index + 1;
+        record_bootstrap_tunnel_diagnostic_event(
+            "bootstrap_tunnel.reconnect_started",
+            BTreeMap::from([(
+                "attemptNumber".to_string(),
+                Value::from(u64::try_from(attempt_number).unwrap_or(u64::MAX)),
+            )]),
+        );
         update_tunnel_supervision_details(
             &runtime.supervisor_handle,
             &runtime.gateway_ws_url,
@@ -135,6 +149,13 @@ pub(super) async fn reconnect_bootstrap_tunnel(
         .await?
         {
             TunnelExchangeOutcome::Success(exchange) => {
+                record_bootstrap_tunnel_diagnostic_event(
+                    "bootstrap_tunnel.token_exchange_succeeded",
+                    BTreeMap::from([(
+                        "attemptNumber".to_string(),
+                        Value::from(u64::try_from(attempt_number).unwrap_or(u64::MAX)),
+                    )]),
+                );
                 *current_tunnel_exchange_token = exchange.tunnel_exchange_token;
                 let connected_url = resolve_bootstrap_tunnel_url(
                     gateway_ws_url,
@@ -147,9 +168,26 @@ pub(super) async fn reconnect_bootstrap_tunnel(
                 .await
                 {
                     Ok((bootstrap_socket, _)) => {
+                        record_bootstrap_tunnel_diagnostic_event(
+                            "bootstrap_tunnel.reconnect_succeeded",
+                            BTreeMap::from([(
+                                "attemptNumber".to_string(),
+                                Value::from(u64::try_from(attempt_number).unwrap_or(u64::MAX)),
+                            )]),
+                        );
                         return Ok(Some(bootstrap_socket));
                     }
                     Err(error) => {
+                        record_bootstrap_tunnel_diagnostic_event(
+                            "bootstrap_tunnel.reconnect_connect_failed",
+                            BTreeMap::from([
+                                (
+                                    "attemptNumber".to_string(),
+                                    Value::from(u64::try_from(attempt_number).unwrap_or(u64::MAX)),
+                                ),
+                                ("error".to_string(), Value::String(error.to_string())),
+                            ]),
+                        );
                         update_tunnel_supervision_details(
                             &runtime.supervisor_handle,
                             &runtime.gateway_ws_url,
@@ -172,6 +210,20 @@ pub(super) async fn reconnect_bootstrap_tunnel(
                 }
             }
             TunnelExchangeOutcome::Retryable(error) => {
+                record_bootstrap_tunnel_diagnostic_event(
+                    "bootstrap_tunnel.token_exchange_failed",
+                    BTreeMap::from([
+                        (
+                            "attemptNumber".to_string(),
+                            Value::from(u64::try_from(attempt_number).unwrap_or(u64::MAX)),
+                        ),
+                        (
+                            "outcome".to_string(),
+                            Value::String("retryable".to_string()),
+                        ),
+                        ("error".to_string(), Value::String(error.clone())),
+                    ]),
+                );
                 update_tunnel_supervision_details(
                     &runtime.supervisor_handle,
                     &runtime.gateway_ws_url,
@@ -191,6 +243,17 @@ pub(super) async fn reconnect_bootstrap_tunnel(
                 );
             }
             TunnelExchangeOutcome::Terminal(error) => {
+                record_bootstrap_tunnel_diagnostic_event(
+                    "bootstrap_tunnel.token_exchange_failed",
+                    BTreeMap::from([
+                        (
+                            "attemptNumber".to_string(),
+                            Value::from(u64::try_from(attempt_number).unwrap_or(u64::MAX)),
+                        ),
+                        ("outcome".to_string(), Value::String("terminal".to_string())),
+                        ("error".to_string(), Value::String(error.clone())),
+                    ]),
+                );
                 update_tunnel_supervision_details(
                     &runtime.supervisor_handle,
                     &runtime.gateway_ws_url,
@@ -215,6 +278,16 @@ pub(super) async fn reconnect_bootstrap_tunnel(
 
         mark_tunnel_disconnected(runtime);
         let backoff_ms = reconnect_backoff_ms(attempt_index);
+        record_bootstrap_tunnel_diagnostic_event(
+            "bootstrap_tunnel.reconnect_scheduled",
+            BTreeMap::from([
+                (
+                    "attemptNumber".to_string(),
+                    Value::from(u64::try_from(attempt_number).unwrap_or(u64::MAX)),
+                ),
+                ("backoffMs".to_string(), Value::from(backoff_ms)),
+            ]),
+        );
         update_tunnel_supervision_details(
             &runtime.supervisor_handle,
             &runtime.gateway_ws_url,
@@ -381,6 +454,16 @@ pub(super) async fn connect_bootstrap_websocket(
             "bootstrap websocket URL must use ws or wss scheme: {connected_url}"
         )));
     }
+    let scheme = uri.scheme_str().unwrap_or("");
+
+    record_bootstrap_tunnel_diagnostic_event(
+        "bootstrap_tunnel.connect_started",
+        BTreeMap::from([
+            ("host".to_string(), Value::String(host.clone())),
+            ("port".to_string(), Value::from(u64::from(port))),
+            ("scheme".to_string(), Value::String(scheme.to_string())),
+        ]),
+    );
 
     let resolved_addresses = prioritize_ipv4_socket_addresses(
         timeout(
@@ -398,6 +481,19 @@ pub(super) async fn connect_bootstrap_websocket(
         .collect::<Vec<_>>(),
     );
     if resolved_addresses.is_empty() {
+        record_bootstrap_tunnel_diagnostic_event(
+            "bootstrap_tunnel.connect_failed",
+            BTreeMap::from([
+                ("host".to_string(), Value::String(host.clone())),
+                ("port".to_string(), Value::from(u64::from(port))),
+                (
+                    "error".to_string(),
+                    Value::String(
+                        "bootstrap websocket host lookup returned no addresses".to_string(),
+                    ),
+                ),
+            ]),
+        );
         return Err(TunnelSessionError::ConfigureTunnelSocket(format!(
             "bootstrap websocket host lookup returned no addresses: {host}:{port}"
         )));
@@ -413,10 +509,30 @@ pub(super) async fn connect_bootstrap_websocket(
         {
             Ok(Ok(socket)) => socket,
             Ok(Err(error)) => {
+                record_bootstrap_tunnel_diagnostic_event(
+                    "bootstrap_tunnel.connect_tcp_failed",
+                    BTreeMap::from([
+                        ("address".to_string(), Value::String(address.to_string())),
+                        ("error".to_string(), Value::String(error.to_string())),
+                    ]),
+                );
                 attempted_connect_errors.push(format!("{address}: {error}"));
                 continue;
             }
             Err(_) => {
+                record_bootstrap_tunnel_diagnostic_event(
+                    "bootstrap_tunnel.connect_tcp_failed",
+                    BTreeMap::from([
+                        ("address".to_string(), Value::String(address.to_string())),
+                        (
+                            "error".to_string(),
+                            Value::String(format!(
+                                "tcp connect timed out after {}ms",
+                                DEFAULT_BOOTSTRAP_TUNNEL_CONNECT_TIMEOUT.as_millis()
+                            )),
+                        ),
+                    ]),
+                );
                 attempted_connect_errors.push(format!(
                     "{address}: tcp connect timed out after {}ms",
                     DEFAULT_BOOTSTRAP_TUNNEL_CONNECT_TIMEOUT.as_millis()
@@ -431,11 +547,41 @@ pub(super) async fn connect_bootstrap_websocket(
         )
         .await
         {
-            Ok(Ok(result)) => return Ok(result),
+            Ok(Ok(result)) => {
+                record_bootstrap_tunnel_diagnostic_event(
+                    "bootstrap_tunnel.connect_succeeded",
+                    BTreeMap::from([
+                        ("address".to_string(), Value::String(address.to_string())),
+                        ("host".to_string(), Value::String(host.clone())),
+                        ("port".to_string(), Value::from(u64::from(port))),
+                    ]),
+                );
+                return Ok(result);
+            }
             Ok(Err(error)) => {
+                record_bootstrap_tunnel_diagnostic_event(
+                    "bootstrap_tunnel.connect_handshake_failed",
+                    BTreeMap::from([
+                        ("address".to_string(), Value::String(address.to_string())),
+                        ("error".to_string(), Value::String(error.to_string())),
+                    ]),
+                );
                 attempted_connect_errors.push(format!("{address}: {error}"));
             }
             Err(_) => {
+                record_bootstrap_tunnel_diagnostic_event(
+                    "bootstrap_tunnel.connect_handshake_failed",
+                    BTreeMap::from([
+                        ("address".to_string(), Value::String(address.to_string())),
+                        (
+                            "error".to_string(),
+                            Value::String(format!(
+                                "websocket handshake timed out after {}ms",
+                                DEFAULT_BOOTSTRAP_TUNNEL_HANDSHAKE_TIMEOUT.as_millis()
+                            )),
+                        ),
+                    ]),
+                );
                 attempted_connect_errors.push(format!(
                     "{address}: websocket handshake timed out after {}ms",
                     DEFAULT_BOOTSTRAP_TUNNEL_HANDSHAKE_TIMEOUT.as_millis()
@@ -444,16 +590,24 @@ pub(super) async fn connect_bootstrap_websocket(
         }
     }
 
-    Err(TunnelSessionError::ConfigureTunnelSocket(
-        if attempted_connect_errors.is_empty() {
-            format!("bootstrap websocket connect failed for {connected_url}")
-        } else {
-            format!(
-                "bootstrap websocket failed to connect to any resolved address for {host}:{port}; attempts: {}",
-                attempted_connect_errors.join("; ")
-            )
-        },
-    ))
+    let error_message = if attempted_connect_errors.is_empty() {
+        "bootstrap websocket connect failed".to_string()
+    } else {
+        format!(
+            "bootstrap websocket failed to connect to any resolved address for {host}:{port}; attempts: {}",
+            attempted_connect_errors.join("; ")
+        )
+    };
+    record_bootstrap_tunnel_diagnostic_event(
+        "bootstrap_tunnel.connect_failed",
+        BTreeMap::from([
+            ("host".to_string(), Value::String(host)),
+            ("port".to_string(), Value::from(u64::from(port))),
+            ("error".to_string(), Value::String(error_message.clone())),
+        ]),
+    );
+
+    Err(TunnelSessionError::ConfigureTunnelSocket(error_message))
 }
 
 async fn connect_bootstrap_tcp_socket(
@@ -555,7 +709,7 @@ pub(super) fn spawn_bootstrap_socket_task(
                             if let Some(close_reason) = close_reason.as_ref() {
                                 attributes.insert("closeReason".to_string(), Value::String(close_reason.clone()));
                             }
-                            record_bootstrap_tunnel_close_event(
+                            record_bootstrap_tunnel_diagnostic_event(
                                 "bootstrap_tunnel.reader_closed",
                                 attributes,
                             );
@@ -579,7 +733,7 @@ pub(super) fn spawn_bootstrap_socket_task(
                             return Ok(());
                         }
                         Some(Err(WebSocketError::ConnectionClosed)) => {
-                            record_bootstrap_tunnel_close_event(
+                            record_bootstrap_tunnel_diagnostic_event(
                                 "bootstrap_tunnel.reader_closed",
                                 BTreeMap::from([
                                     ("closeSource".to_string(), Value::String("reader".to_string())),
@@ -602,7 +756,7 @@ pub(super) fn spawn_bootstrap_socket_task(
                             return Ok(());
                         }
                         None => {
-                            record_bootstrap_tunnel_close_event(
+                            record_bootstrap_tunnel_diagnostic_event(
                                 "bootstrap_tunnel.reader_closed",
                                 BTreeMap::from([
                                     ("closeSource".to_string(), Value::String("reader".to_string())),
@@ -647,7 +801,7 @@ pub(super) fn spawn_bootstrap_socket_task(
                             let _ = event_sender.send(TunnelSessionEvent::BootstrapMessage(message));
                         }
                         Some(Err(error)) => {
-                            record_bootstrap_tunnel_close_event(
+                            record_bootstrap_tunnel_diagnostic_event(
                                 "bootstrap_tunnel.reader_closed",
                                 BTreeMap::from([
                                     ("closeSource".to_string(), Value::String("reader".to_string())),
@@ -696,7 +850,10 @@ fn is_gateway_service_restart_close_frame(
         && close_reason == Some(GATEWAY_SERVICE_RESTART_CLOSE_REASON)
 }
 
-fn record_bootstrap_tunnel_close_event(event: &str, attributes: BTreeMap<String, Value>) {
+pub(in crate::tunnel::session) fn record_bootstrap_tunnel_diagnostic_event(
+    event: &str,
+    attributes: BTreeMap<String, Value>,
+) {
     if let Err(error) = record_bootstrap_tunnel_event(event, attributes) {
         warn!(
             event = "bootstrap_tunnel.diagnostic_record_failed",
@@ -724,7 +881,10 @@ where
         if let Some(reason) = reason.as_ref() {
             attributes.insert("reason".to_string(), Value::String(reason.clone()));
         }
-        record_bootstrap_tunnel_close_event("bootstrap_tunnel.writer_observed_closed", attributes);
+        record_bootstrap_tunnel_diagnostic_event(
+            "bootstrap_tunnel.writer_observed_closed",
+            attributes,
+        );
         info!(
             event = "bootstrap_tunnel.writer_observed_closed",
             close_source = "writer",
@@ -872,7 +1032,7 @@ where
             Ok(value) => Value::from(value),
             Err(_) => Value::String(payload_len.to_string()),
         };
-        record_bootstrap_tunnel_close_event(
+        record_bootstrap_tunnel_diagnostic_event(
             "bootstrap_tunnel.pong_write_failed",
             BTreeMap::from([
                 ("payloadLen".to_string(), payload_len_value),
@@ -1072,9 +1232,35 @@ mod tests {
     use crate::tunnel::session::bootstrap::{
         GATEWAY_SERVICE_RESTART_CLOSE_CODE, GATEWAY_SERVICE_RESTART_CLOSE_REASON,
         bootstrap_close_frame_disconnect_reason, is_gateway_service_restart_close_frame,
-        prioritize_ipv4_socket_addresses, resolve_tunnel_exchange_url,
-        startup_transparent_passthrough_socket_mark,
+        prioritize_ipv4_socket_addresses, record_bootstrap_tunnel_diagnostic_event,
+        resolve_tunnel_exchange_url, startup_transparent_passthrough_socket_mark,
     };
+
+    #[test]
+    fn records_shared_bootstrap_tunnel_diagnostic_events_to_operation_log() {
+        let temp_dir = tempfile::tempdir().expect("tempdir should be created");
+        let _guard = crate::test_support::TestEnvVarsGuard::set([(
+            "MISTLE_SANDBOXD_OPERATION_LOG_DIR",
+            temp_dir
+                .path()
+                .to_str()
+                .expect("temp dir path should be utf8 for environment variable")
+                .to_string(),
+        )]);
+
+        record_bootstrap_tunnel_diagnostic_event(
+            "bootstrap_tunnel.shutdown_requested",
+            std::collections::BTreeMap::from([(
+                "closeSource".to_string(),
+                json!("tunnel_session_handle"),
+            )]),
+        );
+
+        let log_text = std::fs::read_to_string(temp_dir.path().join("bootstrap-tunnel.log"))
+            .expect("bootstrap tunnel diagnostic log should be readable");
+        assert!(log_text.contains(r#""event":"bootstrap_tunnel.shutdown_requested""#));
+        assert!(log_text.contains(r#""closeSource":"tunnel_session_handle""#));
+    }
 
     #[test]
     fn prioritize_ipv4_socket_addresses_sorts_ipv4_before_ipv6() {

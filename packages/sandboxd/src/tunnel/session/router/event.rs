@@ -3,6 +3,8 @@
 //! Runtime tasks and stream handlers send these events back to the router so one
 //! loop can serialize writes and mutate shared session state.
 
+use std::collections::BTreeMap;
+
 use super::*;
 use tracing::{field, warn};
 
@@ -19,6 +21,88 @@ pub(in crate::tunnel::session) async fn handle_tunnel_session_event(
             reason,
         } => {
             let reason_text = reason.unwrap_or_else(|| "bootstrap tunnel closed".to_string());
+            record_bootstrap_tunnel_diagnostic_event(
+                "bootstrap_tunnel.router_observed_closed",
+                BTreeMap::from([
+                    (
+                        "isGatewayServiceRestart".to_string(),
+                        Value::Bool(is_gateway_service_restart),
+                    ),
+                    ("reason".to_string(), Value::String(reason_text.clone())),
+                    (
+                        "pendingAgentOpenCount".to_string(),
+                        Value::from(
+                            u64::try_from(session_state.pending_agent_opens.len())
+                                .unwrap_or(u64::MAX),
+                        ),
+                    ),
+                    (
+                        "activeAgentStreamCount".to_string(),
+                        Value::from(
+                            u64::try_from(session_state.agent_streams.len()).unwrap_or(u64::MAX),
+                        ),
+                    ),
+                    (
+                        "pendingExecOpenCount".to_string(),
+                        Value::from(
+                            u64::try_from(session_state.pending_exec_opens.len())
+                                .unwrap_or(u64::MAX),
+                        ),
+                    ),
+                    (
+                        "activePortAccessHttpStreamCount".to_string(),
+                        Value::from(
+                            u64::try_from(session_state.port_access_http_streams.len())
+                                .unwrap_or(u64::MAX),
+                        ),
+                    ),
+                    (
+                        "activePortAccessTcpStreamCount".to_string(),
+                        Value::from(
+                            u64::try_from(session_state.port_access_tcp_streams.len())
+                                .unwrap_or(u64::MAX),
+                        ),
+                    ),
+                    (
+                        "activeFileSearchStreamCount".to_string(),
+                        Value::from(
+                            u64::try_from(session_state.file_search_streams.len())
+                                .unwrap_or(u64::MAX),
+                        ),
+                    ),
+                    (
+                        "activeFileUploadCount".to_string(),
+                        Value::from(
+                            u64::try_from(session_state.file_uploads.len()).unwrap_or(u64::MAX),
+                        ),
+                    ),
+                    (
+                        "operationStreamRequested".to_string(),
+                        Value::Bool(session_state.operation_stream_requested),
+                    ),
+                    (
+                        "operationStreamCloseRequested".to_string(),
+                        Value::Bool(session_state.operation_stream_close_requested),
+                    ),
+                    (
+                        "pendingOperationRecordCount".to_string(),
+                        Value::from(
+                            u64::try_from(session_state.pending_operation_records.len())
+                                .unwrap_or(u64::MAX),
+                        ),
+                    ),
+                    (
+                        "agentEndpointUrl".to_string(),
+                        Value::String(
+                            session_state
+                                .agent_endpoint_url
+                                .as_deref()
+                                .unwrap_or("")
+                                .to_string(),
+                        ),
+                    ),
+                ]),
+            );
             warn!(
                 event = "bootstrap_tunnel.router_observed_closed",
                 is_gateway_service_restart,

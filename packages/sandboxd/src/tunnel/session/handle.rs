@@ -21,7 +21,9 @@ use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
 use crate::time::{Clock, Sleeper};
 #[cfg(not(test))]
 use crate::tunnel::session::DEFAULT_ATTACHMENT_ROOT;
-use crate::tunnel::session::bootstrap::startup_transparent_passthrough_socket_mark;
+use crate::tunnel::session::bootstrap::{
+    record_bootstrap_tunnel_diagnostic_event, startup_transparent_passthrough_socket_mark,
+};
 use crate::tunnel::session::egress::GatewayEgressTokenProvider;
 use crate::tunnel::session::error::TunnelSessionError;
 use crate::tunnel::session::lifecycle::{format_panic_payload, update_tunnel_supervision_details};
@@ -319,6 +321,13 @@ impl TunnelSession {
 
     /// Stops the live bootstrap tunnel session and waits for its thread to exit.
     pub fn close(mut self) {
+        record_bootstrap_tunnel_diagnostic_event(
+            "bootstrap_tunnel.shutdown_requested",
+            BTreeMap::from([(
+                "closeSource".to_string(),
+                Value::String("tunnel_session_handle".to_string()),
+            )]),
+        );
         self.shutdown_requested.store(true, Ordering::Relaxed);
         let _ = self.request_sender.send(TunnelSessionRequest::Shutdown);
         let Some(thread) = self.thread.take() else {

@@ -15,7 +15,8 @@ use crate::supervision::SupervisedComponent;
 use crate::tunnel::session::TunnelSessionError;
 use crate::tunnel::session::bootstrap::{
     TunnelWebSocket, TunnelWriterMessage, build_tunnel_exchange_http_client,
-    connect_bootstrap_websocket, reconnect_bootstrap_tunnel, resolve_bootstrap_tunnel_url,
+    connect_bootstrap_websocket, reconnect_bootstrap_tunnel,
+    record_bootstrap_tunnel_diagnostic_event, resolve_bootstrap_tunnel_url,
     resolve_tunnel_exchange_url, send_telemetry_frames, spawn_bootstrap_socket_task,
     spawn_tunnel_wake_thread, write_tunnel_close, write_tunnel_text,
 };
@@ -510,6 +511,13 @@ async fn run_connected_tunnel_session(
         };
 
         if runtime.shutdown_requested.load(Ordering::Relaxed) {
+            record_bootstrap_tunnel_diagnostic_event(
+                "bootstrap_tunnel.session_shutdown_observed",
+                BTreeMap::from([(
+                    "reason".to_string(),
+                    Value::String("runtime_shutdown_requested".to_string()),
+                )]),
+            );
             for pending_agent_open in session_state.pending_agent_opens.values() {
                 pending_agent_open.task.abort();
             }
@@ -565,6 +573,13 @@ async fn run_connected_tunnel_session(
                 );
             }
             Ok(TunnelSessionControlFlow::ShutdownRequested) => {
+                record_bootstrap_tunnel_diagnostic_event(
+                    "bootstrap_tunnel.session_shutdown_observed",
+                    BTreeMap::from([(
+                        "reason".to_string(),
+                        Value::String("router_shutdown_requested".to_string()),
+                    )]),
+                );
                 fail_pending_signing_requests(
                     &mut session_state,
                     "bootstrap tunnel session shut down before a signing result arrived",

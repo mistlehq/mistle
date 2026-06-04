@@ -1,6 +1,10 @@
 import type { SandboxAdapter, SandboxProvider, SandboxRuntimeControl } from "@mistle/sandbox";
 
 import { logger } from "../../logger.js";
+import {
+  summarizeBootstrapTunnelDiagnostics,
+  toBoundedOperationLogTextAttributes,
+} from "./bootstrap-tunnel-diagnostics.js";
 
 export async function stopSandbox(
   ctx: {
@@ -61,7 +65,8 @@ export async function emitBootstrapTunnelOperationLog(input: {
       {
         ...attributes,
         operationLogAvailable: true,
-        operationLogText,
+        ...summarizeBootstrapTunnelDiagnostics(operationLogText),
+        ...toBoundedOperationLogTextAttributes(operationLogText),
       },
       "Read sandbox bootstrap tunnel diagnostic log before provider stop.",
     );

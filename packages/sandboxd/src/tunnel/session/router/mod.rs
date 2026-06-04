@@ -35,8 +35,8 @@ use crate::tunnel::session::agent::{
     handle_agent_runtime_message,
 };
 use crate::tunnel::session::bootstrap::{
-    TunnelWebSocket, TunnelWriterMessage, send_telemetry_frames, write_tunnel_pong,
-    write_tunnel_text,
+    TunnelWebSocket, TunnelWriterMessage, record_bootstrap_tunnel_diagnostic_event,
+    send_telemetry_frames, write_tunnel_pong, write_tunnel_text,
 };
 use crate::tunnel::session::egress::{
     handle_egress_token_control_message, handle_egress_token_session_request,
