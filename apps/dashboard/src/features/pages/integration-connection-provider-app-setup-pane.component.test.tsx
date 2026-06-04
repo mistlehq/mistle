@@ -11,11 +11,13 @@ import type {
   IntegrationConnection,
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
+import { createManifestJsonDraft } from "../integrations/manifest-json-editor.js";
 import {
   GitHubInstallationSelectionPanel,
   ProviderAppSetupPane,
 } from "./integration-connection-provider-app-setup-pane.js";
 import {
+  resolveManifestDraftControlPlaneBaseUrl,
   resolveIntegrationSetupAppManifestDraftBuilderOrThrow,
   resolveIntegrationProviderAppSetupOrThrow,
   resolveIntegrationSetupStartFormOrThrow,
@@ -162,6 +164,26 @@ function renderProviderAppSetupPane(input?: {
   );
 }
 
+function buildSlackManifestDraftForTest(input: { webhookCallbackUrl: string }): string {
+  const connection = createSlackConnection();
+  const manifestDraftBuilder = resolveIntegrationSetupAppManifestDraftBuilderOrThrow({
+    connection,
+    setupRoute: {
+      methodId: "slack-bot-token",
+      routeSegment: "slack-app",
+    },
+  });
+
+  return createManifestJsonDraft(
+    manifestDraftBuilder({
+      controlPlaneBaseUrl: resolveManifestDraftControlPlaneBaseUrl({
+        webhookCallbackUrl: input.webhookCallbackUrl,
+      }),
+      webhookCallbackUrl: input.webhookCallbackUrl,
+    }),
+  );
+}
+
 describe("ProviderAppSetupPane", () => {
   afterEach(() => {
     Object.assign(import.meta.env, {
@@ -171,6 +193,11 @@ describe("ProviderAppSetupPane", () => {
   });
 
   it("defaults an incomplete Slack connection to manifest setup", async () => {
+    const webhookCallbackUrl =
+      "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_provider_app_setup";
+    const manifestDraft = buildSlackManifestDraftForTest({
+      webhookCallbackUrl,
+    });
     const rendered = renderProviderAppSetupPane();
 
     expect(screen.getByRole("tab", { name: "Create from manifest", selected: true })).toBeTruthy();
@@ -193,40 +220,44 @@ describe("ProviderAppSetupPane", () => {
       ),
     ).toBeTruthy();
     await waitFor(() => {
-      expect(rendered.container.textContent).toContain(
-        "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_provider_app_setup",
-      );
+      expect(rendered.container.textContent).toContain(webhookCallbackUrl);
     });
-    expect(rendered.container.textContent).toContain(
+    expect(manifestDraft).toContain(
       "https://control-plane.example.com/p/integration/callbacks/setup/slack-app-installation",
     );
-    expect(rendered.container.textContent).toContain(
+    expect(manifestDraft).toContain(
       "https://control-plane.example.com/p/identity-linking/callbacks/slack",
     );
-    expect(rendered.container.textContent).not.toContain("mistle.example.com");
+    expect(manifestDraft).toContain(`"interactivity"`);
+    expect(manifestDraft).toContain(`"request_url": "${webhookCallbackUrl}"`);
+    expect(manifestDraft).not.toContain("mistle.example.com");
     expect(
       screen.getByRole("button", { name: "Create and connect Slack app" }).hasAttribute("disabled"),
     ).toBe(true);
   });
 
   it("uses the provider-facing webhook callback base for generated redirect URLs", async () => {
+    const webhookCallbackUrl =
+      "https://public-control-plane.example.com/base/p/integration/webhooks/slack-default/eps_public";
+    const manifestDraft = buildSlackManifestDraftForTest({
+      webhookCallbackUrl,
+    });
     const rendered = renderProviderAppSetupPane({
-      webhookCallbackUrl:
-        "https://public-control-plane.example.com/base/p/integration/webhooks/slack-default/eps_public",
+      webhookCallbackUrl,
     });
 
     await waitFor(() => {
-      expect(rendered.container.textContent).toContain(
-        "https://public-control-plane.example.com/base/p/integration/webhooks/slack-default/eps_public",
-      );
+      expect(rendered.container.textContent).toContain(webhookCallbackUrl);
     });
-    expect(rendered.container.textContent).toContain(
+    expect(manifestDraft).toContain(
       "https://public-control-plane.example.com/base/p/integration/callbacks/setup/slack-app-installation",
     );
-    expect(rendered.container.textContent).toContain(
+    expect(manifestDraft).toContain(
       "https://public-control-plane.example.com/base/p/identity-linking/callbacks/slack",
     );
-    expect(rendered.container.textContent).not.toContain(
+    expect(manifestDraft).toContain(`"interactivity"`);
+    expect(manifestDraft).toContain(`"request_url": "${webhookCallbackUrl}"`);
+    expect(manifestDraft).not.toContain(
       "http://localhost:3000/p/integration/callbacks/setup/slack-app-installation",
     );
   });

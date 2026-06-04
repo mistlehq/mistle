@@ -6,6 +6,7 @@ import {
   runIntegrationWebhookMiddleware,
   type IntegrationWebhookMiddlewareBaseContext,
 } from "@mistle/integrations-core";
+import { systemSleeper } from "@mistle/time";
 import { describe, expect, it } from "vitest";
 
 import { SlackThreadRootTimestampField } from "./normalized-event-fields.js";
@@ -54,6 +55,45 @@ async function startTestServer(input: {
   };
 }
 
+async function readRequestBody(request: IncomingMessage): Promise<string> {
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of request) {
+    if (typeof chunk === "string") {
+      chunks.push(new TextEncoder().encode(chunk));
+      continue;
+    }
+
+    chunks.push(chunk);
+  }
+
+  return new TextDecoder().decode(Buffer.concat(chunks));
+}
+
+async function waitForCondition(input: {
+  description: string;
+  condition: () => boolean;
+}): Promise<void> {
+  const deadlineMs = Date.now() + 1_000;
+  while (Date.now() < deadlineMs) {
+    if (input.condition()) {
+      return;
+    }
+
+    await systemSleeper.sleep(10);
+  }
+
+  throw new Error(`Timed out waiting for ${input.description}.`);
+}
+
+async function startSimulatedSlackApi(input: {
+  handler: (request: IncomingMessage, response: ServerResponse) => void;
+}): Promise<{
+  baseUrl: string;
+  stop: () => Promise<void>;
+}> {
+  return startTestServer(input);
+}
+
 function createSlackMessageEvent(): Record<string, unknown> {
   return {
     type: "message",
@@ -79,6 +119,8 @@ function createSlackMessagePayload(): Record<string, unknown> {
 }
 
 function createSlackMiddlewareContext(input: {
+  apiBaseUrl?: string;
+  botToken?: string;
   headers: Record<string, string>;
   rawBody: Uint8Array;
   signingSecret: string;
@@ -97,7 +139,7 @@ function createSlackMiddlewareContext(input: {
       variantId: "slack-default",
       enabled: true,
       config: {
-        apiBaseUrl: "https://slack.com/api",
+        apiBaseUrl: input.apiBaseUrl ?? "https://slack.com/api",
       },
       secrets: {},
     },
@@ -106,6 +148,7 @@ function createSlackMiddlewareContext(input: {
       status: "active",
       config: {},
       secrets: {
+        ...(input.botToken === undefined ? {} : { botToken: input.botToken }),
         signingSecret: input.signingSecret,
       },
     },
@@ -133,6 +176,56 @@ function createSlackUrlVerificationRequest(input: { challenge: string; signingSe
 
   return {
     headers: {
+      "x-slack-request-timestamp": timestamp,
+      "x-slack-signature": buildSlackWebhookSignature({
+        signingSecret: input.signingSecret,
+        timestamp,
+        rawBody,
+      }),
+    },
+    rawBody,
+  };
+}
+
+function createSlackEventRequest(input: {
+  payload: Record<string, unknown>;
+  signingSecret: string;
+}): {
+  headers: Record<string, string>;
+  rawBody: Uint8Array;
+} {
+  const rawBody = new TextEncoder().encode(JSON.stringify(input.payload));
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+
+  return {
+    headers: {
+      "x-slack-request-timestamp": timestamp,
+      "x-slack-signature": buildSlackWebhookSignature({
+        signingSecret: input.signingSecret,
+        timestamp,
+        rawBody,
+      }),
+    },
+    rawBody,
+  };
+}
+
+function createSlackBlockActionsRequest(input: {
+  payload: Record<string, unknown>;
+  signingSecret: string;
+}): {
+  headers: Record<string, string>;
+  rawBody: Uint8Array;
+} {
+  const form = new URLSearchParams({
+    payload: JSON.stringify(input.payload),
+  });
+  const rawBody = new TextEncoder().encode(form.toString());
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+
+  return {
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
       "x-slack-request-timestamp": timestamp,
       "x-slack-signature": buildSlackWebhookSignature({
         signingSecret: input.signingSecret,
@@ -190,6 +283,78 @@ describe("slack webhook handler", () => {
     ).rejects.toThrow(IntegrationWebhookError);
   });
 
+  it("short-circuits Slack block action requests after signature verification", async () => {
+    const request = createSlackBlockActionsRequest({
+      payload: {
+        type: "block_actions",
+        user: {
+          id: "U123",
+        },
+        api_app_id: "A123",
+        team: {
+          id: "T123",
+        },
+        actions: [
+          {
+            action_id: "mistle_view_session",
+            block_id: "mistle_session_link",
+            type: "button",
+            action_ts: "1729999330.000000",
+          },
+        ],
+      },
+      signingSecret: "slack-signing-secret",
+    });
+
+    const resolved = await runIntegrationWebhookMiddleware({
+      context: createSlackMiddlewareContext({
+        headers: request.headers,
+        rawBody: request.rawBody,
+        signingSecret: "slack-signing-secret",
+      }),
+      middleware: SlackWebhookMiddlewares,
+      next: async () => "core",
+    });
+
+    expect(resolved).toEqual({
+      kind: "short-circuited",
+      response: {
+        status: 200,
+        contentType: "text/plain",
+        body: "",
+      },
+    });
+  });
+
+  it("rejects Slack block action requests when signature verification fails", async () => {
+    const request = createSlackBlockActionsRequest({
+      payload: {
+        type: "block_actions",
+        actions: [
+          {
+            action_id: "mistle_view_session",
+            block_id: "mistle_session_link",
+            type: "button",
+            action_ts: "1729999330.000000",
+          },
+        ],
+      },
+      signingSecret: "wrong-signing-secret",
+    });
+
+    await expect(
+      runIntegrationWebhookMiddleware({
+        context: createSlackMiddlewareContext({
+          headers: request.headers,
+          rawBody: request.rawBody,
+          signingSecret: "slack-signing-secret",
+        }),
+        middleware: SlackWebhookMiddlewares,
+        next: async () => "core",
+      }),
+    ).rejects.toThrow(IntegrationWebhookError);
+  });
+
   it("continues Slack event callbacks after parsing the webhook payload", async () => {
     const rawBody = new TextEncoder().encode(JSON.stringify(createSlackMessagePayload()));
 
@@ -207,6 +372,308 @@ describe("slack webhook handler", () => {
       kind: "continued",
       result: "core",
     });
+  });
+
+  it("sets Slack assistant status for app mentions", async () => {
+    const seenRequests: Array<{
+      authorization: string | null;
+      body: unknown;
+      contentType: string | null;
+      method: string | undefined;
+      url: string | undefined;
+    }> = [];
+    const server = await startSimulatedSlackApi({
+      handler(request, response) {
+        void (async () => {
+          // Slack assistant.threads.setStatus accepts JSON with channel_id, thread_ts, status,
+          // and loading_messages. See https://docs.slack.dev/reference/methods/assistant.threads.setStatus/
+          seenRequests.push({
+            authorization: request.headers.authorization ?? null,
+            body: JSON.parse(await readRequestBody(request)),
+            contentType: request.headers["content-type"] ?? null,
+            method: request.method,
+            url: request.url,
+          });
+          response.setHeader("content-type", "application/json");
+          response.end(JSON.stringify({ ok: true }));
+        })().catch((error: unknown) => {
+          response.writeHead(500);
+          response.end(error instanceof Error ? error.message : "Unexpected test server error.");
+        });
+      },
+    });
+    const payload = {
+      ...createSlackMessagePayload(),
+      event: {
+        type: "app_mention",
+        channel: "C123",
+        user: "U123",
+        text: "<@A123> can you help?",
+        ts: "1729999330.000000",
+        event_ts: "1729999330.000000",
+      },
+    };
+    const request = createSlackEventRequest({
+      payload,
+      signingSecret: "slack-signing-secret",
+    });
+
+    try {
+      const resolved = await runIntegrationWebhookMiddleware({
+        context: createSlackMiddlewareContext({
+          apiBaseUrl: `${server.baseUrl}/slack/api`,
+          botToken: "xoxb-test-token",
+          headers: request.headers,
+          rawBody: request.rawBody,
+          signingSecret: "slack-signing-secret",
+        }),
+        middleware: SlackWebhookMiddlewares,
+        next: async () => "core",
+      });
+
+      expect(resolved).toEqual({
+        kind: "continued",
+        result: "core",
+      });
+      await waitForCondition({
+        description: "Slack assistant status request",
+        condition: () => seenRequests.length === 1,
+      });
+      expect(seenRequests).toEqual([
+        {
+          authorization: "Bearer xoxb-test-token",
+          body: {
+            channel_id: "C123",
+            thread_ts: "1729999330.000000",
+            status: "Working...",
+            loading_messages: [
+              "Working through it...",
+              "Keeping at it...",
+              "Making progress...",
+              "Still on it...",
+              "On the case...",
+            ],
+          },
+          contentType: "application/json",
+          method: "POST",
+          url: "/slack/api/assistant.threads.setStatus",
+        },
+      ]);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("continues when Slack assistant status cannot be set", async () => {
+    const seenUrls: string[] = [];
+    const server = await startSimulatedSlackApi({
+      handler(request, response) {
+        // Slack Web API error responses use HTTP 200 with ok: false and an error code.
+        // See https://docs.slack.dev/reference/methods/assistant.threads.setStatus/
+        seenUrls.push(request.url ?? "");
+        response.setHeader("content-type", "application/json");
+        response.end(JSON.stringify({ ok: false, error: "missing_scope" }));
+      },
+    });
+    const payload = {
+      ...createSlackMessagePayload(),
+      event: {
+        type: "app_mention",
+        channel: "C123",
+        user: "U123",
+        text: "<@A123> can you help?",
+        ts: "1729999330.000000",
+        thread_ts: "1729999327.187299",
+        event_ts: "1729999330.000000",
+      },
+    };
+    const request = createSlackEventRequest({
+      payload,
+      signingSecret: "slack-signing-secret",
+    });
+
+    try {
+      const resolved = await runIntegrationWebhookMiddleware({
+        context: createSlackMiddlewareContext({
+          apiBaseUrl: `${server.baseUrl}/slack/api`,
+          botToken: "xoxb-test-token",
+          headers: request.headers,
+          rawBody: request.rawBody,
+          signingSecret: "slack-signing-secret",
+        }),
+        middleware: SlackWebhookMiddlewares,
+        next: async () => "core",
+      });
+
+      expect(resolved).toEqual({
+        kind: "continued",
+        result: "core",
+      });
+      await waitForCondition({
+        description: "Slack assistant status request",
+        condition: () => seenUrls.length === 1,
+      });
+      expect(seenUrls).toEqual(["/slack/api/assistant.threads.setStatus"]);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("continues before Slack assistant status completes", async () => {
+    const seenUrls: string[] = [];
+    let statusResponseSent = false;
+    const server = await startSimulatedSlackApi({
+      handler(request, response) {
+        void (async () => {
+          // Slack assistant.threads.setStatus is an optional Web API call for assistant UX.
+          // See https://docs.slack.dev/reference/methods/assistant.threads.setStatus/
+          seenUrls.push(request.url ?? "");
+          await systemSleeper.sleep(100);
+          response.setHeader("content-type", "application/json");
+          response.end(JSON.stringify({ ok: true }));
+          statusResponseSent = true;
+        })().catch((error: unknown) => {
+          response.writeHead(500);
+          response.end(error instanceof Error ? error.message : "Unexpected test server error.");
+        });
+      },
+    });
+    const payload = {
+      ...createSlackMessagePayload(),
+      event: {
+        type: "app_mention",
+        channel: "C123",
+        user: "U123",
+        text: "<@A123> can you help?",
+        ts: "1729999330.000000",
+        event_ts: "1729999330.000000",
+      },
+    };
+    const request = createSlackEventRequest({
+      payload,
+      signingSecret: "slack-signing-secret",
+    });
+
+    try {
+      const resolved = await runIntegrationWebhookMiddleware({
+        context: createSlackMiddlewareContext({
+          apiBaseUrl: `${server.baseUrl}/slack/api`,
+          botToken: "xoxb-test-token",
+          headers: request.headers,
+          rawBody: request.rawBody,
+          signingSecret: "slack-signing-secret",
+        }),
+        middleware: SlackWebhookMiddlewares,
+        next: async () => "core",
+      });
+
+      expect(resolved).toEqual({
+        kind: "continued",
+        result: "core",
+      });
+      expect(statusResponseSent).toBe(false);
+      await waitForCondition({
+        description: "Slack assistant status response",
+        condition: () => statusResponseSent,
+      });
+      expect(seenUrls).toEqual(["/slack/api/assistant.threads.setStatus"]);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("does not set Slack assistant status for plain message events", async () => {
+    const seenUrls: string[] = [];
+    const server = await startSimulatedSlackApi({
+      handler(request, response) {
+        seenUrls.push(request.url ?? "");
+        response.setHeader("content-type", "application/json");
+        response.end(JSON.stringify({ ok: true }));
+      },
+    });
+    const payload = {
+      ...createSlackMessagePayload(),
+      event: {
+        type: "message",
+        channel: "C123",
+        user: "U123",
+        text: "Can you help?",
+        ts: "1729999330.000000",
+        thread_ts: "1729999327.187299",
+        event_ts: "1729999330.000000",
+      },
+    };
+    const request = createSlackEventRequest({
+      payload,
+      signingSecret: "slack-signing-secret",
+    });
+
+    try {
+      const resolved = await runIntegrationWebhookMiddleware({
+        context: createSlackMiddlewareContext({
+          apiBaseUrl: `${server.baseUrl}/slack/api`,
+          botToken: "xoxb-test-token",
+          headers: request.headers,
+          rawBody: request.rawBody,
+          signingSecret: "slack-signing-secret",
+        }),
+        middleware: SlackWebhookMiddlewares,
+        next: async () => "core",
+      });
+
+      expect(resolved).toEqual({
+        kind: "continued",
+        result: "core",
+      });
+      expect(seenUrls).toEqual([]);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("rejects forged Slack assistant status requests before calling Slack", async () => {
+    const seenUrls: string[] = [];
+    const server = await startSimulatedSlackApi({
+      handler(request, response) {
+        seenUrls.push(request.url ?? "");
+        response.setHeader("content-type", "application/json");
+        response.end(JSON.stringify({ ok: true }));
+      },
+    });
+    const payload = {
+      ...createSlackMessagePayload(),
+      event: {
+        type: "app_mention",
+        channel: "C123",
+        user: "U123",
+        text: "<@A123> can you help?",
+        ts: "1729999330.000000",
+        event_ts: "1729999330.000000",
+      },
+    };
+    const request = createSlackEventRequest({
+      payload,
+      signingSecret: "wrong-signing-secret",
+    });
+
+    try {
+      await expect(
+        runIntegrationWebhookMiddleware({
+          context: createSlackMiddlewareContext({
+            apiBaseUrl: `${server.baseUrl}/slack/api`,
+            botToken: "xoxb-test-token",
+            headers: request.headers,
+            rawBody: request.rawBody,
+            signingSecret: "slack-signing-secret",
+          }),
+          middleware: SlackWebhookMiddlewares,
+          next: async () => "core",
+        }),
+      ).rejects.toThrow(IntegrationWebhookError);
+      expect(seenUrls).toEqual([]);
+    } finally {
+      await server.stop();
+    }
   });
 
   it("normalizes Slack message events", () => {

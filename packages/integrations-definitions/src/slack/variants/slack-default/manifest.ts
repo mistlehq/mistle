@@ -40,6 +40,10 @@ export const SlackAppManifestTemplate = {
       request_url: "https://mistle.example.com/api/integrations/slack/webhook",
       bot_events: SlackAppManifestBotEvents,
     },
+    interactivity: {
+      is_enabled: true,
+      request_url: "https://mistle.example.com/api/integrations/slack/webhook",
+    },
     socket_mode_enabled: false,
     token_rotation_enabled: false,
   },

@@ -43,6 +43,10 @@ describe("SlackAppManifestTemplate", () => {
             "reaction_removed",
           ],
         },
+        interactivity: {
+          is_enabled: true,
+          request_url: "https://mistle.example.com/api/integrations/slack/webhook",
+        },
       },
       oauth_config: {
         redirect_urls: [
@@ -104,6 +108,11 @@ describe("buildSlackAppManifest", () => {
             "reaction_added",
             "reaction_removed",
           ],
+        },
+        interactivity: {
+          is_enabled: true,
+          request_url:
+            "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_123",
         },
       },
       oauth_config: {
@@ -181,6 +190,11 @@ describe("buildSlackAppManifestDraft", () => {
           request_url:
             "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_123",
         },
+        interactivity: {
+          is_enabled: true,
+          request_url:
+            "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_123",
+        },
       },
       oauth_config: {
         redirect_urls: expect.arrayContaining([
@@ -192,6 +206,9 @@ describe("buildSlackAppManifestDraft", () => {
     expect(manifest).not.toMatchObject({
       settings: {
         event_subscriptions: {
+          request_url: "https://mistle.example.com/api/integrations/slack/webhook",
+        },
+        interactivity: {
           request_url: "https://mistle.example.com/api/integrations/slack/webhook",
         },
       },

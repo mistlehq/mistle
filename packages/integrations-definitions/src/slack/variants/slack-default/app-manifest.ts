@@ -331,6 +331,7 @@ export function buildSlackAppManifest(input: {
 }): Record<string, unknown> {
   const settings = toRecord(input.manifest["settings"]);
   const eventSubscriptions = toRecord(settings["event_subscriptions"]);
+  const interactivity = toRecord(settings["interactivity"]);
   const oauthConfig = toRecord(input.manifest["oauth_config"]);
   const scopes = toRecord(oauthConfig["scopes"]);
   const redirectUrl = buildSlackAppInstallationCompleteUrl({
@@ -348,6 +349,11 @@ export function buildSlackAppManifest(input: {
           existing: eventSubscriptions["bot_events"],
           requiredValues: SlackAppManifestBotEvents,
         }),
+      },
+      interactivity: {
+        ...interactivity,
+        is_enabled: true,
+        request_url: input.webhookCallbackUrl,
       },
       socket_mode_enabled: false,
     },
