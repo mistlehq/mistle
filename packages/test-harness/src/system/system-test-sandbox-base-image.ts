@@ -6,6 +6,10 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
+import {
+  createTensorlakeRegisteredBaseImageName,
+  createTensorlakeRegisteredImageHandle,
+} from "@mistle/sandbox";
 import { systemClock, systemSleeper } from "@mistle/time";
 
 import { MISTLE_TEST_COORDINATOR_DIR_ENV } from "../environment/runner-pool-session.js";
@@ -15,7 +19,8 @@ import {
 } from "./system-test-sandbox-base-image-source.js";
 export {
   MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REF_ENV,
-  readTensorlakeSystemTestSandboxBaseImageRef,
+  MISTLE_SYSTEM_TEST_TENSORLAKE_SANDBOX_BASE_IMAGE_REF_ENV,
+  readOptionalTensorlakeSystemTestSandboxBaseImageRef,
   resolveSystemTestSandboxBaseImageSource,
   type SystemTestSandboxBaseImageSource,
 } from "./system-test-sandbox-base-image-source.js";
@@ -43,6 +48,12 @@ export async function getSystemTestSandboxBaseImageRef(): Promise<string> {
 
   systemTestSandboxBaseImageRefPromise = resolveSystemTestSandboxBaseImageRef();
   return systemTestSandboxBaseImageRefPromise;
+}
+
+export function createTensorlakeSystemTestSandboxBaseImageRef(sourceImageRef: string): string {
+  return createTensorlakeRegisteredImageHandle(
+    createTensorlakeRegisteredBaseImageName(sourceImageRef),
+  ).imageId;
 }
 
 export async function resolveSystemTestSandboxBaseImageRef(): Promise<string> {

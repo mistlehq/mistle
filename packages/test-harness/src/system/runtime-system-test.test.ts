@@ -1,5 +1,5 @@
 import { SandboxResourceNotFoundError } from "@mistle/sandbox";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { ServiceIds } from "../integration/services/service-ids.js";
 import { createDockerSandboxReachableHostUrl } from "./docker-sandbox-networking.js";
@@ -10,6 +10,13 @@ import {
   selectProviderSandboxIdsCreatedByTest,
   shouldIgnoreRuntimeSystemProviderSandboxCleanupError,
 } from "./runtime-system-test.js";
+import { MISTLE_SYSTEM_TEST_TENSORLAKE_SANDBOX_BASE_IMAGE_REF_ENV } from "./system-test-sandbox-base-image.js";
+
+const originalEnv = { ...process.env };
+
+afterEach(() => {
+  process.env = { ...originalEnv };
+});
 
 describe("resolveRuntimeSystemIntegrationConfigPathInContainer", () => {
   it("uses the shared integration config for non-sandbox runtime system tests", () => {
@@ -64,6 +71,32 @@ describe("createRuntimeSystemServiceOptions", () => {
     ).resolves.toEqual({
       sandbox: {
         provider: "docker",
+      },
+    });
+  });
+
+  it("uses an explicit Tensorlake image override and enables release artifact resolution", async () => {
+    process.env.MISTLE_SANDBOX_TENSORLAKE_API_KEY = "tensorlake-api-key";
+    process.env[MISTLE_SYSTEM_TEST_TENSORLAKE_SANDBOX_BASE_IMAGE_REF_ENV] =
+      "tensorlake:image:mistle-system-test";
+
+    await expect(
+      createRuntimeSystemServiceOptions({
+        sandbox: {
+          provider: "tensorlake",
+        },
+      }),
+    ).resolves.toEqual({
+      dataPlaneWorker: {
+        sandboxdArtifactResolver: "release",
+      },
+      sandbox: {
+        provider: "tensorlake",
+        defaultBaseImageRef: "tensorlake:image:mistle-system-test",
+        tensorlake: {
+          apiKey: "tensorlake-api-key",
+        },
+        publicServiceBaseUrls: new Map(),
       },
     });
   });

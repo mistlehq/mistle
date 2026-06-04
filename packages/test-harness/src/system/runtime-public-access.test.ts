@@ -138,7 +138,7 @@ describe("createRuntimePublicAccessRouteUpgradeProbeUrl", () => {
         upgradeProbePath: "/tunnel/sandbox/sbi_runtime_public_access_probe",
       }).toString(),
     ).toBe(
-      "wss://gateway.example.com/tunnel/sandbox/sbi_runtime_public_access_probe?x-mistle-test-environment-id=test_env_123",
+      "wss://gateway.example.com/__mistle/upgrade-probe?x-mistle-test-environment-id=test_env_123",
     );
   });
 });

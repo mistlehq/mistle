@@ -64,14 +64,12 @@ export function readPrepublishedSystemTestSandboxBaseImageRef(
   return value.trim();
 }
 
-export function readTensorlakeSystemTestSandboxBaseImageRef(
+export function readOptionalTensorlakeSystemTestSandboxBaseImageRef(
   env: NodeJS.ProcessEnv = process.env,
-): string {
+): string | undefined {
   const value = env[MISTLE_SYSTEM_TEST_TENSORLAKE_SANDBOX_BASE_IMAGE_REF_ENV];
   if (value === undefined || value.trim().length === 0) {
-    throw new Error(
-      `${MISTLE_SYSTEM_TEST_TENSORLAKE_SANDBOX_BASE_IMAGE_REF_ENV} is required for Tensorlake runtime system tests.`,
-    );
+    return undefined;
   }
 
   const imageRef = value.trim();

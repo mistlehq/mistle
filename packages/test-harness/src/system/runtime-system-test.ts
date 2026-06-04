@@ -26,8 +26,9 @@ import {
   type RuntimePublicAccessTunnel,
 } from "./runtime-public-access.js";
 import {
+  createTensorlakeSystemTestSandboxBaseImageRef,
   getSystemTestSandboxBaseImageRef,
-  readTensorlakeSystemTestSandboxBaseImageRef,
+  readOptionalTensorlakeSystemTestSandboxBaseImageRef,
   readSystemTestCoordinatorDirectoryPath,
 } from "./system-test-sandbox-base-image.js";
 
@@ -315,13 +316,15 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
     publicServiceBaseUrls?: ReadonlyMap<ServiceId, string>;
   };
 }> {
+  const dataPlaneWorker = createRuntimeSystemDataPlaneWorkerOptions(input);
+
   if (input.sandbox === undefined) {
     if (input.dataPlaneGateway === undefined) {
-      return input.dataPlaneWorker === undefined ? {} : { dataPlaneWorker: input.dataPlaneWorker };
+      return dataPlaneWorker === undefined ? {} : { dataPlaneWorker };
     }
 
     return {
-      ...(input.dataPlaneWorker === undefined ? {} : { dataPlaneWorker: input.dataPlaneWorker }),
+      ...(dataPlaneWorker === undefined ? {} : { dataPlaneWorker }),
       dataPlaneGateway: input.dataPlaneGateway,
     };
   }
@@ -329,7 +332,7 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
   if (input.sandbox.provider === "docker") {
     if (input.dataPlaneGateway === undefined) {
       return {
-        ...(input.dataPlaneWorker === undefined ? {} : { dataPlaneWorker: input.dataPlaneWorker }),
+        ...(dataPlaneWorker === undefined ? {} : { dataPlaneWorker }),
         sandbox: {
           provider: "docker",
         },
@@ -337,7 +340,7 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
     }
 
     return {
-      ...(input.dataPlaneWorker === undefined ? {} : { dataPlaneWorker: input.dataPlaneWorker }),
+      ...(dataPlaneWorker === undefined ? {} : { dataPlaneWorker }),
       dataPlaneGateway: input.dataPlaneGateway,
       sandbox: {
         provider: "docker",
@@ -349,7 +352,7 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
   if (input.sandbox.provider === "e2b") {
     if (input.dataPlaneGateway === undefined) {
       return {
-        ...(input.dataPlaneWorker === undefined ? {} : { dataPlaneWorker: input.dataPlaneWorker }),
+        ...(dataPlaneWorker === undefined ? {} : { dataPlaneWorker }),
         sandbox: {
           provider: "e2b",
           defaultBaseImageRef: await getSystemTestSandboxBaseImageRef(),
@@ -360,7 +363,7 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
     }
 
     return {
-      ...(input.dataPlaneWorker === undefined ? {} : { dataPlaneWorker: input.dataPlaneWorker }),
+      ...(dataPlaneWorker === undefined ? {} : { dataPlaneWorker }),
       dataPlaneGateway: input.dataPlaneGateway,
       sandbox: {
         provider: "e2b",
@@ -373,10 +376,10 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
 
   if (input.dataPlaneGateway === undefined) {
     return {
-      ...(input.dataPlaneWorker === undefined ? {} : { dataPlaneWorker: input.dataPlaneWorker }),
+      ...(dataPlaneWorker === undefined ? {} : { dataPlaneWorker }),
       sandbox: {
         provider: "tensorlake",
-        defaultBaseImageRef: readTensorlakeSystemTestSandboxBaseImageRef(),
+        defaultBaseImageRef: await getTensorlakeSystemTestSandboxBaseImageRef(),
         tensorlake: readTensorlakeOptions(),
         publicServiceBaseUrls,
       },
@@ -384,15 +387,37 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
   }
 
   return {
-    ...(input.dataPlaneWorker === undefined ? {} : { dataPlaneWorker: input.dataPlaneWorker }),
+    ...(dataPlaneWorker === undefined ? {} : { dataPlaneWorker }),
     dataPlaneGateway: input.dataPlaneGateway,
     sandbox: {
       provider: "tensorlake",
-      defaultBaseImageRef: readTensorlakeSystemTestSandboxBaseImageRef(),
+      defaultBaseImageRef: await getTensorlakeSystemTestSandboxBaseImageRef(),
       tensorlake: readTensorlakeOptions(),
       publicServiceBaseUrls,
     },
   };
+}
+
+function createRuntimeSystemDataPlaneWorkerOptions(
+  input: CreateSystemTestInput,
+): IntegrationServiceOptions["dataPlaneWorker"] | undefined {
+  if (input.sandbox?.provider !== "tensorlake") {
+    return input.dataPlaneWorker;
+  }
+
+  return {
+    ...input.dataPlaneWorker,
+    sandboxdArtifactResolver: input.dataPlaneWorker?.sandboxdArtifactResolver ?? "release",
+  };
+}
+
+async function getTensorlakeSystemTestSandboxBaseImageRef(): Promise<string> {
+  const explicitImageRef = readOptionalTensorlakeSystemTestSandboxBaseImageRef();
+  if (explicitImageRef !== undefined) {
+    return explicitImageRef;
+  }
+
+  return createTensorlakeSystemTestSandboxBaseImageRef(await getSystemTestSandboxBaseImageRef());
 }
 
 function readTensorlakeOptions(): {

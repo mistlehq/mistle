@@ -23,6 +23,7 @@ const RuntimePublicAccessProxyPoolLockTimeoutMs = 240_000;
 const RuntimePublicAccessRouteReadyTimeoutMs = 30_000;
 const RuntimePublicAccessUpgradeProbeTimeoutMs = 5_000;
 const RuntimePublicAccessProxyDiagnosticsLogTailBytes = 64 * 1024;
+const RuntimePublicAccessProxyUpgradeProbePath = "/__mistle/upgrade-probe";
 const execFileAsync = promisify(execFile);
 
 export type RuntimePublicAccessTunnel = {
@@ -881,7 +882,7 @@ export function createRuntimePublicAccessRouteUpgradeProbeUrl(input: {
   publicHostname: string;
   upgradeProbePath: string;
 }): URL {
-  const url = new URL(input.upgradeProbePath, `wss://${input.publicHostname}`);
+  const url = new URL(RuntimePublicAccessProxyUpgradeProbePath, `wss://${input.publicHostname}`);
   url.searchParams.set("x-mistle-test-environment-id", input.environmentId);
   return url;
 }
@@ -920,7 +921,7 @@ import net from "node:net";
 import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 const DockerHostGatewayName = "host.docker.internal";
 const DiagnosticsLogTailBytes = 64 * 1024;
@@ -928,6 +929,7 @@ const DiagnosticsLocalOriginProbeTimeoutMs = 2_000;
 const UpgradeTargetConnectRetryIntervalMs = 100;
 const UpgradeTargetConnectTimeoutMs = 10_000;
 const WebhookMarkerRouterPath = "/__mistle/webhook-router/github";
+const RuntimePublicAccessProxyUpgradeProbePath = "/__mistle/upgrade-probe";
 const tunnelId = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_TUNNEL_ID");
 const tunnelCredentialsJson = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_TUNNEL_CREDENTIALS_JSON");
 const ownerPid = Number(readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_OWNER_PID"));
@@ -1190,6 +1192,11 @@ function handleUpgrade(request, socket, head) {
 }
 
 async function handleUpgradeRequest(request, socket, head) {
+  if (isRuntimePublicAccessProxyUpgradeProbeRequest(request)) {
+    respondToRuntimePublicAccessProxyUpgradeProbe(request, socket);
+    return;
+  }
+
   const target = await resolveTarget(request, Buffer.alloc(0));
   if (target === undefined) {
     const routeContext = readRouteContext(request);
@@ -1239,6 +1246,31 @@ async function handleUpgradeRequest(request, socket, head) {
     });
     endSocketResponse(socket, 502, "Bad Gateway", "Runtime public access upgrade target failed to connect.");
   });
+}
+
+function isRuntimePublicAccessProxyUpgradeProbeRequest(request) {
+  const host = String(request.headers.host ?? "").split(":")[0];
+  const requestUrl = new URL(request.url ?? "/", "http://" + host);
+  return requestUrl.pathname === RuntimePublicAccessProxyUpgradeProbePath;
+}
+
+function respondToRuntimePublicAccessProxyUpgradeProbe(request, socket) {
+  const webSocketKey = request.headers["sec-websocket-key"];
+  if (typeof webSocketKey !== "string" || webSocketKey.length === 0) {
+    endSocketResponse(socket, 400, "Bad Request", "Missing websocket key.");
+    return;
+  }
+
+  const acceptValue = createHash("sha1")
+    .update(webSocketKey + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
+    .digest("base64");
+  socket.end(
+    "HTTP/1.1 101 Switching Protocols\r\n" +
+      "upgrade: websocket\r\n" +
+      "connection: Upgrade\r\n" +
+      "sec-websocket-accept: " + acceptValue + "\r\n" +
+      "\r\n",
+  );
 }
 
 function pipeUpgradeSockets(input) {
@@ -1679,6 +1711,7 @@ async function startCloudflared(proxyBaseUrl) {
   const config = [
     "tunnel: " + tunnelId,
     "credentials-file: /etc/cloudflared/credentials.json",
+    "protocol: http2",
     "ingress:",
     ...publicHostnames.flatMap((hostname) => [
       "  - hostname: " + hostname,

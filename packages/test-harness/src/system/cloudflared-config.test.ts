@@ -67,6 +67,7 @@ describe("buildCloudflaredTunnelConfig", () => {
       }),
     ).toBe(`tunnel: 4f782921-0689-45e4-84d9-d8e6398cfef6
 credentials-file: /etc/cloudflared/credentials.json
+protocol: http2
 ingress:
   - hostname: system-control.example.com
     service: http://host.docker.internal:5100

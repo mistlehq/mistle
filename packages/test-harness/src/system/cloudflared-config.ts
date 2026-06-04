@@ -60,6 +60,7 @@ export function buildCloudflaredTunnelConfig(input: BuildCloudflaredTunnelConfig
   return [
     `tunnel: ${input.tunnelId}`,
     `credentials-file: ${input.credentialsFilePath}`,
+    "protocol: http2",
     "ingress:",
     ...input.ingressRules.flatMap((rule) => [
       `  - hostname: ${rule.publicHostname}`,

@@ -4,10 +4,11 @@ import {
   MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REGISTRY_STORAGE_DIR_ENV,
   MISTLE_SYSTEM_TEST_SANDBOX_BASE_IMAGE_REF_ENV,
   MISTLE_SYSTEM_TEST_TENSORLAKE_SANDBOX_BASE_IMAGE_REF_ENV,
+  readOptionalTensorlakeSystemTestSandboxBaseImageRef,
   readSystemTestSandboxBaseImageRegistryStorageDir,
-  readTensorlakeSystemTestSandboxBaseImageRef,
   resolveSystemTestSandboxBaseImageSource,
 } from "./system-test-sandbox-base-image-source.js";
+import { createTensorlakeSystemTestSandboxBaseImageRef } from "./system-test-sandbox-base-image.js";
 
 const LocalSandboxBaseImageRef = "mistle/sandbox-base:dev";
 const PrepublishedSandboxBaseImageRef =
@@ -55,25 +56,39 @@ describe("resolveSystemTestSandboxBaseImageSource", () => {
   });
 });
 
-describe("readTensorlakeSystemTestSandboxBaseImageRef", () => {
-  it("reads a Tensorlake system image handle for Tensorlake runtime tests", () => {
+describe("readOptionalTensorlakeSystemTestSandboxBaseImageRef", () => {
+  it("reads an explicit Tensorlake system image handle override", () => {
     expect(
-      readTensorlakeSystemTestSandboxBaseImageRef({
+      readOptionalTensorlakeSystemTestSandboxBaseImageRef({
         [MISTLE_SYSTEM_TEST_TENSORLAKE_SANDBOX_BASE_IMAGE_REF_ENV]:
           " tensorlake:image:mistle-system-test ",
       }),
     ).toBe("tensorlake:image:mistle-system-test");
   });
 
-  it("requires Tensorlake runtime tests to use a Tensorlake image handle", () => {
+  it("uses no explicit Tensorlake system image handle when the override is absent", () => {
+    expect(readOptionalTensorlakeSystemTestSandboxBaseImageRef({})).toBeUndefined();
+  });
+
+  it("requires explicit Tensorlake runtime test overrides to use a Tensorlake image handle", () => {
     expect(() =>
-      readTensorlakeSystemTestSandboxBaseImageRef({
+      readOptionalTensorlakeSystemTestSandboxBaseImageRef({
         [MISTLE_SYSTEM_TEST_TENSORLAKE_SANDBOX_BASE_IMAGE_REF_ENV]:
           "ghcr.io/mistlehq/sandbox-base:sys-test",
       }),
     ).toThrow(
       `${MISTLE_SYSTEM_TEST_TENSORLAKE_SANDBOX_BASE_IMAGE_REF_ENV} must be a Tensorlake image handle.`,
     );
+  });
+});
+
+describe("createTensorlakeSystemTestSandboxBaseImageRef", () => {
+  it("derives the deterministic Tensorlake image handle for a shared GHCR system image", () => {
+    expect(
+      createTensorlakeSystemTestSandboxBaseImageRef(
+        "ghcr.io/mistlehq/sandbox-base:sys-d7881d87c319dad668a6f4df",
+      ),
+    ).toBe("tensorlake:image:mistle-624c0037585d4ef5851b4125");
   });
 });
 
