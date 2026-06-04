@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 import { SlackThreadRootTimestampField } from "./normalized-event-fields.js";
 import {
   SlackWebhookHandler,
-  SlackWebhookMiddleware,
+  SlackWebhookMiddlewares,
   buildSlackWebhookSignature,
   verifySlackWebhookSignature,
 } from "./webhook.server.js";
@@ -157,7 +157,7 @@ describe("slack webhook handler", () => {
         rawBody: request.rawBody,
         signingSecret: "slack-signing-secret",
       }),
-      middleware: [SlackWebhookMiddleware],
+      middleware: SlackWebhookMiddlewares,
       next: async () => "core",
     });
 
@@ -184,10 +184,29 @@ describe("slack webhook handler", () => {
           rawBody: request.rawBody,
           signingSecret: "slack-signing-secret",
         }),
-        middleware: [SlackWebhookMiddleware],
+        middleware: SlackWebhookMiddlewares,
         next: async () => "core",
       }),
     ).rejects.toThrow(IntegrationWebhookError);
+  });
+
+  it("continues Slack event callbacks after parsing the webhook payload", async () => {
+    const rawBody = new TextEncoder().encode(JSON.stringify(createSlackMessagePayload()));
+
+    const resolved = await runIntegrationWebhookMiddleware({
+      context: createSlackMiddlewareContext({
+        headers: {},
+        rawBody,
+        signingSecret: "slack-signing-secret",
+      }),
+      middleware: SlackWebhookMiddlewares,
+      next: async () => "core",
+    });
+
+    expect(resolved).toEqual({
+      kind: "continued",
+      result: "core",
+    });
   });
 
   it("normalizes Slack message events", () => {

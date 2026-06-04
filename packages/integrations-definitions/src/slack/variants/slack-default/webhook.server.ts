@@ -22,6 +22,7 @@ const SlackTimestampHeaderName = "x-slack-request-timestamp";
 const SlackSignatureVersion = "v0";
 const SlackTimestampToleranceSeconds = 300;
 const SlackConversationsRepliesPath = "conversations.replies";
+const SlackWebhookPayloadStateKey = "slack.webhook.payload";
 
 type SlackWebhookConnectionSecrets = {
   botToken?: string;
@@ -49,6 +50,17 @@ function parseSlackJsonPayload(input: Uint8Array): Record<string, unknown> {
   }
 
   return Object.fromEntries(Object.entries(parsedPayload));
+}
+
+function resolveSlackWebhookPayloadState(
+  state: ReadonlyMap<string, unknown>,
+): Record<string, unknown> {
+  const payload = state.get(SlackWebhookPayloadStateKey);
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+    throw new Error("Slack webhook payload was not parsed before middleware handling.");
+  }
+
+  return cloneSlackRecord(payload);
 }
 
 function resolveSlackRequestType(payload: Record<string, unknown>): string {
@@ -522,8 +534,19 @@ function verifySlackMiddlewareRequestOrThrow(input: {
   }
 }
 
-export const SlackWebhookMiddleware: IntegrationWebhookMiddleware = async (context, next) => {
-  const rawPayload = parseSlackJsonPayload(context.request.rawBody);
+export const ParseSlackWebhookPayloadMiddleware: IntegrationWebhookMiddleware = async (
+  context,
+  next,
+) => {
+  context.state.set(SlackWebhookPayloadStateKey, parseSlackJsonPayload(context.request.rawBody));
+  await next();
+};
+
+export const HandleSlackUrlVerificationWebhookMiddleware: IntegrationWebhookMiddleware = async (
+  context,
+  next,
+) => {
+  const rawPayload = resolveSlackWebhookPayloadState(context.state);
   const requestType = resolveSlackRequestType(rawPayload);
   if (requestType !== "url_verification") {
     await next();
@@ -556,6 +579,11 @@ export const SlackWebhookMiddleware: IntegrationWebhookMiddleware = async (conte
     body: challenge.trim(),
   });
 };
+
+export const SlackWebhookMiddlewares = [
+  ParseSlackWebhookPayloadMiddleware,
+  HandleSlackUrlVerificationWebhookMiddleware,
+];
 
 export const SlackWebhookHandler: IntegrationWebhookHandler<
   SlackTargetConfig,

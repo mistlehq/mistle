@@ -78,6 +78,7 @@ export async function runIntegrationWebhookMiddleware<TResult>(input: {
 
   const context: IntegrationWebhookMiddlewareContext = {
     ...input.context,
+    state: new Map<string, unknown>(),
     respond(response) {
       if (continued) {
         throw new Error("Integration webhook middleware cannot respond after continuing.");

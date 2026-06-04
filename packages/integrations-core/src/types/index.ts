@@ -1685,6 +1685,7 @@ export type IntegrationWebhookMiddlewareContext<
   TConnectionConfig,
   TConnectionSecrets
 > & {
+  readonly state: Map<string, unknown>;
   respond(response: IntegrationWebhookImmediateResponse): void;
 };
 

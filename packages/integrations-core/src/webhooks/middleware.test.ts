@@ -97,6 +97,46 @@ describe("integration webhook middleware", () => {
     });
   });
 
+  it("shares request-local state across middleware without leaking across runs", async () => {
+    const firstResult = await runIntegrationWebhookMiddleware({
+      context: BaseContext,
+      middleware: [
+        async (context, next) => {
+          context.state.set("test.value", "parsed");
+          await next();
+        },
+        async (context, next) => {
+          if (context.state.get("test.value") !== "parsed") {
+            throw new Error("Expected middleware state to be visible to later middleware.");
+          }
+
+          await next();
+        },
+      ],
+      next: async (context) => context.state.get("test.value"),
+    });
+
+    const secondResult = await runIntegrationWebhookMiddleware({
+      context: BaseContext,
+      middleware: [
+        async (context, next) => {
+          await next();
+          context.state.set("test.value", "mutated after terminal handler");
+        },
+      ],
+      next: async (context) => context.state.has("test.value"),
+    });
+
+    expect(firstResult).toEqual({
+      kind: "continued",
+      result: "parsed",
+    });
+    expect(secondResult).toEqual({
+      kind: "continued",
+      result: false,
+    });
+  });
+
   it("rejects middleware that short-circuits without responding", async () => {
     await expect(
       runIntegrationWebhookMiddleware({
