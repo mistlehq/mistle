@@ -3,6 +3,7 @@ import type { z } from "zod";
 import type { AgentRuntimeRegistry } from "../agent-runtimes/index.js";
 import type { AgentPtyLaunchSpec } from "../agent-runtimes/types.js";
 import type { ConnectionCapabilitySet } from "../capabilities/index.js";
+import type { IntegrationMiddleware } from "../middleware/index.js";
 import type { IntegrationRegistry } from "../registry/index.js";
 
 export type IntegrationKind = "agent" | "git" | "connector" | "sandbox";
@@ -1571,6 +1572,15 @@ export type IntegrationWebhookRequestInput<
   rawBody: Uint8Array;
 };
 
+export type IntegrationWebhookRequestSnapshot = {
+  readonly targetKey: string;
+  readonly endpointKey: string;
+  readonly headers: IntegrationWebhookHeaders;
+  readonly rawBody: Uint8Array;
+  text(): string;
+  json(): unknown;
+};
+
 export type IntegrationWebhookEvent = {
   externalEventId: string;
   externalDeliveryId?: string;
@@ -1625,6 +1635,72 @@ export type IntegrationWebhookHandler<
     input: IntegrationWebhookEnrichEventInput<TTargetConfig, TTargetSecrets, TConnectionSecrets>,
   ): MaybePromise<IntegrationWebhookEvent>;
 };
+
+export type IntegrationWebhookMiddlewareTarget<
+  TTargetConfig = unknown,
+  TTargetSecrets = unknown,
+> = IntegrationResolvedTarget<TTargetConfig, TTargetSecrets> & {
+  targetKey: string;
+};
+
+export type IntegrationWebhookMiddlewareConnection<
+  TConnectionConfig = Record<string, unknown>,
+  TConnectionSecrets = Record<string, string>,
+> = Omit<IntegrationConnection, "config"> & {
+  config: TConnectionConfig;
+  secrets: TConnectionSecrets;
+};
+
+export type IntegrationWebhookMiddlewareSource = {
+  readonly id: string;
+  readonly endpointKey: string;
+  readonly providerMetadata: Record<string, unknown>;
+  readonly secrets: Record<string, string>;
+};
+
+export type IntegrationWebhookMiddlewareBaseContext<
+  TTargetConfig = unknown,
+  TTargetSecrets = unknown,
+  TConnectionConfig = Record<string, unknown>,
+  TConnectionSecrets = Record<string, string>,
+> = {
+  readonly request: IntegrationWebhookRequestSnapshot;
+  readonly organizationId: string;
+  readonly target: IntegrationWebhookMiddlewareTarget<TTargetConfig, TTargetSecrets>;
+  readonly connection: IntegrationWebhookMiddlewareConnection<
+    TConnectionConfig,
+    TConnectionSecrets
+  >;
+  readonly webhookSource: IntegrationWebhookMiddlewareSource;
+};
+
+export type IntegrationWebhookMiddlewareContext<
+  TTargetConfig = unknown,
+  TTargetSecrets = unknown,
+  TConnectionConfig = Record<string, unknown>,
+  TConnectionSecrets = Record<string, string>,
+> = IntegrationWebhookMiddlewareBaseContext<
+  TTargetConfig,
+  TTargetSecrets,
+  TConnectionConfig,
+  TConnectionSecrets
+> & {
+  respond(response: IntegrationWebhookImmediateResponse): void;
+};
+
+export type IntegrationWebhookMiddleware<
+  TTargetConfig = unknown,
+  TTargetSecrets = unknown,
+  TConnectionConfig = Record<string, unknown>,
+  TConnectionSecrets = Record<string, string>,
+> = IntegrationMiddleware<
+  IntegrationWebhookMiddlewareContext<
+    TTargetConfig,
+    TTargetSecrets,
+    TConnectionConfig,
+    TConnectionSecrets
+  >
+>;
 
 export type IntegrationConnectionEgressCredentialResolverRef = {
   kind: "integration_connection";
@@ -2478,6 +2554,13 @@ export type IntegrationDefinition<
     ParsedSchemaOutput<TTargetSecretsSchema>,
     Record<string, string>
   >;
+  /**
+   * Provider-specific middleware that can perform side effects or short-circuit
+   * before the deterministic webhook handler runs. Middleware cannot alter the
+   * canonical event/persistence path; returning without `next()` requires
+   * setting a provider-facing response.
+   */
+  webhookMiddleware?: ReadonlyArray<IntegrationWebhookMiddleware>;
   /**
    * Optional inbound webhook-source contract for integrations that need an
    * explicit source-of-truth record and, optionally, provider registration

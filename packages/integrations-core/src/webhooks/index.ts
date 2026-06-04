@@ -16,6 +16,8 @@ import type {
   IntegrationWebhookResolvedRequest,
 } from "../types/index.js";
 
+export * from "./middleware.js";
+
 export type NormalizeWebhookHeadersInput = Readonly<Record<string, string | string[] | undefined>>;
 
 function normalizeHeaderName(input: string): string {

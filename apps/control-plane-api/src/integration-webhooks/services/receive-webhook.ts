@@ -9,13 +9,17 @@ import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import {
   IntegrationWebhookError,
   WebhookErrorCodes,
+  createIntegrationWebhookRequestSnapshot,
   getWebhookHandlerOrThrow,
   normalizeWebhookHeaders,
+  runIntegrationWebhookMiddleware,
   verifyAndResolveWebhookRequestOrThrow,
 } from "@mistle/integrations-core";
 import type {
   IntegrationConnection,
   IntegrationWebhookImmediateResponse,
+  IntegrationWebhookMiddlewareBaseContext,
+  IntegrationWebhookRequestResolution,
 } from "@mistle/integrations-core";
 import { and, eq, isNull } from "drizzle-orm";
 
@@ -64,6 +68,14 @@ type ActiveWebhookConnection = {
   status: IntegrationConnection["status"];
   externalSubjectId: string | null;
   config: Record<string, unknown> | null;
+};
+
+type ResolvedWebhookSourceContext = {
+  activeConnections: ReadonlyArray<ActiveWebhookConnection>;
+  activeConnectionsById: ReadonlyMap<string, ActiveWebhookConnection>;
+  webhookConnections: ReadonlyArray<IntegrationConnection>;
+  webhookSource: IntegrationWebhookSource;
+  webhookSourceSecrets: Record<string, string>;
 };
 
 function toWebhookConnectionOrThrow(input: {
@@ -248,6 +260,129 @@ async function resolveConnectionOwnedWebhookSecrets(input: {
   });
 }
 
+async function resolveWebhookSourceContext(input: {
+  db: AppContext["var"]["db"];
+  integrationRegistry: AppContext["var"]["integrationRegistry"];
+  integrationsConfig: AppContext["var"]["config"]["integrations"];
+  targetKey: string;
+  endpointKey: string;
+}): Promise<ResolvedWebhookSourceContext> {
+  const webhookSource = await resolveWebhookSourceForPreVerificationOrThrow({
+    db: input.db,
+    targetKey: input.targetKey,
+    endpointKey: input.endpointKey,
+  });
+  const webhookSourceSecrets = await resolveWebhookSourceSecretOrThrow({
+    db: input.db,
+    source: webhookSource,
+    integrationsConfig: input.integrationsConfig,
+  });
+  const activeConnections = await input.db.query.integrationConnections.findMany({
+    where: (table, { and: whereAnd, eq: whereEq }) =>
+      whereAnd(
+        whereEq(table.targetKey, input.targetKey),
+        whereEq(table.id, webhookSource.integrationConnectionId),
+        whereEq(table.status, IntegrationConnectionStatuses.ACTIVE),
+      ),
+    columns: {
+      id: true,
+      organizationId: true,
+      status: true,
+      externalSubjectId: true,
+      config: true,
+    },
+  });
+  const activeConnectionsById: ReadonlyMap<string, ActiveWebhookConnection> = new Map(
+    activeConnections.map((connection) => [connection.id, connection]),
+  );
+  const webhookConnections: ReadonlyArray<IntegrationConnection> = activeConnections.map(
+    (connection) =>
+      toWebhookConnectionOrThrow({
+        targetKey: input.targetKey,
+        connection,
+      }),
+  );
+
+  return {
+    activeConnections,
+    activeConnectionsById,
+    webhookConnections,
+    webhookSource,
+    webhookSourceSecrets,
+  };
+}
+
+async function resolveConnectionSecretsForWebhookRequest(input: {
+  activeConnectionsById: ReadonlyMap<string, ActiveWebhookConnection>;
+  connectionId: string;
+  db: AppContext["var"]["db"];
+  integrationRegistry: AppContext["var"]["integrationRegistry"];
+  integrationsConfig: AppContext["var"]["config"]["integrations"];
+}): Promise<Record<string, string>> {
+  const activeConnection = input.activeConnectionsById.get(input.connectionId);
+  if (activeConnection === undefined) {
+    assertConnectionCandidateExistsOrThrow({
+      connectionId: input.connectionId,
+      connectionsById: input.activeConnectionsById,
+    });
+    throw new Error(`Expected active webhook connection '${input.connectionId}' to exist.`);
+  }
+
+  return resolveConnectionOwnedWebhookSecrets({
+    db: input.db,
+    integrationRegistry: input.integrationRegistry,
+    integrationsConfig: input.integrationsConfig,
+    organizationId: activeConnection.organizationId,
+    connectionId: input.connectionId,
+  });
+}
+
+async function createWebhookMiddlewareContext(input: {
+  activeConnection: ActiveWebhookConnection;
+  db: AppContext["var"]["db"];
+  endpointKey: string;
+  integrationRegistry: AppContext["var"]["integrationRegistry"];
+  integrationsConfig: AppContext["var"]["config"]["integrations"];
+  normalizedHeaders: Record<string, string>;
+  rawBody: Uint8Array;
+  resolvedSourceContext: ResolvedWebhookSourceContext;
+  resolvedTarget: IntegrationWebhookMiddlewareBaseContext["target"];
+  targetKey: string;
+}): Promise<IntegrationWebhookMiddlewareBaseContext> {
+  const connection = toWebhookConnectionOrThrow({
+    targetKey: input.targetKey,
+    connection: input.activeConnection,
+  });
+  const connectionSecrets = await resolveConnectionSecretsForWebhookRequest({
+    activeConnectionsById: input.resolvedSourceContext.activeConnectionsById,
+    connectionId: connection.id,
+    db: input.db,
+    integrationRegistry: input.integrationRegistry,
+    integrationsConfig: input.integrationsConfig,
+  });
+
+  return {
+    request: createIntegrationWebhookRequestSnapshot({
+      targetKey: input.targetKey,
+      endpointKey: input.endpointKey,
+      headers: input.normalizedHeaders,
+      rawBody: input.rawBody,
+    }),
+    organizationId: input.activeConnection.organizationId,
+    target: input.resolvedTarget,
+    connection: {
+      ...connection,
+      secrets: connectionSecrets,
+    },
+    webhookSource: {
+      id: input.resolvedSourceContext.webhookSource.id,
+      endpointKey: input.resolvedSourceContext.webhookSource.endpointKey,
+      providerMetadata: input.resolvedSourceContext.webhookSource.providerMetadata,
+      secrets: input.resolvedSourceContext.webhookSourceSecrets,
+    },
+  };
+}
+
 export async function receiveIntegrationWebhook(
   {
     db,
@@ -297,6 +432,7 @@ export async function receiveIntegrationWebhook(
 
   const normalizedHeaders = normalizeWebhookHeaders(input.headers);
   const resolvedTarget = {
+    targetKey: input.targetKey,
     familyId: target.familyId,
     variantId: target.variantId,
     enabled: target.enabled,
@@ -304,19 +440,75 @@ export async function receiveIntegrationWebhook(
     secrets: parsedTargetSecrets,
   };
   const webhookHandler = getWebhookHandlerOrThrow(definition);
-  const webhookRequest = await webhookHandler.resolveWebhookRequest({
-    targetKey: input.targetKey,
-    target: resolvedTarget,
-    headers: normalizedHeaders,
-    rawBody: input.rawBody,
-  });
+  const webhookMiddleware = definition.webhookMiddleware ?? [];
+  let resolvedSourceContext: ResolvedWebhookSourceContext | undefined;
+  let webhookRequest: IntegrationWebhookRequestResolution;
+
+  if (webhookMiddleware.length > 0) {
+    resolvedSourceContext = await resolveWebhookSourceContext({
+      db,
+      endpointKey: input.endpointKey,
+      integrationRegistry,
+      integrationsConfig,
+      targetKey: input.targetKey,
+    });
+    const sourceConnection = resolvedSourceContext.activeConnections[0];
+    if (sourceConnection === undefined) {
+      throw new NotFoundError(
+        IntegrationWebhooksNotFoundCodes.CONNECTION_NOT_FOUND,
+        `Active webhook connection '${resolvedSourceContext.webhookSource.integrationConnectionId}' was not found for target '${input.targetKey}'.`,
+      );
+    }
+
+    const middlewareContext = await createWebhookMiddlewareContext({
+      activeConnection: sourceConnection,
+      db,
+      endpointKey: input.endpointKey,
+      integrationRegistry,
+      integrationsConfig,
+      normalizedHeaders,
+      rawBody: input.rawBody,
+      resolvedSourceContext,
+      resolvedTarget,
+      targetKey: input.targetKey,
+    });
+    const middlewareResult = await runIntegrationWebhookMiddleware({
+      middleware: webhookMiddleware,
+      context: middlewareContext,
+      next: async () =>
+        webhookHandler.resolveWebhookRequest({
+          targetKey: input.targetKey,
+          target: resolvedTarget,
+          headers: normalizedHeaders,
+          rawBody: input.rawBody,
+        }),
+    });
+
+    if (middlewareResult.kind === "short-circuited") {
+      return {
+        kind: "response",
+        response: middlewareResult.response,
+      };
+    }
+
+    webhookRequest = middlewareResult.result;
+  } else {
+    webhookRequest = await webhookHandler.resolveWebhookRequest({
+      targetKey: input.targetKey,
+      target: resolvedTarget,
+      headers: normalizedHeaders,
+      rawBody: input.rawBody,
+    });
+  }
 
   if (webhookRequest.kind === "response" && webhookRequest.verification === "skip") {
-    await resolveWebhookSourceForPreVerificationOrThrow({
-      db,
-      targetKey: input.targetKey,
-      endpointKey: input.endpointKey,
-    });
+    if (webhookMiddleware.length === 0) {
+      await resolveWebhookSourceForPreVerificationOrThrow({
+        db,
+        targetKey: input.targetKey,
+        endpointKey: input.endpointKey,
+      });
+    }
 
     return {
       kind: "response",
@@ -324,41 +516,15 @@ export async function receiveIntegrationWebhook(
     };
   }
 
-  const webhookSource = await resolveWebhookSourceForPreVerificationOrThrow({
+  resolvedSourceContext ??= await resolveWebhookSourceContext({
     db,
-    targetKey: input.targetKey,
     endpointKey: input.endpointKey,
-  });
-  const webhookSourceSecrets = await resolveWebhookSourceSecretOrThrow({
-    db,
-    source: webhookSource,
+    integrationRegistry,
     integrationsConfig,
+    targetKey: input.targetKey,
   });
-  const activeConnections = await db.query.integrationConnections.findMany({
-    where: (table, { and, eq }) =>
-      and(
-        eq(table.targetKey, input.targetKey),
-        eq(table.id, webhookSource.integrationConnectionId),
-        eq(table.status, IntegrationConnectionStatuses.ACTIVE),
-      ),
-    columns: {
-      id: true,
-      organizationId: true,
-      status: true,
-      externalSubjectId: true,
-      config: true,
-    },
-  });
-  const activeConnectionsById: ReadonlyMap<string, ActiveWebhookConnection> = new Map(
-    activeConnections.map((connection) => [connection.id, connection]),
-  );
-  const webhookConnections: ReadonlyArray<IntegrationConnection> = activeConnections.map(
-    (connection) =>
-      toWebhookConnectionOrThrow({
-        targetKey: input.targetKey,
-        connection,
-      }),
-  );
+  const { activeConnectionsById, webhookConnections, webhookSource, webhookSourceSecrets } =
+    resolvedSourceContext;
 
   const resolvedWebhookRequest = await withIntegrationWebhookSpan(
     {
@@ -375,24 +541,14 @@ export async function receiveIntegrationWebhook(
           targetKey: input.targetKey,
           target: resolvedTarget,
           connections: webhookConnections,
-          resolveConnectionSecrets: async ({ connectionId }) => {
-            const activeConnection = activeConnectionsById.get(connectionId);
-            if (activeConnection === undefined) {
-              assertConnectionCandidateExistsOrThrow({
-                connectionId,
-                connectionsById: activeConnectionsById,
-              });
-              throw new Error(`Expected active webhook connection '${connectionId}' to exist.`);
-            }
-
-            return resolveConnectionOwnedWebhookSecrets({
+          resolveConnectionSecrets: ({ connectionId }) =>
+            resolveConnectionSecretsForWebhookRequest({
+              activeConnectionsById,
+              connectionId,
               db,
               integrationRegistry,
               integrationsConfig,
-              organizationId: activeConnection.organizationId,
-              connectionId,
-            });
-          },
+            }),
           webhookSourceSecrets,
           webhookRequest,
           headers: normalizedHeaders,
@@ -427,7 +583,10 @@ export async function receiveIntegrationWebhook(
   );
 
   if (resolvedWebhookRequest.kind === "response") {
-    return resolvedWebhookRequest;
+    return {
+      kind: "response",
+      response: resolvedWebhookRequest.response,
+    };
   }
 
   const resolvedConnection = activeConnectionsById.get(resolvedWebhookRequest.connectionId);
