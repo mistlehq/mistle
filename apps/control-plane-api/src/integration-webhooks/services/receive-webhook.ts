@@ -98,6 +98,17 @@ function toWebhookConnectionOrThrow(input: {
   };
 }
 
+function throwMappedWebhookError(error: IntegrationWebhookError): never {
+  if (error.code === WebhookErrorCodes.WEBHOOK_CONNECTION_NOT_FOUND) {
+    throw new NotFoundError(IntegrationWebhooksNotFoundCodes.CONNECTION_NOT_FOUND, error.message);
+  }
+
+  throw new BadRequestError(
+    IntegrationWebhooksBadRequestCodes.INVALID_WEBHOOK_REQUEST,
+    error.message,
+  );
+}
+
 function assertConnectionCandidateExistsOrThrow(input: {
   connectionId: string;
   connectionsById: ReadonlyMap<string, ActiveWebhookConnection>;
@@ -472,17 +483,43 @@ export async function receiveIntegrationWebhook(
       resolvedTarget,
       targetKey: input.targetKey,
     });
-    const middlewareResult = await runIntegrationWebhookMiddleware({
-      middleware: webhookMiddleware,
-      context: middlewareContext,
-      next: async () =>
-        webhookHandler.resolveWebhookRequest({
+    const middlewareResult = await withIntegrationWebhookSpan(
+      {
+        name: "integration_webhook.middleware",
+        telemetryContext: {
+          endpointKey: input.endpointKey,
           targetKey: input.targetKey,
-          target: resolvedTarget,
-          headers: normalizedHeaders,
-          rawBody: input.rawBody,
-        }),
-    });
+        },
+      },
+      async (span) => {
+        try {
+          const result = await runIntegrationWebhookMiddleware({
+            middleware: webhookMiddleware,
+            context: middlewareContext,
+            next: async () =>
+              webhookHandler.resolveWebhookRequest({
+                targetKey: input.targetKey,
+                target: resolvedTarget,
+                headers: normalizedHeaders,
+                rawBody: input.rawBody,
+              }),
+          });
+
+          span.addEvent("integration_webhook.middleware_succeeded");
+          return result;
+        } catch (error) {
+          span.addEvent("integration_webhook.middleware_failed", {
+            "mistle.error.message": error instanceof Error ? error.message : String(error),
+          });
+
+          if (error instanceof IntegrationWebhookError) {
+            throwMappedWebhookError(error);
+          }
+
+          throw error;
+        }
+      },
+    );
 
     if (middlewareResult.kind === "short-circuited") {
       return {
@@ -564,17 +601,7 @@ export async function receiveIntegrationWebhook(
         });
 
         if (error instanceof IntegrationWebhookError) {
-          if (error.code === WebhookErrorCodes.WEBHOOK_CONNECTION_NOT_FOUND) {
-            throw new NotFoundError(
-              IntegrationWebhooksNotFoundCodes.CONNECTION_NOT_FOUND,
-              error.message,
-            );
-          }
-
-          throw new BadRequestError(
-            IntegrationWebhooksBadRequestCodes.INVALID_WEBHOOK_REQUEST,
-            error.message,
-          );
+          throwMappedWebhookError(error);
         }
 
         throw error;

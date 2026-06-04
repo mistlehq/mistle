@@ -1,10 +1,17 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
+import {
+  createIntegrationWebhookRequestSnapshot,
+  IntegrationWebhookError,
+  runIntegrationWebhookMiddleware,
+  type IntegrationWebhookMiddlewareBaseContext,
+} from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import { SlackThreadRootTimestampField } from "./normalized-event-fields.js";
 import {
   SlackWebhookHandler,
+  SlackWebhookMiddleware,
   buildSlackWebhookSignature,
   verifySlackWebhookSignature,
 } from "./webhook.server.js";
@@ -71,45 +78,116 @@ function createSlackMessagePayload(): Record<string, unknown> {
   };
 }
 
-describe("slack webhook handler", () => {
-  it("resolves Slack URL verification requests as verified immediate responses", () => {
-    const payload = {
-      token: "verification-token",
-      challenge: "challenge-value",
-      type: "url_verification",
-    };
-    const rawBody = new TextEncoder().encode(JSON.stringify(payload));
-
-    const resolved = SlackWebhookHandler.resolveWebhookRequest({
+function createSlackMiddlewareContext(input: {
+  headers: Record<string, string>;
+  rawBody: Uint8Array;
+  signingSecret: string;
+}): IntegrationWebhookMiddlewareBaseContext {
+  return {
+    request: createIntegrationWebhookRequestSnapshot({
       targetKey: "slack-default",
-      target: {
-        familyId: "slack",
-        variantId: "slack-default",
-        enabled: true,
-        config: {
-          apiBaseUrl: "https://slack.com/api",
-        },
-        secrets: {},
+      endpointKey: "iws_slack",
+      headers: input.headers,
+      rawBody: input.rawBody,
+    }),
+    organizationId: "org_slack",
+    target: {
+      targetKey: "slack-default",
+      familyId: "slack",
+      variantId: "slack-default",
+      enabled: true,
+      config: {
+        apiBaseUrl: "https://slack.com/api",
       },
-      headers: {},
-      rawBody,
+      secrets: {},
+    },
+    connection: {
+      id: "icn_slack",
+      status: "active",
+      config: {},
+      secrets: {
+        signingSecret: input.signingSecret,
+      },
+    },
+    webhookSource: {
+      id: "iws_slack",
+      endpointKey: "iws_slack",
+      providerMetadata: {},
+      secrets: {},
+    },
+  };
+}
+
+function createSlackUrlVerificationRequest(input: { challenge: string; signingSecret: string }): {
+  headers: Record<string, string>;
+  rawBody: Uint8Array;
+} {
+  const rawBody = new TextEncoder().encode(
+    JSON.stringify({
+      token: "verification-token",
+      challenge: input.challenge,
+      type: "url_verification",
+    }),
+  );
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+
+  return {
+    headers: {
+      "x-slack-request-timestamp": timestamp,
+      "x-slack-signature": buildSlackWebhookSignature({
+        signingSecret: input.signingSecret,
+        timestamp,
+        rawBody,
+      }),
+    },
+    rawBody,
+  };
+}
+
+describe("slack webhook handler", () => {
+  it("short-circuits Slack URL verification requests after signature verification", async () => {
+    const request = createSlackUrlVerificationRequest({
+      challenge: "challenge-value",
+      signingSecret: "slack-signing-secret",
+    });
+
+    const resolved = await runIntegrationWebhookMiddleware({
+      context: createSlackMiddlewareContext({
+        headers: request.headers,
+        rawBody: request.rawBody,
+        signingSecret: "slack-signing-secret",
+      }),
+      middleware: [SlackWebhookMiddleware],
+      next: async () => "core",
     });
 
     expect(resolved).toEqual({
-      kind: "response",
-      verification: "required",
-      event: {
-        externalEventId: "url_verification:challenge-value",
-        providerEventType: "url_verification",
-        eventType: "slack:url_verification",
-        payload,
-      },
+      kind: "short-circuited",
       response: {
         status: 200,
         contentType: "text/plain",
         body: "challenge-value",
       },
     });
+  });
+
+  it("rejects Slack URL verification requests when signature verification fails", async () => {
+    const request = createSlackUrlVerificationRequest({
+      challenge: "challenge-value",
+      signingSecret: "wrong-signing-secret",
+    });
+
+    await expect(
+      runIntegrationWebhookMiddleware({
+        context: createSlackMiddlewareContext({
+          headers: request.headers,
+          rawBody: request.rawBody,
+          signingSecret: "slack-signing-secret",
+        }),
+        middleware: [SlackWebhookMiddleware],
+        next: async () => "core",
+      }),
+    ).rejects.toThrow(IntegrationWebhookError);
   });
 
   it("normalizes Slack message events", () => {

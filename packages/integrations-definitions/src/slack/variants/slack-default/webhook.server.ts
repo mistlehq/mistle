@@ -3,11 +3,14 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { buildUrlWithPath } from "@mistle/http";
 import {
   createIntegrationWebhookSourceOrderKey,
+  IntegrationWebhookError,
   type IntegrationConnection,
   type IntegrationWebhookEvent,
   type IntegrationWebhookHandler,
+  type IntegrationWebhookMiddleware,
   type IntegrationWebhookResolveConnectionResult,
   type IntegrationWebhookVerifyResult,
+  WebhookErrorCodes,
 } from "@mistle/integrations-core";
 
 import { SlackThreadRootTimestampField } from "./normalized-event-fields.js";
@@ -24,6 +27,8 @@ type SlackWebhookConnectionSecrets = {
   botToken?: string;
   signingSecret?: string;
 };
+
+type SlackWebhookVerifyFailureResult = Exclude<IntegrationWebhookVerifyResult, { ok: true }>;
 
 function cloneSlackRecord(input: object): Record<string, unknown> {
   return Object.fromEntries(Object.entries(input));
@@ -481,6 +486,77 @@ export function verifySlackWebhookSignature(input: {
   return { ok: true };
 }
 
+function throwSlackWebhookVerificationError(input: SlackWebhookVerifyFailureResult): never {
+  throw new IntegrationWebhookError(
+    WebhookErrorCodes.WEBHOOK_VERIFY_FAILED,
+    `Webhook verification failed (${input.code}): ${input.message}`,
+  );
+}
+
+function verifySlackMiddlewareRequestOrThrow(input: {
+  headers: Readonly<Record<string, string>>;
+  rawBody: Uint8Array;
+  signingSecret: string;
+}): void {
+  let timestamp: string;
+  let signature: string;
+  try {
+    timestamp = resolveSlackTimestampHeader(input.headers);
+    signature = resolveSlackSignatureHeader(input.headers);
+  } catch (error) {
+    throwSlackWebhookVerificationError({
+      ok: false,
+      code: "invalid-headers",
+      message: error instanceof Error ? error.message : "Slack headers are invalid.",
+    });
+  }
+
+  const verifyResult = verifySlackWebhookSignature({
+    signingSecret: input.signingSecret,
+    timestamp,
+    signature,
+    rawBody: input.rawBody,
+  });
+  if (!verifyResult.ok) {
+    throwSlackWebhookVerificationError(verifyResult);
+  }
+}
+
+export const SlackWebhookMiddleware: IntegrationWebhookMiddleware = async (context, next) => {
+  const rawPayload = parseSlackJsonPayload(context.request.rawBody);
+  const requestType = resolveSlackRequestType(rawPayload);
+  if (requestType !== "url_verification") {
+    await next();
+    return;
+  }
+
+  const signingSecret = context.connection.secrets.signingSecret;
+  if (typeof signingSecret !== "string" || signingSecret.length === 0) {
+    throwSlackWebhookVerificationError({
+      ok: false,
+      code: "invalid-signature",
+      message: "Slack signing secret is missing for the resolved connection.",
+    });
+  }
+
+  verifySlackMiddlewareRequestOrThrow({
+    headers: context.request.headers,
+    rawBody: context.request.rawBody,
+    signingSecret,
+  });
+
+  const challenge = rawPayload.challenge;
+  if (typeof challenge !== "string" || challenge.trim().length === 0) {
+    throw new Error("Slack URL verification payload is missing challenge.");
+  }
+
+  context.respond({
+    status: 200,
+    contentType: "text/plain",
+    body: challenge.trim(),
+  });
+};
+
 export const SlackWebhookHandler: IntegrationWebhookHandler<
   SlackTargetConfig,
   SlackTargetSecrets,
@@ -489,29 +565,6 @@ export const SlackWebhookHandler: IntegrationWebhookHandler<
   resolveWebhookRequest(input) {
     const rawPayload = parseSlackJsonPayload(input.rawBody);
     const requestType = resolveSlackRequestType(rawPayload);
-
-    if (requestType === "url_verification") {
-      const challenge = rawPayload.challenge;
-      if (typeof challenge !== "string" || challenge.trim().length === 0) {
-        throw new Error("Slack URL verification payload is missing challenge.");
-      }
-
-      return {
-        kind: "response",
-        verification: "required",
-        event: {
-          externalEventId: `url_verification:${challenge.trim()}`,
-          providerEventType: "url_verification",
-          eventType: "slack:url_verification",
-          payload: rawPayload,
-        },
-        response: {
-          status: 200,
-          contentType: "text/plain",
-          body: challenge.trim(),
-        },
-      };
-    }
 
     if (requestType !== "event_callback") {
       throw new Error(`Slack request type '${requestType}' is not supported.`);
