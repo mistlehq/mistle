@@ -1,3 +1,4 @@
+import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import {
   IntegrationDeviceAuthorizationAttemptStatuses,
   type ControlPlaneDatabase,
@@ -13,11 +14,15 @@ import {
   encryptDeviceAuthorizationProviderStateUtf8,
   resolveMasterEncryptionKeyMaterial,
 } from "../../lib/crypto.js";
+import { logger } from "../../logger.js";
 import {
   IntegrationConnectionsNotFoundCodes,
   IntegrationDeviceAuthorizationAttemptErrorCodes,
 } from "../constants.js";
-import { createManagedTokenConnection } from "./create-managed-token-connection.js";
+import {
+  createManagedTokenConnection,
+  reauthorizeManagedTokenConnection,
+} from "./create-managed-token-connection.js";
 import { calculatePollAfterMs, createPollAfterTimestamp } from "./device-authorization-timing.js";
 import { resolveDeviceAuthorizationCapabilityTargetOrThrow } from "./resolve-device-authorization-capability-target.js";
 
@@ -167,6 +172,10 @@ async function lockAttemptForUpdateOrThrow(input: {
 export async function getDeviceAuthorizationAttempt(
   ctx: {
     db: ControlPlaneDatabase;
+    dataPlaneClient?: Pick<
+      DataPlaneSandboxInstancesClient,
+      "invalidateIntegrationConnectionCredentialCache"
+    >;
     integrationRegistry: IntegrationRegistry;
     integrationsConfig: {
       activeMasterEncryptionKeyVersion: number;
@@ -465,7 +474,7 @@ export async function getDeviceAuthorizationAttempt(
     });
   }
 
-  return ctx.db.transaction(async (tx) => {
+  const completedAttempt = await ctx.db.transaction(async (tx) => {
     const tables = getControlPlaneDatabaseSchema(tx);
 
     const lockedAttempt = await lockAttemptForUpdateOrThrow({
@@ -503,43 +512,79 @@ export async function getDeviceAuthorizationAttempt(
       };
     }
 
-    const createdConnection = await createManagedTokenConnection(
-      {
-        tx,
-        integrationsConfig: ctx.integrationsConfig,
-      },
-      {
-        organizationId: input.organizationId,
-        targetKey: lockedAttempt.targetKey,
-        familyId: resolved.target.familyId,
-        variantId: resolved.target.variantId,
-        displayName:
-          lockedAttempt.displayName ?? pollResult.externalSubjectId ?? lockedAttempt.targetKey,
-        connectionMethodId: lockedAttempt.connectionMethodId,
-        connectionConfig: pollResult.connectionConfig,
-        targetSnapshotConfig: resolved.target.config,
-        accessToken: pollResult.accessToken,
-        ...(pollResult.accessTokenExpiresAt === undefined
-          ? {}
-          : { accessTokenExpiresAt: pollResult.accessTokenExpiresAt }),
-        refreshToken: pollResult.refreshToken,
-        ...(pollResult.refreshTokenExpiresAt === undefined
-          ? {}
-          : { refreshTokenExpiresAt: pollResult.refreshTokenExpiresAt }),
-        ...(pollResult.credentialMetadata === undefined
-          ? {}
-          : { credentialMetadata: pollResult.credentialMetadata }),
-        ...(pollResult.externalSubjectId === undefined
-          ? {}
-          : { externalSubjectId: pollResult.externalSubjectId }),
-      },
-    );
+    const reauthorizationConnectionId = lockedAttempt.connectionId;
+    const completedConnection =
+      reauthorizationConnectionId !== null
+        ? await reauthorizeManagedTokenConnection(
+            {
+              tx,
+              integrationsConfig: ctx.integrationsConfig,
+            },
+            {
+              organizationId: input.organizationId,
+              connectionId: reauthorizationConnectionId,
+              familyId: resolved.target.familyId,
+              variantId: resolved.target.variantId,
+              connectionConfig: {
+                ...pollResult.connectionConfig,
+                connection_method: lockedAttempt.connectionMethodId,
+              },
+              targetSnapshotConfig: resolved.target.config,
+              accessToken: pollResult.accessToken,
+              ...(pollResult.accessTokenExpiresAt === undefined
+                ? {}
+                : { accessTokenExpiresAt: pollResult.accessTokenExpiresAt }),
+              refreshToken: pollResult.refreshToken,
+              ...(pollResult.refreshTokenExpiresAt === undefined
+                ? {}
+                : { refreshTokenExpiresAt: pollResult.refreshTokenExpiresAt }),
+              ...(pollResult.credentialMetadata === undefined
+                ? {}
+                : { credentialMetadata: pollResult.credentialMetadata }),
+              ...(pollResult.externalSubjectId === undefined
+                ? {}
+                : { externalSubjectId: pollResult.externalSubjectId }),
+            },
+          )
+        : await createManagedTokenConnection(
+            {
+              tx,
+              integrationsConfig: ctx.integrationsConfig,
+            },
+            {
+              organizationId: input.organizationId,
+              targetKey: lockedAttempt.targetKey,
+              familyId: resolved.target.familyId,
+              variantId: resolved.target.variantId,
+              displayName:
+                lockedAttempt.displayName ??
+                pollResult.externalSubjectId ??
+                lockedAttempt.targetKey,
+              connectionMethodId: lockedAttempt.connectionMethodId,
+              connectionConfig: pollResult.connectionConfig,
+              targetSnapshotConfig: resolved.target.config,
+              accessToken: pollResult.accessToken,
+              ...(pollResult.accessTokenExpiresAt === undefined
+                ? {}
+                : { accessTokenExpiresAt: pollResult.accessTokenExpiresAt }),
+              refreshToken: pollResult.refreshToken,
+              ...(pollResult.refreshTokenExpiresAt === undefined
+                ? {}
+                : { refreshTokenExpiresAt: pollResult.refreshTokenExpiresAt }),
+              ...(pollResult.credentialMetadata === undefined
+                ? {}
+                : { credentialMetadata: pollResult.credentialMetadata }),
+              ...(pollResult.externalSubjectId === undefined
+                ? {}
+                : { externalSubjectId: pollResult.externalSubjectId }),
+            },
+          );
 
     const [updatedAttempt] = await tx
       .update(tables.integrationConnectionDeviceAuthorizationAttempts)
       .set({
         status: IntegrationDeviceAuthorizationAttemptStatuses.COMPLETED,
-        connectionId: createdConnection.id,
+        connectionId: completedConnection.id,
         completedAt: sql`now()`,
         updatedAt: sql`now()`,
       })
@@ -565,7 +610,29 @@ export async function getDeviceAuthorizationAttempt(
     return {
       attemptId: lockedAttempt.id,
       status: IntegrationDeviceAuthorizationAttemptStatuses.COMPLETED,
-      connectionId: createdConnection.id,
+      connectionId: completedConnection.id,
     };
   });
+
+  if (
+    attempt.connectionId !== null &&
+    completedAttempt.status === IntegrationDeviceAuthorizationAttemptStatuses.COMPLETED
+  ) {
+    await ctx.dataPlaneClient
+      ?.invalidateIntegrationConnectionCredentialCache({
+        connectionId: completedAttempt.connectionId,
+      })
+      .catch((error: unknown) => {
+        logger.warn(
+          {
+            err: error,
+            connectionId: completedAttempt.connectionId,
+            reason: "device_authorization_reauthorize",
+          },
+          "Failed to invalidate gateway credential cache",
+        );
+      });
+  }
+
+  return completedAttempt;
 }

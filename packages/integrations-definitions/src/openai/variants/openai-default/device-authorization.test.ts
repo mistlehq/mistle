@@ -6,6 +6,7 @@ import {
   parseJwtClaimsOrThrow,
   parseOpenAiRefreshResponse,
   parseOpenAiTokenExchangeResponse,
+  resolveOpenAiAccessTokenExpiresAt,
   resolveOpenAiDeviceAuthorizationCompletionFromTokens,
 } from "./device-authorization.js";
 
@@ -29,6 +30,51 @@ describe("OpenAI device authorization", () => {
       chatgpt_account_id: "acct_123",
       email: "user@example.com",
     });
+  });
+
+  it("resolves access-token expiry from expires_in before JWT claims", () => {
+    const accessToken = encodeJwt({
+      exp: 4_102_444_799,
+    });
+
+    expect(
+      resolveOpenAiAccessTokenExpiresAt({
+        accessToken,
+        expiresIn: 120,
+        nowMs: Date.parse("2026-06-05T12:00:00.000Z"),
+      }),
+    ).toBe("2026-06-05T12:02:00.000Z");
+  });
+
+  it("resolves access-token expiry from JWT exp when expires_in is missing", () => {
+    const accessToken = encodeJwt({
+      exp: 1_801_401_600,
+    });
+
+    expect(
+      resolveOpenAiAccessTokenExpiresAt({
+        accessToken,
+        nowMs: Date.parse("2026-06-05T12:00:00.000Z"),
+      }),
+    ).toBe("2027-01-31T13:20:00.000Z");
+  });
+
+  it("leaves access-token expiry unknown for opaque tokens and JWTs without exp", () => {
+    expect(
+      resolveOpenAiAccessTokenExpiresAt({
+        accessToken: "opaque-access-token",
+        nowMs: Date.parse("2026-06-05T12:00:00.000Z"),
+      }),
+    ).toBeUndefined();
+
+    expect(
+      resolveOpenAiAccessTokenExpiresAt({
+        accessToken: encodeJwt({
+          sub: "user_123",
+        }),
+        nowMs: Date.parse("2026-06-05T12:00:00.000Z"),
+      }),
+    ).toBeUndefined();
   });
 
   it("derives connection completion output from exchanged tokens", () => {

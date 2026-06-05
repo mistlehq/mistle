@@ -968,6 +968,7 @@ export type IntegrationDeviceAuthorizationConnectionMethodDefinition<
   ui: {
     create: IntegrationDeviceAuthorizationConnectionMethodCreateUi;
     pending?: IntegrationConnectionMethodPendingUi;
+    reauthorize?: IntegrationConnectionMethodReauthorizeUi;
   };
 };
 

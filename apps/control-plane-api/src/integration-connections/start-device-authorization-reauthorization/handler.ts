@@ -3,7 +3,7 @@ import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
-import { getDeviceAuthorizationAttempt } from "../services/get-device-authorization-attempt.js";
+import { startDeviceAuthorizationConnectionReauthorization } from "../services/start-device-authorization-connection.js";
 import { route } from "./route.js";
 
 const routeHandler = async (
@@ -11,26 +11,23 @@ const routeHandler = async (
   { session }: AppSession,
 ) => {
   const config = ctx.get("config");
-  const dataPlaneClient = ctx.get("dataPlaneClient");
   const db = ctx.get("db");
   const integrationRegistry = ctx.get("integrationRegistry");
-  const { attemptId, targetKey } = ctx.req.valid("param");
+  const { connectionId } = ctx.req.valid("param");
 
-  const attempt = await getDeviceAuthorizationAttempt(
+  const startedConnection = await startDeviceAuthorizationConnectionReauthorization(
     {
-      dataPlaneClient,
       db,
       integrationRegistry,
       integrationsConfig: config.integrations,
     },
     {
       organizationId: session.activeOrganizationId,
-      targetKey,
-      attemptId,
+      connectionId,
     },
   );
 
-  return ctx.json(attempt, 200);
+  return ctx.json(startedConnection, 200);
 };
 
 export const handler: RouteHandler<typeof route, AppContextBindings> = withHttpErrorHandler(

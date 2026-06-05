@@ -1,5 +1,6 @@
 import {
   IntegrationCredentialSecretKinds,
+  IntegrationDeviceAuthorizationAttemptStatuses,
   OrganizationIdentityLinkProviderConfigStatus,
   type ControlPlaneDatabase,
   getControlPlaneDatabaseSchema,
@@ -471,6 +472,30 @@ export async function deleteIntegrationConnection(
           ),
         );
     }
+
+    await tx
+      .update(tables.integrationConnectionDeviceAuthorizationAttempts)
+      .set({
+        status: IntegrationDeviceAuthorizationAttemptStatuses.CANCELLED,
+        cancelledAt: sql`now()`,
+        updatedAt: sql`now()`,
+      })
+      .where(
+        and(
+          eq(
+            tables.integrationConnectionDeviceAuthorizationAttempts.organizationId,
+            input.organizationId,
+          ),
+          eq(
+            tables.integrationConnectionDeviceAuthorizationAttempts.connectionId,
+            input.connectionId,
+          ),
+          eq(
+            tables.integrationConnectionDeviceAuthorizationAttempts.status,
+            IntegrationDeviceAuthorizationAttemptStatuses.PENDING,
+          ),
+        ),
+      );
 
     const linkedCredentials = await tx
       .select({

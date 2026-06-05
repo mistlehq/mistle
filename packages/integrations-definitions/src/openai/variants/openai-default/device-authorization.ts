@@ -132,6 +132,36 @@ function resolveIsoTimestampFromExpiresIn(input: {
   return new Date(input.nowMs + expiresInSeconds * 1_000).toISOString();
 }
 
+export function resolveOpenAiAccessTokenExpiresAt(input: {
+  accessToken: string;
+  expiresIn?: string | number;
+  nowMs: number;
+}): string | undefined {
+  if (input.expiresIn !== undefined) {
+    return resolveIsoTimestampFromExpiresIn({
+      expiresIn: input.expiresIn,
+      nowMs: input.nowMs,
+    });
+  }
+
+  let claims: OpenAiJwtClaims;
+  try {
+    claims = parseJwtClaimsOrThrow(input.accessToken);
+  } catch {
+    return undefined;
+  }
+
+  const expiresAtSeconds = claims["exp"];
+  if (typeof expiresAtSeconds !== "number" || !Number.isInteger(expiresAtSeconds)) {
+    return undefined;
+  }
+  if (expiresAtSeconds <= 0) {
+    return undefined;
+  }
+
+  return new Date(expiresAtSeconds * 1_000).toISOString();
+}
+
 type OpenAiRefreshFailure = {
   classification: IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassification;
   message: string;
@@ -330,13 +360,11 @@ function resolveOpenAiRefreshResult(input: {
     input.response.id_token === undefined
       ? undefined
       : parseJwtClaimsOrThrow(input.response.id_token);
-  const accessTokenExpiresAt =
-    input.response.expires_in === undefined
-      ? undefined
-      : resolveIsoTimestampFromExpiresIn({
-          expiresIn: input.response.expires_in,
-          nowMs: Date.now(),
-        });
+  const accessTokenExpiresAt = resolveOpenAiAccessTokenExpiresAt({
+    accessToken: input.response.access_token,
+    ...(input.response.expires_in === undefined ? {} : { expiresIn: input.response.expires_in }),
+    nowMs: Date.now(),
+  });
   const refreshToken = input.response.refresh_token;
   const accountMetadata =
     idTokenClaims === undefined ? {} : resolveOpenAiAccountMetadataFromClaims(idTokenClaims);
@@ -549,19 +577,17 @@ async function pollOpenAiDeviceAuthorization(
     authorizationCode: authorizationCodeGrant.authorization_code,
     codeVerifier: authorizationCodeGrant.code_verifier,
   });
+  const accessTokenExpiresAt = resolveOpenAiAccessTokenExpiresAt({
+    accessToken: tokens.accessToken,
+    ...(tokens.expiresIn === undefined ? {} : { expiresIn: tokens.expiresIn }),
+    nowMs: Date.now(),
+  });
 
   return resolveOpenAiDeviceAuthorizationCompletionFromTokens({
     idToken: tokens.idToken,
     accessToken: tokens.accessToken,
     refreshToken: tokens.refreshToken,
-    ...(tokens.expiresIn === undefined
-      ? {}
-      : {
-          accessTokenExpiresAt: resolveIsoTimestampFromExpiresIn({
-            expiresIn: tokens.expiresIn,
-            nowMs: Date.now(),
-          }),
-        }),
+    ...(accessTokenExpiresAt === undefined ? {} : { accessTokenExpiresAt }),
   });
 }
 

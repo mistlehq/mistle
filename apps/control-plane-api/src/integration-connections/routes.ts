@@ -20,6 +20,7 @@ import * as refreshIntegrationConnectionResources from "./refresh-integration-co
 import * as refreshWebhookTriggerCapabilities from "./refresh-webhook-trigger-capabilities/index.js";
 import * as selectProviderAppSetupInstallation from "./select-provider-app-setup-installation/index.js";
 import * as startDeviceAuthorizationConnection from "./start-device-authorization-connection/index.js";
+import * as startDeviceAuthorizationReauthorization from "./start-device-authorization-reauthorization/index.js";
 import * as startOAuth2AuthorizationCodeConnection from "./start-oauth2-authorization-code-connection/index.js";
 import * as startOAuth2AuthorizationCodeReauthorization from "./start-oauth2-authorization-code-reauthorization/index.js";
 import * as startProviderAppSetup from "./start-provider-app-setup/index.js";
@@ -126,6 +127,11 @@ export function createIntegrationConnectionsRoutes(): AppRoutes<
   routes.openapi(
     startDeviceAuthorizationConnection.route,
     startDeviceAuthorizationConnection.handler,
+  );
+  routes.use(startDeviceAuthorizationReauthorization.route.path, requireAuthSession);
+  routes.openapi(
+    startDeviceAuthorizationReauthorization.route,
+    startDeviceAuthorizationReauthorization.handler,
   );
 
   routes.on(

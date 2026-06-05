@@ -157,7 +157,8 @@ function resolveAuthMethodOrThrow(input: StoryAuthMethodSpec): StoryResolvedAuth
     authMethodLabel: method.label,
     definition,
     normalizedMethod: normalizeStoryConnectionMethod(method),
-    ...(method.kind === "redirect" && method.ui.reauthorize !== undefined
+    ...((method.kind === "redirect" || method.kind === "device-authorization") &&
+    method.ui.reauthorize !== undefined
       ? { reauthorizeUi: method.ui.reauthorize }
       : {}),
     secretLabels:
@@ -1242,6 +1243,24 @@ export function createOpenAiDetailViewStoryProps(): IntegrationConnectionDetailV
     },
     connectionId: "icn_openai_dense",
     displayName: "OpenAI Production",
+  });
+}
+
+export function createOpenAiChatGptDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  return createScenarioDetailViewStoryProps({
+    authMethod: {
+      familyId: "openai",
+      methodId: "chatgpt-device-code",
+      variantId: "openai-default",
+    },
+    connectionConfig: {
+      auth_mode: "chatgpt",
+      chatgpt_account_id: "acct_chatgpt_story",
+      chatgpt_plan_type: "pro",
+      connection_method: "chatgpt-device-code",
+    },
+    connectionId: "icn_openai_chatgpt_dense",
+    displayName: "ChatGPT Subscription",
   });
 }
 

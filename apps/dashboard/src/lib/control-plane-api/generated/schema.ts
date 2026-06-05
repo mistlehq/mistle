@@ -1537,6 +1537,126 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/integration/connections/:connectionId/device-authorization/reauthorize/start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          connectionId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Start a device authorization reauthorization attempt for an integration connection. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              attemptId: string;
+              expiresAt?: string;
+              pollAfterMs?: number;
+              /** @enum {string} */
+              status: "pending";
+              userCode: string;
+              /** Format: uri */
+              verificationUrl: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_DEVICE_AUTH_START_INPUT"
+                    | "DEVICE_AUTH_NOT_SUPPORTED"
+                    | "DEVICE_AUTH_CAPABILITY_NOT_CONFIGURED";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration connection or target was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "CONNECTION_NOT_FOUND" | "TARGET_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration connection cannot be reauthorized. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "CONNECTION_USED_BY_IDENTITY_LINKING";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/integration/connections/:connectionId/form": {
     parameters: {
       query?: never;
@@ -4138,6 +4258,10 @@ export interface paths {
                         pending?: {
                           description?: string;
                           title?: string;
+                        };
+                        reauthorize?: {
+                          actionLabel: string;
+                          pendingLabel: string;
                         };
                       };
                     }

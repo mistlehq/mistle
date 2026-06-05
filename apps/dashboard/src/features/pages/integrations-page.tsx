@@ -340,6 +340,19 @@ export function IntegrationsPage() {
             return;
           }
 
+          const editingMethod =
+            selectedDetailConnectionMethods?.find(
+              (method) => method.id === editingConnection.connectionMethodId,
+            ) ?? null;
+          if (editingMethod?.kind === "device-authorization") {
+            const nextSearchParams = new URLSearchParams(location.search);
+            nextSearchParams.set("reauthorize", "device");
+            void navigate(
+              `/integrations/${detailTargetKey}/${connectionId}/edit?${nextSearchParams.toString()}`,
+            );
+            return;
+          }
+
           void navigate(`/integrations/${detailTargetKey}/${connectionId}/edit${location.search}`);
         }}
         onStartProviderAppSetup={connectionEditors.providerAppSetup.onStartInstallation}

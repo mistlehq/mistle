@@ -20,4 +20,7 @@ export type OpenIntegrationConnectionEditorInput =
       configuredSecretNames?: readonly string[];
       currentMethod: IntegrationConnectionMethod;
       mode: "update";
+      reauthorization?: {
+        kind: "device-authorization";
+      };
     });

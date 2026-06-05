@@ -303,6 +303,31 @@ export async function startDeviceAuthorizationIntegrationConnection(input: {
   }
 }
 
+export async function startDeviceAuthorizationIntegrationConnectionReauthorization(input: {
+  connectionId: string;
+}): Promise<StartedDeviceAuthorizationConnection> {
+  try {
+    const response = await requestControlPlane({
+      operation: "startDeviceAuthorizationIntegrationConnectionReauthorization",
+      method: "POST",
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/device-authorization/reauthorize/start`,
+      fallbackMessage: "Could not start integration connection reauthorization.",
+    });
+
+    return readJsonWithSchema({
+      response,
+      schema: StartedDeviceAuthorizationConnectionSchema,
+      operation: "startDeviceAuthorizationIntegrationConnectionReauthorization",
+    });
+  } catch (error) {
+    throw wrapIntegrationsApiError({
+      operation: "startDeviceAuthorizationIntegrationConnectionReauthorization",
+      error,
+      fallbackMessage: "Could not start integration connection reauthorization.",
+    });
+  }
+}
+
 export async function getDeviceAuthorizationAttempt(input: {
   targetKey: string;
   attemptId: string;

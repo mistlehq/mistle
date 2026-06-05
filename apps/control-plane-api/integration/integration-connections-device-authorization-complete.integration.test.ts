@@ -16,7 +16,12 @@ import { describe, expect } from "vitest";
 
 import { GetDeviceAuthorizationAttemptResponseSchema } from "../src/integration-connections/get-device-authorization-attempt/schema.js";
 import { StartDeviceAuthorizationConnectionResponseSchema } from "../src/integration-connections/start-device-authorization-connection/schema.js";
-import { expectCredentialSlots, seedIntegrationTarget } from "./helpers/integration-connections.js";
+import {
+  expectCredentialSlots,
+  readCredentialIds,
+  seedConnectionCredential,
+  seedIntegrationTarget,
+} from "./helpers/integration-connections.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api"],
@@ -147,6 +152,282 @@ describe.concurrent("integration connections device authorization complete integ
           },
         ],
       });
+    } finally {
+      await simulatedOpenAi.stop();
+    }
+  });
+
+  it("completes a ChatGPT device reauthorization attempt and updates the existing connection", async ({
+    env,
+  }) => {
+    const simulatedOpenAi = await startSimulatedOpenAiDeviceAuthorizationServer();
+    const targetKey = "openai-default-device-auth-reauthorize";
+    const connectionId = "icn_device_auth_reauthorize";
+    const session = await env.auth.createSession({
+      email: "integration-device-auth-reauthorize@example.com",
+    });
+    const slotKeys = createOAuth2AuthorizationCodeCredentialSlotKeys({
+      familyId: "openai",
+      variantId: "openai-default",
+    });
+
+    try {
+      await seedIntegrationTarget(env, {
+        targetKey,
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.openai.com/v1",
+          auth_base_url: simulatedOpenAi.baseUrl,
+        },
+      });
+      await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
+        id: connectionId,
+        organizationId: session.organizationId,
+        targetKey,
+        displayName: "OpenAI Personal",
+        externalSubjectId: "stale-chatgpt-user@example.com",
+        status: IntegrationConnectionStatuses.ERROR,
+        config: {
+          connection_method: "chatgpt-device-code",
+          auth_mode: "chatgpt",
+          chatgpt_account_id: "acct_stale",
+          chatgpt_plan_type: "pro",
+        },
+        targetSnapshotConfig: {
+          api_base_url: "https://api.openai.com/v1",
+          auth_base_url: simulatedOpenAi.baseUrl,
+        },
+      });
+      await seedConnectionCredential({
+        env,
+        organizationId: session.organizationId,
+        connectionId,
+        slotKey: slotKeys.accessToken,
+        secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+        intendedFamilyId: "openai",
+        plaintext: "stale-openai-access-token",
+      });
+      await seedConnectionCredential({
+        env,
+        organizationId: session.organizationId,
+        connectionId,
+        slotKey: slotKeys.refreshToken,
+        secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
+        intendedFamilyId: "openai",
+        plaintext: "stale-openai-refresh-token",
+      });
+      const previousCredentialIds = await readCredentialIds({
+        env,
+        connectionId,
+      });
+
+      const startResponse = await env.controlPlaneApi.http.fetch(
+        `/v1/integration/connections/${connectionId}/device-authorization/reauthorize/start`,
+        {
+          method: "POST",
+          headers: {
+            cookie: session.cookie,
+          },
+        },
+      );
+      expect(startResponse.status).toBe(200);
+      const startedAttempt = StartDeviceAuthorizationConnectionResponseSchema.parse(
+        await startResponse.json(),
+      );
+
+      const persistedPendingAttempt =
+        await env.controlPlaneDb.query.integrationConnectionDeviceAuthorizationAttempts.findFirst({
+          where: (table, { eq }) => eq(table.id, startedAttempt.attemptId),
+        });
+      expect(persistedPendingAttempt?.connectionId).toBe(connectionId);
+
+      await env.controlPlaneDb
+        .update(env.controlPlaneTables.integrationConnectionDeviceAuthorizationAttempts)
+        .set({
+          pollAfterAt: "2026-04-01T00:00:00.000Z",
+        })
+        .where(
+          eq(
+            env.controlPlaneTables.integrationConnectionDeviceAuthorizationAttempts.id,
+            startedAttempt.attemptId,
+          ),
+        );
+
+      const completeResponse = await env.controlPlaneApi.http.fetch(
+        `/v1/integration/connections/${targetKey}/device-authorization/attempts/${startedAttempt.attemptId}`,
+        {
+          headers: {
+            cookie: session.cookie,
+          },
+        },
+      );
+      expect(completeResponse.status).toBe(200);
+      const completedAttempt = GetDeviceAuthorizationAttemptResponseSchema.parse(
+        await completeResponse.json(),
+      );
+      expect(completedAttempt).toEqual({
+        attemptId: startedAttempt.attemptId,
+        status: "completed",
+        connectionId,
+      });
+
+      const connections = await env.controlPlaneDb.query.integrationConnections.findMany({
+        where: (table, { eq }) => eq(table.targetKey, targetKey),
+      });
+      expect(connections).toHaveLength(1);
+      expect(connections[0]).toMatchObject({
+        id: connectionId,
+        organizationId: session.organizationId,
+        targetKey,
+        displayName: "OpenAI Personal",
+        externalSubjectId: "chatgpt-user@example.com",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: "chatgpt-device-code",
+          auth_mode: "chatgpt",
+          chatgpt_account_id: "acct_integration_new",
+          chatgpt_plan_type: "pro",
+        },
+      });
+
+      await expectCredentialSlots({
+        env,
+        connectionId,
+        organizationId: session.organizationId,
+        previousCredentialIds,
+        expected: [
+          {
+            slotKey: slotKeys.accessToken,
+            secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+            plaintext: "simulated-openai-access-token",
+          },
+          {
+            slotKey: slotKeys.refreshToken,
+            secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
+            plaintext: "simulated-openai-refresh-token",
+          },
+        ],
+      });
+
+      const previousCredentials = await env.controlPlaneDb.query.integrationCredentials.findMany({
+        where: (table, { inArray }) => inArray(table.id, previousCredentialIds),
+      });
+      expect(previousCredentials.map((credential) => credential.revokedAt === null)).toEqual([
+        false,
+        false,
+      ]);
+    } finally {
+      await simulatedOpenAi.stop();
+    }
+  });
+
+  it("cancels a pending ChatGPT device reauthorization attempt when deleting the connection", async ({
+    env,
+  }) => {
+    const simulatedOpenAi = await startSimulatedOpenAiDeviceAuthorizationServer();
+    const targetKey = "openai-default-device-auth-reauthorize-delete";
+    const connectionId = "icn_device_auth_reauthorize_delete";
+    const session = await env.auth.createSession({
+      email: "integration-device-auth-reauthorize-delete@example.com",
+    });
+    const slotKeys = createOAuth2AuthorizationCodeCredentialSlotKeys({
+      familyId: "openai",
+      variantId: "openai-default",
+    });
+
+    try {
+      await seedIntegrationTarget(env, {
+        targetKey,
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.openai.com/v1",
+          auth_base_url: simulatedOpenAi.baseUrl,
+        },
+      });
+      await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
+        id: connectionId,
+        organizationId: session.organizationId,
+        targetKey,
+        displayName: "OpenAI Personal",
+        externalSubjectId: "stale-chatgpt-user@example.com",
+        status: IntegrationConnectionStatuses.ERROR,
+        config: {
+          connection_method: "chatgpt-device-code",
+          auth_mode: "chatgpt",
+          chatgpt_account_id: "acct_stale",
+          chatgpt_plan_type: "pro",
+        },
+        targetSnapshotConfig: {
+          api_base_url: "https://api.openai.com/v1",
+          auth_base_url: simulatedOpenAi.baseUrl,
+        },
+      });
+      await seedConnectionCredential({
+        env,
+        organizationId: session.organizationId,
+        connectionId,
+        slotKey: slotKeys.accessToken,
+        secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+        intendedFamilyId: "openai",
+        plaintext: "stale-openai-access-token",
+      });
+      await seedConnectionCredential({
+        env,
+        organizationId: session.organizationId,
+        connectionId,
+        slotKey: slotKeys.refreshToken,
+        secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
+        intendedFamilyId: "openai",
+        plaintext: "stale-openai-refresh-token",
+      });
+
+      const startResponse = await env.controlPlaneApi.http.fetch(
+        `/v1/integration/connections/${connectionId}/device-authorization/reauthorize/start`,
+        {
+          method: "POST",
+          headers: {
+            cookie: session.cookie,
+          },
+        },
+      );
+      expect(startResponse.status).toBe(200);
+      const startedAttempt = StartDeviceAuthorizationConnectionResponseSchema.parse(
+        await startResponse.json(),
+      );
+
+      const deleteResponse = await env.controlPlaneApi.http.fetch(
+        `/v1/integration/connections/${connectionId}`,
+        {
+          method: "DELETE",
+          headers: {
+            cookie: session.cookie,
+          },
+        },
+      );
+      expect(deleteResponse.status).toBe(200);
+
+      const attemptResponse = await env.controlPlaneApi.http.fetch(
+        `/v1/integration/connections/${targetKey}/device-authorization/attempts/${startedAttempt.attemptId}`,
+        {
+          headers: {
+            cookie: session.cookie,
+          },
+        },
+      );
+      expect(attemptResponse.status).toBe(200);
+      await expect(attemptResponse.json()).resolves.toEqual({
+        attemptId: startedAttempt.attemptId,
+        status: IntegrationDeviceAuthorizationAttemptStatuses.CANCELLED,
+      });
+
+      const recreatedConnection = await env.controlPlaneDb.query.integrationConnections.findFirst({
+        where: (table, { eq }) => eq(table.id, connectionId),
+      });
+      expect(recreatedConnection).toBeUndefined();
     } finally {
       await simulatedOpenAi.stop();
     }

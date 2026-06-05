@@ -1,7 +1,7 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { systemScheduler, type Scheduler, type TimerHandle } from "@mistle/time";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import type {
@@ -15,6 +15,7 @@ import type {
   IntegrationConnectionMethod,
   IntegrationManagedWebhookSourcePostCreate,
   ManagedWebhookSetupResult,
+  StartedDeviceAuthorizationConnection,
 } from "../integrations/integrations-service-shared.js";
 import {
   cancelDeviceAuthorizationAttempt,
@@ -22,6 +23,7 @@ import {
   createFormIntegrationConnection,
   getDeviceAuthorizationAttempt,
   startDeviceAuthorizationIntegrationConnection,
+  startDeviceAuthorizationIntegrationConnectionReauthorization,
   startRedirectIntegrationConnection,
   updateFormIntegrationConnection,
   updateIntegrationConnection,
@@ -82,6 +84,47 @@ function resolveEditableConfigValue(input: {
 
 const DeviceAuthorizationPollFloorMs = 2_000;
 
+export type DeviceReauthorizationStartRequest = {
+  connectionId: string;
+  consumed: boolean;
+  request: Promise<StartedDeviceAuthorizationConnection>;
+};
+
+export function resolveDeviceReauthorizationStartRequest(input: {
+  connectionId: string;
+  currentRequest: DeviceReauthorizationStartRequest | null;
+  startRequest: () => Promise<StartedDeviceAuthorizationConnection>;
+}): DeviceReauthorizationStartRequest | null {
+  if (input.currentRequest?.connectionId === input.connectionId) {
+    return input.currentRequest.consumed ? null : input.currentRequest;
+  }
+
+  return {
+    connectionId: input.connectionId,
+    consumed: false,
+    request: input.startRequest(),
+  };
+}
+
+export function consumeDeviceReauthorizationStartRequest(input: {
+  connectionId: string;
+  currentRequest: DeviceReauthorizationStartRequest | null;
+  request: Promise<StartedDeviceAuthorizationConnection>;
+}): DeviceReauthorizationStartRequest | null {
+  if (
+    input.currentRequest?.connectionId !== input.connectionId ||
+    input.currentRequest.request !== input.request
+  ) {
+    return input.currentRequest;
+  }
+
+  return {
+    connectionId: input.connectionId,
+    consumed: true,
+    request: input.request,
+  };
+}
+
 export function useIntegrationConnectionEditorState(
   input: UseIntegrationConnectionEditorStateInput,
 ) {
@@ -98,6 +141,9 @@ export function useIntegrationConnectionEditorState(
   const [deviceAuthorizationPending, setDeviceAuthorizationPending] =
     useState<IntegrationConnectionDeviceAuthorizationPendingState | null>(null);
   const [draft, setDraft] = useState(() => initialState.draft);
+  const deviceReauthorizationStartRequestRef = useRef<DeviceReauthorizationStartRequest | null>(
+    null,
+  );
 
   const createFormMutation = useMutation({
     mutationFn: async (mutationInput: {
@@ -133,6 +179,16 @@ export function useIntegrationConnectionEditorState(
     }) => startDeviceAuthorizationIntegrationConnection(mutationInput),
   });
 
+  const startDeviceAuthorizationReauthorizationMutation = useMutation({
+    mutationFn: async (mutationInput: { connectionId: string }) =>
+      startDeviceAuthorizationIntegrationConnectionReauthorization(mutationInput),
+  });
+  const startDeviceAuthorizationReauthorizationRef = useRef(
+    startDeviceAuthorizationReauthorizationMutation.mutateAsync,
+  );
+  startDeviceAuthorizationReauthorizationRef.current =
+    startDeviceAuthorizationReauthorizationMutation.mutateAsync;
+
   const cancelDeviceAuthorizationMutation = useMutation({
     mutationFn: async (mutationInput: { targetKey: string; attemptId: string }) =>
       cancelDeviceAuthorizationAttempt(mutationInput),
@@ -165,6 +221,7 @@ export function useIntegrationConnectionEditorState(
     createFormMutation.isPending ||
     createDraftFormMutation.isPending ||
     startDeviceAuthorizationMutation.isPending ||
+    startDeviceAuthorizationReauthorizationMutation.isPending ||
     startRedirectMutation.isPending ||
     updateConnectionMutation.isPending ||
     updateFormMutation.isPending;
@@ -301,6 +358,104 @@ export function useIntegrationConnectionEditorState(
       scheduler.cancel(timer);
     };
   }, [deviceAuthorizationPending, editor, input.queryKey, queryClient, scheduler]);
+
+  const deviceReauthorizationConnectionId =
+    editor.mode === "update" && editor.reauthorization?.kind === "device-authorization"
+      ? editor.connectionId
+      : undefined;
+
+  useEffect(() => {
+    if (deviceReauthorizationConnectionId === undefined || deviceAuthorizationPending !== null) {
+      return;
+    }
+
+    const selectedMethod = resolveSelectedConnectionMethod({
+      editor,
+      methodId: draft.methodId,
+    });
+    if (!isDeviceAuthorizationMethod(selectedMethod)) {
+      setDraft((currentDraft) => ({
+        ...currentDraft,
+        error: "This connection does not support device authorization reauthorization.",
+      }));
+      return;
+    }
+
+    const connectionId = deviceReauthorizationConnectionId;
+    const targetKey = editor.targetKey;
+    let active = true;
+    const startRequestState = resolveDeviceReauthorizationStartRequest({
+      connectionId,
+      currentRequest: deviceReauthorizationStartRequestRef.current,
+      startRequest: () =>
+        startDeviceAuthorizationReauthorizationRef.current({
+          connectionId,
+        }),
+    });
+    if (startRequestState === null) {
+      return;
+    }
+
+    deviceReauthorizationStartRequestRef.current = startRequestState;
+    const startRequest = startRequestState.request;
+
+    void startRequest
+      .then((started) => {
+        if (
+          !active ||
+          deviceReauthorizationStartRequestRef.current?.connectionId !== connectionId ||
+          deviceReauthorizationStartRequestRef.current.request !== startRequest
+        ) {
+          return;
+        }
+
+        deviceReauthorizationStartRequestRef.current = consumeDeviceReauthorizationStartRequest({
+          connectionId,
+          currentRequest: deviceReauthorizationStartRequestRef.current,
+          request: startRequest,
+        });
+        setDeviceAuthorizationPending({
+          targetKey,
+          attemptId: started.attemptId,
+          verificationUrl: started.verificationUrl,
+          userCode: started.userCode,
+          method: selectedMethod,
+          ...(started.pollAfterMs === undefined ? {} : { pollAfterMs: started.pollAfterMs }),
+          ...(started.expiresAt === undefined ? {} : { expiresAt: started.expiresAt }),
+        });
+      })
+      .catch((startError: unknown) => {
+        if (
+          !active ||
+          deviceReauthorizationStartRequestRef.current?.connectionId !== connectionId ||
+          deviceReauthorizationStartRequestRef.current.request !== startRequest
+        ) {
+          return;
+        }
+
+        deviceReauthorizationStartRequestRef.current = consumeDeviceReauthorizationStartRequest({
+          connectionId,
+          currentRequest: deviceReauthorizationStartRequestRef.current,
+          request: startRequest,
+        });
+        setDraft((currentDraft) => ({
+          ...currentDraft,
+          error: resolveApiErrorMessage({
+            error: startError,
+            fallbackMessage: "Could not start connection reauthorization.",
+          }),
+        }));
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [
+    deviceAuthorizationPending,
+    deviceReauthorizationConnectionId,
+    draft.methodId,
+    editor.targetKey,
+  ]);
 
   async function runSubmit(): Promise<void> {
     const validationError = resolveIntegrationConnectionEditorValidationError({

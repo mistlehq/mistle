@@ -56,6 +56,9 @@ type UpdateIntegrationConnectionEditorState = {
   displayName?: string;
   initialConnectionDisplayName?: string;
   mode: "update";
+  reauthorization?: {
+    kind: "device-authorization";
+  };
   targetConfig: Record<string, unknown>;
   targetDisplayName: string;
   targetFamilyId: string;

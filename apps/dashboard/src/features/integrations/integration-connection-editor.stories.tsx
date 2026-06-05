@@ -8,6 +8,7 @@ import { resolveConnectionMethodFormUiModel } from "../pages/use-integration-con
 import {
   IntegrationConnectionEditorPage,
   IntegrationConnectionMethodIds,
+  type IntegrationConnectionMethod,
   type IntegrationConnectionEditorState,
 } from "./integration-connection-editor.js";
 
@@ -84,6 +85,54 @@ const JiraCreateEditorState: Extract<IntegrationConnectionEditorState, { mode: "
   targetFamilyId: "jira",
   targetKey: "jira-default",
   targetVariantId: "jira-default",
+};
+
+const ChatGptDeviceAuthorizationMethod: Extract<
+  IntegrationConnectionMethod,
+  { kind: "device-authorization" }
+> = {
+  id: "chatgpt-device-code",
+  label: "ChatGPT subscription",
+  kind: "device-authorization",
+  ui: {
+    create: {
+      submitLabel: "Connect",
+    },
+    pending: {
+      title: "Approve via ChatGPT",
+      description: "Open the link below and enter the code to approve access.",
+    },
+    reauthorize: {
+      actionLabel: "Re-authorize",
+      pendingLabel: "Starting...",
+    },
+  },
+};
+
+const ChatGptDeviceAuthorizationEditorState: Extract<
+  IntegrationConnectionEditorState,
+  { mode: "update" }
+> = {
+  connectionConfig: {
+    auth_mode: "chatgpt",
+    connection_method: "chatgpt-device-code",
+  },
+  connectionId: "icn_openai_chatgpt_story",
+  currentConnectionConfig: {
+    auth_mode: "chatgpt",
+    connection_method: "chatgpt-device-code",
+  },
+  currentMethod: ChatGptDeviceAuthorizationMethod,
+  initialConnectionDisplayName: "ChatGPT Subscription",
+  mode: "update",
+  reauthorization: {
+    kind: "device-authorization",
+  },
+  targetConfig: {},
+  targetDisplayName: "OpenAI",
+  targetFamilyId: "openai",
+  targetKey: "openai-default",
+  targetVariantId: "openai-default",
 };
 
 function IntegrationConnectionEditorStory(input: {
@@ -188,6 +237,44 @@ function JiraPersonalApiTokenEditorStory(): React.JSX.Element {
   );
 }
 
+function ChatGptDeviceReauthorizationPendingStory(): React.JSX.Element {
+  return (
+    <div className="mx-auto w-full max-w-2xl">
+      <IntegrationConnectionEditorPage
+        changedSecretNames={[]}
+        closeDisabled={false}
+        configForm={{
+          mode: "none",
+        }}
+        configValue={{}}
+        connectError={null}
+        connectionDisplayNamePlaceholder="ChatGPT Subscription"
+        connectionDisplayNameValue=""
+        deviceAuthorizationPending={{
+          targetKey: "openai-default",
+          attemptId: "ida_story_chatgpt",
+          verificationUrl: "https://auth.openai.com/codex/device",
+          userCode: "ABCD-EFGH",
+          expiresAt: "2099-12-31T23:59:00.000Z",
+          method: ChatGptDeviceAuthorizationMethod,
+        }}
+        editor={ChatGptDeviceAuthorizationEditorState}
+        hasChanges={false}
+        isConnectionDisplayNameChanged={false}
+        methodId="chatgpt-device-code"
+        onClose={() => {}}
+        onConfigChange={() => {}}
+        onConnectionDisplayNameChange={() => {}}
+        onMethodChange={() => {}}
+        onSecretChange={() => {}}
+        onSubmit={() => {}}
+        pending={false}
+        secrets={{}}
+      />
+    </div>
+  );
+}
+
 const meta = {
   title: "Dashboard/Integrations/Connection Editor",
   component: IntegrationConnectionEditorStory,
@@ -210,6 +297,12 @@ export const ConfiguredSecrets: Story = {
 export const JiraPersonalApiToken: Story = {
   render: function RenderStory() {
     return <JiraPersonalApiTokenEditorStory />;
+  },
+};
+
+export const ChatGptDeviceReauthorizationPending: Story = {
+  render: function RenderStory() {
+    return <ChatGptDeviceReauthorizationPendingStory />;
   },
 };
 

@@ -81,6 +81,7 @@ const IntegrationConnectionMethodSchema = z.discriminatedUnion("kind", [
         .object({
           create: IntegrationDeviceAuthorizationConnectionMethodCreateUiSchema,
           pending: IntegrationConnectionMethodPendingUiSchema.optional(),
+          reauthorize: IntegrationConnectionMethodReauthorizeUiSchema.optional(),
         })
         .strict(),
     })

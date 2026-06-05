@@ -9,6 +9,7 @@ import {
   createJiraDetailViewStoryProps,
   createJiraWebhookNotConfiguredDetailViewStoryProps,
   createLinearDetailViewStoryProps,
+  createOpenAiChatGptDetailViewStoryProps,
   createOpenAiDetailViewStoryProps,
   createPlanetScaleDetailViewStoryProps,
   createSigNozDetailViewStoryProps,
@@ -109,6 +110,30 @@ function buildPlanetScaleReauthorizationStateStoryProps(input: {
   };
 }
 
+function buildOpenAiChatGptReauthorizationStateStoryProps(input: {
+  errorMessage?: string;
+  isPending?: boolean;
+  status?: "active" | "error" | "revoked";
+}): React.ComponentProps<typeof IntegrationConnectionDetailView> {
+  const props = createOpenAiChatGptDetailViewStoryProps();
+
+  return {
+    ...props,
+    connections: props.connections.map((connection) => ({
+      ...connection,
+      reauthorization:
+        connection.reauthorization === undefined
+          ? undefined
+          : {
+              ...connection.reauthorization,
+              ...(input.errorMessage === undefined ? {} : { errorMessage: input.errorMessage }),
+              isPending: input.isPending ?? connection.reauthorization.isPending,
+            },
+      status: input.status ?? connection.status,
+    })),
+  };
+}
+
 const meta = {
   title: "Dashboard/Integrations/Connection Detail",
   component: IntegrationConnectionDetailView,
@@ -174,6 +199,32 @@ export const OpenAi: Story = {
   name: "OpenAI",
   args: {
     ...withoutStoryHandlers(createOpenAiDetailViewStoryProps()),
+  },
+};
+
+export const OpenAiChatGptSubscription: Story = {
+  name: "OpenAI ChatGPT subscription",
+  args: {
+    ...withoutStoryHandlers(createOpenAiChatGptDetailViewStoryProps()),
+  },
+};
+
+export const OpenAiChatGptReauthorizationRequired: Story = {
+  name: "OpenAI ChatGPT reauthorization required",
+  args: {
+    ...withoutStoryHandlers(
+      buildOpenAiChatGptReauthorizationStateStoryProps({
+        errorMessage: "This connection needs to be re-authorized.",
+        status: "error",
+      }),
+    ),
+  },
+};
+
+export const OpenAiChatGptReauthorizeStarting: Story = {
+  name: "OpenAI ChatGPT reauthorize - starting",
+  args: {
+    ...withoutStoryHandlers(buildOpenAiChatGptReauthorizationStateStoryProps({ isPending: true })),
   },
 };
 

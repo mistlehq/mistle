@@ -183,6 +183,10 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
           title: "Approve via ChatGPT",
           description: "Open the link below and enter the code to approve access.",
         },
+        reauthorize: {
+          actionLabel: "Re-authorize",
+          pendingLabel: "Starting...",
+        },
       },
     },
   ],

@@ -113,10 +113,15 @@ export function IntegrationConnectionEditPage(): React.JSX.Element {
     >
       <LoadedIntegrationConnectionEditPage
         key={connection.id}
-        initialEditorInput={buildOpenUpdateIntegrationConnectionInput({
-          card,
-          connection,
-        })}
+        initialEditorInput={{
+          ...buildOpenUpdateIntegrationConnectionInput({
+            card,
+            connection,
+          }),
+          ...(searchParams.get("reauthorize") === "device"
+            ? { reauthorization: { kind: "device-authorization" } }
+            : {}),
+        }}
         {...(returnPath === null ? {} : { returnPath })}
       />
     </PageFrame>
@@ -133,6 +138,17 @@ function LoadedIntegrationConnectionEditPage(input: {
     onClose: () =>
       navigate(input.returnPath ?? `/integrations/${input.initialEditorInput.targetKey}`),
     onSubmitSuccess: async ({ editor }) => {
+      if (editor.mode === "update" && editor.reauthorization?.kind === "device-authorization") {
+        await navigate(
+          input.returnPath ??
+            `/integrations/${editor.targetKey}?${new URLSearchParams({
+              connectionId: editor.connectionId,
+              connectionNotice: "reauthorized",
+            }).toString()}`,
+        );
+        return;
+      }
+
       await navigate(input.returnPath ?? `/integrations/${editor.targetKey}`);
     },
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,

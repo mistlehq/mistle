@@ -368,6 +368,9 @@ export function createInitialIntegrationConnectionEditorState(input: {
           ...(existingConnectionDisplayName === undefined
             ? {}
             : { initialConnectionDisplayName: existingConnectionDisplayName }),
+          ...(input.initialEditorInput.reauthorization === undefined
+            ? {}
+            : { reauthorization: input.initialEditorInput.reauthorization }),
         };
 
   const initialConfigValue = resolveInitialConfigValue({

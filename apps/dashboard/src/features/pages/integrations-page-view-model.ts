@@ -130,6 +130,27 @@ export type ReauthorizationState = {
 
 const OAuthReauthorizationRequiredMessage = "This connection needs to be re-authorized.";
 
+type ReauthorizableIntegrationConnectionMethod = Extract<
+  IntegrationConnectionMethod,
+  { kind: "device-authorization" | "redirect" }
+> & {
+  ui: {
+    reauthorize: {
+      actionLabel: string;
+      pendingLabel: string;
+    };
+  };
+};
+
+function supportsConnectionReauthorization(
+  method: IntegrationConnectionMethod | null,
+): method is ReauthorizableIntegrationConnectionMethod {
+  return (
+    (method?.kind === "redirect" || method?.kind === "device-authorization") &&
+    method.ui.reauthorize !== undefined
+  );
+}
+
 export function buildIntegrationConnectionDetailItems(input: {
   connections: readonly IntegrationConnection[];
   controlPlaneApiOrigin?: string;
@@ -196,7 +217,7 @@ export function buildIntegrationConnectionDetailItems(input: {
         : { authMethodLabel: connection.connectionMethodLabel }),
       ...(authFields.length === 0 ? {} : { authFields }),
       ...(authSecretLabels.length === 0 ? {} : { authSecretLabels }),
-      ...(currentMethod?.kind !== "redirect" || currentMethod.ui.reauthorize === undefined
+      ...(!supportsConnectionReauthorization(currentMethod)
         ? {}
         : {
             reauthorization: {

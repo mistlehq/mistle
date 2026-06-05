@@ -26,6 +26,10 @@ describe("IntegrationTargetSchema", () => {
               title: "Waiting for approval",
               description: "Finish approval in your browser.",
             },
+            reauthorize: {
+              actionLabel: "Re-authorize",
+              pendingLabel: "Starting...",
+            },
           },
         },
       ],
@@ -46,6 +50,10 @@ describe("IntegrationTargetSchema", () => {
           pending: {
             title: "Waiting for approval",
             description: "Finish approval in your browser.",
+          },
+          reauthorize: {
+            actionLabel: "Re-authorize",
+            pendingLabel: "Starting...",
           },
         },
       },

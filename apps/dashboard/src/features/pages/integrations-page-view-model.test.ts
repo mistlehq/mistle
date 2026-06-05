@@ -541,6 +541,54 @@ describe("integrations page view model", () => {
     });
   });
 
+  it("builds a reauthorization required notice for errored device authorization connections", () => {
+    const [item] = buildIntegrationConnectionDetailItems({
+      connections: [
+        {
+          id: "icn_openai_chatgpt_123",
+          targetKey: "openai-default",
+          displayName: "ChatGPT Subscription",
+          status: "error",
+          config: {
+            connection_method: "chatgpt-device-code",
+          },
+          connectionMethodId: "chatgpt-device-code",
+          connectionMethodLabel: "ChatGPT subscription",
+          createdAt: "2026-03-03T00:00:00.000Z",
+          updatedAt: "2026-03-11T04:30:00.000Z",
+        } satisfies IntegrationConnection,
+      ],
+      targetConnectionMethods: [
+        {
+          id: "chatgpt-device-code",
+          label: "ChatGPT subscription",
+          kind: "device-authorization",
+          ui: {
+            create: {
+              submitLabel: "Connect",
+            },
+            pending: {
+              title: "Approve via ChatGPT",
+              description: "Open the link below and enter the code to approve access.",
+            },
+            reauthorize: {
+              actionLabel: "Re-authorize",
+              pendingLabel: "Starting...",
+            },
+          },
+        },
+      ],
+      refreshingResourceKeys: new Set<string>(),
+    });
+
+    expect(item?.reauthorization).toEqual({
+      actionLabel: "Re-authorize",
+      errorMessage: "This connection needs to be re-authorized.",
+      isPending: false,
+      pendingLabel: "Starting...",
+    });
+  });
+
   it("builds detail items for AWS assume-role connections", () => {
     const [item] = buildIntegrationConnectionDetailItems({
       connections: [
