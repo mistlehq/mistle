@@ -16,6 +16,10 @@ type WebSocketPair = {
   serverSocket: WebSocket;
 };
 
+type WebSocketPairOptions = {
+  clientAutoPong?: boolean;
+};
+
 const openPairs = new Set<WebSocketPair>();
 
 afterEach(async () => {
@@ -79,6 +83,34 @@ function waitForPong(socket: WebSocket): Promise<Buffer> {
   });
 }
 
+function waitForPing(socket: WebSocket): Promise<Buffer> {
+  return new Promise((resolve) => {
+    socket.once("ping", (data: RawData) => {
+      if (Buffer.isBuffer(data)) {
+        resolve(data);
+        return;
+      }
+      if (data instanceof ArrayBuffer) {
+        resolve(Buffer.from(data));
+        return;
+      }
+      resolve(Buffer.concat(data));
+    });
+  });
+}
+
+function sendPong(socket: WebSocket, payload: Buffer): Promise<void> {
+  return new Promise((resolve, reject) => {
+    socket.pong(payload, true, (error) => {
+      if (error != null) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
 function toWsReadyState(input: number): 0 | 1 | 2 | 3 {
   if (input === 0 || input === 1 || input === 2 || input === 3) {
     return input;
@@ -133,7 +165,7 @@ function createFakePeerSocket(rawSocket: FakeRawSocket): RelayPeerSocket {
   } as unknown as RelayPeerSocket;
 }
 
-async function createWebSocketPair(): Promise<WebSocketPair> {
+async function createWebSocketPair(options?: WebSocketPairOptions): Promise<WebSocketPair> {
   const server = createServer();
   const webSocketServer = new WebSocketServer({
     server,
@@ -157,7 +189,14 @@ async function createWebSocketPair(): Promise<WebSocketPair> {
     });
     webSocketServer.once("error", reject);
   });
-  const clientSocket = new WebSocket(`ws://127.0.0.1:${String(address.port)}`);
+  const clientSocket = new WebSocket(
+    `ws://127.0.0.1:${String(address.port)}`,
+    options?.clientAutoPong === undefined
+      ? undefined
+      : {
+          autoPong: options.clientAutoPong,
+        },
+  );
 
   await waitForWebSocketOpen(clientSocket);
   const serverSocket = await serverSocketPromise;
@@ -359,10 +398,11 @@ describe("startWebSocketHealthMonitor", () => {
     handle.stop();
   });
 
-  it("ignores stale structured pongs while a newer ping is in flight", () => {
+  it("ignores stale structured pongs while a newer ping is in flight", async () => {
+    const pair = await createWebSocketPair({ clientAutoPong: false });
+    openPairs.add(pair);
     const clock = createMutableClock(3_500);
     const scheduler = createManualScheduler(clock);
-    const rawSocket = new FakeRawSocket();
     const missedPongCounts: number[] = [];
     const recoveredMissedPongCounts: number[] = [];
     let unhealthyCount = 0;
@@ -371,7 +411,7 @@ describe("startWebSocketHealthMonitor", () => {
       clock,
       socketKind: "bootstrap",
       tokenKind: "bootstrap",
-      socket: createFakePeerSocket(rawSocket),
+      socket: pair.peerSocket,
       scheduler,
       pingIntervalMs: 10,
       pongTimeoutMs: 10,
@@ -388,14 +428,20 @@ describe("startWebSocketHealthMonitor", () => {
     });
 
     clock.advanceMs(10);
+    const firstPingPromise = waitForPing(pair.clientSocket);
     scheduler.runDue();
+    const firstPingPayload = await firstPingPromise;
     clock.advanceMs(10);
     scheduler.runDue();
     clock.advanceMs(10);
+    const secondPingPromise = waitForPing(pair.clientSocket);
     scheduler.runDue();
+    await secondPingPromise;
 
     expect(handle.getSnapshot().pingSeq).toBe(2);
-    rawSocket.emit("pong", rawSocket.pingPayloads[0]);
+    const stalePongPromise = waitForPong(pair.serverSocket);
+    await sendPong(pair.clientSocket, firstPingPayload);
+    await stalePongPromise;
 
     expect(handle.getSnapshot().pingSeq).toBe(2);
     expect(handle.isHealthy()).toBe(true);

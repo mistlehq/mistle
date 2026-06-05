@@ -1378,7 +1378,12 @@ pub(in crate::tunnel::session) fn write_tunnel_close(
 
 #[cfg(test)]
 mod tests {
+    use std::time::{Duration, Instant};
+
+    use futures_util::StreamExt;
     use serde_json::json;
+    use tokio_tungstenite::WebSocketStream;
+    use tokio_tungstenite::tungstenite::{Message, protocol::Role};
 
     use crate::protocol::session::SessionRuntimeInput;
     use crate::protocol::startup::{
@@ -1386,11 +1391,13 @@ mod tests {
         TransparentProxyConfiguration,
     };
     use crate::tunnel::session::bootstrap::{
+        BootstrapPongControlMessage, BootstrapWriterControlMessage,
         GATEWAY_SERVICE_RESTART_CLOSE_CODE, GATEWAY_SERVICE_RESTART_CLOSE_REASON,
         bootstrap_close_frame_disconnect_reason, bootstrap_ping_payload_attributes,
         bootstrap_pong_diagnostic_attributes, is_gateway_service_restart_close_frame,
         prioritize_ipv4_socket_addresses, record_bootstrap_tunnel_diagnostic_event,
         resolve_tunnel_exchange_url, startup_transparent_passthrough_socket_mark, usize_value,
+        write_bootstrap_control_message,
     };
 
     #[test]
@@ -1461,6 +1468,80 @@ mod tests {
                 ("payloadLen".to_string(), usize_value(payload.len())),
                 ("queueDelayMs".to_string(), json!(5_u64)),
             ])
+        );
+    }
+
+    #[tokio::test]
+    async fn records_bootstrap_pong_writer_diagnostics_for_control_messages() {
+        let temp_dir = tempfile::tempdir().expect("tempdir should be created");
+        let _guard = crate::test_support::TestEnvVarsGuard::set([(
+            "MISTLE_SANDBOXD_OPERATION_LOG_DIR",
+            temp_dir
+                .path()
+                .to_str()
+                .expect("temp dir path should be utf8 for environment variable")
+                .to_string(),
+        )]);
+        let (client_stream, server_stream) = tokio::io::duplex(1024);
+        let mut writer = WebSocketStream::from_raw_socket(server_stream, Role::Server, None).await;
+        let mut reader = WebSocketStream::from_raw_socket(client_stream, Role::Client, None).await;
+        let payload =
+            br#"{"type":"mistle.tunnel.health_ping","pingSeq":9,"sentAtMs":1780590000001}"#
+                .to_vec();
+
+        write_bootstrap_control_message(
+            &mut writer,
+            BootstrapWriterControlMessage::Pong(BootstrapPongControlMessage {
+                payload: payload.clone(),
+                ping_received_at: Instant::now() - Duration::from_millis(7),
+            }),
+            4,
+            &|reason| {
+                panic!("bootstrap writer should stay open, received reason {reason:?}");
+            },
+        )
+        .await
+        .expect("control pong should be written");
+
+        let Some(Ok(Message::Pong(written_payload))) = reader.next().await else {
+            panic!("peer should receive pong frame");
+        };
+        assert_eq!(written_payload.as_ref(), payload.as_slice());
+
+        let log_text = std::fs::read_to_string(temp_dir.path().join("bootstrap-tunnel.log"))
+            .expect("bootstrap tunnel diagnostic log should be readable");
+        let records: Vec<serde_json::Value> = log_text
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("diagnostic line should be json"))
+            .collect();
+
+        let started = records
+            .iter()
+            .find(|record| record["event"] == "bootstrap_tunnel.pong_write_started")
+            .expect("pong write start record should be present");
+        assert_eq!(started["payloadLen"], json!(payload.len()));
+        assert_eq!(started["pingSeq"], json!(9_u64));
+        assert_eq!(started["gatewaySentAtMs"], json!(1780590000001_u64));
+        assert_eq!(started["pendingOutboundLen"], json!(4));
+        assert!(
+            started["queueDelayMs"].as_u64().is_some(),
+            "pong write start record should include queue delay"
+        );
+
+        let completed = records
+            .iter()
+            .find(|record| record["event"] == "bootstrap_tunnel.pong_write_completed")
+            .expect("pong write completion record should be present");
+        assert_eq!(completed["payloadLen"], json!(payload.len()));
+        assert_eq!(completed["pingSeq"], json!(9_u64));
+        assert_eq!(completed["gatewaySentAtMs"], json!(1780590000001_u64));
+        assert!(
+            completed["queueDelayMs"].as_u64().is_some(),
+            "pong write completion record should include queue delay"
+        );
+        assert!(
+            completed["writeDurationMs"].as_u64().is_some(),
+            "pong write completion record should include write duration"
         );
     }
 
