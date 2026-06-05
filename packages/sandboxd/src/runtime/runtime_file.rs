@@ -15,7 +15,6 @@ use super::plan::{RuntimeClientSetupFile, RuntimeFileWriteMode};
 
 const MANAGED_BLOCK_START_MARKER: &str = "<!-- MISTLE-MANAGED:START mistle-sandbox-context -->";
 const MANAGED_BLOCK_END_MARKER: &str = "<!-- MISTLE-MANAGED:END mistle-sandbox-context -->";
-const LEGACY_MANAGED_CONTEXT_HEADING: &str = "Mistle-managed sandbox context:";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeFileApplyOutcome {
@@ -209,10 +208,6 @@ fn merge_managed_block(existing_content: &str, replacement_content: &str) -> Str
         }
     }
 
-    if let Some(merged) = replace_legacy_managed_context(existing_content, replacement_content) {
-        return merged;
-    }
-
     let mut merged = ensure_trailing_newline(existing_content.to_owned());
     if !merged.ends_with("\n\n") {
         merged.push('\n');
@@ -220,50 +215,6 @@ fn merge_managed_block(existing_content: &str, replacement_content: &str) -> Str
     merged.push_str(trim_trailing_newlines(replacement_content));
     merged.push('\n');
     merged
-}
-
-fn replace_legacy_managed_context(
-    existing_content: &str,
-    replacement_content: &str,
-) -> Option<String> {
-    let mut lines = split_lines_with_endings(existing_content);
-    let start_index = lines
-        .iter()
-        .position(|line| line.trim() == LEGACY_MANAGED_CONTEXT_HEADING)?;
-    let end_index = find_legacy_managed_context_end(&lines, start_index);
-
-    lines.splice(
-        start_index..end_index,
-        split_lines_with_endings(trim_trailing_newlines(replacement_content)),
-    );
-
-    Some(ensure_trailing_newline(lines.concat()))
-}
-
-fn find_legacy_managed_context_end(lines: &[String], start_index: usize) -> usize {
-    let mut index = start_index + 1;
-    while index < lines.len() {
-        let trimmed = lines[index].trim();
-        if trimmed.is_empty() {
-            let next_non_empty = lines[index + 1..]
-                .iter()
-                .find(|line| !line.trim().is_empty());
-            if next_non_empty.is_some_and(|line| line.trim_start().starts_with('-')) {
-                index += 1;
-                continue;
-            }
-
-            break;
-        }
-
-        if !lines[index].trim_start().starts_with('-') {
-            break;
-        }
-
-        index += 1;
-    }
-
-    index
 }
 
 fn looks_like_toml(path: &str, content: &str) -> bool {

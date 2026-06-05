@@ -256,9 +256,9 @@ fn merges_runtime_files_without_replacing_existing_runtime_config() {
         [
             "User instruction",
             "",
-            "Mistle-managed sandbox context:",
-            "",
-            "- old stale managed instruction",
+            "<!-- MISTLE-MANAGED:START mistle-sandbox-context -->",
+            "old managed block",
+            "<!-- MISTLE-MANAGED:END mistle-sandbox-context -->",
             "",
             "Keep this",
             "",
@@ -434,7 +434,7 @@ fn merges_runtime_files_without_replacing_existing_runtime_config() {
     assert!(agents.contains("Keep this"));
     assert!(agents.contains("Mistle MCP tools are available."));
     assert_eq!(agents.matches("Mistle-managed sandbox context:").count(), 1);
-    assert!(!agents.contains("old stale managed instruction"));
+    assert!(!agents.contains("old managed block"));
 
     let json_mcp_config =
         fs::read_to_string(&json_mcp_config_path).expect("JSON MCP config should exist");
