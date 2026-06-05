@@ -35,6 +35,7 @@ const e2bIt = createSystemTest({
 const SYSTEM_TEST_TIMEOUT_MS = 10 * 60_000;
 const TRANSPARENT_PROXY_TABLE_NAME = "mistle_transparent_egress";
 const TRANSPARENT_PROXY_PORT = "38514";
+const TRANSPARENT_TCP_REDIRECT_RULE_PATTERN = `tcp dport 1-65535( counter packets [0-9]+ bytes [0-9]+)? redirect to :${TRANSPARENT_PROXY_PORT}`;
 const TRANSPARENT_INTERCEPTION_MARKER = "MISTLE_TRANSPARENT_INTERCEPTION_OK";
 const LOOPBACK_DIRECT_MARKER = "MISTLE_TRANSPARENT_LOOPBACK_DIRECT_OK";
 const COMMAND_CONTROL_MARKER = "MISTLE_TRANSPARENT_COMMAND_CONTROL_OK";
@@ -261,7 +262,7 @@ function transparentPacketRuleAssertionScript(): string {
     "  assertTransparentRule '127\\.0\\.0\\.0/8' 'loopback destination bypass set element'",
     "  assertTransparentRule 'ip daddr @local_destinations.* return' 'local destination bypass rule'",
     "fi",
-    `assertTransparentRule 'tcp dport 1-65535 redirect to :${TRANSPARENT_PROXY_PORT}' 'transparent TCP redirect'`,
+    `assertTransparentRule '${TRANSPARENT_TCP_REDIRECT_RULE_PATTERN}' 'transparent TCP redirect'`,
     `ss -ltn | grep -q ':${TRANSPARENT_PROXY_PORT} '`,
     `nft -a list chain ip ${TRANSPARENT_PROXY_TABLE_NAME} output > /tmp/mistle-transparent-egress-output-chain-before-counter.txt`,
     `redirect_handle=$(awk '/redirect to :${TRANSPARENT_PROXY_PORT}/ { print $NF; exit }' /tmp/mistle-transparent-egress-output-chain-before-counter.txt)`,
