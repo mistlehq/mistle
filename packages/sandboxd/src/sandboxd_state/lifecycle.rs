@@ -28,8 +28,8 @@ use crate::protocol::startup::ActivationOperationKind;
 use crate::runtime;
 use crate::runtime::CompiledRuntimePlanImageSource;
 use crate::runtime::adapters::{
-    RuntimeAdapterLifecycleObserver, RuntimeAdapterRegistry, RuntimeAdapterRegistryError,
-    RuntimeAdapters,
+    RuntimeAdapterLifecycleObserver, RuntimeAdapterPlatformScopeInput, RuntimeAdapterRegistry,
+    RuntimeAdapterRegistryError, RuntimeAdapters,
 };
 use crate::runtime::readiness::RuntimeReadinessManager;
 use crate::runtime::{
@@ -622,12 +622,17 @@ impl SandboxdState {
             diagnostics_logger: diagnostics_logger.clone(),
         };
         let runtime_adapters = RuntimeAdapterRegistry
-            .start_with_supervisor_and_observer(
+            .start_with_supervisor_observer_and_platform_scopes(
                 session_input,
                 keepalive_manager.clone(),
                 runtime_readiness_manager.clone(),
                 supervisor_handle.clone(),
                 Some(&runtime_adapter_observer),
+                Some(RuntimeAdapterPlatformScopeInput {
+                    cgroup_root: Path::new(DEFAULT_CGROUP_ROOT).to_path_buf(),
+                    sandbox_instance_id: sandbox_instance_id.clone(),
+                    registry: platform_process_registry.clone(),
+                }),
             )
             .map_err(|error| {
                 let mut attributes = runtime_adapter_failure_timeline_attributes(&error);

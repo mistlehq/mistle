@@ -11,9 +11,11 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
+use crate::cgroups::PlatformScopePaths;
 use crate::idempotency::store::IdempotencyStore;
 use crate::keepalive::KeepaliveManager;
 use crate::pi_proxy::idempotency::SharedIdempotencyStore;
+use crate::process::PlatformProcessRegistry;
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
 
 mod idempotency;
@@ -54,6 +56,7 @@ pub enum PiProxyError {
     MissingPiStdin,
     MissingPiStdout,
     MissingSessionFile,
+    PlatformScope(String),
     WritePi(std::io::Error),
     ReadPi(std::io::Error),
     PiResponseTimeout(String),
@@ -99,6 +102,7 @@ impl fmt::Display for PiProxyError {
             Self::MissingPiStdin => write!(f, "spawned Pi RPC process did not expose stdin"),
             Self::MissingPiStdout => write!(f, "spawned Pi RPC process did not expose stdout"),
             Self::MissingSessionFile => write!(f, "Pi did not report sessionFile"),
+            Self::PlatformScope(error) => write!(f, "failed to manage Pi platform scope: {error}"),
             Self::WritePi(error) => write!(f, "failed to write Pi RPC command: {error}"),
             Self::ReadPi(error) => write!(f, "failed to read Pi RPC output: {error}"),
             Self::PiResponseTimeout(id) => {
@@ -126,6 +130,14 @@ pub struct PiProxy {
     supervisor_handle: SandboxdSupervisorHandle,
 }
 
+#[derive(Clone, Debug)]
+pub struct PiProxyPlatformScope {
+    pub registry_key: String,
+    pub process_key: String,
+    pub scope_paths: PlatformScopePaths,
+    pub registry: PlatformProcessRegistry,
+}
+
 impl PiProxy {
     pub fn listen_url(&self) -> &str {
         &self.listen_url
@@ -133,7 +145,10 @@ impl PiProxy {
 
     pub fn close(mut self) -> Result<(), PiProxyError> {
         self.shutdown_requested.store(true, Ordering::Relaxed);
-        self.state.shutdown_child();
+        if let Some(rpc_monitor_thread) = self.rpc_monitor_thread.take() {
+            let _ = rpc_monitor_thread.join();
+        }
+        let shutdown_result = self.state.shutdown_child();
         let close_result = match self.runtime_thread.take() {
             Some(runtime_thread) => match runtime_thread.join() {
                 Ok(result) => result,
@@ -141,11 +156,9 @@ impl PiProxy {
             },
             None => Ok(()),
         };
-        if let Some(rpc_monitor_thread) = self.rpc_monitor_thread.take() {
-            let _ = rpc_monitor_thread.join();
-        }
         self.supervisor_handle
             .mark_component_stopped(SupervisedComponent::PiProxy);
+        shutdown_result?;
         close_result
     }
 }
@@ -164,6 +177,26 @@ pub fn start_pi_proxy_with_supervisor(
         keepalive_manager,
         supervisor_handle,
         Some(Arc::new(Mutex::new(idempotency_store))),
+        None,
+    )
+}
+
+pub fn start_pi_proxy_with_supervisor_and_platform_scope(
+    listen_url: &str,
+    config: PiProxyConfig,
+    keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    supervisor_handle: SandboxdSupervisorHandle,
+    platform_scope: PiProxyPlatformScope,
+) -> Result<PiProxy, PiProxyError> {
+    let idempotency_store = IdempotencyStore::load_default()
+        .map_err(|error| PiProxyError::InvalidRequest(error.to_string()))?;
+    start_pi_proxy_inner(
+        listen_url,
+        config,
+        keepalive_manager,
+        supervisor_handle,
+        Some(Arc::new(Mutex::new(idempotency_store))),
+        Some(platform_scope),
     )
 }
 
@@ -180,6 +213,25 @@ pub fn start_pi_proxy_with_idempotency_store(
         keepalive_manager,
         supervisor_handle,
         Some(Arc::new(Mutex::new(idempotency_store))),
+        None,
+    )
+}
+
+pub fn start_pi_proxy_with_idempotency_store_and_platform_scope(
+    listen_url: &str,
+    config: PiProxyConfig,
+    keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    supervisor_handle: SandboxdSupervisorHandle,
+    idempotency_store: IdempotencyStore,
+    platform_scope: PiProxyPlatformScope,
+) -> Result<PiProxy, PiProxyError> {
+    start_pi_proxy_inner(
+        listen_url,
+        config,
+        keepalive_manager,
+        supervisor_handle,
+        Some(Arc::new(Mutex::new(idempotency_store))),
+        Some(platform_scope),
     )
 }
 
@@ -189,6 +241,7 @@ fn start_pi_proxy_inner(
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     supervisor_handle: SandboxdSupervisorHandle,
     idempotency_store: Option<SharedIdempotencyStore>,
+    platform_scope: Option<PiProxyPlatformScope>,
 ) -> Result<PiProxy, PiProxyError> {
     if config.pi_cli_path.trim().is_empty() {
         return Err(PiProxyError::MissingPiCliPath);
@@ -222,6 +275,7 @@ fn start_pi_proxy_inner(
         next_id: AtomicU64::new(1),
         idempotency_store,
         supervisor_handle: supervisor_handle.clone(),
+        platform_scope,
     });
     if let Err(error) = state.ensure_child(None) {
         supervisor_handle
@@ -253,6 +307,7 @@ mod tests {
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
     use std::os::unix::fs::PermissionsExt;
+    use std::path::Path;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::{Arc, Mutex};
     use std::thread;
@@ -261,13 +316,16 @@ mod tests {
     use serde_json::{Value, json};
     use tempfile::tempdir;
 
+    use crate::cgroups::create_platform_scope;
     use crate::idempotency::store::IdempotencyStore;
     use crate::idempotency::{AgentRuntimeId, IdempotencyOperation, RequestFingerprint};
     use crate::keepalive::KeepaliveManager;
     use crate::pi_proxy::{
-        PiProxyConfig, PiProxyState, json_rpc::handle_json_rpc_request,
+        PiProxyConfig, PiProxyPlatformScope, PiProxyState, json_rpc::handle_json_rpc_request,
         start_pi_proxy_with_idempotency_store,
+        start_pi_proxy_with_idempotency_store_and_platform_scope,
     };
+    use crate::process::PlatformProcessRegistry;
     use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
     use crate::time::SystemClock;
 
@@ -321,6 +379,20 @@ mod tests {
                 "expected Pi RPC process to restart before timeout, got {snapshot:?}"
             );
             thread::sleep(Duration::from_millis(25));
+        }
+    }
+
+    fn test_pi_platform_scope(
+        cgroup_root: &Path,
+        registry: PlatformProcessRegistry,
+    ) -> PiProxyPlatformScope {
+        let scope_paths = create_platform_scope(cgroup_root, "sbi_pi_proxy_test", "pi-rpc")
+            .expect("Pi platform scope should be created");
+        PiProxyPlatformScope {
+            registry_key: "pi-rpc".to_string(),
+            process_key: "pi-rpc".to_string(),
+            scope_paths,
+            registry,
         }
     }
 
@@ -415,6 +487,157 @@ mod tests {
     }
 
     #[test]
+    fn platform_scoped_pi_proxy_registers_rpc_process_and_cleans_scope_on_close() {
+        let simulated_pi = SimulatedPiRpcProcess::start();
+        let supervisor_handle = test_supervisor_handle();
+        let cgroup_root = tempdir().expect("cgroup root should be created");
+        let registry = PlatformProcessRegistry::default();
+        let platform_scope = test_pi_platform_scope(cgroup_root.path(), registry.clone());
+        let procs_file = platform_scope.scope_paths.procs_file.clone();
+        let kill_file = platform_scope.scope_paths.kill_file.clone();
+        let idempotency_store_dir = tempdir().expect("idempotency store dir should be created");
+        let idempotency_store =
+            IdempotencyStore::load_all(idempotency_store_dir.path().join("idempotency"))
+                .expect("idempotency store should load");
+
+        let proxy = start_pi_proxy_with_idempotency_store_and_platform_scope(
+            &reserve_pi_proxy_listen_url(),
+            PiProxyConfig {
+                pi_cli_path: simulated_pi.path(),
+                env: BTreeMap::new(),
+            },
+            Arc::new(Mutex::new(KeepaliveManager::default())),
+            supervisor_handle.clone(),
+            idempotency_store,
+            platform_scope,
+        )
+        .expect("Pi proxy should start with a platform-scoped Pi RPC process");
+
+        let rpc_pid = pi_rpc_process_pid(&supervisor_handle);
+        let snapshots = registry
+            .snapshots()
+            .expect("platform registry snapshots should be readable");
+        assert_eq!(snapshots.len(), 1);
+        assert_eq!(snapshots[0].process_key, "pi-rpc");
+        assert_eq!(snapshots[0].supervised_root_pid, rpc_pid);
+        assert_eq!(
+            fs::read_to_string(&procs_file).expect("cgroup procs file should be readable"),
+            format!("{rpc_pid}\n")
+        );
+
+        proxy.close().expect("Pi proxy should close cleanly");
+        assert!(
+            registry
+                .snapshots()
+                .expect("platform registry snapshots should be readable")
+                .is_empty(),
+            "closing Pi proxy should remove the Pi platform scope from the registry"
+        );
+        assert_eq!(
+            fs::read_to_string(&kill_file).expect("cgroup kill file should be readable"),
+            "1\n"
+        );
+    }
+
+    #[test]
+    fn platform_scoped_pi_proxy_reports_scope_cleanup_failure_on_close() {
+        let simulated_pi = SimulatedPiRpcProcess::start();
+        let supervisor_handle = test_supervisor_handle();
+        let cgroup_root = tempdir().expect("cgroup root should be created");
+        let registry = PlatformProcessRegistry::default();
+        let platform_scope = test_pi_platform_scope(cgroup_root.path(), registry);
+        let scope_root = platform_scope.scope_paths.scope_root.clone();
+        let idempotency_store_dir = tempdir().expect("idempotency store dir should be created");
+        let idempotency_store =
+            IdempotencyStore::load_all(idempotency_store_dir.path().join("idempotency"))
+                .expect("idempotency store should load");
+        let proxy = start_pi_proxy_with_idempotency_store_and_platform_scope(
+            &reserve_pi_proxy_listen_url(),
+            PiProxyConfig {
+                pi_cli_path: simulated_pi.path(),
+                env: BTreeMap::new(),
+            },
+            Arc::new(Mutex::new(KeepaliveManager::default())),
+            supervisor_handle,
+            idempotency_store,
+            platform_scope,
+        )
+        .expect("Pi proxy should start with a platform-scoped Pi RPC process");
+
+        fs::remove_dir_all(&scope_root).expect("platform scope should be removable");
+        let error = proxy
+            .close()
+            .expect_err("Pi proxy close should report platform scope cleanup failure");
+        assert!(
+            error
+                .to_string()
+                .contains("failed to manage Pi platform scope"),
+            "cleanup failure should be surfaced, got {error}"
+        );
+    }
+
+    #[test]
+    fn platform_scoped_pi_proxy_updates_registered_root_pid_after_rpc_restart() {
+        let simulated_pi = SimulatedPiRpcProcess::start();
+        let supervisor_handle = test_supervisor_handle();
+        let cgroup_root = tempdir().expect("cgroup root should be created");
+        let registry = PlatformProcessRegistry::default();
+        let platform_scope = test_pi_platform_scope(cgroup_root.path(), registry.clone());
+        let procs_file = platform_scope.scope_paths.procs_file.clone();
+        let idempotency_store_dir = tempdir().expect("idempotency store dir should be created");
+        let idempotency_store =
+            IdempotencyStore::load_all(idempotency_store_dir.path().join("idempotency"))
+                .expect("idempotency store should load");
+        let proxy = start_pi_proxy_with_idempotency_store_and_platform_scope(
+            &reserve_pi_proxy_listen_url(),
+            PiProxyConfig {
+                pi_cli_path: simulated_pi.path(),
+                env: BTreeMap::new(),
+            },
+            Arc::new(Mutex::new(KeepaliveManager::default())),
+            supervisor_handle.clone(),
+            idempotency_store,
+            platform_scope,
+        )
+        .expect("Pi proxy should start with a platform-scoped Pi RPC process");
+        let original_pid = pi_rpc_process_pid(&supervisor_handle);
+
+        {
+            let mut guard = proxy
+                .state
+                .child
+                .lock()
+                .expect("Pi child lock should not be poisoned");
+            guard
+                .as_mut()
+                .expect("Pi RPC process should be running")
+                .child
+                .kill()
+                .expect("Pi RPC process should be killable");
+        }
+
+        wait_for_pi_rpc_process_replacement(
+            &supervisor_handle,
+            original_pid,
+            Duration::from_secs(5),
+        );
+        let replacement_pid = pi_rpc_process_pid(&supervisor_handle);
+        let snapshots = registry
+            .snapshots()
+            .expect("platform registry snapshots should be readable");
+        assert_eq!(snapshots.len(), 1);
+        assert_eq!(snapshots[0].process_key, "pi-rpc");
+        assert_eq!(snapshots[0].supervised_root_pid, replacement_pid);
+        assert_ne!(snapshots[0].supervised_root_pid, original_pid);
+        assert_eq!(
+            fs::read_to_string(&procs_file).expect("cgroup procs file should be readable"),
+            format!("{replacement_pid}\n")
+        );
+
+        proxy.close().expect("Pi proxy should close cleanly");
+    }
+
+    #[test]
     fn replaces_eager_no_cwd_rpc_process_with_requested_conversation_cwd() {
         let simulated_pi = SimulatedPiRpcProcess::start();
         let state = Arc::new(PiProxyState {
@@ -431,6 +654,7 @@ mod tests {
             next_id: AtomicU64::new(1),
             idempotency_store: None,
             supervisor_handle: test_supervisor_handle(),
+            platform_scope: None,
         });
 
         state
@@ -451,7 +675,9 @@ mod tests {
             fs::canonicalize(simulated_pi.cwd()).expect("expected Pi cwd should canonicalize");
         assert_eq!(reported_cwd, expected_cwd);
 
-        state.shutdown_child();
+        state
+            .shutdown_child()
+            .expect("Pi RPC process should shut down cleanly");
     }
 
     #[test]
@@ -472,6 +698,7 @@ mod tests {
             next_id: AtomicU64::new(1),
             idempotency_store: None,
             supervisor_handle: test_supervisor_handle(),
+            platform_scope: None,
         });
 
         let create_responses = handle_json_rpc_request(
@@ -553,7 +780,9 @@ mod tests {
         assert_eq!(broadcast_event["method"], json!("pi/event"));
         assert_eq!(broadcast_event["params"]["type"], json!("agent_end"));
 
-        state.shutdown_child();
+        state
+            .shutdown_child()
+            .expect("Pi RPC process should shut down cleanly");
     }
 
     #[test]
@@ -577,6 +806,7 @@ mod tests {
                     .expect("idempotency store should load"),
             ))),
             supervisor_handle: test_supervisor_handle(),
+            platform_scope: None,
         });
         let fingerprint = pi_fingerprint(IdempotencyOperation::CreateConversation, "create");
         let first_response = parse_json_rpc_message(
@@ -603,7 +833,9 @@ mod tests {
             json!(simulated_pi.session_id())
         );
 
-        state.shutdown_child();
+        state
+            .shutdown_child()
+            .expect("Pi RPC process should shut down cleanly");
 
         let replay_response = parse_json_rpc_message(
             handle_json_rpc_request(
@@ -652,6 +884,7 @@ mod tests {
                     .expect("idempotency store should load"),
             ))),
             supervisor_handle: test_supervisor_handle(),
+            platform_scope: None,
         });
         let first_fingerprint = pi_fingerprint(IdempotencyOperation::CreateConversation, "create");
         let _ = handle_json_rpc_request(
@@ -670,7 +903,9 @@ mod tests {
             .to_string(),
         );
 
-        state.shutdown_child();
+        state
+            .shutdown_child()
+            .expect("Pi RPC process should shut down cleanly");
 
         let conflicting_fingerprint =
             pi_fingerprint(IdempotencyOperation::CreateConversation, "different");
@@ -718,6 +953,7 @@ mod tests {
             next_id: AtomicU64::new(1),
             idempotency_store: None,
             supervisor_handle: test_supervisor_handle(),
+            platform_scope: None,
         });
 
         let response = parse_json_rpc_message(
@@ -772,6 +1008,7 @@ mod tests {
                     .expect("idempotency store should load"),
             ))),
             supervisor_handle: test_supervisor_handle(),
+            platform_scope: None,
         });
         let fingerprint = pi_fingerprint(IdempotencyOperation::SubmitPayload, "prompt");
 
@@ -801,7 +1038,9 @@ mod tests {
         assert_eq!(first_response["id"], json!("prompt-1"));
         assert_eq!(first_response["result"], json!({ "accepted": true }));
 
-        state.shutdown_child();
+        state
+            .shutdown_child()
+            .expect("Pi RPC process should shut down cleanly");
 
         let replay_response = parse_json_rpc_message(
             handle_json_rpc_request(
@@ -847,6 +1086,7 @@ mod tests {
             next_id: AtomicU64::new(1),
             idempotency_store: None,
             supervisor_handle: test_supervisor_handle(),
+            platform_scope: None,
         });
 
         let event_receiver = state.subscribe_pi_events();
@@ -897,7 +1137,9 @@ mod tests {
             "activity monitor should settle after resumed Pi work ends"
         );
 
-        state.shutdown_child();
+        state
+            .shutdown_child()
+            .expect("Pi RPC process should shut down cleanly");
     }
 
     #[test]
@@ -917,6 +1159,7 @@ mod tests {
             next_id: AtomicU64::new(1),
             idempotency_store: None,
             supervisor_handle: test_supervisor_handle(),
+            platform_scope: None,
         });
 
         state.set_active(true);
@@ -950,6 +1193,7 @@ mod tests {
             next_id: AtomicU64::new(1),
             idempotency_store: None,
             supervisor_handle: test_supervisor_handle(),
+            platform_scope: None,
         });
 
         let resume_responses = handle_json_rpc_request(
@@ -976,7 +1220,9 @@ mod tests {
             json!(simulated_pi.session_file())
         );
 
-        state.shutdown_child();
+        state
+            .shutdown_child()
+            .expect("Pi RPC process should shut down cleanly");
     }
 
     #[test]
@@ -997,6 +1243,7 @@ mod tests {
             next_id: AtomicU64::new(1),
             idempotency_store: None,
             supervisor_handle: test_supervisor_handle(),
+            platform_scope: None,
         });
 
         let catalog_responses = handle_json_rpc_request(
@@ -1063,7 +1310,9 @@ mod tests {
         );
         assert_eq!(set_thinking_level_response["result"], json!({}));
 
-        state.shutdown_child();
+        state
+            .shutdown_child()
+            .expect("Pi RPC process should shut down cleanly");
     }
 
     #[test]
@@ -1103,6 +1352,7 @@ mod tests {
             next_id: AtomicU64::new(1),
             idempotency_store: None,
             supervisor_handle: test_supervisor_handle(),
+            platform_scope: None,
         });
 
         let responses = handle_json_rpc_request(
@@ -1179,6 +1429,7 @@ mod tests {
             next_id: AtomicU64::new(1),
             idempotency_store: None,
             supervisor_handle: test_supervisor_handle(),
+            platform_scope: None,
         });
 
         let responses = handle_json_rpc_request(

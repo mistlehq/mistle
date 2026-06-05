@@ -87,6 +87,7 @@ impl PiProxyState {
             terminate_pi_rpc_child(child);
             self.set_active(false);
             self.mark_pi_rpc_process_stopped();
+            self.kill_and_remove_pi_platform_scope()?;
         }
         self.mark_pi_rpc_process_starting();
 
@@ -105,15 +106,23 @@ impl PiProxyState {
             Ok(child) => child,
             Err(error) => {
                 self.mark_pi_rpc_process_restarting(error.to_string());
+                self.kill_and_remove_pi_platform_scope()?;
                 return Err(PiProxyError::SpawnPi(error));
             }
         };
         let pid = child.id();
+        if let Err(error) = self.register_pi_platform_root_pid(pid) {
+            self.mark_pi_rpc_process_restarting(error.to_string());
+            let _ = child.kill();
+            self.kill_and_remove_pi_platform_scope()?;
+            return Err(error);
+        }
         let stdin = match child.stdin.take() {
             Some(stdin) => stdin,
             None => {
                 self.mark_pi_rpc_process_restarting("missing Pi RPC stdin".to_string());
                 let _ = child.kill();
+                self.kill_and_remove_pi_platform_scope()?;
                 return Err(PiProxyError::MissingPiStdin);
             }
         };
@@ -122,6 +131,7 @@ impl PiProxyState {
             None => {
                 self.mark_pi_rpc_process_restarting("missing Pi RPC stdout".to_string());
                 let _ = child.kill();
+                self.kill_and_remove_pi_platform_scope()?;
                 return Err(PiProxyError::MissingPiStdout);
             }
         };
@@ -164,20 +174,23 @@ impl PiProxyState {
 
         self.set_active(false);
         self.mark_pi_rpc_process_restarting(exit_description);
+        self.kill_and_remove_pi_platform_scope()?;
         self.ensure_child(cwd.as_deref())
     }
 
-    pub(super) fn shutdown_child(&self) {
-        let child = match self.child.lock() {
-            Ok(mut guard) => guard.take(),
-            Err(_) => None,
-        };
+    pub(super) fn shutdown_child(&self) -> Result<(), PiProxyError> {
+        let child = self
+            .child
+            .lock()
+            .map_err(|_| PiProxyError::InvalidRequest("Pi child lock was poisoned".to_string()))?
+            .take();
         let Some(child) = child else {
-            return;
+            return Ok(());
         };
         terminate_pi_rpc_child(child);
         self.set_active(false);
         self.mark_pi_rpc_process_stopped();
+        self.kill_and_remove_pi_platform_scope()
     }
 
     fn pi_rpc_process_details(&self, pid: Option<u32>) -> BTreeMap<String, String> {

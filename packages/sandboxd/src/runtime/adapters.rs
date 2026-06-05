@@ -8,8 +8,10 @@
 
 use std::collections::BTreeSet;
 use std::fmt;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use crate::cgroups::create_platform_scope;
 use crate::codex_proxy::{
     CodexProxy, CodexProxyControlHandle, CodexProxyError, start_codex_proxy_with_supervisor,
 };
@@ -18,7 +20,11 @@ use crate::opencode_proxy::{
     OpenCodeProxy, OpenCodeProxyError, derive_opencode_raw_server_url,
     start_opencode_proxy_with_supervisor,
 };
-use crate::pi_proxy::{PiProxy, PiProxyConfig, PiProxyError, start_pi_proxy_with_supervisor};
+use crate::pi_proxy::{
+    PiProxy, PiProxyConfig, PiProxyError, PiProxyPlatformScope, start_pi_proxy_with_supervisor,
+    start_pi_proxy_with_supervisor_and_platform_scope,
+};
+use crate::process::PlatformProcessRegistry;
 use crate::protocol::session::SessionRuntimeInput;
 use crate::runtime::plan::{
     CompiledAgentRuntime, CompiledRuntimePlan, RuntimeClientConnectionMode,
@@ -31,6 +37,13 @@ use crate::tunnel::session::derive_sandbox_instance_id;
 /// Starts the runtime-specific platform-activity adapters declared by one activation input.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RuntimeAdapterRegistry;
+
+#[derive(Clone, Debug)]
+pub struct RuntimeAdapterPlatformScopeInput {
+    pub cgroup_root: PathBuf,
+    pub sandbox_instance_id: String,
+    pub registry: PlatformProcessRegistry,
+}
 
 pub trait RuntimeAdapterLifecycleObserver {
     fn record_adapter_started(&self, runtime_id: &str);
@@ -293,6 +306,25 @@ impl RuntimeAdapterRegistry {
         supervisor_handle: SandboxdSupervisorHandle,
         observer: Option<&dyn RuntimeAdapterLifecycleObserver>,
     ) -> Result<RuntimeAdapters, RuntimeAdapterRegistryError> {
+        self.start_with_supervisor_observer_and_platform_scopes(
+            session_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            supervisor_handle,
+            observer,
+            None,
+        )
+    }
+
+    pub fn start_with_supervisor_observer_and_platform_scopes(
+        &self,
+        session_input: &SessionRuntimeInput,
+        keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+        runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
+        supervisor_handle: SandboxdSupervisorHandle,
+        observer: Option<&dyn RuntimeAdapterLifecycleObserver>,
+        platform_scope_input: Option<RuntimeAdapterPlatformScopeInput>,
+    ) -> Result<RuntimeAdapters, RuntimeAdapterRegistryError> {
         let runtime_plan: CompiledRuntimePlan =
             serde_json::from_value(session_input.runtime_plan.clone())
                 .map_err(RuntimeAdapterRegistryError::InvalidRuntimePlan)?;
@@ -338,6 +370,7 @@ impl RuntimeAdapterRegistry {
                         &runtime_plan,
                         keepalive_manager.clone(),
                         supervisor_handle.clone(),
+                        platform_scope_input.as_ref(),
                     )?;
                     started_adapters.push(adapter);
                 }
@@ -386,6 +419,7 @@ fn start_pi_runtime_adapter(
     runtime_plan: &CompiledRuntimePlan,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     supervisor_handle: SandboxdSupervisorHandle,
+    platform_scope_input: Option<&RuntimeAdapterPlatformScopeInput>,
 ) -> Result<RuntimeAdapter, RuntimeAdapterRegistryError> {
     let runtime_client = runtime_plan
         .runtime_clients
@@ -421,20 +455,49 @@ fn start_pi_runtime_adapter(
         .ok_or(RuntimeAdapterRegistryError::StartPiProxy(
             PiProxyError::MissingPiCliPath,
         ))?;
-    let proxy = start_pi_proxy_with_supervisor(
-        listen_url,
-        PiProxyConfig {
-            pi_cli_path,
-            env: runtime_client.setup.env.clone(),
-        },
-        keepalive_manager,
-        supervisor_handle,
-    )
+    let config = PiProxyConfig {
+        pi_cli_path,
+        env: runtime_client.setup.env.clone(),
+    };
+    let proxy = match platform_scope_input {
+        Some(platform_scope_input) => start_pi_proxy_with_supervisor_and_platform_scope(
+            listen_url,
+            config,
+            keepalive_manager,
+            supervisor_handle,
+            create_pi_runtime_platform_scope(platform_scope_input)?,
+        ),
+        None => {
+            start_pi_proxy_with_supervisor(listen_url, config, keepalive_manager, supervisor_handle)
+        }
+    }
     .map_err(RuntimeAdapterRegistryError::StartPiProxy)?;
 
     Ok(RuntimeAdapter::Pi {
         runtime_id: agent_runtime.runtime_id.clone(),
         proxy,
+    })
+}
+
+fn create_pi_runtime_platform_scope(
+    platform_scope_input: &RuntimeAdapterPlatformScopeInput,
+) -> Result<PiProxyPlatformScope, RuntimeAdapterRegistryError> {
+    const PI_RPC_PROCESS_KEY: &str = "pi-rpc";
+
+    let scope_paths = create_platform_scope(
+        platform_scope_input.cgroup_root.as_path(),
+        &platform_scope_input.sandbox_instance_id,
+        PI_RPC_PROCESS_KEY,
+    )
+    .map_err(|error| {
+        RuntimeAdapterRegistryError::StartPiProxy(PiProxyError::PlatformScope(error.to_string()))
+    })?;
+
+    Ok(PiProxyPlatformScope {
+        registry_key: PI_RPC_PROCESS_KEY.to_string(),
+        process_key: PI_RPC_PROCESS_KEY.to_string(),
+        scope_paths,
+        registry: platform_scope_input.registry.clone(),
     })
 }
 

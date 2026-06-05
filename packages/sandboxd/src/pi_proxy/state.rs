@@ -12,11 +12,12 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 
+use crate::cgroups::{attach_pid_to_scope, kill_scope};
 use crate::keepalive::KeepaliveManager;
 use crate::pi_proxy::idempotency::SharedIdempotencyStore;
 use crate::pi_proxy::json_rpc::render_pi_event_json_rpc_notification;
 use crate::pi_proxy::rpc_process::{PiRpcChild, PiRpcOutput};
-use crate::pi_proxy::{PiProxyConfig, PiProxyError};
+use crate::pi_proxy::{PiProxyConfig, PiProxyError, PiProxyPlatformScope};
 use crate::supervision::SandboxdSupervisorHandle;
 
 const PI_RPC_RESPONSE_TIMEOUT: Duration = Duration::from_secs(30);
@@ -32,6 +33,7 @@ pub(super) struct PiProxyState {
     pub(super) next_id: AtomicU64,
     pub(super) idempotency_store: Option<SharedIdempotencyStore>,
     pub(super) supervisor_handle: SandboxdSupervisorHandle,
+    pub(super) platform_scope: Option<PiProxyPlatformScope>,
 }
 
 impl PiProxyState {
@@ -230,5 +232,34 @@ impl PiProxyState {
     pub(super) fn mark_active_and_start_activity_monitor(state: &Arc<Self>) {
         state.set_active(true);
         Self::start_activity_monitor(state.clone());
+    }
+
+    pub(super) fn register_pi_platform_root_pid(&self, pid: u32) -> Result<(), PiProxyError> {
+        let Some(platform_scope) = &self.platform_scope else {
+            return Ok(());
+        };
+        attach_pid_to_scope(&platform_scope.scope_paths, pid)
+            .map_err(|error| PiProxyError::PlatformScope(error.to_string()))?;
+        platform_scope
+            .registry
+            .replace_scope(
+                platform_scope.registry_key.clone(),
+                platform_scope.process_key.clone(),
+                platform_scope.scope_paths.clone(),
+                pid,
+            )
+            .map_err(PiProxyError::PlatformScope)
+    }
+
+    pub(super) fn kill_and_remove_pi_platform_scope(&self) -> Result<(), PiProxyError> {
+        let Some(platform_scope) = &self.platform_scope else {
+            return Ok(());
+        };
+        kill_scope(&platform_scope.scope_paths)
+            .map_err(|error| PiProxyError::PlatformScope(error.to_string()))?;
+        platform_scope
+            .registry
+            .remove_scope(&platform_scope.registry_key)
+            .map_err(PiProxyError::PlatformScope)
     }
 }
