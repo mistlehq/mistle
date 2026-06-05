@@ -1,4 +1,3 @@
-import { EventEmitter } from "node:events";
 import { createServer } from "node:http";
 
 import { createManualScheduler, createMutableClock } from "@mistle/time/testing";
@@ -136,35 +135,6 @@ function toPeerSocket(socket: WebSocket): RelayPeerSocket {
   });
 }
 
-class FakeRawSocket extends EventEmitter {
-  public pingCallCount = 0;
-  public pingPayloads: Buffer[] = [];
-  public socketReadyState: 0 | 1 | 2 | 3 = WebSocket.OPEN;
-
-  public ping(
-    data: Buffer | undefined,
-    _mask: boolean,
-    callback?: (error: Error | null | undefined) => void,
-  ): void {
-    this.pingCallCount += 1;
-    if (data !== undefined) {
-      this.pingPayloads.push(data);
-    }
-    callback?.(null);
-  }
-}
-
-function createFakePeerSocket(rawSocket: FakeRawSocket): RelayPeerSocket {
-  return {
-    send: () => undefined,
-    close: () => undefined,
-    get readyState() {
-      return rawSocket.socketReadyState;
-    },
-    raw: rawSocket as unknown as WebSocket,
-  } as unknown as RelayPeerSocket;
-}
-
 async function createWebSocketPair(options?: WebSocketPairOptions): Promise<WebSocketPair> {
   const server = createServer();
   const webSocketServer = new WebSocketServer({
@@ -240,6 +210,17 @@ async function createWebSocketPair(options?: WebSocketPairOptions): Promise<WebS
   };
 }
 
+async function sendScheduledPing(input: {
+  clock: ReturnType<typeof createMutableClock>;
+  clientSocket: WebSocket;
+  scheduler: ReturnType<typeof createManualScheduler>;
+}): Promise<Buffer> {
+  input.clock.advanceMs(10);
+  const pingPromise = waitForPing(input.clientSocket);
+  input.scheduler.runDue();
+  return pingPromise;
+}
+
 describe("startWebSocketHealthMonitor", () => {
   it("keeps responsive sockets healthy across ping and pong", async () => {
     const pair = await createWebSocketPair();
@@ -309,10 +290,11 @@ describe("startWebSocketHealthMonitor", () => {
     expect(unhealthyCount).toBe(0);
   });
 
-  it("stops monitoring without marking unhealthy when the peer disconnects before pong timeout", () => {
+  it("stops monitoring without marking unhealthy when the peer disconnects before pong timeout", async () => {
+    const pair = await createWebSocketPair({ clientAutoPong: false });
+    openPairs.add(pair);
     const clock = createMutableClock(2_500);
     const scheduler = createManualScheduler(clock);
-    const rawSocket = new FakeRawSocket();
     const missedPongCounts: number[] = [];
     let unhealthyCount = 0;
 
@@ -320,7 +302,7 @@ describe("startWebSocketHealthMonitor", () => {
       clock,
       socketKind: "bootstrap",
       tokenKind: "bootstrap",
-      socket: createFakePeerSocket(rawSocket),
+      socket: pair.peerSocket,
       scheduler,
       pingIntervalMs: 10,
       pongTimeoutMs: 10,
@@ -333,9 +315,15 @@ describe("startWebSocketHealthMonitor", () => {
       },
     });
 
-    clock.advanceMs(10);
-    scheduler.runDue();
-    rawSocket.socketReadyState = WebSocket.CLOSING;
+    await sendScheduledPing({
+      clock,
+      clientSocket: pair.clientSocket,
+      scheduler,
+    });
+    const clientClosePromise = waitForWebSocketClose(pair.clientSocket);
+    const serverClosePromise = waitForWebSocketClose(pair.serverSocket);
+    pair.clientSocket.close();
+    await Promise.all([clientClosePromise, serverClosePromise]);
     clock.advanceMs(10);
     scheduler.runDue();
 
@@ -344,10 +332,11 @@ describe("startWebSocketHealthMonitor", () => {
     expect(missedPongCounts).toEqual([]);
   });
 
-  it("keeps sockets healthy through a transient missed pong and resets after recovery", () => {
+  it("keeps sockets healthy through a transient missed pong and resets after recovery", async () => {
+    const pair = await createWebSocketPair({ clientAutoPong: false });
+    openPairs.add(pair);
     const clock = createMutableClock(3_000);
     const scheduler = createManualScheduler(clock);
-    const rawSocket = new FakeRawSocket();
     const missedPongCounts: number[] = [];
     const recoveredMissedPongCounts: number[] = [];
     let unhealthyCount = 0;
@@ -356,7 +345,7 @@ describe("startWebSocketHealthMonitor", () => {
       clock,
       socketKind: "bootstrap",
       tokenKind: "bootstrap",
-      socket: createFakePeerSocket(rawSocket),
+      socket: pair.peerSocket,
       scheduler,
       pingIntervalMs: 10,
       pongTimeoutMs: 10,
@@ -372,8 +361,11 @@ describe("startWebSocketHealthMonitor", () => {
       },
     });
 
-    clock.advanceMs(10);
-    scheduler.runDue();
+    const firstPingPayload = await sendScheduledPing({
+      clock,
+      clientSocket: pair.clientSocket,
+      scheduler,
+    });
     clock.advanceMs(10);
     scheduler.runDue();
 
@@ -382,12 +374,17 @@ describe("startWebSocketHealthMonitor", () => {
     expect(missedPongCounts).toEqual([1]);
     expect(recoveredMissedPongCounts).toEqual([]);
 
-    rawSocket.emit("pong", rawSocket.pingPayloads[0]);
+    const recoveryPongPromise = waitForPong(pair.serverSocket);
+    await sendPong(pair.clientSocket, firstPingPayload);
+    await recoveryPongPromise;
     expect(recoveredMissedPongCounts).toEqual([1]);
     expect(handle.getSnapshot().pingSeq).toBe(null);
 
-    clock.advanceMs(10);
-    scheduler.runDue();
+    await sendScheduledPing({
+      clock,
+      clientSocket: pair.clientSocket,
+      scheduler,
+    });
     clock.advanceMs(10);
     scheduler.runDue();
 
@@ -427,16 +424,18 @@ describe("startWebSocketHealthMonitor", () => {
       },
     });
 
+    const firstPingPayload = await sendScheduledPing({
+      clock,
+      clientSocket: pair.clientSocket,
+      scheduler,
+    });
     clock.advanceMs(10);
-    const firstPingPromise = waitForPing(pair.clientSocket);
     scheduler.runDue();
-    const firstPingPayload = await firstPingPromise;
-    clock.advanceMs(10);
-    scheduler.runDue();
-    clock.advanceMs(10);
-    const secondPingPromise = waitForPing(pair.clientSocket);
-    scheduler.runDue();
-    await secondPingPromise;
+    await sendScheduledPing({
+      clock,
+      clientSocket: pair.clientSocket,
+      scheduler,
+    });
 
     expect(handle.getSnapshot().pingSeq).toBe(2);
     const stalePongPromise = waitForPong(pair.serverSocket);
@@ -459,18 +458,20 @@ describe("startWebSocketHealthMonitor", () => {
     handle.stop();
   });
 
-  it("marks sockets unhealthy only after the configured missed pong threshold", () => {
+  it("marks sockets unhealthy only after the configured missed pong threshold", async () => {
+    const pair = await createWebSocketPair({ clientAutoPong: false });
+    openPairs.add(pair);
     const clock = createMutableClock(4_000);
     const scheduler = createManualScheduler(clock);
-    const rawSocket = new FakeRawSocket();
     const missedPongCounts: number[] = [];
+    const pingPayloads: Buffer[] = [];
     let unhealthyCount = 0;
 
     const handle = startWebSocketHealthMonitor({
       clock,
       socketKind: "bootstrap",
       tokenKind: "bootstrap",
-      socket: createFakePeerSocket(rawSocket),
+      socket: pair.peerSocket,
       scheduler,
       pingIntervalMs: 10,
       pongTimeoutMs: 10,
@@ -484,8 +485,13 @@ describe("startWebSocketHealthMonitor", () => {
     });
 
     for (let iteration = 0; iteration < 3; iteration += 1) {
-      clock.advanceMs(10);
-      scheduler.runDue();
+      pingPayloads.push(
+        await sendScheduledPing({
+          clock,
+          clientSocket: pair.clientSocket,
+          scheduler,
+        }),
+      );
       clock.advanceMs(10);
       scheduler.runDue();
     }
@@ -493,7 +499,7 @@ describe("startWebSocketHealthMonitor", () => {
     expect(handle.isHealthy()).toBe(false);
     expect(unhealthyCount).toBe(1);
     expect(missedPongCounts).toEqual([1, 2, 3]);
-    expect(rawSocket.pingPayloads.map((payload) => JSON.parse(payload.toString("utf8")))).toEqual([
+    expect(pingPayloads.map((payload) => JSON.parse(payload.toString("utf8")))).toEqual([
       {
         type: "mistle.tunnel.health_ping",
         pingSeq: 1,
