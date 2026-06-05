@@ -89,6 +89,9 @@ export function startWebSocketHealthMonitor(input: {
       return;
     }
     const pongPayload = parseHealthPingPayload(data);
+    if (pongPayload !== null && pingSeq !== undefined && pongPayload.pingSeq !== pingSeq) {
+      return;
+    }
     if (pingSentAtMs !== undefined) {
       const roundTripTimeMs = input.clock.nowMs() - pingSentAtMs;
       TunnelWebSocketRoundTripTimeMs.record(
