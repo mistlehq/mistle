@@ -8,24 +8,33 @@ const scriptDirectoryPath = path.dirname(fileURLToPath(import.meta.url));
 const packageRootPath = path.resolve(scriptDirectoryPath, "..");
 const repositoryRootPath = path.resolve(packageRootPath, "..", "..");
 const dockerfilePath = path.join(packageRootPath, "Dockerfile.test");
-const defaultImageTag = createDefaultImageTag(dockerfilePath);
+const dockerfileHash = createDockerfileHash(dockerfilePath);
+const defaultImageTag = `mistle/sandboxd-test-runner:${dockerfileHash}`;
+const defaultCacheKey = `mistle-sandboxd-test-runner-${dockerfileHash}`;
 const imageTag = process.env.MISTLE_SANDBOXD_TEST_IMAGE ?? defaultImageTag;
 const buildPolicy = process.env.MISTLE_SANDBOXD_TEST_RUNNER_BUILD_POLICY ?? "if-missing";
 const netAdminEnabled = process.env.MISTLE_SANDBOXD_TEST_RUNNER_NET_ADMIN === "1";
+const cacheMode = resolveCacheMode();
 const cargoArguments = process.argv.slice(2);
 const localCacheRootPath = path.join(repositoryRootPath, ".local", "sandboxd-test");
 const cargoHomeHostPath = path.join(localCacheRootPath, "cargo-home");
+const cargoTargetHostPath = path.join(localCacheRootPath, "target-ubuntu-container");
 const tempDirectoryHostPath = path.join(localCacheRootPath, "tmp");
 const gitCommonDirectoryPath = readGitPath("rev-parse", "--git-common-dir");
 const resolvedGitCommonDirectoryPath = path.resolve(repositoryRootPath, gitCommonDirectoryPath);
 const repositoryMountPath = repositoryRootPath;
 const packageMountPath = packageRootPath;
-const cargoTargetDirectoryPath = path.join(
-  repositoryMountPath,
-  ".local",
-  "sandboxd-test",
-  "target-debian-container",
-);
+const cargoTargetDirectoryPath =
+  cacheMode === "path"
+    ? path.join(repositoryMountPath, ".local", "sandboxd-test", "target-ubuntu-container")
+    : "/target";
+const cargoHomeMountPath = "/cargo-home";
+const tempDirectoryPath =
+  cacheMode === "path" ? path.join(repositoryMountPath, ".local", "sandboxd-test", "tmp") : "/tmp";
+const cargoHomeVolumeName =
+  process.env.MISTLE_SANDBOXD_TEST_CARGO_HOME_VOLUME ?? `${defaultCacheKey}-cargo-home`;
+const cargoTargetVolumeName =
+  process.env.MISTLE_SANDBOXD_TEST_TARGET_VOLUME ?? `${defaultCacheKey}-target`;
 
 if (cargoArguments.length === 0) {
   throw new Error("Expected cargo arguments, e.g. `test --locked`.");
@@ -37,8 +46,11 @@ if (buildPolicy !== "always" && buildPolicy !== "if-missing" && buildPolicy !== 
   );
 }
 
-mkdirSync(cargoHomeHostPath, { recursive: true });
-mkdirSync(tempDirectoryHostPath, { recursive: true });
+if (cacheMode === "path") {
+  mkdirSync(cargoHomeHostPath, { recursive: true });
+  mkdirSync(cargoTargetHostPath, { recursive: true });
+  mkdirSync(tempDirectoryHostPath, { recursive: true });
+}
 
 if (shouldBuildImage({ imageTag, buildPolicy })) {
   execFileSync(
@@ -57,7 +69,7 @@ const dockerRunArguments = [
   ...createCapabilityArguments(),
   ...createEnvironmentArguments({
     CI: process.env.CI,
-    CARGO_HOME: "/cargo-home",
+    CARGO_HOME: cargoHomeMountPath,
     CARGO_TARGET_DIR: cargoTargetDirectoryPath,
     HOME: "/tmp/mistle-home",
     ...readMistleEnvironmentVariables(),
@@ -65,13 +77,12 @@ const dockerRunArguments = [
     MISTLE_SANDBOXD_TEST_HOST_UID: hostUid(),
     PATH: "/usr/local/cargo/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
     RUSTUP_HOME: "/usr/local/rustup",
-    TMPDIR: path.join(repositoryMountPath, ".local", "sandboxd-test", "tmp"),
+    TMPDIR: tempDirectoryPath,
   }),
   "--volume",
   `${repositoryRootPath}:${repositoryMountPath}`,
   ...createGitMountArguments(),
-  "--volume",
-  `${cargoHomeHostPath}:/cargo-home`,
+  ...createCacheVolumeArguments(),
   "--workdir",
   packageMountPath,
   imageTag,
@@ -95,10 +106,28 @@ if (dockerRunResult.status !== 0) {
   );
 }
 
-function createDefaultImageTag(dockerfilePath) {
+function createDockerfileHash(dockerfilePath) {
   const dockerfileContents = readFileSync(dockerfilePath, "utf8");
-  const hash = createHash("sha256").update(dockerfileContents).digest("hex").slice(0, 12);
-  return `mistle/sandboxd-test-runner:${hash}`;
+  return createHash("sha256").update(dockerfileContents).digest("hex").slice(0, 12);
+}
+
+function resolveCacheMode() {
+  const explicitCacheMode = process.env.MISTLE_SANDBOXD_TEST_CACHE_MODE;
+  if (explicitCacheMode === "path" || explicitCacheMode === "volume") {
+    return explicitCacheMode;
+  }
+
+  if (explicitCacheMode !== undefined) {
+    throw new Error(
+      `Unsupported MISTLE_SANDBOXD_TEST_CACHE_MODE '${explicitCacheMode}'. Expected 'path' or 'volume'.`,
+    );
+  }
+
+  if (process.env.CI !== undefined) {
+    return "path";
+  }
+
+  return "volume";
 }
 
 function readGitPath(...argumentsList) {
@@ -157,6 +186,19 @@ function createGitMountArguments() {
   return ["--volume", `${resolvedGitCommonDirectoryPath}:${resolvedGitCommonDirectoryPath}`];
 }
 
+function createCacheVolumeArguments() {
+  if (cacheMode === "path") {
+    return ["--volume", `${cargoHomeHostPath}:${cargoHomeMountPath}`];
+  }
+
+  return [
+    "--volume",
+    `${cargoHomeVolumeName}:${cargoHomeMountPath}`,
+    "--volume",
+    `${cargoTargetVolumeName}:${cargoTargetDirectoryPath}`,
+  ];
+}
+
 /**
  * @param {Record<string, string | undefined>} environment
  */
@@ -195,6 +237,10 @@ function createCargoCommand() {
 }
 
 function createRestoreOwnershipCommand() {
+  if (cacheMode === "volume") {
+    return "true";
+  }
+
   const cacheRootPath = path.join(repositoryMountPath, ".local", "sandboxd-test");
   const quotedCacheRootPath = shellQuote(cacheRootPath);
   return [

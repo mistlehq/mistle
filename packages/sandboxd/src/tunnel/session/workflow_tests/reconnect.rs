@@ -571,6 +571,9 @@ fn post_startup_panic_marks_restart_required_and_startup_completed() {
 fn retries_when_token_exchange_response_body_read_fails() {
     let bootstrap_listener =
         TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+    bootstrap_listener
+        .set_nonblocking(true)
+        .expect("bootstrap listener should support bounded accepts");
     let bootstrap_port = bootstrap_listener
         .local_addr()
         .expect("bootstrap listener should expose an address")
@@ -579,11 +582,20 @@ fn retries_when_token_exchange_response_body_read_fails() {
         format!("ws://127.0.0.1:{bootstrap_port}/tunnel/sandbox/sbi_tunnel_session");
     let (gateway_ready_sender, gateway_ready_receiver) = mpsc::channel();
     let gateway_thread = thread::spawn(move || {
-        let (initial_stream, _) = bootstrap_listener
-            .accept()
-            .expect("gateway should accept the initial bootstrap websocket");
+        let (initial_stream, _) = accept_tcp_with_timeout(
+            &bootstrap_listener,
+            std::time::Duration::from_secs(2),
+            "initial bootstrap websocket",
+        );
+        initial_stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .expect("initial websocket should support read timeouts");
+        initial_stream
+            .set_write_timeout(Some(std::time::Duration::from_secs(2)))
+            .expect("initial websocket should support write timeouts");
         let (mut initial_websocket, _) = accept_bootstrap_websocket(initial_stream);
         expect_tunnel_connected_publications(&mut initial_websocket);
+        drain_bootstrap_messages_until_idle(&mut initial_websocket);
         initial_websocket
             .close(Some(CloseFrame {
                 code: CloseCode::Library(4001),
@@ -591,9 +603,11 @@ fn retries_when_token_exchange_response_body_read_fails() {
             }))
             .expect("gateway should close the initial websocket for service restart");
 
-        let (mut first_exchange_stream, _) = bootstrap_listener
-            .accept()
-            .expect("gateway should accept the first token exchange request");
+        let (mut first_exchange_stream, _) = accept_tcp_with_timeout(
+            &bootstrap_listener,
+            std::time::Duration::from_secs(2),
+            "first token exchange request",
+        );
         let first_exchange_request = read_http_request(&mut first_exchange_stream);
         assert_http_bearer_token(&first_exchange_request, "exchange-token-initial");
         assert_http_header(&first_exchange_request, "content-length", "0");
@@ -607,9 +621,11 @@ fn retries_when_token_exchange_response_body_read_fails() {
             .expect("gateway should flush the truncated token exchange response");
         drop(first_exchange_stream);
 
-        let (mut second_exchange_stream, _) = bootstrap_listener
-            .accept()
-            .expect("gateway should accept the retried token exchange request");
+        let (mut second_exchange_stream, _) = accept_tcp_with_timeout(
+            &bootstrap_listener,
+            std::time::Duration::from_secs(2),
+            "retried token exchange request",
+        );
         let second_exchange_request = read_http_request(&mut second_exchange_stream);
         assert_http_bearer_token(&second_exchange_request, "exchange-token-initial");
         assert_http_header(&second_exchange_request, "content-length", "0");
@@ -622,9 +638,17 @@ fn retries_when_token_exchange_response_body_read_fails() {
             }),
         );
 
-        let (reconnect_stream, _) = bootstrap_listener
-            .accept()
-            .expect("gateway should accept the reconnect websocket");
+        let (reconnect_stream, _) = accept_tcp_with_timeout(
+            &bootstrap_listener,
+            std::time::Duration::from_secs(2),
+            "reconnect websocket",
+        );
+        reconnect_stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .expect("reconnect websocket should support read timeouts");
+        reconnect_stream
+            .set_write_timeout(Some(std::time::Duration::from_secs(2)))
+            .expect("reconnect websocket should support write timeouts");
         let (mut reconnect_websocket, reconnect_request_uri) =
             accept_bootstrap_websocket(reconnect_stream);
         assert!(
@@ -694,9 +718,11 @@ fn retries_when_token_exchange_response_body_read_fails() {
     )
     .expect("tunnel session should start");
 
-    gateway_ready_receiver.recv().expect(
-        "gateway should observe reconnect after retrying the token exchange body read failure",
-    );
+    gateway_ready_receiver
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .expect(
+            "gateway should observe reconnect after retrying the token exchange body read failure",
+        );
 
     tunnel_session.close();
     gateway_thread
@@ -709,6 +735,9 @@ fn stops_retrying_when_token_exchange_returns_terminal_status() {
     for status_code in [401_u16, 404_u16, 409_u16] {
         let bootstrap_listener =
             TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+        bootstrap_listener
+            .set_nonblocking(true)
+            .expect("bootstrap listener should support bounded accepts");
         let bootstrap_port = bootstrap_listener
             .local_addr()
             .expect("bootstrap listener should expose an address")
@@ -717,9 +746,17 @@ fn stops_retrying_when_token_exchange_returns_terminal_status() {
             format!("ws://127.0.0.1:{bootstrap_port}/tunnel/sandbox/sbi_tunnel_session");
         let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
         let gateway_thread = thread::spawn(move || {
-            let (initial_stream, _) = bootstrap_listener
-                .accept()
-                .expect("gateway should accept the initial bootstrap websocket");
+            let (initial_stream, _) = accept_tcp_with_timeout(
+                &bootstrap_listener,
+                std::time::Duration::from_secs(2),
+                "initial bootstrap websocket",
+            );
+            initial_stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+                .expect("initial websocket should support read timeouts");
+            initial_stream
+                .set_write_timeout(Some(std::time::Duration::from_secs(2)))
+                .expect("initial websocket should support write timeouts");
             let (mut initial_websocket, initial_request_uri) =
                 accept_bootstrap_websocket(initial_stream);
             assert!(
@@ -727,6 +764,7 @@ fn stops_retrying_when_token_exchange_returns_terminal_status() {
                 "initial bootstrap websocket should include the startup bootstrap token"
             );
             expect_tunnel_connected_publications(&mut initial_websocket);
+            drain_bootstrap_messages_until_idle(&mut initial_websocket);
             initial_websocket
                 .close(Some(CloseFrame {
                     code: CloseCode::Library(4001),
@@ -734,9 +772,11 @@ fn stops_retrying_when_token_exchange_returns_terminal_status() {
                 }))
                 .expect("gateway should close the initial websocket for service restart");
 
-            let (mut exchange_stream, _) = bootstrap_listener
-                .accept()
-                .expect("gateway should accept the terminal token exchange request");
+            let (mut exchange_stream, _) = accept_tcp_with_timeout(
+                &bootstrap_listener,
+                std::time::Duration::from_secs(2),
+                "terminal token exchange request",
+            );
             let exchange_request = read_http_request(&mut exchange_stream);
             assert!(
                 exchange_request
@@ -752,12 +792,8 @@ fn stops_retrying_when_token_exchange_returns_terminal_status() {
                 }),
             );
 
-            bootstrap_listener
-                .set_nonblocking(true)
-                .expect("listener should allow nonblocking terminal assertions");
-            thread::sleep(std::time::Duration::from_millis(150));
-            match bootstrap_listener.accept() {
-                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {}
+            match accept_tcp_until(&bootstrap_listener, std::time::Duration::from_millis(150)) {
+                Err(error) if error.kind() == std::io::ErrorKind::TimedOut => {}
                 Ok(_) => panic!(
                     "terminal token exchange status {status_code} should prevent further reconnect attempts"
                 ),
@@ -807,7 +843,7 @@ fn stops_retrying_when_token_exchange_returns_terminal_status() {
         .expect("tunnel session should start");
 
         gateway_done_receiver
-            .recv()
+            .recv_timeout(std::time::Duration::from_secs(5))
             .expect("gateway should observe the terminal exchange response");
 
         tunnel_session.close();
@@ -815,6 +851,87 @@ fn stops_retrying_when_token_exchange_returns_terminal_status() {
             .join()
             .expect("gateway thread should exit cleanly");
     }
+}
+
+fn accept_tcp_with_timeout(
+    listener: &TcpListener,
+    timeout: std::time::Duration,
+    label: &str,
+) -> (TcpStream, std::net::SocketAddr) {
+    accept_tcp_until(listener, timeout).unwrap_or_else(|error| {
+        panic!("gateway should accept {label} within {timeout:?}: {error}");
+    })
+}
+
+fn accept_tcp_until(
+    listener: &TcpListener,
+    timeout: std::time::Duration,
+) -> std::io::Result<(TcpStream, std::net::SocketAddr)> {
+    let deadline = std::time::Instant::now() + timeout;
+    loop {
+        match listener.accept() {
+            Ok(connection) => return Ok(connection),
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                if std::time::Instant::now() >= deadline {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::TimedOut,
+                        "timed out waiting for TCP accept",
+                    ));
+                }
+                thread::sleep(std::time::Duration::from_millis(5));
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+fn drain_bootstrap_messages_until_idle(socket: &mut WebSocket<TcpStream>) {
+    socket
+        .get_mut()
+        .set_read_timeout(Some(std::time::Duration::from_millis(50)))
+        .expect("bootstrap websocket should support read timeouts");
+    loop {
+        match socket.read() {
+            Ok(Message::Text(payload)) => {
+                let message: Value =
+                    serde_json::from_str(payload.as_str()).expect("text payload should be json");
+                match message["type"].as_str() {
+                    Some("keepalive.state") | Some("runtime.ready") => {}
+                    Some("operation.open") => acknowledge_operation_open(socket, &message),
+                    other => panic!("unexpected bootstrap control message before close: {other:?}"),
+                }
+            }
+            Ok(Message::Binary(payload)) => {
+                if let Ok(telemetry_payload) = decode_telemetry_data_frame(payload.as_ref()) {
+                    socket
+                        .send(Message::Text(
+                            json!({
+                                "type": "telemetry.window",
+                                "streamId": SANDBOX_TELEMETRY_LOG_STREAM_ID,
+                                "bytes": telemetry_payload.len()
+                            })
+                            .to_string()
+                            .into(),
+                        ))
+                        .expect("gateway should replenish drained telemetry credit");
+                }
+            }
+            Err(WebSocketError::Io(error))
+                if error.kind() == std::io::ErrorKind::WouldBlock
+                    || error.kind() == std::io::ErrorKind::TimedOut =>
+            {
+                break;
+            }
+            Ok(other) => panic!("unexpected bootstrap message before close: {other:?}"),
+            Err(error) => {
+                panic!("bootstrap websocket should only become idle before close: {error}")
+            }
+        }
+    }
+    socket
+        .get_mut()
+        .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+        .expect("bootstrap websocket should restore read timeout");
 }
 
 #[test]

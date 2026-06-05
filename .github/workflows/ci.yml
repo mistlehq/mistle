@@ -1068,8 +1068,7 @@ jobs:
 
   test-sandboxd:
     name: Sandboxd Test
-    # runs-on: blacksmith-2vcpu-ubuntu-2404
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 60
     needs:
       - changes
@@ -1117,11 +1116,11 @@ jobs:
         id: test-sandboxd-container-target-cache
         uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
-          path: .local/sandboxd-test/target-debian-container
-          key: ${{ runner.os }}-sandboxd-test-target-debian-${{ hashFiles('packages/sandboxd/Cargo.lock') }}-${{ github.sha }}
+          path: .local/sandboxd-test/target-ubuntu-container
+          key: ${{ runner.os }}-sandboxd-test-target-ubuntu-${{ hashFiles('packages/sandboxd/Cargo.lock') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-sandboxd-test-target-debian-${{ hashFiles('packages/sandboxd/Cargo.lock') }}-
-            ${{ runner.os }}-sandboxd-test-target-debian-
+            ${{ runner.os }}-sandboxd-test-target-ubuntu-${{ hashFiles('packages/sandboxd/Cargo.lock') }}-
+            ${{ runner.os }}-sandboxd-test-target-ubuntu-
 
       - name: Restore pnpm store cache
         id: test-sandboxd-pnpm-store-cache
@@ -1185,8 +1184,8 @@ jobs:
         if: ${{ always() && !cancelled() && steps.test-sandboxd-container-target-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
-          path: .local/sandboxd-test/target-debian-container
-          key: ${{ runner.os }}-sandboxd-test-target-debian-${{ hashFiles('packages/sandboxd/Cargo.lock') }}-${{ github.sha }}
+          path: .local/sandboxd-test/target-ubuntu-container
+          key: ${{ runner.os }}-sandboxd-test-target-ubuntu-${{ hashFiles('packages/sandboxd/Cargo.lock') }}-${{ github.sha }}
 
   test-mstl:
     name: MSTL Test

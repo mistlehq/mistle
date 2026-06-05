@@ -1,8 +1,11 @@
 ARG NODE_IMAGE=node:24.14.1-bookworm
+ARG RUST_IMAGE=rust:1.95-bookworm
 
 FROM ${NODE_IMAGE} AS node
 
-FROM rust:1.93-bookworm
+FROM ${RUST_IMAGE} AS rust
+
+FROM ubuntu:24.04
 
 # Installed through npm in the test image, so keep this explicit pin in sync with Codex runtime pins.
 ARG CODEX_CLI_VERSION=0.137.0
@@ -11,6 +14,13 @@ ARG TARGETARCH
 ARG MISE_VERSION=v2026.4.19
 ARG CARGO_NEXTEST_VERSION=0.9.133
 
+ENV DEBIAN_FRONTEND=noninteractive \
+  CARGO_HOME=/usr/local/cargo \
+  RUSTUP_HOME=/usr/local/rustup \
+  PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin
+
+COPY --from=rust /usr/local/cargo /usr/local/cargo
+COPY --from=rust /usr/local/rustup /usr/local/rustup
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
@@ -19,17 +29,26 @@ RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
+    build-essential \
     ca-certificates \
+    cmake \
     curl \
     git \
     iproute2 \
     libssl-dev \
     nftables \
     pkg-config \
+    xz-utils \
   && rm -rf /var/lib/apt/lists/*
 
-RUN cargo install --locked cargo-nextest --version ${CARGO_NEXTEST_VERSION}
-RUN curl https://mise.run | MISE_INSTALL_PATH=/usr/local/bin/mise MISE_VERSION=${MISE_VERSION} sh
+RUN case "${TARGETARCH}" in \
+    amd64) nextest_platform="linux" ;; \
+    arm64) nextest_platform="linux-arm" ;; \
+    *) echo "Unsupported cargo-nextest architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+  esac \
+  && curl -LsSf "https://get.nexte.st/${CARGO_NEXTEST_VERSION}/${nextest_platform}" \
+    | tar zxf - -C /usr/local/cargo/bin
+RUN curl -fsSL https://mise.run | MISE_INSTALL_PATH=/usr/local/bin/mise MISE_VERSION=${MISE_VERSION} sh
 RUN npm install -g @openai/codex@${CODEX_CLI_VERSION}
 RUN case "${TARGETARCH}" in \
     amd64) opencode_asset="opencode-linux-x64-baseline.tar.gz" ;; \
