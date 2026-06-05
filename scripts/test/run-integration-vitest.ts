@@ -4,13 +4,10 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 
 import { buildDevelopmentTomlConfig, stringifyTomlConfig } from "../config/toml-config.ts";
 import { ensureIntegrationRunnerPoolSession } from "./integration-run-id.ts";
-
-type IntegrationVitestProject = {
-  projectName: string;
-  packageName: string;
-  packageDir: string;
-  appServicePrewarm: "control-plane" | "data-plane" | "gateway" | "worker" | "none";
-};
+import {
+  IntegrationVitestProjects,
+  type IntegrationVitestProject,
+} from "./integration-vitest-project-registry.ts";
 
 type SharedInfraPrewarmPlan = {
   postgres: boolean;
@@ -44,51 +41,6 @@ type SharedInfraCoordinator = {
 type RunnerServicePools = {
   stopRunnerServicePools: (input: { runId: string; coordinatorDir?: string }) => Promise<void>;
 };
-
-const IntegrationVitestProjects = [
-  {
-    projectName: "@mistle/control-plane-api",
-    packageName: "@mistle/control-plane-api",
-    packageDir: "apps/control-plane-api",
-    appServicePrewarm: "control-plane",
-  },
-  {
-    projectName: "@mistle/control-plane-worker",
-    packageName: "@mistle/control-plane-worker",
-    packageDir: "apps/control-plane-worker",
-    appServicePrewarm: "worker",
-  },
-  {
-    projectName: "@mistle/dashboard",
-    packageName: "@mistle/dashboard",
-    packageDir: "apps/dashboard",
-    appServicePrewarm: "control-plane",
-  },
-  {
-    projectName: "@mistle/integrations-definitions",
-    packageName: "@mistle/integrations-definitions",
-    packageDir: "packages/integrations-definitions",
-    appServicePrewarm: "none",
-  },
-  {
-    projectName: "@mistle/data-plane-api",
-    packageName: "@mistle/data-plane-api",
-    packageDir: "apps/data-plane-api",
-    appServicePrewarm: "data-plane",
-  },
-  {
-    projectName: "@mistle/data-plane-gateway",
-    packageName: "@mistle/data-plane-gateway",
-    packageDir: "apps/data-plane-gateway",
-    appServicePrewarm: "gateway",
-  },
-  {
-    projectName: "@mistle/data-plane-worker",
-    packageName: "@mistle/data-plane-worker",
-    packageDir: "apps/data-plane-worker",
-    appServicePrewarm: "worker",
-  },
-] satisfies IntegrationVitestProject[];
 
 const RequiredBuildPackages = [
   "@mistle/control-plane-api",

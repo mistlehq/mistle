@@ -485,7 +485,7 @@ Each app package with integration tests should expose:
 - `vitest.integration.config.ts`
 - `test:integration`
 
-Run app and package integration tests from the repo root:
+Run registered app and package integration projects from the repo root:
 
 ```bash
 pnpm test:integration
@@ -497,14 +497,14 @@ projects, so pooled physical infrastructure and pooled services can be reused.
 Run one package through the same root runner:
 
 ```bash
-pnpm test:integration -- --project @mistle/data-plane-gateway
+pnpm test:integration -- --project @mistle/object-store
 ```
 
 Run one file through the same root runner when pooling or timing behavior
 matters:
 
 ```bash
-pnpm test:integration -- --project @mistle/data-plane-gateway integration/gateway-restart.integration.test.ts
+pnpm test:integration -- --project @mistle/object-store integration/s3-compatible-object-store.integration.test.ts
 ```
 
 Detailed setup timing is opt-in:
@@ -516,7 +516,7 @@ MISTLE_TEST_TIMING=1 pnpm test:integration
 For targeted single-file debugging, use direct package Vitest execution:
 
 ```bash
-pnpm --filter @mistle/data-plane-gateway exec vitest run -c vitest.integration.config.ts integration/gateway-restart.integration.test.ts
+pnpm --filter @mistle/object-store exec vitest run -c vitest.integration.config.ts integration/s3-compatible-object-store.integration.test.ts
 ```
 
 Direct package Vitest execution is useful for tight local debugging, but it is
