@@ -5,21 +5,16 @@
   "exports": {
     ".": {
       "types": "./src/index.ts",
+      "workspace-src": "./src/index.ts",
+      "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
     "./styles.css": "./src/styles.css",
     "./test-support/responsive-breakpoints.js": {
       "types": "./src/test-support/responsive-breakpoints.ts",
-      "node": "./src/test-support/responsive-breakpoints.ts",
+      "workspace-src": "./src/test-support/responsive-breakpoints.ts",
       "import": "./src/test-support/responsive-breakpoints.ts",
       "default": "./src/test-support/responsive-breakpoints.ts"
-    },
-    "./*.js": {
-      "types": "./src/*",
-      "workspace-src": "./src/*",
-      "node": "./dist/*.js",
-      "import": "./src/*",
-      "default": "./src/*"
     }
   },
   "scripts": {

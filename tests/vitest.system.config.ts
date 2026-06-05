@@ -14,7 +14,13 @@ const IntegrationsDefinitionsCodexServerPath = fileURLToPath(
 );
 
 export default defineConfig({
+  ssr: {
+    resolve: {
+      conditions: ["workspace-src"],
+    },
+  },
   resolve: {
+    conditions: ["workspace-src", "node", "import", "default"],
     tsconfigPaths: true,
     alias: {
       "@mistle/integrations-definitions/agent-runtimes/codex/server":

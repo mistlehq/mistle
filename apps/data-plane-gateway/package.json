@@ -10,15 +10,15 @@
       "types": "./src/runtime/index.ts",
       "workspace-src": "./src/runtime/index.ts",
       "node": "./dist/runtime/index.js",
-      "import": "./src/runtime/index.ts",
-      "default": "./src/runtime/index.ts"
+      "import": "./dist/runtime/index.js",
+      "default": "./dist/runtime/index.js"
     },
     "./types": {
       "types": "./src/types.ts",
       "workspace-src": "./src/types.ts",
       "node": "./dist/types.js",
-      "import": "./src/types.ts",
-      "default": "./src/types.ts"
+      "import": "./dist/types.js",
+      "default": "./dist/types.js"
     }
   },
   "scripts": {

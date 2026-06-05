@@ -11,155 +11,148 @@
       "types": "./src/index.ts",
       "workspace-src": "./src/index.ts",
       "node": "./dist/index.js",
-      "import": "./src/index.ts",
-      "default": "./src/index.ts"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./server": {
       "types": "./src/server.ts",
       "workspace-src": "./src/server.ts",
       "node": "./dist/server.js",
-      "import": "./src/server.ts",
-      "default": "./src/server.ts"
+      "import": "./dist/server.js",
+      "default": "./dist/server.js"
     },
     "./agent-runtimes/server": {
       "types": "./src/agent-runtimes/server.ts",
       "workspace-src": "./src/agent-runtimes/server.ts",
       "node": "./dist/agent-runtimes/server.js",
-      "import": "./src/agent-runtimes/server.ts",
-      "default": "./src/agent-runtimes/server.ts"
+      "import": "./dist/agent-runtimes/server.js",
+      "default": "./dist/agent-runtimes/server.js"
     },
     "./agent-runtimes/codex": {
       "types": "./src/agent-runtimes/codex/index.ts",
       "workspace-src": "./src/agent-runtimes/codex/index.ts",
       "node": "./dist/agent-runtimes/codex/index.js",
-      "import": "./src/agent-runtimes/codex/index.ts",
-      "default": "./src/agent-runtimes/codex/index.ts"
+      "import": "./dist/agent-runtimes/codex/index.js",
+      "default": "./dist/agent-runtimes/codex/index.js"
     },
     "./agent-runtimes/codex/server": {
       "types": "./src/agent-runtimes/codex/server.ts",
       "workspace-src": "./src/agent-runtimes/codex/server.ts",
       "node": "./dist/agent-runtimes/codex/server.js",
-      "import": "./src/agent-runtimes/codex/server.ts",
-      "default": "./src/agent-runtimes/codex/server.ts"
+      "import": "./dist/agent-runtimes/codex/server.js",
+      "default": "./dist/agent-runtimes/codex/server.js"
     },
     "./agent-runtimes/codex/app-server": {
       "types": "./src/agent-runtimes/codex/app-server.ts",
       "workspace-src": "./src/agent-runtimes/codex/app-server.ts",
       "node": "./dist/agent-runtimes/codex/app-server.js",
-      "import": "./src/agent-runtimes/codex/app-server.ts",
-      "default": "./src/agent-runtimes/codex/app-server.ts"
+      "import": "./dist/agent-runtimes/codex/app-server.js",
+      "default": "./dist/agent-runtimes/codex/app-server.js"
     },
     "./agent-runtimes/codex/client": {
       "types": "./src/agent-runtimes/codex/client.ts",
       "workspace-src": "./src/agent-runtimes/codex/client.ts",
       "node": "./dist/agent-runtimes/codex/client.js",
-      "import": "./src/agent-runtimes/codex/client.ts",
-      "default": "./src/agent-runtimes/codex/client.ts"
+      "import": "./dist/agent-runtimes/codex/client.js",
+      "default": "./dist/agent-runtimes/codex/client.js"
     },
     "./agent-runtimes/opencode": {
       "types": "./src/agent-runtimes/opencode/index.ts",
       "workspace-src": "./src/agent-runtimes/opencode/index.ts",
       "node": "./dist/agent-runtimes/opencode/index.js",
-      "import": "./src/agent-runtimes/opencode/index.ts",
-      "default": "./src/agent-runtimes/opencode/index.ts"
+      "import": "./dist/agent-runtimes/opencode/index.js",
+      "default": "./dist/agent-runtimes/opencode/index.js"
     },
     "./agent-runtimes/opencode/client": {
       "types": "./src/agent-runtimes/opencode/client.ts",
       "workspace-src": "./src/agent-runtimes/opencode/client.ts",
       "node": "./dist/agent-runtimes/opencode/client.js",
-      "import": "./src/agent-runtimes/opencode/client.ts",
-      "default": "./src/agent-runtimes/opencode/client.ts"
+      "import": "./dist/agent-runtimes/opencode/client.js",
+      "default": "./dist/agent-runtimes/opencode/client.js"
     },
     "./agent-runtimes/opencode/composer-capabilities": {
       "types": "./src/agent-runtimes/opencode/composer-capabilities.ts",
       "workspace-src": "./src/agent-runtimes/opencode/composer-capabilities.ts",
       "node": "./dist/agent-runtimes/opencode/composer-capabilities.js",
-      "import": "./src/agent-runtimes/opencode/composer-capabilities.ts",
-      "default": "./src/agent-runtimes/opencode/composer-capabilities.ts"
+      "import": "./dist/agent-runtimes/opencode/composer-capabilities.js",
+      "default": "./dist/agent-runtimes/opencode/composer-capabilities.js"
     },
     "./agent-runtimes/opencode/server": {
       "types": "./src/agent-runtimes/opencode/server.ts",
       "workspace-src": "./src/agent-runtimes/opencode/server.ts",
       "node": "./dist/agent-runtimes/opencode/server.js",
-      "import": "./src/agent-runtimes/opencode/server.ts",
-      "default": "./src/agent-runtimes/opencode/server.ts"
+      "import": "./dist/agent-runtimes/opencode/server.js",
+      "default": "./dist/agent-runtimes/opencode/server.js"
     },
     "./agent-runtimes/opencode/pty-launch": {
       "types": "./src/agent-runtimes/opencode/pty-launch.ts",
       "workspace-src": "./src/agent-runtimes/opencode/pty-launch.ts",
       "node": "./dist/agent-runtimes/opencode/pty-launch.js",
-      "import": "./src/agent-runtimes/opencode/pty-launch.ts",
-      "default": "./src/agent-runtimes/opencode/pty-launch.ts"
+      "import": "./dist/agent-runtimes/opencode/pty-launch.js",
+      "default": "./dist/agent-runtimes/opencode/pty-launch.js"
     },
     "./agent-runtimes/opencode/title-generation": {
       "types": "./src/agent-runtimes/opencode/title-generation.ts",
       "workspace-src": "./src/agent-runtimes/opencode/title-generation.ts",
       "node": "./dist/agent-runtimes/opencode/title-generation.js",
-      "import": "./src/agent-runtimes/opencode/title-generation.ts",
-      "default": "./src/agent-runtimes/opencode/title-generation.ts"
+      "import": "./dist/agent-runtimes/opencode/title-generation.js",
+      "default": "./dist/agent-runtimes/opencode/title-generation.js"
     },
     "./agent-runtimes/pi/client": {
       "types": "./src/agent-runtimes/pi/client.ts",
       "workspace-src": "./src/agent-runtimes/pi/client.ts",
       "node": "./dist/agent-runtimes/pi/client.js",
-      "import": "./src/agent-runtimes/pi/client.ts",
-      "default": "./src/agent-runtimes/pi/client.ts"
+      "import": "./dist/agent-runtimes/pi/client.js",
+      "default": "./dist/agent-runtimes/pi/client.js"
     },
     "./agent-runtimes/pi/pty-launch": {
       "types": "./src/agent-runtimes/pi/pty-launch.ts",
       "workspace-src": "./src/agent-runtimes/pi/pty-launch.ts",
       "node": "./dist/agent-runtimes/pi/pty-launch.js",
-      "import": "./src/agent-runtimes/pi/pty-launch.ts",
-      "default": "./src/agent-runtimes/pi/pty-launch.ts"
+      "import": "./dist/agent-runtimes/pi/pty-launch.js",
+      "default": "./dist/agent-runtimes/pi/pty-launch.js"
     },
     "./agent-runtimes/pi/title-generation-command": {
       "types": "./src/agent-runtimes/pi/title-generation-command.ts",
       "workspace-src": "./src/agent-runtimes/pi/title-generation-command.ts",
       "node": "./dist/agent-runtimes/pi/title-generation-command.js",
-      "import": "./src/agent-runtimes/pi/title-generation-command.ts",
-      "default": "./src/agent-runtimes/pi/title-generation-command.ts"
+      "import": "./dist/agent-runtimes/pi/title-generation-command.js",
+      "default": "./dist/agent-runtimes/pi/title-generation-command.js"
     },
     "./openai": {
       "types": "./src/openai/index.ts",
       "workspace-src": "./src/openai/index.ts",
       "node": "./dist/openai/index.js",
-      "import": "./src/openai/index.ts",
-      "default": "./src/openai/index.ts"
+      "import": "./dist/openai/index.js",
+      "default": "./dist/openai/index.js"
     },
     "./jira": {
       "types": "./src/jira.ts",
       "workspace-src": "./src/jira.ts",
       "node": "./dist/jira.js",
-      "import": "./src/jira.ts",
-      "default": "./src/jira.ts"
+      "import": "./dist/jira.js",
+      "default": "./dist/jira.js"
     },
     "./forms": {
       "types": "./src/forms/index.ts",
       "workspace-src": "./src/forms/index.ts",
       "node": "./dist/forms/index.js",
-      "import": "./src/forms/index.ts",
-      "default": "./src/forms/index.ts"
+      "import": "./dist/forms/index.js",
+      "default": "./dist/forms/index.js"
     },
     "./sandbox-runtimes": {
       "types": "./src/sandbox-runtimes/index.ts",
       "workspace-src": "./src/sandbox-runtimes/index.ts",
       "node": "./dist/sandbox-runtimes/index.js",
-      "import": "./src/sandbox-runtimes/index.ts",
-      "default": "./src/sandbox-runtimes/index.ts"
+      "import": "./dist/sandbox-runtimes/index.js",
+      "default": "./dist/sandbox-runtimes/index.js"
     },
     "./browser": {
       "types": "./src/browser.ts",
       "workspace-src": "./src/browser.ts",
       "node": "./dist/browser.js",
-      "import": "./src/browser.ts",
-      "default": "./src/browser.ts"
-    },
-    "./*.js": {
-      "types": "./src/*.ts",
-      "workspace-src": "./src/*.ts",
-      "node": "./dist/*.js",
-      "import": "./src/*.ts",
-      "default": "./src/*.ts"
+      "import": "./dist/browser.js",
+      "default": "./dist/browser.js"
     }
   },
   "scripts": {

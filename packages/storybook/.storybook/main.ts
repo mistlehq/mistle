@@ -44,6 +44,7 @@ const config: StorybookConfig = {
       },
       plugins: [react(), tailwindcss()],
       resolve: {
+        conditions: ["workspace-src", "module", "browser", "development|production"],
         alias: [
           {
             find: /^@mistle\/sandbox-session-client$/,

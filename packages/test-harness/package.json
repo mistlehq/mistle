@@ -5,18 +5,21 @@
   "exports": {
     ".": {
       "types": "./src/index.ts",
+      "workspace-src": "./src/index.ts",
       "node": "./src/index.ts",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
     "./integration": {
       "types": "./src/integration/index.ts",
+      "workspace-src": "./src/integration/index.ts",
       "node": "./src/integration/index.ts",
       "import": "./src/integration/index.ts",
       "default": "./src/integration/index.ts"
     },
     "./system": {
       "types": "./src/system/index.ts",
+      "workspace-src": "./src/system/index.ts",
       "node": "./src/system/index.ts",
       "import": "./src/system/index.ts",
       "default": "./src/system/index.ts"

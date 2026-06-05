@@ -10,15 +10,15 @@
       "types": "./src/main.ts",
       "workspace-src": "./src/main.ts",
       "node": "./dist/main.js",
-      "import": "./src/main.ts",
-      "default": "./src/main.ts"
+      "import": "./dist/main.js",
+      "default": "./dist/main.js"
     },
     "./types": {
       "types": "./src/types.ts",
       "workspace-src": "./src/types.ts",
       "node": "./dist/types.js",
-      "import": "./src/types.ts",
-      "default": "./src/types.ts"
+      "import": "./dist/types.js",
+      "default": "./dist/types.js"
     }
   },
   "scripts": {

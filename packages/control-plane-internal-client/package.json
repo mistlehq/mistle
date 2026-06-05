@@ -11,22 +11,15 @@
       "types": "./src/index.ts",
       "workspace-src": "./src/index.ts",
       "node": "./dist/index.js",
-      "import": "./src/index.ts",
-      "default": "./src/index.ts"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./generated/schema.js": {
       "types": "./src/generated/schema.ts",
       "workspace-src": "./src/generated/schema.ts",
       "node": "./dist/generated/schema.js",
-      "import": "./src/generated/schema.ts",
-      "default": "./src/generated/schema.ts"
-    },
-    "./*.js": {
-      "types": "./src/*.ts",
-      "workspace-src": "./src/*.ts",
-      "node": "./dist/*.js",
-      "import": "./src/*.ts",
-      "default": "./src/*.ts"
+      "import": "./dist/generated/schema.js",
+      "default": "./dist/generated/schema.js"
     }
   },
   "scripts": {

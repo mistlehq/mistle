@@ -10,7 +10,13 @@ const SandboxLifecycleIndexPath = fileURLToPath(
 );
 
 export default defineConfig({
+  ssr: {
+    resolve: {
+      conditions: ["workspace-src"],
+    },
+  },
   resolve: {
+    conditions: ["workspace-src", "node", "import", "default"],
     alias: [
       {
         find: /^@mistle\/integrations-definitions$/,

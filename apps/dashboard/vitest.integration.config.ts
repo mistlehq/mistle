@@ -110,7 +110,13 @@ export const WorkspaceAliases = [
 ];
 
 export default defineConfig({
+  ssr: {
+    resolve: {
+      conditions: ["workspace-src"],
+    },
+  },
   resolve: {
+    conditions: ["workspace-src", "node", "import", "default"],
     alias: [...WorkspaceAliases, ...ControlPlaneWorkspaceAliases],
     tsconfigPaths: true,
   },

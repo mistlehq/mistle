@@ -5,7 +5,13 @@ import { defineConfig } from "vitest/config";
 import { WorkspaceAliases } from "../data-plane-gateway/vitest.integration.config.js";
 
 export default defineConfig({
+  ssr: {
+    resolve: {
+      conditions: ["workspace-src"],
+    },
+  },
   resolve: {
+    conditions: ["workspace-src", "node", "import", "default"],
     alias: [
       ...WorkspaceAliases,
       {

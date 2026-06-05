@@ -11,15 +11,8 @@
       "types": "./src/index.ts",
       "workspace-src": "./src/index.ts",
       "node": "./dist/index.js",
-      "import": "./src/index.ts",
-      "default": "./src/index.ts"
-    },
-    "./*.js": {
-      "types": "./src/*.ts",
-      "workspace-src": "./src/*.ts",
-      "node": "./dist/*.js",
-      "import": "./src/*.ts",
-      "default": "./src/*.ts"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "scripts": {

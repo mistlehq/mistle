@@ -11,29 +11,29 @@
       "types": "./src/index.ts",
       "workspace-src": "./src/index.ts",
       "node": "./dist/index.js",
-      "import": "./src/index.ts",
-      "default": "./src/index.ts"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./control-plane": {
       "types": "./src/control-plane.ts",
       "workspace-src": "./src/control-plane.ts",
       "node": "./dist/control-plane.js",
-      "import": "./src/control-plane.ts",
-      "default": "./src/control-plane.ts"
+      "import": "./dist/control-plane.js",
+      "default": "./dist/control-plane.js"
     },
     "./data-plane": {
       "types": "./src/data-plane.ts",
       "workspace-src": "./src/data-plane.ts",
       "node": "./dist/data-plane.js",
-      "import": "./src/data-plane.ts",
-      "default": "./src/data-plane.ts"
+      "import": "./dist/data-plane.js",
+      "default": "./dist/data-plane.js"
     },
-    "./*.js": {
-      "types": "./src/*.ts",
-      "workspace-src": "./src/*.ts",
-      "node": "./dist/*.js",
-      "import": "./src/*.ts",
-      "default": "./src/*.ts"
+    "./durable-step-retry.js": {
+      "types": "./src/durable-step-retry.ts",
+      "workspace-src": "./src/durable-step-retry.ts",
+      "node": "./dist/durable-step-retry.js",
+      "import": "./dist/durable-step-retry.js",
+      "default": "./dist/durable-step-retry.js"
     }
   },
   "scripts": {

@@ -24,6 +24,7 @@ export default defineConfig({
     strictPort: true,
   },
   resolve: {
+    conditions: ["workspace-src", "module", "browser", "development|production"],
     alias: [
       {
         find: /^@mistle\/sandbox-session-client$/,

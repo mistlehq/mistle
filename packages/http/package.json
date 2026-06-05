@@ -11,22 +11,22 @@
       "types": "./src/index.ts",
       "workspace-src": "./src/index.ts",
       "node": "./dist/index.js",
-      "import": "./src/index.ts",
-      "default": "./src/index.ts"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./pagination": {
       "types": "./src/pagination/index.ts",
       "workspace-src": "./src/pagination/index.ts",
       "node": "./dist/pagination/index.js",
-      "import": "./src/pagination/index.ts",
-      "default": "./src/pagination/index.ts"
+      "import": "./dist/pagination/index.js",
+      "default": "./dist/pagination/index.js"
     },
-    "./*.js": {
-      "types": "./src/*.ts",
-      "workspace-src": "./src/*.ts",
-      "node": "./dist/*.js",
-      "import": "./src/*.ts",
-      "default": "./src/*.ts"
+    "./errors.js": {
+      "types": "./src/errors.ts",
+      "workspace-src": "./src/errors.ts",
+      "node": "./dist/errors.js",
+      "import": "./dist/errors.js",
+      "default": "./dist/errors.js"
     }
   },
   "scripts": {

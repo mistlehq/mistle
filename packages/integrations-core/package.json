@@ -11,29 +11,22 @@
       "types": "./src/index.ts",
       "workspace-src": "./src/index.ts",
       "node": "./dist/index.js",
-      "import": "./src/index.ts",
-      "default": "./src/index.ts"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./triggers": {
       "types": "./src/triggers.ts",
       "workspace-src": "./src/triggers.ts",
       "node": "./dist/triggers.js",
-      "import": "./src/triggers.ts",
-      "default": "./src/triggers.ts"
+      "import": "./dist/triggers.js",
+      "default": "./dist/triggers.js"
     },
     "./triggers.js": {
       "types": "./src/triggers.ts",
       "workspace-src": "./src/triggers.ts",
       "node": "./dist/triggers.js",
-      "import": "./src/triggers.ts",
-      "default": "./src/triggers.ts"
-    },
-    "./*.js": {
-      "types": "./src/*.ts",
-      "workspace-src": "./src/*.ts",
-      "node": "./dist/*.js",
-      "import": "./src/*.ts",
-      "default": "./src/*.ts"
+      "import": "./dist/triggers.js",
+      "default": "./dist/triggers.js"
     }
   },
   "scripts": {

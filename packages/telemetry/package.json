@@ -11,15 +11,22 @@
       "types": "./src/index.ts",
       "workspace-src": "./src/index.ts",
       "node": "./dist/index.js",
-      "import": "./src/index.ts",
-      "default": "./src/index.ts"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
-    "./*.js": {
-      "types": "./src/*.ts",
-      "workspace-src": "./src/*.ts",
-      "node": "./dist/*.js",
-      "import": "./src/*.ts",
-      "default": "./src/*.ts"
+    "./trace-context.js": {
+      "types": "./src/trace-context.ts",
+      "workspace-src": "./src/trace-context.ts",
+      "node": "./dist/trace-context.js",
+      "import": "./dist/trace-context.js",
+      "default": "./dist/trace-context.js"
+    },
+    "./testing.js": {
+      "types": "./src/testing.ts",
+      "workspace-src": "./src/testing.ts",
+      "node": "./dist/testing.js",
+      "import": "./dist/testing.js",
+      "default": "./dist/testing.js"
     }
   },
   "scripts": {
