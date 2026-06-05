@@ -38,12 +38,12 @@ const CodexGitHubAssets = {
   x86_64: {
     fileName: "codex-x86_64-unknown-linux-musl.tar.gz",
     binaryPath: "codex-x86_64-unknown-linux-musl",
-    sha256: "dadad6c9db74500ad5431fa178b30288fdbdda6bdf3397634db6e1f5981321cf",
+    sha256: "d96e88313b95597e9cbb8704f6db16dbb81c07142b08cfb628479ab433696931",
   },
   aarch64: {
     fileName: "codex-aarch64-unknown-linux-musl.tar.gz",
     binaryPath: "codex-aarch64-unknown-linux-musl",
-    sha256: "9dba0b8054541854b3cc3c12c25f52d6a441c90d87520e5260df56c09ba3eace",
+    sha256: "1b9cae96e27f5da2752054a5bba9204d486939ea60c65df4ba4a638458734bda",
   },
 };
 const ArtifactCommandTimeoutMs = 120_000;
