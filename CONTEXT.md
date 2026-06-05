@@ -382,7 +382,10 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - An **Unavailable resource** should use the same user-facing pattern across resource types.
 - A **Trigger** may select one or more **Trigger events**.
 - A **Trigger** may start from a webhook event or a schedule.
+- A provider pull request activity should be represented as separate **Trigger events** for each supported activity rather than one broad activity event with an action parameter.
 - A **Trigger event** may expose **Trigger event parameters**.
+- A **Trigger event** for a provider review-request event should expose the requested reviewer or team as **Trigger event parameters** instead of hardcoding a Mistle reviewer policy.
+- A **Trigger event** for a removed provider review request delivers cancellation intent into the **Trigger conversation**; it does not imply hard runtime cancellation.
 - A **Trigger event parameter** may have one or more **Trigger event parameter rules**.
 - A **Trigger event parameter rule** may include or exclude matching provider event values.
 - A first-pass exclusion rule should be an equality negation on a **Trigger event parameter**, not a separate exclusion list.

@@ -19,6 +19,7 @@ export type WebhookTriggerFormValues = {
   conversationKeyTemplate: string;
   eventIds: string[];
   eventParameterRules: WebhookTriggerEventParameterRuleMap;
+  remainingPayloadFilter?: Record<string, unknown> | null;
 };
 
 export type WebhookTriggerFormValueKey = keyof WebhookTriggerFormValues;

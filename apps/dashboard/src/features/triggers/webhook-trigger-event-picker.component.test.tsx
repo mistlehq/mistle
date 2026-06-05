@@ -33,6 +33,10 @@ const SlackAppMentionTriggerId = createWebhookTriggerEventId({
   webhookSourceId: SlackWebhookSourceId,
   eventType: "slack:app_mention",
 });
+const PullRequestReviewRequestedTriggerId = createWebhookTriggerEventId({
+  webhookSourceId: GitHubWebhookSourceId,
+  eventType: "github.pull_request.review_requested",
+});
 
 const WebhookEventOptions: readonly WebhookTriggerEventOption[] = [
   createGithubIssueCommentCreatedEventOption({
@@ -42,6 +46,35 @@ const WebhookEventOptions: readonly WebhookTriggerEventOption[] = [
     connectionLabel: GitHubGroupedConnectionLabel,
   }),
 ];
+
+const PullRequestReviewRequestedEventOption: WebhookTriggerEventOption = {
+  id: PullRequestReviewRequestedTriggerId,
+  eventType: "github.pull_request.review_requested",
+  integrationWebhookSourceId: GitHubWebhookSourceId,
+  connectionId: GitHubConnectionId,
+  connectionLabel: GitHubGroupedConnectionLabel,
+  label: "Pull request review requested",
+  logoKey: "github",
+  parameters: [
+    {
+      id: "requestedReviewer",
+      label: "requested reviewer",
+      kind: "resource-select",
+      resourceKind: "user",
+      payloadPath: ["requested_reviewer", "login"],
+      prefix: "for",
+      placeholder: "Any requested reviewer",
+    },
+    {
+      id: "requestedTeam",
+      label: "requested GitHub team",
+      kind: "string",
+      payloadPath: ["requested_team", "slug"],
+      prefix: "for team",
+      placeholder: "Any GitHub team slug",
+    },
+  ],
+};
 
 function isRule(value: string) {
   return {
@@ -511,6 +544,46 @@ describe("WebhookTriggerEventPicker", () => {
     }
 
     expect(parameterSelect.textContent).toContain("pull request");
+  });
+
+  it("renders GitHub review request target parameters as one mutually exclusive control", () => {
+    const { container } = renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedEventIds: [PullRequestReviewRequestedTriggerId],
+      eventOptions: [PullRequestReviewRequestedEventOption],
+      eventParameterRules: {
+        [PullRequestReviewRequestedTriggerId]: {
+          requestedReviewer: isRule("octocat"),
+        },
+      },
+    });
+
+    expect(screen.getByText("Pull request review requested")).toBeDefined();
+    expect(screen.getByText("for reviewer")).toBeDefined();
+    expect(screen.getByText("is")).toBeDefined();
+    expect(screen.queryByText("for team")).toBeNull();
+    expect(container.textContent).not.toContain("Any GitHub team slug");
+  });
+
+  it("preserves exclusion rules for GitHub review request target parameters", () => {
+    renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedEventIds: [PullRequestReviewRequestedTriggerId],
+      eventOptions: [PullRequestReviewRequestedEventOption],
+      eventParameterRules: {
+        [PullRequestReviewRequestedTriggerId]: {
+          requestedReviewer: {
+            operator: WebhookTriggerEventParameterRuleOperators.IS_NOT,
+            value: "octocat",
+          },
+        },
+      },
+    });
+
+    expect(screen.getByText("for reviewer")).toBeDefined();
+    expect(screen.getByText("is not")).toBeDefined();
   });
 
   it("resolves enum equality parameter selections as equality rules", () => {

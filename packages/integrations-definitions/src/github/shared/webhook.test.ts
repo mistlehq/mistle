@@ -384,6 +384,113 @@ const PullRequestSynchronizePayload = createMinimalGitHubPayload({
   },
 });
 
+const PullRequestReadyForReviewPayload = createMinimalGitHubPayload({
+  action: "ready_for_review",
+  body: {
+    number: 48,
+    pull_request: {
+      id: 2105,
+      number: 48,
+      updated_at: "2026-04-02T17:47:43Z",
+    },
+  },
+});
+
+const PullRequestReviewRequestedPayload = createMinimalGitHubPayload({
+  action: "review_requested",
+  body: {
+    number: 49,
+    pull_request: {
+      id: 2106,
+      number: 49,
+      updated_at: "2026-04-02T17:48:43Z",
+    },
+    requested_reviewer: {
+      id: 3101,
+      login: "mistle-agent",
+    },
+  },
+});
+
+const PullRequestTeamReviewRequestedPayload = createMinimalGitHubPayload({
+  action: "review_requested",
+  body: {
+    number: 50,
+    pull_request: {
+      id: 2107,
+      number: 50,
+      updated_at: "2026-04-02T17:49:43Z",
+    },
+    requested_team: {
+      id: 3201,
+      slug: "platform-reviewers",
+    },
+  },
+});
+
+const PullRequestReviewRequestRemovedPayload = createMinimalGitHubPayload({
+  action: "review_request_removed",
+  body: {
+    number: 51,
+    pull_request: {
+      id: 2108,
+      number: 51,
+      updated_at: "2026-04-02T17:50:43Z",
+    },
+    requested_reviewer: {
+      id: 3102,
+      login: "mistle-agent",
+    },
+  },
+});
+
+const PullRequestReviewRequestedWithoutActorPayload = createMinimalGitHubPayload({
+  action: "review_requested",
+  body: {
+    number: 52,
+    pull_request: {
+      id: 2109,
+      number: 52,
+      updated_at: "2026-04-02T17:51:43Z",
+    },
+  },
+});
+
+const PullRequestReviewRequestedWithoutActorIdPayload = createMinimalGitHubPayload({
+  action: "review_requested",
+  body: {
+    number: 53,
+    pull_request: {
+      id: 2110,
+      number: 53,
+      updated_at: "2026-04-02T17:52:43Z",
+    },
+    requested_reviewer: {
+      login: "mistle-agent",
+    },
+  },
+});
+
+const PullRequestReviewRequestedWithReviewerAndTeamPayload = createMinimalGitHubPayload({
+  action: "review_requested",
+  body: {
+    number: 54,
+    pull_request: {
+      id: 2111,
+      number: 54,
+      updated_at: "2026-04-02T17:53:43Z",
+    },
+    requested_reviewer: {
+      id: 3103,
+      login: "mistle-agent",
+    },
+    requested_team: {
+      id: 3202,
+      slug: "platform-reviewers",
+    },
+  },
+});
+
 const PushPayload: PushPayloadWithHeadCommit = resolvePushPayload();
 const CheckSuiteCompletedPayload: CheckSuiteCompletedEvent & InstallationContext =
   resolveCheckSuiteCompletedPayload();
@@ -461,6 +568,30 @@ const SupportedGitHubOrderingCases: ReadonlyArray<{
     payload: PullRequestSynchronizePayload,
     expectedOccurredAt: "2026-04-02T17:46:43Z",
     expectedOrderingIdentifier: "8f2f8f2f8f2f8f2f8f2f8f2f8f2f8f2f8f2f8f2f",
+  },
+  {
+    providerEventType: "pull_request",
+    eventType: "github.pull_request.ready_for_review",
+    deliveryId: "delivery_pull_request_ready_for_review",
+    payload: PullRequestReadyForReviewPayload,
+    expectedOccurredAt: "2026-04-02T17:47:43Z",
+    expectedOrderingIdentifier: "00000000000000002105",
+  },
+  {
+    providerEventType: "pull_request",
+    eventType: "github.pull_request.review_requested",
+    deliveryId: "delivery_pull_request_review_requested",
+    payload: PullRequestReviewRequestedPayload,
+    expectedOccurredAt: "2026-04-02T17:48:43Z",
+    expectedOrderingIdentifier: "00000000000000002106.00000000000000003101.1",
+  },
+  {
+    providerEventType: "pull_request",
+    eventType: "github.pull_request.review_request_removed",
+    deliveryId: "delivery_pull_request_review_request_removed",
+    payload: PullRequestReviewRequestRemovedPayload,
+    expectedOccurredAt: "2026-04-02T17:50:43Z",
+    expectedOrderingIdentifier: "00000000000000002108.00000000000000003102.2",
   },
   {
     providerEventType: "pull_request_review",
@@ -628,6 +759,76 @@ describe("GitHubWebhookHandler", () => {
         },
       });
     }
+  });
+
+  it("derives pull request review request source order keys for requested teams", async () => {
+    const resolved = await GitHubWebhookHandler.resolveWebhookRequest({
+      targetKey: "github_cloud",
+      target: createGitHubCloudTargetConfig(),
+      headers: {
+        "x-github-event": "pull_request",
+        "x-github-delivery": "delivery_pull_request_team_review_requested",
+      },
+      rawBody: encodePayload(PullRequestTeamReviewRequestedPayload),
+    });
+
+    expect(resolved).toMatchObject({
+      kind: "event",
+      event: {
+        externalEventId: "delivery_pull_request_team_review_requested",
+        externalDeliveryId: "delivery_pull_request_team_review_requested",
+        providerEventType: "pull_request",
+        eventType: "github.pull_request.review_requested",
+        occurredAt: "2026-04-02T17:49:43Z",
+        sourceOrderKey: "2026-04-02T17:49:43Z#00000000000000002107.00000000000000003201.1",
+      },
+    });
+  });
+
+  it("rejects pull request review request ordering without a requested actor id", () => {
+    expect(() =>
+      GitHubWebhookHandler.resolveWebhookRequest({
+        targetKey: "github_cloud",
+        target: createGitHubCloudTargetConfig(),
+        headers: {
+          "x-github-event": "pull_request",
+          "x-github-delivery": "delivery_pull_request_review_requested_without_actor",
+        },
+        rawBody: encodePayload(PullRequestReviewRequestedWithoutActorPayload),
+      }),
+    ).toThrow(
+      "GitHub webhook event 'github.pull_request.review_requested' is missing requested reviewer or requested team id.",
+    );
+
+    expect(() =>
+      GitHubWebhookHandler.resolveWebhookRequest({
+        targetKey: "github_cloud",
+        target: createGitHubCloudTargetConfig(),
+        headers: {
+          "x-github-event": "pull_request",
+          "x-github-delivery": "delivery_pull_request_review_requested_without_actor_id",
+        },
+        rawBody: encodePayload(PullRequestReviewRequestedWithoutActorIdPayload),
+      }),
+    ).toThrow(
+      "GitHub webhook event 'github.pull_request.review_requested' is missing requested reviewer or requested team id.",
+    );
+  });
+
+  it("rejects pull request review request ordering with both requested actor ids", () => {
+    expect(() =>
+      GitHubWebhookHandler.resolveWebhookRequest({
+        targetKey: "github_cloud",
+        target: createGitHubCloudTargetConfig(),
+        headers: {
+          "x-github-event": "pull_request",
+          "x-github-delivery": "delivery_pull_request_review_requested_with_two_actors",
+        },
+        rawBody: encodePayload(PullRequestReviewRequestedWithReviewerAndTeamPayload),
+      }),
+    ).toThrow(
+      "GitHub webhook event 'github.pull_request.review_requested' must include exactly one requested reviewer or requested team id.",
+    );
   });
 
   it("resolves matching connection by installation id", async () => {

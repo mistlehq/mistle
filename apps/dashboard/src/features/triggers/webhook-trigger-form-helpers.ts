@@ -97,6 +97,7 @@ export function toWebhookTriggerFormValues(
       conversationKeyTemplate: "",
       eventIds: [],
       eventParameterRules: {},
+      remainingPayloadFilter: null,
     };
   }
 
@@ -122,6 +123,7 @@ export function toWebhookTriggerFormValues(
     conversationKeyTemplate: trigger.conversationKeyTemplate,
     eventIds: selectedEventIds,
     eventParameterRules: extractedEventParameterRules.eventParameterRules,
+    remainingPayloadFilter: extractedEventParameterRules.remainingPayloadFilter,
   };
 }
 
@@ -204,7 +206,7 @@ function toPayloadFilterValue(input: {
     eventOptions: input.eventOptions,
     selectedEventIds: input.values.eventIds,
     eventParameterRules: input.values.eventParameterRules,
-    advancedPayloadFilter: null,
+    advancedPayloadFilter: input.values.remainingPayloadFilter ?? null,
   });
 }
 

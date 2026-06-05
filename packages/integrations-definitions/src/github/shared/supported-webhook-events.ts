@@ -74,6 +74,14 @@ const GitHubPayloadReferences = {
     path: ["pull_request", "head", "ref"],
     description: "Head branch name",
   },
+  REQUESTED_REVIEWER_LOGIN: {
+    path: ["requested_reviewer", "login"],
+    description: "GitHub username requested for pull request review",
+  },
+  REQUESTED_TEAM_SLUG: {
+    path: ["requested_team", "slug"],
+    description: "GitHub team slug requested for pull request review",
+  },
   COMMENT_BODY: {
     path: ["comment", "body"],
     description: "Comment text",
@@ -186,6 +194,25 @@ const GitHubHeadBranchParameter: IntegrationWebhookEventParameterDefinition = {
   placeholder: "Any head branch",
 };
 
+const GitHubRequestedReviewerParameter: IntegrationWebhookEventParameterDefinition = {
+  id: "requestedReviewer",
+  label: "requested reviewer",
+  kind: "resource-select",
+  resourceKind: "user",
+  payloadPath: ["requested_reviewer", "login"],
+  prefix: "for",
+  placeholder: "Any requested reviewer",
+};
+
+const GitHubRequestedTeamParameter: IntegrationWebhookEventParameterDefinition = {
+  id: "requestedTeam",
+  label: "requested GitHub team",
+  kind: "string",
+  payloadPath: ["requested_team", "slug"],
+  prefix: "for team",
+  placeholder: "Any GitHub team slug",
+};
+
 const GitHubPushBranchParameter: IntegrationWebhookEventParameterDefinition = {
   id: "branch",
   label: "branch",
@@ -257,6 +284,40 @@ function createGitHubWebhookEventDefinition(input: {
       : { conversationKeyOptions: input.conversationKeyOptions }),
     ...(input.parameters === undefined ? {} : { parameters: input.parameters }),
   };
+}
+
+function createGitHubPullRequestReviewRequestEventDefinition(input: {
+  eventType: string;
+  displayName: string;
+}): IntegrationWebhookEventDefinition {
+  return createGitHubWebhookEventDefinition({
+    eventType: input.eventType,
+    providerEventType: "pull_request",
+    displayName: input.displayName,
+    category: "Pull requests",
+    requirements: createGitHubWebhookRequirements(
+      "pull_request",
+      GitHubWebhookPermissionRequirements.PULL_REQUESTS_READ,
+    ),
+    payloadReferences: [
+      ...GitHubPayloadReferenceGroups.PULL_REQUEST_CORE,
+      GitHubPayloadReferences.PULL_REQUEST_HEAD_REF,
+      GitHubPayloadReferences.REQUESTED_REVIEWER_LOGIN,
+      GitHubPayloadReferences.REQUESTED_TEAM_SLUG,
+    ],
+    conversationKeyOptions: [
+      GitHubPullRequestConversationKeyOption,
+      GitHubRepositoryConversationKeyOption,
+    ],
+    parameters: [
+      GitHubRepositoryParameter,
+      GitHubAuthorParameter,
+      GitHubBaseBranchParameter,
+      GitHubHeadBranchParameter,
+      GitHubRequestedReviewerParameter,
+      GitHubRequestedTeamParameter,
+    ],
+  });
 }
 
 export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefinition[] = [
@@ -409,6 +470,38 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
       GitHubBaseBranchParameter,
       GitHubHeadBranchParameter,
     ],
+  }),
+  createGitHubWebhookEventDefinition({
+    eventType: "github.pull_request.ready_for_review",
+    providerEventType: "pull_request",
+    displayName: "Pull request ready for review",
+    category: "Pull requests",
+    requirements: createGitHubWebhookRequirements(
+      "pull_request",
+      GitHubWebhookPermissionRequirements.PULL_REQUESTS_READ,
+    ),
+    payloadReferences: [
+      ...GitHubPayloadReferenceGroups.PULL_REQUEST_CORE,
+      GitHubPayloadReferences.PULL_REQUEST_HEAD_REF,
+    ],
+    conversationKeyOptions: [
+      GitHubPullRequestConversationKeyOption,
+      GitHubRepositoryConversationKeyOption,
+    ],
+    parameters: [
+      GitHubRepositoryParameter,
+      GitHubAuthorParameter,
+      GitHubBaseBranchParameter,
+      GitHubHeadBranchParameter,
+    ],
+  }),
+  createGitHubPullRequestReviewRequestEventDefinition({
+    eventType: "github.pull_request.review_requested",
+    displayName: "Pull request review requested",
+  }),
+  createGitHubPullRequestReviewRequestEventDefinition({
+    eventType: "github.pull_request.review_request_removed",
+    displayName: "Pull request review request removed",
   }),
   createGitHubWebhookEventDefinition({
     eventType: "github.pull_request_review.submitted",

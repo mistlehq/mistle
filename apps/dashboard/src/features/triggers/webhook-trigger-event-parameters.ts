@@ -147,6 +147,22 @@ function buildExistsNode(input: {
   };
 }
 
+function isRequestedReviewTargetParameter(parameterId: string): boolean {
+  return parameterId === "requestedReviewer" || parameterId === "requestedTeam";
+}
+
+function hasNegatedFilterForPath(input: {
+  filters: readonly PayloadFilterNode[];
+  path: readonly string[];
+}): boolean {
+  return input.filters.some(
+    (filter) =>
+      filter.op === "neq" &&
+      filter.path.length === input.path.length &&
+      filter.path.every((segment, index) => segment === input.path[index]),
+  );
+}
+
 function mergePayloadFilterNodes(filters: readonly PayloadFilterNode[]): PayloadFilterNode | null {
   if (filters.length === 0) {
     return null;
@@ -171,7 +187,14 @@ function buildPayloadFilterNodeForTrigger(input: {
     return null;
   }
 
+  const requestedReviewerValue =
+    input.eventParameterRules[input.triggerId]?.requestedReviewer?.value.trim() ?? "";
+
   for (const parameter of input.eventOption.parameters ?? []) {
+    if (parameter.id === "requestedTeam" && requestedReviewerValue.length > 0) {
+      continue;
+    }
+
     const rule = input.eventParameterRules[input.triggerId]?.[parameter.id];
     const configuredValue = rule?.value.trim() ?? "";
     if (configuredValue.length === 0) {
@@ -228,6 +251,18 @@ function buildPayloadFilterNodeForTrigger(input: {
       rule?.operator !== WebhookTriggerEventParameterRuleOperators.IS_NOT
     ) {
       continue;
+    }
+
+    if (
+      isRequestedReviewTargetParameter(parameter.id) &&
+      rule.operator === WebhookTriggerEventParameterRuleOperators.IS_NOT
+    ) {
+      filters.push(
+        buildExistsNode({
+          path: [...parameter.payloadPath],
+          operator: WebhookTriggerEventParameterRuleOperators.EXISTS,
+        }),
+      );
     }
 
     filters.push(
@@ -294,10 +329,23 @@ export function mergeWebhookTriggerPayloadFilter(input: {
     selectedEventIds: input.selectedEventIds,
     eventParameterRules: input.eventParameterRules,
   });
+  const selectedEventTypes = new Set(
+    input.selectedEventIds
+      .map((triggerId) =>
+        findEventOptionByTriggerId({
+          eventOptions: input.eventOptions,
+          triggerId,
+        }),
+      )
+      .map((eventOption) => eventOption?.eventType)
+      .filter((eventType): eventType is string => eventType !== undefined),
+  );
   const mergedPayloadFilter: Record<string, unknown> = {};
   const eventTypes = new Set([
     ...Object.keys(eventParameterFiltersByEventType),
-    ...Object.keys(input.advancedPayloadFilter ?? {}),
+    ...Object.keys(input.advancedPayloadFilter ?? {}).filter((eventType) =>
+      selectedEventTypes.has(eventType),
+    ),
   ]);
 
   for (const eventType of eventTypes) {
@@ -396,6 +444,18 @@ export function extractWebhookTriggerEventParameterRules(input: {
             parameter.payloadPath.length === filter.path.length &&
             parameter.payloadPath.every((segment, index) => segment === filter.path[index])
           ) {
+            if (
+              isRequestedReviewTargetParameter(parameter.id) &&
+              filter.op === WebhookTriggerEventParameterRuleOperators.EXISTS &&
+              hasNegatedFilterForPath({
+                filters: rootFilters,
+                path: parameter.payloadPath,
+              })
+            ) {
+              extracted = true;
+              break;
+            }
+
             if (parameter.kind === "enum-select" && parameter.matchMode === "exists") {
               if (filter.op === "exists" || filter.op === "not_exists") {
                 eventParameterRules[triggerId] = {

@@ -451,6 +451,44 @@ describe("integrations-definitions index", () => {
             }),
           ]),
         }),
+        expect.objectContaining({
+          eventType: "github.pull_request.review_requested",
+          providerEventType: "pull_request",
+          displayName: "Pull request review requested",
+          category: "Pull requests",
+          parameters: expect.arrayContaining([
+            expect.objectContaining({
+              id: "requestedReviewer",
+              payloadPath: ["requested_reviewer", "login"],
+            }),
+            expect.objectContaining({
+              id: "requestedTeam",
+              payloadPath: ["requested_team", "slug"],
+            }),
+          ]),
+        }),
+        expect.objectContaining({
+          eventType: "github.pull_request.review_request_removed",
+          providerEventType: "pull_request",
+          displayName: "Pull request review request removed",
+          category: "Pull requests",
+          parameters: expect.arrayContaining([
+            expect.objectContaining({
+              id: "requestedReviewer",
+              payloadPath: ["requested_reviewer", "login"],
+            }),
+            expect.objectContaining({
+              id: "requestedTeam",
+              payloadPath: ["requested_team", "slug"],
+            }),
+          ]),
+        }),
+        expect.objectContaining({
+          eventType: "github.pull_request.ready_for_review",
+          providerEventType: "pull_request",
+          displayName: "Pull request ready for review",
+          category: "Pull requests",
+        }),
       ]),
     );
     expect(githubCloudDefinition?.credentialResolvers).toBeUndefined();

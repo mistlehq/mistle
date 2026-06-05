@@ -216,6 +216,42 @@ function requireStringField(input: {
   );
 }
 
+function resolveOptionalRecordField(input: {
+  payload: Record<string, unknown>;
+  key: string;
+}): Record<string, unknown> | null {
+  const value = input.payload[input.key];
+  return isRecord(value) ? value : null;
+}
+
+function requirePullRequestReviewRequestActorIdentifier(input: {
+  requestedReviewer: Record<string, unknown> | null;
+  requestedTeam: Record<string, unknown> | null;
+  eventType: string;
+}): string {
+  const requestedReviewerIdentifier =
+    input.requestedReviewer === null
+      ? null
+      : resolveNumericIdentifier(input.requestedReviewer, "id");
+  const requestedTeamIdentifier =
+    input.requestedTeam === null ? null : resolveNumericIdentifier(input.requestedTeam, "id");
+
+  if (requestedReviewerIdentifier !== null && requestedTeamIdentifier !== null) {
+    throw new Error(
+      `GitHub webhook event '${input.eventType}' must include exactly one requested reviewer or requested team id.`,
+    );
+  }
+
+  const requestedActorIdentifier = requestedReviewerIdentifier ?? requestedTeamIdentifier;
+  if (requestedActorIdentifier === null) {
+    throw new Error(
+      `GitHub webhook event '${input.eventType}' is missing requested reviewer or requested team id.`,
+    );
+  }
+
+  return requestedActorIdentifier;
+}
+
 function resolveRecordOrdering(input: {
   record: Record<string, unknown>;
   timestampField: string;
@@ -238,6 +274,50 @@ function resolveRecordOrdering(input: {
     sourceOrderKey: createIntegrationWebhookSourceOrderKey({
       occurredAt,
       orderingIdentifier,
+    }),
+  };
+}
+
+function resolvePullRequestReviewRequestOrdering(input: {
+  payload: Record<string, unknown>;
+  eventType: string;
+}): GitHubEventOrdering {
+  const pullRequest = requireRecordField({
+    payload: input.payload,
+    key: "pull_request",
+    eventType: input.eventType,
+  });
+  const occurredAt = requireTimestampField({
+    record: pullRequest,
+    key: "updated_at",
+    eventType: input.eventType,
+  });
+  const pullRequestIdentifier = requireOrderingIdentifier({
+    record: pullRequest,
+    key: "id",
+    eventType: input.eventType,
+  });
+  const requestedReviewer = resolveOptionalRecordField({
+    payload: input.payload,
+    key: "requested_reviewer",
+  });
+  const requestedTeam = resolveOptionalRecordField({
+    payload: input.payload,
+    key: "requested_team",
+  });
+  const requestedActorIdentifier = requirePullRequestReviewRequestActorIdentifier({
+    requestedReviewer,
+    requestedTeam,
+    eventType: input.eventType,
+  });
+  const actionOrderingIdentifier =
+    input.eventType === "github.pull_request.review_request_removed" ? "2" : "1";
+
+  return {
+    occurredAt,
+    sourceOrderKey: createIntegrationWebhookSourceOrderKey({
+      occurredAt,
+      orderingIdentifier: `${pullRequestIdentifier}.${requestedActorIdentifier}.${actionOrderingIdentifier}`,
     }),
   };
 }
@@ -376,6 +456,17 @@ function resolveGitHubEventOrdering(input: {
         }),
       };
     }
+    case "github.pull_request.ready_for_review":
+      return resolvePayloadRecordOrdering({
+        payload: input.payload,
+        payloadKey: "pull_request",
+        timestampField: "updated_at",
+        identifierField: "id",
+        eventType: input.eventType,
+      });
+    case "github.pull_request.review_requested":
+    case "github.pull_request.review_request_removed":
+      return resolvePullRequestReviewRequestOrdering(input);
     case "github.pull_request_review.submitted":
       return resolvePayloadRecordOrdering({
         payload: input.payload,
