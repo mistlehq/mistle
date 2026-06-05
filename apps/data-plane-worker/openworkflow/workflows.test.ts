@@ -9,7 +9,11 @@ import {
 } from "@mistle/workflow-registry/data-plane";
 import { describe, expect, it } from "vitest";
 
-import { SnapshotProviderRequestTimeoutMs } from "./materialize-sandbox-profile-version-snapshot/workflow.js";
+import {
+  SnapshotActivationStepRetryPolicy,
+  SnapshotFailureCleanupStepRetryPolicy,
+  SnapshotProviderRequestTimeoutMs,
+} from "./materialize-sandbox-profile-version-snapshot/workflow.js";
 import { DataPlaneWorkerWorkflows } from "./workflows.js";
 
 const workflows = new Map(
@@ -31,6 +35,14 @@ describe("data-plane worker openworkflow entrypoints", () => {
 
   it("allows snapshot provider requests to run for one hour", () => {
     expect(SnapshotProviderRequestTimeoutMs).toBe(60 * 60 * 1000);
+  });
+
+  it("runs snapshot activation only once before surfacing setup errors", () => {
+    expect(SnapshotActivationStepRetryPolicy.maximumAttempts).toBe(1);
+  });
+
+  it("does not let snapshot failure cleanup retry back into activation", () => {
+    expect(SnapshotFailureCleanupStepRetryPolicy.maximumAttempts).toBe(1);
   });
 
   it("preserves the resume sandbox instance workflow identity", () => {

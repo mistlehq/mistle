@@ -12,6 +12,7 @@ import {
   type MaterializeSandboxProfileVersionSnapshotWorkflowOutput,
 } from "@mistle/workflow-registry/data-plane";
 import { rethrowDurableStepErrorForRetry } from "@mistle/workflow-registry/durable-step-retry.js";
+import type { RetryPolicy } from "openworkflow";
 
 import { getWorkflowContext, type WorkflowContext } from "../core/context.js";
 import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
@@ -45,6 +46,12 @@ const SnapshotMaterializationFailureCodes = {
   STATUS_TRANSITION_TO_STOPPED_FAILED: "snapshot_status_transition_to_stopped_failed",
 } as const;
 export const SnapshotProviderRequestTimeoutMs = 60 * 60 * 1000;
+export const SnapshotActivationStepRetryPolicy = {
+  maximumAttempts: 1,
+} satisfies Partial<RetryPolicy>;
+export const SnapshotFailureCleanupStepRetryPolicy = {
+  maximumAttempts: 1,
+} satisfies Partial<RetryPolicy>;
 
 type SnapshotCaptureResult =
   | {
@@ -73,6 +80,7 @@ export type SnapshotWorkflowStepRunner = {
   run: <Output>(
     config: {
       name: string;
+      retryPolicy?: Partial<RetryPolicy>;
     },
     fn: () => Promise<Output> | Output,
   ) => Promise<Output>;
@@ -172,19 +180,25 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     if (startedSandboxCleanupState && !sandboxDestroyed) {
       const { providerSandboxId, runtimeProvider } = startedSandboxCleanupState;
       try {
-        await step.run({ name: "destroy-snapshot-sandbox-after-failure" }, async () => {
-          const resolvedRuntime =
-            await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
-          await destroySandbox(
-            {
-              sandboxAdapter: resolvedRuntime.sandboxAdapter,
-            },
-            {
-              runtimeProvider,
-              providerSandboxId,
-            },
-          );
-        });
+        await step.run(
+          {
+            name: "destroy-snapshot-sandbox-after-failure",
+            retryPolicy: SnapshotFailureCleanupStepRetryPolicy,
+          },
+          async () => {
+            const resolvedRuntime =
+              await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+            await destroySandbox(
+              {
+                sandboxAdapter: resolvedRuntime.sandboxAdapter,
+              },
+              {
+                runtimeProvider,
+                providerSandboxId,
+              },
+            );
+          },
+        );
         sandboxDestroyed = true;
       } catch (error) {
         rethrowDurableStepErrorForRetry(error);
@@ -204,21 +218,27 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     let markSandboxInstanceFailedError: unknown;
     if (ensuredSandboxInstance) {
       try {
-        await step.run({ name: "mark-snapshot-sandbox-instance-failed" }, async () => {
-          await markSandboxInstanceFailed(
-            {
-              db: ctx.db,
-              tables: ctx.tables,
-            },
-            {
-              sandboxInstanceId: workflowInput.sandboxInstanceId,
-              failureCode: input.failureCode,
-              failureMessage,
-              allowRunningCurrentStatus: true,
-              allowStoppedCurrentStatus: true,
-            },
-          );
-        });
+        await step.run(
+          {
+            name: "mark-snapshot-sandbox-instance-failed",
+            retryPolicy: SnapshotFailureCleanupStepRetryPolicy,
+          },
+          async () => {
+            await markSandboxInstanceFailed(
+              {
+                db: ctx.db,
+                tables: ctx.tables,
+              },
+              {
+                sandboxInstanceId: workflowInput.sandboxInstanceId,
+                failureCode: input.failureCode,
+                failureMessage,
+                allowRunningCurrentStatus: true,
+                allowStoppedCurrentStatus: true,
+              },
+            );
+          },
+        );
       } catch (error) {
         rethrowDurableStepErrorForRetry(error);
 
@@ -237,14 +257,20 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     let markSnapshotJobFailedError: unknown;
     if (currentPhase !== "mark_succeeded") {
       try {
-        await step.run({ name: "mark-snapshot-job-failed" }, async () => {
-          await ctx.controlPlaneInternalClient.markSandboxProfileVersionSnapshotJobFailed({
-            snapshotJobId: workflowInput.snapshotJobId,
-            workflowRunId,
-            errorCode: input.failureCode,
-            errorMessage: failureMessage,
-          });
-        });
+        await step.run(
+          {
+            name: "mark-snapshot-job-failed",
+            retryPolicy: SnapshotFailureCleanupStepRetryPolicy,
+          },
+          async () => {
+            await ctx.controlPlaneInternalClient.markSandboxProfileVersionSnapshotJobFailed({
+              snapshotJobId: workflowInput.snapshotJobId,
+              workflowRunId,
+              errorCode: input.failureCode,
+              errorMessage: failureMessage,
+            });
+          },
+        );
       } catch (error) {
         rethrowDurableStepErrorForRetry(error);
 
@@ -494,28 +520,35 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     });
 
     currentPhase = "init";
-    await step.run({ name: "initialize-snapshot-sandbox-runtime" }, async () => {
-      const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+    await step.run(
+      {
+        name: "initialize-snapshot-sandbox-runtime",
+        retryPolicy: SnapshotActivationStepRetryPolicy,
+      },
+      async () => {
+        const resolvedRuntime =
+          await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
 
-      await activateSandboxRuntime(
-        {
-          config: ctx.config,
-          logger,
-          processEnv: ctx.processEnv,
-          sandboxAdapter: resolvedRuntime.sandboxAdapter,
-          sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
-          sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
-        },
-        {
-          organizationId: workflowInput.organizationId,
-          operationId: workflowInput.snapshotJobId,
-          operationKind: "snapshot",
-          sandboxInstanceId: workflowInput.sandboxInstanceId,
-          providerSandboxId: startedSandbox.providerSandboxId,
-          runtimePlan: compiledRuntimePlan,
-        },
-      );
-    });
+        await activateSandboxRuntime(
+          {
+            config: ctx.config,
+            logger,
+            processEnv: ctx.processEnv,
+            sandboxAdapter: resolvedRuntime.sandboxAdapter,
+            sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
+            sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
+          },
+          {
+            organizationId: workflowInput.organizationId,
+            operationId: workflowInput.snapshotJobId,
+            operationKind: "snapshot",
+            sandboxInstanceId: workflowInput.sandboxInstanceId,
+            providerSandboxId: startedSandbox.providerSandboxId,
+            runtimePlan: compiledRuntimePlan,
+          },
+        );
+      },
+    );
 
     currentPhase = "mark_running";
     await recordWorkerSandboxLifecyclePhase(
