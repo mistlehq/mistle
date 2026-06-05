@@ -9,10 +9,12 @@ import {
   RuntimeConversationNavigatorSheet,
 } from "../session-agents/runtime-conversations/runtime-conversation-navigator.js";
 import { SessionHeaderTitle } from "../sessions/session-header-title.js";
+import { resolveSessionTitleLabel } from "../sessions/session-title-presentation.js";
 import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
 import { PageFrame } from "../shared/page-frame.js";
 import { shouldRenderSidebarTrigger } from "../shared/sidebar-trigger-visibility.js";
 import { UnavailableResourceState } from "../shared/unavailable-resource-state.js";
+import { useDocumentTitle } from "../shared/use-document-title.js";
 import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
 import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
@@ -385,6 +387,13 @@ function SessionWorkbenchPageContent(input: {
   const diffPanelPatch = workbench.connectionReadiness.canConnect
     ? workbench.diffPanelState.patch
     : "";
+  const sessionDocumentTitle =
+    workbench.sandboxStatusQuery.data === undefined
+      ? "Session"
+      : resolveSessionTitleLabel(workbench.sandboxStatusQuery.data.title);
+
+  useDocumentTitle(sessionDocumentTitle);
+
   useEffect(() => {
     if (previousActiveConversationIdRef.current === conversationPane.activeConversationId) {
       return;
