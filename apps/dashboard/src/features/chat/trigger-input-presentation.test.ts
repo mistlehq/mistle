@@ -179,8 +179,25 @@ describe("trigger input presentation", () => {
     expect(presentTriggerInput(originalText)).toBeNull();
   });
 
+  it("renders unchanged for JSON inside longer Markdown code fences", () => {
+    const originalText = [
+      "Please use this literal example:",
+      "````",
+      "```json",
+      '{"text":"keep this nested example as code"}',
+      "```",
+      "````",
+    ].join("\n");
+
+    expect(presentTriggerInput(originalText)).toBeNull();
+  });
+
   it("renders unchanged for malformed JSON", () => {
     expect(presentTriggerInput('Provider payload.event: {"text":"missing close"')).toBeNull();
+  });
+
+  it("does not recover nested JSON from malformed outer JSON", () => {
+    expect(presentTriggerInput('Provider payload.event: {"outer":{"inner":"x"}')).toBeNull();
   });
 
   it("renders unchanged for provider-labeled JSON arrays", () => {

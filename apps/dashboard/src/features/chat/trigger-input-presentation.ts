@@ -18,8 +18,6 @@ type JsonObjectSpan = {
   startIndex: number;
 };
 
-const MaxNestedFallbackSpans = 32;
-
 export function presentTriggerInput(text: string): StructuredTriggerInputPresentation | null {
   const jsonSpans = findJsonObjectSpans(text);
   if (jsonSpans.length === 0) {
@@ -34,9 +32,7 @@ export function presentTriggerInput(text: string): StructuredTriggerInputPresent
 function findJsonObjectSpans(text: string): readonly JsonObjectSpan[] {
   const jsonObjectSpans: JsonObjectSpan[] = [];
   const openBraceIndexes: number[] = [];
-  const nestedFallbackSpans: { endIndex: number; startIndex: number }[] = [];
-  let insideCodeFence = false;
-  let codeFenceMarker: "`" | "~" | null = null;
+  let openCodeFence: MarkdownCodeFence | null = null;
   let insideString = false;
   let escaped = false;
   let lineStartIndex = 0;
@@ -45,12 +41,14 @@ function findJsonObjectSpans(text: string): readonly JsonObjectSpan[] {
     if (openBraceIndexes.length === 0 && index === lineStartIndex) {
       const fence = readMarkdownCodeFence(text, lineStartIndex);
       if (fence !== null) {
-        if (insideCodeFence && fence.marker === codeFenceMarker) {
-          insideCodeFence = false;
-          codeFenceMarker = null;
-        } else if (!insideCodeFence) {
-          insideCodeFence = true;
-          codeFenceMarker = fence.marker;
+        if (
+          openCodeFence !== null &&
+          fence.marker === openCodeFence.marker &&
+          fence.length >= openCodeFence.length
+        ) {
+          openCodeFence = null;
+        } else if (openCodeFence === null) {
+          openCodeFence = fence;
         }
       }
     }
@@ -66,7 +64,7 @@ function findJsonObjectSpans(text: string): readonly JsonObjectSpan[] {
       }
     } else if (openBraceIndexes.length > 0 && character === '"') {
       insideString = true;
-    } else if (!insideCodeFence && character === "{") {
+    } else if (openCodeFence === null && character === "{") {
       openBraceIndexes.push(index);
     } else if (openBraceIndexes.length > 0 && character === "}") {
       const startIndex = openBraceIndexes.pop();
@@ -76,21 +74,10 @@ function findJsonObjectSpans(text: string): readonly JsonObjectSpan[] {
           const parsedSpan = parseJsonObjectSpan(text, startIndex, endIndex);
           if (parsedSpan !== null) {
             jsonObjectSpans.push(parsedSpan);
-          } else {
-            const nestedSpan = findFirstParsedNestedSpan(text, nestedFallbackSpans);
-            if (nestedSpan !== null) {
-              jsonObjectSpans.push(nestedSpan);
-            }
           }
 
-          nestedFallbackSpans.length = 0;
           insideString = false;
           escaped = false;
-        } else if (
-          nestedFallbackSpans.length < MaxNestedFallbackSpans &&
-          isLikelyJsonObjectStart(text, startIndex)
-        ) {
-          nestedFallbackSpans.push({ endIndex, startIndex });
         }
       }
     }
@@ -100,15 +87,15 @@ function findJsonObjectSpans(text: string): readonly JsonObjectSpan[] {
     }
   }
 
-  const nestedSpan = findFirstParsedNestedSpan(text, nestedFallbackSpans);
-  if (nestedSpan !== null) {
-    jsonObjectSpans.push(nestedSpan);
-  }
-
   return jsonObjectSpans;
 }
 
-function readMarkdownCodeFence(text: string, lineStartIndex: number): { marker: "`" | "~" } | null {
+type MarkdownCodeFence = {
+  length: number;
+  marker: "`" | "~";
+};
+
+function readMarkdownCodeFence(text: string, lineStartIndex: number): MarkdownCodeFence | null {
   let index = lineStartIndex;
   while (index < text.length && (text[index] === " " || text[index] === "\t")) {
     index += 1;
@@ -119,21 +106,12 @@ function readMarkdownCodeFence(text: string, lineStartIndex: number): { marker: 
     return null;
   }
 
-  return text[index + 1] === marker && text[index + 2] === marker ? { marker } : null;
-}
-
-function findFirstParsedNestedSpan(
-  text: string,
-  spans: readonly { endIndex: number; startIndex: number }[],
-): JsonObjectSpan | null {
-  for (const span of spans) {
-    const parsedSpan = parseJsonObjectSpan(text, span.startIndex, span.endIndex);
-    if (parsedSpan !== null) {
-      return parsedSpan;
-    }
+  let length = 0;
+  while (text[index + length] === marker) {
+    length += 1;
   }
 
-  return null;
+  return length >= 3 ? { length, marker } : null;
 }
 
 function parseJsonObjectSpan(
@@ -149,19 +127,6 @@ function parseJsonObjectSpan(
 
   const jsonText = text.slice(startIndex, endIndex);
   return isStrictJsonObjectText(jsonText) ? { endIndex, startIndex, text: jsonText } : null;
-}
-
-function isLikelyJsonObjectStart(text: string, startIndex: number): boolean {
-  for (let index = startIndex + 1; index < text.length; index += 1) {
-    const character = text[index];
-    if (character === " " || character === "\n" || character === "\r" || character === "\t") {
-      continue;
-    }
-
-    return character === '"' || character === "}";
-  }
-
-  return false;
 }
 
 function isStrictJsonObjectText(text: string): boolean {
