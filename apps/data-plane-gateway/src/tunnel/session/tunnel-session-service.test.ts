@@ -21,6 +21,7 @@ import {
   WEBSOCKET_PING_INTERVAL_MS,
   WEBSOCKET_PONG_TIMEOUT_MS,
 } from "../../runtime-state/durations.js";
+import { BootstrapTunnelNotConnectedError } from "../bootstrap-tunnel-not-connected-error.js";
 import { LocalGatewayForwardingClientAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
 import { LocalGatewayForwardingServerAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-server-adapter.js";
 import { InteractiveStreamRouter } from "../gateway-forwarding/interactive-stream-router.js";
@@ -38,6 +39,23 @@ const SandboxInstanceId = "sbi_test";
 const BootstrapSessionId = "sess_bootstrap";
 const ConnectionSessionId = "conn_1";
 const OwnerLeaseId = "lease_test";
+
+function createDeferred(): {
+  promise: Promise<void>;
+  resolve: () => void;
+} {
+  let resolveDeferred = (): void => {
+    throw new Error("Deferred resolve was used before initialization.");
+  };
+  const promise = new Promise<void>((resolve) => {
+    resolveDeferred = resolve;
+  });
+
+  return {
+    promise,
+    resolve: resolveDeferred,
+  };
+}
 
 type RuntimeLifecycleEventKind =
   | "bootstrap_degraded"
@@ -1199,6 +1217,131 @@ describe("TunnelSessionService", () => {
       leaseId: OwnerLeaseId,
       sandboxInstanceId: SandboxInstanceId,
     });
+  });
+
+  it("rejects stream opens while current bootstrap detach waits behind lifecycle work", async () => {
+    const clock = createMutableClock(1_000);
+    const scheduler = createManualScheduler(clock);
+    const relayCoordinator = new TunnelRelayCoordinator(
+      GatewayNodeId,
+      new InMemoryLocalPeerRegistryAdapter(),
+      new InMemoryRelayTransportAdapter(GatewayNodeId),
+    );
+    const tunnelSessionRegistry = new TunnelSessionRegistry(
+      new InMemoryTunnelSessionRegistryAdapter(),
+    );
+    const attachmentStore = new InMemorySandboxRuntimeAttachmentStore(clock);
+    const interactiveStreamRouter = new InteractiveStreamRouter(
+      GatewayNodeId,
+      new AttachmentBackedSandboxOwnerResolver(
+        GatewayNodeId,
+        createAttachmentBackedActiveBootstrapSessionStore(attachmentStore),
+        clock,
+      ),
+      new LocalGatewayForwardingClientAdapter(
+        GatewayNodeId,
+        new LocalGatewayForwardingServerAdapter(tunnelSessionRegistry),
+      ),
+    );
+    const lifecycleCoordinator = new SandboxDeadlineLifecycleCoordinator();
+    const service = new TunnelSessionService(
+      GatewayNodeId,
+      interactiveStreamRouter,
+      relayCoordinator,
+      tunnelSessionRegistry,
+      new InMemorySandboxPresenceStore(clock),
+      attachmentStore,
+      new SandboxInstanceDeadlineService(
+        {
+          async putSandboxInstanceDeadline(input) {
+            return {
+              status: "accepted",
+              sandboxInstanceId: input.sandboxInstanceId,
+              kind: input.kind,
+              generation: 1,
+              workflowRunId: "owfr_test",
+            } satisfies PutSandboxInstanceDeadlineAcceptedResponse;
+          },
+          async deleteSandboxInstanceDeadline(input) {
+            return {
+              status: "ok",
+              sandboxInstanceId: input.sandboxInstanceId,
+              kind: input.kind,
+            };
+          },
+          async applySandboxRuntimeLifecycleEvent(input) {
+            return {
+              status: "ok",
+              sandboxInstanceId: input.sandboxInstanceId,
+              lifecycleStatus: resolveTestLifecycleStatus(input.kind),
+            };
+          },
+        },
+        clock,
+        DefaultDataPlaneGatewayLifecycleDurations,
+      ),
+      lifecycleCoordinator,
+      clock,
+      scheduler,
+    );
+
+    const bootstrapPair = await createWebSocketPair();
+    openPairs.add(bootstrapPair);
+
+    const attachedPeer = service.attachBootstrapPeer({
+      leaseId: OwnerLeaseId,
+      onFatalError: () => {
+        throw new Error("Bootstrap attach should not fail in this test.");
+      },
+      onLeaseLost: () => {
+        throw new Error("Bootstrap lease should not be lost in this test.");
+      },
+      onTransportUnhealthy: () => {
+        throw new Error("Bootstrap transport should remain healthy in this test.");
+      },
+      ownerLeaseTtlMs: 60_000,
+      relaySessionId: BootstrapSessionId,
+      sandboxInstanceId: SandboxInstanceId,
+      socket: bootstrapPair.peerSocket,
+    });
+    await attachedPeer.activationPromise;
+
+    const queuedLifecycleWorkStarted = createDeferred();
+    const releaseQueuedLifecycleWork = createDeferred();
+    const queuedLifecycleWorkPromise = lifecycleCoordinator.enqueue({
+      sandboxInstanceId: SandboxInstanceId,
+      operation: async () => {
+        queuedLifecycleWorkStarted.resolve();
+        await releaseQueuedLifecycleWork.promise;
+      },
+    });
+    await queuedLifecycleWorkStarted.promise;
+
+    const detachPromise = service.detachBootstrapPeer({
+      attachedPeer,
+      leaseId: OwnerLeaseId,
+      sandboxInstanceId: SandboxInstanceId,
+    });
+
+    await expect(
+      interactiveStreamRouter.openInteractiveStream({
+        sandboxInstanceId: SandboxInstanceId,
+        channelKind: "agent",
+        clientSessionId: ConnectionSessionId,
+        clientStreamId: 42,
+      }),
+    ).rejects.toThrow(BootstrapTunnelNotConnectedError);
+    expect(
+      tunnelSessionRegistry.getBootstrapTarget({ sandboxInstanceId: SandboxInstanceId }),
+    ).toBeDefined();
+
+    releaseQueuedLifecycleWork.resolve();
+    await queuedLifecycleWorkPromise;
+    await detachPromise;
+
+    expect(
+      tunnelSessionRegistry.getBootstrapTarget({ sandboxInstanceId: SandboxInstanceId }),
+    ).toBeUndefined();
   });
 
   it("releases active file upload bindings and notifies the connection peer on bootstrap disconnect", async () => {

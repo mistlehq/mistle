@@ -509,9 +509,10 @@ export class TunnelSessionService {
   }): Promise<void> {
     input.attachedPeer.leaseHeartbeatHandle?.stop();
     input.attachedPeer.websocketHealthHandle?.stop();
-    this.tunnelSessionRegistry.clearBootstrapSessionAvailability({
+    this.tunnelSessionRegistry.setBootstrapSessionAvailability({
       sandboxInstanceId: input.sandboxInstanceId,
       sessionId: input.attachedPeer.relayTarget.sessionId,
+      isAvailable: () => false,
     });
 
     if (!this.relayCoordinator.isCurrentPeer(input.attachedPeer.relayTarget)) {
@@ -533,6 +534,10 @@ export class TunnelSessionService {
       this.relayCoordinator.detachPeerWithOptions({
         target: input.attachedPeer.relayTarget,
         notifyOppositePeer: false,
+      });
+      this.tunnelSessionRegistry.clearBootstrapSessionAvailability({
+        sandboxInstanceId: input.sandboxInstanceId,
+        sessionId: input.attachedPeer.relayTarget.sessionId,
       });
       this.bootstrapCloseContextsBySessionId.delete(input.attachedPeer.relayTarget.sessionId);
       return;

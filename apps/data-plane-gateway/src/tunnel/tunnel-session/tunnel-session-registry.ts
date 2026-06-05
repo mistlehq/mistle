@@ -38,8 +38,11 @@ export class TunnelSessionRegistry {
    * Removes the bootstrap tunnel only if the supplied target still matches the live one.
    */
   public detachBootstrapSession(input: RelayTarget): DetachBootstrapSessionResult | undefined {
-    this.clearBootstrapSessionAvailability(input);
-    return this.adapter.detachBootstrapSession(input);
+    const result = this.adapter.detachBootstrapSession(input);
+    if (result !== undefined) {
+      this.clearBootstrapSessionAvailability(input);
+    }
+    return result;
   }
 
   /**
