@@ -1,10 +1,6 @@
 import type { IntegrationEgressRequestMiddleware } from "@mistle/integrations-core";
-import { Kind, OperationTypeNode, parse } from "graphql/language";
-import type {
-  FragmentDefinitionNode,
-  OperationDefinitionNode,
-  SelectionSetNode,
-} from "graphql/language";
+import { Kind, OperationTypeNode, parse } from "graphql";
+import type { FragmentDefinitionNode, OperationDefinitionNode, SelectionSetNode } from "graphql";
 
 import { GitHubRequestMiddlewareIds } from "./egress-request-middleware.js";
 
