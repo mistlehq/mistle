@@ -1,0 +1,3 @@
+# Setup Assistant Reads Scripts Through MCP
+
+The Setup Assistant composer starts empty with script-kind-specific placeholder text, while developer instructions require the assistant to read, save, and test the target script through Mistle MCP tools. Composer text expresses the user's request; MCP tools provide and mutate the script source of truth, avoiding stale duplicated script text in the composer. If MCP cannot retrieve the current script, the assistant asks the user to paste the script before continuing. If MCP cannot save the final script, the assistant outputs the full script for the user to copy into the editor.

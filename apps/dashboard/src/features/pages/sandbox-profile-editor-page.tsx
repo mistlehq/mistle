@@ -196,8 +196,8 @@ import {
   type SessionTerminalWorkspaceHandle,
 } from "./session-terminal-workspace.js";
 import {
+  buildSetupAssistantComposerPlaceholder,
   buildSetupAssistantCollaborationModeSettings,
-  buildSetupAssistantInitialComposerText,
   type SetupAssistantScriptKind,
 } from "./setup-assistant-instructions.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
@@ -240,12 +240,12 @@ type SetupScriptAssistantControl = {
   disabled: boolean;
   errorMessage: string | null;
   isStarting: boolean;
-  onToggle: (input: { savedScript: string | null; script: string }) => void;
+  onToggle: () => void;
   title: string;
 };
 type SetupScriptAssistantPanelState = {
-  initialComposerText: string;
   isOpen: boolean;
+  placeholderText: string;
   sandboxInstanceId: string | null;
   scriptKind: SetupAssistantScriptKind;
   startupOperationId: string | null;
@@ -259,8 +259,6 @@ type SetupAssistantCloseDialogState = {
   sandboxInstanceId: string | null;
 } | null;
 type SetupAssistantStartDialogState = {
-  script: string;
-  savedScript: string | null;
   scriptKind: SetupAssistantScriptKind;
   version: number;
   variant: SetupAssistantStartDialogVariant;
@@ -1736,8 +1734,7 @@ function ReadySandboxProfileEditorPage(input: {
     stopSetupAssistantMutation.mutate(sandboxInstanceId);
   }
 
-  function startSetupAssistantWithScript(inputValue: {
-    script: string;
+  function startSetupAssistant(inputValue: {
     scriptKind: SetupAssistantScriptKind;
     version: number;
   }): void {
@@ -1747,14 +1744,11 @@ function ReadySandboxProfileEditorPage(input: {
 
     setSetupAssistantError(null);
     setupAssistantClosedDuringStartupRef.current = false;
-    const initialComposerText = buildSetupAssistantInitialComposerText(
-      inputValue.script,
-      inputValue.scriptKind,
-    );
+    const placeholderText = buildSetupAssistantComposerPlaceholder(inputValue.scriptKind);
 
     setSetupAssistantPanelState((currentState) => ({
-      initialComposerText,
       isOpen: true,
+      placeholderText,
       sandboxInstanceId: currentState?.sandboxInstanceId ?? null,
       scriptKind: inputValue.scriptKind,
       startupOperationId: currentState?.startupOperationId ?? null,
@@ -1786,8 +1780,7 @@ function ReadySandboxProfileEditorPage(input: {
       }
 
       setSetupAssistantStartDialogState(null);
-      startSetupAssistantWithScript({
-        script: dialogState.script,
+      startSetupAssistant({
         scriptKind: dialogState.scriptKind,
         version: dialogState.version,
       });
@@ -1800,8 +1793,7 @@ function ReadySandboxProfileEditorPage(input: {
     dialogState: Exclude<SetupAssistantStartDialogState, null>,
   ): void {
     setSetupAssistantStartDialogState(null);
-    startSetupAssistantWithScript({
-      script: dialogState.savedScript ?? "",
+    startSetupAssistant({
       scriptKind: dialogState.scriptKind,
       version: dialogState.version,
     });
@@ -1846,7 +1838,7 @@ function ReadySandboxProfileEditorPage(input: {
       disabled: setupAssistantPanelIsOpen || inputValue.disabledReason !== null,
       errorMessage: setupAssistantError,
       isStarting: !setupAssistantPanelIsOpen && startSetupAssistantMutation.isPending,
-      onToggle: ({ savedScript, script }) => {
+      onToggle: () => {
         if (setupAssistantPanelState?.isOpen === true) {
           return;
         }
@@ -1858,8 +1850,6 @@ function ReadySandboxProfileEditorPage(input: {
 
         if (inputValue.scriptKind === "setup" && setupAssistantHasVersionDraftChanges) {
           setSetupAssistantStartDialogState({
-            savedScript,
-            script,
             scriptKind: inputValue.scriptKind,
             version,
             variant: resolveSetupAssistantStartDialogVariant({
@@ -1870,8 +1860,7 @@ function ReadySandboxProfileEditorPage(input: {
           return;
         }
 
-        startSetupAssistantWithScript({
-          script: inputValue.scriptKind === "maintenance" ? script : (savedScript ?? ""),
+        startSetupAssistant({
           scriptKind: inputValue.scriptKind,
           version,
         });
@@ -2309,7 +2298,7 @@ function ReadySandboxProfileEditorPage(input: {
                 sandboxInstanceId={setupAssistantPanelState.sandboxInstanceId}
                 scriptKind={setupAssistantPanelState.scriptKind}
                 startupOperationId={setupAssistantPanelState.startupOperationId}
-                initialComposerText={setupAssistantPanelState.initialComposerText}
+                placeholderText={setupAssistantPanelState.placeholderText}
               />
             </ResizablePanel>
           </>
@@ -2416,14 +2405,12 @@ function SetupScriptAssistantPanel(input: {
   sandboxInstanceId: string | null;
   scriptKind: SetupAssistantScriptKind;
   startupOperationId: string | null;
-  initialComposerText: string;
+  placeholderText: string;
 }): React.JSX.Element {
   const { conversationPane, workbench } = useSessionWorkbenchController({
     sandboxInstanceId: input.sandboxInstanceId,
   });
-  const [composerDraft, setComposerDraft] = useState(
-    createComposerDraft(input.initialComposerText),
-  );
+  const [composerDraft, setComposerDraft] = useState(createComposerDraft(""));
   const [pendingDiffComments, setPendingDiffComments] = useState<
     readonly PendingSessionDiffComment[]
   >([]);
@@ -2458,10 +2445,6 @@ function SetupScriptAssistantPanel(input: {
       });
     },
   );
-
-  useEffect(() => {
-    setComposerDraft(createComposerDraft(input.initialComposerText));
-  }, [input.initialComposerText]);
 
   function handleClearPendingDiffComments(): void {
     setPendingDiffComments([]);
@@ -2603,6 +2586,7 @@ function SetupScriptAssistantPanel(input: {
                       conversationPane.composerStateInput.collaborationModeSettings,
                       input.scriptKind,
                     ),
+                    placeholderText: input.placeholderText,
                   }}
                   draftState={{
                     composerDraft,
@@ -3919,10 +3903,7 @@ function ReadySandboxProfileSetupScriptSection(input: {
           disabled: input.setupAssistantControl.disabled,
           isStarting: input.setupAssistantControl.isStarting,
           onClick: () => {
-            input.setupAssistantControl.onToggle({
-              savedScript: setupScriptState.savedValue,
-              script: setupScriptState.draftValue,
-            });
+            input.setupAssistantControl.onToggle();
           },
           title: input.setupAssistantControl.title,
         }}

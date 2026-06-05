@@ -70,7 +70,7 @@ import {
 import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 import { SessionConversationMainContent } from "./session-conversation-pane.js";
 import { SessionStartupStatus } from "./session-startup-status.js";
-import { buildSetupAssistantInitialComposerText } from "./setup-assistant-instructions.js";
+import { buildSetupAssistantComposerPlaceholder } from "./setup-assistant-instructions.js";
 
 export {
   StoryAnthropicConnection,
@@ -739,7 +739,6 @@ function SetupScriptStoryControls(input: {
 
 function SetupAssistantPanel(input: {
   onClose: () => void;
-  setupScript: string;
   state: Exclude<SandboxProfileEditorPageStoryArgs["setupAssistantPanelState"], undefined>;
 }): React.JSX.Element {
   const controlClassName =
@@ -847,10 +846,9 @@ function SetupAssistantPanel(input: {
         <div className="shrink-0 bg-background px-5 py-4">
           <ChatComposer
             {...SessionComposerFixtureProps}
-            composerDraft={createComposerDraft(
-              buildSetupAssistantInitialComposerText(input.setupScript),
-            )}
+            composerDraft={createComposerDraft("")}
             gitBranchLabel={null}
+            placeholderText={buildSetupAssistantComposerPlaceholder()}
             pullRequest={null}
           />
         </div>
@@ -1045,7 +1043,6 @@ function SandboxProfileEditorPageStoryView(
     input.setupAssistantStartDialogState !== undefined,
   );
   const [setupAssistantCloseDialogOpen, setSetupAssistantCloseDialogOpen] = useState(false);
-  const [setupAssistantPanelScript, setSetupAssistantPanelScript] = useState(setupScriptDraft);
   const [duplicateProfileDialogOpen, setDuplicateProfileDialogOpen] = useState(
     input.duplicateProfileDialogState === "open" || input.duplicateProfileDialogState === "error",
   );
@@ -1122,21 +1119,18 @@ function SandboxProfileEditorPageStoryView(
       return;
     }
 
-    setSetupAssistantPanelScript(setupScriptDraft);
     setSetupAssistantPanelState(input.setupAssistantState === "starting" ? "starting" : "ready");
     setSetupAssistantPanelOpen(true);
   }
 
   function handleSaveAndOpenSetupAssistant(): void {
     setPersistedSetupScript(setupScriptDraft);
-    setSetupAssistantPanelScript(setupScriptDraft);
     setSetupAssistantStartDialogOpen(false);
     setSetupAssistantPanelState("ready");
     setSetupAssistantPanelOpen(true);
   }
 
   function handleUseLatestSavedDraftSetupAssistant(): void {
-    setSetupAssistantPanelScript(persistedSetupScript);
     setSetupAssistantStartDialogOpen(false);
     setSetupAssistantPanelState("ready");
     setSetupAssistantPanelOpen(true);
@@ -1469,7 +1463,6 @@ function SandboxProfileEditorPageStoryView(
                 onClose={() => {
                   setSetupAssistantCloseDialogOpen(true);
                 }}
-                setupScript={setupAssistantPanelScript}
                 state={setupAssistantPanelState}
               />
             </ResizablePanel>

@@ -174,6 +174,7 @@ export type SessionComposerRuntimeInput = {
 
 export type SessionComposerSharedInput = {
   attachmentControl: SessionComposerAttachmentControl;
+  placeholderText?: string | undefined;
   repositoryStatus: {
     branchLabel: string | null;
     pullRequest: SessionPullRequestSummary | null;
@@ -1088,6 +1089,7 @@ export function useSessionComposerState(input: {
       pullRequest: composerStateInput.repositoryStatus.pullRequest,
       contextUsage: composerStateInput.contextUsage,
       goalStatus: composerStateInput.goalStatus ?? null,
+      placeholderText: composerStateInput.placeholderText,
       isUploadingAttachments: composerStateInput.attachmentControl.isUploadingAttachments,
       keyboardShortcuts:
         composerStateInput.turnControl.activeTurnState === "running" &&

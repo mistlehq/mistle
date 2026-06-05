@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildSetupAssistantComposerPlaceholder,
   buildSetupAssistantCollaborationModeSettings,
-  buildSetupAssistantInitialComposerText,
   SnapshotMaintenanceAssistantDeveloperInstructions,
   SetupAssistantDeveloperInstructions,
 } from "./setup-assistant-instructions.js";
@@ -35,29 +35,40 @@ describe("buildSetupAssistantCollaborationModeSettings", () => {
 
   it("requires setup scripts to use non-interactive commands", () => {
     expect(SetupAssistantDeveloperInstructions).toContain(
-      "The setup script runs non-interactively when creating a snapshot",
+      "It runs non-interactively during sandbox initialization",
     );
     expect(SetupAssistantDeveloperInstructions).toContain(
-      "Write commands with explicit non-interactive flags or environment variables",
+      "Use explicit non-interactive flags or environment variables",
     );
   });
 
-  it("directs setup assistant to save final setup scripts through Mistle MCP when available", () => {
+  it("directs setup assistant to read and save setup scripts through Mistle MCP", () => {
+    expect(SetupAssistantDeveloperInstructions).toContain(
+      "The deliverable is the setup script saved to the draft sandbox profile version.",
+    );
+    expect(SetupAssistantDeveloperInstructions).toContain("profile_setup_script_get");
     expect(SetupAssistantDeveloperInstructions).toContain("profile_draft_setup_script_put");
     expect(SetupAssistantDeveloperInstructions).toContain("MISTLE_SANDBOX_PROFILE_ID");
     expect(SetupAssistantDeveloperInstructions).toContain("MISTLE_SANDBOX_PROFILE_VERSION");
-    expect(SetupAssistantDeveloperInstructions).toContain("include the complete final script text");
+    expect(SetupAssistantDeveloperInstructions).toContain(
+      "ask the user to paste the current setup script",
+    );
+    expect(SetupAssistantDeveloperInstructions).toContain("complete final setup script");
+    expect(SetupAssistantDeveloperInstructions).toContain("copy it into the setup script editor");
   });
 
   it("requires setup scripts to be locally validated before saving and platform tested after saving", () => {
     expect(SetupAssistantDeveloperInstructions).toContain(
-      "Before updating the draft profile setup script",
+      "Before saving, validate the exact candidate script locally",
     );
-    expect(SetupAssistantDeveloperInstructions).toContain("exact candidate script body");
     expect(SetupAssistantDeveloperInstructions).toContain("after local validation");
-    expect(SetupAssistantDeveloperInstructions).toContain("profile_setup_script_test_start");
     expect(SetupAssistantDeveloperInstructions).toContain(
-      "local validation and platform setup-script test",
+      "after explicitly reporting why local validation was skipped",
+    );
+    expect(SetupAssistantDeveloperInstructions).toContain("profile_setup_script_test_start");
+    expect(SetupAssistantDeveloperInstructions).toContain("Pass the same final `setupScript` body");
+    expect(SetupAssistantDeveloperInstructions).toContain(
+      "what local validation ran or why it was skipped",
     );
   });
 
@@ -66,17 +77,19 @@ describe("buildSetupAssistantCollaborationModeSettings", () => {
       "starts from the current usable snapshot",
     );
     expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
-      "If requested work requires rebuilding from the base image",
+      "If the requested work requires rebuilding from the base image",
     );
   });
 
   it("preserves the maintenance assistant behavior contract", () => {
     expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
-      "Snapshot maintenance script editor",
+      "profile_maintenance_script_get",
     );
-    expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain("temporary artifacts");
     expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
-      "may prompt for input, require confirmation, or change behavior outside CI",
+      "temporary working artifacts",
+    );
+    expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
+      "may prompt, require confirmation, or change behavior outside CI",
     );
     expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain("maintenance intent");
     expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain("snapshot filesystem");
@@ -85,6 +98,9 @@ describe("buildSetupAssistantCollaborationModeSettings", () => {
     );
     expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
       "exact candidate script body",
+    );
+    expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
+      "ask the user to paste the current maintenance script",
     );
     expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
       "profile_maintenance_script_put",
@@ -102,35 +118,24 @@ describe("buildSetupAssistantCollaborationModeSettings", () => {
       "MISTLE_SANDBOX_PROFILE_VERSION",
     );
     expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
-      "include the complete final script text",
+      "complete final maintenance script",
+    );
+    expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
+      "copy it into the maintenance script editor",
     );
   });
 });
 
-describe("buildSetupAssistantInitialComposerText", () => {
-  it("returns a short editable request when no setup script exists", () => {
-    expect(buildSetupAssistantInitialComposerText("  \n\t ")).toBe("Write a setup script");
-  });
-
-  it("returns a short editable request when no maintenance script exists", () => {
-    expect(buildSetupAssistantInitialComposerText("  \n\t ", "maintenance")).toBe(
-      "Write a snapshot maintenance script",
+describe("buildSetupAssistantComposerPlaceholder", () => {
+  it("returns setup script placeholder guidance", () => {
+    expect(buildSetupAssistantComposerPlaceholder()).toBe(
+      "Ask the Setup Assistant to write, fix, or update the setup script",
     );
   });
 
-  it("includes the current setup script when a draft exists", () => {
-    expect(
-      buildSetupAssistantInitialComposerText(
-        "#!/usr/bin/env bash\nset -euo pipefail\n\npnpm install",
-      ),
-    ).toBe(
-      [
-        "Fix this script:",
-        "",
-        "```sh",
-        "#!/usr/bin/env bash\nset -euo pipefail\n\npnpm install",
-        "```",
-      ].join("\n"),
+  it("returns maintenance script placeholder guidance", () => {
+    expect(buildSetupAssistantComposerPlaceholder("maintenance")).toBe(
+      "Ask the Setup Assistant to write, fix, or update the maintenance script",
     );
   });
 });

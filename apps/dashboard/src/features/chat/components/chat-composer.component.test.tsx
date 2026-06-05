@@ -214,6 +214,35 @@ describe("ChatComposer", () => {
     expect(composer.getAttribute("aria-placeholder")).toBe("Ask anything");
   });
 
+  it("renders a custom prompt placeholder when provided", () => {
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        placeholderText="Ask the Setup Assistant to write, fix, or update the setup script"
+      />,
+    );
+
+    const composer = screen.getByRole("textbox");
+
+    expect(composer.getAttribute("aria-placeholder")).toBe(
+      "Ask the Setup Assistant to write, fix, or update the setup script",
+    );
+  });
+
+  it("keeps the steering placeholder during an active turn with a custom prompt placeholder", () => {
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        placeholderText="Ask the Setup Assistant to write, fix, or update the setup script"
+        submitMode="steer"
+      />,
+    );
+
+    const composer = screen.getByRole("textbox");
+
+    expect(composer.getAttribute("aria-placeholder")).toBe("Steer the current turn");
+  });
+
   it("renders a spinner icon while a start-turn request is pending", () => {
     const { container } = render(
       <ChatComposer

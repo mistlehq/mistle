@@ -92,6 +92,7 @@ function SessionComposerStateHarness(input: {
   onSwitchToPlan?: () => void;
   onSwitchToDefault?: () => void;
   pendingDiffComments: readonly PendingSessionDiffComment[];
+  placeholderText?: string | undefined;
   selectedModel?: string | null;
   shouldFailSubmit?: boolean;
   unavailableTypedRuntimeCommands?: readonly {
@@ -159,6 +160,7 @@ function SessionComposerStateHarness(input: {
         branchLabel: null,
         pullRequest: null,
       },
+      ...(input.placeholderText === undefined ? {} : { placeholderText: input.placeholderText }),
       contextUsage: null,
       modelSelection: {
         required: true,
@@ -308,6 +310,9 @@ function SessionComposerStateHarness(input: {
       <div data-testid="config-controls-disabled">
         {composerState.composerViewModel.configControlsDisabled ? "true" : "false"}
       </div>
+      <div data-testid="placeholder-text">
+        {composerState.composerViewModel.placeholderText ?? ""}
+      </div>
       <div data-testid="submitted-prompt">{submittedPrompt ?? ""}</div>
       <div data-testid="submitted-selected-skill-mentions">
         {JSON.stringify(submittedSelectedSkillMentions)}
@@ -369,6 +374,20 @@ describe("useSessionComposerState", () => {
     );
 
     expect(screen.getByTestId("composer-capability-count").textContent).toBe("1");
+  });
+
+  it("passes custom placeholder text through to the composer view model", () => {
+    render(
+      <SessionComposerStateHarness
+        composerText=""
+        pendingDiffComments={[]}
+        placeholderText="Ask the Setup Assistant to write, fix, or update the setup script"
+      />,
+    );
+
+    expect(screen.getByTestId("placeholder-text").textContent).toBe(
+      "Ask the Setup Assistant to write, fix, or update the setup script",
+    );
   });
 
   it("executes available runtime composer commands without submitting prompt text", () => {

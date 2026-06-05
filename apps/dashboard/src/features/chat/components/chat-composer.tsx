@@ -369,6 +369,7 @@ export type ChatComposerViewModel = {
     title: string;
     onSwitchToDefault?: () => void;
   } | null;
+  placeholderText?: string | undefined;
   commandPanel?: ChatComposerCommandPanel | null;
   contextMentionControl?: ChatComposerContextMentionControl | null;
   pendingDiffCommentSummary: {
@@ -552,6 +553,7 @@ export function ChatComposer({
   contextUsage,
   goalStatus = null,
   collaborationModeStatus = null,
+  placeholderText,
   commandPanel = null,
   contextMentionControl = null,
   pendingDiffCommentSummary,
@@ -751,7 +753,7 @@ export function ChatComposer({
   const composerPlaceholder =
     submitMode === "steer" || submitMode === "interrupt"
       ? "Steer the current turn"
-      : "Ask anything";
+      : (placeholderText ?? "Ask anything");
   const composerActionIcon =
     submitMode === "interrupt" ? (
       <StopCircleIcon aria-hidden="true" className="size-5" weight="fill" />
