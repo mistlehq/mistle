@@ -601,7 +601,7 @@ describe.concurrent("sandbox profile versions publish integration", () => {
     expect(responseBody.code).toBe("PROFILE_VERSION_NOT_PUBLISHABLE");
   });
 
-  it("returns 409 when the draft skills source was loaded but is not bound", async ({ env }) => {
+  it("publishes when the draft skills source was loaded but is not bound", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-version-publish-skills-unbound@example.com",
     });
@@ -659,11 +659,18 @@ describe.concurrent("sandbox profile versions publish integration", () => {
       },
     );
 
-    expect(response.status).toBe(409);
-    const responseBody = PublishSandboxProfileVersionConflictResponseSchema.parse(
-      await response.json(),
-    );
-    expect(responseBody.code).toBe("PROFILE_VERSION_NOT_PUBLISHABLE");
+    expect(response.status).toBe(200);
+    const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    expect(responseBody.version.state).toBe(SandboxProfileVersionStates.PUBLISHED);
+    expect(responseBody.version.skillsConfig).toEqual({
+      originUrl: "https://github.com/acme/skills.git",
+      selectedSkills: [
+        {
+          name: "available",
+          relativePath: ".agents/skills/available",
+        },
+      ],
+    });
   });
 
   it("returns 404 when the version does not exist", async ({ env }) => {

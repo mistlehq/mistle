@@ -24,6 +24,14 @@ _Avoid_: Template, cache
 The configured starting sandbox image used before profile-specific preparation.
 _Avoid_: Profile image
 
+**Skills source**:
+A repository that provides selectable skills for a **Sandbox profile version**.
+_Avoid_: Skill repo, skills repository, source repository when the object may be a configured source rather than only a Git repository binding
+
+**Public skills source**:
+A **Skills source** that can be read without a Git integration binding.
+_Avoid_: Public repo when the repo is being used specifically as a skills source
+
 **Setup script**:
 The full initialization script for preparing a **Snapshot** from a **Base image**.
 _Avoid_: Bootstrap script, init script
@@ -588,6 +596,8 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Codex review output uses ordinary chat rendering unless Codex review-mode events are required to keep progress or final output visible.
 - The **Codex review command** is unavailable during an active Codex turn.
 - Non-empty text after `/review` is custom review instructions, not a structured review-target subcommand.
+- A **Sandbox profile version** may use a **Skills source** from a Git integration binding or a **Public skills source**.
+- A **Public skills source** does not require a Git integration binding.
 
 ## Example Dialogue
 

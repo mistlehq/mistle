@@ -6,6 +6,7 @@ import type {
   SandboxProfileBindingEditorRow,
 } from "./sandbox-profile-binding-config-editor.js";
 import {
+  canonicalizePublicGitHubSkillsSourceOriginUrl,
   createNextVisibleDiscoveredSkillsSelection,
   createSkillOptions,
   normalizeSkillsConfig,
@@ -294,5 +295,20 @@ describe("sandbox profile skills section model", () => {
         ],
       }),
     ).toBe("Choose an available skills source, or clear the skills source before saving.");
+  });
+
+  it("canonicalizes public GitHub repository URLs for skills sources", () => {
+    expect(
+      canonicalizePublicGitHubSkillsSourceOriginUrl("https://github.com/mistlehq/skills"),
+    ).toBe("https://github.com/mistlehq/skills.git");
+    expect(
+      canonicalizePublicGitHubSkillsSourceOriginUrl("https://github.com/mistlehq/skills.git"),
+    ).toBe("https://github.com/mistlehq/skills.git");
+    expect(
+      canonicalizePublicGitHubSkillsSourceOriginUrl("https://gitlab.com/mistlehq/skills"),
+    ).toBe(null);
+    expect(
+      canonicalizePublicGitHubSkillsSourceOriginUrl("https://github.com/mistlehq/skills/tree/main"),
+    ).toBe(null);
   });
 });

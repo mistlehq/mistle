@@ -14,6 +14,7 @@ import {
 import { SandboxProfileSkillsSection } from "./sandbox-profile-skills-section.js";
 
 const SkillsOriginUrl = "https://github.com/mistle/main-dashboard.git";
+const PublicSkillsOriginUrl = "https://github.com/mistle/public-skills.git";
 
 const meta = {
   title: "Pages/Sandbox Profile/Skills Section",
@@ -71,6 +72,48 @@ export const Unsynced: Story = {
         selectedSkills: [],
       }}
       skillsSourceRepos={{ items: [] }}
+    />
+  ),
+};
+
+export const PublicGitHubSource: Story = {
+  name: "Public GitHub Source",
+  render: () => (
+    <SkillsSectionStoryHarness
+      initialBindings={[]}
+      skillsConfig={{
+        originUrl: PublicSkillsOriginUrl,
+        selectedSkills: [
+          {
+            name: "public-pr-review",
+            relativePath: ".agents/skills/public-pr-review",
+          },
+        ],
+      }}
+      skillsSourceRepos={{
+        items: [
+          {
+            id: "ksr_story_public_skills",
+            originUrl: PublicSkillsOriginUrl,
+            commitSha: "6c1f2d9",
+            lastSyncedAt: "2026-06-05T10:05:00.000Z",
+            createdAt: "2026-06-05T10:05:00.000Z",
+            updatedAt: "2026-06-05T10:05:00.000Z",
+            skills: [
+              {
+                name: "public-pr-review",
+                description: "Review pull requests using a public skills source.",
+                relativePath: ".agents/skills/public-pr-review",
+              },
+              {
+                name: "issue-triage",
+                description: "Group incoming issues and identify the next owner.",
+                relativePath: ".agents/skills/issue-triage",
+              },
+            ],
+          },
+        ],
+      }}
     />
   ),
 };

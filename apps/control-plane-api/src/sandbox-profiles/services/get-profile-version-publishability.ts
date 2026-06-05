@@ -1,4 +1,8 @@
-import type { ControlPlaneDatabase, ControlPlaneTransaction } from "@mistle/db/control-plane";
+import type {
+  ControlPlaneDatabase,
+  ControlPlaneTransaction,
+  SandboxProfileVersionSkillsConfig,
+} from "@mistle/db/control-plane";
 import { SandboxProfileVersionStates } from "@mistle/db/control-plane";
 
 import {
@@ -11,6 +15,7 @@ import {
   mapProfileVersionRuntimeConfig,
   validateSandboxProfileVersionRuntimeConfig,
 } from "./profile-version-runtime-config.js";
+import { canonicalizePublicGitHubSkillsSourceOriginUrl } from "./profile-version-skills-config.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 export type SandboxProfilePublishabilityIssue = {
@@ -116,13 +121,7 @@ export async function getProfileVersionPublishability(
 async function validateSandboxProfileVersionSkillsConfig(
   { db }: Pick<GetProfileVersionPublishabilityContext, "db">,
   input: GetProfileVersionPublishabilityInput & {
-    skillsConfig: {
-      originUrl: string;
-      selectedSkills: Array<{
-        name: string;
-        relativePath: string;
-      }>;
-    } | null;
+    skillsConfig: SandboxProfileVersionSkillsConfig | null;
   },
 ): Promise<SandboxProfilePublishabilityIssue[]> {
   if (input.skillsConfig === null) {
@@ -130,21 +129,24 @@ async function validateSandboxProfileVersionSkillsConfig(
   }
 
   const skillsConfig = input.skillsConfig;
-  const skillsSourceIsBound = await profileVersionIncludesSkillsSource({
-    db,
-    organizationId: input.organizationId,
-    profileId: input.profileId,
-    profileVersion: input.profileVersion,
-    originUrl: skillsConfig.originUrl,
-  });
-  if (!skillsSourceIsBound) {
-    return [
-      {
-        code: SandboxProfilePublishabilityIssueCodes.SKILLS_SOURCE_NOT_BOUND,
-        message:
-          "Add this repository to the Git integration bindings before publishing this sandbox profile.",
-      },
-    ];
+  const publicOriginUrl = canonicalizePublicGitHubSkillsSourceOriginUrl(skillsConfig.originUrl);
+  if (publicOriginUrl !== skillsConfig.originUrl) {
+    const skillsSourceIsBound = await profileVersionIncludesSkillsSource({
+      db,
+      organizationId: input.organizationId,
+      profileId: input.profileId,
+      profileVersion: input.profileVersion,
+      originUrl: skillsConfig.originUrl,
+    });
+    if (!skillsSourceIsBound) {
+      return [
+        {
+          code: SandboxProfilePublishabilityIssueCodes.SKILLS_SOURCE_NOT_BOUND,
+          message:
+            "Add this repository to the Git integration bindings before publishing this sandbox profile.",
+        },
+      ];
+    }
   }
 
   const skillsSourceRepo = await db.query.skillsSourceRepos.findFirst({

@@ -38,6 +38,14 @@ export const NoSkillsSource: Story = {
   },
 };
 
+export const PublicGitHubSource: Story = {
+  name: "Public GitHub Source",
+  args: {
+    initialBindings: StoryBindings.filter((binding) => binding.kind !== "git"),
+    skillsState: "public-source",
+  },
+};
+
 export const SkillsNotLoaded: Story = {
   args: {
     skillsState: "undiscovered",

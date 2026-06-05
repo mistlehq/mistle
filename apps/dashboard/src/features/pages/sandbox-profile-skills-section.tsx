@@ -68,6 +68,7 @@ type SkillOption = SelectedSkill & {
 };
 
 const NoSkillsSourceValue = "__no_skills_source__";
+const AddPublicGitHubSourceValue = "__add_public_github_source__";
 const UnavailableSkillsSourceSaveBlockedMessage =
   "Choose an available skills source, or clear the skills source before saving.";
 
@@ -124,19 +125,37 @@ export function SandboxProfileSkillsSection(input: {
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [saveAndReloadDialogIsOpen, setSaveAndReloadDialogIsOpen] = useState(false);
   const [saveAndReloadIsPending, setSaveAndReloadIsPending] = useState(false);
+  const [publicSourceDialogIsOpen, setPublicSourceDialogIsOpen] = useState(false);
+  const [publicSourceUrl, setPublicSourceUrl] = useState("");
+  const [publicSourceErrorMessage, setPublicSourceErrorMessage] = useState<string | null>(null);
   const attemptedAutoLoadKeysRef = useRef(new Set<string>());
   const draftConfigRef = useRef(draftConfig);
   draftConfigRef.current = draftConfig;
 
   const selectedOriginUrl = draftConfig?.originUrl ?? null;
+  const selectedPublicSourceOption =
+    selectedOriginUrl === null ||
+    sourceOptions.some((sourceOption) => sourceOption.originUrl === selectedOriginUrl)
+      ? null
+      : createPublicGitHubSkillsSourceOption(selectedOriginUrl);
+  const selectableSourceOptions =
+    selectedPublicSourceOption === null
+      ? sourceOptions
+      : [
+          ...sourceOptions.filter(
+            (sourceOption) => sourceOption.originUrl !== selectedPublicSourceOption.originUrl,
+          ),
+          selectedPublicSourceOption,
+        ].sort(compareSkillsSourceRepositoryOptions);
   const selectedSourceOption =
     selectedOriginUrl === null
       ? null
-      : (sourceOptions.find((sourceOption) => sourceOption.originUrl === selectedOriginUrl) ??
-        null);
+      : (selectableSourceOptions.find(
+          (sourceOption) => sourceOption.originUrl === selectedOriginUrl,
+        ) ?? null);
   const saveBlockedMessage = resolveSkillsConfigSaveBlockedMessage({
     skillsConfig: draftConfig,
-    sourceOptions,
+    sourceOptions: selectableSourceOptions,
   });
   const sourceIsUnavailable = saveBlockedMessage !== null;
   const skillsSourceQuery = useQuery({
@@ -191,7 +210,11 @@ export function SandboxProfileSkillsSection(input: {
     },
   });
 
-  const skillsSourceRepo = resolveSkillsSourceRepo(skillsSourceQuery.data, selectedOriginUrl);
+  const skillsSourceRepo =
+    selectedOriginUrl === null
+      ? null
+      : (skillsSourceQuery.data?.items.find((item) => item.originUrl === selectedOriginUrl) ??
+        null);
   const selectedSkills = draftConfig?.selectedSkills ?? [];
   const skillOptions = createSkillOptions({
     selectedSkills,
@@ -219,13 +242,16 @@ export function SandboxProfileSkillsSection(input: {
   const queryLoadIsPending = selectedOriginUrl !== null && skillsSourceQuery.isPending;
   const loadIsPending = queryLoadIsPending || refreshMutation.isPending;
   const actionIsPending = refreshMutation.isPending || saveAndReloadIsPending;
-  const sourceControlIsDisabled =
-    fieldIsReadOnly || loadIsPending || (sourceOptions.length === 0 && selectedOriginUrl === null);
-  const selectedSourceValue = selectedOriginUrl ?? NoSkillsSourceValue;
+  const sourceControlIsDisabled = fieldIsReadOnly || loadIsPending;
+  const selectedSourceValue = draftConfig === null ? NoSkillsSourceValue : draftConfig.originUrl;
   const savedSelectedOriginUrl = persistedDraftConfig?.originUrl ?? null;
+  const selectedSourceUsesBoundIntegration =
+    selectedOriginUrl !== null &&
+    sourceOptions.some((sourceOption) => sourceOption.originUrl === selectedOriginUrl);
   const selectedSourceHasUnpersistedChanges =
     selectedOriginUrl !== null &&
-    (selectedOriginUrl !== savedSelectedOriginUrl || input.integrationRowsHaveUnpersistedChanges);
+    (selectedOriginUrl !== savedSelectedOriginUrl ||
+      (selectedSourceUsesBoundIntegration && input.integrationRowsHaveUnpersistedChanges));
   const autoLoadKey =
     selectedOriginUrl === null
       ? null
@@ -335,10 +361,47 @@ export function SandboxProfileSkillsSection(input: {
       return;
     }
 
+    if (value === AddPublicGitHubSourceValue) {
+      openPublicSourceDialog();
+      return;
+    }
+
+    const selectedSource =
+      selectableSourceOptions.find((sourceOption) => sourceOption.originUrl === value) ?? null;
+    if (selectedSource === null) {
+      setSaveErrorMessage("Selected skills source is not available.");
+      return;
+    }
+
     setDraftConfig({
-      originUrl: value,
+      originUrl: selectedSource.originUrl,
       selectedSkills: [],
     });
+    setSaveErrorMessage(null);
+  }
+
+  function openPublicSourceDialog(): void {
+    setPublicSourceUrl("");
+    setPublicSourceErrorMessage(null);
+    setPublicSourceDialogIsOpen(true);
+  }
+
+  function addPublicGitHubSource(): void {
+    const publicSourceOption = createPublicGitHubSkillsSourceOption(publicSourceUrl);
+    if (publicSourceOption === null) {
+      setPublicSourceErrorMessage(
+        "Enter a public GitHub repository URL like https://github.com/owner/repo.",
+      );
+      return;
+    }
+
+    setDraftConfig({
+      originUrl: publicSourceOption.originUrl,
+      selectedSkills: [],
+    });
+    setPublicSourceDialogIsOpen(false);
+    setPublicSourceUrl("");
+    setPublicSourceErrorMessage(null);
     setSaveErrorMessage(null);
   }
 
@@ -581,9 +644,9 @@ export function SandboxProfileSkillsSection(input: {
               source.
             </Notice>
           ) : null}
-          {sourceOptions.length === 0 && selectedOriginUrl === null ? (
-            <Notice title="Git repository binding required">
-              Add a Git repository binding before configuring skills.
+          {selectableSourceOptions.length === 0 && selectedOriginUrl === null ? (
+            <Notice title="Skills source required">
+              Add a Git repository binding or a public GitHub repository before configuring skills.
             </Notice>
           ) : null}
           {unavailableSelectedSkillsMessage === null ? null : (
@@ -611,12 +674,15 @@ export function SandboxProfileSkillsSection(input: {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NoSkillsSourceValue}>None</SelectItem>
-                    {sourceIsUnavailable ? (
-                      <SelectItem disabled value={selectedOriginUrl}>
+                    <SelectItem value={AddPublicGitHubSourceValue}>
+                      Add public GitHub repo
+                    </SelectItem>
+                    {sourceIsUnavailable && draftConfig !== null ? (
+                      <SelectItem disabled value={draftConfig.originUrl}>
                         Unavailable repository
                       </SelectItem>
                     ) : null}
-                    {sourceOptions.map((sourceOption) => (
+                    {selectableSourceOptions.map((sourceOption) => (
                       <SelectItem key={sourceOption.originUrl} value={sourceOption.originUrl}>
                         {sourceOption.label}
                       </SelectItem>
@@ -645,6 +711,66 @@ export function SandboxProfileSkillsSection(input: {
           {skillsContent}
         </div>
       </SandboxProfileSectionCard>
+      <Dialog
+        onOpenChange={(open) => {
+          setPublicSourceDialogIsOpen(open);
+          if (!open) {
+            setPublicSourceUrl("");
+            setPublicSourceErrorMessage(null);
+          }
+        }}
+        open={publicSourceDialogIsOpen}
+      >
+        <DialogContent>
+          <form
+            className="grid gap-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              addPublicGitHubSource();
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>Add public GitHub repo</DialogTitle>
+              <DialogDescription>
+                Use a public GitHub repository that contains Mistle skills.
+              </DialogDescription>
+            </DialogHeader>
+            <Field contentWidth="fill">
+              <FieldHeader>
+                <FieldLabel htmlFor="sandbox-profile-public-skills-source-url">
+                  Repository URL
+                </FieldLabel>
+              </FieldHeader>
+              <FieldContent>
+                <Input
+                  id="sandbox-profile-public-skills-source-url"
+                  onChange={(event) => {
+                    setPublicSourceUrl(event.target.value);
+                    setPublicSourceErrorMessage(null);
+                  }}
+                  placeholder="https://github.com/owner/repo"
+                  value={publicSourceUrl}
+                />
+              </FieldContent>
+            </Field>
+            {publicSourceErrorMessage === null ? null : (
+              <Notice variant="alert">{publicSourceErrorMessage}</Notice>
+            )}
+            <DialogFooter>
+              <Button
+                onClick={() => {
+                  setPublicSourceDialogIsOpen(false);
+                }}
+                type="button"
+                variant="outline"
+              >
+                Cancel
+              </Button>
+              <Button type="submit">Add repository</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       <Dialog
         onOpenChange={(open) => {
           if (!open && !saveAndReloadIsPending) {
@@ -687,17 +813,6 @@ export function SandboxProfileSkillsSection(input: {
       </Dialog>
     </SectionBlock>
   );
-}
-
-function resolveSkillsSourceRepo(
-  result: SandboxProfileVersionSkillsSourceReposResult | undefined,
-  originUrl: string | null,
-): SandboxProfileVersionSkillsSourceRepo | null {
-  if (originUrl === null || result === undefined) {
-    return null;
-  }
-
-  return result.items.find((item) => item.originUrl === originUrl) ?? null;
 }
 
 export function resolveSkillsSourceRepositoryOptions(input: {
@@ -743,10 +858,7 @@ export function resolveSkillsSourceRepositoryOptions(input: {
     }
   }
 
-  return [...optionsByOriginUrl.values()].sort(
-    (left, right) =>
-      left.label.localeCompare(right.label) || left.originUrl.localeCompare(right.originUrl),
-  );
+  return [...optionsByOriginUrl.values()].sort(compareSkillsSourceRepositoryOptions);
 }
 
 function createSkillsSourceRepositoryOption(input: {
@@ -766,6 +878,78 @@ function createSkillsSourceRepositoryOption(input: {
     label: input.repository,
     originUrl: originUrl.toString(),
   };
+}
+
+function createPublicGitHubSkillsSourceOption(input: string): SkillsSourceRepositoryOption | null {
+  const originUrl = canonicalizePublicGitHubSkillsSourceOriginUrl(input);
+  if (originUrl === null) {
+    return null;
+  }
+
+  const parsedOriginUrl = new URL(originUrl);
+  const [owner, rawRepository] = parsedOriginUrl.pathname
+    .split("/")
+    .filter((part) => part.length > 0);
+  if (owner === undefined || rawRepository === undefined) {
+    return null;
+  }
+
+  return {
+    label: `${owner}/${rawRepository.slice(0, -".git".length)}`,
+    originUrl,
+  };
+}
+
+export function canonicalizePublicGitHubSkillsSourceOriginUrl(input: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(input.trim());
+  } catch {
+    return null;
+  }
+
+  if (
+    url.protocol !== "https:" ||
+    url.hostname !== "github.com" ||
+    url.username.length > 0 ||
+    url.password.length > 0 ||
+    url.search.length > 0 ||
+    url.hash.length > 0
+  ) {
+    return null;
+  }
+
+  const pathParts = url.pathname.split("/").filter((part) => part.length > 0);
+  if (pathParts.length !== 2) {
+    return null;
+  }
+
+  const [owner, rawRepository] = pathParts;
+  const repository = rawRepository?.endsWith(".git")
+    ? rawRepository.slice(0, -".git".length)
+    : rawRepository;
+  if (
+    owner === undefined ||
+    repository === undefined ||
+    repository.length === 0 ||
+    !isValidGitHubPathPart(owner) ||
+    !isValidGitHubPathPart(repository)
+  ) {
+    return null;
+  }
+
+  return `https://github.com/${owner}/${repository}.git`;
+}
+
+function isValidGitHubPathPart(input: string): boolean {
+  return /^[A-Za-z0-9_.-]+$/.test(input) && !input.startsWith(".") && !input.endsWith(".");
+}
+
+function compareSkillsSourceRepositoryOptions(
+  left: SkillsSourceRepositoryOption,
+  right: SkillsSourceRepositoryOption,
+): number {
+  return left.label.localeCompare(right.label) || left.originUrl.localeCompare(right.originUrl);
 }
 
 function readStringField(input: Record<string, unknown>, field: string): string | null {
