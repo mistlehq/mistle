@@ -196,6 +196,7 @@ fn empty_tunnel_session_state() -> TunnelSessionMutableState {
 fn test_tunnel_session_runtime() -> TunnelSessionRuntime {
     TunnelSessionRuntime {
         keepalive_manager: Arc::new(Mutex::new(KeepaliveManager::default())),
+        platform_process_registry: crate::process::PlatformProcessRegistry::default(),
         runtime_readiness_manager: Arc::new(Mutex::new(RuntimeReadinessManager::default())),
         connection_state: Arc::new(RwLock::new(TunnelSessionRuntimeConnectionState {
             agent_endpoint_url: None,

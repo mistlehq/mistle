@@ -19,7 +19,8 @@ pub const KEEPALIVE_HEARTBEAT_INTERVAL: Duration = Duration::from_millis(10_000)
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct KeepaliveManager {
     has_user_activity: bool,
-    has_platform_activity: bool,
+    has_platform_semantic_activity: bool,
+    has_platform_process_activity: bool,
     tunnel_connected: bool,
     last_published_active: Option<bool>,
     next_heartbeat_at_ms: Option<u64>,
@@ -46,12 +47,19 @@ impl KeepaliveManager {
 
     /// Sets the coarse platform-activity bit derived from runtime adapters.
     pub fn set_platform_active(&mut self, active: bool) {
-        self.has_platform_activity = active;
+        self.has_platform_semantic_activity = active;
+    }
+
+    /// Sets the coarse platform-process activity bit derived from runtime process cgroups.
+    pub fn set_platform_process_active(&mut self, active: bool) {
+        self.has_platform_process_activity = active;
     }
 
     /// Returns whether any current activity should keep the sandbox alive.
     pub fn active(&self) -> bool {
-        self.has_user_activity || self.has_platform_activity
+        self.has_user_activity
+            || self.has_platform_semantic_activity
+            || self.has_platform_process_activity
     }
 
     /// Builds the current wire payload without mutating publication state.
@@ -127,6 +135,15 @@ mod tests {
             .take_publishable_state(&clock)
             .expect("activity change should trigger a publish");
         assert!(state.active);
+    }
+
+    #[test]
+    fn treats_extra_platform_processes_as_keepalive_activity() {
+        let mut manager = KeepaliveManager::default();
+
+        manager.set_platform_process_active(true);
+
+        assert!(manager.active());
     }
 
     #[test]

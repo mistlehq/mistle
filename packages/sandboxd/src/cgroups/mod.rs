@@ -2,10 +2,11 @@
 //!
 //! This module owns the low-level cgroup layout and file operations behind user
 //! process scopes: create the per-sandbox directory tree, allocate one
-//! `/user/<scope-id>` directory per PTY session, attach the PTY child pid via
-//! `cgroup.procs`, observe liveness from `cgroup.events`, and request scope
-//! teardown with `cgroup.kill`.
+//! `/user/<scope-id>` directory per PTY session or `/platform/<scope-id>`
+//! directory per runtime process, attach child pids via `cgroup.procs`, observe
+//! liveness from `cgroup.events`, and request scope teardown with `cgroup.kill`.
 
+use std::collections::BTreeSet;
 use std::fmt::{self, Display};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -32,6 +33,9 @@ pub struct UserScopePaths {
     pub kill_file: PathBuf,
 }
 
+/// Carries the directory and control files for one platform process cgroup.
+pub type PlatformScopePaths = UserScopePaths;
+
 /// Describes why one cgroup filesystem step failed.
 #[derive(Debug)]
 pub enum CgroupError {
@@ -53,6 +57,10 @@ pub enum CgroupError {
         path: PathBuf,
     },
     InvalidPopulatedValue {
+        path: PathBuf,
+        value: String,
+    },
+    InvalidProcessId {
         path: PathBuf,
         value: String,
     },
@@ -89,6 +97,13 @@ impl Display for CgroupError {
                 write!(
                     f,
                     "cgroup.events at {} has invalid populated value '{value}'",
+                    path.display()
+                )
+            }
+            Self::InvalidProcessId { path, value } => {
+                write!(
+                    f,
+                    "cgroup.procs at {} has invalid pid '{value}'",
                     path.display()
                 )
             }
@@ -160,6 +175,29 @@ pub fn create_user_scope(
     })
 }
 
+/// Creates one `/platform/<scope-id>` directory and returns its control-file paths.
+pub fn create_platform_scope(
+    cgroup_root: &Path,
+    sandbox_instance_id: &str,
+    scope_id: &str,
+) -> Result<PlatformScopePaths, CgroupError> {
+    validate_segment(scope_id, CgroupError::InvalidScopeId)?;
+    let sandbox_paths = ensure_sandbox_cgroup_tree(cgroup_root, sandbox_instance_id)?;
+    let scope_root = sandbox_paths.platform_root.join(scope_id);
+
+    fs::create_dir_all(&scope_root).map_err(|error| CgroupError::CreateDirectory {
+        path: scope_root.clone(),
+        error,
+    })?;
+
+    Ok(PlatformScopePaths {
+        procs_file: scope_root.join("cgroup.procs"),
+        events_file: scope_root.join("cgroup.events"),
+        kill_file: scope_root.join("cgroup.kill"),
+        scope_root,
+    })
+}
+
 /// Requests kernel teardown for every user process scope under one sandbox tree.
 pub fn kill_sandbox_user_scopes(
     cgroup_root: &Path,
@@ -203,12 +241,89 @@ pub fn kill_sandbox_user_scopes(
     Ok(())
 }
 
+/// Requests kernel teardown for every platform process scope under one sandbox tree.
+pub fn kill_sandbox_platform_scopes(
+    cgroup_root: &Path,
+    sandbox_instance_id: &str,
+) -> Result<(), CgroupError> {
+    kill_sandbox_scopes(cgroup_root, sandbox_instance_id, "platform")
+}
+
+fn kill_sandbox_scopes(
+    cgroup_root: &Path,
+    sandbox_instance_id: &str,
+    scope_kind: &str,
+) -> Result<(), CgroupError> {
+    validate_segment(sandbox_instance_id, CgroupError::InvalidSandboxInstanceId)?;
+    let scopes_root = cgroup_root.join(sandbox_instance_id).join(scope_kind);
+    let entries = match fs::read_dir(&scopes_root) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(CgroupError::ReadFile {
+                path: scopes_root,
+                error,
+            });
+        }
+    };
+
+    for entry_result in entries {
+        let entry = entry_result.map_err(|error| CgroupError::ReadFile {
+            path: scopes_root.clone(),
+            error,
+        })?;
+        let entry_type = entry.file_type().map_err(|error| CgroupError::ReadFile {
+            path: entry.path(),
+            error,
+        })?;
+        if !entry_type.is_dir() {
+            continue;
+        }
+
+        let scope_root = entry.path();
+        kill_scope(&UserScopePaths {
+            procs_file: scope_root.join("cgroup.procs"),
+            events_file: scope_root.join("cgroup.events"),
+            kill_file: scope_root.join("cgroup.kill"),
+            scope_root,
+        })?;
+    }
+
+    Ok(())
+}
+
 /// Attaches one pid to a user scope by writing it to `cgroup.procs`.
 pub fn attach_pid_to_scope(scope_paths: &UserScopePaths, pid: u32) -> Result<(), CgroupError> {
     fs::write(&scope_paths.procs_file, format!("{pid}\n")).map_err(|error| CgroupError::WriteFile {
         path: scope_paths.procs_file.clone(),
         error,
     })
+}
+
+/// Returns the process ids currently listed in `cgroup.procs`.
+pub fn read_scope_process_ids(scope_paths: &UserScopePaths) -> Result<BTreeSet<u32>, CgroupError> {
+    let procs =
+        fs::read_to_string(&scope_paths.procs_file).map_err(|error| CgroupError::ReadFile {
+            path: scope_paths.procs_file.clone(),
+            error,
+        })?;
+    let mut process_ids = BTreeSet::new();
+
+    for line in procs.lines() {
+        let value = line.trim();
+        if value.is_empty() {
+            continue;
+        }
+        let process_id = value
+            .parse::<u32>()
+            .map_err(|_| CgroupError::InvalidProcessId {
+                path: scope_paths.procs_file.clone(),
+                value: value.to_string(),
+            })?;
+        process_ids.insert(process_id);
+    }
+
+    Ok(process_ids)
 }
 
 /// Returns whether `cgroup.events` currently reports `populated 1`.
@@ -271,8 +386,9 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use crate::cgroups::{
-        CgroupError, attach_pid_to_scope, create_user_scope, ensure_sandbox_cgroup_tree,
-        is_scope_populated, kill_sandbox_user_scopes, kill_scope,
+        CgroupError, attach_pid_to_scope, create_platform_scope, create_user_scope,
+        ensure_sandbox_cgroup_tree, is_scope_populated, kill_sandbox_platform_scopes,
+        kill_sandbox_user_scopes, kill_scope, read_scope_process_ids,
     };
 
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -314,6 +430,50 @@ mod tests {
     }
 
     #[test]
+    fn creates_platform_scope_paths() {
+        let temp_root = create_temp_test_dir("cgroups_platform_tree");
+        let scope_paths = create_platform_scope(&temp_root, "sbi_123", "runtime_0")
+            .expect("platform scope should exist");
+
+        assert!(scope_paths.scope_root.is_dir());
+        assert_eq!(
+            scope_paths.scope_root,
+            temp_root.join("sbi_123").join("platform").join("runtime_0")
+        );
+
+        fs::remove_dir_all(temp_root).expect("temp dir should be removable");
+    }
+
+    #[test]
+    fn parses_process_ids_from_scope_procs_file() {
+        let temp_root = create_temp_test_dir("cgroups_procs");
+        let scope_paths =
+            create_user_scope(&temp_root, "sbi_123", "scope_123").expect("scope should exist");
+        fs::write(&scope_paths.procs_file, "42\n7\n42\n\n").expect("procs file should be writable");
+
+        assert_eq!(
+            read_scope_process_ids(&scope_paths).expect("process ids should parse"),
+            [7_u32, 42_u32].into_iter().collect()
+        );
+
+        fs::remove_dir_all(temp_root).expect("temp dir should be removable");
+    }
+
+    #[test]
+    fn rejects_invalid_process_ids_from_scope_procs_file() {
+        let temp_root = create_temp_test_dir("cgroups_invalid_procs");
+        let scope_paths =
+            create_user_scope(&temp_root, "sbi_123", "scope_123").expect("scope should exist");
+        fs::write(&scope_paths.procs_file, "not-a-pid\n").expect("procs file should be writable");
+
+        let error =
+            read_scope_process_ids(&scope_paths).expect_err("invalid pids should fail parsing");
+        assert!(matches!(error, CgroupError::InvalidProcessId { .. }));
+
+        fs::remove_dir_all(temp_root).expect("temp dir should be removable");
+    }
+
+    #[test]
     fn kills_every_user_scope_for_a_sandbox() {
         let temp_root = create_temp_test_dir("cgroups_kill_sandbox_user");
         let first_scope =
@@ -348,6 +508,36 @@ mod tests {
 
         kill_sandbox_user_scopes(&temp_root, "sbi_missing")
             .expect("missing sandbox scopes should be treated as already clean");
+
+        fs::remove_dir_all(temp_root).expect("temp dir should be removable");
+    }
+
+    #[test]
+    fn kills_every_platform_scope_for_a_sandbox() {
+        let temp_root = create_temp_test_dir("cgroups_kill_sandbox_platform");
+        let first_scope = create_platform_scope(&temp_root, "sbi_123", "runtime_1")
+            .expect("first scope should exist");
+        let second_scope = create_platform_scope(&temp_root, "sbi_123", "runtime_2")
+            .expect("second scope should exist");
+        let other_scope = create_platform_scope(&temp_root, "sbi_other", "runtime_3")
+            .expect("other scope should exist");
+        fs::write(&other_scope.kill_file, "").expect("other kill file should be writable");
+
+        kill_sandbox_platform_scopes(&temp_root, "sbi_123")
+            .expect("sandbox platform scopes should be killed");
+
+        assert_eq!(
+            fs::read_to_string(&first_scope.kill_file).expect("first kill file should exist"),
+            "1\n"
+        );
+        assert_eq!(
+            fs::read_to_string(&second_scope.kill_file).expect("second kill file should exist"),
+            "1\n"
+        );
+        assert_eq!(
+            fs::read_to_string(&other_scope.kill_file).expect("other kill file should exist"),
+            ""
+        );
 
         fs::remove_dir_all(temp_root).expect("temp dir should be removable");
     }

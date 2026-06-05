@@ -10,6 +10,7 @@ use tokio::task::JoinHandle as TokioJoinHandle;
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::keepalive::KeepaliveManager;
+use crate::process::PlatformProcessRegistry;
 use crate::runtime::readiness::RuntimeReadinessManager;
 use crate::supervision::SandboxdSupervisorHandle;
 use crate::time::{Clock, Sleeper};
@@ -113,6 +114,7 @@ pub(in crate::tunnel::session) struct PendingAgentOpenState {
 
 pub(in crate::tunnel::session) struct TunnelSessionRuntime {
     pub(in crate::tunnel::session) keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    pub(in crate::tunnel::session) platform_process_registry: PlatformProcessRegistry,
     pub(in crate::tunnel::session) runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     pub(in crate::tunnel::session) connection_state:
         Arc<RwLock<TunnelSessionRuntimeConnectionState>>,
@@ -141,6 +143,7 @@ pub(in crate::tunnel::session) struct TunnelSessionLoopContext<'a> {
     pub(in crate::tunnel::session) sandbox_instance_id: &'a str,
     pub(in crate::tunnel::session) gateway_ws_url: &'a str,
     pub(in crate::tunnel::session) clock: &'a dyn Clock,
+    pub(in crate::tunnel::session) platform_process_registry: PlatformProcessRegistry,
     pub(in crate::tunnel::session) supervisor_handle: &'a SandboxdSupervisorHandle,
 }
 

@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 
-use crate::cgroups::{DEFAULT_CGROUP_ROOT, kill_sandbox_user_scopes};
+use crate::cgroups::{DEFAULT_CGROUP_ROOT, kill_sandbox_platform_scopes, kill_sandbox_user_scopes};
 use crate::codex_proxy::CodexProxyControlHandle;
 use crate::command::{CommandOutputSink, CommandOutputStream};
 use crate::daemon_liveness::DaemonLivenessMonitor;
@@ -20,6 +20,7 @@ use crate::keepalive::KeepaliveManager;
 use crate::process;
 use crate::process::{
     CodexAppServerControlHandle, CodexAppServerObservationHandle, OpenCodeServerControlHandle,
+    PlatformProcessRegistry,
 };
 use crate::protocol::activation::ActivationInput;
 use crate::protocol::session::SessionRuntimeInput;
@@ -164,6 +165,7 @@ pub struct SandboxdState {
     daemon_liveness_monitor: Option<DaemonLivenessMonitor>,
     supervisor_handle: SandboxdSupervisorHandle,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    platform_process_registry: PlatformProcessRegistry,
     runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     agent_endpoint_url: Option<String>,
     runtime_env: BTreeMap<String, String>,
@@ -264,10 +266,12 @@ impl SandboxdState {
         let execution_mode = input.execution_mode;
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
         let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        let platform_process_registry = PlatformProcessRegistry::default();
         let mut startup_tunnel_session = Some(start_minimal_tunnel_session(
             StartMinimalTunnelSessionInput {
                 session_input,
                 keepalive_manager: keepalive_manager.clone(),
+                platform_process_registry: platform_process_registry.clone(),
                 runtime_readiness_manager: runtime_readiness_manager.clone(),
                 clock: clock.clone(),
                 sleeper: sleeper.clone(),
@@ -552,6 +556,7 @@ impl SandboxdState {
                 daemon_liveness_monitor: None,
                 supervisor_handle,
                 keepalive_manager: Arc::new(Mutex::new(KeepaliveManager::default())),
+                platform_process_registry: PlatformProcessRegistry::default(),
                 runtime_readiness_manager: Arc::new(Mutex::new(RuntimeReadinessManager::default())),
                 agent_endpoint_url: None,
                 runtime_env,
@@ -570,12 +575,17 @@ impl SandboxdState {
             None
         } else {
             Some(
-                process::start_runtime_client_process_manager_with_supervisor_and_observer(
+                process::start_runtime_client_process_manager_with_platform_scopes(
                     &process_specs,
                     clock.as_ref(),
                     sleeper.as_ref(),
                     supervisor_handle.clone(),
                     Some(&runtime_process_observer),
+                    process::PlatformProcessScopeInput {
+                        cgroup_root: Path::new(DEFAULT_CGROUP_ROOT).to_path_buf(),
+                        sandbox_instance_id: sandbox_instance_id.clone(),
+                        registry: platform_process_registry.clone(),
+                    },
                 )
                 .map_err(|error| {
                     record_runtime_process_failure(&diagnostics_logger, &error);
@@ -782,6 +792,7 @@ impl SandboxdState {
             daemon_liveness_monitor,
             supervisor_handle,
             keepalive_manager,
+            platform_process_registry,
             runtime_readiness_manager,
             agent_endpoint_url,
             runtime_env,
@@ -852,6 +863,7 @@ impl SandboxdState {
         let tunnel_session = match start_minimal_tunnel_session(StartMinimalTunnelSessionInput {
             session_input: &session_input,
             keepalive_manager: self.keepalive_manager.clone(),
+            platform_process_registry: self.platform_process_registry.clone(),
             runtime_readiness_manager: self.runtime_readiness_manager.clone(),
             clock: self.clock.clone(),
             sleeper: self.sleeper.clone(),
@@ -1258,6 +1270,8 @@ impl SandboxdState {
             .map_err(|error| SandboxdStateError::StopEgressProxy(error.to_string()))?;
         kill_sandbox_user_scopes(Path::new(DEFAULT_CGROUP_ROOT), &self.sandbox_instance_id)
             .map_err(|error| SandboxdStateError::StopRuntimeProcesses(error.to_string()))?;
+        kill_sandbox_platform_scopes(Path::new(DEFAULT_CGROUP_ROOT), &self.sandbox_instance_id)
+            .map_err(|error| SandboxdStateError::StopRuntimeProcesses(error.to_string()))?;
         if self.execution_mode == SandboxdExecutionMode::Snapshot {
             scrub_snapshot_runtime_artifacts().map_err(SandboxdStateError::StopEgressProxy)?;
         }
@@ -1566,6 +1580,7 @@ fn should_apply_runtime_plan_for_activation(
 struct StartMinimalTunnelSessionInput<'a> {
     session_input: &'a SessionRuntimeInput,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    platform_process_registry: PlatformProcessRegistry,
     runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     clock: Arc<dyn Clock>,
     sleeper: Arc<dyn Sleeper>,
@@ -1584,6 +1599,7 @@ fn start_minimal_tunnel_session(
     let tunnel_session = TunnelSession::start_minimal_session_input_with_supervisor(
         input.session_input,
         input.keepalive_manager,
+        input.platform_process_registry,
         input.runtime_readiness_manager,
         input.clock,
         input.sleeper,

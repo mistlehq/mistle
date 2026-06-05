@@ -10,8 +10,9 @@ use std::sync::Mutex;
 use serde_json::Value;
 use tokio::sync::mpsc;
 
-use crate::cgroups::{UserScopePaths, is_scope_populated};
+use crate::cgroups::{UserScopePaths, is_scope_populated, read_scope_process_ids};
 use crate::keepalive::KeepaliveManager;
+use crate::process::PlatformProcessRegistry;
 use crate::supervision::{
     SandboxdSupervisorHandle, SupervisedComponent, encode_forwarded_lifecycle_event_log_line,
 };
@@ -217,6 +218,34 @@ pub(in crate::tunnel::session) fn sync_pty_scope_keepalive(
     Ok(())
 }
 
+pub(in crate::tunnel::session) fn sync_platform_process_scope_keepalive(
+    keepalive_manager: &Mutex<KeepaliveManager>,
+    platform_process_registry: &PlatformProcessRegistry,
+) -> Result<(), TunnelSessionError> {
+    let mut has_extra_platform_process = false;
+    for scope in platform_process_registry
+        .snapshots()
+        .map_err(TunnelSessionError::Pty)?
+    {
+        let process_ids = read_scope_process_ids(&scope.scope_paths)
+            .map_err(|error| TunnelSessionError::Pty(error.to_string()))?;
+        if process_ids
+            .iter()
+            .any(|process_id| *process_id != scope.supervised_root_pid)
+        {
+            has_extra_platform_process = true;
+            break;
+        }
+    }
+
+    keepalive_manager
+        .lock()
+        .expect("keepalive manager lock should not be poisoned")
+        .set_platform_process_active(has_extra_platform_process);
+
+    Ok(())
+}
+
 pub(in crate::tunnel::session) fn report_dropped_bootstrap_text_message(
     tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     telemetry_relay: &mut TelemetryRelay,
@@ -355,7 +384,10 @@ mod tests {
     use std::sync::Mutex;
 
     use crate::keepalive::KeepaliveManager;
-    use crate::tunnel::session::lifecycle::sync_pty_scope_keepalive;
+    use crate::process::PlatformProcessRegistry;
+    use crate::tunnel::session::lifecycle::{
+        sync_platform_process_scope_keepalive, sync_pty_scope_keepalive,
+    };
 
     #[test]
     fn sync_pty_scope_keepalive_reads_populated_user_scopes_from_disk() {
@@ -389,6 +421,67 @@ mod tests {
                 .expect("keepalive manager lock should not be poisoned")
                 .active(),
             "empty user scope should clear sandbox keepalive"
+        );
+    }
+
+    #[test]
+    fn sync_platform_process_keepalive_ignores_supervised_root_processes() {
+        let test_dir = tempfile::TempDir::new().expect("temp dir should be created");
+        let scope_paths =
+            crate::cgroups::create_platform_scope(test_dir.path(), "sbi_123", "runtime_0")
+                .expect("platform scope should be created");
+        std::fs::write(&scope_paths.procs_file, "101\n").expect("scope procs should be writable");
+        let registry = PlatformProcessRegistry::default();
+        registry
+            .replace_scope(
+                "runtime-0".to_string(),
+                "codex-app-server".to_string(),
+                scope_paths,
+                101,
+            )
+            .expect("platform scope should be registered");
+        let keepalive_manager = Mutex::new(KeepaliveManager::default());
+
+        sync_platform_process_scope_keepalive(&keepalive_manager, &registry)
+            .expect("platform process scope should sync");
+
+        assert!(
+            !keepalive_manager
+                .lock()
+                .expect("keepalive manager lock should not be poisoned")
+                .active(),
+            "supervised root process alone should not keep the sandbox active"
+        );
+    }
+
+    #[test]
+    fn sync_platform_process_keepalive_counts_extra_processes() {
+        let test_dir = tempfile::TempDir::new().expect("temp dir should be created");
+        let scope_paths =
+            crate::cgroups::create_platform_scope(test_dir.path(), "sbi_123", "runtime_0")
+                .expect("platform scope should be created");
+        std::fs::write(&scope_paths.procs_file, "101\n202\n")
+            .expect("scope procs should be writable");
+        let registry = PlatformProcessRegistry::default();
+        registry
+            .replace_scope(
+                "runtime-0".to_string(),
+                "codex-app-server".to_string(),
+                scope_paths,
+                101,
+            )
+            .expect("platform scope should be registered");
+        let keepalive_manager = Mutex::new(KeepaliveManager::default());
+
+        sync_platform_process_scope_keepalive(&keepalive_manager, &registry)
+            .expect("platform process scope should sync");
+
+        assert!(
+            keepalive_manager
+                .lock()
+                .expect("keepalive manager lock should not be poisoned")
+                .active(),
+            "extra platform child process should keep the sandbox active"
         );
     }
 }

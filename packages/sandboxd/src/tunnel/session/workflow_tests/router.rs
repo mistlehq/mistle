@@ -17,6 +17,7 @@ async fn file_search_stream_returns_results_from_open_cwd() {
         sandbox_instance_id: "sbi_test",
         gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
         clock: &clock,
+        platform_process_registry: crate::process::PlatformProcessRegistry::default(),
         supervisor_handle: &supervisor_handle,
     };
     let mut session_state = empty_tunnel_session_state();
@@ -149,6 +150,7 @@ async fn restores_agent_stream_window_credit_after_runtime_writes_complete() {
         sandbox_instance_id: "sbi_test",
         gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
         clock: &clock,
+        platform_process_registry: crate::process::PlatformProcessRegistry::default(),
         supervisor_handle: &supervisor_handle,
     };
 
@@ -224,6 +226,7 @@ async fn serializes_port_access_tcp_events_to_tunnel_frames() {
         sandbox_instance_id: "sbi_test",
         gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
         clock: &clock,
+        platform_process_registry: crate::process::PlatformProcessRegistry::default(),
         supervisor_handle: &supervisor_handle,
     };
 
@@ -495,6 +498,7 @@ async fn rejects_generic_stream_open_when_stream_id_belongs_to_tunnel_stream() {
         sandbox_instance_id: "sbi_test",
         gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
         clock: &clock,
+        platform_process_registry: crate::process::PlatformProcessRegistry::default(),
         supervisor_handle: &supervisor_handle,
     };
 
@@ -611,6 +615,7 @@ async fn rejects_generic_stream_open_when_stream_id_belongs_to_port_access_strea
         sandbox_instance_id: "sbi_test",
         gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
         clock: &clock,
+        platform_process_registry: crate::process::PlatformProcessRegistry::default(),
         supervisor_handle: &supervisor_handle,
     };
     let mut session_state = empty_tunnel_session_state();
@@ -791,6 +796,7 @@ async fn bootstrap_disconnect_terminates_active_port_access_tcp_streams() {
         sandbox_instance_id: "sbi_test",
         gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
         clock: &clock,
+        platform_process_registry: crate::process::PlatformProcessRegistry::default(),
         supervisor_handle: &supervisor_handle,
     };
 
@@ -837,6 +843,7 @@ async fn ordinary_bootstrap_disconnect_requests_shutdown_without_reconnect() {
         sandbox_instance_id: "sbi_test",
         gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
         clock: &clock,
+        platform_process_registry: crate::process::PlatformProcessRegistry::default(),
         supervisor_handle: &supervisor_handle,
     };
 
@@ -905,6 +912,7 @@ async fn emits_agent_stream_summary_when_gateway_closes_stream() {
         sandbox_instance_id: "sbi_test",
         gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
         clock: &clock,
+        platform_process_registry: crate::process::PlatformProcessRegistry::default(),
         supervisor_handle: &supervisor_handle,
     };
     let close_message = parse_stream_control_message(r#"{"type":"stream.close","streamId":7}"#)
@@ -1065,6 +1073,7 @@ async fn emits_window_exhausted_and_summary_telemetry_for_agent_stream() {
         sandbox_instance_id: "sbi_test",
         gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
         clock: &clock,
+        platform_process_registry: crate::process::PlatformProcessRegistry::default(),
         supervisor_handle: &supervisor_handle,
     };
 

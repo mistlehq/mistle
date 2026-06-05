@@ -494,6 +494,7 @@ fn post_startup_panic_marks_restart_required_and_startup_completed() {
         test_tunnel_supervisor_handle("sbi_tunnel_session", panic_clock.clone());
     let runtime = TunnelSessionRuntime {
         keepalive_manager,
+        platform_process_registry: crate::process::PlatformProcessRegistry::default(),
         runtime_readiness_manager,
         connection_state: Arc::new(RwLock::new(TunnelSessionRuntimeConnectionState {
             agent_endpoint_url: None,

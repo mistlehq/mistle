@@ -4,6 +4,7 @@
 //! processes, waits for their declared readiness checks, and applies the stop
 //! policies used during daemon shutdown.
 
+use std::collections::BTreeMap;
 use std::collections::VecDeque;
 use std::fmt;
 use std::process::Child;
@@ -12,6 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
+use crate::cgroups::PlatformScopePaths;
 use crate::runtime::{
     RuntimeClientProcessReadiness, RuntimeClientProcessStopPolicy, RuntimeExecCommand,
 };
@@ -28,7 +30,9 @@ mod readiness;
 use codex_app_server::*;
 use lifecycle::*;
 pub use manager::{
-    flatten_runtime_client_processes, start_runtime_client_process_manager,
+    PlatformProcessScopeInput, flatten_runtime_client_processes,
+    start_runtime_client_process_manager,
+    start_runtime_client_process_manager_with_platform_scopes,
     start_runtime_client_process_manager_with_supervisor,
     start_runtime_client_process_manager_with_supervisor_and_observer,
 };
@@ -76,12 +80,91 @@ pub struct RuntimeClientProcessManager {
     supervisor_handle: SandboxdSupervisorHandle,
 }
 
+/// Shared registry of platform process cgroups owned by runtime client processes.
+#[derive(Clone, Debug, Default)]
+pub struct PlatformProcessRegistry {
+    scopes: Arc<Mutex<BTreeMap<String, PlatformProcessScopeSnapshot>>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlatformProcessScopeSnapshot {
+    pub process_key: String,
+    pub scope_paths: PlatformScopePaths,
+    pub supervised_root_pid: u32,
+}
+
+impl PlatformProcessRegistry {
+    pub fn replace_scope(
+        &self,
+        registry_key: String,
+        process_key: String,
+        scope_paths: PlatformScopePaths,
+        supervised_root_pid: u32,
+    ) -> Result<(), String> {
+        self.scopes
+            .lock()
+            .map_err(|error| format!("platform process registry lock was poisoned: {error}"))?
+            .insert(
+                registry_key,
+                PlatformProcessScopeSnapshot {
+                    process_key,
+                    scope_paths,
+                    supervised_root_pid,
+                },
+            );
+        Ok(())
+    }
+
+    pub fn update_supervised_root_pid(
+        &self,
+        registry_key: &str,
+        supervised_root_pid: u32,
+    ) -> Result<(), String> {
+        if let Some(scope) = self
+            .scopes
+            .lock()
+            .map_err(|error| format!("platform process registry lock was poisoned: {error}"))?
+            .get_mut(registry_key)
+        {
+            scope.supervised_root_pid = supervised_root_pid;
+        }
+        Ok(())
+    }
+
+    pub fn remove_scope(&self, registry_key: &str) -> Result<(), String> {
+        self.scopes
+            .lock()
+            .map_err(|error| format!("platform process registry lock was poisoned: {error}"))?
+            .remove(registry_key);
+        Ok(())
+    }
+
+    pub fn snapshots(&self) -> Result<Vec<PlatformProcessScopeSnapshot>, String> {
+        Ok(self
+            .scopes
+            .lock()
+            .map_err(|error| format!("platform process registry lock was poisoned: {error}"))?
+            .values()
+            .cloned()
+            .collect())
+    }
+}
+
 /// Tracks one live child process together with the spec that produced it.
 #[derive(Debug)]
 struct RunningRuntimeClientProcess {
     spec: RuntimeClientProcessSpec,
     child: Arc<Mutex<Child>>,
     output_capture: ProcessOutputCapture,
+    platform_scope: Option<RuntimeClientProcessPlatformScope>,
+}
+
+#[derive(Clone, Debug)]
+struct RuntimeClientProcessPlatformScope {
+    registry_key: String,
+    process_key: String,
+    scope_paths: PlatformScopePaths,
+    registry: PlatformProcessRegistry,
 }
 
 #[derive(Clone, Debug)]
@@ -141,6 +224,7 @@ struct ManagedCodexAppServerProcess {
     spec: RuntimeClientProcessSpec,
     child: Arc<Mutex<Child>>,
     output_capture: ProcessOutputCapture,
+    platform_scope: Option<RuntimeClientProcessPlatformScope>,
     observation_handle: CodexAppServerObservationHandle,
     supervisor_handle: SandboxdSupervisorHandle,
     restart_lock: Mutex<()>,
@@ -152,6 +236,7 @@ struct ManagedOpenCodeServerProcess {
     spec: RuntimeClientProcessSpec,
     child: Arc<Mutex<Child>>,
     output_capture: ProcessOutputCapture,
+    platform_scope: Option<RuntimeClientProcessPlatformScope>,
     supervisor_handle: SandboxdSupervisorHandle,
     restart_lock: Mutex<()>,
     restart_in_progress: AtomicBool,

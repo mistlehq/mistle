@@ -7,7 +7,9 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use sandboxd::process::{
+    PlatformProcessRegistry, PlatformProcessScopeInput, PlatformProcessScopeSnapshot,
     ProcessManagerError, RuntimeClientProcessSpec,
+    start_runtime_client_process_manager_with_platform_scopes,
     start_runtime_client_process_manager_with_supervisor,
 };
 use sandboxd::runtime::{
@@ -364,6 +366,238 @@ fn opencode_server_control_handle_restarts_after_exit() {
 }
 
 #[test]
+fn platform_scoped_process_manager_attaches_started_processes_and_cleans_registry_on_stop() {
+    let temp_root = create_test_control_dir("platform-process-scope");
+    let registry = PlatformProcessRegistry::default();
+    let process_spec = RuntimeClientProcessSpec {
+        process_key: "runtime-server".to_string(),
+        command: RuntimeExecCommand {
+            args: vec!["sleep".to_string(), "30".to_string()],
+            env: Some(BTreeMap::new()),
+            cwd: None,
+            timeout_ms: None,
+        },
+        readiness: RuntimeClientProcessReadiness::None,
+        stop: RuntimeClientProcessStopPolicy {
+            signal: RuntimeClientProcessStopSignal::Sigkill,
+            timeout_ms: 1_000,
+            grace_period_ms: None,
+        },
+    };
+    let supervisor_handle = SandboxdSupervisorHandle::new(
+        "sandbox-123",
+        std::sync::Arc::new(SystemClock),
+        BTreeSet::new(),
+    );
+
+    let process_manager = start_runtime_client_process_manager_with_platform_scopes(
+        &[process_spec],
+        &SystemClock,
+        &ThreadSleeper,
+        supervisor_handle,
+        None,
+        PlatformProcessScopeInput {
+            cgroup_root: temp_root.clone(),
+            sandbox_instance_id: "sbi_123".to_string(),
+            registry: registry.clone(),
+        },
+    )
+    .expect("platform-scoped process manager should start");
+
+    let snapshots = registry
+        .snapshots()
+        .expect("platform registry snapshots should be readable");
+    assert_eq!(snapshots.len(), 1);
+    let scope = snapshots
+        .first()
+        .expect("platform scope should be registered")
+        .clone();
+    assert_eq!(scope.process_key, "runtime-server");
+    assert_eq!(
+        fs::read_to_string(&scope.scope_paths.procs_file).expect("scope procs should exist"),
+        format!("{}\n", scope.supervised_root_pid)
+    );
+
+    process_manager
+        .stop(&SystemClock, &ThreadSleeper)
+        .expect("process manager stop should kill platform scope");
+    assert!(
+        registry
+            .snapshots()
+            .expect("platform registry snapshots should be readable")
+            .is_empty(),
+        "stopped process manager should remove platform scope registry entries"
+    );
+    assert_eq!(
+        fs::read_to_string(&scope.scope_paths.kill_file).expect("scope kill file should exist"),
+        "1\n"
+    );
+
+    let _ = fs::remove_dir_all(temp_root);
+}
+
+#[test]
+fn platform_scoped_process_manager_kills_platform_scopes_after_readiness_failure() {
+    let temp_root = create_test_control_dir("platform-process-scope-readiness-failure");
+    let registry = PlatformProcessRegistry::default();
+    let unavailable_port = reserve_test_port();
+    let ready_process_spec = RuntimeClientProcessSpec {
+        process_key: "ready-runtime-server".to_string(),
+        command: RuntimeExecCommand {
+            args: vec!["sleep".to_string(), "30".to_string()],
+            env: Some(BTreeMap::new()),
+            cwd: None,
+            timeout_ms: None,
+        },
+        readiness: RuntimeClientProcessReadiness::None,
+        stop: RuntimeClientProcessStopPolicy {
+            signal: RuntimeClientProcessStopSignal::Sigkill,
+            timeout_ms: 1_000,
+            grace_period_ms: None,
+        },
+    };
+    let failing_process_spec = RuntimeClientProcessSpec {
+        process_key: "failing-runtime-server".to_string(),
+        command: RuntimeExecCommand {
+            args: vec!["sleep".to_string(), "30".to_string()],
+            env: Some(BTreeMap::new()),
+            cwd: None,
+            timeout_ms: None,
+        },
+        readiness: RuntimeClientProcessReadiness::Tcp {
+            host: "127.0.0.1".to_string(),
+            port: unavailable_port,
+            timeout_ms: 250,
+        },
+        stop: RuntimeClientProcessStopPolicy {
+            signal: RuntimeClientProcessStopSignal::Sigkill,
+            timeout_ms: 1_000,
+            grace_period_ms: None,
+        },
+    };
+    let supervisor_handle = SandboxdSupervisorHandle::new(
+        "sandbox-123",
+        std::sync::Arc::new(SystemClock),
+        BTreeSet::new(),
+    );
+
+    let error = start_runtime_client_process_manager_with_platform_scopes(
+        &[ready_process_spec, failing_process_spec],
+        &SystemClock,
+        &ThreadSleeper,
+        supervisor_handle,
+        None,
+        PlatformProcessScopeInput {
+            cgroup_root: temp_root.clone(),
+            sandbox_instance_id: "sbi_123".to_string(),
+            registry: registry.clone(),
+        },
+    )
+    .expect_err("platform-scoped process manager should surface readiness failure");
+
+    assert!(matches!(error, ProcessManagerError::ReadinessCheck { .. }));
+    assert!(
+        registry
+            .snapshots()
+            .expect("platform registry snapshots should be readable")
+            .is_empty(),
+        "readiness failure cleanup should remove every platform scope from the registry"
+    );
+    assert_eq!(
+        fs::read_to_string(
+            temp_root
+                .join("sbi_123")
+                .join("platform")
+                .join("runtime-0")
+                .join("cgroup.kill")
+        )
+        .expect("first platform scope kill file should exist"),
+        "1\n"
+    );
+    assert_eq!(
+        fs::read_to_string(
+            temp_root
+                .join("sbi_123")
+                .join("platform")
+                .join("runtime-1")
+                .join("cgroup.kill")
+        )
+        .expect("failing platform scope kill file should exist"),
+        "1\n"
+    );
+
+    let _ = fs::remove_dir_all(temp_root);
+}
+
+#[test]
+fn codex_restart_updates_platform_supervised_root_before_readiness_completes() {
+    let temp_root = create_test_control_dir("platform-process-scope-restart");
+    let control_dir = create_test_control_dir("codex-app-server-delayed-restart");
+    let port = reserve_test_port();
+    let registry = PlatformProcessRegistry::default();
+    let process_spec = codex_app_server_delayed_restart_process_spec(port, &control_dir);
+    let supervisor_handle = SandboxdSupervisorHandle::new(
+        "sandbox-123",
+        std::sync::Arc::new(SystemClock),
+        BTreeSet::from([SupervisedComponent::CodexAppServer]),
+    );
+
+    let process_manager = start_runtime_client_process_manager_with_platform_scopes(
+        std::slice::from_ref(&process_spec),
+        &SystemClock,
+        &ThreadSleeper,
+        supervisor_handle,
+        None,
+        PlatformProcessScopeInput {
+            cgroup_root: temp_root.clone(),
+            sandbox_instance_id: "sbi_123".to_string(),
+            registry: registry.clone(),
+        },
+    )
+    .expect("platform-scoped Codex process manager should start");
+    let control_handle = process_manager
+        .codex_app_server_control_handle()
+        .expect("Codex app-server control handle should exist")
+        .clone();
+    let initial_root_pid = registry
+        .snapshots()
+        .expect("platform registry snapshots should be readable")
+        .first()
+        .expect("platform scope should be registered")
+        .supervised_root_pid;
+
+    let restart_thread =
+        thread::spawn(move || control_handle.restart(&SystemClock, &ThreadSleeper));
+    let replacement_pid = wait_for_pid_file(
+        &control_dir.join("replacement-pid.txt"),
+        Duration::from_secs(5),
+    );
+    assert_ne!(
+        replacement_pid, initial_root_pid,
+        "restart should spawn a replacement root process"
+    );
+    let replacement_scope =
+        wait_for_platform_scope_root_pid(&registry, replacement_pid, Duration::from_secs(5));
+    assert_eq!(
+        fs::read_to_string(&replacement_scope.scope_paths.procs_file)
+            .expect("replacement scope procs file should exist"),
+        format!("{replacement_pid}\n")
+    );
+
+    fs::write(control_dir.join("allow-ready"), "ready").expect("ready marker should be writable");
+    restart_thread
+        .join()
+        .expect("restart thread should not panic")
+        .expect("delayed restart should complete after readiness is released");
+
+    process_manager
+        .stop(&SystemClock, &ThreadSleeper)
+        .expect("process manager stop should succeed after delayed restart");
+    let _ = fs::remove_dir_all(temp_root);
+    let _ = fs::remove_dir_all(control_dir);
+}
+
+#[test]
 fn readiness_failure_flushes_captured_child_output_before_reporting() {
     let port = reserve_test_port();
     let process_spec = codex_app_server_readiness_failure_process_spec(port);
@@ -544,6 +778,101 @@ if (failThisAttempt) {
       }
     }, 50);
   });
+}
+"#;
+
+    RuntimeClientProcessSpec {
+        process_key: "codex-app-server".to_string(),
+        command: RuntimeExecCommand {
+            args: vec![
+                "node".to_string(),
+                "-e".to_string(),
+                script.to_string(),
+                port.to_string(),
+                control_dir.display().to_string(),
+            ],
+            env: Some(BTreeMap::new()),
+            cwd: None,
+            timeout_ms: None,
+        },
+        readiness: RuntimeClientProcessReadiness::Ws {
+            url: format!("ws://127.0.0.1:{port}/health"),
+            timeout_ms: 5_000,
+        },
+        stop: RuntimeClientProcessStopPolicy {
+            signal: RuntimeClientProcessStopSignal::Sigkill,
+            timeout_ms: 1_000,
+            grace_period_ms: None,
+        },
+    }
+}
+
+fn codex_app_server_delayed_restart_process_spec(
+    port: u16,
+    control_dir: &Path,
+) -> RuntimeClientProcessSpec {
+    let script = r#"
+const fs = require('node:fs');
+const path = require('node:path');
+const net = require('node:net');
+
+const [portArg, controlDirArg] = process.argv.slice(1);
+const port = Number(portArg);
+const controlDir = controlDirArg;
+const attemptPath = path.join(controlDir, 'attempt.txt');
+const replacementPidPath = path.join(controlDir, 'replacement-pid.txt');
+const allowReadyPath = path.join(controlDir, 'allow-ready');
+
+let attempt = 0;
+try {
+  attempt = Number(fs.readFileSync(attemptPath, 'utf8').trim() || '0');
+} catch {}
+attempt += 1;
+fs.writeFileSync(attemptPath, String(attempt));
+
+const keepAlive = setInterval(() => {}, 1000);
+let readyWatcher = null;
+const server = net.createServer((socket) => {
+  socket.once('data', (chunk) => {
+    socket.write(
+      (() => {
+        const request = chunk.toString('utf8');
+        if (request.includes('Upgrade: websocket')) {
+          return (
+            'HTTP/1.1 101 Switching Protocols\r\n' +
+            'Connection: Upgrade\r\n' +
+            'Upgrade: websocket\r\n' +
+            'Sec-WebSocket-Accept: sandboxd-test\r\n' +
+            '\r\n'
+          );
+        }
+        return (
+          'HTTP/1.1 200 OK\r\n' +
+          'Connection: close\r\n' +
+          'Content-Length: 0\r\n' +
+          '\r\n'
+        );
+      })(),
+    );
+  });
+});
+
+function listen() {
+  if (readyWatcher !== null) {
+    clearInterval(readyWatcher);
+  }
+  server.listen(port, '127.0.0.1');
+}
+
+if (attempt === 1) {
+  listen();
+} else {
+  fs.writeFileSync(replacementPidPath, String(process.pid));
+  readyWatcher = setInterval(() => {
+    if (fs.existsSync(allowReadyPath)) {
+      listen();
+    }
+  }, 25);
 }
 "#;
 
@@ -800,6 +1129,51 @@ fn wait_for_forwarded_lifecycle_event(
         if Instant::now() >= deadline {
             return false;
         }
+        thread::sleep(Duration::from_millis(25));
+    }
+}
+
+fn wait_for_pid_file(path: &Path, timeout: Duration) -> u32 {
+    let deadline = Instant::now() + timeout;
+    loop {
+        if let Ok(contents) = fs::read_to_string(path)
+            && let Ok(process_id) = contents.trim().parse::<u32>()
+        {
+            return process_id;
+        }
+
+        assert!(
+            Instant::now() < deadline,
+            "expected pid file {} to contain a process id",
+            path.display()
+        );
+        thread::sleep(Duration::from_millis(25));
+    }
+}
+
+fn wait_for_platform_scope_root_pid(
+    registry: &PlatformProcessRegistry,
+    expected_root_pid: u32,
+    timeout: Duration,
+) -> PlatformProcessScopeSnapshot {
+    let deadline = Instant::now() + timeout;
+    loop {
+        if let Some(snapshot) = registry
+            .snapshots()
+            .expect("platform registry snapshots should be readable")
+            .into_iter()
+            .find(|snapshot| snapshot.supervised_root_pid == expected_root_pid)
+        {
+            return snapshot;
+        }
+
+        assert!(
+            Instant::now() < deadline,
+            "expected platform scope registry to report supervised root pid {expected_root_pid}, got {:?}",
+            registry
+                .snapshots()
+                .expect("platform registry snapshots should be readable")
+        );
         thread::sleep(Duration::from_millis(25));
     }
 }

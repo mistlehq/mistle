@@ -7,6 +7,7 @@
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
+use crate::cgroups::attach_pid_to_scope;
 use crate::process::*;
 use crate::supervision::SupervisedComponent;
 use crate::time::{Clock, Sleeper};
@@ -34,6 +35,7 @@ impl CodexAppServerControlHandle {
             spec: self.managed_process.spec.clone(),
             child: self.managed_process.child.clone(),
             output_capture: self.managed_process.output_capture.clone(),
+            platform_scope: self.managed_process.platform_scope.clone(),
         };
         let _ = stop_runtime_client_process(&mut current_process, clock, sleeper);
 
@@ -62,6 +64,48 @@ impl CodexAppServerControlHandle {
                     return Err(error);
                 }
             };
+        let replacement_pid = replacement_child.id();
+        if let Some(platform_scope) = &self.managed_process.platform_scope
+            && let Err(error) = attach_pid_to_scope(&platform_scope.scope_paths, replacement_pid)
+        {
+            let replacement_child = Arc::new(Mutex::new(replacement_child));
+            let mut failed_replacement_process = RunningRuntimeClientProcess {
+                spec: self.managed_process.spec.clone(),
+                child: replacement_child,
+                output_capture: replacement_output_capture.clone(),
+                platform_scope: self.managed_process.platform_scope.clone(),
+            };
+            let _ = stop_runtime_client_process(&mut failed_replacement_process, clock, sleeper);
+            let error = error.to_string();
+            self.managed_process
+                .supervisor_handle
+                .mark_component_restarting(SupervisedComponent::CodexAppServer, error.clone());
+            self.managed_process
+                .restart_in_progress
+                .store(false, Ordering::Relaxed);
+            return Err(error);
+        }
+        if let Some(platform_scope) = &self.managed_process.platform_scope
+            && let Err(error) = platform_scope
+                .registry
+                .update_supervised_root_pid(&platform_scope.registry_key, replacement_pid)
+        {
+            let replacement_child = Arc::new(Mutex::new(replacement_child));
+            let mut failed_replacement_process = RunningRuntimeClientProcess {
+                spec: self.managed_process.spec.clone(),
+                child: replacement_child,
+                output_capture: replacement_output_capture.clone(),
+                platform_scope: self.managed_process.platform_scope.clone(),
+            };
+            let _ = stop_runtime_client_process(&mut failed_replacement_process, clock, sleeper);
+            self.managed_process
+                .supervisor_handle
+                .mark_component_restarting(SupervisedComponent::CodexAppServer, error.clone());
+            self.managed_process
+                .restart_in_progress
+                .store(false, Ordering::Relaxed);
+            return Err(error);
+        }
         if let Err(error) = wait_for_runtime_client_process_readiness_with(
             &self.managed_process.spec,
             &mut replacement_child,
@@ -73,6 +117,7 @@ impl CodexAppServerControlHandle {
                 spec: self.managed_process.spec.clone(),
                 child: replacement_child,
                 output_capture: replacement_output_capture.clone(),
+                platform_scope: self.managed_process.platform_scope.clone(),
             };
             let _ = stop_runtime_client_process(&mut failed_replacement_process, clock, sleeper);
             self.managed_process
@@ -92,7 +137,6 @@ impl CodexAppServerControlHandle {
                 .store(false, Ordering::Relaxed);
             return Err(error);
         }
-        let replacement_pid = replacement_child.id();
         {
             let mut child = self
                 .managed_process
@@ -101,7 +145,6 @@ impl CodexAppServerControlHandle {
                 .expect("runtime client child lock should not be poisoned");
             *child = replacement_child;
         }
-
         update_codex_app_server_observation(
             &self.managed_process.observation_handle,
             &self.managed_process.spec,
@@ -150,6 +193,7 @@ impl OpenCodeServerControlHandle {
             spec: self.managed_process.spec.clone(),
             child: self.managed_process.child.clone(),
             output_capture: self.managed_process.output_capture.clone(),
+            platform_scope: self.managed_process.platform_scope.clone(),
         };
         let _ = stop_runtime_client_process(&mut current_process, clock, sleeper);
 
@@ -178,6 +222,48 @@ impl OpenCodeServerControlHandle {
                     return Err(error);
                 }
             };
+        let replacement_pid = replacement_child.id();
+        if let Some(platform_scope) = &self.managed_process.platform_scope
+            && let Err(error) = attach_pid_to_scope(&platform_scope.scope_paths, replacement_pid)
+        {
+            let replacement_child = Arc::new(Mutex::new(replacement_child));
+            let mut failed_replacement_process = RunningRuntimeClientProcess {
+                spec: self.managed_process.spec.clone(),
+                child: replacement_child,
+                output_capture: replacement_output_capture.clone(),
+                platform_scope: self.managed_process.platform_scope.clone(),
+            };
+            let _ = stop_runtime_client_process(&mut failed_replacement_process, clock, sleeper);
+            let error = error.to_string();
+            self.managed_process
+                .supervisor_handle
+                .mark_component_restarting(SupervisedComponent::OpenCodeServer, error.clone());
+            self.managed_process
+                .restart_in_progress
+                .store(false, Ordering::Relaxed);
+            return Err(error);
+        }
+        if let Some(platform_scope) = &self.managed_process.platform_scope
+            && let Err(error) = platform_scope
+                .registry
+                .update_supervised_root_pid(&platform_scope.registry_key, replacement_pid)
+        {
+            let replacement_child = Arc::new(Mutex::new(replacement_child));
+            let mut failed_replacement_process = RunningRuntimeClientProcess {
+                spec: self.managed_process.spec.clone(),
+                child: replacement_child,
+                output_capture: replacement_output_capture.clone(),
+                platform_scope: self.managed_process.platform_scope.clone(),
+            };
+            let _ = stop_runtime_client_process(&mut failed_replacement_process, clock, sleeper);
+            self.managed_process
+                .supervisor_handle
+                .mark_component_restarting(SupervisedComponent::OpenCodeServer, error.clone());
+            self.managed_process
+                .restart_in_progress
+                .store(false, Ordering::Relaxed);
+            return Err(error);
+        }
         if let Err(error) = wait_for_runtime_client_process_readiness_with(
             &self.managed_process.spec,
             &mut replacement_child,
@@ -189,6 +275,7 @@ impl OpenCodeServerControlHandle {
                 spec: self.managed_process.spec.clone(),
                 child: replacement_child,
                 output_capture: replacement_output_capture.clone(),
+                platform_scope: self.managed_process.platform_scope.clone(),
             };
             let _ = stop_runtime_client_process(&mut failed_replacement_process, clock, sleeper);
             self.managed_process
@@ -208,7 +295,6 @@ impl OpenCodeServerControlHandle {
                 .store(false, Ordering::Relaxed);
             return Err(error);
         }
-        let replacement_pid = replacement_child.id();
         {
             let mut child = match self.managed_process.child.lock() {
                 Ok(child) => child,
@@ -221,7 +307,6 @@ impl OpenCodeServerControlHandle {
             };
             *child = replacement_child;
         }
-
         self.managed_process
             .supervisor_handle
             .replace_component_details(

@@ -10,6 +10,7 @@ use nix::errno::Errno;
 use nix::sys::signal::{Signal, kill as send_signal};
 use nix::unistd::Pid;
 
+use crate::cgroups::{attach_pid_to_scope, kill_scope};
 use crate::process::*;
 use crate::runtime::{RuntimeClientProcessReadiness, RuntimeClientProcessStopSignal};
 use crate::time::{Clock, Sleeper};
@@ -50,6 +51,61 @@ pub(super) fn start_runtime_client_process(
         spec: process_spec.clone(),
         child: Arc::new(Mutex::new(child)),
         output_capture,
+        platform_scope: None,
+    })
+}
+
+pub(super) fn start_scoped_runtime_client_process(
+    process_spec: &RuntimeClientProcessSpec,
+    platform_scope: RuntimeClientProcessPlatformScope,
+) -> Result<RunningRuntimeClientProcess, String> {
+    let (child, output_capture) = match spawn_runtime_client_child(process_spec) {
+        Ok(started_process) => started_process,
+        Err(error) => {
+            if let Err(cleanup_error) =
+                kill_runtime_client_process_platform_scope_by_scope(&platform_scope)
+            {
+                return Err(format!(
+                    "{error}; platform scope cleanup failed: {cleanup_error}"
+                ));
+            }
+            return Err(error);
+        }
+    };
+    let process_id = child.id();
+    if let Err(error) = attach_pid_to_scope(&platform_scope.scope_paths, process_id) {
+        let mut failed_process = RunningRuntimeClientProcess {
+            spec: process_spec.clone(),
+            child: Arc::new(Mutex::new(child)),
+            output_capture,
+            platform_scope: Some(platform_scope.clone()),
+        };
+        let _ = signal_runtime_client_process(
+            &mut failed_process,
+            RuntimeClientProcessStopSignal::Sigkill,
+        );
+        if let Err(cleanup_error) =
+            kill_runtime_client_process_platform_scope_by_scope(&platform_scope)
+        {
+            return Err(format!(
+                "{error}; platform scope cleanup failed: {cleanup_error}"
+            ));
+        }
+        return Err(error.to_string());
+    }
+
+    platform_scope.registry.replace_scope(
+        platform_scope.registry_key.clone(),
+        platform_scope.process_key.clone(),
+        platform_scope.scope_paths.clone(),
+        process_id,
+    )?;
+
+    Ok(RunningRuntimeClientProcess {
+        spec: process_spec.clone(),
+        child: Arc::new(Mutex::new(child)),
+        output_capture,
+        platform_scope: Some(platform_scope),
     })
 }
 
@@ -262,6 +318,26 @@ pub(super) fn stop_runtime_client_process(
         process.output_capture.finish_capture_threads();
     }
     result
+}
+
+pub(super) fn kill_runtime_client_process_platform_scope(
+    process: &RunningRuntimeClientProcess,
+) -> Result<(), String> {
+    let Some(platform_scope) = &process.platform_scope else {
+        return Ok(());
+    };
+
+    kill_runtime_client_process_platform_scope_by_scope(platform_scope)
+}
+
+pub(super) fn kill_runtime_client_process_platform_scope_by_scope(
+    platform_scope: &RuntimeClientProcessPlatformScope,
+) -> Result<(), String> {
+    kill_scope(&platform_scope.scope_paths).map_err(|error| error.to_string())?;
+    platform_scope
+        .registry
+        .remove_scope(&platform_scope.registry_key)?;
+    Ok(())
 }
 
 /// Checks whether a child process has already exited without blocking.

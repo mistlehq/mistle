@@ -15,6 +15,7 @@ use url::Url;
 
 use crate::cgroups::DEFAULT_CGROUP_ROOT;
 use crate::keepalive::KeepaliveManager;
+use crate::process::PlatformProcessRegistry;
 use crate::protocol::session::SessionRuntimeInput;
 use crate::runtime::readiness::RuntimeReadinessManager;
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
@@ -70,6 +71,7 @@ impl TunnelSession {
         Self::start_with_supervisor(
             session_input,
             keepalive_manager,
+            PlatformProcessRegistry::default(),
             runtime_readiness_manager,
             agent_endpoint_url,
             runtime_env,
@@ -84,6 +86,7 @@ impl TunnelSession {
     pub fn start_with_supervisor(
         session_input: &SessionRuntimeInput,
         keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+        platform_process_registry: PlatformProcessRegistry,
         runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
         agent_endpoint_url: Option<String>,
         runtime_env: BTreeMap<String, String>,
@@ -111,6 +114,7 @@ impl TunnelSession {
             let cgroup_root = PathBuf::from(DEFAULT_CGROUP_ROOT);
             let runtime = TunnelSessionRuntime {
                 keepalive_manager,
+                platform_process_registry,
                 runtime_readiness_manager,
                 connection_state: Arc::new(RwLock::new(TunnelSessionRuntimeConnectionState {
                     agent_endpoint_url,
@@ -216,6 +220,7 @@ impl TunnelSession {
         Self::start_minimal_session_input_with_supervisor(
             session_input,
             keepalive_manager,
+            PlatformProcessRegistry::default(),
             runtime_readiness_manager,
             clock,
             sleeper,
@@ -226,6 +231,7 @@ impl TunnelSession {
     pub fn start_minimal_session_input_with_supervisor(
         session_input: &SessionRuntimeInput,
         keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+        platform_process_registry: PlatformProcessRegistry,
         runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
         clock: Arc<dyn Clock>,
         sleeper: Arc<dyn Sleeper>,
@@ -234,6 +240,7 @@ impl TunnelSession {
         Self::start_with_supervisor(
             session_input,
             keepalive_manager,
+            platform_process_registry,
             runtime_readiness_manager,
             None,
             BTreeMap::new(),

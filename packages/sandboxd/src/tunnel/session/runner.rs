@@ -25,7 +25,8 @@ use crate::tunnel::session::exec::cancel_pending_exec_open;
 use crate::tunnel::session::lifecycle::{
     format_panic_payload, forward_supervisor_lifecycle_events, mark_tunnel_connected,
     mark_tunnel_disconnected, publish_initial_runtime_readiness, snapshot_runtime_connection_state,
-    sync_pty_scope_keepalive, update_tunnel_supervision_details,
+    sync_platform_process_scope_keepalive, sync_pty_scope_keepalive,
+    update_tunnel_supervision_details,
 };
 use crate::tunnel::session::operation::operation_open;
 use crate::tunnel::session::process::ProcessStreamState;
@@ -311,6 +312,7 @@ async fn run_connected_tunnel_session(
         sandbox_instance_id: &runtime.sandbox_instance_id,
         gateway_ws_url: &runtime.gateway_ws_url,
         clock: runtime.clock.as_ref(),
+        platform_process_registry: runtime.platform_process_registry.clone(),
         supervisor_handle: &runtime.supervisor_handle,
     };
 
@@ -358,6 +360,33 @@ async fn run_connected_tunnel_session(
                 loop_context.supervisor_handle,
                 loop_context.gateway_ws_url,
                 Some("pty_keepalive_sync_failed"),
+                None,
+                None,
+            );
+            loop_context
+                .supervisor_handle
+                .mark_component_restarting(SupervisedComponent::TunnelSession, error_text.clone());
+            loop_context.supervisor_handle.emit_component_exited(
+                SupervisedComponent::TunnelSession,
+                "thread_returned",
+                Some(&error_text),
+                &[("exitKind", Value::String("thread_returned".to_string()))],
+            );
+            mark_tunnel_disconnected(runtime);
+            return ConnectedTunnelSessionResult {
+                outcome: ConnectedTunnelSessionOutcome::RestartRequired,
+                startup_completed,
+            };
+        }
+        if let Err(error) = sync_platform_process_scope_keepalive(
+            runtime.keepalive_manager.as_ref(),
+            &loop_context.platform_process_registry,
+        ) {
+            let error_text = error.to_string();
+            update_tunnel_supervision_details(
+                loop_context.supervisor_handle,
+                loop_context.gateway_ws_url,
+                Some("platform_process_keepalive_sync_failed"),
                 None,
                 None,
             );

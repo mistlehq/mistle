@@ -171,6 +171,7 @@ fn minimal_initialized_state(execution_mode: SandboxdExecutionMode) -> SandboxdS
             BTreeSet::new(),
         ),
         keepalive_manager: Arc::new(Mutex::new(KeepaliveManager::default())),
+        platform_process_registry: crate::process::PlatformProcessRegistry::default(),
         runtime_readiness_manager: Arc::new(Mutex::new(RuntimeReadinessManager::default())),
         agent_endpoint_url: None,
         runtime_env: BTreeMap::new(),
