@@ -164,9 +164,35 @@ export function listComposerCommands(
 export function listSkillMentions(
   composerCapabilities: readonly ComposerCapability[],
 ): readonly SkillMentionDescriptor[] {
-  return composerCapabilities.flatMap((capability) =>
-    capability.kind === "skillMention" ? (capability.skills ?? []) : [],
-  );
+  const uniqueSkillsByName = new Map<string, SkillMentionDescriptor>();
+  const ambiguousNames = new Set<string>();
+
+  for (const capability of composerCapabilities) {
+    if (capability.kind !== "skillMention") {
+      continue;
+    }
+
+    for (const skill of capability.skills ?? []) {
+      if (ambiguousNames.has(skill.name)) {
+        continue;
+      }
+
+      const existingSkill = uniqueSkillsByName.get(skill.name);
+      if (existingSkill === undefined) {
+        uniqueSkillsByName.set(skill.name, skill);
+        continue;
+      }
+
+      if (existingSkill.sourcePath === skill.sourcePath) {
+        continue;
+      }
+
+      uniqueSkillsByName.delete(skill.name);
+      ambiguousNames.add(skill.name);
+    }
+  }
+
+  return [...uniqueSkillsByName.values()];
 }
 
 export function hasComposerCommand(input: {

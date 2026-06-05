@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   detectActiveComposerTrigger,
+  listSkillMentions,
   readLeadingSlashCommandName,
 } from "./session-composer-trigger-detection.js";
 
@@ -356,5 +357,72 @@ describe("readLeadingSlashCommandName", () => {
     expect(readLeadingSlashCommandName(" /review")).toBeNull();
     expect(readLeadingSlashCommandName("\n/review")).toBeNull();
     expect(readLeadingSlashCommandName("Use /review")).toBeNull();
+  });
+});
+
+describe("listSkillMentions", () => {
+  it("collapses duplicate runtime skill entries for the same source path", () => {
+    expect(
+      listSkillMentions([
+        {
+          kind: "skillMention",
+          trigger: "$",
+          source: "runtimeSkill",
+          submitAs: "inlineText",
+          skills: [
+            {
+              name: "grill-with-docs",
+              description: "Stress test a plan against docs",
+              sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
+            },
+            {
+              name: "grill-with-docs",
+              description: "Stress test a plan against docs",
+              sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
+            },
+          ],
+        },
+      ]),
+    ).toEqual([
+      {
+        name: "grill-with-docs",
+        description: "Stress test a plan against docs",
+        sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
+      },
+    ]);
+  });
+
+  it("omits skill names that resolve to multiple source paths", () => {
+    expect(
+      listSkillMentions([
+        {
+          kind: "skillMention",
+          trigger: "$",
+          source: "runtimeSkill",
+          submitAs: "inlineText",
+          skills: [
+            {
+              name: "grill-with-docs",
+              description: "Root skill",
+              sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
+            },
+            {
+              name: "grill-with-docs",
+              description: "Repo skill",
+              sourcePath: "/workspace/.agents/skills/grill-with-docs/SKILL.md",
+            },
+            {
+              name: "write-a-skill",
+              sourcePath: "/root/.codex/skills/write-a-skill/SKILL.md",
+            },
+          ],
+        },
+      ]),
+    ).toEqual([
+      {
+        name: "write-a-skill",
+        sourcePath: "/root/.codex/skills/write-a-skill/SKILL.md",
+      },
+    ]);
   });
 });

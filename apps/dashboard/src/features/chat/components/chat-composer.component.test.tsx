@@ -678,6 +678,75 @@ describe("ChatComposer", () => {
     expect(getComposerTextarea().value).toBe("Use $grill-with-docs ");
   });
 
+  it("shows one slash-discovered skill for repeated entries with the same source path", () => {
+    render(
+      <ControlledChatComposer
+        composerCapabilities={[
+          ComposerCommandCapabilityFixture,
+          {
+            kind: "skillMention",
+            trigger: "$",
+            source: "runtimeSkill",
+            submitAs: "inlineText",
+            skills: [
+              {
+                name: "grill-with-docs",
+                description: "Stress test a plan against docs",
+                sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
+              },
+              {
+                name: "grill-with-docs",
+                description: "Stress test a plan against docs",
+                sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
+              },
+            ],
+          },
+        ]}
+        composerText="Use /gr"
+      />,
+    );
+
+    expect(screen.getByRole("listbox", { name: "Slash commands" })).toBeTruthy();
+    expect(
+      screen.getAllByRole("option", {
+        name: "$grill-with-docs Stress test a plan against docs",
+      }),
+    ).toHaveLength(1);
+  });
+
+  it("does not show ambiguous slash-discovered skill names from multiple source paths", () => {
+    render(
+      <ControlledChatComposer
+        composerCapabilities={[
+          ComposerCommandCapabilityFixture,
+          {
+            kind: "skillMention",
+            trigger: "$",
+            source: "runtimeSkill",
+            submitAs: "inlineText",
+            skills: [
+              {
+                name: "grill-with-docs",
+                description: "Root skill",
+                sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
+              },
+              {
+                name: "grill-with-docs",
+                description: "Repo skill",
+                sourcePath: "/workspace/.agents/skills/grill-with-docs/SKILL.md",
+              },
+            ],
+          },
+        ]}
+        composerText="Use /gr"
+      />,
+    );
+
+    expect(screen.getByRole("listbox", { name: "Slash commands" })).toBeTruthy();
+    expect(screen.queryByRole("option")).toBeNull();
+    expect(screen.getByText("No commands")).toBeTruthy();
+  });
+
   it("shows skill suggestions from runtime skill mention capabilities", () => {
     render(
       <ControlledChatComposer
@@ -692,6 +761,72 @@ describe("ChatComposer", () => {
         name: "$grill-with-docs Stress test a plan against docs",
       }),
     ).toBeTruthy();
+  });
+
+  it("shows one skill suggestion for repeated entries with the same source path", () => {
+    render(
+      <ControlledChatComposer
+        composerCapabilities={[
+          {
+            kind: "skillMention",
+            trigger: "$",
+            source: "runtimeSkill",
+            submitAs: "inlineText",
+            skills: [
+              {
+                name: "grill-with-docs",
+                description: "Stress test a plan against docs",
+                sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
+              },
+              {
+                name: "grill-with-docs",
+                description: "Stress test a plan against docs",
+                sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
+              },
+            ],
+          },
+        ]}
+        composerText="Use $gr"
+      />,
+    );
+
+    expect(
+      screen.getAllByRole("option", {
+        name: "$grill-with-docs Stress test a plan against docs",
+      }),
+    ).toHaveLength(1);
+  });
+
+  it("does not suggest ambiguous skill names that point to multiple source paths", () => {
+    render(
+      <ControlledChatComposer
+        composerCapabilities={[
+          {
+            kind: "skillMention",
+            trigger: "$",
+            source: "runtimeSkill",
+            submitAs: "inlineText",
+            skills: [
+              {
+                name: "grill-with-docs",
+                description: "Root skill",
+                sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
+              },
+              {
+                name: "grill-with-docs",
+                description: "Repo skill",
+                sourcePath: "/workspace/.agents/skills/grill-with-docs/SKILL.md",
+              },
+            ],
+          },
+        ]}
+        composerText="Use $gr"
+      />,
+    );
+
+    expect(screen.getByRole("listbox", { name: "Skills" })).toBeTruthy();
+    expect(screen.queryByRole("option")).toBeNull();
+    expect(screen.getByText("No skills")).toBeTruthy();
   });
 
   it("inserts selected skill suggestions as editable prompt text", () => {
