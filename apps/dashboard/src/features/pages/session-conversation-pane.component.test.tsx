@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { EditorView } from "@codemirror/view";
 import type { CodexModelSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import {
   SandboxSessionTransport,
@@ -7,14 +8,17 @@ import {
   type UploadFileInput,
 } from "@mistle/sandbox-session-client";
 import { createBrowserSandboxSessionRuntime } from "@mistle/sandbox-session-client/browser";
-import { render, screen } from "@testing-library/react";
-import { fireEvent, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useMemo, useRef, useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import type { ChatEntry } from "../chat/chat-types.js";
 import { SessionComposerFixtureProps } from "../session-agents/codex/fixtures/session-fixtures.js";
-import { useSessionComposerAttachmentControl } from "./session-composer/index.js";
+import {
+  createComposerDraft,
+  useSessionComposerAttachmentControl,
+  type ComposerDraft,
+} from "./session-composer/index.js";
 import {
   SessionConversationBottomPanel,
   SessionConversationBottomPanelController,
@@ -44,6 +48,44 @@ const UploadedImageFixture: UploadedSandboxFile = {
 
 function createImageFile(): File {
   return new File([new Uint8Array([1, 2, 3, 4])], "screenshot.png", { type: "image/png" });
+}
+
+function getComposerEditor(): HTMLElement {
+  const textbox = screen.getByRole("textbox");
+  if (!(textbox instanceof HTMLElement)) {
+    throw new Error("Expected composer textbox to be an element.");
+  }
+
+  return textbox;
+}
+
+function getComposerEditorView(): EditorView {
+  const editorView = EditorView.findFromDOM(getComposerEditor());
+  if (editorView === null) {
+    throw new Error("Expected composer CodeMirror editor view.");
+  }
+
+  return editorView;
+}
+
+function readComposerText(): string {
+  return getComposerEditorView().state.doc.toString();
+}
+
+function replaceComposerText(nextText: string): void {
+  const editorView = getComposerEditorView();
+  act(() => {
+    editorView.dispatch({
+      changes: {
+        from: 0,
+        to: editorView.state.doc.length,
+        insert: nextText,
+      },
+      selection: {
+        anchor: nextText.length,
+      },
+    });
+  });
 }
 
 function createCompletedConversationEntries(
@@ -175,12 +217,12 @@ function RenderedComposerPaneHarness(input: {
         },
       }}
       draftState={{
-        composerText: "",
+        composerDraft: createComposerDraft(""),
         pendingDiffComments: [],
         clearPendingDiffComments: () => {
           return;
         },
-        setComposerText: () => {
+        setComposerDraft: () => {
           return;
         },
       }}
@@ -193,7 +235,7 @@ function RenderedComposerPaneHarness(input: {
 
 function QueuedPromptComposerHarness(): React.JSX.Element {
   const [activeTurnState, setActiveTurnState] = useState<"idle" | "running">("running");
-  const [composerText, setComposerText] = useState("");
+  const [composerDraft, setComposerDraft] = useState<ComposerDraft>(createComposerDraft(""));
   const [startedPrompts, setStartedPrompts] = useState<readonly string[]>([]);
 
   return (
@@ -289,12 +331,12 @@ function QueuedPromptComposerHarness(): React.JSX.Element {
           },
         }}
         draftState={{
-          composerText,
+          composerDraft,
           pendingDiffComments: [],
           clearPendingDiffComments: () => {
             return;
           },
-          setComposerText,
+          setComposerDraft,
         }}
         isRespondingToServerRequest={false}
         onRespondToServerRequest={function onRespondToServerRequest() {}}
@@ -528,9 +570,7 @@ describe("SessionConversationBottomPanel", () => {
         files: [createImageFile()],
       },
     });
-    fireEvent.change(screen.getByRole("textbox"), {
-      target: { value: "Inspect the image" },
-    });
+    replaceComposerText("Inspect the image");
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
     expect(await screen.findByText("That image file could not be validated.")).toBeTruthy();
@@ -562,9 +602,7 @@ describe("SessionConversationBottomPanel", () => {
         files: [createImageFile()],
       },
     });
-    fireEvent.change(screen.getByRole("textbox"), {
-      target: { value: "Inspect the image" },
-    });
+    replaceComposerText("Inspect the image");
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
     expect(await screen.findByText("That image file could not be validated.")).toBeTruthy();
@@ -581,16 +619,16 @@ describe("SessionConversationBottomPanel", () => {
   it("queues the next prompt and starts it automatically after the active turn completes", async () => {
     render(<QueuedPromptComposerHarness />);
 
-    fireEvent.change(screen.getByRole("textbox"), {
-      target: { value: "Queue this follow-up prompt." },
-    });
-    fireEvent.keyDown(screen.getByRole("textbox"), {
+    replaceComposerText("Queue this follow-up prompt.");
+    fireEvent.keyDown(getComposerEditor(), {
       ctrlKey: true,
       key: "Enter",
     });
 
-    expect(screen.getByText("Queue this follow-up prompt.")).toBeTruthy();
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("");
+    expect(screen.getAllByText("Queue this follow-up prompt.").length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(readComposerText()).toBe("");
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Complete turn" }));
 
@@ -605,10 +643,8 @@ describe("SessionConversationBottomPanel", () => {
   it("allows removing a queued prompt before the next turn auto-starts", async () => {
     render(<QueuedPromptComposerHarness />);
 
-    fireEvent.change(screen.getByRole("textbox"), {
-      target: { value: "Remove this queued prompt." },
-    });
-    fireEvent.keyDown(screen.getByRole("textbox"), {
+    replaceComposerText("Remove this queued prompt.");
+    fireEvent.keyDown(getComposerEditor(), {
       ctrlKey: true,
       key: "Enter",
     });

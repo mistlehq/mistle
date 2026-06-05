@@ -5,6 +5,10 @@ import { useState } from "react";
 import { expect, userEvent, within } from "storybook/test";
 
 import {
+  createComposerDraft,
+  type ComposerDraft,
+} from "../../pages/session-composer/session-composer-draft.js";
+import {
   SessionComposerFixtureProps,
   SessionComposerFixturePropsWithPendingDiffComments,
   SessionComposerFixturePropsWithPendingAttachments,
@@ -18,7 +22,11 @@ import {
 import { noop } from "./chat-story-support.js";
 
 type ShortcutPreviewPlatform = "linux" | "macos" | "windows";
-type ChatComposerStoryArgs = React.ComponentProps<typeof ChatComposer> & {
+type ChatComposerStoryArgs = Omit<
+  React.ComponentProps<typeof ChatComposer>,
+  "composerDraft" | "onComposerDraftChange"
+> & {
+  composerText: string;
   shortcutPreviewPlatform: ShortcutPreviewPlatform;
 };
 
@@ -144,6 +152,32 @@ const CodexComposerCapabilitiesWithSkills = [
   CodexSkillMentionCapability,
 ];
 
+const CodexDuplicateSkillMentionCapability: React.ComponentProps<
+  typeof ChatComposer
+>["composerCapabilities"][number] = {
+  kind: "skillMention",
+  trigger: "$",
+  source: "runtimeSkill",
+  submitAs: "inlineText",
+  skills: [
+    {
+      name: "grill-with-docs",
+      description: "Root skill",
+      sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
+    },
+    {
+      name: "grill-with-docs",
+      description: "Repo skill",
+      sourcePath: "/workspace/.agents/skills/grill-with-docs/SKILL.md",
+    },
+    {
+      name: "write-a-skill",
+      description: "Author or refine an agent skill",
+      sourcePath: "/root/.codex/skills/write-a-skill/SKILL.md",
+    },
+  ],
+};
+
 const ContextMentionSearchResults: ChatComposerContextMentionControl = {
   status: "ready",
   results: [
@@ -232,9 +266,16 @@ function PlatformAwareChatComposerStory(props: ChatComposerStoryArgs): React.JSX
 }
 
 function InteractiveChatComposerStory(
-  props: React.ComponentProps<typeof ChatComposer>,
+  props: Omit<
+    React.ComponentProps<typeof ChatComposer>,
+    "composerDraft" | "onComposerDraftChange"
+  > & {
+    composerText: string;
+  },
 ): React.JSX.Element {
-  const [composerText, setComposerText] = useState(props.composerText);
+  const [composerDraft, setComposerDraft] = useState<ComposerDraft>(
+    createComposerDraft(props.composerText),
+  );
   const [selectedModel, setSelectedModel] = useState(props.selectedModel);
   const [selectedReasoningEffort, setSelectedReasoningEffort] = useState(
     props.selectedReasoningEffort,
@@ -249,8 +290,8 @@ function InteractiveChatComposerStory(
     <>
       <ChatComposer
         {...props}
-        composerText={composerText}
-        onComposerTextChange={setComposerText}
+        composerDraft={composerDraft}
+        onComposerDraftChange={setComposerDraft}
         onModelChange={setSelectedModel}
         onPendingFilesAdded={(files) => {
           setPendingAttachments((currentAttachments) => [
@@ -263,7 +304,7 @@ function InteractiveChatComposerStory(
         }}
         onRuntimeCommandSubmit={(commandId) => {
           setRuntimeCommandStatus(`Executed ${commandId}`);
-          setComposerText("");
+          setComposerDraft(createComposerDraft(""));
         }}
         onReasoningEffortChange={setSelectedReasoningEffort}
         onClearPendingDiffComments={() => {
@@ -419,6 +460,33 @@ export const CodexSkillMentionAutocomplete: Story = {
     await expect(
       canvas.getByRole("option", {
         name: "$grill-with-docs Stress test a plan against docs",
+      }),
+    ).toBeVisible();
+  },
+};
+
+export const CodexDuplicateSkillMentionAutocomplete: Story = {
+  args: {
+    composerCapabilities: [CodexDuplicateSkillMentionCapability],
+    composerText: "Use $gr",
+  },
+  render: (args) => (
+    <div className="flex min-h-[420px] items-end">
+      <PlatformAwareChatComposerStory {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByRole("listbox", { name: "Skills" })).toBeVisible();
+    await expect(
+      canvas.getByRole("option", {
+        name: "$grill-with-docs .codex/skills/grill-with-docs",
+      }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("option", {
+        name: "$grill-with-docs .agents/skills/grill-with-docs",
       }),
     ).toBeVisible();
   },
@@ -739,12 +807,14 @@ export const InterruptOnly: Story = {
 export const WithPendingAttachments: Story = {
   args: {
     ...SessionComposerFixturePropsWithPendingAttachments,
+    composerText: "",
   },
 };
 
 export const WithPendingDiffComments: Story = {
   args: {
     ...SessionComposerFixturePropsWithPendingDiffComments,
+    composerText: "Address the selected review comments.",
   },
 };
 

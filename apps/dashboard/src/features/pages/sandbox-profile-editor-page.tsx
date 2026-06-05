@@ -184,6 +184,7 @@ import {
 } from "./sandbox-profile-snapshot-panel.js";
 import { SandboxProfileTriggersSection } from "./sandbox-profile-triggers-section.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
+import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 import {
   SessionConversationBottomPanelController,
   SessionConversationMainContent,
@@ -2420,7 +2421,9 @@ function SetupScriptAssistantPanel(input: {
   const { conversationPane, workbench } = useSessionWorkbenchController({
     sandboxInstanceId: input.sandboxInstanceId,
   });
-  const [composerText, setComposerText] = useState(input.initialComposerText);
+  const [composerDraft, setComposerDraft] = useState(
+    createComposerDraft(input.initialComposerText),
+  );
   const [pendingDiffComments, setPendingDiffComments] = useState<
     readonly PendingSessionDiffComment[]
   >([]);
@@ -2457,7 +2460,7 @@ function SetupScriptAssistantPanel(input: {
   );
 
   useEffect(() => {
-    setComposerText(input.initialComposerText);
+    setComposerDraft(createComposerDraft(input.initialComposerText));
   }, [input.initialComposerText]);
 
   function handleClearPendingDiffComments(): void {
@@ -2602,10 +2605,10 @@ function SetupScriptAssistantPanel(input: {
                     ),
                   }}
                   draftState={{
-                    composerText,
+                    composerDraft,
                     pendingDiffComments,
                     clearPendingDiffComments: handleClearPendingDiffComments,
-                    setComposerText,
+                    setComposerDraft,
                   }}
                   isRespondingToServerRequest={
                     conversationPane.serverRequestsState.isRespondingToServerRequest

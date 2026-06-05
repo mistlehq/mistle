@@ -7,6 +7,10 @@ import { ChatUserMessage } from "../chat/components/chat-user-message.js";
 import { CodexFixtureSessionModelOptions } from "../session-agents/codex/fixtures/session-fixtures.js";
 import { SessionComposerFixtureProps } from "../session-agents/codex/fixtures/session-fixtures.js";
 import {
+  createComposerDraft,
+  type ComposerDraft,
+} from "./session-composer/session-composer-draft.js";
+import {
   SessionConversationBottomPanel,
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
@@ -214,7 +218,10 @@ function SessionConversationWorkbenchHarness(input: {
   const [entries, setEntries] = useState<readonly ChatEntry[]>(LiveHarnessSeedEntries);
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
   const [pendingTurnId, setPendingTurnId] = useState<string | null>(null);
-  const [composerText, setComposerText] = useState("give me 2 more blurbs");
+  const [composerDraft, setComposerDraft] = useState<ComposerDraft>(
+    createComposerDraft("give me 2 more blurbs"),
+  );
+  const composerText = composerDraft.text;
   const [nextTurnIndex, setNextTurnIndex] = useState(1);
   const [streamChunkIndex, setStreamChunkIndex] = useState(0);
   const [queuedPrompts, setQueuedPrompts] = useState<readonly QueuedPrompt[]>([]);
@@ -243,7 +250,7 @@ function SessionConversationWorkbenchHarness(input: {
     setPendingTurnId(pendingId);
     setActiveTurnId(pendingId);
     setStreamChunkIndex(1);
-    setComposerText("");
+    setComposerDraft(createComposerDraft(""));
     setEntries((currentEntries) => [
       ...currentEntries,
       ...createLiveHarnessStartedTurnEntries({
@@ -268,7 +275,7 @@ function SessionConversationWorkbenchHarness(input: {
 
   function startNewTurn(): void {
     launchTurn(composerText.trim());
-    setComposerText("");
+    setComposerDraft(createComposerDraft(""));
   }
 
   function steerActiveTurn(): void {
@@ -308,7 +315,7 @@ function SessionConversationWorkbenchHarness(input: {
       pendingSteerAcceptanceFrameIdsRef.current.push(innerFrameId);
     });
     pendingSteerAcceptanceFrameIdsRef.current.push(outerFrameId);
-    setComposerText("");
+    setComposerDraft(createComposerDraft(""));
   }
 
   function queueCurrentDraft(): void {
@@ -324,7 +331,7 @@ function SessionConversationWorkbenchHarness(input: {
         text: queuedText,
       },
     ]);
-    setComposerText("");
+    setComposerDraft(createComposerDraft(""));
   }
 
   function removeQueuedPrompt(queuedPromptId: string): void {
@@ -432,7 +439,7 @@ function SessionConversationWorkbenchHarness(input: {
     setEntries(LiveHarnessSeedEntries);
     setActiveTurnId(null);
     setPendingTurnId(null);
-    setComposerText("give me 2 more blurbs");
+    setComposerDraft(createComposerDraft("give me 2 more blurbs"));
     setNextTurnIndex(1);
     setStreamChunkIndex(0);
     setQueuedPrompts([]);
@@ -496,7 +503,7 @@ function SessionConversationWorkbenchHarness(input: {
             chatEntries={entries}
             composerViewModel={{
               ...SessionComposerFixtureProps,
-              composerText,
+              composerDraft,
               isSubmitPending: pendingTurnId !== null || autoStartingQueuedPromptId !== null,
               keyboardShortcuts:
                 hasRunningTurn && composerText.trim().length > 0
@@ -506,7 +513,7 @@ function SessionConversationWorkbenchHarness(input: {
                     ]
                   : [],
               modelOptions: CodexFixtureSessionModelOptions,
-              onComposerTextChange: setComposerText,
+              onComposerDraftChange: setComposerDraft,
               onSubmit: () => {
                 if (submitMode === "start") {
                   startNewTurn();

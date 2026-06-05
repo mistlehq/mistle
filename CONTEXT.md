@@ -264,20 +264,28 @@ _Avoid_: Thread panel, Codex thread panel
 A special composer interaction available for a session, including how the input is represented while editing and how it is submitted.
 _Avoid_: Autocomplete feature, composer shortcut
 
+**Composer draft**:
+The current editable session composer content, including the prompt text and any selected mention metadata that may affect submission.
+_Avoid_: Composer text, textarea value
+
 **Inline composer command**:
 A **Composer command** that can be inserted as editable prompt text away from the start of the composer.
 _Avoid_: Runtime command, start-only command
 
 **Codex skill mention**:
 A `$skill-name` token in Codex composer text that may resolve to an enabled Codex runtime skill when submitted.
-_Avoid_: Hardcoded skill, dashboard skill, slash command, selected skill
+_Avoid_: Hardcoded skill, dashboard skill, slash command
+
+**Selected Codex skill mention**:
+A **Codex skill mention** inserted by selecting a specific enabled Codex runtime skill from composer suggestions.
+_Avoid_: Typed skill mention, inferred skill, dashboard skill
 
 **Structured Codex skill input**:
-A non-visible Codex turn input item that invokes the enabled runtime skill resolved from a submitted **Codex skill mention**.
-_Avoid_: Skill mention text, selected skill, dashboard skill
+A non-visible Codex turn input item that invokes the enabled runtime skill resolved from a submitted **Codex skill mention** or **Selected Codex skill mention**.
+_Avoid_: Skill mention text, dashboard skill
 
 **Skill source path**:
-The runtime-provided file path that identifies the skill definition behind a **Codex skill mention**.
+The runtime-provided file path that identifies the skill definition behind a **Selected Codex skill mention** or resolved **Codex skill mention**.
 _Avoid_: Context path, inserted path, attachment path
 
 **Sandbox profile skills source**:
@@ -577,13 +585,25 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Composer command** declares its editing representation separately from whether submission becomes inline prompt text or a typed runtime command.
 - A **Composer command** that depends on an optional runtime feature is available only when the **Agent runtime** confirms that feature is enabled.
 - A **Composer command** entered before an **Active Codex thread** exists remains a command action until the **Agent runtime** can handle it; it does not become ordinary prompt text.
+- A **Composer draft** always has prompt text, and may also have selected mention metadata for runtimes that need structured submission.
+- A **Composer draft** may carry selected mention metadata into queued submission intent, but selected mention metadata is not transcript content.
+- A **Composer draft** exposes selected mention metadata generically; each **Agent runtime** decides whether and how that metadata affects submission.
+- First-pass **Composer draft** selected mention metadata applies to selected skill mentions, not context mentions.
+- First-pass **Composer draft** selected mention metadata does not replace text-based **Composer command** handling.
+- A Codex queued prompt must not accept **Selected Codex skill mentions** unless the queued path can honor them as structured skill inputs.
 - A **Codex skill mention** is represented as editable prompt text whether the user typed it manually or inserted it from the composer UI.
-- A **Codex skill mention** uses the same conservative whitespace-delimited token shape as the Codex skill mention autocomplete.
+- A **Codex skill mention** and **Selected Codex skill mention** use the same conservative whitespace-delimited token shape as the Codex skill mention autocomplete.
 - A **Codex skill mention** resolves to a **Structured Codex skill input** only when the submitted token identifies exactly one enabled Codex runtime skill.
+- A **Selected Codex skill mention** may resolve to a **Structured Codex skill input** even when another enabled Codex runtime skill has the same name.
+- Manually typed duplicate-name **Codex skill mentions** remain ordinary prompt text unless they become **Selected Codex skill mentions** through explicit user selection.
+- A **Selected Codex skill mention** keeps its selected identity through edits around it, but becomes an ordinary **Codex skill mention** when its own visible token no longer exactly matches the selected skill.
+- A stale **Selected Codex skill mention** blocks submission rather than silently becoming ordinary prompt text.
+- A **Selected Codex skill mention** must be visibly distinguishable from an ordinary **Codex skill mention** while preserving the same prompt text.
+- A duplicate-name **Selected Codex skill mention** selection must show enough source identity for the user to choose the intended runtime skill.
 - A **Skill source path** is required runtime metadata for Codex skill mentions; Codex `skills/list` entries without one are not exposed as mentionable composer skills.
-- A **Structured Codex skill input** is derived from submitted **Codex skill mention** text, not from how that text was inserted into the composer.
-- A submitted prompt may produce at most one **Structured Codex skill input** for each distinct resolved Codex runtime skill path.
-- The Codex submission path resolves **Codex skill mentions** into **Structured Codex skill inputs**; the generic composer only edits and submits prompt text.
+- A **Structured Codex skill input** for a **Selected Codex skill mention** is derived from the user's explicit composer selection.
+- A submitted prompt may produce at most one **Structured Codex skill input** for each distinct resolved Codex runtime skill path, including when multiple **Selected Codex skill mentions** use the same visible name.
+- The Codex submission path resolves **Codex skill mentions** and **Selected Codex skill mentions** into **Structured Codex skill inputs**; the generic composer edits a **Composer draft**.
 - Codex skill resolution uses the current dashboard **Composer capability** state at submission time rather than calling `skills/list` during submission.
 - First-pass **Structured Codex skill input** submission applies to Codex `turn/start`, not Codex steer or queued message submission.
 - **Structured Codex skill inputs** do not change the user-visible submitted prompt or transcript text.

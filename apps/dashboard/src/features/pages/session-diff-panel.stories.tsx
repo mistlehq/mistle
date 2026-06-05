@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
 import type { ChatEntry } from "../chat/chat-types.js";
 import { SessionComposerFixturePropsWithPendingDiffComments } from "../session-agents/codex/fixtures/session-fixtures.js";
+import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 import type {
   PendingSessionDiffComment,
   PendingSessionDiffCommentInput,
@@ -368,7 +369,7 @@ function StoryDiffWorkbench({
         primaryBottomPanel: createStorySessionBottomPanel({
           composerViewModel: {
             ...SessionComposerFixturePropsWithPendingDiffComments,
-            composerText: "",
+            composerDraft: createComposerDraft(""),
             onClearPendingDiffComments: () => {
               setPendingComments([]);
             },

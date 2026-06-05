@@ -128,6 +128,177 @@ describe("buildCodexTurnInputItems", () => {
     ]);
   });
 
+  it("resolves selected duplicate-name skills by source path", () => {
+    expect(
+      buildCodexTurnInputItems({
+        text: "$duplicate $duplicate",
+        selectedSkillMentions: [
+          {
+            name: "duplicate",
+            sourcePath: "/home/.codex/skills/one/SKILL.md",
+            range: { start: 0, end: "$duplicate".length },
+          },
+          {
+            name: "duplicate",
+            sourcePath: "/workspace/.codex/skills/two/SKILL.md",
+            range: { start: "$duplicate ".length, end: "$duplicate $duplicate".length },
+          },
+        ],
+        skills: [
+          {
+            name: "duplicate",
+            sourcePath: "/home/.codex/skills/one/SKILL.md",
+          },
+          {
+            name: "duplicate",
+            sourcePath: "/workspace/.codex/skills/two/SKILL.md",
+          },
+        ],
+        attachments: [],
+      }),
+    ).toEqual([
+      {
+        type: "text",
+        text: "$duplicate $duplicate",
+      },
+      {
+        type: "skill",
+        name: "duplicate",
+        path: "/home/.codex/skills/one/SKILL.md",
+      },
+      {
+        type: "skill",
+        name: "duplicate",
+        path: "/workspace/.codex/skills/two/SKILL.md",
+      },
+    ]);
+  });
+
+  it("dedupes repeated selected skill mentions by source path", () => {
+    expect(
+      buildCodexTurnInputItems({
+        text: "$duplicate $duplicate",
+        selectedSkillMentions: [
+          {
+            name: "duplicate",
+            sourcePath: "/home/.codex/skills/one/SKILL.md",
+            range: { start: 0, end: "$duplicate".length },
+          },
+          {
+            name: "duplicate",
+            sourcePath: "/home/.codex/skills/one/SKILL.md",
+            range: { start: "$duplicate ".length, end: "$duplicate $duplicate".length },
+          },
+        ],
+        skills: [
+          {
+            name: "duplicate",
+            sourcePath: "/home/.codex/skills/one/SKILL.md",
+          },
+        ],
+        attachments: [],
+      }),
+    ).toEqual([
+      {
+        type: "text",
+        text: "$duplicate $duplicate",
+      },
+      {
+        type: "skill",
+        name: "duplicate",
+        path: "/home/.codex/skills/one/SKILL.md",
+      },
+    ]);
+  });
+
+  it("rejects stale selected skill paths", () => {
+    expect(() =>
+      buildCodexTurnInputItems({
+        text: "$duplicate",
+        selectedSkillMentions: [
+          {
+            name: "duplicate",
+            sourcePath: "/stale/.codex/skills/duplicate/SKILL.md",
+            range: { start: 0, end: "$duplicate".length },
+          },
+        ],
+        skills: [
+          {
+            name: "duplicate",
+            sourcePath: "/home/.codex/skills/duplicate/SKILL.md",
+          },
+        ],
+        attachments: [],
+      }),
+    ).toThrow('Selected skill "$duplicate" is no longer available.');
+  });
+
+  it("rejects selected skill mentions when the skill name changed at the same source path", () => {
+    expect(() =>
+      buildCodexTurnInputItems({
+        text: "$duplicate",
+        selectedSkillMentions: [
+          {
+            name: "duplicate",
+            sourcePath: "/home/.codex/skills/duplicate/SKILL.md",
+            range: { start: 0, end: "$duplicate".length },
+          },
+        ],
+        skills: [
+          {
+            name: "renamed",
+            sourcePath: "/home/.codex/skills/duplicate/SKILL.md",
+          },
+        ],
+        attachments: [],
+      }),
+    ).toThrow('Selected skill "$duplicate" has changed.');
+  });
+
+  it("rejects selected skill mentions that no longer match the submitted text range", () => {
+    expect(() =>
+      buildCodexTurnInputItems({
+        text: "plain text $duplicate",
+        selectedSkillMentions: [
+          {
+            name: "duplicate",
+            sourcePath: "/home/.codex/skills/duplicate/SKILL.md",
+            range: { start: 0, end: "$duplicate".length },
+          },
+        ],
+        skills: [
+          {
+            name: "duplicate",
+            sourcePath: "/home/.codex/skills/duplicate/SKILL.md",
+          },
+        ],
+        attachments: [],
+      }),
+    ).toThrow('Selected skill "$duplicate" no longer matches the submitted text.');
+  });
+
+  it("rejects selected skill mentions that became part of a larger token", () => {
+    expect(() =>
+      buildCodexTurnInputItems({
+        text: "$duplicatex",
+        selectedSkillMentions: [
+          {
+            name: "duplicate",
+            sourcePath: "/home/.codex/skills/duplicate/SKILL.md",
+            range: { start: 0, end: "$duplicate".length },
+          },
+        ],
+        skills: [
+          {
+            name: "duplicate",
+            sourcePath: "/home/.codex/skills/duplicate/SKILL.md",
+          },
+        ],
+        attachments: [],
+      }),
+    ).toThrow('Selected skill "$duplicate" no longer matches the submitted text.');
+  });
+
   it("only resolves conservative whitespace-delimited skill tokens", () => {
     expect(
       buildCodexTurnInputItems({

@@ -36,6 +36,7 @@ import { AppShellView } from "../shell/app-shell-view.js";
 import { AppSidebarHeader } from "../shell/app-sidebar-header.js";
 import type { SandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
+import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 import {
   createStoryLongCliOutput,
   createStoryWorkbenchCliPtyState,
@@ -439,7 +440,9 @@ export const WithPlanModeComposer: Story = {
           title: "Codex is planning. Submissions stay in Plan mode until implementation starts.",
           onSwitchToDefault: noop,
         },
-        composerText: "Trace the current implementation and propose a patch plan.",
+        composerDraft: createComposerDraft(
+          "Trace the current implementation and propose a patch plan.",
+        ),
         gitBranchLabel: "feature/codex-plan-command",
       },
     }),
@@ -472,7 +475,7 @@ export const WithPlanImplementationConfirmation: Story = {
             },
           ],
         },
-        composerText: "",
+        composerDraft: createComposerDraft(""),
         gitBranchLabel: "feature/codex-plan-command",
       },
     }),
@@ -491,7 +494,7 @@ export const WithClearContextPlanImplementation: Story = {
       primaryBottomPanel={createStorySessionBottomPanel({
         composerViewModel: {
           ...SessionComposerFixtureProps,
-          composerText: "Implement the plan.",
+          composerDraft: createComposerDraft("Implement the plan."),
           gitBranchLabel: "feature/codex-plan-command",
           submitDisabled: true,
           submitLabel: "Sending...",

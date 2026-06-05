@@ -1,4 +1,9 @@
-import { isSkillMentionName, type SkillMentionDescriptor } from "@mistle/integrations-core";
+import {
+  isSkillMentionName,
+  selectedSkillMentionMatchesText,
+  type SelectedSkillMention,
+  type SkillMentionDescriptor,
+} from "@mistle/integrations-core";
 import { z } from "zod";
 
 import { CodexJsonRpcClient } from "./codex-json-rpc.js";
@@ -360,6 +365,7 @@ type CodexTurnStartRequest = {
 export function buildCodexTurnInputItems(input: {
   text: string;
   attachments: readonly CodexTurnInputLocalImageItem[];
+  selectedSkillMentions?: readonly SelectedSkillMention[];
   skills?: readonly SkillMentionDescriptor[];
 }): readonly CodexTurnInputItem[] {
   const trimmedText = input.text.trim();
@@ -367,6 +373,7 @@ export function buildCodexTurnInputItems(input: {
     trimmedText.length === 0
       ? []
       : resolveCodexTurnInputSkillItems({
+          selectedSkillMentions: input.selectedSkillMentions ?? [],
           text: trimmedText,
           skills: input.skills ?? [],
         });
@@ -391,12 +398,46 @@ export function buildCodexTurnInputItems(input: {
 }
 
 function resolveCodexTurnInputSkillItems(input: {
+  selectedSkillMentions: readonly SelectedSkillMention[];
   text: string;
   skills: readonly SkillMentionDescriptor[];
 }): readonly CodexTurnInputSkillItem[] {
   const selectedItems: CodexTurnInputSkillItem[] = [];
   const selectedPaths = new Set<string>();
   const skillsByName = buildUniqueCodexSkillMentionByName(input.skills);
+  const skillsByPath = buildCodexSkillMentionBySourcePath(input.skills);
+
+  for (const selectedMention of input.selectedSkillMentions) {
+    const skill = skillsByPath.get(selectedMention.sourcePath);
+    if (skill === undefined) {
+      throw new Error(
+        `Selected skill "$${selectedMention.name}" is no longer available. Re-select it or remove it.`,
+      );
+    }
+
+    if (skill.name !== selectedMention.name) {
+      throw new Error(
+        `Selected skill "$${selectedMention.name}" has changed. Re-select it or remove it.`,
+      );
+    }
+
+    if (!selectedSkillMentionMatchesText({ mention: selectedMention, text: input.text })) {
+      throw new Error(
+        `Selected skill "$${selectedMention.name}" no longer matches the submitted text. Re-select it or remove it.`,
+      );
+    }
+
+    if (selectedPaths.has(skill.sourcePath)) {
+      continue;
+    }
+
+    selectedPaths.add(skill.sourcePath);
+    selectedItems.push({
+      type: "skill",
+      name: skill.name,
+      path: skill.sourcePath,
+    });
+  }
 
   for (const token of input.text.split(/\s+/)) {
     if (!token.startsWith("$")) {
@@ -445,6 +486,18 @@ function buildUniqueCodexSkillMentionByName(
   }
 
   return skillsByName;
+}
+
+function buildCodexSkillMentionBySourcePath(
+  skills: readonly SkillMentionDescriptor[],
+): ReadonlyMap<string, SkillMentionDescriptor> {
+  const skillsByPath = new Map<string, SkillMentionDescriptor>();
+
+  for (const skill of skills) {
+    skillsByPath.set(skill.sourcePath, skill);
+  }
+
+  return skillsByPath;
 }
 
 export function buildCodexTurnStartRequest(input: {

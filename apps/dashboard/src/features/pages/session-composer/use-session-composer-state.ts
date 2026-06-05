@@ -16,6 +16,12 @@ import {
 import type { SessionPullRequestSummary } from "../use-session-repository-status.js";
 import { resolveComposerSubmitAction } from "./session-composer-capabilities.js";
 import {
+  createComposerDraft,
+  trimComposerDraft,
+  type ComposerDraft,
+  type SelectedSkillMention,
+} from "./session-composer-draft.js";
+import {
   buildModelSelectionRequiredMessage,
   buildUnavailableModelErrorMessage,
   resolveActiveComposerModel,
@@ -49,7 +55,7 @@ type PendingComposerAttachment = {
 
 type QueuedComposerPrompt = {
   id: string;
-  prompt: string;
+  text: string;
   attachments: readonly PendingComposerAttachment[];
   pendingDiffComments: readonly PendingSessionDiffComment[];
   status: "failed" | "queued" | "submitting";
@@ -57,6 +63,7 @@ type QueuedComposerPrompt = {
 
 type PreparedComposerTurnSubmission = {
   preparedAttachments: PreparedComposerAttachments;
+  selectedSkillMentions: readonly SelectedSkillMention[];
   submittedPrompt: string;
 };
 
@@ -69,6 +76,28 @@ type ComposerTurnSubmissionPreparationResult =
       status: "ready";
       submission: PreparedComposerTurnSubmission;
     };
+
+function mapSelectedSkillMentionsToSubmittedPrompt(input: {
+  composerText: string;
+  selectedSkillMentions: readonly SelectedSkillMention[];
+  submittedPrompt: string;
+}): readonly SelectedSkillMention[] {
+  if (input.selectedSkillMentions.length === 0) {
+    return [];
+  }
+
+  const promptComposerTextOffset = input.submittedPrompt.endsWith(input.composerText)
+    ? input.submittedPrompt.length - input.composerText.length
+    : 0;
+
+  return input.selectedSkillMentions.map((mention) => ({
+    ...mention,
+    range: {
+      start: mention.range.start + promptComposerTextOffset,
+      end: mention.range.end + promptComposerTextOffset,
+    },
+  }));
+}
 
 export type QueuedComposerPromptViewModel = {
   id: string;
@@ -87,6 +116,7 @@ export type SessionTurnControl = {
   completedTurnErrorMessage: string | null;
   startTurn: (input: {
     submittedPrompt: string;
+    selectedSkillMentions?: readonly SelectedSkillMention[];
     submittedAttachments?: readonly SessionComposerSubmittedLocalImageAttachment[];
     uploadedAttachments?: readonly UploadedSandboxFile[];
     transcriptPrompt?: string;
@@ -153,10 +183,10 @@ export type SessionComposerSharedInput = {
 export type SessionComposerStateInput = SessionComposerRuntimeInput & SessionComposerSharedInput;
 
 export type SessionComposerDraftState = {
-  composerText: string;
+  composerDraft: ComposerDraft;
   pendingDiffComments: readonly PendingSessionDiffComment[];
   clearPendingDiffComments: () => void;
-  setComposerText: (nextText: string) => void;
+  setComposerDraft: (nextDraft: ComposerDraft) => void;
 };
 
 export type SessionComposerUiState = {
@@ -174,7 +204,8 @@ export function useSessionComposerState(input: {
   const { clearSessionErrorMessage, sessionErrorMessage } = composerStateInput;
   const { required: requiresModelSelection, showControls: showConfigControls } =
     composerStateInput.modelSelection;
-  const composerText = draftState.composerText;
+  const composerDraft = draftState.composerDraft;
+  const composerText = composerDraft.text;
   const [composerErrorMessage, setComposerErrorMessage] = useState<string | null>(null);
   const [pendingComposerAttachments, setPendingComposerAttachments] = useState<
     readonly PendingComposerAttachment[]
@@ -233,11 +264,11 @@ export function useSessionComposerState(input: {
     selectedModel: composerStateInput.configControl.selectedModel,
   });
 
-  const handleComposerTextChange = useCallback(
-    (nextText: string): void => {
+  const handleComposerDraftChange = useCallback(
+    (nextDraft: ComposerDraft): void => {
       clearSessionErrorMessage();
       setComposerErrorMessage(null);
-      draftState.setComposerText(nextText);
+      draftState.setComposerDraft(nextDraft);
     },
     [clearSessionErrorMessage, draftState],
   );
@@ -296,7 +327,7 @@ export function useSessionComposerState(input: {
   const prepareComposerTurnSubmission = useCallback(
     async (prepareInput: {
       attachments: readonly PendingComposerAttachment[];
-      composerText: string;
+      composerDraft: ComposerDraft;
       pendingDiffComments: readonly PendingSessionDiffComment[];
     }): Promise<ComposerTurnSubmissionPreparationResult> => {
       if (composerStateInput.bootstrap.phase.status !== "ready") {
@@ -319,8 +350,9 @@ export function useSessionComposerState(input: {
         };
       }
 
+      const trimmedDraft = trimComposerDraft(prepareInput.composerDraft);
       const submittedPrompt = buildSessionComposerPrompt({
-        composerText: prepareInput.composerText,
+        composerText: trimmedDraft.text,
         pendingDiffComments: prepareInput.pendingDiffComments,
       });
 
@@ -336,6 +368,11 @@ export function useSessionComposerState(input: {
           status: "ready",
           submission: {
             preparedAttachments,
+            selectedSkillMentions: mapSelectedSkillMentionsToSubmittedPrompt({
+              composerText: trimmedDraft.text,
+              selectedSkillMentions: trimmedDraft.selectedSkillMentions,
+              submittedPrompt,
+            }),
             submittedPrompt,
           },
         };
@@ -418,9 +455,16 @@ export function useSessionComposerState(input: {
       setIsSubmittingNativeQueuedPrompt(true);
       void (async (): Promise<void> => {
         try {
+          if (composerDraft.selectedSkillMentions.length > 0) {
+            setComposerErrorMessage(
+              "Selected skills cannot be queued while a task is in progress. Submit them after the current task finishes.",
+            );
+            return;
+          }
+
           const preparationResult = await prepareComposerTurnSubmission({
             attachments: pendingComposerAttachments,
-            composerText: trimmedComposerText,
+            composerDraft: createComposerDraft(trimmedComposerText),
             pendingDiffComments: draftState.pendingDiffComments,
           });
 
@@ -447,7 +491,7 @@ export function useSessionComposerState(input: {
             return;
           }
 
-          draftState.setComposerText("");
+          draftState.setComposerDraft(createComposerDraft(""));
           draftState.clearPendingDiffComments();
           setPendingComposerAttachments([]);
         } finally {
@@ -457,23 +501,31 @@ export function useSessionComposerState(input: {
       return;
     }
 
+    if (composerDraft.selectedSkillMentions.length > 0) {
+      setComposerErrorMessage(
+        "Selected skills cannot be queued while a task is in progress. Submit them after the current task finishes.",
+      );
+      return;
+    }
+
     setQueuedPrompts((currentQueuedPrompts) => [
       ...currentQueuedPrompts,
       {
         id: `queued-prompt-${crypto.randomUUID()}`,
-        prompt: trimmedComposerText,
+        text: trimmedComposerText,
         attachments: pendingComposerAttachments,
         pendingDiffComments: draftState.pendingDiffComments,
         status: "queued",
       },
     ]);
-    draftState.setComposerText("");
+    draftState.setComposerDraft(createComposerDraft(""));
     draftState.clearPendingDiffComments();
     setPendingComposerAttachments([]);
   }, [
     clearSessionErrorMessage,
     composerStateInput.configControl.isUpdating,
     composerStateInput.turnControl,
+    composerDraft.selectedSkillMentions.length,
     composerText,
     draftState,
     isSubmittingNativeQueuedPrompt,
@@ -506,7 +558,7 @@ export function useSessionComposerState(input: {
 
       const preparationResult = await prepareComposerTurnSubmission({
         attachments: queuedPrompt.attachments,
-        composerText: queuedPrompt.prompt,
+        composerDraft: createComposerDraft(queuedPrompt.text),
         pendingDiffComments: queuedPrompt.pendingDiffComments,
       });
 
@@ -577,8 +629,9 @@ export function useSessionComposerState(input: {
 
   const submitPlanTypedRuntimeCommand = useCallback(
     async (command: ComposerCommandDescriptor): Promise<void> => {
-      const trimmedComposerText = composerText.trim();
-      const planPrompt = trimmedComposerText.slice(`/${command.name}`.length).trim();
+      const trimmedDraft = trimComposerDraft(composerDraft);
+      const commandTokenLength = `/${command.name}`.length;
+      const planPrompt = trimmedDraft.text.slice(commandTokenLength).trim();
       if (planPrompt.length === 0) {
         if (composerStateInput.collaborationMode?.onSwitchToPlan === undefined) {
           setComposerErrorMessage(`/${command.name} is not supported.`);
@@ -586,13 +639,31 @@ export function useSessionComposerState(input: {
         }
 
         composerStateInput.collaborationMode.onSwitchToPlan();
-        draftState.setComposerText("");
+        draftState.setComposerDraft(createComposerDraft(""));
         return;
       }
 
+      const planPromptStart = trimmedDraft.text.indexOf(planPrompt, commandTokenLength);
+      const planPromptDraft: ComposerDraft = {
+        text: planPrompt,
+        selectedSkillMentions: trimmedDraft.selectedSkillMentions
+          .filter(
+            (mention) =>
+              mention.range.start >= planPromptStart &&
+              mention.range.end <= planPromptStart + planPrompt.length,
+          )
+          .map((mention) => ({
+            ...mention,
+            range: {
+              start: mention.range.start - planPromptStart,
+              end: mention.range.end - planPromptStart,
+            },
+          })),
+      };
+
       const preparationResult = await prepareComposerTurnSubmission({
         attachments: [],
-        composerText: planPrompt,
+        composerDraft: planPromptDraft,
         pendingDiffComments: [],
       });
 
@@ -608,10 +679,12 @@ export function useSessionComposerState(input: {
         return;
       }
 
+      const { selectedSkillMentions, submittedPrompt } = preparationResult.submission;
       try {
         await composerStateInput.turnControl.startTurn({
-          submittedPrompt: planPrompt,
-          transcriptPrompt: planPrompt,
+          submittedPrompt,
+          selectedSkillMentions,
+          transcriptPrompt: submittedPrompt,
           collaborationMode: "plan",
           collaborationModeSettings: {
             mode: "plan",
@@ -629,7 +702,7 @@ export function useSessionComposerState(input: {
       }
 
       composerStateInput.collaborationMode?.onSwitchToPlan?.();
-      draftState.setComposerText("");
+      draftState.setComposerDraft(createComposerDraft(""));
     },
     [
       activeComposerModel,
@@ -637,7 +710,7 @@ export function useSessionComposerState(input: {
       composerStateInput.collaborationModeSettings?.developerInstructions,
       composerStateInput.configControl.selectedReasoningEffort,
       composerStateInput.turnControl,
-      composerText,
+      composerDraft,
       draftState,
       prepareComposerTurnSubmission,
     ],
@@ -690,7 +763,7 @@ export function useSessionComposerState(input: {
           text: composerText,
         });
         if (commandAccepted) {
-          draftState.setComposerText("");
+          draftState.setComposerDraft(createComposerDraft(""));
         }
         return;
       }
@@ -705,9 +778,19 @@ export function useSessionComposerState(input: {
         return;
       }
 
+      if (submitAction.type === "steer_turn" && composerDraft.selectedSkillMentions.length > 0) {
+        setComposerErrorMessage(
+          "Selected skills cannot be used while steering a task in progress. Submit them after the current task finishes.",
+        );
+        return;
+      }
+
       const preparationResult = await prepareComposerTurnSubmission({
         attachments: pendingComposerAttachments,
-        composerText: submitAction.prompt,
+        composerDraft:
+          submitAction.prompt === composerText.trim()
+            ? composerDraft
+            : createComposerDraft(submitAction.prompt),
         pendingDiffComments: draftState.pendingDiffComments,
       });
 
@@ -731,6 +814,7 @@ export function useSessionComposerState(input: {
         } else {
           await composerStateInput.turnControl.startTurn({
             submittedPrompt: preparedAttachments.prompt,
+            selectedSkillMentions: preparationResult.submission.selectedSkillMentions,
             submittedAttachments: preparedAttachments.submittedAttachments,
             uploadedAttachments: preparedAttachments.uploadedAttachments,
             displayAttachments: preparedAttachments.displayAttachments,
@@ -750,7 +834,7 @@ export function useSessionComposerState(input: {
         return;
       }
 
-      draftState.setComposerText("");
+      draftState.setComposerDraft(createComposerDraft(""));
       draftState.clearPendingDiffComments();
       setComposerErrorMessage(null);
       setPendingComposerAttachments([]);
@@ -761,6 +845,7 @@ export function useSessionComposerState(input: {
     composerStateInput.configControl.isUpdating,
     composerStateInput.executeTypedRuntimeCommand,
     composerStateInput.turnControl,
+    composerDraft,
     composerText,
     draftState,
     pendingComposerAttachments,
@@ -803,7 +888,7 @@ export function useSessionComposerState(input: {
         return;
       }
 
-      draftState.setComposerText("");
+      draftState.setComposerDraft(createComposerDraft(""));
     },
     [
       clearSessionErrorMessage,
@@ -924,8 +1009,8 @@ export function useSessionComposerState(input: {
       queuedPrompts.map((queuedPrompt) => ({
         id: queuedPrompt.id,
         text:
-          queuedPrompt.prompt.length > 0
-            ? queuedPrompt.prompt
+          queuedPrompt.text.length > 0
+            ? queuedPrompt.text
             : buildPendingSessionDiffCommentSummaryLabel(queuedPrompt.pendingDiffComments.length),
         attachments: queuedPrompt.attachments.map((attachment) => ({
           kind: "file" as const,
@@ -972,7 +1057,7 @@ export function useSessionComposerState(input: {
   return {
     composerViewModel: {
       composerCapabilities: composerStateInput.bootstrap.composerCapabilities,
-      composerText,
+      composerDraft,
       commandPanel: composerStateInput.commandPanel ?? null,
       contextMentionControl: composerStateInput.contextMentionControl ?? null,
       pendingDiffCommentSummary:
@@ -1021,7 +1106,7 @@ export function useSessionComposerState(input: {
         composerStateInput.attachmentControl.isUploadingAttachments,
       showConfigControls,
       showReasoningControl: composerStateInput.configControl.canChangeReasoningEffort,
-      onComposerTextChange: handleComposerTextChange,
+      onComposerDraftChange: handleComposerDraftChange,
       onSubmit: submitComposer,
       onRuntimeCommandSubmit: submitRuntimeCommand,
       onSecondarySubmit: queuePrompt,

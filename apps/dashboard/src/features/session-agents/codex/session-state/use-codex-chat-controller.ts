@@ -1,4 +1,4 @@
-import type { SkillMentionDescriptor } from "@mistle/integrations-core";
+import type { SelectedSkillMention, SkillMentionDescriptor } from "@mistle/integrations-core";
 import {
   buildCodexTurnInputItems,
   interruptCodexTurn,
@@ -53,7 +53,7 @@ export function resolveTurnCwdCommit(input: {
   };
 }
 
-type BuildTurnRequestInput = {
+type BuildTextOnlyTurnRequestInput = {
   submittedPrompt: string;
   submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
   transcriptPrompt?: string;
@@ -61,6 +61,10 @@ type BuildTurnRequestInput = {
   cwd?: string;
   collaborationMode?: CodexTurnCollaborationModeKind | undefined;
   collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
+};
+
+type BuildTurnRequestInput = BuildTextOnlyTurnRequestInput & {
+  selectedSkillMentions?: readonly SelectedSkillMention[];
 };
 
 export type CodexStartTurnInput = BuildTurnRequestInput & {
@@ -105,7 +109,12 @@ function buildTurnRequest(
     items: buildCodexTurnInputItems({
       text: submittedPrompt,
       attachments: submittedAttachments,
-      ...(input.skillResolution.kind === "enabled" ? { skills: input.skillResolution.skills } : {}),
+      ...(input.skillResolution.kind === "enabled"
+        ? {
+            selectedSkillMentions: input.selectedSkillMentions ?? [],
+            skills: input.skillResolution.skills,
+          }
+        : {}),
     }),
     ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
     ...(input.collaborationMode === undefined
@@ -131,7 +140,7 @@ export function buildStartTurnRequest(
   });
 }
 
-export function buildTextOnlyTurnRequest(input: BuildTurnRequestInput): TurnRequest {
+export function buildTextOnlyTurnRequest(input: BuildTextOnlyTurnRequestInput): TurnRequest {
   return buildTurnRequest({
     ...input,
     skillResolution: {

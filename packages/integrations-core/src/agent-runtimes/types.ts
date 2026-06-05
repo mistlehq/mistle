@@ -66,6 +66,15 @@ export type SkillMentionDescriptor = {
   sourcePath: string;
 };
 
+export type SelectedSkillMention = {
+  name: string;
+  sourcePath: string;
+  range: {
+    start: number;
+    end: number;
+  };
+};
+
 const SkillMentionQueryPattern = /^[a-z0-9-]*$/;
 const SkillMentionNamePattern = /^[a-z0-9-]+$/;
 
@@ -75,6 +84,35 @@ export function isSkillMentionQuery(value: string): boolean {
 
 export function isSkillMentionName(value: string): boolean {
   return SkillMentionNamePattern.test(value);
+}
+
+export function selectedSkillMentionMatchesText(input: {
+  mention: SelectedSkillMention;
+  text: string;
+}): boolean {
+  return (
+    input.text.slice(input.mention.range.start, input.mention.range.end) ===
+      `$${input.mention.name}` &&
+    selectedSkillMentionHasTokenBoundaries({
+      range: input.mention.range,
+      text: input.text,
+    })
+  );
+}
+
+function selectedSkillMentionHasTokenBoundaries(input: {
+  range: { start: number; end: number };
+  text: string;
+}): boolean {
+  const characterBefore =
+    input.range.start === 0 ? null : (input.text.at(input.range.start - 1) ?? null);
+  const characterAfter =
+    input.range.end >= input.text.length ? null : (input.text.at(input.range.end) ?? null);
+
+  return (
+    (characterBefore === null || /\s/.test(characterBefore)) &&
+    (characterAfter === null || /\s/.test(characterAfter))
+  );
 }
 
 export type ComposerCommandDescriptor = {

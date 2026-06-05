@@ -6,6 +6,11 @@ import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { PendingSessionDiffComment } from "../session-diff-comment.js";
+import {
+  createComposerDraft,
+  type ComposerDraft,
+  type SelectedSkillMention,
+} from "./session-composer-draft.js";
 import type {
   SessionComposerBootstrapResult,
   SessionComposerCollaborationModeSettings,
@@ -74,6 +79,7 @@ function SessionComposerStateHarness(input: {
   canSteer?: boolean;
   collaborationDeveloperInstructions?: string;
   composerCapabilities?: readonly ComposerCapability[];
+  initialComposerDraft?: ComposerDraft;
   composerText: string;
   configControlsDisabled?: boolean;
   configUpdating?: boolean;
@@ -93,9 +99,14 @@ function SessionComposerStateHarness(input: {
     message: string;
   }[];
 }): React.JSX.Element {
-  const [composerText, setComposerText] = useState(input.composerText);
+  const [composerDraft, setComposerDraft] = useState<ComposerDraft>(
+    input.initialComposerDraft ?? createComposerDraft(input.composerText),
+  );
   const [pendingDiffComments, setPendingDiffComments] = useState(input.pendingDiffComments);
   const [submittedPrompt, setSubmittedPrompt] = useState<string | null>(null);
+  const [submittedSelectedSkillMentions, setSubmittedSelectedSkillMentions] = useState<
+    readonly SelectedSkillMention[]
+  >([]);
   const [queuedPrompt, setQueuedPrompt] = useState<string | null>(null);
   const [nativeQueueSubmissionCount, setNativeQueueSubmissionCount] = useState(0);
   const [transcriptPrompt, setTranscriptPrompt] = useState<string | null>(null);
@@ -181,6 +192,7 @@ function SessionComposerStateHarness(input: {
         isInterrupting: false,
         completedTurnErrorMessage: null,
         startTurn: async ({
+          selectedSkillMentions,
           submittedPrompt,
           transcriptPrompt,
           collaborationMode,
@@ -192,6 +204,7 @@ function SessionComposerStateHarness(input: {
           }
 
           setSubmittedPrompt(submittedPrompt);
+          setSubmittedSelectedSkillMentions(selectedSkillMentions ?? []);
           setTranscriptPrompt(transcriptPrompt ?? null);
           setResolveSkillMentions(resolveSkillMentions ?? null);
           setCollaborationMode(collaborationMode ?? null);
@@ -235,12 +248,12 @@ function SessionComposerStateHarness(input: {
         : { unavailableTypedRuntimeCommands: input.unavailableTypedRuntimeCommands }),
     },
     draftState: {
-      composerText,
+      composerDraft,
       pendingDiffComments,
       clearPendingDiffComments: () => {
         setPendingDiffComments([]);
       },
-      setComposerText,
+      setComposerDraft,
     },
   });
 
@@ -296,6 +309,9 @@ function SessionComposerStateHarness(input: {
         {composerState.composerViewModel.configControlsDisabled ? "true" : "false"}
       </div>
       <div data-testid="submitted-prompt">{submittedPrompt ?? ""}</div>
+      <div data-testid="submitted-selected-skill-mentions">
+        {JSON.stringify(submittedSelectedSkillMentions)}
+      </div>
       <div data-testid="queued-prompt">{queuedPrompt ?? ""}</div>
       <div data-testid="native-queue-submission-count">{String(nativeQueueSubmissionCount)}</div>
       <div data-testid="transcript-prompt">{transcriptPrompt ?? ""}</div>
@@ -306,7 +322,7 @@ function SessionComposerStateHarness(input: {
         {collaborationModeSettings === null ? "" : JSON.stringify(collaborationModeSettings)}
       </div>
       <div data-testid="collaboration-mode">{collaborationMode ?? ""}</div>
-      <div data-testid="composer-text">{composerText}</div>
+      <div data-testid="composer-text">{composerDraft.text}</div>
       <div data-testid="pending-attachments">
         {composerState.composerViewModel.pendingAttachments
           .map((attachment) => attachment.name)
@@ -660,6 +676,64 @@ describe("useSessionComposerState", () => {
     expect(screen.getByTestId("composer-text").textContent).toBe("");
   });
 
+  it("preserves selected skill mentions when submitting plan command text", async () => {
+    render(
+      <SessionComposerStateHarness
+        composerCapabilities={[
+          {
+            kind: "composerCommand",
+            trigger: "/",
+            source: "runtimeCommand",
+            commands: [
+              {
+                id: "codex.plan",
+                name: "plan",
+                availability: {
+                  duringActiveTurn: "disabled",
+                },
+                submitAs: "typedRuntimeCommand",
+              },
+            ],
+          },
+        ]}
+        composerText="/plan $duplicate review"
+        initialComposerDraft={{
+          text: "/plan $duplicate review",
+          selectedSkillMentions: [
+            {
+              name: "duplicate",
+              sourcePath: "/workspace/.agents/skills/duplicate/SKILL.md",
+              range: {
+                start: "/plan ".length,
+                end: "/plan $duplicate".length,
+              },
+            },
+          ],
+        }}
+        pendingDiffComments={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("submitted-prompt").textContent).toBe("$duplicate review");
+    });
+    expect(screen.getByTestId("submitted-selected-skill-mentions").textContent).toBe(
+      JSON.stringify([
+        {
+          name: "duplicate",
+          sourcePath: "/workspace/.agents/skills/duplicate/SKILL.md",
+          range: {
+            start: 0,
+            end: "$duplicate".length,
+          },
+        },
+      ]),
+    );
+    expect(screen.getByTestId("collaboration-mode").textContent).toBe("plan");
+  });
+
   it("keeps typed runtime commands submittable when the selected model is unavailable", () => {
     const submittedRuntimeCommands: { commandId: string; text: string }[] = [];
 
@@ -767,6 +841,116 @@ describe("useSessionComposerState", () => {
     expect(screen.getByTestId("queued-prompts").textContent).toBe("");
     expect(screen.getByTestId("composer-text").textContent).toBe("/goal ship the command");
     expect(submittedRuntimeCommands).toEqual([]);
+  });
+
+  it("blocks local queued prompts with selected skill mentions during an active turn", () => {
+    render(
+      <SessionComposerStateHarness
+        activeTurnState="running"
+        canSteer
+        composerText="$duplicate"
+        initialComposerDraft={{
+          text: "$duplicate",
+          selectedSkillMentions: [
+            {
+              name: "duplicate",
+              sourcePath: "/workspace/.agents/skills/duplicate/SKILL.md",
+              range: {
+                start: 0,
+                end: "$duplicate".length,
+              },
+            },
+          ],
+        }}
+        pendingDiffComments={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+
+    expect(screen.getByTestId("status-message").textContent).toBe(
+      "Selected skills cannot be queued while a task is in progress. Submit them after the current task finishes.",
+    );
+    expect(screen.getByTestId("queued-prompts").textContent).toBe("");
+    expect(screen.getByTestId("composer-text").textContent).toBe("$duplicate");
+  });
+
+  it("blocks steering with selected skill mentions during an active turn", () => {
+    render(
+      <SessionComposerStateHarness
+        activeTurnState="running"
+        canSteer
+        composerText="$duplicate"
+        initialComposerDraft={{
+          text: "$duplicate",
+          selectedSkillMentions: [
+            {
+              name: "duplicate",
+              sourcePath: "/workspace/.agents/skills/duplicate/SKILL.md",
+              range: {
+                start: 0,
+                end: "$duplicate".length,
+              },
+            },
+          ],
+        }}
+        pendingDiffComments={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(screen.getByTestId("status-message").textContent).toBe(
+      "Selected skills cannot be used while steering a task in progress. Submit them after the current task finishes.",
+    );
+    expect(screen.getByTestId("submitted-prompt").textContent).toBe("");
+    expect(screen.getByTestId("composer-text").textContent).toBe("$duplicate");
+  });
+
+  it("offsets selected skill mention ranges when pending diff comments are prepended", async () => {
+    const [pendingDiffComment] = PendingDiffCommentsFixture;
+    if (pendingDiffComment === undefined) {
+      throw new Error("Expected a pending diff comment fixture.");
+    }
+
+    render(
+      <SessionComposerStateHarness
+        composerText="$duplicate"
+        initialComposerDraft={{
+          text: "$duplicate",
+          selectedSkillMentions: [
+            {
+              name: "duplicate",
+              sourcePath: "/workspace/.agents/skills/duplicate/SKILL.md",
+              range: {
+                start: 0,
+                end: "$duplicate".length,
+              },
+            },
+          ],
+        }}
+        pendingDiffComments={[pendingDiffComment]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => {
+      const submittedPrompt = screen.getByTestId("submitted-prompt").textContent ?? "";
+      const selectedSkillStart = submittedPrompt.indexOf("$duplicate");
+      expect(screen.getByTestId("submitted-selected-skill-mentions").textContent).toBe(
+        JSON.stringify([
+          {
+            name: "duplicate",
+            sourcePath: "/workspace/.agents/skills/duplicate/SKILL.md",
+            range: {
+              start: selectedSkillStart,
+              end: selectedSkillStart + "$duplicate".length,
+            },
+          },
+        ]),
+      );
+    });
   });
 
   it("submits diff comments even when the composer text is blank and clears them on success", async () => {

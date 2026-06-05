@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
+import { EditorView } from "@codemirror/view";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useCallback, useState } from "react";
 import { describe, expect, it } from "vitest";
 
+import { createComposerDraft, type ComposerDraft } from "../../pages/session-composer/index.js";
 import { ChatComposer } from "./chat-composer.js";
 
 const ComposerCommandCapabilityFixture: React.ComponentProps<
@@ -86,10 +88,31 @@ const SkillMentionCapabilityFixture: React.ComponentProps<
   ],
 };
 
+const DuplicateSkillMentionCapabilityFixture: React.ComponentProps<
+  typeof ChatComposer
+>["composerCapabilities"][number] = {
+  kind: "skillMention",
+  trigger: "$",
+  source: "runtimeSkill",
+  submitAs: "inlineText",
+  skills: [
+    {
+      name: "grill-with-docs",
+      description: "Root skill",
+      sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
+    },
+    {
+      name: "grill-with-docs",
+      description: "Repo skill",
+      sourcePath: "/workspace/.agents/skills/grill-with-docs/SKILL.md",
+    },
+  ],
+};
+
 function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
   return {
     composerCapabilities: [],
-    composerText: "Ship it",
+    composerDraft: createComposerDraft("Ship it"),
     gitBranchLabel: null,
     pullRequest: null,
     contextUsage: null,
@@ -112,7 +135,7 @@ function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
     canUploadAttachments: true,
     isUploadingAttachments: false,
     configControlsDisabled: false,
-    onComposerTextChange: () => {},
+    onComposerDraftChange: () => {},
     onSubmit: () => {},
     onRuntimeCommandSubmit: () => {},
     onModelChange: () => {},
@@ -126,25 +149,54 @@ function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
 function ControlledChatComposer(
   input: Partial<React.ComponentProps<typeof ChatComposer>>,
 ): React.JSX.Element {
-  const [composerText, setComposerText] = useState(input.composerText ?? "");
+  const [composerDraft, setComposerDraft] = useState<ComposerDraft>(
+    input.composerDraft ?? createComposerDraft(""),
+  );
 
   return (
     <ChatComposer
       {...createBaseComposerProps()}
       {...input}
-      composerText={composerText}
-      onComposerTextChange={setComposerText}
+      composerDraft={composerDraft}
+      onComposerDraftChange={setComposerDraft}
     />
   );
 }
 
-function getComposerTextarea(): HTMLTextAreaElement {
+function getComposerEditor(): HTMLElement {
   const textbox = screen.getByRole("textbox");
-  if (!(textbox instanceof HTMLTextAreaElement)) {
-    throw new Error("Expected composer textbox to be a textarea.");
+  if (!(textbox instanceof HTMLElement)) {
+    throw new Error("Expected composer textbox to be an element.");
   }
 
   return textbox;
+}
+
+function getComposerEditorView(): EditorView {
+  const editorView = EditorView.findFromDOM(getComposerEditor());
+  if (editorView === null) {
+    throw new Error("Expected composer CodeMirror editor view.");
+  }
+
+  return editorView;
+}
+
+function readComposerText(): string {
+  return getComposerEditorView().state.doc.toString();
+}
+
+function replaceComposerText(nextText: string): void {
+  const editorView = getComposerEditorView();
+  editorView.dispatch({
+    changes: {
+      from: 0,
+      to: editorView.state.doc.length,
+      insert: nextText,
+    },
+    selection: {
+      anchor: nextText.length,
+    },
+  });
 }
 
 describe("ChatComposer", () => {
@@ -154,13 +206,12 @@ describe("ChatComposer", () => {
     expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
   });
 
-  it("keeps the composer textarea at an iOS-safe mobile font size", () => {
+  it("renders the composer editor with the prompt placeholder", () => {
     render(<ChatComposer {...createBaseComposerProps()} />);
 
-    const composer = screen.getByPlaceholderText("Ask anything");
+    const composer = screen.getByRole("textbox");
 
-    expect(composer.className).toContain("text-base");
-    expect(composer.className).toContain("md:text-sm");
+    expect(composer.getAttribute("aria-placeholder")).toBe("Ask anything");
   });
 
   it("renders a spinner icon while a start-turn request is pending", () => {
@@ -188,7 +239,12 @@ describe("ChatComposer", () => {
   it("renders a Stop action button when an active turn has no steering text", () => {
     const baseProps = createBaseComposerProps();
     render(
-      <ChatComposer {...baseProps} composerText="   " submitMode="interrupt" submitLabel="Stop" />,
+      <ChatComposer
+        {...baseProps}
+        composerDraft={createComposerDraft("   ")}
+        submitMode="interrupt"
+        submitLabel="Stop"
+      />,
     );
 
     expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy();
@@ -199,7 +255,7 @@ describe("ChatComposer", () => {
     render(
       <ChatComposer
         {...baseProps}
-        composerText="Focus on the failing test."
+        composerDraft={createComposerDraft("Focus on the failing test.")}
         submitMode="steer"
         submitLabel="Steer"
       />,
@@ -394,7 +450,7 @@ describe("ChatComposer", () => {
 
     expect(screen.getByText("Implement this plan?")).toBeTruthy();
     expect(
-      screen.getByText("Implement this plan?").compareDocumentPosition(getComposerTextarea()) &
+      screen.getByText("Implement this plan?").compareDocumentPosition(getComposerEditor()) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
@@ -538,7 +594,7 @@ describe("ChatComposer", () => {
     render(
       <ChatComposer
         {...createBaseComposerProps()}
-        composerText="Queue this for later."
+        composerDraft={createComposerDraft("Queue this for later.")}
         keyboardShortcuts={[
           { action: "Steer", shortcut: "enter" },
           { action: "Queue", shortcut: "mod-enter" },
@@ -564,11 +620,93 @@ describe("ChatComposer", () => {
     expect(submitCount).toBe(0);
   });
 
+  it("routes Enter to steer while Cmd/Ctrl+Enter queues when both shortcuts are configured", () => {
+    let steerSubmitCount = 0;
+    let queueSubmitCount = 0;
+
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        composerDraft={createComposerDraft("Steer the active turn.")}
+        keyboardShortcuts={[
+          { action: "Steer", shortcut: "enter" },
+          { action: "Queue", shortcut: "mod-enter" },
+        ]}
+        onSecondarySubmit={() => {
+          queueSubmitCount += 1;
+        }}
+        onSubmit={() => {
+          steerSubmitCount += 1;
+        }}
+        secondarySubmitDisabled={false}
+        submitMode="steer"
+        submitLabel="Steer"
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole("textbox"), {
+      key: "Enter",
+    });
+
+    fireEvent.keyDown(screen.getByRole("textbox"), {
+      key: "Enter",
+      metaKey: true,
+    });
+
+    expect(steerSubmitCount).toBe(1);
+    expect(queueSubmitCount).toBe(1);
+  });
+
+  it("inserts a line break with Shift+Enter without submitting", () => {
+    let submitCount = 0;
+
+    render(
+      <ControlledChatComposer
+        composerDraft={createComposerDraft("First line")}
+        onSubmit={() => {
+          submitCount += 1;
+        }}
+      />,
+    );
+
+    replaceComposerText("First line");
+
+    fireEvent.keyDown(getComposerEditor(), {
+      key: "Enter",
+      shiftKey: true,
+    });
+
+    expect(readComposerText()).toBe("First line\n");
+    expect(submitCount).toBe(0);
+  });
+
+  it("accepts an active suggestion with Shift+Enter instead of inserting a line break", () => {
+    let submitCount = 0;
+
+    render(
+      <ControlledChatComposer
+        composerCapabilities={[ComposerCommandCapabilityFixture]}
+        composerDraft={createComposerDraft("/")}
+        onSubmit={() => {
+          submitCount += 1;
+        }}
+      />,
+    );
+
+    fireEvent.keyDown(getComposerEditor(), {
+      key: "Enter",
+      shiftKey: true,
+    });
+
+    expect(readComposerText()).toBe("/review ");
+    expect(submitCount).toBe(0);
+  });
+
   it("shows slash command suggestions from runtime composer capabilities", () => {
     render(
       <ControlledChatComposer
         composerCapabilities={[ComposerCommandCapabilityFixture]}
-        composerText="/re"
+        composerDraft={createComposerDraft("/re")}
       />,
     );
 
@@ -582,7 +720,7 @@ describe("ChatComposer", () => {
     render(
       <ControlledChatComposer
         composerCapabilities={[ComposerCommandCapabilityFixture]}
-        composerText="Use /re"
+        composerDraft={createComposerDraft("Use /re")}
       />,
     );
 
@@ -595,7 +733,7 @@ describe("ChatComposer", () => {
     render(
       <ControlledChatComposer
         composerCapabilities={[ComposerCommandCapabilityFixture, SkillMentionCapabilityFixture]}
-        composerText="/"
+        composerDraft={createComposerDraft("/")}
       />,
     );
 
@@ -619,7 +757,7 @@ describe("ChatComposer", () => {
       <ChatComposer
         {...createBaseComposerProps()}
         composerCapabilities={[ComposerCommandCapabilityFixture]}
-        composerText="/zz"
+        composerDraft={createComposerDraft("/zz")}
         onSubmit={() => {
           submitCount += 1;
         }}
@@ -637,35 +775,35 @@ describe("ChatComposer", () => {
     render(
       <ControlledChatComposer
         composerCapabilities={[ComposerCommandCapabilityFixture]}
-        composerText="/"
+        composerDraft={createComposerDraft("/")}
       />,
     );
 
-    const composer = getComposerTextarea();
+    const composer = getComposerEditor();
     fireEvent.keyDown(composer, { key: "ArrowDown" });
     fireEvent.keyDown(composer, { key: "Enter" });
 
-    expect(composer.value).toBe("/explain ");
+    expect(readComposerText()).toBe("/explain ");
   });
 
   it("inserts a slash command with mouse selection", () => {
     render(
       <ControlledChatComposer
         composerCapabilities={[ComposerCommandCapabilityFixture]}
-        composerText="/re"
+        composerDraft={createComposerDraft("/re")}
       />,
     );
 
     fireEvent.mouseDown(screen.getByRole("option", { name: "/rewrite Rewrite with constraints" }));
 
-    expect(getComposerTextarea().value).toBe("/rewrite ");
+    expect(readComposerText()).toBe("/rewrite ");
   });
 
   it("inserts slash-discovered skills using Codex skill mention syntax", () => {
     render(
       <ControlledChatComposer
         composerCapabilities={[ComposerCommandCapabilityFixture, SkillMentionCapabilityFixture]}
-        composerText="Use /gr"
+        composerDraft={createComposerDraft("Use /gr")}
       />,
     );
 
@@ -675,7 +813,7 @@ describe("ChatComposer", () => {
       }),
     );
 
-    expect(getComposerTextarea().value).toBe("Use $grill-with-docs ");
+    expect(readComposerText()).toBe("Use $grill-with-docs ");
   });
 
   it("shows one slash-discovered skill for repeated entries with the same source path", () => {
@@ -702,7 +840,7 @@ describe("ChatComposer", () => {
             ],
           },
         ]}
-        composerText="Use /gr"
+        composerDraft={createComposerDraft("Use /gr")}
       />,
     );
 
@@ -714,44 +852,35 @@ describe("ChatComposer", () => {
     ).toHaveLength(1);
   });
 
-  it("does not show ambiguous slash-discovered skill names from multiple source paths", () => {
+  it("shows ambiguous slash-discovered skill names with source labels", () => {
     render(
       <ControlledChatComposer
         composerCapabilities={[
           ComposerCommandCapabilityFixture,
-          {
-            kind: "skillMention",
-            trigger: "$",
-            source: "runtimeSkill",
-            submitAs: "inlineText",
-            skills: [
-              {
-                name: "grill-with-docs",
-                description: "Root skill",
-                sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
-              },
-              {
-                name: "grill-with-docs",
-                description: "Repo skill",
-                sourcePath: "/workspace/.agents/skills/grill-with-docs/SKILL.md",
-              },
-            ],
-          },
+          DuplicateSkillMentionCapabilityFixture,
         ]}
-        composerText="Use /gr"
+        composerDraft={createComposerDraft("Use /gr")}
       />,
     );
 
     expect(screen.getByRole("listbox", { name: "Slash commands" })).toBeTruthy();
-    expect(screen.queryByRole("option")).toBeNull();
-    expect(screen.getByText("No commands")).toBeTruthy();
+    expect(
+      screen.getByRole("option", {
+        name: "$grill-with-docs .codex/skills/grill-with-docs",
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("option", {
+        name: "$grill-with-docs .agents/skills/grill-with-docs",
+      }),
+    ).toBeTruthy();
   });
 
   it("shows skill suggestions from runtime skill mention capabilities", () => {
     render(
       <ControlledChatComposer
         composerCapabilities={[SkillMentionCapabilityFixture]}
-        composerText="Use $gr"
+        composerDraft={createComposerDraft("Use $gr")}
       />,
     );
 
@@ -786,7 +915,7 @@ describe("ChatComposer", () => {
             ],
           },
         ]}
-        composerText="Use $gr"
+        composerDraft={createComposerDraft("Use $gr")}
       />,
     );
 
@@ -797,7 +926,28 @@ describe("ChatComposer", () => {
     ).toHaveLength(1);
   });
 
-  it("does not suggest ambiguous skill names that point to multiple source paths", () => {
+  it("suggests ambiguous skill names with source labels", () => {
+    render(
+      <ControlledChatComposer
+        composerCapabilities={[DuplicateSkillMentionCapabilityFixture]}
+        composerDraft={createComposerDraft("Use $gr")}
+      />,
+    );
+
+    expect(screen.getByRole("listbox", { name: "Skills" })).toBeTruthy();
+    expect(
+      screen.getByRole("option", {
+        name: "$grill-with-docs .codex/skills/grill-with-docs",
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("option", {
+        name: "$grill-with-docs .agents/skills/grill-with-docs",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("expands ambiguous skill source labels until same-name options are distinguishable", () => {
     render(
       <ControlledChatComposer
         composerCapabilities={[
@@ -809,58 +959,189 @@ describe("ChatComposer", () => {
             skills: [
               {
                 name: "grill-with-docs",
-                description: "Root skill",
-                sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
+                sourcePath: "/Users/alice/.codex/skills/grill-with-docs/SKILL.md",
               },
               {
                 name: "grill-with-docs",
-                description: "Repo skill",
-                sourcePath: "/workspace/.agents/skills/grill-with-docs/SKILL.md",
+                sourcePath: "/Users/bob/.codex/skills/grill-with-docs/SKILL.md",
               },
             ],
           },
         ]}
-        composerText="Use $gr"
+        composerDraft={createComposerDraft("Use $gr")}
       />,
     );
 
-    expect(screen.getByRole("listbox", { name: "Skills" })).toBeTruthy();
-    expect(screen.queryByRole("option")).toBeNull();
-    expect(screen.getByText("No skills")).toBeTruthy();
+    expect(
+      screen.getByRole("option", {
+        name: "$grill-with-docs alice/.codex/skills/grill-with-docs",
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("option", {
+        name: "$grill-with-docs bob/.codex/skills/grill-with-docs",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("records the selected source path when inserting a duplicate skill mention", () => {
+    let observedDraft: ComposerDraft | null = null;
+
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        composerCapabilities={[DuplicateSkillMentionCapabilityFixture]}
+        composerDraft={createComposerDraft("Use $gr")}
+        onComposerDraftChange={(nextDraft) => {
+          observedDraft = nextDraft;
+        }}
+      />,
+    );
+
+    fireEvent.mouseDown(
+      screen.getByRole("option", {
+        name: "$grill-with-docs .agents/skills/grill-with-docs",
+      }),
+    );
+
+    expect(observedDraft).toEqual({
+      text: "Use $grill-with-docs ",
+      selectedSkillMentions: [
+        {
+          name: "grill-with-docs",
+          sourcePath: "/workspace/.agents/skills/grill-with-docs/SKILL.md",
+          range: {
+            start: 4,
+            end: 20,
+          },
+        },
+      ],
+    });
   });
 
   it("inserts selected skill suggestions as editable prompt text", () => {
     render(
       <ControlledChatComposer
         composerCapabilities={[SkillMentionCapabilityFixture]}
-        composerText="Use $gr"
+        composerDraft={createComposerDraft("Use $gr")}
       />,
     );
 
-    fireEvent.keyDown(getComposerTextarea(), { key: "Enter" });
+    fireEvent.keyDown(getComposerEditor(), { key: "Enter" });
 
-    expect(getComposerTextarea().value).toBe("Use $grill-with-docs ");
+    expect(readComposerText()).toBe("Use $grill-with-docs ");
+  });
+
+  it("keeps later selected skill ranges aligned when inserting another skill before them", () => {
+    let observedDraft: ComposerDraft | null = null;
+    const selectedSkillStart = "$wr ".length;
+    const selectedSkillEnd = selectedSkillStart + "$grill-with-docs".length;
+
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        composerCapabilities={[SkillMentionCapabilityFixture]}
+        composerDraft={{
+          text: "$wr $grill-with-docs",
+          selectedSkillMentions: [
+            {
+              name: "grill-with-docs",
+              sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
+              range: {
+                start: selectedSkillStart,
+                end: selectedSkillEnd,
+              },
+            },
+          ],
+        }}
+        onComposerDraftChange={(nextDraft) => {
+          observedDraft = nextDraft;
+        }}
+      />,
+    );
+
+    getComposerEditorView().dispatch({
+      selection: {
+        anchor: "$wr".length,
+      },
+    });
+    fireEvent.keyDown(getComposerEditor(), { key: "Enter" });
+
+    expect(observedDraft).toEqual({
+      text: "$write-a-skill  $grill-with-docs",
+      selectedSkillMentions: [
+        {
+          name: "grill-with-docs",
+          sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
+          range: {
+            start: "$write-a-skill  ".length,
+            end: "$write-a-skill  $grill-with-docs".length,
+          },
+        },
+        {
+          name: "write-a-skill",
+          sourcePath: "/root/.codex/skills/write-a-skill/SKILL.md",
+          range: {
+            start: 0,
+            end: "$write-a-skill".length,
+          },
+        },
+      ],
+    });
+  });
+
+  it("clears selected skill metadata when editing the token boundary", () => {
+    let observedDraft: ComposerDraft | null = null;
+
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        composerCapabilities={[SkillMentionCapabilityFixture]}
+        composerDraft={{
+          text: "$grill-with-docs",
+          selectedSkillMentions: [
+            {
+              name: "grill-with-docs",
+              sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
+              range: {
+                start: 0,
+                end: "$grill-with-docs".length,
+              },
+            },
+          ],
+        }}
+        onComposerDraftChange={(nextDraft) => {
+          observedDraft = nextDraft;
+        }}
+      />,
+    );
+
+    getComposerEditorView().dispatch({
+      changes: {
+        from: "$grill-with-docs".length,
+        insert: "x",
+      },
+    });
+
+    expect(observedDraft).toEqual({
+      text: "$grill-with-docsx",
+      selectedSkillMentions: [],
+    });
   });
 
   it("does not reuse slash palette selection when opening the skill menu", () => {
     render(
       <ControlledChatComposer
         composerCapabilities={[ComposerCommandCapabilityFixture, SkillMentionCapabilityFixture]}
-        composerText="/"
+        composerDraft={createComposerDraft("/")}
       />,
     );
 
-    fireEvent.keyDown(getComposerTextarea(), { key: "ArrowDown" });
-    fireEvent.change(getComposerTextarea(), {
-      target: {
-        value: "Use $",
-        selectionStart: 5,
-        selectionEnd: 5,
-      },
-    });
-    fireEvent.keyDown(getComposerTextarea(), { key: "Enter" });
+    fireEvent.keyDown(getComposerEditor(), { key: "ArrowDown" });
+    replaceComposerText("Use $");
+    fireEvent.keyDown(getComposerEditor(), { key: "Enter" });
 
-    expect(getComposerTextarea().value).toBe("Use $grill-with-docs ");
+    expect(readComposerText()).toBe("Use $grill-with-docs ");
   });
 
   it("shows context mention file search results for inline @ queries", () => {
@@ -869,7 +1150,7 @@ describe("ChatComposer", () => {
     render(
       <ControlledChatComposer
         composerCapabilities={[ContextMentionCapabilityFixture]}
-        composerText="review @src"
+        composerDraft={createComposerDraft("review @src")}
         contextMentionControl={{
           status: "ready",
           results: [
@@ -907,7 +1188,7 @@ describe("ChatComposer", () => {
         <>
           <ControlledChatComposer
             composerCapabilities={[ContextMentionCapabilityFixture]}
-            composerText="@src"
+            composerDraft={createComposerDraft("@src")}
             contextMentionControl={{
               status: "ready",
               results,
@@ -941,7 +1222,7 @@ describe("ChatComposer", () => {
     render(
       <ControlledChatComposer
         composerCapabilities={[ContextMentionCapabilityFixture]}
-        composerText="/review @src"
+        composerDraft={createComposerDraft("/review @src")}
         contextMentionControl={{
           status: "ready",
           results: [
@@ -957,12 +1238,69 @@ describe("ChatComposer", () => {
       />,
     );
 
-    const composer = getComposerTextarea();
+    const composer = getComposerEditor();
     fireEvent.keyDown(composer, { key: "ArrowDown" });
     fireEvent.keyDown(composer, { key: "Enter" });
 
-    expect(composer.value).toBe('/review "src/file with space.ts" ');
+    expect(readComposerText()).toBe('/review "src/file with space.ts" ');
     expect(selectedPaths).toEqual(["src/file with space.ts"]);
+  });
+
+  it("keeps selected skill ranges aligned when inserting context mentions before them", () => {
+    let observedDraft: ComposerDraft | null = null;
+    const skillStart = "review @src ".length;
+    const skillEnd = skillStart + "$grill-with-docs".length;
+
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        composerCapabilities={[ContextMentionCapabilityFixture, SkillMentionCapabilityFixture]}
+        composerDraft={{
+          text: "review @src $grill-with-docs",
+          selectedSkillMentions: [
+            {
+              name: "grill-with-docs",
+              sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
+              range: {
+                start: skillStart,
+                end: skillEnd,
+              },
+            },
+          ],
+        }}
+        contextMentionControl={{
+          status: "ready",
+          results: [{ kind: "file", path: "src/index.ts" }],
+          onQueryChange: () => {},
+          onSelect: () => {},
+          onDismiss: () => {},
+        }}
+        onComposerDraftChange={(nextDraft) => {
+          observedDraft = nextDraft;
+        }}
+      />,
+    );
+
+    getComposerEditorView().dispatch({
+      selection: {
+        anchor: "review @src".length,
+      },
+    });
+    fireEvent.keyDown(getComposerEditor(), { key: "Enter" });
+
+    expect(observedDraft).toEqual({
+      text: "review src/index.ts  $grill-with-docs",
+      selectedSkillMentions: [
+        {
+          name: "grill-with-docs",
+          sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
+          range: {
+            start: "review src/index.ts  ".length,
+            end: "review src/index.ts  $grill-with-docs".length,
+          },
+        },
+      ],
+    });
   });
 
   it("keeps keyboard-selected context mention results scrolled into view", () => {
@@ -984,7 +1322,7 @@ describe("ChatComposer", () => {
       render(
         <ControlledChatComposer
           composerCapabilities={[ContextMentionCapabilityFixture]}
-          composerText="@src"
+          composerDraft={createComposerDraft("@src")}
           contextMentionControl={{
             status: "ready",
             results: [
@@ -999,7 +1337,7 @@ describe("ChatComposer", () => {
         />,
       );
 
-      fireEvent.keyDown(getComposerTextarea(), { key: "ArrowDown" });
+      fireEvent.keyDown(getComposerEditor(), { key: "ArrowDown" });
 
       expect(scrolledElementIds.some((elementId) => elementId.endsWith("-1"))).toBe(true);
     } finally {
@@ -1019,7 +1357,7 @@ describe("ChatComposer", () => {
     render(
       <ControlledChatComposer
         composerCapabilities={[ContextMentionCapabilityFixture]}
-        composerText="@src"
+        composerDraft={createComposerDraft("@src")}
         contextMentionControl={{
           status: "unavailable",
           results: [],
@@ -1037,7 +1375,7 @@ describe("ChatComposer", () => {
     render(
       <ControlledChatComposer
         composerCapabilities={[ContextMentionCapabilityFixture]}
-        composerText="@src"
+        composerDraft={createComposerDraft("@src")}
         contextMentionControl={{
           status: "ready",
           results: [{ kind: "file", path: "src/index.ts" }],
@@ -1050,7 +1388,7 @@ describe("ChatComposer", () => {
 
     expect(screen.getByRole("listbox", { name: "Search files" })).toBeTruthy();
 
-    fireEvent.keyDown(getComposerTextarea(), { key: "Escape" });
+    fireEvent.keyDown(getComposerEditor(), { key: "Escape" });
 
     expect(screen.queryByRole("listbox", { name: "Search files" })).toBeNull();
   });
@@ -1063,7 +1401,7 @@ describe("ChatComposer", () => {
       <ChatComposer
         {...createBaseComposerProps()}
         composerCapabilities={[ComposerCommandCapabilityFixture]}
-        composerText="/comp"
+        composerDraft={createComposerDraft("/comp")}
         onRuntimeCommandSubmit={(commandId) => {
           submittedRuntimeCommands.push(commandId);
         }}
@@ -1086,7 +1424,7 @@ describe("ChatComposer", () => {
       <ChatComposer
         {...createBaseComposerProps()}
         composerCapabilities={[ComposerCommandCapabilityFixture]}
-        composerText="/does-not-exist do something"
+        composerDraft={createComposerDraft("/does-not-exist do something")}
         onSubmit={() => {
           submitCount += 1;
         }}
@@ -1108,7 +1446,7 @@ describe("ChatComposer", () => {
       <ChatComposer
         {...createBaseComposerProps()}
         composerCapabilities={[ComposerCommandCapabilityFixture]}
-        composerText="/compact now"
+        composerDraft={createComposerDraft("/compact now")}
         onRuntimeCommandSubmit={(commandId) => {
           submittedRuntimeCommands.push(commandId);
         }}

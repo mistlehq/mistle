@@ -9,6 +9,12 @@ export {
   type SessionComposerUiState,
   type SessionTurnControl,
 } from "./use-session-composer-state.js";
+export {
+  createComposerDraft,
+  trimComposerDraft,
+  type ComposerDraft,
+  type SelectedSkillMention,
+} from "./session-composer-draft.js";
 export { ComposerStatusBanner } from "./composer-status-banner.js";
 export { SessionComposerActivityRow } from "./session-composer-activity-row.js";
 export {

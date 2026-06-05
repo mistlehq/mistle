@@ -7,6 +7,7 @@ import { SessionsSidebarHeader } from "../navigation/sessions-sidebar-header.js"
 import { SessionsSidebarNav } from "../navigation/sessions-sidebar-nav.js";
 import { SessionComposerFixtureProps } from "../session-agents/codex/fixtures/session-fixtures.js";
 import { AppShellView } from "../shell/app-shell-view.js";
+import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 import { SessionConversationMainContent } from "./session-conversation-pane.js";
 import { SessionDiffPanel } from "./session-diff-panel.js";
 import { createStorySessionBottomPanel, StorySandboxInstanceId } from "./session-story-support.js";
@@ -452,7 +453,9 @@ function MarketingProductWorkbenchStory(input: ProductWorkbenchStoryArgs): React
           chatEntries: MarketingHeroConversationEntries,
           composerViewModel: {
             ...SessionComposerFixtureProps,
-            composerText: "Apply the reviewer note and rerun the billing test.",
+            composerDraft: createComposerDraft(
+              "Apply the reviewer note and rerun the billing test.",
+            ),
             gitBranchLabel: "fix/checkout-retry-ledger",
             pullRequest: {
               isDraft: false,

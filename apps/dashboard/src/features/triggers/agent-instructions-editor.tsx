@@ -13,7 +13,6 @@ import { EditorState, type Extension, Prec } from "@codemirror/state";
 import {
   Decoration,
   type DecorationSet,
-  drawSelection,
   EditorView,
   keymap,
   placeholder,
@@ -25,6 +24,12 @@ import { cn, textareaFieldShellClassName } from "@mistle/ui";
 import CodeMirror from "@uiw/react-codemirror";
 import { useMemo } from "react";
 
+import {
+  CodeMirrorThemeValues,
+  createCodeMirrorPlaceholder,
+  createCodeMirrorTheme,
+  getCodeMirrorDrawSelectionExtensions,
+} from "../shared/code-mirror-theme.js";
 import {
   completeAgentInstructionToken,
   rankAgentInstructionTokensForMatching,
@@ -63,144 +68,126 @@ function acceptCompletionOnTab(view: EditorView): boolean {
   return acceptCompletion(view);
 }
 
-function supportsDrawSelection(): boolean {
-  if (typeof Range === "undefined") {
-    return false;
-  }
-
-  return typeof Range.prototype.getClientRects === "function";
-}
-
 function createAgentInstructionsPlaceholder(
   view: EditorView,
   placeholderText: string,
 ): HTMLElement {
-  const element = view.dom.ownerDocument.createElement("div");
-  element.className =
-    "m-0 whitespace-pre-wrap text-muted-foreground font-sans text-sm leading-[var(--text-sm--line-height)]";
-  element.textContent = placeholderText;
-
-  return element;
+  return createCodeMirrorPlaceholder({
+    className:
+      "m-0 whitespace-pre-wrap text-muted-foreground font-sans text-sm leading-[var(--text-sm--line-height)]",
+    text: placeholderText,
+    view,
+  });
 }
 
 function createAgentInstructionsEditorTheme(): ReturnType<typeof EditorView.theme> {
-  return EditorView.theme({
-    "&": {
-      backgroundColor: "transparent",
+  return createCodeMirrorTheme({
+    root: {
       fontSize: "var(--text-sm)",
     },
-    ".cm-editor": {
-      backgroundColor: "transparent",
+    editor: {
       borderRadius: "inherit",
     },
-    ".cm-scroller": {
+    scroller: {
       borderRadius: "inherit",
       fontFamily: "inherit",
       lineHeight: "var(--text-sm--line-height)",
       minHeight: "calc(var(--spacing) * 28)",
     },
-    ".cm-content": {
-      paddingBlock: "calc(var(--spacing) * 2)",
-      paddingInline: "calc(var(--spacing) * 2.5)",
+    content: {
+      paddingBlock: CodeMirrorThemeValues.TEXTAREA_PADDING_BLOCK,
+      paddingInline: CodeMirrorThemeValues.TEXTAREA_PADDING_INLINE,
       minHeight: "calc(var(--spacing) * 28)",
-      caretColor: "currentColor",
     },
-    ".cm-line": {
-      padding: "0",
-    },
-    ".cm-focused": {
-      outline: "none",
-    },
-    ".cm-selectionBackground, ::selection": {
-      backgroundColor: "color-mix(in oklch, var(--accent) 45%, transparent)",
-    },
-    ".cm-agent-token-valid": {
-      color: "var(--agent-token-valid)",
-    },
-    ".cm-agent-token-invalid": {
-      color: "var(--agent-token-invalid)",
-    },
-    ".cm-tooltip-autocomplete": {
-      border: "1px solid var(--border)",
-      backgroundColor: "var(--popover)",
-      color: "var(--popover-foreground)",
-      borderRadius: "var(--radius-md)",
-      boxShadow: "var(--shadow-md)",
-      fontFamily: "var(--font-sans)",
-      fontSize: "var(--text-sm)",
-      overflow: "hidden",
-      minWidth: "20rem",
-      maxWidth: "24rem",
-      zIndex: "30",
-    },
-    ".cm-tooltip.cm-tooltip-autocomplete > ul": {
-      fontFamily: "var(--font-sans)",
-      maxHeight: "18rem",
-      padding: "calc(var(--spacing) * 1)",
-    },
-    ".cm-tooltip.cm-tooltip-autocomplete > ul > li": {
-      display: "grid",
-      gap: "calc(var(--spacing) * 0.25)",
-      borderRadius: "var(--radius-sm)",
-      borderLeft: "3px solid transparent",
-      marginBlock: "calc(var(--spacing) * 0.25)",
-      paddingBlock: "calc(var(--spacing) * 1.25)",
-      paddingInline: "calc(var(--spacing) * 3)",
-      transition: "background-color 120ms ease, color 120ms ease, border-color 120ms ease",
-    },
-    ".cm-tooltip.cm-tooltip-autocomplete > ul > li:hover": {
-      backgroundColor: "color-mix(in oklch, var(--accent) 55%, transparent)",
-    },
-    ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]": {
-      backgroundColor: "var(--accent)",
-      color: "var(--accent-foreground)",
-      borderLeftColor: "var(--foreground)",
-      boxShadow: "inset 0 0 0 1px var(--border)",
-    },
-    ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] *": {
-      color: "var(--accent-foreground)",
-    },
-    ".cm-completionLabel": {
-      display: "block",
-      fontFamily: "var(--font-sans)",
-      fontWeight: "500",
-      fontSize: "var(--text-sm)",
-      lineHeight: "var(--text-sm--line-height)",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
-    },
-    ".cm-completionDetail": {
-      display: "block",
-      color: "var(--muted-foreground)",
-      fontFamily: "var(--font-sans)",
-      fontSize: "var(--text-sm)",
-      fontStyle: "normal",
-      lineHeight: "var(--text-sm--line-height)",
-      marginLeft: "0",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
-    },
-    ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionDetail": {
-      color: "color-mix(in oklch, var(--accent-foreground) 82%, transparent)",
-    },
-    ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionMatchedText": {
-      color: "var(--accent-foreground)",
-      textDecorationColor: "color-mix(in oklch, var(--accent-foreground) 70%, transparent)",
-    },
-    ".cm-completionIcon": {
-      display: "none",
-    },
-    ".cm-tooltip.cm-completionInfo": {
-      border: "1px solid var(--border)",
-      backgroundColor: "var(--popover)",
-      color: "var(--popover-foreground)",
-      borderRadius: "var(--radius-md)",
-      boxShadow: "var(--shadow-md)",
-      paddingBlock: "calc(var(--spacing) * 2)",
-      paddingInline: "calc(var(--spacing) * 2.5)",
-      fontFamily: "var(--font-sans)",
+    rules: {
+      ".cm-agent-token-valid": {
+        color: "var(--agent-token-valid)",
+      },
+      ".cm-agent-token-invalid": {
+        color: "var(--agent-token-invalid)",
+      },
+      ".cm-tooltip-autocomplete": {
+        border: "1px solid var(--border)",
+        backgroundColor: "var(--popover)",
+        color: "var(--popover-foreground)",
+        borderRadius: "var(--radius-md)",
+        boxShadow: "var(--shadow-md)",
+        fontFamily: "var(--font-sans)",
+        fontSize: "var(--text-sm)",
+        overflow: "hidden",
+        minWidth: "20rem",
+        maxWidth: "24rem",
+        zIndex: "30",
+      },
+      ".cm-tooltip.cm-tooltip-autocomplete > ul": {
+        fontFamily: "var(--font-sans)",
+        maxHeight: "18rem",
+        padding: "calc(var(--spacing) * 1)",
+      },
+      ".cm-tooltip.cm-tooltip-autocomplete > ul > li": {
+        display: "grid",
+        gap: "calc(var(--spacing) * 0.25)",
+        borderRadius: "var(--radius-sm)",
+        borderLeft: "3px solid transparent",
+        marginBlock: "calc(var(--spacing) * 0.25)",
+        paddingBlock: "calc(var(--spacing) * 1.25)",
+        paddingInline: "calc(var(--spacing) * 3)",
+        transition: "background-color 120ms ease, color 120ms ease, border-color 120ms ease",
+      },
+      ".cm-tooltip.cm-tooltip-autocomplete > ul > li:hover": {
+        backgroundColor: "color-mix(in oklch, var(--accent) 55%, transparent)",
+      },
+      ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]": {
+        backgroundColor: "var(--accent)",
+        color: "var(--accent-foreground)",
+        borderLeftColor: "var(--foreground)",
+        boxShadow: "inset 0 0 0 1px var(--border)",
+      },
+      ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] *": {
+        color: "var(--accent-foreground)",
+      },
+      ".cm-completionLabel": {
+        display: "block",
+        fontFamily: "var(--font-sans)",
+        fontWeight: "500",
+        fontSize: "var(--text-sm)",
+        lineHeight: "var(--text-sm--line-height)",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+      },
+      ".cm-completionDetail": {
+        display: "block",
+        color: "var(--muted-foreground)",
+        fontFamily: "var(--font-sans)",
+        fontSize: "var(--text-sm)",
+        fontStyle: "normal",
+        lineHeight: "var(--text-sm--line-height)",
+        marginLeft: "0",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+      },
+      ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionDetail": {
+        color: "color-mix(in oklch, var(--accent-foreground) 82%, transparent)",
+      },
+      ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionMatchedText": {
+        color: "var(--accent-foreground)",
+        textDecorationColor: "color-mix(in oklch, var(--accent-foreground) 70%, transparent)",
+      },
+      ".cm-completionIcon": {
+        display: "none",
+      },
+      ".cm-tooltip.cm-completionInfo": {
+        border: "1px solid var(--border)",
+        backgroundColor: "var(--popover)",
+        color: "var(--popover-foreground)",
+        borderRadius: "var(--radius-md)",
+        boxShadow: "var(--shadow-md)",
+        paddingBlock: CodeMirrorThemeValues.TEXTAREA_PADDING_BLOCK,
+        paddingInline: CodeMirrorThemeValues.TEXTAREA_PADDING_INLINE,
+        fontFamily: "var(--font-sans)",
+      },
     },
   });
 }
@@ -270,7 +257,7 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
   const extensions = useMemo(
     () => [
       history(),
-      ...(supportsDrawSelection() ? [drawSelection()] : []),
+      ...getCodeMirrorDrawSelectionExtensions(),
       ...(placeholderText === undefined
         ? []
         : [placeholder((view) => createAgentInstructionsPlaceholder(view, placeholderText))]),

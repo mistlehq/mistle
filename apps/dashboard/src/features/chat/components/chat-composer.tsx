@@ -1,8 +1,13 @@
+import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { Prec, type Extension } from "@codemirror/state";
+import { EditorView, keymap, placeholder } from "@codemirror/view";
+import { Decoration, type DecorationSet, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import type {
   ComposerCapability,
   ComposerCommandDescriptor,
   SkillMentionDescriptor,
 } from "@mistle/integrations-core";
+import { selectedSkillMentionMatchesText } from "@mistle/integrations-core";
 import {
   Button,
   ButtonGroup,
@@ -34,13 +39,25 @@ import {
   StopCircleIcon,
   XIcon,
 } from "@phosphor-icons/react";
+import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
+import type {
+  ComposerDraft,
+  SelectedSkillMention,
+} from "../../pages/session-composer/session-composer-draft.js";
 import {
+  type ActiveComposerTrigger,
   detectActiveComposerTrigger,
   listComposerCommands,
   listSkillMentions,
 } from "../../pages/session-composer/session-composer-trigger-detection.js";
+import {
+  CodeMirrorThemeValues,
+  createCodeMirrorPlaceholder,
+  createCodeMirrorTheme,
+  getCodeMirrorDrawSelectionExtensions,
+} from "../../shared/code-mirror-theme.js";
 import { resolveSelectableValue } from "../../shared/select-value.js";
 import {
   ContextMentionSearchMenu,
@@ -62,6 +79,42 @@ function formatSkillMentionOptionLabel(skill: SkillMentionDescriptor): string {
   }
 
   return `$${skill.name} ${skill.description}`;
+}
+
+function formatSkillMentionSourceLabel(input: {
+  skill: SkillMentionDescriptor;
+  skills: readonly SkillMentionDescriptor[];
+}): string {
+  const duplicateSkills = input.skills.filter((skill) => skill.name === input.skill.name);
+  const targetPathParts = getSkillMentionSourceLabelPathParts(input.skill);
+  if (targetPathParts.length === 0) {
+    return input.skill.sourcePath;
+  }
+
+  for (let suffixLength = 3; suffixLength <= targetPathParts.length; suffixLength += 1) {
+    const targetLabel = targetPathParts.slice(-suffixLength).join("/");
+    const hasCollision = duplicateSkills.some((skill) => {
+      if (skill.sourcePath === input.skill.sourcePath) {
+        return false;
+      }
+
+      return (
+        getSkillMentionSourceLabelPathParts(skill).slice(-suffixLength).join("/") === targetLabel
+      );
+    });
+    if (!hasCollision) {
+      return targetLabel;
+    }
+  }
+
+  return input.skill.sourcePath;
+}
+
+function getSkillMentionSourceLabelPathParts(skill: SkillMentionDescriptor): readonly string[] {
+  return skill.sourcePath
+    .split("/")
+    .filter((pathPart) => pathPart.length > 0)
+    .slice(0, -1);
 }
 
 function formatContextMentionInsertion(path: string): string {
@@ -91,6 +144,146 @@ function resolveShortcutDisplayLabel(shortcut: string): string {
   }
 
   return shortcut;
+}
+
+function createComposerPlaceholder(view: EditorView, placeholderText: string): HTMLElement {
+  return createCodeMirrorPlaceholder({
+    className: "text-muted-foreground/60",
+    text: placeholderText,
+    view,
+  });
+}
+
+function createComposerEditorTheme(): ReturnType<typeof EditorView.theme> {
+  return createCodeMirrorTheme({
+    root: {
+      fontSize: "inherit",
+    },
+    scroller: {
+      fontFamily: "inherit",
+      lineHeight: "1.5rem",
+      maxHeight: "calc(var(--spacing) * 48)",
+      minHeight: "calc(var(--spacing) * 12)",
+      overflowY: "auto",
+    },
+    content: {
+      minHeight: "calc(var(--spacing) * 12)",
+      padding: "calc(var(--spacing) * 1.5)",
+    },
+    rules: {
+      ".cm-selected-skill-mention": {
+        color: "var(--color-blue-700)",
+        fontWeight: "var(--font-weight-medium)",
+      },
+    },
+  });
+}
+
+function createSelectedSkillMentionDecorations(
+  selectedSkillMentions: readonly SelectedSkillMention[],
+): Extension {
+  return ViewPlugin.fromClass(
+    class {
+      decorations: DecorationSet;
+
+      constructor() {
+        this.decorations = buildSelectedSkillMentionDecorations(selectedSkillMentions);
+      }
+
+      update() {
+        this.decorations = buildSelectedSkillMentionDecorations(selectedSkillMentions);
+      }
+    },
+    {
+      decorations: (plugin) => plugin.decorations,
+    },
+  );
+}
+
+function buildSelectedSkillMentionDecorations(
+  selectedSkillMentions: readonly SelectedSkillMention[],
+): DecorationSet {
+  return Decoration.set(
+    selectedSkillMentions
+      .map((mention) =>
+        Decoration.mark({
+          class: "cm-selected-skill-mention",
+          attributes: {
+            title: mention.sourcePath,
+          },
+        }).range(mention.range.start, mention.range.end),
+      )
+      .sort((left, right) => left.from - right.from),
+  );
+}
+
+function insertComposerLineBreak(view: EditorView): boolean {
+  view.dispatch(view.state.replaceSelection("\n"));
+
+  return true;
+}
+
+function mapSelectedSkillMentionRanges(input: {
+  selectedSkillMentions: readonly SelectedSkillMention[];
+  text: string;
+  update: ViewUpdate;
+}): readonly SelectedSkillMention[] {
+  return input.selectedSkillMentions.flatMap((mention) => {
+    const start = input.update.changes.mapPos(mention.range.start, 1);
+    const end = input.update.changes.mapPos(mention.range.end, -1);
+    if (start >= end) {
+      return [];
+    }
+
+    const nextMention = {
+      ...mention,
+      range: {
+        start,
+        end,
+      },
+    };
+
+    if (!selectedSkillMentionMatchesText({ mention: nextMention, text: input.text })) {
+      return [];
+    }
+
+    return [nextMention];
+  });
+}
+
+function updateSelectedSkillMentionsForTextReplacement(input: {
+  insertedText: string;
+  range: { start: number; end: number };
+  selectedSkillMentions: readonly SelectedSkillMention[];
+  text: string;
+}): readonly SelectedSkillMention[] {
+  const replacedLength = input.range.end - input.range.start;
+  const delta = input.insertedText.length - replacedLength;
+
+  return input.selectedSkillMentions.flatMap((mention) => {
+    if (mention.range.end <= input.range.start) {
+      return [mention];
+    }
+
+    if (mention.range.start >= input.range.end) {
+      const nextMention = {
+        ...mention,
+        range: {
+          start: mention.range.start + delta,
+          end: mention.range.end + delta,
+        },
+      };
+
+      return selectedSkillMentionMatchesText({
+        mention: nextMention,
+        text: input.text,
+      })
+        ? [nextMention]
+        : [];
+    }
+
+    return [];
+  });
 }
 
 export type ChatComposerStatusMessage = {
@@ -154,7 +347,7 @@ export type ChatComposerContextMentionControl = {
 
 export type ChatComposerViewModel = {
   composerCapabilities: readonly ComposerCapability[];
-  composerText: string;
+  composerDraft: ComposerDraft;
   gitBranchLabel: string | null;
   pullRequest: {
     isDraft: boolean;
@@ -212,7 +405,7 @@ export type ChatComposerViewModel = {
   configControlsDisabled: boolean;
   showConfigControls?: boolean;
   showReasoningControl?: boolean;
-  onComposerTextChange: (value: string) => void;
+  onComposerDraftChange: (value: ComposerDraft) => void;
   onSubmit: () => void;
   onRuntimeCommandSubmit: (commandId: string) => void;
   onSecondarySubmit?: () => void;
@@ -257,11 +450,18 @@ function SkillMentionOptionButton(input: {
   isActive: boolean;
   onMouseEnter: () => void;
   onSelect: () => void;
+  showSourceLabel: boolean;
   skill: SkillMentionDescriptor;
+  skills: readonly SkillMentionDescriptor[];
 }): React.JSX.Element {
+  const sourceLabel = formatSkillMentionSourceLabel({ skill: input.skill, skills: input.skills });
+  const optionLabel = input.showSourceLabel
+    ? `$${input.skill.name} ${sourceLabel}`
+    : formatSkillMentionOptionLabel(input.skill);
+
   return (
     <button
-      aria-label={formatSkillMentionOptionLabel(input.skill)}
+      aria-label={optionLabel}
       aria-selected={input.isActive}
       className={[
         "flex w-full items-start gap-3 rounded-sm px-3 py-2 text-left text-sm outline-none",
@@ -277,11 +477,22 @@ function SkillMentionOptionButton(input: {
       type="button"
     >
       <span className="min-w-24 font-mono text-xs text-muted-foreground">${input.skill.name}</span>
-      {input.skill.description === undefined ? null : (
+      {input.showSourceLabel ? (
+        <span className="min-w-0 flex-1 text-muted-foreground" title={input.skill.sourcePath}>
+          {sourceLabel}
+        </span>
+      ) : input.skill.description === undefined ? null : (
         <span className="min-w-0 flex-1 text-muted-foreground">{input.skill.description}</span>
       )}
     </button>
   );
+}
+
+function hasDuplicateSkillMentionName(input: {
+  skill: SkillMentionDescriptor;
+  skills: readonly SkillMentionDescriptor[];
+}): boolean {
+  return input.skills.some((skill) => skill !== input.skill && skill.name === input.skill.name);
 }
 
 function ChoiceCommandPanelActions(input: {
@@ -335,7 +546,7 @@ function ChoiceCommandPanelActions(input: {
 
 export function ChatComposer({
   composerCapabilities,
-  composerText,
+  composerDraft,
   gitBranchLabel,
   pullRequest,
   contextUsage,
@@ -360,7 +571,7 @@ export function ChatComposer({
   configControlsDisabled,
   showConfigControls = true,
   showReasoningControl = true,
-  onComposerTextChange,
+  onComposerDraftChange,
   onSubmit,
   onRuntimeCommandSubmit,
   onSecondarySubmit,
@@ -372,13 +583,13 @@ export function ChatComposer({
 }: ChatComposerViewModel): React.JSX.Element {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const commandPanelSearchInputRef = useRef<HTMLInputElement | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const editorViewRef = useRef<EditorView | null>(null);
   const commandListId = useId();
   const contextMentionListId = useId();
   const commandPanelListId = useId();
   const [composerSelection, setComposerSelection] = useState({
-    start: composerText.length,
-    end: composerText.length,
+    start: composerDraft.text.length,
+    end: composerDraft.text.length,
   });
   const [activeSlashCommandIndex, setActiveSlashCommandIndex] = useState(0);
   const [activeSkillMentionIndex, setActiveSkillMentionIndex] = useState(0);
@@ -413,7 +624,7 @@ export function ChatComposer({
   ]);
   const activeComposerTrigger = detectActiveComposerTrigger({
     composerCapabilities,
-    composerText,
+    composerText: composerDraft.text,
     selectionStart: composerSelection.start,
     selectionEnd: composerSelection.end,
   });
@@ -609,91 +820,242 @@ export function ChatComposer({
     onPendingFilesAdded(files);
   }
 
-  function updateComposerSelection(textarea: HTMLTextAreaElement): void {
-    setComposerSelection({
-      start: textarea.selectionStart,
-      end: textarea.selectionEnd,
+  function updateComposerSelectionFromView(view: EditorView): void {
+    const selection = view.state.selection.main;
+    setComposerSelection((currentSelection) => {
+      if (currentSelection.start === selection.from && currentSelection.end === selection.to) {
+        return currentSelection;
+      }
+
+      return {
+        start: selection.from,
+        end: selection.to,
+      };
     });
   }
 
-  function replaceActiveTriggerRange(insertedText: string): void {
-    if (activeComposerTrigger === null) {
+  function readLiveComposerState(): {
+    text: string;
+    selectionStart: number;
+    selectionEnd: number;
+  } {
+    const editorView = editorViewRef.current;
+    if (editorView === null) {
+      return {
+        text: composerDraft.text,
+        selectionStart: composerSelection.start,
+        selectionEnd: composerSelection.end,
+      };
+    }
+
+    const selection = editorView.state.selection.main;
+    return {
+      text: editorView.state.doc.toString(),
+      selectionStart: selection.from,
+      selectionEnd: selection.to,
+    };
+  }
+
+  function detectLiveActiveComposerTrigger(): ActiveComposerTrigger | null {
+    const liveState = readLiveComposerState();
+    return detectActiveComposerTrigger({
+      composerCapabilities,
+      composerText: liveState.text,
+      selectionStart: liveState.selectionStart,
+      selectionEnd: liveState.selectionEnd,
+    });
+  }
+
+  function focusEditorAtPosition(cursorIndex: number): void {
+    requestAnimationFrame(() => {
+      const editorView = editorViewRef.current;
+      if (editorView === null) {
+        return;
+      }
+
+      const boundedCursorIndex = Math.min(cursorIndex, editorView.state.doc.length);
+      editorView.focus();
+      editorView.dispatch({
+        selection: {
+          anchor: boundedCursorIndex,
+        },
+      });
+    });
+  }
+
+  function replaceActiveTriggerRange(input: {
+    insertedText: string;
+    trigger?: ActiveComposerTrigger | null;
+    selectedSkillMentions?: readonly SelectedSkillMention[];
+  }): void {
+    const trigger = input.trigger ?? activeComposerTrigger;
+    if (trigger === null) {
       return;
     }
 
+    const liveState = readLiveComposerState();
     const nextComposerText = [
-      composerText.slice(0, activeComposerTrigger.range.start),
-      insertedText,
-      composerText.slice(activeComposerTrigger.range.end),
+      liveState.text.slice(0, trigger.range.start),
+      input.insertedText,
+      liveState.text.slice(trigger.range.end),
     ].join("");
-    const nextCursorIndex = activeComposerTrigger.range.start + insertedText.length;
+    const nextCursorIndex = trigger.range.start + input.insertedText.length;
+    const selectedSkillMentions =
+      input.selectedSkillMentions ??
+      updateSelectedSkillMentionsForTextReplacement({
+        insertedText: input.insertedText,
+        range: trigger.range,
+        selectedSkillMentions: composerDraft.selectedSkillMentions,
+        text: nextComposerText,
+      });
 
-    onComposerTextChange(nextComposerText);
+    editorViewRef.current?.dispatch({
+      changes: {
+        from: trigger.range.start,
+        to: trigger.range.end,
+        insert: input.insertedText,
+      },
+      selection: {
+        anchor: nextCursorIndex,
+      },
+    });
+
+    onComposerDraftChange({
+      text: nextComposerText,
+      selectedSkillMentions,
+    });
     setComposerSelection({
       start: nextCursorIndex,
       end: nextCursorIndex,
     });
-    requestAnimationFrame(() => {
-      textareaRef.current?.focus();
-      textareaRef.current?.setSelectionRange(nextCursorIndex, nextCursorIndex);
+    focusEditorAtPosition(nextCursorIndex);
+  }
+
+  function insertSlashCommand(
+    command: ComposerCommandDescriptor,
+    trigger: ActiveComposerTrigger | null = activeComposerTrigger,
+  ): void {
+    if (trigger === null || trigger.capabilityKind !== "composerCommand") {
+      return;
+    }
+
+    replaceActiveTriggerRange({
+      insertedText: `/${command.name} `,
+      trigger,
     });
   }
 
-  function insertSlashCommand(command: ComposerCommandDescriptor): void {
+  function insertSkillMention(
+    skill: SkillMentionDescriptor,
+    trigger: ActiveComposerTrigger | null = activeComposerTrigger,
+  ): void {
     if (
-      activeComposerTrigger === null ||
-      activeComposerTrigger.capabilityKind !== "composerCommand"
+      trigger === null ||
+      (trigger.capabilityKind !== "composerCommand" && trigger.capabilityKind !== "skillMention")
     ) {
       return;
     }
 
-    replaceActiveTriggerRange(`/${command.name} `);
-  }
+    const insertedText = `$${skill.name} `;
+    const selectedRange = {
+      start: trigger.range.start,
+      end: trigger.range.start + insertedText.length - 1,
+    };
+    const liveState = readLiveComposerState();
+    const nextComposerText = [
+      liveState.text.slice(0, trigger.range.start),
+      insertedText,
+      liveState.text.slice(trigger.range.end),
+    ].join("");
+    const nextCursorIndex = trigger.range.start + insertedText.length;
+    const selectedSkillMentions = [
+      ...updateSelectedSkillMentionsForTextReplacement({
+        insertedText,
+        range: trigger.range,
+        selectedSkillMentions: composerDraft.selectedSkillMentions,
+        text: nextComposerText,
+      }),
+      {
+        name: skill.name,
+        sourcePath: skill.sourcePath,
+        range: selectedRange,
+      },
+    ];
 
-  function insertSkillMention(skill: SkillMentionDescriptor): void {
-    if (
-      activeComposerTrigger === null ||
-      (activeComposerTrigger.capabilityKind !== "composerCommand" &&
-        activeComposerTrigger.capabilityKind !== "skillMention")
-    ) {
-      return;
-    }
+    editorViewRef.current?.dispatch({
+      changes: {
+        from: trigger.range.start,
+        to: trigger.range.end,
+        insert: insertedText,
+      },
+      selection: {
+        anchor: nextCursorIndex,
+      },
+    });
 
-    replaceActiveTriggerRange(`$${skill.name} `);
+    onComposerDraftChange({
+      text: nextComposerText,
+      selectedSkillMentions,
+    });
+    setComposerSelection({
+      start: nextCursorIndex,
+      end: nextCursorIndex,
+    });
     setActiveSlashCommandIndex(0);
     setActiveSkillMentionIndex(0);
+    focusEditorAtPosition(nextCursorIndex);
   }
 
-  function insertContextMentionPath(path: string, query: string): void {
-    if (
-      activeComposerTrigger === null ||
-      activeComposerTrigger.capabilityKind !== "contextMention"
-    ) {
+  function insertContextMentionPath(
+    path: string,
+    query: string,
+    trigger: ActiveComposerTrigger | null = activeComposerTrigger,
+  ): void {
+    if (trigger === null || trigger.capabilityKind !== "contextMention") {
       return;
     }
 
     const insertedText = formatContextMentionInsertion(path);
+    const liveState = readLiveComposerState();
     const nextComposerText = [
-      composerText.slice(0, activeComposerTrigger.range.start),
+      liveState.text.slice(0, trigger.range.start),
       insertedText,
-      composerText.slice(activeComposerTrigger.range.end),
+      liveState.text.slice(trigger.range.end),
     ].join("");
-    const nextCursorIndex = activeComposerTrigger.range.start + insertedText.length;
+    const nextCursorIndex = trigger.range.start + insertedText.length;
 
     contextMentionControl?.onSelect({ path, query });
-    onComposerTextChange(nextComposerText);
+    editorViewRef.current?.dispatch({
+      changes: {
+        from: trigger.range.start,
+        to: trigger.range.end,
+        insert: insertedText,
+      },
+      selection: {
+        anchor: nextCursorIndex,
+      },
+    });
+    onComposerDraftChange({
+      text: nextComposerText,
+      selectedSkillMentions: updateSelectedSkillMentionsForTextReplacement({
+        insertedText,
+        range: trigger.range,
+        selectedSkillMentions: composerDraft.selectedSkillMentions,
+        text: nextComposerText,
+      }),
+    });
     setComposerSelection({
       start: nextCursorIndex,
       end: nextCursorIndex,
     });
     setActiveContextMentionIndex(0);
-    requestAnimationFrame(() => {
-      textareaRef.current?.focus();
-      textareaRef.current?.setSelectionRange(nextCursorIndex, nextCursorIndex);
-    });
+    focusEditorAtPosition(nextCursorIndex);
   }
 
-  function selectSlashCommand(command: ComposerCommandDescriptor): void {
+  function selectSlashCommand(
+    command: ComposerCommandDescriptor,
+    trigger: ActiveComposerTrigger | null = activeComposerTrigger,
+  ): void {
     if (commandIsDisabledDuringActiveTurn(command)) {
       return;
     }
@@ -703,16 +1065,19 @@ export function ChatComposer({
       return;
     }
 
-    insertSlashCommand(command);
+    insertSlashCommand(command, trigger);
   }
 
-  function selectSlashPaletteOption(option: SlashPaletteOption): void {
+  function selectSlashPaletteOption(
+    option: SlashPaletteOption,
+    trigger: ActiveComposerTrigger | null = activeComposerTrigger,
+  ): void {
     if (option.kind === "command") {
-      selectSlashCommand(option.command);
+      selectSlashCommand(option.command, trigger);
       return;
     }
 
-    insertSkillMention(option.skill);
+    insertSkillMention(option.skill, trigger);
   }
 
   function commandIsDisabledDuringActiveTurn(command: ComposerCommandDescriptor): boolean {
@@ -771,6 +1136,271 @@ export function ChatComposer({
   function selectActiveCommandPanelOption(): void {
     activeCommandPanelOption?.onSelect();
   }
+
+  function handleComposerEditorCommand(input: {
+    key: string;
+    isModEnter?: boolean;
+    skipSubmit?: boolean;
+  }): boolean {
+    const liveComposerTrigger = detectLiveActiveComposerTrigger();
+    const liveContextMentionKey =
+      liveComposerTrigger?.capabilityKind === "contextMention"
+        ? [
+            String(liveComposerTrigger.range.start),
+            String(liveComposerTrigger.range.end),
+            liveComposerTrigger.query,
+          ].join(":")
+        : null;
+    const liveShowContextMentionMenu =
+      liveComposerTrigger !== null &&
+      liveComposerTrigger.capabilityKind === "contextMention" &&
+      contextMentionControl !== null &&
+      liveContextMentionKey !== dismissedContextMentionKey;
+    const liveSlashPaletteOptions =
+      liveComposerTrigger === null || liveComposerTrigger.capabilityKind !== "composerCommand"
+        ? []
+        : [
+            ...slashCommandOptions
+              .filter(
+                (command) =>
+                  (liveComposerTrigger.range.start === 0 || command.submitAs === "inlineText") &&
+                  command.name.startsWith(liveComposerTrigger.query),
+              )
+              .map(createCommandSlashPaletteOption),
+            ...skillMentionOptions
+              .filter((skill) => skill.name.startsWith(liveComposerTrigger.query))
+              .map(createSkillSlashPaletteOption),
+          ];
+    const liveShowSlashCommandMenu =
+      liveComposerTrigger !== null && liveComposerTrigger.capabilityKind === "composerCommand";
+    const liveActiveSlashPaletteOption =
+      liveSlashPaletteOptions.length === 0
+        ? null
+        : (liveSlashPaletteOptions[
+            Math.min(activeSlashCommandIndex, liveSlashPaletteOptions.length - 1)
+          ] ?? null);
+    const liveFilteredSkillMentionOptions =
+      liveComposerTrigger === null || liveComposerTrigger.capabilityKind !== "skillMention"
+        ? []
+        : skillMentionOptions.filter((skill) => skill.name.startsWith(liveComposerTrigger.query));
+    const liveShowSkillMentionMenu =
+      liveComposerTrigger !== null && liveComposerTrigger.capabilityKind === "skillMention";
+    const liveActiveSkillMention =
+      liveFilteredSkillMentionOptions.length === 0
+        ? null
+        : (liveFilteredSkillMentionOptions[
+            Math.min(activeSkillMentionIndex, liveFilteredSkillMentionOptions.length - 1)
+          ] ?? null);
+
+    if (liveShowContextMentionMenu) {
+      if (input.key === "Escape") {
+        setDismissedContextMentionKey(liveContextMentionKey);
+        contextMentionControl?.onDismiss();
+        return true;
+      }
+
+      if (contextMentionResults.length > 0) {
+        if (input.key === "ArrowDown") {
+          moveActiveContextMention(1);
+          return true;
+        }
+
+        if (input.key === "ArrowUp") {
+          moveActiveContextMention(-1);
+          return true;
+        }
+
+        if (input.key === "Tab" || input.key === "Enter") {
+          if (activeContextMention !== null) {
+            insertContextMentionPath(
+              activeContextMention.path,
+              liveComposerTrigger?.query ?? "",
+              liveComposerTrigger,
+            );
+          }
+          return true;
+        }
+      }
+    }
+
+    if (liveShowSlashCommandMenu && liveSlashPaletteOptions.length > 0) {
+      if (input.key === "ArrowDown") {
+        moveActiveSlashCommand(1);
+        return true;
+      }
+
+      if (input.key === "ArrowUp") {
+        moveActiveSlashCommand(-1);
+        return true;
+      }
+
+      if (input.key === "Tab" || input.key === "Enter") {
+        if (liveActiveSlashPaletteOption !== null) {
+          selectSlashPaletteOption(liveActiveSlashPaletteOption, liveComposerTrigger);
+        }
+        return true;
+      }
+    }
+
+    if (liveShowSkillMentionMenu && liveFilteredSkillMentionOptions.length > 0) {
+      if (input.key === "ArrowDown") {
+        moveActiveSkillMention(1);
+        return true;
+      }
+
+      if (input.key === "ArrowUp") {
+        moveActiveSkillMention(-1);
+        return true;
+      }
+
+      if (input.key === "Tab" || input.key === "Enter") {
+        if (liveActiveSkillMention !== null) {
+          insertSkillMention(liveActiveSkillMention, liveComposerTrigger);
+        }
+        return true;
+      }
+    }
+
+    if (input.key !== "Enter") {
+      return false;
+    }
+
+    if (input.skipSubmit === true) {
+      return false;
+    }
+
+    if (input.isModEnter === true && onSecondarySubmit !== undefined) {
+      if (!secondarySubmitDisabled) {
+        onSecondarySubmit();
+      }
+      return true;
+    }
+
+    if (!submitDisabled) {
+      onSubmit();
+    }
+    return true;
+  }
+
+  const composerEditorExtensions = useMemo(() => {
+    const contentAttributes: Record<string, string> = {
+      "aria-expanded": String(
+        showSlashCommandMenu || showSkillMentionMenu || showContextMentionMenu,
+      ),
+      "aria-haspopup": "listbox",
+      "aria-multiline": "true",
+      "aria-placeholder": composerPlaceholder,
+      id: "session-composer",
+      role: "textbox",
+    };
+    const activeDescendant =
+      showContextMentionMenu && activeContextMentionIndexWithinBounds !== null
+        ? `${contextMentionListId}-${String(activeContextMentionIndexWithinBounds)}`
+        : showSlashCommandMenu && activeSlashPaletteOption !== null
+          ? activeSlashPaletteOption.kind === "command"
+            ? `${commandListId}-command-${activeSlashPaletteOption.command.id}`
+            : `${commandListId}-skill-${activeSlashPaletteOption.skill.sourcePath}`
+          : showSkillMentionMenu && activeSkillMention !== null
+            ? `${commandListId}-skill-${activeSkillMention.sourcePath}`
+            : null;
+    if (activeDescendant !== null) {
+      contentAttributes["aria-activedescendant"] = activeDescendant;
+    }
+
+    const ariaControls = showContextMentionMenu
+      ? contextMentionListId
+      : showSlashCommandMenu || showSkillMentionMenu
+        ? commandListId
+        : null;
+    if (ariaControls !== null) {
+      contentAttributes["aria-controls"] = ariaControls;
+    }
+
+    return [
+      history(),
+      ...getCodeMirrorDrawSelectionExtensions(),
+      placeholder((view) => createComposerPlaceholder(view, composerPlaceholder)),
+      EditorView.lineWrapping,
+      EditorView.domEventHandlers({
+        keydown: (event, view) => {
+          if (event.key !== "Enter" || !event.shiftKey || event.metaKey || event.ctrlKey) {
+            return false;
+          }
+
+          event.preventDefault();
+          return insertComposerLineBreak(view);
+        },
+        paste: (event) => {
+          const clipboardFiles = Array.from(event.clipboardData?.files ?? []);
+          if (clipboardFiles.length === 0) {
+            return false;
+          }
+
+          event.preventDefault();
+          addPendingFiles(clipboardFiles);
+          return true;
+        },
+      }),
+      EditorView.updateListener.of((update) => {
+        editorViewRef.current = update.view;
+        updateComposerSelectionFromView(update.view);
+      }),
+      EditorView.contentAttributes.of(contentAttributes),
+      createSelectedSkillMentionDecorations(composerDraft.selectedSkillMentions),
+      Prec.highest(
+        keymap.of([
+          {
+            key: "ArrowDown",
+            run: () => handleComposerEditorCommand({ key: "ArrowDown" }),
+          },
+          {
+            key: "ArrowUp",
+            run: () => handleComposerEditorCommand({ key: "ArrowUp" }),
+          },
+          {
+            key: "Escape",
+            run: () => handleComposerEditorCommand({ key: "Escape" }),
+          },
+          {
+            key: "Tab",
+            run: () => handleComposerEditorCommand({ key: "Tab" }),
+          },
+          {
+            key: "Enter",
+            run: () => handleComposerEditorCommand({ key: "Enter" }),
+          },
+          {
+            key: "Mod-Enter",
+            run: () => handleComposerEditorCommand({ key: "Enter", isModEnter: true }),
+          },
+        ]),
+      ),
+      keymap.of([...defaultKeymap, ...historyKeymap]),
+      createComposerEditorTheme(),
+    ] satisfies Extension[];
+  }, [
+    activeContextMention,
+    activeContextMentionIndexWithinBounds,
+    activeContextMentionKey,
+    activeContextMentionQuery,
+    activeSlashPaletteOption,
+    activeSkillMention,
+    commandListId,
+    composerDraft.selectedSkillMentions,
+    composerPlaceholder,
+    contextMentionControl,
+    contextMentionListId,
+    contextMentionResults,
+    filteredSkillMentionOptions.length,
+    onSecondarySubmit,
+    secondarySubmitDisabled,
+    showContextMentionMenu,
+    showSkillMentionMenu,
+    showSlashCommandMenu,
+    slashPaletteOptions.length,
+    submitDisabled,
+    onSubmit,
+  ]);
 
   function renderCommandPanel(): React.JSX.Element | null {
     if (commandPanel === null) {
@@ -1000,7 +1630,41 @@ export function ChatComposer({
             ))}
           </div>
         )}
-        <div className="relative">
+        <div
+          className="relative"
+          onKeyDownCapture={(event) => {
+            if (event.key === "Enter" && event.shiftKey && !event.metaKey && !event.ctrlKey) {
+              const handled = handleComposerEditorCommand({
+                key: "Enter",
+                skipSubmit: true,
+              });
+              if (handled) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+              }
+
+              const editorView = editorViewRef.current;
+              if (editorView !== null) {
+                event.preventDefault();
+                event.stopPropagation();
+                insertComposerLineBreak(editorView);
+              }
+              return;
+            }
+
+            const handled = handleComposerEditorCommand({
+              key: event.key,
+              isModEnter: event.key === "Enter" && (event.metaKey || event.ctrlKey),
+            });
+            if (!handled) {
+              return;
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+        >
           {showContextMentionMenu ? (
             <ContextMentionSearchMenu
               activePath={activeContextMention?.path ?? null}
@@ -1078,12 +1742,12 @@ export function ChatComposer({
                     const optionIndex = filteredSlashCommandOptions.length + skillIndex;
                     const isActiveSkill =
                       activeSlashPaletteOption?.kind === "skill" &&
-                      activeSlashPaletteOption.skill.name === skill.name;
+                      activeSlashPaletteOption.skill.sourcePath === skill.sourcePath;
 
                     return (
                       <SkillMentionOptionButton
-                        id={`${commandListId}-skill-${skill.name}`}
-                        key={skill.name}
+                        id={`${commandListId}-skill-${skill.sourcePath}`}
+                        key={skill.sourcePath}
                         onMouseEnter={() => {
                           setActiveSlashCommandIndex(optionIndex);
                         }}
@@ -1091,7 +1755,12 @@ export function ChatComposer({
                           insertSkillMention(skill);
                         }}
                         isActive={isActiveSkill}
+                        showSourceLabel={hasDuplicateSkillMentionName({
+                          skill,
+                          skills: skillMentionOptions,
+                        })}
                         skill={skill}
+                        skills={skillMentionOptions}
                       />
                     );
                   })}
@@ -1110,12 +1779,12 @@ export function ChatComposer({
                 <div className="px-3 py-2 text-sm text-muted-foreground">No skills</div>
               ) : (
                 filteredSkillMentionOptions.map((skill, skillIndex) => {
-                  const isActiveSkill = skill.name === activeSkillMention?.name;
+                  const isActiveSkill = skill.sourcePath === activeSkillMention?.sourcePath;
 
                   return (
                     <SkillMentionOptionButton
-                      id={`${commandListId}-skill-${skill.name}`}
-                      key={skill.name}
+                      id={`${commandListId}-skill-${skill.sourcePath}`}
+                      key={skill.sourcePath}
                       onMouseEnter={() => {
                         setActiveSkillMentionIndex(skillIndex);
                       }}
@@ -1123,165 +1792,53 @@ export function ChatComposer({
                         insertSkillMention(skill);
                       }}
                       isActive={isActiveSkill}
+                      showSourceLabel={hasDuplicateSkillMentionName({
+                        skill,
+                        skills: skillMentionOptions,
+                      })}
                       skill={skill}
+                      skills={skillMentionOptions}
                     />
                   );
                 })
               )}
             </div>
           ) : null}
-          <Textarea
-            aria-activedescendant={
-              showContextMentionMenu && activeContextMentionIndexWithinBounds !== null
-                ? `${contextMentionListId}-${String(activeContextMentionIndexWithinBounds)}`
-                : showSlashCommandMenu && activeSlashPaletteOption !== null
-                  ? activeSlashPaletteOption.kind === "command"
-                    ? `${commandListId}-command-${activeSlashPaletteOption.command.id}`
-                    : `${commandListId}-skill-${activeSlashPaletteOption.skill.name}`
-                  : showSkillMentionMenu && activeSkillMention !== null
-                    ? `${commandListId}-skill-${activeSkillMention.name}`
-                    : undefined
-            }
-            aria-controls={
-              showContextMentionMenu
-                ? contextMentionListId
-                : showSlashCommandMenu || showSkillMentionMenu
-                  ? commandListId
-                  : undefined
-            }
-            aria-expanded={showSlashCommandMenu || showSkillMentionMenu || showContextMentionMenu}
-            aria-haspopup="listbox"
-            className="max-h-48 min-h-12 resize-none overflow-y-auto border-0 bg-transparent p-1.5 shadow-none placeholder:text-muted-foreground/60 focus-visible:border-transparent focus-visible:ring-0"
-            id="session-composer"
-            onChange={(event) => {
-              onComposerTextChange(event.target.value);
-              updateComposerSelection(event.currentTarget);
+          <CodeMirror
+            basicSetup={false}
+            className={CodeMirrorThemeValues.PROSE_TEXT_CLASS_NAME}
+            editable
+            extensions={composerEditorExtensions}
+            onChange={(nextText: string, viewUpdate: ViewUpdate) => {
+              const selectedSkillMentions = viewUpdate.docChanged
+                ? mapSelectedSkillMentionRanges({
+                    selectedSkillMentions: composerDraft.selectedSkillMentions,
+                    text: nextText,
+                    update: viewUpdate,
+                  })
+                : composerDraft.selectedSkillMentions;
+
+              onComposerDraftChange({
+                text: nextText,
+                selectedSkillMentions,
+              });
+              updateComposerSelectionFromView(viewUpdate.view);
               setActiveSlashCommandIndex(0);
               setActiveSkillMentionIndex(0);
               setActiveContextMentionIndex(0);
               setDismissedContextMentionKey(null);
             }}
-            onClick={(event) => {
-              updateComposerSelection(event.currentTarget);
+            onCreateEditor={(view: EditorView) => {
+              editorViewRef.current = view;
+              const endPosition = view.state.doc.length;
+              view.dispatch({
+                selection: {
+                  anchor: endPosition,
+                },
+              });
             }}
-            onKeyDown={(event) => {
-              if (showContextMentionMenu) {
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  setDismissedContextMentionKey(activeContextMentionKey);
-                  contextMentionControl?.onDismiss();
-                  return;
-                }
-
-                if (contextMentionResults.length > 0) {
-                  if (event.key === "ArrowDown") {
-                    event.preventDefault();
-                    moveActiveContextMention(1);
-                    return;
-                  }
-
-                  if (event.key === "ArrowUp") {
-                    event.preventDefault();
-                    moveActiveContextMention(-1);
-                    return;
-                  }
-
-                  if (event.key === "Tab" || event.key === "Enter") {
-                    event.preventDefault();
-                    if (activeContextMention !== null) {
-                      insertContextMentionPath(
-                        activeContextMention.path,
-                        activeContextMentionQuery ?? "",
-                      );
-                    }
-                    return;
-                  }
-                }
-              }
-
-              if (showSlashCommandMenu && slashPaletteOptions.length > 0) {
-                if (event.key === "ArrowDown") {
-                  event.preventDefault();
-                  moveActiveSlashCommand(1);
-                  return;
-                }
-
-                if (event.key === "ArrowUp") {
-                  event.preventDefault();
-                  moveActiveSlashCommand(-1);
-                  return;
-                }
-
-                if (event.key === "Tab" || event.key === "Enter") {
-                  event.preventDefault();
-                  if (activeSlashPaletteOption !== null) {
-                    selectSlashPaletteOption(activeSlashPaletteOption);
-                  }
-                  return;
-                }
-              }
-
-              if (showSkillMentionMenu && filteredSkillMentionOptions.length > 0) {
-                if (event.key === "ArrowDown") {
-                  event.preventDefault();
-                  moveActiveSkillMention(1);
-                  return;
-                }
-
-                if (event.key === "ArrowUp") {
-                  event.preventDefault();
-                  moveActiveSkillMention(-1);
-                  return;
-                }
-
-                if (event.key === "Tab" || event.key === "Enter") {
-                  event.preventDefault();
-                  if (activeSkillMention !== null) {
-                    insertSkillMention(activeSkillMention);
-                  }
-                  return;
-                }
-              }
-
-              if (event.key !== "Enter" || event.shiftKey) {
-                return;
-              }
-
-              event.preventDefault();
-              if ((event.metaKey || event.ctrlKey) && onSecondarySubmit !== undefined) {
-                if (secondarySubmitDisabled) {
-                  return;
-                }
-
-                onSecondarySubmit();
-                return;
-              }
-
-              if (submitDisabled) {
-                return;
-              }
-
-              onSubmit();
-            }}
-            onKeyUp={(event) => {
-              updateComposerSelection(event.currentTarget);
-            }}
-            onPaste={(event) => {
-              const clipboardFiles = Array.from(event.clipboardData.files);
-              if (clipboardFiles.length === 0) {
-                return;
-              }
-
-              event.preventDefault();
-              addPendingFiles(clipboardFiles);
-            }}
-            onSelect={(event) => {
-              updateComposerSelection(event.currentTarget);
-            }}
-            placeholder={composerPlaceholder}
-            ref={textareaRef}
-            rows={2}
-            value={composerText}
+            theme="none"
+            value={composerDraft.text}
           />
         </div>
         <div className="flex items-center gap-2">

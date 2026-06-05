@@ -16,6 +16,7 @@ import { UnavailableResourceState } from "../shared/unavailable-resource-state.j
 import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
 import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
+import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 import {
   SessionConversationBottomPanel,
   SessionConversationBottomPanelController,
@@ -77,7 +78,7 @@ function SessionWorkbenchPageContent(input: {
   const [hasEnteredReadyWorkbench, setHasEnteredReadyWorkbench] = useState(false);
   const conversationScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const previousActiveConversationIdRef = useRef<string | null>(null);
-  const [composerText, setComposerText] = useState("");
+  const [composerDraft, setComposerDraft] = useState(createComposerDraft(""));
   const [isMobileConversationNavigatorOpen, setMobileConversationNavigatorOpen] = useState(false);
   const [pendingDiffComments, setPendingDiffComments] = useState<
     readonly PendingSessionDiffComment[]
@@ -390,7 +391,7 @@ function SessionWorkbenchPageContent(input: {
     }
 
     previousActiveConversationIdRef.current = conversationPane.activeConversationId;
-    setComposerText("");
+    setComposerDraft(createComposerDraft(""));
     setPendingDiffComments([]);
   }, [conversationPane.activeConversationId]);
 
@@ -587,10 +588,10 @@ function SessionWorkbenchPageContent(input: {
               chatEntries={conversationPane.chatState.entries}
               composerStateInput={conversationPane.composerStateInput}
               draftState={{
-                composerText,
+                composerDraft,
                 pendingDiffComments,
                 clearPendingDiffComments: handleClearPendingDiffComments,
-                setComposerText,
+                setComposerDraft,
               }}
               isRespondingToServerRequest={
                 conversationPane.serverRequestsState.isRespondingToServerRequest
@@ -730,7 +731,7 @@ function SessionWorkspaceSidebarTrigger(): React.JSX.Element | null {
 function createEmptyComposerViewModel(): ChatComposerViewModel {
   return {
     composerCapabilities: [],
-    composerText: "",
+    composerDraft: createComposerDraft(""),
     gitBranchLabel: null,
     pullRequest: null,
     contextUsage: null,
@@ -752,7 +753,7 @@ function createEmptyComposerViewModel(): ChatComposerViewModel {
     canUploadAttachments: false,
     isUploadingAttachments: false,
     configControlsDisabled: true,
-    onComposerTextChange: function onComposerTextChange() {},
+    onComposerDraftChange: function onComposerDraftChange() {},
     onSubmit: function onSubmit() {},
     onRuntimeCommandSubmit: function onRuntimeCommandSubmit() {},
     onSecondarySubmit: function onSecondarySubmit() {},

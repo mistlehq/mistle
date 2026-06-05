@@ -3,6 +3,7 @@ import type {
   ChatComposerStatusMessage,
   ChatComposerViewModel,
 } from "../../../chat/components/chat-composer.js";
+import { createComposerDraft } from "../../../pages/session-composer/session-composer-draft.js";
 import type { CodexApprovalRequestEntry } from "../approvals/codex-approval-requests-state.js";
 import { CodexFixtureExploringGroupEntry } from "./chat-fixtures.js";
 
@@ -58,7 +59,7 @@ export const CodexFixtureSessionServerRequests: readonly CodexApprovalRequestEnt
 
 export const SessionComposerFixtureProps: ChatComposerViewModel = {
   composerCapabilities: [],
-  composerText: "Focus on dashboard asset ownership next.",
+  composerDraft: createComposerDraft("Focus on dashboard asset ownership next."),
   gitBranchLabel: null,
   pullRequest: null,
   contextUsage: null,
@@ -85,7 +86,7 @@ export const SessionComposerFixtureProps: ChatComposerViewModel = {
   canUploadAttachments: true,
   isUploadingAttachments: false,
   configControlsDisabled: false,
-  onComposerTextChange: function onComposerTextChange() {},
+  onComposerDraftChange: function onComposerDraftChange() {},
   onSubmit: function onSubmit() {},
   onRuntimeCommandSubmit: function onRuntimeCommandSubmit() {},
   onSecondarySubmit: function onSecondarySubmit() {},
@@ -98,7 +99,9 @@ export const SessionComposerFixtureProps: ChatComposerViewModel = {
 
 export const SessionComposerFixturePropsWithPendingAttachments: ChatComposerViewModel = {
   ...SessionComposerFixtureProps,
-  composerText: "Compare the screenshot with the attached implementation notes.",
+  composerDraft: createComposerDraft(
+    "Compare the screenshot with the attached implementation notes.",
+  ),
   pendingAttachments: [
     { id: "attachment-1", name: "session-workbench-overview.png" },
     { id: "attachment-2", name: "deployment-notes.md" },
@@ -108,7 +111,9 @@ export const SessionComposerFixturePropsWithPendingAttachments: ChatComposerView
 
 export const SessionComposerFixturePropsWithPendingDiffComments: ChatComposerViewModel = {
   ...SessionComposerFixtureProps,
-  composerText: "Please address the diff comments before sending the next patch.",
+  composerDraft: createComposerDraft(
+    "Please address the diff comments before sending the next patch.",
+  ),
   pendingDiffCommentSummary: {
     count: 2,
     label: "2 comments",

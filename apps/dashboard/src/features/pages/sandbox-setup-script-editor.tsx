@@ -1,10 +1,17 @@
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import type { Extension } from "@codemirror/state";
-import { drawSelection, EditorView, keymap, placeholder } from "@codemirror/view";
+import { EditorView, keymap, placeholder } from "@codemirror/view";
 import { cn, textareaFieldShellClassName } from "@mistle/ui";
 import CodeMirror from "@uiw/react-codemirror";
 import type React from "react";
 import { useMemo } from "react";
+
+import {
+  CodeMirrorThemeValues,
+  createCodeMirrorPlaceholder,
+  createCodeMirrorTheme,
+  getCodeMirrorDrawSelectionExtensions,
+} from "../shared/code-mirror-theme.js";
 
 type SandboxSetupScriptEditorProps = {
   ariaLabelledBy: string;
@@ -15,53 +22,32 @@ type SandboxSetupScriptEditorProps = {
   value: string;
 };
 
-function supportsDrawSelection(): boolean {
-  if (typeof Range === "undefined") {
-    return false;
-  }
-
-  return typeof Range.prototype.getClientRects === "function";
-}
-
 function createPlaceholder(view: EditorView, placeholderText: string): HTMLElement {
-  const element = view.dom.ownerDocument.createElement("div");
-  element.className = "m-0 whitespace-pre-wrap font-mono text-sm leading-6 text-muted-foreground";
-  element.textContent = placeholderText;
-
-  return element;
+  return createCodeMirrorPlaceholder({
+    className: "m-0 whitespace-pre-wrap font-mono text-sm leading-6 text-muted-foreground",
+    text: placeholderText,
+    view,
+  });
 }
 
 function createEditorTheme(): ReturnType<typeof EditorView.theme> {
-  return EditorView.theme({
-    "&": {
-      backgroundColor: "transparent",
+  return createCodeMirrorTheme({
+    root: {
       fontSize: "var(--text-sm)",
     },
-    ".cm-editor": {
-      backgroundColor: "transparent",
+    editor: {
       borderRadius: "inherit",
     },
-    ".cm-scroller": {
+    scroller: {
       borderRadius: "inherit",
-      fontFamily:
-        "var(--font-mono, ui-monospace, SFMono-Regular, SF Mono, Menlo, Monaco, Consolas, Liberation Mono, monospace)",
+      fontFamily: CodeMirrorThemeValues.MONO_FONT_FAMILY,
       lineHeight: "1.5rem",
       minHeight: "calc(var(--spacing) * 28)",
     },
-    ".cm-content": {
-      caretColor: "currentColor",
+    content: {
       minHeight: "calc(var(--spacing) * 28)",
-      paddingBlock: "calc(var(--spacing) * 2)",
-      paddingInline: "calc(var(--spacing) * 2.5)",
-    },
-    ".cm-line": {
-      padding: "0",
-    },
-    ".cm-focused": {
-      outline: "none",
-    },
-    ".cm-selectionBackground, ::selection": {
-      backgroundColor: "color-mix(in oklch, var(--accent) 45%, transparent)",
+      paddingBlock: CodeMirrorThemeValues.TEXTAREA_PADDING_BLOCK,
+      paddingInline: CodeMirrorThemeValues.TEXTAREA_PADDING_INLINE,
     },
   });
 }
@@ -73,7 +59,7 @@ export function SandboxSetupScriptEditor(input: SandboxSetupScriptEditorProps): 
     () =>
       [
         history(),
-        ...(supportsDrawSelection() ? [drawSelection()] : []),
+        ...getCodeMirrorDrawSelectionExtensions(),
         ...(placeholderText === undefined
           ? []
           : [placeholder((view) => createPlaceholder(view, placeholderText))]),

@@ -62,6 +62,7 @@ import {
   SandboxProfileTriggersStory,
   SelectedScheduleTriggerId,
 } from "./sandbox-profile-editor-triggers.stories.js";
+import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 import { SessionConversationBottomPanel } from "./session-conversation-pane.js";
 import {
   buildPendingSessionDiffCommentSummaryLabel,
@@ -271,7 +272,9 @@ function DocsSessionConversationBottomPanel(input?: {
       chatEntries={CodexFixtureSessionEntriesWithExploringGroup}
       composerViewModel={{
         ...SessionComposerFixtureProps,
-        composerText: "Review the current changes and call out anything risky before we commit.",
+        composerDraft: createComposerDraft(
+          "Review the current changes and call out anything risky before we commit.",
+        ),
         pendingDiffCommentSummary: buildDocsPendingDiffCommentSummary(pendingDiffComments),
       }}
       isRespondingToServerRequest={false}

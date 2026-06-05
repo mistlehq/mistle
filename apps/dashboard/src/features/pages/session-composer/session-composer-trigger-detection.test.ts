@@ -392,7 +392,7 @@ describe("listSkillMentions", () => {
     ]);
   });
 
-  it("omits skill names that resolve to multiple source paths", () => {
+  it("keeps duplicate skill names that resolve to different source paths", () => {
     expect(
       listSkillMentions([
         {
@@ -419,6 +419,16 @@ describe("listSkillMentions", () => {
         },
       ]),
     ).toEqual([
+      {
+        name: "grill-with-docs",
+        description: "Root skill",
+        sourcePath: "/root/.codex/skills/grill-with-docs/SKILL.md",
+      },
+      {
+        name: "grill-with-docs",
+        description: "Repo skill",
+        sourcePath: "/workspace/.agents/skills/grill-with-docs/SKILL.md",
+      },
       {
         name: "write-a-skill",
         sourcePath: "/root/.codex/skills/write-a-skill/SKILL.md",
