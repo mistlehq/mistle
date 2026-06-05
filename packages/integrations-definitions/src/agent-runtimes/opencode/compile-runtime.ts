@@ -132,12 +132,6 @@ function renderOpenCodeGlobalAgentsMd(input: {
   return `${renderMistleManagedSandboxContext({ mcpServers: input.mcpServers })}\n`;
 }
 
-function renderOpenCodeGlobalAgentsMergeContent(input: {
-  mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
-}): string {
-  return renderMistleManagedSandboxContextBlock({ mcpServers: input.mcpServers });
-}
-
 function readChatGptAccountId(route: EgressCredentialRoute): string | undefined {
   for (const [header, value] of Object.entries(route.additionalHeaders ?? {})) {
     if (header.toLowerCase() === "chatgpt-account-id" && value.trim().length > 0) {
@@ -241,7 +235,7 @@ function buildOpenCodeSetupFiles(input: {
       writeMode: input.mergeSetupFiles === true ? "merge" : "if-absent",
       content:
         input.mergeSetupFiles === true
-          ? renderOpenCodeGlobalAgentsMergeContent({ mcpServers: input.mcpServers })
+          ? renderMistleManagedSandboxContextBlock({ mcpServers: input.mcpServers })
           : renderOpenCodeGlobalAgentsMd({ mcpServers: input.mcpServers }),
     },
   ];

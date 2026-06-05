@@ -1,4 +1,5 @@
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
@@ -237,6 +238,8 @@ fn merges_runtime_files_without_replacing_existing_runtime_config() {
         .join("\n"),
     )
     .expect("codex config fixture should be writable");
+    fs::set_permissions(&codex_config_path, fs::Permissions::from_mode(0o644))
+        .expect("codex config fixture mode should be settable");
     fs::write(
         &agents_path,
         [
@@ -376,6 +379,14 @@ fn merges_runtime_files_without_replacing_existing_runtime_config() {
     assert!(config.contains("[mcp_servers.mistle]"));
     assert!(config.contains(r#"url = "https://current-mcp.example.test/mcp""#));
     assert!(!config.contains("old-mcp.example.test"));
+    assert_eq!(
+        fs::metadata(&codex_config_path)
+            .expect("codex config metadata should be readable")
+            .permissions()
+            .mode()
+            & 0o777,
+        0o600,
+    );
 
     let agents = fs::read_to_string(&agents_path).expect("AGENTS.md should exist");
     assert!(agents.contains("User instruction"));

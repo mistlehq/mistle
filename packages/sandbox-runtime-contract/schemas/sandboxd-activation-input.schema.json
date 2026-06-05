@@ -928,7 +928,7 @@
                         },
                         "writeMode": {
                           "type": "string",
-                          "enum": ["overwrite", "if-absent"]
+                          "enum": ["overwrite", "if-absent", "merge"]
                         }
                       },
                       "required": ["fileId", "path", "mode", "content"],

@@ -28,6 +28,7 @@ type CompileProfileVersionRuntimePlanInput = {
   agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
   snapshotPreparationScriptKind?: "setup" | "maintenance";
   mistleMcpCredentialResolver?: EgressCredentialResolverRef;
+  mergeRuntimeSetupFiles?: boolean;
   image: ResolvedSandboxImage;
 };
 
@@ -121,6 +122,9 @@ export async function compileProfileVersionRuntimePlan(
       ...(input.mistleMcpCredentialResolver === undefined
         ? {}
         : { mistleMcpCredentialResolver: input.mistleMcpCredentialResolver }),
+      ...(input.mergeRuntimeSetupFiles === undefined
+        ? {}
+        : { mergeRuntimeSetupFiles: input.mergeRuntimeSetupFiles }),
       image: input.image,
     });
   } catch (error) {

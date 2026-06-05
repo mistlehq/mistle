@@ -6,7 +6,7 @@
 
 use std::fs::{self, DirBuilder, OpenOptions};
 use std::io::Write;
-use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
 use std::path::Path;
 
 use serde_json::Value;
@@ -61,6 +61,8 @@ pub fn apply_runtime_file(
     output_file
         .write_all(content.as_bytes())
         .map_err(|error| format!("failed to write file {}: {error}", file.path))?;
+    fs::set_permissions(&file.path, fs::Permissions::from_mode(file.mode))
+        .map_err(|error| format!("failed to set file mode for {}: {error}", file.path))?;
 
     Ok(RuntimeFileApplyOutcome::Written)
 }
@@ -133,18 +135,14 @@ fn try_merge_json_file(
             file.path
         ));
     }
-    merge_json_value(&mut existing_json, &generated_json, None)?;
+    merge_json_value(&mut existing_json, &generated_json, None);
     serde_json::to_string_pretty(&existing_json)
         .map(ensure_trailing_newline)
         .map(Some)
         .map_err(|error| format!("failed to serialize merged JSON for {}: {error}", file.path))
 }
 
-fn merge_json_value(
-    existing: &mut Value,
-    generated: &Value,
-    parent_key: Option<&str>,
-) -> Result<(), String> {
+fn merge_json_value(existing: &mut Value, generated: &Value, parent_key: Option<&str>) {
     match (existing, generated) {
         (Value::Object(existing_object), Value::Object(generated_object)) => {
             for (key, generated_value) in generated_object {
@@ -156,31 +154,29 @@ fn merge_json_value(
                 match existing_object.get_mut(key) {
                     Some(existing_value) => {
                         if key == "extensions" {
-                            merge_json_extensions(existing_value, generated_value)?;
+                            merge_json_extensions(existing_value, generated_value);
                             continue;
                         }
-                        merge_json_value(existing_value, generated_value, Some(key))?;
+                        merge_json_value(existing_value, generated_value, Some(key));
                     }
                     None => {
                         existing_object.insert(key.clone(), generated_value.clone());
                     }
                 }
             }
-            Ok(())
         }
         (existing_value, generated_value) => {
             *existing_value = generated_value.clone();
-            Ok(())
         }
     }
 }
 
-fn merge_json_extensions(existing: &mut Value, generated: &Value) -> Result<(), String> {
+fn merge_json_extensions(existing: &mut Value, generated: &Value) {
     let (Some(existing_array), Some(generated_array)) =
         (existing.as_array_mut(), generated.as_array())
     else {
         *existing = generated.clone();
-        return Ok(());
+        return;
     };
 
     for generated_item in generated_array {
@@ -191,8 +187,6 @@ fn merge_json_extensions(existing: &mut Value, generated: &Value) -> Result<(), 
             existing_array.push(generated_item.clone());
         }
     }
-
-    Ok(())
 }
 
 fn is_mcp_servers_key(key: Option<&str>) -> bool {

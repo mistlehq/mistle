@@ -587,7 +587,7 @@ export interface paths {
                     mode: number;
                     path: string;
                     /** @enum {string} */
-                    writeMode?: "overwrite" | "if-absent";
+                    writeMode?: "overwrite" | "if-absent" | "merge";
                   }[];
                   launchArgs?: string[];
                 };
@@ -1066,7 +1066,7 @@ export interface paths {
                       mode: number;
                       path: string;
                       /** @enum {string} */
-                      writeMode?: "overwrite" | "if-absent";
+                      writeMode?: "overwrite" | "if-absent" | "merge";
                     }[];
                     launchArgs?: string[];
                   };
