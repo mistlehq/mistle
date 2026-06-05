@@ -445,7 +445,7 @@ describe("slack webhook handler", () => {
           body: {
             channel_id: "C123",
             thread_ts: "1729999330.000000",
-            status: "Working...",
+            status: "working...",
             loading_messages: [
               "Working through it...",
               "Keeping at it...",

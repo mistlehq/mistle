@@ -24,7 +24,7 @@ const SlackTimestampToleranceSeconds = 300;
 const SlackConversationsRepliesPath = "conversations.replies";
 const SlackAssistantThreadsSetStatusPath = "assistant.threads.setStatus";
 const SlackWebhookPayloadStateKey = "slack.webhook.payload";
-const SlackAssistantStatus = "Working...";
+const SlackAssistantStatus = "working...";
 const SlackAssistantLoadingMessages = [
   "Working through it...",
   "Keeping at it...",
