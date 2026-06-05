@@ -18,6 +18,7 @@ const GitHubRepositorySchema = z.looseObject({
   owner: z
     .looseObject({
       login: z.string().min(1),
+      type: z.string().min(1).optional(),
     })
     .optional(),
   default_branch: z.string().min(1).optional().nullable(),
@@ -37,6 +38,17 @@ const GitHubContributorSchema = z.looseObject({
   type: z.string().min(1).optional(),
 });
 
+const GitHubTeamSchema = z.looseObject({
+  id: z.union([z.string().min(1), z.number().int()]),
+  name: z.string().min(1),
+  slug: z.string().min(1),
+  organization: z
+    .looseObject({
+      login: z.string().min(1),
+    })
+    .optional(),
+});
+
 const GitHubInstallationRepositoriesResponseSchema = z.looseObject({
   repositories: z.array(GitHubRepositorySchema),
 });
@@ -46,6 +58,7 @@ const GitHubUserRepositoriesResponseSchema = z.array(GitHubRepositorySchema);
 type GitHubRepository = z.output<typeof GitHubRepositorySchema>;
 type GitHubBranch = z.output<typeof GitHubBranchSchema>;
 type GitHubContributor = z.output<typeof GitHubContributorSchema>;
+type GitHubTeam = z.output<typeof GitHubTeamSchema>;
 
 type GitHubListConnectionResourcesInput = ListConnectionResourcesInput<
   GitHubTargetConfig,
@@ -56,6 +69,7 @@ type GitHubListConnectionResourcesInput = ListConnectionResourcesInput<
 const GitHubRepositoryKind = "repository";
 const GitHubBranchKind = "branch";
 const GitHubUserKind = "user";
+const GitHubTeamKind = "team";
 const GitHubPageSize = 100;
 
 function createGitHubOctokit(input: { apiBaseUrl: string; token: string }): Octokit {
@@ -111,6 +125,21 @@ function toUserResource(input: {
     metadata: {
       repositoryFullName: input.repositoryFullName,
       type: input.contributor.type ?? "User",
+    },
+  };
+}
+
+function toTeamResource(input: {
+  team: GitHubTeam;
+  organizationLogin: string;
+}): DiscoveredIntegrationResource {
+  return {
+    handle: input.team.slug,
+    displayName: `${input.team.name} (${input.organizationLogin})`,
+    metadata: {
+      organizationLogins: [input.organizationLogin],
+      name: input.team.name,
+      slug: input.team.slug,
     },
   };
 }
@@ -256,6 +285,32 @@ async function listGitHubRepositoryContributors(input: {
   }
 }
 
+async function listGitHubOrganizationTeams(input: {
+  apiBaseUrl: string;
+  token: string;
+  organizationLogin: string;
+}): Promise<ReadonlyArray<GitHubTeam>> {
+  const octokit = createGitHubOctokit({
+    apiBaseUrl: input.apiBaseUrl,
+    token: input.token,
+  });
+
+  const teams: GitHubTeam[] = [];
+  for (let page = 1; ; page += 1) {
+    const response = await octokit.rest.teams.list({
+      org: input.organizationLogin,
+      per_page: GitHubPageSize,
+      page,
+    });
+    const parsedResponse = z.array(GitHubTeamSchema).parse(response.data);
+    teams.push(...parsedResponse);
+
+    if (parsedResponse.length < GitHubPageSize) {
+      return teams;
+    }
+  }
+}
+
 async function mapRepositoriesWithConcurrency<T>(input: {
   repositories: readonly GitHubRepository[];
   concurrency: number;
@@ -300,6 +355,55 @@ function dedupeResourcesByHandle(
   return Array.from(resourcesByHandle.values()).sort((left, right) =>
     left.handle.localeCompare(right.handle),
   );
+}
+
+function dedupeTeamResourcesByHandle(
+  resources: readonly DiscoveredIntegrationResource[],
+): DiscoveredIntegrationResource[] {
+  const resourcesByHandle = new Map<string, DiscoveredIntegrationResource>();
+
+  for (const resource of resources) {
+    const existingResource = resourcesByHandle.get(resource.handle);
+    if (existingResource === undefined) {
+      resourcesByHandle.set(resource.handle, resource);
+      continue;
+    }
+
+    const existingOrganizationLogins = parseStringArrayMetadata(
+      existingResource.metadata["organizationLogins"],
+    );
+    const nextOrganizationLogins = parseStringArrayMetadata(
+      resource.metadata["organizationLogins"],
+    );
+    const organizationLogins = [
+      ...new Set([...existingOrganizationLogins, ...nextOrganizationLogins]),
+    ].sort((left, right) => left.localeCompare(right));
+    const teamName =
+      typeof existingResource.metadata["name"] === "string"
+        ? existingResource.metadata["name"]
+        : existingResource.handle;
+
+    resourcesByHandle.set(resource.handle, {
+      ...existingResource,
+      displayName: `${teamName} (${organizationLogins.join(", ")})`,
+      metadata: {
+        ...existingResource.metadata,
+        organizationLogins,
+      },
+    });
+  }
+
+  return Array.from(resourcesByHandle.values()).sort((left, right) =>
+    left.displayName.localeCompare(right.displayName),
+  );
+}
+
+function parseStringArrayMetadata(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((item): item is string => typeof item === "string");
 }
 
 async function listGitHubBranches(input: {
@@ -354,6 +458,50 @@ async function listGitHubUsers(input: {
   return dedupeResourcesByHandle(users);
 }
 
+function listGitHubOrganizationLogins(
+  repositories: readonly GitHubRepository[],
+): ReadonlyArray<string> {
+  const organizationLogins = new Set<string>();
+
+  for (const repository of repositories) {
+    if (repository.owner?.type !== "Organization") {
+      continue;
+    }
+
+    organizationLogins.add(repository.owner.login);
+  }
+
+  return [...organizationLogins].sort((left, right) => left.localeCompare(right));
+}
+
+async function listGitHubTeams(input: {
+  apiBaseUrl: string;
+  credential: string;
+  repositories: readonly GitHubRepository[];
+}): Promise<ReadonlyArray<DiscoveredIntegrationResource>> {
+  const organizationLogins = listGitHubOrganizationLogins(input.repositories);
+  const teamResources: DiscoveredIntegrationResource[] = [];
+
+  for (const organizationLogin of organizationLogins) {
+    const teams = await listGitHubOrganizationTeams({
+      apiBaseUrl: input.apiBaseUrl,
+      token: input.credential,
+      organizationLogin,
+    });
+
+    teamResources.push(
+      ...teams.map((team) =>
+        toTeamResource({
+          team,
+          organizationLogin: team.organization?.login ?? organizationLogin,
+        }),
+      ),
+    );
+  }
+
+  return dedupeTeamResourcesByHandle(teamResources);
+}
+
 export async function listGitHubConnectionResources(
   input: GitHubListConnectionResourcesInput,
 ): Promise<ListConnectionResourcesResult> {
@@ -393,6 +541,16 @@ export async function listGitHubConnectionResources(
   if (input.kind === GitHubUserKind) {
     return {
       resources: await listGitHubUsers({
+        apiBaseUrl: input.target.config.apiBaseUrl,
+        credential: input.credential.value,
+        repositories,
+      }),
+    };
+  }
+
+  if (input.kind === GitHubTeamKind) {
+    return {
+      resources: await listGitHubTeams({
         apiBaseUrl: input.target.config.apiBaseUrl,
         credential: input.credential.value,
         repositories,

@@ -88,6 +88,10 @@ _Avoid_: Filter field
 A match rule applied to a **Trigger event parameter** when deciding whether a **Trigger event** matches a **Trigger**.
 _Avoid_: Exclusion when the rule is one match mode among several
 
+**GitHub team review target**:
+A GitHub team selected as the requested review target for a provider pull request review-request **Trigger event**.
+_Avoid_: GitHub team identity, organization-qualified team
+
 **Trigger conversation**:
 A Mistle-owned **Conversation** created or reused while handling a **Trigger** run.
 _Avoid_: Automation conversation
@@ -393,6 +397,8 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A provider pull request activity should be represented as separate **Trigger events** for each supported activity rather than one broad activity event with an action parameter.
 - A **Trigger event** may expose **Trigger event parameters**.
 - A **Trigger event** for a provider review-request event should expose the requested reviewer or team as **Trigger event parameters** instead of hardcoding a Mistle reviewer policy.
+- A **GitHub team review target** matches GitHub's team slug in the provider event payload, not an organization-qualified team identity.
+- A **GitHub team review target** can be discovered only from a GitHub organization that owns accessible repositories.
 - A **Trigger event** for a removed provider review request delivers cancellation intent into the **Trigger conversation**; it does not imply hard runtime cancellation.
 - A **Trigger event parameter** may have one or more **Trigger event parameter rules**.
 - A **Trigger event parameter rule** may include or exclude matching provider event values.
@@ -630,3 +636,4 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - "active thread" could imply a different sandbox — resolved: use **Active Codex thread** for the selected chat conversation inside the same **Sandbox session**.
 - Switching threads could imply changing the whole workbench — resolved: thread switching changes the **Active Codex thread** without changing the **Sandbox session**.
 - "delete session" could mean hard deletion or user-visible removal — resolved: use **Deleted session** for a session hidden from ordinary lists while retaining its historical record.
+- "GitHub team" could mean either an organization-scoped GitHub team identity or the requested review target value delivered in a pull request webhook — resolved: use **GitHub team review target** for the trigger-filter value, which is the GitHub team slug.

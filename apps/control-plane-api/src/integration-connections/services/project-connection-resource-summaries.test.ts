@@ -30,6 +30,12 @@ describe("projectConnectionResourceSummaries", () => {
         count: 0,
         syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
       },
+      {
+        kind: "team",
+        selectionMode: "multi",
+        count: 0,
+        syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
+      },
     ]);
   });
 
@@ -70,6 +76,12 @@ describe("projectConnectionResourceSummaries", () => {
       },
       {
         kind: "user",
+        selectionMode: "multi",
+        count: 0,
+        syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
+      },
+      {
+        kind: "team",
         selectionMode: "multi",
         count: 0,
         syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,

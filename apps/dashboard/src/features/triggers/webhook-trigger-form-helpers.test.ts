@@ -150,10 +150,11 @@ const GitHubEventOptions: readonly WebhookTriggerEventOption[] = [
       {
         id: "requestedTeam",
         label: "requested GitHub team",
-        kind: "string",
+        kind: "resource-select",
+        resourceKind: "team",
         payloadPath: ["requested_team", "slug"],
         prefix: "for team",
-        placeholder: "Any GitHub team slug",
+        placeholder: "Any GitHub team",
       },
     ],
   },

@@ -47,6 +47,10 @@ const PullRequestOpenedTriggerId = createWebhookTriggerEventId({
   webhookSourceId: GitHubWebhookSourceId,
   eventType: "github.pull_request.opened",
 });
+const PullRequestReviewRequestedTriggerId = createWebhookTriggerEventId({
+  webhookSourceId: GitHubWebhookSourceId,
+  eventType: "github.pull_request.review_requested",
+});
 const PullRequestReviewCommentCreatedTriggerId = createWebhookTriggerEventId({
   webhookSourceId: GitHubWebhookSourceId,
   eventType: "github.pull_request_review_comment.created",
@@ -87,6 +91,14 @@ const GitHubEventOptions: readonly WebhookTriggerEventOption[] = [
     connectionLabel: "GitHub Engineering",
     categoryPrefix: "GitHub Engineering",
     overrides: { id: PullRequestOpenedTriggerId },
+  }),
+  createGitHubEventOption({
+    eventType: "github.pull_request.review_requested",
+    connectionId: GitHubConnectionId,
+    webhookSourceId: GitHubWebhookSourceId,
+    connectionLabel: "GitHub Engineering",
+    categoryPrefix: "GitHub Engineering",
+    overrides: { id: PullRequestReviewRequestedTriggerId },
   }),
   createGitHubEventOption({
     eventType: "github.pull_request_review.submitted",
@@ -200,6 +212,38 @@ const StoryGithubUserResources: IntegrationConnectionResources = {
   ],
 };
 
+const StoryGithubTeamResources: IntegrationConnectionResources = {
+  connectionId: GitHubConnectionId,
+  familyId: "github",
+  kind: "team",
+  syncState: "ready",
+  lastSyncedAt: "2026-03-17T00:00:00.000Z",
+  items: [
+    {
+      id: "icr_github_team_1",
+      familyId: "github",
+      kind: "team",
+      handle: "platform",
+      displayName: "Platform (mistlehq)",
+      status: "accessible",
+      metadata: {
+        organizationLogins: ["mistlehq"],
+      },
+    },
+    {
+      id: "icr_github_team_2",
+      familyId: "github",
+      kind: "team",
+      handle: "security",
+      displayName: "Security (mistlehq)",
+      status: "accessible",
+      metadata: {
+        organizationLogins: ["mistlehq"],
+      },
+    },
+  ],
+};
+
 const StorySlackChannelResources: IntegrationConnectionResources = {
   connectionId: SlackConnectionId,
   familyId: "slack",
@@ -274,6 +318,10 @@ function createWebhookTriggerEventPickerStoryQueryClient(): QueryClient {
   queryClient.setQueryData(
     ["trigger-trigger-parameters", GitHubConnectionId, "user"],
     StoryGithubUserResources,
+  );
+  queryClient.setQueryData(
+    ["trigger-trigger-parameters", GitHubConnectionId, "team"],
+    StoryGithubTeamResources,
   );
   queryClient.setQueryData(
     ["trigger-trigger-parameters", SlackConnectionId, "channel"],
@@ -361,6 +409,21 @@ export const NegativeEqualityParameters: Story = {
         author: isNotRule("dependabot"),
         baseBranch: isRule("main"),
         repository: isRule("mistlehq/platform"),
+      },
+    },
+    eventOptions: GitHubEventOptions,
+  },
+};
+
+export const GitHubReviewRequestTeamTarget: Story = {
+  name: "GitHub review request team target",
+  args: {
+    hasConnectedIntegrations: true,
+    selectedConnectionId: GitHubConnectionId,
+    selectedEventIds: [PullRequestReviewRequestedTriggerId],
+    eventParameterRules: {
+      [PullRequestReviewRequestedTriggerId]: {
+        requestedTeam: isRule("platform"),
       },
     },
     eventOptions: GitHubEventOptions,

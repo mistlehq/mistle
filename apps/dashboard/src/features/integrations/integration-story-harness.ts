@@ -321,16 +321,30 @@ export const DemoIntegrationConnections: readonly IntegrationConnection[] = [
     updatedAt: "2026-03-11T04:30:00.000Z",
     resources: [
       {
-        kind: "repositories",
+        kind: "repository",
         selectionMode: "multi",
         count: 41,
         syncState: "ready",
         lastSyncedAt: "2026-03-11T04:25:00.000Z",
       },
       {
-        kind: "organizations",
-        selectionMode: "single",
-        count: 1,
+        kind: "branch",
+        selectionMode: "multi",
+        count: 126,
+        syncState: "ready",
+        lastSyncedAt: "2026-03-11T04:25:00.000Z",
+      },
+      {
+        kind: "user",
+        selectionMode: "multi",
+        count: 18,
+        syncState: "ready",
+        lastSyncedAt: "2026-03-11T04:25:00.000Z",
+      },
+      {
+        kind: "team",
+        selectionMode: "multi",
+        count: 4,
         syncState: "ready",
         lastSyncedAt: "2026-03-11T04:25:00.000Z",
       },
@@ -346,15 +360,15 @@ export const DemoIntegrationConnections: readonly IntegrationConnection[] = [
     updatedAt: "2026-03-10T10:15:00.000Z",
     resources: [
       {
-        kind: "repositories",
+        kind: "repository",
         selectionMode: "multi",
         count: 0,
         syncState: "error",
         lastErrorMessage: "GitHub returned a 403 while reading repository visibility.",
       },
       {
-        kind: "organizations",
-        selectionMode: "single",
+        kind: "team",
+        selectionMode: "multi",
         count: 0,
         syncState: "never-synced",
       },
@@ -393,7 +407,7 @@ export function createDetailViewStoryProps(input?: {
             {
               id: "repo_1",
               familyId: "github",
-              kind: "repositories",
+              kind: "repository",
               handle: "mistle/dashboard",
               displayName: "mistle/dashboard",
               status: "accessible",
@@ -402,14 +416,98 @@ export function createDetailViewStoryProps(input?: {
             {
               id: "repo_2",
               familyId: "github",
-              kind: "repositories",
+              kind: "repository",
               handle: "mistle/control-plane-api",
               displayName: "mistle/control-plane-api",
               status: "accessible",
               metadata: {},
             },
           ],
-          kind: "repositories",
+          kind: "repository",
+          errorMessage: null,
+        },
+      },
+      {
+        connectionId: "icn_github_primary",
+        state: {
+          isLoading: false,
+          items: [
+            {
+              id: "branch_1",
+              familyId: "github",
+              kind: "branch",
+              handle: "mistle/dashboard:main",
+              displayName: "mistle/dashboard:main",
+              status: "accessible",
+              metadata: {},
+            },
+            {
+              id: "branch_2",
+              familyId: "github",
+              kind: "branch",
+              handle: "mistle/control-plane-api:main",
+              displayName: "mistle/control-plane-api:main",
+              status: "accessible",
+              metadata: {},
+            },
+          ],
+          kind: "branch",
+          errorMessage: null,
+        },
+      },
+      {
+        connectionId: "icn_github_primary",
+        state: {
+          isLoading: false,
+          items: [
+            {
+              id: "user_1",
+              familyId: "github",
+              kind: "user",
+              handle: "ada-lovelace",
+              displayName: "Ada Lovelace",
+              status: "accessible",
+              metadata: {},
+            },
+            {
+              id: "user_2",
+              familyId: "github",
+              kind: "user",
+              handle: "grace-hopper",
+              displayName: "Grace Hopper",
+              status: "accessible",
+              metadata: {},
+            },
+          ],
+          kind: "user",
+          errorMessage: null,
+        },
+      },
+      {
+        connectionId: "icn_github_primary",
+        state: {
+          isLoading: false,
+          items: [
+            {
+              id: "team_1",
+              familyId: "github",
+              kind: "team",
+              handle: "platform",
+              displayName: "Platform (mistle)",
+              status: "accessible",
+              metadata: {},
+            },
+            {
+              id: "team_2",
+              familyId: "github",
+              kind: "team",
+              handle: "security",
+              displayName: "Security (mistle)",
+              status: "accessible",
+              metadata: {},
+            },
+          ],
+          kind: "team",
           errorMessage: null,
         },
       },
@@ -418,7 +516,16 @@ export function createDetailViewStoryProps(input?: {
         state: {
           isLoading: false,
           items: [],
-          kind: "repositories",
+          kind: "repository",
+          errorMessage: null,
+        },
+      },
+      {
+        connectionId: "icn_github_archive",
+        state: {
+          isLoading: false,
+          items: [],
+          kind: "team",
           errorMessage: null,
         },
       },
@@ -434,7 +541,7 @@ export function createRefreshingDetailViewStoryProps() {
     refreshingResourceKeys: new Set<string>([
       createIntegrationConnectionResourceKey({
         connectionId: primaryConnection.id,
-        kind: "repositories",
+        kind: "repository",
       }),
     ]),
   });
@@ -496,6 +603,12 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
             count: 0,
             kind: "user",
             syncState: "never-synced",
+          },
+          {
+            count: 2,
+            kind: "team",
+            lastSyncedAt: "2026-04-13T15:37:00.000Z",
+            syncState: "ready",
           },
         ],
         status: "active",
@@ -614,6 +727,38 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
           errorMessage: null,
         },
       },
+      {
+        connectionId,
+        state: {
+          isLoading: false,
+          items: [
+            {
+              id: "team_dense_1",
+              familyId: "github",
+              kind: "team",
+              handle: "platform",
+              displayName: "Platform (mistlehq)",
+              status: "accessible",
+              metadata: {
+                organizationLogins: ["mistlehq"],
+              },
+            },
+            {
+              id: "team_dense_2",
+              familyId: "github",
+              kind: "team",
+              handle: "security",
+              displayName: "Security (mistlehq)",
+              status: "accessible",
+              metadata: {
+                organizationLogins: ["mistlehq"],
+              },
+            },
+          ],
+          kind: "team",
+          errorMessage: null,
+        },
+      },
     ]),
     webhookPolicy: resolveIntegrationConnectionDetailWebhookPolicy({
       webhookSource: { lifecycle: "implicit" },
@@ -697,17 +842,22 @@ export function createGitHubNotSyncedDetailViewStoryProps(): IntegrationConnecti
         resources: [
           {
             count: 0,
-            kind: "repositories",
+            kind: "repository",
             syncState: "never-synced",
           },
           {
             count: 0,
-            kind: "branches",
+            kind: "branch",
             syncState: "never-synced",
           },
           {
             count: 0,
-            kind: "users",
+            kind: "user",
+            syncState: "never-synced",
+          },
+          {
+            count: 0,
+            kind: "team",
             syncState: "never-synced",
           },
         ],
@@ -721,7 +871,7 @@ export function createGitHubNotSyncedDetailViewStoryProps(): IntegrationConnecti
         state: {
           isLoading: false,
           items: [],
-          kind: "repositories",
+          kind: "repository",
           errorMessage: null,
         },
       },
@@ -730,7 +880,7 @@ export function createGitHubNotSyncedDetailViewStoryProps(): IntegrationConnecti
         state: {
           isLoading: false,
           items: [],
-          kind: "branches",
+          kind: "branch",
           errorMessage: null,
         },
       },
@@ -739,7 +889,16 @@ export function createGitHubNotSyncedDetailViewStoryProps(): IntegrationConnecti
         state: {
           isLoading: false,
           items: [],
-          kind: "users",
+          kind: "user",
+          errorMessage: null,
+        },
+      },
+      {
+        connectionId,
+        state: {
+          isLoading: false,
+          items: [],
+          kind: "team",
           errorMessage: null,
         },
       },
@@ -985,6 +1144,13 @@ export function createGitHubEnterpriseServerDetailViewStoryProps(): IntegrationC
         count: 18,
         items: ["main", "release/2026.04", "feat/self-hosted-webhooks", "ops/incident-runbook"],
         kind: "branch",
+        lastSyncedAt: DenseStoryLastSyncedAt,
+        syncState: "ready",
+      },
+      {
+        count: 2,
+        items: ["Platform (platform)", "Security (platform)"],
+        kind: "team",
         lastSyncedAt: DenseStoryLastSyncedAt,
         syncState: "ready",
       },

@@ -83,16 +83,36 @@ export function createGitHubResourceDefinitions(input: {
         return gitHubRepositoryApiKeyResourceCredential;
       },
     },
+    {
+      kind: "team",
+      selectionMode: IntegrationResourceSelectionModes.MULTI,
+      bindingField: "teams",
+      displayNameSingular: "team",
+      displayNamePlural: "teams",
+      description: "GitHub teams discovered from organizations with accessible repositories.",
+      credential: ({ connection }) => {
+        const parsedConnectionConfig = GitHubConnectionConfigSchema.parse(connection.config);
+
+        if (
+          parsedConnectionConfig.connection_method ===
+          IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
+        ) {
+          return GitHubRepositoryAppInstallationResourceCredential;
+        }
+
+        return gitHubRepositoryApiKeyResourceCredential;
+      },
+    },
   ];
 }
 
 export const GitHubResourceSyncTriggers: ReadonlyArray<IntegrationResourceSyncTrigger> = [
   {
     eventType: "github.installation_repositories.added",
-    resourceKinds: ["repository"],
+    resourceKinds: ["repository", "team"],
   },
   {
     eventType: "github.installation_repositories.removed",
-    resourceKinds: ["repository"],
+    resourceKinds: ["repository", "team"],
   },
 ];

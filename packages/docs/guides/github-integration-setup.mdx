@@ -47,6 +47,8 @@ To keep the integration working, Mistle always overrides the webhook and callbac
 
 The default manifest includes the GitHub App **Email addresses** user permission with **Read-only** access. This is required for GitHub account linking because Mistle reads the authenticated GitHub user's verified email addresses during linked-account authorization.
 
+The default manifest also includes the **Members** organization permission with **Read-only** access. This lets Mistle sync GitHub teams from organizations with accessible repositories so review-request triggers can offer team pickers.
+
 ### Option 1B: Use An Existing GitHub App
 
 If you already created a GitHub App in GitHub.com or GHES, you can connect it directly in Mistle.
@@ -68,9 +70,10 @@ Configure these values in GitHub:
    | Metadata      | Read-only      | List repos.<br />Read basic repo context.                                                             |
    | Pull requests | Read and write | Open/update PRs.<br />Request reviewers.<br />Comment/review PRs.<br />Merge PRs (repo rules apply).  |
 
-6. If this app will be used for GitHub account linking, enable the **Email addresses** user permission with **Read-only** access.
-7. For **Subscribe to events**, enable the events you want Mistle to take action on. This can be changed later.
-8. **Private key** - Generate and download a PEM private key from GitHub App settings.
+6. In **Organization Permissions**, enable **Members** with **Read-only** access when the app should sync GitHub teams for review-request trigger filters.
+7. If this app will be used for GitHub account linking, enable the **Email addresses** user permission with **Read-only** access.
+8. For **Subscribe to events**, enable the events you want Mistle to take action on. This can be changed later.
+9. **Private key** - Generate and download a PEM private key from GitHub App settings.
 
 ### Connect The Existing App In Mistle
 
@@ -122,6 +125,8 @@ Create a GitHub personal access token or other API token with the scopes your wo
 | Field   | Value        |
 | ------- | ------------ |
 | API key | GitHub token |
+
+To sync GitHub teams for review-request trigger filters, the token must be able to read organization members for each organization whose teams should be listed.
 
 ## GitHub Enterprise Server
 

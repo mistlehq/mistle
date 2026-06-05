@@ -251,6 +251,11 @@ describe.concurrent("control-plane worker integration webhook event handling", (
         connectionId: scope.connectionId,
         kind: "repository",
       },
+      {
+        organizationId: scope.organizationId,
+        connectionId: scope.connectionId,
+        kind: "team",
+      },
     ]);
   });
 });

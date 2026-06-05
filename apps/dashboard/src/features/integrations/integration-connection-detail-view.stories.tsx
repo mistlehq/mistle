@@ -208,7 +208,7 @@ export const InteractiveRefresh: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.queryByText("Archive Mirror")).toBeNull();
     await expect(canvas.getByText("Engineering GitHub")).toBeVisible();
-    const refreshButton = canvas.getByRole("button", { name: "Refresh repositories" });
+    const refreshButton = canvas.getByRole("button", { name: "Refresh repository" });
     await userEvent.click(refreshButton);
     await expect(refreshButton).toBeDisabled();
   },

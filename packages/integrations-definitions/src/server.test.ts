@@ -105,8 +105,22 @@ describe("integrations-definitions server", () => {
           kind: "repository",
           bindingField: "repositories",
         }),
+        expect.objectContaining({
+          kind: "team",
+          bindingField: "teams",
+        }),
       ]),
     );
+    expect(githubCloudDefinition?.resourceSyncTriggers).toEqual([
+      {
+        eventType: "github.installation_repositories.added",
+        resourceKinds: ["repository", "team"],
+      },
+      {
+        eventType: "github.installation_repositories.removed",
+        resourceKinds: ["repository", "team"],
+      },
+    ]);
     expect(githubEnterpriseServerDefinition?.webhookHandler).toBeDefined();
     expect(githubEnterpriseServerDefinition?.webhookSource).toMatchObject({
       lifecycle: "implicit",
@@ -144,6 +158,10 @@ describe("integrations-definitions server", () => {
         expect.objectContaining({
           kind: "repository",
           bindingField: "repositories",
+        }),
+        expect.objectContaining({
+          kind: "team",
+          bindingField: "teams",
         }),
       ]),
     );

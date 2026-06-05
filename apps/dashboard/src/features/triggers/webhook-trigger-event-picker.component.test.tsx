@@ -37,6 +37,10 @@ const PullRequestReviewRequestedTriggerId = createWebhookTriggerEventId({
   webhookSourceId: GitHubWebhookSourceId,
   eventType: "github.pull_request.review_requested",
 });
+const PullRequestReviewRequestRemovedTriggerId = createWebhookTriggerEventId({
+  webhookSourceId: GitHubWebhookSourceId,
+  eventType: "github.pull_request.review_request_removed",
+});
 
 const WebhookEventOptions: readonly WebhookTriggerEventOption[] = [
   createGithubIssueCommentCreatedEventOption({
@@ -68,12 +72,19 @@ const PullRequestReviewRequestedEventOption: WebhookTriggerEventOption = {
     {
       id: "requestedTeam",
       label: "requested GitHub team",
-      kind: "string",
+      kind: "resource-select",
+      resourceKind: "team",
       payloadPath: ["requested_team", "slug"],
       prefix: "for team",
-      placeholder: "Any GitHub team slug",
+      placeholder: "Any GitHub team",
     },
   ],
+};
+const PullRequestReviewRequestRemovedEventOption: WebhookTriggerEventOption = {
+  ...PullRequestReviewRequestedEventOption,
+  id: PullRequestReviewRequestRemovedTriggerId,
+  eventType: "github.pull_request.review_request_removed",
+  label: "Pull request review request removed",
 };
 
 function isRule(value: string) {
@@ -148,6 +159,31 @@ function renderTriggerPicker(input: {
         displayName: "octocat",
         status: "accessible",
         metadata: {},
+      },
+    ],
+    page: {
+      totalResults: 1,
+      nextCursor: null,
+      previousCursor: null,
+    },
+  });
+  TestQueryClient.setQueryData(["trigger-trigger-parameters", input.selectedConnectionId, "team"], {
+    connectionId: input.selectedConnectionId,
+    familyId: "github",
+    kind: "team",
+    syncState: "ready",
+    items: [
+      {
+        id: "icr_github_team_1",
+        familyId: "github",
+        kind: "team",
+        externalId: "2001",
+        handle: "platform",
+        displayName: "Platform (mistle)",
+        status: "accessible",
+        metadata: {
+          organizationLogins: ["mistle"],
+        },
       },
     ],
     page: {
@@ -563,7 +599,66 @@ describe("WebhookTriggerEventPicker", () => {
     expect(screen.getByText("for reviewer")).toBeDefined();
     expect(screen.getByText("is")).toBeDefined();
     expect(screen.queryByText("for team")).toBeNull();
-    expect(container.textContent).not.toContain("Any GitHub team slug");
+    expect(container.textContent).not.toContain("Any GitHub team");
+  });
+
+  it("renders GitHub review request team targets from synced team resources", async () => {
+    const { container } = renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedEventIds: [PullRequestReviewRequestedTriggerId],
+      eventOptions: [PullRequestReviewRequestedEventOption],
+      eventParameterRules: {
+        [PullRequestReviewRequestedTriggerId]: {
+          requestedTeam: isRule("platform"),
+        },
+      },
+    });
+
+    expect(screen.getByText("Pull request review requested")).toBeDefined();
+    expect(screen.getByText("for team")).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getAllByDisplayValue("Platform (mistle)").length).toBeGreaterThan(0);
+    });
+    expect(container.textContent).not.toContain("Any requested reviewer");
+  });
+
+  it("renders unavailable GitHub review request team target values", async () => {
+    renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedEventIds: [PullRequestReviewRequestedTriggerId],
+      eventOptions: [PullRequestReviewRequestedEventOption],
+      eventParameterRules: {
+        [PullRequestReviewRequestedTriggerId]: {
+          requestedTeam: isRule("legacy-team"),
+        },
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByDisplayValue("legacy-team (Unavailable)").length).toBeGreaterThan(0);
+    });
+  });
+
+  it("renders GitHub review request removed team targets from synced team resources", async () => {
+    renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedEventIds: [PullRequestReviewRequestRemovedTriggerId],
+      eventOptions: [PullRequestReviewRequestRemovedEventOption],
+      eventParameterRules: {
+        [PullRequestReviewRequestRemovedTriggerId]: {
+          requestedTeam: isRule("platform"),
+        },
+      },
+    });
+
+    expect(screen.getByText("Pull request review request removed")).toBeDefined();
+    expect(screen.getByText("for team")).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getAllByDisplayValue("Platform (mistle)").length).toBeGreaterThan(0);
+    });
   });
 
   it("preserves exclusion rules for GitHub review request target parameters", () => {

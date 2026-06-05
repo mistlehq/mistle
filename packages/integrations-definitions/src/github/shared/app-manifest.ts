@@ -85,6 +85,7 @@ export const GitHubAppManifestTemplate = {
     contents: "write",
     emails: "read",
     issues: "write",
+    members: "read",
     metadata: "read",
     pull_requests: "write",
   },

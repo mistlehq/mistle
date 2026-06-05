@@ -25,21 +25,21 @@ const allStateArgs: React.ComponentProps<typeof IntegrationResourceList> = {
       syncState: "ready",
     },
     {
-      count: 2,
-      kind: "workspace",
-      lastSyncedAt: "2026-04-13T15:37:00.000Z",
-      syncState: "syncing",
-      isRefreshing: true,
-    },
-    {
       count: 0,
+      isRefreshing: true,
       kind: "branch",
-      syncState: "never-synced",
+      syncState: "syncing",
     },
     {
       count: 0,
       kind: "user",
       syncState: "error",
+    },
+    {
+      count: 2,
+      kind: "team",
+      lastSyncedAt: "2026-04-13T15:37:00.000Z",
+      syncState: "ready",
     },
   ],
   resourceItemsByKey: new Map([
@@ -72,11 +72,11 @@ const allStateArgs: React.ComponentProps<typeof IntegrationResourceList> = {
       },
     ],
     [
-      "icn_story:workspace",
+      "icn_story:branch",
       {
         isLoading: true,
         items: [],
-        kind: "workspace",
+        kind: "branch",
         errorMessage: null,
       },
     ],
@@ -87,6 +87,38 @@ const allStateArgs: React.ComponentProps<typeof IntegrationResourceList> = {
         items: [],
         kind: "user",
         errorMessage: "GitHub returned a 403 while loading user data.",
+      },
+    ],
+    [
+      "icn_story:team",
+      {
+        isLoading: false,
+        items: [
+          {
+            id: "team_1",
+            familyId: "github",
+            kind: "team",
+            handle: "platform",
+            displayName: "Platform (mistlehq)",
+            status: "accessible",
+            metadata: {
+              organizationLogins: ["mistlehq"],
+            },
+          },
+          {
+            id: "team_2",
+            familyId: "github",
+            kind: "team",
+            handle: "security",
+            displayName: "Security (mistlehq)",
+            status: "accessible",
+            metadata: {
+              organizationLogins: ["mistlehq"],
+            },
+          },
+        ],
+        kind: "team",
+        errorMessage: null,
       },
     ],
   ]),

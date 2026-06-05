@@ -195,12 +195,12 @@ function EventParameterFields(input: {
   const shouldRenderReviewTargetControl =
     isGitHubReviewRequestEvent(input.eventOption.eventType) &&
     requestedReviewerParameter?.kind === "resource-select" &&
-    requestedTeamParameter?.kind === "string";
+    requestedTeamParameter?.kind === "resource-select";
 
   if (
     shouldRenderReviewTargetControl &&
     requestedReviewerParameter?.kind === "resource-select" &&
-    requestedTeamParameter?.kind === "string"
+    requestedTeamParameter?.kind === "resource-select"
   ) {
     return (
       <>
@@ -394,12 +394,13 @@ function GitHubRequestedReviewTargetField(input: {
   requestedReviewerRule: WebhookTriggerEventParameterRule | undefined;
   requestedTeamParameter: Extract<
     NonNullable<WebhookTriggerEventOption["parameters"]>[number],
-    { kind: "string" }
+    { kind: "resource-select" }
   >;
   requestedTeamRule: WebhookTriggerEventParameterRule | undefined;
   onRuleChange: (parameterId: string, rule: WebhookTriggerEventParameterRule) => void;
 }): React.JSX.Element {
   const reviewerInputId = useId();
+  const teamInputId = useId();
   const requestedReviewerValue = input.requestedReviewerRule?.value ?? "";
   const requestedTeamValue = input.requestedTeamRule?.value ?? "";
   const initialSelectedKind: RequestedReviewTargetKind =
@@ -426,9 +427,28 @@ function GitHubRequestedReviewTargetField(input: {
     enabled: selectedKind === "reviewer" && input.connectionId.trim().length > 0,
     retry: false,
   });
+  const teamResourceQuery = useQuery({
+    queryKey: [
+      "trigger-trigger-parameters",
+      input.connectionId,
+      input.requestedTeamParameter.resourceKind,
+    ],
+    queryFn: async ({ signal }) =>
+      listIntegrationConnectionResources({
+        connectionId: input.connectionId,
+        kind: input.requestedTeamParameter.resourceKind,
+        signal,
+      }),
+    enabled: selectedKind === "team" && input.connectionId.trim().length > 0,
+    retry: false,
+  });
   const normalizedReviewerResourceOptions = normalizeResourceParameterOptions({
     items: reviewerResourceQuery.data?.items ?? [],
     value: requestedReviewerValue,
+  });
+  const normalizedTeamResourceOptions = normalizeResourceParameterOptions({
+    items: teamResourceQuery.data?.items ?? [],
+    value: requestedTeamValue,
   });
 
   function clearInactiveRule(kind: RequestedReviewTargetKind): void {
@@ -497,16 +517,29 @@ function GitHubRequestedReviewTargetField(input: {
           value={requestedReviewerValue.length === 0 ? undefined : requestedReviewerValue}
         />
       ) : (
-        <Input
-          className={EventParameterControlClassName}
-          onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+        <SingleSelectStringComboboxField
+          contentClassName="w-[min(22rem,calc(100vw-2rem))]"
+          inputId={teamInputId}
+          inputLabel={input.requestedTeamParameter.label}
+          inputWrapperClassName={EventParameterControlClassName}
+          onChange={(value) => {
             input.onRuleChange("requestedTeam", {
               operator: resolveEqualityOperator(input.requestedTeamRule),
-              value: event.currentTarget.value,
+              value: value ?? "",
             });
           }}
-          placeholder={input.requestedTeamParameter.placeholder ?? "Any GitHub team slug"}
-          value={requestedTeamValue}
+          options={normalizedTeamResourceOptions.map((option) => ({
+            value: option.handle,
+            label: option.displayName,
+          }))}
+          placeholder={
+            teamResourceQuery.isPending
+              ? "Loading..."
+              : normalizedTeamResourceOptions.length === 0
+                ? "No teams available"
+                : "Any GitHub team"
+          }
+          value={requestedTeamValue.length === 0 ? undefined : requestedTeamValue}
         />
       )}
     </span>

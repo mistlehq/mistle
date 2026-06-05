@@ -463,6 +463,8 @@ describe("integrations-definitions index", () => {
             }),
             expect.objectContaining({
               id: "requestedTeam",
+              kind: "resource-select",
+              resourceKind: "team",
               payloadPath: ["requested_team", "slug"],
             }),
           ]),
@@ -479,6 +481,8 @@ describe("integrations-definitions index", () => {
             }),
             expect.objectContaining({
               id: "requestedTeam",
+              kind: "resource-select",
+              resourceKind: "team",
               payloadPath: ["requested_team", "slug"],
             }),
           ]),
