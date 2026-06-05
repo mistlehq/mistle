@@ -466,7 +466,7 @@ function GitHubRequestedReviewTargetField(input: {
   }
 
   return (
-    <span className={EventParameterRowClassName}>
+    <div className={EventParameterRowClassName}>
       <Select
         modal={false}
         onValueChange={(value) => {
@@ -557,7 +557,7 @@ function GitHubRequestedReviewTargetField(input: {
           )}
         </div>
       )}
-    </span>
+    </div>
   );
 }
 
