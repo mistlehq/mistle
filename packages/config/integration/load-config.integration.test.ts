@@ -187,11 +187,20 @@ const controlPlaneApiEnvConfig = {
   },
   mcp: {
     url: mcpUrl,
+    trustForwardedHeaders: false,
     auth: {
       secret: mcpAuthSecret,
       issuer: mcpAuthIssuer,
       audience: mcpAuthAudience,
     },
+  },
+  billing: {
+    stripe: {
+      enabled: false,
+    },
+  },
+  cache: {
+    backend: "memory",
   },
   dashboard: {
     baseUrl: "http://127.0.0.1:5173",
@@ -259,9 +268,21 @@ const controlPlaneApiBaseFixtureConfig = {
       "2": "integration-master-key-fixture",
     },
   },
+  cache: {
+    backend: "valkey",
+    valkey: {
+      url: "redis://127.0.0.1:6379",
+      keyPrefix: "mistle:control:fixture",
+    },
+  },
 } as const;
 
 const controlPlaneWorkerEnvConfig = {
+  billing: {
+    stripe: {
+      enabled: false,
+    },
+  },
   database: {
     url: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
   },
@@ -377,12 +398,22 @@ const dataPlaneGatewayEnvConfig = {
       keyPrefix: "mistle:runtime-state:integration",
     },
   },
+  gatewayRelay: {
+    backend: "memory",
+  },
   dataPlaneApi: {
     baseUrl: "http://127.0.0.1:5002",
   },
   controlPlaneApi: {
     baseUrl: "http://127.0.0.1:5000",
     publicBaseUrl: "http://127.0.0.1:5000",
+    mcp: {
+      auth: {
+        secret: mcpAuthSecret,
+        issuer: mcpAuthIssuer,
+        audience: mcpAuthAudience,
+      },
+    },
   },
   internalAuth: {
     serviceToken,
@@ -410,6 +441,7 @@ const dataPlaneGatewayBaseFixtureConfig = {
   controlPlaneApi: {
     baseUrl: "http://127.0.0.1:5100",
     publicBaseUrl: "https://mistle.example.test",
+    mcp: dataPlaneGatewayEnvConfig.controlPlaneApi.mcp,
   },
 } as const;
 
@@ -676,7 +708,7 @@ describe("loadConfig integrations", () => {
     ).toBe(dataPlaneWorkflowMigrationUrl);
   });
 
-  it("does not include shared E2B API key env in data-plane API config", () => {
+  it("includes enabled E2B sandbox env in data-plane API config", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_API,
       configPath: tomlConfigFixturePath,
@@ -688,6 +720,12 @@ describe("loadConfig integrations", () => {
 
     expect(config.app.sandbox).toEqual({
       ...dataPlaneApiFixtureConfig.sandbox,
+      e2b: {
+        enabled: true,
+        apiKey: "fixture-e2b-api-key",
+        domain: "e2b.app",
+      },
+      tensorlake: undefined,
     });
   });
 
@@ -962,6 +1000,7 @@ describe("loadConfig integrations", () => {
         server: dataPlaneGatewayEnvConfig.server,
         database: dataPlaneGatewayEnvConfig.database,
         runtimeState: dataPlaneGatewayEnvConfig.runtimeState,
+        gatewayRelay: dataPlaneGatewayEnvConfig.gatewayRelay,
         dataPlaneApi: dataPlaneGatewayEnvConfig.dataPlaneApi,
         controlPlaneApi: dataPlaneGatewayEnvConfig.controlPlaneApi,
         internalAuth: dataPlaneGatewayEnvConfig.internalAuth,
