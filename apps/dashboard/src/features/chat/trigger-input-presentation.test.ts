@@ -192,6 +192,14 @@ describe("trigger input presentation", () => {
     expect(presentTriggerInput(originalText)).toBeNull();
   });
 
+  it("renders unchanged when an inner info-string fence line is inside a Markdown code fence", () => {
+    const originalText = ["```text", "```json", '{"text":"still in outer fence"}', "```"].join(
+      "\n",
+    );
+
+    expect(presentTriggerInput(originalText)).toBeNull();
+  });
+
   it("renders unchanged for malformed JSON", () => {
     expect(presentTriggerInput('Provider payload.event: {"text":"missing close"')).toBeNull();
   });

@@ -44,7 +44,8 @@ function findJsonObjectSpans(text: string): readonly JsonObjectSpan[] {
         if (
           openCodeFence !== null &&
           fence.marker === openCodeFence.marker &&
-          fence.length >= openCodeFence.length
+          fence.length >= openCodeFence.length &&
+          fence.hasOnlyWhitespaceSuffix
         ) {
           openCodeFence = null;
         } else if (openCodeFence === null) {
@@ -91,6 +92,7 @@ function findJsonObjectSpans(text: string): readonly JsonObjectSpan[] {
 }
 
 type MarkdownCodeFence = {
+  hasOnlyWhitespaceSuffix: boolean;
   length: number;
   marker: "`" | "~";
 };
@@ -111,7 +113,29 @@ function readMarkdownCodeFence(text: string, lineStartIndex: number): MarkdownCo
     length += 1;
   }
 
-  return length >= 3 ? { length, marker } : null;
+  if (length < 3) {
+    return null;
+  }
+
+  return {
+    hasOnlyWhitespaceSuffix: hasOnlyWhitespaceLineSuffix(text, index + length),
+    length,
+    marker,
+  };
+}
+
+function hasOnlyWhitespaceLineSuffix(text: string, startIndex: number): boolean {
+  for (let index = startIndex; index < text.length; index += 1) {
+    const character = text[index];
+    if (character === "\n") {
+      return true;
+    }
+    if (character !== " " && character !== "\t" && character !== "\r") {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function parseJsonObjectSpan(
