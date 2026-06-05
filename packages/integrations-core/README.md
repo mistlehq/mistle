@@ -168,6 +168,8 @@ flowchart TD
 - egress URL refs inside MCP definitions are resolved to concrete sandbox egress URLs
 - agent bindings with `mcpConfig` have the configured file path updated in-place (`toml` or `json`) before runtime-plan assembly
 
+- Runtime setup files may opt into `writeMode: "merge"` when a sandbox can start from an existing Snapshot and the runtime compiler needs to preserve inherited config. This is per-file, not a blanket runtime override: runtime compilers should emit narrow fragments only for files that are safe to apply in merge mode, and keep auth files, wrappers, generated binaries, or other runtime-owned files on `overwrite` or `if-absent`.
+
 - `integrations-core` validates cross-binding conflicts and assembles a deterministic `CompiledRuntimePlan`.
 
 ### 5) Runtime execution and egress

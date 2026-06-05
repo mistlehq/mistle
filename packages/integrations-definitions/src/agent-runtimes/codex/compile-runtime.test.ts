@@ -379,6 +379,47 @@ describe("compileCodexRuntime", () => {
     );
   });
 
+  it("uses merge-mode setup files when requested", () => {
+    const compiled = compileCodexRuntime({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      runtimeId: "codex",
+      runtimeConfig: {},
+      mcpServers: [createMistleMcpServer()],
+      mergeRuntimeSetupFiles: true,
+      refs: {
+        sandboxPaths: {
+          userHomeDir: "/root",
+          workspaceDir: "/root",
+          runtimeDataDir: "/var/lib/mistle",
+          runtimeArtifactDir: "/var/lib/mistle/artifacts",
+          runtimeArtifactBinDir: "/usr/local/bin",
+        },
+        artifactBinPath: (artifactName) => `/usr/local/bin/${artifactName}`,
+      },
+    });
+    const runtimeClients = renderRuntimeClients({
+      compiled,
+      egressRoutes: [],
+    });
+    const configFile = runtimeClients[0]?.setup.files.find(
+      (file) => file.fileId === "codex_config",
+    );
+    const agentsFile = runtimeClients[0]?.setup.files.find(
+      (file) => file.fileId === "codex_global_agents",
+    );
+
+    expect(configFile).toMatchObject({
+      writeMode: "merge",
+    });
+    expect(agentsFile).toMatchObject({
+      writeMode: "merge",
+    });
+    expect(agentsFile?.content).toContain("<!-- MISTLE-MANAGED:START mistle-sandbox-context -->");
+    expect(agentsFile?.content).toContain("Mistle MCP tools are available");
+  });
+
   it("renders separate responses and ChatGPT backend bases for ChatGPT subscription mode", () => {
     const compiled = compileCodexRuntime({
       organizationId: "org_123",

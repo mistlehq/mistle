@@ -96,6 +96,7 @@ export type CompileSandboxRuntimePlanInput = {
   agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
   snapshotPreparationScriptKind?: "setup" | "maintenance";
   mistleMcpCredentialResolver?: EgressCredentialResolverRef;
+  mergeRuntimeSetupFiles?: boolean;
   image: ResolvedSandboxImage;
 };
 
@@ -458,6 +459,9 @@ export async function compileSandboxRuntimePlan(
         enabled: mistleMcpEnabled,
         url: input.mcpConfig.url,
       }),
+      ...(input.mergeRuntimeSetupFiles === undefined
+        ? {}
+        : { mergeRuntimeSetupFiles: input.mergeRuntimeSetupFiles }),
     });
     const skills = resolveRuntimePlanSkills({
       runtimePlan,

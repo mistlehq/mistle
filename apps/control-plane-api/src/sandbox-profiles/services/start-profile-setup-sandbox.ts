@@ -40,6 +40,7 @@ type StartProfileSetupSandboxInput = {
   mistleMcpCredentialResolver?: {
     kind: "setup_assistant";
   };
+  mergeRuntimeSetupFiles?: boolean;
   image?: {
     kind: "base" | "snapshot";
     imageId: string;
@@ -193,6 +194,9 @@ export async function startProfileSetupSandbox(
               sandboxProfileVersion: input.profileVersion,
             },
           }),
+      ...(input.mergeRuntimeSetupFiles === undefined
+        ? {}
+        : { mergeRuntimeSetupFiles: input.mergeRuntimeSetupFiles }),
       image: {
         source: input.image?.kind ?? "base",
         imageRef: input.image?.imageId ?? defaultBaseImage,

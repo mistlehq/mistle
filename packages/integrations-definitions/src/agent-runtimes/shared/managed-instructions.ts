@@ -26,6 +26,16 @@ export function renderMistleManagedSandboxContext(input: {
   ].join("\n");
 }
 
+export function renderMistleManagedSandboxContextBlock(input: {
+  mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
+}): string {
+  return [
+    "<!-- MISTLE-MANAGED:START mistle-sandbox-context -->",
+    renderMistleManagedSandboxContext(input),
+    "<!-- MISTLE-MANAGED:END mistle-sandbox-context -->",
+  ].join("\n");
+}
+
 function hasMistleMcpServer(mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>): boolean {
   return mcpServers.some((mcpServer) => mcpServer.source.kind === "mistle");
 }

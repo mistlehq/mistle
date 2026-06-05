@@ -7,7 +7,10 @@ import type {
   RuntimeClientSetupFile,
 } from "@mistle/integrations-core";
 
-import { renderMistleManagedSandboxContext } from "../shared/managed-instructions.js";
+import {
+  renderMistleManagedSandboxContext,
+  renderMistleManagedSandboxContextBlock,
+} from "../shared/managed-instructions.js";
 import {
   isAnthropicApiRoute,
   isOpenAiApiRoute,
@@ -204,6 +207,16 @@ function renderPiSettings(input: { includeMcpAdapter: boolean }): string {
   return renderJson(settings);
 }
 
+function renderPiSettingsMergeFragment(input: { includeMcpAdapter: boolean }): string {
+  if (!input.includeMcpAdapter) {
+    return renderJson({});
+  }
+
+  return renderJson({
+    extensions: [PiMcpAdapterExtensionPath],
+  });
+}
+
 function renderPiMcpConfig(mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>): string {
   const renderedServers: Record<string, PiMcpConfigServer> = {};
 
@@ -250,6 +263,7 @@ function renderPiCliWrapperScript(piCliInstallPath: string): string {
 
 function buildPiSetupFiles(input: {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
+  mergeSetupFiles?: boolean;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
   piCliInstallPath: string;
 }): ReadonlyArray<RuntimeClientSetupFile> {
@@ -273,17 +287,21 @@ function buildPiSetupFiles(input: {
       fileId: "pi_settings",
       path: PiSettingsPath,
       mode: 384,
-      writeMode: "overwrite",
-      content: renderPiSettings({
-        includeMcpAdapter,
-      }),
+      writeMode: input.mergeSetupFiles === true ? "merge" : "overwrite",
+      content:
+        input.mergeSetupFiles === true
+          ? renderPiSettingsMergeFragment({ includeMcpAdapter })
+          : renderPiSettings({ includeMcpAdapter }),
     },
     {
       fileId: "pi_managed_instructions",
       path: PiManagedInstructionsPath,
       mode: 384,
-      writeMode: "overwrite",
-      content: `${renderMistleManagedSandboxContext({ mcpServers: input.mcpServers })}\n`,
+      writeMode: input.mergeSetupFiles === true ? "merge" : "overwrite",
+      content:
+        input.mergeSetupFiles === true
+          ? renderMistleManagedSandboxContextBlock({ mcpServers: input.mcpServers })
+          : `${renderMistleManagedSandboxContext({ mcpServers: input.mcpServers })}\n`,
     },
   ];
 
@@ -299,7 +317,7 @@ function buildPiSetupFiles(input: {
       fileId: "pi_mcp_config",
       path: PiMcpConfigPath,
       mode: 384,
-      writeMode: "overwrite",
+      writeMode: input.mergeSetupFiles === true ? "merge" : "overwrite",
       content: renderPiMcpConfig(input.mcpServers),
     });
   }
@@ -309,6 +327,7 @@ function buildPiSetupFiles(input: {
 
 function buildPiRuntimeClients(input: {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
+  mergeSetupFiles?: boolean;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
   piCliInstallPath: string;
 }): ReadonlyArray<RuntimeClient> {
@@ -323,6 +342,9 @@ function buildPiRuntimeClients(input: {
         },
         files: buildPiSetupFiles({
           egressRoutes: input.egressRoutes,
+          ...(input.mergeSetupFiles === undefined
+            ? {}
+            : { mergeSetupFiles: input.mergeSetupFiles }),
           mcpServers: input.mcpServers,
           piCliInstallPath: input.piCliInstallPath,
         }),
@@ -347,7 +369,8 @@ export function compilePiRuntime(
 ): CompileAgentRuntimeResult {
   const piCliInstallDirectory = `${input.refs.sandboxPaths.runtimeArtifactDir}/${PiCliInstallDirectoryName}`;
   const piCliInstallPath = `${piCliInstallDirectory}/pi`;
-  const mcpServers = input.runtimeConfig.enableMcp ? input.mcpServers : [];
+  const mcpServers =
+    input.runtimeConfig.enableMcp || input.mergeRuntimeSetupFiles === true ? input.mcpServers : [];
 
   return {
     artifacts: [
@@ -388,6 +411,9 @@ export function compilePiRuntime(
     renderRuntimeClients: ({ egressRoutes }) =>
       buildPiRuntimeClients({
         egressRoutes,
+        ...(input.mergeRuntimeSetupFiles === undefined
+          ? {}
+          : { mergeSetupFiles: input.mergeRuntimeSetupFiles }),
         mcpServers,
         piCliInstallPath,
       }),

@@ -1957,6 +1957,7 @@ export type CompiledRuntimeArtifactSpec = {
 export const RuntimeFileWriteMode = {
   OVERWRITE: "overwrite",
   IF_ABSENT: "if-absent",
+  MERGE: "merge",
 } as const;
 
 export type RuntimeFileWriteMode = (typeof RuntimeFileWriteMode)[keyof typeof RuntimeFileWriteMode];
@@ -2799,5 +2800,11 @@ export type CompileRuntimePlanInput = {
   bindings: ReadonlyArray<CompileRuntimePlanBindingInput>;
   egressRoutes?: ReadonlyArray<EgressCredentialRoute>;
   mcpServers?: ReadonlyArray<ResolvedIntegrationMcpServer>;
+  /**
+   * Allows agent runtime definitions to preserve inherited setup files when a
+   * sandbox starts from an existing Snapshot. Runtime definitions decide which
+   * files are safe to emit in merge mode.
+   */
+  mergeRuntimeSetupFiles?: boolean;
   definitions: IntegrationDefinitionsBundle;
 };

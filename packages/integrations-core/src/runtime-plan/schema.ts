@@ -270,7 +270,11 @@ const RuntimeClientSetupSchema = z
             mode: z.number().int().min(0),
             content: z.string(),
             writeMode: z
-              .enum([RuntimeFileWriteMode.OVERWRITE, RuntimeFileWriteMode.IF_ABSENT])
+              .enum([
+                RuntimeFileWriteMode.OVERWRITE,
+                RuntimeFileWriteMode.IF_ABSENT,
+                RuntimeFileWriteMode.MERGE,
+              ])
               .optional(),
           })
           .strict(),

@@ -517,6 +517,8 @@ pub enum RuntimeFileWriteMode {
     Overwrite,
     #[serde(rename = "if-absent")]
     IfAbsent,
+    #[serde(rename = "merge")]
+    Merge,
 }
 
 /// Shared setup state applied before a runtime client's processes start.

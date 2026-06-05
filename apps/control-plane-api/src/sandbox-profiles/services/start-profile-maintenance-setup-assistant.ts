@@ -49,6 +49,7 @@ export async function startProfileMaintenanceSetupAssistant(
     ...(input.mistleMcpCredentialResolver === undefined
       ? {}
       : { mistleMcpCredentialResolver: input.mistleMcpCredentialResolver }),
+    mergeRuntimeSetupFiles: true,
     image: {
       kind: "snapshot",
       imageId: snapshotImageId,

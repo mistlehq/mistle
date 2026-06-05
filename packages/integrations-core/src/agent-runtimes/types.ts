@@ -104,6 +104,14 @@ export type CompileAgentRuntimeInput<TRuntimeConfig = Record<string, unknown>> =
   runtimeId: string;
   runtimeConfig: TRuntimeConfig;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
+  /**
+   * Allows the runtime compiler to emit merge-mode setup files for sandboxes
+   * that start from an existing Snapshot, such as Snapshot maintenance script
+   * Setup Assistant sandboxes. Runtime compilers should selectively merge only
+   * files that are safe to preserve, and may ensure platform MCP setup is present
+   * even when ordinary runtime MCP is disabled.
+   */
+  mergeRuntimeSetupFiles?: boolean;
   refs: CompileBindingRefs;
 };
 

@@ -13,7 +13,10 @@ import {
   OpenAiChatGptOriginBaseUrl,
   OpenAiChatGptResponsesApiBaseUrl,
 } from "../../openai/variants/openai-default/target-config-schema.js";
-import { renderMistleManagedSandboxContext } from "../shared/managed-instructions.js";
+import {
+  renderMistleManagedSandboxContext,
+  renderMistleManagedSandboxContextBlock,
+} from "../shared/managed-instructions.js";
 import {
   isOpenAiApiRoute,
   isOpenAiChatGptSubscriptionRoute,
@@ -93,6 +96,14 @@ function renderCodexConfig(input: { providerMetadata?: CodexProviderMetadata }):
   });
 }
 
+function renderCodexSetupConfigMergeFragment(): string {
+  return stringifyToml({
+    features: {
+      tool_search: true,
+    },
+  });
+}
+
 function renderCodexGlobalAgentsMd(input: {
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
 }): string {
@@ -128,6 +139,7 @@ function resolveCodexProviderMetadataFromEgressRoutes(input: {
 }
 
 function buildCodexSetupFiles(input: {
+  mergeSetupFiles?: boolean;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
   providerMetadata?: CodexProviderMetadata;
 }): ReadonlyArray<RuntimeClientSetupFile> {
@@ -136,24 +148,30 @@ function buildCodexSetupFiles(input: {
       fileId: "codex_config",
       path: CodexConfigPath,
       mode: 384,
-      writeMode: "if-absent",
+      writeMode: input.mergeSetupFiles === true ? "merge" : "if-absent",
       content:
-        input.providerMetadata === undefined
-          ? renderCodexConfig({})
-          : renderCodexConfig({ providerMetadata: input.providerMetadata }),
+        input.mergeSetupFiles === true
+          ? renderCodexSetupConfigMergeFragment()
+          : input.providerMetadata === undefined
+            ? renderCodexConfig({})
+            : renderCodexConfig({ providerMetadata: input.providerMetadata }),
     },
     {
       fileId: "codex_global_agents",
       path: CodexGlobalAgentsPath,
       mode: 384,
-      writeMode: "if-absent",
-      content: renderCodexGlobalAgentsMd({ mcpServers: input.mcpServers }),
+      writeMode: input.mergeSetupFiles === true ? "merge" : "if-absent",
+      content:
+        input.mergeSetupFiles === true
+          ? renderMistleManagedSandboxContextBlock({ mcpServers: input.mcpServers })
+          : renderCodexGlobalAgentsMd({ mcpServers: input.mcpServers }),
     },
   ];
 }
 
 function buildCodexSetupFilesFromEgressRoutes(input: {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
+  mergeSetupFiles?: boolean;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
 }): ReadonlyArray<RuntimeClientSetupFile> {
   const providerMetadata = resolveCodexProviderMetadataFromEgressRoutes({
@@ -161,6 +179,7 @@ function buildCodexSetupFilesFromEgressRoutes(input: {
   });
 
   return buildCodexSetupFiles({
+    ...(input.mergeSetupFiles === undefined ? {} : { mergeSetupFiles: input.mergeSetupFiles }),
     mcpServers: input.mcpServers,
     ...(providerMetadata === undefined ? {} : { providerMetadata }),
   });
@@ -256,6 +275,9 @@ export function compileCodexRuntime(
         codexCliInstallPath,
         setupFiles: buildCodexSetupFilesFromEgressRoutes({
           egressRoutes,
+          ...(input.mergeRuntimeSetupFiles === undefined
+            ? {}
+            : { mergeSetupFiles: input.mergeRuntimeSetupFiles }),
           mcpServers: input.mcpServers,
         }),
       }),

@@ -535,6 +535,7 @@ function compileProfileAgentRuntimeFragment(input: {
   agentRuntimeId: string;
   egressRoutes: ReadonlyArray<CompiledRuntimePlanFragment["egressRoutes"][number]>;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
+  mergeRuntimeSetupFiles?: boolean;
 }): CompiledRuntimePlanFragment {
   const runtimeDefinition = input.definitions.agentRuntimeRegistry.getRuntime({
     runtimeId: input.agentRuntimeId,
@@ -569,6 +570,9 @@ function compileProfileAgentRuntimeFragment(input: {
     runtimeId: input.agentRuntimeId,
     runtimeConfig: parsedRuntimeConfig,
     mcpServers: input.mcpServers,
+    ...(input.mergeRuntimeSetupFiles === undefined
+      ? {}
+      : { mergeRuntimeSetupFiles: input.mergeRuntimeSetupFiles }),
     refs: runtimeRefs,
   });
   let renderedRuntimeClients: ReadonlyArray<RuntimeClient>;
@@ -796,6 +800,9 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
         (compiledRuntimePlanFragment) => compiledRuntimePlanFragment.egressRoutes,
       ),
       mcpServers: resolvedMcpServers,
+      ...(input.mergeRuntimeSetupFiles === undefined
+        ? {}
+        : { mergeRuntimeSetupFiles: input.mergeRuntimeSetupFiles }),
     }),
   ];
 

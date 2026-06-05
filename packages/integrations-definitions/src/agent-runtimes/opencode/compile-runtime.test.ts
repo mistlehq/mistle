@@ -104,7 +104,9 @@ function readOpenCodeManagedConfigContent(
   return envContent === undefined ? undefined : JSON.parse(envContent);
 }
 
-function compileDefaultOpenCodeRuntime(): CompileAgentRuntimeResult {
+function compileDefaultOpenCodeRuntime(input?: {
+  mergeRuntimeSetupFiles?: boolean;
+}): CompileAgentRuntimeResult {
   return compileOpenCodeRuntime({
     organizationId: "org_123",
     sandboxProfileId: "sbp_123",
@@ -112,6 +114,9 @@ function compileDefaultOpenCodeRuntime(): CompileAgentRuntimeResult {
     runtimeId: "opencode",
     runtimeConfig: {},
     mcpServers: [],
+    ...(input?.mergeRuntimeSetupFiles === undefined
+      ? {}
+      : { mergeRuntimeSetupFiles: input.mergeRuntimeSetupFiles }),
     refs: {
       sandboxPaths: {
         userHomeDir: "/root",
@@ -127,6 +132,9 @@ function compileDefaultOpenCodeRuntime(): CompileAgentRuntimeResult {
 
 function compileOpenCodeRuntimeWithMcpServers(
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>,
+  input?: {
+    mergeRuntimeSetupFiles?: boolean;
+  },
 ): CompileAgentRuntimeResult {
   return compileOpenCodeRuntime({
     organizationId: "org_123",
@@ -135,6 +143,9 @@ function compileOpenCodeRuntimeWithMcpServers(
     runtimeId: "opencode",
     runtimeConfig: {},
     mcpServers,
+    ...(input?.mergeRuntimeSetupFiles === undefined
+      ? {}
+      : { mergeRuntimeSetupFiles: input.mergeRuntimeSetupFiles }),
     refs: {
       sandboxPaths: {
         userHomeDir: "/root",
@@ -451,6 +462,74 @@ describe("compileOpenCodeRuntime", () => {
     expect(agentsFile.content).toContain(
       "Mistle MCP tools are available for interacting with Mistle resources",
     );
+  });
+
+  it("uses merge-mode setup files when requested", () => {
+    const runtimeClients = readRuntimeClients(
+      compileOpenCodeRuntimeWithMcpServers([createMistleMcpServer()], {
+        mergeRuntimeSetupFiles: true,
+      }),
+    );
+    const configFile = runtimeClients[0]?.setup.files.find(
+      (file) => file.fileId === "opencode_config",
+    );
+    const agentsFile = runtimeClients[0]?.setup.files.find(
+      (file) => file.fileId === "opencode_global_agents",
+    );
+
+    expect(configFile).toMatchObject({
+      writeMode: "merge",
+    });
+    expect(agentsFile).toMatchObject({
+      writeMode: "merge",
+    });
+    expect(agentsFile?.content).toContain("<!-- MISTLE-MANAGED:START mistle-sandbox-context -->");
+    expect(agentsFile?.content).toContain("Mistle MCP tools are available");
+  });
+
+  it("keeps OpenCode auth overwrite when merge-mode setup files are requested", () => {
+    const compiled = compileOpenCodeRuntime({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      runtimeId: "opencode",
+      runtimeConfig: {},
+      mcpServers: [],
+      mergeRuntimeSetupFiles: true,
+      refs: {
+        sandboxPaths: {
+          userHomeDir: "/root",
+          workspaceDir: "/root",
+          runtimeDataDir: "/var/lib/mistle",
+          runtimeArtifactDir: "/var/lib/mistle/artifacts",
+          runtimeArtifactBinDir: "/usr/local/bin",
+        },
+        artifactBinPath: (artifactName) => `/usr/local/bin/${artifactName}`,
+      },
+    });
+    const runtimeClients = renderRuntimeClients({
+      compiled,
+      egressRoutes: [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_anthropic",
+          bindingId: "bind_anthropic",
+          familyId: "anthropic",
+          variantId: "anthropic-default",
+          host: "api.anthropic.com",
+          baseUrl: "https://api.anthropic.com",
+          secretType: "api_key",
+          authInjection: {
+            type: "header",
+            target: "x-api-key",
+          },
+        }),
+      ],
+    });
+    const authFile = runtimeClients[0]?.setup.files.find((file) => file.fileId === "opencode_auth");
+
+    expect(authFile).toMatchObject({
+      writeMode: "overwrite",
+    });
   });
 
   it("does not emit provider egress routes when provider access has additional headers", () => {

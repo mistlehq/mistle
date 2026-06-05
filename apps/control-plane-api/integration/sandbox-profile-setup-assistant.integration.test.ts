@@ -137,6 +137,28 @@ describe.concurrent("sandbox profile Setup Assistant integration", () => {
       imageId: "sha256:maintenance-assistant-snapshot",
       kind: "snapshot",
     });
+    expect(queuedWorkflowInput.runtimePlan.egressRoutes).toContainEqual(
+      expect.objectContaining({
+        egressRuleId: "egress_rule_platform_mistle_mcp",
+        credentialResolver: {
+          kind: "mistle_mcp_setup_assistant_token",
+          sandboxProfileId: "sbp_maintenance_assistant_001",
+          sandboxProfileVersion: 1,
+        },
+      }),
+    );
+    expect(queuedWorkflowInput.runtimePlan.runtimeClients[0]?.setup.files).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          fileId: "codex_config",
+          writeMode: "merge",
+        }),
+        expect.objectContaining({
+          fileId: "codex_global_agents",
+          writeMode: "merge",
+        }),
+      ]),
+    );
   });
 
   it("starts setup assistant when the selected agent runtime has no proxied provider route", async ({
