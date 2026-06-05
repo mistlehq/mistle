@@ -30,10 +30,6 @@ describe("reserveAvailablePort", () => {
         reserveAvailablePort({
           host: Host,
           coordinatorDir,
-          range: {
-            start: 45_000,
-            end: 45_099,
-          },
         }),
       ),
     );
@@ -43,7 +39,8 @@ describe("reserveAvailablePort", () => {
 
   it("does not allocate a port that is already bound", async () => {
     const coordinatorDir = await createTemporaryDirectory();
-    const server = await listen(Host, 45_120);
+    const server = await listen(Host, 0);
+    const port = readServerPort(server);
 
     try {
       await expect(
@@ -51,8 +48,8 @@ describe("reserveAvailablePort", () => {
           host: Host,
           coordinatorDir,
           range: {
-            start: 45_120,
-            end: 45_120,
+            start: port,
+            end: port,
           },
         }),
       ).rejects.toThrow("Unable to reserve an available port");
@@ -66,21 +63,18 @@ describe("reserveAvailablePort", () => {
     const firstPort = await reserveAvailablePort({
       host: Host,
       coordinatorDir,
-      range: {
-        start: 45_140,
-        end: 45_141,
-      },
-    });
-    const secondPort = await reserveAvailablePort({
-      host: Host,
-      coordinatorDir,
-      range: {
-        start: 45_140,
-        end: 45_141,
-      },
     });
 
-    expect(secondPort).not.toBe(firstPort);
+    await expect(
+      reserveAvailablePort({
+        host: Host,
+        coordinatorDir,
+        range: {
+          start: firstPort,
+          end: firstPort,
+        },
+      }),
+    ).rejects.toThrow("Unable to reserve an available port");
   });
 
   it("reuses a port after its lease is released", async () => {
@@ -88,10 +82,6 @@ describe("reserveAvailablePort", () => {
     const port = await reserveAvailablePort({
       host: Host,
       coordinatorDir,
-      range: {
-        start: 45_160,
-        end: 45_160,
-      },
     });
 
     await releaseReservedPort({
@@ -105,8 +95,8 @@ describe("reserveAvailablePort", () => {
         host: Host,
         coordinatorDir,
         range: {
-          start: 45_160,
-          end: 45_160,
+          start: port,
+          end: port,
         },
       }),
     ).resolves.toBe(port);
@@ -141,4 +131,13 @@ async function close(server: Server): Promise<void> {
       resolve();
     });
   });
+}
+
+function readServerPort(server: Server): number {
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("Expected server to listen on a TCP port.");
+  }
+
+  return address.port;
 }
