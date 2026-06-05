@@ -18,10 +18,11 @@ import { z } from "zod";
 import { RefreshAllIntegrationConnectionResourcesResponseSchema } from "../src/integration-connections/refresh-all-integration-connection-resources/schema.js";
 import { RefreshIntegrationConnectionResourcesResponseSchema } from "../src/integration-connections/refresh-integration-connection-resources/schema.js";
 
-const GitHubResourceKinds: readonly ["repository", "branch", "user"] = [
+const GitHubResourceKinds: readonly ["repository", "branch", "user", "team"] = [
   "repository",
   "branch",
   "user",
+  "team",
 ];
 const CountRowSchema = z
   .object({
@@ -265,7 +266,7 @@ describe.concurrent("integration connection resources refresh integration", () =
   });
 });
 
-type ResourceRefreshKind = "repository" | "branch" | "user" | "channel";
+type ResourceRefreshKind = "repository" | "branch" | "user" | "team" | "channel";
 
 async function refreshAllResources(
   env: IntegrationTestEnvironment,
