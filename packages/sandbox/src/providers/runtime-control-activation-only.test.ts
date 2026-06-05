@@ -76,7 +76,7 @@ describe("provider runtime-control activation migration", () => {
 
     expect(dockerRuntimeControlSource).toContain('["/opt/mistle/bin/sandboxd", "activate"]');
     expect(e2bClientSource).toContain('"/opt/mistle/bin/sandboxd activate"');
-    expect(tensorlakeClientSource).toContain('["activate"]');
+    expect(tensorlakeClientSource).toContain('"activate", "--stdin-bytes"');
   });
 
   it("keeps each provider constructing sandboxd shutdown", async () => {

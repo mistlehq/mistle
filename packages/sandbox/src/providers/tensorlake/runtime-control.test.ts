@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ActivateCommandArgs, ShutdownCommandArgs } from "./client.js";
+import { ShutdownCommandArgs, createTensorlakeActivateCommandArgs } from "./client.js";
 import {
   SandboxdOperationLogPaths,
   SandboxdResetTransparentEgressNftablesTimeoutMs,
@@ -27,8 +27,12 @@ describe("Tensorlake sandbox runtime control operation logs", () => {
 });
 
 describe("Tensorlake sandbox runtime control activate command", () => {
-  it("invokes sandboxd activate", () => {
-    expect(ActivateCommandArgs).toEqual(["activate"]);
+  it("invokes sandboxd activate with the explicit stdin payload length", () => {
+    expect(createTensorlakeActivateCommandArgs({ payload: new Uint8Array([1, 2, 3]) })).toEqual([
+      "activate",
+      "--stdin-bytes",
+      "3",
+    ]);
   });
 });
 

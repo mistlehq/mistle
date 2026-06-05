@@ -16,6 +16,7 @@ import {
 } from "tensorlake";
 
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
+import { SandboxdStopDaemonCommand } from "../../sandboxd-install.js";
 import {
   SandboxBaseImageSourceKinds,
   SandboxInspectDispositions,
@@ -49,20 +50,25 @@ import type { TensorlakeSandboxInspectResult } from "./types.js";
 const SandboxdCommand = "/opt/mistle/bin/sandboxd";
 export const TensorlakeRootProcessUser = "root";
 const ActivateCommand = SandboxdCommand;
-export const ActivateCommandArgs = ["activate"] as const;
+export function createTensorlakeActivateCommandArgs(input: {
+  payload: Uint8Array<ArrayBufferLike>;
+}): readonly string[] {
+  return ["activate", "--stdin-bytes", String(input.payload.byteLength)];
+}
 export const ShutdownCommandArgs = ["shutdown"] as const;
 const ReadyCommand = SandboxdCommand;
 const ReadyCommandArgs = ["ready"];
-const StartDaemonCommand = "sh";
+const StartDaemonCommand = SandboxdCommand;
+const StartDaemonCommandArgs: string[] = [];
 export const TensorlakeSandboxTimeoutSecs = 0;
-export const TensorlakeDaemonSystemdEnvironmentVariables = [
-  "SANDBOX_RUNTIME_LISTEN_ADDR",
-  "SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID",
-  "MISTLE_SANDBOXD_ENABLE_TEST_FAULTS",
-  "MISTLE_SANDBOXD_OPERATION_LOG_DIR",
-] as const;
-const StartDaemonCommandArgs = ["-lc", createTensorlakeStartDaemonShellCommand()];
 const DaemonPath = "/opt/mistle/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin";
+// Backwards compatibility for Tensorlake sandboxes and snapshots built before
+// direct daemon startup. Those images may have sandboxd.service enabled, and
+// after Tensorlake suspend/resume systemd can report the unit active while the
+// MainPID is still systemd-executor and no control socket exists. Stop the
+// legacy unit and remove the stale socket before starting sandboxd directly.
+const DirectDaemonCompatibilityCleanupCommand = SandboxdStopDaemonCommand;
+const DirectDaemonCompatibilityCleanupTimeoutMs = 30_000;
 const DaemonReadinessPollIntervalMs = 100;
 export const DaemonReadinessPollAttempts = 600;
 export const DaemonReadinessPollTimeoutMs =
@@ -72,24 +78,6 @@ const ClaimedSandboxReadinessPollAttempts = 120;
 const StartupCommandPollIntervalMs = 250;
 export const StartupCommandPollTimeoutMs = 60 * 60 * 1000;
 const StartupCommandPollAttempts = StartupCommandPollTimeoutMs / StartupCommandPollIntervalMs;
-
-export function createTensorlakeStartDaemonShellCommand(): string {
-  return [
-    // Tensorlake injects provider-owned environment variables into sandbox
-    // processes. Importing the whole process environment made systemd reject
-    // TL_SSH_PROXY_PUBKEY because the value can contain control characters.
-    // Keep this aligned with packages/sandboxd/systemd/sandboxd.service
-    // PassEnvironment and import only the variables sandboxd actually needs.
-    // Tensorlake SDK commands default to tl-user. Callers start this shell as
-    // root through the SDK user option, so systemd manager operations do not
-    // need sudo. The service unit decides what environment to pass on.
-    `systemctl import-environment ${TensorlakeDaemonSystemdEnvironmentVariables.join(" ")}`,
-    "systemctl start sandboxd.service",
-    "while systemctl is-active --quiet sandboxd.service; do sleep 3600; done",
-    "systemctl status sandboxd.service --no-pager",
-    "exit 1",
-  ].join(" && ");
-}
 
 export function createTensorlakeSandboxdControlCommand(input: {
   readonly args: readonly string[];
@@ -540,7 +528,7 @@ export class TensorlakeApiClient implements TensorlakeClient {
       await this.#runStartupCommand(sandbox, {
         operation: TensorlakeClientOperationIds.ACTIVATE,
         command: ActivateCommand,
-        args: ActivateCommandArgs,
+        args: createTensorlakeActivateCommandArgs({ payload: parsedRequest.payload }),
         payload: parsedRequest.payload,
       });
     } catch (error) {
@@ -611,6 +599,24 @@ export class TensorlakeApiClient implements TensorlakeClient {
     let pollAttempts = 0;
     let startedDaemon = false;
     let recordedFailure = false;
+    if (await this.#isDaemonReady(input.sandbox)) {
+      if (await this.#isLegacySystemdDaemonActive(input.sandbox)) {
+        await this.#stopLegacyDaemonState(input.sandbox);
+      } else {
+        recordSandboxDaemonReady({
+          alreadyReady: true,
+          durationMs: systemClock.nowMs() - startedAtMs,
+          outcome: "success",
+          pollAttempts,
+          provider: "tensorlake",
+          startedDaemon,
+        });
+        return;
+      }
+    } else {
+      await this.#stopLegacyDaemonState(input.sandbox);
+    }
+
     if (await this.#isDaemonReady(input.sandbox)) {
       recordSandboxDaemonReady({
         alreadyReady: true,
@@ -715,6 +721,30 @@ export class TensorlakeApiClient implements TensorlakeClient {
       user: TensorlakeRootProcessUser,
     });
     return result.exitCode === 0;
+  }
+
+  async #isLegacySystemdDaemonActive(sandbox: Sandbox): Promise<boolean> {
+    const result = await sandbox.run("sh", {
+      args: [
+        "-lc",
+        "command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet sandboxd.service",
+      ],
+      user: TensorlakeRootProcessUser,
+    });
+    return result.exitCode === 0;
+  }
+
+  async #stopLegacyDaemonState(sandbox: Sandbox): Promise<void> {
+    const result = await sandbox.run("sh", {
+      args: ["-euc", DirectDaemonCompatibilityCleanupCommand],
+      user: TensorlakeRootProcessUser,
+      timeout: DirectDaemonCompatibilityCleanupTimeoutMs / 1000,
+    });
+    ensureCommandSucceeded({
+      operation: TensorlakeClientOperationIds.ACTIVATE,
+      commandDescription: "Stop legacy Tensorlake sandboxd state",
+      result,
+    });
   }
 
   async #runStartupCommand(

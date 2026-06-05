@@ -59,6 +59,11 @@ if test "$installed_version" != "$MISTLE_SANDBOXD_ARTIFACT_VERSION"; then
 fi
 `.trim();
 
+// Used when replacing a running daemon and for Tensorlake backwards compatibility:
+// older images and snapshots may still have sandboxd.service enabled, and older
+// daemon instances can leave /run/mistle/sandboxd/control.sock behind. Keep the
+// service stop, direct process kill, and socket removal together so callers
+// consistently clear every legacy daemon entrypoint before starting sandboxd.
 export const SandboxdStopDaemonCommand = `
 set -eu
 

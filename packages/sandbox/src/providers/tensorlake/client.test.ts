@@ -6,16 +6,15 @@ import {
   DaemonReadinessPollAttempts,
   DaemonReadinessPollTimeoutMs,
   StartupCommandPollTimeoutMs,
-  TensorlakeDaemonSystemdEnvironmentVariables,
   TensorlakeRootProcessUser,
   TensorlakeSandboxTimeoutSecs,
+  createTensorlakeActivateCommandArgs,
   createTensorlakeDaemonEnv,
   createTensorlakeRunOptions,
   createTensorlakeSandboxOptions,
   createTensorlakeSandboxdControlCommand,
   createTensorlakeSandboxName,
   createTensorlakeSnapshotAndWaitOptions,
-  createTensorlakeStartDaemonShellCommand,
   normalizeTensorlakeInspectDisposition,
   resolveTensorlakeClaimedSandboxStartResponse,
 } from "./client.js";
@@ -88,17 +87,13 @@ describe("createTensorlakeDaemonEnv", () => {
   });
 });
 
-describe("createTensorlakeStartDaemonShellCommand", () => {
-  it("imports only the Mistle environment variables passed through the systemd service", () => {
-    const command = createTensorlakeStartDaemonShellCommand();
-
-    expect(command).toContain(
-      `systemctl import-environment ${TensorlakeDaemonSystemdEnvironmentVariables.join(" ")}`,
-    );
-    expect(command).toContain("systemctl start sandboxd.service");
-    expect(command).not.toContain("sudo");
-    expect(command).not.toContain("systemctl import-environment &&");
-    expect(command).not.toContain("TL_SSH_PROXY_PUBKEY");
+describe("createTensorlakeActivateCommandArgs", () => {
+  it("passes the activation payload byte length explicitly to sandboxd", () => {
+    expect(
+      createTensorlakeActivateCommandArgs({
+        payload: new TextEncoder().encode('{"operationKind":"resume"}'),
+      }),
+    ).toEqual(["activate", "--stdin-bytes", "26"]);
   });
 });
 
