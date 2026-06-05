@@ -3,6 +3,95 @@ import { describe, expect, it } from "vitest";
 import { IntegrationTargetSchema } from "./schemas.js";
 
 describe("IntegrationTargetSchema", () => {
+  it("parses webhook event parameter group metadata", () => {
+    const parsed = IntegrationTargetSchema.parse({
+      targetKey: "github-cloud",
+      familyId: "github",
+      variantId: "github-cloud",
+      kind: "git",
+      enabled: true,
+      config: {},
+      displayName: "GitHub",
+      description: "GitHub integration",
+      connectionMethods: [
+        {
+          id: "github-app-installation",
+          label: "GitHub App installation",
+          kind: "redirect",
+          ui: {
+            create: {
+              submitLabel: "Install GitHub App",
+              helperText: "Connect GitHub.",
+            },
+          },
+        },
+      ],
+      supportedWebhookEvents: [
+        {
+          eventType: "github.pull_request.review_requested",
+          providerEventType: "pull_request",
+          displayName: "Pull request review requested",
+          parameters: [
+            {
+              id: "requestedReviewer",
+              label: "Reviewer",
+              kind: "resource-select",
+              resourceKind: "user",
+              payloadPath: ["requested_reviewer", "login"],
+              negatedMatchRequiresExists: true,
+            },
+            {
+              id: "requestedTeam",
+              label: "Team",
+              kind: "resource-select",
+              resourceKind: "team",
+              payloadPath: ["requested_team", "slug"],
+              negatedMatchRequiresExists: true,
+            },
+          ],
+          parameterGroups: [
+            {
+              id: "requestedReviewTarget",
+              label: "requested review target",
+              kind: "oneOf",
+              options: [
+                {
+                  parameterId: "requestedReviewer",
+                  label: "for reviewer",
+                },
+                {
+                  parameterId: "requestedTeam",
+                  label: "for team",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      targetHealth: {
+        configStatus: "valid",
+      },
+    });
+
+    expect(parsed.supportedWebhookEvents?.[0]?.parameterGroups).toEqual([
+      {
+        id: "requestedReviewTarget",
+        label: "requested review target",
+        kind: "oneOf",
+        options: [
+          {
+            parameterId: "requestedReviewer",
+            label: "for reviewer",
+          },
+          {
+            parameterId: "requestedTeam",
+            label: "for team",
+          },
+        ],
+      },
+    ]);
+  });
+
   it("parses device-authorization connection methods", () => {
     const parsed = IntegrationTargetSchema.parse({
       targetKey: "openai-default",

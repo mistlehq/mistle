@@ -147,8 +147,38 @@ function buildExistsNode(input: {
   };
 }
 
-function isRequestedReviewTargetParameter(parameterId: string): boolean {
-  return parameterId === "requestedReviewer" || parameterId === "requestedTeam";
+function resolveOneOfGroupParameterIds(eventOption: WebhookTriggerEventOption): Set<string> {
+  return new Set(
+    (eventOption.parameterGroups ?? []).flatMap((group) =>
+      group.options.map((option) => option.parameterId),
+    ),
+  );
+}
+
+function resolveActiveOneOfGroupParameterIds(input: {
+  eventOption: WebhookTriggerEventOption;
+  rules: Record<string, { value: string } | undefined>;
+}): Set<string> {
+  const activeParameterIds = new Set<string>();
+
+  for (const group of input.eventOption.parameterGroups ?? []) {
+    const configuredParameterIds = group.options
+      .filter((option) => (input.rules[option.parameterId]?.value.trim().length ?? 0) > 0)
+      .map((option) => option.parameterId);
+
+    if (configuredParameterIds.length > 1) {
+      throw new Error(
+        `Trigger event parameter group '${group.id}' cannot serialize multiple configured options.`,
+      );
+    }
+
+    const configuredParameterId = configuredParameterIds[0];
+    if (configuredParameterId !== undefined) {
+      activeParameterIds.add(configuredParameterId);
+    }
+  }
+
+  return activeParameterIds;
 }
 
 function hasNegatedFilterForPath(input: {
@@ -176,6 +206,12 @@ function mergePayloadFilterNodes(filters: readonly PayloadFilterNode[]): Payload
       };
 }
 
+function flattenAndPayloadFilterNodes(filters: readonly PayloadFilterNode[]): PayloadFilterNode[] {
+  return filters.flatMap((filter) =>
+    filter.op === "and" ? flattenAndPayloadFilterNodes(filter.filters) : [filter],
+  );
+}
+
 function buildPayloadFilterNodeForTrigger(input: {
   eventOption: WebhookTriggerEventOption | undefined;
   triggerId: string;
@@ -187,15 +223,19 @@ function buildPayloadFilterNodeForTrigger(input: {
     return null;
   }
 
-  const requestedReviewerValue =
-    input.eventParameterRules[input.triggerId]?.requestedReviewer?.value.trim() ?? "";
+  const rules = input.eventParameterRules[input.triggerId] ?? {};
+  const groupedParameterIds = resolveOneOfGroupParameterIds(input.eventOption);
+  const activeGroupedParameterIds = resolveActiveOneOfGroupParameterIds({
+    eventOption: input.eventOption,
+    rules,
+  });
 
   for (const parameter of input.eventOption.parameters ?? []) {
-    if (parameter.id === "requestedTeam" && requestedReviewerValue.length > 0) {
+    if (groupedParameterIds.has(parameter.id) && !activeGroupedParameterIds.has(parameter.id)) {
       continue;
     }
 
-    const rule = input.eventParameterRules[input.triggerId]?.[parameter.id];
+    const rule = rules[parameter.id];
     const configuredValue = rule?.value.trim() ?? "";
     if (configuredValue.length === 0) {
       continue;
@@ -254,7 +294,7 @@ function buildPayloadFilterNodeForTrigger(input: {
     }
 
     if (
-      isRequestedReviewTargetParameter(parameter.id) &&
+      parameter.negatedMatchRequiresExists === true &&
       rule.operator === WebhookTriggerEventParameterRuleOperators.IS_NOT
     ) {
       filters.push(
@@ -412,7 +452,9 @@ export function extractWebhookTriggerEventParameterRules(input: {
     }
 
     const rootFilters =
-      parsedPayloadFilter.op === "and" ? parsedPayloadFilter.filters : [parsedPayloadFilter];
+      parsedPayloadFilter.op === "and"
+        ? flattenAndPayloadFilterNodes(parsedPayloadFilter.filters)
+        : [parsedPayloadFilter];
     const remainingFilters: PayloadFilterNode[] = [];
 
     for (const filter of rootFilters) {
@@ -445,7 +487,7 @@ export function extractWebhookTriggerEventParameterRules(input: {
             parameter.payloadPath.every((segment, index) => segment === filter.path[index])
           ) {
             if (
-              isRequestedReviewTargetParameter(parameter.id) &&
+              parameter.negatedMatchRequiresExists === true &&
               filter.op === WebhookTriggerEventParameterRuleOperators.EXISTS &&
               hasNegatedFilterForPath({
                 filters: rootFilters,

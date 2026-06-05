@@ -16,6 +16,7 @@ export type WebhookTriggerEventParameterOption =
       kind: "resource-select";
       resourceKind: string;
       payloadPath: string[];
+      negatedMatchRequiresExists?: boolean;
       prefix?: string;
       placeholder?: string;
     }
@@ -26,6 +27,7 @@ export type WebhookTriggerEventParameterOption =
       payloadPath: string[];
       matchMode?: "eq" | "contains" | "contains_token";
       controlVariant?: "invocation-token";
+      negatedMatchRequiresExists?: boolean;
       prefix?: string;
       placeholder?: string;
     }
@@ -39,9 +41,22 @@ export type WebhookTriggerEventParameterOption =
         value: string;
         label: string;
       }[];
+      negatedMatchRequiresExists?: boolean;
       prefix?: string;
       placeholder?: string;
     };
+
+export type WebhookTriggerEventParameterGroupOption = {
+  parameterId: string;
+  label: string;
+};
+
+export type WebhookTriggerEventParameterGroup = {
+  id: string;
+  label: string;
+  kind: "oneOf";
+  options: readonly WebhookTriggerEventParameterGroupOption[];
+};
 
 export type WebhookTriggerConversationKeyOption = {
   id: string;
@@ -69,6 +84,7 @@ export type WebhookTriggerEventOption = {
   payloadReferences?: readonly WebhookTriggerPayloadReference[];
   conversationKeyOptions?: readonly WebhookTriggerConversationKeyOption[];
   parameters?: readonly WebhookTriggerEventParameterOption[];
+  parameterGroups?: readonly WebhookTriggerEventParameterGroup[];
   requirements?: IntegrationWebhookTriggerRequirements;
 };
 

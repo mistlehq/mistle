@@ -145,6 +145,7 @@ const GitHubEventOptions: readonly WebhookTriggerEventOption[] = [
         kind: "resource-select",
         resourceKind: "user",
         payloadPath: ["requested_reviewer", "login"],
+        negatedMatchRequiresExists: true,
         prefix: "for",
       },
       {
@@ -153,8 +154,26 @@ const GitHubEventOptions: readonly WebhookTriggerEventOption[] = [
         kind: "resource-select",
         resourceKind: "team",
         payloadPath: ["requested_team", "slug"],
+        negatedMatchRequiresExists: true,
         prefix: "for team",
         placeholder: "Any GitHub team",
+      },
+    ],
+    parameterGroups: [
+      {
+        id: "requestedReviewTarget",
+        label: "requested review target",
+        kind: "oneOf",
+        options: [
+          {
+            parameterId: "requestedReviewer",
+            label: "for reviewer",
+          },
+          {
+            parameterId: "requestedTeam",
+            label: "for team",
+          },
+        ],
       },
     ],
   },
@@ -385,6 +404,57 @@ describe("toWebhookTriggerFormValues", () => {
       eventParameterRules: {
         [PullRequestReviewRequestedTriggerId]: {
           requestedReviewer: isNotRule("octocat"),
+        },
+      },
+    });
+  });
+
+  it("hydrates guarded reviewer exclusions from payload filters merged with advanced filters", () => {
+    expect(
+      toWebhookTriggerFormValues(
+        {
+          ...SampleTrigger,
+          eventTypes: ["github.pull_request.review_requested"],
+          payloadFilter: {
+            "github.pull_request.review_requested": {
+              op: "and",
+              filters: [
+                {
+                  op: "and",
+                  filters: [
+                    {
+                      op: "exists",
+                      path: ["requested_reviewer", "login"],
+                    },
+                    {
+                      op: "neq",
+                      path: ["requested_reviewer", "login"],
+                      value: "octocat",
+                    },
+                  ],
+                },
+                {
+                  op: "eq",
+                  path: ["repository", "full_name"],
+                  value: "mistlehq/mistle",
+                },
+              ],
+            },
+          },
+        },
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      eventParameterRules: {
+        [PullRequestReviewRequestedTriggerId]: {
+          requestedReviewer: isNotRule("octocat"),
+        },
+      },
+      remainingPayloadFilter: {
+        "github.pull_request.review_requested": {
+          op: "eq",
+          path: ["repository", "full_name"],
+          value: "mistlehq/mistle",
         },
       },
     });
@@ -806,8 +876,8 @@ describe("trigger payload transforms", () => {
     });
   });
 
-  it("does not combine GitHub requested reviewer and team parameters as an impossible AND filter", () => {
-    expect(
+  it("rejects one-of parameter groups with multiple configured options", () => {
+    expect(() =>
       toCreateWebhookTriggerPayload(
         {
           ...BaseFormValues,
@@ -816,6 +886,25 @@ describe("trigger payload transforms", () => {
             [PullRequestReviewRequestedTriggerId]: {
               requestedReviewer: isRule("mistle-agent[bot]"),
               requestedTeam: isRule("platform"),
+            },
+          },
+        },
+        GitHubEventOptions,
+      ),
+    ).toThrow(
+      "Trigger event parameter group 'requestedReviewTarget' cannot serialize multiple configured options.",
+    );
+  });
+
+  it("serializes one-of parameter group active options", () => {
+    expect(
+      toCreateWebhookTriggerPayload(
+        {
+          ...BaseFormValues,
+          eventIds: [PullRequestReviewRequestedTriggerId],
+          eventParameterRules: {
+            [PullRequestReviewRequestedTriggerId]: {
+              requestedReviewer: isRule("mistle-agent[bot]"),
             },
           },
         },

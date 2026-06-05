@@ -6,11 +6,26 @@ import type {
   AnyIntegrationDefinition,
   IntegrationDefinitionLocator,
   IntegrationDefinitionResolver,
+  IntegrationWebhookEventParameterDefinition,
   IntegrationWebhookTriggerRequirements,
 } from "../types/index.js";
 
 function createDefinitionKey(input: IntegrationDefinitionLocator): string {
   return `${input.familyId}::${input.variantId}`;
+}
+
+function isEqualityStyleWebhookEventParameter(
+  parameter: IntegrationWebhookEventParameterDefinition,
+): boolean {
+  if (parameter.kind === "resource-select") {
+    return true;
+  }
+
+  if (parameter.kind === "string") {
+    return parameter.matchMode === undefined || parameter.matchMode === "eq";
+  }
+
+  return parameter.matchMode === "eq";
 }
 
 function validateDefinition(input: AnyIntegrationDefinition): void {
@@ -157,6 +172,7 @@ function validateDefinition(input: AnyIntegrationDefinition): void {
       }
     }
 
+    const parameterIds = new Set<string>();
     for (const parameter of supportedWebhookEvent.parameters ?? []) {
       if (parameter.id.trim().length === 0) {
         throw new IntegrationDefinitionRegistryError(
@@ -164,6 +180,15 @@ function validateDefinition(input: AnyIntegrationDefinition): void {
           "Integration definition supportedWebhookEvents[*].parameters[*].id must be non-empty.",
         );
       }
+
+      if (parameterIds.has(parameter.id)) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          `Integration definition supportedWebhookEvents[*].parameters contains duplicate id '${parameter.id}'.`,
+        );
+      }
+
+      parameterIds.add(parameter.id);
 
       if (parameter.label.trim().length === 0) {
         throw new IntegrationDefinitionRegistryError(
@@ -199,6 +224,102 @@ function validateDefinition(input: AnyIntegrationDefinition): void {
           DefinitionRegistryErrorCodes.INVALID_DEFINITION,
           "Integration definition supportedWebhookEvents[*].parameters[*].payloadPath must be non-empty.",
         );
+      }
+
+      if (
+        parameter.negatedMatchRequiresExists === true &&
+        !isEqualityStyleWebhookEventParameter(parameter)
+      ) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].parameters[*].negatedMatchRequiresExists is only supported for equality parameters.",
+        );
+      }
+    }
+
+    const parametersById = new Map(
+      (supportedWebhookEvent.parameters ?? []).map((parameter) => [parameter.id, parameter]),
+    );
+    const parameterGroupIds = new Set<string>();
+    const groupedParameterIds = new Set<string>();
+    for (const parameterGroup of supportedWebhookEvent.parameterGroups ?? []) {
+      if (parameterGroup.id.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].parameterGroups[*].id must be non-empty.",
+        );
+      }
+
+      if (parameterGroupIds.has(parameterGroup.id)) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          `Integration definition supportedWebhookEvents[*].parameterGroups contains duplicate id '${parameterGroup.id}'.`,
+        );
+      }
+
+      parameterGroupIds.add(parameterGroup.id);
+
+      if (parameterGroup.label.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].parameterGroups[*].label must be non-empty.",
+        );
+      }
+
+      if (parameterGroup.options.length < 2) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].parameterGroups[*].options must contain at least two options.",
+        );
+      }
+
+      const optionParameterIds = new Set<string>();
+      for (const option of parameterGroup.options) {
+        if (option.parameterId.trim().length === 0) {
+          throw new IntegrationDefinitionRegistryError(
+            DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+            "Integration definition supportedWebhookEvents[*].parameterGroups[*].options[*].parameterId must be non-empty.",
+          );
+        }
+
+        if (option.label.trim().length === 0) {
+          throw new IntegrationDefinitionRegistryError(
+            DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+            "Integration definition supportedWebhookEvents[*].parameterGroups[*].options[*].label must be non-empty.",
+          );
+        }
+
+        const parameter = parametersById.get(option.parameterId);
+        if (parameter === undefined) {
+          throw new IntegrationDefinitionRegistryError(
+            DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+            "Integration definition supportedWebhookEvents[*].parameterGroups[*].options[*].parameterId must reference an existing parameter.",
+          );
+        }
+
+        if (!isEqualityStyleWebhookEventParameter(parameter)) {
+          throw new IntegrationDefinitionRegistryError(
+            DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+            "Integration definition supportedWebhookEvents[*].parameterGroups[*].options[*].parameterId must reference an equality parameter.",
+          );
+        }
+
+        if (optionParameterIds.has(option.parameterId)) {
+          throw new IntegrationDefinitionRegistryError(
+            DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+            "Integration definition supportedWebhookEvents[*].parameterGroups[*].options[*].parameterId must be unique within a parameter group.",
+          );
+        }
+
+        if (groupedParameterIds.has(option.parameterId)) {
+          throw new IntegrationDefinitionRegistryError(
+            DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+            "Integration definition supportedWebhookEvents[*].parameterGroups[*].options[*].parameterId must reference a parameter that is not used by another parameter group.",
+          );
+        }
+
+        optionParameterIds.add(option.parameterId);
+        groupedParameterIds.add(option.parameterId);
       }
     }
   }

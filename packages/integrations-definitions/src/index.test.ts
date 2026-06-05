@@ -460,14 +460,33 @@ describe("integrations-definitions index", () => {
             expect.objectContaining({
               id: "requestedReviewer",
               payloadPath: ["requested_reviewer", "login"],
+              negatedMatchRequiresExists: true,
             }),
             expect.objectContaining({
               id: "requestedTeam",
               kind: "resource-select",
               resourceKind: "team",
               payloadPath: ["requested_team", "slug"],
+              negatedMatchRequiresExists: true,
             }),
           ]),
+          parameterGroups: [
+            {
+              id: "requestedReviewTarget",
+              label: "requested review target",
+              kind: "oneOf",
+              options: [
+                {
+                  parameterId: "requestedReviewer",
+                  label: "for reviewer",
+                },
+                {
+                  parameterId: "requestedTeam",
+                  label: "for team",
+                },
+              ],
+            },
+          ],
         }),
         expect.objectContaining({
           eventType: "github.pull_request.review_request_removed",
@@ -478,14 +497,33 @@ describe("integrations-definitions index", () => {
             expect.objectContaining({
               id: "requestedReviewer",
               payloadPath: ["requested_reviewer", "login"],
+              negatedMatchRequiresExists: true,
             }),
             expect.objectContaining({
               id: "requestedTeam",
               kind: "resource-select",
               resourceKind: "team",
               payloadPath: ["requested_team", "slug"],
+              negatedMatchRequiresExists: true,
             }),
           ]),
+          parameterGroups: [
+            {
+              id: "requestedReviewTarget",
+              label: "requested review target",
+              kind: "oneOf",
+              options: [
+                {
+                  parameterId: "requestedReviewer",
+                  label: "for reviewer",
+                },
+                {
+                  parameterId: "requestedTeam",
+                  label: "for team",
+                },
+              ],
+            },
+          ],
         }),
         expect.objectContaining({
           eventType: "github.pull_request.ready_for_review",

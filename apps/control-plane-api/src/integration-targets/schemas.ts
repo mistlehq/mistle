@@ -152,6 +152,7 @@ export const IntegrationWebhookEventDefinitionSchema = z
               kind: z.literal("resource-select"),
               resourceKind: z.string().min(1),
               payloadPath: z.array(z.string().min(1)).min(1),
+              negatedMatchRequiresExists: z.boolean().optional(),
               prefix: z.string().min(1).optional(),
               placeholder: z.string().min(1).optional(),
             })
@@ -166,6 +167,7 @@ export const IntegrationWebhookEventDefinitionSchema = z
               defaultValue: z.string().min(1).optional(),
               defaultEnabled: z.boolean().optional(),
               controlVariant: z.enum(["invocation-token"]).optional(),
+              negatedMatchRequiresExists: z.boolean().optional(),
               prefix: z.string().min(1).optional(),
               placeholder: z.string().min(1).optional(),
             })
@@ -187,11 +189,33 @@ export const IntegrationWebhookEventDefinitionSchema = z
                     .strict(),
                 )
                 .min(1),
+              negatedMatchRequiresExists: z.boolean().optional(),
               prefix: z.string().min(1).optional(),
               placeholder: z.string().min(1).optional(),
             })
             .strict(),
         ]),
+      )
+      .optional(),
+    parameterGroups: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1),
+            label: z.string().min(1),
+            kind: z.literal("oneOf"),
+            options: z
+              .array(
+                z
+                  .object({
+                    parameterId: z.string().min(1),
+                    label: z.string().min(1),
+                  })
+                  .strict(),
+              )
+              .min(2),
+          })
+          .strict(),
       )
       .optional(),
   })

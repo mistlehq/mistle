@@ -10686,6 +10686,9 @@
                                             },
                                             "minItems": 1
                                           },
+                                          "negatedMatchRequiresExists": {
+                                            "type": "boolean"
+                                          },
                                           "prefix": {
                                             "type": "string",
                                             "minLength": 1
@@ -10741,6 +10744,9 @@
                                           "controlVariant": {
                                             "type": "string",
                                             "enum": ["invocation-token"]
+                                          },
+                                          "negatedMatchRequiresExists": {
+                                            "type": "boolean"
                                           },
                                           "prefix": {
                                             "type": "string",
@@ -10800,6 +10806,9 @@
                                             },
                                             "minItems": 1
                                           },
+                                          "negatedMatchRequiresExists": {
+                                            "type": "boolean"
+                                          },
                                           "prefix": {
                                             "type": "string",
                                             "minLength": 1
@@ -10820,6 +10829,47 @@
                                         "additionalProperties": false
                                       }
                                     ]
+                                  }
+                                },
+                                "parameterGroups": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "label": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["oneOf"]
+                                      },
+                                      "options": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "parameterId": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "label": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "required": ["parameterId", "label"],
+                                          "additionalProperties": false
+                                        },
+                                        "minItems": 2
+                                      }
+                                    },
+                                    "required": ["id", "label", "kind", "options"],
+                                    "additionalProperties": false
                                   }
                                 }
                               },

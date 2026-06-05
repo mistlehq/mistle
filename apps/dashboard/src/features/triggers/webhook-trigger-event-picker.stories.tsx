@@ -63,6 +63,12 @@ function StoryHarness(input: {
               },
             }));
           }}
+          onEventParameterRulesChange={({ triggerId, rules }) => {
+            setEventParameterRules((currentValues) => ({
+              ...currentValues,
+              [triggerId]: rules,
+            }));
+          }}
           onValueChange={setSelectedEventIds}
           selectedConnectionId={input.selectedConnectionId}
           selectedEventIds={selectedEventIds}

@@ -84,6 +84,10 @@ _Avoid_: Webhook event when naming product-facing trigger-builder concepts
 A provider event field that can narrow which **Trigger events** match a **Trigger**.
 _Avoid_: Filter field
 
+**Trigger event parameter group**:
+A provider-defined set of related **Trigger event parameters** that should be configured as one logical trigger-matching choice.
+_Avoid_: Parameter layout, control group
+
 **Trigger event parameter rule**:
 A match rule applied to a **Trigger event parameter** when deciding whether a **Trigger event** matches a **Trigger**.
 _Avoid_: Exclusion when the rule is one match mode among several
@@ -396,11 +400,13 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Trigger** may start from a webhook event or a schedule.
 - A provider pull request activity should be represented as separate **Trigger events** for each supported activity rather than one broad activity event with an action parameter.
 - A **Trigger event** may expose **Trigger event parameters**.
+- A **Trigger event parameter group** references two or more **Trigger event parameters**.
 - A **Trigger event** for a provider review-request event should expose the requested reviewer or team as **Trigger event parameters** instead of hardcoding a Mistle reviewer policy.
 - A **GitHub team review target** matches GitHub's team slug in the provider event payload, not an organization-qualified team identity.
 - A **GitHub team review target** can be discovered only from a GitHub organization that owns accessible repositories.
 - A **Trigger event** for a removed provider review request delivers cancellation intent into the **Trigger conversation**; it does not imply hard runtime cancellation.
 - A **Trigger event parameter** may have one or more **Trigger event parameter rules**.
+- A **Trigger event parameter** may require existence when applying a negated **Trigger event parameter rule**.
 - A **Trigger event parameter rule** may include or exclude matching provider event values.
 - A first-pass exclusion rule should be an equality negation on a **Trigger event parameter**, not a separate exclusion list.
 - Equality-based **Trigger event parameters** may use inclusion or exclusion rules whether their values are selected from provider resources or entered as text.

@@ -13,6 +13,7 @@ import type {
   IntegrationKind,
   IntegrationWebhookEventDefinition,
   IntegrationWebhookEventParameterDefinition,
+  IntegrationWebhookEventParameterGroupDefinition,
   IntegrationWebhookSourceLifecycle,
 } from "@mistle/integrations-core";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
@@ -39,6 +40,7 @@ type ResolvedWebhookEventParameter =
       kind: "resource-select";
       resourceKind: string;
       payloadPath: string[];
+      negatedMatchRequiresExists?: boolean;
       prefix?: string;
       placeholder?: string;
     }
@@ -51,6 +53,7 @@ type ResolvedWebhookEventParameter =
       defaultValue?: string;
       defaultEnabled?: boolean;
       controlVariant?: "invocation-token";
+      negatedMatchRequiresExists?: boolean;
       prefix?: string;
       placeholder?: string;
     }
@@ -64,9 +67,20 @@ type ResolvedWebhookEventParameter =
         value: string;
         label: string;
       }[];
+      negatedMatchRequiresExists?: boolean;
       prefix?: string;
       placeholder?: string;
     };
+
+type ResolvedWebhookEventParameterGroup = {
+  id: string;
+  label: string;
+  kind: "oneOf";
+  options: {
+    parameterId: string;
+    label: string;
+  }[];
+};
 
 type ResolvedWebhookEvent = {
   eventType: string;
@@ -94,6 +108,7 @@ type ResolvedWebhookEvent = {
     template: string;
   }[];
   parameters?: ResolvedWebhookEventParameter[];
+  parameterGroups?: ResolvedWebhookEventParameterGroup[];
 };
 
 export type ResolvedIntegrationTargetMetadata = {
@@ -548,6 +563,9 @@ function cloneWebhookEventParameter(
       kind: parameter.kind,
       resourceKind: parameter.resourceKind,
       payloadPath: [...parameter.payloadPath],
+      ...(parameter.negatedMatchRequiresExists === undefined
+        ? {}
+        : { negatedMatchRequiresExists: parameter.negatedMatchRequiresExists }),
       ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
       ...(parameter.placeholder === undefined ? {} : { placeholder: parameter.placeholder }),
     };
@@ -564,6 +582,9 @@ function cloneWebhookEventParameter(
         value: option.value,
         label: option.label,
       })),
+      ...(parameter.negatedMatchRequiresExists === undefined
+        ? {}
+        : { negatedMatchRequiresExists: parameter.negatedMatchRequiresExists }),
       ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
       ...(parameter.placeholder === undefined ? {} : { placeholder: parameter.placeholder }),
     };
@@ -578,9 +599,26 @@ function cloneWebhookEventParameter(
     ...(parameter.defaultValue === undefined ? {} : { defaultValue: parameter.defaultValue }),
     ...(parameter.defaultEnabled === undefined ? {} : { defaultEnabled: parameter.defaultEnabled }),
     ...(parameter.controlVariant === undefined ? {} : { controlVariant: parameter.controlVariant }),
+    ...(parameter.negatedMatchRequiresExists === undefined
+      ? {}
+      : { negatedMatchRequiresExists: parameter.negatedMatchRequiresExists }),
     ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
     ...(parameter.placeholder === undefined ? {} : { placeholder: parameter.placeholder }),
   };
+}
+
+function cloneWebhookEventParameterGroups(
+  parameterGroups: readonly IntegrationWebhookEventParameterGroupDefinition[],
+): ResolvedWebhookEventParameterGroup[] {
+  return parameterGroups.map((parameterGroup) => ({
+    id: parameterGroup.id,
+    label: parameterGroup.label,
+    kind: parameterGroup.kind,
+    options: parameterGroup.options.map((option) => ({
+      parameterId: option.parameterId,
+      label: option.label,
+    })),
+  }));
 }
 
 function cloneWebhookEvents(
@@ -633,6 +671,11 @@ function cloneWebhookEvents(
           parameters: eventDefinition.parameters.map((parameter) =>
             cloneWebhookEventParameter(parameter),
           ),
+        }),
+    ...(eventDefinition.parameterGroups === undefined
+      ? {}
+      : {
+          parameterGroups: cloneWebhookEventParameterGroups(eventDefinition.parameterGroups),
         }),
   }));
 }

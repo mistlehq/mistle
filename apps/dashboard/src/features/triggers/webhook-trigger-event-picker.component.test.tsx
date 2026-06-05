@@ -10,6 +10,7 @@ import type { IntegrationConnectionResources } from "../integrations/integration
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import type { WebhookTriggerEventPickerDisabledState } from "./webhook-trigger-event-picker-state.js";
 import {
+  resolveOneOfParameterGroupRulesAfterSelection,
   resolveEnumSelectParameterRule,
   WebhookTriggerEventPicker,
 } from "./webhook-trigger-event-picker.js";
@@ -67,6 +68,7 @@ const PullRequestReviewRequestedEventOption: WebhookTriggerEventOption = {
       kind: "resource-select",
       resourceKind: "user",
       payloadPath: ["requested_reviewer", "login"],
+      negatedMatchRequiresExists: true,
       prefix: "for",
       placeholder: "Any requested reviewer",
     },
@@ -76,8 +78,26 @@ const PullRequestReviewRequestedEventOption: WebhookTriggerEventOption = {
       kind: "resource-select",
       resourceKind: "team",
       payloadPath: ["requested_team", "slug"],
+      negatedMatchRequiresExists: true,
       prefix: "for team",
       placeholder: "Any GitHub team",
+    },
+  ],
+  parameterGroups: [
+    {
+      id: "requestedReviewTarget",
+      label: "requested review target",
+      kind: "oneOf",
+      options: [
+        {
+          parameterId: "requestedReviewer",
+          label: "for reviewer",
+        },
+        {
+          parameterId: "requestedTeam",
+          label: "for team",
+        },
+      ],
     },
   ],
 };
@@ -86,6 +106,42 @@ const PullRequestReviewRequestRemovedEventOption: WebhookTriggerEventOption = {
   id: PullRequestReviewRequestRemovedTriggerId,
   eventType: "github.pull_request.review_request_removed",
   label: "Pull request review request removed",
+};
+const ThreeOptionReviewRequestedEventOption: WebhookTriggerEventOption = {
+  ...PullRequestReviewRequestedEventOption,
+  parameters: [
+    ...(PullRequestReviewRequestedEventOption.parameters ?? []),
+    {
+      id: "requestedBot",
+      label: "requested bot",
+      kind: "resource-select",
+      resourceKind: "user",
+      payloadPath: ["requested_bot", "login"],
+      prefix: "for bot",
+      placeholder: "Any requested bot",
+    },
+  ],
+  parameterGroups: [
+    {
+      id: "requestedReviewTarget",
+      label: "requested review target",
+      kind: "oneOf",
+      options: [
+        {
+          parameterId: "requestedReviewer",
+          label: "for reviewer",
+        },
+        {
+          parameterId: "requestedTeam",
+          label: "for team",
+        },
+        {
+          parameterId: "requestedBot",
+          label: "for bot",
+        },
+      ],
+    },
+  ],
 };
 
 function isRule(value: string) {
@@ -206,6 +262,7 @@ function renderTriggerPicker(input: {
         hasConnectedIntegrations={input.hasConnectedIntegrations}
         {...(input.disabledState === undefined ? {} : { disabledState: input.disabledState })}
         onEventParameterRuleChange={() => {}}
+        onEventParameterRulesChange={() => {}}
         onValueChange={setSelectedEventIds}
         selectedConnectionId={input.selectedConnectionId}
         selectedEventIds={selectedEventIds}
@@ -225,6 +282,7 @@ function renderTriggerPicker(input: {
           hasConnectedIntegrations={input.hasConnectedIntegrations}
           {...(input.disabledState === undefined ? {} : { disabledState: input.disabledState })}
           onEventParameterRuleChange={() => {}}
+          onEventParameterRulesChange={() => {}}
           onValueChange={() => {}}
           selectedConnectionId={input.selectedConnectionId}
           selectedEventIds={input.selectedEventIds}
@@ -517,6 +575,7 @@ describe("WebhookTriggerEventPicker", () => {
           eventOptions={[SlackAppMentionEventOption]}
           hasConnectedIntegrations={true}
           onEventParameterRuleChange={() => {}}
+          onEventParameterRulesChange={() => {}}
           onValueChange={() => {}}
           selectedConnectionId={SlackConnectionId}
           selectedEventIds={[SlackAppMentionTriggerId]}
@@ -695,6 +754,33 @@ describe("WebhookTriggerEventPicker", () => {
     expect(screen.getByText("for team")).toBeDefined();
     await waitFor(() => {
       expect(screen.getAllByDisplayValue("Platform (mistle)").length).toBeGreaterThan(0);
+    });
+  });
+
+  it("builds one replacement rules object when clearing inactive one-of group options", () => {
+    const group = ThreeOptionReviewRequestedEventOption.parameterGroups?.[0];
+    if (group === undefined) {
+      throw new Error("Expected test event option to define a parameter group.");
+    }
+
+    expect(
+      resolveOneOfParameterGroupRulesAfterSelection({
+        group,
+        rules: {
+          requestedReviewer: isRule("octocat"),
+          requestedBot: isRule("mistle-agent[bot]"),
+        },
+        selectedParameterId: "requestedTeam",
+      }),
+    ).toEqual({
+      requestedReviewer: {
+        operator: WebhookTriggerEventParameterRuleOperators.IS,
+        value: "",
+      },
+      requestedBot: {
+        operator: WebhookTriggerEventParameterRuleOperators.IS,
+        value: "",
+      },
     });
   });
 
@@ -995,6 +1081,12 @@ describe("WebhookTriggerEventPicker", () => {
                   ...currentValues[nextTriggerId],
                   [parameterId]: rule,
                 },
+              }));
+            }}
+            onEventParameterRulesChange={({ triggerId: nextTriggerId, rules }) => {
+              setEventParameterRules((currentValues) => ({
+                ...currentValues,
+                [nextTriggerId]: rules,
               }));
             }}
             onValueChange={() => {}}

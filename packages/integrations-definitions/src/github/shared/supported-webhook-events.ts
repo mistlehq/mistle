@@ -1,5 +1,6 @@
 import type {
   IntegrationWebhookEventDefinition,
+  IntegrationWebhookEventParameterGroupDefinition,
   IntegrationWebhookEventParameterDefinition,
   IntegrationWebhookPayloadReference,
   IntegrationWebhookTriggerProviderPermissionRequirement,
@@ -200,6 +201,7 @@ const GitHubRequestedReviewerParameter: IntegrationWebhookEventParameterDefiniti
   kind: "resource-select",
   resourceKind: "user",
   payloadPath: ["requested_reviewer", "login"],
+  negatedMatchRequiresExists: true,
   prefix: "for",
   placeholder: "Any requested reviewer",
 };
@@ -210,8 +212,25 @@ const GitHubRequestedTeamParameter: IntegrationWebhookEventParameterDefinition =
   kind: "resource-select",
   resourceKind: "team",
   payloadPath: ["requested_team", "slug"],
+  negatedMatchRequiresExists: true,
   prefix: "for team",
   placeholder: "Any GitHub team",
+};
+
+const GitHubRequestedReviewTargetParameterGroup: IntegrationWebhookEventParameterGroupDefinition = {
+  id: "requestedReviewTarget",
+  label: "requested review target",
+  kind: "oneOf",
+  options: [
+    {
+      parameterId: GitHubRequestedReviewerParameter.id,
+      label: "for reviewer",
+    },
+    {
+      parameterId: GitHubRequestedTeamParameter.id,
+      label: "for team",
+    },
+  ],
 };
 
 const GitHubPushBranchParameter: IntegrationWebhookEventParameterDefinition = {
@@ -270,6 +289,7 @@ function createGitHubWebhookEventDefinition(input: {
     template: string;
   }[];
   parameters?: readonly IntegrationWebhookEventParameterDefinition[];
+  parameterGroups?: readonly IntegrationWebhookEventParameterGroupDefinition[];
 }): IntegrationWebhookEventDefinition {
   return {
     eventType: input.eventType,
@@ -284,6 +304,7 @@ function createGitHubWebhookEventDefinition(input: {
       ? {}
       : { conversationKeyOptions: input.conversationKeyOptions }),
     ...(input.parameters === undefined ? {} : { parameters: input.parameters }),
+    ...(input.parameterGroups === undefined ? {} : { parameterGroups: input.parameterGroups }),
   };
 }
 
@@ -318,6 +339,7 @@ function createGitHubPullRequestReviewRequestEventDefinition(input: {
       GitHubRequestedReviewerParameter,
       GitHubRequestedTeamParameter,
     ],
+    parameterGroups: [GitHubRequestedReviewTargetParameterGroup],
   });
 }
 

@@ -2160,6 +2160,7 @@ export type IntegrationWebhookEventParameterDefinition =
       kind: "resource-select";
       resourceKind: string;
       payloadPath: ReadonlyArray<string>;
+      negatedMatchRequiresExists?: boolean | undefined;
       prefix?: string | undefined;
       placeholder?: string | undefined;
     }
@@ -2172,6 +2173,7 @@ export type IntegrationWebhookEventParameterDefinition =
       defaultValue?: string | undefined;
       defaultEnabled?: boolean | undefined;
       controlVariant?: "invocation-token" | undefined;
+      negatedMatchRequiresExists?: boolean | undefined;
       prefix?: string | undefined;
       placeholder?: string | undefined;
     }
@@ -2182,9 +2184,20 @@ export type IntegrationWebhookEventParameterDefinition =
       payloadPath: ReadonlyArray<string>;
       matchMode: "eq" | "exists";
       options: ReadonlyArray<IntegrationWebhookEventParameterOptionDefinition>;
+      negatedMatchRequiresExists?: boolean | undefined;
       prefix?: string | undefined;
       placeholder?: string | undefined;
     };
+
+export type IntegrationWebhookEventParameterGroupDefinition = {
+  id: string;
+  label: string;
+  kind: "oneOf";
+  options: ReadonlyArray<{
+    parameterId: string;
+    label: string;
+  }>;
+};
 
 export type IntegrationWebhookTriggerProviderPermissionRequirement = {
   permission: string;
@@ -2239,6 +2252,7 @@ export type IntegrationWebhookEventDefinition = {
       }>
     | undefined;
   parameters?: ReadonlyArray<IntegrationWebhookEventParameterDefinition> | undefined;
+  parameterGroups?: ReadonlyArray<IntegrationWebhookEventParameterGroupDefinition> | undefined;
   requirements?: IntegrationWebhookTriggerRequirements | undefined;
 };
 

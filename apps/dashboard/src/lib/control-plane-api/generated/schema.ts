@@ -4285,12 +4285,23 @@ export interface paths {
                   }[];
                   displayName: string;
                   eventType: string;
+                  parameterGroups?: {
+                    id: string;
+                    /** @enum {string} */
+                    kind: "oneOf";
+                    label: string;
+                    options: {
+                      label: string;
+                      parameterId: string;
+                    }[];
+                  }[];
                   parameters?: (
                     | {
                         id: string;
                         /** @enum {string} */
                         kind: "resource-select";
                         label: string;
+                        negatedMatchRequiresExists?: boolean;
                         payloadPath: string[];
                         placeholder?: string;
                         prefix?: string;
@@ -4307,6 +4318,7 @@ export interface paths {
                         label: string;
                         /** @enum {string} */
                         matchMode?: "eq" | "contains" | "contains_token";
+                        negatedMatchRequiresExists?: boolean;
                         payloadPath: string[];
                         placeholder?: string;
                         prefix?: string;
@@ -4318,6 +4330,7 @@ export interface paths {
                         label: string;
                         /** @enum {string} */
                         matchMode: "eq" | "exists";
+                        negatedMatchRequiresExists?: boolean;
                         options: {
                           label: string;
                           value: string;

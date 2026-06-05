@@ -138,6 +138,9 @@ export function createWebhookTriggerEventOption(input: {
                   kind: parameter.kind,
                   resourceKind: parameter.resourceKind,
                   payloadPath: [...parameter.payloadPath],
+                  ...(parameter.negatedMatchRequiresExists === undefined
+                    ? {}
+                    : { negatedMatchRequiresExists: parameter.negatedMatchRequiresExists }),
                   ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
                   ...(parameter.placeholder === undefined
                     ? {}
@@ -154,6 +157,9 @@ export function createWebhookTriggerEventOption(input: {
                       value: option.value,
                       label: option.label,
                     })),
+                    ...(parameter.negatedMatchRequiresExists === undefined
+                      ? {}
+                      : { negatedMatchRequiresExists: parameter.negatedMatchRequiresExists }),
                     ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
                     ...(parameter.placeholder === undefined
                       ? {}
@@ -176,12 +182,28 @@ export function createWebhookTriggerEventOption(input: {
                     ...(parameter.controlVariant === undefined
                       ? {}
                       : { controlVariant: parameter.controlVariant }),
+                    ...(parameter.negatedMatchRequiresExists === undefined
+                      ? {}
+                      : { negatedMatchRequiresExists: parameter.negatedMatchRequiresExists }),
                     ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
                     ...(parameter.placeholder === undefined
                       ? {}
                       : { placeholder: parameter.placeholder }),
                   },
           ),
+        }),
+    ...(input.eventDefinition.parameterGroups === undefined
+      ? {}
+      : {
+          parameterGroups: input.eventDefinition.parameterGroups.map((group) => ({
+            id: group.id,
+            label: group.label,
+            kind: group.kind,
+            options: group.options.map((option) => ({
+              parameterId: option.parameterId,
+              label: option.label,
+            })),
+          })),
         }),
   };
 }

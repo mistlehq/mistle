@@ -476,6 +476,253 @@ describe("integration registry", () => {
     ).toThrow(IntegrationDefinitionRegistryError);
   });
 
+  it("registers definitions with webhook event parameter groups", () => {
+    const registry = new IntegrationRegistry();
+
+    registry.register({
+      familyId: "github",
+      variantId: "github-cloud",
+      kind: "git",
+      displayName: "GitHub",
+      logoKey: "github",
+      targetConfigSchema: ConfigSchema,
+      targetSecretSchema: EmptySecretsSchema,
+      bindingConfigSchema: ConfigSchema,
+      connectionMethods: GitHubConnectionMethods,
+      supportedWebhookEvents: [
+        {
+          eventType: "github.pull_request.review_requested",
+          providerEventType: "pull_request",
+          displayName: "Pull request review requested",
+          parameters: [
+            {
+              id: "requestedReviewer",
+              label: "requested reviewer",
+              kind: "resource-select",
+              resourceKind: "user",
+              payloadPath: ["requested_reviewer", "login"],
+              negatedMatchRequiresExists: true,
+            },
+            {
+              id: "requestedTeam",
+              label: "requested GitHub team",
+              kind: "resource-select",
+              resourceKind: "team",
+              payloadPath: ["requested_team", "slug"],
+              negatedMatchRequiresExists: true,
+            },
+          ],
+          parameterGroups: [
+            {
+              id: "requestedReviewTarget",
+              label: "requested review target",
+              kind: "oneOf",
+              options: [
+                {
+                  parameterId: "requestedReviewer",
+                  label: "for reviewer",
+                },
+                {
+                  parameterId: "requestedTeam",
+                  label: "for team",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      compileBinding: () => ({
+        egressRoutes: [],
+        artifacts: [],
+        runtimeClients: [],
+      }),
+    });
+
+    const definition = registry.getDefinition({
+      familyId: "github",
+      variantId: "github-cloud",
+    });
+
+    expect(definition?.supportedWebhookEvents?.[0]?.parameterGroups).toEqual([
+      {
+        id: "requestedReviewTarget",
+        label: "requested review target",
+        kind: "oneOf",
+        options: [
+          {
+            parameterId: "requestedReviewer",
+            label: "for reviewer",
+          },
+          {
+            parameterId: "requestedTeam",
+            label: "for team",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("rejects webhook event parameter groups that reference missing parameters", () => {
+    const registry = new IntegrationRegistry();
+
+    expect(() =>
+      registry.register({
+        familyId: "github",
+        variantId: "github-cloud",
+        kind: "git",
+        displayName: "GitHub",
+        logoKey: "github",
+        targetConfigSchema: ConfigSchema,
+        targetSecretSchema: EmptySecretsSchema,
+        bindingConfigSchema: ConfigSchema,
+        connectionMethods: GitHubConnectionMethods,
+        supportedWebhookEvents: [
+          {
+            eventType: "github.pull_request.review_requested",
+            providerEventType: "pull_request",
+            displayName: "Pull request review requested",
+            parameters: [
+              {
+                id: "requestedReviewer",
+                label: "requested reviewer",
+                kind: "resource-select",
+                resourceKind: "user",
+                payloadPath: ["requested_reviewer", "login"],
+              },
+            ],
+            parameterGroups: [
+              {
+                id: "requestedReviewTarget",
+                label: "requested review target",
+                kind: "oneOf",
+                options: [
+                  {
+                    parameterId: "requestedReviewer",
+                    label: "for reviewer",
+                  },
+                  {
+                    parameterId: "requestedTeam",
+                    label: "for team",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        compileBinding: () => ({
+          egressRoutes: [],
+          artifacts: [],
+          runtimeClients: [],
+        }),
+      }),
+    ).toThrow(IntegrationDefinitionRegistryError);
+  });
+
+  it("rejects webhook event parameters with duplicate ids", () => {
+    const registry = new IntegrationRegistry();
+
+    expect(() =>
+      registry.register({
+        familyId: "github",
+        variantId: "github-cloud",
+        kind: "git",
+        displayName: "GitHub",
+        logoKey: "github",
+        targetConfigSchema: ConfigSchema,
+        targetSecretSchema: EmptySecretsSchema,
+        bindingConfigSchema: ConfigSchema,
+        connectionMethods: GitHubConnectionMethods,
+        supportedWebhookEvents: [
+          {
+            eventType: "github.pull_request.review_requested",
+            providerEventType: "pull_request",
+            displayName: "Pull request review requested",
+            parameters: [
+              {
+                id: "requestedTarget",
+                label: "requested reviewer",
+                kind: "resource-select",
+                resourceKind: "user",
+                payloadPath: ["requested_reviewer", "login"],
+              },
+              {
+                id: "requestedTarget",
+                label: "requested GitHub team",
+                kind: "resource-select",
+                resourceKind: "team",
+                payloadPath: ["requested_team", "slug"],
+              },
+            ],
+            parameterGroups: [
+              {
+                id: "requestedReviewTarget",
+                label: "requested review target",
+                kind: "oneOf",
+                options: [
+                  {
+                    parameterId: "requestedTarget",
+                    label: "for reviewer",
+                  },
+                  {
+                    parameterId: "requestedTeam",
+                    label: "for team",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        compileBinding: () => ({
+          egressRoutes: [],
+          artifacts: [],
+          runtimeClients: [],
+        }),
+      }),
+    ).toThrow(
+      "Integration definition supportedWebhookEvents[*].parameters contains duplicate id 'requestedTarget'.",
+    );
+  });
+
+  it("rejects negated-match existence guards on non-equality webhook event parameters", () => {
+    const registry = new IntegrationRegistry();
+
+    expect(() =>
+      registry.register({
+        familyId: "github",
+        variantId: "github-cloud",
+        kind: "git",
+        displayName: "GitHub",
+        logoKey: "github",
+        targetConfigSchema: ConfigSchema,
+        targetSecretSchema: EmptySecretsSchema,
+        bindingConfigSchema: ConfigSchema,
+        connectionMethods: GitHubConnectionMethods,
+        supportedWebhookEvents: [
+          {
+            eventType: "github.issue_comment.created",
+            providerEventType: "issue_comment",
+            displayName: "Issue comment created",
+            parameters: [
+              {
+                id: "invocationToken",
+                label: "message contains",
+                kind: "string",
+                payloadPath: ["comment", "body"],
+                matchMode: "contains_token",
+                negatedMatchRequiresExists: true,
+              },
+            ],
+          },
+        ],
+        compileBinding: () => ({
+          egressRoutes: [],
+          artifacts: [],
+          runtimeClients: [],
+        }),
+      }),
+    ).toThrow(IntegrationDefinitionRegistryError);
+  });
+
   it("rejects definitions with invalid webhook event capability requirements", () => {
     const registry = new IntegrationRegistry();
 

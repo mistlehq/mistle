@@ -36,6 +36,7 @@ import {
 } from "./webhook-trigger-event-picker-state.js";
 import type {
   WebhookTriggerEventOption,
+  WebhookTriggerEventParameterGroup,
   WebhookTriggerEventParameterRule,
   WebhookTriggerEventParameterRuleMap,
 } from "./webhook-trigger-event-types.js";
@@ -44,6 +45,20 @@ import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-eve
 const EventParameterRowClassName = "flex w-full items-center gap-4";
 const EventParameterLabelClassName = "text-muted-foreground shrink-0 text-sm whitespace-nowrap";
 const EventParameterControlClassName = "min-w-0 flex-1";
+
+type WebhookTriggerEventParameter = NonNullable<WebhookTriggerEventOption["parameters"]>[number];
+
+type ResolvedOneOfParameterGroupOption = {
+  parameter: WebhookTriggerEventParameter;
+  label: string;
+};
+
+type StringWebhookTriggerEventParameter = Extract<WebhookTriggerEventParameter, { kind: "string" }>;
+
+type EnumSelectWebhookTriggerEventParameter = Extract<
+  WebhookTriggerEventParameter,
+  { kind: "enum-select" }
+>;
 
 export function WebhookTriggerEventPicker(input: {
   hasConnectedIntegrations: boolean;
@@ -58,6 +73,10 @@ export function WebhookTriggerEventPicker(input: {
     triggerId: string;
     parameterId: string;
     rule: WebhookTriggerEventParameterRule;
+  }) => void;
+  onEventParameterRulesChange: (input: {
+    triggerId: string;
+    rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>;
   }) => void;
   showAddTriggerControl?: boolean;
 }): React.JSX.Element {
@@ -157,6 +176,12 @@ export function WebhookTriggerEventPicker(input: {
                     rule,
                   });
                 }}
+                onRulesChange={(rules) => {
+                  input.onEventParameterRulesChange({
+                    triggerId: option.id,
+                    rules,
+                  });
+                }}
               />
               {isWebhookTriggerEventOptionUnavailable(option) &&
               option.description !== undefined ? (
@@ -170,18 +195,45 @@ export function WebhookTriggerEventPicker(input: {
   );
 }
 
-function isGitHubReviewRequestEvent(eventType: string): boolean {
-  return (
-    eventType === "github.pull_request.review_requested" ||
-    eventType === "github.pull_request.review_request_removed"
+function findParameter(
+  parameters: readonly WebhookTriggerEventParameter[],
+  parameterId: string,
+): WebhookTriggerEventParameter | undefined {
+  return parameters.find((parameter) => parameter.id === parameterId);
+}
+
+function findParameterGroupForParameter(input: {
+  groups: readonly WebhookTriggerEventParameterGroup[];
+  parameterId: string;
+}): WebhookTriggerEventParameterGroup | undefined {
+  return input.groups.find((group) =>
+    group.options.some((option) => option.parameterId === input.parameterId),
   );
 }
 
-function findParameter(
-  parameters: readonly NonNullable<WebhookTriggerEventOption["parameters"]>[number][],
-  parameterId: string,
-): NonNullable<WebhookTriggerEventOption["parameters"]>[number] | undefined {
-  return parameters.find((parameter) => parameter.id === parameterId);
+function resolveOneOfParameterGroupOptions(input: {
+  group: WebhookTriggerEventParameterGroup;
+  parameters: readonly WebhookTriggerEventParameter[];
+}): ResolvedOneOfParameterGroupOption[] {
+  return input.group.options.map((option) => {
+    const parameter = findParameter(input.parameters, option.parameterId);
+    if (parameter === undefined) {
+      throw new Error(
+        `Trigger event parameter group '${input.group.id}' references missing parameter '${option.parameterId}'.`,
+      );
+    }
+
+    if (!isEqualityParameter(parameter)) {
+      throw new Error(
+        `Trigger event parameter group '${input.group.id}' references non-equality parameter '${option.parameterId}'.`,
+      );
+    }
+
+    return {
+      parameter,
+      label: option.label,
+    };
+  });
 }
 
 function EventParameterFields(input: {
@@ -189,53 +241,40 @@ function EventParameterFields(input: {
   eventOption: WebhookTriggerEventOption;
   rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>;
   onRuleChange: (parameterId: string, rule: WebhookTriggerEventParameterRule) => void;
+  onRulesChange: (rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>) => void;
 }): React.JSX.Element {
   const parameters = input.eventOption.parameters ?? [];
-  const requestedReviewerParameter = findParameter(parameters, "requestedReviewer");
-  const requestedTeamParameter = findParameter(parameters, "requestedTeam");
-  const shouldRenderReviewTargetControl =
-    isGitHubReviewRequestEvent(input.eventOption.eventType) &&
-    requestedReviewerParameter?.kind === "resource-select" &&
-    requestedTeamParameter?.kind === "resource-select";
-
-  if (
-    shouldRenderReviewTargetControl &&
-    requestedReviewerParameter?.kind === "resource-select" &&
-    requestedTeamParameter?.kind === "resource-select"
-  ) {
-    return (
-      <>
-        <GitHubRequestedReviewTargetField
-          connectionId={input.connectionId}
-          requestedReviewerParameter={requestedReviewerParameter}
-          requestedReviewerRule={input.rules.requestedReviewer}
-          requestedTeamParameter={requestedTeamParameter}
-          requestedTeamRule={input.rules.requestedTeam}
-          onRuleChange={input.onRuleChange}
-        />
-        {parameters
-          .filter(
-            (parameter) => parameter.id !== "requestedReviewer" && parameter.id !== "requestedTeam",
-          )
-          .map((parameter) => (
-            <EventParameterField
-              connectionId={input.connectionId}
-              eventType={input.eventOption.eventType}
-              key={`${input.eventOption.id}:${parameter.id}`}
-              onRuleChange={(rule) => {
-                input.onRuleChange(parameter.id, rule);
-              }}
-              parameter={parameter}
-              rule={input.rules[parameter.id]}
-            />
-          ))}
-      </>
-    );
-  }
+  const parameterGroups = input.eventOption.parameterGroups ?? [];
+  const renderedGroupIds = new Set<string>();
 
   return (
     <>
       {parameters.map((parameter) => {
+        const parameterGroup = findParameterGroupForParameter({
+          groups: parameterGroups,
+          parameterId: parameter.id,
+        });
+
+        if (parameterGroup !== undefined) {
+          if (renderedGroupIds.has(parameterGroup.id)) {
+            return null;
+          }
+
+          renderedGroupIds.add(parameterGroup.id);
+          return (
+            <OneOfParameterGroupField
+              connectionId={input.connectionId}
+              eventType={input.eventOption.eventType}
+              group={parameterGroup}
+              key={`${input.eventOption.id}:group:${parameterGroup.id}`}
+              onRuleChange={input.onRuleChange}
+              onRulesChange={input.onRulesChange}
+              parameters={parameters}
+              rules={input.rules}
+            />
+          );
+        }
+
         return (
           <EventParameterField
             connectionId={input.connectionId}
@@ -356,8 +395,6 @@ export function WebhookTriggerEventPickerAddButton(input: {
   );
 }
 
-type RequestedReviewTargetKind = "reviewer" | "team";
-
 type ResourceParameterOption = {
   id: string;
   handle: string;
@@ -386,83 +423,170 @@ function normalizeResourceParameterOptions(input: {
   ];
 }
 
-function GitHubRequestedReviewTargetField(input: {
-  connectionId: string;
-  requestedReviewerParameter: Extract<
-    NonNullable<WebhookTriggerEventOption["parameters"]>[number],
-    { kind: "resource-select" }
-  >;
-  requestedReviewerRule: WebhookTriggerEventParameterRule | undefined;
-  requestedTeamParameter: Extract<
-    NonNullable<WebhookTriggerEventOption["parameters"]>[number],
-    { kind: "resource-select" }
-  >;
-  requestedTeamRule: WebhookTriggerEventParameterRule | undefined;
-  onRuleChange: (parameterId: string, rule: WebhookTriggerEventParameterRule) => void;
-}): React.JSX.Element {
-  const reviewerInputId = useId();
-  const teamInputId = useId();
-  const requestedReviewerValue = input.requestedReviewerRule?.value ?? "";
-  const requestedTeamValue = input.requestedTeamRule?.value ?? "";
-  const initialSelectedKind: RequestedReviewTargetKind =
-    requestedTeamValue.trim().length > 0 && requestedReviewerValue.trim().length === 0
-      ? "team"
-      : "reviewer";
-  const [selectedKind, setSelectedKind] = useState<RequestedReviewTargetKind>(initialSelectedKind);
-  const selectedParameter =
-    selectedKind === "reviewer" ? input.requestedReviewerParameter : input.requestedTeamParameter;
-  const selectedRule =
-    selectedKind === "reviewer" ? input.requestedReviewerRule : input.requestedTeamRule;
-  const reviewerResourceQuery = useQuery({
-    queryKey: [
-      "trigger-trigger-parameters",
-      input.connectionId,
-      input.requestedReviewerParameter.resourceKind,
-    ],
-    queryFn: async ({ signal }) =>
-      listIntegrationConnectionResources({
-        connectionId: input.connectionId,
-        kind: input.requestedReviewerParameter.resourceKind,
-        signal,
-      }),
-    enabled: selectedKind === "reviewer" && input.connectionId.trim().length > 0,
-    retry: false,
-  });
-  const teamResourceQuery = useQuery({
-    queryKey: [
-      "trigger-trigger-parameters",
-      input.connectionId,
-      input.requestedTeamParameter.resourceKind,
-    ],
-    queryFn: async ({ signal }) =>
-      listIntegrationConnectionResources({
-        connectionId: input.connectionId,
-        kind: input.requestedTeamParameter.resourceKind,
-        signal,
-      }),
-    enabled: selectedKind === "team" && input.connectionId.trim().length > 0,
-    retry: false,
-  });
-  const normalizedReviewerResourceOptions = normalizeResourceParameterOptions({
-    items: reviewerResourceQuery.data?.items ?? [],
-    value: requestedReviewerValue,
-  });
-  const normalizedTeamResourceOptions = normalizeResourceParameterOptions({
-    items: teamResourceQuery.data?.items ?? [],
-    value: requestedTeamValue,
-  });
-  const teamResourceErrorMessage = resolveGitHubTeamResourceErrorMessage({
-    isError: teamResourceQuery.isError,
-    error: teamResourceQuery.error,
-    syncState: teamResourceQuery.data?.syncState,
-    lastErrorMessage: teamResourceQuery.data?.lastErrorMessage,
+function findConfiguredOneOfParameterId(input: {
+  options: readonly ResolvedOneOfParameterGroupOption[];
+  rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>;
+}): string {
+  const configuredOption = input.options.find((option) => {
+    const rule = input.rules[option.parameter.id];
+    return (rule?.value.trim().length ?? 0) > 0;
   });
 
-  function clearInactiveRule(kind: RequestedReviewTargetKind): void {
-    input.onRuleChange(kind === "reviewer" ? "requestedTeam" : "requestedReviewer", {
+  return configuredOption?.parameter.id ?? input.options[0]?.parameter.id ?? "";
+}
+
+export function resolveOneOfParameterGroupRulesAfterSelection(input: {
+  group: WebhookTriggerEventParameterGroup;
+  rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>;
+  selectedParameterId: string;
+}): NonNullable<WebhookTriggerEventParameterRuleMap[string]> {
+  if (!input.group.options.some((option) => option.parameterId === input.selectedParameterId)) {
+    throw new Error(
+      `Trigger event parameter group '${input.group.id}' does not contain parameter '${input.selectedParameterId}'.`,
+    );
+  }
+
+  const nextRules = { ...input.rules };
+  for (const option of input.group.options) {
+    if (option.parameterId === input.selectedParameterId) {
+      continue;
+    }
+
+    nextRules[option.parameterId] = {
       operator: WebhookTriggerEventParameterRuleOperators.IS,
       value: "",
-    });
+    };
+  }
+
+  return nextRules;
+}
+
+function StringEqualityParameterValueField(input: {
+  parameter: StringWebhookTriggerEventParameter;
+  rule: WebhookTriggerEventParameterRule | undefined;
+  value: string;
+  onRuleChange: (rule: WebhookTriggerEventParameterRule) => void;
+}): React.JSX.Element {
+  return (
+    <Input
+      className={EventParameterControlClassName}
+      onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+        input.onRuleChange({
+          operator: resolveEqualityOperator(input.rule),
+          value: event.currentTarget.value,
+        });
+      }}
+      placeholder={input.parameter.placeholder ?? input.parameter.label}
+      value={input.value}
+    />
+  );
+}
+
+function EnumSelectParameterValueField(input: {
+  eventType: string;
+  parameter: EnumSelectWebhookTriggerEventParameter;
+  value: string;
+  onRuleChange: (rule: WebhookTriggerEventParameterRule) => void;
+}): React.JSX.Element {
+  return (
+    <Select
+      modal={false}
+      onValueChange={(value) => {
+        input.onRuleChange(
+          resolveEnumSelectParameterRule({
+            parameter: input.parameter,
+            value,
+          }),
+        );
+      }}
+      value={input.value.length === 0 ? null : input.value}
+    >
+      <SelectTrigger className={EventParameterControlClassName}>
+        <SelectValue placeholder={input.parameter.placeholder ?? `Any ${input.parameter.label}`}>
+          {input.parameter.options.find((option) => option.value === input.value)?.label}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__any__">
+          {input.parameter.placeholder ?? `Any ${input.parameter.label}`}
+        </SelectItem>
+        {input.parameter.options.map((option) => (
+          <SelectItem key={`${input.eventType}:${option.value}`} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function OneOfParameterGroupField(input: {
+  connectionId: string;
+  eventType: string;
+  group: WebhookTriggerEventParameterGroup;
+  parameters: readonly WebhookTriggerEventParameter[];
+  rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>;
+  onRuleChange: (parameterId: string, rule: WebhookTriggerEventParameterRule) => void;
+  onRulesChange: (rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>) => void;
+}): React.JSX.Element {
+  const inputId = useId();
+  const groupOptions = resolveOneOfParameterGroupOptions({
+    group: input.group,
+    parameters: input.parameters,
+  });
+  const [selectedParameterId, setSelectedParameterId] = useState(
+    findConfiguredOneOfParameterId({
+      options: groupOptions,
+      rules: input.rules,
+    }),
+  );
+  const selectedOption = groupOptions.find((option) => option.parameter.id === selectedParameterId);
+  if (selectedOption === undefined) {
+    throw new Error(
+      `Trigger event parameter group '${input.group.id}' has no selected parameter option.`,
+    );
+  }
+
+  const selectedParameter = selectedOption.parameter;
+  const selectedRule = input.rules[selectedParameter.id];
+  const selectedValue = selectedRule?.value ?? "";
+  const selectedResourceKind =
+    selectedParameter.kind === "resource-select" ? selectedParameter.resourceKind : "none";
+  const resourceQuery = useQuery({
+    queryKey: ["trigger-trigger-parameters", input.connectionId, selectedResourceKind],
+    queryFn: async ({ signal }) => {
+      if (selectedParameter.kind !== "resource-select") {
+        throw new Error("Resource parameter group option is missing resource kind.");
+      }
+
+      return listIntegrationConnectionResources({
+        connectionId: input.connectionId,
+        kind: selectedParameter.resourceKind,
+        signal,
+      });
+    },
+    enabled: selectedParameter.kind === "resource-select" && input.connectionId.trim().length > 0,
+    retry: false,
+  });
+  const normalizedResourceOptions = normalizeResourceParameterOptions({
+    items: resourceQuery.data?.items ?? [],
+    value: selectedValue,
+  });
+  const resourceErrorMessage = resolveResourceParameterErrorMessage({
+    isError: resourceQuery.isError,
+    error: resourceQuery.error,
+    syncState: resourceQuery.data?.syncState,
+    lastErrorMessage: resourceQuery.data?.lastErrorMessage,
+  });
+
+  function clearInactiveRules(parameterId: string): void {
+    input.onRulesChange(
+      resolveOneOfParameterGroupRulesAfterSelection({
+        group: input.group,
+        rules: input.rules,
+        selectedParameterId: parameterId,
+      }),
+    );
   }
 
   return (
@@ -470,21 +594,31 @@ function GitHubRequestedReviewTargetField(input: {
       <Select
         modal={false}
         onValueChange={(value) => {
-          if (value !== "reviewer" && value !== "team") {
+          if (value === null) {
             return;
           }
 
-          setSelectedKind(value);
-          clearInactiveRule(value);
+          if (!groupOptions.some((option) => option.parameter.id === value)) {
+            return;
+          }
+
+          setSelectedParameterId(value);
+          clearInactiveRules(value);
         }}
-        value={selectedKind}
+        value={selectedParameter.id}
       >
         <SelectTrigger className="w-36 shrink-0">
-          <SelectValue>{selectedKind === "reviewer" ? "for reviewer" : "for team"}</SelectValue>
+          <SelectValue>{selectedOption.label}</SelectValue>
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="reviewer">for reviewer</SelectItem>
-          <SelectItem value="team">for team</SelectItem>
+          {groupOptions.map((option) => (
+            <SelectItem
+              key={`${input.group.id}:${option.parameter.id}`}
+              value={option.parameter.id}
+            >
+              {option.label}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
       <EqualityOperatorSelect
@@ -492,76 +626,72 @@ function GitHubRequestedReviewTargetField(input: {
         parameter={selectedParameter}
         value={resolveEqualityOperator(selectedRule)}
         onValueChange={(operator) => {
-          input.onRuleChange(selectedKind === "reviewer" ? "requestedReviewer" : "requestedTeam", {
+          input.onRuleChange(selectedParameter.id, {
             operator,
-            value: selectedKind === "reviewer" ? requestedReviewerValue : requestedTeamValue,
+            value: selectedValue,
           });
         }}
       />
-      {selectedKind === "reviewer" ? (
-        <SingleSelectStringComboboxField
-          contentClassName="w-[min(22rem,calc(100vw-2rem))]"
-          inputId={reviewerInputId}
-          inputLabel={input.requestedReviewerParameter.label}
-          inputWrapperClassName={EventParameterControlClassName}
-          onChange={(value) => {
-            input.onRuleChange("requestedReviewer", {
-              operator: resolveEqualityOperator(input.requestedReviewerRule),
-              value: value ?? "",
-            });
-          }}
-          options={normalizedReviewerResourceOptions.map((option) => ({
-            value: option.handle,
-            label: option.displayName,
-          }))}
-          placeholder={
-            reviewerResourceQuery.isPending
-              ? "Loading..."
-              : normalizedReviewerResourceOptions.length === 0
-                ? "No reviewers available"
-                : "Any requested reviewer"
-          }
-          value={requestedReviewerValue.length === 0 ? undefined : requestedReviewerValue}
-        />
-      ) : (
+      {selectedParameter.kind === "resource-select" ? (
         <div className={`${EventParameterControlClassName} space-y-1.5`}>
           <SingleSelectStringComboboxField
             contentClassName="w-[min(22rem,calc(100vw-2rem))]"
-            inputId={teamInputId}
-            inputLabel={input.requestedTeamParameter.label}
+            inputId={inputId}
+            inputLabel={selectedParameter.label}
             inputWrapperClassName="w-full"
             onChange={(value) => {
-              input.onRuleChange("requestedTeam", {
-                operator: resolveEqualityOperator(input.requestedTeamRule),
+              input.onRuleChange(selectedParameter.id, {
+                operator: resolveEqualityOperator(selectedRule),
                 value: value ?? "",
               });
             }}
-            options={normalizedTeamResourceOptions.map((option) => ({
+            options={normalizedResourceOptions.map((option) => ({
               value: option.handle,
               label: option.displayName,
             }))}
             placeholder={
-              teamResourceQuery.isPending
+              resourceQuery.isPending
                 ? "Loading..."
-                : teamResourceErrorMessage !== null
-                  ? "Could not load GitHub teams"
-                  : normalizedTeamResourceOptions.length === 0
-                    ? "No teams available"
-                    : "Any GitHub team"
+                : resourceErrorMessage !== null
+                  ? `Could not load ${selectedParameter.label}s`
+                  : normalizedResourceOptions.length === 0
+                    ? `No ${selectedParameter.label}s available`
+                    : (selectedParameter.placeholder ?? `Any ${selectedParameter.label}`)
             }
-            emptyMessage={teamResourceErrorMessage ?? "No matching teams."}
-            value={requestedTeamValue.length === 0 ? undefined : requestedTeamValue}
+            emptyMessage={resourceErrorMessage ?? `No matching ${selectedParameter.label}s.`}
+            value={selectedValue.length === 0 ? undefined : selectedValue}
           />
-          {teamResourceErrorMessage === null ? null : (
-            <Notice variant="alert">{teamResourceErrorMessage}</Notice>
+          {resourceErrorMessage === null ? null : (
+            <Notice variant="alert">{resourceErrorMessage}</Notice>
           )}
         </div>
+      ) : selectedParameter.kind === "string" ? (
+        <StringEqualityParameterValueField
+          parameter={selectedParameter}
+          rule={selectedRule}
+          value={selectedValue}
+          onRuleChange={(rule) => {
+            input.onRuleChange(selectedParameter.id, {
+              operator: rule.operator,
+              value: rule.value,
+            });
+          }}
+        />
+      ) : (
+        <EnumSelectParameterValueField
+          eventType={input.eventType}
+          parameter={selectedParameter}
+          value={selectedValue}
+          onRuleChange={(rule) => {
+            input.onRuleChange(selectedParameter.id, rule);
+          }}
+        />
       )}
     </div>
   );
 }
 
-function resolveGitHubTeamResourceErrorMessage(input: {
+function resolveResourceParameterErrorMessage(input: {
   isError: boolean;
   error: unknown;
   syncState: string | undefined;
@@ -570,12 +700,12 @@ function resolveGitHubTeamResourceErrorMessage(input: {
   if (input.isError) {
     return resolveApiErrorMessage({
       error: input.error,
-      fallbackMessage: "Could not load GitHub teams for this connection.",
+      fallbackMessage: "Could not load resources for this connection.",
     });
   }
 
   if (input.syncState === "error") {
-    return input.lastErrorMessage ?? "Could not sync GitHub teams for this connection.";
+    return input.lastErrorMessage ?? "Could not sync resources for this connection.";
   }
 
   return null;
@@ -667,16 +797,11 @@ function EventParameterField(input: {
               });
             }}
           />
-          <Input
-            className={EventParameterControlClassName}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-              input.onRuleChange({
-                operator: resolveEqualityOperator(input.rule),
-                value: event.currentTarget.value,
-              });
-            }}
-            placeholder={input.parameter.placeholder ?? input.parameter.label}
+          <StringEqualityParameterValueField
+            parameter={input.parameter}
+            rule={input.rule}
             value={value}
+            onRuleChange={input.onRuleChange}
           />
         </span>
       );
@@ -707,34 +832,12 @@ function EventParameterField(input: {
     return (
       <span className={EventParameterRowClassName}>
         <span className={EventParameterLabelClassName}>{parameter.prefix ?? parameter.label}</span>
-        <Select
-          modal={false}
-          onValueChange={(value) => {
-            input.onRuleChange(
-              resolveEnumSelectParameterRule({
-                parameter,
-                value,
-              }),
-            );
-          }}
-          value={value.length === 0 ? null : value}
-        >
-          <SelectTrigger className={EventParameterControlClassName}>
-            <SelectValue placeholder={parameter.placeholder ?? `Any ${parameter.label}`}>
-              {parameter.options.find((option) => option.value === value)?.label}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__any__">
-              {parameter.placeholder ?? `Any ${parameter.label}`}
-            </SelectItem>
-            {parameter.options.map((option) => (
-              <SelectItem key={`${input.eventType}:${option.value}`} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <EnumSelectParameterValueField
+          eventType={input.eventType}
+          parameter={parameter}
+          value={value}
+          onRuleChange={input.onRuleChange}
+        />
       </span>
     );
   }
@@ -797,7 +900,8 @@ function isEqualityParameter(
   return (
     parameter.kind === "resource-select" ||
     (parameter.kind === "string" &&
-      (parameter.matchMode === undefined || parameter.matchMode === "eq"))
+      (parameter.matchMode === undefined || parameter.matchMode === "eq")) ||
+    (parameter.kind === "enum-select" && parameter.matchMode === "eq")
   );
 }
 

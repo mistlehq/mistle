@@ -135,6 +135,12 @@ export function WebhookTriggerTypeSpecificSection(
               },
             });
           }}
+          onEventParameterRulesChange={({ triggerId, rules }) => {
+            input.onValueChange("eventParameterRules", {
+              ...input.values.eventParameterRules,
+              [triggerId]: rules,
+            });
+          }}
           onValueChange={(value) => {
             input.onValueChange("eventIds", value);
           }}
