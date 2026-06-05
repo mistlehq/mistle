@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, userEvent, within } from "storybook/test";
 
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
+import { StoryAwsConnection } from "./integrations-editor-section-story-support.js";
 import {
   DefaultSandboxProfileEditorStoryArgs,
   SandboxProfileEditorPageStory,
@@ -31,6 +33,34 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 export const CombinedIntegrationsConnectionsAndTools: Story = {};
+
+export const AddConnectorsDialog: Story = {
+  args: {
+    availableConnections: StoryIntegrationConnections.filter(
+      (connection) => connection.id !== StoryAwsConnection.id,
+    ),
+    initialBindings: StoryBindings.filter((binding) => binding.kind !== "connector"),
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+
+    await userEvent.click(canvas.getByRole("button", { name: "Add integration or tool" }));
+
+    const dialog = body.getByRole("dialog", { name: "Add connectors" });
+    await expect(dialog).toBeVisible();
+    const dialogScope = within(dialog);
+    await expect(dialogScope.getByText("AWS")).toBeVisible();
+    await expect(dialogScope.getByText("PlanetScale")).toBeVisible();
+
+    const logoSources = Array.from(
+      dialog.querySelectorAll<HTMLImageElement>('img[src^="/integration-logos/"]'),
+    ).map((image) => image.getAttribute("src"));
+    await expect(logoSources).toContain("/integration-logos/planetscale.svg");
+    await expect(logoSources).toContain("/integration-logos/planetscale-dark.svg");
+    await expect(logoSources).not.toContain("/integration-logos/aws-dark.svg");
+  },
+};
 
 const StoryTargetsWithoutGitConnections = StoryIntegrationTargets.filter(
   (target) => target.familyId !== "github",

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import type { StorybookConfig } from "@storybook/react-vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { mergeConfig } from "vite";
+import { mergeConfig, type UserConfig } from "vite";
 
 const StorybookReleaseVersion = readFileSync(
   fileURLToPath(new URL("../../../VERSION", import.meta.url)),
@@ -34,7 +34,7 @@ const config: StorybookConfig = {
     "../../ui/src/**/*.stories.@(ts|tsx)",
     "../../../apps/dashboard/src/**/*.stories.@(ts|tsx)",
   ],
-  async viteFinal(config) {
+  async viteFinal(config: UserConfig) {
     return mergeConfig(config, {
       define: {
         "import.meta.env.VITE_CONTROL_PLANE_API_ORIGIN": JSON.stringify(

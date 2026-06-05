@@ -11,9 +11,10 @@ type IntegrationLogoProps = {
 
 export function IntegrationLogo(input: IntegrationLogoProps): React.JSX.Element {
   const logoPaths = resolveIntegrationLogoPaths({ logoKey: input.logoKey });
+  const logoClassName = cn("size-5 shrink-0 object-contain", input.className);
 
   if (logoPaths.dark === null) {
-    return <img alt={input.alt} className={input.className} src={logoPaths.light} />;
+    return <img alt={input.alt} className={logoClassName} src={logoPaths.light} />;
   }
 
   const accessibilityProps =
@@ -27,17 +28,20 @@ export function IntegrationLogo(input: IntegrationLogoProps): React.JSX.Element 
         };
 
   return (
-    <span className="inline-flex items-center" {...accessibilityProps}>
+    <span
+      className={cn("inline-flex size-5 shrink-0 items-center justify-center", input.className)}
+      {...accessibilityProps}
+    >
       <img
         alt=""
         aria-hidden="true"
-        className={cn(input.className, "dark:hidden")}
+        className="size-full object-contain dark:hidden"
         src={logoPaths.light}
       />
       <img
         alt=""
         aria-hidden="true"
-        className={cn(input.className, "hidden dark:inline-block")}
+        className="hidden size-full object-contain dark:inline-block"
         src={logoPaths.dark}
       />
     </span>

@@ -2,7 +2,6 @@ const PUBLIC_INTEGRATION_LOGOS_BASE_PATH = "/integration-logos";
 
 const IntegrationLogoDarkVariantKeys = {
   anthropic: true,
-  aws: true,
   e2b: true,
   github: true,
   openai: true,

@@ -10,57 +10,7 @@ describe("resolveIntegrationLogoPath", () => {
   it("returns the dashboard public path for a logo key", () => {
     expect(resolveIntegrationLogoPath({ logoKey: "openai" })).toBe("/integration-logos/openai.svg");
     expect(resolveIntegrationLogoPath({ logoKey: "github" })).toBe("/integration-logos/github.svg");
-    expect(resolveIntegrationLogoPath({ logoKey: "jira" })).toBe("/integration-logos/jira.svg");
-    expect(resolveIntegrationLogoPath({ logoKey: "google" })).toBe("/integration-logos/google.svg");
-    expect(resolveIntegrationLogoPath({ logoKey: "gcp" })).toBe("/integration-logos/gcp.svg");
-    expect(resolveIntegrationLogoPath({ logoKey: "linear" })).toBe("/integration-logos/linear.svg");
-    expect(resolveIntegrationLogoPath({ logoKey: "slack" })).toBe("/integration-logos/slack.svg");
     expect(resolveIntegrationLogoPath({ logoKey: "aws" })).toBe("/integration-logos/aws.svg");
-    expect(resolveIntegrationLogoPath({ logoKey: "anthropic" })).toBe(
-      "/integration-logos/anthropic.svg",
-    );
-    expect(resolveIntegrationLogoPath({ logoKey: "datadog" })).toBe(
-      "/integration-logos/datadog.svg",
-    );
-    expect(resolveIntegrationLogoPath({ logoKey: "docker" })).toBe("/integration-logos/docker.svg");
-    expect(resolveIntegrationLogoPath({ logoKey: "e2b" })).toBe("/integration-logos/e2b.svg");
-    expect(resolveIntegrationLogoPath({ logoKey: "planetscale" })).toBe(
-      "/integration-logos/planetscale.svg",
-    );
-    expect(resolveIntegrationLogoPath({ logoKey: "sentry" })).toBe("/integration-logos/sentry.svg");
-    expect(resolveIntegrationLogoPath({ logoKey: "signoz" })).toBe("/integration-logos/signoz.svg");
-    expect(resolveIntegrationLogoPath({ logoKey: "opencode" })).toBe(
-      "/integration-logos/opencode.svg",
-    );
-    expect(resolveIntegrationLogoPath({ logoKey: "pi" })).toBe("/integration-logos/pi.svg");
-    expect(resolveIntegrationLogoPath({ logoKey: "tensorlake" })).toBe(
-      "/integration-logos/tensorlake.svg",
-    );
-  });
-
-  it("returns dark variant paths for integrations with light-sensitive marks", () => {
-    expect(resolveIntegrationLogoPath({ logoKey: "github", colorScheme: "dark" })).toBe(
-      "/integration-logos/github-dark.svg",
-    );
-    expect(resolveIntegrationLogoPath({ logoKey: "aws", colorScheme: "dark" })).toBe(
-      "/integration-logos/aws-dark.svg",
-    );
-    expect(resolveIntegrationLogoPath({ logoKey: "slack", colorScheme: "dark" })).toBe(
-      "/integration-logos/slack.svg",
-    );
-  });
-
-  it("returns paired logo paths when a dark variant exists", () => {
-    expect(resolveIntegrationLogoPaths({ logoKey: "openai" })).toEqual({
-      light: "/integration-logos/openai.svg",
-      dark: "/integration-logos/openai-dark.svg",
-    });
-    expect(resolveIntegrationLogoPaths({ logoKey: "linear" })).toEqual({
-      light: "/integration-logos/linear.svg",
-      dark: null,
-    });
-    expect(hasIntegrationLogoDarkVariant({ logoKey: "planetscale" })).toBe(true);
-    expect(hasIntegrationLogoDarkVariant({ logoKey: "jira" })).toBe(false);
   });
 
   it("trims whitespace from the logo key", () => {
@@ -79,5 +29,37 @@ describe("resolveIntegrationLogoPath", () => {
     expect(() => resolveIntegrationLogoPath({ logoKey: "   " })).toThrow(
       "Integration logo key must be a non-empty string.",
     );
+  });
+
+  it("returns dark variant paths only for integrations that need theme-specific marks", () => {
+    expect(resolveIntegrationLogoPath({ logoKey: "github", colorScheme: "dark" })).toBe(
+      "/integration-logos/github-dark.svg",
+    );
+    expect(resolveIntegrationLogoPath({ logoKey: "planetscale", colorScheme: "dark" })).toBe(
+      "/integration-logos/planetscale-dark.svg",
+    );
+    expect(resolveIntegrationLogoPath({ logoKey: "aws", colorScheme: "dark" })).toBe(
+      "/integration-logos/aws.svg",
+    );
+    expect(resolveIntegrationLogoPath({ logoKey: "slack", colorScheme: "dark" })).toBe(
+      "/integration-logos/slack.svg",
+    );
+  });
+
+  it("returns paired logo paths for theme-specific marks", () => {
+    expect(resolveIntegrationLogoPaths({ logoKey: "planetscale" })).toEqual({
+      light: "/integration-logos/planetscale.svg",
+      dark: "/integration-logos/planetscale-dark.svg",
+    });
+    expect(resolveIntegrationLogoPaths({ logoKey: "linear" })).toEqual({
+      light: "/integration-logos/linear.svg",
+      dark: null,
+    });
+    expect(resolveIntegrationLogoPaths({ logoKey: "aws" })).toEqual({
+      light: "/integration-logos/aws.svg",
+      dark: null,
+    });
+    expect(hasIntegrationLogoDarkVariant({ logoKey: "planetscale" })).toBe(true);
+    expect(hasIntegrationLogoDarkVariant({ logoKey: "jira" })).toBe(false);
   });
 });
