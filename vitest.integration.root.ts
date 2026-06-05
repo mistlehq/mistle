@@ -21,7 +21,6 @@ import integrationsCoreConfig from "./packages/integrations-core/vitest.integrat
 import integrationsDefinitionsConfig from "./packages/integrations-definitions/vitest.integration.config.ts";
 import objectStoreConfig from "./packages/object-store/vitest.integration.config.ts";
 import sandboxConfig from "./packages/sandbox/vitest.integration.config.ts";
-import testHarnessConfig from "./packages/test-harness/vitest.integration.config.ts";
 import {
   IntegrationVitestProjects,
   type IntegrationVitestProjectName,
@@ -78,8 +77,6 @@ function getProjectConfig(projectName: IntegrationVitestProjectName): TestProjec
       return objectStoreConfig;
     case "@mistle/sandbox":
       return sandboxConfig;
-    case "@mistle/test-harness":
-      return testHarnessConfig;
   }
 
   const exhaustiveProjectName: never = projectName;

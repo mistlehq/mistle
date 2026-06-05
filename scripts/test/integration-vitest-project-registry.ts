@@ -96,12 +96,8 @@ export const IntegrationVitestProjects = defineIntegrationVitestProjects([
     packageDir: "packages/sandbox",
     appServicePrewarm: "none",
   },
-  {
-    projectName: "@mistle/test-harness",
-    packageName: "@mistle/test-harness",
-    packageDir: "packages/test-harness",
-    appServicePrewarm: "none",
-  },
+  // @mistle/test-harness has integration tests for the runner/system harness itself,
+  // and requires dedicated preparation outside the ordinary root app/package runner.
 ]);
 
 export type IntegrationVitestProjectName =
