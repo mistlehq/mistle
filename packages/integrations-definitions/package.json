@@ -182,6 +182,7 @@
     "@octokit/webhooks-methods": "^6.0.0",
     "@opencode-ai/sdk": "1.15.13",
     "@opentelemetry/api": "^1.9.0",
+    "graphql": "^16.14.1",
     "octokit": "^5.0.5",
     "smol-toml": "^1.6.1",
     "ws": "^8.20.0",

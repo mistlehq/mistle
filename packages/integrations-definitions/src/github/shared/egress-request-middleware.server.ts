@@ -1,10 +1,21 @@
 import type { IntegrationEgressRequestMiddleware } from "@mistle/integrations-core";
+import { Kind, OperationTypeNode, parse } from "graphql/language";
+import type {
+  FragmentDefinitionNode,
+  OperationDefinitionNode,
+  SelectionSetNode,
+} from "graphql/language";
 
 import { GitHubRequestMiddlewareIds } from "./egress-request-middleware.js";
 
 type JsonRecord = Record<string, unknown>;
 
 const GitHubSessionLinkLabel = "🔗 View session";
+const GitHubGraphqlMarkdownBodyMutations = new Set([
+  "addComment",
+  "createPullRequest",
+  "updatePullRequest",
+]);
 
 function isJsonRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -29,10 +40,6 @@ function isGraphqlRequest(input: { method: string; pathname: string }): boolean 
   }
 
   return input.pathname.endsWith("/graphql");
-}
-
-function isAddCommentMutation(query: string): boolean {
-  return /addComment\s*\(/.test(query);
 }
 
 function createMarkdownFooter(sessionUrl: string): string {
@@ -60,9 +67,127 @@ function applyRestMarkdownFooter(input: { parsedBody: JsonRecord; footer: string
   return true;
 }
 
+function isGraphqlMarkdownBodyMutation(input: {
+  operationName: string | undefined;
+  query: string;
+}): boolean {
+  const document = parseGitHubGraphqlQuery(input.query);
+  const operations: OperationDefinitionNode[] = [];
+  const fragments = new Map<string, FragmentDefinitionNode>();
+
+  for (const definition of document.definitions) {
+    if (definition.kind === Kind.OPERATION_DEFINITION) {
+      operations.push(definition);
+    }
+    if (definition.kind === Kind.FRAGMENT_DEFINITION) {
+      fragments.set(definition.name.value, definition);
+    }
+  }
+
+  const operation = selectGraphqlOperation({
+    operationName: input.operationName,
+    operations,
+  });
+  if (operation === undefined || operation.operation !== OperationTypeNode.MUTATION) {
+    return false;
+  }
+
+  return selectionSetContainsMarkdownBodyMutation({
+    fragments,
+    selectionSet: operation.selectionSet,
+    visitedFragmentNames: new Set(),
+  });
+}
+
+function parseGitHubGraphqlQuery(query: string) {
+  try {
+    return parse(query, {
+      noLocation: true,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to parse GitHub GraphQL request query: ${message}`, {
+      cause: error,
+    });
+  }
+}
+
+function selectGraphqlOperation(input: {
+  operationName: string | undefined;
+  operations: ReadonlyArray<OperationDefinitionNode>;
+}): OperationDefinitionNode | undefined {
+  if (input.operationName !== undefined) {
+    return input.operations.find((operation) => operation.name?.value === input.operationName);
+  }
+
+  if (input.operations.length !== 1) {
+    return undefined;
+  }
+
+  return input.operations[0];
+}
+
+function selectionSetContainsMarkdownBodyMutation(input: {
+  fragments: ReadonlyMap<string, FragmentDefinitionNode>;
+  selectionSet: SelectionSetNode;
+  visitedFragmentNames: Set<string>;
+}): boolean {
+  for (const selection of input.selectionSet.selections) {
+    if (
+      selection.kind === Kind.FIELD &&
+      GitHubGraphqlMarkdownBodyMutations.has(selection.name.value)
+    ) {
+      return true;
+    }
+
+    if (
+      selection.kind === Kind.INLINE_FRAGMENT &&
+      selectionSetContainsMarkdownBodyMutation({
+        ...input,
+        selectionSet: selection.selectionSet,
+      })
+    ) {
+      return true;
+    }
+
+    if (selection.kind === Kind.FRAGMENT_SPREAD) {
+      const fragmentName = selection.name.value;
+      if (input.visitedFragmentNames.has(fragmentName)) {
+        continue;
+      }
+
+      const fragment = input.fragments.get(fragmentName);
+      if (fragment === undefined) {
+        continue;
+      }
+
+      input.visitedFragmentNames.add(fragmentName);
+      const containsTargetMutation = selectionSetContainsMarkdownBodyMutation({
+        ...input,
+        selectionSet: fragment.selectionSet,
+      });
+      input.visitedFragmentNames.delete(fragmentName);
+
+      if (containsTargetMutation) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 function applyGraphqlMarkdownFooter(input: { parsedBody: JsonRecord; footer: string }): boolean {
   const query = input.parsedBody["query"];
-  if (typeof query !== "string" || !isAddCommentMutation(query)) {
+  const operationName = input.parsedBody["operationName"];
+  if (
+    typeof query !== "string" ||
+    (operationName !== undefined && typeof operationName !== "string") ||
+    !isGraphqlMarkdownBodyMutation({
+      operationName,
+      query,
+    })
+  ) {
     return false;
   }
 

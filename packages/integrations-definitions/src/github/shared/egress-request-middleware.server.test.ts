@@ -138,6 +138,187 @@ describe("AppendSessionLinkToGitHubMarkdownRequestMiddleware", () => {
     });
   });
 
+  it("appends the markdown footer to GraphQL pull request create and update mutations", async () => {
+    const createPullRequest = createGitHubRequest({
+      pathname: "/graphql",
+      body: {
+        operationName: "CreatePullRequest",
+        query:
+          "mutation CreatePullRequest($input:CreatePullRequestInput!){createPullRequest(input: $input){pullRequest{id}}}",
+        variables: {
+          input: {
+            repositoryId: "R_kgDOExample",
+            title: "PR title",
+            headRefName: "feature",
+            baseRefName: "main",
+            body: "PR body",
+          },
+        },
+      },
+    });
+    const updatePullRequest = createGitHubRequest({
+      pathname: "/graphql",
+      body: {
+        operationName: "UpdatePullRequest",
+        query:
+          "mutation UpdatePullRequest($input:UpdatePullRequestInput!){updatePullRequest(input: $input){pullRequest{id}}}",
+        variables: {
+          input: {
+            pullRequestId: "PR_kwDOExample",
+            body: "Updated PR body",
+          },
+        },
+      },
+    });
+
+    const createResult = await AppendSessionLinkToGitHubMarkdownRequestMiddleware.handle({
+      ctx: {
+        sandboxInstanceId: "sandbox_123",
+        sessionUrl: SessionUrl,
+      },
+      request: createPullRequest,
+    });
+    const updateResult = await AppendSessionLinkToGitHubMarkdownRequestMiddleware.handle({
+      ctx: {
+        sandboxInstanceId: "sandbox_123",
+        sessionUrl: SessionUrl,
+      },
+      request: updatePullRequest,
+    });
+
+    expect(JSON.parse(new TextDecoder().decode(createResult.body))).toEqual({
+      operationName: "CreatePullRequest",
+      query:
+        "mutation CreatePullRequest($input:CreatePullRequestInput!){createPullRequest(input: $input){pullRequest{id}}}",
+      variables: {
+        input: {
+          repositoryId: "R_kgDOExample",
+          title: "PR title",
+          headRefName: "feature",
+          baseRefName: "main",
+          body: `PR body\n\n---\n[🔗 View session](${SessionUrl})`,
+        },
+      },
+    });
+    expect(JSON.parse(new TextDecoder().decode(updateResult.body))).toEqual({
+      operationName: "UpdatePullRequest",
+      query:
+        "mutation UpdatePullRequest($input:UpdatePullRequestInput!){updatePullRequest(input: $input){pullRequest{id}}}",
+      variables: {
+        input: {
+          pullRequestId: "PR_kwDOExample",
+          body: `Updated PR body\n\n---\n[🔗 View session](${SessionUrl})`,
+        },
+      },
+    });
+  });
+
+  it("appends the markdown footer when the selected GraphQL operation uses a fragment spread for a pull request mutation", async () => {
+    const request = createGitHubRequest({
+      pathname: "/graphql",
+      body: {
+        operationName: "CreatePullRequest",
+        query: [
+          "mutation CreatePullRequest($input:CreatePullRequestInput!){",
+          "  ...CreatePullRequestMutation",
+          "}",
+          "fragment CreatePullRequestMutation on Mutation {",
+          "  createPullRequest(input: $input) { pullRequest { id } }",
+          "}",
+        ].join("\n"),
+        variables: {
+          input: {
+            repositoryId: "R_kgDOExample",
+            title: "PR title",
+            headRefName: "feature",
+            baseRefName: "main",
+            body: "PR body from fragment",
+          },
+        },
+      },
+    });
+
+    const result = await AppendSessionLinkToGitHubMarkdownRequestMiddleware.handle({
+      ctx: {
+        sandboxInstanceId: "sandbox_123",
+        sessionUrl: SessionUrl,
+      },
+      request,
+    });
+
+    expect(JSON.parse(new TextDecoder().decode(result.body))).toEqual({
+      operationName: "CreatePullRequest",
+      query: [
+        "mutation CreatePullRequest($input:CreatePullRequestInput!){",
+        "  ...CreatePullRequestMutation",
+        "}",
+        "fragment CreatePullRequestMutation on Mutation {",
+        "  createPullRequest(input: $input) { pullRequest { id } }",
+        "}",
+      ].join("\n"),
+      variables: {
+        input: {
+          repositoryId: "R_kgDOExample",
+          title: "PR title",
+          headRefName: "feature",
+          baseRefName: "main",
+          body: `PR body from fragment\n\n---\n[🔗 View session](${SessionUrl})`,
+        },
+      },
+    });
+  });
+
+  it("does not mutate the selected GraphQL operation when an unused pull request mutation is also present", async () => {
+    const request = createGitHubRequest({
+      pathname: "/graphql",
+      body: {
+        operationName: "CreateIssue",
+        query: [
+          "mutation CreatePullRequest($input:CreatePullRequestInput!){",
+          "  createPullRequest(input: $input) { pullRequest { id } }",
+          "}",
+          "mutation CreateIssue($input:CreateIssueInput!){",
+          "  createIssue(input: $input) { issue { id } }",
+          "}",
+        ].join("\n"),
+        variables: {
+          input: {
+            repositoryId: "R_kgDOExample",
+            title: "Issue title",
+            body: "Issue body",
+          },
+        },
+      },
+    });
+
+    const result = await AppendSessionLinkToGitHubMarkdownRequestMiddleware.handle({
+      ctx: {
+        sandboxInstanceId: "sandbox_123",
+        sessionUrl: SessionUrl,
+      },
+      request,
+    });
+
+    expect(JSON.parse(new TextDecoder().decode(result.body))).toEqual({
+      operationName: "CreateIssue",
+      query: [
+        "mutation CreatePullRequest($input:CreatePullRequestInput!){",
+        "  createPullRequest(input: $input) { pullRequest { id } }",
+        "}",
+        "mutation CreateIssue($input:CreateIssueInput!){",
+        "  createIssue(input: $input) { issue { id } }",
+        "}",
+      ].join("\n"),
+      variables: {
+        input: {
+          repositoryId: "R_kgDOExample",
+          title: "Issue title",
+          body: "Issue body",
+        },
+      },
+    });
+  });
+
   it("appends the markdown footer for GitHub Enterprise Server API paths", async () => {
     const request = createGitHubRequest({
       baseUrl: "https://ghe.example.com",
