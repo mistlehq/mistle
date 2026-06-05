@@ -914,8 +914,8 @@ importers:
         specifier: ^3.2.0
         version: 3.2.0(@jsx-email/plugin-inline@2.0.0)(@jsx-email/plugin-minify@2.0.0)(@jsx-email/plugin-pretty@2.0.0)(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.0-rc.17)(vite@8.0.10(@types/node@25.9.1)(esbuild@0.25.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)))(@types/node@25.9.1)(@types/react-dom@19.2.3(@types/react@19.2.16))(@types/react@19.2.16)(babel-plugin-react-compiler@1.0.0)(canispam@1.0.0)(immer@11.1.4)(jiti@2.7.0)(prettier@3.8.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(tsx@4.21.0)(typescript@6.0.3)(use-sync-external-store@1.6.0(react@19.2.5))(yaml@2.8.3)
       nodemailer:
-        specifier: ^8.0.7
-        version: 8.0.7
+        specifier: ^8.0.10
+        version: 8.0.10
       react:
         specifier: ^19.2.5
         version: 19.2.5
@@ -9632,8 +9632,8 @@ packages:
   node-releases@2.0.38:
     resolution: {integrity: sha512-3qT/88Y3FbH/Kx4szpQQ4HzUbVrHPKTLVpVocKiLfoYvw9XSGOX2FmD2d6DrXbVYyAQTF2HeF6My8jmzx7/CRw==}
 
-  nodemailer@8.0.7:
-    resolution: {integrity: sha512-pkjE4mkBzQjdJT4/UmlKl3pX0rC9fZmjh7c6C9o7lv66Ac6w9WCnzPzhbPNxwZAzlF4mdq4CSWB5+FbK6FWCow==}
+  nodemailer@8.0.10:
+    resolution: {integrity: sha512-BLFuSth7QtHOkBzyqTehWWyub0NTRDuK2Q2SQfnGLsrJnzyU+Yeh4WpV1eZGuARFj1xQJHIdnTuJZLP+b9R1GQ==}
     engines: {node: '>=6.0.0'}
 
   non-error@0.1.0:
@@ -22027,7 +22027,7 @@ snapshots:
 
   node-releases@2.0.38: {}
 
-  nodemailer@8.0.7: {}
+  nodemailer@8.0.10: {}
 
   non-error@0.1.0: {}
 
