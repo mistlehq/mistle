@@ -200,6 +200,11 @@ fn merges_runtime_files_without_replacing_existing_runtime_config() {
         .join(".config")
         .join("runtime")
         .join("mcp.json");
+    let opencode_config_path = test_dir
+        .join("root")
+        .join(".config")
+        .join("opencode")
+        .join("opencode.json");
 
     fs::create_dir_all(
         codex_config_path
@@ -219,6 +224,12 @@ fn merges_runtime_files_without_replacing_existing_runtime_config() {
             .expect("JSON MCP config should have a parent"),
     )
     .expect("JSON MCP config dir should be creatable");
+    fs::create_dir_all(
+        opencode_config_path
+            .parent()
+            .expect("OpenCode config should have a parent"),
+    )
+    .expect("OpenCode config dir should be creatable");
     fs::write(
         &codex_config_path,
         [
@@ -245,9 +256,9 @@ fn merges_runtime_files_without_replacing_existing_runtime_config() {
         [
             "User instruction",
             "",
-            "<!-- MISTLE-MANAGED:START mistle-sandbox-context -->",
-            "old managed block",
-            "<!-- MISTLE-MANAGED:END mistle-sandbox-context -->",
+            "Mistle-managed sandbox context:",
+            "",
+            "- old stale managed instruction",
             "",
             "Keep this",
             "",
@@ -279,6 +290,21 @@ fn merges_runtime_files_without_replacing_existing_runtime_config() {
         .expect("JSON MCP config fixture should serialize"),
     )
     .expect("JSON MCP config fixture should be writable");
+    fs::write(
+        &opencode_config_path,
+        serde_json::to_string_pretty(&serde_json::json!({
+          "mcp": {
+            "mistle": {
+              "url": "https://old-mcp.example.test/mcp",
+              "headers": {
+                "x-stale": "true"
+              }
+            }
+          }
+        }))
+        .expect("OpenCode config fixture should serialize"),
+    )
+    .expect("OpenCode config fixture should be writable");
 
     let codex_config_runtime_content = [
         "[features]",
@@ -311,6 +337,14 @@ fn merges_runtime_files_without_replacing_existing_runtime_config() {
         "",
     ]
     .join("\n");
+    let opencode_runtime_content = serde_json::to_string_pretty(&serde_json::json!({
+      "mcp": {
+        "mistle": {
+          "url": "https://current-mcp.example.test/mcp"
+        }
+      }
+    }))
+    .expect("OpenCode runtime content should serialize");
 
     let startup_input = SessionRuntimeInput {
         operation_kind: sandboxd::protocol::startup::ActivationOperationKind::Start,
@@ -353,6 +387,13 @@ fn merges_runtime_files_without_replacing_existing_runtime_config() {
                     "mode": 384,
                     "content": json_mcp_runtime_content,
                     "writeMode": "merge"
+                  },
+                  {
+                    "fileId": "opencode_config",
+                    "path": opencode_config_path.display().to_string(),
+                    "mode": 384,
+                    "content": opencode_runtime_content,
+                    "writeMode": "merge"
                   }
                 ]
               },
@@ -392,7 +433,8 @@ fn merges_runtime_files_without_replacing_existing_runtime_config() {
     assert!(agents.contains("User instruction"));
     assert!(agents.contains("Keep this"));
     assert!(agents.contains("Mistle MCP tools are available."));
-    assert!(!agents.contains("old managed block"));
+    assert_eq!(agents.matches("Mistle-managed sandbox context:").count(), 1);
+    assert!(!agents.contains("old stale managed instruction"));
 
     let json_mcp_config =
         fs::read_to_string(&json_mcp_config_path).expect("JSON MCP config should exist");
@@ -405,6 +447,12 @@ fn merges_runtime_files_without_replacing_existing_runtime_config() {
     assert!(json_mcp_config.contains(r#""https://current-mcp.example.test/mcp""#));
     assert!(!json_mcp_config.contains("old-mcp.example.test"));
     assert!(!json_mcp_config.contains("x-stale"));
+
+    let opencode_config =
+        fs::read_to_string(&opencode_config_path).expect("OpenCode config should exist");
+    assert!(opencode_config.contains(r#""https://current-mcp.example.test/mcp""#));
+    assert!(!opencode_config.contains("old-mcp.example.test"));
+    assert!(!opencode_config.contains("x-stale"));
 
     fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
 }

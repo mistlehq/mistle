@@ -364,13 +364,34 @@ function buildPiRuntimeClients(input: {
   ];
 }
 
+function resolvePiMcpServers(input: {
+  enableMcp: boolean;
+  mergeRuntimeSetupFiles?: boolean;
+  mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
+}): ReadonlyArray<ResolvedIntegrationMcpServer> {
+  if (input.enableMcp) {
+    return input.mcpServers;
+  }
+
+  if (input.mergeRuntimeSetupFiles !== true) {
+    return [];
+  }
+
+  return input.mcpServers.filter((mcpServer) => mcpServer.source.kind === "mistle");
+}
+
 export function compilePiRuntime(
   input: CompileAgentRuntimeInput<PiRuntimeConfig>,
 ): CompileAgentRuntimeResult {
   const piCliInstallDirectory = `${input.refs.sandboxPaths.runtimeArtifactDir}/${PiCliInstallDirectoryName}`;
   const piCliInstallPath = `${piCliInstallDirectory}/pi`;
-  const mcpServers =
-    input.runtimeConfig.enableMcp || input.mergeRuntimeSetupFiles === true ? input.mcpServers : [];
+  const mcpServers = resolvePiMcpServers({
+    enableMcp: input.runtimeConfig.enableMcp,
+    ...(input.mergeRuntimeSetupFiles === undefined
+      ? {}
+      : { mergeRuntimeSetupFiles: input.mergeRuntimeSetupFiles }),
+    mcpServers: input.mcpServers,
+  });
 
   return {
     artifacts: [

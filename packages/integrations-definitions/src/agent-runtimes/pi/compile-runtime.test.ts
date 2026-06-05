@@ -186,6 +186,28 @@ function createMistleMcpServer(): ResolvedIntegrationMcpServer {
   };
 }
 
+function createIntegrationMcpServer(): ResolvedIntegrationMcpServer {
+  return {
+    source: {
+      kind: "integration",
+      bindingId: "bind_remote",
+      connectionId: "conn_remote",
+      targetKey: "remote",
+      familyId: "remote",
+      variantId: "remote",
+    },
+    server: {
+      serverId: "remote",
+      serverName: "remote-http",
+      transport: "streamable-http",
+      url: "https://remote-mcp.example.test/mcp",
+      httpHeaders: {
+        Authorization: "Bearer mistle-managed-credential",
+      },
+    },
+  };
+}
+
 function decodeJwtPayload(token: string): unknown {
   const tokenParts = token.split(".");
   if (tokenParts.length !== 3) {
@@ -497,27 +519,7 @@ describe("compilePiRuntime", () => {
   });
 
   it("renders Pi MCP config with headers and the proxy tool when MCP servers are present", () => {
-    const mcpServers: ResolvedIntegrationMcpServer[] = [
-      {
-        source: {
-          kind: "integration",
-          bindingId: "bind_remote",
-          connectionId: "conn_remote",
-          targetKey: "remote",
-          familyId: "remote",
-          variantId: "remote",
-        },
-        server: {
-          serverId: "remote",
-          serverName: "remote-http",
-          transport: "streamable-http",
-          url: "https://mcp.example.test/mcp",
-          httpHeaders: {
-            Authorization: "Bearer mistle-managed-credential",
-          },
-        },
-      },
-    ];
+    const mcpServers: ResolvedIntegrationMcpServer[] = [createIntegrationMcpServer()];
     const runtimeClients = renderRuntimeClients({
       compiled: compileDefaultPiRuntime({ mcpServers }),
       egressRoutes: [],
@@ -538,7 +540,7 @@ describe("compilePiRuntime", () => {
       },
       mcpServers: {
         "remote-http": {
-          url: "https://mcp.example.test/mcp",
+          url: "https://remote-mcp.example.test/mcp",
           headers: {
             Authorization: "Bearer mistle-managed-credential",
           },
@@ -553,24 +555,7 @@ describe("compilePiRuntime", () => {
     const runtimeClients = renderRuntimeClients({
       compiled: compileDefaultPiRuntime({
         enableMcp: false,
-        mcpServers: [
-          {
-            source: {
-              kind: "integration",
-              bindingId: "bind_remote",
-              connectionId: "conn_remote",
-              targetKey: "remote",
-              familyId: "remote",
-              variantId: "remote",
-            },
-            server: {
-              serverId: "remote",
-              serverName: "remote-http",
-              transport: "streamable-http",
-              url: "https://mcp.example.test/mcp",
-            },
-          },
-        ],
+        mcpServers: [createIntegrationMcpServer()],
       }),
       egressRoutes: [],
     });
@@ -614,6 +599,33 @@ describe("compilePiRuntime", () => {
         }),
       ]),
     );
+    expect(readSetupFile({ runtimeClients, fileId: "pi_managed_instructions" })).toContain(
+      "Mistle MCP tools are available for interacting with Mistle resources",
+    );
+  });
+
+  it("limits merge-mode Pi MCP files to platform MCP when runtime MCP capability is disabled", () => {
+    const runtimeClients = renderRuntimeClients({
+      compiled: compileDefaultPiRuntime({
+        enableMcp: false,
+        mergeRuntimeSetupFiles: true,
+        mcpServers: [createIntegrationMcpServer(), createMistleMcpServer()],
+      }),
+      egressRoutes: [],
+    });
+
+    expect(JSON.parse(readSetupFile({ runtimeClients, fileId: "pi_mcp_config" }))).toEqual({
+      settings: {
+        disableProxyTool: false,
+      },
+      mcpServers: {
+        mistle: {
+          url: "https://mcp.example.test/mcp",
+          directTools: false,
+          lifecycle: "lazy",
+        },
+      },
+    });
     expect(readSetupFile({ runtimeClients, fileId: "pi_managed_instructions" })).toContain(
       "Mistle MCP tools are available for interacting with Mistle resources",
     );
