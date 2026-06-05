@@ -464,7 +464,7 @@ function SkillMentionOptionButton(input: {
       aria-label={optionLabel}
       aria-selected={input.isActive}
       className={[
-        "flex w-full items-start gap-3 rounded-sm px-3 py-2 text-left text-sm outline-none",
+        "flex w-full items-baseline gap-3 rounded-sm px-3 py-2 text-left text-sm outline-none",
         input.isActive ? "bg-muted text-foreground" : "hover:bg-muted/70",
       ].join(" ")}
       id={input.id}
@@ -476,7 +476,7 @@ function SkillMentionOptionButton(input: {
       role="option"
       type="button"
     >
-      <span className="min-w-24 font-mono text-xs text-muted-foreground">${input.skill.name}</span>
+      <span className="min-w-24 text-foreground">${input.skill.name}</span>
       {input.showSourceLabel ? (
         <span className="min-w-0 flex-1 text-muted-foreground" title={input.skill.sourcePath}>
           {sourceLabel}
@@ -1706,7 +1706,7 @@ export function ChatComposer({
                         aria-disabled={isDisabledCommand}
                         aria-selected={isActiveCommand}
                         className={[
-                          "flex w-full items-start gap-3 rounded-sm px-3 py-2 text-left text-sm outline-none",
+                          "flex w-full items-baseline gap-3 rounded-sm px-3 py-2 text-left text-sm outline-none",
                           isActiveCommand ? "bg-muted text-foreground" : "hover:bg-muted/70",
                           isDisabledCommand ? "cursor-not-allowed opacity-50" : null,
                         ].join(" ")}
@@ -1722,9 +1722,7 @@ export function ChatComposer({
                         role="option"
                         type="button"
                       >
-                        <span className="min-w-24 font-mono text-xs text-muted-foreground">
-                          /{command.name}
-                        </span>
+                        <span className="min-w-24 text-foreground">/{command.name}</span>
                         {command.description === undefined ? null : (
                           <span className="min-w-0 flex-1 text-muted-foreground">
                             {command.description}
