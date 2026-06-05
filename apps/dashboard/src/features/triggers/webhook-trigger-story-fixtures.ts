@@ -187,6 +187,16 @@ const StoryGitHubTeamResources: IntegrationConnectionResources = {
   ],
 };
 
+export const StoryGitHubTeamResourcesSyncFailed: IntegrationConnectionResources = {
+  connectionId: StoryGitHubConnectionId,
+  familyId: "github",
+  kind: "team",
+  syncState: "error",
+  lastErrorMessage:
+    "GitHub returned 403 while listing teams. Reapprove Members read permission for this installation.",
+  items: [],
+};
+
 const StorySlackChannelResources: IntegrationConnectionResources = {
   connectionId: StorySlackConnectionId,
   familyId: "slack",
@@ -290,7 +300,9 @@ export const StorySlackEventOptions: readonly WebhookTriggerEventOption[] = [
   },
 ];
 
-export function createWebhookTriggerStoryQueryClient(): QueryClient {
+export function createWebhookTriggerStoryQueryClient(input?: {
+  githubTeamResources?: IntegrationConnectionResources;
+}): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -314,7 +326,7 @@ export function createWebhookTriggerStoryQueryClient(): QueryClient {
   );
   queryClient.setQueryData(
     ["trigger-trigger-parameters", StoryGitHubConnectionId, "team"],
-    StoryGitHubTeamResources,
+    input?.githubTeamResources ?? StoryGitHubTeamResources,
   );
   queryClient.setQueryData(
     ["trigger-trigger-parameters", StorySlackConnectionId, "channel"],

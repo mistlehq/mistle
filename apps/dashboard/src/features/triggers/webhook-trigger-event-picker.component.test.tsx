@@ -6,6 +6,7 @@ import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
+import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import type { WebhookTriggerEventPickerDisabledState } from "./webhook-trigger-event-picker-state.js";
 import {
@@ -142,6 +143,7 @@ function renderTriggerPicker(input: {
   eventParameterRules: WebhookTriggerEventParameterRuleMap;
   disabledState?: WebhookTriggerEventPickerDisabledState | null;
   eventOptions?: readonly WebhookTriggerEventOption[];
+  teamResources?: IntegrationConnectionResources;
   useStatefulSelection?: boolean;
 }): ReturnType<typeof render> {
   TestQueryClient.setQueryData(["trigger-trigger-parameters", input.selectedConnectionId, "user"], {
@@ -191,6 +193,7 @@ function renderTriggerPicker(input: {
       nextCursor: null,
       previousCursor: null,
     },
+    ...(input.teamResources ?? {}),
   });
 
   function StatefulTriggerPicker(): React.JSX.Element {
@@ -639,6 +642,40 @@ describe("WebhookTriggerEventPicker", () => {
     await waitFor(() => {
       expect(screen.getAllByDisplayValue("legacy-team (Unavailable)").length).toBeGreaterThan(0);
     });
+  });
+
+  it("shows GitHub team sync errors separately from an empty team list", async () => {
+    renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedEventIds: [PullRequestReviewRequestedTriggerId],
+      eventOptions: [PullRequestReviewRequestedEventOption],
+      eventParameterRules: {
+        [PullRequestReviewRequestedTriggerId]: {
+          requestedTeam: isRule("platform"),
+        },
+      },
+      teamResources: {
+        connectionId: GitHubConnectionId,
+        familyId: "github",
+        kind: "team",
+        syncState: "error",
+        lastErrorMessage:
+          "GitHub returned 403 while listing teams. Reapprove Members read permission.",
+        items: [],
+      },
+    });
+
+    expect(screen.getByText("for team")).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getAllByDisplayValue("platform (Unavailable)").length).toBeGreaterThan(0);
+    });
+    expect(
+      screen.getByText(
+        "GitHub returned 403 while listing teams. Reapprove Members read permission.",
+      ),
+    ).toBeDefined();
+    expect(screen.queryByPlaceholderText("No teams available")).toBeNull();
   });
 
   it("renders GitHub review request removed team targets from synced team resources", async () => {

@@ -16,6 +16,7 @@ import {
   isRule,
   StoryGitHubConnectionId,
   StoryGitHubEventOptions,
+  StoryGitHubTeamResourcesSyncFailed,
   StoryGitHubWebhookSourceId,
   StoryIssueCommentCreatedTriggerId,
   StoryPullRequestOpenedTriggerId,
@@ -34,8 +35,15 @@ function StoryHarness(input: {
   eventParameterRules?: WebhookTriggerEventParameterRuleMap;
   eventOptions: readonly WebhookTriggerEventOption[];
   error?: string;
+  showGitHubTeamSyncError?: boolean;
 }): React.JSX.Element {
-  const [queryClient] = useState(() => createWebhookTriggerStoryQueryClient());
+  const [queryClient] = useState(() =>
+    createWebhookTriggerStoryQueryClient(
+      input.showGitHubTeamSyncError === true
+        ? { githubTeamResources: StoryGitHubTeamResourcesSyncFailed }
+        : undefined,
+    ),
+  );
   const [selectedEventIds, setSelectedEventIds] = useState([...input.selectedEventIds]);
   const [eventParameterRules, setEventParameterRules] = useState(input.eventParameterRules ?? {});
 
@@ -123,6 +131,22 @@ export const GitHubReviewRequestTeamTarget: Story = {
       },
     },
     eventOptions: StoryGitHubEventOptions,
+  },
+};
+
+export const GitHubReviewRequestTeamSyncFailed: Story = {
+  name: "GitHub review request team sync failed",
+  args: {
+    hasConnectedIntegrations: true,
+    selectedConnectionId: StoryGitHubConnectionId,
+    selectedEventIds: [StoryPullRequestReviewRequestedTriggerId],
+    eventParameterRules: {
+      [StoryPullRequestReviewRequestedTriggerId]: {
+        requestedTeam: isRule("platform"),
+      },
+    },
+    eventOptions: StoryGitHubEventOptions,
+    showGitHubTeamSyncError: true,
   },
 };
 

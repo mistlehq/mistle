@@ -240,6 +240,8 @@ describe("listGitHubConnectionResources", () => {
           return;
         }
 
+        // GitHub REST docs: GET /orgs/{org}/teams can return 403 when the installation
+        // token cannot access organization teams, including missing Members read permission.
         if (requestUrl.pathname === "/orgs/mistle/teams") {
           response.writeHead(403);
           response.end(JSON.stringify({ message: "Resource not accessible by integration" }));

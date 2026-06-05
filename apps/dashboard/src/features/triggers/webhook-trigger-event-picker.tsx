@@ -24,6 +24,7 @@ import { InfoIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
+import { resolveApiErrorMessage } from "../api/error-message.js";
 import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
 import { IntegrationLogo } from "../integrations/integration-logo.js";
 import { listIntegrationConnectionResources } from "../integrations/integrations-service.js";
@@ -450,6 +451,12 @@ function GitHubRequestedReviewTargetField(input: {
     items: teamResourceQuery.data?.items ?? [],
     value: requestedTeamValue,
   });
+  const teamResourceErrorMessage = resolveGitHubTeamResourceErrorMessage({
+    isError: teamResourceQuery.isError,
+    error: teamResourceQuery.error,
+    syncState: teamResourceQuery.data?.syncState,
+    lastErrorMessage: teamResourceQuery.data?.lastErrorMessage,
+  });
 
   function clearInactiveRule(kind: RequestedReviewTargetKind): void {
     input.onRuleChange(kind === "reviewer" ? "requestedTeam" : "requestedReviewer", {
@@ -517,33 +524,61 @@ function GitHubRequestedReviewTargetField(input: {
           value={requestedReviewerValue.length === 0 ? undefined : requestedReviewerValue}
         />
       ) : (
-        <SingleSelectStringComboboxField
-          contentClassName="w-[min(22rem,calc(100vw-2rem))]"
-          inputId={teamInputId}
-          inputLabel={input.requestedTeamParameter.label}
-          inputWrapperClassName={EventParameterControlClassName}
-          onChange={(value) => {
-            input.onRuleChange("requestedTeam", {
-              operator: resolveEqualityOperator(input.requestedTeamRule),
-              value: value ?? "",
-            });
-          }}
-          options={normalizedTeamResourceOptions.map((option) => ({
-            value: option.handle,
-            label: option.displayName,
-          }))}
-          placeholder={
-            teamResourceQuery.isPending
-              ? "Loading..."
-              : normalizedTeamResourceOptions.length === 0
-                ? "No teams available"
-                : "Any GitHub team"
-          }
-          value={requestedTeamValue.length === 0 ? undefined : requestedTeamValue}
-        />
+        <div className={`${EventParameterControlClassName} space-y-1.5`}>
+          <SingleSelectStringComboboxField
+            contentClassName="w-[min(22rem,calc(100vw-2rem))]"
+            inputId={teamInputId}
+            inputLabel={input.requestedTeamParameter.label}
+            inputWrapperClassName="w-full"
+            onChange={(value) => {
+              input.onRuleChange("requestedTeam", {
+                operator: resolveEqualityOperator(input.requestedTeamRule),
+                value: value ?? "",
+              });
+            }}
+            options={normalizedTeamResourceOptions.map((option) => ({
+              value: option.handle,
+              label: option.displayName,
+            }))}
+            placeholder={
+              teamResourceQuery.isPending
+                ? "Loading..."
+                : teamResourceErrorMessage !== null
+                  ? "Could not load GitHub teams"
+                  : normalizedTeamResourceOptions.length === 0
+                    ? "No teams available"
+                    : "Any GitHub team"
+            }
+            emptyMessage={teamResourceErrorMessage ?? "No matching teams."}
+            value={requestedTeamValue.length === 0 ? undefined : requestedTeamValue}
+          />
+          {teamResourceErrorMessage === null ? null : (
+            <Notice variant="alert">{teamResourceErrorMessage}</Notice>
+          )}
+        </div>
       )}
     </span>
   );
+}
+
+function resolveGitHubTeamResourceErrorMessage(input: {
+  isError: boolean;
+  error: unknown;
+  syncState: string | undefined;
+  lastErrorMessage: string | undefined;
+}): string | null {
+  if (input.isError) {
+    return resolveApiErrorMessage({
+      error: input.error,
+      fallbackMessage: "Could not load GitHub teams for this connection.",
+    });
+  }
+
+  if (input.syncState === "error") {
+    return input.lastErrorMessage ?? "Could not sync GitHub teams for this connection.";
+  }
+
+  return null;
 }
 
 function EventParameterField(input: {
