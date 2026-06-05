@@ -556,6 +556,10 @@ function SessionWorkbenchPageContent(input: {
             ].join(":"),
             scrollBehavior: "follow-streaming-at-bottom",
             chatEntries: conversationPane.chatState.entries,
+            formatInitialUserMessageAsTriggerInput: shouldFormatInitialUserMessageAsTriggerInput({
+              activeConversationId: conversationPane.activeConversationId,
+              triggerConversation: workbench.sandboxStatusQuery.data?.triggerConversation ?? null,
+            }),
             onUserMessageAction: conversationPane.dismissUserMessageAction,
             isRespondingToServerRequest:
               conversationPane.serverRequestsState.isRespondingToServerRequest,
@@ -627,6 +631,17 @@ function SessionWorkbenchPageContent(input: {
   );
 }
 
+export function shouldFormatInitialUserMessageAsTriggerInput(input: {
+  activeConversationId: string | null;
+  triggerConversation: { providerConversationId: string | null } | null;
+}): boolean {
+  return (
+    input.triggerConversation !== null &&
+    input.triggerConversation.providerConversationId !== null &&
+    input.triggerConversation.providerConversationId === input.activeConversationId
+  );
+}
+
 type PrimaryPanelConversationContent = Pick<
   React.ComponentProps<typeof SessionConversationMainContent>,
   | "activeTurnId"
@@ -636,6 +651,7 @@ type PrimaryPanelConversationContent = Pick<
   | "initialBottomScrollResetKey"
   | "scrollBehavior"
   | "chatEntries"
+  | "formatInitialUserMessageAsTriggerInput"
   | "onUserMessageAction"
   | "isRespondingToServerRequest"
   | "onRespondToServerRequest"

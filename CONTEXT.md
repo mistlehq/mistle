@@ -92,6 +92,14 @@ _Avoid_: Exclusion when the rule is one match mode among several
 A Mistle-owned **Conversation** created or reused while handling a **Trigger** run.
 _Avoid_: Automation conversation
 
+**Rendered trigger input**:
+The exact text generated from a **Trigger**'s input template and delivered to the agent.
+_Avoid_: Trigger payload, formatted trigger message
+
+**Trigger input presentation**:
+A dashboard-only display interpretation derived from a **Rendered trigger input** that may make structured content easier to read without changing what was delivered to the agent.
+_Avoid_: Rendered trigger input, formatted trigger input
+
 **Conversation**:
 A logical agent dialogue.
 _Avoid_: Bare conversation when ownership matters

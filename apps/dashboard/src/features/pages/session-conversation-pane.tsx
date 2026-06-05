@@ -29,6 +29,7 @@ import {
 
 type SessionConversationMainContentProps = {
   activeTurnId: string | null;
+  formatInitialUserMessageAsTriggerInput?: boolean;
   isTurnInProgress: boolean;
   pendingTurnId: string | null;
   autoScrollToBottomOnInitialLoad?: boolean;
@@ -65,6 +66,7 @@ type SessionConversationBottomPanelControllerProps = SessionConversationSharedPa
 
 export function SessionConversationMainContent({
   activeTurnId,
+  formatInitialUserMessageAsTriggerInput = false,
   isTurnInProgress,
   pendingTurnId,
   autoScrollToBottomOnInitialLoad = false,
@@ -107,6 +109,7 @@ export function SessionConversationMainContent({
     >
       <ChatThread
         entries={chatEntries}
+        formatInitialUserMessageAsTriggerInput={formatInitialUserMessageAsTriggerInput}
         isRespondingToServerRequest={isRespondingToServerRequest}
         onRespondToServerRequest={onRespondToServerRequest}
         {...(onUserMessageAction === undefined ? {} : { onUserMessageAction })}
