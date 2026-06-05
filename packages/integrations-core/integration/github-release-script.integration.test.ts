@@ -45,9 +45,73 @@ function expectTypedInstallStep(
 }
 
 function createDefinitionsBundle(registry: IntegrationRegistry) {
+  const agentRuntimeRegistry = new AgentRuntimeRegistry();
+  agentRuntimeRegistry.register({
+    runtimeId: "codex",
+    displayName: "Codex",
+    logoKey: "openai",
+    configSchema: z.object({}).strict(),
+    compileRuntime: () => ({
+      runtimeClients: [
+        {
+          clientId: "codex-cli",
+          setup: {
+            env: {},
+            files: [],
+          },
+          processes: [],
+          endpoints: [
+            {
+              endpointKey: "app-server",
+              transport: {
+                type: "ws",
+                url: "ws://127.0.0.1:4747",
+              },
+              connectionMode: "dedicated",
+            },
+          ],
+        },
+      ],
+      agentRuntimes: [
+        {
+          runtimeId: "codex",
+          runtimeKey: "codex-app-server",
+          clientId: "codex-cli",
+          endpointKey: "app-server",
+          ptyLaunch: {
+            runtimeId: "codex",
+            displayName: "Codex",
+            newLaunch: {
+              ptySessionId: "cli",
+              cols: 120,
+              rows: 32,
+              command: "codex",
+              args: [],
+            },
+            resumeLaunch: {
+              ptySessionId: "cli",
+              cols: 120,
+              rows: 32,
+              command: "codex",
+              args: [
+                {
+                  kind: "literal",
+                  value: "resume",
+                },
+                {
+                  kind: "threadId",
+                },
+              ],
+            },
+          },
+        },
+      ],
+    }),
+  });
+
   return {
     integrationRegistry: registry,
-    agentRuntimeRegistry: new AgentRuntimeRegistry(),
+    agentRuntimeRegistry,
   };
 }
 
