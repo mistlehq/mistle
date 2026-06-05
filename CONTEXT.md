@@ -409,6 +409,9 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Sandbox session** may contain multiple **Codex threads**.
 - A **Sandbox session** may contain multiple **OpenCode sessions** when its **Agent runtime** is OpenCode.
 - A **Sandbox session** may contain **Pi conversations** when its **Agent runtime** is Pi.
+- A trigger-seeded **Sandbox session title** should identify the external work item before the **Trigger** recipe.
+- A pull-request trigger-seeded **Sandbox session title** should include the pull request number when available.
+- A pull-request trigger-seeded **Sandbox session title** should prefer the pull request title for its topic.
 - For Pi, the initial **Sandbox session title** should follow the same Mistle-generated title behavior as other dashboard-started **Sandbox sessions**.
 - A **Pi follow-up message** should not seed the **Sandbox session title**.
 - Seeding a **Sandbox session title** is a secondary display update and should not block starting the first **Working agent turn**.

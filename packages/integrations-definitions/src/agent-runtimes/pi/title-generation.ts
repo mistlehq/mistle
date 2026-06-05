@@ -31,6 +31,10 @@ export function buildPiConversationTitleGenerationPrompt(inputText: string): str
     "- No quotes, prefixes, trailing punctuation, or markdown.",
     `- Max ${String(ConversationTitleMaxLength)} characters.`,
     "",
+    "Pull request rule:",
+    "- If the input is about a pull request and includes a concrete pull request number, title it as PR #<number> <pull request title/topic>.",
+    "- If the pull request number is missing, title it from the pull request title/topic without inventing a number or using a placeholder.",
+    "",
     "Message:",
     inputText,
   ].join("\n");

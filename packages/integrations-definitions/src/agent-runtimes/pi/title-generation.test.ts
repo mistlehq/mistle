@@ -18,6 +18,16 @@ describe("buildPiConversationTitleGenerationPrompt", () => {
     expect(prompt).toContain("Investigate this failed deploy");
     expect(prompt).not.toContain("Webhook context:");
   });
+
+  it("instructs pull request titles to prefer PR number and topic over trigger recipes", () => {
+    const prompt = buildPiConversationTitleGenerationPrompt(
+      "Use the skill $github-pr-review-subagents\nPR #2678\nPull request title: Bootstrap tunnel diagnostics",
+    );
+
+    expect(prompt).toContain("PR #<number> <pull request title/topic>");
+    expect(prompt).toContain("without inventing a number or using a placeholder");
+    expect(prompt).toContain("Use the skill $github-pr-review-subagents");
+  });
 });
 
 describe("buildPiConversationTitleGenerationShellScript", () => {
