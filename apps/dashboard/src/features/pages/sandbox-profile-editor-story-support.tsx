@@ -143,6 +143,7 @@ export type SandboxProfileEditorPageStoryArgs = {
     | "configured"
     | "searchable"
     | "no-source"
+    | "public-source"
     | "undiscovered"
     | "no-discovered-skills"
     | "unavailable-source"
@@ -174,6 +175,7 @@ const StorySetupAssistantSandboxInstanceId = "sbi_story_setup_assistant";
 const StorySnapshotOperationId = "ssj_story_creating_snapshot";
 const StorySnapshotSandboxInstanceId = "sbi_story_creating_snapshot";
 const StorySkillsOriginUrl = "https://github.com/mistle/main-dashboard.git";
+const StoryPublicSkillsOriginUrl = "https://github.com/mistle/public-skills.git";
 
 const StorySkillsConfig = {
   originUrl: StorySkillsOriginUrl,
@@ -204,6 +206,41 @@ const StorySkillsSourceRepos = {
           name: "release-notes",
           description: "Draft release notes from merged changes.",
           relativePath: ".agents/skills/release-notes",
+        },
+      ],
+    },
+  ],
+} satisfies SandboxProfileVersionSkillsSourceReposResult;
+
+const StoryPublicSkillsConfig = {
+  originUrl: StoryPublicSkillsOriginUrl,
+  selectedSkills: [
+    {
+      name: "public-pr-review",
+      relativePath: ".agents/skills/public-pr-review",
+    },
+  ],
+} satisfies NonNullable<SandboxProfileVersion["skillsConfig"]>;
+
+const StoryPublicSkillsSourceRepos = {
+  items: [
+    {
+      id: "ksr_story_public_skills",
+      originUrl: StoryPublicSkillsOriginUrl,
+      commitSha: "6c1f2d9",
+      lastSyncedAt: "2026-06-05T10:05:00.000Z",
+      createdAt: "2026-06-05T10:05:00.000Z",
+      updatedAt: "2026-06-05T10:05:00.000Z",
+      skills: [
+        {
+          name: "public-pr-review",
+          description: "Review pull requests using a public skills source.",
+          relativePath: ".agents/skills/public-pr-review",
+        },
+        {
+          name: "issue-triage",
+          description: "Group incoming issues and identify the next owner.",
+          relativePath: ".agents/skills/issue-triage",
         },
       ],
     },
@@ -283,6 +320,11 @@ function createStorySkillsState(input: {
       return {
         config: null,
         sourceRepos: null,
+      };
+    case "public-source":
+      return {
+        config: StoryPublicSkillsConfig,
+        sourceRepos: StoryPublicSkillsSourceRepos,
       };
     case "undiscovered":
       return {

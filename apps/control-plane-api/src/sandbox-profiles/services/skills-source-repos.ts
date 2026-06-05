@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
-import { type ControlPlaneDatabase, type SkillsSourceRepo } from "@mistle/db/control-plane";
+import {
+  type ControlPlaneDatabase,
+  type SandboxProfileVersionSkillsConfig,
+  type SkillsSourceRepo,
+} from "@mistle/db/control-plane";
 import type { SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { ResolvedSandboxImage } from "@mistle/integrations-core";
@@ -17,9 +21,11 @@ import {
   SandboxProfilesNotFoundError,
 } from "../errors.js";
 import {
+  type SandboxProfileVersionRuntimeConfigColumns,
   createWorkflowSandboxRuntime,
   mapProfileVersionRuntimeConfig,
 } from "./profile-version-runtime-config.js";
+import { mapProfileVersionSkillsConfig } from "./profile-version-skills-config.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 export type SkillsSourceRepoResponse = {
@@ -32,12 +38,8 @@ export type SkillsSourceRepoResponse = {
   updatedAt: string;
 };
 
-type ProfileVersionRuntimeColumns = {
-  sandboxProvider: string | null;
-  sandboxConnectionId: string | null;
-  sandboxVcpuCount: number | null;
-  sandboxMemoryMb: number | null;
-  sandboxDiskMb: number | null;
+type ProfileVersionContext = SandboxProfileVersionRuntimeConfigColumns & {
+  skillsConfig: SandboxProfileVersionSkillsConfig | null;
 };
 
 export type ListProfileVersionSkillsSourceReposInput = {
@@ -107,7 +109,14 @@ export async function refreshProfileVersionSkillsSourceRepo(
   },
   input: RefreshProfileVersionSkillsSourceRepoInput,
 ): Promise<RefreshProfileVersionSkillsSourceRepoOutput> {
-  const runtimeColumns = await getProfileVersionRuntimeColumns(context.db, input);
+  const profileVersion = await getProfileVersionContext(context.db, input);
+  const skillsConfig = profileVersion.skillsConfig;
+  if (skillsConfig === null || skillsConfig.originUrl !== input.originUrl) {
+    throw new SandboxProfilesConflictError(
+      SandboxProfilesConflictCodes.PROFILE_VERSION_NOT_USABLE,
+      `Sandbox profile version does not include skills source '${input.originUrl}'.`,
+    );
+  }
   const image: ResolvedSandboxImage = {
     source: "base",
     imageRef: context.defaultBaseImage,
@@ -127,7 +136,7 @@ export async function refreshProfileVersionSkillsSourceRepo(
   );
   assertRuntimePlanIncludesSkillsSourceRepo(runtimePlan, input.originUrl);
   const sandboxRuntime = createWorkflowSandboxRuntime(
-    mapProfileVersionRuntimeConfig(runtimeColumns),
+    mapProfileVersionRuntimeConfig(profileVersion),
   );
 
   const output = await syncSkillsSourceRepo(
@@ -198,6 +207,42 @@ export function mapSkillsSourceRepoResponse(
   };
 }
 
+async function getProfileVersionContext(
+  db: ControlPlaneDatabase,
+  input: {
+    organizationId: string;
+    profileId: string;
+    profileVersion: number;
+  },
+): Promise<ProfileVersionContext> {
+  await assertProfileExists(db, input);
+
+  const profileVersion = await db.query.sandboxProfileVersions.findFirst({
+    columns: {
+      sandboxProvider: true,
+      sandboxConnectionId: true,
+      sandboxVcpuCount: true,
+      sandboxMemoryMb: true,
+      sandboxDiskMb: true,
+      skillsConfig: true,
+    },
+    where: (table, { and, eq }) =>
+      and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),
+  });
+
+  if (profileVersion === undefined) {
+    throw new SandboxProfilesNotFoundError(
+      SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
+      "Sandbox profile version was not found.",
+    );
+  }
+
+  return {
+    ...profileVersion,
+    skillsConfig: mapProfileVersionSkillsConfig(profileVersion.skillsConfig),
+  };
+}
+
 async function assertProfileVersionExists(
   db: ControlPlaneDatabase,
   input: {
@@ -206,17 +251,17 @@ async function assertProfileVersionExists(
     profileVersion: number;
   },
 ): Promise<void> {
-  await getProfileVersionRuntimeColumns(db, input);
+  await assertProfileExists(db, input);
+  await assertProfileVersionExistsForProfile(db, input);
 }
 
-async function getProfileVersionRuntimeColumns(
+async function assertProfileExists(
   db: ControlPlaneDatabase,
   input: {
     organizationId: string;
     profileId: string;
-    profileVersion: number;
   },
-): Promise<ProfileVersionRuntimeColumns> {
+): Promise<void> {
   const profile = await db.query.sandboxProfiles.findFirst({
     columns: {
       id: true,
@@ -231,14 +276,18 @@ async function getProfileVersionRuntimeColumns(
       "Sandbox profile was not found.",
     );
   }
+}
 
+async function assertProfileVersionExistsForProfile(
+  db: ControlPlaneDatabase,
+  input: {
+    profileId: string;
+    profileVersion: number;
+  },
+): Promise<void> {
   const profileVersion = await db.query.sandboxProfileVersions.findFirst({
     columns: {
-      sandboxProvider: true,
-      sandboxConnectionId: true,
-      sandboxVcpuCount: true,
-      sandboxMemoryMb: true,
-      sandboxDiskMb: true,
+      sandboxProfileId: true,
     },
     where: (table, { and, eq }) =>
       and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),
@@ -250,8 +299,6 @@ async function getProfileVersionRuntimeColumns(
       "Sandbox profile version was not found.",
     );
   }
-
-  return profileVersion;
 }
 
 export function createSkillsSourceRepoConnectionTokenConfig(

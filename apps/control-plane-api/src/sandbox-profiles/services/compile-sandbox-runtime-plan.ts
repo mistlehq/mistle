@@ -5,6 +5,7 @@ import type {
 } from "@mistle/db/control-plane";
 import {
   CompilerErrorCodes,
+  DefaultSandboxWorkspaceDir,
   IntegrationCompilerError,
   IntegrationMcpTransports,
   compileRuntimePlan,
@@ -16,6 +17,8 @@ import {
   type ResolvedIntegrationMcpServer,
   type ResolvedSandboxImage,
 } from "@mistle/integrations-core";
+
+import { canonicalizePublicGitHubSkillsSourceOriginUrl } from "./profile-version-skills-config.js";
 
 type IntegrationTargetEncryptedSecretsInput = {
   ciphertext: string;
@@ -463,8 +466,12 @@ export async function compileSandboxRuntimePlan(
         ? {}
         : { mergeRuntimeSetupFiles: input.mergeRuntimeSetupFiles }),
     });
-    const skills = resolveRuntimePlanSkills({
+    const runtimePlanWithSkillsSources = resolveRuntimePlanWithSkillsSources({
       runtimePlan,
+      skillsConfig: sandboxProfileVersion.skillsConfig,
+    });
+    const skills = resolveRuntimePlanSkills({
+      runtimePlan: runtimePlanWithSkillsSources,
       skillsConfig: sandboxProfileVersion.skillsConfig,
     });
 
@@ -476,7 +483,7 @@ export async function compileSandboxRuntimePlan(
     );
 
     return {
-      ...runtimePlan,
+      ...runtimePlanWithSkillsSources,
       ...(skills === undefined ? {} : { skills }),
       ...(snapshotPreparationScript === undefined
         ? {}
@@ -495,6 +502,51 @@ export async function compileSandboxRuntimePlan(
   }
 }
 
+function resolveRuntimePlanWithSkillsSources(input: {
+  runtimePlan: CompiledRuntimePlan;
+  skillsConfig: SandboxProfileVersionSkillsConfig | null;
+}): CompiledRuntimePlan {
+  if (input.skillsConfig === null) {
+    return input.runtimePlan;
+  }
+  const skillsConfig = input.skillsConfig;
+
+  const matchingSource = resolveRuntimePlanSkillsSource(input.runtimePlan, skillsConfig.originUrl);
+  if (matchingSource !== null) {
+    return input.runtimePlan;
+  }
+
+  const publicOriginUrl = canonicalizePublicGitHubSkillsSourceOriginUrl(skillsConfig.originUrl);
+  if (publicOriginUrl === null || publicOriginUrl !== skillsConfig.originUrl) {
+    throw new SandboxRuntimePlanCompilerError({
+      code: SandboxRuntimePlanCompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+      message: `Sandbox profile version skills source '${skillsConfig.originUrl}' is not included in the runtime plan workspace sources.`,
+    });
+  }
+
+  const publicWorkspaceSource = {
+    sourceKind: "git-clone",
+    resourceKind: "repository",
+    path: createPublicGitHubSkillsSourceWorkspacePath(skillsConfig.originUrl),
+    originUrl: skillsConfig.originUrl,
+  } as const;
+
+  const conflictingPathSource = input.runtimePlan.workspaceSources.find(
+    (workspaceSource) => workspaceSource.path === publicWorkspaceSource.path,
+  );
+  if (conflictingPathSource !== undefined) {
+    throw new SandboxRuntimePlanCompilerError({
+      code: SandboxRuntimePlanCompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+      message: `Public skills source '${skillsConfig.originUrl}' uses workspace path '${publicWorkspaceSource.path}' that is already used by workspace source '${conflictingPathSource.originUrl}'.`,
+    });
+  }
+
+  return {
+    ...input.runtimePlan,
+    workspaceSources: [...input.runtimePlan.workspaceSources, publicWorkspaceSource],
+  };
+}
+
 function resolveRuntimePlanSkills(input: {
   runtimePlan: CompiledRuntimePlan;
   skillsConfig: SandboxProfileVersionSkillsConfig | null;
@@ -504,19 +556,11 @@ function resolveRuntimePlanSkills(input: {
   }
 
   const skillsConfig = input.skillsConfig;
-  const matchingSources = input.runtimePlan.workspaceSources.filter(
-    (workspaceSource) => workspaceSource.originUrl === skillsConfig.originUrl,
-  );
-  if (matchingSources.length === 0) {
+  const matchingSource = resolveRuntimePlanSkillsSource(input.runtimePlan, skillsConfig.originUrl);
+  if (matchingSource === null) {
     throw new SandboxRuntimePlanCompilerError({
       code: SandboxRuntimePlanCompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
       message: `Sandbox profile version skills source '${skillsConfig.originUrl}' is not included in the runtime plan workspace sources.`,
-    });
-  }
-  if (matchingSources.length > 1) {
-    throw new SandboxRuntimePlanCompilerError({
-      code: SandboxRuntimePlanCompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-      message: `Sandbox profile version skills source '${skillsConfig.originUrl}' is included more than once in the runtime plan workspace sources.`,
     });
   }
 
@@ -527,4 +571,41 @@ function resolveRuntimePlanSkills(input: {
       relativePath: skill.relativePath,
     })),
   };
+}
+
+function resolveRuntimePlanSkillsSource(
+  runtimePlan: CompiledRuntimePlan,
+  originUrl: string,
+): CompiledRuntimePlan["workspaceSources"][number] | null {
+  const matchingSources = runtimePlan.workspaceSources.filter(
+    (workspaceSource) => workspaceSource.originUrl === originUrl,
+  );
+  if (matchingSources.length === 0) {
+    return null;
+  }
+  if (matchingSources.length > 1) {
+    throw new SandboxRuntimePlanCompilerError({
+      code: SandboxRuntimePlanCompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+      message: `Sandbox profile version skills source '${originUrl}' is included more than once in the runtime plan workspace sources.`,
+    });
+  }
+
+  const [matchingSource] = matchingSources;
+  return matchingSource ?? null;
+}
+
+function createPublicGitHubSkillsSourceWorkspacePath(originUrl: string): string {
+  const url = new URL(originUrl);
+  const [owner, rawRepository] = url.pathname.split("/").filter((part) => part.length > 0);
+  if (owner === undefined || rawRepository === undefined) {
+    throw new SandboxRuntimePlanCompilerError({
+      code: SandboxRuntimePlanCompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+      message: `Public skills source '${originUrl}' is not a canonical GitHub repository origin URL.`,
+    });
+  }
+
+  const repository = rawRepository.endsWith(".git")
+    ? rawRepository.slice(0, -".git".length)
+    : rawRepository;
+  return `${DefaultSandboxWorkspaceDir}/${owner}/${repository}`;
 }

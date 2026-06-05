@@ -433,7 +433,6 @@ const RepoRelativeSkillPathPattern =
 const RepoRelativeSkillPathSchema = z.string().regex(RepoRelativeSkillPathPattern, {
   message: "Skill relativePath must be a repo-relative path.",
 });
-
 const SandboxProfileVersionSkillsConfigSchema = z
   .object({
     originUrl: z.url(),

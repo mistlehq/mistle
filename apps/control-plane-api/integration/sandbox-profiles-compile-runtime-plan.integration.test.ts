@@ -241,6 +241,94 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
     });
   });
 
+  it("includes selected public GitHub skills as an uncredentialed workspace source", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-compile-public-skills@example.com",
+    });
+
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_public_skills",
+      skillsConfig: {
+        originUrl: "https://github.com/mistlehq/skills.git",
+        selectedSkills: [
+          {
+            name: "github-pr-authoring",
+            relativePath: ".agents/skills/github-pr-authoring",
+          },
+        ],
+      },
+    });
+
+    const runtimePlan = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_public_skills",
+    });
+
+    expect(runtimePlan.workspaceSources).toContainEqual({
+      sourceKind: "git-clone",
+      resourceKind: "repository",
+      path: "/root/mistlehq/skills",
+      originUrl: "https://github.com/mistlehq/skills.git",
+    });
+    expect(runtimePlan.egressRoutes).toEqual([]);
+    expect(runtimePlan.skills).toEqual({
+      originUrl: "https://github.com/mistlehq/skills.git",
+      selectedSkills: [
+        {
+          name: "github-pr-authoring",
+          relativePath: ".agents/skills/github-pr-authoring",
+        },
+      ],
+    });
+  });
+
+  it("rejects public GitHub skills sources that conflict with an existing workspace path", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-compile-public-skills-path-conflict@example.com",
+    });
+
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_public_skills_path_conflict",
+      skillsConfig: {
+        originUrl: "https://github.com/acme/skills.git",
+        selectedSkills: [],
+      },
+    });
+    await seedConnectorBindings(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_public_skills_path_conflict",
+      bindings: [
+        githubBinding({
+          targetKey: "github-enterprise-compile-public-skills-path-conflict",
+          connectionId: "icn_compile_public_skills_path_conflict_github",
+          bindingId: "ibd_compile_public_skills_path_conflict_github",
+          tools: [],
+          variantId: "github-enterprise-server",
+          apiBaseUrl: "https://ghe.example.com/api/v3",
+          webBaseUrl: "https://ghe.example.com",
+          repositories: ["acme/skills"],
+        }),
+      ],
+    });
+
+    await expect(
+      compilePlan(env, {
+        organizationId: session.organizationId,
+        profileId: "sbp_compile_public_skills_path_conflict",
+      }),
+    ).rejects.toMatchObject({
+      code: SandboxProfilesCompileErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+      message:
+        "Public skills source 'https://github.com/acme/skills.git' uses workspace path '/root/acme/skills' that is already used by workspace source 'https://ghe.example.com/acme/skills.git'.",
+    });
+  });
+
   it("uses the ChatGPT responses base URL for chatgpt-device-code connections", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-sandbox-profile-compile-chatgpt-base-url@example.com",
@@ -1157,15 +1245,19 @@ function githubBinding(input: {
   connectionId: string;
   bindingId: string;
   tools: string[];
+  variantId?: "github-cloud" | "github-enterprise-server";
+  apiBaseUrl?: string;
+  webBaseUrl?: string;
+  repositories?: string[];
 }): ConnectorBindingInput {
   return {
     target: {
       targetKey: input.targetKey,
       familyId: "github",
-      variantId: "github-cloud",
+      variantId: input.variantId ?? "github-cloud",
       config: {
-        api_base_url: "https://api.github.com",
-        web_base_url: "https://github.com",
+        api_base_url: input.apiBaseUrl ?? "https://api.github.com",
+        web_base_url: input.webBaseUrl ?? "https://github.com",
       },
     },
     connection: {
@@ -1179,7 +1271,7 @@ function githubBinding(input: {
       id: input.bindingId,
       kind: IntegrationBindingKinds.GIT,
       config: {
-        repositories: ["mistlehq/mistle"],
+        repositories: input.repositories ?? ["mistlehq/mistle"],
         tools: input.tools,
       },
     },

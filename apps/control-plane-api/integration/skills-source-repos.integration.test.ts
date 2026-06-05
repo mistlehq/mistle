@@ -306,9 +306,9 @@ describe.concurrent("skills source repos integration", () => {
           commitSha: "2222222222222222222222222222222222222222",
           skills: [
             {
-              name: "skills-review",
-              description: "Review skill metadata.",
-              relativePath: ".agents/skills/skills-review",
+              name: "public-skills-review",
+              description: "Review public skill metadata.",
+              relativePath: ".agents/skills/public-skills-review",
             },
           ],
         },
@@ -319,9 +319,9 @@ describe.concurrent("skills source repos integration", () => {
     expect(secondSync.commitSha).toBe("2222222222222222222222222222222222222222");
     expect(secondSync.skills).toEqual([
       {
-        name: "skills-review",
-        description: "Review skill metadata.",
-        relativePath: ".agents/skills/skills-review",
+        name: "public-skills-review",
+        description: "Review public skill metadata.",
+        relativePath: ".agents/skills/public-skills-review",
       },
     ]);
     expect(secondSync.lastSyncedAt).not.toBeNull();
