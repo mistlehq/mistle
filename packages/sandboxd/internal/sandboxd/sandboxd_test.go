@@ -75,7 +75,7 @@ func TestSignerAliasSelectsSignCommand(t *testing.T) {
 
 	assertEqual(t, code, 1)
 	assertEqual(t, stdout.String(), "")
-	assertEqual(t, stderr.String(), "sandboxd sign is not ported to Go yet\n")
+	assertEqual(t, stderr.String(), "unsupported SSH signing invocation: expected '-Y' but received 'version'\n")
 }
 
 func TestReadStartupPayloadUntilEOF(t *testing.T) {

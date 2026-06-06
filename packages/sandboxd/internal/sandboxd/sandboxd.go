@@ -125,7 +125,13 @@ func runWithControlSocket(
 			return 1
 		}
 		return 0
-	case CommandDaemon, CommandEgressProxy, CommandSign, CommandSkills:
+	case CommandSign:
+		if err := RunSign(args, controlSocketPath); err != nil {
+			_, _ = fmt.Fprintln(stderr, err.Error())
+			return 1
+		}
+		return 0
+	case CommandDaemon, CommandEgressProxy, CommandSkills:
 		_, _ = fmt.Fprintf(stderr, "sandboxd %s is not ported to Go yet\n", command.Kind)
 		return 1
 	default:
