@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mistle/sandboxd/protocol"
 )
 
 func TestServerHandlesReadyAndShutdownRequests(t *testing.T) {
@@ -25,7 +27,7 @@ func TestServerHandlesReadyAndShutdownRequests(t *testing.T) {
 	}
 }
 
-func TestServerReturnsControlErrorForActivationUntilDaemonActivationIsMigrated(t *testing.T) {
+func TestServerRecordsFailedActivationWhenStateInitializationIsNotMigrated(t *testing.T) {
 	socketPath := shortUnixSocketPath(t)
 	server, err := StartServer(socketPath)
 	requireNoError(t, err)
@@ -35,9 +37,40 @@ func TestServerReturnsControlErrorForActivationUntilDaemonActivationIsMigrated(t
 	err = SubmitActivate(socketPath, controlClientActivationInput())
 
 	if err == nil {
-		t.Fatalf("expected activation to fail before daemon activation is migrated")
+		t.Fatalf("expected activation to fail before daemon state initialization is migrated")
 	}
-	assertEqual(t, err.Error(), "control socket returned an error: sandbox startup request was rejected: daemon activation is not migrated to Go")
+	assertEqual(t, err.Error(), "control socket returned an error: sandbox startup request was rejected: sandboxd activation failed: failed to initialize sandboxd state: sandboxd state initialization is not migrated to Go")
+	health := fetchHealthResponse(t, server)
+	assertEqual(t, health["daemon_phase"].(string), "failed")
+	assertEqual(t, health["init_error"].(string), "failed to initialize sandboxd state: sandboxd state initialization is not migrated to Go")
+}
+
+func TestServerRejectsDuplicateActivationAfterFailure(t *testing.T) {
+	socketPath := shortUnixSocketPath(t)
+	server, err := StartServer(socketPath)
+	requireNoError(t, err)
+	defer server.Close()
+	waitForControlSocket(t, socketPath)
+
+	activationInput := controlClientActivationInput()
+	firstErr := SubmitActivate(socketPath, activationInput)
+	secondErr := SubmitActivate(socketPath, activationInput)
+
+	if firstErr == nil || secondErr == nil {
+		t.Fatalf("expected both activation attempts to fail")
+	}
+	assertEqual(t, secondErr.Error(), "control socket returned an error: sandbox startup request was rejected: sandboxd activation already failed: failed to initialize sandboxd state: sandboxd state initialization is not migrated to Go")
+}
+
+func TestServerShutdownClearsFailedActivationState(t *testing.T) {
+	socketPath := shortUnixSocketPath(t)
+	server, err := StartServer(socketPath)
+	requireNoError(t, err)
+	waitForControlSocket(t, socketPath)
+	_ = SubmitActivate(socketPath, controlClientActivationInput())
+
+	requireNoError(t, SubmitShutdown(socketPath))
+	requireNoError(t, server.Wait())
 }
 
 func TestServerServesUnactivatedHealthResponse(t *testing.T) {
@@ -63,6 +96,45 @@ func TestServerServesUnactivatedHealthResponse(t *testing.T) {
 	if body["init_error"] != nil {
 		t.Fatalf("expected nil init_error before activation")
 	}
+}
+
+func TestServerSigningRequiresActivation(t *testing.T) {
+	socketPath := shortUnixSocketPath(t)
+	server, err := StartServer(socketPath)
+	requireNoError(t, err)
+	defer server.Close()
+	waitForControlSocket(t, socketPath)
+
+	_, err = SubmitSigning(socketPath, SignRequest{KeyRef: "key", PayloadBase64: "cGF5bG9hZA=="})
+
+	if err == nil {
+		t.Fatalf("expected signing before activation to fail")
+	}
+	assertEqual(t, err.Error(), "control socket returned an error: sandbox startup request was rejected: sandboxd is not activated")
+}
+
+func TestServerSigningValidatesConfiguredKeyBeforeTunnelSigningIsMigrated(t *testing.T) {
+	socketPath := shortUnixSocketPath(t)
+	server, err := StartServer(socketPath)
+	requireNoError(t, err)
+	defer server.Close()
+	waitForControlSocket(t, socketPath)
+	server.state.mutex.Lock()
+	server.state.phase = ActivationPhaseActivated
+	server.state.activationInput = signingActivationInput("key::allowed")
+	server.state.mutex.Unlock()
+
+	_, wrongKeyErr := SubmitSigning(socketPath, SignRequest{KeyRef: "key::different", PayloadBase64: "cGF5bG9hZA=="})
+	_, migratedErr := SubmitSigning(socketPath, SignRequest{KeyRef: "key::allowed", PayloadBase64: "cGF5bG9hZA=="})
+
+	if wrongKeyErr == nil {
+		t.Fatalf("expected mismatched signing key to fail")
+	}
+	assertEqual(t, wrongKeyErr.Error(), "control socket returned an error: sandbox startup request was rejected: requested Git signing key does not match the configured Git signing identity")
+	if migratedErr == nil {
+		t.Fatalf("expected tunnel signing migration error")
+	}
+	assertEqual(t, migratedErr.Error(), "control socket returned an error: sandbox startup request was rejected: daemon signing tunnel is not migrated to Go")
 }
 
 func TestServerServesJSONNotFoundFromHealthEndpoint(t *testing.T) {
@@ -133,4 +205,32 @@ func waitForControlSocket(t *testing.T, socketPath string) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+}
+
+func fetchHealthResponse(t *testing.T, server *Server) map[string]any {
+	t.Helper()
+	response, err := http.Get("http://" + server.HealthEndpointAddr() + DefaultHealthEndpointPath)
+	requireNoError(t, err)
+	defer response.Body.Close()
+	var body map[string]any
+	requireNoError(t, json.NewDecoder(response.Body).Decode(&body))
+	return body
+}
+
+func signingActivationInput(keyRef string) *protocol.ActivationInput {
+	input := controlClientActivationInput()
+	input.GitIdentity = &protocol.GitIdentity{
+		Name:  "Mistle",
+		Email: "mistle@example.test",
+		Signing: &protocol.GitSigningConfig{
+			Format:         "ssh",
+			Program:        "mistle-ssh-sign",
+			KeyRef:         keyRef,
+			OrganizationID: "org_123",
+			ProviderFamily: "github",
+			ActingUserID:   "user_123",
+			Grant:          "grant",
+		},
+	}
+	return &input
 }

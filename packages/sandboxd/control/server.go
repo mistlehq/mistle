@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/mistle/sandboxd/protocol"
 )
 
 const (
@@ -38,9 +40,10 @@ type Server struct {
 }
 
 type serverState struct {
-	mutex     sync.Mutex
-	phase     ActivationPhase
-	initError *string
+	mutex           sync.Mutex
+	phase           ActivationPhase
+	activationInput *protocol.ActivationInput
+	initError       *string
 }
 
 func StartServer(socketPath string) (*Server, error) {
@@ -171,14 +174,82 @@ func (server *Server) dispatchServerRequest(request Request) (Response, bool) {
 	case RequestReady:
 		return OKResponse(nil), false
 	case RequestShutdown:
+		server.beginShutdown()
 		return OKResponse(nil), true
 	case RequestActivate:
-		return ErrorResponse("sandbox startup request was rejected: daemon activation is not migrated to Go"), false
+		if err := server.beginActivate(*request.ActivationInput); err != nil {
+			return ErrorResponse(err.Error()), false
+		}
+		return OKResponse(nil), false
 	case RequestSign:
-		return ErrorResponse("sandbox startup request was rejected: daemon signing is not migrated to Go"), false
+		if err := server.validateSigningRequest(*request.SignRequest); err != nil {
+			return ErrorResponse(err.Error()), false
+		}
+		return ErrorResponse("sandbox startup request was rejected: daemon signing tunnel is not migrated to Go"), false
 	default:
 		return ErrorResponse(fmt.Sprintf("unsupported control request type: %s", request.Type)), false
 	}
+}
+
+func (server *Server) beginShutdown() {
+	server.state.mutex.Lock()
+	defer server.state.mutex.Unlock()
+	server.state.phase = ActivationPhaseUnactivated
+	server.state.activationInput = nil
+	server.state.initError = nil
+}
+
+func (server *Server) beginActivate(activationInput protocol.ActivationInput) error {
+	server.state.mutex.Lock()
+	defer server.state.mutex.Unlock()
+	switch server.state.phase {
+	case ActivationPhaseUnactivated:
+		server.state.phase = ActivationPhaseActivating
+		server.state.activationInput = cloneActivationInput(activationInput)
+		errorText := "failed to initialize sandboxd state: sandboxd state initialization is not migrated to Go"
+		server.state.phase = ActivationPhaseFailed
+		server.state.initError = &errorText
+		return fmt.Errorf("sandbox startup request was rejected: sandboxd activation failed: %s", errorText)
+	case ActivationPhaseActivating:
+		return fmt.Errorf("sandbox startup request was rejected: sandboxd is still initializing after activation wait")
+	case ActivationPhaseActivated:
+		if activationInputsEqual(server.state.activationInput, &activationInput) {
+			return nil
+		}
+		if server.state.activationInput == nil {
+			return fmt.Errorf("sandbox startup request was rejected: sandboxd is activated without accepted session input")
+		}
+		if string(server.state.activationInput.RuntimePlan) != string(activationInput.RuntimePlan) {
+			return fmt.Errorf("failed to resume sandboxd state: initialized activation cannot change runtime plan")
+		}
+		return fmt.Errorf("failed to resume sandboxd state: activated daemon resume is not migrated to Go")
+	case ActivationPhaseFailed:
+		if server.state.initError == nil {
+			return fmt.Errorf("sandbox startup request was rejected: sandboxd activation already failed")
+		}
+		return fmt.Errorf("sandbox startup request was rejected: sandboxd activation already failed: %s", *server.state.initError)
+	default:
+		return fmt.Errorf("sandbox startup request was rejected: unsupported daemon activation phase %s", server.state.phase)
+	}
+}
+
+func (server *Server) validateSigningRequest(signRequest SignRequest) error {
+	server.state.mutex.Lock()
+	defer server.state.mutex.Unlock()
+	if server.state.activationInput == nil {
+		return fmt.Errorf("sandbox startup request was rejected: sandboxd is not activated")
+	}
+	gitIdentity := server.state.activationInput.GitIdentity
+	if gitIdentity == nil || gitIdentity.Signing == nil {
+		return fmt.Errorf("sandbox startup request was rejected: sandbox does not have a configured Git signing identity")
+	}
+	if gitIdentity.Signing.KeyRef != signRequest.KeyRef {
+		return fmt.Errorf("sandbox startup request was rejected: requested Git signing key does not match the configured Git signing identity")
+	}
+	if server.state.phase != ActivationPhaseActivated {
+		return fmt.Errorf("sandbox startup request was rejected: sandboxd state is missing for an activated daemon")
+	}
+	return nil
 }
 
 func (server *Server) healthHandler() http.Handler {
@@ -194,6 +265,62 @@ func (server *Server) healthHandler() http.Handler {
 		writeHealthJSON(responseWriter, http.StatusNotFound, map[string]string{"error": "not_found"})
 	})
 	return mux
+}
+
+func cloneActivationInput(input protocol.ActivationInput) *protocol.ActivationInput {
+	cloned := input
+	cloned.RuntimePlan = append([]byte(nil), input.RuntimePlan...)
+	return &cloned
+}
+
+func activationInputsEqual(left *protocol.ActivationInput, right *protocol.ActivationInput) bool {
+	if left == nil || right == nil {
+		return left == right
+	}
+	leftPlan := string(left.RuntimePlan)
+	rightPlan := string(right.RuntimePlan)
+	leftCopy := *left
+	rightCopy := *right
+	leftCopy.RuntimePlan = nil
+	rightCopy.RuntimePlan = nil
+	return leftPlan == rightPlan &&
+		leftCopy.OperationKind == rightCopy.OperationKind &&
+		leftCopy.BootstrapToken == rightCopy.BootstrapToken &&
+		leftCopy.TunnelExchangeToken == rightCopy.TunnelExchangeToken &&
+		leftCopy.TunnelGatewayWSURL == rightCopy.TunnelGatewayWSURL &&
+		stringPointerEqual(leftCopy.ActingUserID, rightCopy.ActingUserID) &&
+		gitIdentityEqual(leftCopy.GitIdentity, rightCopy.GitIdentity)
+}
+
+func stringPointerEqual(left *string, right *string) bool {
+	if left == nil || right == nil {
+		return left == right
+	}
+	return *left == *right
+}
+
+func gitIdentityEqual(left *protocol.GitIdentity, right *protocol.GitIdentity) bool {
+	if left == nil || right == nil {
+		return left == right
+	}
+	if left.Name != right.Name || left.Email != right.Email {
+		return false
+	}
+	return gitSigningConfigEqual(left.Signing, right.Signing)
+}
+
+func gitSigningConfigEqual(left *protocol.GitSigningConfig, right *protocol.GitSigningConfig) bool {
+	if left == nil || right == nil {
+		return left == right
+	}
+	return left.Format == right.Format &&
+		left.Program == right.Program &&
+		left.KeyRef == right.KeyRef &&
+		left.OrganizationID == right.OrganizationID &&
+		left.ProviderFamily == right.ProviderFamily &&
+		stringPointerEqual(left.IntegrationConnectionID, right.IntegrationConnectionID) &&
+		left.ActingUserID == right.ActingUserID &&
+		left.Grant == right.Grant
 }
 
 type healthResponse struct {
