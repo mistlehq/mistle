@@ -28,3 +28,20 @@ type CompiledRuntimeArtifact struct {
 	Name        string            `json:"name"`
 	Env         map[string]string `json:"env"`
 }
+
+type RuntimeClientProcessReadinessType string
+
+const (
+	RuntimeClientProcessReadinessNone RuntimeClientProcessReadinessType = "none"
+	RuntimeClientProcessReadinessHTTP RuntimeClientProcessReadinessType = "http"
+	RuntimeClientProcessReadinessWS   RuntimeClientProcessReadinessType = "ws"
+	RuntimeClientProcessReadinessTCP  RuntimeClientProcessReadinessType = "tcp"
+)
+
+type RuntimeClientProcessReadiness struct {
+	Type      RuntimeClientProcessReadinessType
+	URL       string
+	Host      string
+	Port      uint16
+	TimeoutMS uint64
+}
