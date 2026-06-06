@@ -644,11 +644,6 @@ export function SandboxProfileSkillsSection(input: {
               source.
             </Notice>
           ) : null}
-          {selectableSourceOptions.length === 0 && selectedOriginUrl === null ? (
-            <Notice title="Skills source required">
-              Add a Git repository binding or a public GitHub repository before configuring skills.
-            </Notice>
-          ) : null}
           {unavailableSelectedSkillsMessage === null ? null : (
             <Notice title="Selected skills no longer found" variant="alert">
               {unavailableSelectedSkillsMessage}
