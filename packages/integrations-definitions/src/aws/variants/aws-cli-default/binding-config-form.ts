@@ -68,7 +68,6 @@ export function resolveAwsBindingConfigForm(input: AwsBindingFormContext): Resol
     },
     uiSchema: {
       services: {
-        "ui:help": "Allowed AWS service ids such as secretsmanager, sts, or s3.",
         "ui:enumNames": AwsEndpointServiceDefinitions.map((definition) => definition.displayName),
         "ui:placeholder": "Search supported AWS services",
         "ui:widget": "multi-select-string-array-combobox",
@@ -77,7 +76,6 @@ export function resolveAwsBindingConfigForm(input: AwsBindingFormContext): Resol
         },
       },
       regions: {
-        "ui:help": "Allowed AWS regions such as us-east-1.",
         "ui:placeholder": "Search supported AWS regions",
         "ui:widget": "multi-select-string-array-combobox",
         "ui:options": {
