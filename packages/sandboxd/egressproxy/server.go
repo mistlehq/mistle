@@ -2,15 +2,19 @@ package egressproxy
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/coder/websocket"
 )
+
+var timeNow = time.Now
 
 type EgressTokenProvider interface {
 	Token() (string, error)
@@ -33,6 +37,8 @@ type ProxyState struct {
 	DirectGateway     DirectGatewayEgressClient
 	TokenProvider     EgressTokenProvider
 	HTTPClient        *http.Client
+	ProxyCACertPEM    string
+	ProxyCAKeyPEM     string
 	NextRequestID     atomic.Uint64
 }
 
@@ -53,7 +59,8 @@ func RunProxyServer(listener net.Listener, state *ProxyState) error {
 }
 
 type ProxyHandler struct {
-	State *ProxyState
+	State          *ProxyState
+	TargetOverride *RequestTargetOverride
 }
 
 func (handler ProxyHandler) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
@@ -62,17 +69,19 @@ func (handler ProxyHandler) ServeHTTP(responseWriter http.ResponseWriter, reques
 		return
 	}
 	if request.Method == http.MethodConnect {
-		http.Error(responseWriter, "CONNECT egress proxy handling is not ported to Go yet", http.StatusBadGateway)
+		if err := HandleConnectRequest(responseWriter, request, handler.State); err != nil {
+			http.Error(responseWriter, err.Error(), http.StatusBadGateway)
+		}
 		return
 	}
 	if isWebSocketUpgradeRequest(request) {
-		if err := ForwardProxyWebSocket(responseWriter, request, handler.State); err != nil {
+		if err := ForwardProxyWebSocket(responseWriter, request, handler.State, handler.TargetOverride); err != nil {
 			http.Error(responseWriter, err.Error(), http.StatusBadGateway)
 		}
 		return
 	}
 
-	response, err := ForwardProxyRequest(request, handler.State)
+	response, err := ForwardProxyRequest(request, handler.State, handler.TargetOverride)
 	if err != nil {
 		http.Error(responseWriter, err.Error(), http.StatusBadGateway)
 		return
@@ -81,11 +90,11 @@ func (handler ProxyHandler) ServeHTTP(responseWriter http.ResponseWriter, reques
 	copyResponse(responseWriter, response)
 }
 
-func ForwardProxyRequest(request *http.Request, state *ProxyState) (*http.Response, error) {
+func ForwardProxyRequest(request *http.Request, state *ProxyState, targetOverride *RequestTargetOverride) (*http.Response, error) {
 	if state == nil {
 		return nil, fmt.Errorf("local egress proxy state is required")
 	}
-	requestTarget, err := ResolveRequestTarget(request, nil)
+	requestTarget, err := ResolveRequestTarget(request, targetOverride)
 	if err != nil {
 		return nil, err
 	}
@@ -100,11 +109,11 @@ func ForwardProxyRequest(request *http.Request, state *ProxyState) (*http.Respon
 	return forwardDirectGatewayRequest(request, requestTarget, route, requestID, state)
 }
 
-func ForwardProxyWebSocket(responseWriter http.ResponseWriter, request *http.Request, state *ProxyState) error {
+func ForwardProxyWebSocket(responseWriter http.ResponseWriter, request *http.Request, state *ProxyState, targetOverride *RequestTargetOverride) error {
 	if state == nil {
 		return fmt.Errorf("local egress proxy state is required")
 	}
-	requestTarget, err := ResolveRequestTarget(request, nil)
+	requestTarget, err := ResolveRequestTarget(request, targetOverride)
 	if err != nil {
 		return err
 	}
@@ -157,6 +166,54 @@ func ForwardProxyWebSocket(responseWriter http.ResponseWriter, request *http.Req
 	return nil
 }
 
+func HandleConnectRequest(responseWriter http.ResponseWriter, request *http.Request, state *ProxyState) error {
+	if state == nil {
+		return fmt.Errorf("local egress proxy state is required")
+	}
+	if state.ProxyCACertPEM == "" {
+		return fmt.Errorf("proxy ca certificate pem is required for CONNECT")
+	}
+	if state.ProxyCAKeyPEM == "" {
+		return fmt.Errorf("proxy ca private key pem is required for CONNECT")
+	}
+	authority := request.Host
+	if authority == "" && request.URL != nil {
+		authority = request.URL.Host
+	}
+	if authority == "" {
+		return fmt.Errorf("CONNECT requests must include a target authority")
+	}
+	hijacker, ok := responseWriter.(http.Hijacker)
+	if !ok {
+		return fmt.Errorf("CONNECT response writer does not support hijacking")
+	}
+	connection, buffered, err := hijacker.Hijack()
+	if err != nil {
+		return fmt.Errorf("failed to hijack CONNECT connection: %w", err)
+	}
+	if buffered.Reader.Buffered() > 0 {
+		connection.Close()
+		return fmt.Errorf("CONNECT request had unexpected buffered payload")
+	}
+	if _, err := buffered.WriteString("HTTP/1.1 200 OK\r\n\r\n"); err != nil {
+		connection.Close()
+		return fmt.Errorf("failed to write CONNECT acknowledgement response: %w", err)
+	}
+	if err := buffered.Flush(); err != nil {
+		connection.Close()
+		return fmt.Errorf("failed to flush CONNECT acknowledgement response: %w", err)
+	}
+
+	tlsConfig, err := buildTLSInterceptConfig(authority, state)
+	if err != nil {
+		connection.Close()
+		return err
+	}
+	tlsConnection := tls.Server(connection, tlsConfig)
+	go serveConnectTLSConnection(tlsConnection, state, authority)
+	return nil
+}
+
 func forwardDirectRequest(request *http.Request, requestTarget RequestTarget, requestID string, state *ProxyState) (*http.Response, error) {
 	outboundRequest, err := buildOutboundRequest(request, requestTarget.URL.String(), request.Body)
 	if err != nil {
@@ -164,7 +221,12 @@ func forwardDirectRequest(request *http.Request, requestTarget RequestTarget, re
 	}
 	outboundRequest.Header = filterOutboundRequestHeaders(request.Header)
 	outboundRequest.Header.Set(SandboxEgressRequestIDHeaderName, requestID)
-	return proxyHTTPClient(state).Do(outboundRequest)
+	response, err := proxyHTTPClient(state).Do(outboundRequest)
+	if err != nil {
+		return nil, err
+	}
+	response.Header.Set(SandboxEgressRequestIDHeaderName, requestID)
+	return response, nil
 }
 
 func forwardDirectGatewayRequest(request *http.Request, requestTarget RequestTarget, route *Route, requestID string, state *ProxyState) (*http.Response, error) {
@@ -186,7 +248,12 @@ func forwardDirectGatewayRequest(request *http.Request, requestTarget RequestTar
 	outboundRequest.Header = FilterDirectGatewayRequestHeaders(request.Header)
 	outboundRequest.Header.Set(DirectGatewayEgressAuthorizationHeaderName, "Bearer "+token)
 	outboundRequest.Header.Set(SandboxEgressRequestIDHeaderName, requestID)
-	return proxyHTTPClient(state).Do(outboundRequest)
+	response, err := proxyHTTPClient(state).Do(outboundRequest)
+	if err != nil {
+		return nil, err
+	}
+	response.Header.Set(SandboxEgressRequestIDHeaderName, requestID)
+	return response, nil
 }
 
 func buildOutboundRequest(source *http.Request, targetURL string, body io.Reader) (*http.Request, error) {
@@ -231,6 +298,87 @@ func isWebSocketUpgradeRequest(request *http.Request) bool {
 		}
 	}
 	return false
+}
+
+func buildTLSInterceptConfig(authority string, state *ProxyState) (*tls.Config, error) {
+	certificatePEM, privateKeyPEM, err := IssueProxyLeafCertificate(state.ProxyCACertPEM, state.ProxyCAKeyPEM, authority, timeNow())
+	if err != nil {
+		return nil, err
+	}
+	certificate, err := tls.X509KeyPair([]byte(certificatePEM), []byte(privateKeyPEM))
+	if err != nil {
+		return nil, fmt.Errorf("failed to build local egress proxy certificate chain: %w", err)
+	}
+	return &tls.Config{
+		Certificates: []tls.Certificate{certificate},
+		MinVersion:   tls.VersionTLS12,
+	}, nil
+}
+
+func serveConnectTLSConnection(connection *tls.Conn, state *ProxyState, authority string) {
+	if err := connection.Handshake(); err != nil {
+		connection.Close()
+		return
+	}
+	listener := newSingleConnectionListener(connection)
+	server := &http.Server{
+		Handler: ProxyHandler{
+			State: state,
+			TargetOverride: &RequestTargetOverride{
+				Scheme:           "https",
+				DefaultAuthority: authority,
+			},
+		},
+	}
+	_ = server.Serve(listener)
+}
+
+type singleConnectionListener struct {
+	connection *singleConnection
+	accepted   atomic.Bool
+	closed     atomic.Bool
+}
+
+func newSingleConnectionListener(connection net.Conn) *singleConnectionListener {
+	done := make(chan struct{})
+	return &singleConnectionListener{
+		connection: &singleConnection{
+			Conn: connection,
+			done: done,
+		},
+	}
+}
+
+func (listener *singleConnectionListener) Accept() (net.Conn, error) {
+	if listener.accepted.CompareAndSwap(false, true) {
+		return listener.connection, nil
+	}
+	<-listener.connection.done
+	return nil, net.ErrClosed
+}
+
+func (listener *singleConnectionListener) Close() error {
+	if listener.closed.CompareAndSwap(false, true) {
+		return listener.connection.Close()
+	}
+	return nil
+}
+
+func (listener *singleConnectionListener) Addr() net.Addr {
+	return listener.connection.LocalAddr()
+}
+
+type singleConnection struct {
+	net.Conn
+	done chan struct{}
+	once atomic.Bool
+}
+
+func (connection *singleConnection) Close() error {
+	if connection.once.CompareAndSwap(false, true) {
+		close(connection.done)
+	}
+	return connection.Conn.Close()
 }
 
 func tunnelWebSockets(parentContext context.Context, downstream *websocket.Conn, upstream *websocket.Conn) {
