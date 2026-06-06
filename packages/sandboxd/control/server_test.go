@@ -5,11 +5,13 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/coder/websocket"
 	"github.com/mistle/sandboxd/protocol"
 )
 
@@ -190,31 +192,51 @@ func TestServerSigningRequiresActivation(t *testing.T) {
 	assertEqual(t, err.Error(), "control socket returned an error: sandbox startup request was rejected: sandboxd is not activated")
 }
 
-func TestServerSigningValidatesConfiguredKeyBeforeTunnelSigningIsMigrated(t *testing.T) {
+func TestServerSigningUsesConfiguredKeyAndBootstrapTunnel(t *testing.T) {
 	socketPath := shortUnixSocketPath(t)
 	server, err := StartServer(socketPath)
 	requireNoError(t, err)
 	defer server.Close()
 	waitForControlSocket(t, socketPath)
-	server.state.mutex.Lock()
-	server.state.phase = ActivationPhaseActivated
-	server.state.activationInput = signingActivationInput("key::allowed")
-	server.state.mutex.Unlock()
+	signingRequests := make(chan string, 2)
+	gatewayURL, closeGateway := startSigningBootstrapGateway(t, signingRequests, `{"type":"signing.result","requestId":"sign_req_0","ok":true,"signature":"c2lnbmF0dXJl","encoding":"base64"}`)
+	defer closeGateway()
+	activationInput := signingActivationInput("key::allowed")
+	activationInput.TunnelGatewayWSURL = gatewayURL
+	requireNoError(t, SubmitActivate(socketPath, *activationInput))
 
 	_, wrongKeyErr := SubmitSigning(socketPath, SignRequest{KeyRef: "key::different", PayloadBase64: "cGF5bG9hZA=="})
-	tunnelPayload, payloadErr := server.buildSigningTunnelRequestPayload(SignRequest{KeyRef: "key::allowed", PayloadBase64: "cGF5bG9hZA=="})
-	_, migratedErr := SubmitSigning(socketPath, SignRequest{KeyRef: "key::allowed", PayloadBase64: "cGF5bG9hZA=="})
+	signatureBase64, signingErr := SubmitSigning(socketPath, SignRequest{KeyRef: "key::allowed", PayloadBase64: "cGF5bG9hZA=="})
 
 	if wrongKeyErr == nil {
 		t.Fatalf("expected mismatched signing key to fail")
 	}
 	assertEqual(t, wrongKeyErr.Error(), "control socket returned an error: sandbox startup request was rejected: requested Git signing key does not match the configured Git signing identity")
-	requireNoError(t, payloadErr)
-	assertEqual(t, tunnelPayload, `{"type":"signing.request","requestId":"sign_req_0","organizationId":"org_123","sandboxInstanceId":"sbi_control","actingUserId":"user_123","providerFamily":"github","format":"ssh","keyRef":"key::allowed","grant":"grant","payload":"cGF5bG9hZA==","encoding":"base64"}`)
-	if migratedErr == nil {
-		t.Fatalf("expected tunnel signing migration error")
+	requireNoError(t, signingErr)
+	assertEqual(t, signatureBase64, "c2lnbmF0dXJl")
+	assertEqual(t, receiveSigningRequest(t, signingRequests), `{"type":"signing.request","requestId":"sign_req_0","organizationId":"org_123","sandboxInstanceId":"sbi_control","actingUserId":"user_123","providerFamily":"github","format":"ssh","keyRef":"key::allowed","grant":"grant","payload":"cGF5bG9hZA==","encoding":"base64"}`)
+}
+
+func TestServerSigningReturnsTunnelFailureResult(t *testing.T) {
+	socketPath := shortUnixSocketPath(t)
+	server, err := StartServer(socketPath)
+	requireNoError(t, err)
+	defer server.Close()
+	waitForControlSocket(t, socketPath)
+	signingRequests := make(chan string, 2)
+	gatewayURL, closeGateway := startSigningBootstrapGateway(t, signingRequests, `{"type":"signing.result","requestId":"sign_req_0","ok":false,"code":"signing_backend_unavailable","message":"signing backend unavailable"}`)
+	defer closeGateway()
+	activationInput := signingActivationInput("key::allowed")
+	activationInput.TunnelGatewayWSURL = gatewayURL
+	requireNoError(t, SubmitActivate(socketPath, *activationInput))
+
+	_, err = SubmitSigning(socketPath, SignRequest{KeyRef: "key::allowed", PayloadBase64: "cGF5bG9hZA=="})
+
+	if err == nil {
+		t.Fatalf("expected signing failure result to fail")
 	}
-	assertEqual(t, migratedErr.Error(), "control socket returned an error: sandbox startup request was rejected: sandboxd signing tunnel session is not migrated to Go")
+	assertEqual(t, err.Error(), "control socket returned an error: bootstrap tunnel signing failed (signing_backend_unavailable): signing backend unavailable")
+	assertEqual(t, receiveSigningRequest(t, signingRequests), `{"type":"signing.request","requestId":"sign_req_0","organizationId":"org_123","sandboxInstanceId":"sbi_control","actingUserId":"user_123","providerFamily":"github","format":"ssh","keyRef":"key::allowed","grant":"grant","payload":"cGF5bG9hZA==","encoding":"base64"}`)
 }
 
 func TestServerServesJSONNotFoundFromHealthEndpoint(t *testing.T) {
@@ -313,4 +335,35 @@ func signingActivationInput(keyRef string) *protocol.ActivationInput {
 		},
 	}
 	return &input
+}
+
+func startSigningBootstrapGateway(t *testing.T, signingRequests chan<- string, signingResponse string) (string, func()) {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
+		connection, err := websocket.Accept(responseWriter, request, nil)
+		if err != nil {
+			return
+		}
+		defer connection.Close(websocket.StatusNormalClosure, "")
+		_, payload, err := connection.Read(request.Context())
+		if err != nil {
+			return
+		}
+		signingRequests <- string(payload)
+		if err := connection.Write(request.Context(), websocket.MessageText, []byte(signingResponse)); err != nil {
+			signingRequests <- "write error: " + err.Error()
+		}
+	}))
+	return "ws" + strings.TrimPrefix(server.URL, "http") + "/bootstrap/sbi_control", server.Close
+}
+
+func receiveSigningRequest(t *testing.T, signingRequests <-chan string) string {
+	t.Helper()
+	select {
+	case request := <-signingRequests:
+		return request
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timed out waiting for signing request")
+		return ""
+	}
 }

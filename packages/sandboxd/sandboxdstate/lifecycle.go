@@ -11,9 +11,11 @@ import (
 	"github.com/mistle/sandboxd/supervision"
 	"github.com/mistle/sandboxd/timeutil"
 	"github.com/mistle/sandboxd/tunnel"
+	tunnelprotocol "github.com/mistle/sandboxd/tunnel/protocol"
 )
 
 const DefaultBootstrapTunnelConnectTimeout = 10 * time.Second
+const DefaultBootstrapTunnelSigningTimeout = 120 * time.Second
 
 type ExecutionMode string
 
@@ -111,6 +113,48 @@ func (state *State) RuntimeEnvironment() map[string]string {
 
 func (state *State) HealthSnapshot() supervision.HealthSnapshot {
 	return state.supervisorHandle.Snapshot()
+}
+
+func (state *State) RequestSigning(payload string) (string, error) {
+	if state.bootstrapTunnel == nil {
+		return "", fmt.Errorf("bootstrap tunnel session is not initialized")
+	}
+	requestMessage, err := tunnelprotocol.ParseSigningControlMessage(payload)
+	if err != nil {
+		return "", err
+	}
+	if requestMessage == nil || requestMessage.Request == nil {
+		return "", fmt.Errorf("signing request payload is required")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultBootstrapTunnelSigningTimeout)
+	defer cancel()
+	if err := state.bootstrapTunnel.SendText(ctx, payload); err != nil {
+		return "", err
+	}
+	responsePayload, err := state.bootstrapTunnel.ReadText(ctx)
+	if err != nil {
+		return "", err
+	}
+	responseMessage, err := tunnelprotocol.ParseSigningControlMessage(responsePayload)
+	if err != nil {
+		return "", err
+	}
+	if responseMessage == nil {
+		return "", fmt.Errorf("bootstrap tunnel returned unsupported signing response")
+	}
+	if responseMessage.SuccessResult != nil {
+		if responseMessage.SuccessResult.RequestID != requestMessage.Request.RequestID {
+			return "", fmt.Errorf("bootstrap tunnel signing result requestId %s did not match requestId %s", responseMessage.SuccessResult.RequestID, requestMessage.Request.RequestID)
+		}
+		return responseMessage.SuccessResult.Signature, nil
+	}
+	if responseMessage.FailureResult != nil {
+		if responseMessage.FailureResult.RequestID != requestMessage.Request.RequestID {
+			return "", fmt.Errorf("bootstrap tunnel signing result requestId %s did not match requestId %s", responseMessage.FailureResult.RequestID, requestMessage.Request.RequestID)
+		}
+		return "", fmt.Errorf("bootstrap tunnel signing failed (%s): %s", responseMessage.FailureResult.Code, responseMessage.FailureResult.Message)
+	}
+	return "", fmt.Errorf("bootstrap tunnel returned unsupported signing response")
 }
 
 func (state *State) Close() error {

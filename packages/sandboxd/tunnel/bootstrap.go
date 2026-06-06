@@ -57,6 +57,20 @@ func (tunnel *BootstrapTunnel) SendText(ctx context.Context, payload string) err
 	return nil
 }
 
+func (tunnel *BootstrapTunnel) ReadText(ctx context.Context) (string, error) {
+	if tunnel.connection == nil {
+		return "", fmt.Errorf("bootstrap tunnel is already closed")
+	}
+	messageType, payload, err := tunnel.connection.Read(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to read bootstrap tunnel frame: %w", err)
+	}
+	if messageType != websocket.MessageText {
+		return "", fmt.Errorf("invalid bootstrap tunnel control frame: expected text frame")
+	}
+	return string(payload), nil
+}
+
 func (tunnel *BootstrapTunnel) Close() error {
 	if tunnel.connection == nil {
 		return nil
