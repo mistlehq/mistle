@@ -125,8 +125,8 @@ func controlClientActivationInput() protocol.ActivationInput {
 		OperationKind:       protocol.ActivationOperationStart,
 		BootstrapToken:      "bootstrap-token-value",
 		TunnelExchangeToken: "tunnel-exchange-token-value",
-		TunnelGatewayWSURL:  "ws://127.0.0.1:5003/tunnel/sandbox",
-		RuntimePlan:         []byte(`{"version":1}`),
+		TunnelGatewayWSURL:  "ws://127.0.0.1:5003/tunnel/sandbox/sbi_control",
+		RuntimePlan:         []byte(`{"sandboxProfileId":"sbp_control","version":1}`),
 		ActingUserID:        nil,
 		GitIdentity:         nil,
 	}

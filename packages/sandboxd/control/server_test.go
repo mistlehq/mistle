@@ -62,6 +62,44 @@ func TestServerRejectsDuplicateActivationAfterFailure(t *testing.T) {
 	assertEqual(t, secondErr.Error(), "control socket returned an error: sandbox startup request was rejected: sandboxd activation already failed: failed to initialize sandboxd state: sandboxd state initialization is not migrated to Go")
 }
 
+func TestServerRejectsActivationWithInvalidGatewayURLBeforeStateInitialization(t *testing.T) {
+	socketPath := shortUnixSocketPath(t)
+	server, err := StartServer(socketPath)
+	requireNoError(t, err)
+	defer server.Close()
+	waitForControlSocket(t, socketPath)
+	activationInput := controlClientActivationInput()
+	activationInput.TunnelGatewayWSURL = "ws://127.0.0.1:5003/"
+
+	err = SubmitActivate(socketPath, activationInput)
+
+	if err == nil {
+		t.Fatalf("expected invalid gateway URL to fail activation")
+	}
+	assertEqual(t, err.Error(), "control socket returned an error: failed to initialize sandboxd state: failed to start bootstrap tunnel session: tunnel gateway url must end with the sandbox instance id path segment")
+	health := fetchHealthResponse(t, server)
+	assertEqual(t, health["daemon_phase"].(string), "unactivated")
+}
+
+func TestServerRejectsActivationWithInvalidRuntimePlanBeforeStateInitialization(t *testing.T) {
+	socketPath := shortUnixSocketPath(t)
+	server, err := StartServer(socketPath)
+	requireNoError(t, err)
+	defer server.Close()
+	waitForControlSocket(t, socketPath)
+	activationInput := controlClientActivationInput()
+	activationInput.RuntimePlan = []byte(`{"version":1}`)
+
+	err = SubmitActivate(socketPath, activationInput)
+
+	if err == nil {
+		t.Fatalf("expected invalid runtime plan to fail activation")
+	}
+	assertEqual(t, err.Error(), "control socket returned an error: failed to initialize sandboxd state: failed to apply session input: runtime plan sandboxProfileId is required")
+	health := fetchHealthResponse(t, server)
+	assertEqual(t, health["daemon_phase"].(string), "unactivated")
+}
+
 func TestServerShutdownClearsFailedActivationState(t *testing.T) {
 	socketPath := shortUnixSocketPath(t)
 	server, err := StartServer(socketPath)

@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/mistle/sandboxd/protocol"
+	"github.com/mistle/sandboxd/runtime"
+	"github.com/mistle/sandboxd/tunnel"
 )
 
 const (
@@ -200,6 +202,9 @@ func (server *Server) beginShutdown() {
 }
 
 func (server *Server) beginActivate(activationInput protocol.ActivationInput) error {
+	if err := validateActivationInputForStateInitialization(activationInput); err != nil {
+		return err
+	}
 	server.state.mutex.Lock()
 	defer server.state.mutex.Unlock()
 	switch server.state.phase {
@@ -231,6 +236,23 @@ func (server *Server) beginActivate(activationInput protocol.ActivationInput) er
 	default:
 		return fmt.Errorf("sandbox startup request was rejected: unsupported daemon activation phase %s", server.state.phase)
 	}
+}
+
+func validateActivationInputForStateInitialization(activationInput protocol.ActivationInput) error {
+	if _, err := tunnel.DeriveSandboxInstanceID(activationInput.TunnelGatewayWSURL); err != nil {
+		return fmt.Errorf("failed to initialize sandboxd state: failed to start bootstrap tunnel session: %w", err)
+	}
+	var runtimePlan runtime.CompiledRuntimePlan
+	if err := json.Unmarshal(activationInput.RuntimePlan, &runtimePlan); err != nil {
+		return fmt.Errorf("failed to initialize sandboxd state: failed to apply session input: %w", err)
+	}
+	if runtimePlan.SandboxProfileID == "" {
+		return fmt.Errorf("failed to initialize sandboxd state: failed to apply session input: runtime plan sandboxProfileId is required")
+	}
+	if runtimePlan.Version == 0 {
+		return fmt.Errorf("failed to initialize sandboxd state: failed to apply session input: runtime plan version is required")
+	}
+	return nil
 }
 
 func (server *Server) validateSigningRequest(signRequest SignRequest) error {
