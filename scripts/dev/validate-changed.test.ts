@@ -111,7 +111,6 @@ describe("validate-changed", () => {
   it("does not plan containerized Rust tests for non-Rust repo-wide changes", () => {
     const commands = getDryRunCommands("pnpm-lock.yaml");
 
-    expect(commands.join("\n")).not.toContain("@mistle/commit-sign");
     expect(commands.join("\n")).not.toContain("@mistle/sandboxd");
   });
 

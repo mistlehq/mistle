@@ -2,11 +2,11 @@
   "name": "@mistle/commit-sign",
   "private": true,
   "scripts": {
-    "build": "rm -rf dist && cargo build --locked --bin commit-sign && mkdir -p dist && cp target/debug/commit-sign dist/commit-sign",
-    "lint": "cargo clippy --locked --all-targets -- -D warnings",
-    "typecheck": "cargo check --locked --all-targets",
-    "test": "node ./scripts/run-cargo-in-container.mjs nextest run --locked",
-    "format": "node ./scripts/cargo-fmt.mjs",
-    "format:check": "node ./scripts/cargo-fmt.mjs --check"
+    "build": "rm -rf dist && go build -o dist/commit-sign ./cmd/commit-sign",
+    "lint": "go vet ./...",
+    "typecheck": "go test ./... -run '^$'",
+    "test": "go test ./...",
+    "format": "gofmt -w .",
+    "format:check": "test -z \"$(gofmt -l .)\""
   }
 }

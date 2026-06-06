@@ -155,7 +155,6 @@ jobs:
               - 'tsconfig.base.json'
             rust_static:
               - '.envrc'
-              - 'packages/commit-sign/**'
               - 'packages/mstl-cli/**'
               - 'packages/mstl-core/**'
               - 'packages/sandboxd/**'
@@ -435,7 +434,6 @@ jobs:
         with:
           shared-key: sandbox-rust
           workspaces: |
-            packages/commit-sign -> target
             packages/mstl-cli -> target
             packages/mstl-core -> target
             packages/sandboxd -> target
@@ -485,10 +483,9 @@ jobs:
         run: >-
           nix develop --command bash -c
           "pnpm --filter @mistle/sandboxd format:check &&
-          pnpm --filter @mistle/commit-sign format:check &&
           pnpm --filter @mistle/mstl-cli format:check &&
           pnpm --filter @mistle/mstl-core format:check &&
-          pnpm turbo run lint typecheck --output-logs=full --concurrency=2 --filter=@mistle/sandboxd --filter=@mistle/commit-sign --filter=@mistle/mstl-cli --filter=@mistle/mstl-core"
+          pnpm turbo run lint typecheck --output-logs=full --concurrency=2 --filter=@mistle/sandboxd --filter=@mistle/mstl-cli --filter=@mistle/mstl-core"
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.static-rust-turbo-cache.outputs.cache-hit != 'true' }}
@@ -991,25 +988,6 @@ jobs:
         with:
           install_options: --no-daemon
 
-      - name: Restore commit-sign container cargo cache
-        id: test-commit-sign-container-cargo-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
-        with:
-          path: .local/commit-sign-test/cargo-home
-          key: ${{ runner.os }}-commit-sign-test-cargo-home-${{ hashFiles('packages/commit-sign/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-commit-sign-test-cargo-home-
-
-      - name: Restore commit-sign container target cache
-        id: test-commit-sign-container-target-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
-        with:
-          path: .local/commit-sign-test/target-alpine-container
-          key: ${{ runner.os }}-commit-sign-test-target-alpine-${{ hashFiles('packages/commit-sign/Cargo.lock') }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-commit-sign-test-target-alpine-${{ hashFiles('packages/commit-sign/Cargo.lock') }}-
-            ${{ runner.os }}-commit-sign-test-target-alpine-
-
       - name: Restore pnpm store cache
         id: test-commit-sign-pnpm-store-cache
         uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
@@ -1032,39 +1010,15 @@ jobs:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
 
-      - name: Setup Blacksmith Docker builder
-        uses: useblacksmith/setup-docker-builder@722e97d12b1d06a961800dd6c05d79d951ad3c80 # v1
-        with:
-          max-cache-size-mb: "10240"
-
-      - name: Build commit-sign test runner image
+      - name: Run commit-sign static checks in Nix shell
         run: >-
-          docker buildx build
-          --load
-          --pull=false
-          --tag "mistle/commit-sign-test-runner:dockerfile-${{ hashFiles('packages/commit-sign/Dockerfile.test') }}"
-          --file packages/commit-sign/Dockerfile.test
-          packages/commit-sign
+          nix develop --command bash -c
+          "pnpm --filter @mistle/commit-sign format:check &&
+          pnpm --filter @mistle/commit-sign lint &&
+          pnpm --filter @mistle/commit-sign typecheck"
 
       - name: Run commit-sign tests in Nix shell
-        env:
-          MISTLE_COMMIT_SIGN_TEST_IMAGE: mistle/commit-sign-test-runner:dockerfile-${{ hashFiles('packages/commit-sign/Dockerfile.test') }}
-          MISTLE_COMMIT_SIGN_TEST_RUNNER_BUILD_POLICY: never
         run: nix develop --command pnpm --filter @mistle/commit-sign test
-
-      - name: Save commit-sign container cargo cache
-        if: steps.test-commit-sign-container-cargo-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
-        with:
-          path: .local/commit-sign-test/cargo-home
-          key: ${{ runner.os }}-commit-sign-test-cargo-home-${{ hashFiles('packages/commit-sign/Cargo.lock') }}
-
-      - name: Save commit-sign container target cache
-        if: ${{ always() && !cancelled() && steps.test-commit-sign-container-target-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
-        with:
-          path: .local/commit-sign-test/target-alpine-container
-          key: ${{ runner.os }}-commit-sign-test-target-alpine-${{ hashFiles('packages/commit-sign/Cargo.lock') }}-${{ github.sha }}
 
   test-sandboxd:
     name: Sandboxd Test

@@ -1,0 +1,8 @@
+github.com/42wim/sshsig v0.0.0-20260317195500-b9f38cf0d432 h1:3Fcz1QzlS7Jv4FT2KI3cHNSZL+KPN3dXxurn9f3YL/Y=
+github.com/42wim/sshsig v0.0.0-20260317195500-b9f38cf0d432/go.mod h1:BLWe6Nol65Xxncvaw07yYMxiyk02We1lBrbRYsMYsjE=
+golang.org/x/crypto v0.49.0 h1:+Ng2ULVvLHnJ/ZFEq4KdcDd/cfjrrjjNSXNzxg0Y4U4=
+golang.org/x/crypto v0.49.0/go.mod h1:ErX4dUh2UM+CFYiXZRTcMpEcN8b/1gxEuv3nODoYtCA=
+golang.org/x/sys v0.42.0 h1:omrd2nAlyT5ESRdCLYdm3+fMfNFE/+Rf4bDIQImRJeo=
+golang.org/x/sys v0.42.0/go.mod h1:4GL1E5IUh+htKOUEOaiffhrAeqysfVGipDYzABqnCmw=
+golang.org/x/term v0.41.0 h1:QCgPso/Q3RTJx2Th4bDLqML4W6iJiaXFq2/ftQF13YU=
+golang.org/x/term v0.41.0/go.mod h1:3pfBgksrReYfZ5lvYM0kSO0LIkAl4Yl2bXOkKP7Ec2A=

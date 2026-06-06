@@ -61,7 +61,7 @@ const AFFECTED_INTEGRATION_TEST_PACKAGE_NAMES = new Set([
   "@mistle/sandbox",
   "@mistle/test-harness",
 ]);
-const AFFECTED_RUST_TEST_PACKAGE_NAMES = new Set(["@mistle/commit-sign", "@mistle/sandboxd"]);
+const AFFECTED_RUST_TEST_PACKAGE_NAMES = new Set(["@mistle/sandboxd"]);
 
 const ALL_PACKAGES_REASON = "root-level or repo-wide config changed";
 const REACT_DOCTOR_PROJECT_PATHS: readonly string[] = [
@@ -827,24 +827,6 @@ function isRustIntegrationTargetFilePath(
   );
 }
 
-function buildAffectedCommitSignTestCommand(
-  workspacePackage: WorkspacePackage,
-  filePaths: readonly string[],
-): Command {
-  return [
-    "pnpm",
-    "--dir",
-    workspacePackage.relativePath,
-    "exec",
-    "node",
-    "./scripts/run-cargo-in-container.mjs",
-    "nextest",
-    "run",
-    "--locked",
-    ...filePaths.flatMap((filePath) => ["--test", parse(filePath).name]),
-  ];
-}
-
 function buildAffectedSandboxdIntegrationTestCommand(
   workspacePackage: WorkspacePackage,
   filePaths: readonly string[],
@@ -887,10 +869,6 @@ function buildAffectedRustTestCommand(
   );
   if (changedExistingRustTestFiles.length !== packageChangedFiles.length) {
     return null;
-  }
-
-  if (workspacePackage.name === "@mistle/commit-sign") {
-    return buildAffectedCommitSignTestCommand(workspacePackage, changedExistingRustTestFiles);
   }
 
   if (workspacePackage.name === "@mistle/sandboxd") {

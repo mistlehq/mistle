@@ -30,7 +30,7 @@ updates:
       prefix: chore(deps)
     cooldown:
       default-days: 7
-  - package-ecosystem: cargo
+  - package-ecosystem: gomod
     directory: "/packages/commit-sign"
     schedule:
       interval: daily
