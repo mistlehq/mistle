@@ -99,6 +99,38 @@ func StartRuntimeClientProcessManagerWithSupervisor(
 	sleeper timeutil.Sleeper,
 	supervisorHandle *supervision.SandboxdSupervisorHandle,
 ) (*RuntimeClientProcessManager, error) {
+	return startRuntimeClientProcessManagerWithSupervisorAndPlatformScopes(
+		processSpecs,
+		clock,
+		sleeper,
+		supervisorHandle,
+		nil,
+	)
+}
+
+func StartRuntimeClientProcessManagerWithPlatformScopes(
+	processSpecs []RuntimeClientProcessSpec,
+	clock timeutil.Clock,
+	sleeper timeutil.Sleeper,
+	supervisorHandle *supervision.SandboxdSupervisorHandle,
+	platformScopeInput PlatformProcessScopeInput,
+) (*RuntimeClientProcessManager, error) {
+	return startRuntimeClientProcessManagerWithSupervisorAndPlatformScopes(
+		processSpecs,
+		clock,
+		sleeper,
+		supervisorHandle,
+		&platformScopeInput,
+	)
+}
+
+func startRuntimeClientProcessManagerWithSupervisorAndPlatformScopes(
+	processSpecs []RuntimeClientProcessSpec,
+	clock timeutil.Clock,
+	sleeper timeutil.Sleeper,
+	supervisorHandle *supervision.SandboxdSupervisorHandle,
+	platformScopeInput *PlatformProcessScopeInput,
+) (*RuntimeClientProcessManager, error) {
 	if err := validateProcessManagerTiming(clock, sleeper); err != nil {
 		return nil, err
 	}
@@ -112,8 +144,25 @@ func StartRuntimeClientProcessManagerWithSupervisor(
 	for processIndex, processSpec := range processSpecs {
 		markTrackedServerStarting(processSpec, supervisorHandle)
 
+		var platformScope *runtimeClientProcessPlatformScope
+		if platformScopeInput != nil {
+			var err error
+			platformScope, err = createRuntimeClientProcessPlatformScope(processIndex, processSpec, *platformScopeInput)
+			if err != nil {
+				_ = stopManagedRuntimeClientProcesses(startedProcesses, clock, sleeper)
+				return nil, startProcessError(processIndex, processSpec, err)
+			}
+		}
+
 		process, err := StartRuntimeClientProcess(processSpec)
 		if err != nil {
+			_ = killRuntimeClientProcessPlatformScope(platformScope)
+			_ = stopManagedRuntimeClientProcesses(startedProcesses, clock, sleeper)
+			return nil, startProcessError(processIndex, processSpec, err)
+		}
+		if err := attachRuntimeClientProcessPlatformScope(platformScope, process); err != nil {
+			_ = StopRuntimeClientProcess(process, clock, sleeper)
+			_ = killRuntimeClientProcessPlatformScope(platformScope)
 			_ = stopManagedRuntimeClientProcesses(startedProcesses, clock, sleeper)
 			return nil, startProcessError(processIndex, processSpec, err)
 		}
@@ -121,10 +170,11 @@ func StartRuntimeClientProcessManagerWithSupervisor(
 		if err := WaitForRuntimeClientProcessReadiness(process, clock, sleeper); err != nil {
 			_ = stopManagedRuntimeClientProcesses(startedProcesses, clock, sleeper)
 			_ = StopRuntimeClientProcess(process, clock, sleeper)
+			_ = killRuntimeClientProcessPlatformScope(platformScope)
 			return nil, readinessCheckError(processIndex, process, err)
 		}
 
-		managedProcess := &managedRuntimeClientProcess{process: process}
+		managedProcess := &managedRuntimeClientProcess{process: process, platformScope: platformScope}
 		markTrackedServerHealthy(process, supervisorHandle)
 		if IsCodexAppServerProcess(processSpec) &&
 			supervisorHandle.TracksComponent(supervision.ComponentCodexAppServer) {

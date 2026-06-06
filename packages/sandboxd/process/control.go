@@ -10,8 +10,9 @@ import (
 )
 
 type managedRuntimeClientProcess struct {
-	mutex   sync.Mutex
-	process *RunningRuntimeClientProcess
+	mutex         sync.Mutex
+	process       *RunningRuntimeClientProcess
+	platformScope *runtimeClientProcessPlatformScope
 }
 
 type processRestartFailurePhase string
@@ -30,7 +31,17 @@ func (managed *managedRuntimeClientProcess) Spec() RuntimeClientProcessSpec {
 func (managed *managedRuntimeClientProcess) Stop(clock timeutil.Clock, sleeper timeutil.Sleeper) error {
 	managed.mutex.Lock()
 	defer managed.mutex.Unlock()
-	return StopRuntimeClientProcess(managed.process, clock, sleeper)
+	var stopErr error
+	if err := StopRuntimeClientProcess(managed.process, clock, sleeper); err != nil {
+		stopErr = err
+	}
+	if err := killRuntimeClientProcessPlatformScope(managed.platformScope); err != nil {
+		if stopErr != nil {
+			return fmt.Errorf("%s; platform scope: %w", stopErr.Error(), err)
+		}
+		return fmt.Errorf("platform scope: %w", err)
+	}
+	return stopErr
 }
 
 func (managed *managedRuntimeClientProcess) PID() uint32 {
@@ -73,6 +84,10 @@ func (managed *managedRuntimeClientProcess) Restart(
 
 	replacementProcess, err := StartRuntimeClientProcess(processSpec)
 	if err != nil {
+		return nil, processRestartSpawnFailure, err
+	}
+	if err := updateRuntimeClientProcessPlatformScope(managed.platformScope, replacementProcess); err != nil {
+		_ = StopRuntimeClientProcess(replacementProcess, clock, sleeper)
 		return nil, processRestartSpawnFailure, err
 	}
 	if err := WaitForRuntimeClientProcessReadiness(replacementProcess, clock, sleeper); err != nil {
