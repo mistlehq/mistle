@@ -9,7 +9,7 @@ const commitSignDir = resolve(workspaceRoot, "packages", "commit-sign");
 const commitSignBinaryDir = resolve(commitSignDir, "target", "debug");
 
 function ensureCommitSignBinary(): void {
-  const result = spawnSync("cargo", ["build", "--locked", "--bin", "commit-sign"], {
+  const result = spawnSync("go", ["build", "-o", "target/debug/commit-sign", "./cmd/commit-sign"], {
     cwd: commitSignDir,
     stdio: "inherit",
   });

@@ -12,7 +12,7 @@ Repo runtime provided by `nix develop`:
 
 - Node v25
 - pnpm 11.4.0
-- Rust stable with `cargo`, `rustfmt`, and `clippy`
+- Go 1.26
 
 ### Prerequisites
 

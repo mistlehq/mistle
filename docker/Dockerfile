@@ -34,16 +34,17 @@ RUN pnpm --filter @mistle/data-plane-worker... build
 FROM workspace-deps AS data-plane-gateway-build
 RUN pnpm --filter @mistle/data-plane-gateway... build
 
-FROM alpine:3.22 AS commit-sign-build
+FROM golang:1.26-alpine AS commit-sign-build
 
 WORKDIR /build/packages/commit-sign
 
-RUN apk add --no-cache cargo rust build-base musl-dev
+COPY packages/commit-sign/go.mod packages/commit-sign/go.sum ./
+RUN go mod download
 
-COPY packages/commit-sign/Cargo.toml packages/commit-sign/Cargo.lock ./
-COPY packages/commit-sign/src ./src
+COPY packages/commit-sign ./
 
-RUN cargo build --locked --release --bin commit-sign
+RUN mkdir -p target/release && \
+  go build -trimpath -ldflags="-s -w" -o target/release/commit-sign ./cmd/commit-sign
 
 FROM base AS control-plane-worker-runtime
 

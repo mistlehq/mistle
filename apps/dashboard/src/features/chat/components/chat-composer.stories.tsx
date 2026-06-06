@@ -213,8 +213,8 @@ const ContextMentionSearchResults: ChatComposerContextMentionControl = {
       path: "apps/dashboard/src/features/pages/session-composer/use-session-composer-context-mention-control.ts",
     },
     {
-      kind: "directory",
-      path: "packages/sandboxd/src/tunnel/file_search.rs",
+      kind: "file",
+      path: "packages/sandboxd/tunnel/bootstrap.go",
     },
   ],
   onQueryChange: noop,

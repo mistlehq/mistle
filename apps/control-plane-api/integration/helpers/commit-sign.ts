@@ -18,8 +18,8 @@ export async function ensureCommitSignBinary(): Promise<string> {
   }
 
   ensuredCommitSignBinaryPromise = execFileAsync(
-    "cargo",
-    ["build", "--locked", "--bin", "commit-sign"],
+    "go",
+    ["build", "-o", "target/debug/commit-sign", "./cmd/commit-sign"],
     {
       cwd: CommitSignPackageRootPath,
       maxBuffer: 8 * 1024 * 1024,
