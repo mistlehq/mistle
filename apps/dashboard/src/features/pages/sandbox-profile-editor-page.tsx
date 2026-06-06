@@ -183,7 +183,6 @@ import {
   type SnapshotPanelState,
 } from "./sandbox-profile-snapshot-panel.js";
 import { SandboxProfileTriggersSection } from "./sandbox-profile-triggers-section.js";
-import { SessionCliPanel } from "./session-cli-panel.js";
 import { createComposerDraft } from "./session-composer/session-composer-draft.js";
 import {
   SessionConversationBottomPanelController,
@@ -2454,9 +2453,6 @@ function SetupScriptAssistantPanel(input: {
   const terminalPanelKey = input.sandboxInstanceId ?? "setup-assistant-missing-sandbox";
   const isTerminalOpenDisabled =
     !workbench.terminalPanelState.isVisible && !workbench.connectionReadiness.canConnect;
-  const cliButtonTitle = workbench.primaryPanelState.isCliToggleActive
-    ? "Return to chat"
-    : (workbench.primaryPanelState.disabledReason ?? "Open Setup Assistant TUI");
   const terminalButtonTitle = isTerminalOpenDisabled
     ? (workbench.stoppedSessionMessage ?? "Terminal is available after the Setup Assistant starts.")
     : workbench.terminalPanelState.isVisible
@@ -2513,33 +2509,6 @@ function SetupScriptAssistantPanel(input: {
           />
           <span aria-hidden className="h-5 w-px bg-border" />
           <Button
-            aria-label="TUI"
-            aria-pressed={workbench.primaryPanelState.isCliToggleActive}
-            className={
-              workbench.primaryPanelState.isCliToggleActive
-                ? "bg-muted text-foreground shadow-none hover:bg-muted/80"
-                : "bg-transparent text-foreground shadow-none hover:bg-muted/60"
-            }
-            disabled={
-              !workbench.primaryPanelState.canEnterCli &&
-              !workbench.primaryPanelState.isCliToggleActive
-            }
-            onClick={() => {
-              if (workbench.primaryPanelState.isCliToggleActive) {
-                void workbench.primaryPanelState.exitCliMode();
-                return;
-              }
-
-              void workbench.primaryPanelState.enterCliMode();
-            }}
-            size="sm"
-            title={cliButtonTitle}
-            type="button"
-            variant="ghost"
-          >
-            TUI
-          </Button>
-          <Button
             aria-label={workbench.terminalPanelState.isVisible ? "Terminal" : "Open terminal"}
             aria-pressed={workbench.terminalPanelState.isVisible}
             className={
@@ -2594,12 +2563,6 @@ function SetupScriptAssistantPanel(input: {
                   scrollContainerRef: conversationScrollContainerRef,
                   serverRequestPanelEntries: unmatchedServerRequests,
                 },
-                cli: {
-                  ptyState: workbench.cliPtyState,
-                  refitKey: workbench.terminalPanelState.isVisible
-                    ? "setup-assistant-cli:terminal-open"
-                    : "setup-assistant-cli:terminal-closed",
-                },
                 initialEntryStartupState: workbench.initialEntryStartupState,
                 sandboxInstanceId: input.sandboxInstanceId,
                 startupOperation:
@@ -2607,11 +2570,9 @@ function SetupScriptAssistantPanel(input: {
                     ? null
                     : workbench.sandboxStatusQuery.data.startupOperation,
                 startupOperationId: input.startupOperationId,
-                transitionState: workbench.primaryPanelState.transitionState,
               })}
             </div>
-            {workbench.primaryPanelState.showsChatComposer &&
-            workbench.initialEntryStartupState === null ? (
+            {workbench.initialEntryStartupState === null ? (
               <div className="shrink-0 bg-background px-5 py-4">
                 <SessionConversationBottomPanelController
                   chatEntries={conversationPane.chatState.entries}
@@ -2677,15 +2638,11 @@ type SetupAssistantConversationContent = React.ComponentProps<
 >;
 
 function renderSetupAssistantMainContent(input: {
-  cli: React.ComponentProps<typeof SessionCliPanel>;
   conversation: SetupAssistantConversationContent;
   initialEntryStartupState: SessionStartupState | null;
   sandboxInstanceId: string | null;
   startupOperation: SetupAssistantStartupOperation;
   startupOperationId: string | null;
-  transitionState: ReturnType<
-    typeof useSessionWorkbenchController
-  >["workbench"]["primaryPanelState"]["transitionState"];
 }): React.JSX.Element {
   if (input.initialEntryStartupState !== null) {
     return (
@@ -2698,15 +2655,7 @@ function renderSetupAssistantMainContent(input: {
     );
   }
 
-  switch (input.transitionState) {
-    case "switching_to_cli":
-    case "restoring_chat":
-      return <></>;
-    case "stable_cli":
-      return <SessionCliPanel {...input.cli} />;
-    case "stable_chat":
-      return <SessionConversationMainContent {...input.conversation} />;
-  }
+  return <SessionConversationMainContent {...input.conversation} />;
 }
 
 export function SetupAssistantStartupProgress(input: {

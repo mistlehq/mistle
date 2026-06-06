@@ -794,23 +794,6 @@ function SetupAssistantPanel(input: {
           />
           <span aria-hidden className="h-5 w-px bg-border" />
           <Button
-            aria-label="TUI"
-            aria-pressed={false}
-            className={controlClassName}
-            disabled={controlsAreDisabled}
-            onClick={() => {}}
-            size="sm"
-            title={
-              controlsAreDisabled
-                ? "Setup Assistant TUI is unavailable."
-                : "Open Setup Assistant TUI"
-            }
-            type="button"
-            variant="ghost"
-          >
-            TUI
-          </Button>
-          <Button
             aria-label="Open terminal"
             aria-pressed={false}
             className={controlClassName}

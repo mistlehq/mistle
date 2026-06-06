@@ -3141,6 +3141,8 @@ describe("SandboxProfileEditorPage", () => {
         name: "Close Setup Assistant panel",
       }),
     ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "TUI" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Open terminal" })).toBeTruthy();
     const snapshotsTab = screen.getByRole("tab", { name: "Snapshots" });
     expect(snapshotsTab.hasAttribute("disabled")).toBe(false);
 
