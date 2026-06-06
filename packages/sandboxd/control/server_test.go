@@ -152,6 +152,27 @@ func TestServerActivatesPrematerializedSnapshotState(t *testing.T) {
 	assertEqual(t, firstComponent["state"].(string), "stopped")
 }
 
+func TestServerResumeReconnectsBootstrapTunnelWhenRuntimePlanIsUnchanged(t *testing.T) {
+	socketPath := shortUnixSocketPath(t)
+	server, err := StartServer(socketPath)
+	requireNoError(t, err)
+	defer server.Close()
+	waitForControlSocket(t, socketPath)
+	bootstrapRequests := make(chan string, 2)
+	gatewayURL, closeGateway := startActivationBootstrapGateway(t, bootstrapRequests)
+	defer closeGateway()
+	activationInput := controlClientActivationInput()
+	activationInput.TunnelGatewayWSURL = gatewayURL
+	resumedActivationInput := activationInput
+	resumedActivationInput.BootstrapToken = "bootstrap-token-resumed"
+
+	requireNoError(t, SubmitActivate(socketPath, activationInput))
+	requireNoError(t, SubmitActivate(socketPath, resumedActivationInput))
+
+	assertEqual(t, receiveBootstrapRequest(t, bootstrapRequests), "bootstrap_token=bootstrap-token-value")
+	assertEqual(t, receiveBootstrapRequest(t, bootstrapRequests), "bootstrap_token=bootstrap-token-resumed")
+}
+
 func TestServerServesUnactivatedHealthResponse(t *testing.T) {
 	socketPath := shortUnixSocketPath(t)
 	server, err := StartServerWithHealthEndpoint(socketPath, "127.0.0.1:0")
@@ -335,6 +356,31 @@ func signingActivationInput(keyRef string) *protocol.ActivationInput {
 		},
 	}
 	return &input
+}
+
+func startActivationBootstrapGateway(t *testing.T, bootstrapRequests chan<- string) (string, func()) {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
+		connection, err := websocket.Accept(responseWriter, request, nil)
+		if err != nil {
+			return
+		}
+		defer connection.Close(websocket.StatusNormalClosure, "")
+		bootstrapRequests <- request.URL.RawQuery
+		_, _, _ = connection.Read(request.Context())
+	}))
+	return "ws" + strings.TrimPrefix(server.URL, "http") + "/bootstrap/sbi_control", server.Close
+}
+
+func receiveBootstrapRequest(t *testing.T, bootstrapRequests <-chan string) string {
+	t.Helper()
+	select {
+	case request := <-bootstrapRequests:
+		return request
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timed out waiting for bootstrap request")
+		return ""
+	}
 }
 
 func startSigningBootstrapGateway(t *testing.T, signingRequests chan<- string, signingResponse string) (string, func()) {

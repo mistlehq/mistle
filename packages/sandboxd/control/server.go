@@ -253,7 +253,11 @@ func (server *Server) beginActivate(activationInput protocol.ActivationInput) er
 		if server.state.sandboxdState == nil {
 			return fmt.Errorf("failed to resume sandboxd state: activated daemon is missing sandboxd state")
 		}
-		return fmt.Errorf("failed to resume sandboxd state: activated daemon resume is not migrated to Go")
+		if err := server.state.sandboxdState.ActivateInitialized(activationInput); err != nil {
+			return fmt.Errorf("failed to resume sandboxd state: %w", err)
+		}
+		server.state.activationInput = cloneActivationInput(activationInput)
+		return nil
 	case ActivationPhaseFailed:
 		if server.state.initError == nil {
 			return fmt.Errorf("sandbox startup request was rejected: sandboxd activation already failed")

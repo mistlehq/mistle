@@ -157,6 +157,29 @@ func (state *State) RequestSigning(payload string) (string, error) {
 	return "", fmt.Errorf("bootstrap tunnel returned unsupported signing response")
 }
 
+func (state *State) ActivateInitialized(activationInput protocol.ActivationInput) error {
+	if activationInput.OperationKind == protocol.ActivationOperationSnapshot {
+		return fmt.Errorf("snapshot materialization activation is only supported before sandboxd is initialized")
+	}
+	if state.executionMode == ExecutionModeSnapshot {
+		return fmt.Errorf("snapshot materialization sandboxes do not support activation")
+	}
+	sessionInput := protocol.SessionRuntimeInputFromActivationInput(activationInput)
+	replacementTunnel, err := connectBootstrapTunnel(sessionInput, state.supervisorHandle)
+	if err != nil {
+		return err
+	}
+	previousTunnel := state.bootstrapTunnel
+	if previousTunnel != nil {
+		if err := previousTunnel.Close(); err != nil {
+			_ = replacementTunnel.Close()
+			return err
+		}
+	}
+	state.bootstrapTunnel = replacementTunnel
+	return nil
+}
+
 func (state *State) Close() error {
 	if state.bootstrapTunnel != nil {
 		if err := state.bootstrapTunnel.Close(); err != nil {
