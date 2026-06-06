@@ -147,7 +147,7 @@ function createTensorlakeClientOptions(
   return { apiKey: config.apiKey };
 }
 
-function normalizeTensorlakeInspectState(
+export function normalizeTensorlakeInspectState(
   status: SandboxStatus,
 ): TensorlakeSandboxInspectResult["state"] {
   switch (status) {
@@ -158,6 +158,7 @@ function normalizeTensorlakeInspectState(
       return SandboxInspectStates.RUNNING;
     case SandboxStatus.SUSPENDED:
     case SandboxStatus.TERMINATED:
+    case SandboxStatus.TIMEOUT:
       return SandboxInspectStates.STOPPED;
   }
 }
@@ -175,6 +176,7 @@ export function normalizeTensorlakeInspectDisposition(
     case SandboxStatus.SUSPENDED:
       return SandboxInspectDispositions.RESUMABLE_STOPPED;
     case SandboxStatus.TERMINATED:
+    case SandboxStatus.TIMEOUT:
       return SandboxInspectDispositions.TERMINAL_STOPPED;
   }
 }

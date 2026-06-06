@@ -1,7 +1,7 @@
 import { SandboxStatus, type SandboxInfo } from "tensorlake";
 import { describe, expect, it } from "vitest";
 
-import { SandboxInspectDispositions } from "../../types.js";
+import { SandboxInspectDispositions, SandboxInspectStates } from "../../types.js";
 import {
   DaemonReadinessPollAttempts,
   DaemonReadinessPollTimeoutMs,
@@ -16,6 +16,7 @@ import {
   createTensorlakeSandboxName,
   createTensorlakeSnapshotAndWaitOptions,
   normalizeTensorlakeInspectDisposition,
+  normalizeTensorlakeInspectState,
   resolveTensorlakeClaimedSandboxStartResponse,
 } from "./client.js";
 
@@ -124,6 +125,15 @@ describe("normalizeTensorlakeInspectDisposition", () => {
   it("maps Tensorlake suspending sandboxes to provider stop-in-progress", () => {
     expect(normalizeTensorlakeInspectDisposition(SandboxStatus.SUSPENDING)).toBe(
       SandboxInspectDispositions.STOPPING,
+    );
+  });
+
+  it("maps Tensorlake timed-out sandboxes to terminal stopped sandboxes", () => {
+    expect(normalizeTensorlakeInspectState(SandboxStatus.TIMEOUT)).toBe(
+      SandboxInspectStates.STOPPED,
+    );
+    expect(normalizeTensorlakeInspectDisposition(SandboxStatus.TIMEOUT)).toBe(
+      SandboxInspectDispositions.TERMINAL_STOPPED,
     );
   });
 });

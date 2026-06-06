@@ -1,12 +1,4 @@
-import {
-  SandboxClient,
-  createSandboxImage,
-  type CommandResult,
-  type OutputResponse,
-  type ProcessInfo,
-  type Sandbox,
-  type StartProcessOptions,
-} from "tensorlake";
+import { createSandboxImage } from "tensorlake";
 
 import type { SandboxSdkImageBaseImageSource } from "../../types.js";
 import { createTensorlakeSandboxBaseImage } from "./base-image-definition.js";
@@ -23,127 +15,96 @@ export async function registerTensorlakeSandboxBaseImage(
   input: RegisterTensorlakeSandboxBaseImageInput,
 ): Promise<void> {
   await withTensorlakeApiKey(input.apiKey, async () => {
-    await createSandboxImage(
-      createTensorlakeSandboxBaseImage({
-        baseImageRef: input.source.baseImageRef,
-        name: input.source.imageId,
-        ...(input.source.sandboxd === undefined ? {} : { sandboxd: input.source.sandboxd }),
-      }),
-      {
-        registeredName: input.source.imageId,
-        contextDir: input.contextPath,
-        verbose: true,
-      },
-      {
-        createClient: createDiagnosticTensorlakeBuildClient,
-      },
-    );
+    const buildLogs = createTensorlakeBuildLogCollector();
+
+    try {
+      await createSandboxImage(
+        createTensorlakeSandboxBaseImage({
+          baseImageRef: input.source.baseImageRef,
+          name: input.source.imageId,
+          ...(input.source.sandboxd === undefined ? {} : { sandboxd: input.source.sandboxd }),
+        }),
+        {
+          registeredName: input.source.imageId,
+          contextDir: input.contextPath,
+        },
+        { emit: buildLogs.emit },
+      );
+    } catch (error) {
+      throw formatTensorlakeBuildFailure(error, buildLogs.entries());
+    }
   });
 }
 
-type TensorlakeBuildContext = {
-  readonly apiUrl: string;
-  readonly apiKey?: string;
-  readonly personalAccessToken?: string;
-  readonly namespace: string;
-  readonly organizationId?: string;
-  readonly projectId?: string;
+type TensorlakeBuildLogEntry = {
+  readonly label: string;
+  readonly message: string;
 };
 
-type TensorlakeBuildClient = {
-  readonly createAndConnect: (options: {
-    readonly image?: string;
-    readonly cpus?: number;
-    readonly memoryMb?: number;
-    readonly diskMb?: number;
-  }) => Promise<TensorlakeBuildSandbox>;
-  readonly close: () => void;
+type TensorlakeBuildLogCollector = {
+  readonly emit: (event: Record<string, unknown>) => void;
+  readonly entries: () => readonly TensorlakeBuildLogEntry[];
 };
 
-type TensorlakeBuildSandbox = {
-  readonly sandboxId: string;
-  readonly run: (
-    command: string,
-    options?: {
-      readonly args?: string[];
-      readonly env?: Record<string, string>;
-      readonly workingDir?: string;
-      readonly timeout?: number;
-    },
-  ) => Promise<CommandResult>;
-  readonly startProcess: (command: string, options?: StartProcessOptions) => Promise<ProcessInfo>;
-  readonly getStdout: (pid: number) => Promise<OutputResponse>;
-  readonly getStderr: (pid: number) => Promise<OutputResponse>;
-  readonly getProcess: (pid: number) => Promise<ProcessInfo>;
-  readonly writeFile: (path: string, content: Uint8Array) => Promise<void>;
-  readonly readFile: (path: string) => Promise<Uint8Array>;
-  readonly terminate: () => Promise<void>;
-};
-
-function createDiagnosticTensorlakeBuildClient(
-  context: TensorlakeBuildContext,
-): TensorlakeBuildClient {
-  const client = new SandboxClient({
-    apiUrl: context.apiUrl,
-    namespace: context.namespace,
-    ...(context.apiKey === undefined ? {} : { apiKey: context.apiKey }),
-    ...(context.organizationId === undefined ? {} : { organizationId: context.organizationId }),
-    ...(context.projectId === undefined ? {} : { projectId: context.projectId }),
-  });
+function createTensorlakeBuildLogCollector(): TensorlakeBuildLogCollector {
+  const entries: TensorlakeBuildLogEntry[] = [];
 
   return {
-    createAndConnect: async (options) => {
-      const sandbox = await client.createAndConnect(options);
-      return createDiagnosticTensorlakeBuildSandbox(sandbox);
-    },
-    close: () => {
-      client.close();
-    },
-  };
-}
-
-function createDiagnosticTensorlakeBuildSandbox(sandbox: Sandbox): TensorlakeBuildSandbox {
-  return {
-    sandboxId: sandbox.sandboxId,
-    run: async (command, options) => {
-      const result = await sandbox.run(command, options);
-      if (result.exitCode !== 0) {
-        throw new Error(formatTensorlakeBuildCommandFailure(command, options?.args ?? [], result));
+    emit: (event) => {
+      const entry = parseTensorlakeBuildLogEntry(event);
+      if (entry === null) {
+        return;
       }
 
-      return result;
+      entries.push(entry);
+      process.stderr.write(`[${entry.label}] ${entry.message}\n`);
     },
-    startProcess: (command, options) => sandbox.startProcess(command, options),
-    getStdout: (pid) => sandbox.getStdout(pid),
-    getStderr: (pid) => sandbox.getStderr(pid),
-    getProcess: (pid) => sandbox.getProcess(pid),
-    writeFile: (path, content) => sandbox.writeFile(path, content),
-    readFile: (path) => sandbox.readFile(path),
-    terminate: () => sandbox.terminate(),
+    entries: () => entries,
   };
 }
 
-export function formatTensorlakeBuildCommandFailure(
-  command: string,
-  args: readonly string[],
-  result: CommandResult,
-): string {
-  return [
-    `Tensorlake rootfs builder command '${[command, ...args].join(" ")}' failed with exit code ${result.exitCode}.`,
-    formatTensorlakeBuildOutput("stderr", result.stderr),
-    formatTensorlakeBuildOutput("stdout", result.stdout),
-  ]
-    .filter((line) => line.length > 0)
-    .join("\n");
-}
-
-function formatTensorlakeBuildOutput(label: string, output: string): string {
-  const trimmedOutput = output.trim();
-  if (trimmedOutput.length === 0) {
-    return "";
+function parseTensorlakeBuildLogEntry(
+  event: Record<string, unknown>,
+): TensorlakeBuildLogEntry | null {
+  if (typeof event.message !== "string") {
+    return null;
   }
 
-  return `${label}:\n${trimmedOutput}`;
+  const message = event.message.trimEnd();
+  if (message.length === 0) {
+    return null;
+  }
+
+  const label =
+    typeof event.stream === "string" && event.stream.length > 0
+      ? event.stream
+      : typeof event.type === "string" && event.type.length > 0
+        ? event.type
+        : "build";
+
+  return { label, message };
+}
+
+export function formatTensorlakeBuildFailure(
+  error: unknown,
+  entries: readonly TensorlakeBuildLogEntry[],
+): Error {
+  const baseMessage =
+    error instanceof Error
+      ? error.message
+      : `Tensorlake sandbox image build failed: ${String(error)}`;
+
+  const logMessage = formatTensorlakeBuildLogs(entries);
+  const message =
+    logMessage.length === 0
+      ? baseMessage
+      : `${baseMessage}\n\nTensorlake sandbox image build output:\n${logMessage}`;
+
+  return new Error(message, { cause: error });
+}
+
+function formatTensorlakeBuildLogs(entries: readonly TensorlakeBuildLogEntry[]): string {
+  return entries.map((entry) => `${entry.label}:\n${entry.message}`).join("\n");
 }
 
 async function withTensorlakeApiKey<Result>(
