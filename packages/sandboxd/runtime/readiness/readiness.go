@@ -1,6 +1,8 @@
 package readiness
 
 import (
+	"sync"
+
 	"github.com/mistle/sandboxd/supervision"
 )
 
@@ -59,29 +61,45 @@ type ReadyMessageType string
 const ReadyMessageState ReadyMessageType = "runtime.ready"
 
 type Manager struct {
+	mutex              sync.Mutex
 	ready              bool
 	tunnelConnected    bool
 	lastPublishedReady *bool
 }
 
 func (manager *Manager) OnTunnelConnected() {
+	manager.mutex.Lock()
+	defer manager.mutex.Unlock()
+
 	manager.tunnelConnected = true
 	manager.lastPublishedReady = nil
 }
 
 func (manager *Manager) OnTunnelDisconnected() {
+	manager.mutex.Lock()
+	defer manager.mutex.Unlock()
+
 	manager.tunnelConnected = false
 }
 
 func (manager *Manager) SetReady(ready bool) {
+	manager.mutex.Lock()
+	defer manager.mutex.Unlock()
+
 	manager.ready = ready
 }
 
 func (manager *Manager) Ready() bool {
+	manager.mutex.Lock()
+	defer manager.mutex.Unlock()
+
 	return manager.ready
 }
 
 func (manager *Manager) TakeInitialPublishableState() *ReadyState {
+	manager.mutex.Lock()
+	defer manager.mutex.Unlock()
+
 	if !manager.tunnelConnected {
 		return nil
 	}
@@ -91,6 +109,9 @@ func (manager *Manager) TakeInitialPublishableState() *ReadyState {
 }
 
 func (manager *Manager) TakePublishableState() *ReadyState {
+	manager.mutex.Lock()
+	defer manager.mutex.Unlock()
+
 	if !manager.tunnelConnected || (manager.lastPublishedReady != nil && *manager.lastPublishedReady == manager.ready) {
 		return nil
 	}
