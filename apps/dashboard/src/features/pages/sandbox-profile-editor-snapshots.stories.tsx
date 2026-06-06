@@ -167,6 +167,16 @@ export const LongSnapshotMaintenanceScriptEditor: Story = {
   },
 };
 
+export const LongSnapshotMaintenanceScriptReadOnly: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotMaintenanceScript: LongMaintenanceScript,
+    snapshotRefreshScheduleState: "existing",
+    snapshotState: "snapshot-ready",
+  },
+};
+
 export const RefreshScheduleInvalidPreview: Story = {
   args: {
     initialSectionId: "snapshot",

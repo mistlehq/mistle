@@ -3920,6 +3920,7 @@ function ReadySandboxProfileSetupScriptSection(input: {
         testPanel={<SandboxProfileSetupScriptTestPanel {...setupScriptTest.panelProps} />}
         value={setupScriptState.draftValue}
         disabled={input.disabled}
+        readOnly={!input.isDraft}
         repositoryHandles={resolveSandboxBaseRepositoryHandles(input.integrationRows)}
       />
     </div>
@@ -3958,6 +3959,7 @@ export function SandboxProfileSetupScriptPanel(input: {
   errorMessage?: string | null;
   notice?: ReactNode;
   onChange?: (nextValue: string) => void;
+  readOnly?: boolean;
   repositoryHandles?: readonly string[];
   setupAssistant?: {
     disabled: boolean;
@@ -3982,6 +3984,7 @@ export function SandboxProfileSetupScriptPanel(input: {
       notice={input.notice}
       onChange={input.onChange}
       placeholderText={SetupScriptPlaceholder}
+      readOnly={input.readOnly}
       setupAssistant={input.setupAssistant}
       testButtonProps={input.testButtonProps}
       testControl={input.testControl}

@@ -48,7 +48,10 @@ import {
   type CronExpressionBreakdown,
 } from "./sandbox-profile-editor-page-model.js";
 import { SandboxProfileEditorHorizontalTabContent } from "./sandbox-profile-editor-sections.js";
-import { SandboxProfileScriptEditorField } from "./sandbox-profile-script-editor-panel.js";
+import {
+  SandboxProfileReadOnlyScriptBlock,
+  SandboxProfileScriptEditorField,
+} from "./sandbox-profile-script-editor-panel.js";
 import { SandboxProfileSectionCard } from "./sandbox-profile-section-card.js";
 import {
   SandboxProfileSetupScriptTestPanel,
@@ -810,9 +813,10 @@ function SnapshotMaintenanceScriptSummaryValue(input: { script: string }): React
   }
 
   return (
-    <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-sm bg-muted/40 p-2 font-mono text-xs leading-5 text-muted-foreground">
-      {input.script}
-    </pre>
+    <SandboxProfileReadOnlyScriptBlock
+      ariaLabelledBy="snapshot-refresh-maintenance-script-label"
+      value={input.script}
+    />
   );
 }
 

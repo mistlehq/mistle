@@ -22,10 +22,10 @@ type SandboxSetupScriptEditorProps = {
   value: string;
 };
 
-const ScriptEditorVisibleLineCount = 28;
-const ScriptEditorLineHeight = "1.5rem";
-const ScriptEditorMinHeight = "calc(var(--spacing) * 28)";
-const ScriptEditorMaxHeight = `calc((${ScriptEditorLineHeight} * ${ScriptEditorVisibleLineCount}) + (var(--spacing) * 4))`;
+export const ScriptEditorVisibleLineCount = 28;
+export const ScriptEditorLineHeight = "1.5rem";
+export const ScriptEditorMinHeight = "calc(var(--spacing) * 28)";
+export const ScriptEditorMaxHeight = `calc((${ScriptEditorLineHeight} * ${ScriptEditorVisibleLineCount}) + (var(--spacing) * 4))`;
 
 function createPlaceholder(view: EditorView, placeholderText: string): HTMLElement {
   return createCodeMirrorPlaceholder({

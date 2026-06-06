@@ -907,6 +907,24 @@ function getAutomaticSnapshotRefreshSection(): HTMLElement {
   return section;
 }
 
+function getReadOnlyScriptBlock(container: ParentNode): HTMLElement {
+  const scriptBlock = container.querySelector<HTMLElement>(
+    "[data-slot='sandbox-profile-read-only-script-block']",
+  );
+  if (scriptBlock === null) {
+    throw new Error("Read-only script block not found.");
+  }
+  return scriptBlock;
+}
+
+function expectReadOnlyScriptBlockToUseEditorScrollBounds(scriptBlock: HTMLElement): void {
+  const scriptBlockStyles = getComputedStyle(scriptBlock);
+
+  expect(scriptBlockStyles.overflow).toBe("auto");
+  expect(scriptBlockStyles.minHeight).toBe("calc(var(--spacing) * 28)");
+  expect(scriptBlockStyles.maxHeight).toBe("calc((1.5rem * 28) + (var(--spacing) * 4))");
+}
+
 function ProfileActionsDialogHarness(input: {
   initialOpenDialog: "delete" | "duplicate";
   triggerUsages?: readonly TriggerSandboxProfileUsage[];
@@ -1914,6 +1932,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByRole("menuitem", { name: "Refresh snapshot (setup script)" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Edit" })).toBeDefined();
     expect(screen.getByText("echo maintain")).toBeDefined();
+    expectReadOnlyScriptBlockToUseEditorScrollBounds(getReadOnlyScriptBlock(refreshSection));
   });
 
   it("marks an existing automatic snapshot refresh schedule for removal when disabled", () => {
@@ -3007,13 +3026,12 @@ describe("SandboxProfileEditorPage", () => {
       name: "Sandbox Profile",
       hidden: false,
     });
-    const editor = within(configurationsPanel).getByRole("textbox", {
-      name: "Setup script",
-    });
+    const setupScriptBlock = getReadOnlyScriptBlock(configurationsPanel);
 
     expect(screen.getByText("Viewing: Published (v3)")).toBeDefined();
-    expect(editor.textContent).toContain("pnpm install");
-    expect(editor.textContent).toContain("pnpm test:setup");
+    expect(setupScriptBlock.textContent).toContain("pnpm install");
+    expect(setupScriptBlock.textContent).toContain("pnpm test:setup");
+    expectReadOnlyScriptBlockToUseEditorScrollBounds(setupScriptBlock);
   });
 
   it("shows selected repository locations in the setup script context", () => {
@@ -3421,7 +3439,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(confirmed).toBe(true);
   });
 
-  it("disables setup script testing for empty and published scripts", () => {
+  it("disables setup script testing for empty scripts and hides editor actions for published scripts", () => {
     renderSandboxProfileEditor({
       bindings: [
         {
@@ -3454,17 +3472,9 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "published",
     });
 
-    const publishedTestButton = screen.getByRole("button", {
-      name: "Test",
-    });
-    const publishedWriteButton = screen.getByRole("button", {
-      name: "Setup Assistant",
-    });
-    expect(publishedTestButton.hasAttribute("disabled")).toBe(true);
-    expect(publishedTestButton.getAttribute("title")).toBe(
-      "Setup script testing is only available while editing a draft.",
-    );
-    expect(publishedWriteButton.hasAttribute("disabled")).toBe(true);
+    expect(screen.queryByRole("button", { name: "Test" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Setup Assistant" })).toBeNull();
+    expect(getReadOnlyScriptBlock(document.body).textContent).toBe("pnpm install");
   });
 
   it("disables Setup Assistant when no agent runtime is configured", () => {
@@ -3533,6 +3543,17 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByText("Codex connection")).toBeDefined();
     expect(screen.queryByRole("button", { name: "Setup script behavior" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Environment and installed tools" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Setup script" })).toBeNull();
+
+    const setupScriptSection = screen
+      .getByRole("heading", { name: "Setup Script" })
+      .closest("section");
+    if (setupScriptSection === null) {
+      throw new Error("Setup script section not found.");
+    }
+    const setupScriptBlock = getReadOnlyScriptBlock(setupScriptSection);
+    expect(setupScriptBlock.textContent).toBe("pnpm install\npnpm dev:bootstrap");
+    expectReadOnlyScriptBlockToUseEditorScrollBounds(setupScriptBlock);
   });
 
   it("renders published profiles with existing drafts as resumable", () => {

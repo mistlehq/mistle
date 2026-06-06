@@ -1345,6 +1345,7 @@ function SandboxProfileEditorPageStoryView(
                   <SandboxProfileSetupScriptPanel
                     onChange={setSetupScriptDraft}
                     disabled={!isEditable}
+                    readOnly={!isEditable}
                     repositoryHandles={resolveSandboxBaseRepositoryHandles(integrationRows)}
                     testControl={
                       <SetupScriptStoryControls

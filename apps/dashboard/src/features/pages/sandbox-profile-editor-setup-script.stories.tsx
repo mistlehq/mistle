@@ -58,6 +58,15 @@ export const LongSetupScriptEditor: Story = {
   },
 };
 
+export const LongSetupScriptReadOnly: Story = {
+  args: {
+    initialBindings: [StoryBindings[0], StoryBindings[1]],
+    initialSectionId: "sandbox-profile",
+    lifecycleState: "published",
+    setupScript: LongSetupScript,
+  },
+};
+
 export const SetupAssistantUnsavedChangesChoice: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],
