@@ -3,6 +3,7 @@ import { ExecStreamClient } from "@mistle/sandbox-session-client";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 
+import { NoLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
 import {
   buildRepositoryDiscoveryFindArgs,
   parseRepositoryPaths,
@@ -144,6 +145,7 @@ export function useSessionPrimaryRepositoryState(input: {
   const selectedRepositoryPath = currentSandboxSelectionState.selectedRepositoryPath;
   const query = useQuery({
     enabled: input.enabled && input.sandboxInstanceId !== null,
+    meta: NoLoadingIndicatorMeta,
     queryFn: async () => {
       const sandboxInstanceId = input.sandboxInstanceId;
       if (sandboxInstanceId === null) {

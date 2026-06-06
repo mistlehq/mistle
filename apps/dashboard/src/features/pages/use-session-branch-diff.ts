@@ -5,6 +5,7 @@ import {
 } from "@mistle/sandbox-session-client";
 import { useQuery } from "@tanstack/react-query";
 
+import { NoLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
 import type { SessionWorkbenchTransportManager } from "./use-session-workbench-transport.js";
 
 const BranchDiffCommandTimeoutMs = 15_000;
@@ -377,6 +378,7 @@ export function useSessionBranchDiff(input: {
 }): SessionBranchDiffState {
   const query = useQuery({
     enabled: input.enabled && input.sandboxInstanceId !== null,
+    meta: NoLoadingIndicatorMeta,
     queryFn: async () => {
       const sandboxInstanceId = input.sandboxInstanceId;
       if (sandboxInstanceId === null) {

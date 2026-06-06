@@ -13,6 +13,8 @@ import {
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useState, type RefObject } from "react";
 
+import { NoLoadingIndicatorMeta } from "../../../../shared/loading-indicator-meta.js";
+
 type CodexConfigValueEdit = {
   keyPath: string;
   value: unknown;
@@ -70,6 +72,7 @@ export function useCodexSessionBootstrapData(input: {
   const [configStatus, setConfigStatus] = useState<CodexConfigStatus>("idle");
 
   const loadModelsMutation = useMutation({
+    meta: NoLoadingIndicatorMeta,
     mutationFn: async () => {
       setModelCatalogStatus("loading");
       const rpcClient = input.rpcClientRef.current;
@@ -96,6 +99,7 @@ export function useCodexSessionBootstrapData(input: {
   });
 
   const readConfigMutation = useMutation({
+    meta: NoLoadingIndicatorMeta,
     mutationFn: async (includeLayers: boolean) => {
       setConfigStatus("loading");
       const rpcClient = input.rpcClientRef.current;
@@ -121,6 +125,7 @@ export function useCodexSessionBootstrapData(input: {
   });
 
   const writeConfigValueMutation = useMutation({
+    meta: NoLoadingIndicatorMeta,
     mutationFn: async (edit: CodexConfigValueEdit) => {
       const rpcClient = input.rpcClientRef.current;
       if (rpcClient === null) {
@@ -143,6 +148,7 @@ export function useCodexSessionBootstrapData(input: {
   });
 
   const batchWriteConfigMutation = useMutation({
+    meta: NoLoadingIndicatorMeta,
     mutationFn: async (inputValue: CodexConfigValueBatch) => {
       const rpcClient = input.rpcClientRef.current;
       if (rpcClient === null) {

@@ -13,6 +13,7 @@ import {
   readComposerConfigSnapshot,
   type ComposerConfigSnapshot,
 } from "../../../../pages/session-composer/session-composer-config.js";
+import { NoLoadingIndicatorMeta } from "../../../../shared/loading-indicator-meta.js";
 import { StaleConnectionAttemptError } from "../session-connection/codex-session-errors.js";
 import { resolveSessionBootstrapState } from "./session-bootstrap-state.js";
 import {
@@ -178,6 +179,7 @@ export function useSessionBootstrap(input: {
       activeConnectionKey === null
         ? ["codex-session-bootstrap", "models", "disconnected"]
         : createModelsQueryKey(activeConnectionKey),
+    meta: NoLoadingIndicatorMeta,
     queryFn: async () => {
       return await input.loadModelsAsync();
     },
@@ -193,6 +195,7 @@ export function useSessionBootstrap(input: {
       activeConnectionKey === null
         ? ["codex-session-bootstrap", "config", "disconnected"]
         : createConfigQueryKey(activeConnectionKey),
+    meta: NoLoadingIndicatorMeta,
     queryFn: async () => {
       return await input.readConfigAsync(false);
     },
@@ -208,6 +211,7 @@ export function useSessionBootstrap(input: {
       activeConnectionKey === null || activeThreadId === null
         ? ["codex-session-bootstrap", "features", "disconnected"]
         : createFeaturesQueryKey(activeConnectionKey, activeThreadId),
+    meta: NoLoadingIndicatorMeta,
     queryFn: async () => {
       if (activeThreadId === null) {
         throw new Error("Choose a Codex thread before listing experimental features.");
@@ -227,6 +231,7 @@ export function useSessionBootstrap(input: {
       activeConnectionKey === null || activeThreadCwd === null
         ? ["codex-session-bootstrap", "skills", "disconnected"]
         : createSkillsQueryKey(activeConnectionKey, activeThreadCwd),
+    meta: NoLoadingIndicatorMeta,
     queryFn: async () => {
       if (activeThreadCwd === null) {
         throw new Error("Choose a Codex thread before listing skills.");

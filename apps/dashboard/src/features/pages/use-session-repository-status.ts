@@ -2,6 +2,7 @@ import { ExecStreamClient, type ExecCommandRequest } from "@mistle/sandbox-sessi
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { NoLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
 import type { SessionWorkbenchTransportManager } from "./use-session-workbench-transport.js";
 
 const RepositoryStatusCommandTimeoutMs = 5_000;
@@ -248,6 +249,7 @@ export function useSessionRepositoryStatus(input: {
   const [freshSelectionIdentity, setFreshSelectionIdentity] = useState<string | null>(null);
   const query = useQuery({
     enabled: isRepositoryStatusTrackingEnabled,
+    meta: NoLoadingIndicatorMeta,
     refetchOnMount: "always",
     queryFn: async () => {
       const sandboxInstanceId = input.sandboxInstanceId;

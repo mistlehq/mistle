@@ -14,6 +14,7 @@ import { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
+import { NoLoadingIndicatorMeta } from "../../../../shared/loading-indicator-meta.js";
 import type { ConnectedCodexSession, StartSessionStep } from "../codex-session-types.js";
 import {
   establishCodexThread,
@@ -371,6 +372,7 @@ export function useCodexSessionConnection(input: {
   );
 
   const connectSessionMutation = useMutation({
+    meta: NoLoadingIndicatorMeta,
     mutationFn: async (connectInput: ConnectCodexSessionInput) => {
       const generation = input.connectionGenerationRef.current + 1;
       input.connectionGenerationRef.current = generation;
@@ -512,6 +514,7 @@ export function useCodexSessionConnection(input: {
   });
 
   const recoverSessionMutation = useMutation({
+    meta: NoLoadingIndicatorMeta,
     mutationFn: async (recoverInput: {
       targetThreadId: string | null;
       sandboxInstanceId: string;
