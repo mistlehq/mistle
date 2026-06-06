@@ -2,14 +2,17 @@ package process
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mistle/sandboxd/supervision"
 	"github.com/mistle/sandboxd/timeutil"
 )
 
 type RuntimeClientProcessManager struct {
-	processes        []*RunningRuntimeClientProcess
-	supervisorHandle *supervision.SandboxdSupervisorHandle
+	processes                   []*managedRuntimeClientProcess
+	codexAppServerControlHandle *CodexAppServerControlHandle
+	openCodeServerControlHandle *OpenCodeServerControlHandle
+	supervisorHandle            *supervision.SandboxdSupervisorHandle
 }
 
 type ProcessManagerErrorKind string
@@ -98,41 +101,93 @@ func StartRuntimeClientProcessManagerWithSupervisor(
 	if supervisorHandle == nil {
 		return nil, fmt.Errorf("sandboxd supervisor handle is required")
 	}
-	startedProcesses := make([]*RunningRuntimeClientProcess, 0, len(processSpecs))
+	startedProcesses := make([]*managedRuntimeClientProcess, 0, len(processSpecs))
+	var codexAppServerControlHandle *CodexAppServerControlHandle
+	var openCodeServerControlHandle *OpenCodeServerControlHandle
 
 	for processIndex, processSpec := range processSpecs {
 		markTrackedServerStarting(processSpec, supervisorHandle)
 
 		process, err := StartRuntimeClientProcess(processSpec)
 		if err != nil {
-			_ = StopStartedProcesses(startedProcesses, clock, sleeper)
+			_ = stopManagedRuntimeClientProcesses(startedProcesses, clock, sleeper)
 			return nil, startProcessError(processIndex, processSpec, err)
 		}
 
 		if err := WaitForRuntimeClientProcessReadiness(process, clock, sleeper); err != nil {
-			_ = StopStartedProcesses(startedProcesses, clock, sleeper)
+			_ = stopManagedRuntimeClientProcesses(startedProcesses, clock, sleeper)
 			_ = StopRuntimeClientProcess(process, clock, sleeper)
 			return nil, readinessCheckError(processIndex, process, err)
 		}
 
+		managedProcess := &managedRuntimeClientProcess{process: process}
 		markTrackedServerHealthy(process, supervisorHandle)
-		startedProcesses = append(startedProcesses, process)
+		if IsCodexAppServerProcess(processSpec) &&
+			supervisorHandle.TracksComponent(supervision.ComponentCodexAppServer) {
+			observationHandle := NewCodexAppServerObservationHandle(processSpec, process.PID(), true, nil)
+			codexAppServerControlHandle = &CodexAppServerControlHandle{
+				managedProcess: managedCodexAppServerProcess{
+					process:          managedProcess,
+					observation:      observationHandle,
+					supervisorHandle: supervisorHandle,
+				},
+			}
+		}
+		if IsOpenCodeServerProcess(processSpec) &&
+			supervisorHandle.TracksComponent(supervision.ComponentOpenCodeServer) {
+			openCodeServerControlHandle = &OpenCodeServerControlHandle{
+				managedProcess: managedOpenCodeServerProcess{
+					process:          managedProcess,
+					supervisorHandle: supervisorHandle,
+				},
+			}
+		}
+		startedProcesses = append(startedProcesses, managedProcess)
 	}
 
 	return &RuntimeClientProcessManager{
-		processes:        startedProcesses,
-		supervisorHandle: supervisorHandle,
+		processes:                   startedProcesses,
+		codexAppServerControlHandle: codexAppServerControlHandle,
+		openCodeServerControlHandle: openCodeServerControlHandle,
+		supervisorHandle:            supervisorHandle,
 	}, nil
 }
 
 func (manager *RuntimeClientProcessManager) Stop(clock timeutil.Clock, sleeper timeutil.Sleeper) error {
-	if err := StopStartedProcesses(manager.processes, clock, sleeper); err != nil {
+	if err := stopManagedRuntimeClientProcesses(manager.processes, clock, sleeper); err != nil {
 		return &ProcessManagerError{
 			Kind:  ProcessManagerStopProcessesError,
 			Cause: err,
 		}
 	}
 	markTrackedServerStopped(manager.supervisorHandle)
+	return nil
+}
+
+func (manager *RuntimeClientProcessManager) CodexAppServerControlHandle() *CodexAppServerControlHandle {
+	return manager.codexAppServerControlHandle
+}
+
+func (manager *RuntimeClientProcessManager) OpenCodeServerControlHandle() *OpenCodeServerControlHandle {
+	return manager.openCodeServerControlHandle
+}
+
+func stopManagedRuntimeClientProcesses(
+	processes []*managedRuntimeClientProcess,
+	clock timeutil.Clock,
+	sleeper timeutil.Sleeper,
+) error {
+	stopErrors := make([]string, 0)
+	for index := len(processes) - 1; index >= 0; index-- {
+		process := processes[index]
+		if err := process.Stop(clock, sleeper); err != nil {
+			processSpec := process.Spec()
+			stopErrors = append(stopErrors, fmt.Sprintf("processKey=%s: %s", processSpec.ProcessKey, err.Error()))
+		}
+	}
+	if len(stopErrors) > 0 {
+		return fmt.Errorf("%s", strings.Join(stopErrors, "; "))
+	}
 	return nil
 }
 
