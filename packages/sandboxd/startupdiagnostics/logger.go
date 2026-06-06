@@ -82,19 +82,31 @@ func (logger ActivationDiagnosticsLogger) RecordStarted(clock timeutil.Clock) er
 }
 
 func (logger ActivationDiagnosticsLogger) RecordPhaseStarted(clock timeutil.Clock, phase string) error {
+	return logger.RecordPhaseStartedWithAttributes(clock, phase, nil)
+}
+
+func (logger ActivationDiagnosticsLogger) RecordPhaseStartedWithAttributes(clock timeutil.Clock, phase string, attributes map[string]any) error {
 	eventNames, err := operationEventNames(logger.operation)
 	if err != nil {
 		return err
 	}
-	return logger.RecordWithClock(clock, ActivationDiagnosticLevelInfo, eventNames.PhaseStarted, map[string]any{"phase": phase})
+	payloadAttributes := cloneMap(attributes)
+	payloadAttributes["phase"] = phase
+	return logger.RecordWithClock(clock, ActivationDiagnosticLevelInfo, eventNames.PhaseStarted, payloadAttributes)
 }
 
 func (logger ActivationDiagnosticsLogger) RecordPhaseCompleted(clock timeutil.Clock, phase string) error {
+	return logger.RecordPhaseCompletedWithAttributes(clock, phase, nil)
+}
+
+func (logger ActivationDiagnosticsLogger) RecordPhaseCompletedWithAttributes(clock timeutil.Clock, phase string, attributes map[string]any) error {
 	eventNames, err := operationEventNames(logger.operation)
 	if err != nil {
 		return err
 	}
-	return logger.RecordWithClock(clock, ActivationDiagnosticLevelInfo, eventNames.PhaseCompleted, map[string]any{"phase": phase})
+	payloadAttributes := cloneMap(attributes)
+	payloadAttributes["phase"] = phase
+	return logger.RecordWithClock(clock, ActivationDiagnosticLevelInfo, eventNames.PhaseCompleted, payloadAttributes)
 }
 
 func (logger ActivationDiagnosticsLogger) RecordPhaseFailed(clock timeutil.Clock, phase string, attributes map[string]any) error {
