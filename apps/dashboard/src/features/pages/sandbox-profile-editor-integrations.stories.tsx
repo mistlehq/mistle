@@ -95,16 +95,24 @@ export const MistleMcpEnabled: Story = {
 
     await expect(canvas.getByRole("combobox", { name: "Mistle resources" })).toBeVisible();
     await expect(
-      canvas.getByRole("button", { name: "View API key permissions: 12 permissions" }),
+      canvas.getByRole("button", { name: "View allowed Mistle resources: 3 resources" }),
     ).toBeVisible();
 
     await userEvent.click(
-      canvas.getByRole("button", { name: "View API key permissions: 12 permissions" }),
+      canvas.getByRole("button", { name: "View allowed Mistle resources: 3 resources" }),
     );
 
-    const dialog = body.getByRole("dialog", { name: "API key permissions" });
+    const dialog = body.getByRole("dialog", { name: "Allowed Mistle resources" });
     await expect(dialog).toBeVisible();
-    await expect(within(dialog).getByText("Read sandbox profiles")).toBeVisible();
+    await expect(
+      within(dialog).getByText(
+        "This profile's agent can use Sandbox agent key for these Mistle resources. Access is limited by that API key's permissions.",
+      ),
+    ).toBeVisible();
+    await expect(within(dialog).getByText("Sandbox profiles")).toBeVisible();
+    await expect(within(dialog).getByText("Sessions")).toBeVisible();
+    await expect(within(dialog).getByText("Triggers")).toBeVisible();
+    await expect(within(dialog).getByText("Connect to sessions")).toBeVisible();
     await expect(within(dialog).getByText("Delete triggers")).toBeVisible();
   },
 };

@@ -284,7 +284,7 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(screen.getByRole("button", { name: "Create new API key" })).toBeTruthy();
   });
 
-  it("summarizes permissions for the selected Mistle API key", () => {
+  it("summarizes allowed Mistle resources for the selected API key", () => {
     render(
       <SandboxProfileRuntimeSection
         apiKeys={[MistleApiKey]}
@@ -303,12 +303,20 @@ describe("SandboxProfileRuntimeSection", () => {
       />,
     );
 
-    expect(screen.getByText("1 permission")).toBeTruthy();
+    expect(screen.getByText("1 resource")).toBeTruthy();
     expect(screen.queryByText("sandboxProfile:read")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "View API key permissions: 1 permission" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "View allowed Mistle resources: 1 resource" }),
+    );
 
-    expect(screen.getByRole("dialog", { name: "API key permissions" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Allowed Mistle resources" })).toBeTruthy();
+    expect(
+      screen.getByText(
+        "This profile's agent can use Mistle MCP key for these Mistle resources. Access is limited by that API key's permissions.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText("Sandbox profiles")).toBeTruthy();
     expect(screen.getByText("Read sandbox profiles")).toBeTruthy();
     expect(screen.queryByText("View sandbox profile configuration.")).toBeNull();
     expect(screen.queryByText("sandboxProfile:read")).toBeNull();
