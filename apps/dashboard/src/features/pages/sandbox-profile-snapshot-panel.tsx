@@ -651,6 +651,7 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
   const [pendingExternalMaintenanceScript, setPendingExternalMaintenanceScript] = useState<
     string | null
   >(null);
+  const [saveCompletionKey, setSaveCompletionKey] = useState(0);
   const previousRefreshScheduleRef = useRef(input.refreshSchedule);
   const previousMaintenanceScriptRef = useRef(input.maintenanceScript);
   const maintenanceScriptDraftRef = useRef(maintenanceScriptDraft);
@@ -677,6 +678,7 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
       setMaintenanceScriptDraft(nextMaintenanceScript);
       setPersistedMaintenanceScript(nextMaintenanceScript);
       setPendingExternalMaintenanceScript(null);
+      setSaveCompletionKey((currentKey) => currentKey + 1);
       await input.invalidateProfileVersions(input.profileId);
     },
     onError: (error: unknown) => {
@@ -772,6 +774,7 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
     <SandboxProfileSnapshotRefreshScheduleForm
       disabled={input.disabled || isMutating}
       existingSchedule={input.refreshSchedule}
+      key={saveCompletionKey}
       maintenanceScriptDraft={maintenanceScriptDraft}
       maintenanceScriptHasChanges={maintenanceScriptHasChanges}
       savedMaintenanceScript={persistedMaintenanceScript}
