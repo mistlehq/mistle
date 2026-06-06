@@ -487,6 +487,13 @@ jobs:
           pnpm --filter @mistle/mstl-core format:check &&
           pnpm turbo run lint typecheck --output-logs=full --concurrency=2 --filter=@mistle/sandboxd --filter=@mistle/mstl-cli --filter=@mistle/mstl-core"
 
+      - name: Run mstl-core Go checks in Nix shell
+        run: >-
+          nix develop --command bash -c
+          "pnpm --filter @mistle/mstl-core lint:go &&
+          pnpm --filter @mistle/mstl-core typecheck:go &&
+          pnpm --filter @mistle/mstl-core test:go"
+
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.static-rust-turbo-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5

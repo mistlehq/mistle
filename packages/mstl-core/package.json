@@ -3,10 +3,15 @@
   "private": true,
   "scripts": {
     "build": "cargo build --locked",
+    "build:go": "go test ./... -run '^$'",
     "lint": "cargo clippy --locked --all-targets -- -D warnings",
+    "lint:go": "go vet ./...",
     "typecheck": "cargo check --locked --all-targets",
+    "typecheck:go": "go test ./... -run '^$'",
     "test": "cargo test --locked",
+    "test:go": "go test ./...",
     "format": "cargo fmt",
+    "format:go": "gofmt -w .",
     "format:check": "cargo fmt --check"
   }
 }
