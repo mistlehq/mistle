@@ -391,7 +391,7 @@ export function SandboxProfileSkillsSection(input: {
     const publicSourceOption = createPublicGitHubSkillsSourceOption(publicSourceUrl);
     if (publicSourceOption === null) {
       setPublicSourceErrorMessage(
-        "Enter a public GitHub repository URL like https://github.com/mistlehq/skills.",
+        "Enter a public GitHub repository URL like https://github.com/mistlehq/skills",
       );
       return;
     }
