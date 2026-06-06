@@ -3,10 +3,15 @@
   "private": true,
   "scripts": {
     "build": "rm -rf dist && cargo build --locked --bin mistle && mkdir -p dist && cp target/debug/mistle dist/mistle",
+    "build:go": "rm -rf dist-go && go build -o dist-go/mistle ./cmd/mistle",
     "lint": "cargo clippy --locked --all-targets -- -D warnings",
+    "lint:go": "go vet ./...",
     "typecheck": "cargo check --locked --all-targets",
+    "typecheck:go": "go test ./... -run '^$'",
     "test": "cargo test --locked",
+    "test:go": "go test ./...",
     "format": "cargo fmt",
+    "format:go": "gofmt -w .",
     "format:check": "cargo fmt --check"
   }
 }

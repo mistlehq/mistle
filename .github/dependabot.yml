@@ -46,6 +46,14 @@ updates:
       prefix: chore(deps)
     cooldown:
       default-days: 7
+  - package-ecosystem: gomod
+    directory: "/packages/mstl-cli"
+    schedule:
+      interval: daily
+    commit-message:
+      prefix: chore(deps)
+    cooldown:
+      default-days: 7
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
