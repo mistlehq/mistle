@@ -390,7 +390,7 @@ export function SandboxProfileSkillsSection(input: {
     const publicSourceOption = createPublicGitHubSkillsSourceOption(publicSourceUrl);
     if (publicSourceOption === null) {
       setPublicSourceErrorMessage(
-        "Enter a public GitHub repository URL like https://github.com/owner/repo.",
+        "Enter a public GitHub repository URL like https://github.com/mistlehq/skills.",
       );
       return;
     }
@@ -726,9 +726,6 @@ export function SandboxProfileSkillsSection(input: {
           >
             <DialogHeader>
               <DialogTitle>Add public GitHub repo</DialogTitle>
-              <DialogDescription>
-                Use a public GitHub repository that contains Mistle skills.
-              </DialogDescription>
             </DialogHeader>
             <Field contentWidth="fill">
               <FieldHeader>
@@ -743,7 +740,7 @@ export function SandboxProfileSkillsSection(input: {
                     setPublicSourceUrl(event.target.value);
                     setPublicSourceErrorMessage(null);
                   }}
-                  placeholder="https://github.com/owner/repo"
+                  placeholder="e.g. https://github.com/mistlehq/skills"
                   value={publicSourceUrl}
                 />
               </FieldContent>
