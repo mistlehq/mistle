@@ -17,11 +17,12 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
   Spinner,
 } from "@mistle/ui";
-import { ArrowClockwiseIcon } from "@phosphor-icons/react";
+import { ArrowClockwiseIcon, PlusIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -669,9 +670,6 @@ export function SandboxProfileSkillsSection(input: {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NoSkillsSourceValue}>None</SelectItem>
-                    <SelectItem value={AddPublicGitHubSourceValue}>
-                      Add public GitHub repo
-                    </SelectItem>
                     {sourceIsUnavailable && draftConfig !== null ? (
                       <SelectItem disabled value={draftConfig.originUrl}>
                         Unavailable repository
@@ -682,6 +680,17 @@ export function SandboxProfileSkillsSection(input: {
                         {sourceOption.label}
                       </SelectItem>
                     ))}
+                    <SelectSeparator />
+                    <SelectItem
+                      className="text-primary focus:text-primary"
+                      onClick={openPublicSourceDialog}
+                      value={AddPublicGitHubSourceValue}
+                    >
+                      <span className="flex items-center gap-2">
+                        <PlusIcon aria-hidden className="size-4" />
+                        Add public GitHub repo
+                      </span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 {reloadButtonIsVisible ? (
