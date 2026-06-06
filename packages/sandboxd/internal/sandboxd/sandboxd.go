@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/mistle/sandboxd/control"
+	"github.com/mistle/sandboxd/egressproxy"
 )
 
 const (
@@ -137,7 +138,13 @@ func runWithControlSocket(
 			return 1
 		}
 		return 0
-	case CommandDaemon, CommandEgressProxy:
+	case CommandEgressProxy:
+		if err := egressproxy.RunEgressProxyChild(command.EgressProxyConfigPath); err != nil {
+			_, _ = fmt.Fprintln(stderr, err.Error())
+			return 1
+		}
+		return 0
+	case CommandDaemon:
 		_, _ = fmt.Fprintf(stderr, "sandboxd %s is not ported to Go yet\n", command.Kind)
 		return 1
 	default:

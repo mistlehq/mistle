@@ -67,6 +67,19 @@ func TestRunVersionPrintsVersion(t *testing.T) {
 	assertEqual(t, stderr.String(), "")
 }
 
+func TestRunEgressProxyReportsConfigReadError(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run("sandboxd", []string{"egress-proxy", "--config", "/tmp/mistle-missing-egress-proxy-child.json"}, strings.NewReader(""), &stdout, &stderr)
+
+	assertEqual(t, code, 1)
+	assertEqual(t, stdout.String(), "")
+	if !strings.Contains(stderr.String(), `failed to read egress proxy child config "/tmp/mistle-missing-egress-proxy-child.json"`) {
+		t.Fatalf("expected egress proxy config read error, got %q", stderr.String())
+	}
+}
+
 func TestSignerAliasSelectsSignCommand(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

@@ -55,6 +55,9 @@ func ReadChildConfig(configPath string) (ChildConfig, error) {
 	if config.TunnelGatewayWSURL == "" {
 		return ChildConfig{}, fmt.Errorf("failed to parse egress proxy child config %q: tunnelGatewayWsUrl is required", configPath)
 	}
+	if config.TokenBridgeFD == nil {
+		return ChildConfig{}, fmt.Errorf("failed to parse egress proxy child config %q: tokenBridgeFd is required", configPath)
+	}
 	if config.ProxyCACertificateFD < 0 {
 		return ChildConfig{}, fmt.Errorf("proxy ca certificate fd must be non-negative")
 	}
@@ -65,6 +68,55 @@ func ReadChildConfig(configPath string) (ChildConfig, error) {
 		return ChildConfig{}, fmt.Errorf("token bridge fd must be non-negative")
 	}
 	return config, nil
+}
+
+func RunEgressProxyChild(configPath string) error {
+	config, err := ReadChildConfig(configPath)
+	if err != nil {
+		return err
+	}
+	listener, err := net.Listen("tcp", config.ListenAddr)
+	if err != nil {
+		return fmt.Errorf("failed to bind local egress proxy listener: %w", err)
+	}
+	state, err := BuildChildProxyState(config)
+	if err != nil {
+		listener.Close()
+		return err
+	}
+	return RunProxyServer(listener, state)
+}
+
+func BuildChildProxyState(config ChildConfig) (*ProxyState, error) {
+	if config.TokenBridgeFD == nil {
+		return nil, fmt.Errorf("egress proxy child tokenBridgeFd is required")
+	}
+	directGateway, err := NewDirectGatewayEgressClient(config.TunnelGatewayWSURL)
+	if err != nil {
+		return nil, err
+	}
+	tokenProvider, err := NewEgressTokenBridgeClientFromFD(*config.TokenBridgeFD)
+	if err != nil {
+		return nil, err
+	}
+	caCertificatePEM, err := ReadPEMFromInheritedFD("proxy ca certificate", config.ProxyCACertificateFD)
+	if err != nil {
+		tokenProvider.Close()
+		return nil, err
+	}
+	caPrivateKeyPEM, err := ReadPEMFromInheritedFD("proxy ca private key", config.ProxyCAPrivateKeyFD)
+	if err != nil {
+		tokenProvider.Close()
+		return nil, err
+	}
+	return &ProxyState{
+		SandboxInstanceID: config.SandboxInstanceID,
+		Routes:            config.EgressRoutes(),
+		DirectGateway:     directGateway,
+		TokenProvider:     tokenProvider,
+		ProxyCACertPEM:    caCertificatePEM,
+		ProxyCAKeyPEM:     caPrivateKeyPEM,
+	}, nil
 }
 
 func (config ChildConfig) EgressRoutes() []Route {
