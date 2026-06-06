@@ -1623,27 +1623,17 @@ async function callMcpTool(input: {
   name: string;
   arguments: Record<string, unknown>;
 }): Promise<z.infer<typeof JsonRpcToolResponseSchema>["result"]> {
-  const response = await input.env.controlPlaneApi.http.fetch("/mcp", {
-    method: "POST",
-    headers: {
-      accept: "application/json, text/event-stream",
-      authorization: `Bearer ${input.token}`,
-      "content-type": "application/json",
-      forwarded: createForwardedHeaderForBaseUrl(input.env.controlPlaneApi.hostBaseUrl),
+  const message = await callMcpJsonRpc({
+    env: input.env,
+    token: input.token,
+    id: "mcp-test",
+    method: "tools/call",
+    params: {
+      name: input.name,
+      arguments: input.arguments,
     },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: "mcp-test",
-      method: "tools/call",
-      params: {
-        name: input.name,
-        arguments: input.arguments,
-      },
-    }),
   });
 
-  expect(response.status).toBe(200);
-  const message = parseStreamableHttpJsonRpcMessage(await response.text());
   return JsonRpcToolResponseSchema.parse(message).result;
 }
 
@@ -1651,6 +1641,24 @@ async function listMcpTools(input: {
   env: IntegrationTestEnvironment;
   token: string;
 }): Promise<z.infer<typeof JsonRpcToolsListResponseSchema>["result"]["tools"]> {
+  const message = await callMcpJsonRpc({
+    env: input.env,
+    token: input.token,
+    id: "mcp-tools-list-test",
+    method: "tools/list",
+    params: {},
+  });
+
+  return JsonRpcToolsListResponseSchema.parse(message).result.tools;
+}
+
+async function callMcpJsonRpc(input: {
+  env: IntegrationTestEnvironment;
+  token: string;
+  id: string;
+  method: "tools/call" | "tools/list";
+  params: Record<string, unknown>;
+}): Promise<unknown> {
   const response = await input.env.controlPlaneApi.http.fetch("/mcp", {
     method: "POST",
     headers: {
@@ -1661,15 +1669,14 @@ async function listMcpTools(input: {
     },
     body: JSON.stringify({
       jsonrpc: "2.0",
-      id: "mcp-tools-list-test",
-      method: "tools/list",
-      params: {},
+      id: input.id,
+      method: input.method,
+      params: input.params,
     }),
   });
 
   expect(response.status).toBe(200);
-  const message = parseStreamableHttpJsonRpcMessage(await response.text());
-  return JsonRpcToolsListResponseSchema.parse(message).result.tools;
+  return parseStreamableHttpJsonRpcMessage(await response.text());
 }
 
 function createForwardedHeaderForBaseUrl(baseUrl: string): string {
