@@ -142,6 +142,21 @@ pnpm db:migrate`,
   },
 };
 
+export const MaintenanceAssistantPanelReady: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    setupAssistantPanelState: "ready",
+    snapshotMaintenanceScript: `#!/usr/bin/env bash
+set -euo pipefail
+
+pnpm install --frozen-lockfile
+pnpm db:migrate`,
+    snapshotRefreshScheduleState: "existing",
+    snapshotState: "snapshot-ready",
+  },
+};
+
 export const LongSnapshotMaintenanceScriptEditor: Story = {
   args: {
     initialSectionId: "snapshot",

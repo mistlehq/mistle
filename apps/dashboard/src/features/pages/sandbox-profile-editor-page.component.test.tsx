@@ -1664,7 +1664,7 @@ describe("SandboxProfileEditorPage", () => {
   });
 
   it("keeps automatic snapshot refresh editing open when maintenance Setup Assistant opens", async () => {
-    renderSandboxProfileEditor({
+    const { router } = renderSandboxProfileEditor({
       maintenanceScript: "echo maintain",
       routeSection: "snapshot",
       versionState: "published",
@@ -1710,6 +1710,31 @@ describe("SandboxProfileEditorPage", () => {
         screen.getByRole("textbox", { name: "Snapshot maintenance script" }),
       ),
     ).toBe("pnpm update\npnpm test");
+    const sandboxProfileTab = screen.getByRole("tab", { name: "Sandbox Profile" });
+    expect(sandboxProfileTab.hasAttribute("disabled")).toBe(false);
+
+    fireEvent.click(sandboxProfileTab);
+
+    expect(screen.getByText("Switch tabs and close Setup Assistant?")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Switching tabs closes the Setup Assistant and stops its temporary sandbox. Unsaved script edits stay only while this profile editor remains open; save them before leaving or reloading.",
+      ),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(router.state.location.pathname).toBe("/sandbox-profiles/sbp_test/snapshots");
+    expect(screen.getByRole("tab", { name: "Snapshots" }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
+
+    fireEvent.click(sandboxProfileTab);
+    fireEvent.click(screen.getByRole("button", { name: "Switch tabs and close" }));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe("/sandbox-profiles/sbp_test/sandbox-profile");
+      expect(screen.queryByRole("button", { name: "Close Setup Assistant panel" })).toBeNull();
+    });
   }, 15_000);
 
   it("applies externally updated maintenance scripts while the maintenance assistant is open", async () => {
@@ -3091,7 +3116,7 @@ describe("SandboxProfileEditorPage", () => {
   });
 
   it("opens the Setup Assistant panel from the setup script action", async () => {
-    renderSandboxProfileEditor({
+    const { router } = renderSandboxProfileEditor({
       bindings: [
         {
           id: "binding-agent",
@@ -3116,6 +3141,31 @@ describe("SandboxProfileEditorPage", () => {
         name: "Close Setup Assistant panel",
       }),
     ).toBeTruthy();
+    const snapshotsTab = screen.getByRole("tab", { name: "Snapshots" });
+    expect(snapshotsTab.hasAttribute("disabled")).toBe(false);
+
+    fireEvent.click(snapshotsTab);
+
+    expect(screen.getByText("Switch tabs and close Setup Assistant?")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Switching tabs closes the Setup Assistant and stops its temporary sandbox. Unsaved script edits stay only while this profile editor remains open; save them before leaving or reloading.",
+      ),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(router.state.location.pathname).toBe("/sandbox-profiles/sbp_test/sandbox-profile/draft");
+    expect(screen.getByRole("tab", { name: "Sandbox Profile" }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
+
+    fireEvent.click(snapshotsTab);
+    fireEvent.click(screen.getByRole("button", { name: "Switch tabs and close" }));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe("/sandbox-profiles/sbp_test/snapshots");
+      expect(screen.queryByRole("button", { name: "Close Setup Assistant panel" })).toBeNull();
+    });
   });
 
   it("closes the Setup Assistant panel immediately after stop confirmation during startup", async () => {
@@ -3357,7 +3407,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByText("Stop Setup Assistant?")).toBeTruthy();
     expect(
       screen.getByText(
-        "Closing the Setup Assistant stops its temporary sandbox. The setup script draft stays in the editor.",
+        "Closing the Setup Assistant stops its temporary sandbox. Unsaved script edits stay only while this profile editor remains open; save them before leaving or reloading.",
       ),
     ).toBeTruthy();
 

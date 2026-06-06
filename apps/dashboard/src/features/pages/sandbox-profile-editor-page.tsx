@@ -256,6 +256,7 @@ type SetupAssistantStartupOperation = {
 } | null;
 
 type SetupAssistantCloseDialogState = {
+  navigationSectionId: SandboxProfileEditorSectionId | null;
   sandboxInstanceId: string | null;
 } | null;
 type SetupAssistantStartDialogState = {
@@ -1596,6 +1597,12 @@ function ReadySandboxProfileEditorPage(input: {
     snapshotVersion,
     input.profile.activeVersion,
   );
+  const setupAssistantOwningSectionId =
+    setupAssistantPanelState?.isOpen === true
+      ? setupAssistantPanelState.scriptKind === "maintenance"
+        ? SandboxProfileEditorSectionIds.SNAPSHOT
+        : SandboxProfileEditorSectionIds.SANDBOX_PROFILE
+      : null;
   const editorSections = SandboxProfileEditorTabs;
   const setupAssistantIntegrationRows = resolveSandboxProfileSetupScriptIntegrationRows(
     integrationsLoader.initialRows,
@@ -1704,8 +1711,36 @@ function ReadySandboxProfileEditorPage(input: {
       );
     },
   });
+  function navigateToEditorSection(sectionId: SandboxProfileEditorSectionId): void {
+    if (
+      sectionId === SandboxProfileEditorSectionIds.SANDBOX_PROFILE &&
+      input.explicitRouteView === undefined
+    ) {
+      void input.navigate(createSandboxProfileEditorPath({ profileId: input.profileId }));
+      return;
+    }
+
+    const view =
+      sectionId === SandboxProfileEditorSectionIds.SANDBOX_PROFILE
+        ? input.explicitRouteView
+        : input.routeView;
+
+    if (view === undefined) {
+      throw new Error("Sandbox profile tab navigation view could not be resolved.");
+    }
+
+    void input.navigate(
+      createSandboxProfileTabPath({
+        profileId: input.profileId,
+        sectionId,
+        view,
+      }),
+    );
+  }
+
   function requestSetupAssistantPanelClose(): void {
     setSetupAssistantCloseDialogState({
+      navigationSectionId: null,
       sandboxInstanceId: setupAssistantPanelState?.sandboxInstanceId ?? null,
     });
   }
@@ -1719,12 +1754,16 @@ function ReadySandboxProfileEditorPage(input: {
       return;
     }
 
+    const navigationSectionId = setupAssistantCloseDialogState.navigationSectionId;
     const sandboxInstanceId = resolveSetupAssistantCloseSandboxInstanceId({
       currentPanelSandboxInstanceId: setupAssistantPanelState?.sandboxInstanceId ?? null,
       dialogSandboxInstanceId: setupAssistantCloseDialogState.sandboxInstanceId,
     });
     setSetupAssistantCloseDialogState(null);
     setSetupAssistantPanelState(null);
+    if (navigationSectionId !== null) {
+      navigateToEditorSection(navigationSectionId);
+    }
     if (sandboxInstanceId === null) {
       setupAssistantClosedDuringStartupRef.current = startSetupAssistantMutation.isPending;
       return;
@@ -2141,30 +2180,15 @@ function ReadySandboxProfileEditorPage(input: {
         void handleSaveDraft();
       }}
       onActiveSectionIdChange={(sectionId) => {
-        if (
-          sectionId === SandboxProfileEditorSectionIds.SANDBOX_PROFILE &&
-          input.explicitRouteView === undefined
-        ) {
-          void input.navigate(createSandboxProfileEditorPath({ profileId: input.profileId }));
+        if (setupAssistantOwningSectionId !== null && sectionId !== setupAssistantOwningSectionId) {
+          setSetupAssistantCloseDialogState({
+            navigationSectionId: sectionId,
+            sandboxInstanceId: setupAssistantPanelState?.sandboxInstanceId ?? null,
+          });
           return;
         }
 
-        const view =
-          sectionId === SandboxProfileEditorSectionIds.SANDBOX_PROFILE
-            ? input.explicitRouteView
-            : input.routeView;
-
-        if (view === undefined) {
-          throw new Error("Sandbox profile tab navigation view could not be resolved.");
-        }
-
-        void input.navigate(
-          createSandboxProfileTabPath({
-            profileId: input.profileId,
-            sectionId,
-            view,
-          }),
-        );
+        navigateToEditorSection(sectionId);
       }}
       onSaveProfileName={metaState.onProfileNameSave}
       onViewActive={input.onViewActive}
@@ -2308,6 +2332,9 @@ function ReadySandboxProfileEditorPage(input: {
         isOpen={setupAssistantCloseDialogState !== null}
         onCancel={cancelSetupAssistantPanelClose}
         onConfirm={confirmSetupAssistantPanelClose}
+        reason={
+          setupAssistantCloseDialogState?.navigationSectionId === null ? "close" : "switch-tabs"
+        }
       />
       {setupAssistantStartDialog}
     </div>
@@ -2368,7 +2395,10 @@ export function SetupAssistantCloseDialog(input: {
   isOpen: boolean;
   onCancel: () => void;
   onConfirm: () => void;
+  reason?: "close" | "switch-tabs";
 }): React.JSX.Element {
+  const reason = input.reason ?? "close";
+
   return (
     <Dialog
       onOpenChange={(open) => {
@@ -2380,10 +2410,15 @@ export function SetupAssistantCloseDialog(input: {
     >
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Stop Setup Assistant?</DialogTitle>
+          <DialogTitle>
+            {reason === "switch-tabs"
+              ? "Switch tabs and close Setup Assistant?"
+              : "Stop Setup Assistant?"}
+          </DialogTitle>
           <DialogDescription>
-            Closing the Setup Assistant stops its temporary sandbox. The setup script draft stays in
-            the editor.
+            {reason === "switch-tabs"
+              ? "Switching tabs closes the Setup Assistant and stops its temporary sandbox. Unsaved script edits stay only while this profile editor remains open; save them before leaving or reloading."
+              : "Closing the Setup Assistant stops its temporary sandbox. Unsaved script edits stay only while this profile editor remains open; save them before leaving or reloading."}
           </DialogDescription>
         </DialogHeader>
 

@@ -1055,6 +1055,8 @@ function SandboxProfileEditorPageStoryView(
     input.setupAssistantStartDialogState !== undefined,
   );
   const [setupAssistantCloseDialogOpen, setSetupAssistantCloseDialogOpen] = useState(false);
+  const [setupAssistantCloseNavigationSectionId, setSetupAssistantCloseNavigationSectionId] =
+    useState<StorySectionId | null>(null);
   const [duplicateProfileDialogOpen, setDuplicateProfileDialogOpen] = useState(
     input.duplicateProfileDialogState === "open" || input.duplicateProfileDialogState === "error",
   );
@@ -1151,6 +1153,10 @@ function SandboxProfileEditorPageStoryView(
   function handleConfirmSetupAssistantClose(): void {
     setSetupAssistantCloseDialogOpen(false);
     setSetupAssistantPanelOpen(false);
+    if (setupAssistantCloseNavigationSectionId !== null) {
+      setActiveSectionId(setupAssistantCloseNavigationSectionId);
+      setSetupAssistantCloseNavigationSectionId(null);
+    }
   }
 
   async function handleCreateApiKey(createInput: {
@@ -1233,7 +1239,15 @@ function SandboxProfileEditorPageStoryView(
         setPersistedSetupScript(setupScriptDraft);
       }}
       onSaveProfileName={handleProfileNameSave}
-      onActiveSectionIdChange={setActiveSectionId}
+      onActiveSectionIdChange={(sectionId) => {
+        if (setupAssistantPanelOpen && sectionId !== activeSectionId) {
+          setSetupAssistantCloseNavigationSectionId(sectionId);
+          setSetupAssistantCloseDialogOpen(true);
+          return;
+        }
+
+        setActiveSectionId(sectionId);
+      }}
       onViewActive={() => {}}
       onViewDraft={() => {}}
       profileName={profileName}
@@ -1483,8 +1497,10 @@ function SandboxProfileEditorPageStoryView(
             isOpen={setupAssistantCloseDialogOpen}
             onCancel={() => {
               setSetupAssistantCloseDialogOpen(false);
+              setSetupAssistantCloseNavigationSectionId(null);
             }}
             onConfirm={handleConfirmSetupAssistantClose}
+            reason={setupAssistantCloseNavigationSectionId === null ? "close" : "switch-tabs"}
           />
         </div>
       )}
