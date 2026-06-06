@@ -3117,8 +3117,30 @@ describe("SandboxProfileEditorPage", () => {
           config: {},
         },
       ],
+      connections: [
+        {
+          id: "connection-agent",
+          displayName: "OpenAI connection",
+          targetKey: "openai-default",
+          status: "active",
+        },
+      ],
       routeSection: "sandbox-profile",
       setupScript: "pnpm install\npnpm dev:bootstrap",
+      targets: [
+        {
+          targetKey: "openai-default",
+          displayName: "OpenAI",
+          familyId: "openai",
+          variantId: "openai-default",
+          config: {
+            api_base_url: "https://api.openai.com",
+          },
+          targetHealth: {
+            configStatus: "valid",
+          },
+        },
+      ],
       versionState: "draft",
     });
 
@@ -3143,8 +3165,30 @@ describe("SandboxProfileEditorPage", () => {
           config: {},
         },
       ],
+      connections: [
+        {
+          id: "connection-agent",
+          displayName: "OpenAI connection",
+          targetKey: "openai-default",
+          status: "active",
+        },
+      ],
       routeSection: "sandbox-profile",
       setupScript: "pnpm install\npnpm dev:bootstrap",
+      targets: [
+        {
+          targetKey: "openai-default",
+          displayName: "OpenAI",
+          familyId: "openai",
+          variantId: "openai-default",
+          config: {
+            api_base_url: "https://api.openai.com",
+          },
+          targetHealth: {
+            configStatus: "valid",
+          },
+        },
+      ],
       versionState: "draft",
     });
 
@@ -3198,8 +3242,30 @@ describe("SandboxProfileEditorPage", () => {
           config: {},
         },
       ],
+      connections: [
+        {
+          id: "connection-agent",
+          displayName: "OpenAI connection",
+          targetKey: "openai-default",
+          status: "active",
+        },
+      ],
       routeSection: "sandbox-profile",
       setupScript: "pnpm install\npnpm dev:bootstrap",
+      targets: [
+        {
+          targetKey: "openai-default",
+          displayName: "OpenAI",
+          familyId: "openai",
+          variantId: "openai-default",
+          config: {
+            api_base_url: "https://api.openai.com",
+          },
+          targetHealth: {
+            configStatus: "valid",
+          },
+        },
+      ],
       versionState: "draft",
     });
 
@@ -3235,8 +3301,30 @@ describe("SandboxProfileEditorPage", () => {
           config: {},
         },
       ],
+      connections: [
+        {
+          id: "connection-agent",
+          displayName: "OpenAI connection",
+          targetKey: "openai-default",
+          status: "active",
+        },
+      ],
       routeSection: "sandbox-profile",
       setupScript: "pnpm install\npnpm dev:bootstrap",
+      targets: [
+        {
+          targetKey: "openai-default",
+          displayName: "OpenAI",
+          familyId: "openai",
+          variantId: "openai-default",
+          config: {
+            api_base_url: "https://api.openai.com",
+          },
+          targetHealth: {
+            configStatus: "valid",
+          },
+        },
+      ],
       versionState: "draft",
     });
 
@@ -3289,36 +3377,13 @@ describe("SandboxProfileEditorPage", () => {
     ).toBe("sbi_start_completed_after_close_request");
   });
 
-  it("uses the latest saved draft when local changes remove the saved agent", () => {
-    renderSandboxProfileEditor({
-      bindings: [
-        {
-          id: "binding-agent",
-          connectionId: "missing-agent-connection",
-          kind: "agent",
-          config: {},
-        },
-      ],
-      routeSection: "sandbox-profile",
-      setupScript: "pnpm install\npnpm dev:bootstrap",
-      versionState: "draft",
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Remove agent provider" }));
-
-    const setupAssistantButton = screen.getByRole("button", {
-      name: "Setup Assistant",
-    });
-    expect(setupAssistantButton.getAttribute("title")).toBe(
-      "Choose whether to save changes before opening Setup Assistant.",
-    );
-
-    fireEvent.click(setupAssistantButton);
-
-    expect(screen.getByRole("dialog")).toBeTruthy();
-    expect(screen.getByText("Unsaved changes")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Use latest saved draft" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Save and open" })).toBeNull();
+  it("resolves the latest-saved-draft-only Setup Assistant dialog when local changes remove the saved agent", () => {
+    expect(
+      resolveSetupAssistantStartDialogVariant({
+        latestSavedDraftHasAgentRuntime: true,
+        localDraftHasAgentRuntime: false,
+      }),
+    ).toBe("use-saved-required");
   });
 
   it("renders the save-required Setup Assistant dialog without the saved-draft action", () => {
@@ -3344,7 +3409,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByText("Save draft to use Setup Assistant")).toBeTruthy();
     expect(
       screen.getByText(
-        "Setup Assistant needs a saved draft with an agent integration. Save your current changes before opening it.",
+        "Setup Assistant needs a saved draft with an agent runtime connection. Save your current changes before opening it.",
       ),
     ).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Use latest saved draft" })).toBeNull();
@@ -3378,7 +3443,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByText("Unsaved changes")).toBeTruthy();
     expect(
       screen.getByText(
-        "Setup Assistant needs a saved draft with an agent integration. Your current changes remove the saved agent integration, so open it with the latest saved draft instead. Your unsaved editor changes will stay in the editor.",
+        "Setup Assistant needs a saved draft with an agent runtime connection. Your current changes remove the saved agent runtime connection, so open it with the latest saved draft instead. Your unsaved editor changes will stay in the editor.",
       ),
     ).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Save and open" })).toBeNull();
@@ -3477,7 +3542,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(getReadOnlyScriptBlock(document.body).textContent).toBe("pnpm install");
   });
 
-  it("disables Setup Assistant when no agent runtime is configured", () => {
+  it("highlights the agent runtime connection field after Setup Assistant is requested without one", () => {
     renderSandboxProfileEditor({
       bindings: [
         {
@@ -3487,8 +3552,30 @@ describe("SandboxProfileEditorPage", () => {
           config: {},
         },
       ],
+      connections: [
+        {
+          id: "connection-agent",
+          displayName: "OpenAI connection",
+          targetKey: "openai-default",
+          status: "active",
+        },
+      ],
       routeSection: "sandbox-profile",
       setupScript: "pnpm install",
+      targets: [
+        {
+          targetKey: "openai-default",
+          displayName: "OpenAI",
+          familyId: "openai",
+          variantId: "openai-default",
+          config: {
+            api_base_url: "https://api.openai.com",
+          },
+          targetHealth: {
+            configStatus: "valid",
+          },
+        },
+      ],
       versionState: "draft",
     });
 
@@ -3496,10 +3583,21 @@ describe("SandboxProfileEditorPage", () => {
       name: "Setup Assistant",
     });
 
-    expect(setupAssistantButton.hasAttribute("disabled")).toBe(true);
+    expect(setupAssistantButton.hasAttribute("disabled")).toBe(false);
     expect(setupAssistantButton.getAttribute("title")).toBe(
-      "Add an agent integration before using Setup Assistant.",
+      "Select and save an agent runtime connection before using Setup Assistant.",
     );
+
+    fireEvent.click(setupAssistantButton);
+
+    expect(
+      screen.getAllByText(
+        "Select and save an agent runtime connection before using Setup Assistant.",
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getByRole("combobox", { name: "OpenAI connection" }).getAttribute("aria-invalid"),
+    ).toBe("true");
   });
 
   it("renders published profiles as read-only", () => {

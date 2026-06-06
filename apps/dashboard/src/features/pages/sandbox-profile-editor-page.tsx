@@ -1,3 +1,7 @@
+import {
+  agentDefinitionAllowsRuntime,
+  createBrowserDefinitionsBundle,
+} from "@mistle/integrations-definitions/browser";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 import {
   Accordion,
@@ -394,17 +398,50 @@ export function buildSandboxProfileRuntimeDraftChanges(input: {
 }
 
 const AgentRuntimeRequiredErrorCode = "AGENT_RUNTIME_REQUIRED";
+const AgentRuntimeConnectionRequiredErrorCode = "AGENT_RUNTIME_CONNECTION_REQUIRED";
 const SetupAssistantAgentRuntimeRequiredMessage =
-  "Add an agent integration before using Setup Assistant.";
+  "Select and save an agent runtime connection before using Setup Assistant.";
 
-function hasSetupAssistantAgentBinding(
-  integrationRows: readonly SandboxProfileBindingEditorRow[] | null,
-): boolean {
-  if (integrationRows === null) {
+const Definitions = createBrowserDefinitionsBundle();
+const IntegrationRegistry = Definitions.integrationRegistry;
+
+function hasSetupAssistantAgentRuntimeConnection(input: {
+  integrationRows: readonly SandboxProfileBindingEditorRow[] | null;
+  agentRuntimeId: SandboxProfileVersion["agentRuntimeId"];
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+}): boolean {
+  if (input.integrationRows === null) {
     return false;
   }
 
-  return integrationRows.some((row) => row.kind === "agent");
+  return input.integrationRows.some((row) => {
+    if (row.kind !== "agent") {
+      return false;
+    }
+
+    const connection = input.availableConnections.find(
+      (candidate) => candidate.id === row.connectionId,
+    );
+    if (connection === undefined) {
+      return false;
+    }
+
+    const target = input.availableTargets.find(
+      (candidate) => candidate.targetKey === connection.targetKey,
+    );
+    if (target === undefined) {
+      return false;
+    }
+
+    return agentDefinitionAllowsRuntime({
+      definition: IntegrationRegistry.getDefinition({
+        familyId: target.familyId,
+        variantId: target.variantId,
+      }),
+      runtimeId: input.agentRuntimeId,
+    });
+  });
 }
 
 const SetupScriptPlaceholder = `#!/usr/bin/env bash
@@ -1585,6 +1622,10 @@ function ReadySandboxProfileEditorPage(input: {
   >(null);
   const [draftTriggerImpactError, setDraftTriggerImpactError] = useState<string | null>(null);
   const [setupAssistantError, setSetupAssistantError] = useState<string | null>(null);
+  const [
+    showSetupAssistantAgentRuntimeConnectionError,
+    setShowSetupAssistantAgentRuntimeConnectionError,
+  ] = useState(false);
   const [publishSuccessNoticeKey, setPublishSuccessNoticeKey] = useState(0);
   const [showPublishSuccessMessage, setShowPublishSuccessMessage] = useState(
     input.publishSuccessMessage,
@@ -1632,16 +1673,37 @@ function ReadySandboxProfileEditorPage(input: {
     integrationsLoader.initialRows,
     integrationDraftState.integrationRows,
   );
+  const setupAssistantSelectedAgentRuntimeId = resolveSelectedSandboxProfileAgentRuntimeId({
+    currentVersion: input.currentVersion,
+    runtimeDraftState,
+  });
   const setupAssistantLatestSavedDraftHasAgentRuntime =
-    input.mode.kind === "draft" && hasSetupAssistantAgentBinding(integrationsLoader.initialRows);
+    input.mode.kind === "draft" &&
+    hasSetupAssistantAgentRuntimeConnection({
+      integrationRows: integrationsLoader.initialRows,
+      agentRuntimeId: input.currentVersion?.agentRuntimeId ?? setupAssistantSelectedAgentRuntimeId,
+      availableConnections: integrationsLoader.availableConnections,
+      availableTargets: integrationsLoader.availableTargets,
+    });
   const setupAssistantLocalDraftHasAgentRuntime =
-    input.mode.kind === "draft" && hasSetupAssistantAgentBinding(setupAssistantIntegrationRows);
+    input.mode.kind === "draft" &&
+    hasSetupAssistantAgentRuntimeConnection({
+      integrationRows: setupAssistantIntegrationRows,
+      agentRuntimeId: setupAssistantSelectedAgentRuntimeId,
+      availableConnections: integrationsLoader.availableConnections,
+      availableTargets: integrationsLoader.availableTargets,
+    });
   const setupAssistantHasVersionDraftChanges =
     integrationDraftState.hasUnpersistedChanges ||
     gitCommitSigningDraftState.hasUnpersistedChanges ||
     skillsDraftState.hasUnpersistedChanges ||
     setupScriptDraftState.hasUnpersistedChanges ||
     runtimeDraftState.hasUnpersistedChanges;
+  useEffect(() => {
+    if (setupAssistantLocalDraftHasAgentRuntime) {
+      setShowSetupAssistantAgentRuntimeConnectionError(false);
+    }
+  }, [setupAssistantLocalDraftHasAgentRuntime]);
   const updateGitCommitSigningIntegrationConnectionId = useCallback(
     (connectionId: string | null) => {
       setGitCommitSigningDraftState((currentState) =>
@@ -1726,13 +1788,21 @@ function ReadySandboxProfileEditorPage(input: {
             },
       );
       setSetupAssistantError(
-        error instanceof SandboxProfilesApiError && error.code === AgentRuntimeRequiredErrorCode
+        error instanceof SandboxProfilesApiError &&
+          (error.code === AgentRuntimeRequiredErrorCode ||
+            error.code === AgentRuntimeConnectionRequiredErrorCode)
           ? SetupAssistantAgentRuntimeRequiredMessage
           : resolveApiErrorMessage({
               error,
               fallbackMessage: "Could not start Setup Assistant.",
             }),
       );
+      if (
+        error instanceof SandboxProfilesApiError &&
+        error.code === AgentRuntimeConnectionRequiredErrorCode
+      ) {
+        setShowSetupAssistantAgentRuntimeConnectionError(true);
+      }
     },
   });
   function navigateToEditorSection(sectionId: SandboxProfileEditorSectionId): void {
@@ -1897,12 +1967,23 @@ function ReadySandboxProfileEditorPage(input: {
     resolveVersion: () => number | null;
     scriptKind: SetupAssistantScriptKind;
   }): SetupScriptAssistantControl {
+    const agentRuntimeConnectionIsRequired =
+      inputValue.scriptKind === "setup" &&
+      inputValue.disabledReason === SetupAssistantAgentRuntimeRequiredMessage;
     return {
-      disabled: setupAssistantPanelIsOpen || inputValue.disabledReason !== null,
+      disabled:
+        setupAssistantPanelIsOpen ||
+        (inputValue.disabledReason !== null && !agentRuntimeConnectionIsRequired),
       errorMessage: setupAssistantError,
       isStarting: !setupAssistantPanelIsOpen && startSetupAssistantMutation.isPending,
       onToggle: () => {
         if (setupAssistantPanelState?.isOpen === true) {
+          return;
+        }
+
+        if (agentRuntimeConnectionIsRequired) {
+          setSetupAssistantError(SetupAssistantAgentRuntimeRequiredMessage);
+          setShowSetupAssistantAgentRuntimeConnectionError(true);
           return;
         }
 
@@ -2257,6 +2338,9 @@ function ReadySandboxProfileEditorPage(input: {
           onRetryPublishSnapshot={input.onRetryPublishSnapshot}
           onSetupScriptDraftStateChange={setSetupScriptDraftState}
           setupAssistantControl={setupAssistantControl}
+          showSetupAssistantAgentRuntimeConnectionError={
+            showSetupAssistantAgentRuntimeConnectionError
+          }
           maintenanceAssistantControl={maintenanceAssistantControl}
           onSaveDraftBeforeSkillsReload={saveDraftBeforeSkillsReload}
           profileId={input.profileId}
@@ -2389,8 +2473,8 @@ export function SetupAssistantStartDialog(input: {
             {input.variant === "choice"
               ? "Setup Assistant uses the latest saved draft. Save your current changes before opening it, or open it with the latest saved draft instead. Your unsaved editor changes will stay in the editor."
               : isUseSavedRequired
-                ? "Setup Assistant needs a saved draft with an agent integration. Your current changes remove the saved agent integration, so open it with the latest saved draft instead. Your unsaved editor changes will stay in the editor."
-                : "Setup Assistant needs a saved draft with an agent integration. Save your current changes before opening it."}
+                ? "Setup Assistant needs a saved draft with an agent runtime connection. Your current changes remove the saved agent runtime connection, so open it with the latest saved draft instead. Your unsaved editor changes will stay in the editor."
+                : "Setup Assistant needs a saved draft with an agent runtime connection. Save your current changes before opening it."}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -2727,6 +2811,7 @@ function SandboxProfileEditorSectionPanels(input: {
   onRetryPublishSnapshot: (version: number) => void;
   onSetupScriptDraftStateChange: (state: SandboxProfileDraftSectionState) => void;
   setupAssistantControl: SetupScriptAssistantControl;
+  showSetupAssistantAgentRuntimeConnectionError: boolean;
   maintenanceAssistantControl: SetupScriptAssistantControl;
   profileId: string;
   publishSuccessMessage: boolean;
@@ -2822,6 +2907,7 @@ function SandboxProfileEditorSectionPanels(input: {
         }
         disabled={input.draftFieldsAreReadOnly}
         readOnly={input.draftFieldsAreReadOnly}
+        showAgentRuntimeConnectionError={input.showSetupAssistantAgentRuntimeConnectionError}
         version={input.mode.version}
       />
       {input.currentVersion === null || sandboxProfileIntegrationRows === null ? null : (
@@ -3025,9 +3111,9 @@ function formatDraftTriggerImpactIssueMessage(
     case "AGENT_BINDING_REQUIRED":
       return "This draft does not have an agent binding.";
     case "AGENT_BINDING_PRIMARY_REQUIRED":
-      return "This draft does not have the agent provider required by the selected runtime.";
+      return "This draft does not have the agent runtime connection required by the selected runtime.";
     case "AGENT_BINDING_AMBIGUOUS":
-      return "This draft has duplicate agent provider bindings.";
+      return "This draft has duplicate agent runtime connection bindings.";
     case "AGENT_BINDING_RUNTIME_INCOMPATIBLE":
       return "The draft agent binding is not compatible with the selected agent runtime.";
     case "INVALID_BINDING_CONNECTION_REFERENCE":
@@ -3618,6 +3704,7 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
   gitCommitSigningIntegrationConnectionId: string | null;
   onGitCommitSigningIntegrationConnectionChange: (connectionId: string | null) => void;
   runtimeSettings: ReactNode | null;
+  showAgentRuntimeConnectionError: boolean;
   onDraftStateChange?: (state: SandboxProfileDraftSectionState) => void;
 }): React.JSX.Element | null {
   const showBindingsUnavailableNotice = input.loader.integrationBindingsQuery.isError;
@@ -3674,6 +3761,7 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
       }
       integrationDirectoryQuery={input.loader.integrationDirectoryQuery}
       runtimeSettings={input.runtimeSettings}
+      showAgentRuntimeConnectionError={input.showAgentRuntimeConnectionError}
       {...(input.onDraftStateChange === undefined
         ? {}
         : { onDraftStateChange: input.onDraftStateChange })}
@@ -3708,6 +3796,7 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
   integrationDirectoryQuery: ReturnType<
     typeof useSandboxProfileIntegrationsLoader
   >["integrationDirectoryQuery"];
+  showAgentRuntimeConnectionError: boolean;
   onDraftStateChange?: (state: SandboxProfileDraftSectionState) => void;
 }): React.JSX.Element {
   const activeOrganizationId = useRequiredOrganizationId();
@@ -3772,6 +3861,7 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
         gitCommitSigningIntegrationConnectionId={input.gitCommitSigningIntegrationConnectionId}
         identityLinkedGitConnectionIds={identityLinkedGitConnectionIds}
         runtimeSettings={input.runtimeSettings}
+        showAgentRuntimeConnectionError={input.showAgentRuntimeConnectionError}
         disabled={input.disabled}
         readOnly={input.readOnly}
         onAddIntegrationBindingRow={integrationsState.onAddIntegrationBindingRow}

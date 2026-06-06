@@ -25,6 +25,7 @@ import {
   type SandboxProfileVersionResources,
   validateSandboxProfileVersionRuntimeConfig,
 } from "./profile-version-runtime-config.js";
+import { assertSetupAssistantAgentRuntimeConnection } from "./setup-assistant-agent-runtime-connection.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type StartProfileSetupSandboxInput = {
@@ -171,6 +172,16 @@ export async function startProfileSetupSandbox(
     }
   }
   const sandboxRuntime = createWorkflowSandboxRuntime(sandboxRuntimeConfig);
+  if (
+    input.purpose === SandboxInstancePurposes.SETUP_ASSISTANT &&
+    input.snapshotPreparationScriptKind !== "maintenance"
+  ) {
+    await assertSetupAssistantAgentRuntimeConnection(db, {
+      organizationId: input.organizationId,
+      profileId: input.profileId,
+      profileVersion: input.profileVersion,
+    });
+  }
   const compiledRuntimePlan = await compileProfileVersionRuntimePlan(
     {
       db,
@@ -206,7 +217,7 @@ export async function startProfileSetupSandbox(
   if (compiledRuntimePlan.agentRuntimes.length === 0) {
     throw new SandboxProfilesCompileError(
       SandboxProfilesCompileErrorCodes.AGENT_RUNTIME_REQUIRED,
-      `Sandbox profile '${input.profileId}' version ${String(input.profileVersion)} does not declare an agent runtime. Add an agent integration binding before starting this setup sandbox.`,
+      `Sandbox profile '${input.profileId}' version ${String(input.profileVersion)} does not declare an agent runtime. Select and save an agent runtime connection before starting this setup sandbox.`,
     );
   }
   const { setupScript: _compiledSetupScript, ...runtimePlanWithoutSetupScript } =

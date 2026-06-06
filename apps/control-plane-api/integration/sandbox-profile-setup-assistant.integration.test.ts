@@ -15,7 +15,10 @@ import {
 } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
-import { StartSandboxProfileSetupAssistantResponseSchema } from "../src/sandbox-profiles/index.js";
+import {
+  SandboxProfilesCompileErrorCodes,
+  StartSandboxProfileSetupAssistantResponseSchema,
+} from "../src/sandbox-profiles/index.js";
 import { waitForQueuedStartWorkflowInput } from "./helpers/data-plane-workflows.js";
 import {
   integrationConnectionRow,
@@ -161,7 +164,7 @@ describe.concurrent("sandbox profile Setup Assistant integration", () => {
     );
   });
 
-  it("starts setup assistant when the selected agent runtime has no proxied provider route", async ({
+  it("rejects setup assistant when the selected agent runtime has no saved connection", async ({
     env,
   }) => {
     const session = await env.auth.createSession({
@@ -205,27 +208,12 @@ describe.concurrent("sandbox profile Setup Assistant integration", () => {
       },
     );
 
-    expect(response.status).toBe(201);
-    const body = StartSandboxProfileSetupAssistantResponseSchema.parse(await response.json());
-    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
-      env,
-      sandboxInstanceId: body.sandboxInstanceId,
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      code: SandboxProfilesCompileErrorCodes.AGENT_RUNTIME_CONNECTION_REQUIRED,
+      message:
+        "Sandbox profile 'sbp_setup_assistant_missing_agent' version 1 needs a saved agent runtime connection before starting Setup Assistant.",
     });
-    expect(queuedWorkflowInput.runtimePlan.agentRuntimes).toMatchObject([
-      {
-        runtimeId: "codex",
-      },
-    ]);
-    expect(queuedWorkflowInput.runtimePlan.egressRoutes).toContainEqual(
-      expect.objectContaining({
-        egressRuleId: "egress_rule_platform_mistle_mcp",
-        credentialResolver: {
-          kind: "mistle_mcp_setup_assistant_token",
-          sandboxProfileId: "sbp_setup_assistant_missing_agent",
-          sandboxProfileVersion: 1,
-        },
-      }),
-    );
   });
 });
 

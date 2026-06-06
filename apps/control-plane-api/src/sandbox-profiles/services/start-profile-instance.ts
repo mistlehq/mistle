@@ -321,7 +321,7 @@ export async function startProfileInstance(
   if (compiledRuntimePlan.agentRuntimes.length === 0) {
     throw new SandboxProfilesCompileError(
       SandboxProfilesCompileErrorCodes.AGENT_RUNTIME_REQUIRED,
-      `Sandbox profile '${serviceInput.profileId}' version ${String(serviceInput.profileVersion)} does not declare an agent runtime. Add an agent integration binding before starting a session.`,
+      `Sandbox profile '${serviceInput.profileId}' version ${String(serviceInput.profileVersion)} does not declare an agent runtime. Select an agent runtime before starting a session.`,
     );
   }
   const runtimePlan = await resolveEffectiveRuntimePlan(

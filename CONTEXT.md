@@ -44,6 +44,10 @@ _Avoid_: Current draft, local draft
 A guided agent workspace for helping author a **Setup script** or **Snapshot maintenance script** for a **Sandbox profile version**.
 _Avoid_: Setup script test, setup check
 
+**Agent runtime connection**:
+An integration connection selected on a **Sandbox profile version** to supply provider access for the selected **Agent runtime**.
+_Avoid_: Agent runtime when referring to the selected connection
+
 **Snapshot maintenance script**:
 The version-scoped, publish-free script for **Automatic snapshot refresh** from an existing usable **Snapshot**; compact UI labels may say maintenance script when the snapshot-refresh context is already visible.
 _Avoid_: Setup script variant, refresh script, update script
@@ -374,7 +378,10 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A session, trigger, or other profile-backed object may have a **Referenced sandbox profile version** that differs from the profile's latest published **Sandbox profile version**.
 - A **Setup script** prepares a **Snapshot** from a **Base image**.
 - **Setup Assistant** starts from a **Latest saved draft** unless the user saves current edits first.
-- **Setup Assistant** requires the **Latest saved draft** to have a saved agent integration.
+- **Setup Assistant** requires the **Latest saved draft** to have a saved **Agent runtime connection** that is compatible with the selected **Agent runtime**.
+- **Setup Assistant** start eligibility is a product contract, not only dashboard guidance.
+- When unsaved editor changes would make an ineligible **Latest saved draft** eligible for **Setup Assistant**, the user must save the draft before starting **Setup Assistant**.
+- When unsaved editor changes would make an eligible **Latest saved draft** ineligible for **Setup Assistant**, the user may still start **Setup Assistant** from the **Latest saved draft** by explicitly choosing to use saved draft data.
 - A **Snapshot maintenance script** prepares a replacement **Snapshot** from an existing usable **Snapshot**.
 - A **Snapshot maintenance script** belongs to one **Sandbox profile version** but may be edited without publishing a new version.
 - A **Snapshot maintenance script** is the script text saved for the **Sandbox profile version**, not a script file created inside a Setup Assistant sandbox.

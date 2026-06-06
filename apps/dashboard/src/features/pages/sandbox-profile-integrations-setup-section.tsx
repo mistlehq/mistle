@@ -101,6 +101,7 @@ type SandboxProfileIntegrationsSetupSectionProps = {
   runtimeSettings: React.ReactNode | null;
   disabled?: boolean | undefined;
   readOnly?: boolean | undefined;
+  showAgentRuntimeConnectionError?: boolean | undefined;
 };
 
 const NoGitConnectionValue = "none";
@@ -111,6 +112,8 @@ const GitCommitSigningTooltip =
   "Commits made in sandboxes will be signed with the acting user's linked GitHub account when enabled.";
 const GitCommitSigningIdentityLinkingDisabledMessage = "Requires identity linking";
 const OrganizationIdentityLinkingSettingsPath = "/settings/organization/identity-linking";
+const AgentRuntimeConnectionRequiredMessage =
+  "Select and save an agent runtime connection before using Setup Assistant.";
 
 const SandboxProfileIntegrationConnectionColumns = [
   { key: "integration", label: "Integration", desktopWidth: "minmax(12rem,0.9fr)" },
@@ -168,6 +171,8 @@ function ConnectionSelectionCell(input: {
   onConnectionChange: (nextConnectionId: string) => void;
   allowNone?: boolean;
   disabled?: boolean | undefined;
+  errorMessage?: string | null | undefined;
+  invalid?: boolean | undefined;
   readOnly?: boolean | undefined;
 }): React.JSX.Element {
   const selectedConnection = input.availableConnections.find(
@@ -192,36 +197,45 @@ function ConnectionSelectionCell(input: {
   }
 
   return (
-    <Select
-      disabled={input.disabled === true}
-      onValueChange={(nextConnectionId) => {
-        if (nextConnectionId === null) {
-          return;
-        }
-        input.onConnectionChange(nextConnectionId);
-      }}
-      value={input.selectedConnectionId ?? null}
-    >
-      <SelectTrigger aria-label={input.ariaLabel} className="w-full min-w-0">
-        <SelectValue placeholder="Choose a connection">
-          {selectedConnection === undefined ? (
-            "Choose a connection"
-          ) : (
-            <ConnectionNameCell displayName={selectedConnection.displayName} />
-          )}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        {input.allowNone === true ? (
-          <SelectItem value={NoProxiedConnectionValue}>None</SelectItem>
-        ) : null}
-        {input.availableConnections.map((connection) => (
-          <SelectItem key={connection.id} value={connection.id}>
-            {connection.displayName}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <div className="grid gap-1.5">
+      <Select
+        disabled={input.disabled === true}
+        onValueChange={(nextConnectionId) => {
+          if (nextConnectionId === null) {
+            return;
+          }
+          input.onConnectionChange(nextConnectionId);
+        }}
+        value={input.selectedConnectionId ?? null}
+      >
+        <SelectTrigger
+          aria-invalid={input.invalid === true ? true : undefined}
+          aria-label={input.ariaLabel}
+          className="w-full min-w-0"
+        >
+          <SelectValue placeholder="Choose a connection">
+            {selectedConnection === undefined ? (
+              "Choose a connection"
+            ) : (
+              <ConnectionNameCell displayName={selectedConnection.displayName} />
+            )}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {input.allowNone === true ? (
+            <SelectItem value={NoProxiedConnectionValue}>None</SelectItem>
+          ) : null}
+          {input.availableConnections.map((connection) => (
+            <SelectItem key={connection.id} value={connection.id}>
+              {connection.displayName}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {input.invalid === true && input.errorMessage !== null && input.errorMessage !== undefined ? (
+        <p className="text-destructive text-xs">{input.errorMessage}</p>
+      ) : null}
+    </div>
   );
 }
 
@@ -1045,7 +1059,7 @@ export function SandboxProfileIntegrationsSetupSection(
                           <div
                             className={`${SandboxProfileIntegrationCellContentClassName} text-sm font-medium`}
                           >
-                            Agent provider
+                            Agent runtime connection
                           </div>
                         </ResponsiveFieldListCell>
                         <ResponsiveFieldListCell columnKey="proxied-connection">
@@ -1070,7 +1084,7 @@ export function SandboxProfileIntegrationsSetupSection(
                           {isReadOnly ? null : (
                             <RemoveIntegrationBindingButton
                               disabled={controlsAreDisabled}
-                              label="Remove agent provider"
+                              label="Remove agent runtime connection"
                               onRemove={() => {
                                 if (controlsAreDisabled) {
                                   return;
@@ -1123,6 +1137,8 @@ export function SandboxProfileIntegrationsSetupSection(
                             }}
                             selectedConnectionId={agentRow?.connectionId}
                             disabled={controlsAreDisabled}
+                            errorMessage={AgentRuntimeConnectionRequiredMessage}
+                            invalid={input.showAgentRuntimeConnectionError === true}
                             readOnly={isReadOnly}
                           />
                         </ResponsiveFieldListCell>
