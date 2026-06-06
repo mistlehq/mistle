@@ -1,11 +1,6 @@
-import { z } from "@hono/zod-openapi";
 import type { McpServer, ToolAnnotations } from "@modelcontextprotocol/server";
 
 import { OrganizationPermissions } from "../../auth/services/organization-policy.js";
-import {
-  sandboxProfileIdParamsSchema,
-  sandboxProfileVersionParamsSchema,
-} from "../../sandbox-profiles/schemas.js";
 import { getProfileVersionMaintenanceScript } from "../../sandbox-profiles/services/get-profile-version-maintenance-script.js";
 import { getProfileVersionSetupScript } from "../../sandbox-profiles/services/get-profile-version-setup-script.js";
 import { getProfile } from "../../sandbox-profiles/services/get-profile.js";
@@ -13,6 +8,13 @@ import { listProfiles } from "../../sandbox-profiles/services/list-profiles.js";
 import { putProfileVersionDraft } from "../../sandbox-profiles/services/put-profile-version-draft.js";
 import { putProfileVersionMaintenanceScript } from "../../sandbox-profiles/services/put-profile-version-maintenance-script.js";
 import type { MistleMcpServerContext } from "../server.js";
+import {
+  mcpListSandboxProfilesInputSchema,
+  mcpProfileDraftSetupScriptPutInputSchema,
+  mcpProfileMaintenanceScriptPutInputSchema,
+  mcpSandboxProfileIdParamsSchema,
+  mcpSandboxProfileVersionParamsSchema,
+} from "../tool-schemas.js";
 import {
   requireMcpSandboxProfileScope,
   requireMcpToolPermission,
@@ -33,39 +35,13 @@ const MutatingToolAnnotations: ToolAnnotations = {
   openWorldHint: false,
 };
 
-const mcpListSandboxProfilesQuerySchema = z
-  .object({
-    limit: z.number().int().min(1).max(100).optional(),
-    after: z.string().min(1).optional(),
-    before: z.string().min(1).optional(),
-  })
-  .strict();
-
-const mcpSandboxProfileVersionParamsSchema = sandboxProfileVersionParamsSchema
-  .extend({
-    version: z.number().int().min(1),
-  })
-  .strict();
-
-const profileDraftSetupScriptPutInputSchema = mcpSandboxProfileVersionParamsSchema
-  .extend({
-    setupScript: z.string().min(1).nullable(),
-  })
-  .strict();
-
-const profileMaintenanceScriptPutInputSchema = mcpSandboxProfileVersionParamsSchema
-  .extend({
-    maintenanceScript: z.string().min(1).nullable(),
-  })
-  .strict();
-
 export function registerProfileTools(server: McpServer, context: MistleMcpServerContext): void {
   server.registerTool(
     "profile_list",
     {
       title: "List sandbox profiles",
       description: "List sandbox profiles available to the current Mistle actor",
-      inputSchema: mcpListSandboxProfilesQuerySchema,
+      inputSchema: mcpListSandboxProfilesInputSchema,
       annotations: {
         ...ReadOnlyToolAnnotations,
         title: "List sandbox profiles",
@@ -117,7 +93,7 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
     {
       title: "Get a sandbox profile",
       description: "Get a sandbox profile by id using the current Mistle actor",
-      inputSchema: sandboxProfileIdParamsSchema,
+      inputSchema: mcpSandboxProfileIdParamsSchema,
       annotations: {
         ...ReadOnlyToolAnnotations,
         title: "Get a sandbox profile",
@@ -190,7 +166,7 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
     {
       title: "Put sandbox profile draft setup script",
       description: "Update the setup script for a sandbox profile draft version",
-      inputSchema: profileDraftSetupScriptPutInputSchema,
+      inputSchema: mcpProfileDraftSetupScriptPutInputSchema,
       annotations: {
         ...MutatingToolAnnotations,
         title: "Put sandbox profile draft setup script",
@@ -265,7 +241,7 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
     {
       title: "Put sandbox profile maintenance script",
       description: "Update the snapshot maintenance script for a sandbox profile version",
-      inputSchema: profileMaintenanceScriptPutInputSchema,
+      inputSchema: mcpProfileMaintenanceScriptPutInputSchema,
       annotations: {
         ...MutatingToolAnnotations,
         title: "Put sandbox profile maintenance script",

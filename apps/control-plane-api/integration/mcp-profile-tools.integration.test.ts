@@ -82,7 +82,12 @@ const JsonRpcToolsListResponseSchema = z
           z
             .object({
               name: z.string().min(1),
-              inputSchema: z.unknown(),
+              inputSchema: z
+                .object({
+                  type: z.literal("object"),
+                })
+                .loose(),
+              outputSchema: z.unknown().optional(),
             })
             .loose(),
         ),
@@ -132,6 +137,7 @@ describe.concurrent("MCP profile tools integration", () => {
       "sandbox_instance_port_access_create",
       "sandbox_operation_events_list",
     ]);
+    expect(tools.every((tool) => tool.outputSchema === undefined)).toBe(true);
   });
 
   it("lists sandbox profiles with the REST response shape scoped to the API key organization", async ({
