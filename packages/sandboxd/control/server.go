@@ -13,7 +13,9 @@ import (
 	"time"
 
 	"github.com/mistle/sandboxd/protocol"
-	"github.com/mistle/sandboxd/runtime"
+	"github.com/mistle/sandboxd/sandboxdstate"
+	"github.com/mistle/sandboxd/supervision"
+	"github.com/mistle/sandboxd/timeutil"
 	"github.com/mistle/sandboxd/tunnel"
 	tunnelprotocol "github.com/mistle/sandboxd/tunnel/protocol"
 )
@@ -48,6 +50,7 @@ type serverState struct {
 	mutex           sync.Mutex
 	phase           ActivationPhase
 	activationInput *protocol.ActivationInput
+	sandboxdState   *sandboxdstate.State
 	initError       *string
 }
 
@@ -179,7 +182,9 @@ func (server *Server) dispatchServerRequest(request Request) (Response, bool) {
 	case RequestReady:
 		return OKResponse(nil), false
 	case RequestShutdown:
-		server.beginShutdown()
+		if err := server.beginShutdown(); err != nil {
+			return ErrorResponse(err.Error()), false
+		}
 		return OKResponse(nil), true
 	case RequestActivate:
 		if err := server.beginActivate(*request.ActivationInput); err != nil {
@@ -196,12 +201,19 @@ func (server *Server) dispatchServerRequest(request Request) (Response, bool) {
 	}
 }
 
-func (server *Server) beginShutdown() {
+func (server *Server) beginShutdown() error {
 	server.state.mutex.Lock()
 	defer server.state.mutex.Unlock()
+	if server.state.sandboxdState != nil {
+		if err := server.state.sandboxdState.Close(); err != nil {
+			return fmt.Errorf("failed to close sandboxd state: %w", err)
+		}
+	}
 	server.state.phase = ActivationPhaseUnactivated
 	server.state.activationInput = nil
+	server.state.sandboxdState = nil
 	server.state.initError = nil
+	return nil
 }
 
 func (server *Server) beginActivate(activationInput protocol.ActivationInput) error {
@@ -214,7 +226,14 @@ func (server *Server) beginActivate(activationInput protocol.ActivationInput) er
 	case ActivationPhaseUnactivated:
 		server.state.phase = ActivationPhaseActivating
 		server.state.activationInput = cloneActivationInput(activationInput)
-		errorText := "failed to initialize sandboxd state: sandboxd state initialization is not migrated to Go"
+		sandboxdState, err := sandboxdstate.ActivateNew(activationInput, timeutil.SystemClock{})
+		if err == nil {
+			server.state.sandboxdState = sandboxdState
+			server.state.phase = ActivationPhaseActivated
+			server.state.initError = nil
+			return nil
+		}
+		errorText := fmt.Sprintf("failed to initialize sandboxd state: %s", err.Error())
 		server.state.phase = ActivationPhaseFailed
 		server.state.initError = &errorText
 		return fmt.Errorf("sandbox startup request was rejected: sandboxd activation failed: %s", errorText)
@@ -229,6 +248,9 @@ func (server *Server) beginActivate(activationInput protocol.ActivationInput) er
 		}
 		if string(server.state.activationInput.RuntimePlan) != string(activationInput.RuntimePlan) {
 			return fmt.Errorf("failed to resume sandboxd state: initialized activation cannot change runtime plan")
+		}
+		if server.state.sandboxdState == nil {
+			return fmt.Errorf("failed to resume sandboxd state: activated daemon is missing sandboxd state")
 		}
 		return fmt.Errorf("failed to resume sandboxd state: activated daemon resume is not migrated to Go")
 	case ActivationPhaseFailed:
@@ -245,15 +267,8 @@ func validateActivationInputForStateInitialization(activationInput protocol.Acti
 	if _, err := tunnel.DeriveSandboxInstanceID(activationInput.TunnelGatewayWSURL); err != nil {
 		return fmt.Errorf("failed to initialize sandboxd state: failed to start bootstrap tunnel session: %w", err)
 	}
-	var runtimePlan runtime.CompiledRuntimePlan
-	if err := json.Unmarshal(activationInput.RuntimePlan, &runtimePlan); err != nil {
+	if _, err := sandboxdstate.DecodeRuntimePlan(activationInput.RuntimePlan); err != nil {
 		return fmt.Errorf("failed to initialize sandboxd state: failed to apply session input: %w", err)
-	}
-	if runtimePlan.SandboxProfileID == "" {
-		return fmt.Errorf("failed to initialize sandboxd state: failed to apply session input: runtime plan sandboxProfileId is required")
-	}
-	if runtimePlan.Version == 0 {
-		return fmt.Errorf("failed to initialize sandboxd state: failed to apply session input: runtime plan version is required")
 	}
 	return nil
 }
@@ -369,19 +384,24 @@ func gitSigningConfigEqual(left *protocol.GitSigningConfig, right *protocol.GitS
 }
 
 type healthResponse struct {
-	DaemonPhase string  `json:"daemon_phase"`
-	ObservedAt  string  `json:"observed_at"`
-	Snapshot    *string `json:"snapshot"`
-	InitError   *string `json:"init_error"`
+	DaemonPhase string                      `json:"daemon_phase"`
+	ObservedAt  string                      `json:"observed_at"`
+	Snapshot    *supervision.HealthSnapshot `json:"snapshot"`
+	InitError   *string                     `json:"init_error"`
 }
 
 func (server *Server) healthResponse() healthResponse {
 	server.state.mutex.Lock()
 	defer server.state.mutex.Unlock()
+	var snapshot *supervision.HealthSnapshot
+	if server.state.phase == ActivationPhaseActivated && server.state.sandboxdState != nil {
+		healthSnapshot := server.state.sandboxdState.HealthSnapshot()
+		snapshot = &healthSnapshot
+	}
 	return healthResponse{
 		DaemonPhase: string(server.state.phase),
 		ObservedAt:  time.Now().UTC().Format(time.RFC3339Nano),
-		Snapshot:    nil,
+		Snapshot:    snapshot,
 		InitError:   server.state.initError,
 	}
 }

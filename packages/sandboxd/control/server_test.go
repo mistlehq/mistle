@@ -27,7 +27,7 @@ func TestServerHandlesReadyAndShutdownRequests(t *testing.T) {
 	}
 }
 
-func TestServerRecordsFailedActivationWhenStateInitializationIsNotMigrated(t *testing.T) {
+func TestServerRecordsFailedActivationWhenRuntimePlanApplicationIsNotMigrated(t *testing.T) {
 	socketPath := shortUnixSocketPath(t)
 	server, err := StartServer(socketPath)
 	requireNoError(t, err)
@@ -37,12 +37,12 @@ func TestServerRecordsFailedActivationWhenStateInitializationIsNotMigrated(t *te
 	err = SubmitActivate(socketPath, controlClientActivationInput())
 
 	if err == nil {
-		t.Fatalf("expected activation to fail before daemon state initialization is migrated")
+		t.Fatalf("expected activation to fail before runtime plan application is migrated")
 	}
-	assertEqual(t, err.Error(), "control socket returned an error: sandbox startup request was rejected: sandboxd activation failed: failed to initialize sandboxd state: sandboxd state initialization is not migrated to Go")
+	assertEqual(t, err.Error(), "control socket returned an error: sandbox startup request was rejected: sandboxd activation failed: failed to initialize sandboxd state: failed to apply runtime plan: runtime plan application is not migrated to Go")
 	health := fetchHealthResponse(t, server)
 	assertEqual(t, health["daemon_phase"].(string), "failed")
-	assertEqual(t, health["init_error"].(string), "failed to initialize sandboxd state: sandboxd state initialization is not migrated to Go")
+	assertEqual(t, health["init_error"].(string), "failed to initialize sandboxd state: failed to apply runtime plan: runtime plan application is not migrated to Go")
 }
 
 func TestServerRejectsDuplicateActivationAfterFailure(t *testing.T) {
@@ -59,7 +59,7 @@ func TestServerRejectsDuplicateActivationAfterFailure(t *testing.T) {
 	if firstErr == nil || secondErr == nil {
 		t.Fatalf("expected both activation attempts to fail")
 	}
-	assertEqual(t, secondErr.Error(), "control socket returned an error: sandbox startup request was rejected: sandboxd activation already failed: failed to initialize sandboxd state: sandboxd state initialization is not migrated to Go")
+	assertEqual(t, secondErr.Error(), "control socket returned an error: sandbox startup request was rejected: sandboxd activation already failed: failed to initialize sandboxd state: failed to apply runtime plan: runtime plan application is not migrated to Go")
 }
 
 func TestServerRejectsActivationWithInvalidGatewayURLBeforeStateInitialization(t *testing.T) {
@@ -109,6 +109,39 @@ func TestServerShutdownClearsFailedActivationState(t *testing.T) {
 
 	requireNoError(t, SubmitShutdown(socketPath))
 	requireNoError(t, server.Wait())
+}
+
+func TestServerActivatesPrematerializedSnapshotState(t *testing.T) {
+	socketPath := shortUnixSocketPath(t)
+	server, err := StartServer(socketPath)
+	requireNoError(t, err)
+	defer server.Close()
+	waitForControlSocket(t, socketPath)
+	activationInput := controlClientActivationInput()
+	activationInput.RuntimePlan = []byte(`{
+		"sandboxProfileId": "sbp_control",
+		"version": 1,
+		"image": {
+			"source": "snapshot",
+			"imageRef": "snapshot-ref"
+		},
+		"egressRoutes": [],
+		"artifacts": [],
+		"runtimeClients": []
+	}`)
+
+	requireNoError(t, SubmitActivate(socketPath, activationInput))
+
+	health := fetchHealthResponse(t, server)
+	assertEqual(t, health["daemon_phase"].(string), "activated")
+	if health["init_error"] != nil {
+		t.Fatalf("expected no init_error after activation, got %#v", health["init_error"])
+	}
+	snapshot := health["snapshot"].(map[string]any)
+	components := snapshot["components"].([]any)
+	firstComponent := components[0].(map[string]any)
+	assertEqual(t, firstComponent["component"].(string), "sandboxd")
+	assertEqual(t, firstComponent["state"].(string), "stopped")
 }
 
 func TestServerServesUnactivatedHealthResponse(t *testing.T) {
