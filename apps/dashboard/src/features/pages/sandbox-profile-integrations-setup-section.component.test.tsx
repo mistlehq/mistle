@@ -25,7 +25,10 @@ import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
 } from "./sandbox-profile-binding-config-editor.js";
-import { SandboxProfileIntegrationsSetupSection } from "./sandbox-profile-integrations-setup-section.js";
+import {
+  SandboxProfileIntegrationsSetupSection,
+  SandboxProfileIntegrationsSetupUnavailableState,
+} from "./sandbox-profile-integrations-setup-section.js";
 
 type SandboxProfileIntegrationsSetupSectionProps = ComponentProps<
   typeof SandboxProfileIntegrationsSetupSection
@@ -762,6 +765,36 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
 
     expect(screen.getByText("Save failed")).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByText("Save failed")).toBeNull();
+  });
+
+  it("collapses paired integration load failures into one notice", () => {
+    render(
+      <SandboxProfileIntegrationsSetupUnavailableState
+        integrationBindingsError={new Error("Could not load sandbox profile integration bindings.")}
+        integrationDirectoryError={new Error("Could not load integration connections.")}
+      />,
+    );
+
+    expect(screen.getByText("Could not load runtime and connections")).toBeDefined();
+    expect(screen.getByText("Could not load sandbox profile integration bindings.")).toBeDefined();
+    expect(screen.getByText("Could not load integration connections.")).toBeDefined();
+    expect(screen.queryByText("Could not load integration bindings")).toBeNull();
+  });
+
+  it("shows agent runtime connection save errors on the field instead of a section notice", () => {
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          agentRuntimeConnectionErrorMessage: "Select an agent runtime connection.",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Select an agent runtime connection.")).toBeDefined();
+    expect(
+      screen.getByRole("combobox", { name: "OpenAI connection" }).getAttribute("aria-invalid"),
+    ).toBe("true");
     expect(screen.queryByText("Save failed")).toBeNull();
   });
 });

@@ -3746,11 +3746,16 @@ describe("SandboxProfileEditorPage", () => {
 
   it("surfaces draft save failures inside the sandbox profile tab", () => {
     renderDraftActionsHarness({
-      draftSaveError: "Saving draft failed. Please try again later.",
+      draftSaveError:
+        "Saving draft failed. Fix the highlighted profile settings below and try again.",
     });
 
     expect(screen.queryByText("Profile version action failed")).toBeNull();
-    expect(screen.getByText("Saving draft failed. Please try again later.")).toBeDefined();
+    expect(
+      screen.getByText(
+        "Saving draft failed. Fix the highlighted profile settings below and try again.",
+      ),
+    ).toBeDefined();
   });
 
   it("surfaces saved draft trigger impact warnings", () => {

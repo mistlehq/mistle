@@ -101,7 +101,7 @@ type SandboxProfileIntegrationsSetupSectionProps = {
   runtimeSettings: React.ReactNode | null;
   disabled?: boolean | undefined;
   readOnly?: boolean | undefined;
-  showAgentRuntimeConnectionError?: boolean | undefined;
+  agentRuntimeConnectionErrorMessage?: string | null | undefined;
 };
 
 const NoGitConnectionValue = "none";
@@ -112,9 +112,6 @@ const GitCommitSigningTooltip =
   "Commits made in sandboxes will be signed with the acting user's linked GitHub account when enabled.";
 const GitCommitSigningIdentityLinkingDisabledMessage = "Requires identity linking";
 const OrganizationIdentityLinkingSettingsPath = "/settings/organization/identity-linking";
-const AgentRuntimeConnectionRequiredMessage =
-  "Select and save an agent runtime connection before using Setup Assistant.";
-
 const SandboxProfileIntegrationConnectionColumns = [
   { key: "integration", label: "Integration", desktopWidth: "minmax(8rem,0.55fr)" },
   {
@@ -863,23 +860,14 @@ export function SandboxProfileIntegrationsSetupSection(
 
   return (
     <div className="flex flex-col gap-4">
-      {input.integrationBindingsQuery.isError ? (
-        <Notice title="Could not load integration bindings" variant="alert">
-          {resolveApiErrorMessage({
-            error: input.integrationBindingsQuery.error,
-            fallbackMessage: "Could not load sandbox profile integration bindings.",
-          })}
-        </Notice>
-      ) : null}
-
-      {input.integrationDirectoryQuery.isError ? (
-        <Notice title="Could not load integration connections" variant="alert">
-          {resolveApiErrorMessage({
-            error: input.integrationDirectoryQuery.error,
-            fallbackMessage: "Could not load integration connections.",
-          })}
-        </Notice>
-      ) : null}
+      <IntegrationLoadErrorNotice
+        integrationBindingsError={
+          input.integrationBindingsQuery.isError ? input.integrationBindingsQuery.error : null
+        }
+        integrationDirectoryError={
+          input.integrationDirectoryQuery.isError ? input.integrationDirectoryQuery.error : null
+        }
+      />
 
       {input.integrationSaveError ? (
         <Notice
@@ -1137,8 +1125,11 @@ export function SandboxProfileIntegrationsSetupSection(
                             }}
                             selectedConnectionId={agentRow?.connectionId}
                             disabled={controlsAreDisabled}
-                            errorMessage={AgentRuntimeConnectionRequiredMessage}
-                            invalid={input.showAgentRuntimeConnectionError === true}
+                            errorMessage={input.agentRuntimeConnectionErrorMessage}
+                            invalid={
+                              input.agentRuntimeConnectionErrorMessage !== null &&
+                              input.agentRuntimeConnectionErrorMessage !== undefined
+                            }
                             readOnly={isReadOnly}
                           />
                         </ResponsiveFieldListCell>
@@ -1309,22 +1300,59 @@ export function SandboxProfileIntegrationsSetupUnavailableState(input: {
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4">
-      {input.integrationBindingsError !== null ? (
-        <Notice title="Could not load integration bindings" variant="alert">
-          {resolveApiErrorMessage({
-            error: input.integrationBindingsError,
-            fallbackMessage: "Could not load sandbox profile integration bindings.",
-          })}
-        </Notice>
-      ) : null}
-      {input.integrationDirectoryError !== null ? (
-        <Notice title="Could not load integration connections" variant="alert">
-          {resolveApiErrorMessage({
-            error: input.integrationDirectoryError,
-            fallbackMessage: "Could not load integration connections.",
-          })}
-        </Notice>
-      ) : null}
+      <IntegrationLoadErrorNotice
+        integrationBindingsError={input.integrationBindingsError}
+        integrationDirectoryError={input.integrationDirectoryError}
+      />
     </div>
   );
+}
+
+function IntegrationLoadErrorNotice(input: {
+  integrationBindingsError: unknown;
+  integrationDirectoryError: unknown;
+}): React.JSX.Element | null {
+  const bindingsMessage =
+    input.integrationBindingsError === null
+      ? null
+      : resolveApiErrorMessage({
+          error: input.integrationBindingsError,
+          fallbackMessage: "Could not load sandbox profile integration bindings.",
+        });
+  const directoryMessage =
+    input.integrationDirectoryError === null
+      ? null
+      : resolveApiErrorMessage({
+          error: input.integrationDirectoryError,
+          fallbackMessage: "Could not load integration connections.",
+        });
+
+  if (bindingsMessage !== null && directoryMessage !== null) {
+    return (
+      <Notice title="Could not load runtime and connections" variant="alert">
+        <div className="space-y-1">
+          <p>{bindingsMessage}</p>
+          <p>{directoryMessage}</p>
+        </div>
+      </Notice>
+    );
+  }
+
+  if (bindingsMessage !== null) {
+    return (
+      <Notice title="Could not load integration bindings" variant="alert">
+        {bindingsMessage}
+      </Notice>
+    );
+  }
+
+  if (directoryMessage !== null) {
+    return (
+      <Notice title="Could not load integration connections" variant="alert">
+        {directoryMessage}
+      </Notice>
+    );
+  }
+
+  return null;
 }

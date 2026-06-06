@@ -401,6 +401,40 @@ const AgentRuntimeRequiredErrorCode = "AGENT_RUNTIME_REQUIRED";
 const AgentRuntimeConnectionRequiredErrorCode = "AGENT_RUNTIME_CONNECTION_REQUIRED";
 const SetupAssistantAgentRuntimeRequiredMessage =
   "Select and save an agent runtime connection before using Setup Assistant.";
+const SaveDraftAgentRuntimeConnectionRequiredMessage = "Select an agent runtime connection.";
+const DraftSaveWorkflowErrorMessage =
+  "Saving draft failed. Fix the highlighted profile settings below and try again.";
+
+const IntegrationDraftSaveErrorCodes = new Set([
+  "CONNECTION_MISMATCH",
+  "CONNECTION_NOT_ACTIVE",
+  "INVALID_BINDING_CONFIG",
+  "INVALID_BINDING_CONNECTION_REFERENCE",
+  "INVALID_CONNECTION_TARGET_REFERENCE",
+  "INVALID_TARGET_CONFIG",
+  "INVALID_TARGET_SECRETS",
+  "KIND_MISMATCH",
+  "TARGET_DISABLED",
+]);
+const RuntimeDraftSaveErrorCodes = new Set([
+  "INVALID_SANDBOX_PROVIDER",
+  "INVALID_SANDBOX_RUNTIME_CONFIG",
+  "SANDBOX_PROVIDER_REQUIRED",
+]);
+const SkillsDraftSaveErrorCodes = new Set([
+  "SELECTED_SKILLS_NOT_FOUND",
+  "SKILLS_SOURCE_NOT_BOUND",
+  "SKILLS_SOURCE_NOT_LOADED",
+]);
+const SetupScriptDraftSaveErrorCodes = new Set(["INVALID_SETUP_SCRIPT"]);
+
+type DraftSaveErrorOwner =
+  | "agent-runtime-connection"
+  | "generic"
+  | "integrations"
+  | "runtime"
+  | "setup-script"
+  | "skills";
 
 const Definitions = createBrowserDefinitionsBundle();
 const IntegrationRegistry = Definitions.integrationRegistry;
@@ -442,6 +476,34 @@ function hasSetupAssistantAgentRuntimeConnection(input: {
       runtimeId: input.agentRuntimeId,
     });
   });
+}
+
+function resolveDraftSaveErrorOwner(error: unknown): DraftSaveErrorOwner {
+  if (!(error instanceof SandboxProfilesApiError) || error.code === null) {
+    return "generic";
+  }
+
+  if (error.code === AgentRuntimeConnectionRequiredErrorCode) {
+    return "agent-runtime-connection";
+  }
+
+  if (IntegrationDraftSaveErrorCodes.has(error.code)) {
+    return "integrations";
+  }
+
+  if (RuntimeDraftSaveErrorCodes.has(error.code)) {
+    return "runtime";
+  }
+
+  if (SkillsDraftSaveErrorCodes.has(error.code)) {
+    return "skills";
+  }
+
+  if (SetupScriptDraftSaveErrorCodes.has(error.code)) {
+    return "setup-script";
+  }
+
+  return "generic";
 }
 
 const SetupScriptPlaceholder = `#!/usr/bin/env bash
@@ -1626,6 +1688,9 @@ function ReadySandboxProfileEditorPage(input: {
     showSetupAssistantAgentRuntimeConnectionError,
     setShowSetupAssistantAgentRuntimeConnectionError,
   ] = useState(false);
+  const [saveDraftAgentRuntimeConnectionError, setSaveDraftAgentRuntimeConnectionError] = useState<
+    string | null
+  >(null);
   const [publishSuccessNoticeKey, setPublishSuccessNoticeKey] = useState(0);
   const [showPublishSuccessMessage, setShowPublishSuccessMessage] = useState(
     input.publishSuccessMessage,
@@ -1702,8 +1767,14 @@ function ReadySandboxProfileEditorPage(input: {
   useEffect(() => {
     if (setupAssistantLocalDraftHasAgentRuntime) {
       setShowSetupAssistantAgentRuntimeConnectionError(false);
+      setSaveDraftAgentRuntimeConnectionError(null);
     }
   }, [setupAssistantLocalDraftHasAgentRuntime]);
+  const agentRuntimeConnectionErrorMessage =
+    saveDraftAgentRuntimeConnectionError ??
+    (showSetupAssistantAgentRuntimeConnectionError
+      ? SetupAssistantAgentRuntimeRequiredMessage
+      : null);
   const updateGitCommitSigningIntegrationConnectionId = useCallback(
     (connectionId: string | null) => {
       setGitCommitSigningDraftState((currentState) =>
@@ -2077,6 +2148,7 @@ function ReadySandboxProfileEditorPage(input: {
 
   async function saveDraftChanges(): Promise<boolean> {
     setPublishFlushError(null);
+    setSaveDraftAgentRuntimeConnectionError(null);
     const shouldSaveRuntime = runtimeDraftState.hasUnpersistedChanges;
     const shouldSaveSkills = skillsDraftState.hasUnpersistedChanges;
     const shouldSaveGitCommitSigning = gitCommitSigningDraftState.hasUnpersistedChanges;
@@ -2085,7 +2157,7 @@ function ReadySandboxProfileEditorPage(input: {
 
     if (skillsDraftState.saveBlockedMessage !== null) {
       skillsDraftState.applyDraftValidationError?.(skillsDraftState.saveBlockedMessage);
-      setPublishFlushError(DraftSaveErrorMessage);
+      setPublishFlushError(DraftSaveWorkflowErrorMessage);
       return false;
     }
 
@@ -2104,7 +2176,7 @@ function ReadySandboxProfileEditorPage(input: {
         ? integrationDraftState.buildIntegrationBindingChanges?.()
         : undefined;
       if (integrationBindings === null) {
-        setPublishFlushError(DraftSaveErrorMessage);
+        setPublishFlushError(DraftSaveWorkflowErrorMessage);
         return false;
       }
       const setupScript = shouldSaveSetupScript
@@ -2193,11 +2265,19 @@ function ReadySandboxProfileEditorPage(input: {
 
       return true;
     } catch (error: unknown) {
-      integrationDraftState.applyDraftSaveError?.(error);
-      setupScriptDraftState.applyDraftSaveError?.(error);
-      runtimeDraftState.applyDraftSaveError?.(error);
-      skillsDraftState.applyDraftSaveError?.(error);
-      setPublishFlushError(DraftSaveErrorMessage);
+      const errorOwner = resolveDraftSaveErrorOwner(error);
+      if (errorOwner === "agent-runtime-connection") {
+        setSaveDraftAgentRuntimeConnectionError(SaveDraftAgentRuntimeConnectionRequiredMessage);
+      } else if (errorOwner === "integrations") {
+        integrationDraftState.applyDraftSaveError?.(error);
+      } else if (errorOwner === "runtime") {
+        runtimeDraftState.applyDraftSaveError?.(error);
+      } else if (errorOwner === "setup-script") {
+        setupScriptDraftState.applyDraftSaveError?.(error);
+      } else if (errorOwner === "skills") {
+        skillsDraftState.applyDraftSaveError?.(error);
+      }
+      setPublishFlushError(DraftSaveWorkflowErrorMessage);
       return false;
     }
   }
@@ -2338,9 +2418,7 @@ function ReadySandboxProfileEditorPage(input: {
           onRetryPublishSnapshot={input.onRetryPublishSnapshot}
           onSetupScriptDraftStateChange={setSetupScriptDraftState}
           setupAssistantControl={setupAssistantControl}
-          showSetupAssistantAgentRuntimeConnectionError={
-            showSetupAssistantAgentRuntimeConnectionError
-          }
+          agentRuntimeConnectionErrorMessage={agentRuntimeConnectionErrorMessage}
           maintenanceAssistantControl={maintenanceAssistantControl}
           onSaveDraftBeforeSkillsReload={saveDraftBeforeSkillsReload}
           profileId={input.profileId}
@@ -2811,7 +2889,7 @@ function SandboxProfileEditorSectionPanels(input: {
   onRetryPublishSnapshot: (version: number) => void;
   onSetupScriptDraftStateChange: (state: SandboxProfileDraftSectionState) => void;
   setupAssistantControl: SetupScriptAssistantControl;
-  showSetupAssistantAgentRuntimeConnectionError: boolean;
+  agentRuntimeConnectionErrorMessage: string | null;
   maintenanceAssistantControl: SetupScriptAssistantControl;
   profileId: string;
   publishSuccessMessage: boolean;
@@ -2907,7 +2985,7 @@ function SandboxProfileEditorSectionPanels(input: {
         }
         disabled={input.draftFieldsAreReadOnly}
         readOnly={input.draftFieldsAreReadOnly}
-        showAgentRuntimeConnectionError={input.showSetupAssistantAgentRuntimeConnectionError}
+        agentRuntimeConnectionErrorMessage={input.agentRuntimeConnectionErrorMessage}
         version={input.mode.version}
       />
       {input.currentVersion === null || sandboxProfileIntegrationRows === null ? null : (
@@ -3059,7 +3137,6 @@ const SandboxProfileEditorTabs = [
   },
 ] as const satisfies readonly SandboxProfileEditorSection<SandboxProfileEditorSectionId>[];
 
-const DraftSaveErrorMessage = "Saving draft failed. Please try again later.";
 const DraftTriggerImpactCheckFailedMessage =
   "Couldn't check whether this draft affects related triggers.";
 
@@ -3362,6 +3439,7 @@ export function SandboxProfileEditorView(input: {
     | readonly SandboxProfileVersionDraftTriggerImpactTrigger[]
     | null;
   draftTriggerImpactError: string | null;
+  draftTriggerImpactErrorAutoHideAfterMs?: number | null;
   onDraftTriggerImpactErrorDismiss: () => void;
   publishRequestIsPending?: boolean;
   saveDraftRequestIsPending?: boolean;
@@ -3540,7 +3618,12 @@ export function SandboxProfileEditorView(input: {
                 )}
                 {input.draftTriggerImpactError === null ? null : (
                   <Notice
-                    autoHideAfterMs={NoticeAutoHideDurationsMs.LONG}
+                    autoHideAfterMs={
+                      input.draftTriggerImpactErrorAutoHideAfterMs === null
+                        ? undefined
+                        : (input.draftTriggerImpactErrorAutoHideAfterMs ??
+                          NoticeAutoHideDurationsMs.LONG)
+                    }
                     dismissible
                     onDismiss={input.onDraftTriggerImpactErrorDismiss}
                     title="Trigger checks failed"
@@ -3704,7 +3787,7 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
   gitCommitSigningIntegrationConnectionId: string | null;
   onGitCommitSigningIntegrationConnectionChange: (connectionId: string | null) => void;
   runtimeSettings: ReactNode | null;
-  showAgentRuntimeConnectionError: boolean;
+  agentRuntimeConnectionErrorMessage: string | null;
   onDraftStateChange?: (state: SandboxProfileDraftSectionState) => void;
 }): React.JSX.Element | null {
   const showBindingsUnavailableNotice = input.loader.integrationBindingsQuery.isError;
@@ -3761,7 +3844,7 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
       }
       integrationDirectoryQuery={input.loader.integrationDirectoryQuery}
       runtimeSettings={input.runtimeSettings}
-      showAgentRuntimeConnectionError={input.showAgentRuntimeConnectionError}
+      agentRuntimeConnectionErrorMessage={input.agentRuntimeConnectionErrorMessage}
       {...(input.onDraftStateChange === undefined
         ? {}
         : { onDraftStateChange: input.onDraftStateChange })}
@@ -3796,7 +3879,7 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
   integrationDirectoryQuery: ReturnType<
     typeof useSandboxProfileIntegrationsLoader
   >["integrationDirectoryQuery"];
-  showAgentRuntimeConnectionError: boolean;
+  agentRuntimeConnectionErrorMessage: string | null;
   onDraftStateChange?: (state: SandboxProfileDraftSectionState) => void;
 }): React.JSX.Element {
   const activeOrganizationId = useRequiredOrganizationId();
@@ -3861,7 +3944,7 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
         gitCommitSigningIntegrationConnectionId={input.gitCommitSigningIntegrationConnectionId}
         identityLinkedGitConnectionIds={identityLinkedGitConnectionIds}
         runtimeSettings={input.runtimeSettings}
-        showAgentRuntimeConnectionError={input.showAgentRuntimeConnectionError}
+        agentRuntimeConnectionErrorMessage={input.agentRuntimeConnectionErrorMessage}
         disabled={input.disabled}
         readOnly={input.readOnly}
         onAddIntegrationBindingRow={integrationsState.onAddIntegrationBindingRow}

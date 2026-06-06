@@ -163,6 +163,16 @@ set -euo pipefail
 pnpm install
 pnpm dev:bootstrap
 pnpm lint`,
-    draftSaveErrorMessage: "Saving draft failed. Please try again later.",
+    draftSaveErrorMessage:
+      "Saving draft failed. Fix the highlighted profile settings below and try again.",
+  },
+};
+
+export const DraftSaveMissingAgentRuntimeConnection: Story = {
+  args: {
+    agentRuntimeConnectionErrorMessage: "Select an agent runtime connection.",
+    draftSaveErrorMessage:
+      "Saving draft failed. Fix the highlighted profile settings below and try again.",
+    initialBindings: [],
   },
 };

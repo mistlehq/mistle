@@ -120,6 +120,7 @@ export type SandboxProfileEditorPageStoryArgs = {
     kind: "error";
   };
   draftSaveErrorMessage?: string;
+  agentRuntimeConnectionErrorMessage?: string;
   draftTriggerImpactError?: string;
   draftTriggerImpactAffectedTriggers?: readonly SandboxProfileVersionDraftTriggerImpactTrigger[];
   duplicateProfileAvailability?: "available" | "unavailable";
@@ -1218,6 +1219,9 @@ function SandboxProfileEditorPageStoryView(
       }
       duplicateProfileTriggerUsagesIsPending={duplicateProfileTriggerState === "loading"}
       draftTriggerImpactError={input.draftTriggerImpactError ?? null}
+      {...(input.draftTriggerImpactError === undefined
+        ? {}
+        : { draftTriggerImpactErrorAutoHideAfterMs: null })}
       draftTriggerImpactAffectedTriggers={input.draftTriggerImpactAffectedTriggers ?? null}
       onDraftTriggerImpactErrorDismiss={() => {}}
       hasUnpersistedSetupScriptChanges={setupScriptDraft !== persistedSetupScript}
@@ -1273,6 +1277,9 @@ function SandboxProfileEditorPageStoryView(
                     }}
                     integrationRows={integrationRows}
                     integrationSaveError={null}
+                    agentRuntimeConnectionErrorMessage={
+                      input.agentRuntimeConnectionErrorMessage ?? null
+                    }
                     gitCommitSigningIntegrationConnectionId={
                       gitCommitSigningIntegrationConnectionId
                     }
