@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -37,6 +38,47 @@ func TestServerReturnsControlErrorForActivationUntilDaemonActivationIsMigrated(t
 		t.Fatalf("expected activation to fail before daemon activation is migrated")
 	}
 	assertEqual(t, err.Error(), "control socket returned an error: sandbox startup request was rejected: daemon activation is not migrated to Go")
+}
+
+func TestServerServesUnactivatedHealthResponse(t *testing.T) {
+	socketPath := shortUnixSocketPath(t)
+	server, err := StartServerWithHealthEndpoint(socketPath, "127.0.0.1:0")
+	requireNoError(t, err)
+	defer server.Close()
+
+	response, err := http.Get("http://" + server.HealthEndpointAddr() + DefaultHealthEndpointPath)
+
+	requireNoError(t, err)
+	defer response.Body.Close()
+	assertEqual(t, response.StatusCode, http.StatusOK)
+	var body map[string]any
+	requireNoError(t, json.NewDecoder(response.Body).Decode(&body))
+	assertEqual(t, body["daemon_phase"].(string), "unactivated")
+	if body["observed_at"].(string) == "" {
+		t.Fatalf("expected observed_at timestamp")
+	}
+	if body["snapshot"] != nil {
+		t.Fatalf("expected nil snapshot before activation")
+	}
+	if body["init_error"] != nil {
+		t.Fatalf("expected nil init_error before activation")
+	}
+}
+
+func TestServerServesJSONNotFoundFromHealthEndpoint(t *testing.T) {
+	socketPath := shortUnixSocketPath(t)
+	server, err := StartServerWithHealthEndpoint(socketPath, "127.0.0.1:0")
+	requireNoError(t, err)
+	defer server.Close()
+
+	response, err := http.Get("http://" + server.HealthEndpointAddr() + "/missing")
+
+	requireNoError(t, err)
+	defer response.Body.Close()
+	assertEqual(t, response.StatusCode, http.StatusNotFound)
+	var body map[string]string
+	requireNoError(t, json.NewDecoder(response.Body).Decode(&body))
+	assertEqual(t, body["error"], "not_found")
 }
 
 func TestServerReturnsProtocolErrorForInvalidRequestPayload(t *testing.T) {
