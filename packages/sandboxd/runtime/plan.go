@@ -1,5 +1,7 @@
 package runtime
 
+import "encoding/json"
+
 type CompiledRuntimePlan struct {
 	SandboxProfileID string                    `json:"sandboxProfileId"`
 	Version          uint32                    `json:"version"`
@@ -8,6 +10,7 @@ type CompiledRuntimePlan struct {
 	EgressRoutes     []any                     `json:"egressRoutes"`
 	Artifacts        []CompiledRuntimeArtifact `json:"artifacts"`
 	RuntimeClients   []RuntimeClient           `json:"runtimeClients"`
+	AgentRuntimes    []CompiledAgentRuntime    `json:"agentRuntimes"`
 }
 
 type CompiledRuntimePlanImage struct {
@@ -91,3 +94,11 @@ const (
 	RuntimeClientProcessStopSignalSIGINT  RuntimeClientProcessStopSignal = "SIGINT"
 	RuntimeClientProcessStopSignalSIGKILL RuntimeClientProcessStopSignal = "SIGKILL"
 )
+
+type CompiledAgentRuntime struct {
+	RuntimeID   string          `json:"runtimeId"`
+	RuntimeKey  string          `json:"runtimeKey"`
+	ClientID    string          `json:"clientId"`
+	EndpointKey string          `json:"endpointKey"`
+	PTYLaunch   json.RawMessage `json:"ptyLaunch"`
+}
