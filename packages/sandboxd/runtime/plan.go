@@ -58,21 +58,31 @@ type RuntimeExecCommand struct {
 }
 
 type RuntimeClientSetup struct {
-	Env        map[string]string
-	Files      []RuntimeClientSetupFile
-	LaunchArgs []string
+	Env        map[string]string        `json:"env"`
+	Files      []RuntimeClientSetupFile `json:"files"`
+	LaunchArgs []string                 `json:"launchArgs"`
 }
 
 type RuntimeClientSetupFile struct {
-	FileID  string
-	Path    string
-	Content string
+	FileID    string                `json:"fileId"`
+	Path      string                `json:"path"`
+	Mode      uint32                `json:"mode"`
+	Content   string                `json:"content"`
+	WriteMode *RuntimeFileWriteMode `json:"writeMode"`
 }
 
+type RuntimeFileWriteMode string
+
+const (
+	RuntimeFileWriteModeOverwrite RuntimeFileWriteMode = "overwrite"
+	RuntimeFileWriteModeIfAbsent  RuntimeFileWriteMode = "if-absent"
+	RuntimeFileWriteModeMerge     RuntimeFileWriteMode = "merge"
+)
+
 type RuntimeClient struct {
-	ClientID  string
-	Setup     RuntimeClientSetup
-	Processes []RuntimeClientProcess
+	ClientID  string                 `json:"clientId"`
+	Setup     RuntimeClientSetup     `json:"setup"`
+	Processes []RuntimeClientProcess `json:"processes"`
 }
 
 type RuntimeClientProcess struct {

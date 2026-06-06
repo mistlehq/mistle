@@ -66,7 +66,10 @@ func ActivateNew(activationInput protocol.ActivationInput, clock timeutil.Clock)
 		supervisorHandle:  supervisorHandle,
 	}
 	if shouldApplyRuntimePlanForActivation(runtimePlan.Image.Source, activationInput.OperationKind) {
-		return nil, fmt.Errorf("failed to apply runtime plan: runtime plan application is not migrated to Go")
+		if err := runtime.ApplyCompiledRuntimePlan(runtimePlan); err != nil {
+			return nil, fmt.Errorf("failed to apply runtime plan: %w", err)
+		}
+		return nil, fmt.Errorf("failed to start bootstrap tunnel session: bootstrap tunnel session is not migrated to Go")
 	}
 	return state, nil
 }
