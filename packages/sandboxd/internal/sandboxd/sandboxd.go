@@ -77,6 +77,17 @@ func ParseCommand(args []string) (Command, error) {
 }
 
 func Run(programName string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
+	return runWithControlSocket(programName, args, stdin, stdout, stderr, defaultControlSocketPath)
+}
+
+func runWithControlSocket(
+	programName string,
+	args []string,
+	stdin io.Reader,
+	stdout io.Writer,
+	stderr io.Writer,
+	controlSocketPath string,
+) int {
 	command := Command{Kind: CommandSign}
 	var err error
 	if !isSignerAlias(programName) {
@@ -95,12 +106,11 @@ func Run(programName string, args []string, stdin io.Reader, stdout io.Writer, s
 		}
 		return 0
 	case CommandActivate:
-		if _, err := ReadStartupPayload(stdin, command.ActivatePayloadSource); err != nil {
+		if err := RunActivate(stdin, stdout, controlSocketPath, command.ActivatePayloadSource); err != nil {
 			_, _ = fmt.Fprintln(stderr, err.Error())
 			return 1
 		}
-		_, _ = fmt.Fprintln(stderr, "sandboxd activate is not ported to Go yet")
-		return 1
+		return 0
 	case CommandDaemon, CommandEgressProxy, CommandReady, CommandShutdown, CommandSign, CommandSkills:
 		_, _ = fmt.Fprintf(stderr, "sandboxd %s is not ported to Go yet\n", command.Kind)
 		return 1
