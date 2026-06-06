@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/mistle/sandboxd/control"
 )
 
 func TestParseCommandDefaultsToDaemon(t *testing.T) {
@@ -80,6 +83,29 @@ func TestRunEgressProxyReportsConfigReadError(t *testing.T) {
 	}
 }
 
+func TestRunDaemonServesControlSocketUntilShutdown(t *testing.T) {
+	socketPath := shortActivateUnixSocketPath(t)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := make(chan int, 1)
+	go func() {
+		code <- runWithControlSocket("sandboxd", nil, strings.NewReader(""), &stdout, &stderr, socketPath)
+	}()
+	waitForDaemonControlSocket(t, socketPath)
+
+	requireNoError(t, control.SubmitReady(socketPath))
+	requireNoError(t, control.SubmitShutdown(socketPath))
+
+	select {
+	case exitCode := <-code:
+		assertEqual(t, exitCode, 0)
+	case <-time.After(2 * time.Second):
+		t.Fatalf("daemon did not exit after shutdown")
+	}
+	assertEqual(t, stdout.String(), "")
+	assertEqual(t, stderr.String(), "")
+}
+
 func TestSignerAliasSelectsSignCommand(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -89,6 +115,20 @@ func TestSignerAliasSelectsSignCommand(t *testing.T) {
 	assertEqual(t, code, 1)
 	assertEqual(t, stdout.String(), "")
 	assertEqual(t, stderr.String(), "unsupported SSH signing invocation: expected '-Y' but received 'version'\n")
+}
+
+func waitForDaemonControlSocket(t *testing.T, socketPath string) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if err := control.SubmitReady(socketPath); err == nil {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("daemon control socket %s was not ready", socketPath)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }
 
 func TestReadStartupPayloadUntilEOF(t *testing.T) {

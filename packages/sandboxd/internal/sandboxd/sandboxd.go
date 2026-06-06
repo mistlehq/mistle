@@ -145,8 +145,16 @@ func runWithControlSocket(
 		}
 		return 0
 	case CommandDaemon:
-		_, _ = fmt.Fprintf(stderr, "sandboxd %s is not ported to Go yet\n", command.Kind)
-		return 1
+		server, err := control.StartServer(controlSocketPath)
+		if err != nil {
+			_, _ = fmt.Fprintln(stderr, err.Error())
+			return 1
+		}
+		if err := server.Wait(); err != nil {
+			_, _ = fmt.Fprintln(stderr, err.Error())
+			return 1
+		}
+		return 0
 	default:
 		_, _ = fmt.Fprintf(stderr, "unknown parsed sandboxd command: %s\n", command.Kind)
 		return 1
