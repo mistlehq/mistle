@@ -3,6 +3,7 @@ package process
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/mistle/sandboxd/supervision"
 	"github.com/mistle/sandboxd/timeutil"
@@ -13,6 +14,9 @@ type RuntimeClientProcessManager struct {
 	codexAppServerControlHandle *CodexAppServerControlHandle
 	openCodeServerControlHandle *OpenCodeServerControlHandle
 	supervisorHandle            *supervision.SandboxdSupervisorHandle
+	monitorShutdown             chan struct{}
+	monitorWaitGroup            sync.WaitGroup
+	monitorStopOnce             sync.Once
 }
 
 type ProcessManagerErrorKind string
@@ -145,15 +149,19 @@ func StartRuntimeClientProcessManagerWithSupervisor(
 		startedProcesses = append(startedProcesses, managedProcess)
 	}
 
-	return &RuntimeClientProcessManager{
+	manager := &RuntimeClientProcessManager{
 		processes:                   startedProcesses,
 		codexAppServerControlHandle: codexAppServerControlHandle,
 		openCodeServerControlHandle: openCodeServerControlHandle,
 		supervisorHandle:            supervisorHandle,
-	}, nil
+		monitorShutdown:             make(chan struct{}),
+	}
+	manager.startProcessMonitors()
+	return manager, nil
 }
 
 func (manager *RuntimeClientProcessManager) Stop(clock timeutil.Clock, sleeper timeutil.Sleeper) error {
+	manager.stopProcessMonitors()
 	if err := stopManagedRuntimeClientProcesses(manager.processes, clock, sleeper); err != nil {
 		return &ProcessManagerError{
 			Kind:  ProcessManagerStopProcessesError,
@@ -170,6 +178,30 @@ func (manager *RuntimeClientProcessManager) CodexAppServerControlHandle() *Codex
 
 func (manager *RuntimeClientProcessManager) OpenCodeServerControlHandle() *OpenCodeServerControlHandle {
 	return manager.openCodeServerControlHandle
+}
+
+func (manager *RuntimeClientProcessManager) startProcessMonitors() {
+	if manager.codexAppServerControlHandle != nil {
+		manager.monitorWaitGroup.Add(1)
+		go func() {
+			defer manager.monitorWaitGroup.Done()
+			runCodexAppServerMonitor(manager.codexAppServerControlHandle, manager.monitorShutdown)
+		}()
+	}
+	if manager.openCodeServerControlHandle != nil {
+		manager.monitorWaitGroup.Add(1)
+		go func() {
+			defer manager.monitorWaitGroup.Done()
+			runOpenCodeServerMonitor(manager.openCodeServerControlHandle, manager.monitorShutdown)
+		}()
+	}
+}
+
+func (manager *RuntimeClientProcessManager) stopProcessMonitors() {
+	manager.monitorStopOnce.Do(func() {
+		close(manager.monitorShutdown)
+	})
+	manager.monitorWaitGroup.Wait()
 }
 
 func stopManagedRuntimeClientProcesses(

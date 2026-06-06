@@ -33,6 +33,34 @@ func (managed *managedRuntimeClientProcess) Stop(clock timeutil.Clock, sleeper t
 	return StopRuntimeClientProcess(managed.process, clock, sleeper)
 }
 
+func (managed *managedRuntimeClientProcess) PID() uint32 {
+	managed.mutex.Lock()
+	defer managed.mutex.Unlock()
+	return managed.process.PID()
+}
+
+func (managed *managedRuntimeClientProcess) ExitObservation() (processExitObservation, error) {
+	managed.mutex.Lock()
+	defer managed.mutex.Unlock()
+
+	processID := managed.process.PID()
+	exited, err := ProcessHasExited(managed.process)
+	if err != nil {
+		return processExitObservation{}, err
+	}
+	if !exited {
+		return processExitObservation{PID: processID}, nil
+	}
+	reason, fields := processExitEventFields(managed.process)
+	return processExitObservation{
+		PID:         processID,
+		Exited:      true,
+		Description: processExitDescription(managed.process),
+		Reason:      reason,
+		Fields:      fields,
+	}, nil
+}
+
 func (managed *managedRuntimeClientProcess) Restart(
 	clock timeutil.Clock,
 	sleeper timeutil.Sleeper,
@@ -54,6 +82,14 @@ func (managed *managedRuntimeClientProcess) Restart(
 
 	managed.process = replacementProcess
 	return replacementProcess, "", nil
+}
+
+type processExitObservation struct {
+	PID         uint32
+	Exited      bool
+	Description string
+	Reason      string
+	Fields      map[string]any
 }
 
 type CodexAppServerObservationHandle struct {

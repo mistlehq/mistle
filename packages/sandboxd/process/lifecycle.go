@@ -15,6 +15,9 @@ import (
 const (
 	DefaultProcessExitPollInterval      = 25 * time.Millisecond
 	DefaultProcessReadinessPollInterval = 100 * time.Millisecond
+	DefaultProcessMonitorPollInterval   = 1000 * time.Millisecond
+	CodexAppServerFailureThreshold      = 3
+	OpenCodeServerFailureThreshold      = 3
 )
 
 type RunningRuntimeClientProcess struct {
@@ -233,6 +236,29 @@ func SignalRuntimeClientProcess(process *RunningRuntimeClientProcess, signal run
 
 func DescribeProcessExit(processState osProcessState) string {
 	return describeProcessExitStatus(processState.ExitCode())
+}
+
+func processExitEventFields(process *RunningRuntimeClientProcess) (string, map[string]any) {
+	process.mutex.Lock()
+	defer process.mutex.Unlock()
+	processState := process.child.ProcessState
+	if processState == nil {
+		return "process_exited", map[string]any{
+			"exitKind": "process_exited",
+			"exitCode": 0,
+		}
+	}
+	waitStatus, ok := processState.Sys().(syscall.WaitStatus)
+	if ok && waitStatus.Signaled() {
+		return "process_signaled", map[string]any{
+			"exitKind": "process_signaled",
+			"signal":   int(waitStatus.Signal()),
+		}
+	}
+	return "process_exited", map[string]any{
+		"exitKind": "process_exited",
+		"exitCode": processState.ExitCode(),
+	}
 }
 
 func describeProcessExitStatus(exitCode int) string {
