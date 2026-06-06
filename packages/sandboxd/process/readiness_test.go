@@ -1,6 +1,12 @@
 package process
 
 import (
+	"bufio"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/mistle/sandboxd/runtime"
@@ -86,4 +92,103 @@ func TestReadinessTypeTargetAndTimeout(t *testing.T) {
 	assertEqual(t, ReadinessTimeoutMS(httpSpec), uint64(2000))
 	assertEqual(t, ReadinessTarget(noneSpec), "")
 	assertEqual(t, ReadinessTimeoutMS(noneSpec), uint64(0))
+}
+
+func TestCheckTCPReadinessConnectsToListeningSocket(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	requireNoError(t, err)
+	defer listener.Close()
+	accepted := make(chan struct{})
+	go func() {
+		connection, err := listener.Accept()
+		if err == nil {
+			connection.Close()
+		}
+		close(accepted)
+	}()
+
+	host, port := splitListenerHostPort(t, listener)
+	requireNoError(t, CheckTCPReadiness(host, port))
+	<-accepted
+}
+
+func TestCheckHTTPReadinessRequiresExpectedStatus(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		assertEqual(t, request.URL.Path, "/readyz")
+		writer.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	requireNoError(t, CheckHTTPReadiness(server.URL+"/readyz", http.StatusNoContent))
+
+	err := CheckHTTPReadiness(server.URL+"/readyz", http.StatusOK)
+	if err == nil {
+		t.Fatalf("expected status mismatch to fail")
+	}
+	if !strings.Contains(err.Error(), "expected 200") {
+		t.Fatalf("expected status mismatch error, got %v", err)
+	}
+}
+
+func TestCheckWSReadinessAcceptsUpgradeResponse(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	requireNoError(t, err)
+	defer listener.Close()
+	go func() {
+		connection, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer connection.Close()
+		reader := bufio.NewReader(connection)
+		for {
+			line, err := reader.ReadString('\n')
+			if err != nil || line == "\r\n" {
+				break
+			}
+		}
+		_, _ = connection.Write([]byte("HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n"))
+	}()
+
+	host, port := splitListenerHostPort(t, listener)
+	requireNoError(t, CheckWSReadiness("ws://"+net.JoinHostPort(host, formatPort(port))+"/agent"))
+}
+
+func TestReadinessProbeRequestRejectsUnsupportedTLSReadinessScheme(t *testing.T) {
+	_, err := ReadinessProbeRequest("https://127.0.0.1:443/readyz", nil, DefaultProcessReadinessProbeTimeout)
+	if err == nil {
+		t.Fatalf("expected https readiness probe to fail")
+	}
+	assertEqual(t, err.Error(), "readiness url scheme \"https\" is not supported yet")
+}
+
+func TestCheckRuntimeClientProcessReadinessFromSpecUsesHTTPExpectedStatus(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(http.StatusAccepted)
+	}))
+	defer server.Close()
+	processSpec := RuntimeClientProcessSpec{
+		ProcessKey: "http-server",
+		Readiness: runtime.RuntimeClientProcessReadiness{
+			Type:           runtime.RuntimeClientProcessReadinessHTTP,
+			URL:            server.URL,
+			ExpectedStatus: http.StatusAccepted,
+			TimeoutMS:      1_000,
+		},
+	}
+
+	requireNoError(t, CheckRuntimeClientProcessReadinessFromSpec(processSpec))
+}
+
+func splitListenerHostPort(t *testing.T, listener net.Listener) (string, uint16) {
+	t.Helper()
+	host, portText, err := net.SplitHostPort(listener.Addr().String())
+	requireNoError(t, err)
+	port, err := net.LookupPort("tcp", portText)
+	requireNoError(t, err)
+	return host, uint16(port)
+}
+
+func formatPort(port uint16) string {
+	return strconv.FormatUint(uint64(port), 10)
 }

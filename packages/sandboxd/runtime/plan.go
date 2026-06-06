@@ -42,11 +42,12 @@ const (
 )
 
 type RuntimeClientProcessReadiness struct {
-	Type      RuntimeClientProcessReadinessType
-	URL       string
-	Host      string
-	Port      uint16
-	TimeoutMS uint64
+	Type           RuntimeClientProcessReadinessType
+	URL            string
+	Host           string
+	Port           uint16
+	ExpectedStatus uint16
+	TimeoutMS      uint64
 }
 
 type RuntimeExecCommand struct {
