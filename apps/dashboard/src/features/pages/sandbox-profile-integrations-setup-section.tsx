@@ -116,16 +116,16 @@ const AgentRuntimeConnectionRequiredMessage =
   "Select and save an agent runtime connection before using Setup Assistant.";
 
 const SandboxProfileIntegrationConnectionColumns = [
-  { key: "integration", label: "Integration", desktopWidth: "minmax(12rem,0.9fr)" },
+  { key: "integration", label: "Integration", desktopWidth: "minmax(8rem,0.55fr)" },
   {
     key: "proxied-connection",
     label: "Proxied Connection",
-    desktopWidth: "minmax(14rem,1fr)",
+    desktopWidth: "minmax(0,1fr)",
   },
   {
     key: "resources-and-tools",
     label: "Resources & Tools",
-    desktopWidth: "minmax(16rem,1.35fr)",
+    desktopWidth: "minmax(0,1fr)",
     hideMobileLabel: true,
   },
   {
