@@ -2,6 +2,8 @@ package supervision
 
 import "time"
 
+const DaemonLivenessJournalErrorDetail = "lastJournalError"
+
 type SupervisedComponent string
 
 const (
