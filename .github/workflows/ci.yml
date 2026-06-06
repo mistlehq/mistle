@@ -155,8 +155,6 @@ jobs:
               - 'tsconfig.base.json'
             rust_static:
               - '.envrc'
-              - 'packages/mstl-cli/**'
-              - 'packages/mstl-core/**'
               - 'packages/sandboxd/**'
               - 'packages/sandbox-runtime-contract/**'
               - 'flake.nix'
@@ -434,8 +432,6 @@ jobs:
         with:
           shared-key: sandbox-rust
           workspaces: |
-            packages/mstl-cli -> target
-            packages/mstl-core -> target
             packages/sandboxd -> target
           env-vars: AR CARGO CC CFLAGS CMAKE CXX DEVELOPER_DIR HOST_PATH LD MACOSX_DEPLOYMENT_TARGET NIX NM RANLIB RUST SDKROOT
           cmd-format: nix develop --command {0}
@@ -483,19 +479,7 @@ jobs:
         run: >-
           nix develop --command bash -c
           "pnpm --filter @mistle/sandboxd format:check &&
-          pnpm --filter @mistle/mstl-cli format:check &&
-          pnpm --filter @mistle/mstl-core format:check &&
-          pnpm turbo run lint typecheck --output-logs=full --concurrency=2 --filter=@mistle/sandboxd --filter=@mistle/mstl-cli --filter=@mistle/mstl-core"
-
-      - name: Run MSTL Go checks in Nix shell
-        run: >-
-          nix develop --command bash -c
-          "pnpm --filter @mistle/mstl-core lint:go &&
-          pnpm --filter @mistle/mstl-core typecheck:go &&
-          pnpm --filter @mistle/mstl-core test:go &&
-          pnpm --filter @mistle/mstl-cli lint:go &&
-          pnpm --filter @mistle/mstl-cli typecheck:go &&
-          pnpm --filter @mistle/mstl-cli test:go"
+          pnpm turbo run lint typecheck --output-logs=full --concurrency=2 --filter=@mistle/sandboxd"
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.static-rust-turbo-cache.outputs.cache-hit != 'true' }}
@@ -1187,16 +1171,6 @@ jobs:
         with:
           install_options: --no-daemon
 
-      - name: Restore MSTL cargo cache
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
-        with:
-          shared-key: mstl-rust
-          workspaces: |
-            packages/mstl-cli -> target
-            packages/mstl-core -> target
-          env-vars: AR CARGO CC CFLAGS CMAKE CXX DEVELOPER_DIR HOST_PATH LD MACOSX_DEPLOYMENT_TARGET NIX NM RANLIB RUST SDKROOT
-          cmd-format: nix develop --command {0}
-
       - name: Restore pnpm store cache
         id: test-mstl-pnpm-store-cache
         uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
@@ -1222,7 +1196,11 @@ jobs:
       - name: Run MSTL tests in Nix shell
         run: >-
           nix develop --command bash -c
-          "pnpm --filter @mistle/mstl-core test &&
+          "pnpm --filter @mistle/mstl-core lint &&
+          pnpm --filter @mistle/mstl-core typecheck &&
+          pnpm --filter @mistle/mstl-core test &&
+          pnpm --filter @mistle/mstl-cli lint &&
+          pnpm --filter @mistle/mstl-cli typecheck &&
           pnpm --filter @mistle/mstl-cli test"
 
   sandbox-base-linux:

@@ -1,31 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import { mstlCliCargoLockUpdateArgs, mstlCoreCargoLockUpdateArgs } from "./mstl-version.js";
+import { updateMstlGoVersion } from "./mstl-version.js";
 
-describe("mstlCoreCargoLockUpdateArgs", () => {
-  it("scopes the mstl-core lockfile refresh to the mstl-core package version", () => {
-    expect(mstlCoreCargoLockUpdateArgs("/repo", "0.17.0")).toEqual([
-      "update",
-      "--manifest-path",
-      "/repo/packages/mstl-core/Cargo.toml",
-      "--package",
-      "mstl-core",
-      "--precise",
-      "0.17.0",
-    ]);
-  });
-});
+describe("updateMstlGoVersion", () => {
+  it("updates the Go CLI version constant", () => {
+    const source = `const (
+\tVersion = "0.16.0"
 
-describe("mstlCliCargoLockUpdateArgs", () => {
-  it("scopes the mstl-cli lockfile refresh to the selected package version", () => {
-    expect(mstlCliCargoLockUpdateArgs("/repo", "mstl-cli", "0.17.0")).toEqual([
-      "update",
-      "--manifest-path",
-      "/repo/packages/mstl-cli/Cargo.toml",
-      "--package",
-      "mstl-cli",
-      "--precise",
-      "0.17.0",
-    ]);
+defaultControlPlaneAPIPublicURL = "http://localhost:5100"
+)`;
+
+    expect(updateMstlGoVersion(source, "0.17.0")).toBe(`const (
+\tVersion = "0.17.0"
+
+defaultControlPlaneAPIPublicURL = "http://localhost:5100"
+)`);
   });
 });

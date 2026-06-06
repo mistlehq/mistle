@@ -33,7 +33,37 @@ type authCredential struct {
 }
 
 func readAuthCredential() (authCredential, error) {
-	return readAuthCredentialFromPath(defaultAuthFilePath())
+	path, err := defaultAuthFilePath()
+	if err != nil {
+		return authCredential{}, err
+	}
+	return readAuthCredentialFromPath(path)
+}
+
+func writeOAuth(auth oauthAuth) (string, error) {
+	path, err := defaultAuthFilePath()
+	if err != nil {
+		return "", err
+	}
+	parent := filepath.Dir(path)
+	if err := os.MkdirAll(parent, 0o700); err != nil {
+		return "", fmt.Errorf("failed to create auth directory `%s`: %w", parent, err)
+	}
+
+	file := authFile{
+		AuthMode: "oauth",
+		OAuth:    &auth,
+	}
+	serialized, err := json.MarshalIndent(file, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to serialize auth file: %w", err)
+	}
+	serialized = append(serialized, '\n')
+
+	if err := os.WriteFile(path, serialized, 0o600); err != nil {
+		return "", fmt.Errorf("failed to write auth file `%s`: %w", path, err)
+	}
+	return path, nil
 }
 
 func readAuthCredentialFromPath(path string) (authCredential, error) {
@@ -79,14 +109,14 @@ func readAuthCredentialFromPath(path string) (authCredential, error) {
 	}
 }
 
-func defaultAuthFilePath() string {
+func defaultAuthFilePath() (string, error) {
 	configHome := os.Getenv("XDG_CONFIG_HOME")
 	if strings.TrimSpace(configHome) == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return filepath.Join(configDirName, authFileName)
+			return "", fmt.Errorf("failed to resolve home directory: %w", err)
 		}
 		configHome = filepath.Join(home, ".config")
 	}
-	return filepath.Join(configHome, configDirName, authFileName)
+	return filepath.Join(configHome, configDirName, authFileName), nil
 }

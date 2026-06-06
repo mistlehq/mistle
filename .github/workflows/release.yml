@@ -407,14 +407,28 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6
+        with:
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 25
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Build Mistle CLI release binary
-        run: cargo build --locked --release --manifest-path packages/mstl-cli/Cargo.toml
+        run: pnpm --filter @mistle/mstl-cli build
 
       - name: Package Mistle CLI release artifact
         shell: bash
         run: |
           version="${{ needs.validate.outputs.release_version }}"
-          binary_path="packages/mstl-cli/target/release/mistle"
+          binary_path="packages/mstl-cli/dist/mistle"
           binary_version="$("${binary_path}" --version | awk 'NR == 1 { print $2 }')"
           if [ "${binary_version}" != "${version}" ]; then
             echo "mistle binary version ${binary_version} did not match release version ${version}" >&2

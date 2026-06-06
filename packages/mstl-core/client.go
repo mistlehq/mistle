@@ -249,6 +249,9 @@ func (client *MistleClient) doJSON(request *http.Request, output any) error {
 	if err != nil {
 		return fmt.Errorf("failed to read response: %w", err)
 	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return fmt.Errorf("request failed: unexpected status %d: %s", response.StatusCode, string(responseBody))
+	}
 
 	if err := json.Unmarshal(responseBody, output); err != nil {
 		return fmt.Errorf("failed to decode response: %w", err)

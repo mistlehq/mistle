@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { assertValidReleaseVersion, normalizeReleaseTag, releaseBranchName } from "./lib.js";
-import { updateMstlCargoLockFiles, updateMstlCargoTomlVersionFiles } from "./mstl-version.js";
+import { updateMstlGoVersionFile } from "./mstl-version.js";
 import { renderReleaseNotes } from "./render-notes.js";
 import {
   updateSandboxdCargoLockFile,
@@ -119,8 +119,7 @@ function main(): void {
   const branch = releaseBranchName(version);
   updateSandboxdCargoTomlVersionFile(RepositoryRootPath, version);
   updateSandboxdCargoLockFile(RepositoryRootPath, version);
-  updateMstlCargoTomlVersionFiles(RepositoryRootPath, version);
-  updateMstlCargoLockFiles(RepositoryRootPath, version);
+  updateMstlGoVersionFile(RepositoryRootPath, version);
 
   execFileSync("git", ["switch", "-c", branch], {
     cwd: RepositoryRootPath,

@@ -232,14 +232,13 @@ func parseCodexCommand(args []string) (Command, error) {
 func runCommand(command Command, stdout io.Writer) error {
 	switch command.Name {
 	case "login":
-		return errors.New("mistle login is not available in the Go CLI yet")
+		return runLogin(stdout)
 	case "logout":
 		return removeAuthFile(stdout)
 	case "whoami":
 		return runWhoami(stdout)
 	case "update":
-		_, err := fmt.Fprintf(stdout, "Mistle CLI is already up to date (%s).\n", Version)
-		return err
+		return runUpdate(stdout)
 	case "org":
 		return runOrg(command, stdout)
 	case "profile":
@@ -303,11 +302,51 @@ func switchOrganization(selector string, stdout io.Writer) error {
 	if _, ok := os.LookupEnv(mstlcore.APIKeyEnvVar); ok {
 		return errOAuthLoginRequired
 	}
+	baseURL, err := controlPlaneAPIPublicURL()
+	if err != nil {
+		return err
+	}
 	credential, err := readAuthCredential()
-	if err != nil || credential.OAuth == nil {
+	if err != nil {
+		if errors.Is(err, errMissingAuthFile) {
+			return errOAuthLoginRequired
+		}
+		return err
+	}
+	if credential.OAuth == nil {
 		return errOAuthLoginRequired
 	}
-	_, err = fmt.Fprintf(stdout, "Switched organization\nID: %s\n", selector)
+	oauth, err := freshOAuthAuth(baseURL, *credential.OAuth)
+	if err != nil {
+		return err
+	}
+	client, err := mstlcore.NewMistleClientWithAuthorizationHeader(mstlcore.MistleClientAuthorizationHeaderConfig{
+		BaseURL:             baseURL,
+		AuthorizationHeader: "Bearer " + oauth.AccessToken,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to configure Mistle client: %w", err)
+	}
+	organizations, err := client.ListCurrentUserOrganizations()
+	if err != nil {
+		return fmt.Errorf("failed to list organizations: %w", err)
+	}
+	organization, err := resolveOrganization(selector, organizations)
+	if err != nil {
+		return err
+	}
+	token, err := client.SwitchOrganization(mstlcore.SwitchOrganizationRequest{OrganizationID: organization.ID})
+	if err != nil {
+		return fmt.Errorf("failed to switch organization: %w", err)
+	}
+	updatedOAuth, err := oauthTokenResponseToAuth(token)
+	if err != nil {
+		return err
+	}
+	if _, err := writeOAuth(updatedOAuth); err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(stdout, "Switched organization\nName: %s\nSlug: %s\nID: %s\n", organization.Name, organization.Slug, organization.ID)
 	return err
 }
 
@@ -409,16 +448,6 @@ func runSandbox(command Command, stdout io.Writer) error {
 	}
 }
 
-func runCodex(command Command) error {
-	if err := validateCodexArgs(command.CodexArgs); err != nil {
-		return fmt.Errorf("failed to validate codex arguments: %w", err)
-	}
-	if _, err := mistleClient(); err != nil {
-		return err
-	}
-	return errors.New("mistle codex websocket proxy is not available in the Go CLI yet")
-}
-
 func validateCodexArgs(args []string) error {
 	for _, arg := range args {
 		if arg == "--remote" || strings.HasPrefix(arg, "--remote=") {
@@ -467,27 +496,76 @@ func resolveAuthorizationHeader() (string, error) {
 	}
 	credential, err := readAuthCredential()
 	if err != nil {
-		return "", errors.New(errMissingAuthMessage)
+		if errors.Is(err, errMissingAuthFile) {
+			return "", errors.New(errMissingAuthMessage)
+		}
+		return "", err
 	}
 	if credential.APIKey != nil {
 		return "Bearer " + *credential.APIKey, nil
 	}
 	if credential.OAuth != nil {
-		return "Bearer " + credential.OAuth.AccessToken, nil
+		baseURL, err := controlPlaneAPIPublicURL()
+		if err != nil {
+			return "", err
+		}
+		oauth, err := freshOAuthAuth(baseURL, *credential.OAuth)
+		if err != nil {
+			return "", err
+		}
+		return "Bearer " + oauth.AccessToken, nil
 	}
 	return "", errors.New(errMissingAuthMessage)
 }
 
+func freshOAuthAuth(baseURL string, oauth oauthAuth) (oauthAuth, error) {
+	currentSeconds, err := currentUnixSeconds()
+	if err != nil {
+		return oauthAuth{}, err
+	}
+	if oauth.ExpiresAtUnixSeconds > currentSeconds+60 {
+		return oauth, nil
+	}
+	refreshedOAuth, err := refreshOAuthAuth(baseURL, oauth.RefreshToken)
+	if err != nil {
+		return oauthAuth{}, err
+	}
+	if _, err := writeOAuth(refreshedOAuth); err != nil {
+		return oauthAuth{}, err
+	}
+	return refreshedOAuth, nil
+}
+
+func resolveOrganization(selector string, response mstlcore.CurrentUserOrganizationsResponse) (mstlcore.CurrentUserOrganization, error) {
+	trimmedSelector := strings.TrimSpace(selector)
+	matches := []mstlcore.CurrentUserOrganization{}
+	for _, organization := range response.Organizations {
+		if organization.ID == trimmedSelector || organization.Slug == trimmedSelector {
+			matches = append(matches, organization)
+		}
+	}
+	if len(matches) == 0 {
+		return mstlcore.CurrentUserOrganization{}, fmt.Errorf("organization `%s` was not found", trimmedSelector)
+	}
+	if len(matches) > 1 {
+		return mstlcore.CurrentUserOrganization{}, fmt.Errorf("organization `%s` matched multiple organizations", trimmedSelector)
+	}
+	return matches[0], nil
+}
+
 func removeAuthFile(stdout io.Writer) error {
-	path := defaultAuthFilePath()
+	path, err := defaultAuthFilePath()
+	if err != nil {
+		return err
+	}
 	if err := os.Remove(path); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			_, writeErr := fmt.Fprintln(stdout, "No Mistle login found.")
+			_, writeErr := fmt.Fprintln(stdout, "No local Mistle auth file found")
 			return writeErr
 		}
 		return fmt.Errorf("failed to remove auth file `%s`: %w", path, err)
 	}
-	_, err := fmt.Fprintf(stdout, "Removed Mistle login: %s\n", path)
+	_, err = fmt.Fprintf(stdout, "Removed local Mistle auth file: %s\n", path)
 	return err
 }
 
