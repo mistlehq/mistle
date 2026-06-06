@@ -3,14 +3,8 @@ import type { McpServer, ToolAnnotations } from "@modelcontextprotocol/server";
 
 import { OrganizationPermissions } from "../../auth/services/organization-policy.js";
 import {
-  listSandboxProfilesQuerySchema,
-  listSandboxProfilesResponseSchema,
-  sandboxProfileVersionMaintenanceScriptSchema,
-  sandboxProfileVersionSetupScriptSchema,
-  putSandboxProfileVersionDraftResponseSchema,
   sandboxProfileIdParamsSchema,
   sandboxProfileVersionParamsSchema,
-  sandboxProfileSchema,
 } from "../../sandbox-profiles/schemas.js";
 import { getProfileVersionMaintenanceScript } from "../../sandbox-profiles/services/get-profile-version-maintenance-script.js";
 import { getProfileVersionSetupScript } from "../../sandbox-profiles/services/get-profile-version-setup-script.js";
@@ -39,13 +33,27 @@ const MutatingToolAnnotations: ToolAnnotations = {
   openWorldHint: false,
 };
 
-const profileDraftSetupScriptPutInputSchema = sandboxProfileVersionParamsSchema
+const mcpListSandboxProfilesQuerySchema = z
+  .object({
+    limit: z.number().int().min(1).max(100).optional(),
+    after: z.string().min(1).optional(),
+    before: z.string().min(1).optional(),
+  })
+  .strict();
+
+const mcpSandboxProfileVersionParamsSchema = sandboxProfileVersionParamsSchema
+  .extend({
+    version: z.number().int().min(1),
+  })
+  .strict();
+
+const profileDraftSetupScriptPutInputSchema = mcpSandboxProfileVersionParamsSchema
   .extend({
     setupScript: z.string().min(1).nullable(),
   })
   .strict();
 
-const profileMaintenanceScriptPutInputSchema = sandboxProfileVersionParamsSchema
+const profileMaintenanceScriptPutInputSchema = mcpSandboxProfileVersionParamsSchema
   .extend({
     maintenanceScript: z.string().min(1).nullable(),
   })
@@ -57,8 +65,7 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
     {
       title: "List sandbox profiles",
       description: "List sandbox profiles available to the current Mistle actor",
-      inputSchema: listSandboxProfilesQuerySchema,
-      outputSchema: listSandboxProfilesResponseSchema,
+      inputSchema: mcpListSandboxProfilesQuerySchema,
       annotations: {
         ...ReadOnlyToolAnnotations,
         title: "List sandbox profiles",
@@ -94,8 +101,10 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
           db: context.db,
         },
         {
-          ...input,
           organizationId: context.organizationActor.organizationId,
+          after: input.after,
+          before: input.before,
+          ...(input.limit === undefined ? {} : { limit: input.limit }),
         },
       );
 
@@ -109,7 +118,6 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
       title: "Get a sandbox profile",
       description: "Get a sandbox profile by id using the current Mistle actor",
       inputSchema: sandboxProfileIdParamsSchema,
-      outputSchema: sandboxProfileSchema,
       annotations: {
         ...ReadOnlyToolAnnotations,
         title: "Get a sandbox profile",
@@ -146,8 +154,7 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
     {
       title: "Get sandbox profile setup script",
       description: "Get the setup script for a sandbox profile version",
-      inputSchema: sandboxProfileVersionParamsSchema,
-      outputSchema: sandboxProfileVersionSetupScriptSchema,
+      inputSchema: mcpSandboxProfileVersionParamsSchema,
       annotations: {
         ...ReadOnlyToolAnnotations,
         title: "Get sandbox profile setup script",
@@ -184,7 +191,6 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
       title: "Put sandbox profile draft setup script",
       description: "Update the setup script for a sandbox profile draft version",
       inputSchema: profileDraftSetupScriptPutInputSchema,
-      outputSchema: putSandboxProfileVersionDraftResponseSchema,
       annotations: {
         ...MutatingToolAnnotations,
         title: "Put sandbox profile draft setup script",
@@ -223,8 +229,7 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
     {
       title: "Get sandbox profile maintenance script",
       description: "Get the snapshot maintenance script for a sandbox profile version",
-      inputSchema: sandboxProfileVersionParamsSchema,
-      outputSchema: sandboxProfileVersionMaintenanceScriptSchema,
+      inputSchema: mcpSandboxProfileVersionParamsSchema,
       annotations: {
         ...ReadOnlyToolAnnotations,
         title: "Get sandbox profile maintenance script",
@@ -261,7 +266,6 @@ export function registerProfileTools(server: McpServer, context: MistleMcpServer
       title: "Put sandbox profile maintenance script",
       description: "Update the snapshot maintenance script for a sandbox profile version",
       inputSchema: profileMaintenanceScriptPutInputSchema,
-      outputSchema: sandboxProfileVersionMaintenanceScriptSchema,
       annotations: {
         ...MutatingToolAnnotations,
         title: "Put sandbox profile maintenance script",

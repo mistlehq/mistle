@@ -167,6 +167,8 @@ function createTunnelDevConfig(input: TunnelDevEnvInput): TunnelDevConfig {
       DATA_PLANE_API_TUNNEL_HOSTNAME: dataPlaneGatewayTunnelHostname,
       CLOUDFLARED_CONFIG_PATH: DEV_CLOUDFLARED_CONFIG_PATH,
       MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: controlPlaneApiPublicUrl,
+      MISTLE_SERVICES_CONTROL_PLANE_API_MCP_URL: `${controlPlaneApiPublicUrl}/mcp`,
+      MISTLE_SERVICES_CONTROL_PLANE_API_MCP_TRUST_FORWARDED_HEADERS: "true",
     },
   };
 }

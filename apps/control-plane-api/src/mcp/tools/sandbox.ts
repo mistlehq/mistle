@@ -4,14 +4,7 @@ import { z } from "zod";
 import { OrganizationPermissions } from "../../auth/services/organization-policy.js";
 import { PUBLIC_PORT_ACCESS_LINKS_ROUTE_BASE_PATH } from "../../public-port-access-links/index.js";
 import { SANDBOX_INSTANCE_PORT_ACCESS_LINK_TTL_SECONDS } from "../../sandbox-instances/constants.js";
-import {
-  sandboxInstanceIdParamsSchema,
-  sandboxInstancePortAccessParamsSchema,
-  sandboxInstancePortAccessSchema,
-  sandboxInstanceStatusResponseSchema,
-  sandboxOperationEventsQuerySchema,
-  sandboxOperationEventsResponseSchema,
-} from "../../sandbox-instances/schemas.js";
+import { sandboxInstanceIdParamsSchema } from "../../sandbox-instances/schemas.js";
 import { getInstance } from "../../sandbox-instances/services/get-instance.js";
 import { listOperationEvents } from "../../sandbox-instances/services/list-operation-events.js";
 import { mintPortAccess } from "../../sandbox-instances/services/mint-port-access.js";
@@ -19,7 +12,6 @@ import {
   sandboxProfileVersionParamsSchema,
   startSandboxProfileMaintenanceScriptTestRunBodySchema,
   startSandboxProfileSetupScriptTestRunBodySchema,
-  startSandboxProfileSetupScriptTestRunResponseSchema,
 } from "../../sandbox-profiles/schemas.js";
 import { startProfileMaintenanceScriptTestRun } from "../../sandbox-profiles/services/start-profile-maintenance-script-test-run.js";
 import { startProfileSetupScriptTestRun } from "../../sandbox-profiles/services/start-profile-setup-script-test-run.js";
@@ -47,20 +39,37 @@ const MutatingToolAnnotations: ToolAnnotations = {
   openWorldHint: false,
 };
 
-const profileSetupScriptTestStartInputSchema =
-  startSandboxProfileSetupScriptTestRunBodySchema.safeExtend(
-    sandboxProfileVersionParamsSchema.shape,
-  );
+const DefaultSandboxOperationEventsLimit = 20;
+
+const mcpSandboxProfileVersionParamsSchema = sandboxProfileVersionParamsSchema
+  .extend({
+    version: z.number().int().min(1),
+  })
+  .strict();
+
+const mcpSandboxInstancePortAccessParamsSchema = sandboxInstanceIdParamsSchema
+  .extend({
+    port: z.number().int().min(1).max(65_535),
+  })
+  .strict();
+
+const profileSetupScriptTestStartInputSchema = startSandboxProfileSetupScriptTestRunBodySchema
+  .safeExtend(mcpSandboxProfileVersionParamsSchema.shape)
+  .strict();
 
 const profileMaintenanceScriptTestStartInputSchema =
-  startSandboxProfileMaintenanceScriptTestRunBodySchema.safeExtend(
-    sandboxProfileVersionParamsSchema.shape,
-  );
+  startSandboxProfileMaintenanceScriptTestRunBodySchema
+    .safeExtend(mcpSandboxProfileVersionParamsSchema.shape)
+    .strict();
 
-const sandboxOperationEventsListInputSchema = sandboxOperationEventsQuerySchema.safeExtend({
-  ...sandboxInstanceIdParamsSchema.shape,
-  limit: z.coerce.number().int().min(1).max(500).optional().default(20),
-});
+const sandboxOperationEventsListInputSchema = z
+  .object({
+    ...sandboxInstanceIdParamsSchema.shape,
+    operationId: z.string().min(1),
+    afterSequence: z.number().int().min(0).optional(),
+    limit: z.number().int().min(1).max(500).optional(),
+  })
+  .strict();
 
 export function registerSandboxTools(server: McpServer, context: MistleMcpServerContext): void {
   server.registerTool(
@@ -69,7 +78,6 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
       title: "Start sandbox profile setup script test",
       description: "Start a sandbox to test a sandbox profile setup script",
       inputSchema: profileSetupScriptTestStartInputSchema,
-      outputSchema: startSandboxProfileSetupScriptTestRunResponseSchema,
       annotations: {
         ...MutatingToolAnnotations,
         title: "Start sandbox profile setup script test",
@@ -140,7 +148,6 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
       description:
         "Start a sandbox from the current snapshot to test a sandbox profile maintenance script",
       inputSchema: profileMaintenanceScriptTestStartInputSchema,
-      outputSchema: startSandboxProfileSetupScriptTestRunResponseSchema,
       annotations: {
         ...MutatingToolAnnotations,
         title: "Start sandbox profile maintenance script test",
@@ -209,8 +216,7 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
     {
       title: "Create sandbox Port Access link",
       description: "Create a short-lived public URL for accessing one port on a sandbox instance",
-      inputSchema: sandboxInstancePortAccessParamsSchema,
-      outputSchema: sandboxInstancePortAccessSchema,
+      inputSchema: mcpSandboxInstancePortAccessParamsSchema,
       annotations: {
         ...MutatingToolAnnotations,
         title: "Create sandbox Port Access link",
@@ -268,7 +274,6 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
       title: "Get sandbox instance",
       description: "Get sandbox instance provisioning and runtime status",
       inputSchema: sandboxInstanceIdParamsSchema,
-      outputSchema: sandboxInstanceStatusResponseSchema,
       annotations: {
         ...ReadOnlyToolAnnotations,
         title: "Get sandbox instance",
@@ -305,7 +310,6 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
       title: "List sandbox operation events",
       description: "List lifecycle and transcript events for a sandbox operation",
       inputSchema: sandboxOperationEventsListInputSchema,
-      outputSchema: sandboxOperationEventsResponseSchema,
       annotations: {
         ...ReadOnlyToolAnnotations,
         title: "List sandbox operation events",
@@ -341,7 +345,7 @@ export function registerSandboxTools(server: McpServer, context: MistleMcpServer
           sandboxInstanceId: instanceId,
           operationId,
           ...(afterSequence === undefined ? {} : { afterSequence }),
-          ...(limit === undefined ? {} : { limit }),
+          limit: limit ?? DefaultSandboxOperationEventsLimit,
         },
       );
 
