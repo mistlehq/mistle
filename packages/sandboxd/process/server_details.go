@@ -13,7 +13,9 @@ const (
 
 type RuntimeClientProcessSpec struct {
 	ProcessKey string
+	Command    runtime.RuntimeExecCommand
 	Readiness  runtime.RuntimeClientProcessReadiness
+	Stop       runtime.RuntimeClientProcessStopPolicy
 }
 
 type CodexAppServerObservation struct {
