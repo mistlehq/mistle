@@ -24,6 +24,22 @@ func TestDecodeActivationInputRejectsLegacyFields(t *testing.T) {
 	}
 }
 
+func TestSessionRuntimeInputFromActivationInputCopiesSharedFields(t *testing.T) {
+	fixture := readContractFixture(t, "activation-input.valid.json")
+	activationInput, err := DecodeActivationInput(fixture)
+	requireNoError(t, err)
+
+	sessionInput := SessionRuntimeInputFromActivationInput(activationInput)
+
+	assertEqual(t, sessionInput.OperationKind, ActivationOperationStart)
+	assertEqual(t, sessionInput.BootstrapToken, "bootstrap-token-value")
+	assertEqual(t, sessionInput.TunnelExchangeToken, "tunnel-exchange-token-value")
+	assertEqual(t, sessionInput.TunnelGatewayWSURL, "ws://127.0.0.1:5003/tunnel/sandbox")
+	if len(sessionInput.RuntimePlan) == 0 {
+		t.Fatalf("expected runtime plan to be copied")
+	}
+}
+
 func TestDecodeActivationResponse(t *testing.T) {
 	ok, err := DecodeActivationResponse([]byte(`{"ok":true}`))
 	requireNoError(t, err)
