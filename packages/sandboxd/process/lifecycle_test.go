@@ -1,6 +1,8 @@
 package process
 
 import (
+	"net"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -81,6 +83,32 @@ func TestStopStartedProcessesReportsErrorsWithProcessKeysInReverseOrder(t *testi
 	}
 	if strings.Index(errorText, "processKey=second") > strings.Index(errorText, "processKey=first") {
 		t.Fatalf("expected reverse-order stop errors, got %q", errorText)
+	}
+}
+
+func TestWaitForRuntimeClientProcessReadinessChecksZeroTimeoutProbe(t *testing.T) {
+	host, port := reserveUnusedLocalPort(t)
+	processSpec := lifecycleProcessSpec("zero-timeout-readiness", runtime.RuntimeExecCommand{
+		Args: []string{"/bin/sleep", "30"},
+	})
+	processSpec.Readiness = runtime.RuntimeClientProcessReadiness{
+		Type:           runtime.RuntimeClientProcessReadinessHTTP,
+		URL:            "http://" + net.JoinHostPort(host, strconv.Itoa(int(port))) + "/readyz",
+		ExpectedStatus: 200,
+		TimeoutMS:      0,
+	}
+	processSpec.Stop.Signal = runtime.RuntimeClientProcessStopSignalSIGKILL
+	process, err := StartRuntimeClientProcess(processSpec)
+	requireNoError(t, err)
+	defer cleanupRunningProcess(t, process)
+
+	err = WaitForRuntimeClientProcessReadiness(process, timeutil.SystemClock{}, timeutil.ThreadSleeper{})
+
+	if err == nil {
+		t.Fatalf("expected zero-timeout readiness probe to fail when target is unavailable")
+	}
+	if !strings.Contains(err.Error(), "timed out after 0ms waiting for readiness") {
+		t.Fatalf("expected zero-timeout readiness failure, got %q", err.Error())
 	}
 }
 

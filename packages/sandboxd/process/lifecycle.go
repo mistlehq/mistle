@@ -12,7 +12,10 @@ import (
 	"github.com/mistle/sandboxd/timeutil"
 )
 
-const DefaultProcessExitPollInterval = 25 * time.Millisecond
+const (
+	DefaultProcessExitPollInterval      = 25 * time.Millisecond
+	DefaultProcessReadinessPollInterval = 100 * time.Millisecond
+)
 
 type RunningRuntimeClientProcess struct {
 	Spec          RuntimeClientProcessSpec
@@ -172,6 +175,42 @@ func WaitForRuntimeClientProcessExit(
 	}
 }
 
+func WaitForRuntimeClientProcessReadiness(
+	process *RunningRuntimeClientProcess,
+	clock timeutil.Clock,
+	sleeper timeutil.Sleeper,
+) error {
+	if process.Spec.Readiness.Type == runtime.RuntimeClientProcessReadinessNone {
+		return nil
+	}
+	timeoutMS := ReadinessTimeoutMS(process.Spec)
+	deadlineMS := clock.NowMS() + timeoutMS
+
+	for {
+		exited, err := ProcessHasExited(process)
+		if err != nil {
+			return err
+		}
+		if exited {
+			return fmt.Errorf("%s", processExitDescription(process))
+		}
+
+		readinessErr := CheckRuntimeClientProcessReadinessFromSpec(process.Spec)
+		if readinessErr == nil {
+			return nil
+		}
+		if clock.NowMS() >= deadlineMS {
+			return fmt.Errorf(
+				"timed out after %dms waiting for readiness: %w",
+				timeoutMS,
+				readinessErr,
+			)
+		}
+
+		sleeper.Sleep(DefaultProcessReadinessPollInterval)
+	}
+}
+
 func SignalRuntimeClientProcess(process *RunningRuntimeClientProcess, signal runtime.RuntimeClientProcessStopSignal) error {
 	process.mutex.Lock()
 	defer process.mutex.Unlock()
@@ -220,6 +259,15 @@ func reapExitedProcess(process *RunningRuntimeClientProcess) (bool, error) {
 	default:
 		return false, nil
 	}
+}
+
+func processExitDescription(process *RunningRuntimeClientProcess) string {
+	process.mutex.Lock()
+	defer process.mutex.Unlock()
+	if process.child.ProcessState == nil {
+		return "process exited"
+	}
+	return DescribeProcessExit(process.child.ProcessState)
 }
 
 func startProcessWait(child *exec.Cmd) chan processWaitResult {
