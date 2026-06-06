@@ -163,16 +163,19 @@ func TestServerSigningValidatesConfiguredKeyBeforeTunnelSigningIsMigrated(t *tes
 	server.state.mutex.Unlock()
 
 	_, wrongKeyErr := SubmitSigning(socketPath, SignRequest{KeyRef: "key::different", PayloadBase64: "cGF5bG9hZA=="})
+	tunnelPayload, payloadErr := server.buildSigningTunnelRequestPayload(SignRequest{KeyRef: "key::allowed", PayloadBase64: "cGF5bG9hZA=="})
 	_, migratedErr := SubmitSigning(socketPath, SignRequest{KeyRef: "key::allowed", PayloadBase64: "cGF5bG9hZA=="})
 
 	if wrongKeyErr == nil {
 		t.Fatalf("expected mismatched signing key to fail")
 	}
 	assertEqual(t, wrongKeyErr.Error(), "control socket returned an error: sandbox startup request was rejected: requested Git signing key does not match the configured Git signing identity")
+	requireNoError(t, payloadErr)
+	assertEqual(t, tunnelPayload, `{"type":"signing.request","requestId":"sign_req_0","organizationId":"org_123","sandboxInstanceId":"sbi_control","actingUserId":"user_123","providerFamily":"github","format":"ssh","keyRef":"key::allowed","grant":"grant","payload":"cGF5bG9hZA==","encoding":"base64"}`)
 	if migratedErr == nil {
 		t.Fatalf("expected tunnel signing migration error")
 	}
-	assertEqual(t, migratedErr.Error(), "control socket returned an error: sandbox startup request was rejected: daemon signing tunnel is not migrated to Go")
+	assertEqual(t, migratedErr.Error(), "control socket returned an error: sandbox startup request was rejected: sandboxd signing tunnel session is not migrated to Go")
 }
 
 func TestServerServesJSONNotFoundFromHealthEndpoint(t *testing.T) {

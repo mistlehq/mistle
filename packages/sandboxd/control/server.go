@@ -9,11 +9,13 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mistle/sandboxd/protocol"
 	"github.com/mistle/sandboxd/runtime"
 	"github.com/mistle/sandboxd/tunnel"
+	tunnelprotocol "github.com/mistle/sandboxd/tunnel/protocol"
 )
 
 const (
@@ -39,6 +41,7 @@ type Server struct {
 	healthDone     chan error
 	closeOnce      sync.Once
 	state          *serverState
+	signRequestID  atomic.Uint64
 }
 
 type serverState struct {
@@ -184,10 +187,10 @@ func (server *Server) dispatchServerRequest(request Request) (Response, bool) {
 		}
 		return OKResponse(nil), false
 	case RequestSign:
-		if err := server.validateSigningRequest(*request.SignRequest); err != nil {
+		if _, err := server.buildSigningTunnelRequestPayload(*request.SignRequest); err != nil {
 			return ErrorResponse(err.Error()), false
 		}
-		return ErrorResponse("sandbox startup request was rejected: daemon signing tunnel is not migrated to Go"), false
+		return ErrorResponse("sandbox startup request was rejected: sandboxd signing tunnel session is not migrated to Go"), false
 	default:
 		return ErrorResponse(fmt.Sprintf("unsupported control request type: %s", request.Type)), false
 	}
@@ -255,23 +258,43 @@ func validateActivationInputForStateInitialization(activationInput protocol.Acti
 	return nil
 }
 
-func (server *Server) validateSigningRequest(signRequest SignRequest) error {
+func (server *Server) buildSigningTunnelRequestPayload(signRequest SignRequest) (string, error) {
 	server.state.mutex.Lock()
 	defer server.state.mutex.Unlock()
 	if server.state.activationInput == nil {
-		return fmt.Errorf("sandbox startup request was rejected: sandboxd is not activated")
+		return "", fmt.Errorf("sandbox startup request was rejected: sandboxd is not activated")
 	}
-	gitIdentity := server.state.activationInput.GitIdentity
+	activationInput := server.state.activationInput
+	gitIdentity := activationInput.GitIdentity
 	if gitIdentity == nil || gitIdentity.Signing == nil {
-		return fmt.Errorf("sandbox startup request was rejected: sandbox does not have a configured Git signing identity")
+		return "", fmt.Errorf("sandbox startup request was rejected: sandbox does not have a configured Git signing identity")
 	}
-	if gitIdentity.Signing.KeyRef != signRequest.KeyRef {
-		return fmt.Errorf("sandbox startup request was rejected: requested Git signing key does not match the configured Git signing identity")
+	signingConfig := gitIdentity.Signing
+	if signingConfig.KeyRef != signRequest.KeyRef {
+		return "", fmt.Errorf("sandbox startup request was rejected: requested Git signing key does not match the configured Git signing identity")
 	}
 	if server.state.phase != ActivationPhaseActivated {
-		return fmt.Errorf("sandbox startup request was rejected: sandboxd state is missing for an activated daemon")
+		return "", fmt.Errorf("sandbox startup request was rejected: sandboxd state is missing for an activated daemon")
 	}
-	return nil
+	sandboxInstanceID, err := tunnel.DeriveSandboxInstanceID(activationInput.TunnelGatewayWSURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to initialize sandboxd state: failed to start bootstrap tunnel session: %w", err)
+	}
+	requestID := fmt.Sprintf("sign_req_%d", server.signRequestID.Add(1)-1)
+	return tunnelprotocol.SigningRequestPayload(tunnelprotocol.SigningRequest{
+		MessageType:             "signing.request",
+		RequestID:               requestID,
+		OrganizationID:          signingConfig.OrganizationID,
+		SandboxInstanceID:       sandboxInstanceID,
+		ActingUserID:            signingConfig.ActingUserID,
+		ProviderFamily:          signingConfig.ProviderFamily,
+		IntegrationConnectionID: signingConfig.IntegrationConnectionID,
+		Format:                  signingConfig.Format,
+		KeyRef:                  signingConfig.KeyRef,
+		Grant:                   signingConfig.Grant,
+		Payload:                 signRequest.PayloadBase64,
+		Encoding:                "base64",
+	})
 }
 
 func (server *Server) healthHandler() http.Handler {
