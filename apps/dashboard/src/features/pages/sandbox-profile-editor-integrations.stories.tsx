@@ -89,12 +89,44 @@ export const MistleMcpEnabled: Story = {
     mistleMcpEnabled: true,
     mistleMcpApiKeyId: StoryMistleApiKey.id,
   },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+
+    await expect(canvas.getByRole("combobox", { name: "Mistle resources" })).toBeVisible();
+    await expect(
+      canvas.getByRole("button", { name: "View API key permissions: 12 permissions" }),
+    ).toBeVisible();
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "View API key permissions: 12 permissions" }),
+    );
+
+    const dialog = body.getByRole("dialog", { name: "API key permissions" });
+    await expect(dialog).toBeVisible();
+    await expect(within(dialog).getByText("Read sandbox profiles")).toBeVisible();
+    await expect(within(dialog).getByText("Delete triggers")).toBeVisible();
+  },
 };
 
 export const MistleMcpNoApiKeys: Story = {
   args: {
     apiKeys: [],
     mistleMcpEnabled: true,
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+
+    await expect(canvas.getByRole("button", { name: "Create new API key" })).toBeVisible();
+
+    await userEvent.click(canvas.getByRole("button", { name: "Create new API key" }));
+
+    const dialog = body.getByRole("dialog", { name: "Create new API key" });
+    await expect(dialog).toBeVisible();
+    await expect(within(dialog).getByText("4 selected")).toBeVisible();
+    await userEvent.click(within(dialog).getByRole("checkbox", { name: "Select all" }));
+    await expect(within(dialog).getByText("12 selected")).toBeVisible();
   },
 };
 

@@ -56,6 +56,10 @@ _Avoid_: Auto-refresh, scheduled rebuild
 The script that a snapshot refresh runs while preparing a **Snapshot**.
 _Avoid_: Generic script
 
+**Mistle resource access**:
+A **Sandbox profile version** setting that lets an agent runtime use Mistle-owned resources through a selected organization API key.
+_Avoid_: Allow agent toggle, Mistle MCP toggle
+
 **Collection landing page**:
 A top-level page that lists existing product objects and offers the primary action for creating the first one.
 _Avoid_: Detail tab, filtered results view
@@ -624,6 +628,8 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Non-empty text after `/review` is custom review instructions, not a structured review-target subcommand.
 - A **Sandbox profile version** may use a **Skills source** from a Git integration binding or a **Public skills source**.
 - A **Public skills source** does not require a Git integration binding.
+- **Mistle resource access** is configured when a **Sandbox profile version** has a selected organization API key for that access.
+- **Mistle resource access** is bounded by the selected organization API key's permissions, not by the **Sandbox profile version** that selected the key.
 
 ## Example Dialogue
 

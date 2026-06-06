@@ -229,7 +229,7 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(screen.getByText("OpenCode")).toBeTruthy();
   });
 
-  it("renders Mistle resource access controls in the Agent section", () => {
+  it("renders Mistle resources as an API key selector in the Agent section", () => {
     render(
       <SandboxProfileRuntimeSection
         apiKeys={[MistleApiKey]}
@@ -246,22 +246,23 @@ describe("SandboxProfileRuntimeSection", () => {
       />,
     );
 
-    const toggle = screen.getByRole("switch", {
-      name: "Allow agent to interact with Mistle resources",
-    });
-    expect(toggle.getAttribute("aria-checked")).toBe("false");
-    expect(
-      screen.queryByText("Expose Mistle profile tools to the sandbox agent through MCP."),
-    ).toBeNull();
-    expect(screen.queryByRole("combobox", { name: "Mistle API key" })).toBeNull();
+    expect(screen.queryByRole("switch")).toBeNull();
+    expect(screen.getByRole("combobox", { name: "Mistle resources" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Explain Mistle resources" })).toBeTruthy();
+    expect(screen.getByText("None")).toBeTruthy();
 
-    fireEvent.click(toggle);
+    fireEvent.click(screen.getByRole("combobox", { name: "Mistle resources" }));
 
-    expect(toggle.getAttribute("aria-checked")).toBe("true");
-    expect(screen.getByRole("combobox", { name: "Mistle API key" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "None" })).toBeTruthy();
+    const createApiKeyOption = screen.getByRole("option", { name: "Create new API key" });
+    expect(createApiKeyOption).toBeTruthy();
+    expect(createApiKeyOption.previousElementSibling?.getAttribute("data-slot")).toBe(
+      "select-separator",
+    );
+    expect(screen.getByRole("option", { name: "Mistle MCP key" })).toBeTruthy();
   });
 
-  it("disables Mistle API key selection when no API keys exist", () => {
+  it("shows API key creation instead of a selector when no API keys exist", () => {
     render(
       <SandboxProfileRuntimeSection
         apiKeys={[]}
@@ -278,19 +279,12 @@ describe("SandboxProfileRuntimeSection", () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole("switch", {
-        name: "Allow agent to interact with Mistle resources",
-      }),
-    );
-
-    expect(screen.getByRole("combobox", { name: "Mistle API key" }).hasAttribute("disabled")).toBe(
-      true,
-    );
+    expect(screen.getByText("Mistle resources")).toBeTruthy();
+    expect(screen.queryByRole("combobox", { name: "Mistle resources" })).toBeNull();
     expect(screen.getByRole("button", { name: "Create new API key" })).toBeTruthy();
   });
 
-  it("shows permissions for the selected Mistle API key", () => {
+  it("summarizes permissions for the selected Mistle API key", () => {
     render(
       <SandboxProfileRuntimeSection
         apiKeys={[MistleApiKey]}
@@ -309,11 +303,18 @@ describe("SandboxProfileRuntimeSection", () => {
       />,
     );
 
-    expect(screen.getByText("Permissions")).toBeTruthy();
-    expect(screen.getByText("sandboxProfile:read")).toBeTruthy();
+    expect(screen.getByText("1 permission")).toBeTruthy();
+    expect(screen.queryByText("sandboxProfile:read")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "View API key permissions: 1 permission" }));
+
+    expect(screen.getByRole("dialog", { name: "API key permissions" })).toBeTruthy();
+    expect(screen.getByText("Read sandbox profiles")).toBeTruthy();
+    expect(screen.queryByText("View sandbox profile configuration.")).toBeNull();
+    expect(screen.queryByText("sandboxProfile:read")).toBeNull();
   });
 
-  it("opens API key creation in a dialog", () => {
+  it("opens API key creation in a dialog from the zero-key state", () => {
     render(
       <SandboxProfileRuntimeSection
         apiKeys={[]}
@@ -339,10 +340,85 @@ describe("SandboxProfileRuntimeSection", () => {
 
     expect(screen.getByRole("dialog", { name: "Create new API key" })).toBeTruthy();
     expect(screen.getByRole("textbox", { name: "Name" })).toBeTruthy();
+    expect(screen.getByText("4 selected")).toBeTruthy();
     expect(screen.getByText("Read sandbox profiles")).toBeTruthy();
+    expect(screen.queryByText("View sandbox profile configuration.")).toBeNull();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select all" }));
+
+    expect(screen.getByText("12 selected")).toBeTruthy();
   });
 
-  it("renders saved Mistle resource access in read-only mode", () => {
+  it("opens API key creation from the Mistle resources selector", () => {
+    render(
+      <SandboxProfileRuntimeSection
+        apiKeys={[MistleApiKey]}
+        availableConnections={[]}
+        availableTargets={[]}
+        disabled={false}
+        isDraft={true}
+        onCreateApiKey={async () => ({
+          apiKey: MistleApiKey,
+          token: "mstl_apk_test",
+        })}
+        providers={[DockerProvider]}
+        version={createVersion({
+          sandboxProvider: "docker",
+          sandboxConnectionId: null,
+          sandboxResources: null,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Mistle resources" }));
+    fireEvent.click(screen.getByRole("option", { name: "Create new API key" }));
+
+    expect(screen.getByRole("dialog", { name: "Create new API key" })).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Name" })).toBeTruthy();
+  });
+
+  it("selects a newly created API key and still shows the one-time token", async () => {
+    render(
+      <SandboxProfileRuntimeSection
+        apiKeys={[]}
+        availableConnections={[]}
+        availableTargets={[]}
+        disabled={false}
+        isDraft={true}
+        onCreateApiKey={async (input) => ({
+          apiKey: {
+            ...MistleApiKey,
+            name: input.name,
+          },
+          token: "mstl_apk_test",
+        })}
+        providers={[DockerProvider]}
+        version={createVersion({
+          sandboxProvider: "docker",
+          sandboxConnectionId: null,
+          sandboxResources: null,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Create new API key" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Name" }), {
+      target: { value: "Sandbox agent key" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create API key" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("API key created")).toBeTruthy();
+    });
+    expect(
+      screen.getByText(
+        "This key has been selected for Mistle resource access. Copy the token only if you also want to use Sandbox agent key outside this profile editor; it will not be shown again.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy API key token" })).toBeTruthy();
+  });
+
+  it("renders saved Mistle resources in read-only mode", () => {
     render(
       <SandboxProfileRuntimeSection
         apiKeys={[MistleApiKey]}
@@ -361,10 +437,29 @@ describe("SandboxProfileRuntimeSection", () => {
       />,
     );
 
-    expect(screen.getByText("Allow agent to interact with Mistle resources")).toBeTruthy();
-    expect(screen.getByText("Yes")).toBeTruthy();
-    expect(screen.getByText("Mistle API key")).toBeTruthy();
+    expect(screen.getByText("Mistle resources")).toBeTruthy();
     expect(screen.getByText("Mistle MCP key")).toBeTruthy();
+  });
+
+  it("renders unconfigured Mistle resources as None in read-only mode", () => {
+    render(
+      <SandboxProfileRuntimeSection
+        apiKeys={[MistleApiKey]}
+        availableConnections={[]}
+        availableTargets={[]}
+        disabled={false}
+        isDraft={false}
+        providers={[DockerProvider]}
+        version={createVersion({
+          sandboxProvider: "docker",
+          sandboxConnectionId: null,
+          sandboxResources: null,
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Mistle resources")).toBeTruthy();
+    expect(screen.getByText("None")).toBeTruthy();
   });
 
   it("renders managed Docker as Mistle without the Docker label", () => {
