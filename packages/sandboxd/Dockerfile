@@ -69,37 +69,26 @@ RUN chmod +x /opt/mistle/bin/mise \
 WORKDIR /root
 USER root
 
-FROM rust:1.95-bookworm AS sandboxd-build
+FROM golang:1.26-bookworm AS sandboxd-build
 
-# Build only the standalone sandboxd Rust crate. The sandbox base image copies
+# Build only the standalone sandboxd Go binary. The sandbox base image copies
 # this binary directly and does not need the rest of the workspace build.
 
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends \
-    libssl-dev \
-    pkg-config \
-  && rm -rf /var/lib/apt/lists/*
+WORKDIR /app/packages/sandboxd
+
+COPY packages/sandboxd /app/packages/sandboxd
+
+RUN mkdir -p target/release \
+  && go build -trimpath -ldflags="-s -w" -o target/release/sandboxd ./cmd/sandboxd
+
+FROM golang:1.26-bookworm AS sandboxd-system-tests-build
 
 WORKDIR /app/packages/sandboxd
 
 COPY packages/sandboxd /app/packages/sandboxd
 
-RUN cargo build --locked --release --bin sandboxd \
-  && strip target/release/sandboxd
-
-FROM rust:1.95-bookworm AS sandboxd-system-tests-build
-
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends \
-    libssl-dev \
-    pkg-config \
-  && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app/packages/sandboxd
-
-COPY packages/sandboxd /app/packages/sandboxd
-
-RUN cargo build --locked --bin sandboxd
+RUN mkdir -p target/debug \
+  && go build -o target/debug/sandboxd ./cmd/sandboxd
 
 FROM sandbox-base-common AS sandbox-base-tooling
 

@@ -22,7 +22,7 @@ import {
 
 const ScriptDirectoryPath = dirname(fileURLToPath(import.meta.url));
 const RepositoryRootPath = resolve(ScriptDirectoryPath, "../..");
-const SandboxdBuildToolchainImage = "rust:1.93-bookworm";
+const SandboxdBuildToolchainImage = "golang:1.26-bookworm";
 
 type ContextFileEntry =
   | {
