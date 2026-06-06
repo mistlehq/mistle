@@ -1,8 +1,10 @@
 package sandboxdstate
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/mistle/sandboxd/protocol"
 	"github.com/mistle/sandboxd/runtime"
@@ -10,6 +12,8 @@ import (
 	"github.com/mistle/sandboxd/timeutil"
 	"github.com/mistle/sandboxd/tunnel"
 )
+
+const DefaultBootstrapTunnelConnectTimeout = 10 * time.Second
 
 type ExecutionMode string
 
@@ -23,6 +27,7 @@ type State struct {
 	executionMode     ExecutionMode
 	runtimeEnv        map[string]string
 	supervisorHandle  *supervision.SandboxdSupervisorHandle
+	bootstrapTunnel   *tunnel.BootstrapTunnel
 }
 
 func ActivateNew(activationInput protocol.ActivationInput, clock timeutil.Clock) (*State, error) {
@@ -69,7 +74,11 @@ func ActivateNew(activationInput protocol.ActivationInput, clock timeutil.Clock)
 		if err := runtime.ApplyCompiledRuntimePlan(runtimePlan); err != nil {
 			return nil, fmt.Errorf("failed to apply runtime plan: %w", err)
 		}
-		return nil, fmt.Errorf("failed to start bootstrap tunnel session: bootstrap tunnel session is not migrated to Go")
+		bootstrapTunnel, err := connectBootstrapTunnel(sessionInput, supervisorHandle)
+		if err != nil {
+			return nil, err
+		}
+		state.bootstrapTunnel = bootstrapTunnel
 	}
 	return state, nil
 }
@@ -105,7 +114,34 @@ func (state *State) HealthSnapshot() supervision.HealthSnapshot {
 }
 
 func (state *State) Close() error {
+	if state.bootstrapTunnel != nil {
+		if err := state.bootstrapTunnel.Close(); err != nil {
+			return err
+		}
+		state.bootstrapTunnel = nil
+	}
+	state.supervisorHandle.MarkComponentStopped(supervision.ComponentTunnelSession)
 	return nil
+}
+
+func connectBootstrapTunnel(
+	sessionInput protocol.SessionRuntimeInput,
+	supervisorHandle *supervision.SandboxdSupervisorHandle,
+) (*tunnel.BootstrapTunnel, error) {
+	supervisorHandle.ReplaceComponentDetails(
+		supervision.ComponentTunnelSession,
+		map[string]string{"gatewayWsUrl": sessionInput.TunnelGatewayWSURL},
+	)
+	supervisorHandle.MarkComponentStarting(supervision.ComponentTunnelSession)
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultBootstrapTunnelConnectTimeout)
+	defer cancel()
+	bootstrapTunnel, err := tunnel.ConnectBootstrapTunnel(ctx, sessionInput.TunnelGatewayWSURL, sessionInput.BootstrapToken)
+	if err != nil {
+		supervisorHandle.MarkComponentRestarting(supervision.ComponentTunnelSession, err.Error())
+		return nil, fmt.Errorf("failed to start bootstrap tunnel session: %w", err)
+	}
+	supervisorHandle.MarkComponentHealthy(supervision.ComponentTunnelSession)
+	return bootstrapTunnel, nil
 }
 
 func executionModeForActivation(operationKind protocol.ActivationOperationKind) ExecutionMode {

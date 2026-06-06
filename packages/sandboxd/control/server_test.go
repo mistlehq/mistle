@@ -27,7 +27,7 @@ func TestServerHandlesReadyAndShutdownRequests(t *testing.T) {
 	}
 }
 
-func TestServerRecordsFailedActivationWhenBootstrapTunnelSessionIsNotMigrated(t *testing.T) {
+func TestServerRecordsFailedActivationWhenBootstrapTunnelConnectionFails(t *testing.T) {
 	socketPath := shortUnixSocketPath(t)
 	server, err := StartServer(socketPath)
 	requireNoError(t, err)
@@ -37,12 +37,16 @@ func TestServerRecordsFailedActivationWhenBootstrapTunnelSessionIsNotMigrated(t 
 	err = SubmitActivate(socketPath, controlClientActivationInput())
 
 	if err == nil {
-		t.Fatalf("expected activation to fail before bootstrap tunnel session is migrated")
+		t.Fatalf("expected activation to fail when bootstrap tunnel connection fails")
 	}
-	assertEqual(t, err.Error(), "control socket returned an error: sandbox startup request was rejected: sandboxd activation failed: failed to initialize sandboxd state: failed to start bootstrap tunnel session: bootstrap tunnel session is not migrated to Go")
+	if !strings.Contains(err.Error(), "control socket returned an error: sandbox startup request was rejected: sandboxd activation failed: failed to initialize sandboxd state: failed to start bootstrap tunnel session: failed to connect bootstrap tunnel:") {
+		t.Fatalf("expected bootstrap tunnel connection failure, got %q", err.Error())
+	}
 	health := fetchHealthResponse(t, server)
 	assertEqual(t, health["daemon_phase"].(string), "failed")
-	assertEqual(t, health["init_error"].(string), "failed to initialize sandboxd state: failed to start bootstrap tunnel session: bootstrap tunnel session is not migrated to Go")
+	if !strings.Contains(health["init_error"].(string), "failed to initialize sandboxd state: failed to start bootstrap tunnel session: failed to connect bootstrap tunnel:") {
+		t.Fatalf("expected health init_error to describe bootstrap tunnel connection failure, got %q", health["init_error"].(string))
+	}
 }
 
 func TestServerRejectsDuplicateActivationAfterFailure(t *testing.T) {
@@ -59,7 +63,9 @@ func TestServerRejectsDuplicateActivationAfterFailure(t *testing.T) {
 	if firstErr == nil || secondErr == nil {
 		t.Fatalf("expected both activation attempts to fail")
 	}
-	assertEqual(t, secondErr.Error(), "control socket returned an error: sandbox startup request was rejected: sandboxd activation already failed: failed to initialize sandboxd state: failed to start bootstrap tunnel session: bootstrap tunnel session is not migrated to Go")
+	if !strings.Contains(secondErr.Error(), "control socket returned an error: sandbox startup request was rejected: sandboxd activation already failed: failed to initialize sandboxd state: failed to start bootstrap tunnel session: failed to connect bootstrap tunnel:") {
+		t.Fatalf("expected duplicate activation to report original bootstrap tunnel failure, got %q", secondErr.Error())
+	}
 }
 
 func TestServerRejectsActivationWithInvalidGatewayURLBeforeStateInitialization(t *testing.T) {
