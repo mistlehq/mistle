@@ -91,6 +91,75 @@ func TestRunDispatchesActivateCommand(t *testing.T) {
 	<-requests
 }
 
+func TestRunDispatchesReadyCommand(t *testing.T) {
+	socketPath := shortActivateUnixSocketPath(t)
+	requests, closeServer := startActivateControlServer(t, socketPath, control.OKResponse(nil))
+	defer closeServer()
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := runWithControlSocket(
+		"sandboxd",
+		[]string{"ready"},
+		strings.NewReader(""),
+		&stdout,
+		&stderr,
+		socketPath,
+	)
+
+	assertEqual(t, code, 0)
+	assertEqual(t, stdout.String(), "")
+	assertEqual(t, stderr.String(), "")
+	request := <-requests
+	assertEqual(t, request.Type, control.RequestReady)
+}
+
+func TestRunDispatchesShutdownCommand(t *testing.T) {
+	socketPath := shortActivateUnixSocketPath(t)
+	requests, closeServer := startActivateControlServer(t, socketPath, control.OKResponse(nil))
+	defer closeServer()
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := runWithControlSocket(
+		"sandboxd",
+		[]string{"shutdown"},
+		strings.NewReader(""),
+		&stdout,
+		&stderr,
+		socketPath,
+	)
+
+	assertEqual(t, code, 0)
+	assertEqual(t, stdout.String(), "")
+	assertEqual(t, stderr.String(), "")
+	request := <-requests
+	assertEqual(t, request.Type, control.RequestShutdown)
+}
+
+func TestRunReadyReportsControlSocketError(t *testing.T) {
+	socketPath := shortActivateUnixSocketPath(t)
+	requests, closeServer := startActivateControlServer(t, socketPath, control.ErrorResponse("service is not ready"))
+	defer closeServer()
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := runWithControlSocket(
+		"sandboxd",
+		[]string{"ready"},
+		strings.NewReader(""),
+		&stdout,
+		&stderr,
+		socketPath,
+	)
+
+	assertEqual(t, code, 1)
+	assertEqual(t, stdout.String(), "")
+	assertEqual(t, stderr.String(), "control socket returned an error: service is not ready\n")
+	request := <-requests
+	assertEqual(t, request.Type, control.RequestReady)
+}
+
 func startActivateControlServer(
 	t *testing.T,
 	socketPath string,

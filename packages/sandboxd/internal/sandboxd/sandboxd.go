@@ -6,6 +6,8 @@ import (
 	"io"
 	"path/filepath"
 	"strconv"
+
+	"github.com/mistle/sandboxd/control"
 )
 
 const (
@@ -111,7 +113,19 @@ func runWithControlSocket(
 			return 1
 		}
 		return 0
-	case CommandDaemon, CommandEgressProxy, CommandReady, CommandShutdown, CommandSign, CommandSkills:
+	case CommandReady:
+		if err := control.SubmitReady(controlSocketPath); err != nil {
+			_, _ = fmt.Fprintln(stderr, err.Error())
+			return 1
+		}
+		return 0
+	case CommandShutdown:
+		if err := control.SubmitShutdown(controlSocketPath); err != nil {
+			_, _ = fmt.Fprintln(stderr, err.Error())
+			return 1
+		}
+		return 0
+	case CommandDaemon, CommandEgressProxy, CommandSign, CommandSkills:
 		_, _ = fmt.Fprintf(stderr, "sandboxd %s is not ported to Go yet\n", command.Kind)
 		return 1
 	default:

@@ -41,6 +41,28 @@ func TestSubmitActivateReturnsControlErrorResponse(t *testing.T) {
 	<-requests
 }
 
+func TestSubmitReadyWritesReadyRequestAndAcceptsSuccessResponse(t *testing.T) {
+	socketPath := shortUnixSocketPath(t)
+	requests, closeServer := startControlProtocolServer(t, socketPath, OKResponse(nil))
+	defer closeServer()
+
+	requireNoError(t, SubmitReady(socketPath))
+
+	request := <-requests
+	assertEqual(t, request.Type, RequestReady)
+}
+
+func TestSubmitShutdownWritesShutdownRequestAndAcceptsSuccessResponse(t *testing.T) {
+	socketPath := shortUnixSocketPath(t)
+	requests, closeServer := startControlProtocolServer(t, socketPath, OKResponse(nil))
+	defer closeServer()
+
+	requireNoError(t, SubmitShutdown(socketPath))
+
+	request := <-requests
+	assertEqual(t, request.Type, RequestShutdown)
+}
+
 func TestSubmitSigningRequiresSignatureInSuccessResponse(t *testing.T) {
 	socketPath := shortUnixSocketPath(t)
 	requests, closeServer := startControlProtocolServer(t, socketPath, OKResponse(nil))
