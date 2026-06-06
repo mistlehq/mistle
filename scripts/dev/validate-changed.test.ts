@@ -108,24 +108,22 @@ describe("validate-changed", () => {
     expect(commands).not.toContain("pnpm lint:react-doctor --diff origin/main");
   });
 
-  it("does not plan containerized Rust tests for non-Rust repo-wide changes", () => {
+  it("plans sandboxd tests for repo-wide dependency changes", () => {
     const commands = getDryRunCommands("pnpm-lock.yaml");
-
-    expect(commands.join("\n")).not.toContain("@mistle/sandboxd");
-  });
-
-  it("plans containerized Rust tests for Rust package changes", () => {
-    const commands = getDryRunCommands("packages/sandboxd/src/main.rs");
 
     expect(commands.join("\n")).toContain("@mistle/sandboxd");
   });
 
-  it("keeps targeted Rust integration test runs for changed Rust test files", () => {
-    const commands = getDryRunCommands("packages/sandboxd/tests/bootstrap_exec.rs");
+  it("plans Go tests for sandboxd package changes", () => {
+    const commands = getDryRunCommands("packages/sandboxd/internal/sandboxd/sandboxd.go");
 
-    expect(commands).toContain(
-      "pnpm --dir packages/sandboxd run test:integration -- packages/sandboxd/tests/bootstrap_exec.rs",
-    );
+    expect(commands.join("\n")).toContain("@mistle/sandboxd");
+  });
+
+  it("plans Go tests for changed sandboxd test files", () => {
+    const commands = getDryRunCommands("packages/sandboxd/tunnel/bootstrap_test.go");
+
+    expect(commands.join("\n")).toContain("@mistle/sandboxd");
   });
 
   it("plans changed app integration test files through the package integration config", () => {

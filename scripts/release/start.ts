@@ -7,10 +7,7 @@ import { fileURLToPath } from "node:url";
 import { assertValidReleaseVersion, normalizeReleaseTag, releaseBranchName } from "./lib.js";
 import { updateMstlGoVersionFile } from "./mstl-version.js";
 import { renderReleaseNotes } from "./render-notes.js";
-import {
-  updateSandboxdCargoLockFile,
-  updateSandboxdCargoTomlVersionFile,
-} from "./sandboxd-version.js";
+import { updateSandboxdGoVersionFile } from "./sandboxd-version.js";
 
 const RepositoryRootPath = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const VersionFilePath = join(RepositoryRootPath, "VERSION");
@@ -108,7 +105,6 @@ function main(): void {
   ensureStartingFromMain();
   ensureRequiredCommandAvailable("git-cliff");
   ensureRequiredCommandAvailable("gh");
-  ensureRequiredCommandAvailable("cargo");
 
   execFileSync("pnpm", ["release:prepare", ...argumentsList], {
     cwd: RepositoryRootPath,
@@ -117,8 +113,7 @@ function main(): void {
 
   const version = readRepositoryVersion();
   const branch = releaseBranchName(version);
-  updateSandboxdCargoTomlVersionFile(RepositoryRootPath, version);
-  updateSandboxdCargoLockFile(RepositoryRootPath, version);
+  updateSandboxdGoVersionFile(RepositoryRootPath, version);
   updateMstlGoVersionFile(RepositoryRootPath, version);
 
   execFileSync("git", ["switch", "-c", branch], {

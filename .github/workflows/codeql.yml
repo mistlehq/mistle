@@ -24,7 +24,6 @@ jobs:
     outputs:
       actions: ${{ steps.resolve.outputs.actions }}
       javascript_typescript: ${{ steps.resolve.outputs.javascript_typescript }}
-      rust: ${{ steps.resolve.outputs.rust }}
 
     steps:
       - name: Checkout
@@ -53,11 +52,6 @@ jobs:
               - 'pnpm-workspace.yaml'
               - 'turbo.json'
               - 'tsconfig.base.json'
-            rust:
-              - '.github/workflows/codeql.yml'
-              - 'packages/sandboxd/**/*.rs'
-              - 'packages/sandboxd/**/Cargo.toml'
-              - 'packages/sandboxd/**/Cargo.lock'
 
       - name: Resolve scan targets
         id: resolve
@@ -67,7 +61,6 @@ jobs:
             {
               echo "actions=${{ steps.filter.outputs.actions }}"
               echo "javascript_typescript=${{ steps.filter.outputs.javascript_typescript }}"
-              echo "rust=${{ steps.filter.outputs.rust }}"
             } >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -75,7 +68,6 @@ jobs:
           {
             echo "actions=true"
             echo "javascript_typescript=true"
-            echo "rust=true"
           } >> "$GITHUB_OUTPUT"
 
   analyze-actions:
@@ -132,31 +124,3 @@ jobs:
         uses: github/codeql-action/analyze@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4
         with:
           category: "/language:javascript-typescript"
-
-  analyze-rust:
-    name: Analyze (rust)
-    needs:
-      - changes
-    if: needs.changes.outputs.rust == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          persist-credentials: false
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4
-        with:
-          languages: rust
-          build-mode: none
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4
-        with:
-          category: "/language:rust"

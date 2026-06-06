@@ -4,21 +4,13 @@
   "scripts": {
     "build": "rm -rf dist && mkdir -p dist && go build -o dist/sandboxd ./cmd/sandboxd",
     "build:go": "rm -rf dist && mkdir -p dist && go build -o dist/sandboxd ./cmd/sandboxd",
-    "build:rust": "rm -rf dist && cargo build --locked --bin sandboxd && mkdir -p dist && cp target/debug/sandboxd dist/sandboxd",
     "lint": "go vet ./...",
     "lint:go": "go vet ./...",
-    "lint:rust": "cargo clippy --locked --all-targets -- -D warnings",
     "typecheck": "go test ./... -run '^$'",
     "typecheck:go": "go test ./... -run '^$'",
-    "typecheck:rust": "cargo check --locked --all-targets",
     "test": "go test ./...",
     "test:go": "go test ./...",
-    "test:rust": "node ./scripts/run-cargo-in-container.mjs nextest run --locked --lib --bins",
-    "test:integration": "node ./scripts/run-cargo-integration-tests-in-container.mjs",
-    "test:stress": "node ./scripts/run-cargo-stress-tests-in-container.mjs",
     "format": "gofmt -w .",
-    "format:check": "test -z \"$(gofmt -l .)\"",
-    "format:rust": "node ./scripts/cargo-fmt.mjs",
-    "format:rust:check": "node ./scripts/cargo-fmt.mjs --check"
+    "format:check": "test -z \"$(gofmt -l .)\""
   }
 }

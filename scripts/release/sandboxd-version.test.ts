@@ -1,52 +1,23 @@
 import { describe, expect, it } from "vitest";
 
-import { sandboxdCargoLockUpdateArgs, updateSandboxdCargoTomlVersion } from "./sandboxd-version.js";
+import { updateSandboxdGoVersion } from "./sandboxd-version.js";
 
-describe("updateSandboxdCargoTomlVersion", () => {
-  it("updates the sandboxd package version without touching dependency versions", () => {
-    const cargoTomlContent = `[package]
-name = "sandboxd"
-version = "0.9.0"
-edition = "2024"
+describe("updateSandboxdGoVersion", () => {
+  it("updates the sandboxd Go version constant", () => {
+    const source = `const (
+\tVersion                  = "0.9.0"
+\tDefaultControlSocketPath = "/run/mistle/sandboxd.sock"
+)`;
 
-[dependencies]
-portable-pty = "0.9.0"
-`;
-
-    expect(updateSandboxdCargoTomlVersion(cargoTomlContent, "0.10.0")).toBe(`[package]
-name = "sandboxd"
-version = "0.10.0"
-edition = "2024"
-
-[dependencies]
-portable-pty = "0.9.0"
-`);
+    expect(updateSandboxdGoVersion(source, "0.10.0")).toBe(`const (
+\tVersion                  = "0.10.0"
+\tDefaultControlSocketPath = "/run/mistle/sandboxd.sock"
+)`);
   });
 
-  it("fails when the sandboxd package version is missing", () => {
-    const cargoTomlContent = `[package]
-name = "sandboxd"
-
-[dependencies]
-portable-pty = "0.9.0"
-`;
-
-    expect(() => updateSandboxdCargoTomlVersion(cargoTomlContent, "0.10.0")).toThrow(
-      "packages/sandboxd/Cargo.toml [package].version must be a string.",
+  it("fails when the sandboxd version const is missing", () => {
+    expect(() => updateSandboxdGoVersion('const Other = "0.9.0"', "0.10.0")).toThrow(
+      "packages/sandboxd/internal/sandboxd/sandboxd.go is missing the Version const",
     );
-  });
-});
-
-describe("sandboxdCargoLockUpdateArgs", () => {
-  it("scopes the lockfile refresh to the sandboxd package version", () => {
-    expect(sandboxdCargoLockUpdateArgs("/repo", "0.10.0")).toEqual([
-      "update",
-      "--manifest-path",
-      "/repo/packages/sandboxd/Cargo.toml",
-      "--package",
-      "sandboxd",
-      "--precise",
-      "0.10.0",
-    ]);
   });
 });

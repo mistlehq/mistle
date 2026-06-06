@@ -61,7 +61,6 @@ const AFFECTED_INTEGRATION_TEST_PACKAGE_NAMES = new Set([
   "@mistle/sandbox",
   "@mistle/test-harness",
 ]);
-const AFFECTED_RUST_TEST_PACKAGE_NAMES = new Set(["@mistle/sandboxd"]);
 
 const ALL_PACKAGES_REASON = "root-level or repo-wide config changed";
 const REACT_DOCTOR_PROJECT_PATHS: readonly string[] = [
@@ -813,96 +812,6 @@ function shouldRunFullPackageTestWithChangedIntegrationFiles(
   return hasOtherPackageChangedFiles || hasSelectionReasonOutsidePackageFiles;
 }
 
-function isRustIntegrationTargetFilePath(
-  workspacePackage: WorkspacePackage,
-  filePath: string,
-): boolean {
-  const testsDirectoryPrefix = `${workspacePackage.relativePath}/tests/`;
-  const relativeTestFilePath = filePath.slice(testsDirectoryPrefix.length);
-
-  return (
-    filePath.startsWith(testsDirectoryPrefix) &&
-    filePath.endsWith(".rs") &&
-    relativeTestFilePath.includes("/") === false
-  );
-}
-
-function buildAffectedSandboxdIntegrationTestCommand(
-  workspacePackage: WorkspacePackage,
-  filePaths: readonly string[],
-): Command {
-  return [
-    "pnpm",
-    "--dir",
-    workspacePackage.relativePath,
-    "run",
-    "test:integration",
-    "--",
-    ...filePaths,
-  ];
-}
-
-function buildAffectedRustTestCommand(
-  plan: ValidationPlan,
-  workspacePackage: WorkspacePackage,
-): Command | null {
-  if (AFFECTED_RUST_TEST_PACKAGE_NAMES.has(workspacePackage.name) === false) {
-    return null;
-  }
-
-  const reasons = plan.packageReasons.get(workspacePackage.name) ?? [];
-  if (reasons.includes(ALL_PACKAGES_REASON)) {
-    return null;
-  }
-
-  const packageChangedFiles = plan.changedFiles.filter((filePath) =>
-    filePath.startsWith(`${workspacePackage.relativePath}/`),
-  );
-  if (packageChangedFiles.length === 0) {
-    return null;
-  }
-
-  const changedExistingRustTestFiles = packageChangedFiles.filter(
-    (filePath) =>
-      isRustIntegrationTargetFilePath(workspacePackage, filePath) &&
-      existsSync(resolve(REPO_ROOT, filePath)),
-  );
-  if (changedExistingRustTestFiles.length !== packageChangedFiles.length) {
-    return null;
-  }
-
-  if (workspacePackage.name === "@mistle/sandboxd") {
-    return buildAffectedSandboxdIntegrationTestCommand(
-      workspacePackage,
-      changedExistingRustTestFiles,
-    );
-  }
-
-  return null;
-}
-
-function hasRustPackageChangedFiles(
-  plan: ValidationPlan,
-  workspacePackage: WorkspacePackage,
-): boolean {
-  return plan.changedFiles.some((filePath) =>
-    filePath.startsWith(`${workspacePackage.relativePath}/`),
-  );
-}
-
-function shouldSkipRustPackageTestForPlan(
-  plan: ValidationPlan,
-  workspacePackage: WorkspacePackage,
-): boolean {
-  const reasons = plan.packageReasons.get(workspacePackage.name) ?? [];
-
-  return (
-    AFFECTED_RUST_TEST_PACKAGE_NAMES.has(workspacePackage.name) &&
-    reasons.includes(ALL_PACKAGES_REASON) &&
-    hasRustPackageChangedFiles(plan, workspacePackage) === false
-  );
-}
-
 function buildAffectedTestCommands(
   plan: ValidationPlan,
   workspacePackages: readonly WorkspacePackage[],
@@ -917,16 +826,6 @@ function buildAffectedTestCommands(
     }
 
     const reasons = plan.packageReasons.get(workspacePackage.name) ?? [];
-    if (shouldSkipRustPackageTestForPlan(plan, workspacePackage)) {
-      continue;
-    }
-
-    const rustTestCommand = buildAffectedRustTestCommand(plan, workspacePackage);
-    if (rustTestCommand !== null) {
-      affectedCommands.push(rustTestCommand);
-      continue;
-    }
-
     const packageChangedFiles = plan.changedFiles.filter((filePath) =>
       filePath.startsWith(`${workspacePackage.relativePath}/`),
     );
@@ -1120,10 +1019,7 @@ function groupWorkspaceChecks(
   const groupedPackages = new Map<string, string[]>();
 
   for (const workspacePackage of workspacePackages) {
-    const workspacePlannedSteps = getWorkspacePlanSteps(workspacePackage, steps).filter(
-      (step) =>
-        step !== "test" || shouldSkipRustPackageTestForPlan(plan, workspacePackage) === false,
-    );
+    const workspacePlannedSteps = getWorkspacePlanSteps(workspacePackage, steps);
     if (workspacePlannedSteps.length === 0) {
       continue;
     }

@@ -22,14 +22,6 @@ updates:
       prefix: chore(deps)
     cooldown:
       default-days: 7
-  - package-ecosystem: cargo
-    directory: "/packages/sandboxd"
-    schedule:
-      interval: daily
-    commit-message:
-      prefix: chore(deps)
-    cooldown:
-      default-days: 7
   - package-ecosystem: gomod
     directory: "/packages/commit-sign"
     schedule:
@@ -48,6 +40,14 @@ updates:
       default-days: 7
   - package-ecosystem: gomod
     directory: "/packages/mstl-cli"
+    schedule:
+      interval: daily
+    commit-message:
+      prefix: chore(deps)
+    cooldown:
+      default-days: 7
+  - package-ecosystem: gomod
+    directory: "/packages/sandboxd"
     schedule:
       interval: daily
     commit-message:
