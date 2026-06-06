@@ -16,6 +16,9 @@ const (
 	PayloadKindRawBytes        = byte(0x01)
 	PayloadKindWebSocketText   = byte(0x02)
 	PayloadKindWebSocketBinary = byte(0x03)
+
+	FileUploadResetCodeInvalidFileType  = "invalid_file_type"
+	FileUploadResetCodeMimeTypeMismatch = "mime_type_mismatch"
 )
 
 type StreamDataFrame struct {
