@@ -1,0 +1,3 @@
+# Separate MCP Discovery Schemas From REST Schemas
+
+MCP tools expose schemas through `tools/list`, where input and output metadata must serialize cleanly to JSON Schema before any tool call can run. REST/API schemas may use transforms, coercions, defaults, response shaping, or other validation behavior that is valid for application request handling but unsafe as MCP discovery metadata, so MCP tool definitions use MCP-specific JSON Schema-compatible input schemas and avoid reusing arbitrary REST response schemas. This duplicates small schema definitions, but it keeps MCP discovery stable and prevents an unrelated REST schema change from breaking MCP clients before invocation.
