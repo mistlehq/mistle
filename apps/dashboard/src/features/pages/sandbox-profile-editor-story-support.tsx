@@ -107,7 +107,12 @@ export type SandboxProfileEditorPageStoryArgs = {
     | "snapshot-ready"
     | "snapshot-failed"
     | "refresh-failed";
-  snapshotRefreshScheduleState?: "none" | "existing" | "invalid-preview" | "save-failure";
+  snapshotRefreshScheduleState?:
+    | "none"
+    | "existing"
+    | "existing-editing"
+    | "invalid-preview"
+    | "save-failure";
   snapshotMaintenanceScript?: string | null;
   integrationsSectionState?: {
     bindingsErrorMessage?: string;
@@ -626,7 +631,7 @@ function createSnapshotPanelState(status: SnapshotStoryStatus): SnapshotPanelSta
 function createSnapshotRefreshSchedule(
   state: SnapshotRefreshScheduleStoryState,
 ): SnapshotRefreshSchedule {
-  return state === "existing"
+  return state === "existing" || state === "existing-editing"
     ? {
         cronExpression: "0 9 * * 1",
         enabled: true,
@@ -641,6 +646,13 @@ function createSnapshotRefreshSchedule(
 function createSnapshotRefreshScheduleInitialDraft(
   state: SnapshotRefreshScheduleStoryState,
 ): { cronExpression: string; timezone: string } | null {
+  if (state === "existing-editing") {
+    return {
+      cronExpression: "0 9 * * 1",
+      timezone: "Asia/Singapore",
+    };
+  }
+
   if (state === "invalid-preview") {
     return {
       cronExpression: "not a cron expression",

@@ -22,6 +22,11 @@ type SandboxSetupScriptEditorProps = {
   value: string;
 };
 
+const ScriptEditorVisibleLineCount = 28;
+const ScriptEditorLineHeight = "1.5rem";
+const ScriptEditorMinHeight = "calc(var(--spacing) * 28)";
+const ScriptEditorMaxHeight = `calc((${ScriptEditorLineHeight} * ${ScriptEditorVisibleLineCount}) + (var(--spacing) * 4))`;
+
 function createPlaceholder(view: EditorView, placeholderText: string): HTMLElement {
   return createCodeMirrorPlaceholder({
     className: "m-0 whitespace-pre-wrap font-mono text-sm leading-6 text-muted-foreground",
@@ -41,11 +46,13 @@ function createEditorTheme(): ReturnType<typeof EditorView.theme> {
     scroller: {
       borderRadius: "inherit",
       fontFamily: CodeMirrorThemeValues.MONO_FONT_FAMILY,
-      lineHeight: "1.5rem",
-      minHeight: "calc(var(--spacing) * 28)",
+      lineHeight: ScriptEditorLineHeight,
+      maxHeight: ScriptEditorMaxHeight,
+      minHeight: ScriptEditorMinHeight,
+      overflow: "auto",
     },
     content: {
-      minHeight: "calc(var(--spacing) * 28)",
+      minHeight: ScriptEditorMinHeight,
       paddingBlock: CodeMirrorThemeValues.TEXTAREA_PADDING_BLOCK,
       paddingInline: CodeMirrorThemeValues.TEXTAREA_PADDING_INLINE,
     },

@@ -7,6 +7,16 @@ import {
   StoryBindings,
 } from "./sandbox-profile-editor-story-support.js";
 
+const LongSetupScript = [
+  "#!/usr/bin/env bash",
+  "set -euo pipefail",
+  "",
+  ...Array.from(
+    { length: 80 },
+    (_unused, index) => `printf 'Preparing setup step ${String(index + 1).padStart(2, "0")}\\n'`,
+  ),
+].join("\n");
+
 const meta = {
   title: "Dashboard/SandboxProfiles/Editor/Setup Script",
   component: SandboxProfileEditorPageStory,
@@ -37,6 +47,14 @@ export const EmptySetupScript: Story = {
 export const SetupAssistantEntry: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],
+  },
+};
+
+export const LongSetupScriptEditor: Story = {
+  args: {
+    initialBindings: [StoryBindings[0], StoryBindings[1]],
+    initialSectionId: "sandbox-profile",
+    setupScript: LongSetupScript,
   },
 };
 
