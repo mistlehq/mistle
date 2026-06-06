@@ -64,13 +64,10 @@ function installSandboxBaseCommon(image: Image): Image {
     )
     .run(`mkdir -p ${MistleBinPath}`)
     .copy("packages/sandboxd/scripts/cmddir", "/opt/mistle/bin/cmddir")
-    .copy("packages/sandboxd/systemd/sandboxd.service", "/etc/systemd/system/sandboxd.service")
     .run(
       [
         "chmod +x /opt/mistle/bin/cmddir",
         "ln -sf /opt/mistle/bin/cmddir /usr/local/bin/cmddir",
-        "mkdir -p /etc/systemd/system/multi-user.target.wants",
-        "ln -sf /etc/systemd/system/sandboxd.service /etc/systemd/system/multi-user.target.wants/sandboxd.service",
       ].join(" && "),
     )
     .run(

@@ -62,12 +62,8 @@ describe("TensorlakeBaseImageBuilder", () => {
     expect(dockerfileText).toContain(
       "COPY packages/sandboxd/scripts/cmddir /opt/mistle/bin/cmddir",
     );
-    expect(dockerfileText).toContain(
-      "COPY packages/sandboxd/systemd/sandboxd.service /etc/systemd/system/sandboxd.service",
-    );
-    expect(dockerfileText).toContain(
-      "ln -sf /etc/systemd/system/sandboxd.service /etc/systemd/system/multi-user.target.wants/sandboxd.service",
-    );
+    expect(dockerfileText).not.toContain("sandboxd.service");
+    expect(dockerfileText).not.toContain("multi-user.target.wants/sandboxd.service");
     expect(dockerfileText).not.toContain("modprobe nf_tables");
     expect(dockerfileText).not.toContain("nft add table");
     expect(dockerfileText).not.toContain("test -x /opt/mistle/bin/sandboxd");
@@ -166,7 +162,7 @@ describe("createTensorlakeSdkImageBuildContext", () => {
         ).resolves.toBeUndefined();
         await expect(
           access(join(buildContext.path, "packages", "sandboxd", "systemd", "sandboxd.service")),
-        ).resolves.toBeUndefined();
+        ).rejects.toThrow("ENOENT");
       } finally {
         await buildContext.cleanup();
       }
@@ -229,9 +225,6 @@ describe("createTensorlakeSdkImageBuildContext", () => {
 
 async function writeTensorlakeBaseContextFiles(repoPath: string): Promise<void> {
   const cmddirPath = join(repoPath, "packages", "sandboxd", "scripts", "cmddir");
-  const servicePath = join(repoPath, "packages", "sandboxd", "systemd", "sandboxd.service");
   await mkdir(join(repoPath, "packages", "sandboxd", "scripts"), { recursive: true });
-  await mkdir(join(repoPath, "packages", "sandboxd", "systemd"), { recursive: true });
   await writeFile(cmddirPath, "#!/bin/sh\n");
-  await writeFile(servicePath, "[Service]\nExecStart=/opt/mistle/bin/sandboxd\n");
 }

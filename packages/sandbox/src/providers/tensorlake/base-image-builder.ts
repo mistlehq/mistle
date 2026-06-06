@@ -19,7 +19,6 @@ import { registerTensorlakeSandboxBaseImage } from "./image-registration.js";
 const TensorlakeLocalSandboxdPartsRelativePath =
   "packages/sandboxd/.generated/tensorlake/sandboxd-parts";
 const TensorlakeCmddirRelativePath = "packages/sandboxd/scripts/cmddir";
-const TensorlakeSandboxdServiceRelativePath = "packages/sandboxd/systemd/sandboxd.service";
 const TensorlakeBuildContextPlaceholderFile = ".mistle-tensorlake-context";
 
 export type TensorlakeBaseImageBuilderOptions = {
@@ -114,11 +113,6 @@ export async function createTensorlakeSdkImageBuildContext(
       buildContextPath,
       sourceContextPath: source.contextPath,
       relativePath: TensorlakeCmddirRelativePath,
-    });
-    await copyTensorlakeBuildContextFile({
-      buildContextPath,
-      sourceContextPath: source.contextPath,
-      relativePath: TensorlakeSandboxdServiceRelativePath,
     });
 
     if (source.sandboxd?.kind === SandboxSdkImageSandboxdSourceKinds.LOCAL) {
