@@ -6,15 +6,10 @@ import {
   createSandboxProfile,
   updateSandboxProfile,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
-import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type { CreateSandboxProfileDefaultRuntimeConfig } from "./sandbox-profile-runtime-defaults.js";
 
 type SandboxProfileEditorFormState = {
   displayName: string;
-};
-
-type CreateSandboxProfileDefaultRuntimeConfig = {
-  sandboxProvider: string;
-  sandboxResources: SandboxProfileVersion["sandboxResources"];
 };
 
 type CommonInput = {
@@ -48,16 +43,16 @@ export function useCreateSandboxProfileMetaState(input: CreateInput): {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const createMutation = useMutation({
-    mutationFn: async (createInput: SandboxProfileEditorFormState) =>
+    mutationFn: async (
+      createInput: SandboxProfileEditorFormState & {
+        defaultRuntimeConfig: CreateSandboxProfileDefaultRuntimeConfig;
+      },
+    ) =>
       createSandboxProfile({
         payload: {
           displayName: createInput.displayName,
-          ...(input.defaultRuntimeConfig === undefined
-            ? {}
-            : {
-                sandboxProvider: input.defaultRuntimeConfig.sandboxProvider,
-                sandboxResources: input.defaultRuntimeConfig.sandboxResources,
-              }),
+          sandboxProvider: createInput.defaultRuntimeConfig.sandboxProvider,
+          sandboxResources: createInput.defaultRuntimeConfig.sandboxResources,
         },
       }),
     onSuccess: async (createdProfile) => {
@@ -89,6 +84,7 @@ export function useCreateSandboxProfileMetaState(input: CreateInput): {
 
     createMutation.mutate({
       displayName: trimmedDisplayName,
+      defaultRuntimeConfig: input.defaultRuntimeConfig,
     });
   }
 

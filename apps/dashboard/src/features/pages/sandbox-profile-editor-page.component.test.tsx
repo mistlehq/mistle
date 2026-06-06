@@ -26,6 +26,7 @@ import type {
   IntegrationTarget,
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
+import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import {
   sandboxProfileDetailQueryKey,
   sandboxProfileIntegrationDirectoryQueryKey,
@@ -73,6 +74,7 @@ import {
   SandboxProfileEditorView,
   SandboxProfileSetupScriptPanel,
   buildSandboxProfileRuntimeDraftChanges,
+  resolveDraftSaveErrorOwner,
   resolveSandboxProfileEditorRefetchInterval,
   resolveSelectedSandboxProfileGitCommitSigningIntegrationConnectionId,
   resolveSelectedSandboxProfileAgentRuntimeId,
@@ -1141,6 +1143,20 @@ function getSetupScriptEditorView(editor: HTMLElement): EditorView {
 }
 
 describe("SandboxProfileEditorPage", () => {
+  it("routes Mistle resource access draft save errors to runtime settings", () => {
+    const owner = resolveDraftSaveErrorOwner(
+      new SandboxProfilesApiError({
+        operation: "putSandboxProfileVersionDraft",
+        status: 400,
+        body: null,
+        code: "INVALID_MISTLE_MCP_CONFIG",
+        message: "Select an API key before allowing the agent to interact with Mistle resources.",
+      }),
+    );
+
+    expect(owner).toBe("runtime");
+  });
+
   it("shows setup script test output before the setup script input", () => {
     render(
       <SandboxProfileSetupScriptPanel

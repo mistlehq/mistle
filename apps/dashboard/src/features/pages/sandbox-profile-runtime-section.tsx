@@ -46,6 +46,11 @@ import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
 } from "./sandbox-profile-binding-config-editor.js";
+import {
+  createDefaultSandboxResources,
+  DockerSandboxProviderId,
+  resolveManagedSandboxProvider,
+} from "./sandbox-profile-runtime-defaults.js";
 import { SandboxProfileSectionCard } from "./sandbox-profile-section-card.js";
 
 const Definitions = createBrowserDefinitionsBundle();
@@ -56,16 +61,8 @@ const MissingProviderValue = "__missing_provider__";
 const MissingConnectionValue = "__missing_connection__";
 const NoMistleMcpApiKeyValue = "__no_mistle_mcp_api_key__";
 const CreateMistleMcpApiKeyValue = "__create_mistle_mcp_api_key__";
-const DockerSandboxProviderId = "docker";
-const E2BSandboxProviderId = "e2b";
-const TensorlakeSandboxProviderId = "tensorlake";
 const ManagedSandboxRuntimeOptionValue = "__managed_sandbox_runtime__";
 const OrganizationSandboxRuntimeOptionPrefix = "organization:";
-const ManagedSandboxProviderPreference = [
-  TensorlakeSandboxProviderId,
-  E2BSandboxProviderId,
-  DockerSandboxProviderId,
-] as const;
 
 type SandboxCredentialSource = "managed" | "organization";
 type AgentRuntimeId = SandboxProfileVersion["agentRuntimeId"];
@@ -293,7 +290,7 @@ export function SandboxProfileRuntimeSection(input: {
       sandboxResources:
         currentRuntime.sandboxProvider === option.provider.id
           ? currentRuntime.sandboxResources
-          : createDefaultResources(option.provider),
+          : createDefaultSandboxResources(option.provider),
     });
     setSaveErrorMessage(null);
   }
@@ -1590,43 +1587,6 @@ function createProviderOptions(
   return options;
 }
 
-export function resolveManagedSandboxProvider(
-  providers: readonly SandboxProviderSummary[],
-): SandboxProviderSummary | undefined {
-  const managedProviders = providers.filter((provider) => provider.managed);
-  for (const providerId of ManagedSandboxProviderPreference) {
-    const provider = managedProviders.find((candidate) => candidate.id === providerId);
-    if (provider !== undefined) {
-      return provider;
-    }
-  }
-
-  return managedProviders[0];
-}
-
-export function createDefaultMistleSandboxRuntimeConfig(
-  providers: readonly SandboxProviderSummary[],
-): Pick<SandboxProfileRuntimeDraftChanges, "sandboxProvider" | "sandboxResources"> | undefined {
-  const managedProvider = resolveManagedSandboxProvider(providers);
-  if (managedProvider === undefined) {
-    return undefined;
-  }
-
-  return {
-    sandboxProvider: managedProvider.id,
-    sandboxResources:
-      managedProvider.resourceCapabilities === null
-        ? null
-        : {
-            vcpuCount: managedProvider.resourceCapabilities.vcpuCount.default,
-            memoryMb: managedProvider.resourceCapabilities.memoryMb.default,
-            ...(managedProvider.resourceCapabilities.diskMb === undefined
-              ? {}
-              : { diskMb: managedProvider.resourceCapabilities.diskMb.default }),
-          },
-  };
-}
-
 function resolveSandboxProviderLogoKey(provider: SandboxProviderSummary): string | undefined {
   if (provider.id === DockerSandboxProviderId) {
     return DockerSandboxProviderId;
@@ -1682,21 +1642,6 @@ function resolveCredentialSource(input: { connectionId: string | null }): Sandbo
   }
 
   return "managed";
-}
-
-function createDefaultResources(
-  provider: SandboxProviderSummary,
-): SandboxProfileVersion["sandboxResources"] {
-  const capabilities = provider.resourceCapabilities;
-  if (capabilities === null) {
-    return null;
-  }
-
-  return {
-    vcpuCount: capabilities.vcpuCount.default,
-    memoryMb: capabilities.memoryMb.default,
-    ...(capabilities.diskMb === undefined ? {} : { diskMb: capabilities.diskMb.default }),
-  };
 }
 
 function findProvider(input: {

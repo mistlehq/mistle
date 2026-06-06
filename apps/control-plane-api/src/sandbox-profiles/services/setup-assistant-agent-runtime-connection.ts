@@ -1,20 +1,16 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { IntegrationBindingKinds, IntegrationConnectionStatuses } from "@mistle/db/control-plane";
-import {
-  agentDefinitionAllowsRuntime,
-  createDefinitionsBundle,
-} from "@mistle/integrations-definitions/server";
+import type { IntegrationRegistry } from "@mistle/integrations-core";
+import { agentDefinitionAllowsRuntime } from "@mistle/integrations-definitions/server";
 
 import { SandboxProfilesCompileError, SandboxProfilesCompileErrorCodes } from "../errors.js";
 
 type AssertSetupAssistantAgentRuntimeConnectionInput = {
+  integrationRegistry: IntegrationRegistry;
   organizationId: string;
   profileId: string;
   profileVersion: number;
 };
-
-const Definitions = createDefinitionsBundle();
-const IntegrationRegistry = Definitions.integrationRegistry;
 
 export async function assertSetupAssistantAgentRuntimeConnection(
   db: ControlPlaneDatabase,
@@ -97,7 +93,7 @@ export async function assertSetupAssistantAgentRuntimeConnection(
       );
     }
 
-    const definition = IntegrationRegistry.getDefinition({
+    const definition = input.integrationRegistry.getDefinition({
       familyId: target.familyId,
       variantId: target.variantId,
     });

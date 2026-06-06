@@ -23593,7 +23593,6 @@
                           "type": "string",
                           "enum": [
                             "AGENT_RUNTIME_REQUIRED",
-                            "AGENT_RUNTIME_CONNECTION_REQUIRED",
                             "SANDBOX_PROVIDER_REQUIRED",
                             "INVALID_SANDBOX_PROVIDER",
                             "INVALID_BINDING_CONNECTION_REFERENCE",
@@ -26239,7 +26238,6 @@
                           "type": "string",
                           "enum": [
                             "AGENT_RUNTIME_REQUIRED",
-                            "AGENT_RUNTIME_CONNECTION_REQUIRED",
                             "SANDBOX_PROVIDER_REQUIRED",
                             "INVALID_SANDBOX_PROVIDER",
                             "INVALID_BINDING_CONNECTION_REFERENCE",
@@ -26498,7 +26496,6 @@
                           "type": "string",
                           "enum": [
                             "AGENT_RUNTIME_REQUIRED",
-                            "AGENT_RUNTIME_CONNECTION_REQUIRED",
                             "SANDBOX_PROVIDER_REQUIRED",
                             "INVALID_SANDBOX_PROVIDER",
                             "INVALID_BINDING_CONNECTION_REFERENCE",
@@ -26747,7 +26744,6 @@
                           "type": "string",
                           "enum": [
                             "AGENT_RUNTIME_REQUIRED",
-                            "AGENT_RUNTIME_CONNECTION_REQUIRED",
                             "SANDBOX_PROVIDER_REQUIRED",
                             "INVALID_SANDBOX_PROVIDER",
                             "INVALID_BINDING_CONNECTION_REFERENCE",
@@ -26779,6 +26775,21 @@
                         "code": {
                           "type": "string",
                           "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["AGENT_RUNTIME_CONNECTION_REQUIRED"]
                         },
                         "message": {
                           "type": "string",
@@ -26987,7 +26998,6 @@
                           "type": "string",
                           "enum": [
                             "AGENT_RUNTIME_REQUIRED",
-                            "AGENT_RUNTIME_CONNECTION_REQUIRED",
                             "SANDBOX_PROVIDER_REQUIRED",
                             "INVALID_SANDBOX_PROVIDER",
                             "INVALID_BINDING_CONNECTION_REFERENCE",
@@ -27236,7 +27246,6 @@
                           "type": "string",
                           "enum": [
                             "AGENT_RUNTIME_REQUIRED",
-                            "AGENT_RUNTIME_CONNECTION_REQUIRED",
                             "SANDBOX_PROVIDER_REQUIRED",
                             "INVALID_SANDBOX_PROVIDER",
                             "INVALID_BINDING_CONNECTION_REFERENCE",

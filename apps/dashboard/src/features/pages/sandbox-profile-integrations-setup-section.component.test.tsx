@@ -529,9 +529,11 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     const proxiedConnections = within(getProxiedConnectionsSection());
 
     expect(screen.getByText("Some integrations need attention")).toBeDefined();
-    expect(proxiedConnections.getByText("Agent provider")).toBeDefined();
+    expect(proxiedConnections.getByText("Agent runtime connection")).toBeDefined();
     expect(proxiedConnections.getByText("Connection cannot be found")).toBeDefined();
-    fireEvent.click(proxiedConnections.getByRole("button", { name: "Remove agent provider" }));
+    fireEvent.click(
+      proxiedConnections.getByRole("button", { name: "Remove agent runtime connection" }),
+    );
     expect(removedRows).toEqual(["stale-agent-row"]);
   });
 
@@ -557,9 +559,11 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     const proxiedConnections = within(getProxiedConnectionsSection());
 
     expect(screen.getByText("Some integrations need attention")).toBeDefined();
-    expect(proxiedConnections.getByText("Agent provider")).toBeDefined();
+    expect(proxiedConnections.getByText("Agent runtime connection")).toBeDefined();
     expect(proxiedConnections.getByText("Integration no longer available.")).toBeDefined();
-    expect(proxiedConnections.getByRole("button", { name: "Remove agent provider" })).toBeDefined();
+    expect(
+      proxiedConnections.getByRole("button", { name: "Remove agent runtime connection" }),
+    ).toBeDefined();
   });
 
   it("links disconnected connector setup to the integration add flow", () => {

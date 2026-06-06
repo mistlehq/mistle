@@ -9983,7 +9983,6 @@ export interface paths {
                   /** @enum {string} */
                   code:
                     | "AGENT_RUNTIME_REQUIRED"
-                    | "AGENT_RUNTIME_CONNECTION_REQUIRED"
                     | "SANDBOX_PROVIDER_REQUIRED"
                     | "INVALID_SANDBOX_PROVIDER"
                     | "INVALID_BINDING_CONNECTION_REFERENCE"
@@ -10886,7 +10885,6 @@ export interface paths {
                   /** @enum {string} */
                   code:
                     | "AGENT_RUNTIME_REQUIRED"
-                    | "AGENT_RUNTIME_CONNECTION_REQUIRED"
                     | "SANDBOX_PROVIDER_REQUIRED"
                     | "INVALID_SANDBOX_PROVIDER"
                     | "INVALID_BINDING_CONNECTION_REFERENCE"
@@ -11160,7 +11158,6 @@ export interface paths {
                   /** @enum {string} */
                   code:
                     | "AGENT_RUNTIME_REQUIRED"
-                    | "AGENT_RUNTIME_CONNECTION_REQUIRED"
                     | "SANDBOX_PROVIDER_REQUIRED"
                     | "INVALID_SANDBOX_PROVIDER"
                     | "INVALID_BINDING_CONNECTION_REFERENCE"
@@ -12292,7 +12289,6 @@ export interface paths {
                   /** @enum {string} */
                   code:
                     | "AGENT_RUNTIME_REQUIRED"
-                    | "AGENT_RUNTIME_CONNECTION_REQUIRED"
                     | "SANDBOX_PROVIDER_REQUIRED"
                     | "INVALID_SANDBOX_PROVIDER"
                     | "INVALID_BINDING_CONNECTION_REFERENCE"
@@ -12313,6 +12309,11 @@ export interface paths {
               | {
                   /** @enum {string} */
                   code: "VALIDATION_ERROR";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "AGENT_RUNTIME_CONNECTION_REQUIRED";
                   message: string;
                 };
           };
@@ -12453,7 +12454,6 @@ export interface paths {
                   /** @enum {string} */
                   code:
                     | "AGENT_RUNTIME_REQUIRED"
-                    | "AGENT_RUNTIME_CONNECTION_REQUIRED"
                     | "SANDBOX_PROVIDER_REQUIRED"
                     | "INVALID_SANDBOX_PROVIDER"
                     | "INVALID_BINDING_CONNECTION_REFERENCE"
@@ -12719,7 +12719,6 @@ export interface paths {
                   /** @enum {string} */
                   code:
                     | "AGENT_RUNTIME_REQUIRED"
-                    | "AGENT_RUNTIME_CONNECTION_REQUIRED"
                     | "SANDBOX_PROVIDER_REQUIRED"
                     | "INVALID_SANDBOX_PROVIDER"
                     | "INVALID_BINDING_CONNECTION_REFERENCE"

@@ -161,9 +161,9 @@ import {
   useCreateSandboxProfileMetaState,
   useEditSandboxProfileMetaState,
 } from "./sandbox-profile-meta-state.js";
+import { createDefaultMistleSandboxRuntimeConfig } from "./sandbox-profile-runtime-defaults.js";
 import {
   createRuntimeDraftSourceVersionKey,
-  createDefaultMistleSandboxRuntimeConfig,
   SandboxProfileRuntimeSection,
   type SandboxProfileRuntimeDraftChanges,
   type SandboxProfileRuntimeDraftState,
@@ -417,6 +417,7 @@ const IntegrationDraftSaveErrorCodes = new Set([
   "TARGET_DISABLED",
 ]);
 const RuntimeDraftSaveErrorCodes = new Set([
+  "INVALID_MISTLE_MCP_CONFIG",
   "INVALID_SANDBOX_PROVIDER",
   "INVALID_SANDBOX_RUNTIME_CONFIG",
   "SANDBOX_PROVIDER_REQUIRED",
@@ -478,7 +479,7 @@ function hasSetupAssistantAgentRuntimeConnection(input: {
   });
 }
 
-function resolveDraftSaveErrorOwner(error: unknown): DraftSaveErrorOwner {
+export function resolveDraftSaveErrorOwner(error: unknown): DraftSaveErrorOwner {
   if (!(error instanceof SandboxProfilesApiError) || error.code === null) {
     return "generic";
   }

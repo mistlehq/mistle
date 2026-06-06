@@ -177,6 +177,7 @@ export async function startProfileSetupSandbox(
     input.snapshotPreparationScriptKind !== "maintenance"
   ) {
     await assertSetupAssistantAgentRuntimeConnection(db, {
+      integrationRegistry,
       organizationId: input.organizationId,
       profileId: input.profileId,
       profileVersion: input.profileVersion,

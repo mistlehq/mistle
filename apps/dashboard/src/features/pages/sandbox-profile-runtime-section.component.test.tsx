@@ -10,10 +10,12 @@ import type {
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { ApiKey } from "../settings/api-keys/api-keys-service.js";
 import {
-  SandboxProfileRuntimeSection,
   createDefaultMistleSandboxRuntimeConfig,
-  type SandboxProfileRuntimeDraftState,
   resolveManagedSandboxProvider,
+} from "./sandbox-profile-runtime-defaults.js";
+import {
+  SandboxProfileRuntimeSection,
+  type SandboxProfileRuntimeDraftState,
 } from "./sandbox-profile-runtime-section.js";
 
 afterEach(() => {

@@ -21,7 +21,6 @@ export const badRequestResponseSchema = z.union([
   createCodeMessageErrorSchema(
     z.enum([
       SandboxProfilesCompileErrorCodes.AGENT_RUNTIME_REQUIRED,
-      SandboxProfilesCompileErrorCodes.AGENT_RUNTIME_CONNECTION_REQUIRED,
       SandboxProfilesCompileErrorCodes.SANDBOX_PROVIDER_REQUIRED,
       SandboxProfilesCompileErrorCodes.INVALID_SANDBOX_PROVIDER,
       SandboxProfilesCompileErrorCodes.INVALID_BINDING_CONNECTION_REFERENCE,

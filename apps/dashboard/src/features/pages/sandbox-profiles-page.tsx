@@ -43,7 +43,8 @@ import { PageFrame } from "../shared/page-frame.js";
 import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
-import { createDefaultMistleSandboxRuntimeConfig } from "./sandbox-profile-runtime-section.js";
+import { createDefaultMistleSandboxRuntimeConfig } from "./sandbox-profile-runtime-defaults.js";
+import type { CreateSandboxProfileDefaultRuntimeConfig } from "./sandbox-profile-runtime-defaults.js";
 
 const DEFAULT_LIST_LIMIT = 20;
 const MAX_LIST_LIMIT = 100;
@@ -105,17 +106,18 @@ export function SandboxProfilesPage(): React.JSX.Element {
       ? undefined
       : createDefaultMistleSandboxRuntimeConfig(sandboxProvidersQuery.data.items);
 
+  type CreateProfileMutationInput = {
+    defaultRuntimeConfig: CreateSandboxProfileDefaultRuntimeConfig;
+    displayName: string;
+  };
+
   const createMutation = useMutation({
-    mutationFn: async (displayName: string) =>
+    mutationFn: async (input: CreateProfileMutationInput) =>
       createSandboxProfile({
         payload: {
-          displayName,
-          ...(defaultRuntimeConfig === undefined
-            ? {}
-            : {
-                sandboxProvider: defaultRuntimeConfig.sandboxProvider,
-                sandboxResources: defaultRuntimeConfig.sandboxResources,
-              }),
+          displayName: input.displayName,
+          sandboxProvider: input.defaultRuntimeConfig.sandboxProvider,
+          sandboxResources: input.defaultRuntimeConfig.sandboxResources,
         },
       }),
     onSuccess: async (createdProfile) => {
@@ -169,7 +171,10 @@ export function SandboxProfilesPage(): React.JSX.Element {
       return;
     }
 
-    createMutation.mutate(trimmedDisplayName);
+    createMutation.mutate({
+      defaultRuntimeConfig,
+      displayName: trimmedDisplayName,
+    });
   }
 
   function handleCreateProfileSubmit(event: SyntheticEvent<HTMLFormElement>): void {

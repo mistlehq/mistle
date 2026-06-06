@@ -7,10 +7,10 @@ import {
   startSandboxProfileSetupAssistantResponseSchema,
 } from "../schemas.js";
 import {
-  badRequestResponseSchema,
-  conflictResponseSchema,
   notFoundResponseSchema,
+  conflictResponseSchema,
 } from "../start-sandbox-profile-instance/schema.js";
+import { badRequestResponseSchema } from "./schema.js";
 
 export const route = createRoute({
   method: "post",
