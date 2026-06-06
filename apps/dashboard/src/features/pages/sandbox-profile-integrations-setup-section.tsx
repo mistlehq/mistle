@@ -952,20 +952,22 @@ export function SandboxProfileIntegrationsSetupSection(
                   </FieldContent>
                 </Field>
 
-                <GitCommitSigningSwitchField
-                  checked={gitCommitSigningIsChecked}
-                  disabled={gitCommitSigningIsDisabled}
-                  disabledMessage={gitCommitSigningDisabledMessage}
-                  onCheckedChange={(checked) => {
-                    if (gitCommitSigningIsDisabled || gitRow === null) {
-                      return;
-                    }
-                    input.onGitCommitSigningIntegrationConnectionChange(
-                      checked ? gitRow.connectionId : null,
-                    );
-                  }}
-                  readOnly={isReadOnly}
-                />
+                {gitRow === null ? null : (
+                  <GitCommitSigningSwitchField
+                    checked={gitCommitSigningIsChecked}
+                    disabled={gitCommitSigningIsDisabled}
+                    disabledMessage={gitCommitSigningDisabledMessage}
+                    onCheckedChange={(checked) => {
+                      if (gitCommitSigningIsDisabled) {
+                        return;
+                      }
+                      input.onGitCommitSigningIntegrationConnectionChange(
+                        checked ? gitRow.connectionId : null,
+                      );
+                    }}
+                    readOnly={isReadOnly}
+                  />
+                )}
 
                 {gitRow === null ||
                 !hasSandboxProfileBindingResourcesAndToolsCellContent({

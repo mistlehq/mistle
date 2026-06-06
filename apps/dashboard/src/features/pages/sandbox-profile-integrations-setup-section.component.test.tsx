@@ -672,6 +672,8 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
 
     expect(screen.getByRole("combobox", { name: "git connection" })).toBeDefined();
     expect(screen.getByText("None")).toBeDefined();
+    expect(screen.queryByRole("switch", { name: "Sign Git commits" })).toBeNull();
+    expect(screen.queryByText("Select a Git connection")).toBeNull();
   });
 
   it("shows the git connection dropdown with provider and connection labels", () => {

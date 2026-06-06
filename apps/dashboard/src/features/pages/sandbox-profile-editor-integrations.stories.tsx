@@ -111,6 +111,22 @@ export const GitCommitSigningUnavailable: Story = {
   },
 };
 
+export const GitConnectionNone: Story = {
+  args: {
+    initialBindings: StoryBindings.filter((binding) => binding.kind !== "git"),
+    initialGitCommitSigningIntegrationConnectionId: null,
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByRole("combobox", { name: "git connection" }).textContent).toContain(
+      "None",
+    );
+    await expect(canvas.queryByRole("switch", { name: "Sign Git commits" })).toBeNull();
+    await expect(canvas.queryByText("Select a Git connection")).toBeNull();
+  },
+};
+
 export const StaleConnectorBinding: Story = {
   args: {
     initialBindings: [
