@@ -20521,6 +20521,29 @@
                   "displayName": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "sandboxProvider": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sandboxResources": {
+                    "type": ["object", "null"],
+                    "properties": {
+                      "vcpuCount": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "memoryMb": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "diskMb": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
+                    },
+                    "required": ["vcpuCount", "memoryMb"],
+                    "additionalProperties": false
                   }
                 },
                 "required": ["displayName"],

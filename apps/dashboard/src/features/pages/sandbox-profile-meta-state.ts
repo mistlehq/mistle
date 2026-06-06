@@ -6,14 +6,24 @@ import {
   createSandboxProfile,
   updateSandboxProfile,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
+import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
 
 type SandboxProfileEditorFormState = {
   displayName: string;
 };
 
+type CreateSandboxProfileDefaultRuntimeConfig = {
+  sandboxProvider: string;
+  sandboxResources: SandboxProfileVersion["sandboxResources"];
+};
+
 type CommonInput = {
   navigate: (to: string) => void | Promise<void>;
   invalidateSandboxProfiles: () => Promise<void>;
+};
+
+type CreateInput = CommonInput & {
+  defaultRuntimeConfig: CreateSandboxProfileDefaultRuntimeConfig | undefined;
 };
 
 type EditInput = CommonInput & {
@@ -24,7 +34,7 @@ type EditInput = CommonInput & {
   invalidateProfileDetail: (profileId: string) => Promise<void>;
 };
 
-export function useCreateSandboxProfileMetaState(input: CommonInput): {
+export function useCreateSandboxProfileMetaState(input: CreateInput): {
   formState: SandboxProfileEditorFormState;
   saveError: string | null;
   pageTitle: string;
@@ -42,6 +52,12 @@ export function useCreateSandboxProfileMetaState(input: CommonInput): {
       createSandboxProfile({
         payload: {
           displayName: createInput.displayName,
+          ...(input.defaultRuntimeConfig === undefined
+            ? {}
+            : {
+                sandboxProvider: input.defaultRuntimeConfig.sandboxProvider,
+                sandboxResources: input.defaultRuntimeConfig.sandboxResources,
+              }),
         },
       }),
     onSuccess: async (createdProfile) => {
@@ -63,6 +79,11 @@ export function useCreateSandboxProfileMetaState(input: CommonInput): {
 
   function onCreate(): void {
     if (trimmedDisplayName.length === 0 || createMutation.isPending) {
+      return;
+    }
+
+    if (input.defaultRuntimeConfig === undefined) {
+      setSaveError("Could not determine the Mistle sandbox provider for new profiles.");
       return;
     }
 

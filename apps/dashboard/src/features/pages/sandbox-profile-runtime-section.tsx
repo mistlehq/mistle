@@ -1433,6 +1433,29 @@ export function resolveManagedSandboxProvider(
   return managedProviders[0];
 }
 
+export function createDefaultMistleSandboxRuntimeConfig(
+  providers: readonly SandboxProviderSummary[],
+): Pick<SandboxProfileRuntimeDraftChanges, "sandboxProvider" | "sandboxResources"> | undefined {
+  const managedProvider = resolveManagedSandboxProvider(providers);
+  if (managedProvider === undefined) {
+    return undefined;
+  }
+
+  return {
+    sandboxProvider: managedProvider.id,
+    sandboxResources:
+      managedProvider.resourceCapabilities === null
+        ? null
+        : {
+            vcpuCount: managedProvider.resourceCapabilities.vcpuCount.default,
+            memoryMb: managedProvider.resourceCapabilities.memoryMb.default,
+            ...(managedProvider.resourceCapabilities.diskMb === undefined
+              ? {}
+              : { diskMb: managedProvider.resourceCapabilities.diskMb.default }),
+          },
+  };
+}
+
 function resolveSandboxProviderLogoKey(provider: SandboxProviderSummary): string | undefined {
   if (provider.id === DockerSandboxProviderId) {
     return DockerSandboxProviderId;

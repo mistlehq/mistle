@@ -7,6 +7,7 @@ import {
   SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
+import { SandboxProvider } from "@mistle/sandbox";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { and, eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
@@ -74,6 +75,46 @@ describe.concurrent("sandbox profiles create integration", () => {
     expect(initialVersion.state).toBe(SandboxProfileVersionStates.DRAFT);
     expect(initialVersion.agentRuntimeId).toBe(SandboxProfileVersionAgentRuntimeIds.CODEX);
     expect(initialVersion.publishedAt).toBeNull();
+    expect(initialVersion.sandboxProvider).toBeNull();
+    expect(initialVersion.sandboxVcpuCount).toBeNull();
+    expect(initialVersion.sandboxMemoryMb).toBeNull();
+    expect(initialVersion.sandboxDiskMb).toBeNull();
+  });
+
+  it("persists an explicit initial sandbox provider on the draft version", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profiles-create-provider@example.com",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/sandbox/profiles", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie,
+      },
+      body: JSON.stringify({
+        displayName: "Created Mistle Provider Profile",
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    });
+    expect(response.status).toBe(201);
+
+    const body = SandboxProfileSchema.parse(await response.json());
+    const initialVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      where: (table, { eq }) => eq(table.sandboxProfileId, body.id),
+    });
+
+    expect(initialVersion).toBeDefined();
+    if (initialVersion === undefined) {
+      throw new Error("Expected initial sandbox profile version to exist.");
+    }
+    expect(initialVersion.version).toBe(1);
+    expect(initialVersion.state).toBe(SandboxProfileVersionStates.DRAFT);
+    expect(initialVersion.sandboxProvider).toBe(SandboxProvider.DOCKER);
+    expect(initialVersion.sandboxConnectionId).toBeNull();
+    expect(initialVersion.sandboxVcpuCount).toBeNull();
+    expect(initialVersion.sandboxMemoryMb).toBeNull();
+    expect(initialVersion.sandboxDiskMb).toBeNull();
   });
 
   it("creates a sandbox profile with an API key that has create permission", async ({ env }) => {

@@ -14,7 +14,7 @@ const routeHandler = async (
   const db = ctx.get("db");
   const integrationRegistry = ctx.get("integrationRegistry");
   const sandboxConfig = ctx.get("sandboxConfig");
-  const { displayName } = ctx.req.valid("json");
+  const { displayName, sandboxProvider, sandboxResources } = ctx.req.valid("json");
 
   const profile = await createProfile(
     {
@@ -25,6 +25,8 @@ const routeHandler = async (
     {
       displayName,
       organizationId: organizationActor.organizationId,
+      ...(sandboxProvider === undefined ? {} : { sandboxProvider }),
+      ...(sandboxResources === undefined ? {} : { sandboxResources }),
     },
   );
 

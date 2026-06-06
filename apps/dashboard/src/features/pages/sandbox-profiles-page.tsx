@@ -29,9 +29,13 @@ import { Link as RouterLink, useNavigate, useSearchParams } from "react-router";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { formatPublishedSandboxProfileVersionBadge } from "../sandbox-profiles/sandbox-profile-version-labels.js";
 import { formatSandboxProfileUpdatedAt } from "../sandbox-profiles/sandbox-profiles-formatters.js";
-import { sandboxProfilesListQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
+import {
+  sandboxProfilesListQueryKey,
+  sandboxProvidersQueryKey,
+} from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import {
   createSandboxProfile,
+  listSandboxProviders,
   listSandboxProfiles,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import { CollectionEmptyState } from "../shared/collection-empty-state.js";
@@ -39,6 +43,7 @@ import { PageFrame } from "../shared/page-frame.js";
 import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
+import { createDefaultMistleSandboxRuntimeConfig } from "./sandbox-profile-runtime-section.js";
 
 const DEFAULT_LIST_LIMIT = 20;
 const MAX_LIST_LIMIT = 100;
@@ -91,12 +96,26 @@ export function SandboxProfilesPage(): React.JSX.Element {
         signal,
       }),
   });
+  const sandboxProvidersQuery = useQuery({
+    queryKey: sandboxProvidersQueryKey(),
+    queryFn: async ({ signal }) => listSandboxProviders({ signal }),
+  });
+  const defaultRuntimeConfig =
+    sandboxProvidersQuery.data === undefined
+      ? undefined
+      : createDefaultMistleSandboxRuntimeConfig(sandboxProvidersQuery.data.items);
 
   const createMutation = useMutation({
     mutationFn: async (displayName: string) =>
       createSandboxProfile({
         payload: {
           displayName,
+          ...(defaultRuntimeConfig === undefined
+            ? {}
+            : {
+                sandboxProvider: defaultRuntimeConfig.sandboxProvider,
+                sandboxResources: defaultRuntimeConfig.sandboxResources,
+              }),
         },
       }),
     onSuccess: async (createdProfile) => {
@@ -142,6 +161,11 @@ export function SandboxProfilesPage(): React.JSX.Element {
   function createProfile(): void {
     const trimmedDisplayName = createProfileDisplayName.trim();
     if (trimmedDisplayName.length === 0 || createMutation.isPending) {
+      return;
+    }
+
+    if (defaultRuntimeConfig === undefined) {
+      setCreateProfileError("Could not determine the Mistle sandbox provider for new profiles.");
       return;
     }
 
@@ -197,6 +221,11 @@ export function SandboxProfilesPage(): React.JSX.Element {
 
   const items = listQuery.data?.items ?? [];
   const isCreateProfileInvalid = createProfileDisplayName.trim().length === 0;
+  const createProfileIsDisabled =
+    isCreateProfileInvalid ||
+    createMutation.isPending ||
+    defaultRuntimeConfig === undefined ||
+    sandboxProvidersQuery.isError;
   const hasNoProfiles = listQuery.data?.totalResults === 0;
 
   return (
@@ -252,11 +281,24 @@ export function SandboxProfilesPage(): React.JSX.Element {
           {createProfileError ? (
             <p className="text-destructive text-sm">{createProfileError}</p>
           ) : null}
+          {sandboxProvidersQuery.isError ? (
+            <Notice title="Could not load sandbox providers" variant="alert">
+              {resolveApiErrorMessage({
+                error: sandboxProvidersQuery.error,
+                fallbackMessage: "Could not load sandbox providers.",
+              })}
+            </Notice>
+          ) : null}
+          {sandboxProvidersQuery.isSuccess && defaultRuntimeConfig === undefined ? (
+            <Notice title="Mistle sandbox provider unavailable" variant="alert">
+              No managed sandbox provider is configured for this deployment.
+            </Notice>
+          ) : null}
           <DialogFooter>
             <Button onClick={closeCreateDialog} type="button" variant="outline">
               Cancel
             </Button>
-            <Button disabled={isCreateProfileInvalid || createMutation.isPending} type="submit">
+            <Button disabled={createProfileIsDisabled} type="submit">
               {createMutation.isPending ? (
                 "Creating..."
               ) : (

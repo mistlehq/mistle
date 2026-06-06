@@ -458,8 +458,13 @@ export const deleteSandboxProfileVersionRefreshScheduleResponseSchema = z
 export const createSandboxProfileBodySchema = z
   .object({
     displayName: z.string().min(1),
+    sandboxProvider: z.string().min(1).optional(),
+    sandboxResources: sandboxProfileVersionResourcesSchema.nullable().optional(),
   })
-  .strict();
+  .strict()
+  .refine((value) => value.sandboxResources === undefined || value.sandboxProvider !== undefined, {
+    message: "Sandbox resources require a sandbox provider.",
+  });
 
 export const duplicateSandboxProfileBodySchema = z
   .object({

@@ -11,6 +11,7 @@ import type {
 import type { ApiKey } from "../settings/api-keys/api-keys-service.js";
 import {
   SandboxProfileRuntimeSection,
+  createDefaultMistleSandboxRuntimeConfig,
   type SandboxProfileRuntimeDraftState,
   resolveManagedSandboxProvider,
 } from "./sandbox-profile-runtime-section.js";
@@ -414,6 +415,19 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(resolveManagedSandboxProvider([DockerProvider, E2BProvider, TensorlakeProvider])).toBe(
       TensorlakeProvider,
     );
+  });
+
+  it("builds the Mistle default runtime config from the managed provider defaults", () => {
+    expect(
+      createDefaultMistleSandboxRuntimeConfig([DockerProvider, E2BProvider, TensorlakeProvider]),
+    ).toEqual({
+      sandboxProvider: "tensorlake",
+      sandboxResources: {
+        vcpuCount: 1,
+        memoryMb: 1024,
+        diskMb: 10240,
+      },
+    });
   });
 
   it("marks the runtime dirty when switching from Mistle to BYOK for the same provider", async () => {

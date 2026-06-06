@@ -9407,6 +9407,12 @@ export interface paths {
         content: {
           "application/json": {
             displayName: string;
+            sandboxProvider?: string;
+            sandboxResources?: {
+              diskMb?: number;
+              memoryMb: number;
+              vcpuCount: number;
+            } | null;
           };
         };
       };

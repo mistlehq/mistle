@@ -7,9 +7,26 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
-import { sandboxProfilesListQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
+import {
+  sandboxProfilesListQueryKey,
+  sandboxProvidersQueryKey,
+} from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type { SandboxProfilesListResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { SandboxProfilesPage } from "./sandbox-profiles-page.js";
+
+function seedSandboxProviders(queryClient: ReturnType<typeof createTestQueryClient>): void {
+  queryClient.setQueryData(sandboxProvidersQueryKey(), {
+    items: [
+      {
+        id: "docker",
+        displayName: "Docker",
+        managed: true,
+        supportsOrganizationConnection: false,
+        resourceCapabilities: null,
+      },
+    ],
+  });
+}
 
 describe("SandboxProfilesPage", () => {
   it("opens and closes the create profile dialog", () => {
@@ -33,6 +50,7 @@ describe("SandboxProfilesPage", () => {
       previousPage: null,
       totalResults: 1,
     };
+    seedSandboxProviders(queryClient);
 
     queryClient.setQueryData(
       sandboxProfilesListQueryKey({
@@ -68,6 +86,7 @@ describe("SandboxProfilesPage", () => {
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,
     });
+    seedSandboxProviders(queryClient);
 
     queryClient.setQueryData(
       sandboxProfilesListQueryKey({
@@ -128,6 +147,7 @@ describe("SandboxProfilesPage", () => {
       previousPage: null,
       totalResults: 1,
     };
+    seedSandboxProviders(queryClient);
 
     queryClient.setQueryData(
       sandboxProfilesListQueryKey({
@@ -184,6 +204,7 @@ describe("SandboxProfilesPage", () => {
       previousPage: null,
       totalResults: 2,
     };
+    seedSandboxProviders(queryClient);
 
     queryClient.setQueryData(
       sandboxProfilesListQueryKey({

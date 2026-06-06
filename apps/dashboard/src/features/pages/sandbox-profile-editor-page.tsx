@@ -159,6 +159,7 @@ import {
 } from "./sandbox-profile-meta-state.js";
 import {
   createRuntimeDraftSourceVersionKey,
+  createDefaultMistleSandboxRuntimeConfig,
   SandboxProfileRuntimeSection,
   type SandboxProfileRuntimeDraftChanges,
   type SandboxProfileRuntimeDraftState,
@@ -627,14 +628,28 @@ function CreateSandboxProfileEditorPage(): React.JSX.Element {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { title, description } = resolvePageFrameText(pageMeta, "Create");
+  const sandboxProvidersQuery = useQuery({
+    queryKey: sandboxProvidersQueryKey(),
+    queryFn: async ({ signal }) => listSandboxProviders({ signal }),
+  });
+  const defaultRuntimeConfig =
+    sandboxProvidersQuery.data === undefined
+      ? undefined
+      : createDefaultMistleSandboxRuntimeConfig(sandboxProvidersQuery.data.items);
   const metaState = useCreateSandboxProfileMetaState({
     navigate,
+    defaultRuntimeConfig,
     invalidateSandboxProfiles: async () => {
       await queryClient.invalidateQueries({
         queryKey: ["sandbox-profiles"],
       });
     },
   });
+  const createIsDisabled =
+    metaState.isDisplayNameInvalid ||
+    metaState.isCreating ||
+    defaultRuntimeConfig === undefined ||
+    sandboxProvidersQuery.isError;
 
   function handleCreateProfileSubmit(event: SyntheticEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -647,6 +662,19 @@ function CreateSandboxProfileEditorPage(): React.JSX.Element {
         {metaState.saveError ? (
           <Notice title="Create failed" variant="alert">
             {metaState.saveError}
+          </Notice>
+        ) : null}
+        {sandboxProvidersQuery.isError ? (
+          <Notice title="Could not load sandbox providers" variant="alert">
+            {resolveApiErrorMessage({
+              error: sandboxProvidersQuery.error,
+              fallbackMessage: "Could not load sandbox providers.",
+            })}
+          </Notice>
+        ) : null}
+        {sandboxProvidersQuery.isSuccess && defaultRuntimeConfig === undefined ? (
+          <Notice title="Mistle sandbox provider unavailable" variant="alert">
+            No managed sandbox provider is configured for this deployment.
           </Notice>
         ) : null}
 
@@ -675,10 +703,7 @@ function CreateSandboxProfileEditorPage(): React.JSX.Element {
               </Field>
 
               <div className="gap-2 flex">
-                <Button
-                  disabled={metaState.isDisplayNameInvalid || metaState.isCreating}
-                  type="submit"
-                >
+                <Button disabled={createIsDisabled} type="submit">
                   {metaState.isCreating ? "Creating..." : "Create profile"}
                 </Button>
                 <Button onClick={metaState.onCancelCreate} type="button" variant="outline">
@@ -2426,7 +2451,7 @@ export function SetupAssistantCloseDialog(input: {
             Cancel
           </Button>
           <Button onClick={input.onConfirm} type="button">
-            Stop and close
+            {reason === "switch-tabs" ? "Switch tabs and close" : "Stop and close"}
           </Button>
         </DialogFooter>
       </DialogContent>
