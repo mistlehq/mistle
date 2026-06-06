@@ -2,6 +2,7 @@ package sandboxd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +15,7 @@ import (
 )
 
 const skillFileName = "SKILL.md"
+const agentSkillsTargetRoot = "/root/.agents/skills"
 
 type SkillsDiscoverOutput struct {
 	CommitSHA string            `json:"commitSha"`
@@ -26,6 +28,19 @@ type DiscoveredSkill struct {
 	RelativePath string `json:"relativePath"`
 }
 
+type SkillsReconcileOutput struct {
+	Runtime    string            `json:"runtime"`
+	TargetRoot string            `json:"targetRoot"`
+	Skills     []ReconciledSkill `json:"skills"`
+}
+
+type ReconciledSkill struct {
+	Name         string `json:"name"`
+	RelativePath string `json:"relativePath"`
+	SourcePath   string `json:"sourcePath"`
+	TargetPath   string `json:"targetPath"`
+}
+
 type SkillsCommandKind string
 
 const (
@@ -34,8 +49,11 @@ const (
 )
 
 type SkillsCommand struct {
-	Kind     SkillsCommandKind
-	RepoRoot string
+	Kind                  SkillsCommandKind
+	RepoRoot              string
+	Runtime               string
+	SelectedRelativePaths []string
+	TargetRootOverride    string
 }
 
 func RunSkills(args []string, stdout io.Writer) error {
@@ -47,7 +65,13 @@ func RunSkills(args []string, stdout io.Writer) error {
 	case SkillsCommandDiscover:
 		return RunSkillsDiscover(command.RepoRoot, stdout)
 	case SkillsCommandReconcile:
-		return fmt.Errorf("sandboxd skills reconcile is not ported to Go yet")
+		return RunSkillsReconcile(
+			command.RepoRoot,
+			command.Runtime,
+			command.SelectedRelativePaths,
+			command.TargetRootOverride,
+			stdout,
+		)
 	default:
 		return fmt.Errorf("unknown parsed sandboxd skills command: %s", command.Kind)
 	}
@@ -93,6 +117,9 @@ func parseSkillsDiscoverArgs(args []string) (SkillsCommand, error) {
 
 func parseSkillsReconcileArgs(args []string) (SkillsCommand, error) {
 	repoRoot := ""
+	runtime := ""
+	selectedRelativePaths := []string{}
+	targetRootOverride := ""
 	for index := 0; index < len(args); index++ {
 		argument := args[index]
 		switch argument {
@@ -106,25 +133,32 @@ func parseSkillsReconcileArgs(args []string) (SkillsCommand, error) {
 			}
 			repoRoot = args[index]
 		case "--runtime":
+			if runtime != "" {
+				return SkillsCommand{}, fmt.Errorf("unexpected sandboxd skills argument: %s", argument)
+			}
 			index++
 			if index >= len(args) {
 				return SkillsCommand{}, fmt.Errorf("sandboxd skills reconcile requires --runtime <id>")
 			}
-			switch args[index] {
-			case "codex", "opencode", "pi":
-			default:
-				return SkillsCommand{}, fmt.Errorf("unknown skills runtime '%s'", args[index])
+			runtime = args[index]
+			if err := validateSkillsRuntime(runtime); err != nil {
+				return SkillsCommand{}, err
 			}
 		case "--skill":
 			index++
 			if index >= len(args) {
 				return SkillsCommand{}, fmt.Errorf("sandboxd skills reconcile --skill requires a relative path value")
 			}
+			selectedRelativePaths = append(selectedRelativePaths, args[index])
 		case "--target-root":
+			if targetRootOverride != "" {
+				return SkillsCommand{}, fmt.Errorf("unexpected sandboxd skills argument: %s", argument)
+			}
 			index++
 			if index >= len(args) {
 				return SkillsCommand{}, fmt.Errorf("sandboxd skills reconcile --target-root requires a path value")
 			}
+			targetRootOverride = args[index]
 		default:
 			return SkillsCommand{}, fmt.Errorf("unexpected sandboxd skills argument: %s", argument)
 		}
@@ -132,7 +166,16 @@ func parseSkillsReconcileArgs(args []string) (SkillsCommand, error) {
 	if repoRoot == "" {
 		return SkillsCommand{}, fmt.Errorf("sandboxd skills requires --repo <path>")
 	}
-	return SkillsCommand{Kind: SkillsCommandReconcile, RepoRoot: repoRoot}, nil
+	if runtime == "" {
+		return SkillsCommand{}, fmt.Errorf("sandboxd skills reconcile requires --runtime <id>")
+	}
+	return SkillsCommand{
+		Kind:                  SkillsCommandReconcile,
+		RepoRoot:              repoRoot,
+		Runtime:               runtime,
+		SelectedRelativePaths: selectedRelativePaths,
+		TargetRootOverride:    targetRootOverride,
+	}, nil
 }
 
 func RunSkillsDiscover(repoRoot string, stdout io.Writer) error {
@@ -143,6 +186,24 @@ func RunSkillsDiscover(repoRoot string, stdout io.Writer) error {
 	encoder := json.NewEncoder(stdout)
 	if err := encoder.Encode(output); err != nil {
 		return fmt.Errorf("failed to serialize skill discovery output: %w", err)
+	}
+	return nil
+}
+
+func RunSkillsReconcile(
+	repoRoot string,
+	runtime string,
+	selectedRelativePaths []string,
+	targetRootOverride string,
+	stdout io.Writer,
+) error {
+	output, err := ReconcileSkills(repoRoot, runtime, selectedRelativePaths, targetRootOverride)
+	if err != nil {
+		return err
+	}
+	encoder := json.NewEncoder(stdout)
+	if err := encoder.Encode(output); err != nil {
+		return fmt.Errorf("failed to serialize skill reconcile output: %w", err)
 	}
 	return nil
 }
@@ -185,6 +246,130 @@ func DiscoverSkills(repoRoot string) (SkillsDiscoverOutput, error) {
 	}, nil
 }
 
+func ReconcileSkills(
+	repoRoot string,
+	runtime string,
+	selectedRelativePaths []string,
+	targetRootOverride string,
+) (SkillsReconcileOutput, error) {
+	if err := validateSkillsRuntime(runtime); err != nil {
+		return SkillsReconcileOutput{}, err
+	}
+	canonicalRepoRoot, err := canonicalizeRepoRoot(repoRoot)
+	if err != nil {
+		return SkillsReconcileOutput{}, err
+	}
+	targetRoot := targetRootOverride
+	if targetRoot == "" {
+		targetRoot = agentSkillsTargetRoot
+	}
+
+	if err := pullGitRepo(canonicalRepoRoot); err != nil {
+		return SkillsReconcileOutput{}, err
+	}
+	selectedSkills, err := readSelectedSkills(canonicalRepoRoot, selectedRelativePaths)
+	if err != nil {
+		return SkillsReconcileOutput{}, err
+	}
+	if err := prepareTargetRoot(targetRoot); err != nil {
+		return SkillsReconcileOutput{}, err
+	}
+	if err := pruneTargetRoot(targetRoot); err != nil {
+		return SkillsReconcileOutput{}, err
+	}
+
+	reconciledSkills := make([]ReconciledSkill, 0, len(selectedSkills))
+	for _, selectedSkill := range selectedSkills {
+		targetPath := filepath.Join(targetRoot, selectedSkill.Name)
+		if err := os.Symlink(selectedSkill.SourcePath, targetPath); err != nil {
+			return SkillsReconcileOutput{}, fmt.Errorf("failed to symlink skill %s to %s: %w", targetPath, selectedSkill.SourcePath, err)
+		}
+		reconciledSkills = append(reconciledSkills, ReconciledSkill{
+			Name:         selectedSkill.Name,
+			RelativePath: selectedSkill.RelativePath,
+			SourcePath:   selectedSkill.SourcePath,
+			TargetPath:   targetPath,
+		})
+	}
+
+	return SkillsReconcileOutput{
+		Runtime:    runtime,
+		TargetRoot: targetRoot,
+		Skills:     reconciledSkills,
+	}, nil
+}
+
+type selectedSkill struct {
+	Name         string
+	RelativePath string
+	SourcePath   string
+}
+
+func readSelectedSkills(repoRoot string, selectedRelativePaths []string) ([]selectedSkill, error) {
+	selectedSkills := make([]selectedSkill, 0, len(selectedRelativePaths))
+	selectedPaths := make(map[string]struct{}, len(selectedRelativePaths))
+	namesToPaths := make(map[string]string, len(selectedRelativePaths))
+	for _, selectedRelativePath := range selectedRelativePaths {
+		normalizedRelativePath, err := normalizeSelectedRelativePath(selectedRelativePath)
+		if err != nil {
+			return nil, err
+		}
+		if _, ok := selectedPaths[normalizedRelativePath]; ok {
+			return nil, fmt.Errorf("selected skill path '%s' was provided more than once", normalizedRelativePath)
+		}
+		selectedPaths[normalizedRelativePath] = struct{}{}
+
+		sourcePath := filepath.Join(repoRoot, repoRelativePathToPath(normalizedRelativePath))
+		canonicalSourcePath, err := filepath.EvalSymlinks(sourcePath)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			return nil, fmt.Errorf("failed to resolve selected skill path '%s' at %s: %w", normalizedRelativePath, sourcePath, err)
+		}
+		if !pathIsWithin(canonicalSourcePath, repoRoot) {
+			return nil, fmt.Errorf("selected skill path '%s' resolves outside the repo root", normalizedRelativePath)
+		}
+		sourceStat, err := os.Stat(canonicalSourcePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve selected skill path '%s' at %s: %w", normalizedRelativePath, canonicalSourcePath, err)
+		}
+		if !sourceStat.IsDir() {
+			return nil, fmt.Errorf("selected skill path '%s' at %s is not a directory", normalizedRelativePath, canonicalSourcePath)
+		}
+
+		skillFilePath := filepath.Join(canonicalSourcePath, skillFileName)
+		skillFileStat, err := os.Stat(skillFilePath)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil, fmt.Errorf("selected skill path '%s' at %s is missing SKILL.md", normalizedRelativePath, canonicalSourcePath)
+			}
+			return nil, fmt.Errorf("failed to read skill file %s: %w", skillFilePath, err)
+		}
+		if !skillFileStat.Mode().IsRegular() {
+			return nil, fmt.Errorf("selected skill path '%s' at %s is missing SKILL.md", normalizedRelativePath, canonicalSourcePath)
+		}
+
+		skill, err := readSkillFile(repoRoot, skillFilePath)
+		if err != nil {
+			return nil, err
+		}
+		if firstPath, ok := namesToPaths[skill.Name]; ok {
+			return nil, fmt.Errorf("selected skills '%s' and '%s' both declare skill name '%s'", firstPath, normalizedRelativePath, skill.Name)
+		}
+		namesToPaths[skill.Name] = normalizedRelativePath
+		selectedSkills = append(selectedSkills, selectedSkill{
+			Name:         skill.Name,
+			RelativePath: skill.RelativePath,
+			SourcePath:   canonicalSourcePath,
+		})
+	}
+	sort.Slice(selectedSkills, func(leftIndex, rightIndex int) bool {
+		return selectedSkills[leftIndex].Name < selectedSkills[rightIndex].Name
+	})
+	return selectedSkills, nil
+}
+
 func canonicalizeRepoRoot(repoRoot string) (string, error) {
 	absoluteRepoRoot, err := filepath.Abs(repoRoot)
 	if err != nil {
@@ -202,6 +387,15 @@ func canonicalizeRepoRoot(repoRoot string) (string, error) {
 		return "", fmt.Errorf("repo root %s is not a directory", canonicalRepoRoot)
 	}
 	return canonicalRepoRoot, nil
+}
+
+func validateSkillsRuntime(runtime string) error {
+	switch runtime {
+	case "codex", "opencode", "pi":
+		return nil
+	default:
+		return fmt.Errorf("unknown skills runtime '%s' (expected 'codex', 'opencode', or 'pi')", runtime)
+	}
 }
 
 func collectSkillFiles(directory string) ([]string, error) {
@@ -343,6 +537,41 @@ func repoRelativePath(repoRoot string, path string) (string, error) {
 	return filepath.ToSlash(relativePath), nil
 }
 
+func normalizeSelectedRelativePath(relativePath string) (string, error) {
+	if relativePath == "." {
+		return ".", nil
+	}
+	if strings.TrimSpace(relativePath) == "" || filepath.IsAbs(relativePath) {
+		return "", fmt.Errorf("selected skill path '%s' must be a repo-relative directory path", relativePath)
+	}
+	components := []string{}
+	for _, component := range strings.Split(filepath.Clean(relativePath), string(filepath.Separator)) {
+		if component == "" || component == "." || component == ".." {
+			return "", fmt.Errorf("selected skill path '%s' must be a repo-relative directory path", relativePath)
+		}
+		components = append(components, component)
+	}
+	if len(components) == 0 {
+		return "", fmt.Errorf("selected skill path '%s' must be a repo-relative directory path", relativePath)
+	}
+	return filepath.ToSlash(filepath.Join(components...)), nil
+}
+
+func repoRelativePathToPath(relativePath string) string {
+	if relativePath == "." {
+		return ""
+	}
+	return filepath.FromSlash(relativePath)
+}
+
+func pathIsWithin(path string, root string) bool {
+	relativePath, err := filepath.Rel(root, path)
+	if err != nil {
+		return false
+	}
+	return relativePath == "." || relativePath != ".." && !strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) && !filepath.IsAbs(relativePath)
+}
+
 func readGitCommitSHA(repoRoot string) (string, error) {
 	command := exec.Command("git", "-C", repoRoot, "rev-parse", "HEAD")
 	output, err := command.Output()
@@ -353,4 +582,70 @@ func readGitCommitSHA(repoRoot string) (string, error) {
 		return "", fmt.Errorf("failed to read git commit SHA for repo %s: %w", repoRoot, err)
 	}
 	return strings.TrimSpace(string(output)), nil
+}
+
+func pullGitRepo(repoRoot string) error {
+	command := exec.Command("git", "-C", repoRoot, "pull", "--ff-only")
+	command.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+	output, err := command.CombinedOutput()
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("failed to pull skills repo %s before reconciliation: %s", repoRoot, strings.TrimSpace(string(output)))
+}
+
+func prepareTargetRoot(targetRoot string) error {
+	if err := rejectSymlinkedExistingTargetPath(targetRoot); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(targetRoot, 0o777); err != nil {
+		return fmt.Errorf("failed to create skills target root %s: %w", targetRoot, err)
+	}
+	return rejectSymlinkedExistingTargetPath(targetRoot)
+}
+
+func rejectSymlinkedExistingTargetPath(targetRoot string) error {
+	cleanTargetRoot := filepath.Clean(targetRoot)
+	currentPath := ""
+	if filepath.IsAbs(cleanTargetRoot) {
+		currentPath = string(filepath.Separator)
+		cleanTargetRoot = strings.TrimPrefix(cleanTargetRoot, string(filepath.Separator))
+	}
+	for _, component := range strings.Split(cleanTargetRoot, string(filepath.Separator)) {
+		if component == "" {
+			continue
+		}
+		currentPath = filepath.Join(currentPath, component)
+		metadata, err := os.Lstat(currentPath)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil
+			}
+			return fmt.Errorf("failed to create skills target root %s: %w", currentPath, err)
+		}
+		if metadata.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("skills target root path %s must not contain symlinks", currentPath)
+		}
+	}
+	return nil
+}
+
+func pruneTargetRoot(targetRoot string) error {
+	entries, err := os.ReadDir(targetRoot)
+	if err != nil {
+		return fmt.Errorf("failed to read skills target root %s: %w", targetRoot, err)
+	}
+	for _, entry := range entries {
+		path := filepath.Join(targetRoot, entry.Name())
+		var removeErr error
+		if entry.IsDir() {
+			removeErr = os.RemoveAll(path)
+		} else {
+			removeErr = os.Remove(path)
+		}
+		if removeErr != nil {
+			return fmt.Errorf("failed to remove stale skills target entry %s: %w", path, removeErr)
+		}
+	}
+	return nil
 }

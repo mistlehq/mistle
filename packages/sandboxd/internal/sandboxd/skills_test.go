@@ -132,22 +132,182 @@ func TestDiscoverSkillsRejectsInvalidFrontmatter(t *testing.T) {
 	}
 }
 
-func TestRunSkillsReconcileReportsExplicitUnportedError(t *testing.T) {
+func TestRunDispatchesSkillsReconcileCommand(t *testing.T) {
+	repoRoot, _ := createSkillsGitRepoWithOrigin(t)
+	targetRoot := createRealSkillsTempDir(t, "target")
+	writeSkill(t, repoRoot, ".agents/skills/write-a-skill", `---
+name: write-a-skill
+description: Write a new skill.
+---
+`)
 	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 
-	err := RunSkills([]string{"reconcile", "--repo", "/repo", "--runtime", "codex"}, &stdout)
+	code := Run(
+		"sandboxd",
+		[]string{
+			"skills",
+			"reconcile",
+			"--repo",
+			repoRoot,
+			"--runtime",
+			"pi",
+			"--skill",
+			".agents/skills/write-a-skill",
+			"--target-root",
+			targetRoot,
+		},
+		strings.NewReader(""),
+		&stdout,
+		&stderr,
+	)
 
-	assertError(t, err, "sandboxd skills reconcile is not ported to Go yet")
-	assertEqual(t, stdout.String(), "")
+	assertEqual(t, code, 0)
+	assertEqual(t, stderr.String(), "")
+	var output SkillsReconcileOutput
+	requireNoError(t, json.Unmarshal(stdout.Bytes(), &output))
+	assertEqual(t, output.Runtime, "pi")
+	assertEqual(t, output.TargetRoot, targetRoot)
+	if len(output.Skills) != 1 {
+		t.Fatalf("expected 1 reconciled skill, got %d", len(output.Skills))
+	}
+	assertEqual(t, output.Skills[0].Name, "write-a-skill")
+	assertEqual(t, output.Skills[0].RelativePath, ".agents/skills/write-a-skill")
+	assertEqual(t, output.Skills[0].SourcePath, filepath.Join(repoRoot, ".agents/skills/write-a-skill"))
+	assertEqual(t, output.Skills[0].TargetPath, filepath.Join(targetRoot, "write-a-skill"))
+	target, err := os.Readlink(filepath.Join(targetRoot, "write-a-skill"))
+	requireNoError(t, err)
+	assertEqual(t, target, filepath.Join(repoRoot, ".agents/skills/write-a-skill"))
+	assertEqual(t, strings.HasSuffix(stdout.String(), "\n"), true)
+}
+
+func TestReconcileSkillsPrunesStaleTargetEntries(t *testing.T) {
+	repoRoot, _ := createSkillsGitRepoWithOrigin(t)
+	targetRoot := createRealSkillsTempDir(t, "target")
+	writeSkill(t, repoRoot, ".", `---
+name: root-skill
+description: Skill defined at the repository root.
+---
+`)
+	requireNoError(t, os.MkdirAll(filepath.Join(targetRoot, "stale-directory"), 0o777))
+	requireNoError(t, os.WriteFile(filepath.Join(targetRoot, "stale-directory", "old.txt"), []byte("old"), 0o666))
+	requireNoError(t, os.WriteFile(filepath.Join(targetRoot, "stale-file"), []byte("old"), 0o666))
+
+	output, err := ReconcileSkills(repoRoot, "opencode", []string{"."}, targetRoot)
+
+	requireNoError(t, err)
+	assertEqual(t, output.Runtime, "opencode")
+	assertEqual(t, len(output.Skills), 1)
+	target, err := os.Readlink(filepath.Join(targetRoot, "root-skill"))
+	requireNoError(t, err)
+	assertEqual(t, target, repoRoot)
+	if _, err := os.Stat(filepath.Join(targetRoot, "stale-directory")); !os.IsNotExist(err) {
+		t.Fatalf("expected stale directory to be pruned, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(targetRoot, "stale-file")); !os.IsNotExist(err) {
+		t.Fatalf("expected stale file to be pruned, got %v", err)
+	}
+}
+
+func TestReconcileSkillsPullsRepoBeforeLinkingSelectedSkills(t *testing.T) {
+	repoRoot, remoteRoot := createSkillsGitRepoWithOrigin(t)
+	updaterRoot := filepath.Join(createRealSkillsTempDir(t, "updater-parent"), "updater")
+	targetRoot := createRealSkillsTempDir(t, "target")
+	writeSkill(t, repoRoot, "skills/old-skill", `---
+name: old-skill
+description: Old skill.
+---
+`)
+	commitSkillsRepo(t, repoRoot)
+	runGit(t, repoRoot, "push")
+	requireNoError(t, os.WriteFile(filepath.Join(targetRoot, "old-skill"), []byte("stale"), 0o666))
+	cloneSkillsRepo(t, remoteRoot, updaterRoot)
+	runGit(t, updaterRoot, "config", "user.name", "Mistle Tests")
+	runGit(t, updaterRoot, "config", "user.email", "mistle-tests@example.com")
+	requireNoError(t, os.RemoveAll(filepath.Join(updaterRoot, "skills", "old-skill")))
+	writeSkill(t, updaterRoot, "skills/new-skill", `---
+name: new-skill
+description: New skill.
+---
+`)
+	commitSkillsRepo(t, updaterRoot)
+	runGit(t, updaterRoot, "push")
+
+	output, err := ReconcileSkills(repoRoot, "codex", []string{"skills/old-skill", "skills/new-skill"}, targetRoot)
+
+	requireNoError(t, err)
+	if len(output.Skills) != 1 {
+		t.Fatalf("expected 1 reconciled skill, got %d", len(output.Skills))
+	}
+	assertEqual(t, output.Skills[0].Name, "new-skill")
+	if _, err := os.Stat(filepath.Join(targetRoot, "old-skill")); !os.IsNotExist(err) {
+		t.Fatalf("expected stale removed skill target to be pruned, got %v", err)
+	}
+	target, err := os.Readlink(filepath.Join(targetRoot, "new-skill"))
+	requireNoError(t, err)
+	assertEqual(t, target, filepath.Join(repoRoot, "skills/new-skill"))
+}
+
+func TestReconcileSkillsRejectsSelectedPathsThatEscapeRepo(t *testing.T) {
+	repoRoot, _ := createSkillsGitRepoWithOrigin(t)
+
+	_, err := ReconcileSkills(repoRoot, "codex", []string{"../outside"}, createRealSkillsTempDir(t, "target"))
+
+	assertError(t, err, "selected skill path '../outside' must be a repo-relative directory path")
+}
+
+func TestReconcileSkillsRejectsDuplicateSelectedSkillNames(t *testing.T) {
+	repoRoot, _ := createSkillsGitRepoWithOrigin(t)
+	writeSkill(t, repoRoot, "one", `---
+name: duplicate-skill
+description: First.
+---
+`)
+	writeSkill(t, repoRoot, "two", `---
+name: duplicate-skill
+description: Second.
+---
+`)
+
+	_, err := ReconcileSkills(repoRoot, "codex", []string{"one", "two"}, createRealSkillsTempDir(t, "target"))
+
+	assertError(t, err, "selected skills 'one' and 'two' both declare skill name 'duplicate-skill'")
+}
+
+func TestReconcileSkillsRejectsSymlinkedTargetRootWithoutPruningDestination(t *testing.T) {
+	repoRoot, _ := createSkillsGitRepoWithOrigin(t)
+	destination := createRealSkillsTempDir(t, "destination")
+	targetRoot := filepath.Join(createRealSkillsTempDir(t, "target-parent"), "linked-target")
+	requireNoError(t, os.WriteFile(filepath.Join(destination, "stale-skill"), []byte("old"), 0o666))
+	requireNoError(t, os.Symlink(destination, targetRoot))
+
+	_, err := ReconcileSkills(repoRoot, "pi", nil, targetRoot)
+
+	assertError(t, err, "skills target root path "+targetRoot+" must not contain symlinks")
+	contents, readErr := os.ReadFile(filepath.Join(destination, "stale-skill"))
+	requireNoError(t, readErr)
+	assertEqual(t, string(contents), "old")
 }
 
 func createSkillsGitRepo(t *testing.T) string {
 	t.Helper()
-	repoRoot := t.TempDir()
+	repoRoot := createRealSkillsTempDir(t, "repo")
 	runGit(t, repoRoot, "init")
 	runGit(t, repoRoot, "config", "user.name", "Mistle Tests")
 	runGit(t, repoRoot, "config", "user.email", "mistle-tests@example.com")
 	return repoRoot
+}
+
+func createSkillsGitRepoWithOrigin(t *testing.T) (string, string) {
+	t.Helper()
+	repoRoot := createSkillsGitRepo(t)
+	remoteRoot := filepath.Join(createRealSkillsTempDir(t, "remote-parent"), "remote.git")
+	runGitCommand(t, "", "init", "--bare", remoteRoot)
+	requireNoError(t, os.WriteFile(filepath.Join(repoRoot, ".gitkeep"), []byte(""), 0o666))
+	commitSkillsRepo(t, repoRoot)
+	runGit(t, repoRoot, "remote", "add", "origin", remoteRoot)
+	runGit(t, repoRoot, "push", "-u", "origin", "HEAD")
+	return repoRoot, remoteRoot
 }
 
 func writeSkill(t *testing.T, repoRoot string, relativeDirectory string, content string) {
@@ -165,7 +325,17 @@ func commitSkillsRepo(t *testing.T, repoRoot string) {
 
 func runGit(t *testing.T, repoRoot string, args ...string) {
 	t.Helper()
-	command := exec.Command("git", append([]string{"-C", repoRoot}, args...)...)
+	runGitCommand(t, repoRoot, args...)
+}
+
+func runGitCommand(t *testing.T, repoRoot string, args ...string) {
+	t.Helper()
+	commandArgs := []string{"-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false"}
+	if repoRoot != "" {
+		commandArgs = append(commandArgs, "-C", repoRoot)
+	}
+	commandArgs = append(commandArgs, args...)
+	command := exec.Command("git", commandArgs...)
 	output, err := command.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %s failed: %v\n%s", strings.Join(args, " "), err, string(output))
@@ -174,10 +344,29 @@ func runGit(t *testing.T, repoRoot string, args ...string) {
 
 func runGitOutput(t *testing.T, repoRoot string, args ...string) string {
 	t.Helper()
-	command := exec.Command("git", append([]string{"-C", repoRoot}, args...)...)
+	commandArgs := []string{"-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", "-C", repoRoot}
+	commandArgs = append(commandArgs, args...)
+	command := exec.Command("git", commandArgs...)
 	output, err := command.Output()
 	if err != nil {
 		t.Fatalf("git %s failed: %v", strings.Join(args, " "), err)
 	}
 	return strings.TrimSpace(string(output))
+}
+
+func cloneSkillsRepo(t *testing.T, remoteRoot string, cloneRoot string) {
+	t.Helper()
+	runGitCommand(t, "", "clone", remoteRoot, cloneRoot)
+}
+
+func createRealSkillsTempDir(t *testing.T, prefix string) string {
+	t.Helper()
+	tempRoot, err := filepath.EvalSymlinks(os.TempDir())
+	requireNoError(t, err)
+	dir, err := os.MkdirTemp(tempRoot, "sbd-skills-"+prefix+"-*")
+	requireNoError(t, err)
+	t.Cleanup(func() {
+		_ = os.RemoveAll(dir)
+	})
+	return dir
 }
