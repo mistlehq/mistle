@@ -1,6 +1,7 @@
 package egressproxy
 
 import (
+	"context"
 	"io"
 	"net"
 	"net/http"
@@ -8,6 +9,9 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/coder/websocket"
 )
 
 func TestProxyServerForwardsUnmatchedHTTPRequestsDirectly(t *testing.T) {
@@ -75,7 +79,7 @@ func TestProxyServerForwardsMatchedHTTPRequestsThroughDirectGateway(t *testing.T
 			Methods:      []string{"POST"},
 		}},
 		DirectGateway: mustDirectGatewayClient(t, gatewayURL.String()),
-		TokenProvider: staticTokenProvider{token: "gateway-token"},
+		TokenProvider: StaticEgressTokenProvider{TokenValue: "gateway-token"},
 	})
 	client := http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
 	request, err := http.NewRequest(http.MethodPost, "http://api.example.test/v1/allowed?x=1", strings.NewReader("gateway body"))
@@ -92,6 +96,58 @@ func TestProxyServerForwardsMatchedHTTPRequestsThroughDirectGateway(t *testing.T
 	body, err := io.ReadAll(response.Body)
 	requireNoError(t, err)
 	assertEqual(t, string(body), "gateway response")
+}
+
+func TestProxyServerForwardsUnmatchedWebSocketUpgradesDirectly(t *testing.T) {
+	upstream := startWebSocketEchoServer(t, func(request *http.Request) {
+		assertEqual(t, request.URL.Path, "/ws/direct")
+		assertEqual(t, request.Header.Get(SandboxEgressRequestIDHeaderName), "")
+	})
+	defer upstream.Close()
+	proxyURL := startHTTPProxyServer(t, &ProxyState{})
+	targetURL := websocketURLFromHTTPURL(t, upstream.URL+"/ws/direct")
+
+	connection, response := dialWebSocketThroughProxy(t, targetURL, proxyURL)
+	defer connection.Close(websocket.StatusNormalClosure, "")
+
+	if response.Header.Get(SandboxEgressRequestIDHeaderName) == "" {
+		t.Fatalf("expected downstream handshake to include request id")
+	}
+	writeWebSocketText(t, connection, "direct websocket")
+	assertEqual(t, readWebSocketText(t, connection), "echo:direct websocket")
+}
+
+func TestProxyServerForwardsMatchedWebSocketUpgradesThroughDirectGateway(t *testing.T) {
+	var gatewayTarget string
+	gateway := startWebSocketEchoServer(t, func(request *http.Request) {
+		assertEqual(t, request.URL.Path, DirectEgressWebSocketRoutePath)
+		gatewayTarget = request.URL.Query().Get("target")
+		assertEqual(t, request.Header.Get(DirectGatewayEgressAuthorizationHeaderName), "Bearer gateway-token")
+	})
+	defer gateway.Close()
+	gatewayURL, err := url.Parse(gateway.URL)
+	requireNoError(t, err)
+	gatewayURL.Scheme = "ws"
+	proxyURL := startHTTPProxyServer(t, &ProxyState{
+		Routes: []Route{{
+			EgressRuleID: "egress-rule-ws",
+			Hosts:        []string{"api.example.test"},
+			PathPrefixes: []string{"/v1"},
+			Methods:      []string{"GET"},
+		}},
+		DirectGateway: mustDirectGatewayClient(t, gatewayURL.String()),
+		TokenProvider: StaticEgressTokenProvider{TokenValue: "gateway-token"},
+	})
+
+	connection, response := dialWebSocketThroughProxy(t, "ws://api.example.test/v1/socket?x=1", proxyURL)
+	defer connection.Close(websocket.StatusNormalClosure, "")
+
+	if response.Header.Get(SandboxEgressRequestIDHeaderName) == "" {
+		t.Fatalf("expected downstream handshake to include request id")
+	}
+	assertEqual(t, gatewayTarget, "ws://api.example.test/v1/socket?x=1")
+	writeWebSocketText(t, connection, "gateway websocket")
+	assertEqual(t, readWebSocketText(t, connection), "echo:gateway websocket")
 }
 
 func TestProxyServerReturnsBadGatewayForConnectRequests(t *testing.T) {
@@ -128,10 +184,61 @@ func mustDirectGatewayClient(t *testing.T, tunnelGatewayURL string) DirectGatewa
 	return client
 }
 
-type staticTokenProvider struct {
-	token string
+func startWebSocketEchoServer(t *testing.T, inspect func(*http.Request)) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if inspect != nil {
+			inspect(request)
+		}
+		connection, err := websocket.Accept(writer, request, &websocket.AcceptOptions{InsecureSkipVerify: true})
+		if err != nil {
+			t.Errorf("expected websocket accept to succeed, got %v", err)
+			return
+		}
+		defer connection.Close(websocket.StatusNormalClosure, "")
+		messageType, payload, err := connection.Read(request.Context())
+		if err != nil {
+			t.Errorf("expected websocket message, got %v", err)
+			return
+		}
+		if err := connection.Write(request.Context(), messageType, []byte("echo:"+string(payload))); err != nil {
+			t.Errorf("expected websocket write to succeed, got %v", err)
+		}
+	}))
 }
 
-func (provider staticTokenProvider) Token() (string, error) {
-	return provider.token, nil
+func websocketURLFromHTTPURL(t *testing.T, rawURL string) string {
+	t.Helper()
+	parsedURL, err := url.Parse(rawURL)
+	requireNoError(t, err)
+	parsedURL.Scheme = "ws"
+	return parsedURL.String()
+}
+
+func dialWebSocketThroughProxy(t *testing.T, targetURL string, proxyURL *url.URL) (*websocket.Conn, *http.Response) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	t.Cleanup(cancel)
+	connection, response, err := websocket.Dial(ctx, targetURL, &websocket.DialOptions{
+		HTTPClient: &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}},
+	})
+	requireNoError(t, err)
+	return connection, response
+}
+
+func writeWebSocketText(t *testing.T, connection *websocket.Conn, payload string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	requireNoError(t, connection.Write(ctx, websocket.MessageText, []byte(payload)))
+}
+
+func readWebSocketText(t *testing.T, connection *websocket.Conn) string {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	messageType, payload, err := connection.Read(ctx)
+	requireNoError(t, err)
+	assertEqual(t, messageType, websocket.MessageText)
+	return string(payload)
 }

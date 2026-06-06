@@ -1,16 +1,30 @@
 package egressproxy
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"strings"
 	"sync/atomic"
+
+	"github.com/coder/websocket"
 )
 
 type EgressTokenProvider interface {
 	Token() (string, error)
+}
+
+type StaticEgressTokenProvider struct {
+	TokenValue string
+}
+
+func (provider StaticEgressTokenProvider) Token() (string, error) {
+	if provider.TokenValue == "" {
+		return "", fmt.Errorf("gateway egress token is required")
+	}
+	return provider.TokenValue, nil
 }
 
 type ProxyState struct {
@@ -52,7 +66,9 @@ func (handler ProxyHandler) ServeHTTP(responseWriter http.ResponseWriter, reques
 		return
 	}
 	if isWebSocketUpgradeRequest(request) {
-		http.Error(responseWriter, "websocket egress proxy handling is not ported to Go yet", http.StatusBadGateway)
+		if err := ForwardProxyWebSocket(responseWriter, request, handler.State); err != nil {
+			http.Error(responseWriter, err.Error(), http.StatusBadGateway)
+		}
 		return
 	}
 
@@ -82,6 +98,63 @@ func ForwardProxyRequest(request *http.Request, state *ProxyState) (*http.Respon
 		return forwardDirectRequest(request, requestTarget, requestID, state)
 	}
 	return forwardDirectGatewayRequest(request, requestTarget, route, requestID, state)
+}
+
+func ForwardProxyWebSocket(responseWriter http.ResponseWriter, request *http.Request, state *ProxyState) error {
+	if state == nil {
+		return fmt.Errorf("local egress proxy state is required")
+	}
+	requestTarget, err := ResolveRequestTarget(request, nil)
+	if err != nil {
+		return err
+	}
+	route, err := MatchRoute(state.Routes, requestTarget.Host, requestPathAndQuery(request), request.Method)
+	if err != nil {
+		return err
+	}
+	requestID := nextEgressProxyRequestID(state)
+	upstreamURL := ""
+	upstreamHeaders := http.Header{}
+	if route == nil {
+		upstreamURL, err = WebSocketTargetURL(requestTarget.URL.String())
+		if err != nil {
+			return err
+		}
+	} else {
+		if state.TokenProvider == nil {
+			return fmt.Errorf("gateway egress token provider is required")
+		}
+		upstreamURL, err = state.DirectGateway.DirectWebSocketURL(requestTarget.URL.String())
+		if err != nil {
+			return err
+		}
+		token, err := state.TokenProvider.Token()
+		if err != nil {
+			return fmt.Errorf("failed to read gateway egress token: %w", err)
+		}
+		upstreamHeaders.Set(DirectGatewayEgressAuthorizationHeaderName, "Bearer "+token)
+	}
+
+	upstreamConnection, _, err := websocket.Dial(request.Context(), upstreamURL, &websocket.DialOptions{
+		HTTPHeader: upstreamHeaders,
+		HTTPClient: proxyHTTPClient(state),
+	})
+	if err != nil {
+		return fmt.Errorf("websocket upstream connection failed: %w", err)
+	}
+	defer upstreamConnection.Close(websocket.StatusNormalClosure, "")
+
+	responseWriter.Header().Set(SandboxEgressRequestIDHeaderName, requestID)
+	downstreamConnection, err := websocket.Accept(responseWriter, request, &websocket.AcceptOptions{
+		InsecureSkipVerify: true,
+	})
+	if err != nil {
+		return fmt.Errorf("websocket downstream upgrade failed: %w", err)
+	}
+	defer downstreamConnection.Close(websocket.StatusNormalClosure, "")
+
+	tunnelWebSockets(context.Background(), downstreamConnection, upstreamConnection)
+	return nil
 }
 
 func forwardDirectRequest(request *http.Request, requestTarget RequestTarget, requestID string, state *ProxyState) (*http.Response, error) {
@@ -158,4 +231,35 @@ func isWebSocketUpgradeRequest(request *http.Request) bool {
 		}
 	}
 	return false
+}
+
+func tunnelWebSockets(parentContext context.Context, downstream *websocket.Conn, upstream *websocket.Conn) {
+	tunnelContext, cancel := context.WithCancel(parentContext)
+	defer cancel()
+	done := make(chan struct{}, 2)
+	go func() {
+		copyWebSocketMessages(tunnelContext, upstream, downstream)
+		cancel()
+		done <- struct{}{}
+	}()
+	go func() {
+		copyWebSocketMessages(tunnelContext, downstream, upstream)
+		cancel()
+		done <- struct{}{}
+	}()
+	<-done
+}
+
+func copyWebSocketMessages(ctx context.Context, destination *websocket.Conn, source *websocket.Conn) {
+	for {
+		messageType, payload, err := source.Read(ctx)
+		if err != nil {
+			_ = destination.Close(websocket.StatusNormalClosure, "")
+			return
+		}
+		if err := destination.Write(ctx, messageType, payload); err != nil {
+			_ = source.Close(websocket.StatusNormalClosure, "")
+			return
+		}
+	}
 }
