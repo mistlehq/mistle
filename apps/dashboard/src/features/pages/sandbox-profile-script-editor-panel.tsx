@@ -1,7 +1,6 @@
-import { Field, FieldContent, FieldHeader, FieldLabel, SectionBlock, cn } from "@mistle/ui";
+import { Field, FieldContent, FieldHeader, FieldLabel, cn } from "@mistle/ui";
 import type { CSSProperties, ReactNode } from "react";
 
-import { SandboxProfileSectionCard } from "./sandbox-profile-section-card.js";
 import {
   SandboxProfileSetupScriptTestButton,
   type SetupScriptTestButtonProps,
@@ -20,55 +19,9 @@ export type SandboxProfileScriptAssistantControl = {
   title: string;
 };
 
-export function SandboxProfileScriptEditorPanel(input: {
-  ariaLabelledBy: string;
-  description?: ReactNode | undefined;
-  detailsContent?: ReactNode | undefined;
-  disabled?: boolean | undefined;
-  errorMessage?: string | null | undefined;
-  fieldLabel: string;
-  footer?: ReactNode | undefined;
-  notice?: ReactNode | undefined;
-  onChange?: ((nextValue: string) => void) | undefined;
-  placeholderText: string;
-  readOnly?: boolean | undefined;
-  setupAssistant?: SandboxProfileScriptAssistantControl | undefined;
-  testButtonProps?: SetupScriptTestButtonProps | undefined;
-  testControl?: ReactNode | undefined;
-  testPanel?: ReactNode | undefined;
-  title: string;
-  value: string;
-}): React.JSX.Element {
-  return (
-    <SectionBlock description={input.description} title={input.title}>
-      <SandboxProfileSectionCard>
-        <SandboxProfileScriptEditorField
-          ariaLabelledBy={input.ariaLabelledBy}
-          description={input.description}
-          detailsContent={input.detailsContent}
-          disabled={input.disabled}
-          errorMessage={input.errorMessage}
-          fieldLabel={input.fieldLabel}
-          footer={input.footer}
-          notice={input.notice}
-          onChange={input.onChange}
-          placeholderText={input.placeholderText}
-          readOnly={input.readOnly}
-          setupAssistant={input.setupAssistant}
-          testButtonProps={input.testButtonProps}
-          testControl={input.testControl}
-          testPanel={input.testPanel}
-          value={input.value}
-        />
-      </SandboxProfileSectionCard>
-    </SectionBlock>
-  );
-}
-
 export function SandboxProfileScriptEditorField(input: {
   ariaLabelledBy: string;
   description?: ReactNode | undefined;
-  detailsContent?: ReactNode | undefined;
   disabled?: boolean | undefined;
   errorMessage?: string | null | undefined;
   fieldLabel: string;
@@ -78,44 +31,49 @@ export function SandboxProfileScriptEditorField(input: {
   placeholderText: string;
   readOnly?: boolean | undefined;
   setupAssistant?: SandboxProfileScriptAssistantControl | undefined;
+  showFieldHeader?: boolean | undefined;
   testButtonProps?: SetupScriptTestButtonProps | undefined;
-  testControl?: ReactNode | undefined;
   testPanel?: ReactNode | undefined;
   value: string;
 }): React.JSX.Element {
   const showsEditorControls = input.readOnly !== true;
+  const showsFieldHeader = input.showFieldHeader !== false;
   const testControl =
-    showsEditorControls &&
-    (input.testControl ??
-      (input.testButtonProps === undefined ? undefined : (
-        <SandboxProfileSetupScriptTestButton
-          {...input.testButtonProps}
-          {...(input.setupAssistant === undefined
-            ? {}
-            : {
-                setupAssistant: {
-                  disabled: input.setupAssistant.disabled,
-                  isStarting: input.setupAssistant.isStarting,
-                  onClick: input.setupAssistant.onClick,
-                  title: input.setupAssistant.title,
-                },
-              })}
-        />
-      )));
+    showsEditorControls && input.testButtonProps !== undefined ? (
+      <SandboxProfileSetupScriptTestButton
+        {...input.testButtonProps}
+        {...(input.setupAssistant === undefined
+          ? {}
+          : {
+              setupAssistant: {
+                disabled: input.setupAssistant.disabled,
+                isStarting: input.setupAssistant.isStarting,
+                onClick: input.setupAssistant.onClick,
+                title: input.setupAssistant.title,
+              },
+            })}
+      />
+    ) : undefined;
 
   return (
     <Field>
-      <FieldHeader>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="space-y-1">
-            <FieldLabel id={input.ariaLabelledBy}>{input.fieldLabel}</FieldLabel>
-            {input.description === undefined ? null : (
-              <p className="text-sm text-muted-foreground">{input.description}</p>
-            )}
+      {showsFieldHeader ? (
+        <FieldHeader>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-1">
+              <FieldLabel id={input.ariaLabelledBy}>{input.fieldLabel}</FieldLabel>
+              {input.description === undefined ? null : (
+                <p className="text-sm text-muted-foreground">{input.description}</p>
+              )}
+            </div>
+            {testControl}
           </div>
-          {testControl}
-        </div>
-      </FieldHeader>
+        </FieldHeader>
+      ) : (
+        <span className="sr-only" id={input.ariaLabelledBy}>
+          {input.fieldLabel}
+        </span>
+      )}
       <FieldContent>
         <div className="flex flex-col gap-2">
           {input.notice}
@@ -136,7 +94,6 @@ export function SandboxProfileScriptEditorField(input: {
               value={input.value}
             />
           )}
-          {input.detailsContent}
           {input.errorMessage ? (
             <div aria-live="polite" className="text-destructive text-xs" role="status">
               {input.errorMessage}
@@ -170,7 +127,7 @@ export function SandboxProfileReadOnlyScriptBlock(input: {
     <pre
       aria-labelledby={input.ariaLabelledBy}
       className={cn(
-        "whitespace-pre-wrap break-words rounded-sm border border-border bg-muted/40 p-3 font-mono text-sm text-muted-foreground",
+        "whitespace-pre-wrap break-words rounded-sm border border-border bg-background p-3 font-mono text-sm text-muted-foreground",
         input.className,
       )}
       data-slot="sandbox-profile-read-only-script-block"

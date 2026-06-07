@@ -168,12 +168,13 @@ import {
   type SandboxProfileRuntimeDraftChanges,
   type SandboxProfileRuntimeDraftState,
 } from "./sandbox-profile-runtime-section.js";
-import { SandboxProfileScriptEditorPanel } from "./sandbox-profile-script-editor-panel.js";
+import { SandboxProfileScriptEditorField } from "./sandbox-profile-script-editor-panel.js";
 import {
   useLoadedSandboxProfileSetupScriptState,
   useSandboxProfileSetupScriptLoader,
 } from "./sandbox-profile-setup-script-state.js";
 import {
+  SandboxProfileSetupScriptTestButton,
   SandboxProfileSetupScriptTestPanel,
   useSandboxProfileSetupScriptTestRun,
   type SetupScriptTestButtonProps,
@@ -4148,29 +4149,47 @@ export function SandboxProfileSetupScriptPanel(input: {
   const setupScriptContext = createSandboxBaseSetupScriptContextFromGeneratedInventory(
     input.repositoryHandles,
   );
+  const showsEditorControls = input.readOnly !== true;
+  const sectionAction = showsEditorControls
+    ? (input.testControl ??
+      (input.testButtonProps === undefined ? undefined : (
+        <SandboxProfileSetupScriptTestButton
+          {...input.testButtonProps}
+          {...(input.setupAssistant === undefined
+            ? {}
+            : {
+                setupAssistant: {
+                  disabled: input.setupAssistant.disabled,
+                  isStarting: input.setupAssistant.isStarting,
+                  onClick: input.setupAssistant.onClick,
+                  title: input.setupAssistant.title,
+                },
+              })}
+        />
+      )))
+    : undefined;
 
   return (
-    <SandboxProfileScriptEditorPanel
-      ariaLabelledBy="sandbox-setup-script-label"
-      disabled={input.disabled}
-      errorMessage={input.errorMessage}
-      fieldLabel="Setup script"
-      notice={input.notice}
-      onChange={input.onChange}
-      placeholderText={SetupScriptPlaceholder}
-      readOnly={input.readOnly}
-      setupAssistant={input.setupAssistant}
-      testButtonProps={input.testButtonProps}
-      testControl={input.testControl}
-      testPanel={input.testPanel}
-      title="Setup Script"
-      value={input.value}
-      detailsContent={
-        input.disabled === true ? null : (
+    <SectionBlock action={sectionAction} title="Setup Script">
+      <div className="grid gap-4">
+        <SandboxProfileScriptEditorField
+          ariaLabelledBy="sandbox-setup-script-label"
+          disabled={input.disabled}
+          errorMessage={input.errorMessage}
+          fieldLabel="Setup script"
+          notice={input.notice}
+          onChange={input.onChange}
+          placeholderText={SetupScriptPlaceholder}
+          readOnly={input.readOnly}
+          showFieldHeader={false}
+          testPanel={input.testPanel}
+          value={input.value}
+        />
+        {input.disabled === true ? null : (
           <SetupScriptDetailsContent setupScriptContext={setupScriptContext} />
-        )
-      }
-    />
+        )}
+      </div>
+    </SectionBlock>
   );
 }
 
@@ -4180,10 +4199,13 @@ function SetupScriptDetailsContent(input: {
   const setupScriptContext = input.setupScriptContext;
 
   return (
-    <div className="flex flex-col pt-1">
-      <Accordion className="border-border/70 w-full border-y" multiple>
+    <div
+      className="overflow-hidden rounded-md border border-border bg-background px-3"
+      data-slot="setup-script-details"
+    >
+      <Accordion className="border-border/70 w-full" multiple>
         <AccordionItem className="border-border/70" value="how-setup-script-works">
-          <AccordionTrigger className="rounded-none border-0 px-0 py-2.5 text-sm font-medium hover:no-underline focus-visible:border-transparent focus-visible:ring-1">
+          <AccordionTrigger className="h-11 items-center rounded-none border-0 px-0 py-0 text-sm font-medium hover:no-underline focus-visible:border-transparent focus-visible:ring-1">
             Setup script behavior
           </AccordionTrigger>
           <AccordionContent className="pb-3">
@@ -4217,7 +4239,7 @@ function SetupScriptDetailsContent(input: {
         </AccordionItem>
 
         <AccordionItem className="border-border/70" value="environment-and-tools">
-          <AccordionTrigger className="rounded-none border-0 px-0 py-2.5 text-sm font-medium hover:no-underline focus-visible:border-transparent focus-visible:ring-1">
+          <AccordionTrigger className="h-11 items-center rounded-none border-0 px-0 py-0 text-sm font-medium hover:no-underline focus-visible:border-transparent focus-visible:ring-1">
             Environment and installed tools
           </AccordionTrigger>
           <AccordionContent className="pb-3">

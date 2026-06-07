@@ -468,7 +468,10 @@ describe("SandboxProfileRuntimeSection", () => {
       />,
     );
 
-    expect(screen.getByText("Mistle resources")).toBeTruthy();
+    const mistleResourcesLabel = screen.getByText("Mistle resources");
+    const mistleResourcesFieldHeader = mistleResourcesLabel.closest('[data-slot="field-header"]');
+    expect(mistleResourcesLabel).toBeTruthy();
+    expect(mistleResourcesFieldHeader?.classList.contains("md:!w-auto")).toBe(false);
     expect(screen.getByText("None")).toBeTruthy();
   });
 

@@ -640,7 +640,7 @@ export function SandboxProfileSkillsSection(input: {
             className="divide-y"
             data-slot="sandbox-profile-skills-list"
             role="region"
-            style={SkillsListHeightStyle}
+            style={shouldShowEditableSkillCatalog ? SkillsListHeightStyle : undefined}
           >
             {shouldShowEditableSkillCatalog
               ? skillOptions.map((skill) => {
@@ -832,7 +832,7 @@ function SelectableSkillRow(input: {
   skill: SkillOption;
 }): React.JSX.Element {
   return (
-    <label className="flex items-start gap-2 px-3 py-2.5 text-sm transition-colors hover:bg-muted/60 focus-within:bg-muted/50 sm:gap-3 sm:py-3">
+    <label className="flex items-start gap-2 px-3 py-2.5 text-sm transition-colors hover:bg-accent focus-within:bg-accent sm:gap-3 sm:py-3">
       <Checkbox
         checked={input.checked}
         className="mt-0.5"

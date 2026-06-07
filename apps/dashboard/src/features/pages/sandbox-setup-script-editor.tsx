@@ -99,7 +99,7 @@ export function SandboxSetupScriptEditor(input: SandboxSetupScriptEditorProps): 
         aria-disabled={input.disabled === true ? "true" : "false"}
         className={cn(
           textareaFieldShellClassName({ focusMode: "focus-within" }),
-          "overflow-hidden",
+          "overflow-hidden bg-background",
           input.disabled === true ? "cursor-not-allowed opacity-50" : null,
         )}
       >

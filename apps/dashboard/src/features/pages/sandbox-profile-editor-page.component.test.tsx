@@ -922,6 +922,7 @@ function getReadOnlyScriptBlock(container: ParentNode): HTMLElement {
 function expectReadOnlyScriptBlockToUseEditorScrollBounds(scriptBlock: HTMLElement): void {
   const scriptBlockStyles = getComputedStyle(scriptBlock);
 
+  expect(scriptBlock.classList.contains("bg-background")).toBe(true);
   expect(scriptBlockStyles.overflow).toBe("auto");
   expect(scriptBlockStyles.minHeight).toBe("calc(var(--spacing) * 28)");
   expect(scriptBlockStyles.maxHeight).toBe("calc((1.5rem * 28) + (var(--spacing) * 4))");
@@ -3169,6 +3170,49 @@ describe("SandboxProfileEditorPage", () => {
     expect(testButton.hasAttribute("disabled")).toBe(false);
     expect(testButton.getAttribute("title")).toBe("Test setup script");
     expect(setupAssistantButton.hasAttribute("disabled")).toBe(false);
+
+    const setupScriptSection = screen
+      .getByRole("heading", { name: "Setup Script" })
+      .closest("section");
+    if (setupScriptSection === null) {
+      throw new Error("Setup script section not found.");
+    }
+
+    expect(within(setupScriptSection).getByRole("button", { name: "Test" })).toBe(testButton);
+    expect(within(setupScriptSection).getByRole("button", { name: "Setup Assistant" })).toBe(
+      setupAssistantButton,
+    );
+    expect(within(setupScriptSection).getByRole("textbox", { name: "Setup script" })).toBeTruthy();
+    expect(
+      setupScriptSection
+        .querySelector("#sandbox-setup-script-label")
+        ?.classList.contains("sr-only"),
+    ).toBe(true);
+
+    const setupScriptCards = Array.from(
+      setupScriptSection.querySelectorAll('[data-slot="sandbox-profile-section-card"]'),
+    );
+    expect(setupScriptCards).toHaveLength(0);
+    const setupScriptDetails = setupScriptSection.querySelector(
+      '[data-slot="setup-script-details"]',
+    );
+    if (!(setupScriptDetails instanceof HTMLElement)) {
+      throw new Error("Setup script helper details were not found.");
+    }
+
+    expect(
+      setupScriptDetails.querySelector(
+        '[role="textbox"][aria-labelledby="sandbox-setup-script-label"]',
+      ),
+    ).toBeNull();
+    expect(
+      within(setupScriptDetails).getByRole("button", { name: "Setup script behavior" }),
+    ).toBeTruthy();
+    expect(
+      within(setupScriptDetails).getByRole("button", {
+        name: "Environment and installed tools",
+      }),
+    ).toBeTruthy();
   });
 
   it("opens the Setup Assistant panel from the setup script action", async () => {

@@ -20,14 +20,21 @@ describe("SandboxSetupScriptEditor", () => {
     );
 
     const editor = screen.getByRole("textbox", { name: "Setup script" });
+    const editorShell = editor.closest(
+      '[data-slot="sandbox-setup-script-editor"]',
+    )?.firstElementChild;
     const editorView = EditorView.findFromDOM(editor);
 
     if (editorView === null) {
       throw new Error("Expected rendered setup script editor to be backed by CodeMirror.");
     }
+    if (!(editorShell instanceof HTMLElement)) {
+      throw new Error("Expected rendered setup script editor shell.");
+    }
 
     const scrollerStyles = getComputedStyle(editorView.scrollDOM);
 
+    expect(editorShell.classList.contains("bg-background")).toBe(true);
     expect(scrollerStyles.overflow).toBe("auto");
     expect(scrollerStyles.minHeight).toBe("calc(var(--spacing) * 28)");
     expect(scrollerStyles.maxHeight).toBe("calc((1.5rem * 28) + (var(--spacing) * 4))");

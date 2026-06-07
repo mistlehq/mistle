@@ -879,11 +879,7 @@ function MistleMcpAccessField(input: {
   if (input.readOnly) {
     return (
       <div className="grid gap-3">
-        <ReadOnlyRuntimeField
-          horizontal={input.horizontal}
-          labelClassName="md:!w-auto md:!shrink-0 [&_[data-slot=field-label]]:whitespace-nowrap"
-          label="Mistle resources"
-        >
+        <ReadOnlyRuntimeField horizontal={input.horizontal} label="Mistle resources">
           {resolveReadOnlyMistleMcpAccessValue({
             apiKeyId: input.apiKeyId,
             enabled: input.enabled,
@@ -1506,14 +1502,13 @@ function ReadOnlyRuntimeField(input: {
   children: ReactNode;
   horizontal: boolean;
   label: string;
-  labelClassName?: string | undefined;
 }): React.JSX.Element {
   return (
     <Field
       contentWidth={input.horizontal ? "fill" : "fit"}
       orientation={input.horizontal ? "horizontal" : "vertical"}
     >
-      <FieldHeader className={input.labelClassName}>
+      <FieldHeader>
         <FieldLabel>{input.label}</FieldLabel>
       </FieldHeader>
       <FieldContent>

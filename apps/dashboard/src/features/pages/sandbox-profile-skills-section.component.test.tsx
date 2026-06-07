@@ -122,7 +122,9 @@ describe("SandboxProfileSkillsSection", () => {
       }),
     });
 
-    expect(screen.getByRole("region", { name: "Selected skills" })).toBeTruthy();
+    const selectedSkillsList = screen.getByRole("region", { name: "Selected skills" });
+    expect(selectedSkillsList).toBeTruthy();
+    expect(selectedSkillsList.getAttribute("style")).toBeNull();
     expect(screen.getByText("mistlehq/skills")).toBeTruthy();
     expect(screen.getByText("pr-review")).toBeTruthy();
     expect(screen.queryByText("release-notes")).toBeNull();
