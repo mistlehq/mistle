@@ -13,7 +13,7 @@ import {
   normalizeFreestyleInspectDisposition,
   normalizeFreestyleInspectState,
 } from "./client.js";
-import { FreestyleVmStates } from "./schemas.js";
+import { FreestyleRuntimeControlRequestSchema, FreestyleVmStates } from "./schemas.js";
 
 describe("createFreestyleCreateVmRequestBody", () => {
   it("requests persistent VMs from an existing Freestyle snapshot", () => {
@@ -97,5 +97,16 @@ describe("createFreestyleActivatePrelude", () => {
     expect(command).toContain("stty raw -echo");
     expect(command).not.toContain("/tmp");
     expect(command).not.toContain("cat >");
+  });
+});
+
+describe("FreestyleRuntimeControlRequestSchema", () => {
+  it("requires a bounded activation timeout for PTY-backed activation", () => {
+    expect(() =>
+      FreestyleRuntimeControlRequestSchema.parse({
+        vmId: "vm_123",
+        payload: new Uint8Array([1]),
+      }),
+    ).toThrow("timeoutMs");
   });
 });

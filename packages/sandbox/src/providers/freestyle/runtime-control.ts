@@ -30,6 +30,7 @@ import type { FreestyleClient } from "./client.js";
 export { SandboxdOperationLogPaths };
 
 const SandboxdEnsureTimeoutMs = 120_000;
+export const FreestyleSandboxdActivateTimeoutMs = 60 * 60 * 1000;
 export const FreestyleSandboxdStopDaemonTimeoutMs = 30_000;
 export const FreestyleSandboxdResetTransparentEgressNftablesTimeoutMs = 10_000;
 export const FreestyleSandboxdReadOperationLogTimeoutMs = 60_000;
@@ -157,6 +158,7 @@ export class FreestyleSandboxRuntimeControl implements SandboxRuntimeControl {
             vmId: input.id,
             payload: input.payload,
             ...(input.env === undefined ? {} : { env: input.env }),
+            timeoutMs: FreestyleSandboxdActivateTimeoutMs,
           });
         } catch (error) {
           if (isFreestyleNotFound(error)) {

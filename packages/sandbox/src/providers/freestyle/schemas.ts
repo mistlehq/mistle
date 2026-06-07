@@ -62,6 +62,7 @@ export const FreestyleRuntimeControlRequestSchema = z
     payload: z.custom<Uint8Array<ArrayBufferLike>>((value) => value instanceof Uint8Array, {
       message: "Freestyle request field `payload` must be a Uint8Array.",
     }),
+    timeoutMs: z.number().int().positive(),
   })
   .strict();
 export type FreestyleRuntimeControlRequest = z.output<typeof FreestyleRuntimeControlRequestSchema>;

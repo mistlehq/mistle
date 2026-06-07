@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 
+import { systemScheduler } from "@mistle/time";
 import { z } from "zod";
 
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
@@ -418,13 +419,23 @@ export class FreestyleApiClient implements FreestyleClient {
   async #runPtyActivation(request: FreestyleRuntimeControlRequest): Promise<void> {
     const exitCode = await new Promise<number>((resolve, reject) => {
       const socket = this.#openPtySocket(request.vmId);
+      let timeout: ReturnType<typeof systemScheduler.schedule> | undefined;
       let settled = false;
 
+      const cleanup = (): void => {
+        if (timeout !== undefined) {
+          systemScheduler.cancel(timeout);
+        }
+        if (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN) {
+          socket.close();
+        }
+      };
       const settleReject = (error: unknown): void => {
         if (settled) {
           return;
         }
         settled = true;
+        cleanup();
         reject(error);
       };
       const settleResolve = (code: number): void => {
@@ -432,8 +443,14 @@ export class FreestyleApiClient implements FreestyleClient {
           return;
         }
         settled = true;
+        cleanup();
         resolve(code);
       };
+      timeout = systemScheduler.schedule(() => {
+        settleReject(
+          new Error(`Freestyle PTY activation timed out after ${String(request.timeoutMs)}ms.`),
+        );
+      }, request.timeoutMs);
 
       socket.binaryType = "arraybuffer";
       socket.addEventListener("open", () => {
