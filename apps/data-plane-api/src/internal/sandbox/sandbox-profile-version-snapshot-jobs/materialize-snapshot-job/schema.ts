@@ -15,7 +15,7 @@ export const MaterializeSandboxProfileVersionSnapshotJobRequestSchema = z
         imageId: z.string().min(1),
         createdAt: z.string().min(1),
         kind: z.enum(["base", "snapshot"]),
-        provider: z.enum(["docker", "e2b", "tensorlake"]),
+        provider: z.enum(["docker", "e2b", "freestyle", "tensorlake"]),
       })
       .strict(),
     sandboxRuntime: SandboxRuntimeProviderInputSchema,

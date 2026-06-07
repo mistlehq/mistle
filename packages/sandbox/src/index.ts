@@ -24,3 +24,9 @@ export {
   resolveTensorlakeStartImage,
   type TensorlakeBaseImageBuilderOptions,
 } from "./providers/tensorlake/index.js";
+export {
+  createFreestyleBaseImageBuilderFromConfig,
+  createFreestyleSnapshotImageHandle,
+  parseFreestyleImageHandle,
+  type FreestyleBaseImageBuilderOptions,
+} from "./providers/freestyle/index.js";

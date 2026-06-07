@@ -101,6 +101,37 @@ describe("createSandboxAdapter", () => {
       }),
     ).toThrow(SandboxConfigurationError);
   });
+
+  it("creates a Freestyle adapter when Freestyle config is provided", () => {
+    const adapter = createSandboxAdapter({
+      provider: SandboxProvider.FREESTYLE,
+      freestyle: {
+        apiKey: "test-api-key",
+      },
+    });
+
+    expect(typeof adapter.prepareImage).toBe("function");
+    expect(typeof adapter.start).toBe("function");
+    expect(typeof adapter.inspect).toBe("function");
+    expect(typeof adapter.resume).toBe("function");
+    expect(typeof adapter.captureSnapshot).toBe("function");
+    expect(typeof adapter.stop).toBe("function");
+    expect(typeof adapter.destroy).toBe("function");
+    expect(adapter.getTransparentProxyConfiguration()).toMatchObject({
+      provider: SandboxProvider.FREESTYLE,
+      passthroughBypass: {
+        kind: SandboxTransparentProxyBypassKinds.SOCKET_MARK,
+      },
+    });
+  });
+
+  it("throws when Freestyle config is missing", () => {
+    expect(() =>
+      createSandboxAdapter({
+        provider: SandboxProvider.FREESTYLE,
+      }),
+    ).toThrow(SandboxConfigurationError);
+  });
 });
 
 describe("createSandboxRuntimeControl", () => {
@@ -175,6 +206,30 @@ describe("createSandboxRuntimeControl", () => {
       }),
     ).toThrow(SandboxConfigurationError);
   });
+
+  it("creates a Freestyle runtime control when Freestyle config is provided", () => {
+    const runtimeControl = createSandboxRuntimeControl({
+      provider: SandboxProvider.FREESTYLE,
+      freestyle: {
+        apiKey: "test-api-key",
+      },
+    });
+
+    expect(typeof runtimeControl.ensureSandboxd).toBe("function");
+    expect(typeof runtimeControl.readSandboxdVersion).toBe("function");
+    expect(typeof runtimeControl.activate).toBe("function");
+    expect(typeof runtimeControl.shutdown).toBe("function");
+    expect(typeof runtimeControl.readOperationLog).toBe("function");
+    expect(typeof runtimeControl.close).toBe("function");
+  });
+
+  it("throws when Freestyle runtime control config is missing", () => {
+    expect(() =>
+      createSandboxRuntimeControl({
+        provider: SandboxProvider.FREESTYLE,
+      }),
+    ).toThrow(SandboxConfigurationError);
+  });
 });
 
 describe("createSandboxBaseImageBuilder", () => {
@@ -220,6 +275,25 @@ describe("createSandboxBaseImageBuilder", () => {
     expect(() =>
       createSandboxBaseImageBuilder({
         provider: SandboxProvider.TENSORLAKE,
+      }),
+    ).toThrow(SandboxConfigurationError);
+  });
+
+  it("creates a Freestyle base image builder when Freestyle config is provided", () => {
+    const builder = createSandboxBaseImageBuilder({
+      provider: SandboxProvider.FREESTYLE,
+      freestyle: {
+        apiKey: "test-api-key",
+      },
+    });
+
+    expect(typeof builder.ensureBaseImage).toBe("function");
+  });
+
+  it("throws when Freestyle base image builder config is missing", () => {
+    expect(() =>
+      createSandboxBaseImageBuilder({
+        provider: SandboxProvider.FREESTYLE,
       }),
     ).toThrow(SandboxConfigurationError);
   });

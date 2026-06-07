@@ -3673,7 +3673,7 @@
                   },
                   "provider": {
                     "type": "string",
-                    "enum": ["docker", "e2b", "tensorlake"]
+                    "enum": ["docker", "e2b", "freestyle", "tensorlake"]
                   },
                   "connectionId": {
                     "type": "string",

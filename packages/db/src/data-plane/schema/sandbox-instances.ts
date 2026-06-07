@@ -10,6 +10,7 @@ export type { SandboxInstanceStatus } from "@mistle/sandbox-lifecycle";
 export const SandboxInstanceProviders = {
   DOCKER: "docker",
   E2B: "e2b",
+  FREESTYLE: "freestyle",
   TENSORLAKE: "tensorlake",
 } as const;
 

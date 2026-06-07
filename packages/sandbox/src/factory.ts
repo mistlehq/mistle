@@ -12,6 +12,12 @@ import {
   type E2BSandboxConfig,
 } from "./providers/e2b/index.js";
 import {
+  createFreestyleAdapter,
+  createFreestyleBaseImageBuilderFromConfig,
+  createFreestyleRuntimeControl,
+  type FreestyleSandboxConfig,
+} from "./providers/freestyle/index.js";
+import {
   createTensorlakeAdapter,
   createTensorlakeBaseImageBuilder,
   createTensorlakeRuntimeControl,
@@ -29,6 +35,7 @@ export type CreateSandboxAdapterInput = {
   provider: SandboxProviderType;
   docker?: DockerSandboxConfig;
   e2b?: E2BSandboxConfig;
+  freestyle?: FreestyleSandboxConfig;
   tensorlake?: TensorlakeSandboxConfig;
 };
 
@@ -67,6 +74,16 @@ export function createSandboxAdapter(input: CreateSandboxAdapterInput): SandboxA
     return createTensorlakeAdapter(input.tensorlake);
   }
 
+  if (input.provider === SandboxProvider.FREESTYLE) {
+    if (input.freestyle === undefined) {
+      throw new SandboxConfigurationError(
+        "Freestyle config is required when provider is freestyle.",
+      );
+    }
+
+    return createFreestyleAdapter(input.freestyle);
+  }
+
   return assertUnreachable(input.provider);
 }
 
@@ -102,6 +119,16 @@ export function createSandboxBaseImageBuilder(
     });
   }
 
+  if (input.provider === SandboxProvider.FREESTYLE) {
+    if (input.freestyle === undefined) {
+      throw new SandboxConfigurationError(
+        "Freestyle config is required when provider is freestyle.",
+      );
+    }
+
+    return createFreestyleBaseImageBuilderFromConfig(input.freestyle);
+  }
+
   return assertUnreachable(input.provider);
 }
 
@@ -132,6 +159,16 @@ export function createSandboxRuntimeControl(
     }
 
     return createTensorlakeRuntimeControl(input.tensorlake);
+  }
+
+  if (input.provider === SandboxProvider.FREESTYLE) {
+    if (input.freestyle === undefined) {
+      throw new SandboxConfigurationError(
+        "Freestyle config is required when provider is freestyle.",
+      );
+    }
+
+    return createFreestyleRuntimeControl(input.freestyle);
   }
 
   return assertUnreachable(input.provider);

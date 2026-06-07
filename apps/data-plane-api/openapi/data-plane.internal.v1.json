@@ -60,7 +60,7 @@
                       },
                       "provider": {
                         "type": "string",
-                        "enum": ["docker", "e2b", "tensorlake"]
+                        "enum": ["docker", "e2b", "freestyle", "tensorlake"]
                       }
                     },
                     "required": ["imageId", "createdAt", "kind", "provider"],
@@ -71,7 +71,7 @@
                     "properties": {
                       "provider": {
                         "type": "string",
-                        "enum": ["docker", "e2b", "tensorlake"]
+                        "enum": ["docker", "e2b", "freestyle", "tensorlake"]
                       },
                       "connectionId": {
                         "type": "string",
@@ -1614,7 +1614,7 @@
                       },
                       "provider": {
                         "type": "string",
-                        "enum": ["docker", "e2b", "tensorlake"]
+                        "enum": ["docker", "e2b", "freestyle", "tensorlake"]
                       }
                     },
                     "required": ["imageId", "kind", "provider"],
@@ -1625,7 +1625,7 @@
                     "properties": {
                       "provider": {
                         "type": "string",
-                        "enum": ["docker", "e2b", "tensorlake"]
+                        "enum": ["docker", "e2b", "freestyle", "tensorlake"]
                       },
                       "connectionId": {
                         "type": "string",

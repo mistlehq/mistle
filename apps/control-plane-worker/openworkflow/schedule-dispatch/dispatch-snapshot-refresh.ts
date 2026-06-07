@@ -42,7 +42,12 @@ type SnapshotRefreshJobResolution = Readonly<{
 function assertScheduledSnapshotSandboxProvider(
   provider: string | null,
 ): SandboxRuntimeProviderInput["provider"] {
-  if (provider === "docker" || provider === "e2b" || provider === "tensorlake") {
+  if (
+    provider === "docker" ||
+    provider === "e2b" ||
+    provider === "freestyle" ||
+    provider === "tensorlake"
+  ) {
     return provider;
   }
 

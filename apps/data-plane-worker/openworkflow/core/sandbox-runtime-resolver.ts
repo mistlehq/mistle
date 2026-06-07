@@ -151,6 +151,10 @@ export function createSandboxRuntimeProviderResolver(input: {
       });
     }
 
+    if (inputRuntime.provider === SandboxProvider.FREESTYLE) {
+      throw new Error("Freestyle sandbox runtime is not wired in data-plane worker yet.");
+    }
+
     return assertUnreachableSandboxProvider(inputRuntime.provider);
   }
 

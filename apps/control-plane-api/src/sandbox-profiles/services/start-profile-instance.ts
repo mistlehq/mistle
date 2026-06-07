@@ -81,6 +81,7 @@ function assertSnapshotImageProvider(
   if (
     provider === SandboxProvider.DOCKER ||
     provider === SandboxProvider.E2B ||
+    provider === SandboxProvider.FREESTYLE ||
     provider === SandboxProvider.TENSORLAKE
   ) {
     return provider;

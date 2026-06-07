@@ -1,7 +1,7 @@
 import { systemClock } from "@mistle/time";
 import { metrics, type Attributes } from "@opentelemetry/api";
 
-export type SandboxProviderTelemetryName = "e2b" | "tensorlake";
+export type SandboxProviderTelemetryName = "e2b" | "freestyle" | "tensorlake";
 
 export type SandboxProviderOperationOutcome = "success" | "error";
 

@@ -4,7 +4,12 @@ import { SandboxProvider } from "@mistle/sandbox";
 export const InternalSandboxRuntimeResolveCredentialsRequestSchema = z
   .object({
     organizationId: z.string().min(1),
-    provider: z.enum([SandboxProvider.DOCKER, SandboxProvider.E2B, SandboxProvider.TENSORLAKE]),
+    provider: z.enum([
+      SandboxProvider.DOCKER,
+      SandboxProvider.E2B,
+      SandboxProvider.FREESTYLE,
+      SandboxProvider.TENSORLAKE,
+    ]),
     connectionId: z.string().min(1).optional(),
   })
   .strict();

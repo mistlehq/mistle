@@ -1,6 +1,7 @@
 export const SandboxProvider = {
   DOCKER: "docker",
   E2B: "e2b",
+  FREESTYLE: "freestyle",
   TENSORLAKE: "tensorlake",
 } as const;
 export type SandboxProvider = (typeof SandboxProvider)[keyof typeof SandboxProvider];

@@ -1237,7 +1237,7 @@ export interface paths {
             connectionId?: string;
             organizationId: string;
             /** @enum {string} */
-            provider: "docker" | "e2b" | "tensorlake";
+            provider: "docker" | "e2b" | "freestyle" | "tensorlake";
           };
         };
       };
