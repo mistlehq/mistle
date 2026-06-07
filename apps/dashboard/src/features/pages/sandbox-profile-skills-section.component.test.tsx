@@ -195,6 +195,7 @@ describe("SandboxProfileSkillsSection", () => {
     expect(screen.getByRole("region", { name: "Selected skills" })).toBeTruthy();
     expect(screen.getByText("removed-skill")).toBeTruthy();
     expect(screen.getByText("No longer found")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
   });
 });
 

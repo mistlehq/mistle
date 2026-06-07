@@ -603,13 +603,12 @@ export function SandboxProfileSkillsSection(input: {
   );
   const skillsContent =
     selectedOriginUrl === null || loadIsPending ? null : shouldShowEditableSkillCatalog &&
-      skillsSourceRepo !== null &&
       skillOptions.length === 0 ? (
       <p className="text-muted-foreground text-sm">No skills found in this repository.</p>
     ) : (
       <div className="grid gap-3">
         <div className="overflow-hidden rounded-md border bg-card">
-          {shouldShowEditableSkillCatalog && skillsSourceRepo !== null ? (
+          {shouldShowEditableSkillCatalog ? (
             <div className="flex flex-col gap-2 border-b bg-muted/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
                 <label className="inline-flex min-w-0 items-center gap-2">
@@ -643,12 +642,11 @@ export function SandboxProfileSkillsSection(input: {
             role="region"
             style={SkillsListHeightStyle}
           >
-            {shouldShowEditableSkillCatalog && skillsSourceRepo !== null
+            {shouldShowEditableSkillCatalog
               ? skillOptions.map((skill) => {
                   if (!skill.available) {
                     return (
                       <UnavailableSkillRow
-                        fieldIsReadOnly={fieldIsReadOnly}
                         key={`${skill.relativePath}:${skill.name}:missing`}
                         onRemove={() => {
                           updateSkillSelection(skill, false);
@@ -679,19 +677,13 @@ export function SandboxProfileSkillsSection(input: {
                   skill.available ? (
                     <SelectedSkillRow key={skill.relativePath} skill={skill} />
                   ) : (
-                    <UnavailableSkillRow
-                      fieldIsReadOnly={fieldIsReadOnly}
+                    <ReadOnlyUnavailableSkillRow
                       key={`${skill.relativePath}:${skill.name}:missing`}
-                      onRemove={() => {
-                        updateSkillSelection(skill, false);
-                      }}
                       skill={skill}
                     />
                   ),
                 )}
-            {shouldShowEditableSkillCatalog &&
-            skillsSourceRepo !== null &&
-            visibleAvailableSkillOptions.length === 0 ? (
+            {shouldShowEditableSkillCatalog && visibleAvailableSkillOptions.length === 0 ? (
               <p className="text-muted-foreground px-3 py-3 text-sm">
                 No matching discovered skills.
               </p>
@@ -863,7 +855,6 @@ function SelectedSkillRow(input: { skill: SkillOption }): React.JSX.Element {
 }
 
 function UnavailableSkillRow(input: {
-  fieldIsReadOnly: boolean;
   onRemove: () => void;
   skill: SkillOption;
 }): React.JSX.Element {
@@ -879,15 +870,25 @@ function UnavailableSkillRow(input: {
         showMobilePath
         skill={input.skill}
       />
-      <Button
-        disabled={input.fieldIsReadOnly}
-        onClick={input.onRemove}
-        size="sm"
-        type="button"
-        variant="outline"
-      >
+      <Button onClick={input.onRemove} size="sm" type="button" variant="outline">
         Remove
       </Button>
+    </div>
+  );
+}
+
+function ReadOnlyUnavailableSkillRow(input: { skill: SkillOption }): React.JSX.Element {
+  return (
+    <div className="bg-destructive/5 px-3 py-2.5 text-sm sm:py-3">
+      <SkillRowBody
+        badge={
+          <span className="rounded border border-destructive/30 bg-background px-1.5 py-0.5 text-xs font-medium text-destructive">
+            No longer found
+          </span>
+        }
+        showMobilePath
+        skill={input.skill}
+      />
     </div>
   );
 }
