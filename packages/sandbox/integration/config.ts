@@ -5,6 +5,7 @@ import { SandboxProvider, type SandboxProvider as SandboxProviderType } from "..
 const SandboxIntegrationProviderSchema = z.union([
   z.literal(SandboxProvider.DOCKER),
   z.literal(SandboxProvider.E2B),
+  z.literal(SandboxProvider.FREESTYLE),
   z.literal(SandboxProvider.TENSORLAKE),
 ]);
 
