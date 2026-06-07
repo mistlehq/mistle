@@ -13,6 +13,7 @@ import {
   FieldLabel,
   Input,
   Notice,
+  OverflowTooltipText,
   SectionBlock,
   Select,
   SelectContent,
@@ -24,6 +25,7 @@ import {
 } from "@mistle/ui";
 import { ArrowClockwiseIcon, PlusIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { CSSProperties, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -42,7 +44,7 @@ import type {
   IntegrationTargetSummary,
   SandboxProfileBindingEditorRow,
 } from "./sandbox-profile-binding-config-editor.js";
-import { SandboxProfileSectionCard } from "./sandbox-profile-section-card.js";
+import { ScriptEditorLineHeight, ScriptEditorMaxHeight } from "./sandbox-setup-script-editor.js";
 
 type SandboxProfileSkillsConfig = SandboxProfileVersion["skillsConfig"];
 type SelectedSkill = NonNullable<SandboxProfileSkillsConfig>["selectedSkills"][number];
@@ -72,6 +74,13 @@ const NoSkillsSourceValue = "__no_skills_source__";
 const AddPublicGitHubSourceValue = "__add_public_github_source__";
 const UnavailableSkillsSourceSaveBlockedMessage =
   "Choose an available skills source, or clear the skills source before saving.";
+const SkillsListMinHeight = "calc(var(--spacing) * 28)";
+const SkillsListHeightStyle = {
+  lineHeight: ScriptEditorLineHeight,
+  maxHeight: ScriptEditorMaxHeight,
+  minHeight: SkillsListMinHeight,
+  overflowY: "auto",
+} satisfies CSSProperties;
 
 export function createSkillsDraftSourceVersionKey(
   version: Pick<SandboxProfileVersion, "sandboxProfileId" | "version">,
@@ -221,13 +230,20 @@ export function SandboxProfileSkillsSection(input: {
     selectedSkills,
     skillsSourceRepo,
   });
+  const selectedSkillIdentities = new Set(selectedSkills.map(createSelectedSkillIdentity));
+  const selectedSkillOptions =
+    skillsSourceRepo === null
+      ? selectedSkills.map(createSelectedSkillOption)
+      : skillOptions.filter(
+          (skill) =>
+            !skill.available || selectedSkillIdentities.has(createSelectedSkillIdentity(skill)),
+        );
   const availableSkillOptions = skillOptions.filter((skill) => skill.available);
   const visibleAvailableSkillOptions = availableSkillOptions.filter((skill) =>
     skillMatchesSearchQuery(skill, skillsSearchQuery),
   );
   const unavailableSelectedSkills =
     skillsSourceRepo === null ? [] : skillOptions.filter((skill) => !skill.available);
-  const selectedSkillIdentities = new Set(selectedSkills.map(createSelectedSkillIdentity));
   const allVisibleDiscoveredSkillsSelected =
     visibleAvailableSkillOptions.length > 0 &&
     visibleAvailableSkillOptions.every((skill) =>
@@ -239,6 +255,7 @@ export function SandboxProfileSkillsSection(input: {
       selectedSkillIdentities.has(createSelectedSkillIdentity(skill)),
     );
   const fieldIsReadOnly = input.disabled || input.readOnly || !input.isDraft;
+  const shouldShowEditableSkillCatalog = !fieldIsReadOnly && skillsSourceRepo !== null;
   const automaticLoadingIsEnabled = input.automaticLoadingEnabled !== false;
   const queryLoadIsPending = selectedOriginUrl !== null && skillsSourceQuery.isPending;
   const loadIsPending = queryLoadIsPending || refreshMutation.isPending;
@@ -511,210 +528,210 @@ export function SandboxProfileSkillsSection(input: {
       : `${String(selectedSkills.length)} selected, ${String(unavailableSelectedSkills.length)} no longer found`;
   const reloadButtonIsVisible =
     selectedOriginUrl !== null &&
+    !fieldIsReadOnly &&
     !sourceIsUnavailable &&
     (skillsSourceRepo !== null ||
       refreshMutation.isError ||
       loadErrorMessage !== null ||
       sourceNotLoadedMessage !== null ||
       sourceNeedsSavedDraftMessage !== null);
+  const selectedSourceLabel =
+    selectedOriginUrl === null ? "None" : (selectedSourceOption?.label ?? "Unavailable repository");
+  const skillsSourceAction = (
+    <div className="flex w-full min-w-0 flex-wrap gap-2 sm:w-auto sm:justify-end">
+      {fieldIsReadOnly ? (
+        <div className="flex min-h-9 min-w-0 items-center truncate text-sm font-medium text-foreground sm:max-w-72">
+          {selectedSourceLabel}
+        </div>
+      ) : (
+        <Select
+          disabled={sourceControlIsDisabled}
+          onValueChange={updateSelectedSource}
+          value={selectedSourceValue}
+        >
+          <SelectTrigger
+            aria-label="Source repository"
+            className="min-w-0 flex-1 sm:min-w-56 sm:max-w-72"
+            id="sandbox-profile-skills-source"
+          >
+            <SelectValue placeholder="Select repository">{selectedSourceLabel}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NoSkillsSourceValue}>None</SelectItem>
+            {sourceIsUnavailable && draftConfig !== null ? (
+              <SelectItem disabled value={draftConfig.originUrl}>
+                Unavailable repository
+              </SelectItem>
+            ) : null}
+            {selectableSourceOptions.map((sourceOption) => (
+              <SelectItem key={sourceOption.originUrl} value={sourceOption.originUrl}>
+                {sourceOption.label}
+              </SelectItem>
+            ))}
+            <SelectSeparator />
+            <SelectItem
+              className="text-primary focus:text-primary"
+              onClick={openPublicSourceDialog}
+              value={AddPublicGitHubSourceValue}
+            >
+              <span className="flex items-center gap-2">
+                <PlusIcon aria-hidden className="size-4" />
+                Add public GitHub repo
+              </span>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      )}
+      {reloadButtonIsVisible ? (
+        <Button
+          aria-label="Reload skills"
+          disabled={actionIsPending || loadIsPending}
+          onClick={reloadSelectedSource}
+          title="Reload skills from this repository"
+          type="button"
+          variant="outline"
+        >
+          {actionIsPending || queryLoadIsPending ? (
+            <Spinner aria-hidden className="size-4" />
+          ) : (
+            <ArrowClockwiseIcon aria-hidden className="size-4" />
+          )}
+          <span className="hidden sm:inline">Reload</span>
+        </Button>
+      ) : null}
+    </div>
+  );
   const skillsContent =
-    selectedOriginUrl === null ||
-    loadIsPending ||
-    skillsSourceRepo === null ? null : skillOptions.length === 0 ? (
+    selectedOriginUrl === null || loadIsPending ? null : shouldShowEditableSkillCatalog &&
+      skillsSourceRepo !== null &&
+      skillOptions.length === 0 ? (
       <p className="text-muted-foreground text-sm">No skills found in this repository.</p>
     ) : (
       <div className="grid gap-3">
-        <div className="divide-y rounded-md border">
-          <div className="flex flex-col gap-2 px-3 py-2.5 text-sm transition-colors hover:bg-muted/60 focus-within:bg-muted/50 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <label className="inline-flex min-w-0 items-center gap-2">
-                <Checkbox
-                  checked={allVisibleDiscoveredSkillsSelected}
-                  disabled={fieldIsReadOnly || visibleAvailableSkillOptions.length === 0}
-                  indeterminate={someVisibleDiscoveredSkillsSelected}
-                  onCheckedChange={toggleAllVisibleDiscoveredSkills}
-                />
-                <span>Select all</span>
-              </label>
-              <span className="text-muted-foreground text-sm">{selectedCountText}</span>
-            </div>
-            <div className="min-w-0">
-              <Input
-                aria-label="Search skills"
-                className="h-8 w-full sm:w-64"
-                onChange={(event) => {
-                  setSkillsSearchQuery(event.target.value);
-                }}
-                placeholder="Search skills"
-                value={skillsSearchQuery}
-              />
-            </div>
-          </div>
-          {skillOptions.map((skill) => {
-            if (!skill.available) {
-              return (
-                <div
-                  className="flex items-start gap-3 bg-destructive/5 px-3 py-3 text-sm transition-colors hover:bg-destructive/10 focus-within:bg-destructive/10"
-                  key={`${skill.relativePath}:${skill.name}:missing`}
-                >
-                  <Checkbox checked disabled className="mt-0.5" />
-                  <span className="-mt-0.5 grid min-w-0 flex-1 gap-1">
-                    <span className="flex min-w-0 flex-wrap items-center gap-2">
-                      <span className="truncate font-medium">{skill.name}</span>
-                      <span className="rounded border border-destructive/30 bg-background px-1.5 py-0.5 text-xs font-medium text-destructive">
-                        No longer found
-                      </span>
-                    </span>
-                    <span className="text-muted-foreground font-mono text-xs">
-                      {skill.relativePath}
-                    </span>
-                  </span>
-                  <Button
-                    disabled={fieldIsReadOnly}
-                    onClick={() => {
-                      updateSkillSelection(skill, false);
-                    }}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    Remove
-                  </Button>
-                </div>
-              );
-            }
-
-            if (!skillMatchesSearchQuery(skill, skillsSearchQuery)) {
-              return null;
-            }
-
-            const checked = selectedSkillIdentities.has(createSelectedSkillIdentity(skill));
-            return (
-              <label
-                className="flex items-start gap-3 px-3 py-3 text-sm transition-colors hover:bg-muted/60 focus-within:bg-muted/50"
-                key={skill.relativePath}
-              >
-                <Checkbox
-                  checked={checked}
-                  className="mt-0.5"
-                  disabled={fieldIsReadOnly}
-                  onCheckedChange={(nextChecked) => {
-                    updateSkillSelection(skill, nextChecked === true);
+        <div className="overflow-hidden rounded-md border bg-card">
+          {shouldShowEditableSkillCatalog && skillsSourceRepo !== null ? (
+            <div className="flex flex-col gap-2 border-b bg-muted/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
+                <label className="inline-flex min-w-0 items-center gap-2">
+                  <Checkbox
+                    checked={allVisibleDiscoveredSkillsSelected}
+                    disabled={visibleAvailableSkillOptions.length === 0}
+                    indeterminate={someVisibleDiscoveredSkillsSelected}
+                    onCheckedChange={toggleAllVisibleDiscoveredSkills}
+                  />
+                  <span>Select all</span>
+                </label>
+                <span className="text-muted-foreground text-sm">{selectedCountText}</span>
+              </div>
+              <div className="min-w-0">
+                <Input
+                  aria-label="Search skills"
+                  className="h-8 w-full bg-background sm:w-64"
+                  onChange={(event) => {
+                    setSkillsSearchQuery(event.target.value);
                   }}
+                  placeholder="Search skills"
+                  value={skillsSearchQuery}
                 />
-                <span className="-mt-0.5 grid min-w-0 gap-1">
-                  <span className="font-medium">{skill.name}</span>
-                  {skill.description.length === 0 ? null : (
-                    <span className="text-muted-foreground">{skill.description}</span>
-                  )}
-                  <span className="text-muted-foreground font-mono text-xs">
-                    {skill.relativePath}
-                  </span>
-                </span>
-              </label>
-            );
-          })}
-          {visibleAvailableSkillOptions.length === 0 ? (
-            <p className="text-muted-foreground px-3 py-3 text-sm">
-              No matching discovered skills.
-            </p>
+              </div>
+            </div>
           ) : null}
+          <div
+            aria-label={shouldShowEditableSkillCatalog ? "Available skills" : "Selected skills"}
+            className="divide-y"
+            data-slot="sandbox-profile-skills-list"
+            role="region"
+            style={SkillsListHeightStyle}
+          >
+            {shouldShowEditableSkillCatalog && skillsSourceRepo !== null
+              ? skillOptions.map((skill) => {
+                  if (!skill.available) {
+                    return (
+                      <UnavailableSkillRow
+                        fieldIsReadOnly={fieldIsReadOnly}
+                        key={`${skill.relativePath}:${skill.name}:missing`}
+                        onRemove={() => {
+                          updateSkillSelection(skill, false);
+                        }}
+                        skill={skill}
+                      />
+                    );
+                  }
+
+                  if (!skillMatchesSearchQuery(skill, skillsSearchQuery)) {
+                    return null;
+                  }
+
+                  const checked = selectedSkillIdentities.has(createSelectedSkillIdentity(skill));
+                  return (
+                    <SelectableSkillRow
+                      checked={checked}
+                      fieldIsReadOnly={fieldIsReadOnly}
+                      key={skill.relativePath}
+                      onCheckedChange={(nextChecked) => {
+                        updateSkillSelection(skill, nextChecked);
+                      }}
+                      skill={skill}
+                    />
+                  );
+                })
+              : selectedSkillOptions.map((skill) =>
+                  skill.available ? (
+                    <SelectedSkillRow key={skill.relativePath} skill={skill} />
+                  ) : (
+                    <UnavailableSkillRow
+                      fieldIsReadOnly={fieldIsReadOnly}
+                      key={`${skill.relativePath}:${skill.name}:missing`}
+                      onRemove={() => {
+                        updateSkillSelection(skill, false);
+                      }}
+                      skill={skill}
+                    />
+                  ),
+                )}
+            {shouldShowEditableSkillCatalog &&
+            skillsSourceRepo !== null &&
+            visibleAvailableSkillOptions.length === 0 ? (
+              <p className="text-muted-foreground px-3 py-3 text-sm">
+                No matching discovered skills.
+              </p>
+            ) : null}
+            {!shouldShowEditableSkillCatalog && selectedSkillOptions.length === 0 ? (
+              <p className="text-muted-foreground px-3 py-3 text-sm">No skills selected.</p>
+            ) : null}
+          </div>
         </div>
       </div>
     );
 
   return (
-    <SectionBlock title="Skills">
-      <SandboxProfileSectionCard>
-        <div className="grid gap-4">
-          {saveErrorMessage === null ? null : <Notice variant="alert">{saveErrorMessage}</Notice>}
-          {loadErrorMessage === null ? null : (
-            <Notice title="Could not load skills" variant="alert">
-              {loadErrorMessage}
-            </Notice>
-          )}
-          {sourceNotLoadedMessage === null ? null : (
-            <Notice title="Skills not loaded">{sourceNotLoadedMessage}</Notice>
-          )}
-          {sourceNeedsSavedDraftMessage === null ? null : (
-            <Notice title="Save draft to load skills">{sourceNeedsSavedDraftMessage}</Notice>
-          )}
-          {sourceIsUnavailable ? (
-            <Notice title="Skills source unavailable" variant="alert">
-              Add this repository back to the Git integration bindings, or choose another skills
-              source.
-            </Notice>
-          ) : null}
-          {unavailableSelectedSkillsMessage === null ? null : (
-            <Notice title="Selected skills no longer found" variant="alert">
-              {unavailableSelectedSkillsMessage}
-            </Notice>
-          )}
-          <Field contentWidth="fill" orientation="horizontal">
-            <FieldHeader>
-              <FieldLabel htmlFor="sandbox-profile-skills-source">Source repository</FieldLabel>
-            </FieldHeader>
-            <FieldContent>
-              <div className="flex flex-wrap gap-2">
-                <Select
-                  disabled={sourceControlIsDisabled}
-                  onValueChange={updateSelectedSource}
-                  value={selectedSourceValue}
-                >
-                  <SelectTrigger className="min-w-72" id="sandbox-profile-skills-source">
-                    <SelectValue placeholder="Select repository">
-                      {selectedOriginUrl === null
-                        ? "None"
-                        : (selectedSourceOption?.label ?? "Unavailable repository")}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NoSkillsSourceValue}>None</SelectItem>
-                    {sourceIsUnavailable && draftConfig !== null ? (
-                      <SelectItem disabled value={draftConfig.originUrl}>
-                        Unavailable repository
-                      </SelectItem>
-                    ) : null}
-                    {selectableSourceOptions.map((sourceOption) => (
-                      <SelectItem key={sourceOption.originUrl} value={sourceOption.originUrl}>
-                        {sourceOption.label}
-                      </SelectItem>
-                    ))}
-                    <SelectSeparator />
-                    <SelectItem
-                      className="text-primary focus:text-primary"
-                      onClick={openPublicSourceDialog}
-                      value={AddPublicGitHubSourceValue}
-                    >
-                      <span className="flex items-center gap-2">
-                        <PlusIcon aria-hidden className="size-4" />
-                        Add public GitHub repo
-                      </span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                {reloadButtonIsVisible ? (
-                  <Button
-                    disabled={fieldIsReadOnly || actionIsPending || loadIsPending}
-                    onClick={reloadSelectedSource}
-                    title="Reload skills from this repository"
-                    type="button"
-                    variant="outline"
-                  >
-                    {actionIsPending || queryLoadIsPending ? (
-                      <Spinner aria-hidden className="size-4" />
-                    ) : (
-                      <ArrowClockwiseIcon aria-hidden className="size-4" />
-                    )}
-                    Reload
-                  </Button>
-                ) : null}
-              </div>
-            </FieldContent>
-          </Field>
-          {skillsContent}
-        </div>
-      </SandboxProfileSectionCard>
+    <SectionBlock action={skillsSourceAction} title="Skills">
+      <div className="grid gap-4">
+        {saveErrorMessage === null ? null : <Notice variant="alert">{saveErrorMessage}</Notice>}
+        {loadErrorMessage === null ? null : (
+          <Notice title="Could not load skills" variant="alert">
+            {loadErrorMessage}
+          </Notice>
+        )}
+        {sourceNotLoadedMessage === null ? null : (
+          <Notice title="Skills not loaded">{sourceNotLoadedMessage}</Notice>
+        )}
+        {sourceNeedsSavedDraftMessage === null ? null : (
+          <Notice title="Save draft to load skills">{sourceNeedsSavedDraftMessage}</Notice>
+        )}
+        {sourceIsUnavailable ? (
+          <Notice title="Skills source unavailable" variant="alert">
+            Add this repository back to the Git integration bindings, or choose another skills
+            source.
+          </Notice>
+        ) : null}
+        {unavailableSelectedSkillsMessage === null ? null : (
+          <Notice title="Selected skills no longer found" variant="alert">
+            {unavailableSelectedSkillsMessage}
+          </Notice>
+        )}
+        {skillsContent}
+      </div>
       <Dialog
         onOpenChange={(open) => {
           setPublicSourceDialogIsOpen(open);
@@ -813,6 +830,99 @@ export function SandboxProfileSkillsSection(input: {
         </DialogContent>
       </Dialog>
     </SectionBlock>
+  );
+}
+
+function SelectableSkillRow(input: {
+  checked: boolean;
+  fieldIsReadOnly: boolean;
+  onCheckedChange: (nextChecked: boolean) => void;
+  skill: SkillOption;
+}): React.JSX.Element {
+  return (
+    <label className="flex items-start gap-2 px-3 py-2.5 text-sm transition-colors hover:bg-muted/60 focus-within:bg-muted/50 sm:gap-3 sm:py-3">
+      <Checkbox
+        checked={input.checked}
+        className="mt-0.5"
+        disabled={input.fieldIsReadOnly}
+        onCheckedChange={(nextChecked) => {
+          input.onCheckedChange(nextChecked === true);
+        }}
+      />
+      <SkillRowBody skill={input.skill} />
+    </label>
+  );
+}
+
+function SelectedSkillRow(input: { skill: SkillOption }): React.JSX.Element {
+  return (
+    <div className="flex items-start gap-2 px-3 py-2.5 text-sm sm:gap-3 sm:py-3">
+      <SkillRowBody skill={input.skill} />
+    </div>
+  );
+}
+
+function UnavailableSkillRow(input: {
+  fieldIsReadOnly: boolean;
+  onRemove: () => void;
+  skill: SkillOption;
+}): React.JSX.Element {
+  return (
+    <div className="flex items-start gap-2 bg-destructive/5 px-3 py-2.5 text-sm transition-colors hover:bg-destructive/10 focus-within:bg-destructive/10 sm:gap-3 sm:py-3">
+      <Checkbox checked disabled className="mt-0.5" />
+      <SkillRowBody
+        badge={
+          <span className="rounded border border-destructive/30 bg-background px-1.5 py-0.5 text-xs font-medium text-destructive">
+            No longer found
+          </span>
+        }
+        showMobilePath
+        skill={input.skill}
+      />
+      <Button
+        disabled={input.fieldIsReadOnly}
+        onClick={input.onRemove}
+        size="sm"
+        type="button"
+        variant="outline"
+      >
+        Remove
+      </Button>
+    </div>
+  );
+}
+
+function SkillRowBody(input: {
+  badge?: ReactNode | undefined;
+  showMobilePath?: boolean | undefined;
+  skill: Pick<SkillOption, "description" | "name" | "relativePath">;
+}): React.JSX.Element {
+  return (
+    <span className="-mt-0.5 grid min-w-0 flex-1 gap-1">
+      <span className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+        <span className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="truncate font-medium">{input.skill.name}</span>
+          {input.badge}
+        </span>
+        <OverflowTooltipText
+          className="font-mono text-xs text-muted-foreground"
+          containerClassName="hidden max-w-[45%] shrink-0 sm:block"
+          text={input.skill.relativePath}
+          tooltipSide="top"
+          truncatePosition="start"
+        />
+      </span>
+      {input.skill.description.length === 0 ? null : (
+        <span className="text-muted-foreground line-clamp-3 sm:line-clamp-none">
+          {input.skill.description}
+        </span>
+      )}
+      {input.showMobilePath === true ? (
+        <span className="text-muted-foreground font-mono text-xs sm:hidden">
+          {input.skill.relativePath}
+        </span>
+      ) : null}
+    </span>
   );
 }
 
@@ -1007,6 +1117,15 @@ export function createSkillOptions(input: {
     (left, right) =>
       left.name.localeCompare(right.name) || left.relativePath.localeCompare(right.relativePath),
   );
+}
+
+function createSelectedSkillOption(skill: SelectedSkill): SkillOption {
+  return {
+    name: skill.name,
+    description: "",
+    relativePath: skill.relativePath,
+    available: true,
+  };
 }
 
 export function createNextVisibleDiscoveredSkillsSelection(input: {

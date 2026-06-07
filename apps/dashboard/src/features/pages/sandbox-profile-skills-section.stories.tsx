@@ -16,6 +16,11 @@ import { SandboxProfileSkillsSection } from "./sandbox-profile-skills-section.js
 const SkillsOriginUrl = "https://github.com/mistle/main-dashboard.git";
 const PublicSkillsOriginUrl = "https://github.com/mistle/public-skills.git";
 
+/**
+ * Use these stories to review sandbox profile skills selection in isolation. The long-list stories
+ * are intended to verify that the skills rows scroll inside the section while source controls,
+ * notices, search, and selection counts remain outside the scroll area.
+ */
 const meta = {
   title: "Pages/Sandbox Profile/Skills Section",
 } satisfies Meta;
@@ -62,6 +67,58 @@ export const Configured: Story = {
       }}
     />
   ),
+};
+
+export const EditableLongCatalog: Story = {
+  name: "Editable Long Catalog",
+  render: () => {
+    const skillsSourceRepos = createLongSkillsSourceRepos({
+      originUrl: SkillsOriginUrl,
+      selectedCount: 4,
+      totalCount: 36,
+    });
+    const skillsSourceRepo = getStorySkillsSourceRepo(skillsSourceRepos);
+
+    return (
+      <SkillsSectionStoryHarness
+        skillsConfig={{
+          originUrl: SkillsOriginUrl,
+          selectedSkills: skillsSourceRepo.skills.slice(0, 4).map((skill) => ({
+            name: skill.name,
+            relativePath: skill.relativePath,
+          })),
+        }}
+        skillsSourceRepos={skillsSourceRepos}
+      />
+    );
+  },
+};
+
+export const ReadOnlySelectedLongList: Story = {
+  name: "Read-only Selected Long List",
+  render: () => {
+    const skillsSourceRepos = createLongSkillsSourceRepos({
+      originUrl: SkillsOriginUrl,
+      selectedCount: 24,
+      totalCount: 36,
+    });
+    const skillsSourceRepo = getStorySkillsSourceRepo(skillsSourceRepos);
+
+    return (
+      <SkillsSectionStoryHarness
+        isDraft={false}
+        readOnly
+        skillsConfig={{
+          originUrl: SkillsOriginUrl,
+          selectedSkills: skillsSourceRepo.skills.slice(0, 24).map((skill) => ({
+            name: skill.name,
+            relativePath: skill.relativePath,
+          })),
+        }}
+        skillsSourceRepos={skillsSourceRepos}
+      />
+    );
+  },
 };
 
 export const Unsynced: Story = {
@@ -144,6 +201,8 @@ export const NoRepositoryBinding: Story = {
 function SkillsSectionStoryHarness(input: {
   initialBindings?: ComponentProps<typeof SandboxProfileSkillsSection>["integrationRows"];
   integrationRowsHaveUnpersistedChanges?: boolean;
+  isDraft?: boolean;
+  readOnly?: boolean;
   skillsConfig: SandboxProfileVersion["skillsConfig"];
   skillsSourceRepos: SandboxProfileVersionSkillsSourceReposResult;
 }): React.JSX.Element {
@@ -195,9 +254,9 @@ function SkillsSectionStoryHarness(input: {
           integrationRowsHaveUnpersistedChanges={
             input.integrationRowsHaveUnpersistedChanges ?? false
           }
-          isDraft
+          isDraft={input.isDraft ?? true}
           profileId={version.sandboxProfileId}
-          readOnly={false}
+          readOnly={input.readOnly ?? false}
           version={version}
         />
       </div>
@@ -226,5 +285,62 @@ function createStoryVersion(
     usable: false,
     refreshSchedule: null,
     latestSnapshotJob: null,
+  };
+}
+
+function getStorySkillsSourceRepo(
+  result: SandboxProfileVersionSkillsSourceReposResult,
+): SandboxProfileVersionSkillsSourceReposResult["items"][number] {
+  const skillsSourceRepo = result.items[0];
+  if (skillsSourceRepo === undefined) {
+    throw new Error("Long skills story fixture must include a skills source repo.");
+  }
+
+  return skillsSourceRepo;
+}
+
+function createLongSkillsSourceRepos(input: {
+  originUrl: string;
+  selectedCount: number;
+  totalCount: number;
+}): SandboxProfileVersionSkillsSourceReposResult {
+  const names = [
+    "pr-review",
+    "release-notes",
+    "incident-triage",
+    "docs-update",
+    "dependency-audit",
+    "migration-plan",
+    "qa-checklist",
+    "customer-escalation",
+    "security-review",
+    "billing-reconciliation",
+    "runbook-refresh",
+    "schema-change-plan",
+  ];
+
+  return {
+    items: [
+      {
+        id: "ksr_story_long_skills",
+        originUrl: input.originUrl,
+        commitSha: "8f7c7a1",
+        lastSyncedAt: "2026-06-07T10:05:00.000Z",
+        createdAt: "2026-06-07T10:05:00.000Z",
+        updatedAt: "2026-06-07T10:05:00.000Z",
+        skills: Array.from({ length: input.totalCount }, (_, index) => {
+          const baseName = names[index % names.length] ?? "workflow";
+          const ordinal = String(index + 1).padStart(2, "0");
+          const selectedHint =
+            index < input.selectedCount ? " This skill is selected in the story fixture." : "";
+
+          return {
+            name: `${baseName}-${ordinal}`,
+            description: `Use this workflow skill to coordinate a focused sandbox task, keep the agent anchored to the right repository context, and produce a compact handoff for reviewers.${selectedHint}`,
+            relativePath: `.agents/skills/${baseName}-${ordinal}`,
+          };
+        }),
+      },
+    ],
   };
 }
