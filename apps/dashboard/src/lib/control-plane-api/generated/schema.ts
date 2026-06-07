@@ -9441,11 +9441,17 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "VALIDATION_ERROR";
-              message: string;
-            };
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_SANDBOX_RUNTIME_CONFIG";
+                  message: string;
+                };
           };
         };
         /** @description Authentication is required. */

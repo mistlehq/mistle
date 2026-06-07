@@ -117,6 +117,29 @@ describe.concurrent("sandbox profiles create integration", () => {
     expect(initialVersion.sandboxDiskMb).toBeNull();
   });
 
+  it("rejects creation with an invalid explicit sandbox provider", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profiles-create-invalid-runtime@example.com",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/sandbox/profiles", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie,
+      },
+      body: JSON.stringify({
+        displayName: "Invalid Runtime Profile",
+        sandboxProvider: "unsupported-provider",
+      }),
+    });
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      code: "INVALID_SANDBOX_RUNTIME_CONFIG",
+      message: "Sandbox provider 'unsupported-provider' is not supported.",
+    });
+  });
+
   it("creates a sandbox profile with an API key that has create permission", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profiles-create-api-key@example.com",
