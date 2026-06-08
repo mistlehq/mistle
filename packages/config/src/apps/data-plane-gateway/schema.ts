@@ -24,6 +24,7 @@ const NatsUrlSchema = z.url().refine((value) => {
 
 const DefaultWebSocketPingIntervalMs = 10_000;
 const DefaultWebSocketPongTimeoutMs = 10_000;
+const DefaultPortAccessAuthorizationTimeoutMs = 5_000;
 
 export const DataPlaneGatewayServerConfigSchema = z
   .object({
@@ -128,6 +129,24 @@ export const DataPlaneGatewayHealthConfigSchema = DataPlaneGatewayHealthConfigOb
 export const PartialDataPlaneGatewayHealthConfigSchema =
   DataPlaneGatewayHealthConfigObjectSchema.partial();
 
+const DataPlaneGatewayPortAccessConfigObjectSchema = z
+  .object({
+    authorizationTimeoutMs: z
+      .number()
+      .int()
+      .positive()
+      .default(DefaultPortAccessAuthorizationTimeoutMs),
+  })
+  .strict();
+
+export const DataPlaneGatewayPortAccessConfigSchema =
+  DataPlaneGatewayPortAccessConfigObjectSchema.default({
+    authorizationTimeoutMs: DefaultPortAccessAuthorizationTimeoutMs,
+  });
+
+export const PartialDataPlaneGatewayPortAccessConfigSchema =
+  DataPlaneGatewayPortAccessConfigObjectSchema.partial();
+
 export const DataPlaneGatewayDataPlaneApiConfigSchema = z
   .object({
     baseUrl: HttpBaseUrlSchema,
@@ -185,6 +204,7 @@ export const DataPlaneGatewayConfigSchema = z
     runtimeState: DataPlaneGatewayRuntimeStateConfigSchema,
     gatewayRelay: DataPlaneGatewayRelayConfigSchema,
     health: DataPlaneGatewayHealthConfigSchema,
+    portAccess: DataPlaneGatewayPortAccessConfigSchema,
     dataPlaneApi: DataPlaneGatewayDataPlaneApiConfigSchema,
     controlPlaneApi: DataPlaneGatewayControlPlaneApiConfigSchema,
     internalAuth: DataPlaneGatewayInternalAuthConfigSchema,
@@ -200,6 +220,7 @@ export const PartialDataPlaneGatewayConfigSchema = z
     runtimeState: PartialDataPlaneGatewayRuntimeStateConfigSchema.optional(),
     gatewayRelay: PartialDataPlaneGatewayRelayConfigSchema.optional(),
     health: PartialDataPlaneGatewayHealthConfigSchema.optional(),
+    portAccess: PartialDataPlaneGatewayPortAccessConfigSchema.optional(),
     dataPlaneApi: DataPlaneGatewayDataPlaneApiConfigSchema.partial().optional(),
     controlPlaneApi: PartialDataPlaneGatewayControlPlaneApiConfigSchema.optional(),
     internalAuth: DataPlaneGatewayInternalAuthConfigSchema.partial().optional(),

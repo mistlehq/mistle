@@ -309,6 +309,10 @@ const DataPlaneGatewayResourceRuntimeEnvExports: readonly RuntimeEnvExportDescri
     path: ["health", "websocketPongTimeoutMs"],
     envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_HEALTH_WEBSOCKET_PONG_TIMEOUT_MS",
   },
+  {
+    path: ["portAccess", "authorizationTimeoutMs"],
+    envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_PORT_ACCESS_AUTHORIZATION_TIMEOUT_MS",
+  },
   { path: ["dataPlaneApi", "baseUrl"], envVar: "MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL" },
   {
     path: ["controlPlaneApi", "baseUrl"],

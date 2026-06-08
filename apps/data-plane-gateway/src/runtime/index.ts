@@ -424,10 +424,15 @@ export function createDataPlaneGatewayRuntime(
     sandboxOwnerResolver,
     gatewayForwardingClient,
   );
-  portsTargetAuthorizeService = new PortsTargetAuthorizeService(relayCoordinator, systemScheduler, {
-    client: gatewayForwardingClient,
-    localNodeId: nodeId,
-  });
+  portsTargetAuthorizeService = new PortsTargetAuthorizeService(
+    relayCoordinator,
+    systemScheduler,
+    {
+      client: gatewayForwardingClient,
+      localNodeId: nodeId,
+    },
+    config.app.portAccess,
+  );
   portAccessTransportService = new PortAccessTransportService(
     relayCoordinator,
     tunnelSessionRegistry,

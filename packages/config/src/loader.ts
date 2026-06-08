@@ -720,6 +720,11 @@ const DataPlaneGatewayEnvDescriptors = [
     path: ["health", "websocketPongTimeoutMs"],
     parse: parseNumberEnv,
   },
+  {
+    envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_PORT_ACCESS_AUTHORIZATION_TIMEOUT_MS",
+    path: ["portAccess", "authorizationTimeoutMs"],
+    parse: parseNumberEnv,
+  },
   { envVar: "MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL", path: ["dataPlaneApi", "baseUrl"] },
   {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL",

@@ -397,6 +397,10 @@ export function selectDataPlaneGatewayConfig(config: Config): DataPlaneGatewayCo
       websocketPongTimeoutMs:
         config.services.data_plane_gateway.health?.websocket_pong_timeout_ms ?? 10_000,
     },
+    portAccess: {
+      authorizationTimeoutMs:
+        config.services.data_plane_gateway.port_access?.authorization_timeout_ms ?? 5_000,
+    },
     dataPlaneApi: {
       baseUrl: config.services.data_plane_api.internal_url,
     },

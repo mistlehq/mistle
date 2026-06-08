@@ -412,6 +412,11 @@ const RootEnvDescriptors = [
     parse: parseNumberEnv,
   },
   {
+    envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_PORT_ACCESS_AUTHORIZATION_TIMEOUT_MS",
+    path: ["services", "data_plane_gateway", "port_access", "authorization_timeout_ms"],
+    parse: parseNumberEnv,
+  },
+  {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY",
     path: ["services", "control_plane_worker", "workflow_concurrency"],
     parse: parseNumberEnv,

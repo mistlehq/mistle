@@ -15,6 +15,7 @@ function createRootConfig(input: {
   enabledMethods?: Array<"otp" | "google">;
   gatewayRelay?: Config["gateway_relay"];
   dataPlaneGatewayHealth?: Config["services"]["data_plane_gateway"]["health"];
+  dataPlaneGatewayPortAccess?: Config["services"]["data_plane_gateway"]["port_access"];
   google?: {
     client_id: string;
     client_secret: string;
@@ -91,6 +92,9 @@ function createRootConfig(input: {
         ...(input.dataPlaneGatewayHealth === undefined
           ? {}
           : { health: input.dataPlaneGatewayHealth }),
+        ...(input.dataPlaneGatewayPortAccess === undefined
+          ? {}
+          : { port_access: input.dataPlaneGatewayPortAccess }),
       },
       control_plane_worker: {
         workflow_concurrency: 4,
@@ -460,6 +464,9 @@ describe("selectDataPlaneGatewayConfig", () => {
       websocketPingIntervalMs: 10_000,
       websocketPongTimeoutMs: 10_000,
     });
+    expect(config.portAccess).toEqual({
+      authorizationTimeoutMs: 5_000,
+    });
     expect(config.controlPlaneApi.mcp.auth).toEqual({
       secret: "mcp-auth-secret",
       issuer: "control-plane-api",
@@ -517,6 +524,20 @@ describe("selectDataPlaneGatewayConfig", () => {
     expect(config.health).toEqual({
       websocketPingIntervalMs: 100,
       websocketPongTimeoutMs: 10_000,
+    });
+  });
+
+  it("projects optional gateway port access config", () => {
+    const config = selectDataPlaneGatewayConfig(
+      createRootConfig({
+        dataPlaneGatewayPortAccess: {
+          authorization_timeout_ms: 250,
+        },
+      }),
+    );
+
+    expect(config.portAccess).toEqual({
+      authorizationTimeoutMs: 250,
     });
   });
 });

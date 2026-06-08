@@ -302,6 +302,12 @@ export const ConfigSchema = z
             })
             .strict()
             .optional(),
+          port_access: z
+            .object({
+              authorization_timeout_ms: z.number().int().positive().optional(),
+            })
+            .strict()
+            .optional(),
         }).strict(),
         control_plane_worker: z
           .object({

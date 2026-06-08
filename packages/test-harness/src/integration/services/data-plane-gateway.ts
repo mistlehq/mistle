@@ -33,6 +33,7 @@ const DockerSandboxReachableHost = "0.0.0.0";
 const DefaultWebSocketPingIntervalMs = 10_000;
 const DefaultWebSocketPongTimeoutMs = 10_000;
 const IntegrationTelemetryBatchDelayMs = 100;
+const DefaultPortAccessAuthorizationTimeoutMs = 5_000;
 const OTelBatchDelayEnv = {
   LOGS: "OTEL_BLRP_SCHEDULE_DELAY",
   TRACES: "OTEL_BSP_SCHEDULE_DELAY",
@@ -126,6 +127,7 @@ function start(input: {
       }),
       gatewayRelay: input.dataPlaneGateway?.gatewayRelay,
       health: input.dataPlaneGateway?.health,
+      portAccess: input.dataPlaneGateway?.portAccess,
       directEgressTrustedCaCertificates:
         input.dataPlaneGateway?.directEgress?.trustedCaCertificates,
       directEgressWebSocketUpstreamResolutionDelayMs:
@@ -213,6 +215,7 @@ function config(input: {
   gatewayWsUrl: string;
   gatewayRelay: IntegrationDataPlaneGatewayRelayOptions | undefined;
   health: NonNullable<IntegrationServiceOptions["dataPlaneGateway"]>["health"] | undefined;
+  portAccess: NonNullable<IntegrationServiceOptions["dataPlaneGateway"]>["portAccess"] | undefined;
   nats: ResolvedTestInfra | undefined;
   sandbox: IntegrationSandboxOptions | undefined;
 }): DataPlaneGatewayConfig {
@@ -255,6 +258,10 @@ function config(input: {
       websocketPingIntervalMs:
         input.health?.websocketPingIntervalMs ?? DefaultWebSocketPingIntervalMs,
       websocketPongTimeoutMs: input.health?.websocketPongTimeoutMs ?? DefaultWebSocketPongTimeoutMs,
+    },
+    portAccess: {
+      authorizationTimeoutMs:
+        input.portAccess?.authorizationTimeoutMs ?? DefaultPortAccessAuthorizationTimeoutMs,
     },
     dataPlaneApi: {
       baseUrl: input.dataPlaneApiBaseUrl,

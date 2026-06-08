@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   DataPlaneGatewayConfigSchema,
   DataPlaneGatewayHealthConfigSchema,
+  DataPlaneGatewayPortAccessConfigSchema,
   DataPlaneGatewayRelayConfigSchema,
 } from "./schema.js";
 
@@ -115,11 +116,45 @@ describe("DataPlaneGatewayHealthConfigSchema", () => {
   });
 });
 
+describe("DataPlaneGatewayPortAccessConfigSchema", () => {
+  it("defaults authorization timeout when omitted", () => {
+    expect(DataPlaneGatewayPortAccessConfigSchema.parse(undefined)).toEqual({
+      authorizationTimeoutMs: 5_000,
+    });
+  });
+
+  it("accepts authorization timeout overrides", () => {
+    expect(
+      DataPlaneGatewayPortAccessConfigSchema.parse({
+        authorizationTimeoutMs: 250,
+      }),
+    ).toEqual({
+      authorizationTimeoutMs: 250,
+    });
+  });
+
+  it("rejects non-positive authorization timeout", () => {
+    expect(() =>
+      DataPlaneGatewayPortAccessConfigSchema.parse({
+        authorizationTimeoutMs: 0,
+      }),
+    ).toThrow(/authorizationTimeoutMs/u);
+  });
+});
+
 describe("DataPlaneGatewayConfigSchema", () => {
   it("fills websocket health defaults when the section is omitted", () => {
     expect(DataPlaneGatewayConfigSchema.parse(createDataPlaneGatewayConfigInput()).health).toEqual({
       websocketPingIntervalMs: 10_000,
       websocketPongTimeoutMs: 10_000,
+    });
+  });
+
+  it("fills Port Access defaults when the section is omitted", () => {
+    expect(
+      DataPlaneGatewayConfigSchema.parse(createDataPlaneGatewayConfigInput()).portAccess,
+    ).toEqual({
+      authorizationTimeoutMs: 5_000,
     });
   });
 });

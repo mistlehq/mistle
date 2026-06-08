@@ -14,7 +14,15 @@ import type { GatewayForwardingTarget } from "../tunnel/gateway-forwarding/types
 import type { TunnelRelayCoordinator } from "../tunnel/relay-coordinator.js";
 import type { RelayTarget } from "../tunnel/types.js";
 
-const PortsTargetAuthorizeTimeoutMs = 5_000;
+const DefaultPortsTargetAuthorizeTimeoutMs = 5_000;
+
+export type PortsTargetAuthorizeConfig = {
+  authorizationTimeoutMs: number;
+};
+
+export const DefaultPortsTargetAuthorizeConfig: PortsTargetAuthorizeConfig = {
+  authorizationTimeoutMs: DefaultPortsTargetAuthorizeTimeoutMs,
+};
 
 type PendingPortsTargetAuthorizeRequest = {
   targetBootstrapSessionId: string;
@@ -75,6 +83,7 @@ export class PortsTargetAuthorizeService {
       client: GatewayForwardingClientAdapter;
       localNodeId: string;
     },
+    private readonly portAccessConfig: PortsTargetAuthorizeConfig = DefaultPortsTargetAuthorizeConfig,
   ) {}
 
   public async requestTargetAuthorize(input: {
@@ -126,7 +135,7 @@ export class PortsTargetAuthorizeService {
           requestId,
         });
         reject(new PortsTargetAuthorizeTimedOutError(input.sandboxInstanceId, input.target.port));
-      }, PortsTargetAuthorizeTimeoutMs);
+      }, this.portAccessConfig.authorizationTimeoutMs);
 
       this.setPendingRequest({
         sandboxInstanceId: input.sandboxInstanceId,
@@ -174,7 +183,7 @@ export class PortsTargetAuthorizeService {
         sandboxInstanceId: input.sandboxInstanceId,
         requestId: forwardedRequestId,
       });
-    }, PortsTargetAuthorizeTimeoutMs);
+    }, this.portAccessConfig.authorizationTimeoutMs);
 
     this.setPendingRequest({
       sandboxInstanceId: input.sandboxInstanceId,

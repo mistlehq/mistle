@@ -43,6 +43,9 @@ export type IntegrationServiceOptions = {
       websocketPingIntervalMs?: number;
       websocketPongTimeoutMs?: number;
     };
+    portAccess?: {
+      authorizationTimeoutMs?: number;
+    };
   };
   sandbox?: IntegrationSandboxOptions;
 };

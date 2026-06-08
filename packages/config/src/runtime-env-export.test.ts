@@ -253,6 +253,10 @@ describe("exportServiceConfigToEnv", () => {
       value: 10000,
     });
     expectEntry(entries, {
+      name: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_PORT_ACCESS_AUTHORIZATION_TIMEOUT_MS",
+      value: 5000,
+    });
+    expectEntry(entries, {
       name: "MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL",
       value: "http://data-plane-api:8082",
     });

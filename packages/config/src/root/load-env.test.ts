@@ -80,6 +80,7 @@ describe("loadRootConfigFromEnv", () => {
         "ws://data-plane-gateway:8084/tunnel/sandbox",
       MISTLE_SERVICES_DATA_PLANE_GATEWAY_HEALTH_WEBSOCKET_PING_INTERVAL_MS: "100",
       MISTLE_SERVICES_DATA_PLANE_GATEWAY_HEALTH_WEBSOCKET_PONG_TIMEOUT_MS: "250",
+      MISTLE_SERVICES_DATA_PLANE_GATEWAY_PORT_ACCESS_AUTHORIZATION_TIMEOUT_MS: "300",
       MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY: "4",
       MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_POOL_MAX: "6",
       MISTLE_SERVICES_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY: "5",
@@ -251,6 +252,9 @@ describe("loadRootConfigFromEnv", () => {
           health: {
             websocket_ping_interval_ms: 100,
             websocket_pong_timeout_ms: 250,
+          },
+          port_access: {
+            authorization_timeout_ms: 300,
           },
         },
         control_plane_worker: {

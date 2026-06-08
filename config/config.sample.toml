@@ -97,6 +97,11 @@ sandbox_ws_internal_url = "ws://data-plane-gateway:8084/tunnel/sandbox"
 #websocket_ping_interval_ms = 10000
 #websocket_pong_timeout_ms = 10000
 
+# Optional Port Access tuning. When omitted, data-plane-gateway waits up to
+# 5000ms for sandbox target authorization during bootstrap.
+#[services.data_plane_gateway.port_access]
+#authorization_timeout_ms = 5000
+
 [services.control_plane_worker]
 workflow_concurrency = 4
 workflow_database_pool_max = 4

@@ -42,9 +42,17 @@ const PortAccessTokenAudience = GatewayTokenAudience;
 const FirstGatewayId = "data-plane-gateway-a";
 const SecondGatewayId = "data-plane-gateway-b";
 const TestTimeoutMs = 40_000;
+const PortAccessAuthorizationTimeoutMs = 100;
 
 const it = createIntegrationTest({
   services: ["data-plane-api", "data-plane-gateway"],
+  __serviceOptions: {
+    dataPlaneGateway: {
+      portAccess: {
+        authorizationTimeoutMs: PortAccessAuthorizationTimeoutMs,
+      },
+    },
+  },
 });
 const distributedIt = createIntegrationTest({
   services: [
@@ -62,6 +70,9 @@ const distributedIt = createIntegrationTest({
       gatewayRelay: {
         backend: "nats",
         namePrefix: "port-access-bootstrap-integration",
+      },
+      portAccess: {
+        authorizationTimeoutMs: PortAccessAuthorizationTimeoutMs,
       },
     },
   },
