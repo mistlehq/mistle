@@ -66,6 +66,30 @@ describe("remote MCP server catalog", () => {
     ).toThrow("Duplicate remote MCP server id 'provider_primary'.");
   });
 
+  it("supports known default selected remote MCP server ids", () => {
+    const schema = z
+      .object({
+        remoteMcpServers: createRemoteMcpServerSelectionSchema({
+          catalog: TestCatalog,
+          defaultSelectedIds: ["provider_primary"],
+        }),
+      })
+      .strict();
+
+    expect(schema.parse({})).toEqual({
+      remoteMcpServers: ["provider_primary"],
+    });
+  });
+
+  it("rejects unknown default selected remote MCP server ids", () => {
+    expect(() =>
+      createRemoteMcpServerSelectionSchema({
+        catalog: TestCatalog,
+        defaultSelectedIds: ["unknown_server"],
+      }),
+    ).toThrow("Unsupported remote MCP server id 'unknown_server'.");
+  });
+
   it("renders a binding form from catalog entries", () => {
     const schema = z
       .object({

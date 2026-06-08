@@ -20,12 +20,18 @@ type RemoteMcpServerRouteAuthInjection =
 
 export function createRemoteMcpServerSelectionSchema(input: {
   catalog: ReadonlyArray<RemoteMcpServerCatalogEntry>;
+  defaultSelectedIds?: ReadonlyArray<string>;
 }) {
   const catalogById = buildRemoteMcpServerCatalogById(input.catalog);
+  const defaultSelectedIds = input.defaultSelectedIds ?? [];
+  assertKnownRemoteMcpServerIds({
+    catalog: input.catalog,
+    selectedIds: defaultSelectedIds,
+  });
 
   return z
     .array(z.string().trim().min(1))
-    .default([])
+    .default([...defaultSelectedIds])
     .superRefine((selectedIds, ctx) => {
       const seenIds = new Set<string>();
 
