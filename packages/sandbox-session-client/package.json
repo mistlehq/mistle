@@ -43,7 +43,7 @@
   "dependencies": {
     "@mistle/sandbox-session-protocol": "workspace:*",
     "@mistle/time": "workspace:*",
-    "ws": "^8.20.0"
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@types/ws": "^8.18.1"

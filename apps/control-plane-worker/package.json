@@ -36,13 +36,13 @@
     "@opentelemetry/api": "^1.9.0",
     "@openworkflow/cli": "^0.4.4",
     "drizzle-orm": "^0.45.2",
-    "liquidjs": "^10.25.7",
+    "liquidjs": "^10.27.0",
     "openworkflow": "^0.9.0",
     "pg": "^8.20.0",
     "postgres": "^3.4.9",
     "stripe": "^22.2.0",
     "typeid-js": "^1.2.0",
-    "ws": "^8.20.0",
+    "ws": "^8.21.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

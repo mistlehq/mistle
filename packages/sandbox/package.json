@@ -35,7 +35,7 @@
   "devDependencies": {
     "@mistle/config": "workspace:*",
     "@types/dockerode": "^4.0.1",
-    "testcontainers": "^11.14.0",
+    "testcontainers": "^12.0.1",
     "vitest": "^4.1.7"
   }
 }
