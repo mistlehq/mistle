@@ -16,6 +16,20 @@ type GatewayRelayPeerLookupOutcome =
   | "no_responders"
   | "timeout";
 type GatewayRelayLifecycleEvent = "started" | "stopped";
+type GatewayNatsConnectionStatus =
+  | "close"
+  | "disconnect"
+  | "error"
+  | "forceReconnect"
+  | "ldm"
+  | "ping"
+  | "reconnect"
+  | "reconnecting"
+  | "slowConsumer"
+  | "staleConnection"
+  | "update";
+type GatewayForwardingRequestOutcome = "succeeded" | "failed";
+type GatewayForwardingSelfCheckOutcome = "succeeded" | "failed";
 type GatewayForwardingPortAccessAuthorizationOutcome =
   | "authorized"
   | "rejected"
@@ -26,10 +40,14 @@ type GatewayRelayInstruments = {
   envelopeEvents: Counter;
   forwardingPortAccessAuthorizationDuration: Histogram;
   forwardingPortAccessAuthorizationEvents: Counter;
+  forwardingRequestDuration: Histogram;
+  forwardingRequestEvents: Counter;
+  forwardingSelfCheckEvents: Counter;
   payloadBytes: Histogram;
   peerLookupEvents: Counter;
   publishEncodedBytes: Histogram;
   publishEvents: Counter;
+  natsConnectionStatusEvents: Counter;
   subscriptionFailures: Counter;
 };
 
@@ -77,6 +95,22 @@ function getGatewayRelayInstruments(): GatewayRelayInstruments {
         unit: "ms",
       },
     ),
+    forwardingRequestEvents: meter.createCounter("mistle.gateway.forwarding.request.events", {
+      description: "Gateway forwarding NATS request outcomes observed by the data-plane gateway.",
+    }),
+    forwardingRequestDuration: meter.createHistogram(
+      "mistle.gateway.forwarding.request.duration_ms",
+      {
+        description: "Duration of gateway forwarding NATS requests.",
+        unit: "ms",
+      },
+    ),
+    forwardingSelfCheckEvents: meter.createCounter("mistle.gateway.forwarding.self_check.events", {
+      description: "Gateway forwarding local responder self-check outcomes.",
+    }),
+    natsConnectionStatusEvents: meter.createCounter("mistle.gateway.relay.nats.status.events", {
+      description: "NATS connection status events observed by the data-plane gateway.",
+    }),
   };
 
   return gatewayRelayInstruments;
@@ -221,6 +255,41 @@ export function recordGatewayRelayLifecycleEvent(input: {
   );
 }
 
+export function recordGatewayRelayNatsConnectionStatusEvent(input: {
+  error?: unknown;
+  localNodeId: string;
+  role: "relay" | "forwarding_self_check";
+  server?: string;
+  status: GatewayNatsConnectionStatus;
+}): void {
+  getGatewayRelayInstruments().natsConnectionStatusEvents.add(1, {
+    "mistle.gateway.relay.backend": "nats",
+    "mistle.gateway.relay.nats.connection_role": input.role,
+    "mistle.gateway.relay.nats.status": input.status,
+  });
+
+  const logData = {
+    eventName: "gateway.relay.nats.status",
+    error: input.error,
+    "mistle.gateway.node_id": input.localNodeId,
+    "mistle.gateway.relay.backend": "nats",
+    "mistle.gateway.relay.nats.connection_role": input.role,
+    "mistle.gateway.relay.nats.status": input.status,
+    ...(input.server === undefined
+      ? {}
+      : {
+          "mistle.gateway.relay.nats.server": input.server,
+        }),
+  };
+
+  if (input.status === "error" || input.status === "staleConnection") {
+    logger.warn(logData, "Gateway relay NATS connection status changed");
+    return;
+  }
+
+  logger.info(logData, "Gateway relay NATS connection status changed");
+}
+
 export function recordGatewayRelaySubscriptionFailure(input: {
   backend: GatewayRelayBackend;
   error: unknown;
@@ -284,6 +353,78 @@ export function recordGatewayForwardingPortAccessAuthorizationEvent(input: {
   logger.debug(logData, "Gateway forwarding Port Access authorization started");
 }
 
+export function recordGatewayForwardingRequestEvent(input: {
+  backend: GatewayRelayBackend;
+  durationMs: number;
+  error?: unknown;
+  localNodeId: string;
+  operation: string;
+  outcome: GatewayForwardingRequestOutcome;
+  reason?: string;
+  sandboxInstanceId: string;
+  sourceNodeId: string;
+  subject: string;
+  targetBootstrapSessionId: string;
+  targetNodeId: string;
+}): void {
+  const instruments = getGatewayRelayInstruments();
+  const attributes = buildGatewayForwardingRequestMetricAttributes(input);
+  instruments.forwardingRequestEvents.add(1, attributes);
+  instruments.forwardingRequestDuration.record(input.durationMs, attributes);
+
+  if (input.outcome === "succeeded") {
+    logger.debug(
+      buildGatewayForwardingRequestLogData(input),
+      "Gateway forwarding request completed",
+    );
+    return;
+  }
+
+  logger.warn(buildGatewayForwardingRequestLogData(input), "Gateway forwarding request failed");
+}
+
+export function recordGatewayForwardingSelfCheckEvent(input: {
+  backend: GatewayRelayBackend;
+  durationMs: number;
+  error?: unknown;
+  localNodeId: string;
+  outcome: GatewayForwardingSelfCheckOutcome;
+  reason?: string;
+  subject: string;
+}): void {
+  getGatewayRelayInstruments().forwardingSelfCheckEvents.add(1, {
+    "mistle.gateway.relay.backend": input.backend,
+    "mistle.gateway.forwarding.self_check.outcome": input.outcome,
+    ...(input.reason === undefined
+      ? {}
+      : {
+          "mistle.gateway.forwarding.self_check.reason": input.reason,
+        }),
+  });
+
+  const logData = {
+    eventName: "gateway.forwarding.self_check",
+    error: input.error,
+    "mistle.gateway.node_id": input.localNodeId,
+    "mistle.gateway.relay.backend": input.backend,
+    "mistle.gateway.forwarding.duration_ms": input.durationMs,
+    "mistle.gateway.forwarding.self_check.outcome": input.outcome,
+    "mistle.gateway.forwarding.subject": input.subject,
+    ...(input.reason === undefined
+      ? {}
+      : {
+          "mistle.gateway.forwarding.self_check.reason": input.reason,
+        }),
+  };
+
+  if (input.outcome === "succeeded") {
+    logger.debug(logData, "Gateway forwarding self-check completed");
+    return;
+  }
+
+  logger.warn(logData, "Gateway forwarding self-check failed");
+}
+
 export function buildRelayEnvelopeMetricAttributes(
   input: {
     backend: GatewayRelayBackend;
@@ -328,6 +469,59 @@ export function buildGatewayForwardingPortAccessAuthorizationMetricAttributes(in
       ? {}
       : {
           "mistle.gateway.forwarding.rejection_reason": input.rejectionReason,
+        }),
+  };
+}
+
+export function buildGatewayForwardingRequestMetricAttributes(input: {
+  backend: GatewayRelayBackend;
+  operation: string;
+  outcome: GatewayForwardingRequestOutcome;
+  reason?: string;
+}): Attributes {
+  return {
+    "mistle.gateway.relay.backend": input.backend,
+    "mistle.gateway.forwarding.operation": input.operation,
+    "mistle.gateway.forwarding.outcome": input.outcome,
+    ...(input.reason === undefined
+      ? {}
+      : {
+          "mistle.gateway.forwarding.reason": input.reason,
+        }),
+  };
+}
+
+export function buildGatewayForwardingRequestLogData(input: {
+  backend: GatewayRelayBackend;
+  durationMs: number;
+  error?: unknown;
+  localNodeId: string;
+  operation: string;
+  outcome: GatewayForwardingRequestOutcome;
+  reason?: string;
+  sandboxInstanceId: string;
+  sourceNodeId: string;
+  subject: string;
+  targetBootstrapSessionId: string;
+  targetNodeId: string;
+}): Record<string, unknown> {
+  return {
+    eventName: "gateway.forwarding.request",
+    error: input.error,
+    "mistle.gateway.node_id": input.localNodeId,
+    "mistle.gateway.relay.backend": input.backend,
+    "mistle.gateway.forwarding.duration_ms": input.durationMs,
+    "mistle.gateway.forwarding.operation": input.operation,
+    "mistle.gateway.forwarding.outcome": input.outcome,
+    "mistle.gateway.forwarding.source_node_id": input.sourceNodeId,
+    "mistle.gateway.forwarding.subject": input.subject,
+    "mistle.gateway.forwarding.target_bootstrap_session_id": input.targetBootstrapSessionId,
+    "mistle.gateway.forwarding.target_node_id": input.targetNodeId,
+    "mistle.sandbox.instance_id": input.sandboxInstanceId,
+    ...(input.reason === undefined
+      ? {}
+      : {
+          "mistle.gateway.forwarding.reason": input.reason,
         }),
   };
 }

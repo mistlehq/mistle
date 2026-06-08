@@ -1,3 +1,4 @@
+import type { Scheduler, TimerHandle } from "@mistle/time";
 import {
   ClosedConnectionError,
   DrainingConnectionError,
@@ -11,6 +12,8 @@ import { z } from "zod";
 
 import { BootstrapTunnelNotConnectedError } from "../../bootstrap-tunnel-not-connected-error.js";
 import {
+  recordGatewayForwardingRequestEvent,
+  recordGatewayForwardingSelfCheckEvent,
   recordGatewayForwardingPortAccessAuthorizationEvent,
   recordGatewayRelaySubscriptionFailure,
 } from "../../gateway-relay-observability.js";
@@ -39,6 +42,9 @@ import {
 
 const RequestTimeoutMs = 5_000;
 const MaxConcurrentForwardingResponses = 64;
+const DefaultSelfCheckIntervalMs = 30_000;
+const SelfCheckSandboxInstanceId = "__gateway_forwarding_self_check__";
+const SelfCheckSessionId = "__gateway_forwarding_self_check__";
 const TextDecoderInstance = new TextDecoder();
 const TextEncoderInstance = new TextEncoder();
 
@@ -326,6 +332,47 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
     await this.waitForActiveResponseTasks();
   }
 
+  public startSelfCheck(
+    connection: NatsConnection,
+    scheduler: Scheduler,
+    intervalMs = DefaultSelfCheckIntervalMs,
+  ): () => void {
+    let isStopped = false;
+    let isInFlight = false;
+    let timerHandle: TimerHandle | undefined;
+
+    const scheduleNextSelfCheck = (): void => {
+      if (isStopped) {
+        return;
+      }
+      timerHandle = scheduler.schedule(runSelfCheck, intervalMs);
+    };
+
+    const runSelfCheck = (): void => {
+      if (isStopped) {
+        return;
+      }
+      if (isInFlight) {
+        scheduleNextSelfCheck();
+        return;
+      }
+      isInFlight = true;
+      void this.checkLocalForwardingResponder(connection, () => isStopped).finally(() => {
+        isInFlight = false;
+        scheduleNextSelfCheck();
+      });
+    };
+
+    runSelfCheck();
+
+    return () => {
+      isStopped = true;
+      if (timerHandle !== undefined) {
+        scheduler.cancel(timerHandle);
+      }
+    };
+  }
+
   public async openInteractiveStream(
     target: GatewayForwardingTarget,
     input: OpenInteractiveStreamInput,
@@ -557,7 +604,15 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
       throw new Error("NATS gateway forwarding adapter has not been started.");
     }
 
+    return this.requestWithConnection(connection, request);
+  }
+
+  private async requestWithConnection(
+    connection: NatsConnection,
+    request: GatewayForwardingRequest,
+  ): Promise<GatewayForwardingResponse> {
     const subject = this.forwardingSubject(request.target.targetNodeId);
+    const startedAtMs = Date.now();
     let response;
     try {
       response = await connection.request(subject, encodeJson(request), {
@@ -566,6 +621,14 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
     } catch (error) {
       const unavailableReason = remoteGatewayUnavailableReason(error);
       if (unavailableReason !== undefined) {
+        this.recordForwardingRequest({
+          durationMs: Date.now() - startedAtMs,
+          error,
+          outcome: "failed",
+          reason: unavailableReason,
+          request,
+          subject,
+        });
         throw new GatewayForwardingUnavailableError(
           `Remote gateway forwarding is unavailable for sandbox '${request.input.sandboxInstanceId}' on node '${request.target.targetNodeId}'.`,
           {
@@ -577,10 +640,103 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
           },
         );
       }
+      this.recordForwardingRequest({
+        durationMs: Date.now() - startedAtMs,
+        error,
+        outcome: "failed",
+        reason: "unexpected_error",
+        request,
+        subject,
+      });
       throw error;
     }
 
-    return GatewayForwardingResponseSchema.parse(decodeJson(response.data));
+    const forwardingResponse = GatewayForwardingResponseSchema.parse(decodeJson(response.data));
+    this.recordForwardingRequest({
+      durationMs: Date.now() - startedAtMs,
+      outcome: "succeeded",
+      request,
+      subject,
+    });
+    return forwardingResponse;
+  }
+
+  private async checkLocalForwardingResponder(
+    connection: NatsConnection,
+    isStopped: () => boolean,
+  ): Promise<void> {
+    const subject = this.localForwardingSubject();
+    const startedAtMs = Date.now();
+    try {
+      await this.requestWithConnection(connection, {
+        operation: "findInteractiveStreamByClient",
+        target: {
+          sourceNodeId: this.nodeId,
+          targetNodeId: this.nodeId,
+          targetBootstrapSessionId: SelfCheckSessionId,
+        },
+        input: {
+          sandboxInstanceId: SelfCheckSandboxInstanceId,
+          clientSessionId: SelfCheckSessionId,
+          clientStreamId: 1,
+        },
+      });
+      recordGatewayForwardingSelfCheckEvent({
+        backend: "nats",
+        durationMs: Date.now() - startedAtMs,
+        localNodeId: this.nodeId,
+        outcome: "succeeded",
+        subject,
+      });
+    } catch (error) {
+      if (isStopped()) {
+        return;
+      }
+      recordGatewayForwardingSelfCheckEvent({
+        backend: "nats",
+        durationMs: Date.now() - startedAtMs,
+        error,
+        localNodeId: this.nodeId,
+        outcome: "failed",
+        reason:
+          error instanceof GatewayForwardingUnavailableError
+            ? error.details.reason
+            : "unexpected_error",
+        subject,
+      });
+    }
+  }
+
+  private recordForwardingRequest(input: {
+    durationMs: number;
+    error?: unknown;
+    outcome: "succeeded" | "failed";
+    reason?: string;
+    request: GatewayForwardingRequest;
+    subject: string;
+  }): void {
+    recordGatewayForwardingRequestEvent({
+      backend: "nats",
+      durationMs: input.durationMs,
+      localNodeId: this.nodeId,
+      operation: input.request.operation,
+      outcome: input.outcome,
+      sandboxInstanceId: input.request.input.sandboxInstanceId,
+      sourceNodeId: input.request.target.sourceNodeId,
+      subject: input.subject,
+      targetBootstrapSessionId: input.request.target.targetBootstrapSessionId,
+      targetNodeId: input.request.target.targetNodeId,
+      ...(input.error === undefined
+        ? {}
+        : {
+            error: input.error,
+          }),
+      ...(input.reason === undefined
+        ? {}
+        : {
+            reason: input.reason,
+          }),
+    });
   }
 
   private recordPortAccessAuthorizationCompleted(input: {
