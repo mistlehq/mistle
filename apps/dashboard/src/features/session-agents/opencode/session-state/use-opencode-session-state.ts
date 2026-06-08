@@ -322,24 +322,42 @@ async function hydrateConnectedOpenCodeChat(input: {
   dispatchChatAction: Dispatch<OpenCodeChatAction>;
   sessionId: string;
 }): Promise<void> {
-  let messages: readonly OpenCodeMessageWithParts[];
-  let pendingPermissions: readonly OpenCodePermissionRequest[];
   try {
-    messages = await input.client.listMessages({
+    const { messages, pendingPermissions } = await readOpenCodeChatHydrationData({
+      client: input.client,
+      ...(input.directory === undefined ? {} : { directory: input.directory }),
       sessionId: input.sessionId,
     });
-    pendingPermissions = await input.client.listPermissions({
-      ...(input.directory === undefined ? {} : { directory: input.directory }),
+    input.dispatchChatAction({
+      type: "hydrate_messages",
+      sessionId: input.sessionId,
+      messages,
+      pendingPermissions,
     });
   } catch (error) {
     throw new Error("Could not hydrate OpenCode messages.", { cause: error });
   }
-  input.dispatchChatAction({
-    type: "hydrate_messages",
+}
+
+async function readOpenCodeChatHydrationData(input: {
+  client: OpenCodeSessionClient;
+  directory?: string;
+  sessionId: string;
+}): Promise<{
+  messages: readonly OpenCodeMessageWithParts[];
+  pendingPermissions: readonly OpenCodePermissionRequest[];
+}> {
+  const messages = await input.client.listMessages({
+    ...(input.directory === undefined ? {} : { directory: input.directory }),
     sessionId: input.sessionId,
+  });
+  const pendingPermissions = await input.client.listPermissions({
+    ...(input.directory === undefined ? {} : { directory: input.directory }),
+  });
+  return {
     messages,
     pendingPermissions,
-  });
+  };
 }
 
 export function useOpenCodeSessionState(input: {
@@ -761,11 +779,10 @@ export function useOpenCodeSessionState(input: {
               });
             }
           })();
-          const messages = await client.listMessages({
-            sessionId: session.id,
-          });
-          const pendingPermissions = await client.listPermissions({
+          const { messages, pendingPermissions } = await readOpenCodeChatHydrationData({
+            client,
             ...(directory === undefined ? {} : { directory }),
+            sessionId: session.id,
           });
           if (generationRef.current !== generation) {
             return;
@@ -991,11 +1008,10 @@ export function useOpenCodeSessionState(input: {
           ...(directory === undefined ? {} : { directory }),
           sessionId,
         });
-        const messages = await client.listMessages({
-          sessionId: session.id,
-        });
-        const pendingPermissions = await client.listPermissions({
+        const { messages, pendingPermissions } = await readOpenCodeChatHydrationData({
+          client,
           ...(directory === undefined ? {} : { directory }),
+          sessionId: session.id,
         });
         if (sessionNavigationRequestSequenceRef.current !== navigationRequestId) {
           return session.id;
@@ -1061,11 +1077,10 @@ export function useOpenCodeSessionState(input: {
         const session = await client.createSession({
           ...(directory === undefined ? {} : { directory }),
         });
-        const messages = await client.listMessages({
-          sessionId: session.id,
-        });
-        const pendingPermissions = await client.listPermissions({
+        const { messages, pendingPermissions } = await readOpenCodeChatHydrationData({
+          client,
           ...(directory === undefined ? {} : { directory }),
+          sessionId: session.id,
         });
         const sessionPage = await listOpenCodeSessionPage({
           client,

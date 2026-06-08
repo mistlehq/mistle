@@ -423,6 +423,7 @@ describe("createOpenCodeSessionClient", () => {
     });
 
     const messagesPromise = client.listMessages({
+      directory: "/workspace/repo",
       sessionId: "ses_test",
     });
     const messagesRequest = await server.nextRequest();
@@ -453,7 +454,7 @@ describe("createOpenCodeSessionClient", () => {
     await expect(messagesPromise).resolves.toHaveLength(1);
     expect(messagesRequest.request).toMatchObject({
       method: "GET",
-      path: "/session/ses_test/message",
+      path: "/session/ses_test/message?directory=%2Fworkspace%2Frepo",
     });
   });
 
