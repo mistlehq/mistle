@@ -347,6 +347,9 @@ async function readOpenCodeChatHydrationData(input: {
   messages: readonly OpenCodeMessageWithParts[];
   pendingPermissions: readonly OpenCodePermissionRequest[];
 }> {
+  // Unlike Codex cwd, OpenCode directory scopes project/session reads. Keep
+  // message hydration directory-scoped so the selected repository matches
+  // OpenCode's own session.messages({ directory, sessionID }) contract.
   const messages = await input.client.listMessages({
     ...(input.directory === undefined ? {} : { directory: input.directory }),
     sessionId: input.sessionId,
