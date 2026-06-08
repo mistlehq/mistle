@@ -86,7 +86,7 @@ importers:
         version: 19.2.3(@types/react@19.2.14)
       '@typescript/native-preview':
         specifier: latest
-        version: 7.0.0-dev.20260604.1
+        version: 7.0.0-dev.20260605.1
       knip:
         specifier: ^6.11.0
         version: 6.11.0(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
@@ -408,8 +408,8 @@ importers:
         specifier: ^2.1.7
         version: 2.1.10(@types/react@19.2.16)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@pierre/diffs':
-        specifier: ^1.1.20
-        version: 1.1.20(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        specifier: ^1.2.5
+        version: 1.2.5(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@posthog/react':
         specifier: ^1.9.1
         version: 1.9.1(@types/react@19.2.16)(posthog-js@1.376.0)(react@19.2.5)
@@ -4684,14 +4684,14 @@ packages:
       react: '>= 16.8'
       react-dom: '>= 16.8'
 
-  '@pierre/diffs@1.1.20':
-    resolution: {integrity: sha512-lLi+3sLCm3QDd5/aLO9pw+WbF6UzhrkWm2oTZ5WZJTGemOyUNRJ4DDhcEKmVusu4C4bXx9Nssh6fF+wQcapb5w==}
+  '@pierre/diffs@1.2.5':
+    resolution: {integrity: sha512-uYOz3Kfs5ED0qY0VraUXzylsEKvZPTVdexboM3QKPx/qBZmTT9F3lKAFuPpY5aIrV04sdHtoFCKStyzEu99U2A==}
     peerDependencies:
       react: ^18.3.1 || ^19.0.0
       react-dom: ^18.3.1 || ^19.0.0
 
-  '@pierre/theme@0.0.28':
-    resolution: {integrity: sha512-1j/H/fECBuc9dEvntdWI+l435HZapw+RCJTlqCA6BboQ5TjlnE005j/ROWutXIs8aq5OAc82JI2Kwk4A1WWBgw==}
+  '@pierre/theme@1.0.3':
+    resolution: {integrity: sha512-sWHv11TMoqKxKDgTIk5VbhQjdPhs8DCcBxbjh3mRlS3YOM/OcrWoGX6MM8eBGn9cUu3M46Py0JnxsG2nJaFTuA==}
     engines: {vscode: ^1.0.0}
 
   '@pinojs/redact@0.4.0':
@@ -6405,50 +6405,50 @@ packages:
     resolution: {integrity: sha512-4h0tY8ppCkdCzcrl2YM5M3my0xsE1Tf8om3owEu5oPWmXwkKRmk0j0LGDzYBGUcAlesEbxBhazqu/K4cu3Ug7w==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260604.1':
-    resolution: {integrity: sha512-zs616um9UuaODLsNlCu5Aw95rFcTV4u3hVt090r6k0lVvTxfaJOv8HKA6BpIotcEYlZlMQowrMSYCCdedo7iyA==}
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260605.1':
+    resolution: {integrity: sha512-FR2ToauEC9dIAMV8OeTD7cXjgnpR09p1YZYrQzIpIOfzkg5FPccil+ca75BMbF0jT9h/0x+6+oy7JxzPO8sT+Q==}
     engines: {node: '>=16.20.0'}
     cpu: [arm64]
     os: [darwin]
 
-  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260604.1':
-    resolution: {integrity: sha512-pOdNAf2pwc9JBjo8gUsvLs5uqg7d0AhYXfE8/3zvPKBlIZG+mTcvEWW1hPawlWxXzf/vxnP4dgYwUHAMDghhKA==}
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260605.1':
+    resolution: {integrity: sha512-vkqJpLeVN5RTtl/ibzasCubv4bQn45KDZRt8hHhneeibw9mZzm+vuvMvH/z/F5Sg/t/nz5kXKdDfhT+CV7aHAA==}
     engines: {node: '>=16.20.0'}
     cpu: [x64]
     os: [darwin]
 
-  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260604.1':
-    resolution: {integrity: sha512-GjIrt6YHP3bbOWBCCE08SlBSDf84Lnjn3Td822/lOX9nm6ODlA/HI7rtGh7KzS/fxehep2Vy4dXU4Il12X1s5A==}
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260605.1':
+    resolution: {integrity: sha512-YYzUP7HlKNUzfHFND+CgrYpPPcQyrcYmV0GhjxxMVWvlhQe6SvmWQLcZdp8ZW0t1BDfvs+jMtL/lI85TiUpY2w==}
     engines: {node: '>=16.20.0'}
     cpu: [arm64]
     os: [linux]
 
-  '@typescript/native-preview-linux-arm@7.0.0-dev.20260604.1':
-    resolution: {integrity: sha512-IKaZL3i5HKmKqwb2IZEXW1j68fVg1HsvAaXkbrkOIG/J5Eyksu5tEnTzucrIY1oPdzgHT+y2HpDIYp2sGeHFvw==}
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20260605.1':
+    resolution: {integrity: sha512-gBsGhto81phtQHoQczJenb2aY2y4JVrgZDb7LPHQIEiFSEYe0uT6E1DR/ZT0XXdkLXn6wFBwcmoDLlDjo/uW2g==}
     engines: {node: '>=16.20.0'}
     cpu: [arm]
     os: [linux]
 
-  '@typescript/native-preview-linux-x64@7.0.0-dev.20260604.1':
-    resolution: {integrity: sha512-twQ7XDjsmaHIevN1MjeRYIVLUPL0fBm8A0jg1FhGYPckhTxEBiHIpJf9E//eFidAdrEHjeTSBP1jJw3GNAensg==}
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20260605.1':
+    resolution: {integrity: sha512-VRtSycQWdN2hMniqVXAzjWG5zgVwT9Yy+yk3O4qGJ+3ncFJ3nYu4VerupNNUNrmP4FFPViS8hjhQJbOUSuINXg==}
     engines: {node: '>=16.20.0'}
     cpu: [x64]
     os: [linux]
 
-  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260604.1':
-    resolution: {integrity: sha512-QBRxaVT3SFiNfOhwYb/56ddpHWPMFdfiJ4zkFJIjaAXeZ/ssWNHM9lH7yR++GrE9VTsUZ4eVSZfOmQbzRERhgw==}
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260605.1':
+    resolution: {integrity: sha512-fBvmDKqL10ST+FnryPLTD1lY8XbEiOYGSa6hi17jYJwCMZA6mLbYPre06lysOB1eO9oRM7N0zUsEQu57YiFWTw==}
     engines: {node: '>=16.20.0'}
     cpu: [arm64]
     os: [win32]
 
-  '@typescript/native-preview-win32-x64@7.0.0-dev.20260604.1':
-    resolution: {integrity: sha512-hR7YHoRpm88Q86gK6/IMayWUA+ROdHGzOPKK8EBp1xD/Cg2Bh5AXbut8HcyUDx/bcGQvnuht/XsW47bT3to9mg==}
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20260605.1':
+    resolution: {integrity: sha512-JDfR4uPr3ZJ7kfkEkPw2y4LvEVcnjLCRTCT9r3MxtYpKg0Oeg88E8TmDPbatVQ48GC9LlhLZ+4WSFSZRGUkIRA==}
     engines: {node: '>=16.20.0'}
     cpu: [x64]
     os: [win32]
 
-  '@typescript/native-preview@7.0.0-dev.20260604.1':
-    resolution: {integrity: sha512-A3/9yZTt2V5NlDURcVJ4mN2YjfeQTXCRyLuENKrNdGhO+y59mC/2UDr7UvpB3Li+83TRAuhDN8SBoM+7gkHdzQ==}
+  '@typescript/native-preview@7.0.0-dev.20260605.1':
+    resolution: {integrity: sha512-JWqt9yAOq2BTh6u6nXiEAfdJVO7akc2bD23OuEwdCcc5sANhp5T3Hgci85NVs9rIQwDh59lqU23phGIUvkc0CA==}
     engines: {node: '>=16.20.0'}
     hasBin: true
 
@@ -10675,6 +10675,9 @@ packages:
 
   property-information@7.1.0:
     resolution: {integrity: sha512-TwEZ+X+yCJmYfL7TPUOcvBZ4QfoT5YenQiJuX//0th53DE6w0xxLEtfK3iyryQFddXuvkIk51EEgrJQ0WJkOmQ==}
+
+  property-information@7.2.0:
+    resolution: {integrity: sha512-IAtzIB6sUiWaJYrX9smp3V46pBGbBeLFRGdh25kg1334VcBlD8HzhPeNIWQH9zhGmo2itIe25EHt9dQP7G5hmg==}
 
   proto-list@1.2.4:
     resolution: {integrity: sha512-vtK/94akxsTMhe0/cbfpR+syPuszcuwhqVjJq26CuNDgFGj682oRBXOP5MJpv2r7JtE8MsiepGIqvvOTBwn2vA==}
@@ -16390,9 +16393,9 @@ snapshots:
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
 
-  '@pierre/diffs@1.1.20(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
+  '@pierre/diffs@1.2.5(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
-      '@pierre/theme': 0.0.28
+      '@pierre/theme': 1.0.3
       '@shikijs/transformers': 3.23.0
       diff: 8.0.3
       hast-util-to-html: 9.0.5
@@ -16401,7 +16404,7 @@ snapshots:
       react-dom: 19.2.5(react@19.2.5)
       shiki: 3.23.0
 
-  '@pierre/theme@0.0.28': {}
+  '@pierre/theme@1.0.3': {}
 
   '@pinojs/redact@0.4.0': {}
 
@@ -18544,36 +18547,36 @@ snapshots:
 
   '@typescript-eslint/types@8.60.1': {}
 
-  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260604.1':
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260605.1':
     optional: true
 
-  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260604.1':
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260605.1':
     optional: true
 
-  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260604.1':
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260605.1':
     optional: true
 
-  '@typescript/native-preview-linux-arm@7.0.0-dev.20260604.1':
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20260605.1':
     optional: true
 
-  '@typescript/native-preview-linux-x64@7.0.0-dev.20260604.1':
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20260605.1':
     optional: true
 
-  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260604.1':
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260605.1':
     optional: true
 
-  '@typescript/native-preview-win32-x64@7.0.0-dev.20260604.1':
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20260605.1':
     optional: true
 
-  '@typescript/native-preview@7.0.0-dev.20260604.1':
+  '@typescript/native-preview@7.0.0-dev.20260605.1':
     optionalDependencies:
-      '@typescript/native-preview-darwin-arm64': 7.0.0-dev.20260604.1
-      '@typescript/native-preview-darwin-x64': 7.0.0-dev.20260604.1
-      '@typescript/native-preview-linux-arm': 7.0.0-dev.20260604.1
-      '@typescript/native-preview-linux-arm64': 7.0.0-dev.20260604.1
-      '@typescript/native-preview-linux-x64': 7.0.0-dev.20260604.1
-      '@typescript/native-preview-win32-arm64': 7.0.0-dev.20260604.1
-      '@typescript/native-preview-win32-x64': 7.0.0-dev.20260604.1
+      '@typescript/native-preview-darwin-arm64': 7.0.0-dev.20260605.1
+      '@typescript/native-preview-darwin-x64': 7.0.0-dev.20260605.1
+      '@typescript/native-preview-linux-arm': 7.0.0-dev.20260605.1
+      '@typescript/native-preview-linux-arm64': 7.0.0-dev.20260605.1
+      '@typescript/native-preview-linux-x64': 7.0.0-dev.20260605.1
+      '@typescript/native-preview-win32-arm64': 7.0.0-dev.20260605.1
+      '@typescript/native-preview-win32-x64': 7.0.0-dev.20260605.1
 
   '@typescript/vfs@1.6.4(typescript@6.0.3)':
     dependencies:
@@ -21059,7 +21062,7 @@ snapshots:
       '@types/unist': 3.0.3
       devlop: 1.1.0
       hastscript: 9.0.1
-      property-information: 7.1.0
+      property-information: 7.2.0
       vfile: 6.0.3
       vfile-location: 5.0.3
       web-namespaces: 2.0.1
@@ -21174,7 +21177,7 @@ snapshots:
       mdast-util-mdx-expression: 2.0.1
       mdast-util-mdx-jsx: 3.2.0
       mdast-util-mdxjs-esm: 2.0.1
-      property-information: 7.1.0
+      property-information: 7.2.0
       space-separated-tokens: 2.0.2
       style-to-js: 1.1.21
       unist-util-position: 5.0.0
@@ -21205,7 +21208,7 @@ snapshots:
       hast-util-whitespace: 3.0.0
       html-void-elements: 3.0.0
       mdast-util-to-hast: 13.2.1
-      property-information: 7.1.0
+      property-information: 7.2.0
       space-separated-tokens: 2.0.2
       stringify-entities: 4.0.4
       zwitch: 2.0.4
@@ -21252,7 +21255,7 @@ snapshots:
       '@types/hast': 3.0.4
       comma-separated-tokens: 2.0.3
       devlop: 1.1.0
-      property-information: 7.1.0
+      property-information: 7.2.0
       space-separated-tokens: 2.0.2
       web-namespaces: 2.0.1
       zwitch: 2.0.4
@@ -21277,7 +21280,7 @@ snapshots:
       '@types/hast': 3.0.4
       comma-separated-tokens: 2.0.3
       hast-util-parse-selector: 4.0.0
-      property-information: 7.1.0
+      property-information: 7.2.0
       space-separated-tokens: 2.0.2
 
   hermes-estree@0.25.1: {}
@@ -23602,6 +23605,8 @@ snapshots:
   property-information@6.5.0: {}
 
   property-information@7.1.0: {}
+
+  property-information@7.2.0: {}
 
   proto-list@1.2.4: {}
 
