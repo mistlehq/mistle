@@ -381,6 +381,9 @@ const dataPlaneGatewayEnvConfig = {
     websocketPingIntervalMs: 10_000,
     websocketPongTimeoutMs: 10_000,
   },
+  portAccess: {
+    authorizationTimeoutMs: 5_000,
+  },
   dataPlaneApi: {
     baseUrl: "http://127.0.0.1:5002",
   },
@@ -936,6 +939,7 @@ describe("loadConfig integrations", () => {
         MISTLE_SERVICES_DATA_PLANE_GATEWAY_PORT: "5303",
         MISTLE_SERVICES_DATA_PLANE_GATEWAY_HEALTH_WEBSOCKET_PING_INTERVAL_MS: "100",
         MISTLE_SERVICES_DATA_PLANE_GATEWAY_HEALTH_WEBSOCKET_PONG_TIMEOUT_MS: "250",
+        MISTLE_SERVICES_DATA_PLANE_GATEWAY_PORT_ACCESS_AUTHORIZATION_TIMEOUT_MS: "300",
       }),
     });
 
@@ -950,6 +954,9 @@ describe("loadConfig integrations", () => {
         health: {
           websocketPingIntervalMs: 100,
           websocketPongTimeoutMs: 250,
+        },
+        portAccess: {
+          authorizationTimeoutMs: 300,
         },
       },
     });
@@ -973,6 +980,7 @@ describe("loadConfig integrations", () => {
         database: dataPlaneGatewayEnvConfig.database,
         runtimeState: dataPlaneGatewayEnvConfig.runtimeState,
         health: dataPlaneGatewayEnvConfig.health,
+        portAccess: dataPlaneGatewayEnvConfig.portAccess,
         dataPlaneApi: dataPlaneGatewayEnvConfig.dataPlaneApi,
         controlPlaneApi: dataPlaneGatewayEnvConfig.controlPlaneApi,
         internalAuth: dataPlaneGatewayEnvConfig.internalAuth,
