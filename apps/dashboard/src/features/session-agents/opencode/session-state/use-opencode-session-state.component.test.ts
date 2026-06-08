@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 
-import type { OpenCodeProviderSummary } from "@mistle/integrations-definitions/agent-runtimes/opencode/client";
+import type {
+  OpenCodeMessageWithParts,
+  OpenCodeProviderSummary,
+} from "@mistle/integrations-definitions/agent-runtimes/opencode/client";
 import { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { createNodeSandboxSessionRuntime } from "@mistle/sandbox-session-client/node";
 import {
@@ -415,6 +418,46 @@ function createOpenCodeProviderCatalogResponse(): {
   };
 }
 
+function createAssistantMessageWithContextUsage(input: {
+  cost: number;
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+}): OpenCodeMessageWithParts {
+  return {
+    info: {
+      agent: "build",
+      cost: input.cost,
+      id: "msg_assistant_usage",
+      mode: "build",
+      modelID: "gpt-5",
+      parentID: "msg_user",
+      path: {
+        cwd: "/workspace",
+        root: "/workspace",
+      },
+      providerID: "openai",
+      role: "assistant",
+      sessionID: "ses_test",
+      time: {
+        created: 2,
+      },
+      tokens: {
+        input: input.inputTokens,
+        output: input.outputTokens,
+        reasoning: input.reasoningTokens,
+        cache: {
+          read: input.cacheReadTokens,
+          write: input.cacheWriteTokens,
+        },
+      },
+    },
+    parts: [],
+  };
+}
+
 function expectOpenCodeSandboxSessionsRequest(request: ObservedOpenCodeProxyRequest): void {
   expect(request.request).toMatchObject({
     method: "GET",
@@ -435,6 +478,7 @@ async function connectOpenCodeSessionForTest(input: {
     template: string;
   }[];
   initialCwd?: string;
+  messagesBody?: readonly OpenCodeMessageWithParts[];
   navigatorSessionListBody?: readonly ReturnType<typeof createSessionResponse>[];
   providerSessionId?: string;
   result: { current: ReturnType<typeof useOpenCodeSessionState> };
@@ -544,7 +588,7 @@ async function connectOpenCodeSessionForTest(input: {
   });
   input.server.sendJsonResponse({
     request: messagesRequest,
-    body: [],
+    body: input.messagesBody ?? [],
   });
 
   const permissionsRequest = await input.server.nextRequest();
@@ -605,6 +649,49 @@ describe("useOpenCodeSessionState", () => {
         isDefault: true,
       },
     ]);
+  });
+
+  it("derives context usage from hydrated OpenCode messages and the provider catalog", async () => {
+    const server = await startOpenCodeProxyTransportServer();
+    const transport = await connectTransport(server);
+    const { result } = renderHook(() =>
+      useOpenCodeSessionState({
+        ensureTransportConnected: async () => {
+          return {
+            sandboxInstanceId: "sbi_123",
+            transport,
+          };
+        },
+      }),
+    );
+
+    const permissionsRequest = await connectOpenCodeSessionForTest({
+      messagesBody: [
+        createAssistantMessageWithContextUsage({
+          cost: 1.25,
+          inputTokens: 30_000,
+          outputTokens: 5_000,
+          reasoningTokens: 3_000,
+          cacheReadTokens: 2_000,
+          cacheWriteTokens: 0,
+        }),
+      ],
+      result,
+      sandboxInstanceId: "sbi_123",
+      server,
+      sessionId: "ses_test",
+    });
+    server.sendJsonResponse({
+      request: permissionsRequest,
+      body: [],
+    });
+
+    await waitFor(() => {
+      expect(result.current.contextUsage).toEqual({
+        label: "Context 40% used",
+        title: "40,000 used of 100,000 window, $1.25 total cost",
+      });
+    });
   });
 
   it("resolves the original OpenCode session from explicit provider identity before creation order", () => {
