@@ -30,6 +30,7 @@ import type { InteractiveStreamRouter } from "../gateway-forwarding/index.js";
 import {
   GatewayForwardingPortAccessAuthorizationError,
   GatewayForwardingPortAccessAuthorizationErrorCodes,
+  GatewayForwardingUnavailableError,
 } from "../gateway-forwarding/types.js";
 import {
   TunnelSessionBindingLimitExceededError,
@@ -264,6 +265,7 @@ function createInvalidStreamDataResetPayload(input: {
 function toStreamOpenErrorPayload(input: { error: Error; streamId: number }): string {
   if (
     input.error instanceof BootstrapTunnelNotConnectedError ||
+    input.error instanceof GatewayForwardingUnavailableError ||
     (input.error instanceof GatewayForwardingPortAccessAuthorizationError &&
       input.error.code ===
         GatewayForwardingPortAccessAuthorizationErrorCodes.BOOTSTRAP_NOT_CONNECTED)

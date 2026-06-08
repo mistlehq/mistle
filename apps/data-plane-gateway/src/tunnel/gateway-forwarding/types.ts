@@ -62,6 +62,16 @@ export type GatewayForwardingTarget = {
   targetBootstrapSessionId: string;
 };
 
+export type GatewayForwardingOperation =
+  | "openInteractiveStream"
+  | "findInteractiveStreamByClient"
+  | "findInteractiveStreamByTunnel"
+  | "closeInteractiveStream"
+  | "releaseClientSessionStreams"
+  | "authorizePortAccessTarget"
+  | "openPortAccessStream"
+  | "releasePortAccessStream";
+
 export type InteractiveStreamRoute = {
   bootstrapTarget: RelayTarget;
   binding: ClientStreamBinding;
@@ -93,6 +103,26 @@ export class GatewayForwardingPortAccessAuthorizationError extends Error {
   public constructor(
     public readonly code: GatewayForwardingPortAccessAuthorizationErrorCode,
     message: string,
+  ) {
+    super(message);
+  }
+}
+
+export type GatewayForwardingUnavailableReason =
+  | "connection_closed"
+  | "connection_draining"
+  | "no_responders";
+
+export class GatewayForwardingUnavailableError extends Error {
+  public constructor(
+    message: string,
+    public readonly details: {
+      operation: GatewayForwardingOperation;
+      reason: GatewayForwardingUnavailableReason;
+      sandboxInstanceId: string;
+      subject: string;
+      target: GatewayForwardingTarget;
+    },
   ) {
     super(message);
   }
