@@ -36,6 +36,10 @@ describe("integrations-definitions server", () => {
       familyId: "datadog",
       variantId: "datadog-default",
     });
+    const cloudflareDefinition = registry.getDefinition({
+      familyId: "cloudflare",
+      variantId: "cloudflare-mcp",
+    });
     const gcpDefinition = registry.getDefinition({
       familyId: "gcp",
       variantId: "gcp-mcp",
@@ -168,6 +172,9 @@ describe("integrations-definitions server", () => {
     expect(datadogDefinition?.webhookHandler).toBeUndefined();
     expect(datadogDefinition?.webhookSource).toBeUndefined();
     expect(datadogDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(cloudflareDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(cloudflareDefinition?.webhookHandler).toBeUndefined();
+    expect(cloudflareDefinition?.webhookSource).toBeUndefined();
     expect(gcpDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(gcpDefinition?.webhookHandler).toBeUndefined();
     expect(gcpDefinition?.webhookSource).toBeUndefined();
@@ -226,7 +233,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(16);
+    expect(definitions).toHaveLength(17);
   });
 
   it("builds the server definitions bundle with an agent runtime registry", () => {

@@ -21,6 +21,10 @@ describe("integrations-definitions index", () => {
       familyId: "datadog",
       variantId: "datadog-default",
     });
+    const cloudflareDefinition = registry.getDefinition({
+      familyId: "cloudflare",
+      variantId: "cloudflare-mcp",
+    });
     const gcpDefinition = registry.getDefinition({
       familyId: "gcp",
       variantId: "gcp-mcp",
@@ -126,6 +130,28 @@ describe("integrations-definitions index", () => {
       ],
     });
     expect(datadogDefinition?.mcp).toBeDefined();
+    expect(cloudflareDefinition).toMatchObject({
+      familyId: "cloudflare",
+      variantId: "cloudflare-mcp",
+      kind: "connector",
+      displayName: "Cloudflare",
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "API token",
+          kind: "form",
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "Cloudflare API token",
+              inputType: "password",
+              slotKey: "cloudflare.cloudflare-mcp.api-key.api-key",
+            },
+          ],
+        },
+      ],
+    });
+    expect(cloudflareDefinition?.mcp).toBeDefined();
     expect(gcpDefinition).toMatchObject({
       familyId: "gcp",
       variantId: "gcp-mcp",
@@ -691,12 +717,13 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(16);
+    expect(definitions).toHaveLength(17);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
       "anthropic::anthropic-default",
       "aws::aws-cli-default",
+      "cloudflare::cloudflare-mcp",
       "datadog::datadog-default",
       "gcp::gcp-mcp",
       "jira::jira-default",

@@ -6,6 +6,7 @@ import {
 
 import { AnthropicDefinition } from "./anthropic/index.js";
 import { AwsBaseDefinition } from "./aws/variants/aws-cli-default/base-definition.js";
+import { CloudflareDefinition } from "./cloudflare/variants/cloudflare-mcp/definition.js";
 import { DatadogDefinition } from "./datadog/index.js";
 import { GcpMcpBaseDefinition } from "./gcp/variants/gcp-mcp/base-definition.js";
 import { GitHubCloudBaseDefinition } from "./github/variants/github-cloud/base-definition.js";
@@ -25,6 +26,7 @@ import { SignozMcpBaseDefinition } from "./signoz/variants/signoz-mcp/base-defin
 import { SlackBaseDefinition } from "./slack/variants/slack-default/base-definition.js";
 export const AnthropicBrowserDefinition = AnthropicDefinition;
 export const AwsBrowserDefinition = AwsBaseDefinition;
+export const CloudflareBrowserDefinition = CloudflareDefinition;
 export const DatadogBrowserDefinition = DatadogDefinition;
 export const GcpBrowserDefinition = GcpMcpBaseDefinition;
 export const GitHubCloudBrowserDefinition = GitHubCloudBaseDefinition;
@@ -42,6 +44,7 @@ export const SlackBrowserDefinition = SlackBaseDefinition;
 const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   AnthropicBrowserDefinition,
   AwsBrowserDefinition,
+  CloudflareBrowserDefinition,
   DatadogBrowserDefinition,
   GcpBrowserDefinition,
   JiraBrowserDefinition,
@@ -77,6 +80,7 @@ export function createBrowserDefinitionsBundle(): IntegrationDefinitionsBundle {
 
 export * from "./anthropic/index.js";
 export * from "./agent-runtimes/provider-selection.js";
+export * from "./cloudflare/browser.js";
 export * from "./datadog/index.js";
 export * from "./gcp/browser.js";
 export * from "./github/browser.js";

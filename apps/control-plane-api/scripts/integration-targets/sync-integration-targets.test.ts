@@ -24,6 +24,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "cloudflare-mcp",
+        familyId: "cloudflare",
+        variantId: "cloudflare-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "datadog-default",
         familyId: "datadog",
         variantId: "datadog-default",
