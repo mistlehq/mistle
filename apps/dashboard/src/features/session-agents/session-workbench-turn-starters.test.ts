@@ -3,10 +3,15 @@ import { describe, expect, it } from "vitest";
 
 import { createInitialPiChatState, type PiChatState } from "./pi/session-state/pi-chat-state.js";
 import {
+  buildOpenCodeTurnSteerer,
   buildPiTurnQueuer,
   buildPiTurnStarter,
   shouldGenerateInitialSessionTitle,
 } from "./session-workbench-turn-starters.js";
+
+type OpenCodeSteerPromptInput = Parameters<
+  Parameters<typeof buildOpenCodeTurnSteerer>[0]["chat"]["sendPrompt"]
+>[0];
 
 function createPiChatState(input?: { messages?: PiChatState["messages"] }): PiChatState {
   return {
@@ -166,6 +171,70 @@ describe("buildPiTurnStarter", () => {
     });
 
     expect(generationInputs).toEqual([]);
+  });
+});
+
+describe("buildOpenCodeTurnSteerer", () => {
+  it("steers OpenCode with the selected repository, model, variant, transcript prompt, and attachments", async () => {
+    const sentPrompts: OpenCodeSteerPromptInput[] = [];
+    const steerTurn = buildOpenCodeTurnSteerer({
+      chat: {
+        sendPrompt: async (input) => {
+          sentPrompts.push(input);
+        },
+      },
+      modelSelection: {
+        hasExplicitModelSelection: true,
+        selectedModel: "openai/gpt-5",
+        selectedReasoningEffort: "high",
+      },
+      selectedRepositoryPath: "/workspace/project",
+    });
+
+    await steerTurn({
+      submittedPrompt: "Keep going @notes.txt",
+      transcriptPrompt: "Keep going\n\nAttached files:\n- notes.txt",
+      uploadedAttachments: [
+        {
+          attachmentId: "attachment_1",
+          kind: "file",
+          mimeType: "text/plain",
+          originalFilename: "notes.txt",
+          path: "/tmp/mistle/uploads/notes.txt",
+          sizeBytes: 123,
+          threadId: "thread_1",
+        },
+      ],
+    });
+
+    expect(sentPrompts).toEqual([
+      {
+        directory: "/workspace/project",
+        model: {
+          modelID: "gpt-5",
+          providerID: "openai",
+        },
+        submittedPrompt: "Keep going\n\nAttached files:\n- notes.txt",
+        submittedAttachments: [
+          {
+            type: "file",
+            filename: "notes.txt",
+            mime: "text/plain",
+            url: "file:///tmp/mistle/uploads/notes.txt",
+            source: {
+              type: "file",
+              path: "/tmp/mistle/uploads/notes.txt",
+              text: {
+                value: "@notes.txt",
+                start: 0,
+                end: 10,
+              },
+            },
+          },
+        ],
+        variant: "high",
+      },
+    ]);
   });
 });
 

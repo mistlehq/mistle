@@ -27,7 +27,7 @@ describe("SessionRuntimeWorkbenchCapabilities", () => {
         required: false,
         showControls: true,
       },
-      supportsSteering: false,
+      supportsSteering: true,
       preservesCliLaunchContext: true,
       hasContextUsage: false,
     });

@@ -759,6 +759,32 @@ export const OpenCodePromptCommands: Story = {
   },
 };
 
+export const OpenCodeActiveTurnSteering: Story = {
+  args: {
+    composerText: "Keep the current implementation path and add the missing coverage.",
+    modelOptions: [
+      {
+        value: "openai/gpt-5.3-codex",
+        label: "OpenAI / GPT-5.3 Codex (default)",
+      },
+      {
+        value: "anthropic/claude-sonnet-4-5",
+        label: "Anthropic / Claude Sonnet 4.5",
+      },
+    ],
+    selectedModel: "openai/gpt-5.3-codex",
+    selectedReasoningEffort: null,
+    showReasoningControl: false,
+    submitMode: "steer",
+    submitLabel: "Steer",
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByRole("button", { name: "Steer" })).toBeVisible();
+  },
+};
+
 export const SteeringTurnShortcutHover: Story = {
   args: {
     composerText: "Focus only on Storybook asset ownership.",

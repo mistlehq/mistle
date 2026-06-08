@@ -223,6 +223,9 @@ function createOpenCodeRuntimeInput(reportedMessages: string[]): OpenCodeRuntime
     startTurn: async () => {
       return;
     },
+    steerTurn: async () => {
+      return;
+    },
   };
 }
 
@@ -459,6 +462,76 @@ describe("buildCodexConversationRuntime", () => {
 });
 
 describe("buildOpenCodeConversationRuntime", () => {
+  it("exposes OpenCode active-turn steering when the session is busy", () => {
+    const input = createOpenCodeRuntimeInput([]);
+    input.chat.chatState.status = "busy";
+    const runtime = buildOpenCodeConversationRuntime(input);
+
+    expect(runtime.composerRuntimeInput.turnControl.activeTurnState).toBe("running");
+    expect(runtime.composerRuntimeInput.turnControl.canSteer).toBe(true);
+  });
+
+  it("does not expose OpenCode steering when the session is idle", () => {
+    const runtime = buildOpenCodeConversationRuntime(createOpenCodeRuntimeInput([]));
+
+    expect(runtime.composerRuntimeInput.turnControl.activeTurnState).toBe("idle");
+    expect(runtime.composerRuntimeInput.turnControl.canSteer).toBe(false);
+  });
+
+  it("routes OpenCode steering to the runtime-native steerer", async () => {
+    const steeredPrompts: Parameters<OpenCodeRuntimeInput["steerTurn"]>[0][] = [];
+    const input = createOpenCodeRuntimeInput([]);
+    input.chat.chatState.status = "busy";
+    input.steerTurn = async (turnInput) => {
+      steeredPrompts.push(turnInput);
+    };
+    const runtime = buildOpenCodeConversationRuntime(input);
+
+    await runtime.composerRuntimeInput.turnControl.steerTurn({
+      submittedPrompt: "Keep going @notes.txt",
+      transcriptPrompt: "Keep going\n\nAttached files:\n- notes.txt",
+      uploadedAttachments: [
+        {
+          attachmentId: "attachment_1",
+          kind: "file",
+          mimeType: "text/plain",
+          originalFilename: "notes.txt",
+          path: "/tmp/mistle/uploads/notes.txt",
+          sizeBytes: 123,
+          threadId: "thread_1",
+        },
+      ],
+    });
+
+    expect(steeredPrompts).toEqual([
+      {
+        submittedPrompt: "Keep going @notes.txt",
+        transcriptPrompt: "Keep going\n\nAttached files:\n- notes.txt",
+        uploadedAttachments: [
+          {
+            attachmentId: "attachment_1",
+            kind: "file",
+            mimeType: "text/plain",
+            originalFilename: "notes.txt",
+            path: "/tmp/mistle/uploads/notes.txt",
+            sizeBytes: 123,
+            threadId: "thread_1",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("uses the OpenCode prompt request state as active-turn steering progress", () => {
+    const input = createOpenCodeRuntimeInput([]);
+    input.chat.chatState.status = "busy";
+    input.chat.isStartingTurn = true;
+
+    const runtime = buildOpenCodeConversationRuntime(input);
+
+    expect(runtime.composerRuntimeInput.turnControl.isSteering).toBe(true);
+  });
+
   it("does not expose runtime command execution", () => {
     const runtime = buildOpenCodeConversationRuntime(createOpenCodeRuntimeInput([]));
 

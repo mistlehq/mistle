@@ -35,6 +35,32 @@ type OpenCodeTurnStarterModelSelection = Pick<
   "hasExplicitModelSelection" | "selectedModel" | "selectedReasoningEffort"
 >;
 
+type OpenCodeTurnInput = Parameters<SessionTurnControl["startTurn"]>[0];
+
+async function sendOpenCodeTurnPrompt(input: {
+  chat: Pick<UseOpenCodeSessionStateResult["chat"], "sendPrompt">;
+  modelSelection: OpenCodeTurnStarterModelSelection;
+  selectedRepositoryPath: string | null;
+  turnInput: OpenCodeTurnInput;
+}): Promise<void> {
+  const selectedOpenCodeModel = resolveOpenCodePromptModelOverride(
+    input.modelSelection.hasExplicitModelSelection,
+    input.modelSelection.selectedModel,
+  );
+  const selectedOpenCodeVariant = resolveOpenCodePromptVariantOverride(
+    input.modelSelection.selectedReasoningEffort,
+  );
+  const attachmentParts = buildOpenCodeAttachmentParts(input.turnInput.uploadedAttachments ?? []);
+
+  await input.chat.sendPrompt({
+    ...(input.selectedRepositoryPath === null ? {} : { directory: input.selectedRepositoryPath }),
+    ...(selectedOpenCodeModel === undefined ? {} : { model: selectedOpenCodeModel }),
+    ...(selectedOpenCodeVariant === undefined ? {} : { variant: selectedOpenCodeVariant }),
+    submittedAttachments: attachmentParts,
+    submittedPrompt: input.turnInput.transcriptPrompt ?? input.turnInput.submittedPrompt,
+  });
+}
+
 export function shouldGenerateInitialSessionTitle(input: {
   cachedTitle: string | null | undefined;
   messageCount: number;
@@ -102,21 +128,15 @@ export function buildOpenCodeTurnStarter(input: {
       cachedTitle: input.cachedTitle,
       messageCount: input.chat.chatState.messageOrder.length,
     });
-    const selectedOpenCodeModel = resolveOpenCodePromptModelOverride(
-      input.modelSelection.hasExplicitModelSelection,
-      input.modelSelection.selectedModel,
-    );
-    const selectedOpenCodeVariant = resolveOpenCodePromptVariantOverride(
-      input.modelSelection.selectedReasoningEffort,
-    );
-    const attachmentParts = buildOpenCodeAttachmentParts(turnInput.uploadedAttachments ?? []);
-
-    await input.chat.sendPrompt({
-      ...(input.selectedRepositoryPath === null ? {} : { directory: input.selectedRepositoryPath }),
-      ...(selectedOpenCodeModel === undefined ? {} : { model: selectedOpenCodeModel }),
-      ...(selectedOpenCodeVariant === undefined ? {} : { variant: selectedOpenCodeVariant }),
-      submittedAttachments: attachmentParts,
-      submittedPrompt: messagePayload,
+    await sendOpenCodeTurnPrompt({
+      chat: input.chat,
+      modelSelection: input.modelSelection,
+      selectedRepositoryPath: input.selectedRepositoryPath,
+      turnInput: {
+        ...turnInput,
+        submittedPrompt: messagePayload,
+        transcriptPrompt: messagePayload,
+      },
     });
 
     if (!shouldGenerateSessionTitle || sandboxInstanceId === null) {
@@ -133,6 +153,21 @@ export function buildOpenCodeTurnStarter(input: {
         });
       },
       queryClient: input.queryClient,
+    });
+  };
+}
+
+export function buildOpenCodeTurnSteerer(input: {
+  chat: Pick<UseOpenCodeSessionStateResult["chat"], "sendPrompt">;
+  modelSelection: OpenCodeTurnStarterModelSelection;
+  selectedRepositoryPath: string | null;
+}): SessionTurnControl["steerTurn"] {
+  return async (turnInput): Promise<void> => {
+    await sendOpenCodeTurnPrompt({
+      chat: input.chat,
+      modelSelection: input.modelSelection,
+      selectedRepositoryPath: input.selectedRepositoryPath,
+      turnInput,
     });
   };
 }

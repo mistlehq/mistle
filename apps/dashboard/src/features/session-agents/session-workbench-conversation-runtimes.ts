@@ -260,6 +260,7 @@ export function buildOpenCodeConversationRuntime(input: {
   sessionMessage: UseOpenCodeSessionStateResult["sessionMessage"];
   sessionSnapshot: UseOpenCodeSessionStateResult["lifecycle"]["sessionSnapshot"];
   startTurn: SessionTurnControl["startTurn"];
+  steerTurn: SessionTurnControl["steerTurn"];
 }): SessionWorkbenchRuntimeAdapter {
   const capabilities = SessionRuntimeWorkbenchCapabilities.OPENCODE;
   const isTurnRunning = input.chat.chatState.status === "busy";
@@ -300,18 +301,16 @@ export function buildOpenCodeConversationRuntime(input: {
       turnControl: {
         activeTurnState: isTurnRunning ? "running" : "idle",
         canInterrupt: input.chat.canInterruptTurn,
-        canSteer: capabilities.supportsSteering,
+        canSteer: capabilities.supportsSteering && isTurnRunning,
         completedTurnErrorMessage: input.chat.chatState.completedErrorMessage,
         interruptTurn: (): void => {
           void input.chat.abortSession();
         },
         isInterrupting: input.chat.isInterruptingTurn,
         isStarting: input.chat.isStartingTurn,
-        isSteering: false,
+        isSteering: isTurnRunning && input.chat.isStartingTurn,
         startTurn: input.startTurn,
-        steerTurn: async (): Promise<void> => {
-          throw new Error("OpenCode does not support steering an active turn.");
-        },
+        steerTurn: input.steerTurn,
       },
       sessionErrorMessage: input.sessionMessage.sessionErrorMessage,
       clearSessionErrorMessage: input.sessionMessage.clearSessionErrorMessage,

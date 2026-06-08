@@ -27,6 +27,7 @@ import {
 import {
   buildCodexTurnStarter,
   buildOpenCodeTurnStarter,
+  buildOpenCodeTurnSteerer,
   buildPiTurnQueuer,
   buildPiTurnStarter,
   buildPiTurnSteerer,
@@ -381,6 +382,25 @@ export function useSessionWorkbenchConversationRuntime(input: {
       openCodeSessionState.commands.sendPromptCommand,
     ],
   );
+  const steerOpenCodeTurn = useMemo<SessionTurnControl["steerTurn"]>(
+    () =>
+      buildOpenCodeTurnSteerer({
+        chat: openCodeSessionState.chat,
+        modelSelection: {
+          hasExplicitModelSelection: openCodeConfigControl.hasExplicitModelSelection,
+          selectedModel: openCodeConfigControl.selectedModel,
+          selectedReasoningEffort: openCodeConfigControl.selectedReasoningEffort,
+        },
+        selectedRepositoryPath: input.selectedRepositoryPath,
+      }),
+    [
+      input.selectedRepositoryPath,
+      openCodeConfigControl.hasExplicitModelSelection,
+      openCodeConfigControl.selectedModel,
+      openCodeConfigControl.selectedReasoningEffort,
+      openCodeSessionState.chat,
+    ],
+  );
   const startPiTurn = useMemo<SessionTurnControl["startTurn"]>(
     () =>
       buildPiTurnStarter({
@@ -486,6 +506,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
         sessionMessage: openCodeSessionState.sessionMessage,
         sessionSnapshot: openCodeSessionState.lifecycle.sessionSnapshot,
         startTurn: startOpenCodeTurn,
+        steerTurn: steerOpenCodeTurn,
       }),
     [
       openCodeComposerBootstrap,
@@ -503,6 +524,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
       openCodeSessionState.sessionMessage.reportSessionErrorMessage,
       openCodeSessionState.sessionMessage.sessionErrorMessage,
       startOpenCodeTurn,
+      steerOpenCodeTurn,
     ],
   );
   const piRuntime = useMemo<SessionWorkbenchRuntimeAdapter>(
