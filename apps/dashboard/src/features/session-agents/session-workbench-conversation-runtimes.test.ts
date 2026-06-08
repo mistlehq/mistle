@@ -207,6 +207,7 @@ function createOpenCodeRuntimeInput(reportedMessages: string[]): OpenCodeRuntime
       },
     },
     configControl: ComposerConfigControl,
+    contextUsage: null,
     executePromptCommand: async () => {
       return;
     },
@@ -463,6 +464,20 @@ describe("buildOpenCodeConversationRuntime", () => {
     const runtime = buildOpenCodeConversationRuntime(createOpenCodeRuntimeInput([]));
 
     expect("executeRuntimeCommand" in runtime.composerRuntimeInput).toBe(false);
+  });
+
+  it("exposes OpenCode context usage through the shared composer contract", () => {
+    const input = createOpenCodeRuntimeInput([]);
+    input.contextUsage = {
+      label: "Context 40% used",
+      title: "400 used of 1,000 window, $1.75 total cost",
+    };
+    const runtime = buildOpenCodeConversationRuntime(input);
+
+    expect(runtime.composerRuntimeInput.contextUsage).toEqual({
+      label: "Context 40% used",
+      title: "400 used of 1,000 window, $1.75 total cost",
+    });
   });
 
   it("routes typed OpenCode prompt commands to the OpenCode command executor", () => {

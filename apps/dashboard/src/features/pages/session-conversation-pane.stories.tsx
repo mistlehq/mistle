@@ -171,6 +171,31 @@ export const WithPendingAttachments: Story = {
   },
 };
 
+export const OpenCodeContextUsage: Story = {
+  args: {
+    composerViewModel: {
+      ...SessionConversationPanePlaygroundBaseArgs.composerViewModel,
+      contextUsage: {
+        label: "Context 40% used",
+        title: "400 used of 1,000 window, $1.75 total cost",
+      },
+      modelOptions: [
+        {
+          value: "openai/gpt-5.3-codex",
+          label: "OpenAI / GPT-5.3 Codex (default)",
+        },
+        {
+          value: "anthropic/claude-sonnet-4-5",
+          label: "Anthropic / Claude Sonnet 4.5",
+        },
+      ],
+      selectedModel: "openai/gpt-5.3-codex",
+      selectedReasoningEffort: null,
+      showReasoningControl: false,
+    },
+  },
+};
+
 export const UploadingAttachments: Story = {
   args: {
     composerViewModel: SessionComposerFixturePropsUploadingAttachments,

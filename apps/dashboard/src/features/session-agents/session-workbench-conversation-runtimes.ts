@@ -256,6 +256,7 @@ export function buildOpenCodeConversationRuntime(input: {
   bootstrap: SessionComposerRuntimeInput["bootstrap"];
   chat: UseOpenCodeSessionStateResult["chat"];
   configControl: SessionComposerRuntimeInput["configControl"];
+  contextUsage: SessionComposerRuntimeInput["contextUsage"];
   executePromptCommand: (input: { text: string }) => Promise<void>;
   sessionMessage: UseOpenCodeSessionStateResult["sessionMessage"];
   sessionSnapshot: UseOpenCodeSessionStateResult["lifecycle"]["sessionSnapshot"];
@@ -315,7 +316,7 @@ export function buildOpenCodeConversationRuntime(input: {
       },
       sessionErrorMessage: input.sessionMessage.sessionErrorMessage,
       clearSessionErrorMessage: input.sessionMessage.clearSessionErrorMessage,
-      contextUsage: null,
+      contextUsage: capabilities.hasContextUsage ? input.contextUsage : null,
       executeTypedRuntimeCommand: (commandInput) => {
         if (!isOpenCodePromptCommandId(commandInput.commandId)) {
           input.sessionMessage.reportSessionErrorMessage(

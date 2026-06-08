@@ -111,6 +111,25 @@ const OpenCodePromptCommandCapabilities = mapOpenCodePromptCommandsToComposerCap
   },
 ]);
 
+const OpenCodeComposerModelArgs = {
+  modelOptions: [
+    {
+      value: "openai/gpt-5.3-codex",
+      label: "OpenAI / GPT-5.3 Codex (default)",
+    },
+    {
+      value: "anthropic/claude-sonnet-4-5",
+      label: "Anthropic / Claude Sonnet 4.5",
+    },
+  ],
+  selectedModel: "openai/gpt-5.3-codex",
+  selectedReasoningEffort: null,
+  showReasoningControl: false,
+} satisfies Pick<
+  ChatComposerStoryArgs,
+  "modelOptions" | "selectedModel" | "selectedReasoningEffort" | "showReasoningControl"
+>;
+
 const ContextMentionCapability: React.ComponentProps<
   typeof ChatComposer
 >["composerCapabilities"][number] = {
@@ -724,23 +743,23 @@ export const OpenCodeDefaultModel: Story = {
   },
 };
 
+export const OpenCodeWithContextUsage: Story = {
+  args: {
+    ...OpenCodeComposerModelArgs,
+    composerCapabilities: OpenCodePromptCommandCapabilities,
+    composerText: "Summarize the remaining implementation risk.",
+    contextUsage: {
+      label: "Context 40% used",
+      title: "400 used of 1,000 window, $1.75 total cost",
+    },
+  },
+};
+
 export const OpenCodePromptCommands: Story = {
   args: {
+    ...OpenCodeComposerModelArgs,
     composerCapabilities: OpenCodePromptCommandCapabilities,
     composerText: "/",
-    modelOptions: [
-      {
-        value: "openai/gpt-5.3-codex",
-        label: "OpenAI / GPT-5.3 Codex (default)",
-      },
-      {
-        value: "anthropic/claude-sonnet-4-5",
-        label: "Anthropic / Claude Sonnet 4.5",
-      },
-    ],
-    selectedModel: "openai/gpt-5.3-codex",
-    selectedReasoningEffort: null,
-    showReasoningControl: false,
   },
   render: (args) => (
     <div className="flex min-h-[420px] items-end">

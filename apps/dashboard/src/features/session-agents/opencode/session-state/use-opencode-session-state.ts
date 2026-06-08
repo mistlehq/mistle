@@ -17,7 +17,15 @@ import {
 } from "@mistle/integrations-definitions/agent-runtimes/opencode/composer-capabilities";
 import { waitForGeneratedOpenCodeConversationTitle } from "@mistle/integrations-definitions/agent-runtimes/opencode/title-generation";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
-import { useCallback, useEffect, useReducer, useRef, useState, type Dispatch } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type Dispatch,
+} from "react";
 
 import type {
   SessionComposerBootstrapPhase,
@@ -30,6 +38,10 @@ import {
   type OpenCodeChatAction,
   type OpenCodeChatState,
 } from "./opencode-chat-state.js";
+import {
+  formatOpenCodeContextUsage,
+  type OpenCodeContextUsageViewModel,
+} from "./opencode-context-usage.js";
 
 export type ConnectedOpenCodeSession = {
   activeDirectory: string | null;
@@ -95,6 +107,7 @@ export type OpenCodeSessionNavigatorState = {
 export type UseOpenCodeSessionStateResult = {
   bootstrap: SessionComposerBootstrapResult;
   commandCatalogDirectory: string | null;
+  contextUsage: OpenCodeContextUsageViewModel | null;
   modelCatalogDirectory: string | null;
   chat: {
     abortSession: () => Promise<void>;
@@ -369,6 +382,7 @@ export function useOpenCodeSessionState(input: {
   const [lifecycleErrorMessage, setLifecycleErrorMessage] = useState<string | null>(null);
   const [sessionErrorMessage, setSessionErrorMessage] = useState<string | null>(null);
   const [availableModels, setAvailableModels] = useState<readonly SessionComposerModel[]>([]);
+  const [providerCatalog, setProviderCatalog] = useState<readonly OpenCodeProviderSummary[]>([]);
   const [promptCommands, setPromptCommands] = useState<readonly OpenCodeCommandSummary[]>([]);
   const [commandCatalogDirectory, setCommandCatalogDirectory] = useState<string | null>(null);
   const [availableSessions, setAvailableSessions] = useState<readonly OpenCodeSessionSummary[]>([]);
@@ -424,6 +438,7 @@ export function useOpenCodeSessionState(input: {
       phase,
     };
     setAvailableModels([]);
+    setProviderCatalog([]);
     setModelCatalogDirectory(null);
     setBootstrapPhase(phase);
   }, []);
@@ -527,6 +542,7 @@ export function useOpenCodeSessionState(input: {
         phase: { status: "bootstrapping" },
       };
       setAvailableModels([]);
+      setProviderCatalog([]);
       setModelCatalogDirectory(directory);
       setBootstrapPhase({ status: "bootstrapping" });
 
@@ -546,6 +562,7 @@ export function useOpenCodeSessionState(input: {
           phase: { status: "ready" },
         };
         setAvailableModels(composerModels);
+        setProviderCatalog(providerCatalog.providers);
         setBootstrapPhase({ status: "ready" });
       } catch (error) {
         if (modelCatalogGenerationRef.current !== generation) {
@@ -562,6 +579,7 @@ export function useOpenCodeSessionState(input: {
           phase: failedPhase,
         };
         setAvailableModels([]);
+        setProviderCatalog([]);
         setBootstrapPhase(failedPhase);
         throw error;
       }
@@ -1115,6 +1133,14 @@ export function useOpenCodeSessionState(input: {
     },
     [connectSession, sessionSnapshot?.providerSessionId],
   );
+  const contextUsage = useMemo(
+    () =>
+      formatOpenCodeContextUsage({
+        chatState,
+        providers: providerCatalog,
+      }),
+    [chatState, providerCatalog],
+  );
 
   return {
     bootstrap: {
@@ -1126,6 +1152,7 @@ export function useOpenCodeSessionState(input: {
       },
     },
     commandCatalogDirectory,
+    contextUsage,
     modelCatalogDirectory,
     commands: {
       promptCommands,

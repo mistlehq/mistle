@@ -35,7 +35,7 @@ export const SessionRuntimeWorkbenchCapabilities = {
     },
     supportsSteering: false,
     preservesCliLaunchContext: true,
-    hasContextUsage: false,
+    hasContextUsage: true,
   },
   PI: {
     runtimeId: "pi",
