@@ -17,6 +17,8 @@ import { createAttachmentBackedActiveBootstrapSessionStore } from "../../runtime
 import { InMemorySandboxPresenceStore } from "../../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
 import {
+  type DataPlaneGatewayHealthConfig,
+  DefaultDataPlaneGatewayHealthConfig,
   OWNER_LEASE_RENEW_INTERVAL_MS,
   WEBSOCKET_PING_INTERVAL_MS,
   WEBSOCKET_PONG_TIMEOUT_MS,
@@ -356,6 +358,7 @@ async function createDisconnectTestHarness() {
     new SandboxDeadlineLifecycleCoordinator(),
     clock,
     scheduler,
+    DefaultDataPlaneGatewayHealthConfig,
   );
 
   const bootstrapPair = await createWebSocketPair();
@@ -389,7 +392,7 @@ async function createDisconnectTestHarness() {
   };
 }
 
-function createBootstrapHealthTestHarness() {
+function createBootstrapHealthTestHarness(input?: { healthConfig?: DataPlaneGatewayHealthConfig }) {
   const clock = createMutableClock(1_000);
   const scheduler = createManualScheduler(clock);
   const lifecycleEvents: Array<{
@@ -465,6 +468,7 @@ function createBootstrapHealthTestHarness() {
     lifecycleCoordinator,
     clock,
     scheduler,
+    input?.healthConfig ?? DefaultDataPlaneGatewayHealthConfig,
   );
 
   return {
@@ -760,6 +764,54 @@ describe("TunnelSessionService", () => {
     attachedPeer.websocketHealthHandle?.stop();
   });
 
+  it("uses configured websocket health timing for bootstrap missed pong checks", async () => {
+    const { clock, lifecycleEvents, rawSocket, scheduler, service } =
+      createBootstrapHealthTestHarness({
+        healthConfig: {
+          websocketPingIntervalMs: 25,
+          websocketPongTimeoutMs: 30,
+        },
+      });
+    const attachedPeer = service.attachBootstrapPeer({
+      leaseId: OwnerLeaseId,
+      onFatalError: () => {
+        throw new Error("Bootstrap attach should not fail in this test.");
+      },
+      onLeaseLost: () => {
+        throw new Error("Bootstrap lease should not be lost in this test.");
+      },
+      onTransportUnhealthy: () => {
+        throw new Error("Bootstrap transport should remain healthy after one missed pong.");
+      },
+      ownerLeaseTtlMs: 60_000,
+      relaySessionId: BootstrapSessionId,
+      sandboxInstanceId: SandboxInstanceId,
+      socket: createFakePeerSocket(rawSocket),
+    });
+
+    await attachedPeer.activationPromise;
+    clock.advanceMs(24);
+    scheduler.runDue();
+    expect(lifecycleEvents).not.toContainEqual({
+      kind: "bootstrap_degraded",
+      ownerLeaseId: OwnerLeaseId,
+    });
+
+    clock.advanceMs(1);
+    scheduler.runDue();
+    clock.advanceMs(30);
+    scheduler.runDue();
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await Promise.resolve();
+    }
+
+    expect(lifecycleEvents).toContainEqual({
+      kind: "bootstrap_degraded",
+      ownerLeaseId: OwnerLeaseId,
+    });
+    attachedPeer.websocketHealthHandle?.stop();
+  });
+
   it("ignores queued bootstrap health changes from a replaced bootstrap peer", async () => {
     const { clock, lifecycleCoordinator, lifecycleEvents, rawSocket, scheduler, service } =
       createBootstrapHealthTestHarness();
@@ -909,6 +961,7 @@ describe("TunnelSessionService", () => {
       new SandboxDeadlineLifecycleCoordinator(),
       clock,
       scheduler,
+      DefaultDataPlaneGatewayHealthConfig,
     );
 
     const bootstrapPair = await createWebSocketPair();
@@ -1032,6 +1085,7 @@ describe("TunnelSessionService", () => {
       new SandboxDeadlineLifecycleCoordinator(),
       clock,
       scheduler,
+      DefaultDataPlaneGatewayHealthConfig,
     );
 
     const bootstrapPair = await createWebSocketPair();
@@ -1151,6 +1205,7 @@ describe("TunnelSessionService", () => {
       new SandboxDeadlineLifecycleCoordinator(),
       clock,
       scheduler,
+      DefaultDataPlaneGatewayHealthConfig,
     );
 
     const bootstrapPair = await createWebSocketPair();
@@ -1285,6 +1340,7 @@ describe("TunnelSessionService", () => {
       lifecycleCoordinator,
       clock,
       scheduler,
+      DefaultDataPlaneGatewayHealthConfig,
     );
 
     const bootstrapPair = await createWebSocketPair();

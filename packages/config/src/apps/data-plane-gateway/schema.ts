@@ -22,6 +22,9 @@ const NatsUrlSchema = z.url().refine((value) => {
   return parsedUrl.protocol === "nats:" || parsedUrl.protocol === "tls:";
 }, "Expected a nats or tls URL.");
 
+const DefaultWebSocketPingIntervalMs = 10_000;
+const DefaultWebSocketPongTimeoutMs = 10_000;
+
 export const DataPlaneGatewayServerConfigSchema = z
   .object({
     host: z.string().min(1),
@@ -110,6 +113,21 @@ export const PartialDataPlaneGatewayRelayConfigSchema = z
   })
   .strict();
 
+const DataPlaneGatewayHealthConfigObjectSchema = z
+  .object({
+    websocketPingIntervalMs: z.number().int().positive().default(DefaultWebSocketPingIntervalMs),
+    websocketPongTimeoutMs: z.number().int().positive().default(DefaultWebSocketPongTimeoutMs),
+  })
+  .strict();
+
+export const DataPlaneGatewayHealthConfigSchema = DataPlaneGatewayHealthConfigObjectSchema.default({
+  websocketPingIntervalMs: DefaultWebSocketPingIntervalMs,
+  websocketPongTimeoutMs: DefaultWebSocketPongTimeoutMs,
+});
+
+export const PartialDataPlaneGatewayHealthConfigSchema =
+  DataPlaneGatewayHealthConfigObjectSchema.partial();
+
 export const DataPlaneGatewayDataPlaneApiConfigSchema = z
   .object({
     baseUrl: HttpBaseUrlSchema,
@@ -166,6 +184,7 @@ export const DataPlaneGatewayConfigSchema = z
     database: DataPlaneGatewayDatabaseConfigSchema,
     runtimeState: DataPlaneGatewayRuntimeStateConfigSchema,
     gatewayRelay: DataPlaneGatewayRelayConfigSchema,
+    health: DataPlaneGatewayHealthConfigSchema,
     dataPlaneApi: DataPlaneGatewayDataPlaneApiConfigSchema,
     controlPlaneApi: DataPlaneGatewayControlPlaneApiConfigSchema,
     internalAuth: DataPlaneGatewayInternalAuthConfigSchema,
@@ -180,6 +199,7 @@ export const PartialDataPlaneGatewayConfigSchema = z
     database: DataPlaneGatewayDatabaseConfigSchema.partial().optional(),
     runtimeState: PartialDataPlaneGatewayRuntimeStateConfigSchema.optional(),
     gatewayRelay: PartialDataPlaneGatewayRelayConfigSchema.optional(),
+    health: PartialDataPlaneGatewayHealthConfigSchema.optional(),
     dataPlaneApi: DataPlaneGatewayDataPlaneApiConfigSchema.partial().optional(),
     controlPlaneApi: PartialDataPlaneGatewayControlPlaneApiConfigSchema.optional(),
     internalAuth: DataPlaneGatewayInternalAuthConfigSchema.partial().optional(),

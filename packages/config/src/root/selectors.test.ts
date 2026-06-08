@@ -14,6 +14,7 @@ function createRootConfig(input: {
   billingStripe?: { enabled: false; secret_key?: string } | { enabled: true; secret_key: string };
   enabledMethods?: Array<"otp" | "google">;
   gatewayRelay?: Config["gateway_relay"];
+  dataPlaneGatewayHealth?: Config["services"]["data_plane_gateway"]["health"];
   google?: {
     client_id: string;
     client_secret: string;
@@ -87,6 +88,9 @@ function createRootConfig(input: {
         internal_url: "http://data-plane-gateway:8084",
         sandbox_ws_public_url: "wss://gateway.example.com/tunnel/sandbox",
         sandbox_ws_internal_url: "ws://data-plane-gateway:8084/tunnel/sandbox",
+        ...(input.dataPlaneGatewayHealth === undefined
+          ? {}
+          : { health: input.dataPlaneGatewayHealth }),
       },
       control_plane_worker: {
         workflow_concurrency: 4,
@@ -452,6 +456,10 @@ describe("selectDataPlaneGatewayConfig", () => {
     expect(config.gatewayRelay).toEqual({
       backend: "memory",
     });
+    expect(config.health).toEqual({
+      websocketPingIntervalMs: 10_000,
+      websocketPongTimeoutMs: 10_000,
+    });
     expect(config.controlPlaneApi.mcp.auth).toEqual({
       secret: "mcp-auth-secret",
       issuer: "control-plane-api",
@@ -478,6 +486,37 @@ describe("selectDataPlaneGatewayConfig", () => {
         url: "nats://gateway-relay:4222",
         namePrefix: "mistle-prod",
       },
+    });
+  });
+
+  it("projects optional gateway health config", () => {
+    const config = selectDataPlaneGatewayConfig(
+      createRootConfig({
+        dataPlaneGatewayHealth: {
+          websocket_ping_interval_ms: 100,
+          websocket_pong_timeout_ms: 250,
+        },
+      }),
+    );
+
+    expect(config.health).toEqual({
+      websocketPingIntervalMs: 100,
+      websocketPongTimeoutMs: 250,
+    });
+  });
+
+  it("defaults omitted gateway health fields independently", () => {
+    const config = selectDataPlaneGatewayConfig(
+      createRootConfig({
+        dataPlaneGatewayHealth: {
+          websocket_ping_interval_ms: 100,
+        },
+      }),
+    );
+
+    expect(config.health).toEqual({
+      websocketPingIntervalMs: 100,
+      websocketPongTimeoutMs: 10_000,
     });
   });
 });

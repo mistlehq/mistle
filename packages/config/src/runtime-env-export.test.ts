@@ -245,6 +245,14 @@ describe("exportServiceConfigToEnv", () => {
       value: "memory",
     });
     expectEntry(entries, {
+      name: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_HEALTH_WEBSOCKET_PING_INTERVAL_MS",
+      value: 10000,
+    });
+    expectEntry(entries, {
+      name: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_HEALTH_WEBSOCKET_PONG_TIMEOUT_MS",
+      value: 10000,
+    });
+    expectEntry(entries, {
       name: "MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL",
       value: "http://data-plane-api:8082",
     });

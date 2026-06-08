@@ -12,6 +12,7 @@ import { PortAccessTransportService } from "../publishing/port-access-transport.
 import { PortsTargetAuthorizeService } from "../publishing/ports-target-authorize-service.js";
 import type { ActiveBootstrapSessionStore } from "../runtime-state/active-bootstrap-session-store.js";
 import { OWNER_LEASE_TTL_MS } from "../runtime-state/durations.js";
+import type { DataPlaneGatewayHealthConfig } from "../runtime-state/durations.js";
 import type { SandboxKeepaliveStore } from "../runtime-state/sandbox-keepalive-store.js";
 import type { SandboxPresenceStore } from "../runtime-state/sandbox-presence-store.js";
 import type { SandboxRuntimeAttachmentStore } from "../runtime-state/sandbox-runtime-attachment-store.js";
@@ -78,6 +79,7 @@ type RegisterSandboxTunnelRouteInput = {
   allowRemoteOwnerConnections: boolean;
   clock: Clock;
   drainRegistry: GatewayDrainRegistry;
+  healthConfig: DataPlaneGatewayHealthConfig;
   lifecycle: GatewayLifecycle;
   scheduler: Scheduler;
 };
@@ -134,6 +136,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
     input.sandboxDeadlineLifecycleCoordinator,
     input.clock,
     input.scheduler,
+    input.healthConfig,
   );
 
   input.app.get(

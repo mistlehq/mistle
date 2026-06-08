@@ -10,3 +10,13 @@ export const ACTIVITY_LEASE_TTL_MS = 30_000;
 export const WEBSOCKET_PING_INTERVAL_MS = 10_000;
 export const WEBSOCKET_PONG_TIMEOUT_MS = 10_000;
 export const BOOTSTRAP_WEBSOCKET_MAX_CONSECUTIVE_MISSED_PONGS = 3;
+
+export type DataPlaneGatewayHealthConfig = {
+  websocketPingIntervalMs: number;
+  websocketPongTimeoutMs: number;
+};
+
+export const DefaultDataPlaneGatewayHealthConfig: DataPlaneGatewayHealthConfig = {
+  websocketPingIntervalMs: WEBSOCKET_PING_INTERVAL_MS,
+  websocketPongTimeoutMs: WEBSOCKET_PONG_TIMEOUT_MS,
+};

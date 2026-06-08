@@ -295,6 +295,13 @@ export const ConfigSchema = z
         data_plane_gateway: ServiceEndpointSchema.extend({
           sandbox_ws_public_url: UrlSchema,
           sandbox_ws_internal_url: UrlSchema,
+          health: z
+            .object({
+              websocket_ping_interval_ms: z.number().int().positive().optional(),
+              websocket_pong_timeout_ms: z.number().int().positive().optional(),
+            })
+            .strict()
+            .optional(),
         }).strict(),
         control_plane_worker: z
           .object({

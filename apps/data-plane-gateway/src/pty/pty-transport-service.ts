@@ -21,10 +21,7 @@ import type { WSContext, WSMessageReceive } from "hono/ws";
 import WebSocket from "ws";
 
 import { logger } from "../logger.js";
-import {
-  WEBSOCKET_PING_INTERVAL_MS,
-  WEBSOCKET_PONG_TIMEOUT_MS,
-} from "../runtime-state/durations.js";
+import { type DataPlaneGatewayHealthConfig } from "../runtime-state/durations.js";
 import { BootstrapTunnelNotConnectedError } from "../tunnel/bootstrap-tunnel-not-connected-error.js";
 import type { SandboxOwnerResolver } from "../tunnel/ownership/sandbox-owner-resolver.js";
 import type { TunnelRelayCoordinator } from "../tunnel/relay-coordinator.js";
@@ -106,6 +103,7 @@ export class PtyTransportService {
       tokenConfig: PtyTransportTokenConfig;
       clock: Clock;
       scheduler: Scheduler;
+      healthConfig: DataPlaneGatewayHealthConfig;
     },
   ) {}
 
@@ -425,8 +423,8 @@ export class PtyTransportService {
         tokenKind: "pty",
         socket: input.socket,
         scheduler: this.input.scheduler,
-        pingIntervalMs: WEBSOCKET_PING_INTERVAL_MS,
-        pongTimeoutMs: WEBSOCKET_PONG_TIMEOUT_MS,
+        pingIntervalMs: this.input.healthConfig.websocketPingIntervalMs,
+        pongTimeoutMs: this.input.healthConfig.websocketPongTimeoutMs,
         maxConsecutiveMissedPongs: PtyWebSocketMaxConsecutiveMissedPongs,
         onMissedPong: ({ consecutiveMissedPongs, lastPongAgeMs, maxConsecutiveMissedPongs }) => {
           logger.warn(

@@ -39,6 +39,10 @@ export type IntegrationServiceOptions = {
       webSocketUpstreamResolutionDelayMs?: number;
     };
     gatewayRelay?: { backend: "memory" } | { backend: "nats"; namePrefix: string };
+    health?: {
+      websocketPingIntervalMs?: number;
+      websocketPongTimeoutMs?: number;
+    };
   };
   sandbox?: IntegrationSandboxOptions;
 };

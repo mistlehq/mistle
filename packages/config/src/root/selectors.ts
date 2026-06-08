@@ -391,6 +391,12 @@ export function selectDataPlaneGatewayConfig(config: Config): DataPlaneGatewayCo
         : {
             backend: "memory",
           },
+    health: {
+      websocketPingIntervalMs:
+        config.services.data_plane_gateway.health?.websocket_ping_interval_ms ?? 10_000,
+      websocketPongTimeoutMs:
+        config.services.data_plane_gateway.health?.websocket_pong_timeout_ms ?? 10_000,
+    },
     dataPlaneApi: {
       baseUrl: config.services.data_plane_api.internal_url,
     },

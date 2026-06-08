@@ -402,6 +402,16 @@ const RootEnvDescriptors = [
     path: ["services", "data_plane_gateway", "sandbox_ws_internal_url"],
   },
   {
+    envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_HEALTH_WEBSOCKET_PING_INTERVAL_MS",
+    path: ["services", "data_plane_gateway", "health", "websocket_ping_interval_ms"],
+    parse: parseNumberEnv,
+  },
+  {
+    envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_HEALTH_WEBSOCKET_PONG_TIMEOUT_MS",
+    path: ["services", "data_plane_gateway", "health", "websocket_pong_timeout_ms"],
+    parse: parseNumberEnv,
+  },
+  {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY",
     path: ["services", "control_plane_worker", "workflow_concurrency"],
     parse: parseNumberEnv,

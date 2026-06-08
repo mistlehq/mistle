@@ -7,11 +7,10 @@ import { logger } from "../../logger.js";
 import {
   BOOTSTRAP_WEBSOCKET_MAX_CONSECUTIVE_MISSED_PONGS,
   ATTACHMENT_TTL_MS,
+  type DataPlaneGatewayHealthConfig,
   OWNER_LEASE_RENEW_INTERVAL_MS,
   PRESENCE_LEASE_RENEW_INTERVAL_MS,
   PRESENCE_LEASE_TTL_MS,
-  WEBSOCKET_PING_INTERVAL_MS,
-  WEBSOCKET_PONG_TIMEOUT_MS,
 } from "../../runtime-state/durations.js";
 import type { SandboxPresenceStore } from "../../runtime-state/sandbox-presence-store.js";
 import type { SandboxRuntimeAttachmentStore } from "../../runtime-state/sandbox-runtime-attachment-store.js";
@@ -127,6 +126,7 @@ export class TunnelSessionService {
     private readonly sandboxDeadlineLifecycleCoordinator: SandboxDeadlineLifecycleCoordinator,
     private readonly clock: Clock,
     private readonly scheduler: Scheduler,
+    private readonly healthConfig: DataPlaneGatewayHealthConfig,
   ) {}
 
   /**
@@ -170,8 +170,8 @@ export class TunnelSessionService {
         tokenKind: "bootstrap",
         socket: input.socket,
         scheduler: this.scheduler,
-        pingIntervalMs: WEBSOCKET_PING_INTERVAL_MS,
-        pongTimeoutMs: WEBSOCKET_PONG_TIMEOUT_MS,
+        pingIntervalMs: this.healthConfig.websocketPingIntervalMs,
+        pongTimeoutMs: this.healthConfig.websocketPongTimeoutMs,
         maxConsecutiveMissedPongs: BOOTSTRAP_WEBSOCKET_MAX_CONSECUTIVE_MISSED_PONGS,
         onMissedPong: ({
           consecutiveMissedPongs,
@@ -397,8 +397,8 @@ export class TunnelSessionService {
         tokenKind: "connection",
         socket: input.socket,
         scheduler: this.scheduler,
-        pingIntervalMs: WEBSOCKET_PING_INTERVAL_MS,
-        pongTimeoutMs: WEBSOCKET_PONG_TIMEOUT_MS,
+        pingIntervalMs: this.healthConfig.websocketPingIntervalMs,
+        pongTimeoutMs: this.healthConfig.websocketPongTimeoutMs,
         onUnhealthy: () => {
           logger.error(
             {

@@ -710,6 +710,16 @@ const DataPlaneGatewayEnvDescriptors = [
     envVar: "MISTLE_GATEWAY_RELAY_NATS_NAME_PREFIX",
     path: ["gatewayRelay", "nats", "namePrefix"],
   },
+  {
+    envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_HEALTH_WEBSOCKET_PING_INTERVAL_MS",
+    path: ["health", "websocketPingIntervalMs"],
+    parse: parseNumberEnv,
+  },
+  {
+    envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_HEALTH_WEBSOCKET_PONG_TIMEOUT_MS",
+    path: ["health", "websocketPongTimeoutMs"],
+    parse: parseNumberEnv,
+  },
   { envVar: "MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL", path: ["dataPlaneApi", "baseUrl"] },
   {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL",

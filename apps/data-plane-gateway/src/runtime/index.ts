@@ -469,6 +469,7 @@ export function createDataPlaneGatewayRuntime(
   const ptyTransportService = new PtyTransportService({
     config: config.app.sandbox,
     clock: systemClock,
+    healthConfig: config.app.health,
     relayCoordinator,
     sandboxOwnerResolver,
     scheduler: systemScheduler,
@@ -598,6 +599,7 @@ export function createDataPlaneGatewayRuntime(
     allowRemoteOwnerConnections: config.app.gatewayRelay.backend === "nats",
     clock: systemClock,
     drainRegistry,
+    healthConfig: config.app.health,
     lifecycle,
     scheduler: systemScheduler,
   });

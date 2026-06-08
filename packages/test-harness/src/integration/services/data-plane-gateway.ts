@@ -30,6 +30,8 @@ import {
 
 const Host = "127.0.0.1";
 const DockerSandboxReachableHost = "0.0.0.0";
+const DefaultWebSocketPingIntervalMs = 10_000;
+const DefaultWebSocketPongTimeoutMs = 10_000;
 
 const InfraIds = {
   NATS: "nats",
@@ -118,6 +120,7 @@ function start(input: {
         peer,
       }),
       gatewayRelay: input.dataPlaneGateway?.gatewayRelay,
+      health: input.dataPlaneGateway?.health,
       directEgressTrustedCaCertificates:
         input.dataPlaneGateway?.directEgress?.trustedCaCertificates,
       directEgressWebSocketUpstreamResolutionDelayMs:
@@ -175,6 +178,7 @@ function config(input: {
   directEgressWebSocketUpstreamResolutionDelayMs: number | undefined;
   gatewayWsUrl: string;
   gatewayRelay: IntegrationDataPlaneGatewayRelayOptions | undefined;
+  health: NonNullable<IntegrationServiceOptions["dataPlaneGateway"]>["health"] | undefined;
   nats: ResolvedTestInfra | undefined;
   sandbox: IntegrationSandboxOptions | undefined;
 }): DataPlaneGatewayConfig {
@@ -213,6 +217,11 @@ function config(input: {
       },
     },
     gatewayRelay,
+    health: {
+      websocketPingIntervalMs:
+        input.health?.websocketPingIntervalMs ?? DefaultWebSocketPingIntervalMs,
+      websocketPongTimeoutMs: input.health?.websocketPongTimeoutMs ?? DefaultWebSocketPongTimeoutMs,
+    },
     dataPlaneApi: {
       baseUrl: input.dataPlaneApiBaseUrl,
     },

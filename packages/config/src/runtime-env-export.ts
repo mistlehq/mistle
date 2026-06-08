@@ -301,6 +301,14 @@ const DataPlaneGatewayResourceRuntimeEnvExports: readonly RuntimeEnvExportDescri
     path: ["gatewayRelay", "nats", "namePrefix"],
     envVar: "MISTLE_GATEWAY_RELAY_NATS_NAME_PREFIX",
   },
+  {
+    path: ["health", "websocketPingIntervalMs"],
+    envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_HEALTH_WEBSOCKET_PING_INTERVAL_MS",
+  },
+  {
+    path: ["health", "websocketPongTimeoutMs"],
+    envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_HEALTH_WEBSOCKET_PONG_TIMEOUT_MS",
+  },
   { path: ["dataPlaneApi", "baseUrl"], envVar: "MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL" },
   {
     path: ["controlPlaneApi", "baseUrl"],
