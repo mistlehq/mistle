@@ -171,7 +171,7 @@ function renderMeasurementHud(input: {
   );
 }
 
-export function renderConversationPaneLayoutPlayground(
+export function SessionConversationPaneLayoutPlayground(
   args: SessionConversationPaneStoryArgs,
 ): React.JSX.Element {
   const [hoveredTarget, setHoveredTarget] = useState<MeasurementHighlightTarget | null>(null);

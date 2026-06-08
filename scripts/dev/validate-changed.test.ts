@@ -6,6 +6,96 @@ import { describe, expect, it } from "vitest";
 const RepositoryRootPath = fileURLToPath(new URL("../..", import.meta.url));
 
 describe("validate-changed", () => {
+  it("plans advisory React Doctor lint for dashboard React changes", () => {
+    const commands = getDryRunCommands(
+      "apps/dashboard/src/lib/analytics/authenticated.tsx",
+      "lint",
+    );
+
+    expect(commands).toContain("pnpm lint:react-doctor");
+  });
+
+  it("plans advisory React Doctor lint for shared UI React changes", () => {
+    const commands = getDryRunCommands("packages/ui/src/components/ui/button.tsx", "lint");
+
+    expect(commands).toContain("pnpm lint:react-doctor");
+  });
+
+  it("plans advisory React Doctor lint for email template React changes", () => {
+    const commands = getDryRunCommands("packages/emails/src/templates/otp/template.tsx", "lint");
+
+    expect(commands).toContain("pnpm lint:react-doctor");
+  });
+
+  it("skips React Doctor lint for backend-only changes", () => {
+    const commands = getDryRunCommands("apps/control-plane-api/src/server.ts", "lint");
+
+    expect(commands).not.toContain("pnpm lint:react-doctor");
+  });
+
+  it("skips React Doctor lint for non-code files in React projects", () => {
+    const commands = getDryRunCommands("apps/dashboard/README.md", "lint");
+
+    expect(commands).not.toContain("pnpm lint:react-doctor");
+  });
+
+  it("plans advisory React Doctor lint for root package metadata changes", () => {
+    const commands = getDryRunCommands("package.json", "lint");
+
+    expect(commands).toContain("pnpm lint:react-doctor");
+  });
+
+  it("plans advisory React Doctor lint for project-local React Doctor config changes", () => {
+    const commands = getDryRunCommands("apps/dashboard/doctor.config.json", "lint");
+
+    expect(commands).toContain("pnpm lint:react-doctor");
+  });
+
+  it("plans branch React Doctor lint against the requested base ref", () => {
+    const commands = getDryRunCommandsWithArgs([
+      "--files",
+      "apps/dashboard/src/lib/analytics/authenticated.tsx",
+      "--base",
+      "origin/release",
+      "--head",
+      "HEAD",
+      "--steps",
+      "lint",
+    ]);
+
+    expect(commands).toContain("pnpm lint:react-doctor --diff origin/release");
+  });
+
+  it("rejects React Doctor lint when the requested branch head is not checked out", () => {
+    expect(() =>
+      getDryRunCommandsWithArgs([
+        "--files",
+        "apps/dashboard/src/lib/analytics/authenticated.tsx",
+        "--base",
+        "origin/main",
+        "--head",
+        "origin/main",
+        "--steps",
+        "lint",
+      ]),
+    ).toThrow(/React Doctor lint can only validate the checked-out head/);
+  });
+
+  it("does not require the requested branch head to be checked out for backend-only lint", () => {
+    const commands = getDryRunCommandsWithArgs([
+      "--files",
+      "apps/control-plane-api/src/server.ts",
+      "--base",
+      "origin/main",
+      "--head",
+      "origin/main",
+      "--steps",
+      "lint",
+    ]);
+
+    expect(commands).not.toContain("pnpm lint:react-doctor --diff origin/main");
+  });
+
   it("does not plan containerized Rust tests for non-Rust repo-wide changes", () => {
     const commands = getDryRunCommands("pnpm-lock.yaml");
 
@@ -197,15 +287,15 @@ describe("validate-changed", () => {
   });
 });
 
-function getDryRunCommands(files: string): string[] {
-  const output = execFileSync(
-    "pnpm",
-    ["validate:changed", "--dry-run", "--files", files, "--steps", "test"],
-    {
-      cwd: RepositoryRootPath,
-      encoding: "utf8",
-    },
-  );
+function getDryRunCommands(files: string, steps = "test"): string[] {
+  return getDryRunCommandsWithArgs(["--files", files, "--steps", steps]);
+}
+
+function getDryRunCommandsWithArgs(args: readonly string[]): string[] {
+  const output = execFileSync("pnpm", ["validate:changed", "--dry-run", ...args], {
+    cwd: RepositoryRootPath,
+    encoding: "utf8",
+  });
 
   const commandsStartIndex = output.indexOf("\nCommands (");
   if (commandsStartIndex === -1) {

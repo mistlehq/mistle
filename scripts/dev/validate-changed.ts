@@ -64,6 +64,22 @@ const AFFECTED_INTEGRATION_TEST_PACKAGE_NAMES = new Set([
 const AFFECTED_RUST_TEST_PACKAGE_NAMES = new Set(["@mistle/commit-sign", "@mistle/sandboxd"]);
 
 const ALL_PACKAGES_REASON = "root-level or repo-wide config changed";
+const REACT_DOCTOR_PROJECT_PATHS: readonly string[] = [
+  "apps/dashboard",
+  "packages/emails",
+  "packages/storybook",
+  "packages/ui",
+];
+const REACT_DOCTOR_CONFIG_FILE_NAMES = new Set([
+  "doctor.config.cjs",
+  "doctor.config.cts",
+  "doctor.config.js",
+  "doctor.config.json",
+  "doctor.config.jsonc",
+  "doctor.config.mjs",
+  "doctor.config.mts",
+  "doctor.config.ts",
+]);
 
 const REPO_WIDE_FILES = new Set([
   "package.json",
@@ -436,6 +452,8 @@ function addPackageReason(
 function getLintRepoCheckCommands(
   changedFiles: readonly string[],
   steps: readonly Step[],
+  reactDoctorBaseRef: string | null,
+  reactDoctorHeadRef: string | null,
 ): Command[] {
   const commands: Command[] = [];
 
@@ -459,7 +477,73 @@ function getLintRepoCheckCommands(
     steps.includes("lint") && changedFiles.some((filePath) => filePath.startsWith("packages/db/")),
   );
 
+  if (
+    steps.includes("lint") &&
+    changedFiles.some((filePath) => isReactDoctorRelevantPath(filePath))
+  ) {
+    commands.push(buildReactDoctorCommand(reactDoctorBaseRef, reactDoctorHeadRef));
+  }
+
   return commands;
+}
+
+function buildReactDoctorCommand(baseRef: string | null, headRef: string | null): Command {
+  const command = ["pnpm", "lint:react-doctor"];
+  if (baseRef !== null) {
+    if (headRef !== null && isCurrentCheckoutRef(headRef) === false) {
+      throw new Error(
+        [
+          "React Doctor lint can only validate the checked-out head.",
+          `Requested --head ${headRef}, but the current checkout is HEAD.`,
+          "Check out the requested head before running React Doctor validation.",
+        ].join(" "),
+      );
+    }
+    command.push("--diff", baseRef);
+  }
+
+  return command;
+}
+
+function isCurrentCheckoutRef(refName: string): boolean {
+  return resolveGitRevision(refName) === resolveGitRevision("HEAD");
+}
+
+function resolveGitRevision(refName: string): string {
+  return execFileSync("git", ["rev-parse", "--verify", refName], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+  }).trim();
+}
+
+function isReactDoctorProjectFilePath(filePath: string): boolean {
+  return REACT_DOCTOR_PROJECT_PATHS.some(
+    (projectPath) => filePath === projectPath || filePath.startsWith(`${projectPath}/`),
+  );
+}
+
+function isJavaScriptOrTypeScriptPath(filePath: string): boolean {
+  return /\.(?:[cm]?js|jsx|[cm]?ts|tsx)$/.test(filePath);
+}
+
+function isReactDoctorRelevantPath(filePath: string): boolean {
+  if (filePath === "package.json") {
+    return true;
+  }
+
+  if (REACT_DOCTOR_CONFIG_FILE_NAMES.has(filePath)) {
+    return true;
+  }
+
+  if (isReactDoctorProjectFilePath(filePath) === false) {
+    return false;
+  }
+
+  return (
+    REACT_DOCTOR_CONFIG_FILE_NAMES.has(parse(filePath).base) ||
+    isJavaScriptOrTypeScriptPath(filePath) ||
+    filePath.endsWith("/package.json")
+  );
 }
 
 function selectWorkspacePackages(
@@ -526,12 +610,21 @@ function createValidationPlan(
   changedFiles: readonly string[],
   steps: readonly Step[],
   workspacePackages: readonly WorkspacePackage[],
+  reactDoctorBaseRef: string | null,
+  reactDoctorHeadRef: string | null,
 ): ValidationPlan {
   const extraCommands = createEmptyExtraCommands();
   const normalizedChangedFiles = normalizeChangedFiles(changedFiles);
   const packageSelection = selectWorkspacePackages(normalizedChangedFiles, workspacePackages);
 
-  extraCommands.lint.push(...getLintRepoCheckCommands(normalizedChangedFiles, steps));
+  extraCommands.lint.push(
+    ...getLintRepoCheckCommands(
+      normalizedChangedFiles,
+      steps,
+      reactDoctorBaseRef,
+      reactDoctorHeadRef,
+    ),
+  );
   if (steps.includes("typecheck")) {
     extraCommands.typecheck.push(["pnpm", "--dir", "packages/storybook", "run", "typecheck"]);
   }
@@ -1186,7 +1279,7 @@ function main(): void {
   }
 
   const workspacePackages = loadWorkspacePackages();
-  const plan = createValidationPlan(changedFiles, steps, workspacePackages);
+  const plan = createValidationPlan(changedFiles, steps, workspacePackages, baseRef, headRef);
   const commands = buildExecutionCommands(plan, steps);
 
   printPlan(plan, steps, dryRun, commands);

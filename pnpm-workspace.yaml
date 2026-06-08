@@ -18,6 +18,7 @@ allowBuilds:
   cpu-features: false
   esbuild: true
   lefthook: true
+  msgpackr-extract: false
   prisma: false
   protobufjs: false
   puppeteer: false
@@ -37,7 +38,9 @@ overrides:
   cookie: "0.7.0"
   defu: "6.1.5"
   "dockerode>protobufjs": "7.5.8"
+  "@effect/platform-node-shared>effect": "4.0.0-beta.70"
   effect: "3.20.0"
+  "react-doctor>effect": "4.0.0-beta.70"
   esbuild: "0.25.0"
   express: "4.20.0"
   fast-uri: "3.1.2"

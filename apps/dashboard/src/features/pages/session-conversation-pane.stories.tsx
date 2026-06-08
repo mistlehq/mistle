@@ -27,7 +27,7 @@ import {
   SessionConversationPanePlaygroundArgTypes,
   SessionConversationPanePlaygroundControlInclude,
   SessionConversationPanePlaygroundDocs,
-  renderConversationPaneLayoutPlayground,
+  SessionConversationPaneLayoutPlayground,
 } from "./session-conversation-pane-playground.js";
 import { SessionConversationMainContent } from "./session-conversation-pane.js";
 import {
@@ -124,7 +124,7 @@ export const LayoutPlayground: Story = {
       include: SessionConversationPanePlaygroundControlInclude,
     },
   },
-  render: renderConversationPaneLayoutPlayground,
+  render: SessionConversationPaneLayoutPlayground,
 };
 
 export const Default: Story = {};
