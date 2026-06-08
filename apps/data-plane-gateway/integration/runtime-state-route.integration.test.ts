@@ -32,6 +32,8 @@ import {
 const TestTimeoutMs = 40_000;
 const RuntimeStateReadTimeoutMs = 5_000;
 const RuntimeStateReadPollIntervalMs = 50;
+const GatewayHealthIntervalMs = 100;
+const GatewayHealthTimeoutMs = 100;
 const InternalServiceTokenHeader = "x-mistle-service-token";
 const BootstrapTokenSecret = "integration-new-bootstrap-token-secret";
 const BootstrapTokenIssuer = "integration-new-data-plane-worker";
@@ -46,6 +48,14 @@ const TerminateBootstrapAttachmentResponseSchema = z
 
 const it = createIntegrationTest({
   services: ["data-plane-api", "data-plane-gateway"],
+  __serviceOptions: {
+    dataPlaneGateway: {
+      health: {
+        websocketPingIntervalMs: GatewayHealthIntervalMs,
+        websocketPongTimeoutMs: GatewayHealthTimeoutMs,
+      },
+    },
+  },
 });
 
 it(
