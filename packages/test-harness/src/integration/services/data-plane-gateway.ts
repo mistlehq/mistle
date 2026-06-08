@@ -32,6 +32,11 @@ const Host = "127.0.0.1";
 const DockerSandboxReachableHost = "0.0.0.0";
 const DefaultWebSocketPingIntervalMs = 10_000;
 const DefaultWebSocketPongTimeoutMs = 10_000;
+const IntegrationTelemetryBatchDelayMs = 100;
+const OTelBatchDelayEnv = {
+  LOGS: "OTEL_BLRP_SCHEDULE_DELAY",
+  TRACES: "OTEL_BSP_SCHEDULE_DELAY",
+} as const;
 
 const InfraIds = {
   NATS: "nats",
@@ -128,6 +133,8 @@ function start(input: {
       nats: startInput.infra.get(InfraIds.NATS),
       sandbox: input.sandbox,
     });
+    const restoreTelemetryBatchEnv =
+      otlp === undefined ? undefined : setDefaultTelemetryBatchDelayEnv();
     const telemetry =
       otlp === undefined
         ? undefined
@@ -144,6 +151,7 @@ function start(input: {
     } catch (error) {
       await runtime.stop();
       await telemetry?.shutdown();
+      restoreTelemetryBatchEnv?.();
       throw error;
     }
 
@@ -158,11 +166,37 @@ function start(input: {
       },
       startDrain: runtime.startDrain,
       stop: async () => {
-        await runtime.stop();
-        await telemetry?.shutdown();
+        try {
+          await runtime.stop();
+          await telemetry?.shutdown();
+        } finally {
+          restoreTelemetryBatchEnv?.();
+        }
       },
     };
   };
+}
+
+function setDefaultTelemetryBatchDelayEnv(): () => void {
+  const originalLogBatchDelay = process.env[OTelBatchDelayEnv.LOGS];
+  const originalTraceBatchDelay = process.env[OTelBatchDelayEnv.TRACES];
+
+  process.env[OTelBatchDelayEnv.LOGS] ??= String(IntegrationTelemetryBatchDelayMs);
+  process.env[OTelBatchDelayEnv.TRACES] ??= String(IntegrationTelemetryBatchDelayMs);
+
+  return () => {
+    restoreOptionalEnv(OTelBatchDelayEnv.LOGS, originalLogBatchDelay);
+    restoreOptionalEnv(OTelBatchDelayEnv.TRACES, originalTraceBatchDelay);
+  };
+}
+
+function restoreOptionalEnv(envName: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[envName];
+    return;
+  }
+
+  process.env[envName] = value;
 }
 
 function config(input: {

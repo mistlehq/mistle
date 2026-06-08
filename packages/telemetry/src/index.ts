@@ -14,7 +14,12 @@ import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import type { PgRequestHookInformation } from "@opentelemetry/instrumentation-pg";
-import { BatchLogRecordProcessor, LoggerProvider } from "@opentelemetry/sdk-logs";
+import {
+  BatchLogRecordProcessor,
+  LoggerProvider,
+  type BufferConfig,
+  type LogRecordExporter,
+} from "@opentelemetry/sdk-logs";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { NodeSDK, resources } from "@opentelemetry/sdk-node";
 
@@ -31,6 +36,10 @@ const OTLP_TRACES_ENDPOINT_ENV = "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT";
 const OTLP_LOGS_ENDPOINT_ENV = "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT";
 const OTLP_METRICS_ENDPOINT_ENV = "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT";
 const OTEL_NODE_ENABLED_INSTRUMENTATIONS_ENV = "OTEL_NODE_ENABLED_INSTRUMENTATIONS";
+const OTEL_BLRP_MAX_QUEUE_SIZE_ENV = "OTEL_BLRP_MAX_QUEUE_SIZE";
+const OTEL_BLRP_SCHEDULE_DELAY_ENV = "OTEL_BLRP_SCHEDULE_DELAY";
+const OTEL_BLRP_EXPORT_TIMEOUT_ENV = "OTEL_BLRP_EXPORT_TIMEOUT";
+const OTEL_BLRP_MAX_EXPORT_BATCH_SIZE_ENV = "OTEL_BLRP_MAX_EXPORT_BATCH_SIZE";
 const DISABLED_VALUES = new Set(["0", "false"]);
 const ENABLED_VALUES = new Set(["1", "true"]);
 const DEFAULT_NODE_INSTRUMENTATIONS: readonly string[] = [
@@ -352,6 +361,44 @@ function resolveRequiredEndpoint(env: NodeJS.ProcessEnv, envName: string): strin
   return endpoint;
 }
 
+function readNonNegativeNumberEnv(envName: string): number | undefined {
+  const rawValue = process.env[envName]?.trim();
+  if (rawValue === undefined || rawValue.length === 0) {
+    return undefined;
+  }
+
+  const value = Number(rawValue);
+  if (Number.isFinite(value) && value >= 0) {
+    return value;
+  }
+
+  diag.warn(`${envName} must be a non-negative number. Ignoring value '${rawValue}'.`);
+  return undefined;
+}
+
+function createBatchLogRecordProcessor(exporter: LogRecordExporter): BatchLogRecordProcessor {
+  const config: BufferConfig = {};
+  const maxQueueSize = readNonNegativeNumberEnv(OTEL_BLRP_MAX_QUEUE_SIZE_ENV);
+  const scheduledDelayMillis = readNonNegativeNumberEnv(OTEL_BLRP_SCHEDULE_DELAY_ENV);
+  const exportTimeoutMillis = readNonNegativeNumberEnv(OTEL_BLRP_EXPORT_TIMEOUT_ENV);
+  const maxExportBatchSize = readNonNegativeNumberEnv(OTEL_BLRP_MAX_EXPORT_BATCH_SIZE_ENV);
+
+  if (maxQueueSize !== undefined) {
+    config.maxQueueSize = maxQueueSize;
+  }
+  if (scheduledDelayMillis !== undefined) {
+    config.scheduledDelayMillis = scheduledDelayMillis;
+  }
+  if (exportTimeoutMillis !== undefined) {
+    config.exportTimeoutMillis = exportTimeoutMillis;
+  }
+  if (maxExportBatchSize !== undefined) {
+    config.maxExportBatchSize = maxExportBatchSize;
+  }
+
+  return new BatchLogRecordProcessor(exporter, config);
+}
+
 function readTelemetryConfig(env: NodeJS.ProcessEnv): TelemetryConfig {
   const enabled = normalizeBooleanEnv(env[ENABLED_ENV], ENABLED_ENV) ?? false;
   const debug = normalizeBooleanEnv(env[DEBUG_ENV], DEBUG_ENV) ?? false;
@@ -435,7 +482,7 @@ export function createOtlpLogForwarder(input: {
         resourceAttributes: input.resourceAttributes,
       }),
     ),
-    processors: [new BatchLogRecordProcessor(new OTLPLogExporter({ url: input.logs.endpoint }))],
+    processors: [createBatchLogRecordProcessor(new OTLPLogExporter({ url: input.logs.endpoint }))],
   });
   const logger = loggerProvider.getLogger(serviceName);
 
@@ -496,7 +543,7 @@ export function initializeTelemetry(input: InitializeTelemetryInput): TelemetryH
     serviceName,
     traceExporter: new OTLPTraceExporter({ url: config.traces.endpoint }),
     logRecordProcessors: [
-      new BatchLogRecordProcessor(new OTLPLogExporter({ url: config.logs.endpoint })),
+      createBatchLogRecordProcessor(new OTLPLogExporter({ url: config.logs.endpoint })),
     ],
     metricReaders: [
       new PeriodicExportingMetricReader({

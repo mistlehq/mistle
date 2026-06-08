@@ -80,6 +80,43 @@ describe("createOtlpLogForwarder", () => {
     expect(server.requests[0]?.body.toString("utf8")).toContain("sandbox runtime started");
   });
 
+  it("uses the standard OTEL_BLRP schedule delay for batch log exports", async () => {
+    const server = await startOtlpTestServer();
+    const originalScheduleDelay = process.env.OTEL_BLRP_SCHEDULE_DELAY;
+    process.env.OTEL_BLRP_SCHEDULE_DELAY = "1";
+
+    const forwarder = createOtlpLogForwarder({
+      serviceName: "@mistle/sandboxd",
+      logs: {
+        endpoint: server.endpointForPath("/v1/logs"),
+      },
+    });
+
+    try {
+      forwarder.emit({
+        body: "sandbox runtime streamed log",
+        severityText: "INFO",
+      });
+
+      await expect
+        .poll(() => server.requests.some((request) => request.path === "/v1/logs"), {
+          interval: 10,
+          timeout: 1_000,
+        })
+        .toBe(true);
+    } finally {
+      await forwarder.shutdown();
+      await server.close();
+      if (originalScheduleDelay === undefined) {
+        delete process.env.OTEL_BLRP_SCHEDULE_DELAY;
+      } else {
+        process.env.OTEL_BLRP_SCHEDULE_DELAY = originalScheduleDelay;
+      }
+    }
+
+    expect(server.requests.some((request) => request.path === "/v1/logs")).toBe(true);
+  });
+
   it("exports OTLP metrics and preserves an explicit instrumentation allowlist", async () => {
     const server = await startOtlpTestServer();
     const originalInstrumentationEnv = process.env.OTEL_NODE_ENABLED_INSTRUMENTATIONS;
