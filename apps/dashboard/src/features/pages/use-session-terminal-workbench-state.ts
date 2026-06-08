@@ -1,15 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
-import {
-  getBestEffortBrowserStorage,
-  readBrowserStorageJson,
-  writeBrowserStorageJson,
-} from "../shared/browser-storage.js";
-
-const TERMINAL_WORKBENCH_STORAGE_KEY_PREFIX = "dashboard:session-terminal-workbench:";
 const MIN_TERMINAL_PANEL_SIZE = 160;
 
-type PersistedTerminalWorkbenchState = {
+type TerminalWorkbenchPanelState = {
   isVisible: boolean;
 };
 
@@ -20,135 +13,40 @@ type SessionTerminalWorkbenchState = {
   togglePanel: () => void;
 };
 
-type VolatileTerminalWorkbenchState = {
-  generation: number;
-  state: PersistedTerminalWorkbenchState;
-};
-
-function getTerminalWorkbenchStorageKey(sandboxInstanceId: string): string {
-  return `${TERMINAL_WORKBENCH_STORAGE_KEY_PREFIX}${sandboxInstanceId}`;
-}
-
-function isPersistedTerminalWorkbenchState(
-  value: unknown,
-): value is PersistedTerminalWorkbenchState {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return false;
-  }
-
-  return typeof Reflect.get(value, "isVisible") === "boolean";
-}
-
-function readPersistedTerminalWorkbenchState(
-  sandboxInstanceId: string | null,
-): PersistedTerminalWorkbenchState {
-  if (sandboxInstanceId === null) {
-    return {
-      isVisible: false,
-    };
-  }
-
-  const storage = getBestEffortBrowserStorage("local");
-  if (storage === null) {
-    return {
-      isVisible: false,
-    };
-  }
-
-  const storedValue = readBrowserStorageJson({
-    key: getTerminalWorkbenchStorageKey(sandboxInstanceId),
-    storage,
-    isValue: isPersistedTerminalWorkbenchState,
-  });
-  if (storedValue === null) {
-    return {
-      isVisible: false,
-    };
-  }
-
+function createClosedTerminalWorkbenchState(): TerminalWorkbenchPanelState {
   return {
-    isVisible: storedValue.isVisible,
+    isVisible: false,
   };
 }
 
 export function useSessionTerminalWorkbenchState(input: {
   sandboxInstanceId: string | null;
 }): SessionTerminalWorkbenchState {
-  const storage = getBestEffortBrowserStorage("local");
   const previousSandboxInstanceIdRef = useRef(input.sandboxInstanceId);
-  const volatileStateGenerationRef = useRef(0);
+  const currentStateRef = useRef<TerminalWorkbenchPanelState>(createClosedTerminalWorkbenchState());
+  const [, setRevision] = useState(0);
+
   if (previousSandboxInstanceIdRef.current !== input.sandboxInstanceId) {
     previousSandboxInstanceIdRef.current = input.sandboxInstanceId;
-    volatileStateGenerationRef.current += 1;
+    currentStateRef.current = createClosedTerminalWorkbenchState();
   }
-  const [stateBySandboxInstanceId, setStateBySandboxInstanceId] = useState<
-    Readonly<Record<string, PersistedTerminalWorkbenchState>>
-  >({});
-  const [volatileState, setVolatileState] = useState<VolatileTerminalWorkbenchState>({
-    generation: volatileStateGenerationRef.current,
-    state: readPersistedTerminalWorkbenchState(null),
-  });
+
   const resolvedState =
     input.sandboxInstanceId === null
-      ? readPersistedTerminalWorkbenchState(null)
-      : storage === null
-        ? volatileState.generation === volatileStateGenerationRef.current
-          ? volatileState.state
-          : readPersistedTerminalWorkbenchState(null)
-        : (stateBySandboxInstanceId[input.sandboxInstanceId] ??
-          readPersistedTerminalWorkbenchState(input.sandboxInstanceId));
+      ? createClosedTerminalWorkbenchState()
+      : currentStateRef.current;
 
   const updateCurrentState = useCallback(
-    (
-      updater: (currentState: PersistedTerminalWorkbenchState) => PersistedTerminalWorkbenchState,
-    ): void => {
+    (updater: (currentState: TerminalWorkbenchPanelState) => TerminalWorkbenchPanelState): void => {
       if (input.sandboxInstanceId === null) {
         return;
       }
-      const sandboxInstanceId = input.sandboxInstanceId;
 
-      if (storage === null) {
-        setVolatileState((currentState) => ({
-          generation: volatileStateGenerationRef.current,
-          state: updater(
-            currentState.generation === volatileStateGenerationRef.current
-              ? currentState.state
-              : readPersistedTerminalWorkbenchState(null),
-          ),
-        }));
-        return;
-      }
-
-      setStateBySandboxInstanceId((currentState) => {
-        const persistedState =
-          currentState[sandboxInstanceId] ?? readPersistedTerminalWorkbenchState(sandboxInstanceId);
-
-        return {
-          ...currentState,
-          [sandboxInstanceId]: updater(persistedState),
-        };
-      });
+      currentStateRef.current = updater(currentStateRef.current);
+      setRevision((currentRevision) => currentRevision + 1);
     },
-    [input.sandboxInstanceId, storage, volatileStateGenerationRef],
+    [input.sandboxInstanceId],
   );
-
-  useEffect(() => {
-    if (input.sandboxInstanceId === null) {
-      return;
-    }
-
-    if (storage === null) {
-      return;
-    }
-
-    writeBrowserStorageJson({
-      key: getTerminalWorkbenchStorageKey(input.sandboxInstanceId),
-      value: {
-        isVisible: resolvedState.isVisible,
-      },
-      storage,
-    });
-  }, [input.sandboxInstanceId, resolvedState, storage]);
 
   const openPanel = useCallback((): void => {
     updateCurrentState((currentState) => ({

@@ -742,29 +742,39 @@ describe("useSessionWorkbenchController", () => {
     ).toBe("error");
   });
 
-  it("persists terminal panel visibility per sandbox instance", () => {
-    const hasStorageApi =
-      typeof window.localStorage === "object" &&
-      window.localStorage !== null &&
-      typeof window.localStorage.getItem === "function" &&
-      typeof window.localStorage.removeItem === "function";
+  it("starts terminal panel visibility closed after changing sandbox workbenches", () => {
     const sandboxInstanceIdOne = `sbi-one-${Date.now()}`;
     const sandboxInstanceIdTwo = `sbi-two-${Date.now()}`;
-
-    if (hasStorageApi) {
-      window.localStorage.removeItem(
-        `dashboard:session-terminal-workbench:${sandboxInstanceIdOne}`,
-      );
-      window.localStorage.removeItem(
-        `dashboard:session-terminal-workbench:${sandboxInstanceIdTwo}`,
-      );
-    }
 
     const queryClient = createControllerQueryClient();
     const { result, rerender } = renderSessionWorkbenchController({
       queryClient,
       sandboxInstanceId: sandboxInstanceIdOne,
     });
+
+    act(() => {
+      result.current.workbench.terminalPanelState.openPanel();
+    });
+
+    expect(result.current.workbench.terminalPanelState.isVisible).toBe(true);
+
+    act(() => {
+      result.current.workbench.terminalPanelState.closePanel();
+    });
+
+    expect(result.current.workbench.terminalPanelState.isVisible).toBe(false);
+
+    act(() => {
+      result.current.workbench.terminalPanelState.togglePanel();
+    });
+
+    expect(result.current.workbench.terminalPanelState.isVisible).toBe(true);
+
+    act(() => {
+      result.current.workbench.terminalPanelState.togglePanel();
+    });
+
+    expect(result.current.workbench.terminalPanelState.isVisible).toBe(false);
 
     act(() => {
       result.current.workbench.terminalPanelState.openPanel();
@@ -782,9 +792,34 @@ describe("useSessionWorkbenchController", () => {
       sandboxInstanceId: sandboxInstanceIdOne,
     });
 
-    const expectedVisibility = hasStorageApi;
+    expect(result.current.workbench.terminalPanelState.isVisible).toBe(false);
+  });
 
-    expect(result.current.workbench.terminalPanelState.isVisible).toBe(expectedVisibility);
+  it("starts terminal panel visibility closed after remounting the same sandbox workbench", () => {
+    const sandboxInstanceId = `sbi-remount-${Date.now()}`;
+
+    const queryClient = createControllerQueryClient();
+    const firstRender = renderSessionWorkbenchController({
+      queryClient,
+      sandboxInstanceId,
+    });
+
+    expect(firstRender.result.current.workbench.terminalPanelState.isVisible).toBe(false);
+
+    act(() => {
+      firstRender.result.current.workbench.terminalPanelState.openPanel();
+    });
+
+    expect(firstRender.result.current.workbench.terminalPanelState.isVisible).toBe(true);
+
+    firstRender.unmount();
+
+    const secondRender = renderSessionWorkbenchController({
+      queryClient,
+      sandboxInstanceId,
+    });
+
+    expect(secondRender.result.current.workbench.terminalPanelState.isVisible).toBe(false);
   });
 
   it("persists diff panel visibility per sandbox instance", () => {

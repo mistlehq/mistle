@@ -16,12 +16,12 @@ import {
 } from "../shared/browser-storage.js";
 import { MIN_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 
-const BottomPanelGroupIdPrefix = "dashboard:session-workbench:bottom";
 const MainPanelGroupIdPrefix = "dashboard:session-workbench:main";
 const MainWorkspacePanelId = "session-workbench-main-workspace-panel";
 const BottomPanelId = "session-workbench-bottom-panel";
 const PrimaryPanelId = "session-workbench-primary-panel";
 const SecondaryPanelId = "session-workbench-secondary-panel";
+const DefaultTerminalPanelHeightPx = 320;
 
 type SessionWorkbenchAlert = {
   title: string;
@@ -92,10 +92,6 @@ export function SessionWorkbenchPageView({
       });
     },
   } satisfies Pick<Storage, "getItem" | "setItem">;
-  const bottomPanelLayoutPersistence = useDefaultLayout({
-    id: `${BottomPanelGroupIdPrefix}:${sandboxInstanceKey}`,
-    storage: layoutStorage,
-  });
   const mainPanelLayoutPersistence = useDefaultLayout({
     id: `${MainPanelGroupIdPrefix}:${sandboxInstanceKey}:${secondaryPanelLayoutKey}`,
     panelIds: isSecondaryPanelVisible ? [PrimaryPanelId, SecondaryPanelId] : [PrimaryPanelId],
@@ -125,6 +121,9 @@ export function SessionWorkbenchPageView({
     }
 
     bottomPanel.expand();
+    if (wasBottomPanelVisible !== true) {
+      bottomPanel.resize(`${String(DefaultTerminalPanelHeightPx)}px`);
+    }
   }, [isBottomPanelVisible]);
 
   if (sandboxInstanceId === null) {
@@ -175,14 +174,6 @@ export function SessionWorkbenchPageView({
   const workspaceWithBottomPanel = (
     <ResizablePanelGroup
       className="min-h-0 h-full"
-      defaultLayout={bottomPanelLayoutPersistence.defaultLayout}
-      onLayoutChanged={(layout: { [id: string]: number }) => {
-        if (!isBottomPanelVisible) {
-          return;
-        }
-
-        bottomPanelLayoutPersistence.onLayoutChanged(layout);
-      }}
       orientation="vertical"
       resizeTargetMinimumSize={{ coarse: 36, fine: 18 }}
     >

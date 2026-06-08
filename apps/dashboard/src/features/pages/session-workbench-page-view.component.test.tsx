@@ -79,6 +79,45 @@ describe("SessionWorkbenchPageView", () => {
     expect(screen.getByText("Terminal workspace")).toBeDefined();
   });
 
+  it("opens the terminal panel with a pixel-based default height", () => {
+    const originalOffsetHeight = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      "offsetHeight",
+    );
+
+    Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
+      configurable: true,
+      get(): number {
+        return 400;
+      },
+    });
+
+    try {
+      render(
+        <SessionWorkbenchPageView
+          alert={null}
+          bottomPanel={<div>Terminal workspace</div>}
+          isBottomPanelVisible
+          isSecondaryPanelVisible={false}
+          mainContent={<div>Conversation body</div>}
+          primaryBottomPanel={<div>Composer</div>}
+          sandboxInstanceId="sbi_test"
+          secondaryPanel={<div>Secondary</div>}
+        />,
+      );
+
+      expect(screen.getByTestId("session-workbench-bottom-panel").getAttribute("style")).toContain(
+        "flex: 40 1 0px;",
+      );
+    } finally {
+      if (originalOffsetHeight === undefined) {
+        Reflect.deleteProperty(HTMLElement.prototype, "offsetHeight");
+      } else {
+        Object.defineProperty(HTMLElement.prototype, "offsetHeight", originalOffsetHeight);
+      }
+    }
+  });
+
   it("renders neutral reconnect alerts as polite status updates", () => {
     render(
       <SessionWorkbenchPageView
