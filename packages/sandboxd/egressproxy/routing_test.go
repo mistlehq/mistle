@@ -79,6 +79,42 @@ func TestBuildGatewayEgressRouteNormalizesMatchFields(t *testing.T) {
 	assertEqual(t, route.Methods[0], "POST")
 }
 
+func TestBuildGatewayEgressRouteDoesNotRequireLocalEgressGrants(t *testing.T) {
+	route, err := BuildGatewayEgressRoute(CompiledEgressRoute{
+		EgressRuleID: "egress-rule-a",
+		Match: CompiledEgressRouteMatch{
+			Hosts:        []string{"api.openai.com"},
+			PathPrefixes: []string{"/v1"},
+			Methods:      []string{"POST"},
+		},
+		Upstream: CompiledEgressRouteUpstream{BaseURL: "https://gateway.example.test/direct"},
+	})
+	requireNoError(t, err)
+
+	assertEqual(t, route.EgressRuleID, "egress-rule-a")
+	assertEqual(t, route.Hosts[0], "api.openai.com")
+}
+
+func TestBuildGatewayEgressRouteMatchesDeclaredHostsNotUpstreamHost(t *testing.T) {
+	route, err := BuildGatewayEgressRoute(CompiledEgressRoute{
+		EgressRuleID: "egress-rule-a",
+		Match: CompiledEgressRouteMatch{
+			Hosts:        []string{"API.GITHUB.COM"},
+			PathPrefixes: []string{"/v1/chat/completions"},
+			Methods:      []string{"POST"},
+		},
+		Upstream: CompiledEgressRouteUpstream{BaseURL: "https://proxy.github.internal/direct"},
+	})
+	requireNoError(t, err)
+
+	assertEqual(t, route.Hosts[0], "api.github.com")
+	matched, err := MatchRoute([]Route{route}, "API.GITHUB.COM", "/v1/chat/completions", "POST")
+	requireNoError(t, err)
+	if matched == nil {
+		t.Fatalf("expected declared host to match even when upstream host differs")
+	}
+}
+
 func TestManagedProxyEnvIncludesCAVariablesWithoutProxyRouting(t *testing.T) {
 	env := BuildManagedProxyEnv("/run/mistle/sandboxd/egress-proxy-ca-bundle.pem")
 

@@ -10,13 +10,14 @@ import (
 )
 
 type ChildConfig struct {
-	SandboxInstanceID    string       `json:"sandboxInstanceId"`
-	ListenAddr           string       `json:"listenAddr"`
-	TunnelGatewayWSURL   string       `json:"tunnelGatewayWsUrl"`
-	TokenBridgeFD        *int         `json:"tokenBridgeFd"`
-	Routes               []ChildRoute `json:"routes"`
-	ProxyCACertificateFD int          `json:"proxyCaCertificateFd"`
-	ProxyCAPrivateKeyFD  int          `json:"proxyCaPrivateKeyFd"`
+	SandboxInstanceID     string       `json:"sandboxInstanceId"`
+	ListenAddr            string       `json:"listenAddr"`
+	TransparentListenAddr string       `json:"transparentListenAddr,omitempty"`
+	TunnelGatewayWSURL    string       `json:"tunnelGatewayWsUrl"`
+	TokenBridgeFD         *int         `json:"tokenBridgeFd"`
+	Routes                []ChildRoute `json:"routes"`
+	ProxyCACertificateFD  int          `json:"proxyCaCertificateFd"`
+	ProxyCAPrivateKeyFD   int          `json:"proxyCaPrivateKeyFd"`
 }
 
 type ChildRoute struct {
@@ -48,6 +49,11 @@ func ReadChildConfig(configPath string) (ChildConfig, error) {
 	}
 	if _, err := net.ResolveTCPAddr("tcp", config.ListenAddr); err != nil {
 		return ChildConfig{}, fmt.Errorf("failed to parse egress proxy child config %q: listenAddr must be a socket address: %w", configPath, err)
+	}
+	if config.TransparentListenAddr != "" {
+		if _, err := net.ResolveTCPAddr("tcp", config.TransparentListenAddr); err != nil {
+			return ChildConfig{}, fmt.Errorf("failed to parse egress proxy child config %q: transparentListenAddr must be a socket address: %w", configPath, err)
+		}
 	}
 	if config.SandboxInstanceID == "" {
 		return ChildConfig{}, fmt.Errorf("failed to parse egress proxy child config %q: sandboxInstanceId is required", configPath)
@@ -84,7 +90,28 @@ func RunEgressProxyChild(configPath string) error {
 		listener.Close()
 		return err
 	}
-	return RunProxyServer(listener, state)
+	if config.TransparentListenAddr == "" {
+		return RunProxyServer(listener, state)
+	}
+	transparentListener, err := net.Listen("tcp", config.TransparentListenAddr)
+	if err != nil {
+		listener.Close()
+		return fmt.Errorf("failed to bind transparent egress proxy listener: %w", err)
+	}
+	done := make(chan error, 2)
+	go func() {
+		done <- RunProxyServer(listener, state)
+	}()
+	go func() {
+		done <- RunTransparentProxyServer(transparentListener, state)
+	}()
+	err = <-done
+	_ = listener.Close()
+	_ = transparentListener.Close()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func BuildChildProxyState(config ChildConfig) (*ProxyState, error) {

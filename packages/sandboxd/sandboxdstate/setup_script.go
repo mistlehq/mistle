@@ -16,10 +16,23 @@ const (
 )
 
 func RunSetupScript(runtimePlan runtime.CompiledRuntimePlan, runtimeEnv map[string]string) *command.Failure {
-	return RunSetupScriptInDirectory(runtimePlan, runtimeEnv, SetupScriptWorkingDirectory)
+	return RunSetupScriptWithOutputSink(runtimePlan, runtimeEnv, nil)
+}
+
+func RunSetupScriptWithOutputSink(runtimePlan runtime.CompiledRuntimePlan, runtimeEnv map[string]string, outputSink command.OutputSink) *command.Failure {
+	return RunSetupScriptInDirectoryWithOutputSink(runtimePlan, runtimeEnv, SetupScriptWorkingDirectory, outputSink)
 }
 
 func RunSetupScriptInDirectory(runtimePlan runtime.CompiledRuntimePlan, runtimeEnv map[string]string, workingDirectory string) *command.Failure {
+	return RunSetupScriptInDirectoryWithOutputSink(runtimePlan, runtimeEnv, workingDirectory, nil)
+}
+
+func RunSetupScriptInDirectoryWithOutputSink(
+	runtimePlan runtime.CompiledRuntimePlan,
+	runtimeEnv map[string]string,
+	workingDirectory string,
+	outputSink command.OutputSink,
+) *command.Failure {
 	setupScript := runtimePlan.SetupScript
 	if setupScript == nil || strings.TrimSpace(*setupScript) == "" {
 		return nil
@@ -61,11 +74,11 @@ func RunSetupScriptInDirectory(runtimePlan runtime.CompiledRuntimePlan, runtimeE
 	}
 
 	environment := BuildSetupScriptEnvironment(runtimeEnv)
-	runFailure := command.RunWithDetails(command.Spec{
+	runFailure := command.RunWithDetailsAndOutputSink(command.Spec{
 		Args: buildSetupScriptCommandArgs(*setupScript, setupScriptPath),
 		Env:  environment,
 		CWD:  &workingDirectory,
-	})
+	}, outputSink)
 	cleanupFailure := cleanup()
 	if cleanupFailure != nil {
 		return cleanupFailure

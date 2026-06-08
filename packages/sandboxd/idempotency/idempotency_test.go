@@ -119,6 +119,12 @@ func TestSameOperationAndKeyAreScopedByRuntimeID(t *testing.T) {
 	}
 	assertEqual(t, codexRecord.RuntimeID, AgentRuntimeCodex)
 	assertEqual(t, opencodeRecord.RuntimeID, AgentRuntimeOpenCode)
+	storedCodexRecord, err := store.GetByKey(AgentRuntimeCodex, IdempotencyOperationSubmitPayload, "shared_key")
+	requireNoError(t, err)
+	assertEqual(t, storedCodexRecord.RequestFingerprint, submitFingerprint(t, "codex"))
+	storedOpenCodeRecord, err := store.GetByKey(AgentRuntimeOpenCode, IdempotencyOperationSubmitPayload, "shared_key")
+	requireNoError(t, err)
+	assertEqual(t, storedOpenCodeRecord.RequestFingerprint, opencodeSubmitFingerprint(t, "opencode"))
 }
 
 func TestDeleteStartedRemovesMatchingStartedRecord(t *testing.T) {
@@ -189,6 +195,15 @@ func TestAcceptedAndCompletedUpdatesPersistAcrossReload(t *testing.T) {
 		t.Fatalf("expected provider conversation id")
 	}
 	assertEqual(t, *record.ProviderConversationID, "thread_123")
+	if record.ProviderExecutionID == nil {
+		t.Fatalf("expected provider execution id")
+	}
+	assertEqual(t, *record.ProviderExecutionID, "turn_123")
+	response, ok := record.Response.(map[string]any)
+	if !ok {
+		t.Fatalf("expected persisted response object, got %#v", record.Response)
+	}
+	assertEqual(t, response["accepted"].(bool), true)
 }
 
 func TestMarkAcceptedRequiresExistingRecord(t *testing.T) {

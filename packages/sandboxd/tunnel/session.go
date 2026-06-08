@@ -24,3 +24,11 @@ func DeriveSandboxInstanceID(gatewayWSURL string) (string, error) {
 	}
 	return "", fmt.Errorf("tunnel gateway url must end with the sandbox instance id path segment")
 }
+
+func DeriveOperationID(gatewayWSURL string) (string, error) {
+	parsedURL, err := url.Parse(gatewayWSURL)
+	if err != nil {
+		return "", fmt.Errorf("tunnel gateway url is invalid: %w", err)
+	}
+	return parsedURL.Query().Get("operation_id"), nil
+}

@@ -18,6 +18,7 @@ func TestReadChildConfigParsesRoutesAndInheritedFDs(t *testing.T) {
 	requireNoError(t, os.WriteFile(configPath, []byte(`{
 		"sandboxInstanceId": "sbi_child_config",
 		"listenAddr": "127.0.0.1:38513",
+		"transparentListenAddr": "127.0.0.1:38514",
 		"tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox/sbi_child_config",
 		"tokenBridgeFd": 7,
 		"routes": [
@@ -37,6 +38,7 @@ func TestReadChildConfigParsesRoutesAndInheritedFDs(t *testing.T) {
 	requireNoError(t, err)
 	assertEqual(t, config.SandboxInstanceID, "sbi_child_config")
 	assertEqual(t, config.ListenAddr, "127.0.0.1:38513")
+	assertEqual(t, config.TransparentListenAddr, "127.0.0.1:38514")
 	assertEqual(t, config.TunnelGatewayWSURL, "ws://127.0.0.1:5003/tunnel/sandbox/sbi_child_config")
 	if config.TokenBridgeFD == nil {
 		t.Fatalf("expected token bridge fd")
@@ -198,6 +200,7 @@ func TestReadPEMFromInheritedFDRejectsEmptyPayload(t *testing.T) {
 	requireNoError(t, err)
 
 	_, err = ReadPEMFromInheritedFD("proxy ca private key", int(tempFile.Fd()))
+	_ = tempFile.Close()
 
 	if err == nil {
 		t.Fatalf("expected empty payload to fail")

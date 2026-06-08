@@ -1,22 +1,37 @@
 package egressproxy
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/netip"
+	"os"
+	"os/exec"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/mistle/sandboxd/protocol"
 )
 
 const (
-	TransparentNftablesTableName = "mistle_transparent_egress"
-	localDestinationSetName      = "local_destinations"
+	TransparentNftablesTableName      = "mistle_transparent_egress"
+	localDestinationSetName           = "local_destinations"
+	localDestinationReconcileInterval = 30 * time.Second
 )
 
 var StaticLocalDestinationIPv4CIDRs = []string{"127.0.0.0/8", "169.254.0.0/16"}
+
+var transparentProxyDiagnosticsOutput io.Writer = os.Stderr
+var discoverTransparentLocalDestinationIPv4CIDRs = discoverLocalDestinationIPv4CIDRs
+var runTransparentNftScript = runNftScript
+var transparentLocalDestinationState = struct {
+	sync.Mutex
+	cidrsByTable map[string][]string
+}{cidrsByTable: map[string][]string{}}
 
 type NftablesRulePlan struct {
 	TableName                 string
@@ -24,6 +39,134 @@ type NftablesRulePlan struct {
 	PassthroughMark           uint32
 	LocalDestinationIPv4CIDRs []string
 	ExcludedIPv4CIDRs         []string
+}
+
+type TransparentPacketRules struct {
+	TableName                 string
+	LocalDestinationIPv4CIDRs []string
+	ExcludedIPv4CIDRs         []string
+	reconciler                *transparentLocalDestinationReconciler
+}
+
+func InstallTransparentPacketRules(configuration protocol.TransparentProxyConfiguration, listenerPort uint16) (*TransparentPacketRules, error) {
+	plan, err := BuildNftablesRulePlan(configuration, listenerPort)
+	if err != nil {
+		return nil, err
+	}
+	if err := CleanupTransparentNftablesTable(plan.TableName); err != nil {
+		return nil, err
+	}
+	if err := installNftablesRulePlan(plan); err != nil {
+		return nil, err
+	}
+	reconciler, err := startTransparentLocalDestinationReconciler(plan.TableName, localDestinationReconcileInterval)
+	if err != nil {
+		return nil, cleanupAfterNftablesInstallError(plan.TableName, err)
+	}
+	return &TransparentPacketRules{
+		TableName:                 plan.TableName,
+		LocalDestinationIPv4CIDRs: append([]string(nil), plan.LocalDestinationIPv4CIDRs...),
+		ExcludedIPv4CIDRs:         append([]string(nil), plan.ExcludedIPv4CIDRs...),
+		reconciler:                reconciler,
+	}, nil
+}
+
+func (rules *TransparentPacketRules) Cleanup() error {
+	if rules == nil {
+		return nil
+	}
+	if rules.reconciler != nil {
+		rules.reconciler.Close()
+	}
+	return CleanupTransparentNftablesTable(rules.TableName)
+}
+
+type transparentLocalDestinationReconciler struct {
+	stop    chan struct{}
+	done    chan struct{}
+	monitor transparentRouteEventMonitor
+	once    sync.Once
+}
+
+type transparentRouteEventMonitor interface {
+	Close()
+	Events() <-chan struct{}
+}
+
+type transparentRouteEventMonitorStarter func() (transparentRouteEventMonitor, error)
+
+func startTransparentLocalDestinationReconciler(tableName string, interval time.Duration) (*transparentLocalDestinationReconciler, error) {
+	return startTransparentLocalDestinationReconcilerWithMonitor(tableName, interval, startTransparentRouteEventMonitor)
+}
+
+func startTransparentLocalDestinationReconcilerWithMonitor(
+	tableName string,
+	interval time.Duration,
+	startMonitor transparentRouteEventMonitorStarter,
+) (*transparentLocalDestinationReconciler, error) {
+	monitor, err := startMonitor()
+	if err != nil {
+		return nil, fmt.Errorf("failed to start transparent proxy local destination route monitor: %w", err)
+	}
+	reconciler := &transparentLocalDestinationReconciler{
+		stop:    make(chan struct{}),
+		done:    make(chan struct{}),
+		monitor: monitor,
+	}
+	go func() {
+		defer close(reconciler.done)
+		defer monitor.Close()
+		recordTransparentLocalDestinationReconcile(tableName, "startup", 0)
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-reconciler.stop:
+				return
+			case _, ok := <-monitor.Events():
+				if !ok {
+					return
+				}
+				recordTransparentLocalDestinationReconcile(tableName, "rtnetlink_event", drainTransparentRouteEvents(monitor.Events())+1)
+			case <-ticker.C:
+				recordTransparentLocalDestinationReconcile(tableName, "periodic", 0)
+			}
+		}
+	}()
+	return reconciler, nil
+}
+
+func (reconciler *transparentLocalDestinationReconciler) Close() {
+	reconciler.once.Do(func() {
+		close(reconciler.stop)
+		<-reconciler.done
+	})
+}
+
+func drainTransparentRouteEvents(events <-chan struct{}) int {
+	count := 0
+	for {
+		select {
+		case _, ok := <-events:
+			if !ok {
+				return count
+			}
+			count++
+		default:
+			return count
+		}
+	}
+}
+
+func BuildNftablesRulePlan(
+	configuration protocol.TransparentProxyConfiguration,
+	listenerPort uint16,
+) (NftablesRulePlan, error) {
+	localDestinationIPv4CIDRs, err := discoverLocalDestinationIPv4CIDRs()
+	if err != nil {
+		return NftablesRulePlan{}, err
+	}
+	return BuildNftablesRulePlanWithLocalDestinations(configuration, listenerPort, localDestinationIPv4CIDRs)
 }
 
 func BuildNftablesRulePlanWithLocalDestinations(
@@ -95,6 +238,161 @@ func BuildNftablesLocalDestinationSetReplaceScript(tableName string, cidrs []str
 		lines = append(lines, strings.Join(command, " "))
 	}
 	return strings.Join(lines, "\n") + "\n"
+}
+
+func recordTransparentLocalDestinationReconcile(tableName string, trigger string, eventCount int) {
+	startedAt := time.Now()
+	cidrs, err := reconcileTransparentLocalDestinationsWith(tableName, discoverTransparentLocalDestinationIPv4CIDRs, runTransparentNftScript)
+	if err != nil {
+		emitTransparentProxyDiagnostic("egress_proxy_local_destination_reconcile_failed", map[string]any{
+			"tableName":  tableName,
+			"trigger":    trigger,
+			"eventCount": eventCount,
+			"durationMs": time.Since(startedAt).Milliseconds(),
+			"error":      err.Error(),
+		})
+		return
+	}
+	addedCIDRs, removedCIDRs := updateTransparentLocalDestinationState(tableName, cidrs)
+	emitTransparentProxyDiagnostic("egress_proxy_local_destination_reconcile_completed", map[string]any{
+		"tableName":    tableName,
+		"trigger":      trigger,
+		"eventCount":   eventCount,
+		"durationMs":   time.Since(startedAt).Milliseconds(),
+		"cidrCount":    len(cidrs),
+		"cidrs":        cidrs,
+		"addedCidrs":   addedCIDRs,
+		"removedCidrs": removedCIDRs,
+	})
+}
+
+func updateTransparentLocalDestinationState(tableName string, cidrs []string) ([]string, []string) {
+	transparentLocalDestinationState.Lock()
+	defer transparentLocalDestinationState.Unlock()
+	previous := transparentLocalDestinationState.cidrsByTable[tableName]
+	added, removed := diffSortedStrings(previous, cidrs)
+	transparentLocalDestinationState.cidrsByTable[tableName] = append([]string(nil), cidrs...)
+	return added, removed
+}
+
+func diffSortedStrings(previous []string, next []string) ([]string, []string) {
+	previousSet := make(map[string]struct{}, len(previous))
+	for _, value := range previous {
+		previousSet[value] = struct{}{}
+	}
+	nextSet := make(map[string]struct{}, len(next))
+	for _, value := range next {
+		nextSet[value] = struct{}{}
+	}
+	added := make([]string, 0)
+	for _, value := range next {
+		if _, ok := previousSet[value]; !ok {
+			added = append(added, value)
+		}
+	}
+	removed := make([]string, 0)
+	for _, value := range previous {
+		if _, ok := nextSet[value]; !ok {
+			removed = append(removed, value)
+		}
+	}
+	return added, removed
+}
+
+func reconcileTransparentLocalDestinations(tableName string) error {
+	_, err := reconcileTransparentLocalDestinationsWith(tableName, discoverLocalDestinationIPv4CIDRs, runNftScript)
+	return err
+}
+
+func reconcileTransparentLocalDestinationsWith(
+	tableName string,
+	discover func() ([]string, error),
+	runScript func(string) error,
+) ([]string, error) {
+	discovered, err := discover()
+	if err != nil {
+		return nil, err
+	}
+	cidrs := append([]string(nil), StaticLocalDestinationIPv4CIDRs...)
+	cidrs = append(cidrs, discovered...)
+	canonicalized, err := canonicalizeIPv4IntervalSetCIDRs(cidrs)
+	if err != nil {
+		return nil, err
+	}
+	if err := runScript(BuildNftablesLocalDestinationSetReplaceScript(tableName, canonicalized)); err != nil {
+		return nil, err
+	}
+	return canonicalized, nil
+}
+
+func emitTransparentProxyDiagnostic(event string, attributes map[string]any) {
+	if transparentProxyDiagnosticsOutput == nil {
+		return
+	}
+	payload := map[string]any{"event": event}
+	for key, value := range attributes {
+		payload[key] = value
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		fmt.Fprintf(transparentProxyDiagnosticsOutput, `{"event":"transparent_proxy_diagnostic_encode_failed","error":%q}`+"\n", err.Error())
+		return
+	}
+	fmt.Fprintln(transparentProxyDiagnosticsOutput, string(encoded))
+}
+
+func CleanupTransparentNftablesTable(tableName string) error {
+	if tableName == "" {
+		return fmt.Errorf("transparent proxy nftables table name is required")
+	}
+	output, err := exec.Command("nft", "delete", "table", "ip", tableName).CombinedOutput()
+	if err != nil {
+		if nftDeleteTableErrorIsAbsent(output) {
+			return nil
+		}
+		return fmt.Errorf("nft cleanup command failed: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+	return nil
+}
+
+func installNftablesRulePlan(plan NftablesRulePlan) error {
+	for _, command := range BuildNftablesInstallCommands(plan) {
+		if err := runNftCommand(command); err != nil {
+			return cleanupAfterNftablesInstallError(plan.TableName, err)
+		}
+	}
+	return nil
+}
+
+func cleanupAfterNftablesInstallError(tableName string, installErr error) error {
+	if cleanupErr := CleanupTransparentNftablesTable(tableName); cleanupErr != nil {
+		return fmt.Errorf("failed to install transparent proxy nftables rules: %w; additionally failed to clean up nftables table %q: %v", installErr, tableName, cleanupErr)
+	}
+	return fmt.Errorf("failed to install transparent proxy nftables rules: %w", installErr)
+}
+
+func runNftCommand(arguments []string) error {
+	output, err := exec.Command("nft", arguments...).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("nft command failed: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+	return nil
+}
+
+func runNftScript(script string) error {
+	command := exec.Command("nft", "-f", "-")
+	command.Stdin = strings.NewReader(script)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("nft script failed: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+	return nil
+}
+
+func nftDeleteTableErrorIsAbsent(stderr []byte) bool {
+	return bytes.Contains(stderr, []byte("No such file or directory")) ||
+		bytes.Contains(stderr, []byte("No such table")) ||
+		bytes.Contains(stderr, []byte("does not exist"))
 }
 
 func ParseIproute2LinkScopeIPv4RouteCIDRs(routeJSON []byte) ([]string, error) {

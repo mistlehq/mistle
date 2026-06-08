@@ -8,12 +8,15 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/mistle/sandboxd/protocol"
 	"github.com/mistle/sandboxd/sandboxdstate"
+	"github.com/mistle/sandboxd/security"
+	"github.com/mistle/sandboxd/startupdiagnostics"
 	"github.com/mistle/sandboxd/supervision"
 	"github.com/mistle/sandboxd/timeutil"
 	"github.com/mistle/sandboxd/tunnel"
@@ -44,6 +47,7 @@ type Server struct {
 	closeOnce      sync.Once
 	state          *serverState
 	signRequestID  atomic.Uint64
+	gitConfigPath  string
 }
 
 type serverState struct {
@@ -89,6 +93,7 @@ func StartServerWithHealthEndpoint(socketPath string, healthEndpointAddr string)
 		done:           make(chan error, 1),
 		healthDone:     make(chan error, 1),
 		state:          state,
+		gitConfigPath:  serverGlobalGitConfigPath(),
 	}
 	server.healthServer = &http.Server{Handler: server.healthHandler()}
 	go server.run()
@@ -101,6 +106,15 @@ func (server *Server) HealthEndpointAddr() string {
 		return ""
 	}
 	return server.healthListener.Addr().String()
+}
+
+func (server *Server) ActivationInput() *protocol.ActivationInput {
+	if server == nil || server.state == nil {
+		return nil
+	}
+	server.state.mutex.Lock()
+	defer server.state.mutex.Unlock()
+	return cloneActivationInputPointer(server.state.activationInput)
 }
 
 func (server *Server) Wait() error {
@@ -152,7 +166,27 @@ func (server *Server) run() {
 
 func (server *Server) finish(err error) {
 	_ = os.Remove(server.socketPath)
+	if closeErr := server.closeActiveSandboxdState(); closeErr != nil && err == nil {
+		err = closeErr
+	}
 	server.done <- err
+}
+
+func (server *Server) closeActiveSandboxdState() error {
+	server.state.mutex.Lock()
+	sandboxdState := server.state.sandboxdState
+	server.state.sandboxdState = nil
+	server.state.phase = ActivationPhaseUnactivated
+	server.state.activationInput = nil
+	server.state.initError = nil
+	server.state.mutex.Unlock()
+	if sandboxdState == nil {
+		return nil
+	}
+	if err := sandboxdState.Close(); err != nil {
+		return fmt.Errorf("failed to close sandboxd state: %w", err)
+	}
+	return nil
 }
 
 func (server *Server) runHealth() {
@@ -165,6 +199,13 @@ func (server *Server) runHealth() {
 
 func (server *Server) handleServerConnection(connection net.Conn) (bool, error) {
 	defer connection.Close()
+	unixConnection, ok := connection.(*net.UnixConn)
+	if !ok {
+		return false, writeServerResponse(connection, ErrorResponse("control socket connection must be a unix socket connection"))
+	}
+	if err := security.EnsureUnixSocketPeerMatchesCurrentProcessUID(unixConnection); err != nil {
+		return false, writeServerResponse(connection, ErrorResponse(err.Error()))
+	}
 	requestBytes, err := io.ReadAll(connection)
 	if err != nil {
 		return false, writeServerResponse(connection, ErrorResponse(fmt.Sprintf("failed to read control socket request: %v", err)))
@@ -190,7 +231,7 @@ func (server *Server) dispatchServerRequest(request Request) (Response, bool) {
 		if err := server.beginActivate(*request.ActivationInput); err != nil {
 			return ErrorResponse(err.Error()), false
 		}
-		return OKResponse(nil), false
+		return OKResponse(nil), request.ActivationInput.OperationKind == protocol.ActivationOperationSnapshot
 	case RequestSign:
 		signatureBase64, err := server.requestSigning(*request.SignRequest)
 		if err != nil {
@@ -218,54 +259,132 @@ func (server *Server) beginShutdown() error {
 }
 
 func (server *Server) beginActivate(activationInput protocol.ActivationInput) error {
-	if err := validateActivationInputForStateInitialization(activationInput); err != nil {
-		return err
-	}
 	server.state.mutex.Lock()
-	defer server.state.mutex.Unlock()
 	switch server.state.phase {
 	case ActivationPhaseUnactivated:
 		server.state.phase = ActivationPhaseActivating
 		server.state.activationInput = cloneActivationInput(activationInput)
-		sandboxdState, err := sandboxdstate.ActivateNew(activationInput, timeutil.SystemClock{})
+		server.state.initError = nil
+		server.state.mutex.Unlock()
+		diagnosticsLogger := initializeActivationDiagnosticsLoggerBestEffort(activationInput)
+		if err := validateActivationInputForStateInitialization(activationInput); err != nil {
+			server.state.mutex.Lock()
+			server.state.phase = ActivationPhaseFailed
+			errorText := err.Error()
+			server.state.initError = &errorText
+			server.state.mutex.Unlock()
+			return fmt.Errorf("sandbox startup request was rejected: sandboxd activation failed: %s", err.Error())
+		}
+		options, err := sandboxdstate.DefaultProductionActivationOptions()
+		if err != nil {
+			server.state.mutex.Lock()
+			server.state.phase = ActivationPhaseFailed
+			errorText := fmt.Sprintf("failed to initialize sandboxd state: %s", err.Error())
+			server.state.initError = &errorText
+			server.state.mutex.Unlock()
+			return fmt.Errorf("sandbox startup request was rejected: sandboxd activation failed: %s", errorText)
+		}
+		options.GlobalGitConfigPath = server.gitConfigPath
+		options.DiagnosticsLogger = diagnosticsLogger
+		sandboxdState, err := sandboxdstate.ActivateNewWithOptions(activationInput, timeutil.SystemClock{}, options)
 		if err == nil {
+			server.state.mutex.Lock()
 			server.state.sandboxdState = sandboxdState
 			server.state.phase = ActivationPhaseActivated
 			server.state.initError = nil
+			server.state.mutex.Unlock()
 			return nil
 		}
 		errorText := fmt.Sprintf("failed to initialize sandboxd state: %s", err.Error())
+		server.state.mutex.Lock()
 		server.state.phase = ActivationPhaseFailed
 		server.state.initError = &errorText
+		server.state.mutex.Unlock()
 		return fmt.Errorf("sandbox startup request was rejected: sandboxd activation failed: %s", errorText)
 	case ActivationPhaseActivating:
+		server.state.mutex.Unlock()
 		return fmt.Errorf("sandbox startup request was rejected: sandboxd is still initializing after activation wait")
 	case ActivationPhaseActivated:
 		if activationInputsEqual(server.state.activationInput, &activationInput) {
+			server.state.mutex.Unlock()
 			return nil
 		}
 		if server.state.activationInput == nil {
+			server.state.mutex.Unlock()
 			return fmt.Errorf("sandbox startup request was rejected: sandboxd is activated without accepted session input")
 		}
-		if string(server.state.activationInput.RuntimePlan) != string(activationInput.RuntimePlan) {
+		sameRuntimePlan, err := runtimePlanJSONEqual(server.state.activationInput.RuntimePlan, activationInput.RuntimePlan)
+		if err != nil {
+			server.state.mutex.Unlock()
+			return fmt.Errorf("failed to resume sandboxd state: initialized activation cannot compare runtime plan: %w", err)
+		}
+		if !sameRuntimePlan {
+			server.state.mutex.Unlock()
 			return fmt.Errorf("failed to resume sandboxd state: initialized activation cannot change runtime plan")
 		}
 		if server.state.sandboxdState == nil {
+			server.state.mutex.Unlock()
 			return fmt.Errorf("failed to resume sandboxd state: activated daemon is missing sandboxd state")
 		}
-		if err := server.state.sandboxdState.ActivateInitialized(activationInput); err != nil {
+		diagnosticsLogger := initializeActivationDiagnosticsLoggerBestEffort(activationInput)
+		sandboxdState := server.state.sandboxdState
+		server.state.phase = ActivationPhaseActivating
+		server.state.mutex.Unlock()
+		sandboxdState.SetDiagnosticsLogger(diagnosticsLogger)
+		if err := sandboxdState.ActivateInitialized(activationInput); err != nil {
+			server.state.mutex.Lock()
+			server.state.phase = ActivationPhaseActivated
+			server.state.mutex.Unlock()
 			return fmt.Errorf("failed to resume sandboxd state: %w", err)
 		}
+		server.state.mutex.Lock()
 		server.state.activationInput = cloneActivationInput(activationInput)
+		server.state.phase = ActivationPhaseActivated
+		server.state.mutex.Unlock()
 		return nil
 	case ActivationPhaseFailed:
 		if server.state.initError == nil {
+			server.state.mutex.Unlock()
 			return fmt.Errorf("sandbox startup request was rejected: sandboxd activation already failed")
 		}
-		return fmt.Errorf("sandbox startup request was rejected: sandboxd activation already failed: %s", *server.state.initError)
+		initError := *server.state.initError
+		server.state.mutex.Unlock()
+		return fmt.Errorf("sandbox startup request was rejected: sandboxd activation already failed: %s", initError)
 	default:
-		return fmt.Errorf("sandbox startup request was rejected: unsupported daemon activation phase %s", server.state.phase)
+		phase := server.state.phase
+		server.state.mutex.Unlock()
+		return fmt.Errorf("sandbox startup request was rejected: unsupported daemon activation phase %s", phase)
 	}
+}
+
+func initializeActivationDiagnosticsLogger(activationInput protocol.ActivationInput) (*startupdiagnostics.ActivationDiagnosticsLogger, error) {
+	logger, err := startupdiagnostics.InitializeActivationDiagnosticsLogger(
+		startupdiagnostics.ActivationOperation{OperationKind: activationInput.OperationKind},
+		activationInput.TunnelGatewayWSURL,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err := logger.RecordStarted(timeutil.SystemClock{}); err != nil {
+		return nil, err
+	}
+	return &logger, nil
+}
+
+func initializeActivationDiagnosticsLoggerBestEffort(activationInput protocol.ActivationInput) *startupdiagnostics.ActivationDiagnosticsLogger {
+	logger, err := initializeActivationDiagnosticsLogger(activationInput)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "sandboxd failed to initialize activation diagnostics: %v\n", err)
+		return nil
+	}
+	return logger
+}
+
+func serverGlobalGitConfigPath() string {
+	if path := os.Getenv(sandboxdstate.GlobalGitConfigEnvName); path != "" {
+		return path
+	}
+	return sandboxdstate.DefaultGlobalGitConfigPath
 }
 
 func validateActivationInputForStateInitialization(activationInput protocol.ActivationInput) error {
@@ -358,23 +477,43 @@ func cloneActivationInput(input protocol.ActivationInput) *protocol.ActivationIn
 	return &cloned
 }
 
+func cloneActivationInputPointer(input *protocol.ActivationInput) *protocol.ActivationInput {
+	if input == nil {
+		return nil
+	}
+	return cloneActivationInput(*input)
+}
+
 func activationInputsEqual(left *protocol.ActivationInput, right *protocol.ActivationInput) bool {
 	if left == nil || right == nil {
 		return left == right
 	}
-	leftPlan := string(left.RuntimePlan)
-	rightPlan := string(right.RuntimePlan)
+	sameRuntimePlan, err := runtimePlanJSONEqual(left.RuntimePlan, right.RuntimePlan)
+	if err != nil || !sameRuntimePlan {
+		return false
+	}
 	leftCopy := *left
 	rightCopy := *right
 	leftCopy.RuntimePlan = nil
 	rightCopy.RuntimePlan = nil
-	return leftPlan == rightPlan &&
-		leftCopy.OperationKind == rightCopy.OperationKind &&
+	return leftCopy.OperationKind == rightCopy.OperationKind &&
 		leftCopy.BootstrapToken == rightCopy.BootstrapToken &&
 		leftCopy.TunnelExchangeToken == rightCopy.TunnelExchangeToken &&
 		leftCopy.TunnelGatewayWSURL == rightCopy.TunnelGatewayWSURL &&
 		stringPointerEqual(leftCopy.ActingUserID, rightCopy.ActingUserID) &&
 		gitIdentityEqual(leftCopy.GitIdentity, rightCopy.GitIdentity)
+}
+
+func runtimePlanJSONEqual(left json.RawMessage, right json.RawMessage) (bool, error) {
+	var leftValue any
+	if err := json.Unmarshal(left, &leftValue); err != nil {
+		return false, err
+	}
+	var rightValue any
+	if err := json.Unmarshal(right, &rightValue); err != nil {
+		return false, err
+	}
+	return reflect.DeepEqual(leftValue, rightValue), nil
 }
 
 func stringPointerEqual(left *string, right *string) bool {
@@ -423,8 +562,12 @@ func (server *Server) healthResponse() healthResponse {
 		healthSnapshot := server.state.sandboxdState.HealthSnapshot()
 		snapshot = &healthSnapshot
 	}
+	phase := server.state.phase
+	if phase == ActivationPhaseActivated && server.state.sandboxdState == nil {
+		phase = ActivationPhaseActivating
+	}
 	return healthResponse{
-		DaemonPhase: string(server.state.phase),
+		DaemonPhase: string(phase),
 		ObservedAt:  time.Now().UTC().Format(time.RFC3339Nano),
 		Snapshot:    snapshot,
 		InitError:   server.state.initError,

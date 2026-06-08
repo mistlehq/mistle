@@ -89,9 +89,9 @@ func TestRunDaemonServesControlSocketUntilShutdown(t *testing.T) {
 	var stderr bytes.Buffer
 	code := make(chan int, 1)
 	go func() {
-		code <- runWithControlSocket("sandboxd", nil, strings.NewReader(""), &stdout, &stderr, socketPath)
+		code <- runWithControlSocketAndHealthEndpoint("sandboxd", nil, strings.NewReader(""), &stdout, &stderr, socketPath, "127.0.0.1:0")
 	}()
-	waitForDaemonControlSocket(t, socketPath)
+	waitForDaemonControlSocket(t, socketPath, code, &stdout, &stderr)
 
 	requireNoError(t, control.SubmitReady(socketPath))
 	requireNoError(t, control.SubmitShutdown(socketPath))
@@ -106,6 +106,23 @@ func TestRunDaemonServesControlSocketUntilShutdown(t *testing.T) {
 	assertEqual(t, stderr.String(), "")
 }
 
+func TestRunUsesConfiguredControlSocketPathEnv(t *testing.T) {
+	socketPath := shortActivateUnixSocketPath(t)
+	requests, closeServer := startActivateControlServer(t, socketPath, control.OKResponse(nil))
+	defer closeServer()
+	t.Setenv(ControlSocketPathEnvName, socketPath)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run("sandboxd", []string{"ready"}, strings.NewReader(""), &stdout, &stderr)
+
+	assertEqual(t, code, 0)
+	assertEqual(t, stdout.String(), "")
+	assertEqual(t, stderr.String(), "")
+	request := <-requests
+	assertEqual(t, request.Type, control.RequestReady)
+}
+
 func TestSignerAliasSelectsSignCommand(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -117,15 +134,20 @@ func TestSignerAliasSelectsSignCommand(t *testing.T) {
 	assertEqual(t, stderr.String(), "unsupported SSH signing invocation: expected '-Y' but received 'version'\n")
 }
 
-func waitForDaemonControlSocket(t *testing.T, socketPath string) {
+func waitForDaemonControlSocket(t *testing.T, socketPath string, code <-chan int, stdout *bytes.Buffer, stderr *bytes.Buffer) {
 	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 	for {
 		if err := control.SubmitReady(socketPath); err == nil {
 			return
 		}
+		select {
+		case exitCode := <-code:
+			t.Fatalf("daemon exited before control socket was ready: code=%d stdout=%q stderr=%q", exitCode, stdout.String(), stderr.String())
+		default:
+		}
 		if time.Now().After(deadline) {
-			t.Fatalf("daemon control socket %s was not ready", socketPath)
+			t.Fatalf("daemon control socket %s was not ready stdout=%q stderr=%q", socketPath, stdout.String(), stderr.String())
 		}
 		time.Sleep(10 * time.Millisecond)
 	}

@@ -1,10 +1,13 @@
 package egressproxy
 
 import (
+	"net"
 	"os"
 	"strings"
 	"syscall"
 	"testing"
+
+	tunnelprotocol "github.com/mistle/sandboxd/tunnel/protocol"
 )
 
 func TestEgressTokenBridgeClientRequestsTokenOverInheritedUnixSocket(t *testing.T) {
@@ -41,7 +44,9 @@ func TestEgressTokenBridgeClientRequestsTokenOverInheritedUnixSocket(t *testing.
 	token, err := client.Token()
 
 	requireNoError(t, err)
-	assertEqual(t, token, "jwt-token")
+	assertEqual(t, token.Token, "jwt-token")
+	assertEqual(t, token.ExpiresAt, "2026-05-17T00:05:00Z")
+	assertEqual(t, token.TTLMS, uint64(300000))
 	<-done
 }
 
@@ -78,6 +83,47 @@ func TestEgressTokenBridgeClientRejectsMismatchedResponseID(t *testing.T) {
 		t.Fatalf("expected response id mismatch error, got %q", err.Error())
 	}
 	<-done
+}
+
+func TestEgressTokenBridgeServerPreservesProviderTokenMetadata(t *testing.T) {
+	parent, childFD := newTokenBridgePair(t)
+	defer parent.Close()
+	child := os.NewFile(uintptr(childFD), "token bridge child")
+	requireNoError(t, syscall.SetNonblock(childFD, false))
+	childConnection, err := net.FileConn(child)
+	requireNoError(t, err)
+	requireNoError(t, child.Close())
+	defer childConnection.Close()
+	server, err := StartEgressTokenBridgeServer(childConnection, metadataTokenProvider{
+		token: tunnelprotocol.EgressToken{
+			Token:     "jwt-token",
+			ExpiresAt: "2026-05-17T00:05:00Z",
+			TTLMS:     300000,
+		},
+	})
+	requireNoError(t, err)
+	defer server.Close()
+	requireNoError(t, writeTokenBridgeJSONLine(parent, egressTokenBridgeRequest{
+		Type:      "egressToken.request",
+		RequestID: "req_123",
+	}))
+
+	response, err := readTokenBridgeJSONLine[egressTokenBridgeResponse](parent)
+
+	requireNoError(t, err)
+	assertEqual(t, response.Type, "egressToken.response")
+	assertEqual(t, response.RequestID, "req_123")
+	assertEqual(t, response.Token, "jwt-token")
+	assertEqual(t, response.ExpiresAt, "2026-05-17T00:05:00Z")
+	assertEqual(t, response.TTLMS, uint64(300000))
+}
+
+type metadataTokenProvider struct {
+	token tunnelprotocol.EgressToken
+}
+
+func (provider metadataTokenProvider) Token() (tunnelprotocol.EgressToken, error) {
+	return provider.token, nil
 }
 
 func TestReadTokenBridgeJSONLineRejectsOversizedFrames(t *testing.T) {

@@ -16,6 +16,8 @@ import (
 
 const skillFileName = "SKILL.md"
 const agentSkillsTargetRoot = "/root/.agents/skills"
+const managedSkillsManifestFileName = ".mistle-managed-skills.json"
+const managedSkillsManifestVersion = 1
 
 type SkillsDiscoverOutput struct {
 	CommitSHA string            `json:"commitSha"`
@@ -39,6 +41,11 @@ type ReconciledSkill struct {
 	RelativePath string `json:"relativePath"`
 	SourcePath   string `json:"sourcePath"`
 	TargetPath   string `json:"targetPath"`
+}
+
+type SkillsReconcileSelection struct {
+	Name         string
+	RelativePath string
 }
 
 type SkillsCommandKind string
@@ -252,6 +259,45 @@ func ReconcileSkills(
 	selectedRelativePaths []string,
 	targetRootOverride string,
 ) (SkillsReconcileOutput, error) {
+	requests := make([]skillsReconcileRequest, 0, len(selectedRelativePaths))
+	for _, selectedRelativePath := range selectedRelativePaths {
+		requests = append(requests, skillsReconcileRequest{RelativePath: selectedRelativePath})
+	}
+	return reconcileSkillsWithOptions(repoRoot, runtime, requests, targetRootOverride, true, skillsTargetOwnershipAllEntries)
+}
+
+func ReconcileMaterializedSkills(
+	repoRoot string,
+	runtime string,
+	selections []SkillsReconcileSelection,
+	targetRootOverride string,
+) (SkillsReconcileOutput, error) {
+	requests := make([]skillsReconcileRequest, 0, len(selections))
+	for _, selection := range selections {
+		expectedName := selection.Name
+		requests = append(requests, skillsReconcileRequest{
+			ExpectedName: &expectedName,
+			RelativePath: selection.RelativePath,
+		})
+	}
+	return reconcileSkillsWithOptions(repoRoot, runtime, requests, targetRootOverride, false, skillsTargetOwnershipManagedSymlinks)
+}
+
+type skillsTargetOwnership string
+
+const (
+	skillsTargetOwnershipAllEntries      skillsTargetOwnership = "all_entries"
+	skillsTargetOwnershipManagedSymlinks skillsTargetOwnership = "managed_symlinks"
+)
+
+func reconcileSkillsWithOptions(
+	repoRoot string,
+	runtime string,
+	selections []skillsReconcileRequest,
+	targetRootOverride string,
+	pullRepo bool,
+	targetOwnership skillsTargetOwnership,
+) (SkillsReconcileOutput, error) {
 	if err := validateSkillsRuntime(runtime); err != nil {
 		return SkillsReconcileOutput{}, err
 	}
@@ -264,18 +310,29 @@ func ReconcileSkills(
 		targetRoot = agentSkillsTargetRoot
 	}
 
-	if err := pullGitRepo(canonicalRepoRoot); err != nil {
-		return SkillsReconcileOutput{}, err
+	if pullRepo {
+		if err := pullGitRepo(canonicalRepoRoot); err != nil {
+			return SkillsReconcileOutput{}, err
+		}
 	}
-	selectedSkills, err := readSelectedSkills(canonicalRepoRoot, selectedRelativePaths)
+	selectedSkills, err := readSelectedSkillRequests(canonicalRepoRoot, selections)
 	if err != nil {
 		return SkillsReconcileOutput{}, err
 	}
 	if err := prepareTargetRoot(targetRoot); err != nil {
 		return SkillsReconcileOutput{}, err
 	}
-	if err := pruneTargetRoot(targetRoot); err != nil {
-		return SkillsReconcileOutput{}, err
+	switch targetOwnership {
+	case skillsTargetOwnershipAllEntries:
+		if err := pruneTargetRoot(targetRoot); err != nil {
+			return SkillsReconcileOutput{}, err
+		}
+	case skillsTargetOwnershipManagedSymlinks:
+		if err := pruneManagedTargetSymlinks(targetRoot); err != nil {
+			return SkillsReconcileOutput{}, err
+		}
+	default:
+		return SkillsReconcileOutput{}, fmt.Errorf("unknown skills target ownership %s", targetOwnership)
 	}
 
 	reconciledSkills := make([]ReconciledSkill, 0, len(selectedSkills))
@@ -291,6 +348,15 @@ func ReconcileSkills(
 			TargetPath:   targetPath,
 		})
 	}
+	if targetOwnership == skillsTargetOwnershipManagedSymlinks {
+		managedSkillNames := make([]string, 0, len(reconciledSkills))
+		for _, reconciledSkill := range reconciledSkills {
+			managedSkillNames = append(managedSkillNames, reconciledSkill.Name)
+		}
+		if err := writeManagedSkillsManifest(targetRoot, managedSkillNames); err != nil {
+			return SkillsReconcileOutput{}, err
+		}
+	}
 
 	return SkillsReconcileOutput{
 		Runtime:    runtime,
@@ -305,12 +371,17 @@ type selectedSkill struct {
 	SourcePath   string
 }
 
-func readSelectedSkills(repoRoot string, selectedRelativePaths []string) ([]selectedSkill, error) {
-	selectedSkills := make([]selectedSkill, 0, len(selectedRelativePaths))
-	selectedPaths := make(map[string]struct{}, len(selectedRelativePaths))
-	namesToPaths := make(map[string]string, len(selectedRelativePaths))
-	for _, selectedRelativePath := range selectedRelativePaths {
-		normalizedRelativePath, err := normalizeSelectedRelativePath(selectedRelativePath)
+type skillsReconcileRequest struct {
+	ExpectedName *string
+	RelativePath string
+}
+
+func readSelectedSkillRequests(repoRoot string, selections []skillsReconcileRequest) ([]selectedSkill, error) {
+	selectedSkills := make([]selectedSkill, 0, len(selections))
+	selectedPaths := make(map[string]struct{}, len(selections))
+	namesToPaths := make(map[string]string, len(selections))
+	for _, selection := range selections {
+		normalizedRelativePath, err := normalizeSelectedRelativePath(selection.RelativePath)
 		if err != nil {
 			return nil, err
 		}
@@ -335,6 +406,9 @@ func readSelectedSkills(repoRoot string, selectedRelativePaths []string) ([]sele
 			return nil, fmt.Errorf("failed to resolve selected skill path '%s' at %s: %w", normalizedRelativePath, canonicalSourcePath, err)
 		}
 		if !sourceStat.IsDir() {
+			if selection.ExpectedName != nil {
+				continue
+			}
 			return nil, fmt.Errorf("selected skill path '%s' at %s is not a directory", normalizedRelativePath, canonicalSourcePath)
 		}
 
@@ -342,17 +416,29 @@ func readSelectedSkills(repoRoot string, selectedRelativePaths []string) ([]sele
 		skillFileStat, err := os.Stat(skillFilePath)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
+				if selection.ExpectedName != nil {
+					continue
+				}
 				return nil, fmt.Errorf("selected skill path '%s' at %s is missing SKILL.md", normalizedRelativePath, canonicalSourcePath)
 			}
 			return nil, fmt.Errorf("failed to read skill file %s: %w", skillFilePath, err)
 		}
 		if !skillFileStat.Mode().IsRegular() {
+			if selection.ExpectedName != nil {
+				continue
+			}
 			return nil, fmt.Errorf("selected skill path '%s' at %s is missing SKILL.md", normalizedRelativePath, canonicalSourcePath)
 		}
 
 		skill, err := readSkillFile(repoRoot, skillFilePath)
 		if err != nil {
+			if selection.ExpectedName != nil && isSelectedSkillMetadataDrift(err) {
+				continue
+			}
 			return nil, err
+		}
+		if selection.ExpectedName != nil && skill.Name != *selection.ExpectedName {
+			continue
 		}
 		if firstPath, ok := namesToPaths[skill.Name]; ok {
 			return nil, fmt.Errorf("selected skills '%s' and '%s' both declare skill name '%s'", firstPath, normalizedRelativePath, skill.Name)
@@ -368,6 +454,24 @@ func readSelectedSkills(repoRoot string, selectedRelativePaths []string) ([]sele
 		return selectedSkills[leftIndex].Name < selectedSkills[rightIndex].Name
 	})
 	return selectedSkills, nil
+}
+
+func isSelectedSkillMetadataDrift(err error) bool {
+	message := err.Error()
+	for _, substring := range []string{
+		"must begin with YAML frontmatter",
+		"has unterminated YAML frontmatter",
+		"has invalid YAML frontmatter",
+		"must use a YAML mapping for frontmatter",
+		"is missing required frontmatter field",
+		"frontmatter field",
+		"has invalid skill name",
+	} {
+		if strings.Contains(message, substring) {
+			return true
+		}
+	}
+	return false
 }
 
 func canonicalizeRepoRoot(repoRoot string) (string, error) {
@@ -648,4 +752,74 @@ func pruneTargetRoot(targetRoot string) error {
 		}
 	}
 	return nil
+}
+
+type managedSkillsManifest struct {
+	Version    int      `json:"version"`
+	SkillNames []string `json:"skillNames"`
+}
+
+func pruneManagedTargetSymlinks(targetRoot string) error {
+	manifest, ok, err := readManagedSkillsManifest(targetRoot)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+	for _, skillName := range manifest.SkillNames {
+		if !isValidSkillName(skillName) {
+			return fmt.Errorf("managed skills manifest %s contains invalid skill name '%s'", managedSkillsManifestPath(targetRoot), skillName)
+		}
+		targetPath := filepath.Join(targetRoot, skillName)
+		metadata, err := os.Lstat(targetPath)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			return fmt.Errorf("failed to read skills target root %s: %w", targetPath, err)
+		}
+		if metadata.Mode()&os.ModeSymlink == 0 {
+			return fmt.Errorf("managed skills target entry %s is not a symlink", targetPath)
+		}
+		if err := os.Remove(targetPath); err != nil {
+			return fmt.Errorf("failed to remove stale skills target entry %s: %w", targetPath, err)
+		}
+	}
+	return nil
+}
+
+func readManagedSkillsManifest(targetRoot string) (managedSkillsManifest, bool, error) {
+	manifestPath := managedSkillsManifestPath(targetRoot)
+	content, err := os.ReadFile(manifestPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return managedSkillsManifest{}, false, nil
+		}
+		return managedSkillsManifest{}, false, fmt.Errorf("failed to read managed skills manifest %s: %w", manifestPath, err)
+	}
+	var manifest managedSkillsManifest
+	if err := json.Unmarshal(content, &manifest); err != nil {
+		return managedSkillsManifest{}, false, fmt.Errorf("failed to parse managed skills manifest %s: %w", manifestPath, err)
+	}
+	if manifest.Version != managedSkillsManifestVersion {
+		return managedSkillsManifest{}, false, fmt.Errorf("managed skills manifest %s has unsupported version %d", manifestPath, manifest.Version)
+	}
+	return manifest, true, nil
+}
+
+func writeManagedSkillsManifest(targetRoot string, skillNames []string) error {
+	manifestPath := managedSkillsManifestPath(targetRoot)
+	content, err := json.MarshalIndent(managedSkillsManifest{Version: managedSkillsManifestVersion, SkillNames: skillNames}, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to write managed skills manifest %s: %w", manifestPath, err)
+	}
+	if err := os.WriteFile(manifestPath, content, 0o666); err != nil {
+		return fmt.Errorf("failed to write managed skills manifest %s: %w", manifestPath, err)
+	}
+	return nil
+}
+
+func managedSkillsManifestPath(targetRoot string) string {
+	return filepath.Join(targetRoot, managedSkillsManifestFileName)
 }

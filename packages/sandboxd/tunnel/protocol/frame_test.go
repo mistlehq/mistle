@@ -29,6 +29,20 @@ func TestDecodeStreamDataFrameReadsBinaryPayload(t *testing.T) {
 	}
 }
 
+func TestStreamDataFramePreservesRawBytesPayloadKind(t *testing.T) {
+	encoded, err := EncodeStreamDataFrame(2, PayloadKindRawBytes, []byte("bytes"))
+	requireNoError(t, err)
+
+	decoded, err := DecodeStreamDataFrame(encoded)
+	requireNoError(t, err)
+
+	assertEqual(t, decoded.StreamID, uint32(2))
+	assertEqual(t, decoded.PayloadKind, PayloadKindRawBytes)
+	if !bytes.Equal(decoded.Payload, []byte("bytes")) {
+		t.Fatalf("expected raw bytes payload, got %v", decoded.Payload)
+	}
+}
+
 func TestDecodeStreamDataFrameRejectsInvalidFrames(t *testing.T) {
 	for _, input := range []struct {
 		name     string

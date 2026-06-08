@@ -289,6 +289,55 @@ func TestReconcileSkillsRejectsSymlinkedTargetRootWithoutPruningDestination(t *t
 	assertEqual(t, string(contents), "old")
 }
 
+func TestReconcileMaterializedSkillsPrunesOnlyManifestManagedSymlinks(t *testing.T) {
+	repoRoot := createSkillsGitRepo(t)
+	targetRoot := createRealSkillsTempDir(t, "target")
+	oldSourceRoot := createRealSkillsTempDir(t, "old-source")
+	writeSkill(t, repoRoot, "skills/new-skill", `---
+name: new-skill
+description: New skill.
+---
+`)
+	requireNoError(t, os.WriteFile(filepath.Join(targetRoot, "user-skill"), []byte("keep"), 0o666))
+	requireNoError(t, os.MkdirAll(filepath.Join(oldSourceRoot, "old-skill"), 0o777))
+	requireNoError(t, os.Symlink(filepath.Join(oldSourceRoot, "old-skill"), filepath.Join(targetRoot, "old-skill")))
+	requireNoError(t, os.WriteFile(
+		filepath.Join(targetRoot, managedSkillsManifestFileName),
+		[]byte(`{"version":1,"skillNames":["old-skill"]}`),
+		0o666,
+	))
+
+	output, err := ReconcileMaterializedSkills(
+		repoRoot,
+		"codex",
+		[]SkillsReconcileSelection{
+			{Name: "old-skill", RelativePath: "skills/old-skill"},
+			{Name: "new-skill", RelativePath: "skills/new-skill"},
+		},
+		targetRoot,
+	)
+
+	requireNoError(t, err)
+	if len(output.Skills) != 1 {
+		t.Fatalf("expected 1 reconciled skill, got %d", len(output.Skills))
+	}
+	assertEqual(t, output.Skills[0].Name, "new-skill")
+	if _, err := os.Stat(filepath.Join(targetRoot, "old-skill")); !os.IsNotExist(err) {
+		t.Fatalf("expected stale managed symlink to be pruned, got %v", err)
+	}
+	assertEqual(t, string(readSkillsTestFile(t, filepath.Join(targetRoot, "user-skill"))), "keep")
+	target, err := os.Readlink(filepath.Join(targetRoot, "new-skill"))
+	requireNoError(t, err)
+	assertEqual(t, target, filepath.Join(repoRoot, "skills/new-skill"))
+	var manifest managedSkillsManifest
+	requireNoError(t, json.Unmarshal(readSkillsTestFile(t, filepath.Join(targetRoot, managedSkillsManifestFileName)), &manifest))
+	assertEqual(t, manifest.Version, managedSkillsManifestVersion)
+	if len(manifest.SkillNames) != 1 {
+		t.Fatalf("expected 1 manifest skill, got %d", len(manifest.SkillNames))
+	}
+	assertEqual(t, manifest.SkillNames[0], "new-skill")
+}
+
 func createSkillsGitRepo(t *testing.T) string {
 	t.Helper()
 	repoRoot := createRealSkillsTempDir(t, "repo")
@@ -369,4 +418,11 @@ func createRealSkillsTempDir(t *testing.T, prefix string) string {
 		_ = os.RemoveAll(dir)
 	})
 	return dir
+}
+
+func readSkillsTestFile(t *testing.T, path string) []byte {
+	t.Helper()
+	content, err := os.ReadFile(path)
+	requireNoError(t, err)
+	return content
 }

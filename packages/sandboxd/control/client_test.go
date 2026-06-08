@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/mistle/sandboxd/protocol"
+	"github.com/mistle/sandboxd/sandboxdstate"
+	"github.com/mistle/sandboxd/startupdiagnostics"
 )
 
 func TestSubmitActivateWritesControlRequestAndAcceptsSuccessResponse(t *testing.T) {
@@ -126,9 +128,21 @@ func controlClientActivationInput() protocol.ActivationInput {
 		BootstrapToken:      "bootstrap-token-value",
 		TunnelExchangeToken: "tunnel-exchange-token-value",
 		TunnelGatewayWSURL:  "ws://127.0.0.1:5003/tunnel/sandbox/sbi_control",
-		RuntimePlan:         []byte(`{"sandboxProfileId":"sbp_control","version":1}`),
-		ActingUserID:        nil,
-		GitIdentity:         nil,
+		RuntimePlan: []byte(`{
+			"sandboxProfileId": "sbp_control",
+			"version": 1,
+			"image": {
+				"source": "base",
+				"imageRef": "base-ref"
+			},
+			"egressRoutes": [],
+			"artifacts": [],
+			"workspaceSources": [],
+			"runtimeClients": [],
+			"agentRuntimes": []
+		}`),
+		ActingUserID: nil,
+		GitIdentity:  nil,
 	}
 }
 
@@ -136,6 +150,8 @@ func shortUnixSocketPath(t *testing.T) string {
 	t.Helper()
 	dir, err := os.MkdirTemp("/tmp", "sbd-control-*")
 	requireNoError(t, err)
+	t.Setenv(startupdiagnostics.TestLogDirEnv, filepath.Join(dir, "diagnostics"))
+	t.Setenv(sandboxdstate.GlobalGitConfigEnvName, filepath.Join(dir, "gitconfig"))
 	t.Cleanup(func() {
 		_ = os.RemoveAll(dir)
 	})

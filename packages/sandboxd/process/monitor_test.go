@@ -42,6 +42,46 @@ func TestCodexAppServerMonitorMarksReadinessUnreachableAfterFailureThreshold(t *
 	assertEqual(t, payload["failureThreshold"].(string), "3")
 }
 
+func TestCodexAppServerMonitorRecordsReadinessDegradationWhileProcessStaysAlive(t *testing.T) {
+	supervisorHandle, err := supervision.NewSandboxdSupervisorHandle(
+		"sandbox-123",
+		timeutil.SystemClock{},
+		[]supervision.SupervisedComponent{supervision.ComponentCodexAppServer},
+	)
+	requireNoError(t, err)
+	controlHandle, cleanup := startManagedCodexAppServerProcess(t, supervisorHandle, codexMonitorSpec(t))
+	defer cleanup()
+	state := newRuntimeClientProcessMonitorState()
+
+	requireNoError(t, observeCodexAppServerProcess(controlHandle, &state))
+
+	degradedSnapshot := supervisorHandle.ComponentSnapshot(supervision.ComponentCodexAppServer)
+	if degradedSnapshot == nil {
+		t.Fatalf("expected Codex app-server component to be tracked")
+	}
+	assertEqual(t, degradedSnapshot.State, supervision.ComponentHealthy)
+	assertEqual(t, degradedSnapshot.Details["livenessState"], "Alive")
+	assertEqual(t, degradedSnapshot.Details["readinessState"], "Degraded")
+	if degradedSnapshot.LastError != nil {
+		t.Fatalf("expected degraded readiness before threshold to avoid a supervisor error, got %q", *degradedSnapshot.LastError)
+	}
+	observation := controlHandle.ObservationHandle().Snapshot()
+	assertEqual(t, observation.IsAlive, true)
+	assertEqual(t, observation.LastExitStatus == nil, true)
+	assertEqual(t, len(supervisorHandle.DrainForwardedLifecycleEventLines()), 0)
+
+	requireNoError(t, observeCodexAppServerProcess(controlHandle, &state))
+	requireNoError(t, observeCodexAppServerProcess(controlHandle, &state))
+
+	unreachableSnapshot := supervisorHandle.ComponentSnapshot(supervision.ComponentCodexAppServer)
+	if unreachableSnapshot == nil {
+		t.Fatalf("expected Codex app-server component to be tracked")
+	}
+	assertEqual(t, unreachableSnapshot.State, supervision.ComponentRestarting)
+	assertEqual(t, unreachableSnapshot.Details["livenessState"], "Alive")
+	assertEqual(t, unreachableSnapshot.Details["readinessState"], "Unreachable")
+}
+
 func TestOpenCodeServerMonitorProjectsExitedProcessToSupervisor(t *testing.T) {
 	supervisorHandle, err := supervision.NewSandboxdSupervisorHandle(
 		"sandbox-123",
@@ -79,6 +119,49 @@ func TestOpenCodeServerMonitorProjectsExitedProcessToSupervisor(t *testing.T) {
 	assertEqual(t, int(payload["exitCode"].(float64)), 7)
 }
 
+func TestOpenCodeServerMonitorRecordsReadinessDegradationWhileProcessStaysAlive(t *testing.T) {
+	supervisorHandle, err := supervision.NewSandboxdSupervisorHandle(
+		"sandbox-123",
+		timeutil.SystemClock{},
+		[]supervision.SupervisedComponent{supervision.ComponentOpenCodeServer},
+	)
+	requireNoError(t, err)
+	controlHandle, cleanup := startManagedOpenCodeServerProcess(t, supervisorHandle, openCodeMonitorSpec(t))
+	defer cleanup()
+	state := newRuntimeClientProcessMonitorState()
+
+	requireNoError(t, observeOpenCodeServerProcess(controlHandle, &state))
+
+	degradedSnapshot := supervisorHandle.ComponentSnapshot(supervision.ComponentOpenCodeServer)
+	if degradedSnapshot == nil {
+		t.Fatalf("expected OpenCode server component to be tracked")
+	}
+	assertEqual(t, degradedSnapshot.State, supervision.ComponentHealthy)
+	assertEqual(t, degradedSnapshot.Details["livenessState"], "Alive")
+	assertEqual(t, degradedSnapshot.Details["readinessState"], "Degraded")
+	if degradedSnapshot.LastError != nil {
+		t.Fatalf("expected degraded readiness before threshold to avoid a supervisor error, got %q", *degradedSnapshot.LastError)
+	}
+	assertEqual(t, len(supervisorHandle.DrainForwardedLifecycleEventLines()), 0)
+
+	requireNoError(t, observeOpenCodeServerProcess(controlHandle, &state))
+	requireNoError(t, observeOpenCodeServerProcess(controlHandle, &state))
+
+	unreachableSnapshot := supervisorHandle.ComponentSnapshot(supervision.ComponentOpenCodeServer)
+	if unreachableSnapshot == nil {
+		t.Fatalf("expected OpenCode server component to be tracked")
+	}
+	assertEqual(t, unreachableSnapshot.State, supervision.ComponentRestarting)
+	assertEqual(t, unreachableSnapshot.Details["livenessState"], "Alive")
+	assertEqual(t, unreachableSnapshot.Details["readinessState"], "Unreachable")
+	lines := supervisorHandle.DrainForwardedLifecycleEventLines()
+	payload := requireLifecycleEventPayload(t, lines, "component_healthcheck_failed")
+	assertEqual(t, payload["reason"].(string), "readiness_probe_failed")
+	assertEqual(t, payload["probeKind"].(string), "readiness_http")
+	assertEqual(t, payload["consecutiveFailures"].(string), "3")
+	assertEqual(t, payload["failureThreshold"].(string), "3")
+}
+
 func startManagedCodexAppServerProcess(
 	t *testing.T,
 	supervisorHandle *supervision.SandboxdSupervisorHandle,
@@ -107,6 +190,32 @@ func startManagedCodexAppServerProcess(
 	}
 }
 
+func startManagedOpenCodeServerProcess(
+	t *testing.T,
+	supervisorHandle *supervision.SandboxdSupervisorHandle,
+	processSpec RuntimeClientProcessSpec,
+) (*OpenCodeServerControlHandle, func()) {
+	t.Helper()
+	process, err := StartRuntimeClientProcess(processSpec)
+	requireNoError(t, err)
+	processID := process.PID()
+	managedProcess := &managedRuntimeClientProcess{process: process}
+	controlHandle := &OpenCodeServerControlHandle{
+		managedProcess: managedOpenCodeServerProcess{
+			process:          managedProcess,
+			supervisorHandle: supervisorHandle,
+		},
+	}
+	supervisorHandle.ReplaceComponentDetails(
+		supervision.ComponentOpenCodeServer,
+		OpenCodeServerDetailsWithStatus(processSpec, &processID, nil, "Alive", "Ready"),
+	)
+	supervisorHandle.MarkComponentHealthy(supervision.ComponentOpenCodeServer)
+	return controlHandle, func() {
+		_ = managedProcess.Stop(timeutil.SystemClock{}, timeutil.ThreadSleeper{})
+	}
+}
+
 func codexMonitorSpec(t *testing.T) RuntimeClientProcessSpec {
 	t.Helper()
 	host, port := reserveUnusedLocalPort(t)
@@ -114,6 +223,18 @@ func codexMonitorSpec(t *testing.T) RuntimeClientProcessSpec {
 	processSpec.Readiness = runtime.RuntimeClientProcessReadiness{
 		Type:      runtime.RuntimeClientProcessReadinessWS,
 		URL:       "ws://" + net.JoinHostPort(host, strconv.Itoa(int(port))) + "/agent",
+		TimeoutMS: 1,
+	}
+	return processSpec
+}
+
+func openCodeMonitorSpec(t *testing.T) RuntimeClientProcessSpec {
+	t.Helper()
+	host, port := reserveUnusedLocalPort(t)
+	processSpec := managerProcessSpec(OpenCodeServerProcessKey, []string{"/bin/sleep", "30"})
+	processSpec.Readiness = runtime.RuntimeClientProcessReadiness{
+		Type:      runtime.RuntimeClientProcessReadinessHTTP,
+		URL:       "http://" + net.JoinHostPort(host, strconv.Itoa(int(port))) + "/ready",
 		TimeoutMS: 1,
 	}
 	return processSpec

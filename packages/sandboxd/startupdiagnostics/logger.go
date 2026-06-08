@@ -1,6 +1,7 @@
 package startupdiagnostics
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/mistle/sandboxd/protocol"
 	"github.com/mistle/sandboxd/timeutil"
@@ -17,6 +20,8 @@ const (
 	ActivateLogPath = "/run/mistle/activate.log"
 	TestLogDirEnv   = "MISTLE_SANDBOXD_OPERATION_LOG_DIR"
 )
+
+const operationStreamCloseTimeout = 2 * time.Second
 
 type ActivationDiagnosticLevel string
 
@@ -37,6 +42,18 @@ type ActivationDiagnosticsLogger struct {
 	sandboxInstanceID string
 	operation         ActivationOperation
 	path              string
+	publisher         *operationPublisherState
+}
+
+type OperationRecordPublisher interface {
+	RecordOperationLine(ctx context.Context, line string) error
+	CloseOperationStream(ctx context.Context) error
+}
+
+type operationPublisherState struct {
+	mutex          sync.Mutex
+	publisher      OperationRecordPublisher
+	pendingRecords []string
 }
 
 func InitializeActivationDiagnosticsLogger(operation ActivationOperation, tunnelGatewayWebSocketURL string) (ActivationDiagnosticsLogger, error) {
@@ -70,7 +87,49 @@ func InitializeActivationDiagnosticsLogger(operation ActivationOperation, tunnel
 		sandboxInstanceID: sandboxInstanceID,
 		operation:         operation,
 		path:              path,
+		publisher:         &operationPublisherState{},
 	}, nil
+}
+
+func (logger ActivationDiagnosticsLogger) AttachOperationPublisher(publisher OperationRecordPublisher) {
+	if logger.publisher == nil {
+		return
+	}
+	pendingRecords := func() []string {
+		logger.publisher.mutex.Lock()
+		defer logger.publisher.mutex.Unlock()
+		logger.publisher.publisher = publisher
+		pending := logger.publisher.pendingRecords
+		logger.publisher.pendingRecords = nil
+		return pending
+	}()
+	for _, record := range pendingRecords {
+		if err := publisher.RecordOperationLine(context.Background(), record); err != nil {
+			fmt.Fprintf(os.Stderr, "sandboxd failed to publish pending operation record: %v\n", err)
+		}
+	}
+}
+
+func (logger ActivationDiagnosticsLogger) CloseOperationStream() {
+	if logger.publisher == nil {
+		return
+	}
+	publisher := func() OperationRecordPublisher {
+		logger.publisher.mutex.Lock()
+		defer logger.publisher.mutex.Unlock()
+		logger.publisher.pendingRecords = nil
+		selectedPublisher := logger.publisher.publisher
+		logger.publisher.publisher = nil
+		return selectedPublisher
+	}()
+	if publisher == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), operationStreamCloseTimeout)
+	defer cancel()
+	if err := publisher.CloseOperationStream(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "sandboxd failed to close operation stream: %v\n", err)
+	}
 }
 
 func (logger ActivationDiagnosticsLogger) RecordStarted(clock timeutil.Clock) error {
@@ -173,7 +232,36 @@ func (logger ActivationDiagnosticsLogger) RecordWithClock(clock timeutil.Clock, 
 		return fmt.Errorf("failed to append startup diagnostic log %s: %w", logger.path, err)
 	}
 
+	operationRecord, err := OperationRecordLine(logger.operation, timestamp, event, payload)
+	if err != nil {
+		return err
+	}
+	if operationRecord != nil {
+		logger.publishOperationRecord(*operationRecord)
+	}
+
 	return nil
+}
+
+func (logger ActivationDiagnosticsLogger) publishOperationRecord(line string) {
+	if logger.publisher == nil {
+		return
+	}
+	publisher := func() OperationRecordPublisher {
+		logger.publisher.mutex.Lock()
+		defer logger.publisher.mutex.Unlock()
+		if logger.publisher.publisher == nil {
+			logger.publisher.pendingRecords = append(logger.publisher.pendingRecords, line)
+			return nil
+		}
+		return logger.publisher.publisher
+	}()
+	if publisher == nil {
+		return
+	}
+	if err := publisher.RecordOperationLine(context.Background(), line); err != nil {
+		fmt.Fprintf(os.Stderr, "sandboxd failed to publish operation record: %v\n", err)
+	}
 }
 
 func DeriveSandboxInstanceID(gatewayWebSocketURL string) (string, error) {

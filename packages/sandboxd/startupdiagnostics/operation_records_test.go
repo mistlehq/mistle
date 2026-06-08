@@ -36,6 +36,28 @@ func TestBuildsLifecycleOperationRecordLines(t *testing.T) {
 	}
 }
 
+func TestBuildsActivationLifecycleRecordsWithActivationOperationKind(t *testing.T) {
+	operation := ActivationOperation{OperationKind: protocol.ActivationOperationSnapshot}
+
+	line, err := OperationRecordLine(operation, "2026-05-21T00:00:00Z", "sandbox_snapshot_phase_started", map[string]any{
+		"timestamp":         "2026-05-21T00:00:00Z",
+		"level":             "info",
+		"event":             "sandbox_snapshot_phase_started",
+		"sandboxInstanceId": "sbi_test",
+		"operation":         "activate",
+		"operationKind":     "snapshot",
+		"phase":             "apply_runtime_plan",
+	})
+	requireOperationRecordLine(t, line, err)
+
+	record := decodeRecordLine(t, *line)
+	assertEqual(t, record["kind"].(string), "lifecycle")
+	assertEqual(t, record["phase"].(string), "runtime_plan")
+	assertEqual(t, record["status"].(string), "started")
+	attributes := record["attributes"].(map[string]any)
+	assertEqual(t, attributes["operationKind"].(string), "snapshot")
+}
+
 func TestBuildsTranscriptOperationRecordLines(t *testing.T) {
 	operation := ActivationOperation{OperationKind: protocol.ActivationOperationSetupCheck}
 
@@ -51,6 +73,20 @@ func TestBuildsTranscriptOperationRecordLines(t *testing.T) {
 	assertEqual(t, record["phase"].(string), "setup_script")
 	assertEqual(t, record["stream"].(string), "stdout")
 	assertEqual(t, record["payloadBase64"].(string), "aW5zdGFsbGluZyBkZXBlbmRlbmNpZXM=")
+}
+
+func TestMapsEgressStartAndStopToDistinctLifecyclePhases(t *testing.T) {
+	egressPhase, ok := OperationLifecyclePhase("start_egress_proxy")
+	if !ok {
+		t.Fatalf("expected egress start phase to map")
+	}
+	assertEqual(t, egressPhase, "egress")
+
+	teardownPhase, ok := OperationLifecyclePhase("stop_egress_proxy")
+	if !ok {
+		t.Fatalf("expected egress stop phase to map")
+	}
+	assertEqual(t, teardownPhase, "teardown")
 }
 
 func TestMapsCleanupPhasesToTheResourceBeingCleanedUp(t *testing.T) {

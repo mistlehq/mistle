@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+
+	"github.com/mistle/sandboxd/runtime"
 )
 
 type Route struct {
@@ -13,21 +15,9 @@ type Route struct {
 	Methods      []string
 }
 
-type CompiledEgressRoute struct {
-	EgressRuleID string
-	Match        CompiledEgressRouteMatch
-	Upstream     CompiledEgressRouteUpstream
-}
-
-type CompiledEgressRouteMatch struct {
-	Hosts        []string
-	PathPrefixes []string
-	Methods      []string
-}
-
-type CompiledEgressRouteUpstream struct {
-	BaseURL string
-}
+type CompiledEgressRoute = runtime.CompiledEgressRoute
+type CompiledEgressRouteMatch = runtime.CompiledEgressRouteMatch
+type CompiledEgressRouteUpstream = runtime.CompiledEgressRouteUpstream
 
 func BuildGatewayEgressRoute(route CompiledEgressRoute) (Route, error) {
 	upstreamURL, err := url.Parse(route.Upstream.BaseURL)

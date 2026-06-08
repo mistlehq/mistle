@@ -325,8 +325,6 @@ func unixStopSignal(signal runtime.RuntimeClientProcessStopSignal) (syscall.Sign
 	switch signal {
 	case runtime.RuntimeClientProcessStopSignalSIGTERM:
 		return syscall.SIGTERM, nil
-	case runtime.RuntimeClientProcessStopSignalSIGINT:
-		return syscall.SIGINT, nil
 	case runtime.RuntimeClientProcessStopSignalSIGKILL:
 		return syscall.SIGKILL, nil
 	default:

@@ -1,12 +1,14 @@
 package control
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -84,9 +86,10 @@ func TestServerRejectsActivationWithInvalidGatewayURLBeforeStateInitialization(t
 	if err == nil {
 		t.Fatalf("expected invalid gateway URL to fail activation")
 	}
-	assertEqual(t, err.Error(), "control socket returned an error: failed to initialize sandboxd state: failed to start bootstrap tunnel session: tunnel gateway url must end with the sandbox instance id path segment")
+	assertEqual(t, err.Error(), "control socket returned an error: sandbox startup request was rejected: sandboxd activation failed: failed to initialize sandboxd state: failed to start bootstrap tunnel session: tunnel gateway url must end with the sandbox instance id path segment")
 	health := fetchHealthResponse(t, server)
-	assertEqual(t, health["daemon_phase"].(string), "unactivated")
+	assertEqual(t, health["daemon_phase"].(string), "failed")
+	assertEqual(t, health["init_error"].(string), "failed to initialize sandboxd state: failed to start bootstrap tunnel session: tunnel gateway url must end with the sandbox instance id path segment")
 }
 
 func TestServerRejectsActivationWithInvalidRuntimePlanBeforeStateInitialization(t *testing.T) {
@@ -96,16 +99,53 @@ func TestServerRejectsActivationWithInvalidRuntimePlanBeforeStateInitialization(
 	defer server.Close()
 	waitForControlSocket(t, socketPath)
 	activationInput := controlClientActivationInput()
-	activationInput.RuntimePlan = []byte(`{"version":1}`)
+	activationInput.RuntimePlan = []byte(`{
+		"version": 1,
+		"image": {
+			"source": "base",
+			"imageRef": "base-ref"
+		},
+		"egressRoutes": [],
+		"artifacts": [],
+		"workspaceSources": [],
+		"runtimeClients": [],
+		"agentRuntimes": []
+	}`)
 
 	err = SubmitActivate(socketPath, activationInput)
 
 	if err == nil {
 		t.Fatalf("expected invalid runtime plan to fail activation")
 	}
-	assertEqual(t, err.Error(), "control socket returned an error: failed to initialize sandboxd state: failed to apply session input: runtime plan sandboxProfileId is required")
+	assertEqual(t, err.Error(), "control socket returned an error: sandbox startup request was rejected: sandboxd activation failed: failed to initialize sandboxd state: failed to apply session input: runtime plan sandboxProfileId is required")
 	health := fetchHealthResponse(t, server)
-	assertEqual(t, health["daemon_phase"].(string), "unactivated")
+	assertEqual(t, health["daemon_phase"].(string), "failed")
+	assertEqual(t, health["init_error"].(string), "failed to initialize sandboxd state: failed to apply session input: runtime plan sandboxProfileId is required")
+}
+
+func TestServerActivationDiagnosticsInitializationFailureIsBestEffort(t *testing.T) {
+	socketPath := shortUnixSocketPath(t)
+	diagnosticsPath := filepath.Join(filepath.Dir(socketPath), "diagnostics-file")
+	requireNoError(t, os.WriteFile(diagnosticsPath, []byte("not a directory"), 0o644))
+	t.Setenv("MISTLE_SANDBOXD_OPERATION_LOG_DIR", diagnosticsPath)
+	server, err := StartServer(socketPath)
+	requireNoError(t, err)
+	defer server.Close()
+	waitForControlSocket(t, socketPath)
+
+	err = SubmitActivate(socketPath, controlClientActivationInput())
+
+	if err == nil {
+		t.Fatalf("expected activation to fail on bootstrap tunnel, not diagnostics")
+	}
+	if strings.Contains(err.Error(), "failed to initialize activation diagnostics") {
+		t.Fatalf("expected diagnostics failure to be best-effort, got %q", err.Error())
+	}
+	if !strings.Contains(err.Error(), "failed to start bootstrap tunnel session") {
+		t.Fatalf("expected real activation failure after diagnostics failure, got %q", err.Error())
+	}
+	health := fetchHealthResponse(t, server)
+	assertEqual(t, health["daemon_phase"].(string), "failed")
 }
 
 func TestServerShutdownClearsFailedActivationState(t *testing.T) {
@@ -123,9 +163,13 @@ func TestServerActivatesPrematerializedSnapshotState(t *testing.T) {
 	socketPath := shortUnixSocketPath(t)
 	server, err := StartServer(socketPath)
 	requireNoError(t, err)
-	defer server.Close()
 	waitForControlSocket(t, socketPath)
+	bootstrapRequests := make(chan string, 1)
+	gatewayURL, closeGateway := startActivationBootstrapGateway(t, bootstrapRequests)
+	defer closeGateway()
 	activationInput := controlClientActivationInput()
+	activationInput.OperationKind = protocol.ActivationOperationSnapshot
+	activationInput.TunnelGatewayWSURL = gatewayURL
 	activationInput.RuntimePlan = []byte(`{
 		"sandboxProfileId": "sbp_control",
 		"version": 1,
@@ -135,21 +179,109 @@ func TestServerActivatesPrematerializedSnapshotState(t *testing.T) {
 		},
 		"egressRoutes": [],
 		"artifacts": [],
-		"runtimeClients": []
+		"workspaceSources": [],
+		"runtimeClients": [],
+		"agentRuntimes": []
 	}`)
 
 	requireNoError(t, SubmitActivate(socketPath, activationInput))
-
-	health := fetchHealthResponse(t, server)
-	assertEqual(t, health["daemon_phase"].(string), "activated")
-	if health["init_error"] != nil {
-		t.Fatalf("expected no init_error after activation, got %#v", health["init_error"])
+	assertEqual(t, receiveBootstrapRequest(t, bootstrapRequests), "bootstrap_token=bootstrap-token-value")
+	requireNoError(t, server.Wait())
+	if _, err := os.Lstat(socketPath); !os.IsNotExist(err) {
+		t.Fatalf("expected control socket to be removed after snapshot activation, got %v", err)
 	}
-	snapshot := health["snapshot"].(map[string]any)
-	components := snapshot["components"].([]any)
-	firstComponent := components[0].(map[string]any)
-	assertEqual(t, firstComponent["component"].(string), "sandboxd")
-	assertEqual(t, firstComponent["state"].(string), "stopped")
+}
+
+func TestServerAppliesActivationInputAfterActivationSubmission(t *testing.T) {
+	socketPath := shortUnixSocketPath(t)
+	server, err := StartServer(socketPath)
+	requireNoError(t, err)
+	defer server.Close()
+	waitForControlSocket(t, socketPath)
+	bootstrapRequests := make(chan string, 1)
+	gatewayURL, closeGateway := startActivationBootstrapGateway(t, bootstrapRequests)
+	defer closeGateway()
+	outputPath := filepath.Join(t.TempDir(), "startup-output.txt")
+	activationInput := controlClientActivationInput()
+	activationInput.TunnelGatewayWSURL = gatewayURL
+	runtimePlan, err := json.Marshal(map[string]any{
+		"sandboxProfileId": "sbp_control_apply",
+		"version":          1,
+		"image": map[string]string{
+			"source":   "base",
+			"imageRef": "base-ref",
+		},
+		"egressRoutes": []any{},
+		"artifacts": []any{
+			map[string]any{
+				"artifactKey": "artifact_1",
+				"name":        "artifact one",
+				"lifecycle": map[string]any{
+					"install": []any{
+						map[string]any{
+							"op": "exec",
+							"command": map[string]any{
+								"args": []string{"sh", "-c", "printf startup > \"$1\"", "sh", outputPath},
+							},
+						},
+					},
+				},
+			},
+		},
+		"runtimeClients":   []any{},
+		"workspaceSources": []any{},
+		"agentRuntimes":    []any{},
+	})
+	requireNoError(t, err)
+	activationInput.RuntimePlan = runtimePlan
+
+	requireNoError(t, SubmitActivate(socketPath, activationInput))
+
+	assertEqual(t, receiveBootstrapRequest(t, bootstrapRequests), "bootstrap_token=bootstrap-token-value")
+	waitForFileContents(t, outputPath, "startup", server)
+	acceptedInput := server.ActivationInput()
+	if acceptedInput == nil {
+		t.Fatalf("expected daemon to retain accepted activation input")
+	}
+	assertEqual(t, acceptedInput.BootstrapToken, "bootstrap-token-value")
+}
+
+func TestServerHealthReportsActivatingWhileActivationIsInProgress(t *testing.T) {
+	socketPath := shortUnixSocketPath(t)
+	server, err := StartServer(socketPath)
+	requireNoError(t, err)
+	defer server.Close()
+	waitForControlSocket(t, socketPath)
+	bootstrapRequests := make(chan string, 1)
+	gatewayURL, closeGateway := startActivationBootstrapGateway(t, bootstrapRequests)
+	defer closeGateway()
+	activationInput := controlClientActivationInput()
+	activationInput.TunnelGatewayWSURL = gatewayURL
+	activationDone := make(chan error, 1)
+	go func() {
+		activationDone <- SubmitActivate(socketPath, activationInput)
+	}()
+	assertEqual(t, receiveBootstrapRequest(t, bootstrapRequests), "bootstrap_token=bootstrap-token-value")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+server.HealthEndpointAddr()+DefaultHealthEndpointPath, nil)
+	requireNoError(t, err)
+	response, err := http.DefaultClient.Do(request)
+
+	requireNoError(t, err)
+	defer response.Body.Close()
+	var body map[string]any
+	requireNoError(t, json.NewDecoder(response.Body).Decode(&body))
+	assertEqual(t, body["daemon_phase"].(string), "activating")
+	if body["snapshot"] != nil {
+		t.Fatalf("expected nil snapshot while activation is in progress")
+	}
+	select {
+	case err := <-activationDone:
+		t.Fatalf("expected activation to still be in progress, got %v", err)
+	default:
+	}
 }
 
 func TestServerResumeReconnectsBootstrapTunnelWhenRuntimePlanIsUnchanged(t *testing.T) {
@@ -171,6 +303,109 @@ func TestServerResumeReconnectsBootstrapTunnelWhenRuntimePlanIsUnchanged(t *test
 
 	assertEqual(t, receiveBootstrapRequest(t, bootstrapRequests), "bootstrap_token=bootstrap-token-value")
 	assertEqual(t, receiveBootstrapRequest(t, bootstrapRequests), "bootstrap_token=bootstrap-token-resumed")
+}
+
+func TestServerHealthReportsActivatingWhileInitializedActivationRefreshIsInProgress(t *testing.T) {
+	socketPath := shortUnixSocketPath(t)
+	server, err := StartServer(socketPath)
+	requireNoError(t, err)
+	defer server.Close()
+	waitForControlSocket(t, socketPath)
+	bootstrapRequests := make(chan string, 2)
+	firstGatewayURL, closeFirstGateway := startActivationBootstrapGateway(t, bootstrapRequests)
+	defer closeFirstGateway()
+	secondGatewayURL, closeSecondGateway := startActivationBootstrapGateway(t, bootstrapRequests)
+	defer closeSecondGateway()
+	activationInput := controlClientActivationInput()
+	activationInput.TunnelGatewayWSURL = firstGatewayURL
+	requireNoError(t, SubmitActivate(socketPath, activationInput))
+	assertEqual(t, receiveBootstrapRequest(t, bootstrapRequests), "bootstrap_token=bootstrap-token-value")
+	resumedActivationInput := activationInput
+	resumedActivationInput.BootstrapToken = "bootstrap-token-resumed"
+	resumedActivationInput.TunnelExchangeToken = "tunnel-exchange-token-resumed"
+	resumedActivationInput.TunnelGatewayWSURL = secondGatewayURL
+	activationDone := make(chan error, 1)
+	go func() {
+		activationDone <- SubmitActivate(socketPath, resumedActivationInput)
+	}()
+	assertEqual(t, receiveBootstrapRequest(t, bootstrapRequests), "bootstrap_token=bootstrap-token-resumed")
+
+	health := fetchHealthResponse(t, server)
+
+	assertEqual(t, health["daemon_phase"].(string), "activating")
+	if health["snapshot"] != nil {
+		t.Fatalf("expected nil snapshot while initialized activation refresh is in progress")
+	}
+	select {
+	case err := <-activationDone:
+		t.Fatalf("expected initialized activation refresh to still be in progress, got %v", err)
+	default:
+	}
+}
+
+func TestServerResumeAcceptsSemanticallyEqualRuntimePlanJSON(t *testing.T) {
+	socketPath := shortUnixSocketPath(t)
+	server, err := StartServer(socketPath)
+	requireNoError(t, err)
+	defer server.Close()
+	waitForControlSocket(t, socketPath)
+	bootstrapRequests := make(chan string, 2)
+	gatewayURL, closeGateway := startActivationBootstrapGateway(t, bootstrapRequests)
+	defer closeGateway()
+	activationInput := controlClientActivationInput()
+	activationInput.TunnelGatewayWSURL = gatewayURL
+	activationInput.RuntimePlan = []byte(`{
+		"version": 1,
+		"sandboxProfileId": "sbp_control",
+		"image": {
+			"imageRef": "base-ref",
+			"source": "base"
+		},
+		"runtimeClients": [],
+		"workspaceSources": [],
+		"artifacts": [],
+		"egressRoutes": [],
+		"agentRuntimes": []
+	}`)
+	requireNoError(t, SubmitActivate(socketPath, activationInput))
+	assertEqual(t, receiveBootstrapRequest(t, bootstrapRequests), "bootstrap_token=bootstrap-token-value")
+	resumedActivationInput := activationInput
+	resumedActivationInput.BootstrapToken = "bootstrap-token-resumed"
+	resumedActivationInput.RuntimePlan = []byte(`{
+		"sandboxProfileId": "sbp_control",
+		"version": 1,
+		"image": {
+			"source": "base",
+			"imageRef": "base-ref"
+		},
+		"egressRoutes": [],
+		"artifacts": [],
+		"workspaceSources": [],
+		"runtimeClients": [],
+		"agentRuntimes": []
+	}`)
+
+	requireNoError(t, SubmitActivate(socketPath, resumedActivationInput))
+
+	assertEqual(t, receiveBootstrapRequest(t, bootstrapRequests), "bootstrap_token=bootstrap-token-resumed")
+}
+
+func TestServerHealthReportsActivatingWhenActivatedStateIsMissing(t *testing.T) {
+	socketPath := shortUnixSocketPath(t)
+	server, err := StartServerWithHealthEndpoint(socketPath, "127.0.0.1:0")
+	requireNoError(t, err)
+	defer server.Close()
+	server.state.mutex.Lock()
+	server.state.phase = ActivationPhaseActivated
+	server.state.sandboxdState = nil
+	server.state.mutex.Unlock()
+
+	health := fetchHealthResponse(t, server)
+
+	assertEqual(t, health["daemon_phase"].(string), "activating")
+	if health["snapshot"] != nil {
+		t.Fatalf("expected nil snapshot when activated state is missing")
+	}
 }
 
 func TestServerServesUnactivatedHealthResponse(t *testing.T) {
@@ -330,6 +565,24 @@ func waitForControlSocket(t *testing.T, socketPath string) {
 	}
 }
 
+func waitForFileContents(t *testing.T, path string, expected string, server *Server) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if contents, err := os.ReadFile(path); err == nil && string(contents) == expected {
+			return
+		}
+		health := server.healthResponse()
+		if health.DaemonPhase == string(ActivationPhaseFailed) && health.InitError != nil {
+			t.Fatalf("sandboxd activation failed before output was observed: %s", *health.InitError)
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s to contain %q", path, expected)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func fetchHealthResponse(t *testing.T, server *Server) map[string]any {
 	t.Helper()
 	response, err := http.Get("http://" + server.HealthEndpointAddr() + DefaultHealthEndpointPath)
@@ -367,7 +620,11 @@ func startActivationBootstrapGateway(t *testing.T, bootstrapRequests chan<- stri
 		}
 		defer connection.Close(websocket.StatusNormalClosure, "")
 		bootstrapRequests <- request.URL.RawQuery
-		_, _, _ = connection.Read(request.Context())
+		for {
+			if _, _, err := connection.Read(request.Context()); err != nil {
+				return
+			}
+		}
 	}))
 	return "ws" + strings.TrimPrefix(server.URL, "http") + "/bootstrap/sbi_control", server.Close
 }
@@ -391,13 +648,25 @@ func startSigningBootstrapGateway(t *testing.T, signingRequests chan<- string, s
 			return
 		}
 		defer connection.Close(websocket.StatusNormalClosure, "")
-		_, payload, err := connection.Read(request.Context())
-		if err != nil {
-			return
-		}
-		signingRequests <- string(payload)
-		if err := connection.Write(request.Context(), websocket.MessageText, []byte(signingResponse)); err != nil {
-			signingRequests <- "write error: " + err.Error()
+		for {
+			messageType, payload, err := connection.Read(request.Context())
+			if err != nil {
+				return
+			}
+			if messageType != websocket.MessageText {
+				continue
+			}
+			var message map[string]any
+			if err := json.Unmarshal(payload, &message); err != nil {
+				continue
+			}
+			if message["type"] != "signing.request" {
+				continue
+			}
+			signingRequests <- string(payload)
+			if err := connection.Write(request.Context(), websocket.MessageText, []byte(signingResponse)); err != nil {
+				signingRequests <- "write error: " + err.Error()
+			}
 		}
 	}))
 	return "ws" + strings.TrimPrefix(server.URL, "http") + "/bootstrap/sbi_control", server.Close

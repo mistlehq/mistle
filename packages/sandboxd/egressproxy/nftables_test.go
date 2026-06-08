@@ -1,8 +1,13 @@
 package egressproxy
 
 import (
+	"bytes"
+	"errors"
 	"slices"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/mistle/sandboxd/protocol"
 )
@@ -77,6 +82,110 @@ func TestBuildsLocalDestinationSetReplacementForReconciliation(t *testing.T) {
 	assertEqual(t, script, "flush set ip mistle_transparent_egress local_destinations\nadd element ip mistle_transparent_egress local_destinations { 127.0.0.0/8 , 169.254.0.0/16 , 172.18.0.0/16 }\n")
 }
 
+func TestReconcilesTransparentLocalDestinationsWithDiagnosticsOnSuccess(t *testing.T) {
+	var nftScript string
+	cidrs, err := reconcileTransparentLocalDestinationsWith(
+		TransparentNftablesTableName,
+		func() ([]string, error) {
+			return []string{"172.18.0.0/16"}, nil
+		},
+		func(script string) error {
+			nftScript = script
+			return nil
+		},
+	)
+	requireNoError(t, err)
+
+	assertStringSlicesEqual(t, cidrs, []string{"127.0.0.0/8", "169.254.0.0/16", "172.18.0.0/16"})
+	if !strings.Contains(nftScript, "flush set ip mistle_transparent_egress local_destinations") {
+		t.Fatalf("expected nft script to replace local destination set, got %q", nftScript)
+	}
+}
+
+func TestRecordsTransparentLocalDestinationReconcileFailureDiagnostics(t *testing.T) {
+	var output bytes.Buffer
+	previousOutput := transparentProxyDiagnosticsOutput
+	transparentProxyDiagnosticsOutput = &output
+	t.Cleanup(func() {
+		transparentProxyDiagnosticsOutput = previousOutput
+	})
+
+	_, err := reconcileTransparentLocalDestinationsWith(
+		TransparentNftablesTableName,
+		func() ([]string, error) {
+			return nil, errors.New("ip route failed")
+		},
+		func(string) error {
+			t.Fatalf("nft script should not run after discovery failure")
+			return nil
+		},
+	)
+	if err == nil {
+		t.Fatalf("expected reconcile failure")
+	}
+	emitTransparentProxyDiagnostic("egress_proxy_local_destination_reconcile_failed", map[string]any{
+		"tableName": TransparentNftablesTableName,
+		"trigger":   "test",
+		"error":     err.Error(),
+	})
+
+	logLine := output.String()
+	if !strings.Contains(logLine, `"event":"egress_proxy_local_destination_reconcile_failed"`) ||
+		!strings.Contains(logLine, `"error":"ip route failed"`) ||
+		!strings.Contains(logLine, `"tableName":"mistle_transparent_egress"`) {
+		t.Fatalf("expected structured reconcile failure diagnostic, got %q", logLine)
+	}
+}
+
+func TestTransparentLocalDestinationReconcilerReconcilesOnRouteMonitorEventsLikeRust(t *testing.T) {
+	var output bytes.Buffer
+	previousOutput := transparentProxyDiagnosticsOutput
+	previousDiscover := discoverTransparentLocalDestinationIPv4CIDRs
+	previousRunNftScript := runTransparentNftScript
+	transparentProxyDiagnosticsOutput = &output
+	discoverCount := 0
+	discoverTransparentLocalDestinationIPv4CIDRs = func() ([]string, error) {
+		discoverCount++
+		if discoverCount == 1 {
+			return []string{"172.18.0.0/16"}, nil
+		}
+		return []string{"172.19.0.0/16"}, nil
+	}
+	scriptRuns := make(chan string, 2)
+	runTransparentNftScript = func(script string) error {
+		scriptRuns <- script
+		return nil
+	}
+	t.Cleanup(func() {
+		transparentProxyDiagnosticsOutput = previousOutput
+		discoverTransparentLocalDestinationIPv4CIDRs = previousDiscover
+		runTransparentNftScript = previousRunNftScript
+	})
+	monitor := newChannelTransparentRouteEventMonitor()
+	reconciler, err := startTransparentLocalDestinationReconcilerWithMonitor(
+		TransparentNftablesTableName,
+		time.Hour,
+		func() (transparentRouteEventMonitor, error) {
+			return monitor, nil
+		},
+	)
+	requireNoError(t, err)
+	defer reconciler.Close()
+	requireScriptRun(t, scriptRuns, "startup reconciliation should run")
+
+	monitor.Send()
+	requireScriptRun(t, scriptRuns, "rtnetlink event should trigger reconciliation")
+
+	logs := output.String()
+	if !strings.Contains(logs, `"event":"egress_proxy_local_destination_reconcile_completed"`) ||
+		!strings.Contains(logs, `"trigger":"rtnetlink_event"`) ||
+		!strings.Contains(logs, `"cidrs":["127.0.0.0/8","169.254.0.0/16","172.19.0.0/16"]`) ||
+		!strings.Contains(logs, `"addedCidrs":["172.19.0.0/16"]`) ||
+		!strings.Contains(logs, `"removedCidrs":["172.18.0.0/16"]`) {
+		t.Fatalf("expected Rust-compatible route event reconciliation logs, got %q", logs)
+	}
+}
+
 func TestParsesLinkScopeIPv4RoutesAsLocalDestinationCIDRs(t *testing.T) {
 	cidrs, err := ParseIproute2LinkScopeIPv4RouteCIDRs([]byte(`[
 		{"dst":"172.17.0.0/16","dev":"docker0","protocol":"kernel","scope":"link","prefsrc":"172.17.0.1"},
@@ -145,5 +254,37 @@ func assertStringSlicesEqual(t *testing.T, actual []string, expected []string) {
 	t.Helper()
 	if !slices.Equal(actual, expected) {
 		t.Fatalf("expected %#v, got %#v", expected, actual)
+	}
+}
+
+type channelTransparentRouteEventMonitor struct {
+	events chan struct{}
+	once   sync.Once
+}
+
+func newChannelTransparentRouteEventMonitor() *channelTransparentRouteEventMonitor {
+	return &channelTransparentRouteEventMonitor{events: make(chan struct{}, 4)}
+}
+
+func (monitor *channelTransparentRouteEventMonitor) Close() {
+	monitor.once.Do(func() {
+		close(monitor.events)
+	})
+}
+
+func (monitor *channelTransparentRouteEventMonitor) Events() <-chan struct{} {
+	return monitor.events
+}
+
+func (monitor *channelTransparentRouteEventMonitor) Send() {
+	monitor.events <- struct{}{}
+}
+
+func requireScriptRun(t *testing.T, scriptRuns <-chan string, description string) {
+	t.Helper()
+	select {
+	case <-scriptRuns:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timed out waiting for %s", description)
 	}
 }

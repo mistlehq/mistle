@@ -17,8 +17,24 @@ const (
 	PayloadKindWebSocketText   = byte(0x02)
 	PayloadKindWebSocketBinary = byte(0x03)
 
-	FileUploadResetCodeInvalidFileType  = "invalid_file_type"
-	FileUploadResetCodeMimeTypeMismatch = "mime_type_mismatch"
+	ConnectErrorCodeAgentEndpointDialFailed = "agent_endpoint_dial_failed"
+	ConnectErrorCodeExecCommandStartFailed  = "exec_command_start_failed"
+	ConnectErrorCodeFileSearchUnavailable   = "file_search_stream_unavailable"
+	ConnectErrorCodeInvalidConnectRequest   = "invalid_connect_request"
+	ConnectErrorCodeUnsupportedChannel      = "unsupported_channel"
+
+	StreamResetCodeExecCommandFailed     = "exec_command_failed"
+	StreamResetCodeInvalidStreamSignal   = "invalid_stream_signal"
+	StreamResetCodeInvalidStreamData     = "invalid_stream_data"
+	StreamResetCodeInvalidStreamWindow   = "invalid_stream_window"
+	StreamResetCodeInvalidStreamClose    = "invalid_stream_close"
+	StreamResetCodeStreamCloseFailed     = "stream_close_failed"
+	StreamResetCodeStreamWindowExhausted = "stream_window_exhausted"
+	StreamResetCodeTargetClosed          = "target_closed"
+	FileUploadResetCodeByteCountExceeded = "byte_count_exceeded"
+	FileUploadResetCodeByteCountMismatch = "byte_count_mismatch"
+	FileUploadResetCodeInvalidFileType   = "invalid_file_type"
+	FileUploadResetCodeMimeTypeMismatch  = "mime_type_mismatch"
 )
 
 type StreamDataFrame struct {

@@ -19,6 +19,11 @@ type RuntimeClientProcessManager struct {
 	monitorStopOnce             sync.Once
 }
 
+type RuntimeClientProcessObserver interface {
+	RecordProcessStarted(processSpec RuntimeClientProcessSpec)
+	RecordProcessCompleted(processSpec RuntimeClientProcessSpec)
+}
+
 type ProcessManagerErrorKind string
 
 const (
@@ -99,12 +104,29 @@ func StartRuntimeClientProcessManagerWithSupervisor(
 	sleeper timeutil.Sleeper,
 	supervisorHandle *supervision.SandboxdSupervisorHandle,
 ) (*RuntimeClientProcessManager, error) {
-	return startRuntimeClientProcessManagerWithSupervisorAndPlatformScopes(
+	return StartRuntimeClientProcessManagerWithSupervisorAndObserver(
 		processSpecs,
 		clock,
 		sleeper,
 		supervisorHandle,
 		nil,
+	)
+}
+
+func StartRuntimeClientProcessManagerWithSupervisorAndObserver(
+	processSpecs []RuntimeClientProcessSpec,
+	clock timeutil.Clock,
+	sleeper timeutil.Sleeper,
+	supervisorHandle *supervision.SandboxdSupervisorHandle,
+	observer RuntimeClientProcessObserver,
+) (*RuntimeClientProcessManager, error) {
+	return startRuntimeClientProcessManagerWithSupervisorPlatformScopesAndObserver(
+		processSpecs,
+		clock,
+		sleeper,
+		supervisorHandle,
+		nil,
+		observer,
 	)
 }
 
@@ -115,21 +137,41 @@ func StartRuntimeClientProcessManagerWithPlatformScopes(
 	supervisorHandle *supervision.SandboxdSupervisorHandle,
 	platformScopeInput PlatformProcessScopeInput,
 ) (*RuntimeClientProcessManager, error) {
-	return startRuntimeClientProcessManagerWithSupervisorAndPlatformScopes(
+	return StartRuntimeClientProcessManagerWithPlatformScopesAndObserver(
+		processSpecs,
+		clock,
+		sleeper,
+		supervisorHandle,
+		platformScopeInput,
+		nil,
+	)
+}
+
+func StartRuntimeClientProcessManagerWithPlatformScopesAndObserver(
+	processSpecs []RuntimeClientProcessSpec,
+	clock timeutil.Clock,
+	sleeper timeutil.Sleeper,
+	supervisorHandle *supervision.SandboxdSupervisorHandle,
+	platformScopeInput PlatformProcessScopeInput,
+	observer RuntimeClientProcessObserver,
+) (*RuntimeClientProcessManager, error) {
+	return startRuntimeClientProcessManagerWithSupervisorPlatformScopesAndObserver(
 		processSpecs,
 		clock,
 		sleeper,
 		supervisorHandle,
 		&platformScopeInput,
+		observer,
 	)
 }
 
-func startRuntimeClientProcessManagerWithSupervisorAndPlatformScopes(
+func startRuntimeClientProcessManagerWithSupervisorPlatformScopesAndObserver(
 	processSpecs []RuntimeClientProcessSpec,
 	clock timeutil.Clock,
 	sleeper timeutil.Sleeper,
 	supervisorHandle *supervision.SandboxdSupervisorHandle,
 	platformScopeInput *PlatformProcessScopeInput,
+	observer RuntimeClientProcessObserver,
 ) (*RuntimeClientProcessManager, error) {
 	if err := validateProcessManagerTiming(clock, sleeper); err != nil {
 		return nil, err
@@ -143,6 +185,9 @@ func startRuntimeClientProcessManagerWithSupervisorAndPlatformScopes(
 
 	for processIndex, processSpec := range processSpecs {
 		markTrackedServerStarting(processSpec, supervisorHandle)
+		if observer != nil {
+			observer.RecordProcessStarted(processSpec)
+		}
 
 		var platformScope *runtimeClientProcessPlatformScope
 		if platformScopeInput != nil {
@@ -197,6 +242,9 @@ func startRuntimeClientProcessManagerWithSupervisorAndPlatformScopes(
 			}
 		}
 		startedProcesses = append(startedProcesses, managedProcess)
+		if observer != nil {
+			observer.RecordProcessCompleted(processSpec)
+		}
 	}
 
 	manager := &RuntimeClientProcessManager{

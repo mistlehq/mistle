@@ -4,16 +4,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strconv"
 
 	"github.com/mistle/sandboxd/control"
 	"github.com/mistle/sandboxd/egressproxy"
+	"github.com/mistle/sandboxd/security"
 )
 
 const (
 	Version                  = "0.31.0"
 	DefaultSignerAliasName   = "mistle-ssh-sign"
+	ControlSocketPathEnvName = "MISTLE_SANDBOXD_CONTROL_SOCKET_PATH"
 	defaultControlSocketPath = "/run/mistle/sandboxd/control.sock"
 )
 
@@ -80,7 +83,7 @@ func ParseCommand(args []string) (Command, error) {
 }
 
 func Run(programName string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
-	return runWithControlSocket(programName, args, stdin, stdout, stderr, defaultControlSocketPath)
+	return runWithControlSocket(programName, args, stdin, stdout, stderr, configuredControlSocketPath())
 }
 
 func runWithControlSocket(
@@ -90,6 +93,18 @@ func runWithControlSocket(
 	stdout io.Writer,
 	stderr io.Writer,
 	controlSocketPath string,
+) int {
+	return runWithControlSocketAndHealthEndpoint(programName, args, stdin, stdout, stderr, controlSocketPath, control.DefaultHealthEndpointAddr)
+}
+
+func runWithControlSocketAndHealthEndpoint(
+	programName string,
+	args []string,
+	stdin io.Reader,
+	stdout io.Writer,
+	stderr io.Writer,
+	controlSocketPath string,
+	healthEndpointAddr string,
 ) int {
 	command := Command{Kind: CommandSign}
 	var err error
@@ -145,7 +160,11 @@ func runWithControlSocket(
 		}
 		return 0
 	case CommandDaemon:
-		server, err := control.StartServer(controlSocketPath)
+		if err := security.ApplyCurrentProcessSecurity(); err != nil {
+			_, _ = fmt.Fprintln(stderr, err.Error())
+			return 1
+		}
+		server, err := control.StartServerWithHealthEndpoint(controlSocketPath, healthEndpointAddr)
 		if err != nil {
 			_, _ = fmt.Fprintln(stderr, err.Error())
 			return 1
@@ -213,4 +232,11 @@ func rejectUnexpectedArgs(args []string) error {
 
 func isSignerAlias(programName string) bool {
 	return filepath.Base(programName) == DefaultSignerAliasName
+}
+
+func configuredControlSocketPath() string {
+	if path := os.Getenv(ControlSocketPathEnvName); path != "" {
+		return path
+	}
+	return defaultControlSocketPath
 }

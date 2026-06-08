@@ -21,7 +21,7 @@ func TestCollectTrackedComponentsAlwaysTracksDaemonAndTunnel(t *testing.T) {
 
 func TestCollectTrackedComponentsIncludesEgressProxyWhenRoutesExist(t *testing.T) {
 	runtimePlan := runtimePlanWithAgentRuntimes(nil)
-	runtimePlan.EgressRoutes = []any{map[string]any{"egressRuleId": "egress_rule_123"}}
+	runtimePlan.EgressRoutes = []runtime.CompiledEgressRoute{{EgressRuleID: "egress_rule_123"}}
 
 	components := CollectTrackedComponents(runtimePlan)
 

@@ -1,6 +1,7 @@
 package keepalive
 
 import (
+	"sync"
 	"time"
 
 	"github.com/mistle/sandboxd/protocol"
@@ -18,6 +19,27 @@ type Manager struct {
 	tunnelConnected             bool
 	lastPublishedActive         *bool
 	nextHeartbeatAtMS           *uint64
+}
+
+type SharedManager struct {
+	mutex   sync.Mutex
+	manager *Manager
+}
+
+func NewSharedManager() *SharedManager {
+	return &SharedManager{manager: &Manager{}}
+}
+
+func (manager *SharedManager) WithLocked(callback func(*Manager)) {
+	manager.mutex.Lock()
+	defer manager.mutex.Unlock()
+	callback(manager.manager)
+}
+
+func (manager *SharedManager) Active() bool {
+	manager.mutex.Lock()
+	defer manager.mutex.Unlock()
+	return manager.manager.Active()
 }
 
 func (manager *Manager) OnTunnelConnected(clock timeutil.Clock) {
