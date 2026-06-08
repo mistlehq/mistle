@@ -64,9 +64,18 @@ const TestPrivateKey = readFileSync(TestPrivateKeyPath, "utf8");
 const TestPublicKey =
   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILM+rvN+ot98qgEN796jTiQfZfG1KaT0PtFDJ/XFSqti user@example.com";
 const GitHubAppInstallationConnectionMethodId = "github-app-installation";
+const MaxActiveBindingsPerSandbox = 3;
+const NoMessageTimeoutMs = 50;
 
 const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api", "data-plane-gateway"],
+  __serviceOptions: {
+    dataPlaneGateway: {
+      tunnel: {
+        maxActiveBindingsPerSandbox: MaxActiveBindingsPerSandbox,
+      },
+    },
+  },
 });
 
 beforeAll(async () => {
@@ -345,7 +354,7 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
         bootstrapSocket = await connectBootstrapSocket({ env, sandboxInstanceId });
         clientSocket = await connectConnectionSocket({ env, sandboxInstanceId });
 
-        const bootstrapNoMessage = waitForNoWebSocketMessage(bootstrapSocket);
+        const bootstrapNoMessage = waitForNoWebSocketMessage(bootstrapSocket, NoMessageTimeoutMs);
         const clientReset = waitForWebSocketMessage(clientSocket);
         await sendWebSocketMessage(
           clientSocket,
@@ -382,7 +391,7 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
         bootstrapSocket = await connectBootstrapSocket({ env, sandboxInstanceId });
         clientSocket = await connectConnectionSocket({ env, sandboxInstanceId });
 
-        const bootstrapNoMessage = waitForNoWebSocketMessage(bootstrapSocket);
+        const bootstrapNoMessage = waitForNoWebSocketMessage(bootstrapSocket, NoMessageTimeoutMs);
         const clientClosed = waitForWebSocketClose(clientSocket);
         await sendWebSocketMessage(
           clientSocket,
@@ -429,7 +438,10 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
         bootstrapSocket = await connectBootstrapSocket({ env, sandboxInstanceId });
         textClientSocket = await connectConnectionSocket({ env, sandboxInstanceId });
 
-        const bootstrapNoTextMessage = waitForNoWebSocketMessage(bootstrapSocket);
+        const bootstrapNoTextMessage = waitForNoWebSocketMessage(
+          bootstrapSocket,
+          NoMessageTimeoutMs,
+        );
         const textClientClosed = waitForWebSocketClose(textClientSocket);
         await sendWebSocketMessage(textClientSocket, "hello from client");
         await expect(textClientClosed).resolves.toEqual({
@@ -440,7 +452,10 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
 
         binaryClientSocket = await connectConnectionSocket({ env, sandboxInstanceId });
 
-        const bootstrapNoBinaryMessage = waitForNoWebSocketMessage(bootstrapSocket);
+        const bootstrapNoBinaryMessage = waitForNoWebSocketMessage(
+          bootstrapSocket,
+          NoMessageTimeoutMs,
+        );
         const binaryClientClosed = waitForWebSocketClose(binaryClientSocket);
         await sendWebSocketMessage(binaryClientSocket, Buffer.from([0x01, 0x7f, 0xa5]));
         await expect(binaryClientClosed).resolves.toEqual({
@@ -472,7 +487,7 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
         bootstrapSocket = await connectBootstrapSocket({ env, sandboxInstanceId });
         clientSocket = await connectConnectionSocket({ env, sandboxInstanceId });
 
-        const bootstrapNoMessage = waitForNoWebSocketMessage(bootstrapSocket);
+        const bootstrapNoMessage = waitForNoWebSocketMessage(bootstrapSocket, NoMessageTimeoutMs);
         const clientClosed = waitForWebSocketClose(clientSocket);
         await sendWebSocketMessage(
           clientSocket,
@@ -630,8 +645,8 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
           streamId: 1,
         });
 
-        const bootstrapNoMessage = waitForNoWebSocketMessage(bootstrapSocket);
-        const clientNoMessage = waitForNoWebSocketMessage(clientSocket);
+        const bootstrapNoMessage = waitForNoWebSocketMessage(bootstrapSocket, NoMessageTimeoutMs);
+        const clientNoMessage = waitForNoWebSocketMessage(clientSocket, NoMessageTimeoutMs);
         await sendWebSocketMessage(
           bootstrapSocket,
           JSON.stringify({
@@ -777,7 +792,10 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
         });
 
         const firstBootstrapData = waitForWebSocketMessage(firstClientSocket);
-        const secondClientNoMessage = waitForNoWebSocketMessage(secondClientSocket);
+        const secondClientNoMessage = waitForNoWebSocketMessage(
+          secondClientSocket,
+          NoMessageTimeoutMs,
+        );
         await sendWebSocketMessage(
           bootstrapSocket,
           Buffer.from(
@@ -796,7 +814,10 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
         await secondClientNoMessage;
 
         const secondBootstrapData = waitForWebSocketMessage(secondClientSocket);
-        const firstClientNoMessage = waitForNoWebSocketMessage(firstClientSocket);
+        const firstClientNoMessage = waitForNoWebSocketMessage(
+          firstClientSocket,
+          NoMessageTimeoutMs,
+        );
         await sendWebSocketMessage(
           bootstrapSocket,
           Buffer.from(
@@ -917,11 +938,13 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
 
       try {
         bootstrapSocket = await connectBootstrapSocket({ env, sandboxInstanceId });
-        for (let index = 0; index < 33; index += 1) {
+        for (let index = 0; index < MaxActiveBindingsPerSandbox + 1; index += 1) {
           clientSockets.push(await connectConnectionSocket({ env, sandboxInstanceId }));
         }
 
-        for (const [index, clientSocket] of clientSockets.slice(0, 32).entries()) {
+        for (const [index, clientSocket] of clientSockets
+          .slice(0, MaxActiveBindingsPerSandbox)
+          .entries()) {
           const forwardedOpen = waitForWebSocketMessage(bootstrapSocket);
           await sendWebSocketMessage(
             clientSocket,
@@ -942,13 +965,13 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
           });
         }
 
-        const rejectedClientSocket = clientSockets.at(32);
+        const rejectedClientSocket = clientSockets.at(MaxActiveBindingsPerSandbox);
         if (rejectedClientSocket === undefined) {
           throw new Error("Expected the rejected client websocket to exist.");
         }
 
         const rejectedOpen = waitForWebSocketMessage(rejectedClientSocket);
-        const bootstrapNoMessage = waitForNoWebSocketMessage(bootstrapSocket);
+        const bootstrapNoMessage = waitForNoWebSocketMessage(bootstrapSocket, NoMessageTimeoutMs);
         await sendWebSocketMessage(
           rejectedClientSocket,
           JSON.stringify({
@@ -967,7 +990,7 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
         expect(rejectedOpenPayload.streamId).toBe(99);
         expect(rejectedOpenPayload.code).toBe("max_active_streams_exceeded");
         expect(rejectedOpenPayload.message).toContain(
-          "maximum 32 active interactive stream bindings",
+          `maximum ${String(MaxActiveBindingsPerSandbox)} active interactive stream bindings`,
         );
         await bootstrapNoMessage;
       } finally {

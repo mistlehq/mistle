@@ -102,6 +102,11 @@ sandbox_ws_internal_url = "ws://data-plane-gateway:8084/tunnel/sandbox"
 #[services.data_plane_gateway.port_access]
 #authorization_timeout_ms = 5000
 
+# Optional sandbox tunnel tuning. When omitted, data-plane-gateway allows up to
+# 32 active interactive stream bindings per sandbox bootstrap tunnel.
+#[services.data_plane_gateway.tunnel]
+#max_active_bindings_per_sandbox = 32
+
 [services.control_plane_worker]
 workflow_concurrency = 4
 workflow_database_pool_max = 4

@@ -97,7 +97,6 @@ export {
 } from "./gateway-websocket-close.js";
 import { GatewayWebSocketCloseReasons } from "./gateway-websocket-close.js";
 
-const DefaultMaxActiveBindingsPerSandbox = 32;
 const ServiceRestartConnectionDrainTimeoutMs = 25_000;
 const ShutdownTunnelTaskDrainTimeoutMs = 5_000;
 
@@ -381,7 +380,7 @@ export function createDataPlaneGatewayRuntime(
     systemClock,
   );
   const tunnelSessionRegistry = new TunnelSessionRegistry(
-    new InMemoryTunnelSessionRegistryAdapter(DefaultMaxActiveBindingsPerSandbox),
+    new InMemoryTunnelSessionRegistryAdapter(config.app.tunnel.maxActiveBindingsPerSandbox),
   );
   let portsTargetAuthorizeService: PortsTargetAuthorizeService;
   let portAccessTransportService: PortAccessTransportService;

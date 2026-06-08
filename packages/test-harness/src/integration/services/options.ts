@@ -46,6 +46,9 @@ export type IntegrationServiceOptions = {
     portAccess?: {
       authorizationTimeoutMs?: number;
     };
+    tunnel?: {
+      maxActiveBindingsPerSandbox?: number;
+    };
   };
   sandbox?: IntegrationSandboxOptions;
 };

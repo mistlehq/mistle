@@ -34,6 +34,7 @@ const DefaultWebSocketPingIntervalMs = 10_000;
 const DefaultWebSocketPongTimeoutMs = 10_000;
 const IntegrationTelemetryBatchDelayMs = 100;
 const DefaultPortAccessAuthorizationTimeoutMs = 5_000;
+const DefaultTunnelMaxActiveBindingsPerSandbox = 32;
 const OTelBatchDelayEnv = {
   LOGS: "OTEL_BLRP_SCHEDULE_DELAY",
   TRACES: "OTEL_BSP_SCHEDULE_DELAY",
@@ -128,6 +129,7 @@ function start(input: {
       gatewayRelay: input.dataPlaneGateway?.gatewayRelay,
       health: input.dataPlaneGateway?.health,
       portAccess: input.dataPlaneGateway?.portAccess,
+      tunnel: input.dataPlaneGateway?.tunnel,
       directEgressTrustedCaCertificates:
         input.dataPlaneGateway?.directEgress?.trustedCaCertificates,
       directEgressWebSocketUpstreamResolutionDelayMs:
@@ -216,6 +218,7 @@ function config(input: {
   gatewayRelay: IntegrationDataPlaneGatewayRelayOptions | undefined;
   health: NonNullable<IntegrationServiceOptions["dataPlaneGateway"]>["health"] | undefined;
   portAccess: NonNullable<IntegrationServiceOptions["dataPlaneGateway"]>["portAccess"] | undefined;
+  tunnel: NonNullable<IntegrationServiceOptions["dataPlaneGateway"]>["tunnel"] | undefined;
   nats: ResolvedTestInfra | undefined;
   sandbox: IntegrationSandboxOptions | undefined;
 }): DataPlaneGatewayConfig {
@@ -262,6 +265,10 @@ function config(input: {
     portAccess: {
       authorizationTimeoutMs:
         input.portAccess?.authorizationTimeoutMs ?? DefaultPortAccessAuthorizationTimeoutMs,
+    },
+    tunnel: {
+      maxActiveBindingsPerSandbox:
+        input.tunnel?.maxActiveBindingsPerSandbox ?? DefaultTunnelMaxActiveBindingsPerSandbox,
     },
     dataPlaneApi: {
       baseUrl: input.dataPlaneApiBaseUrl,

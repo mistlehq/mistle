@@ -16,6 +16,7 @@ function createRootConfig(input: {
   gatewayRelay?: Config["gateway_relay"];
   dataPlaneGatewayHealth?: Config["services"]["data_plane_gateway"]["health"];
   dataPlaneGatewayPortAccess?: Config["services"]["data_plane_gateway"]["port_access"];
+  dataPlaneGatewayTunnel?: Config["services"]["data_plane_gateway"]["tunnel"];
   google?: {
     client_id: string;
     client_secret: string;
@@ -95,6 +96,9 @@ function createRootConfig(input: {
         ...(input.dataPlaneGatewayPortAccess === undefined
           ? {}
           : { port_access: input.dataPlaneGatewayPortAccess }),
+        ...(input.dataPlaneGatewayTunnel === undefined
+          ? {}
+          : { tunnel: input.dataPlaneGatewayTunnel }),
       },
       control_plane_worker: {
         workflow_concurrency: 4,
@@ -467,6 +471,9 @@ describe("selectDataPlaneGatewayConfig", () => {
     expect(config.portAccess).toEqual({
       authorizationTimeoutMs: 5_000,
     });
+    expect(config.tunnel).toEqual({
+      maxActiveBindingsPerSandbox: 32,
+    });
     expect(config.controlPlaneApi.mcp.auth).toEqual({
       secret: "mcp-auth-secret",
       issuer: "control-plane-api",
@@ -538,6 +545,20 @@ describe("selectDataPlaneGatewayConfig", () => {
 
     expect(config.portAccess).toEqual({
       authorizationTimeoutMs: 250,
+    });
+  });
+
+  it("projects optional gateway tunnel config", () => {
+    const config = selectDataPlaneGatewayConfig(
+      createRootConfig({
+        dataPlaneGatewayTunnel: {
+          max_active_bindings_per_sandbox: 3,
+        },
+      }),
+    );
+
+    expect(config.tunnel).toEqual({
+      maxActiveBindingsPerSandbox: 3,
     });
   });
 });

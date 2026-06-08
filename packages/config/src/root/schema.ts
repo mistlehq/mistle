@@ -308,6 +308,12 @@ export const ConfigSchema = z
             })
             .strict()
             .optional(),
+          tunnel: z
+            .object({
+              max_active_bindings_per_sandbox: z.number().int().positive().optional(),
+            })
+            .strict()
+            .optional(),
         }).strict(),
         control_plane_worker: z
           .object({

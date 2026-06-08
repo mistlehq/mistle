@@ -725,6 +725,11 @@ const DataPlaneGatewayEnvDescriptors = [
     path: ["portAccess", "authorizationTimeoutMs"],
     parse: parseNumberEnv,
   },
+  {
+    envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_TUNNEL_MAX_ACTIVE_BINDINGS_PER_SANDBOX",
+    path: ["tunnel", "maxActiveBindingsPerSandbox"],
+    parse: parseNumberEnv,
+  },
   { envVar: "MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL", path: ["dataPlaneApi", "baseUrl"] },
   {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL",

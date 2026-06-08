@@ -313,6 +313,10 @@ const DataPlaneGatewayResourceRuntimeEnvExports: readonly RuntimeEnvExportDescri
     path: ["portAccess", "authorizationTimeoutMs"],
     envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_PORT_ACCESS_AUTHORIZATION_TIMEOUT_MS",
   },
+  {
+    path: ["tunnel", "maxActiveBindingsPerSandbox"],
+    envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_TUNNEL_MAX_ACTIVE_BINDINGS_PER_SANDBOX",
+  },
   { path: ["dataPlaneApi", "baseUrl"], envVar: "MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL" },
   {
     path: ["controlPlaneApi", "baseUrl"],

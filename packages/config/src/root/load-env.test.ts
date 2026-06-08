@@ -81,6 +81,7 @@ describe("loadRootConfigFromEnv", () => {
       MISTLE_SERVICES_DATA_PLANE_GATEWAY_HEALTH_WEBSOCKET_PING_INTERVAL_MS: "100",
       MISTLE_SERVICES_DATA_PLANE_GATEWAY_HEALTH_WEBSOCKET_PONG_TIMEOUT_MS: "250",
       MISTLE_SERVICES_DATA_PLANE_GATEWAY_PORT_ACCESS_AUTHORIZATION_TIMEOUT_MS: "300",
+      MISTLE_SERVICES_DATA_PLANE_GATEWAY_TUNNEL_MAX_ACTIVE_BINDINGS_PER_SANDBOX: "3",
       MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY: "4",
       MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_POOL_MAX: "6",
       MISTLE_SERVICES_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY: "5",
@@ -255,6 +256,9 @@ describe("loadRootConfigFromEnv", () => {
           },
           port_access: {
             authorization_timeout_ms: 300,
+          },
+          tunnel: {
+            max_active_bindings_per_sandbox: 3,
           },
         },
         control_plane_worker: {

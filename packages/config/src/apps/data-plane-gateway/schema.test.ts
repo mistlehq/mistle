@@ -5,6 +5,7 @@ import {
   DataPlaneGatewayHealthConfigSchema,
   DataPlaneGatewayPortAccessConfigSchema,
   DataPlaneGatewayRelayConfigSchema,
+  DataPlaneGatewayTunnelConfigSchema,
 } from "./schema.js";
 
 function createDataPlaneGatewayConfigInput() {
@@ -142,6 +143,32 @@ describe("DataPlaneGatewayPortAccessConfigSchema", () => {
   });
 });
 
+describe("DataPlaneGatewayTunnelConfigSchema", () => {
+  it("defaults max active bindings when omitted", () => {
+    expect(DataPlaneGatewayTunnelConfigSchema.parse(undefined)).toEqual({
+      maxActiveBindingsPerSandbox: 32,
+    });
+  });
+
+  it("accepts max active binding overrides", () => {
+    expect(
+      DataPlaneGatewayTunnelConfigSchema.parse({
+        maxActiveBindingsPerSandbox: 3,
+      }),
+    ).toEqual({
+      maxActiveBindingsPerSandbox: 3,
+    });
+  });
+
+  it("rejects non-positive max active bindings", () => {
+    expect(() =>
+      DataPlaneGatewayTunnelConfigSchema.parse({
+        maxActiveBindingsPerSandbox: 0,
+      }),
+    ).toThrow(/maxActiveBindingsPerSandbox/u);
+  });
+});
+
 describe("DataPlaneGatewayConfigSchema", () => {
   it("fills websocket health defaults when the section is omitted", () => {
     expect(DataPlaneGatewayConfigSchema.parse(createDataPlaneGatewayConfigInput()).health).toEqual({
@@ -155,6 +182,12 @@ describe("DataPlaneGatewayConfigSchema", () => {
       DataPlaneGatewayConfigSchema.parse(createDataPlaneGatewayConfigInput()).portAccess,
     ).toEqual({
       authorizationTimeoutMs: 5_000,
+    });
+  });
+
+  it("fills tunnel defaults when the section is omitted", () => {
+    expect(DataPlaneGatewayConfigSchema.parse(createDataPlaneGatewayConfigInput()).tunnel).toEqual({
+      maxActiveBindingsPerSandbox: 32,
     });
   });
 });

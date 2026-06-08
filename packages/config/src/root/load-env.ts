@@ -417,6 +417,11 @@ const RootEnvDescriptors = [
     parse: parseNumberEnv,
   },
   {
+    envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_TUNNEL_MAX_ACTIVE_BINDINGS_PER_SANDBOX",
+    path: ["services", "data_plane_gateway", "tunnel", "max_active_bindings_per_sandbox"],
+    parse: parseNumberEnv,
+  },
+  {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY",
     path: ["services", "control_plane_worker", "workflow_concurrency"],
     parse: parseNumberEnv,

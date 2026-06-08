@@ -25,6 +25,7 @@ const NatsUrlSchema = z.url().refine((value) => {
 const DefaultWebSocketPingIntervalMs = 10_000;
 const DefaultWebSocketPongTimeoutMs = 10_000;
 const DefaultPortAccessAuthorizationTimeoutMs = 5_000;
+const DefaultTunnelMaxActiveBindingsPerSandbox = 32;
 
 export const DataPlaneGatewayServerConfigSchema = z
   .object({
@@ -147,6 +148,23 @@ export const DataPlaneGatewayPortAccessConfigSchema =
 export const PartialDataPlaneGatewayPortAccessConfigSchema =
   DataPlaneGatewayPortAccessConfigObjectSchema.partial();
 
+const DataPlaneGatewayTunnelConfigObjectSchema = z
+  .object({
+    maxActiveBindingsPerSandbox: z
+      .number()
+      .int()
+      .positive()
+      .default(DefaultTunnelMaxActiveBindingsPerSandbox),
+  })
+  .strict();
+
+export const DataPlaneGatewayTunnelConfigSchema = DataPlaneGatewayTunnelConfigObjectSchema.default({
+  maxActiveBindingsPerSandbox: DefaultTunnelMaxActiveBindingsPerSandbox,
+});
+
+export const PartialDataPlaneGatewayTunnelConfigSchema =
+  DataPlaneGatewayTunnelConfigObjectSchema.partial();
+
 export const DataPlaneGatewayDataPlaneApiConfigSchema = z
   .object({
     baseUrl: HttpBaseUrlSchema,
@@ -205,6 +223,7 @@ export const DataPlaneGatewayConfigSchema = z
     gatewayRelay: DataPlaneGatewayRelayConfigSchema,
     health: DataPlaneGatewayHealthConfigSchema,
     portAccess: DataPlaneGatewayPortAccessConfigSchema,
+    tunnel: DataPlaneGatewayTunnelConfigSchema,
     dataPlaneApi: DataPlaneGatewayDataPlaneApiConfigSchema,
     controlPlaneApi: DataPlaneGatewayControlPlaneApiConfigSchema,
     internalAuth: DataPlaneGatewayInternalAuthConfigSchema,
@@ -221,6 +240,7 @@ export const PartialDataPlaneGatewayConfigSchema = z
     gatewayRelay: PartialDataPlaneGatewayRelayConfigSchema.optional(),
     health: PartialDataPlaneGatewayHealthConfigSchema.optional(),
     portAccess: PartialDataPlaneGatewayPortAccessConfigSchema.optional(),
+    tunnel: PartialDataPlaneGatewayTunnelConfigSchema.optional(),
     dataPlaneApi: DataPlaneGatewayDataPlaneApiConfigSchema.partial().optional(),
     controlPlaneApi: PartialDataPlaneGatewayControlPlaneApiConfigSchema.optional(),
     internalAuth: DataPlaneGatewayInternalAuthConfigSchema.partial().optional(),

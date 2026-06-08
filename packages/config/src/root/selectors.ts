@@ -401,6 +401,10 @@ export function selectDataPlaneGatewayConfig(config: Config): DataPlaneGatewayCo
       authorizationTimeoutMs:
         config.services.data_plane_gateway.port_access?.authorization_timeout_ms ?? 5_000,
     },
+    tunnel: {
+      maxActiveBindingsPerSandbox:
+        config.services.data_plane_gateway.tunnel?.max_active_bindings_per_sandbox ?? 32,
+    },
     dataPlaneApi: {
       baseUrl: config.services.data_plane_api.internal_url,
     },

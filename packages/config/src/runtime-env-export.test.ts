@@ -257,6 +257,10 @@ describe("exportServiceConfigToEnv", () => {
       value: 5000,
     });
     expectEntry(entries, {
+      name: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_TUNNEL_MAX_ACTIVE_BINDINGS_PER_SANDBOX",
+      value: 32,
+    });
+    expectEntry(entries, {
       name: "MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL",
       value: "http://data-plane-api:8082",
     });
