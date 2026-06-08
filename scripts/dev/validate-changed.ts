@@ -80,6 +80,11 @@ const REACT_DOCTOR_CONFIG_FILE_NAMES = new Set([
   "doctor.config.mts",
   "doctor.config.ts",
 ]);
+const REACT_DOCTOR_ROOT_METADATA_FILES = new Set([
+  "package.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+]);
 
 const REPO_WIDE_FILES = new Set([
   "package.json",
@@ -527,7 +532,7 @@ function isJavaScriptOrTypeScriptPath(filePath: string): boolean {
 }
 
 function isReactDoctorRelevantPath(filePath: string): boolean {
-  if (filePath === "package.json") {
+  if (REACT_DOCTOR_ROOT_METADATA_FILES.has(filePath)) {
     return true;
   }
 

@@ -45,6 +45,18 @@ describe("validate-changed", () => {
     expect(commands).toContain("pnpm lint:react-doctor");
   });
 
+  it("plans advisory React Doctor lint for root workspace metadata changes", () => {
+    const commands = getDryRunCommands("pnpm-workspace.yaml", "lint");
+
+    expect(commands).toContain("pnpm lint:react-doctor");
+  });
+
+  it("plans advisory React Doctor lint for lockfile changes", () => {
+    const commands = getDryRunCommands("pnpm-lock.yaml", "lint");
+
+    expect(commands).toContain("pnpm lint:react-doctor");
+  });
+
   it("plans advisory React Doctor lint for project-local React Doctor config changes", () => {
     const commands = getDryRunCommands("apps/dashboard/doctor.config.json", "lint");
 
