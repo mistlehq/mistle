@@ -14,6 +14,7 @@ import {
   type IntegrationTestEnvironment,
   createIntegrationTest,
 } from "@mistle/test-harness/integration";
+import { systemSleeper } from "@mistle/time";
 import { typeid } from "typeid-js";
 import { describe, expect } from "vitest";
 import WebSocket from "ws";
@@ -43,6 +44,8 @@ const FirstGatewayId = "data-plane-gateway-a";
 const SecondGatewayId = "data-plane-gateway-b";
 const TestTimeoutMs = 40_000;
 const PortAccessAuthorizationTimeoutMs = 100;
+const BootstrapAttachmentReadyTimeoutMs = 5_000;
+const BootstrapAttachmentReadyPollIntervalMs = 25;
 
 const it = createIntegrationTest({
   services: ["data-plane-api", "data-plane-gateway"],
@@ -657,7 +660,7 @@ async function connectBootstrapSocket(input: {
   gateway: GatewayHttpService;
   sandboxInstanceId: string;
 }): Promise<WebSocket> {
-  return await connectSandboxTunnelWebSocket({
+  const socket = await connectSandboxTunnelWebSocket({
     websocketBaseUrl: createWebSocketBaseUrl(input.gateway.hostBaseUrl),
     sandboxInstanceId: input.sandboxInstanceId,
     tokenKind: "bootstrap",
@@ -675,6 +678,54 @@ async function connectBootstrapSocket(input: {
       [TestEnvironmentIdHeader]: input.env.id,
     },
   });
+
+  try {
+    await waitForBootstrapAttachment({
+      env: input.env,
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+  } catch (error) {
+    await closeIfOpen(socket);
+    throw error;
+  }
+
+  return socket;
+}
+
+async function waitForBootstrapAttachment(input: {
+  env: IntegrationTestEnvironment;
+  sandboxInstanceId: string;
+}): Promise<void> {
+  const valkeyClient = createValkeyClient({
+    url: input.env.dataPlaneGatewayRuntimeState.valkeyUrl,
+  });
+
+  try {
+    await connectValkeyClient(valkeyClient);
+    const store = new ValkeySandboxRuntimeAttachmentStore(
+      valkeyClient,
+      input.env.dataPlaneGatewayRuntimeState.keyPrefix,
+    );
+    const deadline = Date.now() + BootstrapAttachmentReadyTimeoutMs;
+
+    while (Date.now() < deadline) {
+      const attachment = await store.getAttachment({
+        sandboxInstanceId: input.sandboxInstanceId,
+        nowMs: Date.now(),
+      });
+      if (attachment !== null) {
+        return;
+      }
+
+      await systemSleeper.sleep(BootstrapAttachmentReadyPollIntervalMs);
+    }
+
+    throw new Error(
+      `Timed out waiting for bootstrap attachment for sandbox '${input.sandboxInstanceId}'.`,
+    );
+  } finally {
+    await closeValkeyClient(valkeyClient);
+  }
 }
 
 async function mintPortAccessBootstrap(input: {
