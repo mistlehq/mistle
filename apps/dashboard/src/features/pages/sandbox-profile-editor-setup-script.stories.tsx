@@ -124,6 +124,14 @@ export const SetupAssistantPanelReady: Story = {
   },
 };
 
+export const SetupAssistantPublishConfirmation: Story = {
+  args: {
+    initialBindings: [StoryBindings[0], StoryBindings[1]],
+    setupAssistantCloseDialogReason: "publish",
+    setupAssistantPanelState: "ready",
+  },
+};
+
 export const SetupAssistantPanelDisconnected: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],
