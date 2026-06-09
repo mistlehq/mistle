@@ -8,7 +8,11 @@ import { InMemoryTunnelSessionRegistryAdapter } from "../tunnel-session/adapters
 import { TunnelSessionRegistry } from "../tunnel-session/index.js";
 import { LocalGatewayForwardingClientAdapter } from "./adapters/local-gateway-forwarding-client-adapter.js";
 import { LocalGatewayForwardingServerAdapter } from "./adapters/local-gateway-forwarding-server-adapter.js";
-import { InteractiveStreamRouter } from "./interactive-stream-router.js";
+import {
+  InteractiveStreamRouter,
+  resolveGatewayForwardingRetryTarget,
+} from "./interactive-stream-router.js";
+import { GatewayForwardingUnavailableError, type GatewayForwardingTarget } from "./types.js";
 
 describe("InteractiveStreamRouter", () => {
   it("routes interactive stream operations to the resolved owner node", async () => {
@@ -225,6 +229,92 @@ describe("InteractiveStreamRouter", () => {
     });
   });
 
+  it("does not retry unavailable forwarding when the fresh owner lookup is missing", () => {
+    const target = gatewayForwardingTarget({
+      targetBootstrapSessionId: "sess_stale",
+      targetNodeId: "dpg_stale",
+    });
+
+    expect(
+      resolveGatewayForwardingRetryTarget({
+        currentTarget: target,
+        error: unavailableError(target),
+        retryOwnerResolution: { kind: "missing" },
+        sourceNodeId: "dpg_source",
+      }),
+    ).toBeUndefined();
+  });
+
+  it("does not retry unavailable forwarding when the owner is unchanged", () => {
+    const target = gatewayForwardingTarget({
+      targetBootstrapSessionId: "sess_current",
+      targetNodeId: "dpg_current",
+    });
+
+    expect(
+      resolveGatewayForwardingRetryTarget({
+        currentTarget: target,
+        error: unavailableError(target),
+        retryOwnerResolution: {
+          kind: "remote",
+          owner: {
+            sandboxInstanceId: "sbi_test",
+            nodeId: "dpg_current",
+            sessionId: "sess_current",
+            leaseId: "dtl_current",
+            expiresAt: new Date(1_000),
+          },
+        },
+        sourceNodeId: "dpg_source",
+      }),
+    ).toBeUndefined();
+  });
+
+  it("retries unavailable forwarding against a changed owner", () => {
+    const target = gatewayForwardingTarget({
+      targetBootstrapSessionId: "sess_stale",
+      targetNodeId: "dpg_stale",
+    });
+
+    expect(
+      resolveGatewayForwardingRetryTarget({
+        currentTarget: target,
+        error: unavailableError(target),
+        retryOwnerResolution: {
+          kind: "remote",
+          owner: {
+            sandboxInstanceId: "sbi_test",
+            nodeId: "dpg_current",
+            sessionId: "sess_current",
+            leaseId: "dtl_current",
+            expiresAt: new Date(1_000),
+          },
+        },
+        sourceNodeId: "dpg_source",
+      }),
+    ).toEqual({
+      sourceNodeId: "dpg_source",
+      targetNodeId: "dpg_current",
+      targetBootstrapSessionId: "sess_current",
+    });
+  });
+
+  it("does not handle non-unavailable forwarding errors as retryable", () => {
+    const error = new Error("Unexpected forwarding failure.");
+
+    expect(() =>
+      resolveGatewayForwardingRetryTarget({
+        currentTarget: gatewayForwardingTarget({
+          targetBootstrapSessionId: "sess_current",
+          targetNodeId: "dpg_current",
+        }),
+        error,
+        retryOwnerResolution: { kind: "missing" },
+        sourceNodeId: "dpg_source",
+      }),
+    ).toThrow(error);
+  });
+
   it("does not release connection streams from a different local bootstrap session than the active attachment", async () => {
     const attachmentStore = new InMemorySandboxRuntimeAttachmentStore(systemClock);
     await attachmentStore.upsertAttachment({
@@ -287,3 +377,27 @@ describe("InteractiveStreamRouter", () => {
     });
   });
 });
+
+function gatewayForwardingTarget(input: {
+  targetBootstrapSessionId: string;
+  targetNodeId: string;
+}): GatewayForwardingTarget {
+  return {
+    sourceNodeId: "dpg_source",
+    targetBootstrapSessionId: input.targetBootstrapSessionId,
+    targetNodeId: input.targetNodeId,
+  };
+}
+
+function unavailableError(target: GatewayForwardingTarget): GatewayForwardingUnavailableError {
+  return new GatewayForwardingUnavailableError(
+    "Remote gateway forwarding is unavailable for test.",
+    {
+      operation: "openInteractiveStream",
+      reason: "no_responders",
+      sandboxInstanceId: "sbi_test",
+      subject: `mistle-test.gateway.forward.${target.targetNodeId}`,
+      target,
+    },
+  );
+}

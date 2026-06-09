@@ -34,6 +34,7 @@ import type {
 import {
   GatewayForwardingPortAccessAuthorizationError,
   GatewayForwardingPortAccessAuthorizationErrorCodes,
+  GatewayForwardingUnavailableError,
 } from "../types.js";
 
 const RequestTimeoutMs = 5_000;
@@ -556,13 +557,28 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
       throw new Error("NATS gateway forwarding adapter has not been started.");
     }
 
-    const response = await connection.request(
-      this.forwardingSubject(request.target.targetNodeId),
-      encodeJson(request),
-      {
+    const subject = this.forwardingSubject(request.target.targetNodeId);
+    let response;
+    try {
+      response = await connection.request(subject, encodeJson(request), {
         timeout: RequestTimeoutMs,
-      },
-    );
+      });
+    } catch (error) {
+      const unavailableReason = remoteGatewayUnavailableReason(error);
+      if (unavailableReason !== undefined) {
+        throw new GatewayForwardingUnavailableError(
+          `Remote gateway forwarding is unavailable for sandbox '${request.input.sandboxInstanceId}' on node '${request.target.targetNodeId}'.`,
+          {
+            operation: request.operation,
+            reason: unavailableReason,
+            sandboxInstanceId: request.input.sandboxInstanceId,
+            subject,
+            target: request.target,
+          },
+        );
+      }
+      throw error;
+    }
 
     return GatewayForwardingResponseSchema.parse(decodeJson(response.data));
   }
@@ -784,7 +800,7 @@ function toGatewayForwardingErrorResponse(error: unknown): GatewayForwardingResp
   };
 }
 
-function toPortAccessForwardingRequestError(
+export function toPortAccessForwardingRequestError(
   error: unknown,
   input: AuthorizePortAccessTargetInput,
 ): GatewayForwardingPortAccessAuthorizationError | null {
@@ -795,7 +811,7 @@ function toPortAccessForwardingRequestError(
     );
   }
 
-  if (isRemoteGatewayUnavailableError(error)) {
+  if (error instanceof GatewayForwardingUnavailableError) {
     return new GatewayForwardingPortAccessAuthorizationError(
       GatewayForwardingPortAccessAuthorizationErrorCodes.BOOTSTRAP_NOT_CONNECTED,
       `Remote gateway forwarding is unavailable for sandbox '${input.sandboxInstanceId}' port ${String(input.target.port)}.`,
@@ -813,20 +829,30 @@ function isRequestTimeoutError(error: unknown): boolean {
   return error instanceof RequestError && error.cause instanceof TimeoutError;
 }
 
-function isRemoteGatewayUnavailableError(error: unknown): boolean {
+export function remoteGatewayUnavailableReason(
+  error: unknown,
+): GatewayForwardingUnavailableError["details"]["reason"] | undefined {
   if (
     error instanceof NoRespondersError ||
-    error instanceof ClosedConnectionError ||
-    error instanceof DrainingConnectionError
+    (error instanceof RequestError &&
+      (error.isNoResponders() || error.cause instanceof NoRespondersError))
   ) {
-    return true;
+    return "no_responders";
   }
 
-  return (
-    error instanceof RequestError &&
-    (error.isNoResponders() ||
-      error.cause instanceof NoRespondersError ||
-      error.cause instanceof ClosedConnectionError ||
-      error.cause instanceof DrainingConnectionError)
-  );
+  if (
+    error instanceof ClosedConnectionError ||
+    (error instanceof RequestError && error.cause instanceof ClosedConnectionError)
+  ) {
+    return "connection_closed";
+  }
+
+  if (
+    error instanceof DrainingConnectionError ||
+    (error instanceof RequestError && error.cause instanceof DrainingConnectionError)
+  ) {
+    return "connection_draining";
+  }
+
+  return undefined;
 }
