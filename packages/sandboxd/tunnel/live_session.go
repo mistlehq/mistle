@@ -28,6 +28,7 @@ const DefaultProcessesSnapshotInterval = 500 * time.Millisecond
 const DefaultLiveTunnelPublishInterval = 100 * time.Millisecond
 const GatewayServiceRestartCloseCode websocket.StatusCode = 4001
 const GatewayServiceRestartCloseReason = "service_restart"
+const defaultFileSearchDebounce = 100 * time.Millisecond
 
 var DefaultTunnelReconnectBackoff = []time.Duration{
 	100 * time.Millisecond,
@@ -102,6 +103,7 @@ type liveTunnelStream struct {
 	agent             *websocket.Conn
 	cancel            context.CancelFunc
 	upload            *fileUploadState
+	fileSearch        chan fileSearchCommand
 	httpBodyWriter    *io.PipeWriter
 	tcpConnection     net.Conn
 	tcpRequestWindow  uint64
@@ -110,6 +112,10 @@ type liveTunnelStream struct {
 	window            uint64
 	lastSent          time.Time
 	agentStats        *agentStreamStats
+}
+
+type fileSearchCommand struct {
+	query *tunnelprotocol.FileSearchQuery
 }
 
 type outstandingAgentSend struct {
@@ -992,11 +998,15 @@ func (session *LiveTunnelSession) openFileSearchStream(ctx context.Context, mess
 		)
 		return session.writeControl(ctx, payload, payloadErr)
 	}
+	streamCtx, cancel := context.WithCancel(context.Background())
+	commands := make(chan fileSearchCommand, 64)
 	session.mutex.Lock()
 	session.streams[message.StreamID] = &liveTunnelStream{
-		kind:    "fileSearch",
-		channel: message.Channel,
-		window:  tunnelprotocol.DefaultStreamWindowBytes,
+		kind:       "fileSearch",
+		channel:    message.Channel,
+		cancel:     cancel,
+		fileSearch: commands,
+		window:     tunnelprotocol.DefaultStreamWindowBytes,
 	}
 	session.mutex.Unlock()
 	payload, payloadErr := tunnelprotocol.StreamOpenOK(message.StreamID)
@@ -1004,6 +1014,7 @@ func (session *LiveTunnelSession) openFileSearchStream(ctx context.Context, mess
 		session.closeStream(message.StreamID)
 		return err
 	}
+	go session.runFileSearchStream(streamCtx, message.StreamID, message.Channel, commands)
 	return nil
 }
 
@@ -1234,15 +1245,76 @@ func (session *LiveTunnelSession) handleFileSearchFrame(ctx context.Context, fra
 		return err
 	}
 	if message.Select != nil {
+		return session.sendFileSearchCommand(ctx, stream, fileSearchCommand{})
+	}
+	return session.sendFileSearchCommand(ctx, stream, fileSearchCommand{query: message.Query})
+}
+
+func (session *LiveTunnelSession) sendFileSearchCommand(ctx context.Context, stream *liveTunnelStream, command fileSearchCommand) error {
+	if stream.fileSearch == nil {
 		return nil
 	}
-	items, err := SearchFiles(stream.channel, *message.Query)
-	if err != nil {
-		payload, payloadErr := tunnelprotocol.FileSearchErrorPayload(message.Query.RequestID, "search_failed", err.Error())
-		return session.writeStreamPayload(ctx, frame.StreamID, payload, payloadErr)
+	select {
+	case stream.fileSearch <- command:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
-	payload, payloadErr = tunnelprotocol.FileSearchResultsPayload(message.Query.RequestID, message.Query.Query, items)
-	return session.writeStreamPayload(ctx, frame.StreamID, payload, payloadErr)
+}
+
+func (session *LiveTunnelSession) runFileSearchStream(ctx context.Context, streamID uint32, channel tunnelprotocol.StreamChannel, commands <-chan fileSearchCommand) {
+	for {
+		var first fileSearchCommand
+		select {
+		case <-ctx.Done():
+			return
+		case command := <-commands:
+			if command.query == nil {
+				continue
+			}
+			first = command
+		}
+		command, ok := latestDebouncedFileSearchCommand(ctx, commands, first)
+		if !ok {
+			return
+		}
+		if !session.streamActive(streamID) {
+			return
+		}
+		items, err := SearchFiles(channel, *command.query)
+		var payload string
+		var payloadErr error
+		if err != nil {
+			payload, payloadErr = tunnelprotocol.FileSearchErrorPayload(command.query.RequestID, "search_failed", err.Error())
+		} else {
+			payload, payloadErr = tunnelprotocol.FileSearchResultsPayload(command.query.RequestID, command.query.Query, items)
+		}
+		if !session.streamActive(streamID) {
+			return
+		}
+		if err := session.writeStreamPayload(context.Background(), streamID, payload, payloadErr); err != nil {
+			session.closeStream(streamID)
+			return
+		}
+	}
+}
+
+func latestDebouncedFileSearchCommand(ctx context.Context, commands <-chan fileSearchCommand, first fileSearchCommand) (fileSearchCommand, bool) {
+	timer := time.NewTimer(defaultFileSearchDebounce)
+	defer timer.Stop()
+	latest := first
+	for {
+		select {
+		case <-ctx.Done():
+			return fileSearchCommand{}, false
+		case command := <-commands:
+			if command.query != nil {
+				latest = command
+			}
+		case <-timer.C:
+			return latest, true
+		}
+	}
 }
 
 func fileSearchMessageType(message tunnelprotocol.FileSearchStreamMessage) string {

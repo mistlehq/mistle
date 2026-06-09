@@ -2844,14 +2844,8 @@ func TestLiveTunnelSessionSearchesFilesOnFileSearchStream(t *testing.T) {
 	defer cancel()
 	requireNoError(t, gatewayConnection.Write(ctx, websocket.MessageBinary, encoded))
 
-	window := readControlOfType(t, gatewayConnection, "stream.window")
-	assertEqual(t, window["streamId"].(float64), float64(21))
-	assertEqual(t, window["bytes"].(float64), float64(len(queryPayload)))
-	frame := liveSessionReadFrame(t, gatewayConnection)
-	assertEqual(t, frame.StreamID, uint32(21))
-	assertEqual(t, frame.PayloadKind, tunnelprotocol.PayloadKindWebSocketText)
 	var results map[string]any
-	requireNoError(t, json.Unmarshal(frame.Payload, &results))
+	results = readFileSearchResultsAfterWindows(t, gatewayConnection, 21, 1)
 	assertEqual(t, results["type"].(string), "fileSearch.results")
 	assertEqual(t, results["requestId"].(string), "file_req_1")
 	assertEqual(t, results["query"].(string), "protocol")
@@ -2862,6 +2856,58 @@ func TestLiveTunnelSessionSearchesFilesOnFileSearchStream(t *testing.T) {
 	item := items[0].(map[string]any)
 	assertEqual(t, item["path"].(string), "src/protocol.go")
 	assertEqual(t, item["kind"].(string), "file")
+}
+
+func TestLiveTunnelSessionDebouncesFileSearchQueriesLikeRust(t *testing.T) {
+	gatewayServer, gatewayConnections := startLiveSessionGatewayServer(t)
+	tunnel, err := ConnectBootstrapTunnel(context.Background(), liveSessionWebSocketURL(gatewayServer), "bootstrap-token")
+	requireNoError(t, err)
+	gatewayConnection := <-gatewayConnections
+	session, err := StartLiveTunnelSession(tunnel, LiveTunnelSessionOptions{
+		Clock:                   timeutil.SystemClock{},
+		KeepaliveManager:        keepalive.NewSharedManager(),
+		RuntimeReadinessManager: &readiness.Manager{},
+	})
+	requireNoError(t, err)
+	defer session.Close()
+	requireInitialRuntimeReady(t, gatewayConnection, false)
+	root := t.TempDir()
+	requireNoError(t, os.WriteFile(filepath.Join(root, "first.txt"), []byte("first\n"), 0o644))
+	requireNoError(t, os.WriteFile(filepath.Join(root, "second.txt"), []byte("second\n"), 0o644))
+
+	liveSessionWriteJSON(t, gatewayConnection, map[string]any{
+		"type":     "stream.open",
+		"streamId": float64(24),
+		"channel": map[string]any{
+			"kind": "fileSearch",
+			"cwd":  root,
+		},
+	})
+	openOK := liveSessionReadJSON(t, gatewayConnection)
+	assertEqual(t, openOK["type"].(string), "stream.open.ok")
+	assertEqual(t, openOK["streamId"].(float64), float64(24))
+
+	firstQueryPayload := `{"type":"fileSearch.query","requestId":"file_req_1","query":"first","limit":10}`
+	firstEncoded, err := tunnelprotocol.EncodeStreamDataFrame(24, tunnelprotocol.PayloadKindWebSocketText, []byte(firstQueryPayload))
+	requireNoError(t, err)
+	secondQueryPayload := `{"type":"fileSearch.query","requestId":"file_req_2","query":"second","limit":10}`
+	secondEncoded, err := tunnelprotocol.EncodeStreamDataFrame(24, tunnelprotocol.PayloadKindWebSocketText, []byte(secondQueryPayload))
+	requireNoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	requireNoError(t, gatewayConnection.Write(ctx, websocket.MessageBinary, firstEncoded))
+	requireNoError(t, gatewayConnection.Write(ctx, websocket.MessageBinary, secondEncoded))
+
+	results := readFileSearchResultsAfterWindows(t, gatewayConnection, 24, 2)
+	assertEqual(t, results["type"].(string), "fileSearch.results")
+	assertEqual(t, results["requestId"].(string), "file_req_2")
+	assertEqual(t, results["query"].(string), "second")
+	items := results["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("expected one debounced file search result, got %d", len(items))
+	}
+	item := items[0].(map[string]any)
+	assertEqual(t, item["path"].(string), "second.txt")
 }
 
 func TestLiveTunnelSessionRejectsGatewayFileSearchResultsPayload(t *testing.T) {
@@ -3459,6 +3505,41 @@ func readTelemetryRecordOfEvent(t *testing.T, connection *websocket.Conn, event 
 			if record["event"] == event {
 				return record
 			}
+		default:
+			t.Fatalf("unexpected websocket message type %v", messageType)
+		}
+	}
+}
+
+func readFileSearchResultsAfterWindows(t *testing.T, connection *websocket.Conn, streamID uint32, expectedWindows int) map[string]any {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	windowCount := 0
+	for {
+		messageType, payload, err := connection.Read(ctx)
+		requireNoError(t, err)
+		switch messageType {
+		case websocket.MessageText:
+			var decoded map[string]any
+			requireNoError(t, json.Unmarshal(payload, &decoded))
+			if decoded["type"] != "stream.window" {
+				continue
+			}
+			assertEqual(t, decoded["streamId"].(float64), float64(streamID))
+			windowCount++
+		case websocket.MessageBinary:
+			frame, err := tunnelprotocol.DecodeStreamDataFrame(payload)
+			requireNoError(t, err)
+			if frame.StreamID != streamID {
+				continue
+			}
+			if windowCount != expectedWindows {
+				t.Fatalf("received file search result after %d window credits, expected %d", windowCount, expectedWindows)
+			}
+			var decoded map[string]any
+			requireNoError(t, json.Unmarshal(frame.Payload, &decoded))
+			return decoded
 		default:
 			t.Fatalf("unexpected websocket message type %v", messageType)
 		}
