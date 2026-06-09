@@ -21,7 +21,7 @@ import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
-import { systemScheduler, type TimerHandle } from "@mistle/time";
+import { systemScheduler, systemSleeper, type TimerHandle } from "@mistle/time";
 import { typeid } from "typeid-js";
 import { describe, expect } from "vitest";
 import WebSocket, { WebSocketServer } from "ws";
@@ -70,6 +70,12 @@ type SimulatedHttpUpstream = {
   baseUrl: string;
   close: () => Promise<void>;
   nextRequest: () => Promise<ReceivedHttpRequest>;
+};
+
+type SimulatedHttpUpstreamResponse = {
+  body: string;
+  headers?: Record<string, string>;
+  status: number;
 };
 
 type SimulatedWebSocketUpstream = {
@@ -146,7 +152,24 @@ describe.concurrent("direct egress proxy integration", () => {
         email: `direct-egress-github-pr-${uniqueId}@example.com`,
       });
       const sandboxInstanceId = typeid("sbi").toString();
-      const upstream = await startSimulatedHttpUpstream();
+      const upstream = await startSimulatedHttpUpstream({
+        response: {
+          status: 201,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+          },
+          body: JSON.stringify({
+            id: 987654321,
+            number: 42,
+            base: {
+              repo: {
+                full_name: "mistlehq/mistle",
+              },
+            },
+            html_url: "https://github.com/mistlehq/mistle/pull/42",
+          }),
+        },
+      });
       const upstreamUrl = new URL("/repos/mistlehq/mistle/pulls", upstream.baseUrl);
       const targetKey = `github_direct_egress_pr_${uniqueId}`;
       const providerConfigId = `ilp_direct_egress_pr_${uniqueId}`;
@@ -196,6 +219,15 @@ describe.concurrent("direct egress proxy integration", () => {
         organizationId: session.organizationId,
         sandboxInstanceId,
         runtimePlan: createRuntimePlan({
+          associatedResourceEventRouting: {
+            enabled: true,
+            resources: [
+              {
+                resourceKind: "github.pull_request",
+                eventTypes: ["github.pull_request.issue_comment.created"],
+              },
+            ],
+          },
           egressRoutes: [
             createRoute({
               authInjection: {
@@ -238,7 +270,17 @@ describe.concurrent("direct egress proxy integration", () => {
           },
         );
 
-        expect(response.status).toBe(202);
+        expect(response.status).toBe(201);
+        await expect(response.json()).resolves.toEqual({
+          id: 987654321,
+          number: 42,
+          base: {
+            repo: {
+              full_name: "mistlehq/mistle",
+            },
+          },
+          html_url: "https://github.com/mistlehq/mistle/pull/42",
+        });
         const request = await withTimeout({
           label: "waiting for managed GitHub pull request upstream request",
           promise: upstream.nextRequest(),
@@ -246,6 +288,13 @@ describe.concurrent("direct egress proxy integration", () => {
         expect(request.method).toBe("POST");
         expect(request.url).toBe("/repos/mistlehq/mistle/pulls");
         expect(request.headers.authorization).toBe("Bearer github-linked-user-token");
+        await pollForProviderResourceAssociation({
+          env,
+          integrationConnectionId: connectionId,
+          providerResourceId: "mistlehq/mistle#42",
+          resourceKind: "github.pull_request",
+          sandboxInstanceId,
+        });
       } finally {
         await upstream.close();
       }
@@ -987,6 +1036,7 @@ async function insertSandboxInstanceRow(input: {
 }
 
 function createRuntimePlan(input: {
+  associatedResourceEventRouting?: CompiledRuntimePlan["associatedResourceEventRouting"];
   egressRoutes: CompiledRuntimePlan["egressRoutes"];
 }): CompiledRuntimePlan {
   return {
@@ -999,7 +1049,8 @@ function createRuntimePlan(input: {
     egressRoutes: input.egressRoutes,
     artifacts: [],
     workspaceSources: [],
-    associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
+    associatedResourceEventRouting:
+      input.associatedResourceEventRouting ?? createDisabledAssociatedResourceEventRouting(),
     runtimeClients: [],
     agentRuntimes: [],
   };
@@ -1242,13 +1293,18 @@ async function mintDirectEgressToken(input: {
   return minted.token;
 }
 
-async function startSimulatedHttpUpstream(): Promise<SimulatedHttpUpstream> {
+async function startSimulatedHttpUpstream(
+  input: {
+    response?: SimulatedHttpUpstreamResponse;
+  } = {},
+): Promise<SimulatedHttpUpstream> {
   const receivedRequests: ReceivedHttpRequest[] = [];
   const waitingResolvers: Array<(request: ReceivedHttpRequest) => void> = [];
   const server = createServer((request, response) => {
     handleSimulatedHttpRequest({
       receivedRequests,
       request,
+      responseConfig: input.response,
       response,
       waitingResolvers,
     });
@@ -1276,6 +1332,7 @@ async function startSimulatedHttpUpstream(): Promise<SimulatedHttpUpstream> {
 function handleSimulatedHttpRequest(input: {
   receivedRequests: ReceivedHttpRequest[];
   request: IncomingMessage;
+  responseConfig: SimulatedHttpUpstreamResponse | undefined;
   response: ServerResponse;
   waitingResolvers: Array<(request: ReceivedHttpRequest) => void>;
 }): void {
@@ -1297,10 +1354,49 @@ function handleSimulatedHttpRequest(input: {
       input.receivedRequests.push(receivedRequest);
     }
 
-    input.response.statusCode = 202;
-    input.response.setHeader("content-type", "text/plain; charset=utf-8");
+    input.response.statusCode = input.responseConfig?.status ?? 202;
+    input.response.setHeader(
+      "content-type",
+      input.responseConfig?.headers?.["content-type"] ?? "text/plain; charset=utf-8",
+    );
     input.response.setHeader("x-upstream-marker", "simulated-http");
-    input.response.end("hello from upstream");
+    for (const [header, value] of Object.entries(input.responseConfig?.headers ?? {})) {
+      if (header.toLowerCase() !== "content-type") {
+        input.response.setHeader(header, value);
+      }
+    }
+    input.response.end(input.responseConfig?.body ?? "hello from upstream");
+  });
+}
+
+async function pollForProviderResourceAssociation(input: {
+  env: IntegrationTestEnvironment;
+  integrationConnectionId: string;
+  providerResourceId: string;
+  resourceKind: string;
+  sandboxInstanceId: string;
+}): Promise<void> {
+  await withTimeout({
+    label: "waiting for provider resource association registration",
+    promise: (async () => {
+      while (true) {
+        const association =
+          await input.env.controlPlaneDb.query.providerResourceAssociations.findFirst({
+            where: (table, { and, eq }) =>
+              and(
+                eq(table.integrationConnectionId, input.integrationConnectionId),
+                eq(table.providerResourceId, input.providerResourceId),
+                eq(table.resourceKind, input.resourceKind),
+                eq(table.sandboxInstanceId, input.sandboxInstanceId),
+              ),
+          });
+        if (association !== undefined) {
+          return;
+        }
+
+        await systemSleeper.sleep(50);
+      }
+    })(),
   });
 }
 

@@ -15,6 +15,11 @@ import {
   type McpTokenConfig,
   type VerifiedEgressToken,
 } from "@mistle/gateway-tunnel-auth";
+import {
+  GitHubFamilyId,
+  isGitHubPullRequestCreationRequest,
+  observeGitHubRoutableResourceFromEgressResponse,
+} from "@mistle/integrations-definitions/server";
 
 import { logger } from "../logger.js";
 import type { ActiveSandboxRuntimePlanRepository } from "./active-runtime-plan-cache.js";
@@ -37,6 +42,7 @@ import {
 export const DirectEgressHttpRoutePath = "/_mistle/egress/http";
 export const DirectEgressWebSocketRoutePath = "/_mistle/egress/ws";
 export const DirectEgressTokenHeaderName = "x-mistle-egress-token";
+const ProviderResourceAssociationObservationBodyLimitBytes = 1024 * 1024;
 
 type ActiveRuntimePlan = NonNullable<Awaited<ReturnType<typeof loadActiveSandboxRuntimePlan>>>;
 type DirectEgressTransport = "http" | "websocket";
@@ -54,6 +60,11 @@ type DirectEgressFailureCode =
   | "upstream_connect_failed";
 
 type DirectEgressRequest = GatewayEgressHttpRequest;
+type DirectEgressResponseObserver = (input: {
+  body: Uint8Array;
+  headers: Headers;
+  status: number;
+}) => Promise<void>;
 
 type DirectEgressRouteAuthorization =
   | {
@@ -280,12 +291,24 @@ export class DirectEgressProxyService {
       },
       "Direct gateway HTTP egress request started",
     );
+    const responseObserver =
+      input.admission.kind === "managed"
+        ? createManagedProviderResourceAssociationObserver({
+            admission: input.admission,
+            controlPlaneInternalClient: this.controlPlaneInternalClient,
+            requestBody: input.body,
+            ...(input.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: input.testEnvironmentId }),
+          })
+        : undefined;
 
     return await sendDirectHttpRequest({
       body: outgoingRequest.body,
       headers: outgoingRequest.headers,
       logFields,
       method: outgoingRequest.method,
+      ...(responseObserver === undefined ? {} : { responseObserver }),
       requestBodyBytes: input.body?.byteLength ?? 0,
       startedAtMs,
       trustedUpstreamCaCertificates: this.trustedUpstreamCaCertificates,
@@ -587,6 +610,7 @@ function sendDirectHttpRequest(input: {
   headers: Headers | Record<string, string>;
   logFields: DirectEgressLogFields;
   method: string;
+  responseObserver?: DirectEgressResponseObserver;
   requestBodyBytes: number;
   startedAtMs: number;
   trustedUpstreamCaCertificates: readonly string[] | undefined;
@@ -630,20 +654,29 @@ function sendDirectHttpRequest(input: {
         status,
       };
       logger.info(responseLogFields, "Direct gateway HTTP egress response started");
+      const responseHeaders = toResponseHeaders(response.headers);
+      const responseBodyStream = toResponseBodyStream({
+        logFields: responseLogFields,
+        request: upstreamRequest,
+        response,
+        startedAtMs: input.startedAtMs,
+      });
+      const responseBodyForClient =
+        input.responseObserver === undefined
+          ? responseBodyStream
+          : observeResponseBody({
+              logFields: responseLogFields,
+              observer: input.responseObserver,
+              responseBodyStream,
+              responseHeaders,
+              status,
+            });
 
       resolve(
-        new Response(
-          toResponseBodyStream({
-            logFields: responseLogFields,
-            request: upstreamRequest,
-            response,
-            startedAtMs: input.startedAtMs,
-          }),
-          {
-            status,
-            headers: toResponseHeaders(response.headers),
-          },
-        ),
+        new Response(responseBodyForClient, {
+          status,
+          headers: responseHeaders,
+        }),
       );
     });
     upstreamRequest.on("error", (error) => {
@@ -667,6 +700,184 @@ function sendDirectHttpRequest(input: {
 
     upstreamRequest.end(input.body);
   });
+}
+
+function observeResponseBody(input: {
+  logFields: DirectEgressLogFields;
+  observer: DirectEgressResponseObserver;
+  responseBodyStream: ReadableStream<Uint8Array>;
+  responseHeaders: Headers;
+  status: number;
+}): ReadableStream<Uint8Array> {
+  const [clientStream, observerStream] = input.responseBodyStream.tee();
+  void readResponseBody({
+    maxByteLength: ProviderResourceAssociationObservationBodyLimitBytes,
+    stream: observerStream,
+  })
+    .then((body) =>
+      input.observer({
+        body,
+        headers: input.responseHeaders,
+        status: input.status,
+      }),
+    )
+    .catch((error: unknown) => {
+      logger.warn(
+        {
+          ...input.logFields,
+          event: "gateway_direct_egress_response_observer_failed",
+        },
+        error instanceof Error ? error.message : String(error),
+      );
+    });
+
+  return clientStream;
+}
+
+async function readResponseBody(input: {
+  maxByteLength: number;
+  stream: ReadableStream<Uint8Array>;
+}): Promise<Uint8Array> {
+  const reader = input.stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let byteLength = 0;
+  try {
+    let result = await reader.read();
+    while (!result.done) {
+      if (byteLength + result.value.byteLength > input.maxByteLength) {
+        await reader.cancel(
+          `Response body exceeded provider resource association observation limit of ${String(input.maxByteLength)} bytes.`,
+        );
+        throw new Error(
+          `Response body exceeded provider resource association observation limit of ${String(input.maxByteLength)} bytes.`,
+        );
+      }
+      chunks.push(result.value);
+      byteLength += result.value.byteLength;
+      result = await reader.read();
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+}
+
+function createManagedProviderResourceAssociationObserver(input: {
+  admission: Extract<DirectEgressAdmission, { kind: "managed" }>;
+  controlPlaneInternalClient: ControlPlaneInternalClient;
+  requestBody: Uint8Array | undefined;
+  testEnvironmentId?: string;
+}): DirectEgressResponseObserver | undefined {
+  if (input.admission.classification.route.familyId !== GitHubFamilyId) {
+    return undefined;
+  }
+  if (
+    !isGitHubPullRequestCreationRequest({
+      method: input.admission.request.method,
+      path: input.admission.request.path,
+      requestBody: input.requestBody,
+    })
+  ) {
+    return undefined;
+  }
+
+  const integrationConnectionId = resolvePrimaryCredentialIntegrationConnectionId(
+    input.admission.classification.route.credentialResolver,
+  );
+  if (integrationConnectionId === undefined) {
+    return undefined;
+  }
+
+  return async (response) => {
+    if (!isJsonContentType(response.headers)) {
+      return;
+    }
+
+    const observedResource = observeGitHubRoutableResourceFromEgressResponse({
+      method: input.admission.request.method,
+      path: input.admission.request.path,
+      requestBody: input.requestBody,
+      responseBody: parseJsonResponseBody(response.body),
+      status: response.status,
+    });
+    if (observedResource === null) {
+      return;
+    }
+
+    try {
+      const result = await input.controlPlaneInternalClient.registerProviderResourceAssociation(
+        {
+          integrationConnectionId,
+          resourceKind: observedResource.resourceKind,
+          providerResourceId: observedResource.providerResourceId,
+          sandboxInstanceId: input.admission.token.sub,
+        },
+        input.testEnvironmentId === undefined ? {} : { testEnvironmentId: input.testEnvironmentId },
+      );
+      logger.info(
+        {
+          event: "gateway_direct_egress_provider_resource_association_registered",
+          providerResourceId: observedResource.providerResourceId,
+          resourceKind: observedResource.resourceKind,
+          routeCredentialConnectionId: integrationConnectionId,
+          sandboxInstanceId: input.admission.token.sub,
+          status: result.status,
+        },
+        "Direct gateway egress provider resource association registration completed",
+      );
+    } catch (error) {
+      logger.warn(
+        {
+          event: "gateway_direct_egress_provider_resource_association_registration_failed",
+          providerResourceId: observedResource.providerResourceId,
+          resourceKind: observedResource.resourceKind,
+          routeCredentialConnectionId: integrationConnectionId,
+          sandboxInstanceId: input.admission.token.sub,
+        },
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  };
+}
+
+function isJsonContentType(headers: Headers): boolean {
+  const contentType = headers.get("content-type");
+  return contentType !== null && contentType.toLowerCase().includes("application/json");
+}
+
+function parseJsonResponseBody(body: Uint8Array): unknown {
+  if (body.byteLength === 0) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(new TextDecoder().decode(body));
+  } catch {
+    return null;
+  }
+}
+
+function resolvePrimaryCredentialIntegrationConnectionId(
+  credentialResolver: Extract<
+    GatewayEgressRouteClassification,
+    { kind: "matched" }
+  >["route"]["credentialResolver"],
+): string | undefined {
+  if (credentialResolver.kind === "integration_connection") {
+    return credentialResolver.connectionId;
+  }
+  if (credentialResolver.kind === "linked_principal") {
+    return credentialResolver.integrationConnectionId;
+  }
+
+  return undefined;
 }
 
 function toResponseBodyStream(input: {

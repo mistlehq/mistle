@@ -40,3 +40,8 @@ export {
   createGitHubResourceDefinitions,
   GitHubResourceSyncTriggers,
 } from "./resource-definitions.js";
+export {
+  isGitHubPullRequestCreationRequest,
+  observeGitHubRoutableResourceFromEgressResponse,
+  type GitHubRoutableResourceObservation,
+} from "./provider-resource-associations.js";

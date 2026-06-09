@@ -73,6 +73,10 @@ export type RequestIntegrationConnectionResourceRefreshInput =
   paths["/internal/integration-connections/refresh-resource"]["post"]["requestBody"]["content"]["application/json"];
 export type RequestIntegrationConnectionResourceRefreshOutput =
   paths["/internal/integration-connections/refresh-resource"]["post"]["responses"]["202"]["content"]["application/json"];
+export type RegisterProviderResourceAssociationInput =
+  paths["/internal/provider-resource-associations/register"]["post"]["requestBody"]["content"]["application/json"];
+export type RegisterProviderResourceAssociationOutput =
+  paths["/internal/provider-resource-associations/register"]["post"]["responses"]["200"]["content"]["application/json"];
 export type ClaimSandboxProfileVersionSnapshotJobInput = {
   snapshotJobId: string;
   workflowRunId: paths["/internal/snapshot-jobs/{jobId}/claim"]["post"]["requestBody"]["content"]["application/json"]["workflowRunId"];
@@ -346,6 +350,27 @@ export class ControlPlaneInternalClient {
     throw new Error(
       `Control-plane internal resource refresh failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
     );
+  }
+
+  async registerProviderResourceAssociation(
+    input: RegisterProviderResourceAssociationInput,
+    options: ControlPlaneInternalClientRequestOptions = {},
+  ): Promise<RegisterProviderResourceAssociationOutput> {
+    const result = await this.#client.POST("/internal/provider-resource-associations/register", {
+      body: input,
+      headers: this.#headers(options),
+      signal: AbortSignal.timeout(this.#requestTimeoutMs),
+    });
+
+    if (result.response.status === 200 && result.data !== undefined) {
+      return result.data;
+    }
+
+    throw new ControlPlaneInternalClientRequestError({
+      status: result.response.status,
+      code: extractErrorCode(result.error),
+      message: `Control-plane internal provider resource association registration failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+    });
   }
 
   async claimSandboxProfileVersionSnapshotJob(

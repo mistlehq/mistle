@@ -19,6 +19,7 @@ import { createIntegrationWebhooksRoutes } from "./integration-webhooks/index.js
 import { createInternalIdentityLinkingRoutes } from "./internal/identity-linking/index.js";
 import { createInternalIntegrationConnectionsRoutes } from "./internal/integration-connections/index.js";
 import { createInternalIntegrationCredentialsRoutes } from "./internal/integration-credentials/index.js";
+import { createInternalProviderResourceAssociationsRoutes } from "./internal/provider-resource-associations/index.js";
 import { createInternalSandboxProfileVersionSnapshotJobRoutes } from "./internal/sandbox-profile-version-snapshot-jobs/index.js";
 import { createInternalSandboxRuntimeRoutes } from "./internal/sandbox-runtime/index.js";
 import { createInternalSchedulesRoutes } from "./internal/schedules/index.js";
@@ -221,6 +222,8 @@ export function registerInternalApiRouteModules(app: ControlPlaneApp): void {
   const internalIntegrationConnectionsRoutes = createInternalIntegrationConnectionsRoutes();
   const internalIntegrationCredentialsRoutes = createInternalIntegrationCredentialsRoutes();
   const internalIdentityLinkingRoutes = createInternalIdentityLinkingRoutes();
+  const internalProviderResourceAssociationsRoutes =
+    createInternalProviderResourceAssociationsRoutes();
   const internalSchedulesRoutes = createInternalSchedulesRoutes();
   const internalSandboxProfileVersionSnapshotJobRoutes =
     createInternalSandboxProfileVersionSnapshotJobRoutes();
@@ -235,6 +238,10 @@ export function registerInternalApiRouteModules(app: ControlPlaneApp): void {
     internalIntegrationCredentialsRoutes.routes,
   );
   app.route(internalIdentityLinkingRoutes.basePath, internalIdentityLinkingRoutes.routes);
+  app.route(
+    internalProviderResourceAssociationsRoutes.basePath,
+    internalProviderResourceAssociationsRoutes.routes,
+  );
   app.route(internalSchedulesRoutes.basePath, internalSchedulesRoutes.routes);
   app.route(
     internalSandboxProfileVersionSnapshotJobRoutes.basePath,
