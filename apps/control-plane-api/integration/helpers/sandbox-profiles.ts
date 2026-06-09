@@ -2,6 +2,7 @@ import {
   type IntegrationBindingKind,
   type IntegrationConnectionStatus,
   type SandboxProfileVersionSkillsConfig,
+  type SandboxProfileAssociatedResourceEventRoutingConfig,
   type SandboxProfileVersionAgentRuntimeId,
   SandboxProfileStatuses,
   SandboxProfileVersionStates,
@@ -42,6 +43,7 @@ export function sandboxProfileVersionRow(input: {
   sandboxDiskMb?: number | null;
   mistleMcpEnabled?: boolean;
   mistleMcpApiKeyId?: string | null;
+  associatedResourceEventRoutingConfig?: SandboxProfileAssociatedResourceEventRoutingConfig;
   skillsConfig?: SandboxProfileVersionSkillsConfig | null;
 }) {
   return {
@@ -73,6 +75,9 @@ export function sandboxProfileVersionRow(input: {
     ...(input.mistleMcpApiKeyId === undefined
       ? {}
       : { mistleMcpApiKeyId: input.mistleMcpApiKeyId }),
+    ...(input.associatedResourceEventRoutingConfig === undefined
+      ? {}
+      : { associatedResourceEventRoutingConfig: input.associatedResourceEventRoutingConfig }),
     ...(input.skillsConfig === undefined ? {} : { skillsConfig: input.skillsConfig }),
   };
 }

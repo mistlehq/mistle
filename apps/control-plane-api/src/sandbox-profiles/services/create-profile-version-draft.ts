@@ -12,6 +12,10 @@ import {
   SandboxProfilesNotFoundCodes,
   SandboxProfilesNotFoundError,
 } from "../errors.js";
+import {
+  mapProfileVersionAssociatedResourceEventRoutingConfig,
+  type SandboxProfileAssociatedResourceEventRoutingConfig,
+} from "./profile-version-associated-resource-routing-config.js";
 import type { ProfileVersionRefreshScheduleSummary } from "./profile-version-refresh-schedule-summary.js";
 import {
   mapProfileVersionRuntimeConfig,
@@ -42,6 +46,7 @@ type CreateProfileVersionDraftOutput = {
   maintenanceScript: string | null;
   sandboxResources: SandboxProfileVersionResources | null;
   skillsConfig: SandboxProfileVersionSkillsConfig | null;
+  associatedResourceEventRoutingConfig: SandboxProfileAssociatedResourceEventRoutingConfig;
   isActive: boolean;
   usable: boolean;
   refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
@@ -104,6 +109,7 @@ export async function createProfileVersionDraft(
           sandboxMemoryMb: true,
           sandboxDiskMb: true,
           skillsConfig: true,
+          associatedResourceEventRoutingConfig: true,
         },
         where: (table, { eq }) => eq(table.sandboxProfileId, input.profileId),
         orderBy: (table, { desc }) => [desc(table.version)],
@@ -150,6 +156,7 @@ export async function createProfileVersionDraft(
           sandboxMemoryMb: latestVersion.sandboxMemoryMb,
           sandboxDiskMb: latestVersion.sandboxDiskMb,
           skillsConfig: latestVersion.skillsConfig,
+          associatedResourceEventRoutingConfig: latestVersion.associatedResourceEventRoutingConfig,
         })
         .returning({
           sandboxProfileId: tables.sandboxProfileVersions.sandboxProfileId,
@@ -167,6 +174,8 @@ export async function createProfileVersionDraft(
           sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
           sandboxDiskMb: tables.sandboxProfileVersions.sandboxDiskMb,
           skillsConfig: tables.sandboxProfileVersions.skillsConfig,
+          associatedResourceEventRoutingConfig:
+            tables.sandboxProfileVersions.associatedResourceEventRoutingConfig,
         });
 
       if (createdDraftVersion === undefined) {
@@ -199,6 +208,9 @@ export async function createProfileVersionDraft(
         mistleMcpApiKeyId: createdDraftVersion.mistleMcpApiKeyId,
         ...mapProfileVersionRuntimeConfig(createdDraftVersion),
         skillsConfig: mapProfileVersionSkillsConfig(createdDraftVersion.skillsConfig),
+        associatedResourceEventRoutingConfig: mapProfileVersionAssociatedResourceEventRoutingConfig(
+          createdDraftVersion.associatedResourceEventRoutingConfig,
+        ),
         maintenanceScript: latestVersion.maintenanceScript,
         isActive: false,
         usable: false,

@@ -162,6 +162,7 @@ describe.concurrent("sandbox profile versions create integration", () => {
       agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
       ...EmptySandboxRuntimeConfig,
       gitCommitSigningIntegrationConnectionId: "icn_version_create_latest_git",
+      associatedResourceEventRoutingConfig: {},
       skillsConfig: {
         originUrl: "https://github.com/mistle/skills.git",
         selectedSkills: [

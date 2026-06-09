@@ -10,7 +10,12 @@ import {
   SandboxProfileVersionStates,
   TriggerKinds,
   type ScheduleKind,
+  type SandboxProfileAssociatedResourceEventRoutingConfig,
 } from "@mistle/db/control-plane";
+import {
+  AssociatedProviderResourceKinds,
+  AssociatedResourceEventTypes,
+} from "@mistle/integrations-core";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
@@ -33,6 +38,21 @@ import {
 const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
+const ActiveAssociatedResourceEventRoutingConfig: SandboxProfileAssociatedResourceEventRoutingConfig =
+  {
+    enabled: true,
+    resources: [
+      {
+        resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+        eventTypes: [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED],
+      },
+    ],
+  };
+const DraftAssociatedResourceEventRoutingConfig: SandboxProfileAssociatedResourceEventRoutingConfig =
+  {
+    enabled: false,
+    resources: [],
+  };
 
 describe.concurrent("sandbox profiles duplicate integration", () => {
   it("duplicates the active usable snapshot, carries the draft, copies refresh schedule, and creates disabled reusable triggers", async ({
@@ -58,6 +78,7 @@ describe.concurrent("sandbox profiles duplicate integration", () => {
         maintenanceScript: "echo active maintain",
         snapshotImageProvider: "docker",
         snapshotImageId: "sha256:duplicate-active",
+        associatedResourceEventRoutingConfig: ActiveAssociatedResourceEventRoutingConfig,
       })
       .where(
         and(
@@ -75,6 +96,7 @@ describe.concurrent("sandbox profiles duplicate integration", () => {
         state: SandboxProfileVersionStates.DRAFT,
         setupScript: "echo draft setup",
         maintenanceScript: "echo draft maintain",
+        associatedResourceEventRoutingConfig: DraftAssociatedResourceEventRoutingConfig,
       }),
     );
     await env.controlPlaneDb
@@ -174,6 +196,7 @@ describe.concurrent("sandbox profiles duplicate integration", () => {
       maintenanceScript: "echo active maintain",
       snapshotImageProvider: "docker",
       snapshotImageId: "sha256:duplicate-active",
+      associatedResourceEventRoutingConfig: ActiveAssociatedResourceEventRoutingConfig,
     });
     expect(duplicatedVersions[1]).toMatchObject({
       sandboxProfileId: body.profile.id,
@@ -183,6 +206,7 @@ describe.concurrent("sandbox profiles duplicate integration", () => {
       maintenanceScript: "echo draft maintain",
       snapshotImageProvider: null,
       snapshotImageId: null,
+      associatedResourceEventRoutingConfig: DraftAssociatedResourceEventRoutingConfig,
     });
 
     const duplicatedRefreshTarget =

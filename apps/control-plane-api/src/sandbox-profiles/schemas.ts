@@ -16,6 +16,10 @@ import {
   createKeysetPaginationEnvelopeSchema,
   createKeysetPaginationQuerySchema,
 } from "@mistle/http/pagination";
+import {
+  AssociatedProviderResourceKinds,
+  AssociatedResourceEventTypes,
+} from "@mistle/integrations-core";
 import { createSelectSchema } from "drizzle-zod";
 
 import {
@@ -59,6 +63,26 @@ const sandboxProfileVersionResourcesSchema = z
     vcpuCount: z.number().int().min(1),
     memoryMb: z.number().int().min(1),
     diskMb: z.number().int().min(1).optional(),
+  })
+  .strict();
+const associatedResourceEventRoutingResourceRuleSchema = z
+  .object({
+    resourceKind: z.enum([AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST]),
+    eventTypes: z
+      .array(
+        z.enum([
+          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
+        ]),
+      )
+      .min(1),
+  })
+  .strict();
+const sandboxProfileAssociatedResourceEventRoutingConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    resources: z.array(associatedResourceEventRoutingResourceRuleSchema).optional(),
   })
   .strict();
 const sandboxProfileVersionSnapshotJobSummarySchema = z
@@ -205,6 +229,7 @@ export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVers
     maintenanceScript: z.string().nullable(),
     sandboxResources: sandboxProfileVersionResourcesSchema.nullable(),
     skillsConfig: sandboxProfileVersionSkillsConfigSchema.nullable(),
+    associatedResourceEventRoutingConfig: sandboxProfileAssociatedResourceEventRoutingConfigSchema,
     isActive: z.boolean(),
     usable: z.boolean(),
     refreshSchedule: sandboxProfileVersionRefreshScheduleSummarySchema.nullable(),
@@ -388,6 +413,8 @@ export const putSandboxProfileVersionDraftBodySchema = z
     sandboxConnectionId: z.string().min(1).nullable().optional(),
     sandboxResources: sandboxProfileVersionResourcesSchema.nullable().optional(),
     skillsConfig: sandboxProfileVersionSkillsConfigSchema.nullable().optional(),
+    associatedResourceEventRoutingConfig:
+      sandboxProfileAssociatedResourceEventRoutingConfigSchema.optional(),
     integrationBindings: sandboxProfileVersionIntegrationBindingsWriteBodySchema.optional(),
   })
   .strict()
@@ -402,6 +429,7 @@ export const putSandboxProfileVersionDraftBodySchema = z
       value.sandboxConnectionId !== undefined ||
       value.sandboxResources !== undefined ||
       value.skillsConfig !== undefined ||
+      value.associatedResourceEventRoutingConfig !== undefined ||
       value.integrationBindings !== undefined,
     {
       message: "At least one draft field must be provided.",
@@ -421,6 +449,7 @@ export const putSandboxProfileVersionDraftResponseSchema = z
     sandboxConnectionId: z.string().min(1).nullable(),
     sandboxResources: sandboxProfileVersionResourcesSchema.nullable(),
     skillsConfig: sandboxProfileVersionSkillsConfigSchema.nullable(),
+    associatedResourceEventRoutingConfig: sandboxProfileAssociatedResourceEventRoutingConfigSchema,
     integrationBindings: sandboxProfileVersionIntegrationBindingsResponseSchema,
   })
   .strict();

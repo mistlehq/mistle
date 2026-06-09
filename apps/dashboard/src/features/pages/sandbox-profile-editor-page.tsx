@@ -124,6 +124,10 @@ import {
   SetupScriptTimingDescription,
 } from "./sandbox-base-inventory-copy.js";
 import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
+import {
+  SandboxProfileAssociatedResourceRoutingSection,
+  type SandboxProfileAssociatedResourceRoutingDraftState,
+} from "./sandbox-profile-associated-resource-routing-section.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -241,6 +245,10 @@ type SandboxProfileGitCommitSigningDraftState = {
   sourceVersionKey: string | undefined;
   hasUnpersistedChanges: boolean;
 };
+type SandboxProfileAssociatedResourceRoutingSettingsDraftState =
+  SandboxProfileAssociatedResourceRoutingDraftState & {
+    sourceVersionKey: string | undefined;
+  };
 type SetupScriptAssistantControl = {
   disabled: boolean;
   errorMessage: string | null;
@@ -313,6 +321,13 @@ function createIdleSandboxProfileGitCommitSigningDraftState(): SandboxProfileGit
   };
 }
 
+function createIdleSandboxProfileAssociatedResourceRoutingDraftState(): SandboxProfileAssociatedResourceRoutingSettingsDraftState {
+  return {
+    sourceVersionKey: undefined,
+    hasUnpersistedChanges: false,
+  };
+}
+
 export function updateSandboxProfileGitCommitSigningDraftState(input: {
   currentState: SandboxProfileGitCommitSigningDraftState;
   currentVersion: SandboxProfileVersion | null;
@@ -378,6 +393,25 @@ export function resolveSelectedSandboxProfileGitCommitSigningIntegrationConnecti
   return input.gitCommitSigningDraftState.gitCommitSigningIntegrationConnectionId === undefined
     ? currentVersionConnectionId
     : input.gitCommitSigningDraftState.gitCommitSigningIntegrationConnectionId;
+}
+
+function createAssociatedResourceRoutingDraftSourceVersionKey(
+  version: SandboxProfileVersion,
+): string {
+  return `${createRuntimeDraftSourceVersionKey(version)}:${JSON.stringify(
+    version.associatedResourceEventRoutingConfig,
+  )}`;
+}
+
+function associatedResourceRoutingDraftStateIsCurrent(input: {
+  currentVersion: SandboxProfileVersion | null;
+  draftState: Pick<SandboxProfileAssociatedResourceRoutingSettingsDraftState, "sourceVersionKey">;
+}): boolean {
+  return (
+    input.currentVersion !== null &&
+    input.draftState.sourceVersionKey ===
+      createAssociatedResourceRoutingDraftSourceVersionKey(input.currentVersion)
+  );
 }
 
 export function buildSandboxProfileRuntimeDraftChanges(input: {
@@ -1690,6 +1724,9 @@ function ReadySandboxProfileEditorPage(input: {
   const [gitCommitSigningDraftState, setGitCommitSigningDraftState] = useState(
     createIdleSandboxProfileGitCommitSigningDraftState,
   );
+  const [associatedResourceRoutingDraftState, setAssociatedResourceRoutingDraftState] = useState(
+    createIdleSandboxProfileAssociatedResourceRoutingDraftState,
+  );
   const [publishRequestIsPending, setPublishRequestIsPending] = useState(false);
   const [saveDraftRequestIsPending, setSaveDraftRequestIsPending] = useState(false);
   const [publishFlushError, setPublishFlushError] = useState<string | null>(null);
@@ -1729,6 +1766,12 @@ function ReadySandboxProfileEditorPage(input: {
     input.currentVersion?.version,
     input.draftEditorResetKey,
   ]);
+  const associatedResourceRoutingHasUnpersistedChanges =
+    associatedResourceRoutingDraftState.hasUnpersistedChanges &&
+    associatedResourceRoutingDraftStateIsCurrent({
+      currentVersion: input.currentVersion,
+      draftState: associatedResourceRoutingDraftState,
+    });
   const [setupAssistantCloseDialogState, setSetupAssistantCloseDialogState] =
     useState<SetupAssistantCloseDialogState>(null);
   const [setupAssistantStartDialogState, setSetupAssistantStartDialogState] =
@@ -1774,6 +1817,7 @@ function ReadySandboxProfileEditorPage(input: {
     });
   const setupAssistantHasVersionDraftChanges =
     integrationDraftState.hasUnpersistedChanges ||
+    associatedResourceRoutingHasUnpersistedChanges ||
     gitCommitSigningDraftState.hasUnpersistedChanges ||
     skillsDraftState.hasUnpersistedChanges ||
     setupScriptDraftState.hasUnpersistedChanges ||
@@ -2168,6 +2212,7 @@ function ReadySandboxProfileEditorPage(input: {
     const shouldSaveRuntime = runtimeDraftState.hasUnpersistedChanges;
     const shouldSaveSkills = skillsDraftState.hasUnpersistedChanges;
     const shouldSaveGitCommitSigning = gitCommitSigningDraftState.hasUnpersistedChanges;
+    const shouldSaveAssociatedResourceRouting = associatedResourceRoutingHasUnpersistedChanges;
     const shouldSaveIntegrations = integrationDraftState.hasUnpersistedChanges;
     const shouldSaveSetupScript = setupScriptDraftState.hasUnpersistedChanges;
 
@@ -2181,6 +2226,7 @@ function ReadySandboxProfileEditorPage(input: {
       !shouldSaveRuntime &&
       !shouldSaveSkills &&
       !shouldSaveGitCommitSigning &&
+      !shouldSaveAssociatedResourceRouting &&
       !shouldSaveIntegrations &&
       !shouldSaveSetupScript
     ) {
@@ -2200,6 +2246,9 @@ function ReadySandboxProfileEditorPage(input: {
         : undefined;
       const skillsConfig = shouldSaveSkills
         ? (skillsDraftState.buildDraftChanges?.() ?? null)
+        : undefined;
+      const associatedResourceEventRoutingConfig = shouldSaveAssociatedResourceRouting
+        ? associatedResourceRoutingDraftState.buildDraftChanges?.()
         : undefined;
       const runtimeChanges: SandboxProfileRuntimeDraftChanges | undefined = shouldSaveRuntime
         ? buildSandboxProfileRuntimeDraftChanges({
@@ -2232,6 +2281,9 @@ function ReadySandboxProfileEditorPage(input: {
           ? {}
           : { gitCommitSigningIntegrationConnectionId }),
         ...(skillsConfig === undefined ? {} : { skillsConfig }),
+        ...(associatedResourceEventRoutingConfig === undefined
+          ? {}
+          : { associatedResourceEventRoutingConfig }),
         ...(shouldSaveIntegrations && integrationBindings !== undefined
           ? { integrationBindings: { bindings: integrationBindings } }
           : {}),
@@ -2272,9 +2324,17 @@ function ReadySandboxProfileEditorPage(input: {
           await input.invalidateProfileVersions(input.profileId);
         }
       }
+      if (shouldSaveAssociatedResourceRouting) {
+        associatedResourceRoutingDraftState.applySavedAssociatedResourceEventRoutingConfig?.(
+          savedDraft.associatedResourceEventRoutingConfig,
+        );
+        if (!shouldSaveRuntime && !shouldSaveSkills) {
+          await input.invalidateProfileVersions(input.profileId);
+        }
+      }
       if (shouldSaveGitCommitSigning) {
         setGitCommitSigningDraftState(createIdleSandboxProfileGitCommitSigningDraftState());
-        if (!shouldSaveRuntime && !shouldSaveSkills) {
+        if (!shouldSaveRuntime && !shouldSaveSkills && !shouldSaveAssociatedResourceRouting) {
           await input.invalidateProfileVersions(input.profileId);
         }
       }
@@ -2292,6 +2352,8 @@ function ReadySandboxProfileEditorPage(input: {
         setupScriptDraftState.applyDraftSaveError?.(error);
       } else if (errorOwner === "skills") {
         skillsDraftState.applyDraftSaveError?.(error);
+      } else if (shouldSaveAssociatedResourceRouting) {
+        associatedResourceRoutingDraftState.applyDraftSaveError?.(error);
       }
       setPublishFlushError(DraftSaveWorkflowErrorMessage);
       return false;
@@ -2360,6 +2422,7 @@ function ReadySandboxProfileEditorPage(input: {
       hasUnpersistedIntegrationChanges={
         integrationDraftState.hasUnpersistedChanges ||
         gitCommitSigningDraftState.hasUnpersistedChanges ||
+        associatedResourceRoutingHasUnpersistedChanges ||
         skillsDraftState.hasUnpersistedChanges
       }
       hasUnpersistedSetupScriptChanges={setupScriptDraftState.hasUnpersistedChanges}
@@ -2434,12 +2497,14 @@ function ReadySandboxProfileEditorPage(input: {
           mode={input.mode}
           runtimeDraftState={runtimeDraftState}
           skillsDraftState={skillsDraftState}
+          associatedResourceRoutingDraftState={associatedResourceRoutingDraftState}
           gitCommitSigningDraftState={gitCommitSigningDraftState}
           onGitCommitSigningIntegrationConnectionChange={
             updateGitCommitSigningIntegrationConnectionId
           }
           onRuntimeDraftStateChange={setRuntimeDraftState}
           onSkillsDraftStateChange={setSkillsDraftState}
+          onAssociatedResourceRoutingDraftStateChange={setAssociatedResourceRoutingDraftState}
           onIntegrationDraftStateChange={setIntegrationDraftState}
           onPublishSuccessMessageDismiss={() => {
             setShowPublishSuccessMessage(false);
@@ -2918,10 +2983,14 @@ function SandboxProfileEditorSectionPanels(input: {
   mode: SandboxProfileEditorVersionMode;
   runtimeDraftState: SandboxProfileRuntimeSettingsDraftState;
   skillsDraftState: SandboxProfileSkillsSettingsDraftState;
+  associatedResourceRoutingDraftState: SandboxProfileAssociatedResourceRoutingSettingsDraftState;
   gitCommitSigningDraftState: SandboxProfileGitCommitSigningDraftState;
   onGitCommitSigningIntegrationConnectionChange: (connectionId: string | null) => void;
   onRuntimeDraftStateChange: (state: SandboxProfileRuntimeSettingsDraftState) => void;
   onSkillsDraftStateChange: (state: SandboxProfileSkillsSettingsDraftState) => void;
+  onAssociatedResourceRoutingDraftStateChange: (
+    state: SandboxProfileAssociatedResourceRoutingSettingsDraftState,
+  ) => void;
   onSaveDraftBeforeSkillsReload: () => Promise<boolean>;
   onIntegrationDraftStateChange: (state: SandboxProfileDraftSectionState) => void;
   buildSetupScriptTestRuntimeConfig?: () => SandboxProfileRuntimeDraftChanges;
@@ -3044,6 +3113,31 @@ function SandboxProfileEditorSectionPanels(input: {
             onSaveDraftBeforeSkillsReload={input.onSaveDraftBeforeSkillsReload}
             profileId={input.profileId}
             readOnly={input.draftFieldsAreReadOnly}
+            version={input.currentVersion}
+          />
+        </SandboxProfilePanelSection>
+      )}
+      {input.currentVersion === null || sandboxProfileIntegrationRows === null ? null : (
+        <SandboxProfilePanelSection>
+          <SandboxProfileAssociatedResourceRoutingSection
+            availableConnections={input.integrationsLoader.availableConnections}
+            availableTargets={input.integrationsLoader.availableTargets}
+            disabled={input.draftFieldsAreReadOnly}
+            integrationRows={sandboxProfileIntegrationRows}
+            isDraft={input.mode.kind === "draft"}
+            key={`${input.profileId}:${String(input.mode.version)}:${String(input.draftEditorResetKey)}:associated-resource-routing`}
+            onDraftStateChange={(state) => {
+              if (input.currentVersion === null) {
+                return;
+              }
+
+              input.onAssociatedResourceRoutingDraftStateChange({
+                ...state,
+                sourceVersionKey: createAssociatedResourceRoutingDraftSourceVersionKey(
+                  input.currentVersion,
+                ),
+              });
+            }}
             version={input.currentVersion}
           />
         </SandboxProfilePanelSection>

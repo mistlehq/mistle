@@ -21,6 +21,10 @@ import {
 import { enqueueSnapshotMaterializationJob } from "./enqueue-snapshot-materialization-job.js";
 import { getProfileVersionPublishability } from "./get-profile-version-publishability.js";
 import {
+  mapProfileVersionAssociatedResourceEventRoutingConfig,
+  type SandboxProfileAssociatedResourceEventRoutingConfig,
+} from "./profile-version-associated-resource-routing-config.js";
+import {
   loadActiveRefreshSchedulesByVersion,
   type ProfileVersionRefreshScheduleSummary,
 } from "./profile-version-refresh-schedule-summary.js";
@@ -56,6 +60,7 @@ type PublishProfileVersionOutput = {
     maintenanceScript: string | null;
     sandboxResources: SandboxProfileVersionResources | null;
     skillsConfig: SandboxProfileVersionSkillsConfig | null;
+    associatedResourceEventRoutingConfig: SandboxProfileAssociatedResourceEventRoutingConfig;
     isActive: boolean;
     usable: boolean;
     refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
@@ -383,6 +388,8 @@ export async function publishProfileVersion(
         sandboxDiskMb: tables.sandboxProfileVersions.sandboxDiskMb,
         maintenanceScript: tables.sandboxProfileVersions.maintenanceScript,
         skillsConfig: tables.sandboxProfileVersions.skillsConfig,
+        associatedResourceEventRoutingConfig:
+          tables.sandboxProfileVersions.associatedResourceEventRoutingConfig,
       });
 
     if (publishedVersion === undefined) {
@@ -448,6 +455,9 @@ export async function publishProfileVersion(
         maintenanceScript: publishedVersion.maintenanceScript,
         ...mapProfileVersionRuntimeConfig(publishedVersion),
         skillsConfig: mapProfileVersionSkillsConfig(publishedVersion.skillsConfig),
+        associatedResourceEventRoutingConfig: mapProfileVersionAssociatedResourceEventRoutingConfig(
+          publishedVersion.associatedResourceEventRoutingConfig,
+        ),
         isActive: false,
         usable: false,
         refreshSchedule:

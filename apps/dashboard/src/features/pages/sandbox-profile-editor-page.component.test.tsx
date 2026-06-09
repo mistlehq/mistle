@@ -123,6 +123,7 @@ function createSandboxProfileVersionFixture(input: {
     sandboxProvider: "docker",
     sandboxResources: null,
     skillsConfig: null,
+    associatedResourceEventRoutingConfig: {},
     maintenanceScript: input.maintenanceScript ?? null,
     isActive: input.isActive,
     usable: input.usable ?? input.state === "published",

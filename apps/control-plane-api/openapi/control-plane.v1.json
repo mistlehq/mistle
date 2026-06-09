@@ -21216,6 +21216,41 @@
                       "required": ["originUrl", "selectedSkills"],
                       "additionalProperties": false
                     },
+                    "associatedResourceEventRoutingConfig": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "resources": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "resourceKind": {
+                                "type": "string",
+                                "enum": ["github.pull_request"]
+                              },
+                              "eventTypes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "enum": [
+                                    "github.pull_request.issue_comment.created",
+                                    "github.pull_request.review.submitted",
+                                    "github.pull_request.review_comment.created"
+                                  ]
+                                },
+                                "minItems": 1
+                              }
+                            },
+                            "required": ["resourceKind", "eventTypes"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
                     "isActive": {
                       "type": "boolean"
                     },
@@ -21327,6 +21362,7 @@
                     "maintenanceScript",
                     "sandboxResources",
                     "skillsConfig",
+                    "associatedResourceEventRoutingConfig",
                     "isActive",
                     "usable",
                     "refreshSchedule",
@@ -21575,6 +21611,41 @@
                             "required": ["originUrl", "selectedSkills"],
                             "additionalProperties": false
                           },
+                          "associatedResourceEventRoutingConfig": {
+                            "type": "object",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean"
+                              },
+                              "resources": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "resourceKind": {
+                                      "type": "string",
+                                      "enum": ["github.pull_request"]
+                                    },
+                                    "eventTypes": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "enum": [
+                                          "github.pull_request.issue_comment.created",
+                                          "github.pull_request.review.submitted",
+                                          "github.pull_request.review_comment.created"
+                                        ]
+                                      },
+                                      "minItems": 1
+                                    }
+                                  },
+                                  "required": ["resourceKind", "eventTypes"],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          },
                           "isActive": {
                             "type": "boolean"
                           },
@@ -21686,6 +21757,7 @@
                           "maintenanceScript",
                           "sandboxResources",
                           "skillsConfig",
+                          "associatedResourceEventRoutingConfig",
                           "isActive",
                           "usable",
                           "refreshSchedule",
@@ -23865,6 +23937,41 @@
                     "required": ["originUrl", "selectedSkills"],
                     "additionalProperties": false
                   },
+                  "associatedResourceEventRoutingConfig": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "resources": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "resourceKind": {
+                              "type": "string",
+                              "enum": ["github.pull_request"]
+                            },
+                            "eventTypes": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "github.pull_request.issue_comment.created",
+                                  "github.pull_request.review.submitted",
+                                  "github.pull_request.review_comment.created"
+                                ]
+                              },
+                              "minItems": 1
+                            }
+                          },
+                          "required": ["resourceKind", "eventTypes"],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "integrationBindings": {
                     "type": "object",
                     "properties": {
@@ -23998,6 +24105,41 @@
                       "required": ["originUrl", "selectedSkills"],
                       "additionalProperties": false
                     },
+                    "associatedResourceEventRoutingConfig": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "resources": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "resourceKind": {
+                                "type": "string",
+                                "enum": ["github.pull_request"]
+                              },
+                              "eventTypes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "enum": [
+                                    "github.pull_request.issue_comment.created",
+                                    "github.pull_request.review.submitted",
+                                    "github.pull_request.review_comment.created"
+                                  ]
+                                },
+                                "minItems": 1
+                              }
+                            },
+                            "required": ["resourceKind", "eventTypes"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
                     "integrationBindings": {
                       "type": "object",
                       "properties": {
@@ -24067,6 +24209,7 @@
                     "sandboxConnectionId",
                     "sandboxResources",
                     "skillsConfig",
+                    "associatedResourceEventRoutingConfig",
                     "integrationBindings"
                   ],
                   "additionalProperties": false
@@ -24943,6 +25086,41 @@
                           "required": ["originUrl", "selectedSkills"],
                           "additionalProperties": false
                         },
+                        "associatedResourceEventRoutingConfig": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "resources": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "resourceKind": {
+                                    "type": "string",
+                                    "enum": ["github.pull_request"]
+                                  },
+                                  "eventTypes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "github.pull_request.issue_comment.created",
+                                        "github.pull_request.review.submitted",
+                                        "github.pull_request.review_comment.created"
+                                      ]
+                                    },
+                                    "minItems": 1
+                                  }
+                                },
+                                "required": ["resourceKind", "eventTypes"],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "isActive": {
                           "type": "boolean"
                         },
@@ -25054,6 +25232,7 @@
                         "maintenanceScript",
                         "sandboxResources",
                         "skillsConfig",
+                        "associatedResourceEventRoutingConfig",
                         "isActive",
                         "usable",
                         "refreshSchedule",
@@ -25389,6 +25568,41 @@
                           "required": ["originUrl", "selectedSkills"],
                           "additionalProperties": false
                         },
+                        "associatedResourceEventRoutingConfig": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "resources": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "resourceKind": {
+                                    "type": "string",
+                                    "enum": ["github.pull_request"]
+                                  },
+                                  "eventTypes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "github.pull_request.issue_comment.created",
+                                        "github.pull_request.review.submitted",
+                                        "github.pull_request.review_comment.created"
+                                      ]
+                                    },
+                                    "minItems": 1
+                                  }
+                                },
+                                "required": ["resourceKind", "eventTypes"],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "isActive": {
                           "type": "boolean"
                         },
@@ -25500,6 +25714,7 @@
                         "maintenanceScript",
                         "sandboxResources",
                         "skillsConfig",
+                        "associatedResourceEventRoutingConfig",
                         "isActive",
                         "usable",
                         "refreshSchedule",
@@ -25818,6 +26033,41 @@
                           "required": ["originUrl", "selectedSkills"],
                           "additionalProperties": false
                         },
+                        "associatedResourceEventRoutingConfig": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "resources": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "resourceKind": {
+                                    "type": "string",
+                                    "enum": ["github.pull_request"]
+                                  },
+                                  "eventTypes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "github.pull_request.issue_comment.created",
+                                        "github.pull_request.review.submitted",
+                                        "github.pull_request.review_comment.created"
+                                      ]
+                                    },
+                                    "minItems": 1
+                                  }
+                                },
+                                "required": ["resourceKind", "eventTypes"],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "isActive": {
                           "type": "boolean"
                         },
@@ -25929,6 +26179,7 @@
                         "maintenanceScript",
                         "sandboxResources",
                         "skillsConfig",
+                        "associatedResourceEventRoutingConfig",
                         "isActive",
                         "usable",
                         "refreshSchedule",

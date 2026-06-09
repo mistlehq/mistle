@@ -318,6 +318,7 @@ function createVersion(skillsConfig: SandboxProfileVersion["skillsConfig"]): San
     maintenanceScript: null,
     sandboxResources: null,
     skillsConfig,
+    associatedResourceEventRoutingConfig: {},
     isActive: false,
     usable: false,
     latestSnapshotJob: null,

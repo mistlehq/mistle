@@ -78,6 +78,7 @@ describe("resolveSnapshotPanelState", () => {
         sandboxConnectionId: null,
         sandboxResources: null,
         skillsConfig: null,
+        associatedResourceEventRoutingConfig: {},
         maintenanceScript: null,
         isActive: true,
         usable: true,
