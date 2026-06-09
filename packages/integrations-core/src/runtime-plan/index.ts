@@ -14,12 +14,17 @@ import type {
   RuntimeFileWriteMode,
 } from "../types/index.js";
 
-export { CompiledRuntimePlanSchema } from "./schema.js";
+export {
+  AssociatedResourceEventRoutingSchema,
+  CompiledRuntimePlanSchema,
+  SandboxProfileAssociatedResourceEventRoutingConfigSchema,
+} from "./schema.js";
 
 type AssembleCompiledRuntimePlanInput = {
   sandboxProfileId: string;
   version: number;
   image: CompiledRuntimePlan["image"];
+  associatedResourceEventRouting: CompiledRuntimePlan["associatedResourceEventRouting"];
   compiledRuntimePlanFragments: ReadonlyArray<CompiledRuntimePlanFragment>;
 };
 
@@ -461,5 +466,6 @@ export function assembleCompiledRuntimePlan(
     workspaceSources,
     runtimeClients,
     agentRuntimes,
+    associatedResourceEventRouting: input.associatedResourceEventRouting,
   };
 }

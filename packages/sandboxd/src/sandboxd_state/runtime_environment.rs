@@ -179,6 +179,7 @@ mod tests {
             skills: None,
             runtime_clients: Vec::new(),
             agent_runtimes: Vec::new(),
+            associated_resource_event_routing: Default::default(),
         };
 
         let runtime_env =
@@ -232,6 +233,7 @@ mod tests {
             skills: None,
             runtime_clients: Vec::new(),
             agent_runtimes: Vec::new(),
+            associated_resource_event_routing: Default::default(),
         };
 
         let error =

@@ -31,6 +31,9 @@ import { defineOrganizationCredentialKeys } from "./organization-credential-keys
 import { defineOrganizationIdentityLinkProviderConfigs } from "./organization-identity-link-provider-configs.js";
 import { defineOrganizations } from "./organizations.js";
 import { definePortAccessLinks } from "./port-access-links.js";
+import { defineProviderResourceAssociationDeliveries } from "./provider-resource-association-deliveries.js";
+import { defineProviderResourceAssociationDeliveryProcessors } from "./provider-resource-association-delivery-processors.js";
+import { defineProviderResourceAssociations } from "./provider-resource-associations.js";
 import { defineSandboxProfileSnapshotRefreshScheduleTargets } from "./sandbox-profile-snapshot-refresh-schedule-targets.js";
 import { defineSandboxProfileVersionIntegrationBindings } from "./sandbox-profile-version-integration-bindings.js";
 import { defineSandboxProfileVersionSnapshotJobs } from "./sandbox-profile-version-snapshot-jobs.js";
@@ -106,6 +109,10 @@ export function createControlPlaneDbSchema(schemaName: string) {
   const oauthAccessTokens = defineOAuthAccessTokens(schema);
   const oauthRefreshTokens = defineOAuthRefreshTokens(schema);
   const oauthServerStates = defineOAuthServerStates(schema);
+  const providerResourceAssociations = defineProviderResourceAssociations(schema);
+  const providerResourceAssociationDeliveries = defineProviderResourceAssociationDeliveries(schema);
+  const providerResourceAssociationDeliveryProcessors =
+    defineProviderResourceAssociationDeliveryProcessors(schema);
   const sandboxProfileSnapshotRefreshScheduleTargets =
     defineSandboxProfileSnapshotRefreshScheduleTargets(schema);
   const sandboxProfileVersionIntegrationBindings =
@@ -177,6 +184,9 @@ export function createControlPlaneDbSchema(schemaName: string) {
     oauthGrants,
     oauthRefreshTokens,
     oauthServerStates,
+    providerResourceAssociationDeliveries,
+    providerResourceAssociationDeliveryProcessors,
+    providerResourceAssociations,
     sandboxProfileSnapshotRefreshScheduleTargets,
     sandboxProfileVersionIntegrationBindings,
     sandboxProfileVersionSnapshotJobs,

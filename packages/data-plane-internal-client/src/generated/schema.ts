@@ -399,6 +399,18 @@ export interface paths {
                 };
                 name: string;
               }[];
+              associatedResourceEventRouting: {
+                enabled: boolean;
+                resources: {
+                  eventTypes: (
+                    | "github.pull_request.issue_comment.created"
+                    | "github.pull_request.review.submitted"
+                    | "github.pull_request.review_comment.created"
+                  )[];
+                  /** @enum {string} */
+                  resourceKind: "github.pull_request";
+                }[];
+              };
               egressRoutes: {
                 additionalCredentialHeaders?: {
                   credentialResolver:
@@ -878,6 +890,18 @@ export interface paths {
                   };
                   name: string;
                 }[];
+                associatedResourceEventRouting: {
+                  enabled: boolean;
+                  resources: {
+                    eventTypes: (
+                      | "github.pull_request.issue_comment.created"
+                      | "github.pull_request.review.submitted"
+                      | "github.pull_request.review_comment.created"
+                    )[];
+                    /** @enum {string} */
+                    resourceKind: "github.pull_request";
+                  }[];
+                };
                 egressRoutes: {
                   additionalCredentialHeaders?: {
                     credentialResolver:

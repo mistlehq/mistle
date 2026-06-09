@@ -1,4 +1,7 @@
-import type { CompiledRuntimePlan } from "@mistle/sandbox-runtime-contract";
+import {
+  createDisabledAssociatedResourceEventRouting,
+  type CompiledRuntimePlan,
+} from "@mistle/sandbox-runtime-contract";
 import { describe, expect, it } from "vitest";
 
 import { classifyRuntimePlanEgressRoute } from "./runtime-plan-route-classifier.js";
@@ -141,6 +144,7 @@ function createRuntimePlan(input: {
     egressRoutes: input.egressRoutes,
     artifacts: [],
     workspaceSources: [],
+    associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
     runtimeClients: [],
     agentRuntimes: [],
   };

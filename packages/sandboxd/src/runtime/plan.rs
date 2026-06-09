@@ -23,6 +23,38 @@ pub struct CompiledRuntimePlan {
     pub skills: Option<CompiledRuntimePlanSkills>,
     pub runtime_clients: Vec<RuntimeClient>,
     pub agent_runtimes: Vec<CompiledAgentRuntime>,
+    #[serde(default)]
+    pub associated_resource_event_routing: AssociatedResourceEventRouting,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Default)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AssociatedResourceEventRouting {
+    pub enabled: bool,
+    pub resources: Vec<AssociatedResourceEventRoutingResourceRule>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AssociatedResourceEventRoutingResourceRule {
+    pub resource_kind: AssociatedProviderResourceKind,
+    pub event_types: Vec<AssociatedResourceEventType>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub enum AssociatedProviderResourceKind {
+    #[serde(rename = "github.pull_request")]
+    GithubPullRequest,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub enum AssociatedResourceEventType {
+    #[serde(rename = "github.pull_request.issue_comment.created")]
+    IssueCommentCreated,
+    #[serde(rename = "github.pull_request.review.submitted")]
+    ReviewSubmitted,
+    #[serde(rename = "github.pull_request.review_comment.created")]
+    ReviewCommentCreated,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

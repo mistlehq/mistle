@@ -1313,6 +1313,44 @@
             "required": ["runtimeId", "runtimeKey", "clientId", "endpointKey", "ptyLaunch"],
             "additionalProperties": false
           }
+        },
+        "associatedResourceEventRouting": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "resources": {
+              "readOnly": true,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "resourceKind": {
+                    "type": "string",
+                    "enum": ["github.pull_request"]
+                  },
+                  "eventTypes": {
+                    "readOnly": true,
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "github.pull_request.issue_comment.created",
+                        "github.pull_request.review.submitted",
+                        "github.pull_request.review_comment.created"
+                      ]
+                    }
+                  }
+                },
+                "required": ["resourceKind", "eventTypes"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["enabled", "resources"],
+          "additionalProperties": false
         }
       },
       "required": [
@@ -1323,7 +1361,8 @@
         "artifacts",
         "workspaceSources",
         "runtimeClients",
-        "agentRuntimes"
+        "agentRuntimes",
+        "associatedResourceEventRouting"
       ],
       "additionalProperties": false
     },

@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import { SandboxInstanceStatuses, type SandboxInstanceStatus } from "@mistle/db/data-plane";
+import { createDisabledAssociatedResourceEventRouting } from "@mistle/integrations-core";
 import {
   TestEnvironmentIdHeader,
   createIntegrationTest,
@@ -273,6 +274,7 @@ function createRuntimePlan(
     egressRoutes: [],
     artifacts: [],
     runtimeClients: [],
+    associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
     workspaceSources: [],
     agentRuntimes: [],
   };

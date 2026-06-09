@@ -1,3 +1,4 @@
+import { createDisabledAssociatedResourceEventRouting } from "@mistle/integrations-core";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -108,6 +109,21 @@ const RuntimePlanSchema = z.object({
       }),
     }),
   ),
+  associatedResourceEventRouting: z.object({
+    enabled: z.boolean(),
+    resources: z.array(
+      z.object({
+        resourceKind: z.literal("github.pull_request"),
+        eventTypes: z.array(
+          z.enum([
+            "github.pull_request.issue_comment.created",
+            "github.pull_request.review.submitted",
+            "github.pull_request.review_comment.created",
+          ]),
+        ),
+      }),
+    ),
+  }),
   workspaceSources: z.array(
     z.discriminatedUnion("sourceKind", [
       z.object({
@@ -325,6 +341,7 @@ function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
     ],
     artifacts: [],
     workspaceSources: [],
+    associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
     runtimeClients: [],
     agentRuntimes: [],
   };

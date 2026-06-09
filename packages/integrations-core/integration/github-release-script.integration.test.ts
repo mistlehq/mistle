@@ -7,6 +7,7 @@ import { compileRuntimePlan } from "../src/compiler/index.js";
 import { IntegrationRegistry } from "../src/registry/index.js";
 import {
   IntegrationConnectionMethodIds,
+  createDisabledAssociatedResourceEventRouting,
   type IntegrationDefinition,
   type RuntimeArtifactInstallStep,
 } from "../src/types/index.js";
@@ -44,10 +45,50 @@ function expectTypedInstallStep(
   return entry;
 }
 
+const MinimalConversationProvider = {
+  connect: async () => ({
+    request: async () => ({ ok: true }),
+    close: async () => {},
+  }),
+  inspectConversation: async () => ({
+    exists: true,
+    status: "idle" as const,
+    activeExecutionId: null,
+  }),
+  createConversation: async () => ({
+    providerConversationId: "thread_123",
+  }),
+  resumeConversation: async () => {},
+  startExecution: async () => ({
+    providerExecutionId: null,
+  }),
+  steerExecution: async () => ({
+    providerExecutionId: "turn_123",
+  }),
+  interruptExecution: async () => {},
+};
+
 function createDefinitionsBundle(registry: IntegrationRegistry) {
+  const agentRuntimeRegistry = new AgentRuntimeRegistry();
+  agentRuntimeRegistry.register({
+    runtimeId: "codex",
+    displayName: "Codex",
+    logoKey: "openai",
+    configSchema: z.object({}).strict(),
+    createConversationProvider: () => MinimalConversationProvider,
+    materializeMcpConfig: () => [],
+    compileRuntime: () => ({
+      egressRoutes: [],
+      artifacts: [],
+      runtimeClients: [],
+      workspaceSources: [],
+      agentRuntimes: [],
+    }),
+  });
+
   return {
     integrationRegistry: registry,
-    agentRuntimeRegistry: new AgentRuntimeRegistry(),
+    agentRuntimeRegistry,
   };
 }
 
@@ -163,6 +204,7 @@ describe("github release helper integration", () => {
         imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
       agentRuntimeId: "codex",
+      associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
       definitions: createDefinitionsBundle(registry),
       bindings: [
         {
@@ -224,6 +266,7 @@ describe("github release helper integration", () => {
         imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
       agentRuntimeId: "codex",
+      associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
       definitions: createDefinitionsBundle(registry),
       bindings: [
         {

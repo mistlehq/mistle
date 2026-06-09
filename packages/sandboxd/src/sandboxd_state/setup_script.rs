@@ -235,6 +235,7 @@ mod tests {
             skills: None,
             runtime_clients: Vec::new(),
             agent_runtimes: Vec::new(),
+            associated_resource_event_routing: Default::default(),
         };
         run_setup_script(
             &missing_setup_script_plan,
@@ -255,6 +256,7 @@ mod tests {
             skills: None,
             runtime_clients: Vec::new(),
             agent_runtimes: Vec::new(),
+            associated_resource_event_routing: Default::default(),
         };
         run_setup_script(
             &blank_setup_script_plan,
@@ -288,6 +290,7 @@ mod tests {
             skills: None,
             runtime_clients: Vec::new(),
             agent_runtimes: Vec::new(),
+            associated_resource_event_routing: Default::default(),
         };
 
         run_setup_script_in_directory(
@@ -339,6 +342,7 @@ mod tests {
             skills: None,
             runtime_clients: Vec::new(),
             agent_runtimes: Vec::new(),
+            associated_resource_event_routing: Default::default(),
         };
         let runtime_env =
             BTreeMap::from([("MISTLE_TEST_ENV".to_string(), "runtime-value".to_string())]);
@@ -397,6 +401,7 @@ mod tests {
             skills: None,
             runtime_clients: Vec::new(),
             agent_runtimes: Vec::new(),
+            associated_resource_event_routing: Default::default(),
         };
 
         let error = run_setup_script_in_directory(

@@ -1,4 +1,7 @@
-import type { CompiledRuntimePlan } from "@mistle/integrations-core";
+import {
+  createDisabledAssociatedResourceEventRouting,
+  type CompiledRuntimePlan,
+} from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import { resolveSandboxInstanceRuntimeContext } from "./runtime-context.js";
@@ -16,6 +19,7 @@ function createRuntimePlan(input: {
     },
     egressRoutes: [],
     artifacts: [],
+    associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
     workspaceSources: input.workspaceSources ?? [],
     runtimeClients: [],
     agentRuntimes: [

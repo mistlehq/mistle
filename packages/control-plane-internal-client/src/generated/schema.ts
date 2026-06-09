@@ -708,6 +708,18 @@ export interface paths {
                   };
                   name: string;
                 }[];
+                associatedResourceEventRouting: {
+                  enabled: boolean;
+                  resources: {
+                    eventTypes: (
+                      | "github.pull_request.issue_comment.created"
+                      | "github.pull_request.review.submitted"
+                      | "github.pull_request.review_comment.created"
+                    )[];
+                    /** @enum {string} */
+                    resourceKind: "github.pull_request";
+                  }[];
+                };
                 egressRoutes: {
                   additionalCredentialHeaders?: {
                     credentialResolver:
@@ -1017,9 +1029,23 @@ export interface paths {
           };
           content: {
             "application/json": {
+              associatedResourceEventRouting: {
+                enabled: boolean;
+                resources: {
+                  eventTypes: (
+                    | "github.pull_request.issue_comment.created"
+                    | "github.pull_request.review.submitted"
+                    | "github.pull_request.review_comment.created"
+                  )[];
+                  /** @enum {string} */
+                  resourceKind: "github.pull_request";
+                }[];
+              } | null;
               failureCode: string | null;
               failureMessage: string | null;
               id: string;
+              sandboxProfileId: string;
+              sandboxProfileVersion: number;
               /** @enum {string} */
               status:
                 | "pending"

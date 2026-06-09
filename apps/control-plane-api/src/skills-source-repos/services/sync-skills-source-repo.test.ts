@@ -1,4 +1,7 @@
-import type { CompiledRuntimePlan } from "@mistle/integrations-core";
+import {
+  createDisabledAssociatedResourceEventRouting,
+  type CompiledRuntimePlan,
+} from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -22,6 +25,7 @@ describe("skills source repo sync service", () => {
         source: "base",
         imageRef: "ubuntu:24.04",
       },
+      associatedResourceEventRouting: runtimePlan.associatedResourceEventRouting,
       egressRoutes: runtimePlan.egressRoutes,
       artifacts: [],
       workspaceSources: [
@@ -195,6 +199,7 @@ function createRuntimePlan(
         },
       },
     ],
+    associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
     artifacts: [
       {
         artifactKey: "unused",

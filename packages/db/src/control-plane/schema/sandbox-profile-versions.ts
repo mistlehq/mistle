@@ -42,6 +42,8 @@ export type SandboxProfileVersionSkillsConfig = {
   }>;
 };
 
+export type SandboxProfileAssociatedResourceEventRoutingConfig = Record<string, unknown>;
+
 export function defineSandboxProfileVersions(schema: PgSchema) {
   return schema.table(
     "sandbox_profile_versions",
@@ -72,6 +74,10 @@ export function defineSandboxProfileVersions(schema: PgSchema) {
       mistleMcpEnabled: boolean("mistle_mcp_enabled").notNull().default(false),
       mistleMcpApiKeyId: text("mistle_mcp_api_key_id"),
       skillsConfig: jsonb("skills_config").$type<SandboxProfileVersionSkillsConfig>(),
+      associatedResourceEventRoutingConfig: jsonb("associated_resource_event_routing_config")
+        .$type<SandboxProfileAssociatedResourceEventRoutingConfig>()
+        .notNull()
+        .default(sql`'{}'::jsonb`),
     },
     (table) => [
       primaryKey({

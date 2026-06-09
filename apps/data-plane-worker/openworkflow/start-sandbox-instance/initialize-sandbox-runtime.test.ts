@@ -1,3 +1,4 @@
+import { createDisabledAssociatedResourceEventRouting } from "@mistle/integrations-core";
 import { SandboxProvider, createSandboxAdapter } from "@mistle/sandbox";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 import { describe, expect, it } from "vitest";
@@ -66,6 +67,7 @@ function createRuntimePlan(input?: {
     egressRoutes: input?.egressRoutes ?? [],
     artifacts: [],
     workspaceSources: [],
+    associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
     runtimeClients: [],
     agentRuntimes: [],
   };

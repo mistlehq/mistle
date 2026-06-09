@@ -2073,6 +2073,44 @@ export type CompiledRuntimePlanSkills = {
   selectedSkills: ReadonlyArray<CompiledSkillSelection>;
 };
 
+export const AssociatedProviderResourceKinds = {
+  GITHUB_PULL_REQUEST: "github.pull_request",
+} as const;
+
+export type AssociatedProviderResourceKind =
+  (typeof AssociatedProviderResourceKinds)[keyof typeof AssociatedProviderResourceKinds];
+
+export const AssociatedResourceEventTypes = {
+  GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED: "github.pull_request.issue_comment.created",
+  GITHUB_PULL_REQUEST_REVIEW_SUBMITTED: "github.pull_request.review.submitted",
+  GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED: "github.pull_request.review_comment.created",
+} as const;
+
+export type AssociatedResourceEventType =
+  (typeof AssociatedResourceEventTypes)[keyof typeof AssociatedResourceEventTypes];
+
+export type AssociatedResourceEventRoutingResourceRule = {
+  resourceKind: AssociatedProviderResourceKind;
+  eventTypes: ReadonlyArray<AssociatedResourceEventType>;
+};
+
+export type AssociatedResourceEventRouting = {
+  enabled: boolean;
+  resources: ReadonlyArray<AssociatedResourceEventRoutingResourceRule>;
+};
+
+export type SandboxProfileAssociatedResourceEventRoutingConfig = {
+  enabled?: boolean | undefined;
+  resources?: ReadonlyArray<AssociatedResourceEventRoutingResourceRule> | undefined;
+};
+
+export function createDisabledAssociatedResourceEventRouting(): AssociatedResourceEventRouting {
+  return {
+    enabled: false,
+    resources: [],
+  };
+}
+
 export type CompileBindingResult = {
   egressRoutes: ReadonlyArray<CompileBindingEgressRoute>;
   artifacts: ReadonlyArray<RuntimeArtifactSpec>;
@@ -2779,6 +2817,7 @@ export type CompiledRuntimePlan = {
   skills?: CompiledRuntimePlanSkills;
   runtimeClients: ReadonlyArray<RuntimeClient>;
   agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
+  associatedResourceEventRouting: AssociatedResourceEventRouting;
 };
 
 export type IntegrationDefinitionLocator = {
@@ -2815,6 +2854,7 @@ export type CompileRuntimePlanInput = {
   bindings: ReadonlyArray<CompileRuntimePlanBindingInput>;
   egressRoutes?: ReadonlyArray<EgressCredentialRoute>;
   mcpServers?: ReadonlyArray<ResolvedIntegrationMcpServer>;
+  associatedResourceEventRouting: AssociatedResourceEventRouting;
   /**
    * Allows agent runtime definitions to preserve inherited setup files when a
    * sandbox starts from an existing Snapshot. Runtime definitions decide which

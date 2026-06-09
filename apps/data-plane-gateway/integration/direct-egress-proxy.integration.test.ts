@@ -12,7 +12,10 @@ import {
 } from "@mistle/db/control-plane";
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { mintEgressToken, verifyMcpToken } from "@mistle/gateway-tunnel-auth";
-import type { CompiledRuntimePlan } from "@mistle/sandbox-runtime-contract";
+import {
+  createDisabledAssociatedResourceEventRouting,
+  type CompiledRuntimePlan,
+} from "@mistle/sandbox-runtime-contract";
 import {
   TestEnvironmentIdHeader,
   createIntegrationTest,
@@ -996,6 +999,7 @@ function createRuntimePlan(input: {
     egressRoutes: input.egressRoutes,
     artifacts: [],
     workspaceSources: [],
+    associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
     runtimeClients: [],
     agentRuntimes: [],
   };

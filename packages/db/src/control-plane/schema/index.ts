@@ -217,6 +217,25 @@ export {
   type IntegrationWebhookSourceStatus,
 } from "./integration-webhook-sources.js";
 export {
+  providerResourceAssociations,
+  type InsertProviderResourceAssociation,
+  type ProviderResourceAssociation,
+} from "./provider-resource-associations.js";
+export {
+  providerResourceAssociationDeliveries,
+  ProviderResourceAssociationDeliveryStatuses,
+  type InsertProviderResourceAssociationDelivery,
+  type ProviderResourceAssociationDelivery,
+  type ProviderResourceAssociationDeliveryStatus,
+} from "./provider-resource-association-deliveries.js";
+export {
+  providerResourceAssociationDeliveryProcessors,
+  ProviderResourceAssociationDeliveryProcessorStatuses,
+  type InsertProviderResourceAssociationDeliveryProcessor,
+  type ProviderResourceAssociationDeliveryProcessor,
+  type ProviderResourceAssociationDeliveryProcessorStatus,
+} from "./provider-resource-association-delivery-processors.js";
+export {
   webhookTriggers,
   type InsertWebhookTrigger,
   type WebhookTrigger,
@@ -268,6 +287,7 @@ export {
 } from "./sandbox-profile-versions.js";
 export type {
   InsertSandboxProfileVersion,
+  SandboxProfileAssociatedResourceEventRoutingConfig,
   SandboxProfileVersion,
   SandboxProfileVersionAgentRuntimeId,
   SandboxProfileVersionSkillsConfig,

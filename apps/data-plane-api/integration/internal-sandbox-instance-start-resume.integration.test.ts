@@ -10,7 +10,10 @@ import {
 } from "@mistle/data-plane-internal-client";
 import { SandboxInstancePurposes, SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { createDataPlaneWorkflowNamespaceId } from "@mistle/db/test-environment";
-import type { CompiledRuntimePlan } from "@mistle/integrations-core";
+import {
+  createDisabledAssociatedResourceEventRouting,
+  type CompiledRuntimePlan,
+} from "@mistle/integrations-core";
 import {
   createIntegrationTest,
   TestEnvironmentIdHeader,
@@ -407,6 +410,7 @@ function runtimePlan(input: {
     egressRoutes: [],
     artifacts: [],
     runtimeClients: [],
+    associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
     workspaceSources: [],
     agentRuntimes: [],
   };

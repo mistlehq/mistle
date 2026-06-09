@@ -2747,6 +2747,42 @@
                             ],
                             "additionalProperties": false
                           }
+                        },
+                        "associatedResourceEventRouting": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "resources": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "resourceKind": {
+                                    "type": "string",
+                                    "enum": ["github.pull_request"]
+                                  },
+                                  "eventTypes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "github.pull_request.issue_comment.created",
+                                        "github.pull_request.review.submitted",
+                                        "github.pull_request.review_comment.created"
+                                      ]
+                                    },
+                                    "minItems": 1
+                                  }
+                                },
+                                "required": ["resourceKind", "eventTypes"],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": ["enabled", "resources"],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -2757,7 +2793,8 @@
                         "artifacts",
                         "workspaceSources",
                         "runtimeClients",
-                        "agentRuntimes"
+                        "agentRuntimes",
+                        "associatedResourceEventRouting"
                       ],
                       "additionalProperties": false
                     }
@@ -3163,9 +3200,61 @@
                     "failureMessage": {
                       "type": ["string", "null"],
                       "minLength": 1
+                    },
+                    "sandboxProfileId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileVersion": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "associatedResourceEventRouting": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "resources": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "resourceKind": {
+                                "type": "string",
+                                "enum": ["github.pull_request"]
+                              },
+                              "eventTypes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "enum": [
+                                    "github.pull_request.issue_comment.created",
+                                    "github.pull_request.review.submitted",
+                                    "github.pull_request.review_comment.created"
+                                  ]
+                                },
+                                "minItems": 1
+                              }
+                            },
+                            "required": ["resourceKind", "eventTypes"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["enabled", "resources"],
+                      "additionalProperties": false
                     }
                   },
-                  "required": ["id", "status", "failureCode", "failureMessage"],
+                  "required": [
+                    "id",
+                    "status",
+                    "failureCode",
+                    "failureMessage",
+                    "sandboxProfileId",
+                    "sandboxProfileVersion",
+                    "associatedResourceEventRouting"
+                  ],
                   "additionalProperties": false
                 }
               }

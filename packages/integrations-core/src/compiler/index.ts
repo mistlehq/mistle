@@ -814,6 +814,7 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
     sandboxProfileId: input.sandboxProfileId,
     version: input.version,
     image: input.image,
+    associatedResourceEventRouting: input.associatedResourceEventRouting,
     compiledRuntimePlanFragments,
   });
 }
