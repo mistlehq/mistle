@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, userEvent, within } from "storybook/test";
 
 import {
   createDashboardMemoryRouterDecorator,
@@ -38,6 +39,11 @@ const StoryApiKeys = [
   },
 ] satisfies readonly ApiKey[];
 
+/**
+ * Review the organization API keys settings page as a page-level surface. Use the default story to
+ * scan the table-level permissions summary, then use the permission details story to inspect the
+ * grouped allowed Mistle resources dialog opened from the eye icon affordance.
+ */
 const meta = {
   title: "Dashboard/Settings/OrganizationApiKeys/PageView",
   component: OrganizationApiKeysSettingsPageView,
@@ -59,6 +65,20 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const PermissionDetailsOpen: Story = {
+  name: "Permission details open",
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "View allowed Mistle resources: 3 resources" }),
+    );
+
+    await expect(body.getByRole("dialog", { name: "Allowed Mistle resources" })).toBeVisible();
+  },
+};
 
 export const CreatedToken: Story = {
   args: {

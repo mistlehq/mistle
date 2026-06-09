@@ -7,7 +7,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  Badge,
   Button,
   CopyableValue,
   Empty,
@@ -26,6 +25,7 @@ import { KeyIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Link as RouterLink } from "react-router";
 
+import { ApiKeyMistleResourceAccessSummary } from "../settings/api-keys/api-key-permissions-summary.js";
 import type { ApiKey } from "../settings/api-keys/api-keys-service.js";
 import { formatDateTime } from "../shared/date-formatters.js";
 
@@ -140,7 +140,15 @@ export function OrganizationApiKeysSettingsPageView(
                   </code>
                 </TableCell>
                 <TableCell>
-                  <ApiKeyPermissionsCell permissions={apiKey.permissions} />
+                  <ApiKeyMistleResourceAccessSummary
+                    apiKey={apiKey}
+                    description={
+                      <>
+                        {apiKey.name} can access these Mistle resources. Access is limited by this
+                        API key&apos;s permissions.
+                      </>
+                    }
+                  />
                 </TableCell>
                 <TableCell>{formatNullableDate(apiKey.lastUsedAt, "Never")}</TableCell>
                 <TableCell>{formatDateTime(apiKey.createdAt)}</TableCell>
@@ -195,22 +203,6 @@ export function OrganizationApiKeysSettingsPageView(
           </AlertDialogContent>
         )}
       </AlertDialog>
-    </div>
-  );
-}
-
-function ApiKeyPermissionsCell(input: { permissions: readonly string[] }): React.JSX.Element {
-  const visiblePermissions = input.permissions.slice(0, 3);
-  const hiddenCount = input.permissions.length - visiblePermissions.length;
-
-  return (
-    <div className="flex max-w-lg flex-wrap gap-1.5">
-      {visiblePermissions.map((permission) => (
-        <Badge key={permission} variant="outline">
-          {permission}
-        </Badge>
-      ))}
-      {hiddenCount > 0 ? <Badge variant="secondary">+ {String(hiddenCount)} more</Badge> : null}
     </div>
   );
 }
