@@ -141,6 +141,7 @@ export type SandboxProfileEditorPageStoryArgs = {
   setupScript: string | null;
   setupScriptDraft?: string;
   setupAssistantStartDialogState?: "choice" | "save-required" | "use-saved-required";
+  setupAssistantCloseDialogReason?: "close" | "publish" | "switch-tabs";
   setupAssistantPanelState?: "closed" | "starting" | "disconnected" | "ready" | "proposed-script";
   setupAssistantErrorMessage?: string;
   setupAssistantState?: "available" | "starting" | "disabled";
@@ -1101,7 +1102,12 @@ function SandboxProfileEditorPageStoryView(
   const [setupAssistantStartDialogOpen, setSetupAssistantStartDialogOpen] = useState(
     input.setupAssistantStartDialogState !== undefined,
   );
-  const [setupAssistantCloseDialogOpen, setSetupAssistantCloseDialogOpen] = useState(false);
+  const [setupAssistantCloseDialogOpen, setSetupAssistantCloseDialogOpen] = useState(
+    input.setupAssistantCloseDialogReason !== undefined,
+  );
+  const [setupAssistantCloseDialogReason, setSetupAssistantCloseDialogReason] = useState<
+    "close" | "publish" | "switch-tabs"
+  >(input.setupAssistantCloseDialogReason ?? "close");
   const [setupAssistantCloseNavigationSectionId, setSetupAssistantCloseNavigationSectionId] =
     useState<StorySectionId | null>(null);
   const [duplicateProfileDialogOpen, setDuplicateProfileDialogOpen] = useState(
@@ -1171,6 +1177,7 @@ function SandboxProfileEditorPageStoryView(
   });
   function handleToggleSetupAssistant(): void {
     if (setupAssistantPanelOpen) {
+      setSetupAssistantCloseDialogReason("close");
       setSetupAssistantCloseDialogOpen(true);
       return;
     }
@@ -1198,12 +1205,16 @@ function SandboxProfileEditorPageStoryView(
   }
 
   function handleConfirmSetupAssistantClose(): void {
+    const closeReason = setupAssistantCloseDialogReason;
     setSetupAssistantCloseDialogOpen(false);
     setSetupAssistantPanelOpen(false);
-    if (setupAssistantCloseNavigationSectionId !== null) {
+    if (closeReason === "switch-tabs" && setupAssistantCloseNavigationSectionId !== null) {
       setActiveSectionId(setupAssistantCloseNavigationSectionId);
       setSetupAssistantCloseNavigationSectionId(null);
+    } else if (closeReason === "publish") {
+      setActiveSectionId("snapshot");
     }
+    setSetupAssistantCloseDialogReason("close");
   }
 
   async function handleCreateApiKey(createInput: {
@@ -1284,7 +1295,12 @@ function SandboxProfileEditorPageStoryView(
       onDuplicateProfileDialogOpenChange={setDuplicateProfileDialogOpen}
       onMakeChanges={() => {}}
       onDiscardChangesAndLeaveDraft={() => {}}
-      onPublish={() => {}}
+      onPublish={() => {
+        if (setupAssistantPanelOpen) {
+          setSetupAssistantCloseDialogReason("publish");
+          setSetupAssistantCloseDialogOpen(true);
+        }
+      }}
       onSaveDraft={() => {
         setPersistedSetupScript(setupScriptDraft);
       }}
@@ -1292,6 +1308,7 @@ function SandboxProfileEditorPageStoryView(
       onActiveSectionIdChange={(sectionId) => {
         if (setupAssistantPanelOpen && sectionId !== activeSectionId) {
           setSetupAssistantCloseNavigationSectionId(sectionId);
+          setSetupAssistantCloseDialogReason("switch-tabs");
           setSetupAssistantCloseDialogOpen(true);
           return;
         }
@@ -1541,6 +1558,7 @@ function SandboxProfileEditorPageStoryView(
             <ResizablePanel defaultSize="28%" id="setup-assistant-page-panel" minSize="360px">
               <SetupAssistantPanel
                 onClose={() => {
+                  setSetupAssistantCloseDialogReason("close");
                   setSetupAssistantCloseDialogOpen(true);
                 }}
                 state={setupAssistantPanelState}
@@ -1552,9 +1570,10 @@ function SandboxProfileEditorPageStoryView(
             onCancel={() => {
               setSetupAssistantCloseDialogOpen(false);
               setSetupAssistantCloseNavigationSectionId(null);
+              setSetupAssistantCloseDialogReason("close");
             }}
             onConfirm={handleConfirmSetupAssistantClose}
-            reason={setupAssistantCloseNavigationSectionId === null ? "close" : "switch-tabs"}
+            reason={setupAssistantCloseDialogReason}
           />
         </div>
       )}

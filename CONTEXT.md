@@ -384,6 +384,9 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - **Setup Assistant** starts from a **Latest saved draft** unless the user saves current edits first.
 - **Setup Assistant** requires the **Latest saved draft** to have a saved **Agent runtime connection** that is compatible with the selected **Agent runtime**.
 - **Setup Assistant** start eligibility is a product contract, not only dashboard guidance.
+- **Setup Assistant** is scoped to draft editing and cannot remain open after its **Sandbox profile version** is published.
+- Publishing a **Sandbox profile version** requires closing any open **Setup Assistant** before the profile version changes state.
+- Publishing a **Sandbox profile version** still saves ordinary profile editor draft changes, but does not preserve Setup Assistant work that has not been saved back to the draft.
 - When unsaved editor changes would make an ineligible **Latest saved draft** eligible for **Setup Assistant**, the user must save the draft before starting **Setup Assistant**.
 - When unsaved editor changes would make an eligible **Latest saved draft** ineligible for **Setup Assistant**, the user may still start **Setup Assistant** from the **Latest saved draft** by explicitly choosing to use saved draft data.
 - A **Snapshot maintenance script** prepares a replacement **Snapshot** from an existing usable **Snapshot**.

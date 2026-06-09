@@ -3231,6 +3231,79 @@ describe("SandboxProfileEditorPage", () => {
     });
   });
 
+  it("prompts before publishing when the Setup Assistant panel is open", async () => {
+    const { router } = renderSandboxProfileEditor({
+      bindings: [
+        {
+          id: "binding-agent",
+          connectionId: "connection-agent",
+          kind: "agent",
+          config: {},
+        },
+      ],
+      connections: [
+        {
+          id: "connection-agent",
+          displayName: "OpenAI connection",
+          targetKey: "openai-default",
+          status: "active",
+        },
+      ],
+      routeSection: "sandbox-profile",
+      setupScript: "pnpm install\npnpm dev:bootstrap",
+      targets: [
+        {
+          targetKey: "openai-default",
+          displayName: "OpenAI",
+          familyId: "openai",
+          variantId: "openai-default",
+          config: {
+            api_base_url: "https://api.openai.com",
+          },
+          targetHealth: {
+            configStatus: "valid",
+          },
+        },
+      ],
+      versionState: "draft",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Setup Assistant" }));
+
+    expect(
+      await screen.findByRole("button", {
+        name: "Close Setup Assistant panel",
+      }),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+
+    expect(screen.getByText("Publish and close Setup Assistant?")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Publishing closes the Setup Assistant and stops its temporary sandbox. Any assistant work that has not been saved back to the draft will be lost.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Setup Assistant conversation" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByText("Publish and close Setup Assistant?")).toBeNull();
+    expect(screen.getByRole("button", { name: "Close Setup Assistant panel" })).toBeTruthy();
+    expect(router.state.location.pathname).toBe("/sandbox-profiles/sbp_test/sandbox-profile/draft");
+
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    fireEvent.click(screen.getByRole("button", { name: "Publish and close" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Publish and close Setup Assistant?")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Close Setup Assistant panel" })).toBeNull();
+      expect(screen.queryByRole("region", { name: "Setup Assistant conversation" })).toBeNull();
+    });
+    expect(await screen.findByText("Profile version action failed")).toBeDefined();
+    expect(await screen.findByRole("button", { name: "Publish" })).toBeDefined();
+  });
+
   it("closes the Setup Assistant panel immediately after stop confirmation during startup", async () => {
     renderSandboxProfileEditor({
       bindings: [
@@ -3500,6 +3573,32 @@ describe("SandboxProfileEditorPage", () => {
     expect(confirmed).toBe(false);
 
     fireEvent.click(screen.getByRole("button", { name: "Stop and close" }));
+    expect(confirmed).toBe(true);
+  });
+
+  it("uses publish-specific copy when publishing closes Setup Assistant", () => {
+    let confirmed = false;
+
+    render(
+      <SetupAssistantCloseDialog
+        isOpen
+        onCancel={() => {}}
+        onConfirm={() => {
+          confirmed = true;
+        }}
+        reason="publish"
+      />,
+    );
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getByText("Publish and close Setup Assistant?")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Publishing closes the Setup Assistant and stops its temporary sandbox. Any assistant work that has not been saved back to the draft will be lost.",
+      ),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Publish and close" }));
     expect(confirmed).toBe(true);
   });
 

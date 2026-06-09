@@ -260,10 +260,22 @@ type SetupAssistantStartupOperation = {
   operationId: string;
 } | null;
 
-type SetupAssistantCloseDialogState = {
-  navigationSectionId: SandboxProfileEditorSectionId | null;
-  sandboxInstanceId: string | null;
-} | null;
+type SetupAssistantCloseDialogState =
+  | {
+      reason: "close";
+      sandboxInstanceId: string | null;
+    }
+  | {
+      reason: "switch-tabs";
+      navigationSectionId: SandboxProfileEditorSectionId;
+      sandboxInstanceId: string | null;
+    }
+  | {
+      reason: "publish";
+      publishVersion: number;
+      sandboxInstanceId: string | null;
+    }
+  | null;
 type SetupAssistantStartDialogState = {
   scriptKind: SetupAssistantScriptKind;
   version: number;
@@ -1907,7 +1919,7 @@ function ReadySandboxProfileEditorPage(input: {
 
   function requestSetupAssistantPanelClose(): void {
     setSetupAssistantCloseDialogState({
-      navigationSectionId: null,
+      reason: "close",
       sandboxInstanceId: setupAssistantPanelState?.sandboxInstanceId ?? null,
     });
   }
@@ -1921,23 +1933,25 @@ function ReadySandboxProfileEditorPage(input: {
       return;
     }
 
-    const navigationSectionId = setupAssistantCloseDialogState.navigationSectionId;
+    const dialogState = setupAssistantCloseDialogState;
     const sandboxInstanceId = resolveSetupAssistantCloseSandboxInstanceId({
       currentPanelSandboxInstanceId: setupAssistantPanelState?.sandboxInstanceId ?? null,
-      dialogSandboxInstanceId: setupAssistantCloseDialogState.sandboxInstanceId,
+      dialogSandboxInstanceId: dialogState.sandboxInstanceId,
     });
     setSetupAssistantCloseDialogState(null);
     setSetupAssistantPanelState(null);
-    if (navigationSectionId !== null) {
-      navigateToEditorSection(navigationSectionId);
-    }
     if (sandboxInstanceId === null) {
       setupAssistantClosedDuringStartupRef.current = startSetupAssistantMutation.isPending;
-      return;
+    } else {
+      setupAssistantClosedDuringStartupRef.current = false;
+      stopSetupAssistantMutation.mutate(sandboxInstanceId);
     }
 
-    setupAssistantClosedDuringStartupRef.current = false;
-    stopSetupAssistantMutation.mutate(sandboxInstanceId);
+    if (dialogState.reason === "switch-tabs") {
+      navigateToEditorSection(dialogState.navigationSectionId);
+    } else if (dialogState.reason === "publish") {
+      void publishDraftVersion(dialogState.publishVersion);
+    }
   }
 
   function startSetupAssistant(inputValue: {
@@ -2308,7 +2322,7 @@ function ReadySandboxProfileEditorPage(input: {
     }
   }
 
-  async function handlePublish(version: number): Promise<void> {
+  async function publishDraftVersion(version: number): Promise<void> {
     setPublishRequestIsPending(true);
     try {
       const draftSaved = await saveDraftChanges();
@@ -2324,6 +2338,19 @@ function ReadySandboxProfileEditorPage(input: {
     } finally {
       setPublishRequestIsPending(false);
     }
+  }
+
+  function handlePublish(version: number): void {
+    if (setupAssistantPanelState?.isOpen === true) {
+      setSetupAssistantCloseDialogState({
+        reason: "publish",
+        publishVersion: version,
+        sandboxInstanceId: setupAssistantPanelState.sandboxInstanceId,
+      });
+      return;
+    }
+
+    void publishDraftVersion(version);
   }
 
   const editorView = (
@@ -2361,7 +2388,7 @@ function ReadySandboxProfileEditorPage(input: {
       }}
       onDiscardChangesAndLeaveDraft={input.onDiscardChangesAndLeaveDraft}
       onPublish={(version) => {
-        void handlePublish(version);
+        handlePublish(version);
       }}
       onSaveDraft={() => {
         void handleSaveDraft();
@@ -2369,6 +2396,7 @@ function ReadySandboxProfileEditorPage(input: {
       onActiveSectionIdChange={(sectionId) => {
         if (setupAssistantOwningSectionId !== null && sectionId !== setupAssistantOwningSectionId) {
           setSetupAssistantCloseDialogState({
+            reason: "switch-tabs",
             navigationSectionId: sectionId,
             sandboxInstanceId: setupAssistantPanelState?.sandboxInstanceId ?? null,
           });
@@ -2520,9 +2548,7 @@ function ReadySandboxProfileEditorPage(input: {
         isOpen={setupAssistantCloseDialogState !== null}
         onCancel={cancelSetupAssistantPanelClose}
         onConfirm={confirmSetupAssistantPanelClose}
-        reason={
-          setupAssistantCloseDialogState?.navigationSectionId === null ? "close" : "switch-tabs"
-        }
+        reason={setupAssistantCloseDialogState?.reason}
       />
       {setupAssistantStartDialog}
     </div>
@@ -2583,9 +2609,30 @@ export function SetupAssistantCloseDialog(input: {
   isOpen: boolean;
   onCancel: () => void;
   onConfirm: () => void;
-  reason?: "close" | "switch-tabs";
+  reason?: "close" | "publish" | "switch-tabs" | undefined;
 }): React.JSX.Element {
   const reason = input.reason ?? "close";
+  const content =
+    reason === "switch-tabs"
+      ? {
+          confirmLabel: "Switch tabs and close",
+          description:
+            "Switching tabs closes the Setup Assistant and stops its temporary sandbox. Unsaved script edits stay only while this profile editor remains open; save them before leaving or reloading.",
+          title: "Switch tabs and close Setup Assistant?",
+        }
+      : reason === "publish"
+        ? {
+            confirmLabel: "Publish and close",
+            description:
+              "Publishing closes the Setup Assistant and stops its temporary sandbox. Any assistant work that has not been saved back to the draft will be lost.",
+            title: "Publish and close Setup Assistant?",
+          }
+        : {
+            confirmLabel: "Stop and close",
+            description:
+              "Closing the Setup Assistant stops its temporary sandbox. Unsaved script edits stay only while this profile editor remains open; save them before leaving or reloading.",
+            title: "Stop Setup Assistant?",
+          };
 
   return (
     <Dialog
@@ -2598,16 +2645,8 @@ export function SetupAssistantCloseDialog(input: {
     >
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>
-            {reason === "switch-tabs"
-              ? "Switch tabs and close Setup Assistant?"
-              : "Stop Setup Assistant?"}
-          </DialogTitle>
-          <DialogDescription>
-            {reason === "switch-tabs"
-              ? "Switching tabs closes the Setup Assistant and stops its temporary sandbox. Unsaved script edits stay only while this profile editor remains open; save them before leaving or reloading."
-              : "Closing the Setup Assistant stops its temporary sandbox. Unsaved script edits stay only while this profile editor remains open; save them before leaving or reloading."}
-          </DialogDescription>
+          <DialogTitle>{content.title}</DialogTitle>
+          <DialogDescription>{content.description}</DialogDescription>
         </DialogHeader>
 
         <DialogFooter>
@@ -2615,7 +2654,7 @@ export function SetupAssistantCloseDialog(input: {
             Cancel
           </Button>
           <Button onClick={input.onConfirm} type="button">
-            {reason === "switch-tabs" ? "Switch tabs and close" : "Stop and close"}
+            {content.confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>
