@@ -725,7 +725,7 @@ jobs:
 
   test-ts-integration:
     name: TS Integration
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 60
     needs:
       - changes
