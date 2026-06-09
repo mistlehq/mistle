@@ -13,7 +13,7 @@ import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-intern
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { BootstrapTokenConfig, PtyTransportTokenConfig } from "@mistle/gateway-tunnel-auth";
 import { systemClock, systemScheduler } from "@mistle/time";
-import { connect, type NatsConnection } from "@nats-io/transport-node";
+import { connect, type NatsConnection, type Status } from "@nats-io/transport-node";
 import { typeid } from "typeid-js";
 import WebSocket, { type WebSocketServer } from "ws";
 
@@ -62,6 +62,7 @@ import {
   GatewayForwardingPortAccessAuthorizationError,
   GatewayForwardingPortAccessAuthorizationErrorCodes,
 } from "../tunnel/gateway-forwarding/types.js";
+import { recordGatewayRelayNatsConnectionStatusEvent } from "../tunnel/gateway-relay-observability.js";
 import { InMemoryLocalPeerRegistryAdapter } from "../tunnel/local-peer-registry/adapters/in-memory-local-peer-registry-adapter.js";
 import { LocalRelayPeerResolver } from "../tunnel/local-peer-registry/local-relay-peer-resolver.js";
 import { SandboxOperationIngressService } from "../tunnel/operation-ingress/index.js";
@@ -208,9 +209,32 @@ function createGatewayRelayRuntimeResources(input: {
   let peerResolver: RelayPeerResolver;
   let gatewayForwardingClient: GatewayForwardingClientAdapter;
   let natsConnection: NatsConnection | undefined;
+  let natsConnectionStatusWatcherStop: (() => void) | undefined;
+  let natsForwardingSelfCheckConnection: NatsConnection | undefined;
+  let natsForwardingSelfCheckStatusWatcherStop: (() => void) | undefined;
+  let natsForwardingSelfCheckStop: (() => void) | undefined;
   let natsRelayTransport: NatsRelayTransportAdapter | undefined;
   let natsPeerResolver: NatsRelayPeerResolver | undefined;
   let natsGatewayForwarding: NatsGatewayForwardingAdapter | undefined;
+
+  const stopNatsResources = async (): Promise<void> => {
+    natsForwardingSelfCheckStop?.();
+    natsForwardingSelfCheckStop = undefined;
+    natsForwardingSelfCheckStatusWatcherStop?.();
+    natsForwardingSelfCheckStatusWatcherStop = undefined;
+    const selfCheckConnection = natsForwardingSelfCheckConnection;
+    natsForwardingSelfCheckConnection = undefined;
+    await selfCheckConnection?.close();
+
+    await natsGatewayForwarding?.stop();
+    await natsPeerResolver?.stop();
+    await natsRelayTransport?.stop();
+    natsConnectionStatusWatcherStop?.();
+    natsConnectionStatusWatcherStop = undefined;
+    const connection = natsConnection;
+    natsConnection = undefined;
+    await connection?.close();
+  };
 
   if (input.config.backend === "memory") {
     relayTransport = new InMemoryRelayTransportAdapter(input.nodeId);
@@ -268,23 +292,97 @@ function createGatewayRelayRuntimeResources(input: {
         servers: input.config.nats.url,
       });
       natsConnection = connection;
-      natsRelayTransport.start(connection);
-      natsPeerResolver.start(connection);
-      natsGatewayForwarding.start(connection);
+      try {
+        natsConnectionStatusWatcherStop = watchNatsConnectionStatus({
+          connection,
+          localNodeId: input.nodeId,
+          role: "relay",
+        });
+        natsRelayTransport.start(connection);
+        natsPeerResolver.start(connection);
+        natsGatewayForwarding.start(connection);
+
+        const selfCheckConnection = await connect({
+          name: `mistle-data-plane-gateway-${input.nodeId}-forwarding-self-check`,
+          servers: input.config.nats.url,
+        });
+        natsForwardingSelfCheckConnection = selfCheckConnection;
+        natsForwardingSelfCheckStatusWatcherStop = watchNatsConnectionStatus({
+          connection: selfCheckConnection,
+          localNodeId: input.nodeId,
+          role: "forwarding_self_check",
+        });
+        natsForwardingSelfCheckStop = natsGatewayForwarding.startSelfCheck(
+          selfCheckConnection,
+          systemScheduler,
+        );
+      } catch (error) {
+        await stopNatsResources();
+        throw error;
+      }
     },
     stop: async () => {
       if (input.config.backend === "memory") {
         return;
       }
 
-      await natsGatewayForwarding?.stop();
-      await natsPeerResolver?.stop();
-      await natsRelayTransport?.stop();
-      const connection = natsConnection;
-      natsConnection = undefined;
-      await connection?.close();
+      await stopNatsResources();
     },
   };
+}
+
+function watchNatsConnectionStatus(input: {
+  connection: NatsConnection;
+  localNodeId: string;
+  role: "relay" | "forwarding_self_check";
+}): () => void {
+  let isStopped = false;
+
+  void (async () => {
+    for await (const status of input.connection.status()) {
+      if (isStopped) {
+        break;
+      }
+      const server = natsStatusServer(status);
+      const statusEvent: Parameters<typeof recordGatewayRelayNatsConnectionStatusEvent>[0] = {
+        localNodeId: input.localNodeId,
+        role: input.role,
+        status: status.type,
+      };
+      if (status.type === "error") {
+        statusEvent.error = status.error;
+      }
+      if (server !== undefined) {
+        statusEvent.server = server;
+      }
+      recordGatewayRelayNatsConnectionStatusEvent(statusEvent);
+    }
+  })().catch((error: unknown) => {
+    if (isStopped) {
+      return;
+    }
+    logger.warn(
+      {
+        err: error,
+        eventName: "gateway.relay.nats.status_watcher_failed",
+        "mistle.gateway.node_id": input.localNodeId,
+        "mistle.gateway.relay.nats.connection_role": input.role,
+      },
+      "Gateway relay NATS status watcher failed",
+    );
+  });
+
+  return () => {
+    isStopped = true;
+  };
+}
+
+function natsStatusServer(status: Status): string | undefined {
+  if ("server" in status) {
+    return status.server;
+  }
+
+  return undefined;
 }
 
 export function createDataPlaneGatewayRuntime(
