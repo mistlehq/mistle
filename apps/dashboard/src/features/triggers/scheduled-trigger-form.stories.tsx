@@ -191,6 +191,20 @@ export const NewConversationEachRun: Story = {
   },
 };
 
+export const SteppedWeekdaySchedule: Story = {
+  args: {
+    mode: "edit",
+    onDelete: function onDelete() {},
+    primaryRepositoryOptions: PrimaryRepositoryOptions,
+    values: {
+      ...ExistingScheduledTriggerValues,
+      name: "Weekday business-hours triage",
+      cronExpression: "0 8-18/2 * * 1-5",
+      inputTemplate: "Review queued requests during business hours.",
+    },
+  },
+};
+
 export const InvalidCronPreview: Story = {
   args: {
     mode: "create",

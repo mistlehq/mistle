@@ -39,14 +39,14 @@ import {
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { formatDateTime, formatTimeZoneOffset } from "../shared/date-formatters.js";
-import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
 import {
   createTimezoneOptions,
   formatCronExpressionBreakdownDiagram,
   resolveCronExpressionBreakdown,
   resolveSnapshotRefreshScheduleBehaviorDescription,
   type CronExpressionBreakdown,
-} from "./sandbox-profile-editor-page-model.js";
+} from "../shared/schedule-presentation.js";
+import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
 import { SandboxProfileEditorHorizontalTabContent } from "./sandbox-profile-editor-sections.js";
 import {
   SandboxProfileReadOnlyScriptBlock,
