@@ -43,6 +43,7 @@ import type {
   SandboxProfileVersionSkillsSourceRepo,
   SandboxProfileVersionSkillsSourceReposResult,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { NoLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -86,6 +87,8 @@ const SkillsListHeightStyle = {
   overflowY: "auto",
 } satisfies CSSProperties;
 
+export const SkillsSourceRefreshMutationMeta = NoLoadingIndicatorMeta;
+
 export function createSkillsDraftSourceVersionKey(
   version: Pick<SandboxProfileVersion, "sandboxProfileId" | "version">,
 ): string {
@@ -105,6 +108,21 @@ export function resolveSkillsConfigSaveBlockedMessage(input: {
     (sourceOption) => sourceOption.originUrl === selectedOriginUrl,
   );
   return sourceIsAvailable ? null : UnavailableSkillsSourceSaveBlockedMessage;
+}
+
+export function resolveSkillsReloadPresentationState(input: {
+  fieldIsReadOnly: boolean;
+  queryLoadIsPending: boolean;
+  refreshIsPending: boolean;
+  selectedOriginUrl: string | null;
+}): {
+  skillsCatalogIsDisabled: boolean;
+  skillsContentIsHidden: boolean;
+} {
+  return {
+    skillsCatalogIsDisabled: input.fieldIsReadOnly || input.refreshIsPending,
+    skillsContentIsHidden: input.selectedOriginUrl !== null && input.queryLoadIsPending,
+  };
 }
 
 export function SandboxProfileSkillsSection(input: {
@@ -202,6 +220,7 @@ export function SandboxProfileSkillsSection(input: {
     retry: false,
   });
   const refreshMutation = useMutation({
+    meta: SkillsSourceRefreshMutationMeta,
     mutationFn: async (originUrl: string) =>
       refreshSandboxProfileVersionSkillsSourceRepo({
         profileId: input.profileId,
@@ -273,6 +292,13 @@ export function SandboxProfileSkillsSection(input: {
     selectedOriginUrl !== null &&
     !selectedSourceHasUnpersistedChanges &&
     skillsSourceQuery.isPending;
+  const reloadPresentationState = resolveSkillsReloadPresentationState({
+    fieldIsReadOnly,
+    queryLoadIsPending,
+    refreshIsPending: refreshMutation.isPending,
+    selectedOriginUrl,
+  });
+  const { skillsCatalogIsDisabled } = reloadPresentationState;
   const loadIsPending = queryLoadIsPending || refreshMutation.isPending;
   const actionIsPending = refreshMutation.isPending || saveAndReloadIsPending;
   const sourceControlIsDisabled = fieldIsReadOnly || loadIsPending;
@@ -520,6 +546,7 @@ export function SandboxProfileSkillsSection(input: {
     selectedOriginUrl !== null && !loadIsPending && selectedSourceHasUnpersistedChanges
       ? "Loading skills will save this draft first."
       : null;
+  const skillsCatalogIsEmpty = shouldShowEditableSkillCatalog && skillOptions.length === 0;
   const unavailableSelectedSkillsMessage =
     unavailableSelectedSkills.length === 0
       ? null
@@ -626,18 +653,24 @@ export function SandboxProfileSkillsSection(input: {
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
-    ) : loadIsPending ? null : shouldShowEditableSkillCatalog && skillOptions.length === 0 ? (
+    ) : reloadPresentationState.skillsContentIsHidden ? null : skillsCatalogIsEmpty ? (
       <p className="text-muted-foreground text-sm">No skills found in this repository.</p>
     ) : (
       <div className="grid gap-3">
-        <div className="overflow-hidden rounded-md border bg-card">
+        <div
+          aria-busy={refreshMutation.isPending}
+          aria-disabled={refreshMutation.isPending}
+          className={`overflow-hidden rounded-md border bg-card transition-opacity ${
+            refreshMutation.isPending ? "opacity-60" : ""
+          }`}
+        >
           {shouldShowEditableSkillCatalog ? (
             <div className="flex flex-col gap-2 border-b bg-muted/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
                 <label className="inline-flex min-w-0 items-center gap-2">
                   <Checkbox
                     checked={allVisibleDiscoveredSkillsSelected}
-                    disabled={visibleAvailableSkillOptions.length === 0}
+                    disabled={skillsCatalogIsDisabled || visibleAvailableSkillOptions.length === 0}
                     indeterminate={someVisibleDiscoveredSkillsSelected}
                     onCheckedChange={toggleAllVisibleDiscoveredSkills}
                   />
@@ -649,6 +682,7 @@ export function SandboxProfileSkillsSection(input: {
                 <Input
                   aria-label="Search skills"
                   className="h-8 w-full bg-background sm:w-64"
+                  disabled={skillsCatalogIsDisabled}
                   onChange={(event) => {
                     setSkillsSearchQuery(event.target.value);
                   }}
@@ -670,6 +704,7 @@ export function SandboxProfileSkillsSection(input: {
                   if (!skill.available) {
                     return (
                       <UnavailableSkillRow
+                        disabled={skillsCatalogIsDisabled}
                         key={`${skill.relativePath}:${skill.name}:missing`}
                         onRemove={() => {
                           updateSkillSelection(skill, false);
@@ -687,7 +722,7 @@ export function SandboxProfileSkillsSection(input: {
                   return (
                     <SelectableSkillRow
                       checked={checked}
-                      fieldIsReadOnly={fieldIsReadOnly}
+                      disabled={skillsCatalogIsDisabled}
                       key={skill.relativePath}
                       onCheckedChange={(nextChecked) => {
                         updateSkillSelection(skill, nextChecked);
@@ -849,7 +884,7 @@ export function SandboxProfileSkillsSection(input: {
 
 function SelectableSkillRow(input: {
   checked: boolean;
-  fieldIsReadOnly: boolean;
+  disabled: boolean;
   onCheckedChange: (nextChecked: boolean) => void;
   skill: SkillOption;
 }): React.JSX.Element {
@@ -858,7 +893,7 @@ function SelectableSkillRow(input: {
       <Checkbox
         checked={input.checked}
         className="mt-0.5"
-        disabled={input.fieldIsReadOnly}
+        disabled={input.disabled}
         onCheckedChange={(nextChecked) => {
           input.onCheckedChange(nextChecked === true);
         }}
@@ -877,6 +912,7 @@ function SelectedSkillRow(input: { skill: SkillOption }): React.JSX.Element {
 }
 
 function UnavailableSkillRow(input: {
+  disabled: boolean;
   onRemove: () => void;
   skill: SkillOption;
 }): React.JSX.Element {
@@ -892,7 +928,13 @@ function UnavailableSkillRow(input: {
         showMobilePath
         skill={input.skill}
       />
-      <Button onClick={input.onRemove} size="sm" type="button" variant="outline">
+      <Button
+        disabled={input.disabled}
+        onClick={input.onRemove}
+        size="sm"
+        type="button"
+        variant="outline"
+      >
         Remove
       </Button>
     </div>

@@ -272,8 +272,8 @@ function renderSkillsSection(input: {
   readOnly?: boolean | undefined;
   skillsSourceRepos?: SandboxProfileVersionSkillsSourceReposResult | undefined;
   version: SandboxProfileVersion;
-}): void {
-  const queryClient = createTestQueryClient();
+}): { queryClient: ReturnType<typeof createTestQueryClient> } {
+  const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
   if (input.skillsSourceRepos !== undefined) {
     queryClient.setQueryData(
       sandboxProfileVersionSkillsSourceReposQueryKey({
@@ -300,6 +300,7 @@ function renderSkillsSection(input: {
       />
     </QueryClientProvider>,
   );
+  return { queryClient };
 }
 
 function createVersion(skillsConfig: SandboxProfileVersion["skillsConfig"]): SandboxProfileVersion {
