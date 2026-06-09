@@ -61,7 +61,7 @@ func TestCodexProxyLogsDeliveryContextTurnMappingAndCompletionLikeRust(t *testin
 		activeTurns:        map[string]codexActiveTurn{},
 	}
 	deliveryContext := map[string]any{
-		"traceparent":        "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+		"traceparent":        "00-4cf92f3577c34dc6a3ce929d0e0e4736-00f067cc0dc902d7-01",
 		"source":             "webhook",
 		"webhookEventId":     "wev_123",
 		"deliveryTaskId":     "task_123",
@@ -109,7 +109,7 @@ func TestCodexProxyLogsDeliveryContextTurnMappingAndCompletionLikeRust(t *testin
 	records := parseCodexProxyLogRecords(t, logs.String())
 	requireCodexProxyLogRecord(t, records, func(record map[string]any) bool {
 		return record["event"] == "codex_proxy.delivery_context.received" &&
-			record["traceId"] == "4bf92f3577b34da6a3ce929d0e0e4736" &&
+			record["traceId"] == "4cf92f3577c34dc6a3ce929d0e0e4736" &&
 			record["deliveryTaskId"] == "task_123"
 	})
 	requireCodexProxyLogRecord(t, records, func(record map[string]any) bool {
@@ -1006,11 +1006,11 @@ func TestCodexProxyConsumesMistleDeliveryContextWithoutForwardingToRaw(t *testin
 		"id":     "delivery",
 		"method": "mistle/setDeliveryContext",
 		"params": map[string]any{
-			"traceparent":       "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+			"traceparent":       "00-4cf92f3577c34dc6a3ce929d0e0e4736-00f067cc0dc902d7-01",
 			"source":            "webhook",
 			"webhookEventId":    "evt_123",
 			"deliveryTaskId":    "dtask_123",
-			"triggerRunId":      "trun_123",
+			"triggerRunId":      "trigger_123",
 			"conversationId":    "conv_123",
 			"sandboxInstanceId": "sbi_123",
 		},
@@ -1356,7 +1356,7 @@ func codexProxyTestDeliveryContext() *codexDeliveryContextPayload {
 	externalDeliveryID := "ext_123"
 	routeID := "route_123"
 	return &codexDeliveryContextPayload{
-		Traceparent:        "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+		Traceparent:        "00-4cf92f3577c34dc6a3ce929d0e0e4736-00f067cc0dc902d7-01",
 		Source:             codexDeliveryContextSourceWebhook,
 		WebhookEventID:     &webhookEventID,
 		DeliveryTaskID:     "cdt_123",

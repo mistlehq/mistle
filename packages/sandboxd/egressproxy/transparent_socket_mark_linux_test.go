@@ -5,7 +5,6 @@ package egressproxy
 import (
 	"context"
 	"net"
-	"strconv"
 	"syscall"
 	"testing"
 )
@@ -55,7 +54,7 @@ func socketMark(t *testing.T, connection net.Conn) int {
 	requireNoError(t, err)
 	requireNoError(t, controlErr)
 	if mark < 0 {
-		t.Fatalf("expected socket mark to be non-negative, got " + strconv.Itoa(mark))
+		t.Fatalf("expected socket mark to be non-negative, got %d", mark)
 	}
 	return mark
 }
