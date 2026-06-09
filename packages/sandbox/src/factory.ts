@@ -18,6 +18,12 @@ import {
   type FreestyleSandboxConfig,
 } from "./providers/freestyle/index.js";
 import {
+  createModalAdapter,
+  createModalBaseImageBuilderFromConfig,
+  createModalRuntimeControl,
+  type ModalSandboxConfig,
+} from "./providers/modal/index.js";
+import {
   createTensorlakeAdapter,
   createTensorlakeBaseImageBuilder,
   createTensorlakeRuntimeControl,
@@ -36,6 +42,7 @@ export type CreateSandboxAdapterInput = {
   docker?: DockerSandboxConfig;
   e2b?: E2BSandboxConfig;
   freestyle?: FreestyleSandboxConfig;
+  modal?: ModalSandboxConfig;
   tensorlake?: TensorlakeSandboxConfig;
 };
 
@@ -84,6 +91,14 @@ export function createSandboxAdapter(input: CreateSandboxAdapterInput): SandboxA
     return createFreestyleAdapter(input.freestyle);
   }
 
+  if (input.provider === SandboxProvider.MODAL) {
+    if (input.modal === undefined) {
+      throw new SandboxConfigurationError("Modal config is required when provider is modal.");
+    }
+
+    return createModalAdapter(input.modal);
+  }
+
   return assertUnreachable(input.provider);
 }
 
@@ -129,6 +144,14 @@ export function createSandboxBaseImageBuilder(
     return createFreestyleBaseImageBuilderFromConfig(input.freestyle);
   }
 
+  if (input.provider === SandboxProvider.MODAL) {
+    if (input.modal === undefined) {
+      throw new SandboxConfigurationError("Modal config is required when provider is modal.");
+    }
+
+    return createModalBaseImageBuilderFromConfig(input.modal);
+  }
+
   return assertUnreachable(input.provider);
 }
 
@@ -169,6 +192,14 @@ export function createSandboxRuntimeControl(
     }
 
     return createFreestyleRuntimeControl(input.freestyle);
+  }
+
+  if (input.provider === SandboxProvider.MODAL) {
+    if (input.modal === undefined) {
+      throw new SandboxConfigurationError("Modal config is required when provider is modal.");
+    }
+
+    return createModalRuntimeControl(input.modal);
   }
 
   return assertUnreachable(input.provider);

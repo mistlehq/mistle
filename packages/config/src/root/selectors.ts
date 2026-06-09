@@ -243,6 +243,20 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
         : config.sandbox.tensorlake?.enabled === false
           ? { tensorlake: { enabled: false } }
           : {}),
+      ...(config.sandbox.modal?.enabled === true
+        ? {
+            modal: {
+              enabled: true,
+              tokenId: config.sandbox.modal.token_id,
+              tokenSecret: config.sandbox.modal.token_secret,
+              appName: config.sandbox.modal.app_name,
+              environment: config.sandbox.modal.environment,
+              defaultTimeoutMs: config.sandbox.modal.default_timeout_ms,
+            },
+          }
+        : config.sandbox.modal?.enabled === false
+          ? { modal: { enabled: false } }
+          : {}),
     },
     integrations: {
       activeMasterEncryptionKeyVersion:
@@ -355,6 +369,19 @@ export function selectDataPlaneApiConfig(config: Config): DataPlaneApiConfig {
               apiKey: config.sandbox.tensorlake.api_key,
             }
           : config.sandbox.tensorlake?.enabled === false
+            ? { enabled: false }
+            : undefined,
+      modal:
+        config.sandbox.modal?.enabled === true
+          ? {
+              enabled: true,
+              tokenId: config.sandbox.modal.token_id,
+              tokenSecret: config.sandbox.modal.token_secret,
+              appName: config.sandbox.modal.app_name,
+              environment: config.sandbox.modal.environment,
+              defaultTimeoutMs: config.sandbox.modal.default_timeout_ms,
+            }
+          : config.sandbox.modal?.enabled === false
             ? { enabled: false }
             : undefined,
     },
@@ -480,6 +507,19 @@ export function selectDataPlaneWorkerConfig(config: Config): DataPlaneWorkerConf
               apiKey: config.sandbox.tensorlake.api_key,
             }
           : config.sandbox.tensorlake?.enabled === false
+            ? { enabled: false }
+            : undefined,
+      modal:
+        config.sandbox.modal?.enabled === true
+          ? {
+              enabled: true,
+              tokenId: config.sandbox.modal.token_id,
+              tokenSecret: config.sandbox.modal.token_secret,
+              appName: config.sandbox.modal.app_name,
+              environment: config.sandbox.modal.environment,
+              defaultTimeoutMs: config.sandbox.modal.default_timeout_ms,
+            }
+          : config.sandbox.modal?.enabled === false
             ? { enabled: false }
             : undefined,
     },

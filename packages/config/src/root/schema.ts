@@ -189,6 +189,29 @@ const SandboxTensorlakeProviderConfigSchema = z.discriminatedUnion("enabled", [
     .strict(),
 ]);
 
+const SandboxModalProviderConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      token_id: z.string().trim().min(1),
+      token_secret: z.string().trim().min(1),
+      app_name: z.string().trim().min(1),
+      environment: z.string().trim().min(1).optional(),
+      default_timeout_ms: z.number().int().min(1).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      token_id: z.string().trim().min(1).optional(),
+      token_secret: z.string().trim().min(1).optional(),
+      app_name: z.string().trim().min(1).optional(),
+      environment: z.string().trim().min(1).optional(),
+      default_timeout_ms: z.number().int().min(1).optional(),
+    })
+    .strict(),
+]);
+
 const ControlPlaneApiAuthSchema = z
   .object({
     secret: z.string().trim().min(1),
@@ -421,6 +444,7 @@ export const ConfigSchema = z
         docker: SandboxDockerProviderConfigSchema.optional(),
         sandboxd_test_faults_enabled: z.boolean().optional(),
         e2b: SandboxE2BProviderConfigSchema.optional(),
+        modal: SandboxModalProviderConfigSchema.optional(),
         tensorlake: SandboxTensorlakeProviderConfigSchema.optional(),
       })
       .strict(),

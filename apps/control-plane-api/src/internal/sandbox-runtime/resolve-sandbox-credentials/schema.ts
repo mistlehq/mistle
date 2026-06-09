@@ -8,6 +8,7 @@ export const InternalSandboxRuntimeResolveCredentialsRequestSchema = z
       SandboxProvider.DOCKER,
       SandboxProvider.E2B,
       SandboxProvider.FREESTYLE,
+      SandboxProvider.MODAL,
       SandboxProvider.TENSORLAKE,
     ]),
     connectionId: z.string().min(1).optional(),
@@ -36,6 +37,17 @@ export const InternalSandboxRuntimeResolveCredentialsResponseSchema = z.discrimi
         provider: z.literal(SandboxProvider.TENSORLAKE),
         source: z.enum(["managed", "connection"]),
         apiKey: z.string().min(1),
+      })
+      .strict(),
+    z
+      .object({
+        provider: z.literal(SandboxProvider.MODAL),
+        source: z.literal("managed"),
+        tokenId: z.string().min(1),
+        tokenSecret: z.string().min(1),
+        appName: z.string().min(1),
+        environment: z.string().min(1).optional(),
+        defaultTimeoutMs: z.number().int().min(1).optional(),
       })
       .strict(),
   ],

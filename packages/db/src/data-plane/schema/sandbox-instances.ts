@@ -11,6 +11,7 @@ export const SandboxInstanceProviders = {
   DOCKER: "docker",
   E2B: "e2b",
   FREESTYLE: "freestyle",
+  MODAL: "modal",
   TENSORLAKE: "tensorlake",
 } as const;
 

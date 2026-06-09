@@ -589,6 +589,20 @@ const ControlPlaneApiEnvDescriptors = [
   },
   { envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY", path: ["sandbox", "tensorlake", "apiKey"] },
   {
+    envVar: "MISTLE_SANDBOX_MODAL_ENABLED",
+    path: ["sandbox", "modal", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  { envVar: "MISTLE_SANDBOX_MODAL_TOKEN_ID", path: ["sandbox", "modal", "tokenId"] },
+  { envVar: "MISTLE_SANDBOX_MODAL_TOKEN_SECRET", path: ["sandbox", "modal", "tokenSecret"] },
+  { envVar: "MISTLE_SANDBOX_MODAL_APP_NAME", path: ["sandbox", "modal", "appName"] },
+  { envVar: "MISTLE_SANDBOX_MODAL_ENVIRONMENT", path: ["sandbox", "modal", "environment"] },
+  {
+    envVar: "MISTLE_SANDBOX_MODAL_DEFAULT_TIMEOUT_MS",
+    path: ["sandbox", "modal", "defaultTimeoutMs"],
+    parse: parseNumberEnv,
+  },
+  {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION",
     path: ["integrations", "activeMasterEncryptionKeyVersion"],
     parse: parseNumberEnv,
@@ -691,6 +705,20 @@ const DataPlaneApiEnvDescriptors = [
     parse: parseStrictBooleanEnv,
   },
   { envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY", path: ["sandbox", "tensorlake", "apiKey"] },
+  {
+    envVar: "MISTLE_SANDBOX_MODAL_ENABLED",
+    path: ["sandbox", "modal", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  { envVar: "MISTLE_SANDBOX_MODAL_TOKEN_ID", path: ["sandbox", "modal", "tokenId"] },
+  { envVar: "MISTLE_SANDBOX_MODAL_TOKEN_SECRET", path: ["sandbox", "modal", "tokenSecret"] },
+  { envVar: "MISTLE_SANDBOX_MODAL_APP_NAME", path: ["sandbox", "modal", "appName"] },
+  { envVar: "MISTLE_SANDBOX_MODAL_ENVIRONMENT", path: ["sandbox", "modal", "environment"] },
+  {
+    envVar: "MISTLE_SANDBOX_MODAL_DEFAULT_TIMEOUT_MS",
+    path: ["sandbox", "modal", "defaultTimeoutMs"],
+    parse: parseNumberEnv,
+  },
 ] satisfies readonly EnvDescriptor[];
 
 const DataPlaneGatewayEnvDescriptors = [
@@ -823,6 +851,20 @@ const DataPlaneWorkerEnvDescriptors = [
     parse: parseStrictBooleanEnv,
   },
   { envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY", path: ["sandbox", "tensorlake", "apiKey"] },
+  {
+    envVar: "MISTLE_SANDBOX_MODAL_ENABLED",
+    path: ["sandbox", "modal", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  { envVar: "MISTLE_SANDBOX_MODAL_TOKEN_ID", path: ["sandbox", "modal", "tokenId"] },
+  { envVar: "MISTLE_SANDBOX_MODAL_TOKEN_SECRET", path: ["sandbox", "modal", "tokenSecret"] },
+  { envVar: "MISTLE_SANDBOX_MODAL_APP_NAME", path: ["sandbox", "modal", "appName"] },
+  { envVar: "MISTLE_SANDBOX_MODAL_ENVIRONMENT", path: ["sandbox", "modal", "environment"] },
+  {
+    envVar: "MISTLE_SANDBOX_MODAL_DEFAULT_TIMEOUT_MS",
+    path: ["sandbox", "modal", "defaultTimeoutMs"],
+    parse: parseNumberEnv,
+  },
 ] satisfies readonly EnvDescriptor[];
 
 function applyWorkflowRunMigrationsFalse(config: Record<string, unknown>): Record<string, unknown> {

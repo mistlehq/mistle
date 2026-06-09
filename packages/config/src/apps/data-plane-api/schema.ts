@@ -126,10 +126,45 @@ const PartialDataPlaneApiSandboxTensorlakeConfigSchema = z
   })
   .strict();
 
+export const DataPlaneApiSandboxModalConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      tokenId: z.string().min(1),
+      tokenSecret: z.string().min(1),
+      appName: z.string().min(1),
+      environment: z.string().min(1).optional(),
+      defaultTimeoutMs: z.number().int().min(1).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      tokenId: z.string().min(1).optional(),
+      tokenSecret: z.string().min(1).optional(),
+      appName: z.string().min(1).optional(),
+      environment: z.string().min(1).optional(),
+      defaultTimeoutMs: z.number().int().min(1).optional(),
+    })
+    .strict(),
+]);
+
+const PartialDataPlaneApiSandboxModalConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    tokenId: z.string().min(1).optional(),
+    tokenSecret: z.string().min(1).optional(),
+    appName: z.string().min(1).optional(),
+    environment: z.string().min(1).optional(),
+    defaultTimeoutMs: z.number().int().min(1).optional(),
+  })
+  .strict();
+
 export const DataPlaneApiSandboxConfigSchema = z
   .object({
     docker: DataPlaneApiSandboxDockerConfigSchema.optional(),
     e2b: DataPlaneApiSandboxE2BConfigSchema.optional(),
+    modal: DataPlaneApiSandboxModalConfigSchema.optional(),
     tensorlake: DataPlaneApiSandboxTensorlakeConfigSchema.optional(),
   })
   .strict();
@@ -138,6 +173,7 @@ export const PartialDataPlaneApiSandboxConfigSchema = z
   .object({
     docker: PartialDataPlaneApiSandboxDockerConfigSchema.optional(),
     e2b: PartialDataPlaneApiSandboxE2BConfigSchema.optional(),
+    modal: PartialDataPlaneApiSandboxModalConfigSchema.optional(),
     tensorlake: PartialDataPlaneApiSandboxTensorlakeConfigSchema.optional(),
   })
   .strict();
@@ -173,7 +209,7 @@ export const PartialDataPlaneApiConfigSchema = z
   .strict();
 
 export function getDataPlaneApiSandboxProviderValidationIssue(input: {
-  appSandbox: Pick<DataPlaneApiConfig["sandbox"], "docker" | "e2b" | "tensorlake">;
+  appSandbox: Pick<DataPlaneApiConfig["sandbox"], "docker" | "e2b" | "modal" | "tensorlake">;
 }): {
   path: readonly ["sandbox", "docker"];
   message: string;
