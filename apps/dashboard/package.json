@@ -51,7 +51,7 @@
     "dockview": "^6.0.3",
     "openapi-fetch": "^0.17.0",
     "posthog-js": "^1.376.0",
-    "react": "^19.2.5",
+    "react": "^19.2.7",
     "react-dom": "^19.2.5",
     "react-router": "~7.15.0",
     "streamdown": "^2.5.0"
