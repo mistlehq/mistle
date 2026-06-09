@@ -18,11 +18,13 @@ import type {
   TestServiceSelection,
 } from "../environment/types.js";
 import type { IntegrationTestEnvironment } from "./environment.js";
+import type { ManagedIntegrationTestEnvironment } from "./environment.js";
 import { createAliasedServiceDefinition } from "./service-alias.js";
 import type { IntegrationServiceOptions } from "./services/options.js";
 import { ServiceIds, type ServiceId } from "./services/service-ids.js";
 import {
   formatIntegrationDuration,
+  writeIntegrationTimingRecord,
   writeIntegrationTimingEvent,
   writeIntegrationTimingLine,
 } from "./timing.js";
@@ -102,77 +104,129 @@ function formatSelectedServices(selectionsInput: readonly IntegrationServiceSele
 export function createIntegrationTest(input: CreateIntegrationTestInput) {
   const selectedServices = formatSelectedServices(input.services);
   const timing = input.__timing;
+  const caller = readCallerFromStack();
   writeIntegrationTimingEvent(
     "createIntegrationTest evaluated",
-    `label=${timing?.label ?? "integration"} caller=${readCallerFromStack()} services=${selectedServices}`,
+    `label=${timing?.label ?? "integration"} caller=${caller} services=${selectedServices}`,
     timing,
   );
 
   return base.extend<IntegrationTestFixture>({
     env: [
       async ({}, use) => {
-        writeIntegrationTimingEvent(
-          "env fixture start",
-          `label=${timing?.label ?? "integration"} services=${selectedServices}`,
-          timing,
-        );
-        const setupStartedAt = Date.now();
-        const environmentDefinition = await environmentDefinitionFor(input);
-        const services = selections({
-          registry: environmentDefinition.registry,
-          selections: input.services,
-        });
-        const environment = await startTestEnvironment({
-          registry: environmentDefinition.registry,
-          services,
-          extraInfra: environmentDefinition.extraInfra,
-          ...(timing === undefined ? {} : { timing }),
-        });
-        const { createIntegrationEnvironment } = await import("./environment.js");
-        const integrationEnvironment = createIntegrationEnvironment({
-          environment,
-        });
+        const fileTimingStartedAt = Date.now();
         const extraCleanupTasks: Array<() => Promise<void>> = [];
-        if (input.__afterStart !== undefined) {
-          const cleanup = await input.__afterStart({
-            environment,
-            integrationEnvironment,
-          });
-          if (cleanup !== undefined) {
-            extraCleanupTasks.unshift(cleanup);
-          }
-        }
-        const setupDurationMs = Date.now() - setupStartedAt;
-
-        writeIntegrationTimingLine(
-          `[integration] env ${environment.id} setup completed in ${formatIntegrationDuration(setupDurationMs)} for ${selectedServices}.`,
-          timing,
-        );
+        const label = timing?.label ?? "integration";
+        let bodyDurationMs = 0;
+        let environment: TestEnvironment<string> | undefined;
+        let environmentId = "unknown";
+        let integrationEnvironment: ManagedIntegrationTestEnvironment | undefined;
+        let pendingError: unknown;
+        let setupDurationMs = 0;
+        let status: "passed" | "failed" = "passed";
+        let teardownDurationMs = 0;
 
         try {
-          const testStartedAt = Date.now();
-          await use(integrationEnvironment);
-          writeIntegrationTimingLine(
-            `[integration] env ${environment.id} test body completed in ${formatIntegrationDuration(Date.now() - testStartedAt)}.`,
+          writeIntegrationTimingEvent(
+            "env fixture start",
+            `label=${label} services=${selectedServices}`,
             timing,
           );
-        } finally {
-          const teardownStartedAt = Date.now();
-          await environment.stop({
-            afterServicesStopped: async () => {
-              try {
-                for (const cleanup of extraCleanupTasks) {
-                  await cleanup();
-                }
-              } finally {
-                await integrationEnvironment.stop();
-              }
-            },
+          const setupStartedAt = Date.now();
+          const environmentDefinition = await environmentDefinitionFor(input);
+          const services = selections({
+            registry: environmentDefinition.registry,
+            selections: input.services,
           });
+          environment = await startTestEnvironment({
+            registry: environmentDefinition.registry,
+            services,
+            extraInfra: environmentDefinition.extraInfra,
+            ...(timing === undefined ? {} : { timing }),
+          });
+          environmentId = environment.id;
+          const { createIntegrationEnvironment } = await import("./environment.js");
+          integrationEnvironment = createIntegrationEnvironment({
+            environment,
+          });
+          if (input.__afterStart !== undefined) {
+            const cleanup = await input.__afterStart({
+              environment,
+              integrationEnvironment,
+            });
+            if (cleanup !== undefined) {
+              extraCleanupTasks.unshift(cleanup);
+            }
+          }
+          setupDurationMs = Date.now() - setupStartedAt;
+
           writeIntegrationTimingLine(
-            `[integration] env ${environment.id} teardown completed in ${formatIntegrationDuration(Date.now() - teardownStartedAt)}.`,
+            `[integration] env ${environmentId} setup completed in ${formatIntegrationDuration(setupDurationMs)} for ${selectedServices}.`,
             timing,
           );
+
+          const testStartedAt = Date.now();
+          try {
+            await use(integrationEnvironment);
+          } catch (error) {
+            status = "failed";
+            throw error;
+          } finally {
+            bodyDurationMs = Date.now() - testStartedAt;
+            writeIntegrationTimingLine(
+              `[integration] env ${environmentId} test body completed in ${formatIntegrationDuration(bodyDurationMs)}.`,
+              timing,
+            );
+          }
+        } catch (error) {
+          status = "failed";
+          pendingError = error;
+        }
+
+        if (environment !== undefined && integrationEnvironment !== undefined) {
+          const teardownStartedAt = Date.now();
+          try {
+            await environment.stop({
+              afterServicesStopped: async () => {
+                try {
+                  for (const cleanup of extraCleanupTasks) {
+                    await cleanup();
+                  }
+                } finally {
+                  await integrationEnvironment.stop();
+                }
+              },
+            });
+          } catch (error) {
+            status = "failed";
+            pendingError ??= error;
+          } finally {
+            teardownDurationMs = Date.now() - teardownStartedAt;
+            writeIntegrationTimingLine(
+              `[integration] env ${environmentId} teardown completed in ${formatIntegrationDuration(teardownDurationMs)}.`,
+              timing,
+            );
+          }
+        }
+
+        writeIntegrationTimingRecord(
+          {
+            type: "integration-file",
+            label,
+            file: readFilePathFromCaller(caller),
+            services: selectedServices,
+            envId: environmentId,
+            setupMs: setupDurationMs,
+            bodyMs: bodyDurationMs,
+            teardownMs: teardownDurationMs,
+            totalMs: Date.now() - fileTimingStartedAt,
+            status,
+          },
+          timing,
+        );
+
+        if (pendingError !== undefined) {
+          throw pendingError;
         }
       },
       {
@@ -204,6 +258,15 @@ function readCallerFromStack(): string {
   }
 
   return "unknown";
+}
+
+function readFilePathFromCaller(caller: string): string {
+  const location = caller.match(/\bat (?<file>.+):\d+:\d+$/u)?.groups?.file;
+  if (location === undefined || location.length === 0) {
+    return caller;
+  }
+
+  return location.startsWith("file://") ? new URL(location).pathname : location;
 }
 
 type IntegrationEnvironmentDefinition = {

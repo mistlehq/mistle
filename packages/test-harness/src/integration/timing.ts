@@ -1,9 +1,26 @@
+import { appendFileSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+
 const TimingEnabledValue = "1";
 const TimingStartedAtEnv = "MISTLE_TEST_TIMING_STARTED_AT_MS";
+const TimingEventsFileEnv = "MISTLE_TEST_TIMING_EVENTS_FILE";
 const TimingProcessStartedAtMs = Date.now();
 
 type TimingWriteOptions = {
   force?: boolean;
+};
+
+export type IntegrationTimingFileRecord = {
+  type: "integration-file";
+  label: string;
+  file: string;
+  services: string;
+  envId: string;
+  setupMs: number;
+  bodyMs: number;
+  teardownMs: number;
+  totalMs: number;
+  status: "passed" | "failed";
 };
 
 export function markIntegrationTimingStart(environment: NodeJS.ProcessEnv): void {
@@ -44,6 +61,23 @@ export function writeIntegrationTimingEvent(
     `[integration] ${formatTimingOffset()} pid=${String(process.pid)} ${formatWorkerLabel()} ${event}: ${details}.`,
     options,
   );
+}
+
+export function writeIntegrationTimingRecord(
+  record: IntegrationTimingFileRecord,
+  options: TimingWriteOptions = {},
+): void {
+  if (options.force !== true && process.env["MISTLE_TEST_TIMING"] !== TimingEnabledValue) {
+    return;
+  }
+
+  const eventsFile = process.env[TimingEventsFileEnv];
+  if (eventsFile === undefined || eventsFile.length === 0) {
+    return;
+  }
+
+  mkdirSync(dirname(eventsFile), { recursive: true });
+  appendFileSync(eventsFile, `${JSON.stringify(record)}\n`, "utf8");
 }
 
 function formatTimingOffset(): string {
