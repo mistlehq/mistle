@@ -43,7 +43,8 @@ const PortAccessTokenAudience = GatewayTokenAudience;
 const FirstGatewayId = "data-plane-gateway-a";
 const SecondGatewayId = "data-plane-gateway-b";
 const TestTimeoutMs = 40_000;
-const PortAccessAuthorizationTimeoutMs = 100;
+const PortAccessAuthorizationTimeoutMs = 5_000;
+const FastPortAccessAuthorizationTimeoutMs = 100;
 const BootstrapAttachmentReadyTimeoutMs = 5_000;
 const BootstrapAttachmentReadyPollIntervalMs = 25;
 
@@ -57,31 +58,43 @@ const it = createIntegrationTest({
     },
   },
 });
-const distributedIt = createIntegrationTest({
-  services: [
-    "data-plane-api",
-    { id: FirstGatewayId, service: "data-plane-gateway", mode: "runtime" },
-    { id: SecondGatewayId, service: "data-plane-gateway", mode: "runtime" },
-  ],
-  extraInfra: ["nats"],
-  __dangerouslyIsolatedServices: {
-    reason: "This suite starts two gateway runtime instances for distributed Port Access coverage.",
-    services: [FirstGatewayId, SecondGatewayId],
-  },
-  __serviceOptions: {
-    dataPlaneGateway: {
-      gatewayRelay: {
-        backend: "nats",
-        namePrefix: "port-access-bootstrap-integration",
-      },
-      portAccess: {
-        authorizationTimeoutMs: PortAccessAuthorizationTimeoutMs,
-      },
-    },
-  },
+const distributedIt = createDistributedPortAccessBootstrapIntegrationTest({
+  authorizationTimeoutMs: PortAccessAuthorizationTimeoutMs,
+});
+const fastTimeoutDistributedIt = createDistributedPortAccessBootstrapIntegrationTest({
+  authorizationTimeoutMs: FastPortAccessAuthorizationTimeoutMs,
 });
 
 type GatewayHttpService = Pick<IntegrationTestEnvironment["dataPlaneGateway"], "hostBaseUrl">;
+
+function createDistributedPortAccessBootstrapIntegrationTest(input: {
+  authorizationTimeoutMs: number;
+}): ReturnType<typeof createIntegrationTest> {
+  return createIntegrationTest({
+    services: [
+      "data-plane-api",
+      { id: FirstGatewayId, service: "data-plane-gateway", mode: "runtime" },
+      { id: SecondGatewayId, service: "data-plane-gateway", mode: "runtime" },
+    ],
+    extraInfra: ["nats"],
+    __dangerouslyIsolatedServices: {
+      reason:
+        "This suite starts two gateway runtime instances for distributed Port Access coverage.",
+      services: [FirstGatewayId, SecondGatewayId],
+    },
+    __serviceOptions: {
+      dataPlaneGateway: {
+        gatewayRelay: {
+          backend: "nats",
+          namePrefix: "port-access-bootstrap-integration",
+        },
+        portAccess: {
+          authorizationTimeoutMs: input.authorizationTimeoutMs,
+        },
+      },
+    },
+  });
+}
 
 describe.concurrent("port access bootstrap integration", () => {
   it(
@@ -432,7 +445,7 @@ describe.concurrent("distributed port access bootstrap integration", () => {
     TestTimeoutMs,
   );
 
-  distributedIt(
+  fastTimeoutDistributedIt(
     "continues processing distributed authorizations while another remote authorization is pending",
     async ({ env }) => {
       const firstSandboxInstanceId = typeid("sbi").toString();
@@ -537,7 +550,7 @@ describe.concurrent("distributed port access bootstrap integration", () => {
     TestTimeoutMs,
   );
 
-  distributedIt(
+  fastTimeoutDistributedIt(
     "returns a bootstrap failure when the recorded owner gateway is unavailable",
     async ({ env }) => {
       const sandboxInstanceId = typeid("sbi").toString();
