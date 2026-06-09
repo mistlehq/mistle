@@ -735,6 +735,7 @@ jobs:
       TURBO_TELEMETRY_DISABLED: "1"
       TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
       TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+      MISTLE_TEST_TIMING: "1"
 
     steps:
       - name: Checkout
