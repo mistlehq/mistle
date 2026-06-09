@@ -258,7 +258,21 @@ func (server *Server) beginShutdown() error {
 	return nil
 }
 
-func (server *Server) beginActivate(activationInput protocol.ActivationInput) error {
+func (server *Server) beginActivate(activationInput protocol.ActivationInput) (returnErr error) {
+	defer func() {
+		panicValue := recover()
+		if panicValue == nil {
+			return
+		}
+		errorText := fmt.Sprintf("failed to initialize sandboxd state: activation panicked: %v", panicValue)
+		server.state.mutex.Lock()
+		if server.state.phase == ActivationPhaseActivating {
+			server.state.phase = ActivationPhaseFailed
+		}
+		server.state.initError = &errorText
+		server.state.mutex.Unlock()
+		returnErr = fmt.Errorf("sandbox startup request was rejected: sandboxd activation failed: %s", errorText)
+	}()
 	server.state.mutex.Lock()
 	switch server.state.phase {
 	case ActivationPhaseUnactivated:

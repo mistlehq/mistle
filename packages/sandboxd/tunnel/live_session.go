@@ -270,12 +270,12 @@ func (session *LiveTunnelSession) RequestSigning(ctx context.Context, payload st
 }
 
 type LiveTunnelEgressTokenProvider struct {
-	session *LiveTunnelSession
-	state   *liveTunnelEgressTokenProviderState
+	state *liveTunnelEgressTokenProviderState
 }
 
 type liveTunnelEgressTokenProviderState struct {
 	mutex        sync.Mutex
+	session      *LiveTunnelSession
 	generation   uint64
 	attached     bool
 	token        string
@@ -286,12 +286,30 @@ type liveTunnelEgressTokenProviderState struct {
 
 func (session *LiveTunnelSession) EgressTokenProvider(actingUserID *string) LiveTunnelEgressTokenProvider {
 	return LiveTunnelEgressTokenProvider{
-		session: session,
 		state: &liveTunnelEgressTokenProviderState{
+			session:      session,
 			attached:     true,
 			actingUserID: cloneStringPointer(actingUserID),
 		},
 	}
+}
+
+func (provider LiveTunnelEgressTokenProvider) AttachSession(session *LiveTunnelSession) error {
+	if provider.state == nil {
+		return fmt.Errorf("live tunnel egress token provider state is required")
+	}
+	if session == nil {
+		return fmt.Errorf("live tunnel session is required")
+	}
+	provider.state.mutex.Lock()
+	defer provider.state.mutex.Unlock()
+	provider.state.generation++
+	provider.state.session = session
+	provider.state.attached = true
+	provider.state.token = ""
+	provider.state.expiresAt = ""
+	provider.state.expiresAtMS = 0
+	return nil
 }
 
 func (provider LiveTunnelEgressTokenProvider) SetActingUserID(actingUserID *string) error {
@@ -319,6 +337,7 @@ func (provider LiveTunnelEgressTokenProvider) Detach() error {
 	defer provider.state.mutex.Unlock()
 	provider.state.generation++
 	provider.state.attached = false
+	provider.state.session = nil
 	provider.state.token = ""
 	provider.state.expiresAt = ""
 	provider.state.expiresAtMS = 0
@@ -326,18 +345,20 @@ func (provider LiveTunnelEgressTokenProvider) Detach() error {
 }
 
 func (provider LiveTunnelEgressTokenProvider) Token() (tunnelprotocol.EgressToken, error) {
-	if provider.session == nil {
-		return tunnelprotocol.EgressToken{}, fmt.Errorf("live tunnel session is required")
-	}
 	if provider.state == nil {
 		return tunnelprotocol.EgressToken{}, fmt.Errorf("live tunnel egress token provider state is required")
 	}
-	nowMS := provider.session.clock.NowMS()
 	provider.state.mutex.Lock()
 	if !provider.state.attached {
 		provider.state.mutex.Unlock()
 		return tunnelprotocol.EgressToken{}, fmt.Errorf("gateway egress token provider is not attached to the bootstrap session")
 	}
+	session := provider.state.session
+	if session == nil {
+		provider.state.mutex.Unlock()
+		return tunnelprotocol.EgressToken{}, fmt.Errorf("live tunnel session is required")
+	}
+	nowMS := session.clock.NowMS()
 	generation := provider.state.generation
 	actingUserID := cloneStringPointer(provider.state.actingUserID)
 	if provider.state.token != "" && nowMS < provider.state.expiresAtMS {
@@ -355,7 +376,7 @@ func (provider LiveTunnelEgressTokenProvider) Token() (tunnelprotocol.EgressToke
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	response, err := provider.session.requestEgressToken(ctx, actingUserID)
+	response, err := session.requestEgressToken(ctx, actingUserID)
 	if err != nil {
 		return tunnelprotocol.EgressToken{}, err
 	}

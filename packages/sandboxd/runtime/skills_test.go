@@ -38,6 +38,39 @@ description: Renamed skill.
 	assertEqual(t, selectedSkills[0].sourcePath, filepath.Join(canonicalRepoRoot, "skills/new-skill"))
 }
 
+func TestReadRuntimePlanSelectedSkillsSkipsInvalidSelectedMetadataLikeRust(t *testing.T) {
+	repoRoot := t.TempDir()
+	writeRuntimeSkillTestFile(t, repoRoot, "skills/invalid-yaml", `---
+name: [invalid
+description: Invalid yaml.
+---
+`)
+	writeRuntimeSkillTestFile(t, repoRoot, "skills/invalid-name", `---
+name: Invalid Skill
+description: Invalid name.
+---
+`)
+	writeRuntimeSkillTestFile(t, repoRoot, "skills/valid-skill", `---
+name: valid-skill
+description: Valid skill.
+---
+`)
+	canonicalRepoRoot, err := canonicalizeRuntimeSkillsRepoRoot(repoRoot)
+	requireNoError(t, err)
+
+	selectedSkills, err := readRuntimePlanSelectedSkills(canonicalRepoRoot, []CompiledSkillSelection{
+		{Name: "invalid-yaml", RelativePath: "skills/invalid-yaml"},
+		{Name: "invalid-name", RelativePath: "skills/invalid-name"},
+		{Name: "valid-skill", RelativePath: "skills/valid-skill"},
+	})
+
+	requireNoError(t, err)
+	if len(selectedSkills) != 1 {
+		t.Fatalf("expected 1 selected skill, got %d", len(selectedSkills))
+	}
+	assertEqual(t, selectedSkills[0].name, "valid-skill")
+}
+
 func writeRuntimeSkillTestFile(t *testing.T, repoRoot string, relativeDirectory string, content string) {
 	t.Helper()
 	skillDirectory := filepath.Join(repoRoot, filepath.FromSlash(relativeDirectory))

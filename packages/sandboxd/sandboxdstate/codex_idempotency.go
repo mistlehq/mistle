@@ -70,11 +70,6 @@ func prepareCodexIdempotency(payload map[string]any, store *CodexSharedIdempoten
 	if rawIdempotency == nil {
 		return codexIdempotencyAction{kind: codexIdempotencyActionDisabled}
 	}
-	requestID, hasRequestID := payload["id"]
-	if !hasRequestID {
-		return codexIdempotencyAction{kind: codexIdempotencyActionReject, message: "Codex idempotency requires a JSON-RPC request id."}
-	}
-	_ = requestID
 	var requestIdempotency codexIdempotency
 	serialized, err := json.Marshal(rawIdempotency)
 	if err != nil {

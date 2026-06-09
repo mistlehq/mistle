@@ -2,6 +2,7 @@ package egressproxy
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -231,7 +232,13 @@ func readTokenBridgeJSONLine[T any](reader io.Reader) (T, error) {
 		line = append(line, nextByte)
 	}
 	var payload T
-	if err := json.Unmarshal(line, &payload); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(line))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&payload); err != nil {
+		return payload, fmt.Errorf("failed to parse token bridge json: %w", err)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != nil && err != io.EOF {
 		return payload, fmt.Errorf("failed to parse token bridge json: %w", err)
 	}
 	return payload, nil

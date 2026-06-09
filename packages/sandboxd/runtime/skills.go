@@ -116,8 +116,11 @@ func readRuntimeSkillName(skillFilePath string) (string, bool, error) {
 		return "", false, fmt.Errorf("failed to read skill file %s: %w", skillFilePath, err)
 	}
 	frontmatter, ok, err := parseRuntimeSkillFrontmatter(skillFilePath, string(content))
-	if err != nil || !ok {
-		return "", ok, err
+	if err != nil {
+		return "", false, nil
+	}
+	if !ok {
+		return "", false, nil
 	}
 	value, ok := frontmatter["name"]
 	if !ok {

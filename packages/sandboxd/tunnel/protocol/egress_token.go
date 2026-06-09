@@ -1,10 +1,8 @@
 package protocol
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"strings"
 )
 
@@ -65,7 +63,7 @@ func ParseEgressTokenControlMessage(payload string) (*EgressTokenControlMessage,
 	switch *raw.Type {
 	case "egress.token.request":
 		var request EgressTokenRequest
-		if err := decodeEgressTokenStrict([]byte(payload), &request); err != nil {
+		if err := json.Unmarshal([]byte(payload), &request); err != nil {
 			return nil, err
 		}
 		if err := ValidateEgressTokenRequest(request); err != nil {
@@ -74,7 +72,7 @@ func ParseEgressTokenControlMessage(payload string) (*EgressTokenControlMessage,
 		return &EgressTokenControlMessage{Request: &request}, nil
 	case "egress.token.response":
 		var response EgressTokenResponse
-		if err := decodeEgressTokenStrict([]byte(payload), &response); err != nil {
+		if err := json.Unmarshal([]byte(payload), &response); err != nil {
 			return nil, err
 		}
 		if err := ValidateEgressTokenResponse(response); err != nil {
@@ -83,7 +81,7 @@ func ParseEgressTokenControlMessage(payload string) (*EgressTokenControlMessage,
 		return &EgressTokenControlMessage{Response: &response}, nil
 	case "egress.token.error":
 		var tokenError EgressTokenError
-		if err := decodeEgressTokenStrict([]byte(payload), &tokenError); err != nil {
+		if err := json.Unmarshal([]byte(payload), &tokenError); err != nil {
 			return nil, err
 		}
 		if err := ValidateEgressTokenError(tokenError); err != nil {
@@ -141,20 +139,4 @@ func ValidateEgressTokenError(message EgressTokenError) error {
 		return fmt.Errorf("egress.token.error message is required")
 	}
 	return nil
-}
-
-func decodeEgressTokenStrict(data []byte, target any) error {
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(target); err != nil {
-		return err
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); err != nil {
-		if err == io.EOF {
-			return nil
-		}
-		return err
-	}
-	return fmt.Errorf("unexpected trailing JSON data")
 }

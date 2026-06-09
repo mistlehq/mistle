@@ -146,8 +146,38 @@ func TestParsePortsTransportMessageRejectsInvalidPayloads(t *testing.T) {
 		},
 		{
 			name:     "invalid http response status",
-			payload:  `{"type":"ports.http.response.start","streamId":41,"status":99,"headers":{"content-type":["text/plain"]}}`,
-			expected: "ports.http.response.start status must be between 100 and 999",
+			payload:  `{"type":"ports.http.response.start","streamId":41,"status":101,"headers":{"content-type":["text/plain"]}}`,
+			expected: "ports.http.response.start status must be between 200 and 599",
+		},
+		{
+			name:     "invalid high http response status",
+			payload:  `{"type":"ports.http.response.start","streamId":41,"status":700,"headers":{"content-type":["text/plain"]}}`,
+			expected: "ports.http.response.start status must be between 200 and 599",
+		},
+		{
+			name:     "empty http open query",
+			payload:  `{"type":"ports.http.open","streamId":41,"target":{"kind":"port","port":5173},"upstreamProtocol":"https","request":{"method":"GET","path":"/src/main.ts","query":"","headers":{"accept":["text/plain"]}}}`,
+			expected: "ports.http.open request.query must be non-empty when provided",
+		},
+		{
+			name:     "invalid tcp error code",
+			payload:  `{"type":"ports.tcp.error","streamId":61,"code":"future_code","message":"target refused connection"}`,
+			expected: `ports.tcp.error code is not supported: "future_code"`,
+		},
+		{
+			name:     "empty tcp error message",
+			payload:  `{"type":"ports.tcp.error","streamId":61,"code":"upstream_connect_failed","message":""}`,
+			expected: "ports.tcp.error message is required",
+		},
+		{
+			name:     "invalid stream error code",
+			payload:  `{"type":"ports.stream.error","streamId":41,"code":"future_code","message":"upstream closed early"}`,
+			expected: `ports.stream.error code is not supported: "future_code"`,
+		},
+		{
+			name:     "empty stream error message",
+			payload:  `{"type":"ports.stream.error","streamId":41,"code":"upstream_io_error","message":""}`,
+			expected: "ports.stream.error message is required",
 		},
 		{
 			name:     "invalid http response header",

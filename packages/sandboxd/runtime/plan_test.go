@@ -146,7 +146,7 @@ func TestCompiledRuntimePlanRejectsMissingRustRequiredNestedFields(t *testing.T)
 			name:          "missing image source",
 			replace:       `"source": "base",`,
 			with:          ``,
-			errorContains: "runtime plan image source is required",
+			errorContains: "runtime plan image source field is required",
 		},
 		{
 			name:          "missing exec args",
@@ -191,7 +191,7 @@ func TestCompiledRuntimePlanRejectsMissingRustRequiredNestedFields(t *testing.T)
 			name:          "missing endpoint connection mode",
 			replace:       `},` + "\n" + `						"connectionMode": "dedicated"`,
 			with:          `}`,
-			errorContains: "runtime client endpoint connection mode is required",
+			errorContains: "runtime client endpoint connectionMode field is required",
 		},
 		{
 			name:          "missing workspace path",
@@ -397,6 +397,7 @@ func TestCompiledRuntimePlanDecodesAgentRuntimes(t *testing.T) {
 		"setupScript": null,
 		"egressRoutes": [],
 		"artifacts": [],
+		"workspaceSources": [],
 		"runtimeClients": [],
 		"agentRuntimes": [
 			{

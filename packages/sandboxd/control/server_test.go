@@ -117,10 +117,10 @@ func TestServerRejectsActivationWithInvalidRuntimePlanBeforeStateInitialization(
 	if err == nil {
 		t.Fatalf("expected invalid runtime plan to fail activation")
 	}
-	assertEqual(t, err.Error(), "control socket returned an error: sandbox startup request was rejected: sandboxd activation failed: failed to initialize sandboxd state: failed to apply session input: runtime plan sandboxProfileId is required")
+	assertEqual(t, err.Error(), "control socket returned an error: sandbox startup request was rejected: sandboxd activation failed: failed to initialize sandboxd state: failed to apply session input: runtime plan sandboxProfileId field is required")
 	health := fetchHealthResponse(t, server)
 	assertEqual(t, health["daemon_phase"].(string), "failed")
-	assertEqual(t, health["init_error"].(string), "failed to initialize sandboxd state: failed to apply session input: runtime plan sandboxProfileId is required")
+	assertEqual(t, health["init_error"].(string), "failed to initialize sandboxd state: failed to apply session input: runtime plan sandboxProfileId field is required")
 }
 
 func TestServerActivationDiagnosticsInitializationFailureIsBestEffort(t *testing.T) {

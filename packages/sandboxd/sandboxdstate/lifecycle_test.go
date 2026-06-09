@@ -300,6 +300,57 @@ func TestActivateInitializedRefreshesEgressProxyWhenTunnelGatewayChanges(t *test
 	assertEqual(t, receiveLifecycleEvent(t, secondEvents), "gateway:Bearer second-gateway-jwt:http://api.example.test/v1/allowed")
 }
 
+func TestActivateInitializedUpdatesEgressActingUserWithoutProxyRefreshLikeRust(t *testing.T) {
+	events := make(chan string, 8)
+	gatewayURL, closeGateway := startLifecycleEgressGatewayWithToken(t, events, "gateway-jwt")
+	defer closeGateway()
+	caBundlePath := filepath.Join(t.TempDir(), "egress-proxy-ca-bundle.pem")
+	activationInput := lifecycleActivationInput(protocol.ActivationOperationStart, runtime.CompiledRuntimePlanImageSnapshot)
+	activationInput.TunnelGatewayWSURL = gatewayURL
+	activationInput.ActingUserID = ptr("usr_initial")
+	activationInput.RuntimePlan = lifecycleRuntimePlanJSONWithEgressRoute()
+	options := lifecycleActivationOptions(t)
+	options.EgressProxyOptions = egressproxy.ManagedProxyOptions{
+		ListenAddr:               "127.0.0.1:0",
+		RuntimeProxyCABundlePath: caBundlePath,
+	}
+	state, err := ActivateNewWithOptions(activationInput, timeutil.NewMutableClock(1_700_000_000_000), options)
+	requireNoError(t, err)
+	defer state.Close()
+	assertEqual(t, receiveLifecycleEvent(t, events), "bootstrap:bootstrap_token=bootstrap-token")
+	egressSnapshot := waitForComponentState(t, state.supervisorHandle, supervision.ComponentEgressProxy, supervision.ComponentHealthy)
+	proxyURL, err := url.Parse("http://" + egressSnapshot.Details["listenAddr"])
+	requireNoError(t, err)
+	client := http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
+	request, err := http.NewRequest(http.MethodPost, "http://api.example.test/v1/allowed", strings.NewReader("gateway body"))
+	requireNoError(t, err)
+	response, err := client.Do(request)
+	requireNoError(t, err)
+	defer response.Body.Close()
+	assertEqual(t, response.StatusCode, http.StatusAccepted)
+	assertEqual(t, receiveLifecycleEvent(t, events), "token:egress_token_req_1:usr_initial")
+	assertEqual(t, receiveLifecycleEvent(t, events), "gateway:Bearer gateway-jwt:http://api.example.test/v1/allowed")
+
+	resumeInput := activationInput
+	resumeInput.OperationKind = protocol.ActivationOperationResume
+	resumeInput.BootstrapToken = "bootstrap-token-resumed"
+	resumeInput.TunnelExchangeToken = "exchange-token-resumed"
+	resumeInput.ActingUserID = ptr("usr_resumed")
+	requireNoError(t, state.ActivateInitialized(resumeInput))
+	assertEqual(t, receiveLifecycleEvent(t, events), "bootstrap:bootstrap_token=bootstrap-token-resumed")
+	reusedSnapshot := waitForComponentState(t, state.supervisorHandle, supervision.ComponentEgressProxy, supervision.ComponentHealthy)
+	assertEqual(t, reusedSnapshot.Details["listenAddr"], egressSnapshot.Details["listenAddr"])
+
+	request, err = http.NewRequest(http.MethodPost, "http://api.example.test/v1/allowed", strings.NewReader("gateway body"))
+	requireNoError(t, err)
+	response, err = client.Do(request)
+	requireNoError(t, err)
+	defer response.Body.Close()
+	assertEqual(t, response.StatusCode, http.StatusAccepted)
+	assertEqual(t, receiveLifecycleEvent(t, events), "token:egress_token_req_1:usr_resumed")
+	assertEqual(t, receiveLifecycleEvent(t, events), "gateway:Bearer gateway-jwt:http://api.example.test/v1/allowed")
+}
+
 func TestActivateInitializedRecordsRustCompatibleRefreshLifecyclePhases(t *testing.T) {
 	logDir := t.TempDir()
 	t.Setenv(startupdiagnostics.TestLogDirEnv, logDir)
@@ -491,14 +542,14 @@ func TestActivateNewConnectsBootstrapTunnelBeforeRuntimeSetupFiles(t *testing.T)
 
 func TestActivateNewRejectsInvalidRuntimePlanBeforeStateInitialization(t *testing.T) {
 	activationInput := lifecycleActivationInput(protocol.ActivationOperationStart, runtime.CompiledRuntimePlanImageSnapshot)
-	activationInput.RuntimePlan = []byte(`{"version":7}`)
+	activationInput.RuntimePlan = []byte(`{"sandboxProfileId":"profile_lifecycle","version":7,"image":{"imageRef":"image-ref"},"egressRoutes":[],"artifacts":[],"workspaceSources":[],"runtimeClients":[],"agentRuntimes":[]}`)
 
 	_, err := ActivateNew(activationInput, timeutil.NewMutableClock(1_700_000_000_000))
 
 	if err == nil {
 		t.Fatalf("expected invalid runtime plan to fail")
 	}
-	assertEqual(t, err.Error(), "failed to apply session input: runtime plan image source is required")
+	assertEqual(t, err.Error(), "failed to apply session input: runtime plan image source field is required")
 }
 
 func TestActivateInitializedRejectsRuntimePlanChanges(t *testing.T) {

@@ -609,15 +609,11 @@ func prepareCodexClientPayloadForForwarding(
 		return serialized, true, nil
 	case codexIdempotencyActionForward:
 		requestKey, ok := codexJSONRPCIDKey(requestID)
-		if !ok {
-			if err := writeCodexIdempotencyError(ctx, clientConnection, requestID, "Codex idempotency requires a JSON-RPC request id."); err != nil {
-				return nil, false, err
-			}
-			return nil, false, nil
+		if ok {
+			relayState.mutex.Lock()
+			relayState.pendingIdempotency[requestKey] = *action.started
+			relayState.mutex.Unlock()
 		}
-		relayState.mutex.Lock()
-		relayState.pendingIdempotency[requestKey] = *action.started
-		relayState.mutex.Unlock()
 		serialized, err := json.Marshal(decoded)
 		if err != nil {
 			return nil, false, err

@@ -35,6 +35,22 @@ func TestParseEgressTokenControlMessages(t *testing.T) {
 	}
 }
 
+func TestParseEgressTokenControlMessagesAllowFutureFieldsLikeRust(t *testing.T) {
+	response, err := ParseEgressTokenControlMessage(`{"type":"egress.token.response","requestId":"egress_token_req_1","token":"jwt-token","expiresAt":"2026-01-02T03:04:05Z","ttlMs":60000,"futureField":{"nested":true}}`)
+	requireNoError(t, err)
+	if response == nil || response.Response == nil {
+		t.Fatalf("expected egress token response")
+	}
+	assertEqual(t, response.Response.Token, "jwt-token")
+
+	tokenError, err := ParseEgressTokenControlMessage(`{"type":"egress.token.error","requestId":"egress_token_req_1","code":"forbidden","message":"not allowed","futureField":true}`)
+	requireNoError(t, err)
+	if tokenError == nil || tokenError.Error == nil {
+		t.Fatalf("expected egress token error")
+	}
+	assertEqual(t, tokenError.Error.Code, "forbidden")
+}
+
 func TestParseEgressTokenControlMessageRejectsInvalidPayloads(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -44,7 +60,6 @@ func TestParseEgressTokenControlMessageRejectsInvalidPayloads(t *testing.T) {
 		{name: "empty acting user", payload: `{"type":"egress.token.request","requestId":"egress_token_req_1","actingUserId":""}`},
 		{name: "empty token", payload: `{"type":"egress.token.response","requestId":"egress_token_req_1","token":"","expiresAt":"2026-01-02T03:04:05Z","ttlMs":60000}`},
 		{name: "zero ttl", payload: `{"type":"egress.token.response","requestId":"egress_token_req_1","token":"jwt-token","expiresAt":"2026-01-02T03:04:05Z","ttlMs":0}`},
-		{name: "unknown response field", payload: `{"type":"egress.token.error","requestId":"egress_token_req_1","code":"forbidden","message":"not allowed","extra":true}`},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

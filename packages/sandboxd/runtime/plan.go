@@ -22,10 +22,19 @@ type CompiledRuntimePlan struct {
 func (plan *CompiledRuntimePlan) UnmarshalJSON(payload []byte) error {
 	type wireCompiledRuntimePlan CompiledRuntimePlan
 	var wire wireCompiledRuntimePlan
+	fields, err := decodeObjectFields(payload)
+	if err != nil {
+		return err
+	}
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&wire); err != nil {
 		return err
+	}
+	for _, field := range []string{"sandboxProfileId", "version", "image", "egressRoutes", "artifacts", "workspaceSources", "runtimeClients", "agentRuntimes"} {
+		if err := requireJSONField(fields, field, "runtime plan"); err != nil {
+			return err
+		}
 	}
 	*plan = CompiledRuntimePlan(wire)
 	return plan.validate()
@@ -189,6 +198,30 @@ type CompiledRuntimePlanImage struct {
 	ImageRef string                         `json:"imageRef"`
 }
 
+func (image *CompiledRuntimePlanImage) UnmarshalJSON(payload []byte) error {
+	var wire struct {
+		Source   CompiledRuntimePlanImageSource `json:"source"`
+		ImageRef string                         `json:"imageRef"`
+	}
+	fields, err := decodeObjectFields(payload)
+	if err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&wire); err != nil {
+		return err
+	}
+	if err := requireJSONField(fields, "source", "runtime plan image"); err != nil {
+		return err
+	}
+	if err := requireNonEmptyJSONField(fields, "imageRef", wire.ImageRef, "runtime plan image"); err != nil {
+		return err
+	}
+	*image = CompiledRuntimePlanImage(wire)
+	return nil
+}
+
 type CompiledRuntimePlanImageSource string
 
 const (
@@ -233,8 +266,10 @@ func (route *CompiledEgressRoute) UnmarshalJSON(payload []byte) error {
 	if err := decoder.Decode(&wire); err != nil {
 		return err
 	}
-	if err := requireJSONField(fields, "credentialResolver", "egress route"); err != nil {
-		return err
+	for _, field := range []string{"egressRuleId", "bindingId", "familyId", "variantId", "match", "upstream", "authInjection", "credentialResolver"} {
+		if err := requireJSONField(fields, field, "egress route"); err != nil {
+			return err
+		}
 	}
 	*route = CompiledEgressRoute(wire)
 	return nil
@@ -246,8 +281,50 @@ type CompiledEgressRouteMatch struct {
 	Methods      []string `json:"methods"`
 }
 
+func (match *CompiledEgressRouteMatch) UnmarshalJSON(payload []byte) error {
+	var wire struct {
+		Hosts        []string `json:"hosts"`
+		PathPrefixes []string `json:"pathPrefixes"`
+		Methods      []string `json:"methods"`
+	}
+	fields, err := decodeObjectFields(payload)
+	if err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&wire); err != nil {
+		return err
+	}
+	if err := requireJSONField(fields, "hosts", "egress route match"); err != nil {
+		return err
+	}
+	*match = CompiledEgressRouteMatch(wire)
+	return nil
+}
+
 type CompiledEgressRouteUpstream struct {
 	BaseURL string `json:"baseUrl"`
+}
+
+func (upstream *CompiledEgressRouteUpstream) UnmarshalJSON(payload []byte) error {
+	var wire struct {
+		BaseURL string `json:"baseUrl"`
+	}
+	fields, err := decodeObjectFields(payload)
+	if err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&wire); err != nil {
+		return err
+	}
+	if err := requireNonEmptyJSONField(fields, "baseUrl", wire.BaseURL, "egress route upstream"); err != nil {
+		return err
+	}
+	*upstream = CompiledEgressRouteUpstream(wire)
+	return nil
 }
 
 type CompiledEgressRouteAuthInjection struct {
@@ -429,8 +506,53 @@ type CompiledRuntimeArtifact struct {
 	Lifecycle   RuntimeArtifactLifecycle `json:"lifecycle"`
 }
 
+func (artifact *CompiledRuntimeArtifact) UnmarshalJSON(payload []byte) error {
+	var wire struct {
+		ArtifactKey string                   `json:"artifactKey"`
+		Name        string                   `json:"name"`
+		Env         map[string]string        `json:"env"`
+		Lifecycle   RuntimeArtifactLifecycle `json:"lifecycle"`
+	}
+	fields, err := decodeObjectFields(payload)
+	if err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&wire); err != nil {
+		return err
+	}
+	for _, field := range []string{"artifactKey", "name", "lifecycle"} {
+		if err := requireJSONField(fields, field, "runtime artifact"); err != nil {
+			return err
+		}
+	}
+	*artifact = CompiledRuntimeArtifact(wire)
+	return nil
+}
+
 type RuntimeArtifactLifecycle struct {
 	Install []RuntimeArtifactInstallStep `json:"install"`
+}
+
+func (lifecycle *RuntimeArtifactLifecycle) UnmarshalJSON(payload []byte) error {
+	var wire struct {
+		Install []RuntimeArtifactInstallStep `json:"install"`
+	}
+	fields, err := decodeObjectFields(payload)
+	if err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&wire); err != nil {
+		return err
+	}
+	if err := requireJSONField(fields, "install", "runtime artifact lifecycle"); err != nil {
+		return err
+	}
+	*lifecycle = RuntimeArtifactLifecycle(wire)
+	return nil
 }
 
 type RuntimeArtifactInstallStep struct {
@@ -443,6 +565,46 @@ type RuntimeArtifactInstallStep struct {
 	Release     RuntimeArtifactGitHubReleaseSelector     `json:"release"`
 	Asset       RuntimeArtifactGitHubReleaseInstallAsset `json:"asset"`
 	InstallPath string                                   `json:"installPath"`
+}
+
+func (step *RuntimeArtifactInstallStep) UnmarshalJSON(payload []byte) error {
+	var wire struct {
+		Op          RuntimeArtifactInstallOp                 `json:"op"`
+		Command     RuntimeExecCommand                       `json:"command"`
+		Tools       []string                                 `json:"tools"`
+		Force       *bool                                    `json:"force"`
+		TimeoutMS   *uint64                                  `json:"timeoutMs"`
+		Repository  string                                   `json:"repository"`
+		Release     RuntimeArtifactGitHubReleaseSelector     `json:"release"`
+		Asset       RuntimeArtifactGitHubReleaseInstallAsset `json:"asset"`
+		InstallPath string                                   `json:"installPath"`
+	}
+	fields, err := decodeObjectFields(payload)
+	if err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&wire); err != nil {
+		return err
+	}
+	if err := requireJSONField(fields, "op", "runtime artifact install step"); err != nil {
+		return err
+	}
+	switch wire.Op {
+	case RuntimeArtifactInstallOpExec:
+		if err := requireJSONField(fields, "command", "exec runtime artifact install step"); err != nil {
+			return err
+		}
+	case RuntimeArtifactInstallOpGitHubReleaseInstall:
+		for _, field := range []string{"release", "asset"} {
+			if err := requireJSONField(fields, field, "github_release_install runtime artifact install step"); err != nil {
+				return err
+			}
+		}
+	}
+	*step = RuntimeArtifactInstallStep(wire)
+	return nil
 }
 
 type RuntimeArtifactInstallOp string
@@ -689,9 +851,57 @@ type CompiledRuntimePlanSkills struct {
 	SelectedSkills []CompiledSkillSelection `json:"selectedSkills"`
 }
 
+func (skills *CompiledRuntimePlanSkills) UnmarshalJSON(payload []byte) error {
+	var wire struct {
+		OriginURL      string                   `json:"originUrl"`
+		SelectedSkills []CompiledSkillSelection `json:"selectedSkills"`
+	}
+	fields, err := decodeObjectFields(payload)
+	if err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&wire); err != nil {
+		return err
+	}
+	if err := requireNonEmptyJSONField(fields, "originUrl", wire.OriginURL, "runtime plan skills"); err != nil {
+		return err
+	}
+	if err := requireJSONField(fields, "selectedSkills", "runtime plan skills"); err != nil {
+		return err
+	}
+	*skills = CompiledRuntimePlanSkills(wire)
+	return nil
+}
+
 type CompiledSkillSelection struct {
 	Name         string `json:"name"`
 	RelativePath string `json:"relativePath"`
+}
+
+func (selection *CompiledSkillSelection) UnmarshalJSON(payload []byte) error {
+	var wire struct {
+		Name         string `json:"name"`
+		RelativePath string `json:"relativePath"`
+	}
+	fields, err := decodeObjectFields(payload)
+	if err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&wire); err != nil {
+		return err
+	}
+	if err := requireNonEmptyJSONField(fields, "name", wire.Name, "runtime skill selection"); err != nil {
+		return err
+	}
+	if err := requireNonEmptyJSONField(fields, "relativePath", wire.RelativePath, "runtime skill selection"); err != nil {
+		return err
+	}
+	*selection = CompiledSkillSelection(wire)
+	return nil
 }
 
 type RuntimeClientProcessReadinessType string
@@ -863,12 +1073,62 @@ type RuntimeClientSetup struct {
 	LaunchArgs []string                 `json:"launchArgs"`
 }
 
+func (setup *RuntimeClientSetup) UnmarshalJSON(payload []byte) error {
+	var wire struct {
+		Env        map[string]string        `json:"env"`
+		Files      []RuntimeClientSetupFile `json:"files"`
+		LaunchArgs []string                 `json:"launchArgs"`
+	}
+	fields, err := decodeObjectFields(payload)
+	if err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&wire); err != nil {
+		return err
+	}
+	for _, field := range []string{"files", "launchArgs"} {
+		if err := requireJSONField(fields, field, "runtime client setup"); err != nil {
+			return err
+		}
+	}
+	*setup = RuntimeClientSetup(wire)
+	return nil
+}
+
 type RuntimeClientSetupFile struct {
 	FileID    string                `json:"fileId"`
 	Path      string                `json:"path"`
 	Mode      uint32                `json:"mode"`
 	Content   string                `json:"content"`
 	WriteMode *RuntimeFileWriteMode `json:"writeMode"`
+}
+
+func (file *RuntimeClientSetupFile) UnmarshalJSON(payload []byte) error {
+	var wire struct {
+		FileID    string                `json:"fileId"`
+		Path      string                `json:"path"`
+		Mode      uint32                `json:"mode"`
+		Content   string                `json:"content"`
+		WriteMode *RuntimeFileWriteMode `json:"writeMode"`
+	}
+	fields, err := decodeObjectFields(payload)
+	if err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&wire); err != nil {
+		return err
+	}
+	for _, field := range []string{"fileId", "path", "mode", "content"} {
+		if err := requireJSONField(fields, field, "runtime client setup file"); err != nil {
+			return err
+		}
+	}
+	*file = RuntimeClientSetupFile(wire)
+	return nil
 }
 
 type RuntimeFileWriteMode string
@@ -886,11 +1146,61 @@ type RuntimeClient struct {
 	Endpoints []RuntimeClientEndpoint `json:"endpoints"`
 }
 
+func (client *RuntimeClient) UnmarshalJSON(payload []byte) error {
+	var wire struct {
+		ClientID  string                  `json:"clientId"`
+		Setup     RuntimeClientSetup      `json:"setup"`
+		Processes []RuntimeClientProcess  `json:"processes"`
+		Endpoints []RuntimeClientEndpoint `json:"endpoints"`
+	}
+	fields, err := decodeObjectFields(payload)
+	if err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&wire); err != nil {
+		return err
+	}
+	for _, field := range []string{"clientId", "setup", "processes", "endpoints"} {
+		if err := requireJSONField(fields, field, "runtime client"); err != nil {
+			return err
+		}
+	}
+	*client = RuntimeClient(wire)
+	return nil
+}
+
 type RuntimeClientProcess struct {
 	ProcessKey string
 	Command    RuntimeExecCommand
 	Readiness  RuntimeClientProcessReadiness
 	Stop       RuntimeClientProcessStopPolicy
+}
+
+func (process *RuntimeClientProcess) UnmarshalJSON(payload []byte) error {
+	var wire struct {
+		ProcessKey string                         `json:"processKey"`
+		Command    RuntimeExecCommand             `json:"command"`
+		Readiness  RuntimeClientProcessReadiness  `json:"readiness"`
+		Stop       RuntimeClientProcessStopPolicy `json:"stop"`
+	}
+	fields, err := decodeObjectFields(payload)
+	if err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&wire); err != nil {
+		return err
+	}
+	for _, field := range []string{"processKey", "command", "readiness", "stop"} {
+		if err := requireJSONField(fields, field, "runtime process"); err != nil {
+			return err
+		}
+	}
+	*process = RuntimeClientProcess(wire)
+	return nil
 }
 
 func (process RuntimeClientProcess) MarshalJSON() ([]byte, error) {
@@ -960,6 +1270,31 @@ type RuntimeClientEndpoint struct {
 	ConnectionMode string                         `json:"connectionMode"`
 }
 
+func (endpoint *RuntimeClientEndpoint) UnmarshalJSON(payload []byte) error {
+	var wire struct {
+		EndpointKey    string                         `json:"endpointKey"`
+		ProcessKey     *string                        `json:"processKey"`
+		Transport      RuntimeClientEndpointTransport `json:"transport"`
+		ConnectionMode string                         `json:"connectionMode"`
+	}
+	fields, err := decodeObjectFields(payload)
+	if err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&wire); err != nil {
+		return err
+	}
+	for _, field := range []string{"endpointKey", "transport", "connectionMode"} {
+		if err := requireJSONField(fields, field, "runtime client endpoint"); err != nil {
+			return err
+		}
+	}
+	*endpoint = RuntimeClientEndpoint(wire)
+	return nil
+}
+
 type RuntimeClientEndpointTransport struct {
 	Type string `json:"type"`
 	URL  string `json:"url"`
@@ -1003,4 +1338,30 @@ type CompiledAgentRuntime struct {
 	ClientID    string          `json:"clientId"`
 	EndpointKey string          `json:"endpointKey"`
 	PTYLaunch   json.RawMessage `json:"ptyLaunch"`
+}
+
+func (agentRuntime *CompiledAgentRuntime) UnmarshalJSON(payload []byte) error {
+	var wire struct {
+		RuntimeID   string          `json:"runtimeId"`
+		RuntimeKey  string          `json:"runtimeKey"`
+		ClientID    string          `json:"clientId"`
+		EndpointKey string          `json:"endpointKey"`
+		PTYLaunch   json.RawMessage `json:"ptyLaunch"`
+	}
+	fields, err := decodeObjectFields(payload)
+	if err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&wire); err != nil {
+		return err
+	}
+	for _, field := range []string{"runtimeId", "runtimeKey", "clientId", "endpointKey", "ptyLaunch"} {
+		if err := requireJSONField(fields, field, "agent runtime"); err != nil {
+			return err
+		}
+	}
+	*agentRuntime = CompiledAgentRuntime(wire)
+	return nil
 }

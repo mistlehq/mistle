@@ -479,6 +479,53 @@ func TestCodexProxyReplaysCompletedIdempotentThreadStartWithoutReforwardingToRaw
 	assertEqual(t, rawRequestCount.Load(), int32(1))
 }
 
+func TestCodexProxyForwardsIdempotentNotificationWithoutJSONRPCIDLikeRust(t *testing.T) {
+	forwardedPayloads := make(chan map[string]any, 1)
+	rawServer := startCodexProxyRawServer(t, func(ctx context.Context, connection codexProxyRawConnection) {
+		_, payload, err := connection.Read(ctx)
+		if err != nil {
+			t.Errorf("expected raw notification request: %v", err)
+			return
+		}
+		var request map[string]any
+		if err := json.Unmarshal(payload, &request); err != nil {
+			t.Errorf("expected raw notification JSON request: %v", err)
+			return
+		}
+		forwardedPayloads <- request
+		<-ctx.Done()
+	})
+	store, err := idempotency.LoadStore(t.TempDir())
+	requireNoError(t, err)
+	_, proxyListenURL := startTestCodexProxyWithStore(t, rawServer.URL, store)
+	client := dialCodexProxyTestWebSocket(t, proxyListenURL)
+	defer client.CloseNow()
+	fingerprint := codexCreateConversationFingerprint(t, "notification")
+
+	writeCodexProxyTestJSON(t, client, map[string]any{
+		"method": "thread/start",
+		"params": map[string]any{},
+		"idempotency": map[string]any{
+			"key":                "notification-delivery-key",
+			"operation":          "createConversation",
+			"requestFingerprint": fingerprint.Value(),
+		},
+	})
+
+	select {
+	case forwarded := <-forwardedPayloads:
+		if _, exists := forwarded["idempotency"]; exists {
+			t.Fatalf("expected idempotency envelope to be stripped before raw forwarding")
+		}
+		if _, exists := forwarded["id"]; exists {
+			t.Fatalf("expected notification not to synthesize JSON-RPC id, got %#v", forwarded)
+		}
+		assertEqual(t, forwarded["method"], "thread/start")
+	case <-time.After(time.Second):
+		t.Fatalf("expected idempotent notification to forward to raw Codex")
+	}
+}
+
 func TestCodexProxyReplaysCompletedNonRetainedIdempotentTurnStartWithoutReforwardingToRaw(t *testing.T) {
 	rawRequestCount := atomic.Int32{}
 	forwardedPayloads := make(chan map[string]any, 2)

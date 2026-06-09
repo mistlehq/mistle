@@ -135,6 +135,17 @@ func TestReadTokenBridgeJSONLineRejectsOversizedFrames(t *testing.T) {
 	assertEqual(t, err.Error(), "egress token bridge frame exceeds 65536 bytes")
 }
 
+func TestReadTokenBridgeJSONLineRejectsUnknownFieldsLikeRust(t *testing.T) {
+	_, err := readTokenBridgeJSONLine[egressTokenBridgeRequest](strings.NewReader(`{"type":"egressToken.request","requestId":"req_123","futureField":true}` + "\n"))
+
+	if err == nil {
+		t.Fatalf("expected token bridge frame with unknown field to fail")
+	}
+	if !strings.Contains(err.Error(), "unknown field") {
+		t.Fatalf("expected unknown field error, got %q", err.Error())
+	}
+}
+
 func newTokenBridgePair(t *testing.T) (*os.File, int) {
 	t.Helper()
 	fds, err := syscall.Socketpair(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)

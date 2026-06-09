@@ -3,6 +3,7 @@ package piproxy
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -47,6 +48,56 @@ func TestPiRequestIDsStartAtRustCompatibleOne(t *testing.T) {
 
 	assertPiEqual(t, state.nextPiRequestID(), "mistle_pi_1")
 	assertPiEqual(t, state.nextPiRequestID(), "mistle_pi_2")
+}
+
+func TestPiRPCMonitorRestartsExitedChildWithOriginalCWDLikeRust(t *testing.T) {
+	tempDir := t.TempDir()
+	workspaceDir := filepath.Join(tempDir, "workspace")
+	if err := os.MkdirAll(workspaceDir, 0o700); err != nil {
+		t.Fatalf("expected workspace directory to be created: %v", err)
+	}
+	canonicalWorkspaceDir, err := filepath.EvalSymlinks(workspaceDir)
+	if err != nil {
+		t.Fatalf("expected workspace directory to resolve: %v", err)
+	}
+	cwdLogPath := filepath.Join(tempDir, "cwd.log")
+	cliPath := filepath.Join(tempDir, "pi-rpc-cli")
+	if err := os.WriteFile(cliPath, []byte("#!/bin/sh\npwd >> \"$PI_CWD_LOG\"\nexit 0\n"), 0o700); err != nil {
+		t.Fatalf("expected Pi CLI to be written: %v", err)
+	}
+	supervisorHandle, err := supervision.NewSandboxdSupervisorHandle(
+		"sandboxd-pi-rpc-restart-cwd-test",
+		timeutil.SystemClock{},
+		[]supervision.SupervisedComponent{supervision.ComponentPiRpcProcess},
+	)
+	if err != nil {
+		t.Fatalf("expected supervisor handle to initialize: %v", err)
+	}
+	state := NewState(Config{
+		PiCLIPath: cliPath,
+		Env: map[string]string{
+			"PI_CWD_LOG": cwdLogPath,
+		},
+	}, keepalive.NewSharedManager(), supervisorHandle, nil, nil)
+
+	if err := state.EnsureChild(&workspaceDir); err != nil {
+		t.Fatalf("expected Pi child to start: %v", err)
+	}
+	if err := waitForPiCWDLogLines(cwdLogPath, 1); err != nil {
+		t.Fatalf("expected first cwd log: %v", err)
+	}
+	if err := state.RestartExitedChild(); err != nil {
+		t.Fatalf("expected exited Pi child to restart: %v", err)
+	}
+	if err := waitForPiCWDLogLines(cwdLogPath, 2); err != nil {
+		t.Fatalf("expected second cwd log: %v", err)
+	}
+
+	contents, err := os.ReadFile(cwdLogPath)
+	if err != nil {
+		t.Fatalf("expected cwd log to be readable: %v", err)
+	}
+	assertPiEqual(t, strings.TrimSpace(string(contents)), canonicalWorkspaceDir+"\n"+canonicalWorkspaceDir)
 }
 
 func TestPiProxyListsAndResolvesSessionFiles(t *testing.T) {
@@ -94,6 +145,26 @@ func TestPiProxyListsAndResolvesSessionFiles(t *testing.T) {
 	resolveResponse := readPiTestJSON(t, connection)
 	resolveResult := resolveResponse["result"].(map[string]any)
 	assertPiEqual(t, resolveResult["sessionFile"], sessionFile)
+}
+
+func waitForPiCWDLogLines(path string, expected int) error {
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		contents, err := os.ReadFile(path)
+		if err == nil {
+			lines := strings.Split(strings.TrimSpace(string(contents)), "\n")
+			if strings.TrimSpace(string(contents)) == "" {
+				lines = nil
+			}
+			if len(lines) >= expected {
+				return nil
+			}
+		} else if !os.IsNotExist(err) {
+			return err
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return fmt.Errorf("timed out waiting for %d cwd log lines at %s", expected, path)
 }
 
 func TestPiProxyReplaysCompletedIdempotentPromptWithoutReinvokingPi(t *testing.T) {

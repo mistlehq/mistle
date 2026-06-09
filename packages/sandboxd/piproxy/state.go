@@ -266,15 +266,27 @@ func (state *State) StartChildMonitor(stop <-chan struct{}) {
 		case <-stop:
 			return
 		case <-ticker.C:
-			state.childMutex.Lock()
-			child := state.child
-			exited := child != nil && state.childExited(child)
-			state.childMutex.Unlock()
-			if exited {
-				_ = state.EnsureChild(nil)
+			if err := state.RestartExitedChild(); err != nil {
+				fmt.Fprintf(os.Stderr, "sandboxd failed to restart exited Pi RPC process: %v\n", err)
 			}
 		}
 	}
+}
+
+func (state *State) RestartExitedChild() error {
+	state.childMutex.Lock()
+	child := state.child
+	if child == nil {
+		state.childMutex.Unlock()
+		return nil
+	}
+	if !state.childExited(child) {
+		state.childMutex.Unlock()
+		return nil
+	}
+	cwd := cloneStringPointer(child.cwd)
+	state.childMutex.Unlock()
+	return state.EnsureChild(cwd)
 }
 
 func (state *State) currentChild() (*piRPCChild, error) {

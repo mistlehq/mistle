@@ -1,10 +1,8 @@
 package protocol
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"strings"
 )
 
@@ -70,7 +68,7 @@ func ParseSigningControlMessage(payload string) (*SigningControlMessage, error) 
 	switch *raw.Type {
 	case "signing.request":
 		var request SigningRequest
-		if err := decodeSigningStrict([]byte(payload), &request); err != nil {
+		if err := json.Unmarshal([]byte(payload), &request); err != nil {
 			return nil, err
 		}
 		if err := ValidateSigningRequest(request); err != nil {
@@ -83,7 +81,7 @@ func ParseSigningControlMessage(payload string) (*SigningControlMessage, error) 
 		}
 		if *raw.OK {
 			var result SigningSuccessResult
-			if err := decodeSigningStrict([]byte(payload), &result); err != nil {
+			if err := json.Unmarshal([]byte(payload), &result); err != nil {
 				return nil, err
 			}
 			if err := ValidateSigningSuccessResult(result); err != nil {
@@ -92,7 +90,7 @@ func ParseSigningControlMessage(payload string) (*SigningControlMessage, error) 
 			return &SigningControlMessage{SuccessResult: &result}, nil
 		}
 		var result SigningFailureResult
-		if err := decodeSigningStrict([]byte(payload), &result); err != nil {
+		if err := json.Unmarshal([]byte(payload), &result); err != nil {
 			return nil, err
 		}
 		if err := ValidateSigningFailureResult(result); err != nil {
@@ -174,20 +172,4 @@ func ValidateSigningFailureResult(message SigningFailureResult) error {
 		return fmt.Errorf("signing.result message is required")
 	}
 	return nil
-}
-
-func decodeSigningStrict(data []byte, target any) error {
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(target); err != nil {
-		return err
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); err != nil {
-		if err == io.EOF {
-			return nil
-		}
-		return err
-	}
-	return fmt.Errorf("unexpected trailing JSON data")
 }

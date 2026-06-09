@@ -182,7 +182,7 @@ func ParsePortsTransportMessage(payload string) (*PortsTransportMessage, error) 
 		if err := json.Unmarshal([]byte(payload), &message); err != nil {
 			return nil, fmt.Errorf("ports.tcp.error message is invalid: %w", err)
 		}
-		if err := validateStreamID(message.StreamID); err != nil {
+		if err := ValidatePortsTCPError(message); err != nil {
 			return nil, err
 		}
 		return &PortsTransportMessage{TCPError: &message}, nil
@@ -236,7 +236,7 @@ func ParsePortsTransportMessage(payload string) (*PortsTransportMessage, error) 
 		if err := json.Unmarshal([]byte(payload), &message); err != nil {
 			return nil, fmt.Errorf("ports.stream.error message is invalid: %w", err)
 		}
-		if err := validateStreamID(message.StreamID); err != nil {
+		if err := ValidatePortsStreamError(message); err != nil {
 			return nil, err
 		}
 		return &PortsTransportMessage{StreamError: &message}, nil
@@ -364,6 +364,19 @@ func ValidatePortsTCPClose(message PortsTCPClose) error {
 	return nil
 }
 
+func ValidatePortsTCPError(message PortsTCPError) error {
+	if message.MessageType != "ports.tcp.error" {
+		return fmt.Errorf("ports.tcp.error message type must be 'ports.tcp.error', got %q", message.MessageType)
+	}
+	if err := validateStreamID(message.StreamID); err != nil {
+		return err
+	}
+	if err := validatePortAccessUpstreamError(message.Code, message.Message, "ports.tcp.error"); err != nil {
+		return err
+	}
+	return nil
+}
+
 func ValidatePortsHTTPOpen(message PortsHTTPOpen) error {
 	if message.MessageType != "ports.http.open" {
 		return fmt.Errorf("ports.http.open message type must be 'ports.http.open', got %q", message.MessageType)
@@ -383,6 +396,9 @@ func ValidatePortsHTTPOpen(message PortsHTTPOpen) error {
 	if strings.TrimSpace(message.Request.Path) == "" {
 		return fmt.Errorf("ports.http.open request.path is required")
 	}
+	if message.Request.Query != nil && *message.Request.Query == "" {
+		return fmt.Errorf("ports.http.open request.query must be non-empty when provided")
+	}
 	return validateRepeatedHeaderValues(message.Request.Headers, "ports.http.open request.headers")
 }
 
@@ -393,8 +409,8 @@ func ValidatePortsHTTPResponseStart(message PortsHTTPResponseStart) error {
 	if err := validateStreamID(message.StreamID); err != nil {
 		return err
 	}
-	if message.Status < 100 || message.Status > 999 {
-		return fmt.Errorf("ports.http.response.start status must be between 100 and 999")
+	if message.Status < 200 || message.Status > 599 {
+		return fmt.Errorf("ports.http.response.start status must be between 200 and 599")
 	}
 	return validateRepeatedHeaderValues(message.Headers, "ports.http.response.start headers")
 }
@@ -428,12 +444,37 @@ func ValidatePortsHTTPBodyEnd(message PortsHTTPBodyEnd) error {
 	return nil
 }
 
+func ValidatePortsStreamError(message PortsStreamError) error {
+	if message.MessageType != "ports.stream.error" {
+		return fmt.Errorf("ports.stream.error message type must be 'ports.stream.error', got %q", message.MessageType)
+	}
+	if err := validateStreamID(message.StreamID); err != nil {
+		return err
+	}
+	if err := validatePortAccessUpstreamError(message.Code, message.Message, "ports.stream.error"); err != nil {
+		return err
+	}
+	return nil
+}
+
 func ValidatePortAccessTarget(target PortAccessTarget) error {
 	if target.Kind != "port" {
 		return fmt.Errorf("ports target kind must be 'port', got %q", target.Kind)
 	}
 	if target.Port == 0 {
 		return fmt.Errorf("ports target port must be greater than zero")
+	}
+	return nil
+}
+
+func validatePortAccessUpstreamError(code string, message string, fieldName string) error {
+	switch code {
+	case "upstream_connect_failed", "upstream_handshake_failed", "upstream_io_error":
+	default:
+		return fmt.Errorf("%s code is not supported: %q", fieldName, code)
+	}
+	if strings.TrimSpace(message) == "" {
+		return fmt.Errorf("%s message is required", fieldName)
 	}
 	return nil
 }

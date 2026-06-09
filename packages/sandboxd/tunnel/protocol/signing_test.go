@@ -68,6 +68,22 @@ func TestParseSigningControlMessages(t *testing.T) {
 	}
 }
 
+func TestParseSigningControlMessagesAllowsFutureFieldsLikeRust(t *testing.T) {
+	success, err := ParseSigningControlMessage(`{"type":"signing.result","requestId":"sign_req_123","ok":true,"signature":"c2lnbmF0dXJl","encoding":"base64","futureField":{"nested":true}}`)
+	requireNoError(t, err)
+	if success == nil || success.SuccessResult == nil {
+		t.Fatalf("expected signing success result")
+	}
+	assertEqual(t, success.SuccessResult.Signature, "c2lnbmF0dXJl")
+
+	failure, err := ParseSigningControlMessage(`{"type":"signing.result","requestId":"sign_req_124","ok":false,"code":"signing_backend_not_implemented","message":"unavailable","futureField":true}`)
+	requireNoError(t, err)
+	if failure == nil || failure.FailureResult == nil {
+		t.Fatalf("expected signing failure result")
+	}
+	assertEqual(t, failure.FailureResult.Code, "signing_backend_not_implemented")
+}
+
 func TestParseSigningControlMessageRejectsInvalidPayloads(t *testing.T) {
 	for _, input := range []struct {
 		name     string

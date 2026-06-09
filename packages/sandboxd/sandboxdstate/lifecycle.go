@@ -50,6 +50,7 @@ type State struct {
 	platformScopeInput    *process.PlatformProcessScopeInput
 	globalGitConfigPath   string
 	egressProxy           *egressproxy.ManagedProxy
+	egressTokenProvider   *tunnel.LiveTunnelEgressTokenProvider
 	processManager        *process.RuntimeClientProcessManager
 	runtimeAdapters       *RuntimeAdapters
 	runtimeCoordination   *RuntimeCoordinationHandle
@@ -506,6 +507,20 @@ func (state *State) ActivateInitialized(activationInput protocol.ActivationInput
 		return err
 	}
 	replacementLiveTunnelSession := state.liveTunnelSession
+	if state.egressTokenProvider != nil {
+		if err := state.egressTokenProvider.AttachSession(replacementLiveTunnelSession); err != nil {
+			state.restoreInitializedActivationTunnel(
+				previousBootstrapTunnel,
+				previousLiveTunnelSession,
+				previousTunnelHealthSnapshot,
+				replacementTunnel,
+				replacementLiveTunnelSession,
+				timeutil.SystemClock{},
+			)
+			_ = RecordOperationPhaseFailure(state.diagnosticsLogger, timeutil.SystemClock{}, "start_tunnel_session", map[string]any{"error": err.Error()})
+			return err
+		}
+	}
 	if err := RecordOperationPhaseCompletedWithAttributes(state.diagnosticsLogger, timeutil.SystemClock{}, "start_tunnel_session", TimelineAttributes("tunnel", "Connecting tunnel")); err != nil {
 		return err
 	}
@@ -534,6 +549,32 @@ func (state *State) ActivateInitialized(activationInput protocol.ActivationInput
 	if err := RecordOperationPhaseCompletedWithAttributes(state.diagnosticsLogger, timeutil.SystemClock{}, "apply_git_identity", TimelineAttributes("git-identity", "Configuring Git")); err != nil {
 		return err
 	}
+	if state.egressTokenProvider != nil {
+		if err := state.egressTokenProvider.SetActingUserID(sessionInput.ActingUserID); err != nil {
+			state.restoreInitializedActivationTunnel(
+				previousBootstrapTunnel,
+				previousLiveTunnelSession,
+				previousTunnelHealthSnapshot,
+				replacementTunnel,
+				replacementLiveTunnelSession,
+				timeutil.SystemClock{},
+			)
+			var restoreErrors []error
+			if restoreErr := state.egressTokenProvider.AttachSession(previousLiveTunnelSession); restoreErr != nil {
+				restoreErrors = append(restoreErrors, restoreErr)
+			}
+			if restoreErr := state.egressTokenProvider.SetActingUserID(previousSessionInput.ActingUserID); restoreErr != nil {
+				restoreErrors = append(restoreErrors, restoreErr)
+			}
+			if restoreErr := restoreGitIdentityForInitializedActivation(previousSessionInput, state.globalGitConfigPath); restoreErr != nil {
+				restoreErrors = append(restoreErrors, restoreErr)
+			}
+			if len(restoreErrors) > 0 {
+				return errors.Join(append([]error{err}, restoreErrors...)...)
+			}
+			return err
+		}
+	}
 	if err := RecordOperationPhaseStartedWithAttributes(state.diagnosticsLogger, timeutil.SystemClock{}, "attach_runtime_environment", TimelineAttributes("runtime-environment", "Configuring runtime environment")); err != nil {
 		return err
 	}
@@ -557,6 +598,14 @@ func (state *State) ActivateInitialized(activationInput protocol.ActivationInput
 				timeutil.SystemClock{},
 			)
 			var restoreErrors []error
+			if state.egressTokenProvider != nil {
+				if restoreErr := state.egressTokenProvider.AttachSession(previousLiveTunnelSession); restoreErr != nil {
+					restoreErrors = append(restoreErrors, restoreErr)
+				}
+				if restoreErr := state.egressTokenProvider.SetActingUserID(previousSessionInput.ActingUserID); restoreErr != nil {
+					restoreErrors = append(restoreErrors, restoreErr)
+				}
+			}
 			if restoreErr := state.restoreEgressProxyForInitializedActivation(previousEgressProxy, previousSessionInput, timeutil.SystemClock{}); restoreErr != nil {
 				restoreErrors = append(restoreErrors, restoreErr)
 			}
@@ -910,10 +959,14 @@ func (state *State) startEgressProxy(
 		)
 		return nil, fmt.Errorf("bootstrap tunnel session is required before starting local egress proxy")
 	}
+	tokenProvider, err := state.egressTokenProviderForSession(sessionInput)
+	if err != nil {
+		return nil, err
+	}
 	egressProxy, err := egressproxy.StartManagedProxy(
 		runtimePlan,
 		sessionInput,
-		state.liveTunnelSession.EgressTokenProvider(sessionInput.ActingUserID),
+		tokenProvider,
 		clock,
 		state.supervisorHandle,
 		state.egressProxyOptions,
@@ -940,6 +993,21 @@ func (state *State) startEgressProxy(
 		return nil, nil
 	}
 	return egressProxy.RuntimeEnvironment(), nil
+}
+
+func (state *State) egressTokenProviderForSession(sessionInput protocol.SessionRuntimeInput) (tunnel.LiveTunnelEgressTokenProvider, error) {
+	if state.egressTokenProvider == nil {
+		provider := state.liveTunnelSession.EgressTokenProvider(sessionInput.ActingUserID)
+		state.egressTokenProvider = &provider
+		return provider, nil
+	}
+	if err := state.egressTokenProvider.AttachSession(state.liveTunnelSession); err != nil {
+		return tunnel.LiveTunnelEgressTokenProvider{}, err
+	}
+	if err := state.egressTokenProvider.SetActingUserID(sessionInput.ActingUserID); err != nil {
+		return tunnel.LiveTunnelEgressTokenProvider{}, err
+	}
+	return *state.egressTokenProvider, nil
 }
 
 func (state *State) startRuntimeCoordination(clock timeutil.Clock) {

@@ -40,7 +40,7 @@ func SearchFiles(channel tunnelprotocol.StreamChannel, query tunnelprotocol.File
 		if relativePath == "." {
 			return nil
 		}
-		score, ok := fileSearchScore(relativePath, normalizedQuery)
+		score, ok := fileSearchPathScore(relativePath, normalizedQuery, directoryEntry.IsDir())
 		if !ok {
 			return nil
 		}
@@ -136,4 +136,12 @@ func fileSearchScore(path string, normalizedQuery string) (int, bool) {
 		return 0, false
 	}
 	return 1000 + lastIndex - firstIndex, true
+}
+
+func fileSearchPathScore(path string, normalizedQuery string, isDirectory bool) (int, bool) {
+	score, ok := fileSearchScore(path, normalizedQuery)
+	if ok || !isDirectory {
+		return score, ok
+	}
+	return fileSearchScore(path+"/", normalizedQuery)
 }

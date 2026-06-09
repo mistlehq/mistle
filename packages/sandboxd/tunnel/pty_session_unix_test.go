@@ -44,7 +44,7 @@ func TestScopedPTYSessionAttachesProcessToUserScope(t *testing.T) {
 		t.Fatalf("expected pty user scope")
 	}
 	assertEqual(t, readPTYTestFile(t, session.scopePaths.ProcsFile), strconv.FormatUint(uint64(session.ProcessID()), 10)+"\n")
-	if scopeName := filepath.Base(session.scopePaths.ScopeRoot); !strings.HasPrefix(scopeName, "pty-") {
+	if scopeName := filepath.Base(session.scopePaths.ScopeRoot); !strings.HasPrefix(scopeName, "scope_") {
 		t.Fatalf("expected pty user scope name, got %q", scopeName)
 	}
 	waitForPTYExit(t, session, nil)

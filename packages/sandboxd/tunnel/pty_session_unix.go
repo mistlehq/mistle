@@ -79,21 +79,37 @@ func startPTYSession(request PTYSpawnRequest, cgroupRoot string, sandboxInstance
 		events:    make(chan PTYEvent, 32),
 	}
 	if cgroupRoot != "" {
-		scopeID := fmt.Sprintf("pty-%d", ptyScopeCounter.Add(1))
+		scopeID := fmt.Sprintf("scope_%d_%d", time.Now().UnixMilli(), ptyScopeCounter.Add(1))
 		scopePaths, err := cgroups.CreateUserScope(cgroupRoot, sandboxInstanceID, scopeID)
 		if err != nil {
 			_, _ = session.Terminate(DefaultPTYTerminatePollInterval, DefaultPTYTerminateTimeout)
 			return nil, fmt.Errorf("failed to create pty user scope: %w", err)
 		}
 		if err := cgroups.AttachPIDToScope(scopePaths, session.processID); err != nil {
-			_, _ = session.Terminate(DefaultPTYTerminatePollInterval, DefaultPTYTerminateTimeout)
-			return nil, fmt.Errorf("failed to attach pty process to user scope: %w", err)
+			var cgroupErr *cgroups.CgroupError
+			if !errors.As(err, &cgroupErr) || !cgroupErr.IsMissingProcess() || !session.waitForExit(100*time.Millisecond) {
+				_, _ = session.Terminate(DefaultPTYTerminatePollInterval, DefaultPTYTerminateTimeout)
+				return nil, fmt.Errorf("failed to attach pty process to user scope: %w", err)
+			}
 		}
 		session.scopePaths = &scopePaths
 	}
 	go session.readLoop()
 	go session.waitLoop()
 	return session, nil
+}
+
+func (session *PTYSession) waitForExit(timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for {
+		if session.ExitCode() != nil {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
 }
 
 func buildPTYEnvironment(env map[string]string) []string {
