@@ -28,6 +28,8 @@ import {
   createSandboxInstancePortAccess,
   redeemPortAccessLink,
 } from "../src/features/sessions/sessions-service.js";
+import { resolveSessionFromAuthPayload } from "../src/features/shell/session-query-result.js";
+import { authClient, resetAuthClientForTest } from "../src/lib/auth/client.js";
 import { resetControlPlaneApiClientForTest } from "../src/lib/control-plane-api/client.js";
 
 const execFileAsync = promisify(execFile);
@@ -40,6 +42,57 @@ const it = createIntegrationTest({
 });
 
 const IntegrationDashboardBaseUrl = "http://localhost:5173";
+
+it("resolves the dashboard session from the real control-plane API", async ({ env }) => {
+  const session = await env.auth.createSession({
+    organizationName: "Dashboard Integration",
+  });
+
+  const backendSessionResponse = await env.controlPlaneApi.http.fetch("/v1/auth/get-session", {
+    headers: {
+      cookie: session.cookie,
+    },
+  });
+  expect(backendSessionResponse.status).toBe(200);
+
+  const backendSessionPayload = await backendSessionResponse.json();
+  expect(backendSessionPayload).toMatchObject({
+    session: {
+      activeOrganizationId: session.organizationId,
+    },
+    user: {
+      email: session.email,
+    },
+  });
+
+  try {
+    configureDashboardForControlPlaneApi(env);
+
+    const dashboardAuthResponse = await authClient.getSession({
+      fetchOptions: {
+        headers: {
+          cookie: session.cookie,
+          [TestEnvironmentIdHeader]: env.id,
+        },
+      },
+    });
+    const dashboardSession = resolveSessionFromAuthPayload({
+      data: dashboardAuthResponse.data,
+      error: dashboardAuthResponse.error,
+    });
+
+    expect(dashboardSession).toMatchObject({
+      session: {
+        activeOrganizationId: session.organizationId,
+      },
+      user: {
+        email: session.email,
+      },
+    });
+  } finally {
+    resetDashboardClientState();
+  }
+});
 
 it("creates sandbox port access through the real control-plane API", async ({ env }) => {
   const session = await env.auth.createSession({
@@ -72,12 +125,7 @@ it("creates sandbox port access through the real control-plane API", async ({ en
     });
     await waitForGatewayRuntimeReady(env, sandboxInstanceId);
 
-    Object.assign(import.meta.env, {
-      VITE_CONTROL_PLANE_API_ORIGIN: env.controlPlaneApi.hostBaseUrl,
-      VITE_MISTLE_RELEASE_VERSION: "0.18.1",
-    });
-    resetDashboardConfigForTest();
-    resetControlPlaneApiClientForTest();
+    configureDashboardForControlPlaneApi(env);
     setControlPlaneRequestHeadersForTest({
       cookie: session.cookie,
       [TestEnvironmentIdHeader]: env.id,
@@ -120,10 +168,23 @@ it("creates sandbox port access through the real control-plane API", async ({ en
     await closeIfOpen(bootstrapSocket);
     await destroyDockerSandboxContainer(providerSandboxId);
     setControlPlaneRequestHeadersForTest(undefined);
-    resetDashboardConfigForTest();
-    resetControlPlaneApiClientForTest();
+    resetDashboardClientState();
   }
 });
+
+function configureDashboardForControlPlaneApi(env: IntegrationTestEnvironment): void {
+  Object.assign(import.meta.env, {
+    VITE_CONTROL_PLANE_API_ORIGIN: env.controlPlaneApi.hostBaseUrl,
+    VITE_MISTLE_RELEASE_VERSION: "0.18.1",
+  });
+  resetDashboardClientState();
+}
+
+function resetDashboardClientState(): void {
+  resetDashboardConfigForTest();
+  resetAuthClientForTest();
+  resetControlPlaneApiClientForTest();
+}
 
 async function startDockerSandboxContainer(): Promise<string> {
   const { stdout } = await execFileAsync("docker", ["run", "-d", "registry:3"]);
