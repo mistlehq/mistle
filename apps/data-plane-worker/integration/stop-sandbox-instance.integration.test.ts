@@ -11,13 +11,64 @@ import {
 
 const {
   it,
+  insertRunningSandboxInstance,
   insertStoppedSandboxInstance,
+  expectSandboxStopped,
+  expectSandboxFailed,
+  expectSandboxFailedUsageEvent,
   connectBootstrapSocket,
   waitForRuntimeState,
   closeIfOpen,
 } = createStopSandboxBootstrapAttachmentTestHarness();
 
-describe("data-plane worker stop sandbox stale bootstrap attachment cleanup", () => {
+describe("data-plane worker stop sandbox cleanup", () => {
+  it(
+    "finalizes a running sandbox through the stop workflow",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertRunningSandboxInstance(env, sandboxInstanceId);
+
+      const handle = await env.dataPlaneWorkflow.runWorkflow(StopSandboxInstanceWorkflowSpec, {
+        sandboxInstanceId,
+        stopReason: SandboxStopReasons.USER,
+      });
+      await expect(handle.result({ timeoutMs: 15_000 })).resolves.toEqual({
+        sandboxInstanceId,
+        executed: true,
+        outcome: "stopped",
+      });
+
+      await expectSandboxStopped(env, sandboxInstanceId, SandboxStopReasons.USER);
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "fails a running sandbox stop when the provider runtime is missing",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertRunningSandboxInstance(env, sandboxInstanceId, {
+        providerSandboxId: `missing-${sandboxInstanceId}`,
+      });
+
+      const handle = await env.dataPlaneWorkflow.runWorkflow(StopSandboxInstanceWorkflowSpec, {
+        sandboxInstanceId,
+        stopReason: SandboxStopReasons.USER,
+      });
+      await expect(handle.result({ timeoutMs: 15_000 })).rejects.toThrow(
+        "provider_runtime_missing",
+      );
+      await expectSandboxFailed(env, sandboxInstanceId, {
+        failureCode: "provider_runtime_missing",
+        failureMessage: "Sandbox runtime was not found at the provider during stop execution.",
+      });
+      await expectSandboxFailedUsageEvent(env, sandboxInstanceId, {
+        providerSandboxId: `missing-${sandboxInstanceId}`,
+      });
+    },
+    TestTimeoutMs,
+  );
+
   it(
     "terminates a stale bootstrap attachment when the stop workflow observes an already-stopped sandbox",
     async ({ env }) => {
