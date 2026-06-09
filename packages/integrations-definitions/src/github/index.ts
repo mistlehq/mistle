@@ -18,7 +18,13 @@ export {
 } from "./shared/app-manifest.js";
 export { GitHubAppInstallationCredentialResolver } from "./shared/credential-resolver.server.js";
 export {
+  createGitHubPullRequestProviderResourceId,
   isGitHubPullRequestCreationRequest,
   observeGitHubRoutableResourceFromEgressResponse,
   type GitHubRoutableResourceObservation,
 } from "./shared/provider-resource-associations.js";
+export {
+  observeGitHubAssociatedResourceFromWebhookEvent,
+  type GitHubAssociatedResourceRenderedInput,
+  type GitHubAssociatedResourceWebhookObservation,
+} from "./shared/provider-resource-association-webhooks.js";

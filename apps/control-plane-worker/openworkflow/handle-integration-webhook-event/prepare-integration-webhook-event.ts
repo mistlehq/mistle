@@ -1,3 +1,4 @@
+import type { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
   TriggerRunStatuses,
   IntegrationWebhookEventStatuses,
@@ -7,6 +8,10 @@ import {
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import type { HandleIntegrationWebhookEventWorkflowInput } from "@mistle/workflow-registry/control-plane";
 
+import {
+  prepareProviderResourceAssociationDeliveries,
+  type QueuedProviderResourceAssociationDelivery,
+} from "./prepare-provider-resource-association-deliveries.js";
 import { resolveResourceSyncKindsForWebhookEvent } from "./resolve-resource-sync-kinds-for-webhook-event.js";
 import { resolveWebhookTriggerTargets } from "./resolve-webhook-trigger-targets.js";
 import { updateWebhookEventStatus } from "./update-webhook-event-status.js";
@@ -24,6 +29,7 @@ export type PrepareIntegrationWebhookEventOutput = {
   targetKey: string;
   webhookEventStatus: (typeof IntegrationWebhookEventStatuses)[keyof typeof IntegrationWebhookEventStatuses];
   triggerRunIds: ReadonlyArray<string>;
+  providerResourceAssociationDeliveries: ReadonlyArray<QueuedProviderResourceAssociationDelivery>;
   resourceSyncRequests: ReadonlyArray<IntegrationWebhookResourceSyncRequest>;
   finalized: boolean;
 };
@@ -38,6 +44,7 @@ function isTerminalWebhookEventStatus(input: string): boolean {
 
 export async function prepareIntegrationWebhookEvent(
   ctx: {
+    controlPlaneInternalClient: Pick<ControlPlaneInternalClient, "getSandboxInstance">;
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
   },
@@ -58,6 +65,7 @@ export async function prepareIntegrationWebhookEvent(
       externalDeliveryId: webhookEvent.externalDeliveryId,
       finalized: true,
       integrationConnectionId: webhookEvent.integrationConnectionId,
+      providerResourceAssociationDeliveries: [],
       resourceSyncRequests: [],
       targetKey: webhookEvent.targetKey,
       webhookEventStatus: webhookEvent.status,
@@ -96,6 +104,7 @@ export async function prepareIntegrationWebhookEvent(
           externalDeliveryId: webhookEvent.externalDeliveryId,
           finalized: true,
           integrationConnectionId: webhookEvent.integrationConnectionId,
+          providerResourceAssociationDeliveries: [],
           resourceSyncRequests: [],
           targetKey: webhookEvent.targetKey,
           webhookEventStatus: currentWebhookEvent.status,
@@ -130,7 +139,22 @@ export async function prepareIntegrationWebhookEvent(
       eventType: webhookEvent.eventType,
       payload: webhookEvent.payload,
     });
-    if (resolvedTargets.length === 0 && resourceSyncKinds.length === 0) {
+    const providerResourceAssociationDeliveries =
+      await prepareProviderResourceAssociationDeliveries(
+        {
+          controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+          db: ctx.db,
+        },
+        {
+          webhookEvent,
+        },
+      );
+
+    if (
+      resolvedTargets.length === 0 &&
+      resourceSyncKinds.length === 0 &&
+      providerResourceAssociationDeliveries.length === 0
+    ) {
       await updateWebhookEventStatus({
         db: ctx.db,
         webhookEventId: input.webhookEventId,
@@ -144,6 +168,7 @@ export async function prepareIntegrationWebhookEvent(
         externalDeliveryId: webhookEvent.externalDeliveryId,
         finalized: true,
         integrationConnectionId: webhookEvent.integrationConnectionId,
+        providerResourceAssociationDeliveries: [],
         resourceSyncRequests: [],
         targetKey: webhookEvent.targetKey,
         webhookEventStatus: IntegrationWebhookEventStatuses.IGNORED,
@@ -190,6 +215,7 @@ export async function prepareIntegrationWebhookEvent(
       externalDeliveryId: webhookEvent.externalDeliveryId,
       finalized: false,
       integrationConnectionId: webhookEvent.integrationConnectionId,
+      providerResourceAssociationDeliveries,
       resourceSyncRequests,
       targetKey: webhookEvent.targetKey,
       webhookEventStatus: IntegrationWebhookEventStatuses.PROCESSING,

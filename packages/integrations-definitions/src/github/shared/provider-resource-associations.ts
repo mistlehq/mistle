@@ -89,7 +89,7 @@ function observeGraphqlPullRequestCreationResponse(
   };
 }
 
-function createGitHubPullRequestProviderResourceId(input: {
+export function createGitHubPullRequestProviderResourceId(input: {
   pullRequestNumber: number;
   repositoryFullName: string;
 }): string {

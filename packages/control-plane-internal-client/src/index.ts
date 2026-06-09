@@ -328,9 +328,11 @@ export class ControlPlaneInternalClient {
       return result.data;
     }
 
-    throw new Error(
-      `Control-plane internal sandbox read failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
-    );
+    throw new ControlPlaneInternalClientRequestError({
+      status: result.response.status,
+      code: extractErrorCode(result.error),
+      message: `Control-plane internal sandbox read failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+    });
   }
 
   async requestIntegrationConnectionResourceRefresh(

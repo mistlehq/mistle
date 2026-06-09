@@ -2,19 +2,29 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
+import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
   TriggerKinds,
   TriggerRunStatuses,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
   IntegrationWebhookEventStatuses,
+  ProviderResourceAssociationDeliveryProcessorStatuses,
+  ProviderResourceAssociationDeliveryStatuses,
 } from "@mistle/db/control-plane";
+import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import type { CompiledRuntimePlan } from "@mistle/integrations-core";
+import {
+  AssociatedProviderResourceKinds,
+  AssociatedResourceEventTypes,
+} from "@mistle/integrations-core";
 import {
   createIntegrationRegistry,
   OpenAiApiKeyDefinition,
 } from "@mistle/integrations-definitions/server";
 import {
   createIntegrationTest,
+  TestEnvironmentIdHeader,
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
@@ -22,9 +32,10 @@ import { describe, expect } from "vitest";
 import { prepareIntegrationWebhookEvent } from "../openworkflow/handle-integration-webhook-event/prepare-integration-webhook-event.js";
 
 const it = createIntegrationTest({
-  services: ["control-plane-worker"],
+  services: ["control-plane-worker", "control-plane-api", "data-plane-api"],
 });
 
+const InternalServiceToken = "integration-new-internal-service-token";
 const OpenAiAgentTargetConfig = {
   api_base_url: "https://api.openai.com/v1",
 };
@@ -67,6 +78,7 @@ describe.concurrent("control-plane worker integration webhook event handling", (
 
     const preparedEvent = await prepareIntegrationWebhookEvent(
       {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
         db: env.controlPlaneDb,
         integrationRegistry: createIntegrationRegistry(),
       },
@@ -94,6 +106,128 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       triggerId: scope.triggerId,
       triggerTargetId: scope.triggerTargetId,
       status: TriggerRunStatuses.QUEUED,
+    });
+  });
+
+  it("queues trigger runs and provider resource association deliveries for the same webhook event", async ({
+    env,
+  }) => {
+    const scope = await seedWebhookEventScope({
+      env,
+      suffix: createSuffix("association_delivery"),
+      familyId: "github",
+      variantId: "github-cloud",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      connectionConfig: {},
+      eventType: "github.issue_comment.created",
+      providerEventType: "issue_comment",
+      payloadFilter: {
+        "github.issue_comment.created": {
+          op: "contains_token",
+          path: ["comment", "body"],
+          value: "@mistlebot",
+        },
+      },
+      payload: {
+        repository: {
+          full_name: "mistlehq/mistle",
+        },
+        issue: {
+          number: 42,
+          pull_request: {},
+        },
+        comment: {
+          body: "please run @mistlebot",
+        },
+        sender: {
+          login: "octocat",
+        },
+      },
+      externalEventId: "evt_association_delivery",
+      externalDeliveryId: "delivery_association_delivery",
+    });
+    const sandboxInstanceId = "sbi_association_delivery";
+    const associationId = "pra_association_delivery";
+    const staleAssociationId = "pra_association_delivery_stale";
+
+    await seedSandboxInstance({
+      env,
+      organizationId: scope.organizationId,
+      sandboxInstanceId,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.providerResourceAssociations).values({
+      id: associationId,
+      integrationConnectionId: scope.connectionId,
+      resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+      providerResourceId: "mistlehq/mistle#42",
+      sandboxInstanceId,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.providerResourceAssociations).values({
+      id: staleAssociationId,
+      integrationConnectionId: scope.connectionId,
+      resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+      providerResourceId: "mistlehq/mistle#42",
+      sandboxInstanceId: "sbi_missing_association_delivery",
+    });
+
+    const preparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+
+    expect(preparedEvent).toMatchObject({
+      webhookEventId: scope.webhookEventId,
+      webhookEventStatus: IntegrationWebhookEventStatuses.PROCESSING,
+      finalized: false,
+    });
+    expect(preparedEvent.triggerRunIds).toHaveLength(1);
+    expect(preparedEvent.providerResourceAssociationDeliveries).toHaveLength(1);
+    expect(preparedEvent.providerResourceAssociationDeliveries[0]).toMatchObject({
+      providerResourceAssociationId: associationId,
+    });
+
+    const queuedDeliveries =
+      await env.controlPlaneDb.query.providerResourceAssociationDeliveries.findMany({
+        where: (table, { eq }) => eq(table.sourceWebhookEventId, scope.webhookEventId),
+      });
+    expect(queuedDeliveries).toHaveLength(1);
+    expect(queuedDeliveries[0]).toMatchObject({
+      providerResourceAssociationId: associationId,
+      sourceWebhookEventId: scope.webhookEventId,
+      sourceOrderKey: "2026-03-09T00:00:00Z#0001",
+      status: ProviderResourceAssociationDeliveryStatuses.QUEUED,
+      renderedInput: {
+        kind: "github.pull_request.associated_resource_event",
+        eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+        resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+        providerResourceId: "mistlehq/mistle#42",
+        text: [
+          "GitHub pull request issue comment created",
+          "Repository: mistlehq/mistle",
+          "Pull request: #42",
+          "Author: octocat",
+          "",
+          "please run @mistlebot",
+        ].join("\n"),
+      },
+    });
+
+    const processor =
+      await env.controlPlaneDb.query.providerResourceAssociationDeliveryProcessors.findFirst({
+        where: (table, { eq }) => eq(table.providerResourceAssociationId, associationId),
+      });
+    expect(processor).toMatchObject({
+      providerResourceAssociationId: associationId,
+      status: ProviderResourceAssociationDeliveryProcessorStatuses.IDLE,
     });
   });
 
@@ -130,6 +264,7 @@ describe.concurrent("control-plane worker integration webhook event handling", (
 
     const preparedEvent = await prepareIntegrationWebhookEvent(
       {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
         db: env.controlPlaneDb,
         integrationRegistry: createIntegrationRegistry(),
       },
@@ -145,6 +280,7 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       targetKey: scope.targetKey,
       webhookEventStatus: IntegrationWebhookEventStatuses.IGNORED,
       triggerRunIds: [],
+      providerResourceAssociationDeliveries: [],
       resourceSyncRequests: [],
       finalized: true,
     });
@@ -189,6 +325,7 @@ describe.concurrent("control-plane worker integration webhook event handling", (
 
     const preparedEvent = await prepareIntegrationWebhookEvent(
       {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
         db: env.controlPlaneDb,
         integrationRegistry: createIntegrationRegistry(),
       },
@@ -231,6 +368,7 @@ describe.concurrent("control-plane worker integration webhook event handling", (
 
     const preparedEvent = await prepareIntegrationWebhookEvent(
       {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
         db: env.controlPlaneDb,
         integrationRegistry: createIntegrationRegistry(),
       },
@@ -449,6 +587,69 @@ async function seedOpenAiAgentBinding(input: {
       kind: IntegrationBindingKinds.AGENT,
       config: {},
     });
+}
+
+async function seedSandboxInstance(input: {
+  env: IntegrationTestEnvironment;
+  organizationId: string;
+  sandboxInstanceId: string;
+}): Promise<void> {
+  await input.env.dataPlaneDb.insert(input.env.dataPlaneTables.sandboxInstances).values({
+    id: input.sandboxInstanceId,
+    organizationId: input.organizationId,
+    sandboxProfileId: "sbp_association_delivery",
+    sandboxProfileVersion: 1,
+    runtimeProvider: "docker",
+    providerSandboxId: `provider-${input.sandboxInstanceId}`,
+    status: SandboxInstanceStatuses.STARTING,
+    startedByKind: "system",
+    startedById: "workflow_association_delivery",
+    source: "webhook",
+  });
+
+  await input.env.dataPlaneDb.insert(input.env.dataPlaneTables.sandboxInstanceRuntimePlans).values({
+    sandboxInstanceId: input.sandboxInstanceId,
+    revision: 1,
+    compiledRuntimePlan: createRuntimePlan(),
+    compiledFromProfileId: "sbp_association_delivery",
+    compiledFromProfileVersion: 1,
+  });
+}
+
+function createRuntimePlan(): CompiledRuntimePlan {
+  return {
+    sandboxProfileId: "sbp_association_delivery",
+    version: 1,
+    image: {
+      source: "base",
+      imageRef: "sandbox-base",
+    },
+    egressRoutes: [],
+    artifacts: [],
+    workspaceSources: [],
+    associatedResourceEventRouting: {
+      enabled: true,
+      resources: [
+        {
+          resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+          eventTypes: [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED],
+        },
+      ],
+    },
+    runtimeClients: [],
+    agentRuntimes: [],
+  };
+}
+
+function createControlPlaneInternalClient(
+  env: IntegrationTestEnvironment,
+): ControlPlaneInternalClient {
+  return new ControlPlaneInternalClient({
+    baseUrl: env.controlPlaneApi.hostBaseUrl,
+    internalAuthServiceToken: InternalServiceToken,
+    testEnvironmentId: env.id,
+    testEnvironmentIdHeader: TestEnvironmentIdHeader,
+  });
 }
 
 function createSuffix(label: string): string {

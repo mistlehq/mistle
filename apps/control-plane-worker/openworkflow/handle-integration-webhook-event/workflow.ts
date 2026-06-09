@@ -40,6 +40,7 @@ export const HandleIntegrationWebhookEventWorkflow = defineTracedControlPlaneWor
         async (span) => {
           const preparedEvent = await prepareIntegrationWebhookEvent(
             {
+              controlPlaneInternalClient,
               db,
               integrationRegistry,
             },
@@ -56,6 +57,8 @@ export const HandleIntegrationWebhookEventWorkflow = defineTracedControlPlaneWor
             "mistle.trigger.run.count": preparedEvent.triggerRunIds.length,
             "mistle.webhook.event_status": preparedEvent.webhookEventStatus,
             "mistle.webhook.finalized": preparedEvent.finalized,
+            "mistle.webhook.provider_resource_association_delivery.count":
+              preparedEvent.providerResourceAssociationDeliveries.length,
             "mistle.webhook.resource_sync.count": preparedEvent.resourceSyncRequests.length,
           });
 
@@ -73,6 +76,8 @@ export const HandleIntegrationWebhookEventWorkflow = defineTracedControlPlaneWor
         "mistle.trigger.run.count": preparedWebhookEvent.triggerRunIds.length,
         "mistle.webhook.event_status": preparedWebhookEvent.webhookEventStatus,
         "mistle.webhook.finalized": preparedWebhookEvent.finalized,
+        "mistle.webhook.provider_resource_association_delivery.count":
+          preparedWebhookEvent.providerResourceAssociationDeliveries.length,
         "mistle.webhook.resource_sync.count": preparedWebhookEvent.resourceSyncRequests.length,
       });
 
