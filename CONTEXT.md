@@ -192,6 +192,10 @@ _Avoid_: Chat session when referring to runtime tools or sandbox state
 The customer-facing **Sandbox provider** option where Mistle operates the sandbox and manages the underlying provider choice.
 _Avoid_: Managed provider, managed Docker, managed E2B, managed Tensorlake
 
+**Mistle sandbox resource baseline**:
+The customer-facing default compute and disk allocation for new or newly selected **Mistle sandbox provider** configurations.
+_Avoid_: Provider default, minimum resources
+
 **Sandbox session title**:
 The Mistle-owned display title for a **Sandbox session**.
 _Avoid_: Conversation name, provider title
@@ -637,6 +641,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Public skills source** does not require a Git integration binding.
 - **Mistle resource access** is configured when a **Sandbox profile version** has a selected organization API key for that access.
 - **Mistle resource access** is bounded by the selected organization API key's permissions, not by the **Sandbox profile version** that selected the key.
+- The **Mistle sandbox resource baseline** may differ from the underlying provider's own resource defaults.
 
 ## Example Dialogue
 
@@ -681,6 +686,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - An **Unavailable resource** reached through a deep link should keep the attempted location and rely on ordinary product navigation for recovery.
 - Unauthenticated deep links may become available after sign-in — resolved: **Unavailable resource** is an authenticated product state, not a replacement for sign-in.
 - "chat session" could mean either the live sandbox environment or a Codex conversation — resolved: use **Sandbox session** for the live environment and **Codex thread** for the conversation.
+- "default resources" could mean provider-owned capability defaults or the customer-facing **Mistle sandbox resource baseline** — resolved: use **Mistle sandbox resource baseline** for Mistle-owned sandbox-provider defaults.
 - "Pi thread" could imply Codex-style thread navigation — resolved: use **Pi conversation** for Pi's runtime-owned chat object.
 - "active thread" could imply a different sandbox — resolved: use **Active Codex thread** for the selected chat conversation inside the same **Sandbox session**.
 - Switching threads could imply changing the whole workbench — resolved: thread switching changes the **Active Codex thread** without changing the **Sandbox session**.

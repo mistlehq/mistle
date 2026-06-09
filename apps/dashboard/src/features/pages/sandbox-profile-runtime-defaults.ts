@@ -13,6 +13,12 @@ const ManagedSandboxProviderPreference = [
   DockerSandboxProviderId,
 ] as const;
 
+const MistleSandboxResourceBaseline = {
+  vcpuCount: 2,
+  memoryMb: 8192,
+  diskMb: 10240,
+} satisfies NonNullable<SandboxProfileVersion["sandboxResources"]>;
+
 export type CreateSandboxProfileDefaultRuntimeConfig = {
   sandboxProvider: string;
   sandboxResources: SandboxProfileVersion["sandboxResources"];
@@ -47,6 +53,22 @@ export function createDefaultSandboxResources(
   };
 }
 
+export function createDefaultMistleSandboxResources(
+  provider: SandboxProviderSummary,
+): SandboxProfileVersion["sandboxResources"] {
+  if (provider.resourceCapabilities === null) {
+    return null;
+  }
+
+  return {
+    vcpuCount: MistleSandboxResourceBaseline.vcpuCount,
+    memoryMb: MistleSandboxResourceBaseline.memoryMb,
+    ...(provider.resourceCapabilities.diskMb === undefined
+      ? {}
+      : { diskMb: MistleSandboxResourceBaseline.diskMb }),
+  };
+}
+
 export function createDefaultMistleSandboxRuntimeConfig(
   providers: readonly SandboxProviderSummary[],
 ): CreateSandboxProfileDefaultRuntimeConfig | undefined {
@@ -57,6 +79,6 @@ export function createDefaultMistleSandboxRuntimeConfig(
 
   return {
     sandboxProvider: managedProvider.id,
-    sandboxResources: createDefaultSandboxResources(managedProvider),
+    sandboxResources: createDefaultMistleSandboxResources(managedProvider),
   };
 }
