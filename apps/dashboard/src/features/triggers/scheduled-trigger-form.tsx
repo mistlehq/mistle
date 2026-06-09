@@ -2,14 +2,14 @@ import { Field, FieldContent, FieldHeader, FieldLabel, Input } from "@mistle/ui"
 import { useMemo, type ReactNode } from "react";
 
 import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
+import { FormPageSection } from "../shared/form-page.js";
 import {
   createTimezoneOptions,
   formatCronExpressionBreakdownDiagram,
   resolveCronExpressionBreakdown,
-  resolveSnapshotRefreshScheduleBehaviorDescription,
+  resolveScheduleBehaviorDescription,
   type CronExpressionBreakdown,
-} from "../pages/sandbox-profile-editor-page-model.js";
-import { FormPageSection } from "../shared/form-page.js";
+} from "../shared/schedule-presentation.js";
 import { ScheduledTriggerConversationOptions } from "./scheduled-trigger-form-helpers.js";
 import { resolveScheduledTriggerFormPresentation } from "./scheduled-trigger-form-state.js";
 import type {
@@ -86,9 +86,11 @@ export function ScheduledTriggerTypeSpecificSection(
     () => createTimezoneOptions(input.values.timezone),
     [input.values.timezone],
   );
-  const scheduleBehaviorDescription = resolveSnapshotRefreshScheduleBehaviorDescription({
+  const scheduleBehaviorDescription = resolveScheduleBehaviorDescription({
     after: previewAfter,
     cronExpression: input.values.cronExpression,
+    occurrenceLabel: "run",
+    previewPrompt: "Enter a valid cron expression and timezone to preview the schedule.",
     timezone: input.values.timezone,
   });
   const cronExpressionBreakdown = resolveCronExpressionBreakdown(input.values.cronExpression);

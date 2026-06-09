@@ -12,6 +12,7 @@ import { Link as RouterLink } from "react-router";
 
 import { IntegrationLogo } from "../integrations/integration-logo.js";
 import { formatCompactSandboxProfileVersion } from "../sandbox-profiles/sandbox-profile-version-labels.js";
+import { formatCronExpressionReadableSummary } from "../shared/schedule-presentation.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 import { resolveEventSummary } from "./trigger-list-event-summary.js";
@@ -100,6 +101,7 @@ function EventSummaryCell(input: {
 function ScheduleSummaryCell(input: {
   item: Extract<TriggerListItemViewModel["source"], { kind: "schedule" }>;
 }): React.JSX.Element {
+  const readableSchedule = formatCronExpressionReadableSummary(input.item.cronExpression);
   const scheduleTiming =
     input.item.nextScheduledAtLabel === null
       ? `Not scheduled · ${input.item.timezoneOffsetLabel}`
@@ -107,9 +109,14 @@ function ScheduleSummaryCell(input: {
 
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <span className="truncate font-mono text-xs text-foreground">
-        {input.item.cronExpression}
+      <span className="text-sm text-foreground">
+        {readableSchedule ?? input.item.cronExpression}
       </span>
+      {readableSchedule === null ? null : (
+        <span className="truncate font-mono text-xs text-muted-foreground">
+          {input.item.cronExpression}
+        </span>
+      )}
       <span className="truncate text-xs">{scheduleTiming}</span>
     </div>
   );

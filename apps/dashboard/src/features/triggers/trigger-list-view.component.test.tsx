@@ -57,4 +57,38 @@ describe("TriggerListView", () => {
     expect(screen.getByText("27 10 * * *")).toBeDefined();
     expect(screen.getByText("Next May 4, 2026, 10:27 AM GMT+8")).toBeDefined();
   });
+
+  it("shows a readable schedule summary before the raw cron expression", () => {
+    render(
+      <MemoryRouter>
+        <TriggerListView
+          activeFilter="all"
+          errorMessage={null}
+          hasNextPage={false}
+          hasPreviousPage={false}
+          items={[
+            {
+              ...ScheduleTrigger,
+              source: {
+                kind: "schedule",
+                cronExpression: "0 8-18/2 * * 1-5",
+                timezone: "Asia/Singapore",
+                nextScheduledAtLabel: "May 4, 2026, 10:27 AM",
+                timezoneOffsetLabel: "GMT+8",
+              },
+            },
+          ]}
+          onFilterChange={noop}
+          onNextPage={noop}
+          onPreviousPage={noop}
+          onSearchValueChange={noop}
+          searchValue=""
+          totalResults={1}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("Every 2 hours from 8 AM to 6 PM, Mon-Fri")).toBeDefined();
+    expect(screen.getByText("0 8-18/2 * * 1-5")).toBeDefined();
+  });
 });

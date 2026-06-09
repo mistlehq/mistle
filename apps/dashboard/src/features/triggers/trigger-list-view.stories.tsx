@@ -156,6 +156,28 @@ const ScheduleWithoutNextRunItem: TriggerListItemViewModel = {
   updatedAtLabel: "5 days ago",
 };
 
+const SteppedWeekdayScheduleItem: TriggerListItemViewModel = {
+  id: "trg_01jps9q9d0d9wdkd2w90vsy4ka",
+  kind: "schedule",
+  name: "Weekday business-hours triage",
+  enabled: true,
+  target: {
+    sandboxProfileId: "sbp_repo_maintainer",
+    sandboxProfileName: "Repo Maintainer",
+    sandboxProfileVersion: 3,
+    primaryRepositoryId: "mistlehq/platform",
+    primaryRepositoryName: "mistlehq/platform",
+  },
+  source: {
+    kind: "schedule",
+    cronExpression: "0 8-18/2 * * 1-5",
+    timezone: "Asia/Singapore",
+    nextScheduledAtLabel: "Jun 9, 2026, 8:00 AM",
+    timezoneOffsetLabel: "GMT+8",
+  },
+  updatedAtLabel: "just now",
+};
+
 const meta = {
   title: "Dashboard/Triggers/ListView",
   component: TriggerListView,
@@ -241,6 +263,13 @@ export const RowLevelIssue: Story = {
 export const ScheduleWithoutNextRun: Story = {
   args: {
     items: [ScheduleWithoutNextRunItem],
+    totalResults: 1,
+  },
+};
+
+export const SteppedWeekdaySchedule: Story = {
+  args: {
+    items: [SteppedWeekdayScheduleItem],
     totalResults: 1,
   },
 };
