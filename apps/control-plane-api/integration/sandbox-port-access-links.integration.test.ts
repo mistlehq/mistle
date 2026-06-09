@@ -51,6 +51,7 @@ describe.concurrent("sandbox Port Access links integration", () => {
         organizationId: session.organizationId,
         sandboxInstanceId,
         providerSandboxId,
+        status: SandboxInstanceStatuses.RUNNING,
       });
       bootstrapSocket = await attachBootstrapRuntime({
         env,
@@ -455,7 +456,7 @@ async function insertSandboxInstance(
     sandboxProfileVersion: 1,
     runtimeProvider: "docker",
     providerSandboxId: input.providerSandboxId ?? `provider-${input.sandboxInstanceId}`,
-    status: input.status ?? SandboxInstanceStatuses.RUNNING,
+    status: input.status ?? SandboxInstanceStatuses.PENDING,
     startedByKind: "user",
     startedById: "usr_port_access_link",
     source: SandboxInstanceSources.DASHBOARD,
