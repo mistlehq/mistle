@@ -83,13 +83,28 @@ const SkillsSourceRepos = {
 } satisfies SandboxProfileVersionSkillsSourceReposResult;
 
 describe("SandboxProfileSkillsSection", () => {
+  it("shows an empty state when no skills source is selected", () => {
+    renderSkillsSection({
+      version: createVersion(null),
+    });
+
+    const emptyState = screen.getByText("No skills source selected").closest("[data-slot='empty']");
+    expect(emptyState).not.toBeNull();
+    expect(
+      screen.getByText("Choose a repository to load selectable skills for this sandbox profile."),
+    ).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Source repository" }).textContent).toContain(
+      "Select skills source",
+    );
+  });
+
   it("shows add public GitHub repo as a separated source repository footer action", () => {
     renderSkillsSection({
       version: createVersion(null),
     });
 
     const sourceRepositorySelect = screen.getByRole("combobox", { name: "Source repository" });
-    expect(sourceRepositorySelect.textContent).toContain("None");
+    expect(sourceRepositorySelect.textContent).toContain("Select skills source");
 
     fireEvent.click(sourceRepositorySelect);
 
@@ -103,7 +118,57 @@ describe("SandboxProfileSkillsSection", () => {
     fireEvent.click(addPublicRepoOption);
 
     expect(screen.getByRole("dialog", { name: "Add public GitHub repo" })).toBeTruthy();
-    expect(sourceRepositorySelect.textContent).toContain("None");
+    expect(sourceRepositorySelect.textContent).toContain("Select skills source");
+  });
+
+  it("informs the user that loading skills will save the draft first", () => {
+    renderSkillsSection({
+      version: createVersion(null),
+    });
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Source repository" }));
+    fireEvent.click(screen.getByRole("option", { name: "Add public GitHub repo" }));
+    fireEvent.change(screen.getByLabelText("Repository URL"), {
+      target: { value: "https://github.com/acme/public-skills" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add repository" }));
+
+    expect(screen.getByRole("combobox", { name: "Source repository" }).textContent).toContain(
+      "acme/public-skills",
+    );
+    expect(screen.getByText("Draft will be saved")).toBeTruthy();
+    expect(screen.getByText("Loading skills will save this draft first.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Load skills" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Reload" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Load skills" }));
+
+    expect(screen.getByRole("dialog", { name: "Load skills?" })).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Mistle will save this draft first, then load skills from the selected skills source.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save and load skills" })).toBeTruthy();
+  });
+
+  it("does not show cached skills from a dirty source before the draft is saved", () => {
+    renderSkillsSection({
+      integrationRowsHaveUnpersistedChanges: true,
+      skillsSourceRepos: SkillsSourceRepos,
+      version: createVersion({
+        originUrl: SkillsOriginUrl,
+        selectedSkills: [],
+      }),
+    });
+
+    expect(screen.getByText("Draft will be saved")).toBeTruthy();
+    expect(screen.getByText("Loading skills will save this draft first.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Load skills" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Reload" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Available skills" })).toBeNull();
+    expect(screen.queryByText("pr-review")).toBeNull();
+    expect(screen.queryByText("release-notes")).toBeNull();
   });
 
   it("shows only selected skills when the profile is not editable", () => {
@@ -202,6 +267,7 @@ describe("SandboxProfileSkillsSection", () => {
 });
 
 function renderSkillsSection(input: {
+  integrationRowsHaveUnpersistedChanges?: boolean | undefined;
   isDraft?: boolean | undefined;
   readOnly?: boolean | undefined;
   skillsSourceRepos?: SandboxProfileVersionSkillsSourceReposResult | undefined;
@@ -226,7 +292,7 @@ function renderSkillsSection(input: {
         availableTargets={[GithubTarget]}
         disabled={false}
         integrationRows={[GithubBinding]}
-        integrationRowsHaveUnpersistedChanges={false}
+        integrationRowsHaveUnpersistedChanges={input.integrationRowsHaveUnpersistedChanges ?? false}
         isDraft={input.isDraft ?? true}
         profileId={input.version.sandboxProfileId}
         readOnly={input.readOnly ?? false}

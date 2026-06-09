@@ -7,6 +7,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
   Field,
   FieldContent,
   FieldHeader,
@@ -168,6 +172,14 @@ export function SandboxProfileSkillsSection(input: {
     sourceOptions: selectableSourceOptions,
   });
   const sourceIsUnavailable = saveBlockedMessage !== null;
+  const savedSelectedOriginUrl = persistedDraftConfig?.originUrl ?? null;
+  const selectedSourceUsesBoundIntegration =
+    selectedOriginUrl !== null &&
+    sourceOptions.some((sourceOption) => sourceOption.originUrl === selectedOriginUrl);
+  const selectedSourceHasUnpersistedChanges =
+    selectedOriginUrl !== null &&
+    (selectedOriginUrl !== savedSelectedOriginUrl ||
+      (selectedSourceUsesBoundIntegration && input.integrationRowsHaveUnpersistedChanges));
   const skillsSourceQuery = useQuery({
     queryKey: sandboxProfileVersionSkillsSourceReposQueryKey({
       profileId: input.profileId,
@@ -186,7 +198,7 @@ export function SandboxProfileSkillsSection(input: {
         signal,
       });
     },
-    enabled: selectedOriginUrl !== null,
+    enabled: selectedOriginUrl !== null && !selectedSourceHasUnpersistedChanges,
     retry: false,
   });
   const refreshMutation = useMutation({
@@ -221,7 +233,7 @@ export function SandboxProfileSkillsSection(input: {
   });
 
   const skillsSourceRepo =
-    selectedOriginUrl === null
+    selectedOriginUrl === null || selectedSourceHasUnpersistedChanges
       ? null
       : (skillsSourceQuery.data?.items.find((item) => item.originUrl === selectedOriginUrl) ??
         null);
@@ -257,19 +269,14 @@ export function SandboxProfileSkillsSection(input: {
   const fieldIsReadOnly = input.disabled || input.readOnly || !input.isDraft;
   const shouldShowEditableSkillCatalog = !fieldIsReadOnly && skillsSourceRepo !== null;
   const automaticLoadingIsEnabled = input.automaticLoadingEnabled !== false;
-  const queryLoadIsPending = selectedOriginUrl !== null && skillsSourceQuery.isPending;
+  const queryLoadIsPending =
+    selectedOriginUrl !== null &&
+    !selectedSourceHasUnpersistedChanges &&
+    skillsSourceQuery.isPending;
   const loadIsPending = queryLoadIsPending || refreshMutation.isPending;
   const actionIsPending = refreshMutation.isPending || saveAndReloadIsPending;
   const sourceControlIsDisabled = fieldIsReadOnly || loadIsPending;
   const selectedSourceValue = draftConfig === null ? NoSkillsSourceValue : draftConfig.originUrl;
-  const savedSelectedOriginUrl = persistedDraftConfig?.originUrl ?? null;
-  const selectedSourceUsesBoundIntegration =
-    selectedOriginUrl !== null &&
-    sourceOptions.some((sourceOption) => sourceOption.originUrl === selectedOriginUrl);
-  const selectedSourceHasUnpersistedChanges =
-    selectedOriginUrl !== null &&
-    (selectedOriginUrl !== savedSelectedOriginUrl ||
-      (selectedSourceUsesBoundIntegration && input.integrationRowsHaveUnpersistedChanges));
   const autoLoadKey =
     selectedOriginUrl === null
       ? null
@@ -337,7 +344,6 @@ export function SandboxProfileSkillsSection(input: {
       input.disabled ||
       !automaticLoadingIsEnabled ||
       sourceIsUnavailable ||
-      selectedOriginUrl !== savedSelectedOriginUrl ||
       selectedSourceHasUnpersistedChanges ||
       skillsSourceQuery.isPending ||
       skillsSourceQuery.isError ||
@@ -359,7 +365,6 @@ export function SandboxProfileSkillsSection(input: {
     input.isDraft,
     input.readOnly,
     refreshMutation,
-    savedSelectedOriginUrl,
     selectedOriginUrl,
     selectedSourceHasUnpersistedChanges,
     skillsSourceQuery.isError,
@@ -494,29 +499,26 @@ export function SandboxProfileSkillsSection(input: {
     }
   }
 
-  const loadErrorMessage =
-    skillsSourceQuery.isError && selectedOriginUrl !== null
-      ? resolveApiErrorMessage({
-          error: skillsSourceQuery.error,
-          fallbackMessage: "Could not load sandbox profile skills.",
-        })
-      : null;
+  const queryErrorIsRelevant =
+    skillsSourceQuery.isError && selectedOriginUrl !== null && !selectedSourceHasUnpersistedChanges;
+  const loadErrorMessage = queryErrorIsRelevant
+    ? resolveApiErrorMessage({
+        error: skillsSourceQuery.error,
+        fallbackMessage: "Could not load sandbox profile skills.",
+      })
+    : null;
   const sourceNotLoadedMessage =
     selectedOriginUrl !== null &&
     !loadIsPending &&
-    !skillsSourceQuery.isError &&
+    !queryErrorIsRelevant &&
     skillsSourceRepo === null &&
     !selectedSourceHasUnpersistedChanges &&
     (autoLoadHasBeenAttempted || !automaticLoadingIsEnabled)
       ? "Skills have not been loaded for this repository yet."
       : null;
   const sourceNeedsSavedDraftMessage =
-    selectedOriginUrl !== null &&
-    !loadIsPending &&
-    !skillsSourceQuery.isError &&
-    skillsSourceRepo === null &&
-    selectedSourceHasUnpersistedChanges
-      ? "Save this draft to load skills from the selected repository."
+    selectedOriginUrl !== null && !loadIsPending && selectedSourceHasUnpersistedChanges
+      ? "Loading skills will save this draft first."
       : null;
   const unavailableSelectedSkillsMessage =
     unavailableSelectedSkills.length === 0
@@ -535,8 +537,19 @@ export function SandboxProfileSkillsSection(input: {
       loadErrorMessage !== null ||
       sourceNotLoadedMessage !== null ||
       sourceNeedsSavedDraftMessage !== null);
+  const skillsLoadActionLabel = skillsSourceRepo === null ? "Load skills" : "Reload";
+  const skillsLoadActionTitle =
+    skillsSourceRepo === null ? "Load skills from this source" : "Reload skills from this source";
   const selectedSourceLabel =
-    selectedOriginUrl === null ? "None" : (selectedSourceOption?.label ?? "Unavailable repository");
+    selectedOriginUrl === null
+      ? "No source"
+      : (selectedSourceOption?.label ?? "Unavailable repository");
+  const selectedSourceTriggerContent =
+    selectedOriginUrl === null ? (
+      <span className="text-muted-foreground">Select skills source</span>
+    ) : (
+      selectedSourceLabel
+    );
   const skillsSourceAction = (
     <div className="flex w-full min-w-0 flex-wrap gap-2 sm:w-auto sm:justify-end">
       {fieldIsReadOnly ? (
@@ -554,10 +567,12 @@ export function SandboxProfileSkillsSection(input: {
             className="min-w-0 flex-1 sm:min-w-56 sm:max-w-72"
             id="sandbox-profile-skills-source"
           >
-            <SelectValue placeholder="Select repository">{selectedSourceLabel}</SelectValue>
+            <SelectValue placeholder="Select skills source">
+              {selectedSourceTriggerContent}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={NoSkillsSourceValue}>None</SelectItem>
+            <SelectItem value={NoSkillsSourceValue}>No source</SelectItem>
             {sourceIsUnavailable && draftConfig !== null ? (
               <SelectItem disabled value={draftConfig.originUrl}>
                 Unavailable repository
@@ -584,10 +599,10 @@ export function SandboxProfileSkillsSection(input: {
       )}
       {reloadButtonIsVisible ? (
         <Button
-          aria-label="Reload skills"
+          aria-label={skillsLoadActionLabel}
           disabled={actionIsPending || loadIsPending}
           onClick={reloadSelectedSource}
-          title="Reload skills from this repository"
+          title={skillsLoadActionTitle}
           type="button"
           variant="outline"
         >
@@ -596,14 +611,22 @@ export function SandboxProfileSkillsSection(input: {
           ) : (
             <ArrowClockwiseIcon aria-hidden className="size-4" />
           )}
-          <span className="hidden sm:inline">Reload</span>
+          <span className="hidden sm:inline">{skillsLoadActionLabel}</span>
         </Button>
       ) : null}
     </div>
   );
   const skillsContent =
-    selectedOriginUrl === null || loadIsPending ? null : shouldShowEditableSkillCatalog &&
-      skillOptions.length === 0 ? (
+    selectedOriginUrl === null ? (
+      <Empty className="min-h-40 py-8">
+        <EmptyHeader>
+          <EmptyTitle>No skills source selected</EmptyTitle>
+          <EmptyDescription>
+            Choose a repository to load selectable skills for this sandbox profile.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    ) : loadIsPending ? null : shouldShowEditableSkillCatalog && skillOptions.length === 0 ? (
       <p className="text-muted-foreground text-sm">No skills found in this repository.</p>
     ) : (
       <div className="grid gap-3">
@@ -709,7 +732,7 @@ export function SandboxProfileSkillsSection(input: {
           <Notice title="Skills not loaded">{sourceNotLoadedMessage}</Notice>
         )}
         {sourceNeedsSavedDraftMessage === null ? null : (
-          <Notice title="Save draft to load skills">{sourceNeedsSavedDraftMessage}</Notice>
+          <Notice title="Draft will be saved">{sourceNeedsSavedDraftMessage}</Notice>
         )}
         {sourceIsUnavailable ? (
           <Notice title="Skills source unavailable" variant="alert">
@@ -791,10 +814,9 @@ export function SandboxProfileSkillsSection(input: {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Save and reload skills?</DialogTitle>
+            <DialogTitle>Load skills?</DialogTitle>
             <DialogDescription>
-              Reloading skills uses the latest saved draft. Save this draft first so the selected
-              source is available to the skills loader.
+              Mistle will save this draft first, then load skills from the selected skills source.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -816,7 +838,7 @@ export function SandboxProfileSkillsSection(input: {
               type="button"
             >
               {saveAndReloadIsPending ? <Spinner aria-hidden className="size-4" /> : null}
-              Save and reload
+              Save and load skills
             </Button>
           </DialogFooter>
         </DialogContent>
