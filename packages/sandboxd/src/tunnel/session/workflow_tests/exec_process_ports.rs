@@ -178,7 +178,11 @@ fn starts_live_tunnel_session_for_exec_streams() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -381,7 +385,11 @@ fn starts_live_tunnel_session_for_processes_streams() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -507,7 +515,11 @@ fn starts_live_tunnel_session_for_ports_target_authorize() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -709,7 +721,11 @@ fn starts_live_tunnel_session_for_ports_http_transport() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -848,7 +864,11 @@ fn sends_ports_stream_error_when_http_transport_cannot_connect_upstream() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -997,7 +1017,11 @@ fn sends_ports_stream_error_when_http_transport_upstream_closes_mid_response() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -1188,7 +1212,11 @@ fn relays_port_access_tcp_bytes_and_directional_closes() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,

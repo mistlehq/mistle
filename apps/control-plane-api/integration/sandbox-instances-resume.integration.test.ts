@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 
 import { SandboxProfileStatuses, SandboxProfileVersionStates } from "@mistle/db/control-plane";
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import { createDisabledAssociatedResourceEventRouting } from "@mistle/integrations-core";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
@@ -365,6 +366,7 @@ async function insertRuntimePlan(
       egressRoutes: [],
       artifacts: [],
       runtimeClients: [],
+      associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
       workspaceSources: [],
       agentRuntimes: [],
     },

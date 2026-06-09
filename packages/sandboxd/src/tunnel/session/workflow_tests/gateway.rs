@@ -133,7 +133,11 @@ fn drops_invalid_bootstrap_messages_and_keeps_tunnel_alive() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -233,7 +237,11 @@ fn close_wakes_idle_connected_tunnel_session() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -356,7 +364,11 @@ fn forwards_signing_requests_over_the_bootstrap_tunnel_and_returns_gateway_resul
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -485,7 +497,11 @@ fn requests_and_caches_egress_tokens_over_the_bootstrap_tunnel() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -605,7 +621,11 @@ fn updating_egress_token_provider_acting_user_clears_cached_token() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -717,7 +737,11 @@ fn detaching_egress_token_provider_suspends_requests_and_clears_cached_token() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -864,7 +888,11 @@ fn egress_token_provider_rejects_in_flight_response_after_actor_change() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -995,7 +1023,11 @@ fn refreshes_egress_tokens_from_relative_ttl_not_expires_at_wall_time() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -1135,7 +1167,11 @@ fn operation_stream_opens_records_and_closes_over_the_reserved_stream() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -1285,7 +1321,11 @@ fn operation_stream_flushes_pending_records_before_close_after_open_ack() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -1411,7 +1451,11 @@ fn returns_authorization_failures_from_gateway_signing_results() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,

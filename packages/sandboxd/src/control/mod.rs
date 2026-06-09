@@ -744,7 +744,11 @@ mod tests {
                 "artifacts": [],
                 "runtimeClients": [],
                 "workspaceSources": [],
-                "agentRuntimes": []
+                "agentRuntimes": [],
+                "associatedResourceEventRouting": {
+                    "enabled": false,
+                    "resources": []
+                }
             }),
             git_identity: None,
             transparent_proxy: None,

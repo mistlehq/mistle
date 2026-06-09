@@ -681,6 +681,10 @@ mod tests {
                 "artifacts": [],
                 "runtimeClients": [],
                 "workspaceSources": [],
+                "associatedResourceEventRouting": {
+                    "enabled": false,
+                    "resources": []
+                },
                 "agentRuntimes": [
                     {
                         "runtimeId": "unknown-runtime",
@@ -760,6 +764,10 @@ mod tests {
                 }
             ],
             "workspaceSources": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            },
             "agentRuntimes": [
                 {
                     "runtimeId": "opencode",

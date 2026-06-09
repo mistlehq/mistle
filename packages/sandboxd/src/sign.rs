@@ -458,7 +458,11 @@ mod tests {
                 "artifacts": [],
                 "runtimeClients": [],
                 "workspaceSources": [],
-                "agentRuntimes": []
+                "agentRuntimes": [],
+                "associatedResourceEventRouting": {
+                    "enabled": false,
+                    "resources": []
+                }
             }),
             git_identity: Some(GitIdentity {
                 name: "Mistle User".to_string(),

@@ -488,6 +488,10 @@ fn starts_live_tunnel_session_for_agent_and_file_upload_streams() {
                     ]
                 }
             ],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            },
             "agentRuntimes": [
                 {
                     "runtimeId": "codex",
@@ -844,6 +848,10 @@ fn keeps_large_agent_responses_open_when_the_response_fits_within_the_stream_win
                     ]
                 }
             ],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            },
             "agentRuntimes": [
                 {
                     "runtimeId": "codex",

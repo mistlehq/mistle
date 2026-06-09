@@ -69,7 +69,11 @@ fn bootstrap_disconnect_leaves_publish_managers_disconnected_until_explicit_clos
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -157,7 +161,11 @@ fn start_returns_error_when_initial_bootstrap_session_never_establishes() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -300,7 +308,11 @@ fn reconnects_after_gateway_service_restart_close_and_rolls_exchange_token_forwa
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -415,7 +427,11 @@ fn does_not_reconnect_after_near_miss_bootstrap_service_restart_close() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -700,7 +716,11 @@ fn retries_when_token_exchange_response_body_read_fails() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -824,7 +844,11 @@ fn stops_retrying_when_token_exchange_returns_terminal_status() {
                 "artifacts": [],
                 "workspaceSources": [],
                 "runtimeClients": [],
-                "agentRuntimes": []
+                "agentRuntimes": [],
+                "associatedResourceEventRouting": {
+                    "enabled": false,
+                    "resources": []
+                }
             }),
             git_identity: None,
             transparent_proxy: None,
@@ -1111,7 +1135,11 @@ fn refresh_style_agent_open_cancels_slow_prior_dial() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -1254,7 +1282,11 @@ fn agent_dial_failure_returns_stream_open_error_without_dropping_tunnel() {
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,

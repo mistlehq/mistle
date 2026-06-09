@@ -23,7 +23,6 @@ pub struct CompiledRuntimePlan {
     pub skills: Option<CompiledRuntimePlanSkills>,
     pub runtime_clients: Vec<RuntimeClient>,
     pub agent_runtimes: Vec<CompiledAgentRuntime>,
-    #[serde(default)]
     pub associated_resource_event_routing: AssociatedResourceEventRouting,
 }
 
@@ -732,6 +731,10 @@ mod tests {
           "workspaceSources": [],
           "runtimeClients": [],
           "agentRuntimes": [],
+          "associatedResourceEventRouting": {
+            "enabled": false,
+            "resources": []
+          },
           "futureRuntimePlanField": true
         }))
         .expect_err("runtime plan decoder should reject unknown top-level fields");
@@ -740,6 +743,31 @@ mod tests {
             error
                 .to_string()
                 .contains("unknown field `futureRuntimePlanField`"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn rejects_missing_associated_resource_event_routing() {
+        let error = serde_json::from_value::<CompiledRuntimePlan>(serde_json::json!({
+          "sandboxProfileId": "sbp_01k00000000000000000000000",
+          "version": 1,
+          "image": {
+            "source": "base",
+            "imageRef": "registry.example.test/base:latest"
+          },
+          "egressRoutes": [],
+          "artifacts": [],
+          "workspaceSources": [],
+          "runtimeClients": [],
+          "agentRuntimes": []
+        }))
+        .expect_err("runtime plan decoder should require associated resource event routing");
+
+        assert!(
+            error
+                .to_string()
+                .contains("missing field `associatedResourceEventRouting`"),
             "unexpected error: {error}"
         );
     }

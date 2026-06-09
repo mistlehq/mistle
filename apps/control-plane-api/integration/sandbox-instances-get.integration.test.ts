@@ -10,6 +10,7 @@ import {
   SandboxProfileStatuses,
 } from "@mistle/db/control-plane";
 import { SandboxInstancePurposes, SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import { createDisabledAssociatedResourceEventRouting } from "@mistle/integrations-core";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
@@ -411,6 +412,7 @@ function createRuntimePlan() {
     egressRoutes: [],
     artifacts: [],
     runtimeClients: [],
+    associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
     workspaceSources: [
       {
         sourceKind: "git-clone",
