@@ -47,6 +47,7 @@ import type {
   IntegrationTargetSummary,
 } from "./sandbox-profile-binding-config-editor.js";
 import {
+  createDefaultMistleSandboxResources,
   createDefaultSandboxResources,
   DockerSandboxProviderId,
   resolveManagedSandboxProvider,
@@ -287,10 +288,10 @@ export function SandboxProfileRuntimeSection(input: {
       mistleMcpApiKeyId: currentRuntime.mistleMcpApiKeyId,
       sandboxProvider: option.provider.id,
       sandboxConnectionId: null,
-      sandboxResources:
-        currentRuntime.sandboxProvider === option.provider.id
-          ? currentRuntime.sandboxResources
-          : createDefaultSandboxResources(option.provider),
+      sandboxResources: createNextSandboxResourcesForProviderSelection({
+        currentRuntime,
+        option,
+      }),
     });
     setSaveErrorMessage(null);
   }
@@ -1580,6 +1581,34 @@ function createProviderOptions(
   }
 
   return options;
+}
+
+function createDefaultSandboxResourcesForOption(
+  option: SandboxRuntimeOption,
+): SandboxProfileVersion["sandboxResources"] {
+  if (option.kind === "managed") {
+    return createDefaultMistleSandboxResources(option.provider);
+  }
+
+  return createDefaultSandboxResources(option.provider);
+}
+
+function createNextSandboxResourcesForProviderSelection(input: {
+  currentRuntime: RuntimeConfigState;
+  option: SandboxRuntimeOption;
+}): SandboxProfileVersion["sandboxResources"] {
+  if (input.currentRuntime.sandboxProvider !== input.option.provider.id) {
+    return createDefaultSandboxResourcesForOption(input.option);
+  }
+
+  if (input.option.kind === "managed") {
+    const providerDefaults = createDefaultSandboxResources(input.option.provider);
+    if (resourcesAreEqual(input.currentRuntime.sandboxResources, providerDefaults)) {
+      return createDefaultMistleSandboxResources(input.option.provider);
+    }
+  }
+
+  return input.currentRuntime.sandboxResources;
 }
 
 function resolveSandboxProviderLogoKey(provider: SandboxProviderSummary): string | undefined {

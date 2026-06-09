@@ -173,6 +173,15 @@ function createVersion(
   };
 }
 
+function selectOptionFromCombobox(input: { comboboxName: string; optionName: string }): void {
+  fireEvent.click(screen.getByRole("combobox", { name: input.comboboxName }));
+  const option = screen.getByRole("option", { name: input.optionName });
+  fireEvent.mouseMove(option);
+  fireEvent.mouseDown(option, { button: 0 });
+  fireEvent.mouseUp(option, { button: 0 });
+  fireEvent.click(option, { button: 0 });
+}
+
 describe("SandboxProfileRuntimeSection", () => {
   it("renders Mistle as a sandbox provider without exposing the underlying provider name", () => {
     render(
@@ -525,16 +534,60 @@ describe("SandboxProfileRuntimeSection", () => {
     );
   });
 
-  it("builds the Mistle default runtime config from the managed provider defaults", () => {
+  it("builds the Mistle default runtime config from the Mistle resource baseline", () => {
     expect(
       createDefaultMistleSandboxRuntimeConfig([DockerProvider, E2BProvider, TensorlakeProvider]),
     ).toEqual({
       sandboxProvider: "tensorlake",
       sandboxResources: {
-        vcpuCount: 1,
-        memoryMb: 1024,
+        vcpuCount: 2,
+        memoryMb: 8192,
         diskMb: 10240,
       },
+    });
+  });
+
+  it("uses the Mistle resource baseline when selecting Mistle from no provider", async () => {
+    let runtimeDraftState: SandboxProfileRuntimeDraftState | undefined;
+    render(
+      <MemoryRouter>
+        <SandboxProfileRuntimeSection
+          apiKeys={[]}
+          availableConnections={[]}
+          availableTargets={[]}
+          disabled={false}
+          isDraft={true}
+          onDraftStateChange={(nextState) => {
+            runtimeDraftState = nextState;
+          }}
+          providers={[TensorlakeProvider]}
+          version={createVersion({
+            sandboxProvider: null,
+            sandboxConnectionId: null,
+            sandboxResources: null,
+          })}
+        />
+      </MemoryRouter>,
+    );
+
+    selectOptionFromCombobox({ comboboxName: "Sandbox provider", optionName: "Mistle" });
+
+    await waitFor(() => {
+      if (runtimeDraftState?.buildDraftChanges === undefined) {
+        throw new Error("Expected runtime draft changes builder to be available.");
+      }
+
+      expect(runtimeDraftState.buildDraftChanges()).toEqual(
+        expect.objectContaining({
+          sandboxConnectionId: null,
+          sandboxProvider: "tensorlake",
+          sandboxResources: {
+            vcpuCount: 2,
+            memoryMb: 8192,
+            diskMb: 10240,
+          },
+        }),
+      );
     });
   });
 
@@ -566,23 +619,13 @@ describe("SandboxProfileRuntimeSection", () => {
 
     expect(runtimeDraftState?.hasUnpersistedChanges).toBe(false);
 
-    fireEvent.click(screen.getByRole("combobox", { name: "Sandbox provider" }));
-    const organizationProviderOption = screen.getByRole("option", { name: "E2B" });
-    fireEvent.mouseMove(organizationProviderOption);
-    fireEvent.mouseDown(organizationProviderOption, { button: 0 });
-    fireEvent.mouseUp(organizationProviderOption, { button: 0 });
-    fireEvent.click(organizationProviderOption, { button: 0 });
+    selectOptionFromCombobox({ comboboxName: "Sandbox provider", optionName: "E2B" });
 
     await waitFor(() => {
       expect(runtimeDraftState?.hasUnpersistedChanges).toBe(true);
     });
 
-    fireEvent.click(screen.getByRole("combobox", { name: "Connection" }));
-    const connectionOption = screen.getByRole("option", { name: "E2B Production" });
-    fireEvent.mouseMove(connectionOption);
-    fireEvent.mouseDown(connectionOption, { button: 0 });
-    fireEvent.mouseUp(connectionOption, { button: 0 });
-    fireEvent.click(connectionOption, { button: 0 });
+    selectOptionFromCombobox({ comboboxName: "Connection", optionName: "E2B Production" });
 
     await waitFor(() => {
       if (runtimeDraftState === undefined) {
@@ -599,6 +642,100 @@ describe("SandboxProfileRuntimeSection", () => {
           sandboxProvider: "e2b",
           sandboxResources: {
             vcpuCount: 4,
+            memoryMb: 8192,
+          },
+        }),
+      );
+    });
+  });
+
+  it("preserves custom resources when switching from BYOK to Mistle for the same provider", async () => {
+    let runtimeDraftState: SandboxProfileRuntimeDraftState | undefined;
+    render(
+      <MemoryRouter>
+        <SandboxProfileRuntimeSection
+          apiKeys={[]}
+          availableConnections={[E2BRuntimeConnection]}
+          availableTargets={[E2BRuntimeTarget]}
+          disabled={false}
+          isDraft={true}
+          onDraftStateChange={(nextState) => {
+            runtimeDraftState = nextState;
+          }}
+          providers={[E2BProvider]}
+          version={createVersion({
+            sandboxProvider: "e2b",
+            sandboxConnectionId: E2BRuntimeConnection.id,
+            sandboxResources: {
+              vcpuCount: 4,
+              memoryMb: 8192,
+            },
+          })}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(runtimeDraftState?.hasUnpersistedChanges).toBe(false);
+
+    selectOptionFromCombobox({ comboboxName: "Sandbox provider", optionName: "Mistle" });
+
+    await waitFor(() => {
+      if (runtimeDraftState?.buildDraftChanges === undefined) {
+        throw new Error("Expected runtime draft changes builder to be available.");
+      }
+
+      expect(runtimeDraftState.buildDraftChanges()).toEqual(
+        expect.objectContaining({
+          sandboxConnectionId: null,
+          sandboxProvider: "e2b",
+          sandboxResources: {
+            vcpuCount: 4,
+            memoryMb: 8192,
+          },
+        }),
+      );
+    });
+  });
+
+  it("uses the Mistle resource baseline when switching from BYOK provider defaults to Mistle", async () => {
+    let runtimeDraftState: SandboxProfileRuntimeDraftState | undefined;
+    render(
+      <MemoryRouter>
+        <SandboxProfileRuntimeSection
+          apiKeys={[]}
+          availableConnections={[E2BRuntimeConnection]}
+          availableTargets={[E2BRuntimeTarget]}
+          disabled={false}
+          isDraft={true}
+          onDraftStateChange={(nextState) => {
+            runtimeDraftState = nextState;
+          }}
+          providers={[E2BProvider]}
+          version={createVersion({
+            sandboxProvider: "e2b",
+            sandboxConnectionId: E2BRuntimeConnection.id,
+            sandboxResources: {
+              vcpuCount: 2,
+              memoryMb: 4096,
+            },
+          })}
+        />
+      </MemoryRouter>,
+    );
+
+    selectOptionFromCombobox({ comboboxName: "Sandbox provider", optionName: "Mistle" });
+
+    await waitFor(() => {
+      if (runtimeDraftState?.buildDraftChanges === undefined) {
+        throw new Error("Expected runtime draft changes builder to be available.");
+      }
+
+      expect(runtimeDraftState.buildDraftChanges()).toEqual(
+        expect.objectContaining({
+          sandboxConnectionId: null,
+          sandboxProvider: "e2b",
+          sandboxResources: {
+            vcpuCount: 2,
             memoryMb: 8192,
           },
         }),
@@ -779,12 +916,7 @@ describe("SandboxProfileRuntimeSection", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("combobox", { name: "Sandbox provider" }));
-    const organizationProviderOption = screen.getByRole("option", { name: "E2B" });
-    fireEvent.mouseMove(organizationProviderOption);
-    fireEvent.mouseDown(organizationProviderOption, { button: 0 });
-    fireEvent.mouseUp(organizationProviderOption, { button: 0 });
-    fireEvent.click(organizationProviderOption, { button: 0 });
+    selectOptionFromCombobox({ comboboxName: "Sandbox provider", optionName: "E2B" });
 
     expect(screen.queryByRole("combobox", { name: "API key" })).toBeNull();
     expect(screen.getByRole("combobox", { name: "Connection" }).hasAttribute("disabled")).toBe(

@@ -54,6 +54,10 @@ import {
   SandboxProfileIntegrationsSetupUnavailableState,
 } from "./sandbox-profile-integrations-setup-section.js";
 import { mapBindingsToEditorRows } from "./sandbox-profile-integrations-state.js";
+import {
+  createDefaultMistleSandboxResources,
+  createDefaultSandboxResources,
+} from "./sandbox-profile-runtime-defaults.js";
 import { SandboxProfileRuntimeSection } from "./sandbox-profile-runtime-section.js";
 import {
   SandboxProfileSetupScriptTestButton,
@@ -513,6 +517,35 @@ const StoryE2BSandboxProvider = {
   },
 } satisfies SandboxProviderSummary;
 
+const StoryTensorlakeSandboxProvider = {
+  id: "tensorlake",
+  displayName: "Tensorlake",
+  managed: true,
+  supportsOrganizationConnection: true,
+  resourceCapabilities: {
+    vcpuCount: {
+      min: 1,
+      max: 8,
+      step: 1,
+      default: 1,
+    },
+    memoryMb: {
+      min: 1024,
+      max: 65_536,
+      step: 1024,
+      default: 1024,
+      minPerVcpu: 1024,
+      maxPerVcpu: 8192,
+    },
+    diskMb: {
+      min: 10_240,
+      max: 102_400,
+      step: 1024,
+      default: 10_240,
+    },
+  },
+} satisfies SandboxProviderSummary;
+
 const StorySandboxProviders = [
   StoryDockerSandboxProvider,
   {
@@ -525,11 +558,7 @@ function createStorySandboxProviders(input: {
   runtimeState: SandboxProfileEditorPageStoryArgs["runtimeState"];
 }): readonly SandboxProviderSummary[] {
   if (input.runtimeState === "mistle-provider") {
-    return [StoryE2BSandboxProvider];
-  }
-
-  if (input.runtimeState === "e2b-missing-connection") {
-    return StorySandboxProviders;
+    return [StoryTensorlakeSandboxProvider];
   }
 
   return StorySandboxProviders;
@@ -694,6 +723,7 @@ function createRuntimeStoryVersion(input: {
   version: number;
 }): SandboxProfileVersion {
   const runtimeState = input.runtimeState ?? "docker";
+  const sandboxConfig = createRuntimeStorySandboxConfig(runtimeState);
   return {
     sandboxProfileId: "sandbox-profile-story",
     version: input.version,
@@ -703,21 +733,41 @@ function createRuntimeStoryVersion(input: {
     gitCommitSigningIntegrationConnectionId: input.gitCommitSigningIntegrationConnectionId,
     mistleMcpEnabled: input.mistleMcpEnabled,
     mistleMcpApiKeyId: input.mistleMcpApiKeyId,
-    sandboxProvider: runtimeState === "docker" ? "docker" : "e2b",
-    sandboxConnectionId: runtimeState === "e2b-connection" ? StoryE2BSandboxConnection.id : null,
+    sandboxProvider: sandboxConfig.sandboxProvider,
+    sandboxConnectionId: sandboxConfig.sandboxConnectionId,
     maintenanceScript: null,
-    sandboxResources:
-      runtimeState === "docker"
-        ? null
-        : {
-            vcpuCount: 2,
-            memoryMb: 4096,
-          },
+    sandboxResources: sandboxConfig.sandboxResources,
     skillsConfig: input.skillsConfig ?? null,
     isActive: false,
     usable: false,
     refreshSchedule: null,
     latestSnapshotJob: null,
+  };
+}
+
+function createRuntimeStorySandboxConfig(
+  runtimeState: SandboxProfileEditorPageStoryArgs["runtimeState"],
+): Pick<SandboxProfileVersion, "sandboxProvider" | "sandboxConnectionId" | "sandboxResources"> {
+  if (runtimeState === "docker") {
+    return {
+      sandboxProvider: "docker",
+      sandboxConnectionId: null,
+      sandboxResources: null,
+    };
+  }
+
+  if (runtimeState === "mistle-provider") {
+    return {
+      sandboxProvider: "tensorlake",
+      sandboxConnectionId: null,
+      sandboxResources: createDefaultMistleSandboxResources(StoryTensorlakeSandboxProvider),
+    };
+  }
+
+  return {
+    sandboxProvider: "e2b",
+    sandboxConnectionId: runtimeState === "e2b-connection" ? StoryE2BSandboxConnection.id : null,
+    sandboxResources: createDefaultSandboxResources(StoryE2BSandboxProvider),
   };
 }
 
