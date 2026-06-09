@@ -1,4 +1,5 @@
 import {
+  HandleProviderResourceAssociationDeliveryWorkflowSpec,
   HandleTriggerRunWorkflowSpec,
   HandleIntegrationWebhookEventWorkflowSpec,
 } from "@mistle/workflow-registry/control-plane";
@@ -6,6 +7,10 @@ import { trace } from "@opentelemetry/api";
 
 import { getWorkflowContext } from "../core/context.js";
 import { defineTracedControlPlaneWorkflow } from "../core/tracing.js";
+import {
+  setProviderResourceAssociationDeliveryProcessorIdle,
+  startProviderResourceAssociationDeliveryProcessors,
+} from "../handle-provider-resource-association-delivery/processor.js";
 import {
   createWebhookDeliveryTelemetryAttributes,
   logWebhookDeliveryEvent,
@@ -166,6 +171,49 @@ export const HandleIntegrationWebhookEventWorkflow = defineTracedControlPlaneWor
               targetKey: preparedWebhookEvent.targetKey,
             },
           });
+        }
+
+        const associationDeliveryProcessorHandoffs =
+          await startProviderResourceAssociationDeliveryProcessors(
+            {
+              db,
+            },
+            {
+              providerResourceAssociationIds:
+                preparedWebhookEvent.providerResourceAssociationDeliveries.map(
+                  (delivery) => delivery.providerResourceAssociationId,
+                ),
+            },
+          );
+
+        for (const handoff of associationDeliveryProcessorHandoffs) {
+          if (!handoff.shouldStart) {
+            continue;
+          }
+
+          try {
+            await openWorkflow.runWorkflow(
+              HandleProviderResourceAssociationDeliveryWorkflowSpec,
+              {
+                providerResourceAssociationId: handoff.providerResourceAssociationId,
+                generation: handoff.generation,
+              },
+              {
+                idempotencyKey: `provider-resource-association-delivery:${handoff.providerResourceAssociationId}:${String(handoff.generation)}`,
+              },
+            );
+          } catch (error) {
+            await setProviderResourceAssociationDeliveryProcessorIdle(
+              {
+                db,
+              },
+              {
+                providerResourceAssociationId: handoff.providerResourceAssociationId,
+                generation: handoff.generation,
+              },
+            );
+            throw error;
+          }
         }
 
         await withWebhookDeliverySpan(

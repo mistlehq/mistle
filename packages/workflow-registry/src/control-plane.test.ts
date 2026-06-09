@@ -4,6 +4,7 @@ import {
   HandleTriggerConversationDeliveryWorkflowSpec,
   HandleTriggerRunWorkflowSpec,
   HandleIntegrationWebhookEventWorkflowSpec,
+  HandleProviderResourceAssociationDeliveryWorkflowSpec,
   ProvisionStripeCustomerWorkflowSpec,
   RequestDeleteSandboxProfileWorkflowSpec,
   ScheduleDispatchBatchWorkflowSpec,
@@ -27,6 +28,7 @@ describe("control-plane workflow registry", () => {
       SyncIntegrationConnectionResourcesWorkflowSpec,
       HandleTriggerRunWorkflowSpec,
       HandleTriggerConversationDeliveryWorkflowSpec,
+      HandleProviderResourceAssociationDeliveryWorkflowSpec,
       ScheduleDispatchWorkflowSpec,
       ScheduleDispatchBatchWorkflowSpec,
     ]).toEqual([
@@ -39,6 +41,7 @@ describe("control-plane workflow registry", () => {
       { name: "control-plane.integration-connections.sync-resources", version: "1" },
       { name: "control-plane.automations.handle-run", version: "1" },
       { name: "control-plane.automation-conversations.handle-delivery", version: "1" },
+      { name: "control-plane.provider-resource-associations.handle-delivery", version: "1" },
       { name: "control-plane.schedules.dispatch", version: "1" },
       { name: "control-plane.schedules.dispatch-batch", version: "1" },
     ]);

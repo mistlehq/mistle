@@ -73,8 +73,13 @@ function createProviderDeliveryIdempotencyMetadata(input: {
   deliveryContext: ExecuteConversationProviderDeliveryInput["deliveryContext"];
   fields: RuntimeRequestFingerprintFields;
 }): AgentConversationIdempotencyMetadata {
+  const keyPrefix =
+    input.deliveryContext.source === "provider_resource_association"
+      ? "provider-resource-association-delivery"
+      : "trigger-conversation-delivery";
+
   return {
-    key: `trigger-conversation-delivery:${input.deliveryContext.deliveryTaskId}:${input.keySuffix}`,
+    key: `${keyPrefix}:${input.deliveryContext.deliveryTaskId}:${input.keySuffix}`,
     operation: input.operation,
     requestFingerprint: createRuntimeRequestFingerprint({
       runtimeId: input.runtimeId,
@@ -92,12 +97,7 @@ export function createConversationIdempotencyMetadata(
     operation: "createConversation",
     keySuffix: "create-conversation",
     deliveryContext: input.deliveryContext,
-    fields: {
-      conversation_id: input.conversationId,
-      delivery_task_id: input.deliveryContext.deliveryTaskId,
-      trigger_run_id: input.deliveryContext.triggerRunId,
-      working_directory: input.workingDirectory,
-    },
+    fields: createConversationFingerprintFields(input),
   });
 }
 
@@ -110,12 +110,53 @@ export function submitPayloadIdempotencyMetadata(input: {
     operation: "submitPayload",
     keySuffix: "submit-payload",
     deliveryContext: input.deliveryInput.deliveryContext,
-    fields: {
-      conversation_id: input.deliveryInput.conversationId,
-      delivery_task_id: input.deliveryInput.deliveryContext.deliveryTaskId,
-      input_text: input.deliveryInput.inputText,
-      provider_conversation_id: input.providerConversationId,
-      trigger_run_id: input.deliveryInput.deliveryContext.triggerRunId,
-    },
+    fields: submitPayloadFingerprintFields(input),
   });
+}
+
+function createConversationFingerprintFields(
+  input: ExecuteConversationProviderDeliveryInput,
+): RuntimeRequestFingerprintFields {
+  const baseFields = {
+    conversation_id: input.conversationId,
+    delivery_task_id: input.deliveryContext.deliveryTaskId,
+    working_directory: input.workingDirectory,
+  };
+
+  if (input.deliveryContext.source === "provider_resource_association") {
+    return {
+      ...baseFields,
+      provider_resource_association_id: input.deliveryContext.providerResourceAssociationId,
+    };
+  }
+
+  return {
+    ...baseFields,
+    trigger_run_id: input.deliveryContext.triggerRunId,
+  };
+}
+
+function submitPayloadFingerprintFields(input: {
+  deliveryInput: ExecuteConversationProviderDeliveryInput;
+  providerConversationId: string;
+}): RuntimeRequestFingerprintFields {
+  const baseFields = {
+    conversation_id: input.deliveryInput.conversationId,
+    delivery_task_id: input.deliveryInput.deliveryContext.deliveryTaskId,
+    input_text: input.deliveryInput.inputText,
+    provider_conversation_id: input.providerConversationId,
+  };
+
+  if (input.deliveryInput.deliveryContext.source === "provider_resource_association") {
+    return {
+      ...baseFields,
+      provider_resource_association_id:
+        input.deliveryInput.deliveryContext.providerResourceAssociationId,
+    };
+  }
+
+  return {
+    ...baseFields,
+    trigger_run_id: input.deliveryInput.deliveryContext.triggerRunId,
+  };
 }

@@ -115,6 +115,64 @@ describe("executeConversationProviderDelivery", () => {
     }
   });
 
+  it("sends provider resource association delivery context before any Codex delivery RPC", async () => {
+    const server = await startSimulatedCodexRuntimeServer("existing_conversation");
+
+    try {
+      const activeContext = trace.setSpan(
+        context.active(),
+        trace.wrapSpanContext(ParentSpanContext),
+      );
+      const expectedTraceparentValue = expectedTraceparent(activeContext);
+
+      const result = await context.with(
+        activeContext,
+        async () =>
+          await executeConversationProviderDelivery({
+            conversationId: "cnv_association_123",
+            runtimeId: "codex",
+            connectionUrl: server.url,
+            inputText: "GitHub pull request comment received.",
+            workingDirectory: "/root",
+            deliveryContext: {
+              source: "provider_resource_association",
+              webhookEventId: "iwe_association_123",
+              deliveryTaskId: "prd_association_123",
+              externalDeliveryId: "github_delivery_123",
+              providerResourceAssociationId: "pra_association_123",
+              conversationId: "cnv_association_123",
+              sandboxInstanceId: "sbi_association_123",
+              routeId: "cvr_association_123",
+            },
+            providerConversationId: "thread_123",
+            providerExecutionId: null,
+          }),
+      );
+
+      expect(result).toEqual({
+        providerConversationId: "thread_123",
+        providerExecutionId: "turn_123",
+      });
+
+      expect(await server.deliveryContextMessage).toEqual({
+        method: "mistle/setDeliveryContext",
+        params: {
+          traceparent: expectedTraceparentValue,
+          source: "provider_resource_association",
+          webhookEventId: "iwe_association_123",
+          deliveryTaskId: "prd_association_123",
+          externalDeliveryId: "github_delivery_123",
+          providerResourceAssociationId: "pra_association_123",
+          conversationId: "cnv_association_123",
+          sandboxInstanceId: "sbi_association_123",
+          routeId: "cvr_association_123",
+        },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it("sends complete Codex collaboration mode settings when trigger instructions are present", async () => {
     const server = await startSimulatedCodexRuntimeServer(
       "existing_conversation_with_collaboration_mode",

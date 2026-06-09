@@ -2,6 +2,7 @@ import {
   HandleTriggerConversationDeliveryWorkflowSpec,
   HandleTriggerRunWorkflowSpec,
   HandleIntegrationWebhookEventWorkflowSpec,
+  HandleProviderResourceAssociationDeliveryWorkflowSpec,
   ProvisionStripeCustomerWorkflowSpec,
   RequestDeleteSandboxProfileWorkflowSpec,
   ScheduleDispatchBatchWorkflowSpec,
@@ -37,6 +38,12 @@ describe("control-plane worker openworkflow entrypoints", () => {
     expect(readWorkflowSpec(HandleIntegrationWebhookEventWorkflowSpec.name)).toMatchObject(
       HandleIntegrationWebhookEventWorkflowSpec,
     );
+  });
+
+  it("preserves the handle provider resource association delivery workflow identity", () => {
+    expect(
+      readWorkflowSpec(HandleProviderResourceAssociationDeliveryWorkflowSpec.name),
+    ).toMatchObject(HandleProviderResourceAssociationDeliveryWorkflowSpec);
   });
 
   it("preserves the request delete sandbox profile workflow identity", () => {

@@ -8,6 +8,7 @@ import {
   AssociatedProviderResourceKinds,
   AssociatedResourceEventTypes,
   createDisabledAssociatedResourceEventRouting,
+  type AssociatedProviderResourceKind,
   type CompiledRuntimePlan,
 } from "@mistle/integrations-core";
 import {
@@ -112,14 +113,11 @@ describe.concurrent("internal provider resource association registration", () =>
       reason: "resource_kind_not_enabled",
     });
     await expect(
-      env.controlPlaneDb.query.providerResourceAssociations.findMany({
-        where: (table, { and, eq }) =>
-          and(
-            eq(table.integrationConnectionId, "icn_provider_resource_disabled_001"),
-            eq(table.resourceKind, AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST),
-            eq(table.providerResourceId, "123456"),
-            eq(table.sandboxInstanceId, "sbi_provider_resource_disabled_001"),
-          ),
+      findAssociations(env, {
+        integrationConnectionId: "icn_provider_resource_disabled_001",
+        resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+        providerResourceId: "123456",
+        sandboxInstanceId: "sbi_provider_resource_disabled_001",
       }),
     ).resolves.toEqual([]);
   });
@@ -152,14 +150,11 @@ describe.concurrent("internal provider resource association registration", () =>
 
     expect(response.status).toBe(404);
     await expect(
-      env.controlPlaneDb.query.providerResourceAssociations.findMany({
-        where: (table, { and, eq }) =>
-          and(
-            eq(table.integrationConnectionId, "icn_provider_resource_cross_org_001"),
-            eq(table.resourceKind, AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST),
-            eq(table.providerResourceId, "456789"),
-            eq(table.sandboxInstanceId, "sbi_provider_resource_cross_org_001"),
-          ),
+      findAssociations(env, {
+        integrationConnectionId: "icn_provider_resource_cross_org_001",
+        resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+        providerResourceId: "456789",
+        sandboxInstanceId: "sbi_provider_resource_cross_org_001",
       }),
     ).resolves.toEqual([]);
   });
@@ -178,6 +173,26 @@ describe.concurrent("internal provider resource association registration", () =>
     });
   });
 });
+
+async function findAssociations(
+  env: IntegrationTestEnvironment,
+  input: {
+    integrationConnectionId: string;
+    providerResourceId: string;
+    resourceKind: AssociatedProviderResourceKind;
+    sandboxInstanceId: string;
+  },
+) {
+  return await env.controlPlaneDb.query.providerResourceAssociations.findMany({
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.integrationConnectionId, input.integrationConnectionId),
+        eq(table.resourceKind, input.resourceKind),
+        eq(table.providerResourceId, input.providerResourceId),
+        eq(table.sandboxInstanceId, input.sandboxInstanceId),
+      ),
+  });
+}
 
 async function registerAssociation(env: IntegrationTestEnvironment, body: Record<string, unknown>) {
   return await env.controlPlaneApi.http.fetch(

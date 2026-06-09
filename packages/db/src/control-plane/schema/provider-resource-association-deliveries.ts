@@ -45,6 +45,7 @@ export function defineProviderResourceAssociationDeliveries(schema: PgSchema) {
         .$type<ProviderResourceAssociationDeliveryStatus>()
         .default(ProviderResourceAssociationDeliveryStatuses.QUEUED),
       attemptCount: bigint("attempt_count", { mode: "number" }).notNull().default(0),
+      processorGeneration: bigint("processor_generation", { mode: "number" }),
       failureCode: text("failure_code"),
       failureMessage: text("failure_message"),
       claimedAt: timestamp("claimed_at", { withTimezone: true, mode: "string" }),

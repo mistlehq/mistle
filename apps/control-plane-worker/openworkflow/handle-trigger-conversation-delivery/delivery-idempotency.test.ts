@@ -26,6 +26,26 @@ const DeliveryInput: ExecuteConversationProviderDeliveryInput = {
   providerExecutionId: null,
 };
 
+const AssociationDeliveryInput: ExecuteConversationProviderDeliveryInput = {
+  conversationId: "conversation_123",
+  runtimeId: "codex",
+  connectionUrl: "wss://sandbox.example.test/agent",
+  inputText: "Handle this PR comment",
+  workingDirectory: "/workspace/repo",
+  deliveryContext: {
+    source: "provider_resource_association",
+    webhookEventId: "evt_123",
+    deliveryTaskId: "prd_123",
+    externalDeliveryId: "delivery_123",
+    providerResourceAssociationId: "pra_123",
+    conversationId: "conversation_123",
+    sandboxInstanceId: "sandbox_123",
+    routeId: "route_123",
+  },
+  providerConversationId: "thread_123",
+  providerExecutionId: null,
+};
+
 describe("provider delivery idempotency metadata", () => {
   it("derives a stable createConversation envelope from the delivery task", () => {
     expect(createConversationIdempotencyMetadata(DeliveryInput)).toEqual({
@@ -45,6 +65,19 @@ describe("provider delivery idempotency metadata", () => {
       key: "trigger-conversation-delivery:task_123:submit-payload",
       operation: "submitPayload",
       requestFingerprint: "sha256:4637ba033ca97e6c2011c334d05ddb73eda5f88a2111ea02b124ed94e45dfb1c",
+    });
+  });
+
+  it("derives a stable association submitPayload envelope from the logical payload delivery", () => {
+    expect(
+      submitPayloadIdempotencyMetadata({
+        deliveryInput: AssociationDeliveryInput,
+        providerConversationId: "thread_123",
+      }),
+    ).toEqual({
+      key: "provider-resource-association-delivery:prd_123:submit-payload",
+      operation: "submitPayload",
+      requestFingerprint: "sha256:7026ffb2d308abf9e53e732d90360c6e75cd20a0fa6715ca6d091f8e4c44aabd",
     });
   });
 });

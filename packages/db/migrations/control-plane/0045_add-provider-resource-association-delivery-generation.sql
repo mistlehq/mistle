@@ -1,0 +1,1 @@
+ALTER TABLE "control_plane"."provider_resource_association_deliveries" ADD COLUMN "processor_generation" bigint;

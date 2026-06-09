@@ -1,4 +1,5 @@
 import { HandleIntegrationWebhookEventWorkflow } from "./handle-integration-webhook-event/workflow.js";
+import { HandleProviderResourceAssociationDeliveryWorkflow } from "./handle-provider-resource-association-delivery/workflow.js";
 import { HandleTriggerConversationDeliveryWorkflow } from "./handle-trigger-conversation-delivery/workflow.js";
 import { HandleTriggerRunWorkflow } from "./handle-trigger-run/workflow.js";
 import { ProvisionStripeCustomerWorkflow } from "./provision-stripe-customer/workflow.js";
@@ -21,6 +22,7 @@ import { SyncIntegrationConnectionResourcesWorkflow } from "./sync-integration-c
  * repeating CLI discovery and module loading for every environment.
  */
 export const ControlPlaneWorkerWorkflows = [
+  HandleProviderResourceAssociationDeliveryWorkflow,
   HandleTriggerConversationDeliveryWorkflow,
   HandleTriggerRunWorkflow,
   HandleIntegrationWebhookEventWorkflow,
