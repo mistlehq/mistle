@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useMemo, type ComponentProps } from "react";
+import { useEffect, useMemo, type ComponentProps } from "react";
 import { expect, userEvent, within } from "storybook/test";
 
 import { sandboxProfileVersionSkillsSourceReposQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
@@ -134,6 +134,40 @@ export const Unsynced: Story = {
   ),
 };
 
+export const ReloadingCatalog: Story = {
+  name: "Reloading Catalog",
+  play: async ({ canvasElement }) => {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => {
+        resolve();
+      });
+    });
+    canvasElement.querySelector<HTMLButtonElement>('button[aria-label="Reload"]')?.click();
+  },
+  render: () => {
+    const skillsSourceRepos = createLongSkillsSourceRepos({
+      originUrl: SkillsOriginUrl,
+      selectedCount: 3,
+      totalCount: 12,
+    });
+    const skillsSourceRepo = getStorySkillsSourceRepo(skillsSourceRepos);
+
+    return (
+      <SkillsSectionStoryHarness
+        keepRefreshPending
+        skillsConfig={{
+          originUrl: SkillsOriginUrl,
+          selectedSkills: skillsSourceRepo.skills.slice(0, 3).map((skill) => ({
+            name: skill.name,
+            relativePath: skill.relativePath,
+          })),
+        }}
+        skillsSourceRepos={skillsSourceRepos}
+      />
+    );
+  },
+};
+
 export const PublicGitHubSource: Story = {
   name: "Public GitHub Source",
   render: () => (
@@ -263,6 +297,7 @@ function SkillsSectionStoryHarness(input: {
   readOnly?: boolean;
   skillsConfig: SandboxProfileVersion["skillsConfig"];
   skillsSourceRepos: SandboxProfileVersionSkillsSourceReposResult;
+  keepRefreshPending?: boolean;
 }): React.JSX.Element {
   const version = createStoryVersion(input.skillsConfig);
   const queryClient = useMemo(() => {
@@ -288,6 +323,36 @@ function SkillsSectionStoryHarness(input: {
     version.sandboxProfileId,
     version.version,
   ]);
+  useEffect(() => {
+    if (input.keepRefreshPending !== true) {
+      return;
+    }
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (requestInfo, requestInit) => {
+      const url =
+        typeof requestInfo === "string"
+          ? requestInfo
+          : requestInfo instanceof URL
+            ? requestInfo.href
+            : requestInfo.url;
+      const method =
+        requestInit?.method ??
+        (typeof requestInfo === "string" || requestInfo instanceof URL
+          ? "GET"
+          : requestInfo.method);
+
+      if (method === "POST" && url.includes("/skills-sources/refresh")) {
+        return await new Promise<Response>(() => {});
+      }
+
+      return await originalFetch(requestInfo, requestInit);
+    };
+
+    return () => {
+      globalThis.fetch = originalFetch;
+    };
+  }, [input.keepRefreshPending]);
 
   return (
     <QueryClientProvider client={queryClient}>

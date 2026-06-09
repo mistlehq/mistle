@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { NoLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -11,7 +12,9 @@ import {
   createSkillOptions,
   normalizeSkillsConfig,
   resolveSkillsConfigSaveBlockedMessage,
+  resolveSkillsReloadPresentationState,
   resolveSkillsSourceRepositoryOptions,
+  SkillsSourceRefreshMutationMeta,
   skillsConfigsAreEqual,
 } from "./sandbox-profile-skills-section.js";
 
@@ -295,6 +298,38 @@ describe("sandbox profile skills section model", () => {
         ],
       }),
     ).toBe("Choose an available skills source, or clear the skills source before saving.");
+  });
+
+  it("disables the catalog without hiding skills while a skills source reload is pending", () => {
+    expect(
+      resolveSkillsReloadPresentationState({
+        fieldIsReadOnly: false,
+        queryLoadIsPending: false,
+        refreshIsPending: true,
+        selectedOriginUrl: "https://github.com/mistlehq/skills.git",
+      }),
+    ).toEqual({
+      skillsCatalogIsDisabled: true,
+      skillsContentIsHidden: false,
+    });
+  });
+
+  it("hides skills content only while the selected source query is loading", () => {
+    expect(
+      resolveSkillsReloadPresentationState({
+        fieldIsReadOnly: false,
+        queryLoadIsPending: true,
+        refreshIsPending: false,
+        selectedOriginUrl: "https://github.com/mistlehq/skills.git",
+      }),
+    ).toEqual({
+      skillsCatalogIsDisabled: false,
+      skillsContentIsHidden: true,
+    });
+  });
+
+  it("uses no loading indicator metadata for skills source refreshes", () => {
+    expect(SkillsSourceRefreshMutationMeta).toBe(NoLoadingIndicatorMeta);
   });
 
   it("canonicalizes public GitHub repository URLs for skills sources", () => {
