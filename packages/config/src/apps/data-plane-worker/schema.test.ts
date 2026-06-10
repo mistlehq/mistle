@@ -102,6 +102,22 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
     });
   });
 
+  it("rejects Modal sandbox timeouts above the provider maximum", () => {
+    expect(() =>
+      DataPlaneWorkerSandboxConfigSchema.parse({
+        internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+        bootstrap: SandboxTokenConfig,
+        modal: {
+          enabled: true,
+          tokenId: "ak-test-token-id",
+          tokenSecret: "as-test-token-secret",
+          appName: "mistle-modal-sandboxes",
+          defaultTimeoutMs: 86_400_001,
+        },
+      }),
+    ).toThrow(/<=86400000/u);
+  });
+
   it("requires control-plane API config on the full worker config", () => {
     expect(() =>
       DataPlaneWorkerConfigSchema.parse({

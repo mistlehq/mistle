@@ -1,6 +1,8 @@
 import { z } from "@hono/zod-openapi";
 import { SandboxProvider } from "@mistle/sandbox";
 
+const ModalSandboxMaxTimeoutMs = 24 * 60 * 60 * 1000;
+
 export const InternalSandboxRuntimeResolveCredentialsRequestSchema = z
   .object({
     organizationId: z.string().min(1),
@@ -47,7 +49,7 @@ export const InternalSandboxRuntimeResolveCredentialsResponseSchema = z.discrimi
         tokenSecret: z.string().min(1),
         appName: z.string().min(1),
         environment: z.string().min(1).optional(),
-        defaultTimeoutMs: z.number().int().min(1).optional(),
+        defaultTimeoutMs: z.number().int().min(1).max(ModalSandboxMaxTimeoutMs).optional(),
       })
       .strict(),
   ],

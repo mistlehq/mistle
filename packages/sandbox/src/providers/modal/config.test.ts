@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { validateModalSandboxConfig } from "./config.js";
+import { ModalSandboxMaxTimeoutMs, validateModalSandboxConfig } from "./config.js";
 
 describe("validateModalSandboxConfig", () => {
   it("accepts Modal credentials with app and runtime options", () => {
@@ -47,5 +47,16 @@ describe("validateModalSandboxConfig", () => {
         appName: "",
       }),
     ).toThrow("Modal config field `appName` is required.");
+  });
+
+  it("rejects Modal timeouts above the provider maximum", () => {
+    expect(() =>
+      validateModalSandboxConfig({
+        tokenId: "ak-test-token-id",
+        tokenSecret: "as-test-token-secret",
+        appName: "mistle-modal-sandboxes",
+        defaultTimeoutMs: ModalSandboxMaxTimeoutMs + 1,
+      }),
+    ).toThrow(/<=86400000/u);
   });
 });

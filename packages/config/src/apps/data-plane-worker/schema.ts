@@ -6,6 +6,7 @@ import {
 } from "../../global/schema.js";
 
 const DefaultE2BCloudDomain = "e2b.app";
+const ModalSandboxMaxTimeoutMs = 24 * 60 * 60 * 1000;
 
 const HttpBaseUrlSchema = z.url().refine((value) => {
   const parsedUrl = new URL(value);
@@ -142,7 +143,7 @@ export const DataPlaneWorkerSandboxModalConfigSchema = z.discriminatedUnion("ena
       tokenSecret: z.string().min(1),
       appName: z.string().min(1),
       environment: z.string().min(1).optional(),
-      defaultTimeoutMs: z.number().int().min(1).optional(),
+      defaultTimeoutMs: z.number().int().min(1).max(ModalSandboxMaxTimeoutMs).optional(),
     })
     .strict(),
   z
@@ -152,7 +153,7 @@ export const DataPlaneWorkerSandboxModalConfigSchema = z.discriminatedUnion("ena
       tokenSecret: z.string().min(1).optional(),
       appName: z.string().min(1).optional(),
       environment: z.string().min(1).optional(),
-      defaultTimeoutMs: z.number().int().min(1).optional(),
+      defaultTimeoutMs: z.number().int().min(1).max(ModalSandboxMaxTimeoutMs).optional(),
     })
     .strict(),
 ]);
@@ -164,7 +165,7 @@ export const PartialDataPlaneWorkerSandboxModalConfigSchema = z
     tokenSecret: z.string().min(1).optional(),
     appName: z.string().min(1).optional(),
     environment: z.string().min(1).optional(),
-    defaultTimeoutMs: z.number().int().min(1).optional(),
+    defaultTimeoutMs: z.number().int().min(1).max(ModalSandboxMaxTimeoutMs).optional(),
   })
   .strict();
 

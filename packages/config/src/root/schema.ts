@@ -4,6 +4,7 @@ import { defaultMissingEnabledToFalse } from "../core/discriminated-union.js";
 
 const UrlSchema = z.string().trim().min(1);
 const DefaultE2BCloudDomain = "e2b.app";
+const ModalSandboxMaxTimeoutMs = 24 * 60 * 60 * 1000;
 const DefaultE2BCpuCount = 2;
 const DefaultE2BMemoryMb = 4 * 1024;
 
@@ -197,7 +198,7 @@ const SandboxModalProviderConfigSchema = z.discriminatedUnion("enabled", [
       token_secret: z.string().trim().min(1),
       app_name: z.string().trim().min(1),
       environment: z.string().trim().min(1).optional(),
-      default_timeout_ms: z.number().int().min(1).optional(),
+      default_timeout_ms: z.number().int().min(1).max(ModalSandboxMaxTimeoutMs).optional(),
     })
     .strict(),
   z
@@ -207,7 +208,7 @@ const SandboxModalProviderConfigSchema = z.discriminatedUnion("enabled", [
       token_secret: z.string().trim().min(1).optional(),
       app_name: z.string().trim().min(1).optional(),
       environment: z.string().trim().min(1).optional(),
-      default_timeout_ms: z.number().int().min(1).optional(),
+      default_timeout_ms: z.number().int().min(1).max(ModalSandboxMaxTimeoutMs).optional(),
     })
     .strict(),
 ]);

@@ -3779,7 +3779,8 @@
                         },
                         "defaultTimeoutMs": {
                           "type": "integer",
-                          "minimum": 1
+                          "minimum": 1,
+                          "maximum": 86400000
                         }
                       },
                       "required": ["provider", "source", "tokenId", "tokenSecret", "appName"],

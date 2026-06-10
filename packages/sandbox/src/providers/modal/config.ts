@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const ModalSandboxMaxTimeoutMs = 24 * 60 * 60 * 1000;
+
 export const ModalSandboxConfigSchema = z
   .object({
     tokenId: z.string().trim().min(1, {
@@ -12,7 +14,7 @@ export const ModalSandboxConfigSchema = z
       message: "Modal config field `appName` is required.",
     }),
     environment: z.string().trim().min(1).optional(),
-    defaultTimeoutMs: z.number().int().positive().optional(),
+    defaultTimeoutMs: z.number().int().positive().max(ModalSandboxMaxTimeoutMs).optional(),
   })
   .strict();
 
