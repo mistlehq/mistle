@@ -101,6 +101,10 @@ describe("integrations-definitions index", () => {
       familyId: "e2b",
       variantId: "e2b-default",
     });
+    const freestyleSandboxRuntimeDefinition = registry.getDefinition({
+      familyId: "freestyle",
+      variantId: "freestyle-default",
+    });
     const modalSandboxRuntimeDefinition = registry.getDefinition({
       familyId: "modal",
       variantId: "modal-default",
@@ -583,6 +587,54 @@ describe("integrations-definitions index", () => {
               label: "API key",
               inputType: "password",
               slotKey: "e2b.e2b-default.api-key.api-key",
+            },
+          ],
+        },
+      ],
+    });
+    expect(freestyleSandboxRuntimeDefinition).toMatchObject({
+      familyId: "freestyle",
+      variantId: "freestyle-default",
+      kind: "sandbox",
+      displayName: "Freestyle",
+      logoKey: "freestyle",
+      sandboxRuntime: {
+        providerId: "freestyle",
+        displayName: "Freestyle",
+        resourceCapabilities: {
+          vcpuCount: {
+            min: 1,
+            max: 32,
+            step: 1,
+            default: 2,
+            allowedValues: [1, 2, 4, 8, 16, 32],
+          },
+          memoryMb: {
+            min: 1024,
+            max: 32768,
+            step: 1024,
+            default: 4096,
+            allowedValues: [1024, 2048, 4096, 8192, 16384, 32768],
+          },
+          diskMb: {
+            min: 1024,
+            max: 65536,
+            step: 1024,
+            default: 16384,
+          },
+        },
+      },
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "API key",
+          kind: "form",
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "API key",
+              inputType: "password",
+              slotKey: "freestyle.freestyle-default.api-key.api-key",
             },
           ],
         },
@@ -1433,6 +1485,7 @@ describe("integrations-definitions index", () => {
       "render::render-mcp",
       "resend::resend-mcp",
       "e2b::e2b-default",
+      "freestyle::freestyle-default",
       "modal::modal-default",
       "opencomputer::opencomputer-default",
       "tensorlake::tensorlake-default",

@@ -634,6 +634,13 @@ const ControlPlaneApiEnvDescriptors = [
     path: ["sandbox", "opencomputer", "apiBaseUrl"],
   },
   {
+    envVar: "MISTLE_SANDBOX_FREESTYLE_ENABLED",
+    path: ["sandbox", "freestyle", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  { envVar: "MISTLE_SANDBOX_FREESTYLE_API_KEY", path: ["sandbox", "freestyle", "apiKey"] },
+  { envVar: "MISTLE_SANDBOX_FREESTYLE_BASE_URL", path: ["sandbox", "freestyle", "baseUrl"] },
+  {
     envVar: "MISTLE_SANDBOX_MODAL_ENABLED",
     path: ["sandbox", "modal", "enabled"],
     parse: parseStrictBooleanEnv,
@@ -760,6 +767,13 @@ const DataPlaneApiEnvDescriptors = [
     envVar: "MISTLE_SANDBOX_OPENCOMPUTER_API_BASE_URL",
     path: ["sandbox", "opencomputer", "apiBaseUrl"],
   },
+  {
+    envVar: "MISTLE_SANDBOX_FREESTYLE_ENABLED",
+    path: ["sandbox", "freestyle", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  { envVar: "MISTLE_SANDBOX_FREESTYLE_API_KEY", path: ["sandbox", "freestyle", "apiKey"] },
+  { envVar: "MISTLE_SANDBOX_FREESTYLE_BASE_URL", path: ["sandbox", "freestyle", "baseUrl"] },
   {
     envVar: "MISTLE_SANDBOX_MODAL_ENABLED",
     path: ["sandbox", "modal", "enabled"],
@@ -920,6 +934,13 @@ const DataPlaneWorkerEnvDescriptors = [
     envVar: "MISTLE_SANDBOX_OPENCOMPUTER_API_BASE_URL",
     path: ["sandbox", "opencomputer", "apiBaseUrl"],
   },
+  {
+    envVar: "MISTLE_SANDBOX_FREESTYLE_ENABLED",
+    path: ["sandbox", "freestyle", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  { envVar: "MISTLE_SANDBOX_FREESTYLE_API_KEY", path: ["sandbox", "freestyle", "apiKey"] },
+  { envVar: "MISTLE_SANDBOX_FREESTYLE_BASE_URL", path: ["sandbox", "freestyle", "baseUrl"] },
   {
     envVar: "MISTLE_SANDBOX_MODAL_ENABLED",
     path: ["sandbox", "modal", "enabled"],

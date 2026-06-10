@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
-import { IntegrationTargetSchema } from "./integrations-service-shared.js";
+import {
+  IntegrationTargetSchema,
+  IntegrationsApiError,
+  readJsonWithSchema,
+} from "./integrations-service-shared.js";
 
 describe("IntegrationTargetSchema", () => {
   it("parses device-authorization connection methods", () => {
@@ -178,5 +183,45 @@ describe("IntegrationTargetSchema", () => {
         },
       },
     });
+  });
+});
+
+describe("readJsonWithSchema", () => {
+  it("reports the operation and schema path when an integration response payload is invalid", async () => {
+    const response = new Response(
+      JSON.stringify({
+        items: [
+          {
+            targetKey: "",
+          },
+        ],
+      }),
+    );
+
+    const error = await readJsonWithSchema({
+      response,
+      operation: "listIntegrationTargets",
+      schema: z
+        .object({
+          items: z.array(
+            z
+              .object({
+                targetKey: z.string().min(1),
+              })
+              .strict(),
+          ),
+        })
+        .strict(),
+    }).catch((caughtError: unknown) => caughtError);
+
+    expect(error).toBeInstanceOf(IntegrationsApiError);
+    if (!(error instanceof IntegrationsApiError)) {
+      throw error;
+    }
+
+    expect(error.message).toContain(
+      "Integration API response payload is invalid for listIntegrationTargets",
+    );
+    expect(error.message).toContain("items.0.targetKey");
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createE2BSandboxProviderConfig,
+  createFreestyleSandboxProviderConfig,
   createModalSandboxProviderConfig,
   createOpenComputerSandboxProviderConfig,
   createResolveSandboxRuntimeInput,
@@ -172,6 +173,27 @@ describe("createOpenComputerSandboxProviderConfig", () => {
             sha256: "a".repeat(64),
           },
         },
+      },
+    });
+  });
+});
+
+describe("createFreestyleSandboxProviderConfig", () => {
+  it("maps Freestyle credentials into provider config", () => {
+    expect(
+      createFreestyleSandboxProviderConfig({
+        credentials: {
+          provider: "freestyle",
+          source: "connection",
+          apiKey: "freestyle-api-key",
+          baseUrl: "https://api.freestyle.example.test",
+        },
+      }),
+    ).toEqual({
+      provider: "freestyle",
+      freestyle: {
+        apiKey: "freestyle-api-key",
+        baseUrl: "https://api.freestyle.example.test",
       },
     });
   });

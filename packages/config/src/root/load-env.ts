@@ -532,6 +532,19 @@ const RootEnvDescriptors = [
     path: ["sandbox", "opencomputer", "api_base_url"],
   },
   {
+    envVar: "MISTLE_SANDBOX_FREESTYLE_ENABLED",
+    path: ["sandbox", "freestyle", "enabled"],
+    parse: parseBooleanEnv,
+  },
+  {
+    envVar: "MISTLE_SANDBOX_FREESTYLE_API_KEY",
+    path: ["sandbox", "freestyle", "api_key"],
+  },
+  {
+    envVar: "MISTLE_SANDBOX_FREESTYLE_BASE_URL",
+    path: ["sandbox", "freestyle", "base_url"],
+  },
+  {
     envVar: "MISTLE_SANDBOX_MODAL_ENABLED",
     path: ["sandbox", "modal", "enabled"],
     parse: parseBooleanEnv,

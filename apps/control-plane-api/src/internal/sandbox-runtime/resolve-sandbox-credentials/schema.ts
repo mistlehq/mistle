@@ -52,6 +52,14 @@ export const InternalSandboxRuntimeResolveCredentialsResponseSchema = z.discrimi
       .strict(),
     z
       .object({
+        provider: z.literal(SandboxProvider.FREESTYLE),
+        source: z.enum(["managed", "connection"]),
+        apiKey: z.string().min(1),
+        baseUrl: z.url().optional(),
+      })
+      .strict(),
+    z
+      .object({
         provider: z.literal(SandboxProvider.MODAL),
         source: z.enum(["managed", "connection"]),
         tokenId: z.string().min(1),

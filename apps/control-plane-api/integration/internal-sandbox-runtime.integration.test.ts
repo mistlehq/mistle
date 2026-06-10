@@ -18,6 +18,9 @@ import {
   E2BSandboxRuntimeCredentialSlotKeys,
   E2BSandboxRuntimeFamilyId,
   E2BSandboxRuntimeVariantId,
+  FreestyleSandboxRuntimeCredentialSlotKeys,
+  FreestyleSandboxRuntimeFamilyId,
+  FreestyleSandboxRuntimeVariantId,
   ModalSandboxRuntimeCredentialSlotKeys,
   ModalSandboxRuntimeFamilyId,
   ModalSandboxRuntimeVariantId,
@@ -429,6 +432,69 @@ describe.concurrent("internal sandbox runtime integration", () => {
       tokenId: "ak-connection-token-id",
       tokenSecret: "as-connection-token-secret",
       appName: "mistle-modal-sandboxes",
+    });
+  });
+
+  it("resolves Freestyle sandbox runtime credentials from a sandbox connection", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-internal-sandbox-runtime-freestyle-credentials@example.com",
+    });
+    await seedIntegrationTarget(env, {
+      targetKey: "freestyle-internal-runtime-credentials",
+      familyId: FreestyleSandboxRuntimeFamilyId,
+      variantId: FreestyleSandboxRuntimeVariantId,
+      config: {
+        baseUrl: "https://api.freestyle.internal.example.com",
+      },
+    });
+
+    const createResponse = await createFormConnection({
+      env,
+      targetKey: "freestyle-internal-runtime-credentials",
+      cookie: session.cookie,
+      body: {
+        displayName: "Freestyle runtime credentials",
+        methodId: IntegrationConnectionMethodIds.API_KEY,
+        config: {},
+        secrets: {
+          apiKey: "freestyle-connection-api-key",
+        },
+      },
+    });
+
+    expect(createResponse.status).toBe(201);
+    const connection = CreatedFormIntegrationConnectionSchema.parse(await createResponse.json());
+    await expectCredentialSlots({
+      env,
+      connectionId: connection.id,
+      organizationId: session.organizationId,
+      expected: [
+        {
+          slotKey: FreestyleSandboxRuntimeCredentialSlotKeys.API_KEY,
+          secretKind: IntegrationCredentialSecretKinds.API_KEY,
+          intendedFamilyId: FreestyleSandboxRuntimeFamilyId,
+          plaintext: "freestyle-connection-api-key",
+        },
+      ],
+    });
+
+    const response = await internalSandboxRuntimeRequest(env, {
+      path: "/resolve-credentials",
+      body: {
+        organizationId: session.organizationId,
+        provider: "freestyle",
+        connectionId: connection.id,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      provider: "freestyle",
+      source: "connection",
+      apiKey: "freestyle-connection-api-key",
+      baseUrl: "https://api.freestyle.internal.example.com",
     });
   });
 

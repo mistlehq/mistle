@@ -205,6 +205,10 @@ enabled = true
 api_key = "replace-with-opencomputer-api-key"
 #api_base_url = "https://app.opencomputer.dev/api"
 
+[sandbox.freestyle]
+enabled = true
+api_key = "replace-with-freestyle-api-key"
+
 #[sandbox.docker]
 #enabled = true
 #socket_path = "/var/run/docker.sock"

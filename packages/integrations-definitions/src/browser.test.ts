@@ -11,6 +11,7 @@ import {
   E2BSandboxRuntimeBrowserDefinition,
   ExpoBrowserDefinition,
   FireworksBrowserDefinition,
+  FreestyleSandboxRuntimeBrowserDefinition,
   GcpBrowserDefinition,
   GitHubCloudBrowserDefinition,
   GoogleAdsBrowserDefinition,
@@ -475,6 +476,22 @@ describe("browser definitions", () => {
       logoKey: "opencomputer",
       sandboxRuntime: {
         providerId: "opencomputer",
+      },
+    });
+  });
+
+  it("registers Freestyle sandbox runtime in the browser-safe definitions bundle", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: FreestyleSandboxRuntimeBrowserDefinition.familyId,
+      variantId: FreestyleSandboxRuntimeBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "freestyle",
+      variantId: "freestyle-default",
+      kind: "sandbox",
+      sandboxRuntime: {
+        providerId: "freestyle",
       },
     });
   });

@@ -712,11 +712,32 @@ export async function readJsonWithSchema<T>(input: {
       operation: input.operation,
       status: 500,
       body: json,
-      message: "Integration API response payload is invalid.",
+      message: `Integration API response payload is invalid for ${input.operation}: ${formatSchemaIssues(
+        parsed.error.issues,
+      )}.`,
     });
   }
 
   return parsed.data;
+}
+
+function formatSchemaIssues(issues: readonly z.core.$ZodIssue[]): string {
+  const firstIssue = issues[0];
+  if (firstIssue === undefined) {
+    return "unknown schema error";
+  }
+
+  const remainingIssueCount = issues.length - 1;
+  if (remainingIssueCount === 0) {
+    return formatSchemaIssue(firstIssue);
+  }
+
+  return `${formatSchemaIssue(firstIssue)} (+${remainingIssueCount} more)`;
+}
+
+function formatSchemaIssue(issue: z.core.$ZodIssue): string {
+  const path = issue.path.length === 0 ? "<root>" : issue.path.map(String).join(".");
+  return `${path}: ${issue.message}`;
 }
 
 export function wrapIntegrationsApiError(input: {

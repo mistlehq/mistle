@@ -80,6 +80,10 @@ describe("integrations-definitions server", () => {
       familyId: "e2b",
       variantId: "e2b-default",
     });
+    const freestyleSandboxRuntimeDefinition = registry.getDefinition({
+      familyId: "freestyle",
+      variantId: "freestyle-default",
+    });
     const modalSandboxRuntimeDefinition = registry.getDefinition({
       familyId: "modal",
       variantId: "modal-default",
@@ -267,6 +271,14 @@ describe("integrations-definitions server", () => {
       kind: "sandbox",
       sandboxRuntime: {
         providerId: "e2b",
+      },
+    });
+    expect(freestyleSandboxRuntimeDefinition).toMatchObject({
+      familyId: "freestyle",
+      variantId: "freestyle-default",
+      kind: "sandbox",
+      sandboxRuntime: {
+        providerId: "freestyle",
       },
     });
     expect(modalSandboxRuntimeDefinition).toMatchObject({

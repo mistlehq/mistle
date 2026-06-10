@@ -135,6 +135,35 @@ const OpenComputerProvider = {
   },
 } satisfies SandboxProviderSummary;
 
+const FreestyleProvider = {
+  id: "freestyle",
+  displayName: "Freestyle",
+  managed: true,
+  supportsOrganizationConnection: true,
+  resourceCapabilities: {
+    vcpuCount: {
+      min: 1,
+      max: 32,
+      step: 1,
+      default: 2,
+      allowedValues: [1, 2, 4, 8, 16, 32],
+    },
+    memoryMb: {
+      min: 1024,
+      max: 32768,
+      step: 1024,
+      default: 4096,
+      allowedValues: [1024, 2048, 4096, 8192, 16384, 32768],
+    },
+    diskMb: {
+      min: 1024,
+      max: 65536,
+      step: 1024,
+      default: 16384,
+    },
+  },
+} satisfies SandboxProviderSummary;
+
 const OrganizationStorageE2BProvider = {
   id: "e2b",
   displayName: "E2B",
@@ -1138,6 +1167,59 @@ describe("SandboxProfileRuntimeSection", () => {
     ).toEqual({
       vcpuCount: 1,
       memoryMb: 4096,
+    });
+  });
+
+  it("renders Freestyle as a selectable provider with explicit resource choices", async () => {
+    let runtimeDraftState: SandboxProfileRuntimeDraftState | undefined;
+    render(
+      <MemoryRouter>
+        <SandboxProfileRuntimeSection
+          apiKeys={[]}
+          availableConnections={[]}
+          availableTargets={[]}
+          disabled={false}
+          isDraft={true}
+          onDraftStateChange={(nextState) => {
+            runtimeDraftState = nextState;
+          }}
+          providers={[FreestyleProvider]}
+          version={createVersion({
+            sandboxProvider: "freestyle",
+            sandboxConnectionId: null,
+            sandboxResources: {
+              vcpuCount: 2,
+              memoryMb: 4096,
+              diskMb: 16384,
+            },
+          })}
+        />
+      </MemoryRouter>,
+    );
+
+    const providerCombobox = screen.getByRole("combobox", { name: "Sandbox provider" });
+    fireEvent.click(providerCombobox);
+    expect(screen.getByRole("option", { name: "Freestyle" })).toBeTruthy();
+    fireEvent.keyDown(providerCombobox, { key: "Escape" });
+
+    selectOptionFromCombobox({ comboboxName: "CPU", optionName: "4 vCPU" });
+    selectOptionFromCombobox({ comboboxName: "Memory (MB)", optionName: "8192 MB" });
+
+    await waitFor(() => {
+      if (runtimeDraftState?.buildDraftChanges === undefined) {
+        throw new Error("Expected runtime draft changes builder to be available.");
+      }
+
+      expect(runtimeDraftState.buildDraftChanges()).toEqual(
+        expect.objectContaining({
+          sandboxProvider: "freestyle",
+          sandboxResources: {
+            vcpuCount: 4,
+            memoryMb: 8192,
+            diskMb: 16384,
+          },
+        }),
+      );
     });
   });
 

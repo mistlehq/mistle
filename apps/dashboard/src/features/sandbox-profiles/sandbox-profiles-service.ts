@@ -493,8 +493,9 @@ const SandboxProfileVersionSkillsConfigSchema = z
   })
   .strict();
 
-const SandboxRuntimeResourceCapabilitySchema = z
+const SandboxRuntimeResourceCapabilityObjectSchema = z
   .object({
+    allowedValues: z.array(z.number().int().min(0)).nonempty().optional(),
     default: z.number().int().min(0),
     max: z.number().int().min(0),
     min: z.number().int().min(0),
@@ -502,17 +503,28 @@ const SandboxRuntimeResourceCapabilitySchema = z
   })
   .strict();
 
-const SandboxRuntimeMemoryResourceCapabilitySchema = SandboxRuntimeResourceCapabilitySchema.extend({
-  maxPerVcpu: z.number().int().min(0).optional(),
-  minPerVcpu: z.number().int().min(0).optional(),
-}).transform((capability) => ({
-  default: capability.default,
-  max: capability.max,
-  ...(capability.maxPerVcpu === undefined ? {} : { maxPerVcpu: capability.maxPerVcpu }),
-  min: capability.min,
-  ...(capability.minPerVcpu === undefined ? {} : { minPerVcpu: capability.minPerVcpu }),
-  step: capability.step,
-}));
+const SandboxRuntimeResourceCapabilitySchema =
+  SandboxRuntimeResourceCapabilityObjectSchema.transform((capability) => ({
+    ...(capability.allowedValues === undefined ? {} : { allowedValues: capability.allowedValues }),
+    default: capability.default,
+    max: capability.max,
+    min: capability.min,
+    step: capability.step,
+  }));
+
+const SandboxRuntimeMemoryResourceCapabilitySchema =
+  SandboxRuntimeResourceCapabilityObjectSchema.extend({
+    maxPerVcpu: z.number().int().min(0).optional(),
+    minPerVcpu: z.number().int().min(0).optional(),
+  }).transform((capability) => ({
+    ...(capability.allowedValues === undefined ? {} : { allowedValues: capability.allowedValues }),
+    default: capability.default,
+    max: capability.max,
+    ...(capability.maxPerVcpu === undefined ? {} : { maxPerVcpu: capability.maxPerVcpu }),
+    min: capability.min,
+    ...(capability.minPerVcpu === undefined ? {} : { minPerVcpu: capability.minPerVcpu }),
+    step: capability.step,
+  }));
 
 const SandboxRuntimeResourceCapabilitiesSchema = z
   .object({

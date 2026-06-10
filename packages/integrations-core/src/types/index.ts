@@ -30,6 +30,7 @@ export type SandboxRuntimeResourceField = {
   max: number;
   step: number;
   default: number;
+  allowedValues?: number[];
 };
 
 export type SandboxRuntimeMemoryResourceField = SandboxRuntimeResourceField & {

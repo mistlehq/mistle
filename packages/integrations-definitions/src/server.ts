@@ -46,6 +46,7 @@ import { RenderDefinition } from "./render/index.js";
 import { ResendDefinition } from "./resend/server.js";
 import {
   E2BSandboxRuntimeDefinition,
+  FreestyleSandboxRuntimeDefinition,
   ModalSandboxRuntimeDefinition,
   OpenComputerSandboxRuntimeDefinition,
   TensorlakeSandboxRuntimeDefinition,
@@ -153,6 +154,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   RenderDefinition,
   ResendDefinition,
   E2BSandboxRuntimeDefinition,
+  FreestyleSandboxRuntimeDefinition,
   ModalSandboxRuntimeDefinition,
   OpenComputerSandboxRuntimeDefinition,
   TensorlakeSandboxRuntimeDefinition,

@@ -57,6 +57,34 @@ describe.concurrent("sandbox providers catalog integration", () => {
         },
       },
       {
+        id: "freestyle",
+        displayName: "Freestyle",
+        managed: false,
+        supportsOrganizationConnection: true,
+        resourceCapabilities: {
+          vcpuCount: {
+            min: 1,
+            max: 32,
+            step: 1,
+            default: 2,
+            allowedValues: [1, 2, 4, 8, 16, 32],
+          },
+          memoryMb: {
+            min: 1024,
+            max: 32768,
+            step: 1024,
+            default: 4096,
+            allowedValues: [1024, 2048, 4096, 8192, 16384, 32768],
+          },
+          diskMb: {
+            min: 1024,
+            max: 65536,
+            step: 1024,
+            default: 16384,
+          },
+        },
+      },
+      {
         id: "modal",
         displayName: "Modal",
         managed: false,

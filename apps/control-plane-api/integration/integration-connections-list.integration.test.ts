@@ -16,6 +16,7 @@ import { createIntegrationTest } from "@mistle/test-harness/integration";
 import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
+import { IntegrationConnectionsPageSchema as DashboardIntegrationConnectionsPageSchema } from "../../dashboard/src/features/integrations/integrations-service-shared.js";
 import { ListIntegrationConnectionsResponseSchema } from "../src/integration-connections/list-integration-connections/schema.js";
 
 const it = createIntegrationTest({
@@ -423,6 +424,53 @@ describe.concurrent("integration connections list integration", () => {
     );
   });
 
+  it("returns Freestyle sandbox connections consumable by the dashboard integrations parser", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-connections-list-freestyle@example.com",
+    });
+
+    await seedTarget(env, {
+      targetKey: "freestyle_connections_list",
+      familyId: "freestyle",
+      variantId: "freestyle-default",
+      config: {},
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
+      id: "icn_integration_new_freestyle_api_key",
+      organizationId: session.organizationId,
+      targetKey: "freestyle_connections_list",
+      displayName: "Freestyle API key",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: IntegrationConnectionMethodIds.API_KEY,
+      },
+      targetSnapshotConfig: {},
+    });
+
+    const body = await listConnections({
+      cookie: session.cookie,
+      env,
+      query: "",
+    });
+
+    expect(body.items).toEqual([
+      expect.objectContaining({
+        id: "icn_integration_new_freestyle_api_key",
+        targetKey: "freestyle_connections_list",
+        displayName: "Freestyle API key",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+        targetSnapshotConfig: {},
+        connectionMethodId: IntegrationConnectionMethodIds.API_KEY,
+        connectionMethodLabel: "API key",
+      }),
+    ]);
+  });
+
   it("reports webhook-source support for Slack implicit webhook connections", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-connections-list-slack-webhook-support@example.com",
@@ -543,7 +591,10 @@ async function listConnections(input: {
   );
   expect(response.status).toBe(200);
 
-  return ListIntegrationConnectionsResponseSchema.parse(await response.json());
+  const json = await response.json();
+  DashboardIntegrationConnectionsPageSchema.parse(json);
+
+  return ListIntegrationConnectionsResponseSchema.parse(json);
 }
 
 function normalizeConnectionTimestamps(

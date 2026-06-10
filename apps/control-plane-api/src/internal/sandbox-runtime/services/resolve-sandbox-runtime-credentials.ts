@@ -6,6 +6,9 @@ import {
   E2BSandboxRuntimeCredentialSecretTypes,
   E2BSandboxRuntimeCredentialSlotKeys,
   E2BSandboxRuntimeTargetConfigSchema,
+  FreestyleSandboxRuntimeCredentialSecretTypes,
+  FreestyleSandboxRuntimeCredentialSlotKeys,
+  FreestyleSandboxRuntimeTargetConfigSchema,
   ModalSandboxRuntimeCredentialSecretTypes,
   ModalSandboxRuntimeCredentialSlotKeys,
   ModalSandboxRuntimeDefaultAppName,
@@ -54,6 +57,12 @@ type ResolvedSandboxRuntimeCredentials =
       source: "managed" | "connection";
       apiKey: string;
       apiBaseUrl?: string;
+    }
+  | {
+      provider: typeof SandboxProvider.FREESTYLE;
+      source: "managed" | "connection";
+      apiKey: string;
+      baseUrl?: string;
     }
   | {
       provider: typeof SandboxProvider.MODAL;
@@ -145,10 +154,15 @@ export async function resolveSandboxRuntimeCredentials(
   }
 
   if (input.provider === SandboxProvider.FREESTYLE) {
-    throw new BadRequestError(
-      "UNSUPPORTED_SANDBOX_PROVIDER",
-      "Freestyle sandbox runtime credentials are not wired in this deployment yet.",
-    );
+    if (input.connectionId === undefined) {
+      return resolveManagedFreestyleCredentials(ctx);
+    }
+
+    return resolveConnectionFreestyleCredentials(ctx, {
+      organizationId: input.organizationId,
+      provider: SandboxProvider.FREESTYLE,
+      connectionId: input.connectionId,
+    });
   }
 
   return assertUnreachableSandboxProvider(input.provider);
@@ -235,6 +249,26 @@ function resolveManagedE2BCredentials(
     source: "managed",
     apiKey: ctx.sandboxConfig.e2b.apiKey,
     ...(ctx.sandboxConfig.e2b.domain === undefined ? {} : { domain: ctx.sandboxConfig.e2b.domain }),
+  };
+}
+
+function resolveManagedFreestyleCredentials(
+  ctx: ResolveSandboxRuntimeCredentialsContext,
+): ResolvedSandboxRuntimeCredentials {
+  if (ctx.sandboxConfig.freestyle?.enabled !== true) {
+    throw new BadRequestError(
+      "MANAGED_SANDBOX_PROVIDER_UNAVAILABLE",
+      "Managed Freestyle sandbox runtime is not configured for this deployment.",
+    );
+  }
+
+  return {
+    provider: SandboxProvider.FREESTYLE,
+    source: "managed",
+    apiKey: ctx.sandboxConfig.freestyle.apiKey,
+    ...(ctx.sandboxConfig.freestyle.baseUrl === undefined
+      ? {}
+      : { baseUrl: ctx.sandboxConfig.freestyle.baseUrl }),
   };
 }
 
@@ -562,6 +596,85 @@ async function resolveConnectionE2BCredentials(
     source: "connection",
     apiKey: resolvedCredential.value,
     ...(targetConfig.domain === undefined ? {} : { domain: targetConfig.domain }),
+  };
+}
+
+async function resolveConnectionFreestyleCredentials(
+  ctx: ResolveSandboxRuntimeCredentialsContext,
+  input: ResolveSandboxRuntimeCredentialsInput & {
+    provider: typeof SandboxProvider.FREESTYLE;
+    connectionId: string;
+  },
+): Promise<ResolvedSandboxRuntimeCredentials> {
+  const connection = await readSandboxConnection(ctx, input);
+  const target = await ctx.db.query.integrationTargets.findFirst({
+    columns: {
+      targetKey: true,
+      familyId: true,
+      variantId: true,
+      enabled: true,
+      config: true,
+    },
+    where: (table, { eq }) => eq(table.targetKey, connection.targetKey),
+  });
+
+  if (target === undefined) {
+    throw new NotFoundError(
+      "SANDBOX_CONNECTION_TARGET_NOT_FOUND",
+      `Sandbox connection '${connection.id}' target was not found.`,
+    );
+  }
+
+  if (!target.enabled) {
+    throw new BadRequestError(
+      "SANDBOX_CONNECTION_TARGET_DISABLED",
+      `Sandbox connection '${connection.id}' target is disabled.`,
+    );
+  }
+
+  const definition = ctx.integrationRegistry.getDefinition({
+    familyId: target.familyId,
+    variantId: target.variantId,
+  });
+
+  if (definition?.kind !== IntegrationKinds.SANDBOX || definition.sandboxRuntime === undefined) {
+    throw new BadRequestError(
+      "SANDBOX_CONNECTION_KIND_MISMATCH",
+      `Sandbox connection '${connection.id}' does not reference a sandbox integration target.`,
+    );
+  }
+
+  if (definition.sandboxRuntime.providerId !== SandboxProvider.FREESTYLE) {
+    throw new BadRequestError(
+      "SANDBOX_CONNECTION_PROVIDER_MISMATCH",
+      `Sandbox connection '${connection.id}' does not match sandbox provider 'freestyle'.`,
+    );
+  }
+
+  const resolvedCredential = await resolveIntegrationCredential(
+    {
+      db: ctx.db,
+      integrationRegistry: ctx.integrationRegistry,
+      integrationsConfig: ctx.integrationsConfig,
+    },
+    {
+      connectionId: connection.id,
+      secretType: FreestyleSandboxRuntimeCredentialSecretTypes.API_KEY,
+      slotKey: FreestyleSandboxRuntimeCredentialSlotKeys.API_KEY,
+    },
+  );
+
+  if (resolvedCredential.kind !== "value") {
+    throw new Error("Freestyle sandbox runtime API key must resolve to a string credential.");
+  }
+
+  const targetConfig = FreestyleSandboxRuntimeTargetConfigSchema.parse(target.config);
+
+  return {
+    provider: SandboxProvider.FREESTYLE,
+    source: "connection",
+    apiKey: resolvedCredential.value,
+    ...(targetConfig.baseUrl === undefined ? {} : { baseUrl: targetConfig.baseUrl }),
   };
 }
 

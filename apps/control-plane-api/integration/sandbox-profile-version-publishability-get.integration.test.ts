@@ -235,6 +235,64 @@ describe.concurrent("sandbox profile version publishability get integration", ()
     });
   });
 
+  it("rejects Freestyle sandbox resources outside the explicit provider sizing set", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-publishability-freestyle-invalid-sizing@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_publishability_freestyle_invalid_sizing",
+        organizationId: session.organizationId,
+        displayName: "Publishability Freestyle Invalid Sizing",
+        activeVersion: null,
+        createdAt: "2026-05-10T00:07:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_publishability_freestyle_invalid_sizing",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CODEX,
+        sandboxProvider: SandboxProvider.FREESTYLE,
+        sandboxVcpuCount: 3,
+        sandboxMemoryMb: 3072,
+        sandboxDiskMb: 16_384,
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_publishability_freestyle_invalid_sizing/versions/1/publishability",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = GetSandboxProfileVersionPublishabilityResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody).toEqual({
+      publishable: false,
+      issues: [
+        {
+          code: "INVALID_SANDBOX_RESOURCES",
+          message: "Sandbox provider 'freestyle' resources are outside supported limits.",
+        },
+        {
+          code: "SANDBOX_MANAGED_PROVIDER_UNAVAILABLE",
+          message:
+            "Managed Freestyle sandbox provider credentials are not configured for this deployment.",
+        },
+      ],
+    });
+  });
+
   it("returns profile version not draft for published versions", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-version-publishability-published@example.com",

@@ -15213,12 +15213,14 @@ export interface paths {
                 managed: boolean;
                 resourceCapabilities: {
                   diskMb?: {
+                    allowedValues?: number[];
                     default: number;
                     max: number;
                     min: number;
                     step: number;
                   };
                   memoryMb: {
+                    allowedValues?: number[];
                     default: number;
                     max: number;
                     maxPerVcpu?: number;
@@ -15231,6 +15233,7 @@ export interface paths {
                     vcpuCount: number;
                   }[];
                   vcpuCount: {
+                    allowedValues?: number[];
                     default: number;
                     max: number;
                     min: number;

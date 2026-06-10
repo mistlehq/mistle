@@ -1462,6 +1462,15 @@ export interface paths {
                   source: "managed" | "connection";
                 }
               | {
+                  apiKey: string;
+                  /** Format: uri */
+                  baseUrl?: string;
+                  /** @enum {string} */
+                  provider: "freestyle";
+                  /** @enum {string} */
+                  source: "managed" | "connection";
+                }
+              | {
                   appName: string;
                   defaultTimeoutMs?: number;
                   environment?: string;

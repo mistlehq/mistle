@@ -43,6 +43,7 @@ import { RenderDefinition } from "./render/variants/render-mcp/definition.js";
 import { ResendMcpBaseDefinition } from "./resend/variants/resend-mcp/base-definition.js";
 import {
   E2BSandboxRuntimeDefinition,
+  FreestyleSandboxRuntimeDefinition,
   ModalSandboxRuntimeDefinition,
   OpenComputerSandboxRuntimeDefinition,
   TensorlakeSandboxRuntimeDefinition,
@@ -91,6 +92,7 @@ export const RailwayBrowserDefinition = RailwayMcpBaseDefinition;
 export const RenderBrowserDefinition = RenderDefinition;
 export const ResendBrowserDefinition = ResendMcpBaseDefinition;
 export const E2BSandboxRuntimeBrowserDefinition = E2BSandboxRuntimeDefinition;
+export const FreestyleSandboxRuntimeBrowserDefinition = FreestyleSandboxRuntimeDefinition;
 export const ModalSandboxRuntimeBrowserDefinition = ModalSandboxRuntimeDefinition;
 export const OpenComputerSandboxRuntimeBrowserDefinition = OpenComputerSandboxRuntimeDefinition;
 export const TensorlakeSandboxRuntimeBrowserDefinition = TensorlakeSandboxRuntimeDefinition;
@@ -141,6 +143,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   RenderBrowserDefinition,
   ResendBrowserDefinition,
   E2BSandboxRuntimeBrowserDefinition,
+  FreestyleSandboxRuntimeBrowserDefinition,
   ModalSandboxRuntimeBrowserDefinition,
   OpenComputerSandboxRuntimeBrowserDefinition,
   TensorlakeSandboxRuntimeBrowserDefinition,
