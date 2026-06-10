@@ -49,6 +49,10 @@ describe("integrations-definitions index", () => {
       familyId: "e2b",
       variantId: "e2b-default",
     });
+    const modalSandboxRuntimeDefinition = registry.getDefinition({
+      familyId: "modal",
+      variantId: "modal-default",
+    });
     const tensorlakeSandboxRuntimeDefinition = registry.getDefinition({
       familyId: "tensorlake",
       variantId: "tensorlake-default",
@@ -291,6 +295,17 @@ describe("integrations-definitions index", () => {
           ],
         },
       ],
+    });
+    expect(modalSandboxRuntimeDefinition).toMatchObject({
+      familyId: "modal",
+      variantId: "modal-default",
+      kind: "sandbox",
+      displayName: "Modal",
+      sandboxRuntime: {
+        providerId: "modal",
+        displayName: "Modal",
+      },
+      connectionMethods: [],
     });
     expect(tensorlakeSandboxRuntimeDefinition).toMatchObject({
       familyId: "tensorlake",
@@ -717,7 +732,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(17);
+    expect(definitions).toHaveLength(18);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -734,6 +749,7 @@ describe("integrations-definitions index", () => {
       "opencode::opencode-go",
       "planetscale::planetscale-mcp",
       "e2b::e2b-default",
+      "modal::modal-default",
       "tensorlake::tensorlake-default",
       "sentry::sentry-mcp",
       "signoz::signoz-mcp",

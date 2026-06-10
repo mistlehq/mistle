@@ -14,6 +14,7 @@ export function listSandboxProviders(ctx: {
 }): ListSandboxProvidersResponse {
   const sandboxRuntimeDefinitions = [
     findSandboxRuntimeDefinition(ctx.integrationRegistry, SandboxProvider.E2B),
+    findSandboxRuntimeDefinition(ctx.integrationRegistry, SandboxProvider.MODAL),
     findSandboxRuntimeDefinition(ctx.integrationRegistry, SandboxProvider.TENSORLAKE),
   ];
 
@@ -32,10 +33,12 @@ export function listSandboxProviders(ctx: {
         managed:
           definition.sandboxRuntime.providerId === SandboxProvider.E2B
             ? ctx.sandboxConfig.e2b?.enabled === true
-            : definition.sandboxRuntime.providerId === SandboxProvider.TENSORLAKE
-              ? ctx.sandboxConfig.tensorlake?.enabled === true
-              : false,
-        supportsOrganizationConnection: true,
+            : definition.sandboxRuntime.providerId === SandboxProvider.MODAL
+              ? ctx.sandboxConfig.modal?.enabled === true
+              : definition.sandboxRuntime.providerId === SandboxProvider.TENSORLAKE
+                ? ctx.sandboxConfig.tensorlake?.enabled === true
+                : false,
+        supportsOrganizationConnection: definition.connectionMethods.length > 0,
         resourceCapabilities: definition.sandboxRuntime.resourceCapabilities,
       })),
     ],
@@ -51,6 +54,7 @@ function findSandboxRuntimeDefinition(
     displayName: string;
     resourceCapabilities: SandboxRuntimeResourceCapabilities;
   };
+  connectionMethods: readonly unknown[];
 } {
   const definition = integrationRegistry
     .listDefinitions()
@@ -66,5 +70,6 @@ function findSandboxRuntimeDefinition(
 
   return {
     sandboxRuntime: definition.sandboxRuntime,
+    connectionMethods: definition.connectionMethods,
   };
 }

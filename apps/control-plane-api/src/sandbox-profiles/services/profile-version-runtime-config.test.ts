@@ -57,4 +57,23 @@ describe("profile version runtime config", () => {
       },
     });
   });
+
+  it("creates Modal workflow runtime input", () => {
+    expect(
+      createWorkflowSandboxRuntime({
+        sandboxProvider: SandboxProvider.MODAL,
+        sandboxConnectionId: null,
+        sandboxResources: {
+          vcpuCount: 2,
+          memoryMb: 4096,
+        },
+      }),
+    ).toEqual({
+      provider: SandboxProvider.MODAL,
+      resources: {
+        vcpuCount: 2,
+        memoryMb: 4096,
+      },
+    });
+  });
 });

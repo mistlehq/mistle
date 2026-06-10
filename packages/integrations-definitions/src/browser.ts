@@ -19,6 +19,7 @@ import { PlanetScaleMcpBaseDefinition } from "./planetscale/variants/planetscale
 import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
 import {
   E2BSandboxRuntimeDefinition,
+  ModalSandboxRuntimeDefinition,
   TensorlakeSandboxRuntimeDefinition,
 } from "./sandbox-runtimes/index.js";
 import { SentryMcpBaseDefinition } from "./sentry/variants/sentry-mcp/base-definition.js";
@@ -36,6 +37,7 @@ export const LinearBrowserDefinition = LinearBaseDefinition;
 export const OpenCodeGoBrowserDefinition = OpenCodeGoDefinition;
 export const PlanetScaleBrowserDefinition = PlanetScaleMcpBaseDefinition;
 export const E2BSandboxRuntimeBrowserDefinition = E2BSandboxRuntimeDefinition;
+export const ModalSandboxRuntimeBrowserDefinition = ModalSandboxRuntimeDefinition;
 export const TensorlakeSandboxRuntimeBrowserDefinition = TensorlakeSandboxRuntimeDefinition;
 export const SentryBrowserDefinition = SentryMcpBaseDefinition;
 export const SignozBrowserDefinition = SignozMcpBaseDefinition;
@@ -55,6 +57,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   OpenCodeGoBrowserDefinition,
   PlanetScaleBrowserDefinition,
   E2BSandboxRuntimeBrowserDefinition,
+  ModalSandboxRuntimeBrowserDefinition,
   TensorlakeSandboxRuntimeBrowserDefinition,
   SentryBrowserDefinition,
   SignozBrowserDefinition,

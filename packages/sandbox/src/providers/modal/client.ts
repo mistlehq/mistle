@@ -30,6 +30,7 @@ const ModalDefaultSandboxCommand = ["sleep", "48h"] as const;
 const ModalVmRuntimeExperimentalOptions = { vm_runtime: true } as const;
 const ModalEntrypointResetCommand = "ENTRYPOINT []";
 const ModalInspectProbeCommand = ["true"] as const;
+export const ModalDefaultSandboxTimeoutMs = 24 * 60 * 60 * 1000;
 
 export type ModalStartSandboxResponse = { sandboxId: string };
 export type ModalCaptureSandboxSnapshotResponse = { imageId: string };
@@ -95,9 +96,7 @@ export class ModalApiClient implements ModalClientApi {
       const sandbox = await this.#client.sandboxes.create(app, image, {
         command: [...ModalDefaultSandboxCommand],
         experimentalOptions: ModalVmRuntimeExperimentalOptions,
-        ...(this.#config.defaultTimeoutMs === undefined
-          ? {}
-          : { timeoutMs: this.#config.defaultTimeoutMs }),
+        timeoutMs: resolveModalSandboxTimeoutMs(this.#config),
         ...(parsedRequest.sandboxInstanceId === undefined
           ? {}
           : {
@@ -194,9 +193,9 @@ export class ModalApiClient implements ModalClientApi {
 
   async activate(request: ModalRuntimeControlRequest): Promise<void> {
     const parsedRequest = ModalRuntimeControlRequestSchema.parse(request);
-    const sandbox = await this.#client.sandboxes.fromId(parsedRequest.sandboxId);
 
     try {
+      const sandbox = await this.#client.sandboxes.fromId(parsedRequest.sandboxId);
       const process = await sandbox.exec(
         [
           "/opt/mistle/bin/sandboxd",
@@ -325,6 +324,12 @@ export function createModalSdkClient(config: ModalSandboxConfig): ModalClient {
     tokenSecret: config.tokenSecret,
     ...(config.environment === undefined ? {} : { environment: config.environment }),
   });
+}
+
+export function resolveModalSandboxTimeoutMs(
+  config: Pick<ValidatedModalSandboxConfig, "defaultTimeoutMs">,
+): number {
+  return config.defaultTimeoutMs ?? ModalDefaultSandboxTimeoutMs;
 }
 
 export function isModalNotFound(error: unknown): boolean {

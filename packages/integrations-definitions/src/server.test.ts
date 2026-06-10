@@ -56,6 +56,10 @@ describe("integrations-definitions server", () => {
       familyId: "e2b",
       variantId: "e2b-default",
     });
+    const modalSandboxRuntimeDefinition = registry.getDefinition({
+      familyId: "modal",
+      variantId: "modal-default",
+    });
     const tensorlakeSandboxRuntimeDefinition = registry.getDefinition({
       familyId: "tensorlake",
       variantId: "tensorlake-default",
@@ -147,6 +151,15 @@ describe("integrations-definitions server", () => {
         providerId: "e2b",
       },
     });
+    expect(modalSandboxRuntimeDefinition).toMatchObject({
+      familyId: "modal",
+      variantId: "modal-default",
+      kind: "sandbox",
+      sandboxRuntime: {
+        providerId: "modal",
+      },
+      connectionMethods: [],
+    });
     expect(tensorlakeSandboxRuntimeDefinition).toMatchObject({
       familyId: "tensorlake",
       variantId: "tensorlake-default",
@@ -233,7 +246,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(17);
+    expect(definitions).toHaveLength(18);
   });
 
   it("builds the server definitions bundle with an agent runtime registry", () => {
