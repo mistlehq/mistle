@@ -10,6 +10,7 @@ import {
   SandboxSdkImageSandboxdSourceKinds,
   SandboxProvider,
   createSandboxBaseImageBuilder,
+  createFreestyleSnapshotBaseImageName,
   createTensorlakeRegisteredBaseImageName,
 } from "../../packages/sandbox/src/index.js";
 
@@ -31,15 +32,17 @@ const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
 const SandboxBaseImageRefEnv = "MISTLE_SANDBOX_BASE_IMAGE_REF";
 const E2BApiKeyEnv = "E2B_API_KEY";
 const E2BConfigApiKeyEnv = "MISTLE_SANDBOX_E2B_API_KEY";
+const FreestyleApiKeyEnv = "FREESTYLE_API_KEY";
+const FreestyleConfigApiKeyEnv = "MISTLE_SANDBOX_FREESTYLE_API_KEY";
 const TensorlakeApiKeyEnv = "TENSORLAKE_API_KEY";
 const TensorlakeConfigApiKeyEnv = "MISTLE_SANDBOX_TENSORLAKE_API_KEY";
 
-const TensorlakeSandboxdSources = {
+const SandboxdSources = {
   LOCAL: "local",
   RELEASE: "release",
 } as const;
-type TensorlakeSandboxdSource =
-  (typeof TensorlakeSandboxdSources)[keyof typeof TensorlakeSandboxdSources];
+type SandboxdSource = (typeof SandboxdSources)[keyof typeof SandboxdSources];
+type SdkImageProvider = typeof SandboxProvider.FREESTYLE | typeof SandboxProvider.TENSORLAKE;
 
 type ParsedCliArguments = {
   additionalOutputImageRefs: string[];
@@ -52,11 +55,12 @@ type ParsedCliArguments = {
   provider: SandboxProvider;
   publishMode: "load" | "push";
   repository: string;
+  repositoryProvided: boolean;
   sourceImageRef?: string;
   sandboxdArtifactSha256?: string;
   sandboxdArtifactUrl?: string;
   sandboxdArtifactVersion?: string;
-  sandboxdSource?: TensorlakeSandboxdSource;
+  sandboxdSource?: SandboxdSource;
   tag?: string;
   target?: string;
   cpuCount?: number;
@@ -96,6 +100,16 @@ Tensorlake options:
   --platform <value>                   Linux platform for the sandboxd build artifact (default: ${DEFAULT_PLATFORM})
                                           Uses the Tensorlake SDK image builder
 
+Freestyle options:
+  --output-image-ref <name>            Freestyle snapshot name
+                                          Defaults to the deterministic name for --source-image-ref
+  --source-image-ref <ref>             Freestyle base image ref
+  --api-key <key>                      Freestyle API key
+  --sandboxd-source <release>          sandboxd source for the Freestyle SDK image
+  --sandboxd-artifact-url <url>        Release sandboxd artifact URL when --sandboxd-source release
+  --sandboxd-artifact-sha256 <sha256>  Release sandboxd artifact SHA256 when --sandboxd-source release
+  --sandboxd-artifact-version <value>  Release sandboxd version when --sandboxd-source release
+
 General options:
   --help                               Show this message
 `);
@@ -123,13 +137,14 @@ function parseProvider(value: string): SandboxProvider {
   if (
     value === SandboxProvider.DOCKER ||
     value === SandboxProvider.E2B ||
+    value === SandboxProvider.FREESTYLE ||
     value === SandboxProvider.TENSORLAKE
   ) {
     return value;
   }
 
   throw new Error(
-    `--provider must be ${SandboxProvider.DOCKER}, ${SandboxProvider.E2B}, or ${SandboxProvider.TENSORLAKE}.`,
+    `--provider must be ${SandboxProvider.DOCKER}, ${SandboxProvider.E2B}, ${SandboxProvider.FREESTYLE}, or ${SandboxProvider.TENSORLAKE}.`,
   );
 }
 
@@ -141,8 +156,8 @@ function parsePublishMode(value: string): "load" | "push" {
   throw new Error("--publish-mode must be load or push.");
 }
 
-function parseTensorlakeSandboxdSource(value: string): TensorlakeSandboxdSource {
-  if (value === TensorlakeSandboxdSources.LOCAL || value === TensorlakeSandboxdSources.RELEASE) {
+function parseSandboxdSource(value: string): SandboxdSource {
+  if (value === SandboxdSources.LOCAL || value === SandboxdSources.RELEASE) {
     return value;
   }
 
@@ -176,10 +191,11 @@ function parseCliArguments(argv: readonly string[]): ParsedCliArguments {
   let provider: SandboxProvider | undefined;
   let publishMode: "load" | "push" = SandboxBaseImagePublishModes.PUSH;
   let repository = DEFAULT_REPOSITORY;
+  let repositoryProvided = false;
   let sandboxdArtifactSha256: string | undefined;
   let sandboxdArtifactUrl: string | undefined;
   let sandboxdArtifactVersion: string | undefined;
-  let sandboxdSource: TensorlakeSandboxdSource | undefined;
+  let sandboxdSource: SandboxdSource | undefined;
   let sourceImageRef: string | undefined;
   let tag: string | undefined;
   let target: string | undefined;
@@ -211,6 +227,7 @@ function parseCliArguments(argv: readonly string[]): ParsedCliArguments {
 
     if (argument === "--repository") {
       repository = requireFlagValue(argv, index, argument);
+      repositoryProvided = true;
       index += 1;
       continue;
     }
@@ -277,7 +294,7 @@ function parseCliArguments(argv: readonly string[]): ParsedCliArguments {
     }
 
     if (argument === "--sandboxd-source") {
-      sandboxdSource = parseTensorlakeSandboxdSource(requireFlagValue(argv, index, argument));
+      sandboxdSource = parseSandboxdSource(requireFlagValue(argv, index, argument));
       index += 1;
       continue;
     }
@@ -340,6 +357,7 @@ function parseCliArguments(argv: readonly string[]): ParsedCliArguments {
     provider,
     publishMode,
     repository,
+    repositoryProvided,
     ...(apiKey === undefined ? {} : { apiKey }),
     ...(cpuCount === undefined ? {} : { cpuCount }),
     ...(domain === undefined ? {} : { domain }),
@@ -474,18 +492,42 @@ function prepareTensorlakeSandboxdBinary(platform: string): void {
   }
 }
 
-function requireTensorlakeSourceImageRef(
+function requireSdkSourceImageRef(
   argumentsList: ParsedCliArguments,
+  provider: SdkImageProvider,
 ): NonNullable<ParsedCliArguments["sourceImageRef"]> {
   const sourceImageRef = argumentsList.sourceImageRef ?? readOptionalEnv(SandboxBaseImageRefEnv);
 
   if (sourceImageRef === undefined || sourceImageRef.trim() === "") {
     throw new Error(
-      `--source-image-ref or ${SandboxBaseImageRefEnv} is required when --provider is tensorlake.`,
+      `--source-image-ref or ${SandboxBaseImageRefEnv} is required when --provider is ${provider}.`,
     );
   }
 
   return sourceImageRef;
+}
+
+function createSdkImageReleaseSandboxdSource(
+  argumentsList: ParsedCliArguments,
+  provider: SdkImageProvider,
+): {
+  kind: typeof SandboxSdkImageSandboxdSourceKinds.RELEASE;
+  artifact: {
+    version: string;
+    url: string;
+    sha256: string;
+  };
+} {
+  const sandboxdSource = argumentsList.sandboxdSource;
+  if (sandboxdSource === undefined) {
+    throw new Error(`--sandboxd-source is required when --provider is ${provider}.`);
+  }
+
+  if (sandboxdSource !== SandboxdSources.RELEASE) {
+    throw new Error(`--sandboxd-source must be release when --provider is ${provider}.`);
+  }
+
+  return createReleaseSandboxdSource(argumentsList, provider);
 }
 
 function createTensorlakeSandboxdSource(argumentsList: ParsedCliArguments):
@@ -506,18 +548,32 @@ function createTensorlakeSandboxdSource(argumentsList: ParsedCliArguments):
     throw new Error("--sandboxd-source is required when --provider is tensorlake.");
   }
 
-  if (sandboxdSource === TensorlakeSandboxdSources.LOCAL) {
+  if (sandboxdSource === SandboxdSources.LOCAL) {
     return {
       kind: SandboxSdkImageSandboxdSourceKinds.LOCAL,
     };
   }
 
+  return createReleaseSandboxdSource(argumentsList, SandboxProvider.TENSORLAKE);
+}
+
+function createReleaseSandboxdSource(
+  argumentsList: ParsedCliArguments,
+  provider: SdkImageProvider,
+): {
+  kind: typeof SandboxSdkImageSandboxdSourceKinds.RELEASE;
+  artifact: {
+    version: string;
+    url: string;
+    sha256: string;
+  };
+} {
   if (
     argumentsList.sandboxdArtifactUrl === undefined ||
     argumentsList.sandboxdArtifactUrl.trim() === ""
   ) {
     throw new Error(
-      "--sandboxd-artifact-url is required when --provider is tensorlake and --sandboxd-source is release.",
+      `--sandboxd-artifact-url is required when --provider is ${provider} and --sandboxd-source is release.`,
     );
   }
 
@@ -526,7 +582,7 @@ function createTensorlakeSandboxdSource(argumentsList: ParsedCliArguments):
     !SHA256_PATTERN.test(argumentsList.sandboxdArtifactSha256)
   ) {
     throw new Error(
-      "--sandboxd-artifact-sha256 must be a lowercase SHA256 hex digest when --provider is tensorlake and --sandboxd-source is release.",
+      `--sandboxd-artifact-sha256 must be a lowercase SHA256 hex digest when --provider is ${provider} and --sandboxd-source is release.`,
     );
   }
 
@@ -535,7 +591,7 @@ function createTensorlakeSandboxdSource(argumentsList: ParsedCliArguments):
     argumentsList.sandboxdArtifactVersion.trim() === ""
   ) {
     throw new Error(
-      "--sandboxd-artifact-version is required when --provider is tensorlake and --sandboxd-source is release.",
+      `--sandboxd-artifact-version is required when --provider is ${provider} and --sandboxd-source is release.`,
     );
   }
 
@@ -607,7 +663,7 @@ async function buildTensorlakeBaseImage(argumentsList: ParsedCliArguments): Prom
     throw new Error("--label is not supported when --provider is tensorlake.");
   }
 
-  const sourceImageRef = requireTensorlakeSourceImageRef(argumentsList);
+  const sourceImageRef = requireSdkSourceImageRef(argumentsList, SandboxProvider.TENSORLAKE);
   const outputImageRef =
     argumentsList.outputImageRef ?? createTensorlakeRegisteredBaseImageName(sourceImageRef);
   const sandboxd = createTensorlakeSandboxdSource(argumentsList);
@@ -637,6 +693,73 @@ async function buildTensorlakeBaseImage(argumentsList: ParsedCliArguments): Prom
   });
 
   console.log(`Tensorlake sandbox image is ready: ${image.imageId}.`);
+}
+
+async function buildFreestyleBaseImage(argumentsList: ParsedCliArguments): Promise<void> {
+  const apiKey =
+    argumentsList.apiKey ??
+    readOptionalEnv(FreestyleApiKeyEnv) ??
+    readOptionalEnv(FreestyleConfigApiKeyEnv);
+
+  if (apiKey === undefined || apiKey.trim() === "") {
+    throw new Error(
+      `--api-key, ${FreestyleApiKeyEnv}, or ${FreestyleConfigApiKeyEnv} is required when --provider is freestyle.`,
+    );
+  }
+
+  if (argumentsList.target !== undefined) {
+    throw new Error(
+      "--target is not supported when --provider is freestyle. Freestyle uses the provider SDK image builder.",
+    );
+  }
+
+  if (argumentsList.repositoryProvided) {
+    throw new Error("--repository is not supported when --provider is freestyle.");
+  }
+
+  if (argumentsList.tag !== undefined) {
+    throw new Error("--tag is not supported when --provider is freestyle.");
+  }
+
+  if (argumentsList.additionalOutputImageRefs.length > 0) {
+    throw new Error("--additional-output-image-ref is not supported when --provider is freestyle.");
+  }
+
+  if (argumentsList.platform !== undefined) {
+    throw new Error("--platform is not supported when --provider is freestyle.");
+  }
+
+  if (argumentsList.publishMode !== SandboxBaseImagePublishModes.PUSH) {
+    throw new Error("--publish-mode must be push when --provider is freestyle.");
+  }
+
+  if (Object.keys(argumentsList.labels).length > 0) {
+    throw new Error("--label is not supported when --provider is freestyle.");
+  }
+
+  const sourceImageRef = requireSdkSourceImageRef(argumentsList, SandboxProvider.FREESTYLE);
+  const outputImageRef =
+    argumentsList.outputImageRef ?? createFreestyleSnapshotBaseImageName(sourceImageRef);
+  const sandboxd = createSdkImageReleaseSandboxdSource(argumentsList, SandboxProvider.FREESTYLE);
+  const builder = createSandboxBaseImageBuilder({
+    provider: SandboxProvider.FREESTYLE,
+    freestyle: {
+      apiKey,
+    },
+  });
+
+  console.log(`Creating Freestyle sandbox snapshot ${outputImageRef}.`);
+  const image = await builder.ensureBaseImage({
+    source: {
+      kind: SandboxBaseImageSourceKinds.SDK_IMAGE,
+      baseImageRef: sourceImageRef,
+      contextPath: REPO_ROOT,
+      imageId: outputImageRef,
+      sandboxd,
+    },
+  });
+
+  console.log(`Freestyle sandbox snapshot is ready: ${image.imageId}.`);
 }
 
 async function buildE2BBaseImage(argumentsList: ParsedCliArguments): Promise<void> {
@@ -687,6 +810,11 @@ async function main(): Promise<void> {
 
   if (argumentsList.provider === SandboxProvider.E2B) {
     await buildE2BBaseImage(argumentsList);
+    return;
+  }
+
+  if (argumentsList.provider === SandboxProvider.FREESTYLE) {
+    await buildFreestyleBaseImage(argumentsList);
     return;
   }
 

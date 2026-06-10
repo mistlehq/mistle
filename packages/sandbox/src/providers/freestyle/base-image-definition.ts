@@ -1,3 +1,8 @@
+// oxlint-disable-next-line typescript/triple-slash-reference -- Freestyle 0.1.63 has runtime exports missing from its public declarations.
+/// <reference path="./types.d.ts" />
+
+import { VmBaseImage, VmSpec } from "freestyle";
+
 import { SandboxdInstallCommand, SandboxdInstallEnvVars } from "../../sandboxd-install.js";
 import type { FreestyleCreateSnapshotImageRequest } from "./schemas.js";
 
@@ -55,31 +60,53 @@ export type FreestyleSnapshotFile = {
 export function createFreestyleSnapshotSpec(
   input: FreestyleCreateSnapshotImageRequest,
 ): FreestyleSnapshotSpec {
+  return serializeFreestyleSnapshotVmSpec(createFreestyleSnapshotVmSpec(input));
+}
+
+export function createFreestyleSnapshotVmSpec(input: FreestyleCreateSnapshotImageRequest): VmSpec {
+  return new VmSpec()
+    .baseImage(createFreestyleSnapshotBaseImage(input))
+    .workdir("/root")
+    .additionalFiles(createFreestyleAdditionalFiles(input));
+}
+
+export function serializeFreestyleSnapshotVmSpec(spec: VmSpec): FreestyleSnapshotSpec {
+  const baseImage = spec.raw.baseImage;
+  if (baseImage === undefined) {
+    throw new Error("Freestyle snapshot spec requires a base image.");
+  }
+
+  const workdir = spec.raw.workdir;
+  if (workdir === undefined) {
+    throw new Error("Freestyle snapshot spec requires a workdir.");
+  }
+
+  const additionalFiles = spec.raw.additionalFiles;
+  if (additionalFiles === undefined) {
+    throw new Error("Freestyle snapshot spec requires additional files.");
+  }
+
   return {
-    baseImage: {
-      dockerfileContent: createFreestyleSandboxBaseDockerfile(input),
-    },
-    workdir: "/root",
-    additionalFiles: {
-      "/opt/mistle/bin/cmddir": {
-        content: input.cmddirBase64,
-        encoding: "base64",
-        executable: true,
-      },
-    },
+    baseImage: baseImage instanceof VmBaseImage ? baseImage.toRaw() : baseImage,
+    workdir,
+    additionalFiles,
   };
 }
 
-export function createFreestyleSandboxBaseDockerfile(
+export function createFreestyleSnapshotBaseImage(
   input: FreestyleCreateSnapshotImageRequest,
-): string {
-  return [
-    `FROM ${input.baseImageRef}`,
-    "ENV DEBIAN_FRONTEND=noninteractive",
-    "ENV container=docker",
-    "ENV HOME=/root",
-    `ENV PATH=${SandboxBasePath}`,
-    runShell(
+): VmBaseImage {
+  const image = new VmBaseImage()
+    .from(input.baseImageRef)
+    .appendDockerfile(
+      [
+        "ENV DEBIAN_FRONTEND=noninteractive",
+        "ENV container=docker",
+        "ENV HOME=/root",
+        `ENV PATH=${SandboxBasePath}`,
+      ].join("\n"),
+    )
+    .runCommands(
       [
         "apt-get update",
         `apt-get install -y --no-install-recommends ${CommonAptPackages.join(" ")}`,
@@ -87,8 +114,8 @@ export function createFreestyleSandboxBaseDockerfile(
         "update-alternatives --set ip6tables /usr/sbin/ip6tables-nft",
         "rm -rf /var/lib/apt/lists/*",
       ].join(" && "),
-    ),
-    runShell(
+    )
+    .runCommands(
       [
         "cat > /etc/profile.d/mistle-path.sh <<'EOF'",
         `for p in ${MistleBinPath}; do`,
@@ -100,25 +127,53 @@ export function createFreestyleSandboxBaseDockerfile(
         "export PATH",
         "EOF",
       ].join("\n"),
-    ),
-    runShell(
+    )
+    .runCommands(
       [
         `mkdir -p ${MistleBinPath} /run/mistle /var/lib/mistle/artifacts`,
         "chmod 0700 /run/mistle",
         "ln -sf /opt/mistle/bin/cmddir /usr/local/bin/cmddir",
         "rm -rf /var/log/journal",
       ].join(" && "),
-    ),
-    runShell(
+    )
+    .runCommands(
       [
         'curl -fsSL https://mise.run | MISE_VERSION="v2026.4.28" MISE_INSTALL_PATH="/opt/mistle/bin/mise" sh',
         "chmod +x /opt/mistle/bin/mise",
         "ln -sf /opt/mistle/bin/mise /usr/local/bin/mise",
       ].join(" && "),
-    ),
-    ...(input.sandboxd === undefined ? [] : [runShell(createSandboxdReleaseInstall(input))]),
-    "WORKDIR /root",
-  ].join("\n");
+    );
+
+  if (input.sandboxd === undefined) {
+    return image;
+  }
+
+  return image
+    .runCommands(createSandboxdReleaseInstall(input))
+    .runCommands(
+      [
+        "ln -sf /opt/mistle/bin/sandboxd /usr/local/bin/sandboxd",
+        "ln -sf /opt/mistle/bin/mistle-ssh-sign /usr/local/bin/mistle-ssh-sign",
+      ].join(" && "),
+    );
+}
+
+export function createFreestyleSandboxBaseDockerfile(
+  input: FreestyleCreateSnapshotImageRequest,
+): string {
+  return createFreestyleSnapshotBaseImage(input).toRaw().dockerfileContent;
+}
+
+function createFreestyleAdditionalFiles(
+  input: FreestyleCreateSnapshotImageRequest,
+): Readonly<Record<string, FreestyleSnapshotFile>> {
+  return {
+    "/opt/mistle/bin/cmddir": {
+      content: input.cmddirBase64,
+      encoding: "base64",
+      executable: true,
+    },
+  };
 }
 
 function createSandboxdReleaseInstall(input: FreestyleCreateSnapshotImageRequest): string {
@@ -132,13 +187,7 @@ function createSandboxdReleaseInstall(input: FreestyleCreateSnapshotImageRequest
       [SandboxdInstallEnvVars.SHA256]: input.sandboxd.artifact.sha256,
       [SandboxdInstallEnvVars.VERSION]: input.sandboxd.artifact.version,
     }),
-    "ln -sf /opt/mistle/bin/sandboxd /usr/local/bin/sandboxd",
-    "ln -sf /opt/mistle/bin/mistle-ssh-sign /usr/local/bin/mistle-ssh-sign",
   ].join(" && ");
-}
-
-function runShell(script: string): string {
-  return ["RUN <<'FREESTYLE_EOF'", script, "FREESTYLE_EOF"].join("\n");
 }
 
 function shellQuote(value: string): string {

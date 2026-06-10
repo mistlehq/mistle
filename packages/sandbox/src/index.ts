@@ -26,6 +26,7 @@ export {
 } from "./providers/tensorlake/index.js";
 export {
   createFreestyleBaseImageBuilderFromConfig,
+  createFreestyleSnapshotBaseImageName,
   createFreestyleSnapshotImageHandle,
   parseFreestyleImageHandle,
   type FreestyleBaseImageBuilderOptions,

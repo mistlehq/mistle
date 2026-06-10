@@ -13,6 +13,16 @@ export const FreestyleVmStates = {
 } as const;
 export type FreestyleVmState = (typeof FreestyleVmStates)[keyof typeof FreestyleVmStates];
 
+export const FreestyleSnapshotStates = {
+  BUILDING: "building",
+  READY: "ready",
+  FAILED: "failed",
+  CANCELLED: "cancelled",
+  LOST: "lost",
+} as const;
+export type FreestyleSnapshotState =
+  (typeof FreestyleSnapshotStates)[keyof typeof FreestyleSnapshotStates];
+
 export const FreestyleMaxVcpuCount = 32;
 export const FreestyleMaxMemoryGb = 32;
 export const FreestyleMaxDiskGb = 64;
