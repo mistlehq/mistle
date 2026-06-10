@@ -57,6 +57,26 @@ describe.concurrent("sandbox providers catalog integration", () => {
         },
       },
       {
+        id: "modal",
+        displayName: "Modal",
+        managed: false,
+        supportsOrganizationConnection: false,
+        resourceCapabilities: {
+          vcpuCount: {
+            min: 1,
+            max: 8,
+            step: 1,
+            default: 1,
+          },
+          memoryMb: {
+            min: 1024,
+            max: 32_768,
+            step: 1024,
+            default: 4096,
+          },
+        },
+      },
+      {
         id: "tensorlake",
         displayName: "Tensorlake",
         managed: false,
