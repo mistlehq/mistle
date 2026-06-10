@@ -12,10 +12,10 @@ describe("Signoz target schemas", () => {
   it("accepts an explicit issuer base URL", () => {
     expect(
       SignozTargetConfigSchema.parse({
-        issuer_base_url: "https://mcp.us.signoz.cloud",
+        issuer_base_url: "https://mcp.us2.signoz.cloud",
       }),
     ).toEqual({
-      issuer_base_url: "https://mcp.us.signoz.cloud",
+      issuer_base_url: "https://mcp.us2.signoz.cloud",
     });
   });
 

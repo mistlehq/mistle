@@ -54,11 +54,11 @@ describe("compileSignozBinding", () => {
     expect(compiled.egressRoutes).toEqual([
       {
         match: {
-          hosts: ["mcp.us.signoz.cloud"],
+          hosts: ["mcp.us2.signoz.cloud"],
           pathPrefixes: ["/mcp"],
         },
         upstream: {
-          baseUrl: "https://mcp.us.signoz.cloud/mcp",
+          baseUrl: "https://mcp.us2.signoz.cloud/mcp",
         },
         authInjection: {
           type: "bearer",
