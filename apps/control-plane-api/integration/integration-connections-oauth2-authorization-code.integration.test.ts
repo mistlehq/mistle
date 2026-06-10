@@ -222,7 +222,7 @@ describe.concurrent("integration connections OAuth 2.0 authorization-code integr
     await seedSignozTarget({
       env,
       targetKey,
-      issuerBaseUrl: "https://mcp.us.signoz.cloud",
+      issuerBaseUrl: "https://mcp.us2.signoz.cloud",
     });
     const session = await env.auth.createSession({
       email: "integration-new-oauth2-update@example.com",
@@ -427,7 +427,7 @@ describe.concurrent("integration connections OAuth 2.0 authorization-code integr
     await seedSignozTarget({
       env,
       targetKey: "signoz-oauth-invalid-start",
-      issuerBaseUrl: "https://mcp.us.signoz.cloud",
+      issuerBaseUrl: "https://mcp.us2.signoz.cloud",
     });
 
     const unsupportedStartResponse = await startOAuth2AuthorizationCodeConnection({

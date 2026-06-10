@@ -41,7 +41,7 @@ describe("SigNoz OAuth 2.0 authorization code", () => {
     );
 
     expect(authorizationUrl.origin + authorizationUrl.pathname).toBe(
-      "https://mcp.us.signoz.cloud/oauth/authorize",
+      "https://mcp.us2.signoz.cloud/oauth/authorize",
     );
     expect(authorizationUrl.searchParams.get("response_type")).toBe("code");
     expect(authorizationUrl.searchParams.get("client_id")).toBe("signoz_client_123");

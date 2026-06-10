@@ -23,6 +23,11 @@ export const SignozRegionLabels: Record<SignozRegion, string> = {
   eu: "EU",
 };
 
+const SignozHostedRegionSubdomains: Record<SignozRegion, string> = {
+  us: "us2",
+  eu: "eu",
+};
+
 export const SignozRegionSchema = z.enum(["us", "eu"], {
   error: "Region must be US or EU.",
 });
@@ -50,7 +55,12 @@ export function resolveSignozIssuerUrl(input: {
   region: string;
   issuerBaseUrl?: string | undefined;
 }): string {
-  return input.issuerBaseUrl ?? `https://mcp.${input.region}.signoz.cloud`;
+  if (input.issuerBaseUrl !== undefined) {
+    return input.issuerBaseUrl;
+  }
+
+  const hostedRegion = SignozRegionSchema.parse(input.region);
+  return `https://mcp.${SignozHostedRegionSubdomains[hostedRegion]}.signoz.cloud`;
 }
 
 export function resolveSignozMcpUrl(input: {
