@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 
 import { systemScheduler } from "@mistle/time";
+import { Freestyle } from "freestyle";
 import { z } from "zod";
 
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
@@ -13,6 +14,7 @@ import {
 import { createFreestyleSnapshotSpec } from "./base-image-definition.js";
 import {
   FreestyleClientError,
+  FreestyleClientErrorCodes,
   FreestyleClientOperationIds,
   FreestyleCommandExitError,
   FreestyleHttpError,
@@ -24,6 +26,7 @@ import {
   FreestyleCreateSnapshotImageRequestSchema,
   FreestyleRuntimeControlRequestSchema,
   FreestyleSandboxIdRequestSchema,
+  FreestyleSnapshotStates,
   FreestyleStartSandboxRequestSchema,
   FreestyleVmStates,
   memoryMbToGb,
@@ -32,6 +35,7 @@ import {
   type FreestyleCreateSnapshotImageRequest,
   type FreestyleRuntimeControlRequest,
   type FreestyleSandboxIdRequest,
+  type FreestyleSnapshotState,
   type FreestyleStartSandboxRequest,
   type FreestyleVmState,
 } from "./schemas.js";
@@ -49,6 +53,19 @@ const CreateVmResponseSchema = z.looseObject({
 
 const CreateSnapshotResponseSchema = z.looseObject({
   snapshotId: z.string().trim().min(1),
+});
+
+const FreestyleSnapshotInfoSchema = z.looseObject({
+  snapshotId: z.string().trim().min(1),
+  state: z.enum([
+    FreestyleSnapshotStates.BUILDING,
+    FreestyleSnapshotStates.READY,
+    FreestyleSnapshotStates.FAILED,
+    FreestyleSnapshotStates.CANCELLED,
+    FreestyleSnapshotStates.LOST,
+  ]),
+  deleted: z.boolean().optional(),
+  failureReason: z.string().nullable().optional(),
 });
 
 const ExecAwaitResponseSchema = z.looseObject({
@@ -87,6 +104,12 @@ export type FreestyleRunCommandResponse = {
   readonly stdout: string;
   readonly stderr: string;
   readonly statusCode: number;
+};
+export type FreestyleSnapshotInfo = {
+  readonly snapshotId: string;
+  readonly state: FreestyleSnapshotState;
+  readonly deleted?: boolean;
+  readonly failureReason?: string | null;
 };
 
 export interface FreestyleClient {
@@ -218,20 +241,71 @@ export function createFreestyleActivatePrelude(input: {
   });
 }
 
+export function validateFreestyleSnapshotForPrepareImage(snapshot: FreestyleSnapshotInfo): string {
+  if (snapshot.deleted === true) {
+    throw new FreestyleClientError({
+      code: FreestyleClientErrorCodes.NOT_FOUND,
+      operation: FreestyleClientOperationIds.PREPARE_IMAGE,
+      retryable: false,
+      message: `Freestyle operation \`${FreestyleClientOperationIds.PREPARE_IMAGE}\` failed: snapshot ${snapshot.snapshotId} is deleted.`,
+      cause: undefined,
+    });
+  }
+
+  if (snapshot.state === FreestyleSnapshotStates.READY) {
+    return snapshot.snapshotId;
+  }
+
+  if (snapshot.state === FreestyleSnapshotStates.BUILDING) {
+    throw new FreestyleClientError({
+      code: FreestyleClientErrorCodes.INVALID_ARGUMENT,
+      operation: FreestyleClientOperationIds.PREPARE_IMAGE,
+      retryable: true,
+      message: `Freestyle operation \`${FreestyleClientOperationIds.PREPARE_IMAGE}\` failed: snapshot ${snapshot.snapshotId} is still building.`,
+      cause: undefined,
+    });
+  }
+
+  throw new FreestyleClientError({
+    code: FreestyleClientErrorCodes.INVALID_ARGUMENT,
+    operation: FreestyleClientOperationIds.PREPARE_IMAGE,
+    retryable: false,
+    message: `Freestyle operation \`${FreestyleClientOperationIds.PREPARE_IMAGE}\` failed: snapshot ${snapshot.snapshotId} is ${snapshot.state}.${formatSnapshotFailureReason(
+      snapshot.failureReason,
+    )}`,
+    cause: undefined,
+  });
+}
+
 export class FreestyleApiClient implements FreestyleClient {
   readonly #apiKey: string;
   readonly #baseUrl: string;
+  readonly #sdk: Freestyle;
 
   constructor(input: { apiKey: string; baseUrl?: string }) {
+    const baseUrl = normalizeBaseUrl(input.baseUrl ?? FreestyleDefaultBaseUrl);
     this.#apiKey = input.apiKey;
-    this.#baseUrl = normalizeBaseUrl(input.baseUrl ?? FreestyleDefaultBaseUrl);
+    this.#baseUrl = baseUrl;
+    this.#sdk = new Freestyle({ apiKey: input.apiKey, baseUrl });
   }
 
   async prepareImage(request: { snapshotId: string }): Promise<{ snapshotId: string }> {
     if (request.snapshotId.trim().length === 0) {
       throw new Error("Freestyle snapshot id is required.");
     }
-    return { snapshotId: request.snapshotId };
+
+    try {
+      const response = await this.#jsonRequest({
+        method: "GET",
+        path: `/v1/vms/snapshots/${encodeURIComponent(request.snapshotId)}`,
+        schema: FreestyleSnapshotInfoSchema,
+      });
+      return {
+        snapshotId: validateFreestyleSnapshotForPrepareImage(toFreestyleSnapshotInfo(response)),
+      };
+    } catch (error) {
+      throw mapFreestyleClientError(FreestyleClientOperationIds.PREPARE_IMAGE, error);
+    }
   }
 
   async createSnapshotImage(
@@ -240,7 +314,7 @@ export class FreestyleApiClient implements FreestyleClient {
     const parsedRequest = FreestyleCreateSnapshotImageRequestSchema.parse(request);
 
     try {
-      const response = await this.#jsonRequest({
+      const response = await this.#sdkJsonRequest({
         method: "POST",
         path: "/v1/vms/snapshots",
         body: {
@@ -529,6 +603,25 @@ export class FreestyleApiClient implements FreestyleClient {
     return input.schema.parse(await response.json());
   }
 
+  async #sdkJsonRequest<Output>(input: {
+    method: string;
+    path: string;
+    body?: unknown;
+    schema: z.ZodType<Output>;
+  }): Promise<Output> {
+    const response = await this.#sdk.fetch(input.path, {
+      method: input.method,
+      headers: { "Content-Type": "application/json" },
+      ...(input.body === undefined ? {} : { body: JSON.stringify(input.body) }),
+    });
+
+    if (!response.ok) {
+      throw await createHttpError(response);
+    }
+
+    return input.schema.parse(await response.json());
+  }
+
   async #rawRequest(input: {
     method: string;
     path: string;
@@ -604,6 +697,17 @@ function toFreestyleVmInfo(input: z.output<typeof FreestyleVmInfoSchema>): Frees
   };
 }
 
+function toFreestyleSnapshotInfo(
+  input: z.output<typeof FreestyleSnapshotInfoSchema>,
+): FreestyleSnapshotInfo {
+  return {
+    snapshotId: input.snapshotId,
+    state: input.state,
+    ...(input.deleted === undefined ? {} : { deleted: input.deleted }),
+    ...(input.failureReason === undefined ? {} : { failureReason: input.failureReason }),
+  };
+}
+
 function toFreestyleSandboxInspectResult(vm: FreestyleVmInfo): FreestyleSandboxInspectResult {
   return {
     provider: SandboxProvider.FREESTYLE,
@@ -647,6 +751,14 @@ function parsePtyJsonMessage(data: string): { type: "exited"; exitCode: number }
   } catch {
     return null;
   }
+}
+
+function formatSnapshotFailureReason(reason: string | null | undefined): string {
+  if (reason === undefined || reason === null || reason.trim().length === 0) {
+    return "";
+  }
+
+  return ` Failure reason: ${reason.trim()}`;
 }
 
 function normalizeBaseUrl(baseUrl: string): string {

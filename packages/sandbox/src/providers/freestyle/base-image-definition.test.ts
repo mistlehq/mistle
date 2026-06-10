@@ -4,6 +4,8 @@ import { SandboxSdkImageSandboxdSourceKinds } from "../../types.js";
 import {
   createFreestyleSandboxBaseDockerfile,
   createFreestyleSnapshotSpec,
+  createFreestyleSnapshotVmSpec,
+  serializeFreestyleSnapshotVmSpec,
 } from "./base-image-definition.js";
 
 describe("createFreestyleSnapshotSpec", () => {
@@ -28,6 +30,25 @@ describe("createFreestyleSnapshotSpec", () => {
     expect(spec.baseImage.dockerfileContent).toContain("iproute2");
     expect(spec.baseImage.dockerfileContent).toContain("https://mise.run");
     expect(spec.baseImage.dockerfileContent).not.toContain("COPY ");
+  });
+
+  it("serializes the Freestyle SDK VM spec into the snapshot API payload", () => {
+    const vmSpec = createFreestyleSnapshotVmSpec({
+      imageId: "mistle-base",
+      baseImageRef: "ubuntu:24.04",
+      cmddirBase64: "Y21kZGly",
+    });
+
+    const spec = serializeFreestyleSnapshotVmSpec(vmSpec);
+
+    expect(spec.workdir).toBe("/root");
+    expect(spec.baseImage.dockerfileContent).toContain("FROM ubuntu:24.04");
+    expect(spec.baseImage.dockerfileContent).toContain("RUN <<'FREESTYLE_EOF'");
+    expect(spec.additionalFiles["/opt/mistle/bin/cmddir"]).toEqual({
+      content: "Y21kZGly",
+      encoding: "base64",
+      executable: true,
+    });
   });
 
   it("can bake a release sandboxd artifact into the Freestyle snapshot Dockerfile", () => {

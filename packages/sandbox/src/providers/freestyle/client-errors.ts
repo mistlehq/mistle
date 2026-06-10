@@ -2,6 +2,7 @@ import { SandboxError } from "../../errors.js";
 
 export const FreestyleClientOperationIds = {
   BUILD_BASE_IMAGE: "build_base_image",
+  PREPARE_IMAGE: "prepare_image",
   CREATE_SANDBOX: "create_sandbox",
   GET_SANDBOX_INFO: "get_sandbox_info",
   RESUME_SANDBOX: "resume_sandbox",

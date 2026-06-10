@@ -6,14 +6,20 @@ import {
   SandboxRuntimeEnv,
   SandboxRuntimeEnvDefaults,
 } from "../../index.js";
+import { FreestyleClientError, FreestyleClientErrorCodes } from "./client-errors.js";
 import {
   createFreestyleActivatePrelude,
   createFreestyleCreateVmRequestBody,
   createFreestyleExecCommand,
   normalizeFreestyleInspectDisposition,
   normalizeFreestyleInspectState,
+  validateFreestyleSnapshotForPrepareImage,
 } from "./client.js";
-import { FreestyleRuntimeControlRequestSchema, FreestyleVmStates } from "./schemas.js";
+import {
+  FreestyleRuntimeControlRequestSchema,
+  FreestyleSnapshotStates,
+  FreestyleVmStates,
+} from "./schemas.js";
 
 describe("createFreestyleCreateVmRequestBody", () => {
   it("requests persistent VMs from an existing Freestyle snapshot", () => {
@@ -74,6 +80,66 @@ describe("Freestyle lifecycle normalization", () => {
     );
   });
 });
+
+describe("validateFreestyleSnapshotForPrepareImage", () => {
+  it("accepts ready Freestyle snapshots", () => {
+    expect(
+      validateFreestyleSnapshotForPrepareImage({
+        snapshotId: "sh_ready",
+        state: FreestyleSnapshotStates.READY,
+      }),
+    ).toBe("sh_ready");
+  });
+
+  it("rejects deleted snapshots as missing images", () => {
+    const error = captureFreestyleClientError(() => {
+      return validateFreestyleSnapshotForPrepareImage({
+        snapshotId: "sh_deleted",
+        state: FreestyleSnapshotStates.READY,
+        deleted: true,
+      });
+    });
+
+    expect(error.code).toBe(FreestyleClientErrorCodes.NOT_FOUND);
+    expect(error.retryable).toBe(false);
+  });
+
+  it("rejects building snapshots as retryable not-ready images", () => {
+    const error = captureFreestyleClientError(() => {
+      return validateFreestyleSnapshotForPrepareImage({
+        snapshotId: "sh_building",
+        state: FreestyleSnapshotStates.BUILDING,
+      });
+    });
+
+    expect(error.code).toBe(FreestyleClientErrorCodes.INVALID_ARGUMENT);
+    expect(error.retryable).toBe(true);
+  });
+
+  it("rejects failed snapshots with the provider failure reason", () => {
+    expect(() =>
+      validateFreestyleSnapshotForPrepareImage({
+        snapshotId: "sh_failed",
+        state: FreestyleSnapshotStates.FAILED,
+        failureReason: "apt-get failed",
+      }),
+    ).toThrow("Failure reason: apt-get failed");
+  });
+});
+
+function captureFreestyleClientError(run: () => string): FreestyleClientError {
+  try {
+    run();
+  } catch (error) {
+    if (error instanceof FreestyleClientError) {
+      return error;
+    }
+
+    throw error;
+  }
+
+  throw new Error("Expected FreestyleClientError.");
+}
 
 describe("createFreestyleExecCommand", () => {
   it("injects required sandbox runtime env before provider shell commands", () => {
