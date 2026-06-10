@@ -586,7 +586,7 @@ describe("openai codex json-rpc client", () => {
     });
 
     await expect(pendingCall).rejects.toThrow(
-      "Sandbox session stream reset (bootstrap_disconnected): Sandbox bootstrap tunnel disconnected and invalidated the active interactive stream.",
+      "Sandbox session stream reset (bootstrap_disconnected): Sandbox bootstrap tunnel disconnected and invalidated the active interactive stream. Pending JSON-RPC methods: thread/list.",
     );
   });
 

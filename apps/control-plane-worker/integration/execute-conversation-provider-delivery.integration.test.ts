@@ -4,6 +4,7 @@ import { TraceFlags, context, trace, type Context } from "@opentelemetry/api";
 import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import { afterAll, beforeAll, describe, expect } from "vitest";
 
+import { submitCodexAssociatedResourceDelivery } from "../openworkflow/handle-provider-resource-association-delivery/submit-codex-associated-resource-delivery.js";
 import {
   createConversationProviderDeliveryConversation,
   executeConversationProviderDelivery,
@@ -108,6 +109,56 @@ describe("executeConversationProviderDelivery", () => {
         "initialized",
         "mistle/setDeliveryContext",
         "model/list",
+        "turn/start",
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("submits Codex associated-resource delivery directly to the stored thread", async () => {
+    const server = await startSimulatedCodexRuntimeServer("associated_resource_direct_turn");
+
+    try {
+      const activeContext = trace.setSpan(
+        context.active(),
+        trace.wrapSpanContext(ParentSpanContext),
+      );
+
+      const result = await context.with(
+        activeContext,
+        async () =>
+          await submitCodexAssociatedResourceDelivery({
+            deliveryInput: {
+              conversationId: "cnv_associated_resource",
+              runtimeId: "codex",
+              connectionUrl: server.url,
+              inputText: "GitHub pull request issue comment created.",
+              workingDirectory: "/root/mistlehq/mistle.dev",
+              deliveryContext: {
+                source: "provider_resource_association",
+                webhookEventId: "iwe_associated_resource",
+                deliveryTaskId: "prd_associated_resource",
+                externalDeliveryId: "github_delivery_123",
+                providerResourceAssociationId: "pra_associated_resource",
+                conversationId: "cnv_associated_resource",
+                sandboxInstanceId: "sbi_associated_resource",
+                routeId: "cvr_associated_resource",
+              },
+              providerConversationId: "thread_123",
+              providerExecutionId: null,
+            },
+            providerConversationId: "thread_123",
+          }),
+      );
+
+      expect(result).toEqual({
+        providerExecutionId: "turn_123",
+      });
+      expect(await server.methodSequence).toEqual([
+        "initialize",
+        "initialized",
+        "thread/resume",
         "turn/start",
       ]);
     } finally {

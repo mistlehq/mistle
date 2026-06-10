@@ -35,6 +35,10 @@ import {
   GatewayManagedEgressUnsupportedRouteError,
 } from "./managed-egress-request.js";
 import {
+  decodeObservedResponseBody,
+  ObservedResponseBodyDecodeError,
+} from "./observed-response-body.js";
+import {
   classifyRuntimePlanEgressRoute,
   type GatewayEgressRouteClassification,
 } from "./runtime-plan-route-classifier.js";
@@ -796,6 +800,45 @@ function createManagedProviderResourceAssociationObserver(input: {
   }
 
   return async (response) => {
+    let decodedResponseBody: Awaited<ReturnType<typeof decodeObservedResponseBody>>;
+    try {
+      decodedResponseBody = await decodeObservedResponseBody({
+        body: response.body,
+        headers: response.headers,
+        maxDecodedBodyBytes: ProviderResourceAssociationObservationBodyLimitBytes,
+      });
+    } catch (error) {
+      logger.warn(
+        {
+          event: "gateway_direct_egress_github_pull_request_creation_response_decode_failed",
+          responseBodyBytes: response.body.byteLength,
+          routeCredentialConnectionId: integrationConnectionId,
+          sandboxInstanceId: input.admission.token.sub,
+          status: response.status,
+          ...(error instanceof ObservedResponseBodyDecodeError
+            ? { contentEncoding: error.contentEncoding }
+            : {}),
+        },
+        error instanceof Error ? error.message : String(error),
+      );
+      return;
+    }
+
+    const responseBodyText = decodeResponseBodyForLog(decodedResponseBody.body);
+    logger.info(
+      {
+        contentEncoding: decodedResponseBody.contentEncoding,
+        decodedResponseBodyBytes: decodedResponseBody.decodedBodyBytes,
+        event: "gateway_direct_egress_github_pull_request_creation_response_observed",
+        responseBody: responseBodyText,
+        responseBodyBytes: decodedResponseBody.rawBodyBytes,
+        routeCredentialConnectionId: integrationConnectionId,
+        sandboxInstanceId: input.admission.token.sub,
+        status: response.status,
+      },
+      "Direct gateway egress GitHub pull request creation response observed",
+    );
+
     if (!isJsonContentType(response.headers)) {
       return;
     }
@@ -804,10 +847,23 @@ function createManagedProviderResourceAssociationObserver(input: {
       method: input.admission.request.method,
       path: input.admission.request.path,
       requestBody: input.requestBody,
-      responseBody: parseJsonResponseBody(response.body),
+      responseBody: parseJsonResponseBody(decodedResponseBody.body),
       status: response.status,
     });
     if (observedResource === null) {
+      logger.warn(
+        {
+          contentEncoding: decodedResponseBody.contentEncoding,
+          decodedResponseBodyBytes: decodedResponseBody.decodedBodyBytes,
+          event:
+            "gateway_direct_egress_github_pull_request_creation_response_resource_not_observed",
+          responseBodyBytes: decodedResponseBody.rawBodyBytes,
+          routeCredentialConnectionId: integrationConnectionId,
+          sandboxInstanceId: input.admission.token.sub,
+          status: response.status,
+        },
+        "Direct gateway egress GitHub pull request creation response did not contain an observable provider resource",
+      );
       return;
     }
 
@@ -824,6 +880,7 @@ function createManagedProviderResourceAssociationObserver(input: {
       logger.info(
         {
           event: "gateway_direct_egress_provider_resource_association_registered",
+          providerResourceExtractionMethod: observedResource.extractionMethod,
           providerResourceId: observedResource.providerResourceId,
           resourceKind: observedResource.resourceKind,
           routeCredentialConnectionId: integrationConnectionId,
@@ -836,6 +893,7 @@ function createManagedProviderResourceAssociationObserver(input: {
       logger.warn(
         {
           event: "gateway_direct_egress_provider_resource_association_registration_failed",
+          providerResourceExtractionMethod: observedResource.extractionMethod,
           providerResourceId: observedResource.providerResourceId,
           resourceKind: observedResource.resourceKind,
           routeCredentialConnectionId: integrationConnectionId,
@@ -845,6 +903,10 @@ function createManagedProviderResourceAssociationObserver(input: {
       );
     }
   };
+}
+
+function decodeResponseBodyForLog(body: Uint8Array): string {
+  return new TextDecoder().decode(body);
 }
 
 function isJsonContentType(headers: Headers): boolean {

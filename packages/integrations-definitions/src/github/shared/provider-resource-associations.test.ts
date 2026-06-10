@@ -21,6 +21,7 @@ describe("observeGitHubRoutableResourceFromEgressResponse", () => {
         },
       }),
     ).toEqual({
+      extractionMethod: "github_rest_pull_request_fields",
       resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
       providerResourceId: "mistlehq/mistle#42",
     });
@@ -43,6 +44,7 @@ describe("observeGitHubRoutableResourceFromEgressResponse", () => {
         },
       }),
     ).toEqual({
+      extractionMethod: "github_rest_pull_request_fields",
       resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
       providerResourceId: "mistlehq/mistle#43",
     });
@@ -74,8 +76,38 @@ describe("observeGitHubRoutableResourceFromEgressResponse", () => {
         },
       }),
     ).toEqual({
+      extractionMethod: "github_graphql_pull_request_fields",
       resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
       providerResourceId: "mistlehq/mistle#44",
+    });
+  });
+
+  it("recognizes GraphQL createPullRequest responses with only a pull request URL", () => {
+    expect(
+      observeGitHubRoutableResourceFromEgressResponse({
+        method: "POST",
+        path: "/graphql",
+        requestBody: encodeJson({
+          operationName: "CreatePullRequest",
+          query:
+            "mutation CreatePullRequest($input: CreatePullRequestInput!) { createPullRequest(input: $input) { pullRequest { id url } } }",
+        }),
+        status: 200,
+        responseBody: {
+          data: {
+            createPullRequest: {
+              pullRequest: {
+                id: "PR_kwDORPPBa87kpaOR",
+                url: "https://github.com/mistlehq/mistle.dev/pull/20",
+              },
+            },
+          },
+        },
+      }),
+    ).toEqual({
+      extractionMethod: "github_graphql_pull_request_url",
+      resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+      providerResourceId: "mistlehq/mistle.dev#20",
     });
   });
 

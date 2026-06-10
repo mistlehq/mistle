@@ -9,7 +9,7 @@ import { z } from "zod";
 import { CodexJsonRpcClient } from "./codex-json-rpc.js";
 import { isRecord } from "./is-record.js";
 
-const AllCodexThreadSourceKinds = [
+export const AllCodexThreadSourceKinds = [
   "cli",
   "vscode",
   "exec",
@@ -231,6 +231,35 @@ export type CodexThreadSummary = {
 
 export function isCodexSubagentThread(thread: CodexThreadSummary): boolean {
   return thread.isSubagent;
+}
+
+export function resolveOriginalCodexThreadId(
+  threads: readonly CodexThreadSummary[],
+): string | null {
+  let originalThreadId: string | null = null;
+  let originalCreatedAt: number | null = null;
+
+  for (const thread of threads) {
+    if (isCodexSubagentThread(thread)) {
+      continue;
+    }
+
+    if (thread.createdAt === null) {
+      continue;
+    }
+
+    if (
+      originalCreatedAt === null ||
+      thread.createdAt < originalCreatedAt ||
+      (thread.createdAt === originalCreatedAt &&
+        (originalThreadId === null || thread.id < originalThreadId))
+    ) {
+      originalThreadId = thread.id;
+      originalCreatedAt = thread.createdAt;
+    }
+  }
+
+  return originalThreadId;
 }
 
 function isCodexSubagentThreadSource(threadSource: string | null): boolean {

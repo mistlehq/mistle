@@ -9,6 +9,7 @@ import { sandboxProfiles } from "./sandbox-profiles.js";
 export const TriggerConversationOwnerKinds = {
   TRIGGER_TARGET: "trigger_target",
   INTEGRATION_BINDING: "integration_binding",
+  PROVIDER_RESOURCE_ASSOCIATION: "provider_resource_association",
 } as const;
 
 export type TriggerConversationOwnerKind =

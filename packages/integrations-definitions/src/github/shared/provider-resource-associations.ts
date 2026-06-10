@@ -24,10 +24,25 @@ const GitHubGraphqlPullRequestCreationResponseSchema = z.looseObject({
     }),
   }),
 });
+const GitHubGraphqlPullRequestCreationUrlResponseSchema = z.looseObject({
+  data: z.looseObject({
+    createPullRequest: z.looseObject({
+      pullRequest: z.looseObject({
+        url: z.url(),
+      }),
+    }),
+  }),
+});
 
 const GitHubGraphqlCreatePullRequestPattern = /\bcreatePullRequest\b/;
 
+export type GitHubPullRequestProviderResourceExtractionMethod =
+  | "github_rest_pull_request_fields"
+  | "github_graphql_pull_request_fields"
+  | "github_graphql_pull_request_url";
+
 export type GitHubRoutableResourceObservation = {
+  extractionMethod: GitHubPullRequestProviderResourceExtractionMethod;
   resourceKind: Extract<AssociatedProviderResourceKind, "github.pull_request">;
   providerResourceId: string;
 };
@@ -57,36 +72,55 @@ export function observeGitHubRoutableResourceFromEgressResponse(input: {
 function observeRestPullRequestCreationResponse(
   responseBody: unknown,
 ): GitHubRoutableResourceObservation | null {
+  // REST pull request creation returns stable structured fields for the
+  // routable key: `number` and `base.repo.full_name`.
   const parsedBody = GitHubPullRequestCreationResponseSchema.safeParse(responseBody);
   if (!parsedBody.success) {
     return null;
   }
 
-  return {
-    resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
-    providerResourceId: createGitHubPullRequestProviderResourceId({
-      repositoryFullName: parsedBody.data.base.repo.full_name,
-      pullRequestNumber: parsedBody.data.number,
-    }),
-  };
+  return createPullRequestObservation({
+    extractionMethod: "github_rest_pull_request_fields",
+    repositoryFullName: parsedBody.data.base.repo.full_name,
+    pullRequestNumber: parsedBody.data.number,
+  });
 }
 
 function observeGraphqlPullRequestCreationResponse(
   responseBody: unknown,
 ): GitHubRoutableResourceObservation | null {
+  // GraphQL responses only include fields selected by the caller. This shape is
+  // ideal when the caller selected structured PR identity fields directly.
   const parsedBody = GitHubGraphqlPullRequestCreationResponseSchema.safeParse(responseBody);
-  if (!parsedBody.success) {
-    return null;
-  }
-
-  return {
-    resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
-    providerResourceId: createGitHubPullRequestProviderResourceId({
+  if (parsedBody.success) {
+    return createPullRequestObservation({
+      extractionMethod: "github_graphql_pull_request_fields",
       repositoryFullName:
         parsedBody.data.data.createPullRequest.pullRequest.repository.nameWithOwner,
       pullRequestNumber: parsedBody.data.data.createPullRequest.pullRequest.number,
-    }),
-  };
+    });
+  }
+
+  // The currently observed `gh pr create` GraphQL response selects only
+  // `pullRequest.id` and `pullRequest.url`, so URL parsing is the active path
+  // for that client while still producing the same canonical `owner/repo#number`
+  // provider resource id used by webhook association delivery.
+  const parsedUrlBody = GitHubGraphqlPullRequestCreationUrlResponseSchema.safeParse(responseBody);
+  if (!parsedUrlBody.success) {
+    return null;
+  }
+
+  const pullRequestResource = parseGitHubPullRequestUrl(
+    parsedUrlBody.data.data.createPullRequest.pullRequest.url,
+  );
+  if (pullRequestResource === null) {
+    return null;
+  }
+
+  return createPullRequestObservation({
+    extractionMethod: "github_graphql_pull_request_url",
+    ...pullRequestResource,
+  });
 }
 
 export function createGitHubPullRequestProviderResourceId(input: {
@@ -94,6 +128,44 @@ export function createGitHubPullRequestProviderResourceId(input: {
   repositoryFullName: string;
 }): string {
   return `${input.repositoryFullName}#${String(input.pullRequestNumber)}`;
+}
+
+function createPullRequestObservation(input: {
+  extractionMethod: GitHubPullRequestProviderResourceExtractionMethod;
+  pullRequestNumber: number;
+  repositoryFullName: string;
+}): GitHubRoutableResourceObservation {
+  return {
+    extractionMethod: input.extractionMethod,
+    resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+    providerResourceId: createGitHubPullRequestProviderResourceId(input),
+  };
+}
+
+function parseGitHubPullRequestUrl(url: string): {
+  pullRequestNumber: number;
+  repositoryFullName: string;
+} | null {
+  const parsedUrl = new URL(url);
+  const segments = parsedUrl.pathname.split("/").filter(Boolean);
+  if (segments.length !== 4 || segments[2] !== "pull") {
+    return null;
+  }
+
+  const [owner, repo, , pullRequestNumberText] = segments;
+  if (owner === undefined || repo === undefined || pullRequestNumberText === undefined) {
+    return null;
+  }
+
+  const pullRequestNumber = Number(pullRequestNumberText);
+  if (!Number.isInteger(pullRequestNumber) || pullRequestNumber <= 0) {
+    return null;
+  }
+
+  return {
+    repositoryFullName: `${owner}/${repo}`,
+    pullRequestNumber,
+  };
 }
 
 export function isGitHubPullRequestCreationRequest(input: {

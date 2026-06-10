@@ -11,6 +11,7 @@ import { type RawData, type WebSocket, WebSocketServer } from "ws";
 export type SimulatedCodexRuntimeScenario =
   | "existing_conversation"
   | "existing_conversation_with_collaboration_mode"
+  | "associated_resource_direct_turn"
   | "create_conversation"
   | "resume_not_loaded_conversation"
   | "no_default_model"
@@ -431,7 +432,10 @@ export async function startSimulatedCodexRuntimeServer(
         }
 
         if (methodPayload.method === "thread/resume") {
-          if (scenario !== "resume_not_loaded_conversation") {
+          if (
+            scenario !== "resume_not_loaded_conversation" &&
+            scenario !== "associated_resource_direct_turn"
+          ) {
             throw new Error("Unexpected thread/resume request for this scenario.");
           }
 
@@ -446,20 +450,29 @@ export async function startSimulatedCodexRuntimeServer(
         }
 
         if (methodPayload.method === "turn/start") {
-          expectRequestModel(
-            scenario === "no_default_model"
-              ? {
-                  method: methodPayload.method,
-                  params: methodPayload.params,
-                  expectedModel: FallbackCodexModel,
-                  expectedEffort: FallbackCodexModelReasoningEffort,
-                }
-              : {
-                  method: methodPayload.method,
-                  params: methodPayload.params,
-                  expectedModel: DefaultCodexModel,
-                },
-          );
+          if (scenario === "associated_resource_direct_turn") {
+            if (methodPayload.params?.model !== undefined) {
+              throw new Error("Expected associated resource turn/start not to include model.");
+            }
+            if (methodPayload.params?.effort !== undefined) {
+              throw new Error("Expected associated resource turn/start not to include effort.");
+            }
+          } else {
+            expectRequestModel(
+              scenario === "no_default_model"
+                ? {
+                    method: methodPayload.method,
+                    params: methodPayload.params,
+                    expectedModel: FallbackCodexModel,
+                    expectedEffort: FallbackCodexModelReasoningEffort,
+                  }
+                : {
+                    method: methodPayload.method,
+                    params: methodPayload.params,
+                    expectedModel: DefaultCodexModel,
+                  },
+            );
+          }
           if (scenario === "existing_conversation_with_collaboration_mode") {
             expectCollaborationModeSettings({
               params: methodPayload.params,
