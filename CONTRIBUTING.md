@@ -106,11 +106,12 @@ pnpm --filter @mistle/control-plane-api integration-targets:sync
 
 ### Development Commands
 
-| Command          | What it does                                                                                                                                                 |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `pnpm dev`       | Starts local infra and app dev processes. On stop, runs compose `down --remove-orphans` and keeps volumes and images so Postgres and registry state persist. |
-| `pnpm dev:down`  | Stops and removes containers and network. Keeps volumes and images.                                                                                          |
-| `pnpm dev:reset` | Same as `dev:down`, then removes compose volumes and wipes Postgres and local registry state.                                                                |
+| Command             | What it does                                                                                                                                                                                                                                                                                                           |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm doctor:agent` | Reports whether the repo shell is usable, whether Nix is active, which `pnpm` command wrapper to use, and which local config files or tunnel env values are missing. It does not create or modify files. If `pnpm` is not reachable yet, run `node --experimental-strip-types ./scripts/dev/doctor-agent.ts` directly. |
+| `pnpm dev`          | Starts local infra and app dev processes. On stop, runs compose `down --remove-orphans` and keeps volumes and images so Postgres and registry state persist.                                                                                                                                                           |
+| `pnpm dev:down`     | Stops and removes containers and network. Keeps volumes and images.                                                                                                                                                                                                                                                    |
+| `pnpm dev:reset`    | Same as `dev:down`, then removes compose volumes and wipes Postgres and local registry state.                                                                                                                                                                                                                          |
 
 ### Environment Files
 
