@@ -30,3 +30,7 @@ export {
   parseFreestyleImageHandle,
   type FreestyleBaseImageBuilderOptions,
 } from "./providers/freestyle/index.js";
+export {
+  createModalBaseImageBuilderFromConfig,
+  type ModalBaseImageBuilderOptions,
+} from "./providers/modal/index.js";

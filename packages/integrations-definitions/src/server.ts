@@ -23,6 +23,7 @@ import { PlanetScaleDefinition } from "./planetscale/server.js";
 import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
 import {
   E2BSandboxRuntimeDefinition,
+  ModalSandboxRuntimeDefinition,
   TensorlakeSandboxRuntimeDefinition,
 } from "./sandbox-runtimes/index.js";
 import { SentryDefinition } from "./sentry/server.js";
@@ -68,6 +69,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   OpenCodeGoDefinition,
   PlanetScaleDefinition,
   E2BSandboxRuntimeDefinition,
+  ModalSandboxRuntimeDefinition,
   TensorlakeSandboxRuntimeDefinition,
   SentryDefinition,
   SignozDefinition,

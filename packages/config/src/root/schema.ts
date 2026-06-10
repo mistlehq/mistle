@@ -4,6 +4,7 @@ import { defaultMissingEnabledToFalse } from "../core/discriminated-union.js";
 
 const UrlSchema = z.string().trim().min(1);
 const DefaultE2BCloudDomain = "e2b.app";
+const ModalSandboxMaxTimeoutMs = 24 * 60 * 60 * 1000;
 const DefaultE2BCpuCount = 2;
 const DefaultE2BMemoryMb = 4 * 1024;
 
@@ -185,6 +186,29 @@ const SandboxTensorlakeProviderConfigSchema = z.discriminatedUnion("enabled", [
     .object({
       enabled: z.literal(false),
       api_key: z.string().trim().min(1).optional(),
+    })
+    .strict(),
+]);
+
+const SandboxModalProviderConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      token_id: z.string().trim().min(1),
+      token_secret: z.string().trim().min(1),
+      app_name: z.string().trim().min(1),
+      environment: z.string().trim().min(1).optional(),
+      default_timeout_ms: z.number().int().min(1).max(ModalSandboxMaxTimeoutMs).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      token_id: z.string().trim().min(1).optional(),
+      token_secret: z.string().trim().min(1).optional(),
+      app_name: z.string().trim().min(1).optional(),
+      environment: z.string().trim().min(1).optional(),
+      default_timeout_ms: z.number().int().min(1).max(ModalSandboxMaxTimeoutMs).optional(),
     })
     .strict(),
 ]);
@@ -421,6 +445,7 @@ export const ConfigSchema = z
         docker: SandboxDockerProviderConfigSchema.optional(),
         sandboxd_test_faults_enabled: z.boolean().optional(),
         e2b: SandboxE2BProviderConfigSchema.optional(),
+        modal: SandboxModalProviderConfigSchema.optional(),
         tensorlake: SandboxTensorlakeProviderConfigSchema.optional(),
       })
       .strict(),

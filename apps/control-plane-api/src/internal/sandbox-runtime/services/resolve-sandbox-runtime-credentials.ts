@@ -42,6 +42,15 @@ type ResolvedSandboxRuntimeCredentials =
       provider: typeof SandboxProvider.TENSORLAKE;
       source: "managed" | "connection";
       apiKey: string;
+    }
+  | {
+      provider: typeof SandboxProvider.MODAL;
+      source: "managed";
+      tokenId: string;
+      tokenSecret: string;
+      appName: string;
+      environment?: string;
+      defaultTimeoutMs?: number;
     };
 
 type SandboxConnection = {
@@ -99,6 +108,17 @@ export async function resolveSandboxRuntimeCredentials(
     });
   }
 
+  if (input.provider === SandboxProvider.MODAL) {
+    if (input.connectionId !== undefined) {
+      throw new BadRequestError(
+        "INVALID_SANDBOX_CREDENTIAL_REQUEST",
+        "Modal sandbox runtime credentials cannot be resolved from an integration connection.",
+      );
+    }
+
+    return resolveManagedModalCredentials(ctx);
+  }
+
   if (input.provider === SandboxProvider.FREESTYLE) {
     throw new BadRequestError(
       "UNSUPPORTED_SANDBOX_PROVIDER",
@@ -111,6 +131,31 @@ export async function resolveSandboxRuntimeCredentials(
 
 function assertUnreachableSandboxProvider(_provider: never): never {
   throw new BadRequestError("UNSUPPORTED_SANDBOX_PROVIDER", "Sandbox provider is not supported.");
+}
+
+function resolveManagedModalCredentials(
+  ctx: ResolveSandboxRuntimeCredentialsContext,
+): ResolvedSandboxRuntimeCredentials {
+  if (ctx.sandboxConfig.modal?.enabled !== true) {
+    throw new BadRequestError(
+      "MANAGED_SANDBOX_PROVIDER_UNAVAILABLE",
+      "Managed Modal sandbox runtime is not configured for this deployment.",
+    );
+  }
+
+  return {
+    provider: SandboxProvider.MODAL,
+    source: "managed",
+    tokenId: ctx.sandboxConfig.modal.tokenId,
+    tokenSecret: ctx.sandboxConfig.modal.tokenSecret,
+    appName: ctx.sandboxConfig.modal.appName,
+    ...(ctx.sandboxConfig.modal.environment === undefined
+      ? {}
+      : { environment: ctx.sandboxConfig.modal.environment }),
+    ...(ctx.sandboxConfig.modal.defaultTimeoutMs === undefined
+      ? {}
+      : { defaultTimeoutMs: ctx.sandboxConfig.modal.defaultTimeoutMs }),
+  };
 }
 
 function resolveManagedTensorlakeCredentials(

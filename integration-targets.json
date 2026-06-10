@@ -34,6 +34,11 @@
       "config": {}
     },
     {
+      "targetKey": "modal-default",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "gcp-mcp",
       "enabled": true,
       "config": {}

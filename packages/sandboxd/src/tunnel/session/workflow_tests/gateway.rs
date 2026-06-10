@@ -173,6 +173,7 @@ fn close_wakes_idle_connected_tunnel_session() {
             .expect("bootstrap listener should expose an address")
             .port()
     );
+    let (gateway_ready_sender, gateway_ready_receiver) = mpsc::channel();
     let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
     let gateway_thread = thread::spawn(move || {
         let (stream, _) = bootstrap_listener
@@ -193,6 +194,9 @@ fn close_wakes_idle_connected_tunnel_session() {
                 .into(),
             ))
             .expect("gateway should acknowledge telemetry.open");
+        gateway_ready_sender
+            .send(())
+            .expect("gateway readiness should be observable");
 
         loop {
             match websocket.read() {
@@ -251,6 +255,9 @@ fn close_wakes_idle_connected_tunnel_session() {
         Arc::new(ThreadSleeper),
     )
     .expect("tunnel session should start");
+    gateway_ready_receiver
+        .recv_timeout(Duration::from_secs(2))
+        .expect("gateway should acknowledge telemetry before close");
 
     let (close_done_sender, close_done_receiver) = mpsc::channel();
     let close_thread = thread::spawn(move || {

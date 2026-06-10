@@ -52,6 +52,54 @@ describe("ConfigSchema sandbox provider config", () => {
       network_name: "mistle-sandbox-dev",
     });
   });
+
+  it("rejects Modal sandbox timeouts above the provider maximum", () => {
+    expect(() =>
+      ConfigSchema.shape.sandbox.parse({
+        default_base_image: "registry.example.com/sandbox:latest",
+        publish_base_domain: "mistle.example",
+        tokens: {
+          connect: {
+            secret: "connect-secret",
+            issuer: "control-plane-api",
+            audience: "data-plane-gateway",
+          },
+          bootstrap: {
+            secret: "bootstrap-secret",
+            issuer: "data-plane-worker",
+            audience: "data-plane-gateway",
+          },
+          egress: {
+            secret: "egress-secret",
+            issuer: "data-plane-gateway",
+            audience: "mistle-gateway-egress",
+          },
+          pty_transport: {
+            secret: "pty-secret",
+            issuer: "data-plane-gateway",
+            audience: "mistle-gateway-pty",
+          },
+        },
+        publish: {
+          access_token: {
+            secret: "publish-access-secret",
+            issuer: "control-plane-api",
+            audience: "data-plane-gateway",
+          },
+          session: {
+            cookie_signing_secret: "publish-session-secret",
+          },
+        },
+        modal: {
+          enabled: true,
+          token_id: "ak-test-token-id",
+          token_secret: "as-test-token-secret",
+          app_name: "mistle-modal-sandboxes",
+          default_timeout_ms: 86_400_001,
+        },
+      }),
+    ).toThrow(/<=86400000/u);
+  });
 });
 
 describe("ConfigSchema billing config", () => {

@@ -62,6 +62,16 @@ function buildRemoteSandboxEnv(): NodeJS.ProcessEnv {
   };
 }
 
+function buildModalSandboxEnv(): NodeJS.ProcessEnv {
+  return {
+    ...buildCommonEnv(),
+    MISTLE_SANDBOX_MODAL_ENABLED: "true",
+    MISTLE_SANDBOX_MODAL_TOKEN_ID: "ak-test-token-id",
+    MISTLE_SANDBOX_MODAL_TOKEN_SECRET: "as-test-token-secret",
+    MISTLE_SANDBOX_MODAL_APP_NAME: "mistle-modal-sandboxes",
+  };
+}
+
 describe("generateContainerRuntimeConfig", () => {
   it("generates a single-container config with Docker runtime settings", () => {
     const tempDir = createTempDir();
@@ -100,6 +110,28 @@ describe("generateContainerRuntimeConfig", () => {
       expect(
         getValueAtPath(config, ["services", "data_plane_gateway", "sandbox_ws_internal_url"]),
       ).toBe("wss://gateway.example.test/tunnel/sandbox");
+    } finally {
+      cleanupTempDir(tempDir);
+    }
+  });
+
+  it("generates a single-container config with Modal runtime settings", () => {
+    const tempDir = createTempDir();
+
+    try {
+      const config = generateContainerRuntimeConfig({
+        env: buildModalSandboxEnv(),
+        secretsPath: join(tempDir, "secrets.env"),
+      });
+
+      expect(getValueAtPath(config, ["sandbox", "modal", "enabled"])).toBe(true);
+      expect(getValueAtPath(config, ["sandbox", "modal", "token_id"])).toBe("ak-test-token-id");
+      expect(getValueAtPath(config, ["sandbox", "modal", "token_secret"])).toBe(
+        "as-test-token-secret",
+      );
+      expect(getValueAtPath(config, ["sandbox", "modal", "app_name"])).toBe(
+        "mistle-modal-sandboxes",
+      );
     } finally {
       cleanupTempDir(tempDir);
     }
@@ -147,6 +179,23 @@ describe("generateContainerRuntimeConfig", () => {
           secretsPath: join(tempDir, "secrets.env"),
         }),
       ).toThrow("Missing required environment variable: MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL");
+    } finally {
+      cleanupTempDir(tempDir);
+    }
+  });
+
+  it("fails fast when Modal is enabled without required credentials", () => {
+    const tempDir = createTempDir();
+    const env = buildModalSandboxEnv();
+    delete env.MISTLE_SANDBOX_MODAL_TOKEN_SECRET;
+
+    try {
+      expect(() =>
+        generateContainerRuntimeConfig({
+          env,
+          secretsPath: join(tempDir, "secrets.env"),
+        }),
+      ).toThrow("Missing required environment variable: MISTLE_SANDBOX_MODAL_TOKEN_SECRET");
     } finally {
       cleanupTempDir(tempDir);
     }

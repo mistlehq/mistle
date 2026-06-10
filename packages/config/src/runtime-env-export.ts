@@ -231,6 +231,15 @@ const ControlPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
   { path: ["sandbox", "e2b", "domain"], envVar: "MISTLE_SANDBOX_E2B_DOMAIN" },
   { path: ["sandbox", "tensorlake", "enabled"], envVar: "MISTLE_SANDBOX_TENSORLAKE_ENABLED" },
   { path: ["sandbox", "tensorlake", "apiKey"], envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY" },
+  { path: ["sandbox", "modal", "enabled"], envVar: "MISTLE_SANDBOX_MODAL_ENABLED" },
+  { path: ["sandbox", "modal", "tokenId"], envVar: "MISTLE_SANDBOX_MODAL_TOKEN_ID" },
+  { path: ["sandbox", "modal", "tokenSecret"], envVar: "MISTLE_SANDBOX_MODAL_TOKEN_SECRET" },
+  { path: ["sandbox", "modal", "appName"], envVar: "MISTLE_SANDBOX_MODAL_APP_NAME" },
+  { path: ["sandbox", "modal", "environment"], envVar: "MISTLE_SANDBOX_MODAL_ENVIRONMENT" },
+  {
+    path: ["sandbox", "modal", "defaultTimeoutMs"],
+    envVar: "MISTLE_SANDBOX_MODAL_DEFAULT_TIMEOUT_MS",
+  },
 ];
 
 const ControlPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
@@ -286,6 +295,15 @@ const DataPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor
   { path: ["sandbox", "e2b", "domain"], envVar: "MISTLE_SANDBOX_E2B_DOMAIN" },
   { path: ["sandbox", "tensorlake", "enabled"], envVar: "MISTLE_SANDBOX_TENSORLAKE_ENABLED" },
   { path: ["sandbox", "tensorlake", "apiKey"], envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY" },
+  { path: ["sandbox", "modal", "enabled"], envVar: "MISTLE_SANDBOX_MODAL_ENABLED" },
+  { path: ["sandbox", "modal", "tokenId"], envVar: "MISTLE_SANDBOX_MODAL_TOKEN_ID" },
+  { path: ["sandbox", "modal", "tokenSecret"], envVar: "MISTLE_SANDBOX_MODAL_TOKEN_SECRET" },
+  { path: ["sandbox", "modal", "appName"], envVar: "MISTLE_SANDBOX_MODAL_APP_NAME" },
+  { path: ["sandbox", "modal", "environment"], envVar: "MISTLE_SANDBOX_MODAL_ENVIRONMENT" },
+  {
+    path: ["sandbox", "modal", "defaultTimeoutMs"],
+    envVar: "MISTLE_SANDBOX_MODAL_DEFAULT_TIMEOUT_MS",
+  },
 ];
 
 const DataPlaneGatewayResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
@@ -398,6 +416,15 @@ const DataPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
   { path: ["sandbox", "e2b", "memoryMb"], envVar: "MISTLE_SANDBOX_E2B_MEMORY_MB" },
   { path: ["sandbox", "tensorlake", "enabled"], envVar: "MISTLE_SANDBOX_TENSORLAKE_ENABLED" },
   { path: ["sandbox", "tensorlake", "apiKey"], envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY" },
+  { path: ["sandbox", "modal", "enabled"], envVar: "MISTLE_SANDBOX_MODAL_ENABLED" },
+  { path: ["sandbox", "modal", "tokenId"], envVar: "MISTLE_SANDBOX_MODAL_TOKEN_ID" },
+  { path: ["sandbox", "modal", "tokenSecret"], envVar: "MISTLE_SANDBOX_MODAL_TOKEN_SECRET" },
+  { path: ["sandbox", "modal", "appName"], envVar: "MISTLE_SANDBOX_MODAL_APP_NAME" },
+  { path: ["sandbox", "modal", "environment"], envVar: "MISTLE_SANDBOX_MODAL_ENVIRONMENT" },
+  {
+    path: ["sandbox", "modal", "defaultTimeoutMs"],
+    envVar: "MISTLE_SANDBOX_MODAL_DEFAULT_TIMEOUT_MS",
+  },
 ];
 
 function getAppRuntimeEnvExports(app: AppConfigModuleKey): readonly RuntimeEnvExportDescriptor[] {

@@ -75,6 +75,20 @@ describe("DataPlaneApiSandboxConfigSchema", () => {
     });
   });
 
+  it("rejects Modal sandbox timeouts above the provider maximum", () => {
+    expect(() =>
+      DataPlaneApiSandboxConfigSchema.parse({
+        modal: {
+          enabled: true,
+          tokenId: "ak-test-token-id",
+          tokenSecret: "as-test-token-secret",
+          appName: "mistle-modal-sandboxes",
+          defaultTimeoutMs: 86_400_001,
+        },
+      }),
+    ).toThrow(/<=86400000/u);
+  });
+
   it("requires control-plane API config", () => {
     expect(() =>
       DataPlaneApiConfigSchema.parse({

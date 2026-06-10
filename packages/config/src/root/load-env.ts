@@ -484,6 +484,32 @@ const RootEnvDescriptors = [
     path: ["sandbox", "tensorlake", "api_key"],
   },
   {
+    envVar: "MISTLE_SANDBOX_MODAL_ENABLED",
+    path: ["sandbox", "modal", "enabled"],
+    parse: parseBooleanEnv,
+  },
+  {
+    envVar: "MISTLE_SANDBOX_MODAL_TOKEN_ID",
+    path: ["sandbox", "modal", "token_id"],
+  },
+  {
+    envVar: "MISTLE_SANDBOX_MODAL_TOKEN_SECRET",
+    path: ["sandbox", "modal", "token_secret"],
+  },
+  {
+    envVar: "MISTLE_SANDBOX_MODAL_APP_NAME",
+    path: ["sandbox", "modal", "app_name"],
+  },
+  {
+    envVar: "MISTLE_SANDBOX_MODAL_ENVIRONMENT",
+    path: ["sandbox", "modal", "environment"],
+  },
+  {
+    envVar: "MISTLE_SANDBOX_MODAL_DEFAULT_TIMEOUT_MS",
+    path: ["sandbox", "modal", "default_timeout_ms"],
+    parse: parseNumberEnv,
+  },
+  {
     envVar: "MISTLE_SANDBOX_E2B_CPU_COUNT",
     path: ["sandbox", "e2b", "cpu_count"],
     parse: parseNumberEnv,

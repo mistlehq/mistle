@@ -132,6 +132,39 @@ describe("createSandboxAdapter", () => {
       }),
     ).toThrow(SandboxConfigurationError);
   });
+
+  it("creates a Modal adapter when Modal config is provided", () => {
+    const adapter = createSandboxAdapter({
+      provider: SandboxProvider.MODAL,
+      modal: {
+        tokenId: "ak-test-token-id",
+        tokenSecret: "as-test-token-secret",
+        appName: "mistle-modal-sandboxes",
+      },
+    });
+
+    expect(typeof adapter.prepareImage).toBe("function");
+    expect(typeof adapter.start).toBe("function");
+    expect(typeof adapter.inspect).toBe("function");
+    expect(typeof adapter.resume).toBe("function");
+    expect(typeof adapter.captureSnapshot).toBe("function");
+    expect(typeof adapter.stop).toBe("function");
+    expect(typeof adapter.destroy).toBe("function");
+    expect(adapter.getTransparentProxyConfiguration()).toMatchObject({
+      provider: SandboxProvider.MODAL,
+      passthroughBypass: {
+        kind: SandboxTransparentProxyBypassKinds.SOCKET_MARK,
+      },
+    });
+  });
+
+  it("throws when Modal config is missing", () => {
+    expect(() =>
+      createSandboxAdapter({
+        provider: SandboxProvider.MODAL,
+      }),
+    ).toThrow(SandboxConfigurationError);
+  });
 });
 
 describe("createSandboxRuntimeControl", () => {
@@ -230,6 +263,32 @@ describe("createSandboxRuntimeControl", () => {
       }),
     ).toThrow(SandboxConfigurationError);
   });
+
+  it("creates a Modal runtime control when Modal config is provided", () => {
+    const runtimeControl = createSandboxRuntimeControl({
+      provider: SandboxProvider.MODAL,
+      modal: {
+        tokenId: "ak-test-token-id",
+        tokenSecret: "as-test-token-secret",
+        appName: "mistle-modal-sandboxes",
+      },
+    });
+
+    expect(typeof runtimeControl.ensureSandboxd).toBe("function");
+    expect(typeof runtimeControl.readSandboxdVersion).toBe("function");
+    expect(typeof runtimeControl.activate).toBe("function");
+    expect(typeof runtimeControl.shutdown).toBe("function");
+    expect(typeof runtimeControl.readOperationLog).toBe("function");
+    expect(typeof runtimeControl.close).toBe("function");
+  });
+
+  it("throws when Modal runtime control config is missing", () => {
+    expect(() =>
+      createSandboxRuntimeControl({
+        provider: SandboxProvider.MODAL,
+      }),
+    ).toThrow(SandboxConfigurationError);
+  });
 });
 
 describe("createSandboxBaseImageBuilder", () => {
@@ -294,6 +353,27 @@ describe("createSandboxBaseImageBuilder", () => {
     expect(() =>
       createSandboxBaseImageBuilder({
         provider: SandboxProvider.FREESTYLE,
+      }),
+    ).toThrow(SandboxConfigurationError);
+  });
+
+  it("creates a Modal base image builder when Modal config is provided", () => {
+    const builder = createSandboxBaseImageBuilder({
+      provider: SandboxProvider.MODAL,
+      modal: {
+        tokenId: "ak-test-token-id",
+        tokenSecret: "as-test-token-secret",
+        appName: "mistle-modal-sandboxes",
+      },
+    });
+
+    expect(typeof builder.ensureBaseImage).toBe("function");
+  });
+
+  it("throws when Modal base image builder config is missing", () => {
+    expect(() =>
+      createSandboxBaseImageBuilder({
+        provider: SandboxProvider.MODAL,
       }),
     ).toThrow(SandboxConfigurationError);
   });

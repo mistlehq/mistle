@@ -131,6 +131,7 @@ function findSandboxRuntimeDefinition(input: {
         providerId: string;
         resourceCapabilities: SandboxRuntimeResourceCapabilities;
       };
+      connectionMethods: readonly unknown[];
     }
   | undefined {
   const definition = input.integrationRegistry
@@ -147,6 +148,7 @@ function findSandboxRuntimeDefinition(input: {
 
   return {
     sandboxRuntime: definition.sandboxRuntime,
+    connectionMethods: definition.connectionMethods,
   };
 }
 
@@ -244,6 +246,16 @@ export async function validateSandboxProfileVersionRuntimeConfig(
     return issues;
   }
 
+  if (sandboxRuntimeDefinition.connectionMethods.length === 0) {
+    issues.push({
+      code: SandboxProfilePublishabilityIssueCodes.INVALID_SANDBOX_CONNECTION_REFERENCE,
+      message: `Sandbox provider '${providerId}' cannot reference a sandbox connection.`,
+      connectionId: input.runtimeConfig.sandboxConnectionId,
+    });
+
+    return issues;
+  }
+
   return [
     ...issues,
     ...(await validateSandboxConnection({
@@ -298,11 +310,25 @@ function validateManagedSandboxProviderAvailability(input: {
     return [];
   }
 
+  if (input.providerId === SandboxProvider.MODAL && input.sandboxConfig.modal?.enabled === true) {
+    return [];
+  }
+
   if (input.providerId === SandboxProvider.E2B && input.sandboxConfig.e2b?.enabled !== true) {
     return [
       {
         code: SandboxProfilePublishabilityIssueCodes.SANDBOX_MANAGED_PROVIDER_UNAVAILABLE,
         message: "Managed E2B sandbox provider credentials are not configured for this deployment.",
+      },
+    ];
+  }
+
+  if (input.providerId === SandboxProvider.MODAL && input.sandboxConfig.modal?.enabled !== true) {
+    return [
+      {
+        code: SandboxProfilePublishabilityIssueCodes.SANDBOX_MANAGED_PROVIDER_UNAVAILABLE,
+        message:
+          "Managed Modal sandbox provider credentials are not configured for this deployment.",
       },
     ];
   }

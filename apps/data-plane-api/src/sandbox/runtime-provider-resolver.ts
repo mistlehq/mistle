@@ -86,6 +86,13 @@ function createRemoteSandboxProviderConfig(input: {
     });
   }
 
+  if (input.credentials.provider === SandboxProvider.MODAL) {
+    return createModalSandboxProviderConfig({
+      credentials: input.credentials,
+      resources: input.resources,
+    });
+  }
+
   return assertUnreachableResolvedSandboxRuntimeCredentials(input.credentials);
 }
 
@@ -120,6 +127,30 @@ function createTensorlakeSandboxProviderConfig(input: {
     provider: SandboxProvider.TENSORLAKE,
     tensorlake: {
       apiKey: input.credentials.apiKey,
+    },
+  };
+}
+
+function createModalSandboxProviderConfig(input: {
+  credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "modal" }>;
+  resources?: ResolveSandboxRuntimeAdapterInput["resources"];
+}): CreateSandboxAdapterInput {
+  if (input.resources?.diskMb !== undefined) {
+    throw new Error("Modal sandbox runtime does not support configurable disk.");
+  }
+
+  return {
+    provider: SandboxProvider.MODAL,
+    modal: {
+      tokenId: input.credentials.tokenId,
+      tokenSecret: input.credentials.tokenSecret,
+      appName: input.credentials.appName,
+      ...(input.credentials.environment === undefined
+        ? {}
+        : { environment: input.credentials.environment }),
+      ...(input.credentials.defaultTimeoutMs === undefined
+        ? {}
+        : { defaultTimeoutMs: input.credentials.defaultTimeoutMs }),
     },
   };
 }

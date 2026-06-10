@@ -6,6 +6,7 @@ import {
 } from "../../global/schema.js";
 
 const DefaultE2BCloudDomain = "e2b.app";
+const ModalSandboxMaxTimeoutMs = 24 * 60 * 60 * 1000;
 
 const HttpBaseUrlSchema = z.url().refine((value) => {
   const parsedUrl = new URL(value);
@@ -134,6 +135,40 @@ export const PartialDataPlaneWorkerSandboxTensorlakeConfigSchema = z
   })
   .strict();
 
+export const DataPlaneWorkerSandboxModalConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      tokenId: z.string().min(1),
+      tokenSecret: z.string().min(1),
+      appName: z.string().min(1),
+      environment: z.string().min(1).optional(),
+      defaultTimeoutMs: z.number().int().min(1).max(ModalSandboxMaxTimeoutMs).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      tokenId: z.string().min(1).optional(),
+      tokenSecret: z.string().min(1).optional(),
+      appName: z.string().min(1).optional(),
+      environment: z.string().min(1).optional(),
+      defaultTimeoutMs: z.number().int().min(1).max(ModalSandboxMaxTimeoutMs).optional(),
+    })
+    .strict(),
+]);
+
+export const PartialDataPlaneWorkerSandboxModalConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    tokenId: z.string().min(1).optional(),
+    tokenSecret: z.string().min(1).optional(),
+    appName: z.string().min(1).optional(),
+    environment: z.string().min(1).optional(),
+    defaultTimeoutMs: z.number().int().min(1).max(ModalSandboxMaxTimeoutMs).optional(),
+  })
+  .strict();
+
 export const DataPlaneWorkerSandboxConfigSchema = z
   .object({
     internalGatewayWsUrl: z.string().trim().min(1),
@@ -141,6 +176,7 @@ export const DataPlaneWorkerSandboxConfigSchema = z
     sandboxdTestFaultsEnabled: z.boolean().optional(),
     docker: DataPlaneWorkerSandboxDockerConfigSchema.optional(),
     e2b: DataPlaneWorkerSandboxE2BConfigSchema.optional(),
+    modal: DataPlaneWorkerSandboxModalConfigSchema.optional(),
     tensorlake: DataPlaneWorkerSandboxTensorlakeConfigSchema.optional(),
   })
   .strict();
@@ -152,6 +188,7 @@ export const PartialDataPlaneWorkerSandboxConfigSchema = z
     sandboxdTestFaultsEnabled: z.boolean().optional(),
     docker: PartialDataPlaneWorkerSandboxDockerConfigSchema.optional(),
     e2b: PartialDataPlaneWorkerSandboxE2BConfigSchema.optional(),
+    modal: PartialDataPlaneWorkerSandboxModalConfigSchema.optional(),
     tensorlake: PartialDataPlaneWorkerSandboxTensorlakeConfigSchema.optional(),
   })
   .strict();

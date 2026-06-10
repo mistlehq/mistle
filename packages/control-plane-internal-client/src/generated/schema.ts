@@ -1237,7 +1237,7 @@ export interface paths {
             connectionId?: string;
             organizationId: string;
             /** @enum {string} */
-            provider: "docker" | "e2b" | "freestyle" | "tensorlake";
+            provider: "docker" | "e2b" | "freestyle" | "modal" | "tensorlake";
           };
         };
       };
@@ -1269,6 +1269,17 @@ export interface paths {
                   provider: "tensorlake";
                   /** @enum {string} */
                   source: "managed" | "connection";
+                }
+              | {
+                  appName: string;
+                  defaultTimeoutMs?: number;
+                  environment?: string;
+                  /** @enum {string} */
+                  provider: "modal";
+                  /** @enum {string} */
+                  source: "managed";
+                  tokenId: string;
+                  tokenSecret: string;
                 };
           };
         };

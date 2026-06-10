@@ -54,6 +54,12 @@ const DockerSandboxRequiredEnvVars = ["MISTLE_SANDBOX_DOCKER_SOCKET_PATH"];
 
 const E2BSandboxRequiredEnvVars = ["MISTLE_SANDBOX_E2B_API_KEY"];
 
+const ModalSandboxRequiredEnvVars = [
+  "MISTLE_SANDBOX_MODAL_TOKEN_ID",
+  "MISTLE_SANDBOX_MODAL_TOKEN_SECRET",
+  "MISTLE_SANDBOX_MODAL_APP_NAME",
+];
+
 const TensorlakeSandboxRequiredEnvVars = ["MISTLE_SANDBOX_TENSORLAKE_API_KEY"];
 
 function createSecret(): string {
@@ -94,13 +100,14 @@ function readOptionalBooleanEnv(env: NodeJS.ProcessEnv, envVar: string): boolean
 function requireRuntimeEnv(env: NodeJS.ProcessEnv): void {
   const dockerEnabled = readOptionalBooleanEnv(env, "MISTLE_SANDBOX_DOCKER_ENABLED") === true;
   const e2bEnabled = readOptionalBooleanEnv(env, "MISTLE_SANDBOX_E2B_ENABLED") === true;
+  const modalEnabled = readOptionalBooleanEnv(env, "MISTLE_SANDBOX_MODAL_ENABLED") === true;
   const tensorlakeEnabled =
     readOptionalBooleanEnv(env, "MISTLE_SANDBOX_TENSORLAKE_ENABLED") === true;
   const requiredEnvVars = [...CommonRequiredEnvVars];
 
-  if (!dockerEnabled && !e2bEnabled && !tensorlakeEnabled) {
+  if (!dockerEnabled && !e2bEnabled && !modalEnabled && !tensorlakeEnabled) {
     throw new Error(
-      "At least one sandbox runtime provider must be enabled. Set MISTLE_SANDBOX_DOCKER_ENABLED, MISTLE_SANDBOX_E2B_ENABLED, or MISTLE_SANDBOX_TENSORLAKE_ENABLED to true.",
+      "At least one sandbox runtime provider must be enabled. Set MISTLE_SANDBOX_DOCKER_ENABLED, MISTLE_SANDBOX_E2B_ENABLED, MISTLE_SANDBOX_MODAL_ENABLED, or MISTLE_SANDBOX_TENSORLAKE_ENABLED to true.",
     );
   }
 
@@ -110,6 +117,10 @@ function requireRuntimeEnv(env: NodeJS.ProcessEnv): void {
 
   if (e2bEnabled) {
     requiredEnvVars.push(...E2BSandboxRequiredEnvVars);
+  }
+
+  if (modalEnabled) {
+    requiredEnvVars.push(...ModalSandboxRequiredEnvVars);
   }
 
   if (tensorlakeEnabled) {

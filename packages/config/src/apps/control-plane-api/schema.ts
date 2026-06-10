@@ -6,6 +6,7 @@ import {
 } from "../../global/schema.js";
 
 const DefaultE2BCloudDomain = "e2b.app";
+const ModalSandboxMaxTimeoutMs = 24 * 60 * 60 * 1000;
 
 const ValkeyUrlSchema = z.url().refine((value) => {
   const parsedUrl = new URL(value);
@@ -87,6 +88,29 @@ const ControlPlaneApiSandboxTensorlakeConfigSchema = z.discriminatedUnion("enabl
     .object({
       enabled: z.literal(false),
       apiKey: z.string().min(1).optional(),
+    })
+    .strict(),
+]);
+
+const ControlPlaneApiSandboxModalConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      tokenId: z.string().min(1),
+      tokenSecret: z.string().min(1),
+      appName: z.string().min(1),
+      environment: z.string().min(1).optional(),
+      defaultTimeoutMs: z.number().int().min(1).max(ModalSandboxMaxTimeoutMs).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      tokenId: z.string().min(1).optional(),
+      tokenSecret: z.string().min(1).optional(),
+      appName: z.string().min(1).optional(),
+      environment: z.string().min(1).optional(),
+      defaultTimeoutMs: z.number().int().min(1).max(ModalSandboxMaxTimeoutMs).optional(),
     })
     .strict(),
 ]);
@@ -235,6 +259,7 @@ export const ControlPlaneApiSandboxRuntimeConfigSchema = z
     bootstrap: GlobalSandboxTokenConfigSchema.optional(),
     docker: ControlPlaneApiSandboxDockerConfigSchema.optional(),
     e2b: ControlPlaneApiSandboxE2BConfigSchema.optional(),
+    modal: ControlPlaneApiSandboxModalConfigSchema.optional(),
     tensorlake: ControlPlaneApiSandboxTensorlakeConfigSchema.optional(),
   })
   .strict();

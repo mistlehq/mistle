@@ -3673,7 +3673,7 @@
                   },
                   "provider": {
                     "type": "string",
-                    "enum": ["docker", "e2b", "freestyle", "tensorlake"]
+                    "enum": ["docker", "e2b", "freestyle", "modal", "tensorlake"]
                   },
                   "connectionId": {
                     "type": "string",
@@ -3748,6 +3748,42 @@
                         }
                       },
                       "required": ["provider", "source", "apiKey"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "enum": ["modal"]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": ["managed"]
+                        },
+                        "tokenId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "tokenSecret": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "appName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "environment": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "defaultTimeoutMs": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 86400000
+                        }
+                      },
+                      "required": ["provider", "source", "tokenId", "tokenSecret", "appName"],
                       "additionalProperties": false
                     }
                   ]

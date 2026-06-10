@@ -80,6 +80,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "modal-default",
+        familyId: "modal",
+        variantId: "modal-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "openai-default",
         familyId: "openai",
         variantId: "openai-default",

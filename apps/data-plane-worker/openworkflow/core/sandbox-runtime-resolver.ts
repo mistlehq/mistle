@@ -151,6 +151,25 @@ export function createSandboxRuntimeProviderResolver(input: {
       });
     }
 
+    if (inputRuntime.provider === SandboxProvider.MODAL) {
+      if (inputRuntime.connectionId !== undefined) {
+        throw new Error("Modal sandbox runtime cannot use a sandbox connection.");
+      }
+
+      const credentials = await input.controlPlaneInternalClient.resolveSandboxRuntimeCredentials({
+        organizationId: inputRuntime.organizationId,
+        provider: SandboxProvider.MODAL,
+      });
+      if (credentials.provider !== SandboxProvider.MODAL) {
+        throw new Error("Control-plane returned non-Modal credentials for Modal runtime.");
+      }
+
+      return createModalSandboxRuntime({
+        credentials,
+        resources: inputRuntime.resources,
+      });
+    }
+
     if (inputRuntime.provider === SandboxProvider.FREESTYLE) {
       throw new Error("Freestyle sandbox runtime is not wired in data-plane worker yet.");
     }
@@ -244,6 +263,19 @@ function createTensorlakeSandboxRuntime(input: {
   };
 }
 
+function createModalSandboxRuntime(input: {
+  credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "modal" }>;
+  resources?: ResolveSandboxRuntimeInput["resources"];
+}): ResolvedSandboxRuntime {
+  const providerConfig = createModalSandboxProviderConfig(input);
+
+  return {
+    provider: SandboxProvider.MODAL,
+    sandboxAdapter: createSandboxAdapter(providerConfig),
+    sandboxRuntimeControl: createSandboxRuntimeControl(providerConfig),
+  };
+}
+
 export function createTensorlakeSandboxProviderConfig(input: {
   credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "tensorlake" }>;
   resources?: ResolveSandboxRuntimeInput["resources"];
@@ -254,6 +286,30 @@ export function createTensorlakeSandboxProviderConfig(input: {
     tensorlake: {
       apiKey: input.credentials.apiKey,
       ...(input.sandboxd === undefined ? {} : { sandboxd: input.sandboxd }),
+    },
+  };
+}
+
+export function createModalSandboxProviderConfig(input: {
+  credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "modal" }>;
+  resources?: ResolveSandboxRuntimeInput["resources"];
+}): CreateSandboxAdapterInput {
+  if (input.resources?.diskMb !== undefined) {
+    throw new Error("Modal sandbox runtime does not support configurable disk.");
+  }
+
+  return {
+    provider: SandboxProvider.MODAL,
+    modal: {
+      tokenId: input.credentials.tokenId,
+      tokenSecret: input.credentials.tokenSecret,
+      appName: input.credentials.appName,
+      ...(input.credentials.environment === undefined
+        ? {}
+        : { environment: input.credentials.environment }),
+      ...(input.credentials.defaultTimeoutMs === undefined
+        ? {}
+        : { defaultTimeoutMs: input.credentials.defaultTimeoutMs }),
     },
   };
 }
