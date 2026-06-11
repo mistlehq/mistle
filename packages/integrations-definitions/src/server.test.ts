@@ -190,6 +190,10 @@ describe("integrations-definitions server", () => {
           kind: "team",
           bindingField: "teams",
         }),
+        expect.objectContaining({
+          kind: "bot",
+          bindingField: "bots",
+        }),
       ]),
     );
     expect(datadogDefinition?.webhookHandler).toBeUndefined();

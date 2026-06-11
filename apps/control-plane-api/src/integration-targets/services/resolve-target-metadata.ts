@@ -411,6 +411,7 @@ function cloneSetupStartForm(
             })),
           }),
       ...(field.description === undefined ? {} : { description: field.description }),
+      ...(field.defaultValue === undefined ? {} : { defaultValue: field.defaultValue }),
       inputType: field.inputType,
       label: field.label,
       name: field.name,

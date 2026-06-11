@@ -1,4 +1,5 @@
 import type { IntegrationFormConnectionMethodProviderAppSetup } from "@mistle/integrations-core";
+import { GitHubOrganizationOnlyAppManifestPermissions } from "@mistle/integrations-definitions/browser";
 
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import {
@@ -12,10 +13,6 @@ import { hasConfiguredSetupSecretField } from "./integration-connection-setup-se
 const GitHubProviderAppManifestOwnerKindFieldName = "ownerKind";
 const GitHubProviderAppManifestOrganizationOwnerKind = "organization";
 const GitHubProviderAppManifestPersonalOwnerKind = "personal";
-const GitHubOrganizationOnlyProviderAppManifestPermissions = {
-  members: "read",
-  organization_administration: "read",
-} satisfies Record<string, string>;
 
 export function createInitialProviderAppSetupDraft(input: {
   connection: IntegrationConnection;
@@ -186,7 +183,7 @@ export function updateGitHubProviderAppManifestForSetupStartFormValue(input: {
 
   const manifest = parseManifestJsonObject(input.manifestValue);
   const defaultPermissions = parseDefaultPermissions(manifest.default_permissions);
-  for (const permission of Object.keys(GitHubOrganizationOnlyProviderAppManifestPermissions)) {
+  for (const permission of Object.keys(GitHubOrganizationOnlyAppManifestPermissions)) {
     delete defaultPermissions[permission];
   }
 
@@ -195,7 +192,7 @@ export function updateGitHubProviderAppManifestForSetupStartFormValue(input: {
       ...manifest,
       default_permissions: {
         ...defaultPermissions,
-        ...GitHubOrganizationOnlyProviderAppManifestPermissions,
+        ...GitHubOrganizationOnlyAppManifestPermissions,
       },
     });
   }

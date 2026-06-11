@@ -47,6 +47,38 @@ describe("resolveTargetMetadata", () => {
     );
   });
 
+  it("preserves setup start form default values from integration definitions", () => {
+    const metadata = resolveTargetMetadata({
+      familyId: "github",
+      variantId: "github-cloud",
+      displayNameOverride: null,
+      descriptionOverride: null,
+    });
+    if (metadata.connectionMethods === undefined) {
+      throw new Error("Expected GitHub target metadata to include connection methods.");
+    }
+
+    let githubAppInstallationStartFormFields:
+      | readonly { defaultValue?: string | undefined; name: string }[]
+      | undefined;
+    for (const method of metadata.connectionMethods) {
+      if (!("setupFlow" in method) || method.id !== "github-app-installation") {
+        continue;
+      }
+
+      githubAppInstallationStartFormFields = method.setupFlow?.startForm?.fields;
+    }
+
+    expect(githubAppInstallationStartFormFields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "ownerKind",
+          defaultValue: "organization",
+        }),
+      ]),
+    );
+  });
+
   it("requires override-only targets to resolve to a registered integration definition", () => {
     expect(() =>
       resolveTargetMetadata({
