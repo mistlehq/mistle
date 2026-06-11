@@ -2,6 +2,8 @@ import type {
   AgentConversationCollaborationModeSettings,
   AgentConversationIdempotencyMetadata,
   AgentConversationProvider,
+  AgentConversationSubmitAssociatedResourceDeliveryInput,
+  AgentConversationSubmitAssociatedResourceDeliveryResult,
 } from "@mistle/integrations-core";
 import { resolveAgentConversationProvider } from "@mistle/integrations-definitions/agent-runtimes/server";
 
@@ -104,13 +106,6 @@ export type ProviderRecoverLateSteerInput = {
   idempotency?: AgentConversationIdempotencyMetadata | undefined;
 };
 
-export type ProviderSubmitAssociatedResourceDeliveryInput = {
-  connection: ProviderConnection;
-  providerConversationId: string;
-  inputText: string;
-  idempotency?: AgentConversationIdempotencyMetadata | undefined;
-};
-
 export type ProviderInterruptExecutionInput = {
   connection: ProviderConnection;
   providerConversationId: string;
@@ -138,8 +133,8 @@ export type ConversationProviderAdapter = {
     input: ProviderRecoverLateSteerInput,
   ) => Promise<ProviderStartExecutionOutput>;
   submitAssociatedResourceDelivery?: (
-    input: ProviderSubmitAssociatedResourceDeliveryInput,
-  ) => Promise<ProviderStartExecutionOutput>;
+    input: AgentConversationSubmitAssociatedResourceDeliveryInput,
+  ) => Promise<AgentConversationSubmitAssociatedResourceDeliveryResult>;
   interruptExecution: (input: ProviderInterruptExecutionInput) => Promise<void>;
 };
 

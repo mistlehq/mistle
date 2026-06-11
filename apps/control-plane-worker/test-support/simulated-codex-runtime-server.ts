@@ -83,7 +83,6 @@ function isAssociatedResourceActiveScenario(scenario: SimulatedCodexRuntimeScena
 function isAssociatedResourceTurnStartScenario(scenario: SimulatedCodexRuntimeScenario): boolean {
   return (
     scenario === "associated_resource_direct_turn" ||
-    scenario === "associated_resource_late_steer" ||
     scenario === "associated_resource_unmaterialized_thread"
   );
 }

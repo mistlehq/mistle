@@ -1220,9 +1220,8 @@ export function createOpenAiConversationProvider(): AgentConversationProvider {
         providerExecutionId: extractTurnStartExecutionId(startResult),
       };
     },
-    steerExecution: async (input) => await steerCodexExecution(input),
-    submitAssociatedResourceDelivery: async (input) =>
-      await submitCodexAssociatedResourceDelivery(input),
+    steerExecution: steerCodexExecution,
+    submitAssociatedResourceDelivery: submitCodexAssociatedResourceDelivery,
     interruptExecution: async (input) => {
       try {
         await input.connection.request({
