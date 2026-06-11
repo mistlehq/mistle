@@ -6,6 +6,7 @@ import {
   type AssociatedResourceProviderActor,
   type AssociatedResourceEventType,
   type AssociatedResourceWebhookObservation,
+  type AssociatedResourceSelfAuthorshipInput,
   type IntegrationAssociatedResourceEventsCapability,
 } from "@mistle/integrations-core";
 import { z } from "zod";
@@ -207,12 +208,9 @@ function createObservation(input: {
   };
 }
 
-export function isSelfAuthoredGitHubAssociatedResourceEvent(input: {
-  connection: {
-    config: GitHubConnectionConfig | Record<string, unknown> | null;
-  };
-  observation: AssociatedResourceWebhookObservation;
-}): boolean {
+export function isSelfAuthoredGitHubAssociatedResourceEvent(
+  input: AssociatedResourceSelfAuthorshipInput<GitHubConnectionConfig | Record<string, unknown>>,
+): boolean {
   const parsedConnectionConfig = tryParseGitHubConnectionConfig(input.connection.config);
   if (
     parsedConnectionConfig === null ||

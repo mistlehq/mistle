@@ -192,6 +192,7 @@ describe("GitHub associated resource webhook observation", () => {
     expect(
       isSelfAuthoredGitHubAssociatedResourceEvent({
         connection: {
+          id: "icn_github_app_bot",
           config: {
             connection_method: "github-app-installation",
             app_id: "12345",
@@ -231,6 +232,7 @@ describe("GitHub associated resource webhook observation", () => {
     expect(
       isSelfAuthoredGitHubAssociatedResourceEvent({
         connection: {
+          id: "icn_github_app_linked_user",
           config: {
             connection_method: "github-app-installation",
             app_id: "12345",
@@ -246,6 +248,7 @@ describe("GitHub associated resource webhook observation", () => {
     expect(
       isSelfAuthoredGitHubAssociatedResourceEvent({
         connection: {
+          id: "icn_github_api_key_unknown_actor",
           config: {
             connection_method: "api-key",
           },
@@ -254,6 +257,61 @@ describe("GitHub associated resource webhook observation", () => {
           ...observed,
           actor: undefined,
         },
+      }),
+    ).toBe(false);
+  });
+
+  it("does not treat missing app actor or API key bot events as self-authored", () => {
+    const observed = observeGitHubAssociatedResourceFromWebhookEvent({
+      eventType: "github.issue_comment.created",
+      payload: {
+        repository: {
+          full_name: "mistlehq/mistle",
+        },
+        issue: {
+          number: 42,
+          pull_request: {},
+        },
+        comment: {
+          body: "comment from the app",
+        },
+        sender: {
+          login: "mistle-github-app[bot]",
+        },
+      },
+    });
+    if (observed === null) {
+      throw new Error("Expected GitHub pull request issue comment to be observed.");
+    }
+
+    expect(
+      isSelfAuthoredGitHubAssociatedResourceEvent({
+        connection: {
+          id: "icn_github_app_unknown_actor",
+          config: {
+            connection_method: "github-app-installation",
+            app_id: "12345",
+            app_slug: "mistle-github-app",
+            client_id: "Iv1.example",
+            installation_id: "98765",
+          },
+        },
+        observation: {
+          ...observed,
+          actor: undefined,
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      isSelfAuthoredGitHubAssociatedResourceEvent({
+        connection: {
+          id: "icn_github_api_key_bot",
+          config: {
+            connection_method: "api-key",
+          },
+        },
+        observation: observed,
       }),
     ).toBe(false);
   });

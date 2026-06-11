@@ -16,6 +16,7 @@ import {
   AssociatedProviderResourceKinds,
   createDisabledAssociatedResourceEventRouting,
 } from "@mistle/integrations-core";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
@@ -236,6 +237,7 @@ describe.concurrent("provider resource association delivery", () => {
       {
         dataPlaneClient: createDataPlaneClient(env),
         db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
       },
       {
         providerResourceAssociationId: scope.providerResourceAssociationId,
@@ -264,6 +266,7 @@ describe.concurrent("provider resource association delivery", () => {
       {
         dataPlaneClient: createDataPlaneClient(env),
         db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
       },
       {
         providerResourceAssociationId: scope.providerResourceAssociationId,
@@ -292,6 +295,7 @@ describe.concurrent("provider resource association delivery", () => {
       {
         dataPlaneClient: createDataPlaneClient(env),
         db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
       },
       {
         providerResourceAssociationId: scope.providerResourceAssociationId,
@@ -328,6 +332,7 @@ describe.concurrent("provider resource association delivery", () => {
         {
           dataPlaneClient: createDataPlaneClient(env),
           db: env.controlPlaneDb,
+          integrationRegistry: createIntegrationRegistry(),
         },
         {
           providerResourceAssociationId: scope.providerResourceAssociationId,
@@ -353,6 +358,7 @@ describe.concurrent("provider resource association delivery", () => {
         {
           dataPlaneClient: createDataPlaneClient(env),
           db: env.controlPlaneDb,
+          integrationRegistry: createIntegrationRegistry(),
         },
         {
           providerResourceAssociationId: scope.providerResourceAssociationId,

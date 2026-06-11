@@ -34,7 +34,8 @@ const IdempotentProviderDeliveryStepRetryPolicy = {
 export const HandleProviderResourceAssociationDeliveryWorkflow = defineTracedControlPlaneWorkflow(
   HandleProviderResourceAssociationDeliveryWorkflowSpec,
   async ({ input, run, step }) => {
-    const { controlPlaneInternalClient, dataPlaneClient, db } = await getWorkflowContext();
+    const { controlPlaneInternalClient, dataPlaneClient, db, integrationRegistry } =
+      await getWorkflowContext();
     const workflowRunId = run.id;
     let iteration = 0;
 
@@ -104,6 +105,7 @@ export const HandleProviderResourceAssociationDeliveryWorkflow = defineTracedCon
                 controlPlaneInternalClient,
                 dataPlaneClient,
                 db,
+                integrationRegistry,
               },
               {
                 delivery: activeDelivery,
@@ -172,7 +174,7 @@ export const HandleProviderResourceAssociationDeliveryWorkflow = defineTracedCon
 async function deliverActiveProviderResourceAssociationDelivery(
   ctx: Pick<
     Awaited<ReturnType<typeof getWorkflowContext>>,
-    "controlPlaneInternalClient" | "dataPlaneClient" | "db"
+    "controlPlaneInternalClient" | "dataPlaneClient" | "db" | "integrationRegistry"
   >,
   input: {
     delivery: ActiveProviderResourceAssociationDelivery;
@@ -205,7 +207,11 @@ async function deliverActiveProviderResourceAssociationDelivery(
     }
 
     const target = await resolveProviderResourceAssociationDeliveryTarget(
-      { dataPlaneClient: ctx.dataPlaneClient, db: ctx.db },
+      {
+        dataPlaneClient: ctx.dataPlaneClient,
+        db: ctx.db,
+        integrationRegistry: ctx.integrationRegistry,
+      },
       {
         providerResourceAssociationId: input.delivery.providerResourceAssociationId,
         sourceWebhookEventId: input.delivery.sourceWebhookEventId,

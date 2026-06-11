@@ -2,13 +2,11 @@ import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-interna
 import { type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type {
   AssociatedResourceEventRouting,
+  AssociatedResourceWebhookObservation,
   CompiledRuntimePlan,
+  IntegrationRegistry,
 } from "@mistle/integrations-core";
 import { supportsAssociatedResourceDeliveryRuntime } from "@mistle/integrations-core";
-import {
-  GitHubFamilyId,
-  observeGitHubAssociatedResourceFromWebhookEvent,
-} from "@mistle/integrations-definitions/server";
 
 import {
   ProviderResourceAssociationDeliveryError,
@@ -27,6 +25,7 @@ export async function resolveProviderResourceAssociationDeliveryTarget(
   ctx: {
     dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "getSandboxInstance">;
     db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
   },
   input: {
     providerResourceAssociationId: string;
@@ -84,6 +83,7 @@ export async function resolveProviderResourceAssociationDeliveryTarget(
   if (input.sourceWebhookEventId !== undefined) {
     const observedEvent = await resolveAssociatedResourceEventFromWebhook(ctx.db, {
       association,
+      integrationRegistry: ctx.integrationRegistry,
       sourceWebhookEventId: input.sourceWebhookEventId,
       targetKey: integrationConnection.targetKey,
     });
@@ -121,12 +121,11 @@ async function resolveAssociatedResourceEventFromWebhook(
       providerResourceId: string;
       resourceKind: string;
     };
+    integrationRegistry: IntegrationRegistry;
     sourceWebhookEventId: string;
     targetKey: string;
   },
-): Promise<{
-  eventType: string;
-}> {
+): Promise<AssociatedResourceWebhookObservation> {
   const webhookEvent = await db.query.integrationWebhookEvents.findFirst({
     columns: {
       eventType: true,
@@ -151,16 +150,22 @@ async function resolveAssociatedResourceEventFromWebhook(
   const target = await db.query.integrationTargets.findFirst({
     columns: {
       familyId: true,
+      variantId: true,
     },
     where: (table, { eq }) => eq(table.targetKey, webhookEvent.targetKey),
   });
+  const definition =
+    target === undefined
+      ? undefined
+      : input.integrationRegistry.getDefinition({
+          familyId: target.familyId,
+          variantId: target.variantId,
+        });
   const observedEvent =
-    target?.familyId === GitHubFamilyId
-      ? observeGitHubAssociatedResourceFromWebhookEvent({
-          eventType: webhookEvent.eventType,
-          payload: webhookEvent.payload,
-        })
-      : null;
+    (await definition?.associatedResourceEvents?.observeWebhookEvent({
+      eventType: webhookEvent.eventType,
+      payload: webhookEvent.payload,
+    })) ?? null;
 
   if (
     observedEvent === null ||
@@ -173,9 +178,7 @@ async function resolveAssociatedResourceEventFromWebhook(
     });
   }
 
-  return {
-    eventType: observedEvent.eventType,
-  };
+  return observedEvent;
 }
 
 function supportsAssociatedResourceEvent(input: {

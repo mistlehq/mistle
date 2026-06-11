@@ -145,7 +145,7 @@ An external provider identity that authors or performs provider-side actions.
 _Avoid_: User when the actor may be an app, bot, or service account
 
 **Self-authored association event**:
-An **Association-backed provider event** authored by the same **Provider actor** Mistle used to perform the provider-side action for the associated **Sandbox session**.
+An **Association-backed provider event** authored by the same **Provider actor** Mistle uses for the event's **Integration connection**.
 _Avoid_: Duplicate webhook, bot event, loop event
 
 **Association delivery**:
@@ -813,4 +813,4 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Switching threads could imply changing the whole workbench — resolved: thread switching changes the **Active Codex thread** without changing the **Sandbox session**.
 - "delete session" could mean hard deletion or user-visible removal — resolved: use **Deleted session** for a session hidden from ordinary lists while retaining its historical record.
 - "GitHub team" could mean either an organization-scoped GitHub team identity or the requested review target value delivered in a pull request webhook — resolved: use **GitHub team review target** for the trigger-filter value, which is the GitHub team slug.
-- "self" in provider-event routing could mean the same Mistle user, same sandbox session, or same provider actor — resolved: use **Self-authored association event** for provider events authored by the same **Provider actor** Mistle used for the associated sandbox action.
+- "self" in provider-event routing could mean the same Mistle user, same sandbox session, or same provider actor — resolved: use **Self-authored association event** for provider events authored by the same **Provider actor** Mistle uses for the event's **Integration connection**.

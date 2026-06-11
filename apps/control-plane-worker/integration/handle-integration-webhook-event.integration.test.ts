@@ -337,6 +337,97 @@ describe.concurrent("control-plane worker integration webhook event handling", (
     expect(queuedDeliveries).toEqual([]);
   });
 
+  it("marks self-authored app events ignored when suppression leaves no queued work", async ({
+    env,
+  }) => {
+    const scope = await seedWebhookEventScope({
+      env,
+      suffix: createSuffix("association_self_authored_ignored"),
+      familyId: "github",
+      variantId: "github-cloud",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      connectionConfig: {
+        connection_method: "github-app-installation",
+        app_id: "12345",
+        app_slug: "mistle-github-app",
+        client_id: "Iv1.example",
+        installation_id: "98765",
+      },
+      eventType: "github.issue_comment.created",
+      providerEventType: "issue_comment",
+      createTrigger: false,
+      payload: {
+        repository: {
+          full_name: "mistlehq/mistle",
+        },
+        issue: {
+          number: 46,
+          pull_request: {},
+        },
+        comment: {
+          body: "finished this",
+        },
+        sender: {
+          login: "mistle-github-app[bot]",
+        },
+      },
+      externalEventId: "evt_association_self_authored_ignored",
+      externalDeliveryId: "delivery_association_self_authored_ignored",
+    });
+    const sandboxInstanceId = "sbi_association_self_authored_ignored";
+    const associationId = "pra_association_self_authored_ignored";
+
+    await seedSandboxInstance({
+      env,
+      organizationId: scope.organizationId,
+      sandboxInstanceId,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.providerResourceAssociations).values({
+      id: associationId,
+      integrationConnectionId: scope.connectionId,
+      resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+      providerResourceId: "mistlehq/mistle#46",
+      sandboxInstanceId,
+    });
+
+    const preparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+
+    expect(preparedEvent).toEqual({
+      webhookEventId: scope.webhookEventId,
+      externalDeliveryId: "delivery_association_self_authored_ignored",
+      integrationConnectionId: scope.connectionId,
+      targetKey: scope.targetKey,
+      webhookEventStatus: IntegrationWebhookEventStatuses.IGNORED,
+      triggerRunIds: [],
+      providerResourceAssociationDeliveries: [],
+      resourceSyncRequests: [],
+      finalized: true,
+    });
+
+    const queuedDeliveries =
+      await env.controlPlaneDb.query.providerResourceAssociationDeliveries.findMany({
+        where: (table, { eq }) => eq(table.sourceWebhookEventId, scope.webhookEventId),
+      });
+    expect(queuedDeliveries).toEqual([]);
+
+    const queuedRuns = await env.controlPlaneDb.query.triggerRuns.findMany({
+      where: (table, { eq }) => eq(table.sourceWebhookEventId, scope.webhookEventId),
+    });
+    expect(queuedRuns).toEqual([]);
+  });
+
   it("queues provider resource association deliveries when the associated sandbox is missing", async ({
     env,
   }) => {
