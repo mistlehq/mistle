@@ -23,6 +23,7 @@ describe("createFreestyleSnapshotSpec", () => {
       executable: true,
     });
     expect(spec.baseImage.dockerfileContent).toContain("FROM debian:trixie-slim");
+    expect(spec.baseImage.dockerfileContent).toContain("ENTRYPOINT []");
     expect(spec.baseImage.dockerfileContent).toContain(
       "apt-get install -y --no-install-recommends",
     );

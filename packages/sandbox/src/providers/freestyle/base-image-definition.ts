@@ -104,6 +104,7 @@ export function createFreestyleSnapshotBaseImage(
         "ENV container=docker",
         "ENV HOME=/root",
         `ENV PATH=${SandboxBasePath}`,
+        "ENTRYPOINT []",
       ].join("\n"),
     )
     .runCommands(
