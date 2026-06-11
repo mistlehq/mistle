@@ -10,6 +10,7 @@ import {
   Route,
   RouterProvider,
 } from "react-router";
+import { expect, userEvent, within } from "storybook/test";
 import { z } from "zod";
 
 import { getDashboardStoryControlPlaneApiOrigin } from "../../storybook/dashboard-story-config.js";
@@ -580,8 +581,26 @@ export const AddConnection: PageStory = {
 };
 
 export const SetupWithManifest: PageStory = {
+  name: "Setup with manifest - organization",
   render: function RenderStory() {
     return <GitHubAppSetupPageStory connection={createDraftGitHubConnection()} />;
+  },
+};
+
+export const SetupWithManifestPersonalAccount: PageStory = {
+  render: function RenderStory() {
+    return <GitHubAppSetupPageStory connection={createDraftGitHubConnection()} />;
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(await canvas.findByRole("radio", { name: "Personal account" }));
+
+    await expect(canvas.getByRole("radio", { name: "Personal account" })).toBeChecked();
+    await expect(canvas.queryByText("GitHub organization")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("organization_administration")).not.toBeInTheDocument();
+    await expect(canvas.queryByText('"members"')).not.toBeInTheDocument();
+    await expect(canvas.getByText('"pull_requests"')).toBeVisible();
   },
 };
 

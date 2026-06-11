@@ -103,16 +103,37 @@ export function createGitHubResourceDefinitions(input: {
         return gitHubRepositoryApiKeyResourceCredential;
       },
     },
+    {
+      kind: "bot",
+      selectionMode: IntegrationResourceSelectionModes.MULTI,
+      bindingField: "bots",
+      displayNameSingular: "GitHub App bot",
+      displayNamePlural: "GitHub App bots",
+      description:
+        "GitHub App bots discovered from app installations in organizations with accessible repositories.",
+      credential: ({ connection }) => {
+        const parsedConnectionConfig = GitHubConnectionConfigSchema.parse(connection.config);
+
+        if (
+          parsedConnectionConfig.connection_method ===
+          IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
+        ) {
+          return GitHubRepositoryAppInstallationResourceCredential;
+        }
+
+        return gitHubRepositoryApiKeyResourceCredential;
+      },
+    },
   ];
 }
 
 export const GitHubResourceSyncTriggers: ReadonlyArray<IntegrationResourceSyncTrigger> = [
   {
     eventType: "github.installation_repositories.added",
-    resourceKinds: ["repository", "team"],
+    resourceKinds: ["repository"],
   },
   {
     eventType: "github.installation_repositories.removed",
-    resourceKinds: ["repository", "team"],
+    resourceKinds: ["repository"],
   },
 ];

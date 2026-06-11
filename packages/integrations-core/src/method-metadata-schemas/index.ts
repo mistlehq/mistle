@@ -140,6 +140,7 @@ const IntegrationFormConnectionMethodSetupStartFormActionSchema = z
 const IntegrationFormConnectionMethodSetupStartFormFieldSchema = z
   .object({
     actions: z.array(IntegrationFormConnectionMethodSetupStartFormActionSchema).min(1).optional(),
+    defaultValue: z.string().min(1).optional(),
     description: z.string().min(1).optional(),
     inputType: z.enum(["password", "radio", "text", "textarea"]),
     label: z.string().min(1),

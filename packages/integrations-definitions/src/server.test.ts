@@ -117,16 +117,20 @@ describe("integrations-definitions server", () => {
           kind: "team",
           bindingField: "teams",
         }),
+        expect.objectContaining({
+          kind: "bot",
+          bindingField: "bots",
+        }),
       ]),
     );
     expect(githubCloudDefinition?.resourceSyncTriggers).toEqual([
       {
         eventType: "github.installation_repositories.added",
-        resourceKinds: ["repository", "team"],
+        resourceKinds: ["repository"],
       },
       {
         eventType: "github.installation_repositories.removed",
-        resourceKinds: ["repository", "team"],
+        resourceKinds: ["repository"],
       },
     ]);
     expect(githubEnterpriseServerDefinition?.webhookHandler).toBeDefined();

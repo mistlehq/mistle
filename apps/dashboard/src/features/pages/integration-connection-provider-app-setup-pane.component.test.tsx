@@ -315,7 +315,7 @@ describe("ProviderAppSetupPane", () => {
   });
 
   it("renders GitHub provider-owned manifest setup fields", async () => {
-    renderProviderAppSetupPane({
+    const rendered = renderProviderAppSetupPane({
       connection: createGitHubConnection(),
       methodId: "github-app-installation",
       routeSegment: "github-app",
@@ -323,15 +323,32 @@ describe("ProviderAppSetupPane", () => {
 
     expect(screen.getByRole("tab", { name: "Create from manifest", selected: true })).toBeTruthy();
     expect(
+      screen
+        .getByRole("radio", {
+          name: "Organization",
+        })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(
       screen.getByRole("radio", {
         name: "Personal account",
       }),
     ).toBeTruthy();
-    expect(screen.getByRole("radio", { name: "Organization" })).toBeTruthy();
-    expect(screen.queryByLabelText("GitHub organization")).toBeNull();
+    expect(screen.getByText("GitHub organization")).toBeTruthy();
+    expect(getTextControlById("integration-setup-start-form-organizationSlug")).toBeTruthy();
     expect(screen.getByRole("heading", { level: 3, name: "GitHub App Manifest" })).toBeTruthy();
     await waitFor(() => {
-      expect(screen.getByText("Create app in GitHub").hasAttribute("disabled")).toBe(true);
+      expect(rendered.container.textContent).toContain("organization_administration");
+      expect(rendered.container.textContent).toContain("members");
+    });
+    fireEvent.click(screen.getByRole("radio", { name: "Personal account" }));
+    await waitFor(() => {
+      expect(rendered.container.textContent).not.toContain("organization_administration");
+      expect(rendered.container.textContent).not.toContain("members");
+    });
+    expect(screen.queryByText("GitHub organization")).toBeNull();
+    await waitFor(() => {
+      expect(screen.getByText("Create app in GitHub").hasAttribute("disabled")).toBe(false);
     });
   });
 
@@ -342,6 +359,7 @@ describe("ProviderAppSetupPane", () => {
       routeSegment: "github-app",
     });
 
+    fireEvent.click(screen.getByRole("radio", { name: "Personal account" }));
     fireEvent.click(screen.getByRole("radio", { name: "Organization" }));
 
     const organizationInput = getTextControlById("integration-setup-start-form-organizationSlug");

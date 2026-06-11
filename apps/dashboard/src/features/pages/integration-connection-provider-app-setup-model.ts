@@ -1,8 +1,21 @@
 import type { IntegrationFormConnectionMethodProviderAppSetup } from "@mistle/integrations-core";
 
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
+import {
+  createManifestJsonDraft,
+  parseManifestJsonObject,
+  validateManifestJsonObject,
+} from "../integrations/manifest-json-editor.js";
 import type { IntegrationConnectionSetupStartFormState } from "./integration-connection-setup-flow.js";
 import { hasConfiguredSetupSecretField } from "./integration-connection-setup-secret-fields.js";
+
+const GitHubProviderAppManifestOwnerKindFieldName = "ownerKind";
+const GitHubProviderAppManifestOrganizationOwnerKind = "organization";
+const GitHubProviderAppManifestPersonalOwnerKind = "personal";
+const GitHubOrganizationOnlyProviderAppManifestPermissions = {
+  members: "read",
+  organization_administration: "read",
+} satisfies Record<string, string>;
 
 export function createInitialProviderAppSetupDraft(input: {
   connection: IntegrationConnection;
@@ -151,6 +164,48 @@ export function buildProviderAppSetupStartBody(input: {
   return body;
 }
 
+export function updateGitHubProviderAppManifestForSetupStartFormValue(input: {
+  fieldName: string;
+  manifestValue: string;
+  value: string;
+}): string {
+  if (input.fieldName !== GitHubProviderAppManifestOwnerKindFieldName) {
+    return input.manifestValue;
+  }
+
+  if (
+    input.value !== GitHubProviderAppManifestOrganizationOwnerKind &&
+    input.value !== GitHubProviderAppManifestPersonalOwnerKind
+  ) {
+    throw new Error(`Unsupported GitHub App manifest owner kind '${input.value}'.`);
+  }
+
+  if (validateManifestJsonObject(input.manifestValue).status === "invalid") {
+    return input.manifestValue;
+  }
+
+  const manifest = parseManifestJsonObject(input.manifestValue);
+  const defaultPermissions = parseDefaultPermissions(manifest.default_permissions);
+  for (const permission of Object.keys(GitHubOrganizationOnlyProviderAppManifestPermissions)) {
+    delete defaultPermissions[permission];
+  }
+
+  if (input.value === GitHubProviderAppManifestOrganizationOwnerKind) {
+    return createManifestJsonDraft({
+      ...manifest,
+      default_permissions: {
+        ...defaultPermissions,
+        ...GitHubOrganizationOnlyProviderAppManifestPermissions,
+      },
+    });
+  }
+
+  return createManifestJsonDraft({
+    ...manifest,
+    default_permissions: defaultPermissions,
+  });
+}
+
 export function buildProviderAppSetupConfigFieldInputs(input: {
   draft: Record<string, string>;
   providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
@@ -210,4 +265,12 @@ export function buildProviderAppSetupSecretFieldInputs(input: {
 
 function normalizeInputValue(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function parseDefaultPermissions(value: unknown): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(Object.entries(value));
 }

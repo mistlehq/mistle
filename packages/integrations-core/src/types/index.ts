@@ -542,6 +542,7 @@ export type IntegrationFormConnectionMethodSetupStartFormAction = {
 
 export type IntegrationFormConnectionMethodSetupStartFormField = {
   actions?: ReadonlyArray<IntegrationFormConnectionMethodSetupStartFormAction> | undefined;
+  defaultValue?: string | undefined;
   description?: string | undefined;
   inputType: "password" | "radio" | "text" | "textarea";
   label: string;

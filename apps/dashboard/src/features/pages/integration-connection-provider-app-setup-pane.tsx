@@ -1,6 +1,7 @@
-import type {
-  IntegrationFormConnectionMethodProviderAppSetup,
-  IntegrationFormConnectionMethodSetupStartForm,
+import {
+  IntegrationConnectionMethodIds,
+  type IntegrationFormConnectionMethodProviderAppSetup,
+  type IntegrationFormConnectionMethodSetupStartForm,
 } from "@mistle/integrations-core";
 import { Button, CopyableValue, Notice } from "@mistle/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -44,6 +45,7 @@ import {
   isProviderAppExistingAppStartActionInstalled,
   isProviderAppRequiredDraftComplete,
   normalizeProviderAppSetupValue,
+  updateGitHubProviderAppManifestForSetupStartFormValue,
 } from "./integration-connection-provider-app-setup-model.js";
 import {
   IntegrationConnectionSetupManifestPanel,
@@ -425,6 +427,22 @@ export function ProviderAppSetupPane(input: {
     }
   }
 
+  function updateSetupStartFormValue(fieldName: string, value: string): void {
+    setupStartFormState.updateValue(fieldName, value);
+    if (input.methodId !== IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION) {
+      return;
+    }
+
+    const nextManifestValue = updateGitHubProviderAppManifestForSetupStartFormValue({
+      fieldName,
+      manifestValue: manifestDraft.manifestValue,
+      value,
+    });
+    if (nextManifestValue !== manifestDraft.manifestValue) {
+      manifestDraft.onManifestChange(nextManifestValue);
+    }
+  }
+
   async function startExistingAppAction(): Promise<void> {
     const startAction = input.providerAppSetup.existingApp.startAction;
     setInstallationSelection(null);
@@ -721,7 +739,7 @@ export function ProviderAppSetupPane(input: {
             manifestValidation={manifestValidation}
             manifestValue={manifestDraft.manifestValue}
             onManifestChange={manifestDraft.onManifestChange}
-            onSetupStartFormValueChange={setupStartFormState.updateValue}
+            onSetupStartFormValueChange={updateSetupStartFormValue}
             setupStartForm={input.setupStartForm}
             setupStartFormValues={setupStartFormState.values}
           />

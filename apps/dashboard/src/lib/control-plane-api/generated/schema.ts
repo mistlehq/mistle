@@ -4146,6 +4146,7 @@ export interface paths {
                               label: string;
                               opensInNewWindow?: boolean;
                             }[];
+                            defaultValue?: string;
                             description?: string;
                             /** @enum {string} */
                             inputType: "password" | "radio" | "text" | "textarea";

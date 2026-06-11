@@ -290,4 +290,175 @@ describe("listGitHubConnectionResources", () => {
       await server.stop();
     }
   });
+
+  it("lists GitHub App bot resources from app installations in accessible repository organizations", async () => {
+    const seenPaths: string[] = [];
+    const server = await startSimulatedGitHubApi({
+      handler(request, response) {
+        if (request.url === undefined) {
+          response.writeHead(500);
+          response.end("Missing request URL.");
+          return;
+        }
+
+        const requestUrl = new URL(request.url, "http://127.0.0.1");
+        seenPaths.push(`${requestUrl.pathname}?${requestUrl.searchParams.toString()}`);
+        response.setHeader("content-type", "application/json");
+
+        // GitHub REST docs: GET /installation/repositories lists repositories for an installation token.
+        if (requestUrl.pathname === "/installation/repositories") {
+          response.end(
+            JSON.stringify({
+              repositories: [
+                {
+                  id: 1001,
+                  full_name: "mistle/app",
+                  owner: {
+                    login: "mistle",
+                    type: "Organization",
+                  },
+                },
+                {
+                  id: 1002,
+                  full_name: "acme/site",
+                  owner: {
+                    login: "acme",
+                    type: "Organization",
+                  },
+                },
+                {
+                  id: 1003,
+                  full_name: "octocat/playground",
+                  owner: {
+                    login: "octocat",
+                    type: "User",
+                  },
+                },
+              ],
+            }),
+          );
+          return;
+        }
+
+        // GitHub REST docs: GET /orgs/{org}/installations lists all GitHub Apps
+        // installed in an organization and requires Administration organization read permission.
+        if (requestUrl.pathname === "/orgs/mistle/installations") {
+          response.end(
+            JSON.stringify({
+              total_count: 2,
+              installations: [
+                {
+                  id: 4001,
+                  app_id: 9001,
+                  app_slug: "dependabot",
+                  account: {
+                    login: "mistle",
+                    type: "Organization",
+                  },
+                },
+                {
+                  id: 4002,
+                  app_id: 9002,
+                  app_slug: "mistle-reviewer",
+                  account: {
+                    login: "mistle",
+                    type: "Organization",
+                  },
+                },
+              ],
+            }),
+          );
+          return;
+        }
+
+        if (requestUrl.pathname === "/orgs/acme/installations") {
+          response.end(
+            JSON.stringify({
+              total_count: 1,
+              installations: [
+                {
+                  id: 5001,
+                  app_id: 9001,
+                  app_slug: "dependabot",
+                  account: {
+                    login: "acme",
+                    type: "Organization",
+                  },
+                },
+              ],
+            }),
+          );
+          return;
+        }
+
+        response.writeHead(404);
+        response.end(JSON.stringify({ message: "not found" }));
+      },
+    });
+
+    try {
+      const result = await listGitHubConnectionResources({
+        organizationId: "org_test",
+        targetKey: "github-cloud-test",
+        target: {
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {
+            apiBaseUrl: server.baseUrl,
+            webBaseUrl: "https://github.example",
+          },
+          secrets: {},
+        },
+        connection: {
+          id: "icn_github",
+          status: "active",
+          config: {
+            connection_method: "github-app-installation",
+            app_id: "123",
+            app_slug: "mistle-test",
+            client_id: "Iv1.client",
+            installation_id: "456",
+          },
+        },
+        kind: "bot",
+        credential: {
+          kind: "value",
+          value: "github-installation-token",
+        },
+      });
+
+      expect(result.resources).toEqual([
+        {
+          externalId: "9001",
+          handle: "dependabot[bot]",
+          displayName: "dependabot[bot]",
+          metadata: {
+            appId: "9001",
+            appSlug: "dependabot",
+            installationIds: ["4001", "5001"],
+            organizationLogins: ["acme", "mistle"],
+          },
+        },
+        {
+          externalId: "9002",
+          handle: "mistle-reviewer[bot]",
+          displayName: "mistle-reviewer[bot]",
+          metadata: {
+            appId: "9002",
+            appSlug: "mistle-reviewer",
+            installationIds: ["4002"],
+            organizationLogins: ["mistle"],
+          },
+        },
+      ]);
+      expect(seenPaths).toEqual([
+        "/installation/repositories?per_page=100&page=1",
+        "/orgs/acme/installations?per_page=100&page=1",
+        "/orgs/mistle/installations?per_page=100&page=1",
+      ]);
+    } finally {
+      await server.stop();
+    }
+  });
 });
