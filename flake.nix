@@ -13,7 +13,7 @@
         nodejs = if pkgs ? nodejs_25 then pkgs.nodejs_25 else pkgs.nodejs;
         docsNodejs = if pkgs ? nodejs_22 then pkgs.nodejs_22 else pkgs.nodejs;
         codexVersion = "0.137.0";
-        opencodeVersion = "1.16.2";
+        opencodeVersion = "1.17.3";
         codexReleaseAsset =
           {
             x86_64-linux = {
@@ -43,22 +43,22 @@
           {
             x86_64-linux = {
               fileName = "opencode-linux-x64-baseline.tar.gz";
-              hash = "sha256-/jSwR+PU4vbYkfDS07T0SDfvUnHuz9m5iVHlOFfaaeY=";
+              hash = "sha256-4WgOpdnUOZvI4vhdYYeYdbut5q+8N/ZLzd4TDwpPqhk=";
               unpackPhase = ''tar -xzf "$src"'';
             };
             aarch64-linux = {
               fileName = "opencode-linux-arm64.tar.gz";
-              hash = "sha256-6x1YdscGdc/ak8ShxDhdcnQS+ucxVPHwBdFVYm31tVk=";
+              hash = "sha256-hhuMZs7VHW2aZup3POR+3mY6RL0X2De5whrPo0aIAeU=";
               unpackPhase = ''tar -xzf "$src"'';
             };
             x86_64-darwin = {
               fileName = "opencode-darwin-x64-baseline.zip";
-              hash = "sha256-XYgULuCXqOdtr32lHkMtPPdMrmmKGUYzcHbDCpG3oB4=";
+              hash = "sha256-AO34NANiFgSr85QNQBqs4gNHPhbbH0LzgSegjzWuWdU=";
               unpackPhase = ''unzip "$src"'';
             };
             aarch64-darwin = {
               fileName = "opencode-darwin-arm64.zip";
-              hash = "sha256-AVhf9NFYIL06h45Lx8rPsep14jbR/tjC9fNZXtyLerU=";
+              hash = "sha256-tJlI+W2OksV31UhU4vA4OJ0Dw9+76sxEZDtzEjIQ/RM=";
               unpackPhase = ''unzip "$src"'';
             };
           }
