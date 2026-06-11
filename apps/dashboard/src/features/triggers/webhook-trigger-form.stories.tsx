@@ -162,6 +162,18 @@ const ExistingTriggerWithExcludedAuthorValues: WebhookTriggerFormValues = {
   },
 };
 
+const ExistingTriggerWithBotActorValues: WebhookTriggerFormValues = {
+  ...ExistingTriggerValues,
+  name: "GitHub bot-authored PR triage",
+  eventParameterRules: {
+    [StoryPullRequestOpenedTriggerId]: {
+      repository: isRule("mistlehq/platform"),
+      botActor: isRule("dependabot[bot]"),
+      baseBranch: isRule("main"),
+    },
+  },
+};
+
 const ExistingReviewRequestTeamTriggerValues: WebhookTriggerFormValues = {
   ...ExistingTriggerValues,
   name: "GitHub team review intake",
@@ -171,6 +183,19 @@ const ExistingReviewRequestTeamTriggerValues: WebhookTriggerFormValues = {
   eventParameterRules: {
     [StoryPullRequestReviewRequestedTriggerId]: {
       requestedTeam: isRule("platform"),
+    },
+  },
+};
+
+const ExistingReviewRequestBotTriggerValues: WebhookTriggerFormValues = {
+  ...ExistingTriggerValues,
+  name: "GitHub bot review intake",
+  conversationKeyTemplate:
+    "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
+  eventIds: [StoryPullRequestReviewRequestedTriggerId],
+  eventParameterRules: {
+    [StoryPullRequestReviewRequestedTriggerId]: {
+      requestedBot: isRule("mistle-reviewer[bot]"),
     },
   },
 };
@@ -312,12 +337,30 @@ export const EditPageWithExcludedAuthor: Story = {
   },
 };
 
+export const EditPageWithBotActor: Story = {
+  name: "Edit page with GitHub bot actor",
+  args: {
+    mode: "edit",
+    onDelete: function onDelete() {},
+    values: ExistingTriggerWithBotActorValues,
+  },
+};
+
 export const EditPageWithReviewRequestTeamTarget: Story = {
   name: "Edit page with GitHub review request team target",
   args: {
     mode: "edit",
     onDelete: function onDelete() {},
     values: ExistingReviewRequestTeamTriggerValues,
+  },
+};
+
+export const EditPageWithReviewRequestBotTarget: Story = {
+  name: "Edit page with GitHub review request bot target",
+  args: {
+    mode: "edit",
+    onDelete: function onDelete() {},
+    values: ExistingReviewRequestBotTriggerValues,
   },
 };
 

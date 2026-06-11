@@ -187,6 +187,40 @@ const StoryGitHubTeamResources: IntegrationConnectionResources = {
   ],
 };
 
+const StoryGitHubBotResources: IntegrationConnectionResources = {
+  connectionId: StoryGitHubConnectionId,
+  familyId: "github",
+  kind: "bot",
+  syncState: "ready",
+  lastSyncedAt: "2026-03-17T00:00:00.000Z",
+  items: [
+    {
+      id: "icr_github_bot_1",
+      familyId: "github",
+      kind: "bot",
+      externalId: "3001",
+      handle: "dependabot[bot]",
+      displayName: "dependabot[bot]",
+      status: "accessible",
+      metadata: {
+        appSlug: "dependabot",
+      },
+    },
+    {
+      id: "icr_github_bot_2",
+      familyId: "github",
+      kind: "bot",
+      externalId: "3002",
+      handle: "mistle-reviewer[bot]",
+      displayName: "mistle-reviewer[bot]",
+      status: "accessible",
+      metadata: {
+        appSlug: "mistle-reviewer",
+      },
+    },
+  ],
+};
+
 export const StoryGitHubTeamResourcesSyncFailed: IntegrationConnectionResources = {
   connectionId: StoryGitHubConnectionId,
   familyId: "github",
@@ -327,6 +361,10 @@ export function createWebhookTriggerStoryQueryClient(input?: {
   queryClient.setQueryData(
     ["trigger-trigger-parameters", StoryGitHubConnectionId, "team"],
     input?.githubTeamResources ?? StoryGitHubTeamResources,
+  );
+  queryClient.setQueryData(
+    ["trigger-trigger-parameters", StoryGitHubConnectionId, "bot"],
+    StoryGitHubBotResources,
   );
   queryClient.setQueryData(
     ["trigger-trigger-parameters", StorySlackConnectionId, "channel"],

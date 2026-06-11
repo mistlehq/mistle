@@ -71,3 +71,21 @@ export function createGithubPullRequestOpenedEventOption(
     ...(overrides === undefined ? {} : { overrides }),
   });
 }
+
+export function createGithubPullRequestReviewRequestedEventOption(
+  overrides?: Partial<WebhookTriggerEventOption>,
+): WebhookTriggerEventOption {
+  return createGitHubEventOption({
+    eventType: "github.pull_request.review_requested",
+    ...(overrides === undefined ? {} : { overrides }),
+  });
+}
+
+export function createGithubPullRequestReviewRequestRemovedEventOption(
+  overrides?: Partial<WebhookTriggerEventOption>,
+): WebhookTriggerEventOption {
+  return createGitHubEventOption({
+    eventType: "github.pull_request.review_request_removed",
+    ...(overrides === undefined ? {} : { overrides }),
+  });
+}

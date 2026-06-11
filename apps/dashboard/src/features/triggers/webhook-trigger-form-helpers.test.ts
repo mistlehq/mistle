@@ -18,6 +18,7 @@ import {
 import {
   createGithubIssueCommentCreatedEventOption,
   createGithubPullRequestOpenedEventOption,
+  createGithubPullRequestReviewRequestedEventOption,
   GitHubWebhookSourceId,
 } from "./webhook-trigger-test-fixtures.js";
 import type { WebhookTrigger } from "./webhook-triggers-types.js";
@@ -111,72 +112,13 @@ const GitHubEventOptions: readonly WebhookTriggerEventOption[] = [
         template: "{{payload.repository.full_name}}",
       },
     ],
-    parameters: [
-      {
-        id: "repository",
-        label: "repository",
-        kind: "resource-select",
-        resourceKind: "repository",
-        payloadPath: ["repository", "full_name"],
-        prefix: "in",
-      },
-      {
-        id: "author",
-        label: "author",
-        kind: "resource-select",
-        resourceKind: "user",
-        payloadPath: ["sender", "login"],
-        prefix: "by",
-        placeholder: "Any author",
-      },
-    ],
   }),
-  {
+  createGithubPullRequestReviewRequestedEventOption({
     id: PullRequestReviewRequestedTriggerId,
-    eventType: "github.pull_request.review_requested",
     integrationWebhookSourceId: GitHubWebhookSourceId,
     connectionId: GitHubConnectionId,
     connectionLabel: "GitHub Engineering",
-    label: "Pull request review requested",
-    parameters: [
-      {
-        id: "requestedReviewer",
-        label: "requested reviewer",
-        kind: "resource-select",
-        resourceKind: "user",
-        payloadPath: ["requested_reviewer", "login"],
-        negatedMatchRequiresExists: true,
-        prefix: "for",
-      },
-      {
-        id: "requestedTeam",
-        label: "requested GitHub team",
-        kind: "resource-select",
-        resourceKind: "team",
-        payloadPath: ["requested_team", "slug"],
-        negatedMatchRequiresExists: true,
-        prefix: "for team",
-        placeholder: "Any GitHub team",
-      },
-    ],
-    parameterGroups: [
-      {
-        id: "requestedReviewTarget",
-        label: "requested review target",
-        kind: "oneOf",
-        options: [
-          {
-            parameterId: "requestedReviewer",
-            label: "for reviewer",
-          },
-          {
-            parameterId: "requestedTeam",
-            label: "for team",
-          },
-        ],
-      },
-    ],
-  },
+  }),
 ];
 
 const SlackAppMentionEventOption: WebhookTriggerEventOption = {
@@ -375,6 +317,31 @@ describe("toWebhookTriggerFormValues", () => {
     });
   });
 
+  it("hydrates GitHub bot actor filters out of sender login payload filters", () => {
+    expect(
+      toWebhookTriggerFormValues(
+        {
+          ...SampleTrigger,
+          eventTypes: ["github.pull_request.opened"],
+          payloadFilter: {
+            "github.pull_request.opened": {
+              op: "eq",
+              path: ["sender", "login"],
+              value: "dependabot[bot]",
+            },
+          },
+        },
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      eventParameterRules: {
+        [PullRequestOpenedTriggerId]: {
+          botActor: isRule("dependabot[bot]"),
+        },
+      },
+    });
+  });
+
   it("hydrates guarded GitHub requested reviewer exclusion filters", () => {
     expect(
       toWebhookTriggerFormValues(
@@ -409,6 +376,65 @@ describe("toWebhookTriggerFormValues", () => {
     });
   });
 
+  it("hydrates GitHub requested bot filters out of requested reviewer login payload filters", () => {
+    expect(
+      toWebhookTriggerFormValues(
+        {
+          ...SampleTrigger,
+          eventTypes: ["github.pull_request.review_requested"],
+          payloadFilter: {
+            "github.pull_request.review_requested": {
+              op: "eq",
+              path: ["requested_reviewer", "login"],
+              value: "mistle-agent[bot]",
+            },
+          },
+        },
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      eventParameterRules: {
+        [PullRequestReviewRequestedTriggerId]: {
+          requestedBot: isRule("mistle-agent[bot]"),
+        },
+      },
+    });
+  });
+
+  it("hydrates guarded GitHub requested bot exclusion filters", () => {
+    expect(
+      toWebhookTriggerFormValues(
+        {
+          ...SampleTrigger,
+          eventTypes: ["github.pull_request.review_requested"],
+          payloadFilter: {
+            "github.pull_request.review_requested": {
+              op: "and",
+              filters: [
+                {
+                  op: "exists",
+                  path: ["requested_reviewer", "login"],
+                },
+                {
+                  op: "neq",
+                  path: ["requested_reviewer", "login"],
+                  value: "mistle-agent[bot]",
+                },
+              ],
+            },
+          },
+        },
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      eventParameterRules: {
+        [PullRequestReviewRequestedTriggerId]: {
+          requestedBot: isNotRule("mistle-agent[bot]"),
+        },
+      },
+    });
+  });
+
   it("hydrates guarded reviewer exclusions from payload filters merged with advanced filters", () => {
     expect(
       toWebhookTriggerFormValues(
@@ -435,8 +461,8 @@ describe("toWebhookTriggerFormValues", () => {
                 },
                 {
                   op: "eq",
-                  path: ["repository", "full_name"],
-                  value: "mistlehq/mistle",
+                  path: ["pull_request", "draft"],
+                  value: "false",
                 },
               ],
             },
@@ -453,8 +479,8 @@ describe("toWebhookTriggerFormValues", () => {
       remainingPayloadFilter: {
         "github.pull_request.review_requested": {
           op: "eq",
-          path: ["repository", "full_name"],
-          value: "mistlehq/mistle",
+          path: ["pull_request", "draft"],
+          value: "false",
         },
       },
     });
@@ -876,6 +902,30 @@ describe("trigger payload transforms", () => {
     });
   });
 
+  it("builds GitHub bot actor filters into the payload filter", () => {
+    expect(
+      toCreateWebhookTriggerPayload(
+        {
+          ...BaseFormValues,
+          eventParameterRules: {
+            [PullRequestOpenedTriggerId]: {
+              botActor: isRule("dependabot[bot]"),
+            },
+          },
+        },
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      payloadFilter: {
+        "github.pull_request.opened": {
+          op: "eq",
+          path: ["sender", "login"],
+          value: "dependabot[bot]",
+        },
+      },
+    });
+  });
+
   it("rejects one-of parameter groups with multiple configured options", () => {
     expect(() =>
       toCreateWebhookTriggerPayload(
@@ -884,7 +934,7 @@ describe("trigger payload transforms", () => {
           eventIds: [PullRequestReviewRequestedTriggerId],
           eventParameterRules: {
             [PullRequestReviewRequestedTriggerId]: {
-              requestedReviewer: isRule("mistle-agent[bot]"),
+              requestedReviewer: isRule("octocat"),
               requestedTeam: isRule("platform"),
             },
           },
@@ -904,7 +954,7 @@ describe("trigger payload transforms", () => {
           eventIds: [PullRequestReviewRequestedTriggerId],
           eventParameterRules: {
             [PullRequestReviewRequestedTriggerId]: {
-              requestedReviewer: isRule("mistle-agent[bot]"),
+              requestedReviewer: isRule("octocat"),
             },
           },
         },
@@ -912,6 +962,31 @@ describe("trigger payload transforms", () => {
       ),
     ).toMatchObject({
       eventTypes: ["github.pull_request.review_requested"],
+      payloadFilter: {
+        "github.pull_request.review_requested": {
+          op: "eq",
+          path: ["requested_reviewer", "login"],
+          value: "octocat",
+        },
+      },
+    });
+  });
+
+  it("serializes GitHub requested bot review targets through requested reviewer login", () => {
+    expect(
+      toCreateWebhookTriggerPayload(
+        {
+          ...BaseFormValues,
+          eventIds: [PullRequestReviewRequestedTriggerId],
+          eventParameterRules: {
+            [PullRequestReviewRequestedTriggerId]: {
+              requestedBot: isRule("mistle-agent[bot]"),
+            },
+          },
+        },
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
       payloadFilter: {
         "github.pull_request.review_requested": {
           op: "eq",

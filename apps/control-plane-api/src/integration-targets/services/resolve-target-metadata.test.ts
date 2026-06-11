@@ -17,6 +17,11 @@ describe("resolveTargetMetadata", () => {
           eventType: "github.pull_request.review_requested",
           parameters: expect.arrayContaining([
             expect.objectContaining({
+              id: "botActor",
+              resourceKind: "bot",
+              payloadPath: ["sender", "login"],
+            }),
+            expect.objectContaining({
               id: "requestedReviewer",
               negatedMatchRequiresExists: true,
             }),
@@ -24,8 +29,29 @@ describe("resolveTargetMetadata", () => {
               id: "requestedTeam",
               negatedMatchRequiresExists: true,
             }),
+            expect.objectContaining({
+              id: "requestedBot",
+              resourceKind: "bot",
+              payloadPath: ["requested_reviewer", "login"],
+              negatedMatchRequiresExists: true,
+            }),
           ]),
           parameterGroups: [
+            {
+              id: "actor",
+              label: "actor",
+              kind: "oneOf",
+              options: [
+                {
+                  parameterId: "author",
+                  label: "by user",
+                },
+                {
+                  parameterId: "botActor",
+                  label: "by bot",
+                },
+              ],
+            },
             {
               id: "requestedReviewTarget",
               label: "requested review target",
@@ -38,6 +64,10 @@ describe("resolveTargetMetadata", () => {
                 {
                   parameterId: "requestedTeam",
                   label: "for team",
+                },
+                {
+                  parameterId: "requestedBot",
+                  label: "for bot",
                 },
               ],
             },
