@@ -1,4 +1,5 @@
 import {
+  HandleProviderResourceAssociationDeliveryWorkflowSpec,
   HandleTriggerRunWorkflowSpec,
   HandleIntegrationWebhookEventWorkflowSpec,
 } from "@mistle/workflow-registry/control-plane";
@@ -6,6 +7,10 @@ import { trace } from "@opentelemetry/api";
 
 import { getWorkflowContext } from "../core/context.js";
 import { defineTracedControlPlaneWorkflow } from "../core/tracing.js";
+import {
+  setProviderResourceAssociationDeliveryProcessorIdle,
+  startProviderResourceAssociationDeliveryProcessors,
+} from "../handle-provider-resource-association-delivery/processor.js";
 import {
   createWebhookDeliveryTelemetryAttributes,
   logWebhookDeliveryEvent,
@@ -40,6 +45,7 @@ export const HandleIntegrationWebhookEventWorkflow = defineTracedControlPlaneWor
         async (span) => {
           const preparedEvent = await prepareIntegrationWebhookEvent(
             {
+              controlPlaneInternalClient,
               db,
               integrationRegistry,
             },
@@ -56,6 +62,8 @@ export const HandleIntegrationWebhookEventWorkflow = defineTracedControlPlaneWor
             "mistle.trigger.run.count": preparedEvent.triggerRunIds.length,
             "mistle.webhook.event_status": preparedEvent.webhookEventStatus,
             "mistle.webhook.finalized": preparedEvent.finalized,
+            "mistle.webhook.provider_resource_association_delivery.count":
+              preparedEvent.providerResourceAssociationDeliveries.length,
             "mistle.webhook.resource_sync.count": preparedEvent.resourceSyncRequests.length,
           });
 
@@ -73,6 +81,8 @@ export const HandleIntegrationWebhookEventWorkflow = defineTracedControlPlaneWor
         "mistle.trigger.run.count": preparedWebhookEvent.triggerRunIds.length,
         "mistle.webhook.event_status": preparedWebhookEvent.webhookEventStatus,
         "mistle.webhook.finalized": preparedWebhookEvent.finalized,
+        "mistle.webhook.provider_resource_association_delivery.count":
+          preparedWebhookEvent.providerResourceAssociationDeliveries.length,
         "mistle.webhook.resource_sync.count": preparedWebhookEvent.resourceSyncRequests.length,
       });
 
@@ -161,6 +171,49 @@ export const HandleIntegrationWebhookEventWorkflow = defineTracedControlPlaneWor
               targetKey: preparedWebhookEvent.targetKey,
             },
           });
+        }
+
+        const associationDeliveryProcessorHandoffs =
+          await startProviderResourceAssociationDeliveryProcessors(
+            {
+              db,
+            },
+            {
+              providerResourceAssociationIds:
+                preparedWebhookEvent.providerResourceAssociationDeliveries.map(
+                  (delivery) => delivery.providerResourceAssociationId,
+                ),
+            },
+          );
+
+        for (const handoff of associationDeliveryProcessorHandoffs) {
+          if (!handoff.shouldStart) {
+            continue;
+          }
+
+          try {
+            await openWorkflow.runWorkflow(
+              HandleProviderResourceAssociationDeliveryWorkflowSpec,
+              {
+                providerResourceAssociationId: handoff.providerResourceAssociationId,
+                generation: handoff.generation,
+              },
+              {
+                idempotencyKey: `provider-resource-association-delivery:${handoff.providerResourceAssociationId}:${String(handoff.generation)}`,
+              },
+            );
+          } catch (error) {
+            await setProviderResourceAssociationDeliveryProcessorIdle(
+              {
+                db,
+              },
+              {
+                providerResourceAssociationId: handoff.providerResourceAssociationId,
+                generation: handoff.generation,
+              },
+            );
+            throw error;
+          }
         }
 
         await withWebhookDeliverySpan(

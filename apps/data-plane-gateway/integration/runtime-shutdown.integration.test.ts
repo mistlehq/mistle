@@ -11,6 +11,7 @@ import { mintBootstrapToken, mintEgressToken } from "@mistle/gateway-tunnel-auth
 import { derivePortAccessHost } from "@mistle/port-access-auth";
 import {
   SandboxRuntimeStateSnapshotSchema,
+  createDisabledAssociatedResourceEventRouting,
   type CompiledRuntimePlan,
   type SandboxRuntimeStateSnapshot,
 } from "@mistle/sandbox-runtime-contract";
@@ -522,6 +523,7 @@ function createRuntimePlan(): CompiledRuntimePlan {
     egressRoutes: [],
     artifacts: [],
     workspaceSources: [],
+    associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
     runtimeClients: [],
     agentRuntimes: [],
   };

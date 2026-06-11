@@ -21,6 +21,10 @@ import {
   type SnapshotMaterializationImageInput,
 } from "./enqueue-snapshot-materialization-job.js";
 import {
+  mapProfileVersionAssociatedResourceEventRoutingConfig,
+  type SandboxProfileAssociatedResourceEventRoutingConfig,
+} from "./profile-version-associated-resource-routing-config.js";
+import {
   loadActiveRefreshSchedulesByVersion,
   type ProfileVersionRefreshScheduleSummary,
 } from "./profile-version-refresh-schedule-summary.js";
@@ -69,6 +73,7 @@ type RefreshProfileVersionSnapshotOutput = {
     maintenanceScript: string | null;
     sandboxResources: SandboxProfileVersionResources | null;
     skillsConfig: SandboxProfileVersionSkillsConfig | null;
+    associatedResourceEventRoutingConfig: SandboxProfileAssociatedResourceEventRoutingConfig;
     isActive: boolean;
     usable: boolean;
     refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
@@ -191,6 +196,8 @@ async function queueProfileVersionSnapshot(
           sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
           sandboxDiskMb: tables.sandboxProfileVersions.sandboxDiskMb,
           skillsConfig: tables.sandboxProfileVersions.skillsConfig,
+          associatedResourceEventRoutingConfig:
+            tables.sandboxProfileVersions.associatedResourceEventRoutingConfig,
         })
         .from(tables.sandboxProfiles)
         .leftJoin(
@@ -328,6 +335,10 @@ async function queueProfileVersionSnapshot(
             sandboxDiskMb: resolvedSandboxDiskMb,
           }),
           skillsConfig: mapProfileVersionSkillsConfig(sandboxProfileVersion.skillsConfig),
+          associatedResourceEventRoutingConfig:
+            mapProfileVersionAssociatedResourceEventRoutingConfig(
+              sandboxProfileVersion.associatedResourceEventRoutingConfig,
+            ),
           isActive: sandboxProfileVersion.activeVersion === input.profileVersion,
           usable: versionHasUsableSnapshot,
           refreshSchedule: refreshSchedulesByVersion.get(resolvedSandboxProfileVersion) ?? null,

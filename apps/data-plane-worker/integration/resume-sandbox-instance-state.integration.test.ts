@@ -8,6 +8,7 @@ import {
   SandboxInstanceStatuses,
   SandboxStopReasons,
 } from "@mistle/db/data-plane";
+import { createDisabledAssociatedResourceEventRouting } from "@mistle/integrations-core";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
@@ -347,6 +348,7 @@ function createRuntimePlan(input: {
     egressRoutes: [],
     artifacts: [],
     runtimeClients: [],
+    associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
     workspaceSources: [],
     agentRuntimes: [],
   };

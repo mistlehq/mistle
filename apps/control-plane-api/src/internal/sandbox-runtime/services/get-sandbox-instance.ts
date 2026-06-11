@@ -1,4 +1,5 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
+import type { AssociatedResourceEventRouting } from "@mistle/integrations-core";
 import type { SandboxInstanceStatus } from "@mistle/sandbox-lifecycle";
 
 import {
@@ -21,6 +22,9 @@ export async function getSandboxInstance(
   status: SandboxInstanceStatus;
   failureCode: string | null;
   failureMessage: string | null;
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+  associatedResourceEventRouting: AssociatedResourceEventRouting | null;
 }> {
   const sandboxInstance = await dataPlaneClient.getSandboxInstance({
     organizationId: input.organizationId,
@@ -39,5 +43,9 @@ export async function getSandboxInstance(
     status: sandboxInstance.status,
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
+    sandboxProfileId: sandboxInstance.sandboxProfileId,
+    sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+    associatedResourceEventRouting:
+      sandboxInstance.runtimePlan?.associatedResourceEventRouting ?? null,
   };
 }

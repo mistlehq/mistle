@@ -1,6 +1,6 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 
-import { getConversationProviderAdapter } from "./provider-adapter.js";
+import { getConversationProviderAdapter } from "../shared/provider-adapter.js";
 
 type SandboxInstanceTitleSeedResult = "completed" | "unsupported";
 

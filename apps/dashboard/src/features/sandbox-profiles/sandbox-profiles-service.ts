@@ -1,3 +1,7 @@
+import {
+  AssociatedProviderResourceKinds,
+  AssociatedResourceEventTypes,
+} from "@mistle/integrations-core";
 import { z } from "zod";
 
 import { getControlPlaneApiClient } from "../../lib/control-plane-api/client.js";
@@ -36,6 +40,30 @@ import type {
 } from "./sandbox-profiles-types.js";
 
 const AgentRuntimeIdSchema = z.enum(["codex", "opencode", "pi"]);
+const AssociatedResourceEventRoutingResourceRuleSchema = z
+  .object({
+    resourceKind: z.enum([AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST]),
+    eventTypes: z
+      .array(
+        z.enum([
+          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
+        ]),
+      )
+      .min(1),
+  })
+  .strict();
+const SandboxProfileAssociatedResourceEventRoutingConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    resources: z.array(AssociatedResourceEventRoutingResourceRuleSchema).optional(),
+  })
+  .strict()
+  .transform((config) => ({
+    ...(config.enabled === undefined ? {} : { enabled: config.enabled }),
+    ...(config.resources === undefined ? {} : { resources: config.resources }),
+  }));
 
 const LaunchableSandboxProfilesResultSchema = z
   .object({
@@ -525,6 +553,7 @@ const SandboxProfileVersionSchema = z
     sandboxProvider: z.string().min(1).nullable(),
     sandboxResources: SandboxProfileVersionResourcesSchema.nullable(),
     skillsConfig: SandboxProfileVersionSkillsConfigSchema.nullable(),
+    associatedResourceEventRoutingConfig: SandboxProfileAssociatedResourceEventRoutingConfigSchema,
     state: z.enum(["draft", "published"]),
     publishedAt: z.string().min(1).nullable(),
     usable: z.boolean(),
@@ -698,6 +727,7 @@ const PutSandboxProfileVersionDraftResultSchema = z
     sandboxProvider: z.string().min(1).nullable(),
     sandboxResources: SandboxProfileVersionResourcesSchema.nullable(),
     skillsConfig: SandboxProfileVersionSkillsConfigSchema.nullable(),
+    associatedResourceEventRoutingConfig: SandboxProfileAssociatedResourceEventRoutingConfigSchema,
     integrationBindings: SandboxProfileVersionIntegrationBindingsResponseSchema,
   })
   .strict();
@@ -1382,6 +1412,11 @@ export async function putSandboxProfileVersionDraft(
           ? {}
           : { sandboxResources: input.sandboxResources }),
         ...(input.skillsConfig === undefined ? {} : { skillsConfig: input.skillsConfig }),
+        ...(input.associatedResourceEventRoutingConfig === undefined
+          ? {}
+          : {
+              associatedResourceEventRoutingConfig: input.associatedResourceEventRoutingConfig,
+            }),
         ...(input.integrationBindings === undefined
           ? {}
           : { integrationBindings: input.integrationBindings }),

@@ -1,4 +1,5 @@
 import { z } from "@hono/zod-openapi";
+import { AssociatedResourceEventRoutingSchema } from "@mistle/integrations-core";
 import { SandboxInstanceStatuses } from "@mistle/sandbox-lifecycle";
 
 export const InternalSandboxRuntimeGetSandboxInstanceRequestSchema = z
@@ -25,5 +26,8 @@ export const InternalSandboxRuntimeGetSandboxInstanceResponseSchema = z
     ]),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
+    sandboxProfileId: z.string().min(1),
+    sandboxProfileVersion: z.number().int().positive(),
+    associatedResourceEventRouting: AssociatedResourceEventRoutingSchema.nullable(),
   })
   .strict();

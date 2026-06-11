@@ -6,18 +6,25 @@ import { AgentRuntimeRegistry } from "../agent-runtimes/index.js";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import { IntegrationRegistry } from "../registry/index.js";
 import {
+  AssociatedProviderResourceKinds,
+  AssociatedResourceEventTypes,
   type CompileRuntimePlanInput,
   type CompileBindingResult,
   type CompiledRuntimeArtifactSpec,
   IntegrationConnectionMethodIds,
   IntegrationMcpConfigFormats,
+  createDisabledAssociatedResourceEventRouting,
   type IntegrationDefinition,
   type RuntimeArtifactInstallStep,
 } from "../types/index.js";
 import { compileRuntimePlan } from "./index.js";
 
-type TestCompileRuntimePlanInput = Omit<CompileRuntimePlanInput, "agentRuntimeId"> & {
+type TestCompileRuntimePlanInput = Omit<
+  CompileRuntimePlanInput,
+  "agentRuntimeId" | "associatedResourceEventRouting"
+> & {
   agentRuntimeId?: string;
+  associatedResourceEventRouting?: CompileRuntimePlanInput["associatedResourceEventRouting"];
 };
 
 const OpenAiTargetConfigSchema = z.object({
@@ -112,6 +119,8 @@ function compileTestRuntimePlan(input: TestCompileRuntimePlanInput) {
   return compileRuntimePlan({
     ...input,
     agentRuntimeId: input.agentRuntimeId ?? "codex",
+    associatedResourceEventRouting:
+      input.associatedResourceEventRouting ?? createDisabledAssociatedResourceEventRouting(),
   });
 }
 
@@ -785,6 +794,41 @@ function createTypedMiseInstallArtifactDefinition(): IntegrationDefinition<
 }
 
 describe("compileRuntimePlan", () => {
+  it("preserves associated resource event routing in the compiled runtime plan", () => {
+    const registry = new IntegrationRegistry();
+
+    const runtimePlan = compileTestRuntimePlan({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      image: {
+        source: "base",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
+      },
+      definitions: createDefinitionsBundle(registry),
+      bindings: [],
+      associatedResourceEventRouting: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+            eventTypes: [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED],
+          },
+        ],
+      },
+    });
+
+    expect(runtimePlan.associatedResourceEventRouting).toEqual({
+      enabled: true,
+      resources: [
+        {
+          resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+          eventTypes: [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED],
+        },
+      ],
+    });
+  });
+
   it("compiles bindings into a deterministic runtime plan", () => {
     const registry = new IntegrationRegistry();
     registry.register(createOpenAiDefinition());

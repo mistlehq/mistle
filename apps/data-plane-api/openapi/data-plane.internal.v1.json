@@ -1502,6 +1502,42 @@
                           ],
                           "additionalProperties": false
                         }
+                      },
+                      "associatedResourceEventRouting": {
+                        "type": "object",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "resources": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "resourceKind": {
+                                  "type": "string",
+                                  "enum": ["github.pull_request"]
+                                },
+                                "eventTypes": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "enum": [
+                                      "github.pull_request.issue_comment.created",
+                                      "github.pull_request.review.submitted",
+                                      "github.pull_request.review_comment.created"
+                                    ]
+                                  },
+                                  "minItems": 1
+                                }
+                              },
+                              "required": ["resourceKind", "eventTypes"],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": ["enabled", "resources"],
+                        "additionalProperties": false
                       }
                     },
                     "required": [
@@ -1512,7 +1548,8 @@
                       "artifacts",
                       "workspaceSources",
                       "runtimeClients",
-                      "agentRuntimes"
+                      "agentRuntimes",
+                      "associatedResourceEventRouting"
                     ],
                     "additionalProperties": false
                   },
@@ -3903,6 +3940,42 @@
                             ],
                             "additionalProperties": false
                           }
+                        },
+                        "associatedResourceEventRouting": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "resources": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "resourceKind": {
+                                    "type": "string",
+                                    "enum": ["github.pull_request"]
+                                  },
+                                  "eventTypes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "github.pull_request.issue_comment.created",
+                                        "github.pull_request.review.submitted",
+                                        "github.pull_request.review_comment.created"
+                                      ]
+                                    },
+                                    "minItems": 1
+                                  }
+                                },
+                                "required": ["resourceKind", "eventTypes"],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": ["enabled", "resources"],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -3913,7 +3986,8 @@
                         "artifacts",
                         "workspaceSources",
                         "runtimeClients",
-                        "agentRuntimes"
+                        "agentRuntimes",
+                        "associatedResourceEventRouting"
                       ],
                       "additionalProperties": false
                     },

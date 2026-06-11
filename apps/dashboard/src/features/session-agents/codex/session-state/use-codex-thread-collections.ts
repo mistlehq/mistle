@@ -1,7 +1,7 @@
 import {
-  isCodexSubagentThread,
   listCodexThreads,
   listLoadedCodexThreads,
+  resolveOriginalCodexThreadId,
   type CodexJsonRpcClient,
   type CodexThreadSummary,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
@@ -263,34 +263,7 @@ export function resolveReusableOriginalThreadIdSnapshot(input: {
   return input.snapshot;
 }
 
-export function resolveOriginalCodexThreadId(
-  threads: readonly CodexThreadSummary[],
-): string | null {
-  let originalThreadId: string | null = null;
-  let originalCreatedAt: number | null = null;
-
-  for (const thread of threads) {
-    if (isCodexSubagentThread(thread)) {
-      continue;
-    }
-
-    if (thread.createdAt === null) {
-      continue;
-    }
-
-    if (
-      originalCreatedAt === null ||
-      thread.createdAt < originalCreatedAt ||
-      (thread.createdAt === originalCreatedAt &&
-        (originalThreadId === null || thread.id < originalThreadId))
-    ) {
-      originalThreadId = thread.id;
-      originalCreatedAt = thread.createdAt;
-    }
-  }
-
-  return originalThreadId;
-}
+export { resolveOriginalCodexThreadId };
 
 export function resolveOriginalThreadIdSnapshotAfterThreadStart(input: {
   generation: number;

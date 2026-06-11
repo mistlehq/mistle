@@ -8,6 +8,7 @@ import {
   type SandboxProfileVersionAgentRuntimeId,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
+import type { SandboxProfileAssociatedResourceEventRoutingConfig as SandboxProfileAssociatedResourceEventRoutingConfigInput } from "@mistle/integrations-core";
 import { and, eq, inArray } from "drizzle-orm";
 
 import { GitHubProviderFamily } from "../../identity-linking/github-signing.js";
@@ -21,6 +22,10 @@ import {
 } from "../errors.js";
 import { resolveGitCommitSigningPolicy } from "./git-signing-policy.js";
 import { lockProfileVersionForUpdateOrThrow } from "./lock-profile-version-for-update.js";
+import {
+  mapProfileVersionAssociatedResourceEventRoutingConfig,
+  type SandboxProfileAssociatedResourceEventRoutingConfig,
+} from "./profile-version-associated-resource-routing-config.js";
 import {
   replaceProfileVersionIntegrationBindings,
   validateProfileVersionIntegrationBindings,
@@ -49,6 +54,7 @@ type PutProfileVersionDraftInput = {
   sandboxConnectionId?: string | null;
   sandboxResources?: SandboxProfileVersionResources | null;
   skillsConfig?: SandboxProfileVersionSkillsConfig | null;
+  associatedResourceEventRoutingConfig?: SandboxProfileAssociatedResourceEventRoutingConfigInput;
   integrationBindings?: {
     bindings: Array<{
       id?: string;
@@ -72,6 +78,7 @@ type PutProfileVersionDraftOutput = {
   sandboxConnectionId: string | null;
   sandboxResources: SandboxProfileVersionResources | null;
   skillsConfig: SandboxProfileVersionSkillsConfig | null;
+  associatedResourceEventRoutingConfig: SandboxProfileAssociatedResourceEventRoutingConfig;
   integrationBindings: Awaited<ReturnType<typeof replaceProfileVersionIntegrationBindings>>;
 };
 
@@ -211,7 +218,8 @@ export async function putProfileVersionDraft(
       input.sandboxProvider !== undefined ||
       input.sandboxConnectionId !== undefined ||
       input.sandboxResources !== undefined ||
-      input.skillsConfig !== undefined;
+      input.skillsConfig !== undefined ||
+      input.associatedResourceEventRoutingConfig !== undefined;
 
     if (hasVersionFieldUpdate) {
       const [updatedVersion] = await tx
@@ -251,6 +259,11 @@ export async function putProfileVersionDraft(
                   sandboxDiskMb: input.sandboxResources.diskMb ?? null,
                 }),
           ...(input.skillsConfig === undefined ? {} : { skillsConfig: input.skillsConfig }),
+          ...(input.associatedResourceEventRoutingConfig === undefined
+            ? {}
+            : {
+                associatedResourceEventRoutingConfig: input.associatedResourceEventRoutingConfig,
+              }),
         })
         .where(
           and(
@@ -311,6 +324,7 @@ export async function putProfileVersionDraft(
         sandboxMemoryMb: true,
         sandboxDiskMb: true,
         skillsConfig: true,
+        associatedResourceEventRoutingConfig: true,
       },
       where: (table, { and: whereAnd, eq: whereEq }) =>
         whereAnd(
@@ -337,6 +351,9 @@ export async function putProfileVersionDraft(
       mistleMcpApiKeyId: persistedVersion.mistleMcpApiKeyId,
       ...mapProfileVersionRuntimeConfig(persistedVersion),
       skillsConfig: mapProfileVersionSkillsConfig(persistedVersion.skillsConfig),
+      associatedResourceEventRoutingConfig: mapProfileVersionAssociatedResourceEventRoutingConfig(
+        persistedVersion.associatedResourceEventRoutingConfig,
+      ),
       integrationBindings,
     };
   });

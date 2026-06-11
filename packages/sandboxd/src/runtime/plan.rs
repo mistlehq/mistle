@@ -23,6 +23,37 @@ pub struct CompiledRuntimePlan {
     pub skills: Option<CompiledRuntimePlanSkills>,
     pub runtime_clients: Vec<RuntimeClient>,
     pub agent_runtimes: Vec<CompiledAgentRuntime>,
+    pub associated_resource_event_routing: AssociatedResourceEventRouting,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Default)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AssociatedResourceEventRouting {
+    pub enabled: bool,
+    pub resources: Vec<AssociatedResourceEventRoutingResourceRule>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AssociatedResourceEventRoutingResourceRule {
+    pub resource_kind: AssociatedProviderResourceKind,
+    pub event_types: Vec<AssociatedResourceEventType>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub enum AssociatedProviderResourceKind {
+    #[serde(rename = "github.pull_request")]
+    GithubPullRequest,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub enum AssociatedResourceEventType {
+    #[serde(rename = "github.pull_request.issue_comment.created")]
+    IssueCommentCreated,
+    #[serde(rename = "github.pull_request.review.submitted")]
+    ReviewSubmitted,
+    #[serde(rename = "github.pull_request.review_comment.created")]
+    ReviewCommentCreated,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -700,6 +731,10 @@ mod tests {
           "workspaceSources": [],
           "runtimeClients": [],
           "agentRuntimes": [],
+          "associatedResourceEventRouting": {
+            "enabled": false,
+            "resources": []
+          },
           "futureRuntimePlanField": true
         }))
         .expect_err("runtime plan decoder should reject unknown top-level fields");
@@ -708,6 +743,31 @@ mod tests {
             error
                 .to_string()
                 .contains("unknown field `futureRuntimePlanField`"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn rejects_missing_associated_resource_event_routing() {
+        let error = serde_json::from_value::<CompiledRuntimePlan>(serde_json::json!({
+          "sandboxProfileId": "sbp_01k00000000000000000000000",
+          "version": 1,
+          "image": {
+            "source": "base",
+            "imageRef": "registry.example.test/base:latest"
+          },
+          "egressRoutes": [],
+          "artifacts": [],
+          "workspaceSources": [],
+          "runtimeClients": [],
+          "agentRuntimes": []
+        }))
+        .expect_err("runtime plan decoder should require associated resource event routing");
+
+        assert!(
+            error
+                .to_string()
+                .contains("missing field `associatedResourceEventRouting`"),
             "unexpected error: {error}"
         );
     }

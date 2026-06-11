@@ -6,7 +6,10 @@ import { randomUUID } from "node:crypto";
 
 import { Cache, ValkeyCacheAdapter, closeValkeyClient, createValkeyClient } from "@mistle/cache";
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
-import type { CompiledRuntimePlan } from "@mistle/sandbox-runtime-contract";
+import {
+  createDisabledAssociatedResourceEventRouting,
+  type CompiledRuntimePlan,
+} from "@mistle/sandbox-runtime-contract";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
@@ -549,6 +552,7 @@ function createRuntimePlan(): CompiledRuntimePlan {
     egressRoutes: [],
     artifacts: [],
     workspaceSources: [],
+    associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
     runtimeClients: [],
     agentRuntimes: [],
   };

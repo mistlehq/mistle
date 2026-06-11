@@ -33,6 +33,7 @@ const DockerSandboxRuntimeColumns = {
 
 const DockerSandboxRuntimeConfig = {
   agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CODEX,
+  associatedResourceEventRoutingConfig: {},
   mistleMcpApiKeyId: null,
   mistleMcpEnabled: false,
   sandboxConnectionId: null,

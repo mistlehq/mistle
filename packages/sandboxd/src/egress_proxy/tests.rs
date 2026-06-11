@@ -1415,6 +1415,7 @@ fn sample_runtime_plan() -> CompiledRuntimePlan {
         skills: None,
         runtime_clients: Vec::new(),
         agent_runtimes: Vec::new(),
+        associated_resource_event_routing: Default::default(),
     }
 }
 

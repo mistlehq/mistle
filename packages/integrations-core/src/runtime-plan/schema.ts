@@ -1,9 +1,12 @@
 import { z } from "zod";
 
 import {
+  AssociatedProviderResourceKinds,
+  AssociatedResourceEventTypes,
   RuntimeFileWriteMode,
   SandboxImageSources,
   type CompiledRuntimePlan,
+  type SandboxProfileAssociatedResourceEventRoutingConfig,
 } from "../types/index.js";
 
 const ResolvedSandboxImageSchema = z.discriminatedUnion("source", [
@@ -434,6 +437,48 @@ const CompiledRuntimePlanSkillsSchema = z
   })
   .strict();
 
+const AssociatedResourceEventRoutingResourceRuleSchema = z
+  .object({
+    resourceKind: z.enum([AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST]),
+    eventTypes: z
+      .array(
+        z.enum([
+          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
+        ]),
+      )
+      .min(1)
+      .readonly(),
+  })
+  .strict();
+
+export const SandboxProfileAssociatedResourceEventRoutingConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    resources: z.array(AssociatedResourceEventRoutingResourceRuleSchema).readonly().optional(),
+  })
+  .strict()
+  .transform(
+    (config): SandboxProfileAssociatedResourceEventRoutingConfig => ({
+      ...(config.enabled === undefined ? {} : { enabled: config.enabled }),
+      ...(config.resources === undefined
+        ? {}
+        : { resources: normalizeAssociatedResourceRules(config.resources) }),
+    }),
+  );
+
+export const AssociatedResourceEventRoutingSchema = z
+  .object({
+    enabled: z.boolean(),
+    resources: z.array(AssociatedResourceEventRoutingResourceRuleSchema).readonly(),
+  })
+  .strict()
+  .transform((routing): CompiledRuntimePlan["associatedResourceEventRouting"] => ({
+    enabled: routing.enabled,
+    resources: normalizeAssociatedResourceRules(routing.resources),
+  }));
+
 type RuntimePlanRoute = CompiledRuntimePlan["egressRoutes"][number];
 type RuntimePlanArtifact = CompiledRuntimePlan["artifacts"][number];
 type RuntimePlanExecCommand =
@@ -445,11 +490,24 @@ type RuntimePlanRuntimeClientFile = RuntimePlanRuntimeClient["setup"]["files"][n
 type RuntimePlanWorkspaceSource = CompiledRuntimePlan["workspaceSources"][number];
 type RuntimePlanSkills = NonNullable<CompiledRuntimePlan["skills"]>;
 type RuntimePlanAgentRuntime = CompiledRuntimePlan["agentRuntimes"][number];
+type RuntimePlanAssociatedResourceRule =
+  CompiledRuntimePlan["associatedResourceEventRouting"]["resources"][number];
 
 function sortRecord(input: Record<string, string>): Record<string, string> {
   return Object.fromEntries(
     Object.entries(input).sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey)),
   );
+}
+
+function normalizeAssociatedResourceRules(
+  rules: ReadonlyArray<RuntimePlanAssociatedResourceRule>,
+): ReadonlyArray<RuntimePlanAssociatedResourceRule> {
+  return rules
+    .map((rule) => ({
+      resourceKind: rule.resourceKind,
+      eventTypes: [...new Set(rule.eventTypes)].sort(),
+    }))
+    .sort((left, right) => left.resourceKind.localeCompare(right.resourceKind));
 }
 
 const HeaderNamePattern = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
@@ -955,6 +1013,7 @@ const CompiledRuntimePlanValidationSchema = z
     skills: CompiledRuntimePlanSkillsSchema.optional(),
     runtimeClients: z.array(RuntimeClientSchema).readonly(),
     agentRuntimes: z.array(CompiledAgentRuntimeSchema).readonly(),
+    associatedResourceEventRouting: AssociatedResourceEventRoutingSchema,
   })
   .strict();
 
@@ -970,5 +1029,6 @@ export const CompiledRuntimePlanSchema = CompiledRuntimePlanValidationSchema.tra
     ...(runtimePlan.skills === undefined ? {} : { skills: normalizeSkills(runtimePlan.skills) }),
     runtimeClients: runtimePlan.runtimeClients.map(normalizeRuntimeClient),
     agentRuntimes: runtimePlan.agentRuntimes.map(normalizeAgentRuntime),
+    associatedResourceEventRouting: runtimePlan.associatedResourceEventRouting,
   }),
 );

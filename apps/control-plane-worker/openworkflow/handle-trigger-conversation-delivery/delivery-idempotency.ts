@@ -92,12 +92,7 @@ export function createConversationIdempotencyMetadata(
     operation: "createConversation",
     keySuffix: "create-conversation",
     deliveryContext: input.deliveryContext,
-    fields: {
-      conversation_id: input.conversationId,
-      delivery_task_id: input.deliveryContext.deliveryTaskId,
-      trigger_run_id: input.deliveryContext.triggerRunId,
-      working_directory: input.workingDirectory,
-    },
+    fields: createConversationFingerprintFields(input),
   });
 }
 
@@ -110,12 +105,34 @@ export function submitPayloadIdempotencyMetadata(input: {
     operation: "submitPayload",
     keySuffix: "submit-payload",
     deliveryContext: input.deliveryInput.deliveryContext,
-    fields: {
-      conversation_id: input.deliveryInput.conversationId,
-      delivery_task_id: input.deliveryInput.deliveryContext.deliveryTaskId,
-      input_text: input.deliveryInput.inputText,
-      provider_conversation_id: input.providerConversationId,
-      trigger_run_id: input.deliveryInput.deliveryContext.triggerRunId,
-    },
+    fields: submitPayloadFingerprintFields(input),
   });
+}
+
+function createConversationFingerprintFields(
+  input: ExecuteConversationProviderDeliveryInput,
+): RuntimeRequestFingerprintFields {
+  const baseFields = {
+    conversation_id: input.conversationId,
+    delivery_task_id: input.deliveryContext.deliveryTaskId,
+    working_directory: input.workingDirectory,
+    trigger_run_id: input.deliveryContext.triggerRunId,
+  };
+
+  return baseFields;
+}
+
+function submitPayloadFingerprintFields(input: {
+  deliveryInput: ExecuteConversationProviderDeliveryInput;
+  providerConversationId: string;
+}): RuntimeRequestFingerprintFields {
+  const baseFields = {
+    conversation_id: input.deliveryInput.conversationId,
+    delivery_task_id: input.deliveryInput.deliveryContext.deliveryTaskId,
+    input_text: input.deliveryInput.inputText,
+    provider_conversation_id: input.providerConversationId,
+    trigger_run_id: input.deliveryInput.deliveryContext.triggerRunId,
+  };
+
+  return baseFields;
 }

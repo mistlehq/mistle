@@ -192,6 +192,7 @@ export function buildSkillsSourceRepoDiscoveryRuntimePlan(input: {
     sandboxProfileId: input.runtimePlan.sandboxProfileId,
     version: input.runtimePlan.version,
     image: input.runtimePlan.image,
+    associatedResourceEventRouting: input.runtimePlan.associatedResourceEventRouting,
     egressRoutes: filterSkillsSourceRepoEgressRoutes({
       egressRoutes: input.runtimePlan.egressRoutes,
       originUrl: input.originUrl,

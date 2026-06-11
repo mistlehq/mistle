@@ -11,6 +11,7 @@ import {
 } from "@mistle/data-plane-internal-client";
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
+import { createDisabledAssociatedResourceEventRouting } from "@mistle/integrations-core";
 import {
   createSandboxAdapter,
   SandboxProvider,
@@ -328,6 +329,7 @@ function createRuntimePlan(input: {
     egressRoutes: [],
     artifacts: [],
     runtimeClients: [],
+    associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
     workspaceSources: [
       {
         sourceKind: "git-clone",

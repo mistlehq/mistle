@@ -482,7 +482,11 @@ fn valid_signing_startup_input(
             "artifacts": [],
             "runtimeClients": [],
             "workspaceSources": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: Some(GitIdentity {
             name: "Mistle User".to_string(),

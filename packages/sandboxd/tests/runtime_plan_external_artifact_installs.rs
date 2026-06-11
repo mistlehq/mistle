@@ -41,7 +41,11 @@ fn applies_typed_mise_install_steps() {
           ],
           "runtimeClients": [],
           "workspaceSources": [],
-          "agentRuntimes": []
+          "agentRuntimes": [],
+          "associatedResourceEventRouting": {
+            "enabled": false,
+            "resources": []
+          }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -109,7 +113,11 @@ fn applies_github_release_artifact_install_steps_from_pinned_public_release() {
           ],
           "runtimeClients": [],
           "workspaceSources": [],
-          "agentRuntimes": []
+          "agentRuntimes": [],
+          "associatedResourceEventRouting": {
+            "enabled": false,
+            "resources": []
+          }
         }),
         git_identity: None,
         transparent_proxy: None,

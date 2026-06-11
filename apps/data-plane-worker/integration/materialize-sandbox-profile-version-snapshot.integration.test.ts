@@ -13,6 +13,7 @@ import {
   SandboxInstanceSources,
   SandboxInstanceStatuses,
 } from "@mistle/db/data-plane";
+import { createDisabledAssociatedResourceEventRouting } from "@mistle/integrations-core";
 import { SandboxProvider } from "@mistle/sandbox";
 import { SandboxLifecycleEvents } from "@mistle/sandbox-lifecycle";
 import {
@@ -298,6 +299,7 @@ describe.concurrent("data-plane worker snapshot materialization", () => {
           egressRoutes: [],
           artifacts: [],
           runtimeClients: [],
+          associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
           workspaceSources: [],
           agentRuntimes: [],
         },

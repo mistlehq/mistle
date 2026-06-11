@@ -34,6 +34,7 @@ const it = createIntegrationTest({
 
 const EmptySandboxRuntimeConfig = {
   agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CODEX,
+  associatedResourceEventRoutingConfig: {},
   mistleMcpEnabled: false,
   mistleMcpApiKeyId: null,
   sandboxConnectionId: null,

@@ -5,6 +5,7 @@ import {
   type ControlPlaneTables,
   type ControlPlaneTransaction,
   type SandboxProfile,
+  type SandboxProfileAssociatedResourceEventRoutingConfig,
   type SandboxProfileVersionAgentRuntimeId,
   SandboxProfileStatuses,
   type SandboxProfileVersionState,
@@ -69,6 +70,7 @@ type SourceProfileVersion = {
   gitCommitSigningIntegrationConnectionId: string | null;
   mistleMcpEnabled: boolean;
   mistleMcpApiKeyId: string | null;
+  associatedResourceEventRoutingConfig: SandboxProfileAssociatedResourceEventRoutingConfig;
   skillsConfig: SandboxProfileVersionSkillsConfig | null;
 };
 
@@ -373,6 +375,7 @@ async function insertDuplicatedVersion(
     gitCommitSigningIntegrationConnectionId: input.source.gitCommitSigningIntegrationConnectionId,
     mistleMcpEnabled: input.source.mistleMcpEnabled,
     mistleMcpApiKeyId: input.source.mistleMcpApiKeyId,
+    associatedResourceEventRoutingConfig: input.source.associatedResourceEventRoutingConfig,
     skillsConfig: input.source.skillsConfig,
   });
 }

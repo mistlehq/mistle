@@ -2,6 +2,11 @@ import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { describe, expect, it } from "vitest";
 
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
+import {
+  AssociatedProviderResourceKinds,
+  AssociatedResourceEventTypes,
+  createDisabledAssociatedResourceEventRouting,
+} from "../types/index.js";
 import { assembleCompiledRuntimePlan, CompiledRuntimePlanSchema } from "./index.js";
 
 const GitHubCliTokenPattern = /^ghp_[A-Za-z0-9]{36}$/;
@@ -45,6 +50,48 @@ function createPtyLaunch(input: { runtimeId: string; displayName?: string; comma
 }
 
 describe("assembleCompiledRuntimePlan", () => {
+  it("normalizes associated resource event routing rules in the shared runtime-plan schema", () => {
+    const plan = CompiledRuntimePlanSchema.parse({
+      sandboxProfileId: "sbp_123",
+      version: 7,
+      image: {
+        source: "base",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
+      },
+      associatedResourceEventRouting: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+            eventTypes: [
+              AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+              AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+              AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+            ],
+          },
+        ],
+      },
+      egressRoutes: [],
+      artifacts: [],
+      workspaceSources: [],
+      runtimeClients: [],
+      agentRuntimes: [],
+    });
+
+    expect(plan.associatedResourceEventRouting).toEqual({
+      enabled: true,
+      resources: [
+        {
+          resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+          eventTypes: [
+            AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+            AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+          ],
+        },
+      ],
+    });
+  });
+
   it("accepts aws sigv4 egress routes in the shared runtime-plan schema", () => {
     const plan = assembleCompiledRuntimePlan({
       sandboxProfileId: "sbp_aws",
@@ -53,6 +100,7 @@ describe("assembleCompiledRuntimePlan", () => {
         source: "base",
         imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
+      associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
       compiledRuntimePlanFragments: [
         {
           egressRoutes: [
@@ -100,6 +148,7 @@ describe("assembleCompiledRuntimePlan", () => {
         source: "base",
         imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
+      associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
       compiledRuntimePlanFragments: [
         {
           egressRoutes: [],
@@ -169,6 +218,7 @@ describe("assembleCompiledRuntimePlan", () => {
           source: "base",
           imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
+        associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
         compiledRuntimePlanFragments: [
           {
             egressRoutes: [],
@@ -193,6 +243,7 @@ describe("assembleCompiledRuntimePlan", () => {
         source: "base",
         imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
+      associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
       compiledRuntimePlanFragments: [
         {
           egressRoutes: [
@@ -457,6 +508,7 @@ describe("assembleCompiledRuntimePlan", () => {
         source: "base",
         imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
+      associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
       compiledRuntimePlanFragments: [
         {
           egressRoutes: [],
@@ -541,6 +593,7 @@ describe("assembleCompiledRuntimePlan", () => {
           source: "base",
           imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
+        associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
         compiledRuntimePlanFragments: [
           {
             egressRoutes: [],
@@ -593,6 +646,7 @@ describe("assembleCompiledRuntimePlan", () => {
           source: "base",
           imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
+        associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
         compiledRuntimePlanFragments: [
           {
             egressRoutes: [],
@@ -653,6 +707,7 @@ describe("assembleCompiledRuntimePlan", () => {
           source: "base",
           imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
+        associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
         compiledRuntimePlanFragments: [
           {
             egressRoutes: [],
@@ -715,6 +770,7 @@ describe("assembleCompiledRuntimePlan", () => {
           source: "base",
           imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
+        associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
         compiledRuntimePlanFragments: [
           {
             egressRoutes: [],
@@ -784,6 +840,7 @@ describe("assembleCompiledRuntimePlan", () => {
         source: "base",
         imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
+      associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
       egressRoutes: [
         {
           egressRuleId: "egress_rule_openai",
@@ -834,6 +891,7 @@ describe("assembleCompiledRuntimePlan", () => {
           source: "base",
           imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
+        associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
         egressRoutes: [
           {
             egressRuleId: "egress_rule_openai",
@@ -877,6 +935,7 @@ describe("assembleCompiledRuntimePlan", () => {
         source: "base",
         imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
+      associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
       egressRoutes: [
         {
           egressRuleId: "egress_rule_datadog",
@@ -940,6 +999,7 @@ describe("assembleCompiledRuntimePlan", () => {
           source: "base",
           imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
+        associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
         egressRoutes: [
           {
             egressRuleId: "egress_rule_datadog",
@@ -998,6 +1058,7 @@ describe("assembleCompiledRuntimePlan", () => {
           source: "base",
           imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
+        associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
         egressRoutes: [
           {
             egressRuleId: "egress_rule_aws",
@@ -1049,6 +1110,7 @@ describe("assembleCompiledRuntimePlan", () => {
           source: "base",
           imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
+        associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
         egressRoutes: [],
         artifacts: [
           {

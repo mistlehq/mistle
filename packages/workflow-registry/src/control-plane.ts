@@ -177,6 +177,28 @@ export const HandleIntegrationWebhookEventWorkflowSpec = defineWorkflowSpec<
   version: HandleIntegrationWebhookEventWorkflowVersion,
 });
 
+export const HandleProviderResourceAssociationDeliveryWorkflowName =
+  "control-plane.provider-resource-associations.handle-delivery";
+export const HandleProviderResourceAssociationDeliveryWorkflowVersion = "1";
+
+export type HandleProviderResourceAssociationDeliveryWorkflowInput = {
+  providerResourceAssociationId: string;
+  generation: number;
+};
+
+export type HandleProviderResourceAssociationDeliveryWorkflowOutput = {
+  providerResourceAssociationId: string;
+  generation: number;
+};
+
+export const HandleProviderResourceAssociationDeliveryWorkflowSpec = defineWorkflowSpec<
+  HandleProviderResourceAssociationDeliveryWorkflowInput,
+  HandleProviderResourceAssociationDeliveryWorkflowOutput
+>({
+  name: HandleProviderResourceAssociationDeliveryWorkflowName,
+  version: HandleProviderResourceAssociationDeliveryWorkflowVersion,
+});
+
 export const SyncIntegrationConnectionResourcesWorkflowName =
   "control-plane.integration-connections.sync-resources";
 export const SyncIntegrationConnectionResourcesWorkflowVersion = "1";

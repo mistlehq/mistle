@@ -1,3 +1,4 @@
+import type { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
   TriggerRunStatuses,
   IntegrationWebhookEventStatuses,
@@ -7,6 +8,10 @@ import {
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import type { HandleIntegrationWebhookEventWorkflowInput } from "@mistle/workflow-registry/control-plane";
 
+import {
+  prepareProviderResourceAssociationDeliveries,
+  type QueuedProviderResourceAssociationDelivery,
+} from "./prepare-provider-resource-association-deliveries.js";
 import { resolveResourceSyncKindsForWebhookEvent } from "./resolve-resource-sync-kinds-for-webhook-event.js";
 import { resolveWebhookTriggerTargets } from "./resolve-webhook-trigger-targets.js";
 import { updateWebhookEventStatus } from "./update-webhook-event-status.js";
@@ -24,6 +29,7 @@ export type PrepareIntegrationWebhookEventOutput = {
   targetKey: string;
   webhookEventStatus: (typeof IntegrationWebhookEventStatuses)[keyof typeof IntegrationWebhookEventStatuses];
   triggerRunIds: ReadonlyArray<string>;
+  providerResourceAssociationDeliveries: ReadonlyArray<QueuedProviderResourceAssociationDelivery>;
   resourceSyncRequests: ReadonlyArray<IntegrationWebhookResourceSyncRequest>;
   finalized: boolean;
 };
@@ -38,6 +44,7 @@ function isTerminalWebhookEventStatus(input: string): boolean {
 
 export async function prepareIntegrationWebhookEvent(
   ctx: {
+    controlPlaneInternalClient: Pick<ControlPlaneInternalClient, "getSandboxInstance">;
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
   },
@@ -58,6 +65,7 @@ export async function prepareIntegrationWebhookEvent(
       externalDeliveryId: webhookEvent.externalDeliveryId,
       finalized: true,
       integrationConnectionId: webhookEvent.integrationConnectionId,
+      providerResourceAssociationDeliveries: [],
       resourceSyncRequests: [],
       targetKey: webhookEvent.targetKey,
       webhookEventStatus: webhookEvent.status,
@@ -87,25 +95,130 @@ export async function prepareIntegrationWebhookEvent(
         throw new Error(`Webhook event '${input.webhookEventId}' was not found.`);
       }
 
-      if (
-        currentWebhookEvent.status === IntegrationWebhookEventStatuses.PROCESSING ||
-        isTerminalWebhookEventStatus(currentWebhookEvent.status)
-      ) {
+      if (isTerminalWebhookEventStatus(currentWebhookEvent.status)) {
         return {
           triggerRunIds: [],
           externalDeliveryId: webhookEvent.externalDeliveryId,
           finalized: true,
           integrationConnectionId: webhookEvent.integrationConnectionId,
+          providerResourceAssociationDeliveries: [],
           resourceSyncRequests: [],
           targetKey: webhookEvent.targetKey,
           webhookEventStatus: currentWebhookEvent.status,
           webhookEventId: input.webhookEventId,
         };
       }
+      if (currentWebhookEvent.status === IntegrationWebhookEventStatuses.PROCESSING) {
+        const resourceSyncKinds = await resolveResourceSyncKindsForWebhookEvent({
+          db: ctx.db,
+          integrationRegistry: ctx.integrationRegistry,
+          targetKey: webhookEvent.targetKey,
+          eventType: webhookEvent.eventType,
+        });
+        const resourceSyncRequests = await resolveRecoverableResourceSyncRequests(ctx.db, {
+          webhookEvent,
+          resourceSyncKinds,
+        });
 
-      throw new Error(
-        `Failed to transition webhook event '${input.webhookEventId}' into processing from status '${currentWebhookEvent.status}'.`,
-      );
+        if (webhookEvent.integrationWebhookSourceId == null) {
+          throw new Error(
+            `Webhook event '${webhookEvent.id}' is missing integrationWebhookSourceId.`,
+          );
+        }
+
+        const resolvedTargets = await resolveWebhookTriggerTargets(ctx.db, {
+          organizationId: webhookEvent.organizationId,
+          integrationWebhookSourceId: webhookEvent.integrationWebhookSourceId,
+          eventType: webhookEvent.eventType,
+          payload: webhookEvent.payload,
+        });
+        let queuedTriggerRunIds: ReadonlyArray<string> = [];
+        if (resolvedTargets.length > 0) {
+          await ctx.db
+            .insert(tables.triggerRuns)
+            .values(
+              resolvedTargets.map((resolvedTarget) => ({
+                triggerId: resolvedTarget.triggerId,
+                triggerTargetId: resolvedTarget.triggerTargetId,
+                sourceWebhookEventId: input.webhookEventId,
+                status: TriggerRunStatuses.QUEUED,
+              })),
+            )
+            .onConflictDoNothing({
+              target: [tables.triggerRuns.triggerTargetId, tables.triggerRuns.sourceWebhookEventId],
+            });
+
+          const queuedTriggerRuns = await ctx.db.query.triggerRuns.findMany({
+            columns: {
+              id: true,
+            },
+            where: (table, { and: whereAnd, eq: whereEq, inArray: whereInArray }) =>
+              whereAnd(
+                whereEq(table.sourceWebhookEventId, input.webhookEventId),
+                whereEq(table.status, TriggerRunStatuses.QUEUED),
+                whereInArray(
+                  table.triggerTargetId,
+                  resolvedTargets.map((target) => target.triggerTargetId),
+                ),
+              ),
+          });
+
+          queuedTriggerRunIds = queuedTriggerRuns.map((queuedRun) => queuedRun.id);
+        }
+
+        const providerResourceAssociationDeliveries =
+          await prepareProviderResourceAssociationDeliveries(
+            {
+              controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+              db: ctx.db,
+            },
+            {
+              webhookEvent,
+            },
+          );
+
+        if (
+          resolvedTargets.length === 0 &&
+          resourceSyncKinds.length === 0 &&
+          providerResourceAssociationDeliveries.length === 0
+        ) {
+          await updateWebhookEventStatus({
+            db: ctx.db,
+            webhookEventId: input.webhookEventId,
+            status: IntegrationWebhookEventStatuses.IGNORED,
+            finalized: true,
+            fromStatuses: [IntegrationWebhookEventStatuses.PROCESSING],
+          });
+
+          return {
+            triggerRunIds: [],
+            externalDeliveryId: webhookEvent.externalDeliveryId,
+            finalized: true,
+            integrationConnectionId: webhookEvent.integrationConnectionId,
+            providerResourceAssociationDeliveries: [],
+            resourceSyncRequests: [],
+            targetKey: webhookEvent.targetKey,
+            webhookEventStatus: IntegrationWebhookEventStatuses.IGNORED,
+            webhookEventId: input.webhookEventId,
+          };
+        }
+
+        return {
+          triggerRunIds: queuedTriggerRunIds,
+          externalDeliveryId: webhookEvent.externalDeliveryId,
+          finalized: false,
+          integrationConnectionId: webhookEvent.integrationConnectionId,
+          providerResourceAssociationDeliveries,
+          resourceSyncRequests,
+          targetKey: webhookEvent.targetKey,
+          webhookEventStatus: IntegrationWebhookEventStatuses.PROCESSING,
+          webhookEventId: input.webhookEventId,
+        };
+      } else {
+        throw new Error(
+          `Failed to transition webhook event '${input.webhookEventId}' into processing from status '${currentWebhookEvent.status}'.`,
+        );
+      }
     }
 
     if (webhookEvent.integrationWebhookSourceId == null) {
@@ -130,7 +243,22 @@ export async function prepareIntegrationWebhookEvent(
       eventType: webhookEvent.eventType,
       payload: webhookEvent.payload,
     });
-    if (resolvedTargets.length === 0 && resourceSyncKinds.length === 0) {
+    const providerResourceAssociationDeliveries =
+      await prepareProviderResourceAssociationDeliveries(
+        {
+          controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+          db: ctx.db,
+        },
+        {
+          webhookEvent,
+        },
+      );
+
+    if (
+      resolvedTargets.length === 0 &&
+      resourceSyncKinds.length === 0 &&
+      providerResourceAssociationDeliveries.length === 0
+    ) {
       await updateWebhookEventStatus({
         db: ctx.db,
         webhookEventId: input.webhookEventId,
@@ -144,6 +272,7 @@ export async function prepareIntegrationWebhookEvent(
         externalDeliveryId: webhookEvent.externalDeliveryId,
         finalized: true,
         integrationConnectionId: webhookEvent.integrationConnectionId,
+        providerResourceAssociationDeliveries: [],
         resourceSyncRequests: [],
         targetKey: webhookEvent.targetKey,
         webhookEventStatus: IntegrationWebhookEventStatuses.IGNORED,
@@ -190,6 +319,7 @@ export async function prepareIntegrationWebhookEvent(
       externalDeliveryId: webhookEvent.externalDeliveryId,
       finalized: false,
       integrationConnectionId: webhookEvent.integrationConnectionId,
+      providerResourceAssociationDeliveries,
       resourceSyncRequests,
       targetKey: webhookEvent.targetKey,
       webhookEventStatus: IntegrationWebhookEventStatuses.PROCESSING,
@@ -205,4 +335,50 @@ export async function prepareIntegrationWebhookEvent(
 
     throw error;
   }
+}
+
+async function resolveRecoverableResourceSyncRequests(
+  db: ControlPlaneDatabase,
+  input: {
+    webhookEvent: {
+      integrationConnectionId: string;
+      organizationId: string;
+      sourceOccurredAt: string | null;
+    };
+    resourceSyncKinds: ReadonlyArray<string>;
+  },
+): Promise<ReadonlyArray<IntegrationWebhookResourceSyncRequest>> {
+  if (input.resourceSyncKinds.length === 0) {
+    return [];
+  }
+
+  const resourceStates = await db.query.integrationConnectionResourceStates.findMany({
+    columns: {
+      kind: true,
+      lastSyncStartedAt: true,
+    },
+    where: (table, { and, eq, inArray }) =>
+      and(
+        eq(table.connectionId, input.webhookEvent.integrationConnectionId),
+        inArray(table.kind, input.resourceSyncKinds),
+      ),
+  });
+  const scheduledKinds = new Set(
+    resourceStates
+      .filter(
+        (resourceState) =>
+          resourceState.lastSyncStartedAt !== null &&
+          input.webhookEvent.sourceOccurredAt !== null &&
+          resourceState.lastSyncStartedAt >= input.webhookEvent.sourceOccurredAt,
+      )
+      .map((resourceState) => resourceState.kind),
+  );
+
+  return input.resourceSyncKinds
+    .filter((kind) => !scheduledKinds.has(kind))
+    .map((kind) => ({
+      organizationId: input.webhookEvent.organizationId,
+      connectionId: input.webhookEvent.integrationConnectionId,
+      kind,
+    }));
 }

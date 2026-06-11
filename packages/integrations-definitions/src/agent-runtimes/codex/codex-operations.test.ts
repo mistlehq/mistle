@@ -7,6 +7,7 @@ import {
   parseCodexThreadListResponse,
   parseCodexSkillsListResponse,
   parseCodexThreadSessionResponse,
+  resolveOriginalCodexThreadId,
 } from "./codex-operations.js";
 
 describe("buildCodexTurnInputItems", () => {
@@ -716,6 +717,47 @@ describe("parseCodexThreadListResponse", () => {
     });
   });
 });
+
+describe("resolveOriginalCodexThreadId", () => {
+  it("selects the earliest created non-subagent thread", () => {
+    expect(
+      resolveOriginalCodexThreadId([
+        createCodexThreadSummary({ id: "thread_later", createdAt: 30 }),
+        createCodexThreadSummary({ id: "thread_subagent", createdAt: 5, isSubagent: true }),
+        createCodexThreadSummary({ id: "thread_original", createdAt: 10 }),
+      ]),
+    ).toBe("thread_original");
+  });
+
+  it("uses thread id as the tie breaker for matching creation times", () => {
+    expect(
+      resolveOriginalCodexThreadId([
+        createCodexThreadSummary({ id: "thread_b", createdAt: 10 }),
+        createCodexThreadSummary({ id: "thread_a", createdAt: 10 }),
+      ]),
+    ).toBe("thread_a");
+  });
+});
+
+function createCodexThreadSummary(input: {
+  id: string;
+  createdAt: number | null;
+  isSubagent?: boolean;
+}) {
+  return {
+    id: input.id,
+    name: null,
+    preview: null,
+    parentThreadId: null,
+    threadSource: null,
+    isSubagent: input.isSubagent ?? false,
+    agentNickname: null,
+    agentRole: null,
+    cwd: "/root/repo",
+    updatedAt: input.createdAt,
+    createdAt: input.createdAt,
+  };
+}
 
 describe("parseCodexSkillsListResponse", () => {
   it("reads enabled skill metadata from Codex app-server skills/list responses", () => {

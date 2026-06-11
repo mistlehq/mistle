@@ -8,6 +8,10 @@ import { SandboxProfileVersionStates } from "@mistle/db/control-plane";
 
 import { SandboxProfilesNotFoundCodes, SandboxProfilesNotFoundError } from "../errors.js";
 import {
+  mapProfileVersionAssociatedResourceEventRoutingConfig,
+  type SandboxProfileAssociatedResourceEventRoutingConfig,
+} from "./profile-version-associated-resource-routing-config.js";
+import {
   loadActiveRefreshSchedulesByVersion,
   type ProfileVersionRefreshScheduleSummary,
 } from "./profile-version-refresh-schedule-summary.js";
@@ -41,6 +45,7 @@ type ListProfileVersionsOutput = {
     maintenanceScript: string | null;
     sandboxResources: SandboxProfileVersionResources | null;
     skillsConfig: SandboxProfileVersionSkillsConfig | null;
+    associatedResourceEventRoutingConfig: SandboxProfileAssociatedResourceEventRoutingConfig;
     isActive: boolean;
     usable: boolean;
     refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
@@ -97,6 +102,7 @@ export async function listProfileVersions(
       sandboxMemoryMb: true,
       sandboxDiskMb: true,
       skillsConfig: true,
+      associatedResourceEventRoutingConfig: true,
     },
     where: (table, { eq }) => eq(table.sandboxProfileId, input.profileId),
     orderBy: (table, { desc }) => [desc(table.version)],
@@ -149,6 +155,9 @@ export async function listProfileVersions(
         maintenanceScript: version.maintenanceScript,
         ...mapProfileVersionRuntimeConfig(version),
         skillsConfig: mapProfileVersionSkillsConfig(version.skillsConfig),
+        associatedResourceEventRoutingConfig: mapProfileVersionAssociatedResourceEventRoutingConfig(
+          version.associatedResourceEventRoutingConfig,
+        ),
         isActive: version.version === sandboxProfile.activeVersion,
         usable:
           version.state === SandboxProfileVersionStates.PUBLISHED &&

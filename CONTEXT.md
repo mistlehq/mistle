@@ -96,6 +96,10 @@ _Avoid_: Cloned automation, enabled copy
 A provider event that can be selected as the event source for a **Trigger**.
 _Avoid_: Webhook event when naming product-facing trigger-builder concepts
 
+**Associated resource event routing**:
+A snapshot-affecting **Sandbox profile version** behavior that selects which provider events on associated **Routable provider resources** should produce **Association deliveries**.
+_Avoid_: Trigger when no Trigger conversation is created, hardcoded association routing
+
 **Trigger event parameter**:
 A provider event field that can narrow which **Trigger events** match a **Trigger**.
 _Avoid_: Filter field
@@ -115,6 +119,34 @@ _Avoid_: GitHub team identity, organization-qualified team
 **Trigger conversation**:
 A Mistle-owned **Conversation** created or reused while handling a **Trigger** run.
 _Avoid_: Automation conversation
+
+**Provider resource association**:
+A Mistle-owned association between a **Routable provider resource** and the **Sandbox session** used to resolve related provider-event delivery.
+_Avoid_: Dynamic resource, resource attachment, conversation mapping
+
+**Routable provider resource**:
+An external provider resource whose future provider events can continue an agent loop through a **Provider resource association**.
+_Avoid_: Provider object, touched resource
+
+**Routable provider resource key**:
+The provider-derived identity used to match provider events to a **Routable provider resource**.
+_Avoid_: Conversation key, group key
+
+**Association-backed provider event**:
+A provider event routed through a **Provider resource association** rather than through a **Trigger**.
+_Avoid_: Trigger event when no Trigger is involved, ad hoc trigger
+
+**Association delivery**:
+An attempt to deliver an **Association-backed provider event** to its **Routing runtime conversation**.
+_Avoid_: Trigger delivery when no Trigger is involved
+
+**Association registration**:
+The act of recording a **Provider resource association** after Mistle observes a **Routable provider resource**.
+_Avoid_: Resource claim, ownership claim
+
+**Rendered association input**:
+The exact text generated from an **Associated resource event routing** selection and delivered to the agent.
+_Avoid_: Association payload, raw webhook payload
 
 **Rendered trigger input**:
 The exact text generated from a **Trigger**'s input template and delivered to the agent.
@@ -139,6 +171,10 @@ _Avoid_: Bare thread, bare session
 **Active runtime conversation**:
 The **Runtime conversation** currently selected for the chat pane within a **Sandbox session**.
 _Avoid_: Active thread when speaking across providers
+
+**Routing runtime conversation**:
+The **Runtime conversation** selected to receive follow-up provider events for a **Provider resource association**.
+_Avoid_: Caller conversation, active conversation, current thread
 
 **Original runtime conversation**:
 The earliest-created **Runtime conversation** in the **Sandbox session**, unless a provider conversation is explicitly supplied by a triggering system.
@@ -380,6 +416,14 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Sandbox profile duplicate** should preserve the source profile's configuration references unless a reference is no longer valid.
 - A **Sandbox profile duplicate** does not carry source **Snapshot** job history.
 - A session, trigger, or other profile-backed object may have a **Referenced sandbox profile version** that differs from the profile's latest published **Sandbox profile version**.
+- **Associated resource event routing** belongs to a **Referenced sandbox profile version** and is part of the runtime behavior for sessions started from that version.
+- Changing **Associated resource event routing** requires the **Sandbox profile version** publish and **Snapshot** lifecycle rather than changing already-running **Sandbox sessions**.
+- First-pass **Associated resource event routing** selects provider event types for associated resources; the **Provider resource association** supplies the resource match.
+- Supported **Associated resource event routing** is enabled by default for a sandbox profile version with the corresponding integration.
+- First-pass GitHub pull request **Associated resource event routing** covers pull request comments and reviews, not pull request lifecycle state changes.
+- First-pass **Association registration** creates **Provider resource associations** only for GitHub pull requests created through managed egress.
+- First-pass **Association registration** is reported directly from the data-plane gateway to the control plane.
+- The control plane owns **Provider resource association** records even when they reference data-plane sandbox instances.
 - A **Setup script** prepares a **Snapshot** from a **Base image**.
 - **Setup Assistant** starts from a **Latest saved draft** unless the user saves current edits first.
 - **Setup Assistant** requires the **Latest saved draft** to have a saved **Agent runtime connection** that is compatible with the selected **Agent runtime**.
@@ -458,6 +502,30 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Trigger conversation** is owned by Mistle, not by an agent runtime provider.
 - A **Provider conversation** is owned by an agent runtime provider.
 - A **Runtime conversation** is a provider-owned conversation visible inside a **Sandbox session**.
+- A **Provider resource association** belongs to a **Routable provider resource**, not every provider object the agent touches.
+- A **Provider resource association** is matched by a **Routable provider resource key**.
+- A **Sandbox session** can have many **Provider resource associations**.
+- First-pass provider-event delivery does not fan out one **Association-backed provider event** to multiple **Sandbox sessions**.
+- **Association delivery** resolves its **Routing runtime conversation** from the associated **Sandbox session**.
+- First-pass **Association delivery** resolves the **Routing runtime conversation** from the **Sandbox session**'s **Original runtime conversation**.
+- **Association delivery** resolves the **Routing runtime conversation** during delivery, not during provider webhook ingress.
+- A **Sandbox session** does not have conflicting **Original runtime conversation** resolution sources; if conflict is detected, the **Trigger conversation** route wins and the conflict is an error.
+- An **Association delivery** fails explicitly when its **Routing runtime conversation** cannot be resolved.
+- A **Provider resource association** records ownership of a provider resource, not whether future provider events are still useful.
+- A **Provider resource association** is not a user-managed dashboard resource.
+- **Association registration** does not change whether the provider request that produced the **Routable provider resource** succeeds.
+- An **Association-backed provider event** is not a **Trigger** run.
+- A **Provider resource association** can outlive its ability to produce successful **Association deliveries**.
+- An **Association delivery** targets the associated **Routing runtime conversation** and does not reroute to another conversation when that target is unavailable.
+- An **Association delivery** depends on a **Provider resource association** already recorded when the provider event is handled.
+- An **Association delivery** starts a new turn when the **Routing runtime conversation** is idle, steers an active turn when steering is supported, and queues when the runtime cannot steer.
+- **Association delivery** idempotency is scoped separately from **Trigger** run idempotency.
+- **Associated resource event routing** reuses provider event definitions without creating a **Trigger conversation**.
+- **Associated resource event routing** uses a **Routable provider resource key** where a **Trigger** uses a conversation key.
+- **Associated resource event routing** for an existing **Provider resource association** does not change when a later **Sandbox profile version** is published.
+- A **Rendered association input** belongs to **Associated resource event routing**, not to a **Trigger**.
+- First-pass **Rendered association input** is concise structured text rather than raw provider-event JSON.
+- One provider event may produce both an **Association-backed provider event** and one or more **Trigger** runs.
 - A Mistle organization may have one **Billing customer** per billing provider.
 - A **Welcome email** is sent once per **Mistle organization**.
 - The first user in a newly created **Mistle organization** receives the **Welcome email** after organization initialization succeeds.

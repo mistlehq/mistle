@@ -1,4 +1,8 @@
-import { CompiledRuntimePlanSchema, assembleCompiledRuntimePlan } from "@mistle/integrations-core";
+import {
+  CompiledRuntimePlanSchema,
+  assembleCompiledRuntimePlan,
+  createDisabledAssociatedResourceEventRouting,
+} from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import { ResumeSandboxInstanceInputSchema } from "./resume-sandbox-instance/schema.js";
@@ -13,6 +17,7 @@ function createRuntimePlan() {
       source: "base",
       imageRef: "img_base_123",
     },
+    associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
     compiledRuntimePlanFragments: [
       {
         egressRoutes: [],

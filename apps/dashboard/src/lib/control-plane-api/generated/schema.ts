@@ -10110,6 +10110,18 @@ export interface paths {
               versions: {
                 /** @enum {string} */
                 agentRuntimeId: "codex" | "opencode" | "pi";
+                associatedResourceEventRoutingConfig: {
+                  enabled?: boolean;
+                  resources?: {
+                    eventTypes: (
+                      | "github.pull_request.issue_comment.created"
+                      | "github.pull_request.review.submitted"
+                      | "github.pull_request.review_comment.created"
+                    )[];
+                    /** @enum {string} */
+                    resourceKind: "github.pull_request";
+                  }[];
+                };
                 gitCommitSigningIntegrationConnectionId: string | null;
                 isActive: boolean;
                 latestSnapshotJob: {
@@ -10245,6 +10257,18 @@ export interface paths {
             "application/json": {
               /** @enum {string} */
               agentRuntimeId: "codex" | "opencode" | "pi";
+              associatedResourceEventRoutingConfig: {
+                enabled?: boolean;
+                resources?: {
+                  eventTypes: (
+                    | "github.pull_request.issue_comment.created"
+                    | "github.pull_request.review.submitted"
+                    | "github.pull_request.review_comment.created"
+                  )[];
+                  /** @enum {string} */
+                  resourceKind: "github.pull_request";
+                }[];
+              };
               gitCommitSigningIntegrationConnectionId: string | null;
               isActive: boolean;
               latestSnapshotJob: {
@@ -10518,6 +10542,18 @@ export interface paths {
           "application/json": {
             /** @enum {string} */
             agentRuntimeId?: "codex" | "opencode" | "pi";
+            associatedResourceEventRoutingConfig?: {
+              enabled?: boolean;
+              resources?: {
+                eventTypes: (
+                  | "github.pull_request.issue_comment.created"
+                  | "github.pull_request.review.submitted"
+                  | "github.pull_request.review_comment.created"
+                )[];
+                /** @enum {string} */
+                resourceKind: "github.pull_request";
+              }[];
+            };
             gitCommitSigningIntegrationConnectionId?: string | null;
             integrationBindings?: {
               bindings: {
@@ -10562,6 +10598,18 @@ export interface paths {
             "application/json": {
               /** @enum {string} */
               agentRuntimeId: "codex" | "opencode" | "pi";
+              associatedResourceEventRoutingConfig: {
+                enabled?: boolean;
+                resources?: {
+                  eventTypes: (
+                    | "github.pull_request.issue_comment.created"
+                    | "github.pull_request.review.submitted"
+                    | "github.pull_request.review_comment.created"
+                  )[];
+                  /** @enum {string} */
+                  resourceKind: "github.pull_request";
+                }[];
+              };
               gitCommitSigningIntegrationConnectionId: string | null;
               integrationBindings: {
                 bindings: {
@@ -11302,6 +11350,18 @@ export interface paths {
               version: {
                 /** @enum {string} */
                 agentRuntimeId: "codex" | "opencode" | "pi";
+                associatedResourceEventRoutingConfig: {
+                  enabled?: boolean;
+                  resources?: {
+                    eventTypes: (
+                      | "github.pull_request.issue_comment.created"
+                      | "github.pull_request.review.submitted"
+                      | "github.pull_request.review_comment.created"
+                    )[];
+                    /** @enum {string} */
+                    resourceKind: "github.pull_request";
+                  }[];
+                };
                 gitCommitSigningIntegrationConnectionId: string | null;
                 isActive: boolean;
                 latestSnapshotJob: {
@@ -11612,6 +11672,18 @@ export interface paths {
               version: {
                 /** @enum {string} */
                 agentRuntimeId: "codex" | "opencode" | "pi";
+                associatedResourceEventRoutingConfig: {
+                  enabled?: boolean;
+                  resources?: {
+                    eventTypes: (
+                      | "github.pull_request.issue_comment.created"
+                      | "github.pull_request.review.submitted"
+                      | "github.pull_request.review_comment.created"
+                    )[];
+                    /** @enum {string} */
+                    resourceKind: "github.pull_request";
+                  }[];
+                };
                 gitCommitSigningIntegrationConnectionId: string | null;
                 isActive: boolean;
                 latestSnapshotJob: {
@@ -12000,6 +12072,18 @@ export interface paths {
               version: {
                 /** @enum {string} */
                 agentRuntimeId: "codex" | "opencode" | "pi";
+                associatedResourceEventRoutingConfig: {
+                  enabled?: boolean;
+                  resources?: {
+                    eventTypes: (
+                      | "github.pull_request.issue_comment.created"
+                      | "github.pull_request.review.submitted"
+                      | "github.pull_request.review_comment.created"
+                    )[];
+                    /** @enum {string} */
+                    resourceKind: "github.pull_request";
+                  }[];
+                };
                 gitCommitSigningIntegrationConnectionId: string | null;
                 isActive: boolean;
                 latestSnapshotJob: {

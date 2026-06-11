@@ -514,6 +514,114 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/internal/provider-resource-associations/register": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            integrationConnectionId: string;
+            providerResourceId: string;
+            /** @enum {string} */
+            resourceKind: "github.pull_request";
+            sandboxInstanceId: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Register a provider resource association for internal callers. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  associationId: string;
+                  /** @enum {string} */
+                  status: "created";
+                }
+              | {
+                  associationId: string;
+                  /** @enum {string} */
+                  status: "already_exists";
+                }
+              | {
+                  /** @enum {string} */
+                  reason: "resource_kind_not_enabled";
+                  /** @enum {string} */
+                  status: "not_applicable";
+                };
+          };
+        };
+        /** @description Request validation failed. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal service authentication failed. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Referenced resource was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              code: string;
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/internal/sandbox-runtime/compile-plan": {
     parameters: {
       query?: never;
@@ -708,6 +816,18 @@ export interface paths {
                   };
                   name: string;
                 }[];
+                associatedResourceEventRouting: {
+                  enabled: boolean;
+                  resources: {
+                    eventTypes: (
+                      | "github.pull_request.issue_comment.created"
+                      | "github.pull_request.review.submitted"
+                      | "github.pull_request.review_comment.created"
+                    )[];
+                    /** @enum {string} */
+                    resourceKind: "github.pull_request";
+                  }[];
+                };
                 egressRoutes: {
                   additionalCredentialHeaders?: {
                     credentialResolver:
@@ -1017,9 +1137,23 @@ export interface paths {
           };
           content: {
             "application/json": {
+              associatedResourceEventRouting: {
+                enabled: boolean;
+                resources: {
+                  eventTypes: (
+                    | "github.pull_request.issue_comment.created"
+                    | "github.pull_request.review.submitted"
+                    | "github.pull_request.review_comment.created"
+                  )[];
+                  /** @enum {string} */
+                  resourceKind: "github.pull_request";
+                }[];
+              } | null;
               failureCode: string | null;
               failureMessage: string | null;
               id: string;
+              sandboxProfileId: string;
+              sandboxProfileVersion: number;
               /** @enum {string} */
               status:
                 | "pending"

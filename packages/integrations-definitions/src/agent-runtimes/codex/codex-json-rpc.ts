@@ -35,8 +35,17 @@ export type CodexJsonRpcCallOptions = {
 type NotificationListener = (notification: CodexJsonRpcNotification) => void;
 type ServerRequestListener = (request: CodexJsonRpcServerRequest) => void;
 
-function createStreamResetError(resetInfo: SandboxSessionResetInfo): Error {
-  return new Error(`Sandbox session stream reset (${resetInfo.code}): ${resetInfo.message}`);
+function createStreamResetError(input: {
+  resetInfo: SandboxSessionResetInfo;
+  pendingMethods: readonly string[];
+}): Error {
+  const pendingMethodSummary =
+    input.pendingMethods.length === 0
+      ? ""
+      : ` Pending JSON-RPC methods: ${input.pendingMethods.join(", ")}.`;
+  return new Error(
+    `Sandbox session stream reset (${input.resetInfo.code}): ${input.resetInfo.message}${pendingMethodSummary}`,
+  );
 }
 
 function isErrorResponse(
@@ -142,7 +151,13 @@ export class CodexJsonRpcClient {
           ...(options?.idempotency === undefined ? {} : { idempotency: options.idempotency }),
         })
         .catch((error: unknown) => {
-          this.#rejectPendingRequest(id, error instanceof Error ? error : new Error(String(error)));
+          const cause = error instanceof Error ? error : new Error(String(error));
+          this.#rejectPendingRequest(
+            id,
+            new Error(`JSON-RPC request ${method} could not be sent: ${cause.message}`, {
+              cause,
+            }),
+          );
         });
     });
 
@@ -236,7 +251,12 @@ export class CodexJsonRpcClient {
     }
 
     if (event.type === "stream_reset") {
-      this.#rejectAllPendingRequests(createStreamResetError(event.resetInfo));
+      this.#rejectAllPendingRequests(
+        createStreamResetError({
+          resetInfo: event.resetInfo,
+          pendingMethods: [...this.#pendingRequests.values()].map((request) => request.method),
+        }),
+      );
     }
   }
 

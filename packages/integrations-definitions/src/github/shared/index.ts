@@ -40,3 +40,14 @@ export {
   createGitHubResourceDefinitions,
   GitHubResourceSyncTriggers,
 } from "./resource-definitions.js";
+export {
+  createGitHubPullRequestProviderResourceId,
+  isGitHubPullRequestCreationRequest,
+  observeGitHubRoutableResourceFromEgressResponse,
+  type GitHubRoutableResourceObservation,
+} from "./provider-resource-associations.js";
+export {
+  observeGitHubAssociatedResourceFromWebhookEvent,
+  type GitHubAssociatedResourceRenderedInput,
+  type GitHubAssociatedResourceWebhookObservation,
+} from "./provider-resource-association-webhooks.js";

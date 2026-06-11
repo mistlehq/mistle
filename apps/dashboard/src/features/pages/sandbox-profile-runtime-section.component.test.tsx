@@ -187,6 +187,7 @@ function createVersion(
     maintenanceScript: null,
     sandboxResources: input.sandboxResources,
     skillsConfig: null,
+    associatedResourceEventRoutingConfig: {},
     isActive: false,
     usable: false,
     latestSnapshotJob: null,

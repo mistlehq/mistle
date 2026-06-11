@@ -4,6 +4,7 @@ import { TraceFlags, context, trace, type Context } from "@opentelemetry/api";
 import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import { afterAll, beforeAll, describe, expect } from "vitest";
 
+import { submitCodexAssociatedResourceDelivery } from "../openworkflow/handle-provider-resource-association-delivery/submit-codex-associated-resource-delivery.js";
 import {
   createConversationProviderDeliveryConversation,
   executeConversationProviderDelivery,
@@ -108,6 +109,174 @@ describe("executeConversationProviderDelivery", () => {
         "initialized",
         "mistle/setDeliveryContext",
         "model/list",
+        "turn/start",
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("submits Codex associated-resource delivery directly to the stored thread", async () => {
+    const server = await startSimulatedCodexRuntimeServer("associated_resource_direct_turn");
+
+    try {
+      const activeContext = trace.setSpan(
+        context.active(),
+        trace.wrapSpanContext(ParentSpanContext),
+      );
+
+      const result = await context.with(
+        activeContext,
+        async () =>
+          await submitCodexAssociatedResourceDelivery({
+            deliveryInput: {
+              runtimeId: "codex",
+              connectionUrl: server.url,
+              inputText: "GitHub pull request issue comment created.",
+              deliveryId: "prd_associated_resource",
+              providerResourceAssociationId: "pra_associated_resource",
+            },
+          }),
+      );
+
+      expect(result).toEqual({
+        providerConversationId: "thread_original",
+        providerExecutionId: "turn_123",
+      });
+      expect(await server.methodSequence).toEqual([
+        "initialize",
+        "initialized",
+        "thread/list",
+        "thread/list",
+        "thread/resume",
+        "thread/read",
+        "turn/start",
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("steers the active original Codex turn for associated-resource delivery", async () => {
+    const server = await startSimulatedCodexRuntimeServer("associated_resource_active_turn");
+
+    try {
+      const activeContext = trace.setSpan(
+        context.active(),
+        trace.wrapSpanContext(ParentSpanContext),
+      );
+
+      const result = await context.with(
+        activeContext,
+        async () =>
+          await submitCodexAssociatedResourceDelivery({
+            deliveryInput: {
+              runtimeId: "codex",
+              connectionUrl: server.url,
+              inputText: "GitHub pull request issue comment created while active.",
+              deliveryId: "prd_associated_resource_active",
+              providerResourceAssociationId: "pra_associated_resource_active",
+            },
+          }),
+      );
+
+      expect(result).toEqual({
+        providerConversationId: "thread_original",
+        providerExecutionId: "turn_active",
+      });
+      expect(await server.methodSequence).toEqual([
+        "initialize",
+        "initialized",
+        "thread/list",
+        "thread/list",
+        "thread/resume",
+        "thread/read",
+        "turn/steer",
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("resteers the current Codex turn when associated-resource active-turn steering finds a stale turn", async () => {
+    const server = await startSimulatedCodexRuntimeServer("associated_resource_late_steer");
+
+    try {
+      const activeContext = trace.setSpan(
+        context.active(),
+        trace.wrapSpanContext(ParentSpanContext),
+      );
+
+      const result = await context.with(
+        activeContext,
+        async () =>
+          await submitCodexAssociatedResourceDelivery({
+            deliveryInput: {
+              runtimeId: "codex",
+              connectionUrl: server.url,
+              inputText: "GitHub pull request issue comment created after active turn finished.",
+              deliveryId: "prd_associated_resource_late_steer",
+              providerResourceAssociationId: "pra_associated_resource_late_steer",
+            },
+          }),
+      );
+
+      expect(result).toEqual({
+        providerConversationId: "thread_original",
+        providerExecutionId: "turn_next",
+      });
+      expect(await server.methodSequence).toEqual([
+        "initialize",
+        "initialized",
+        "thread/list",
+        "thread/list",
+        "thread/resume",
+        "thread/read",
+        "turn/steer",
+        "thread/read",
+        "turn/steer",
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("starts a Codex turn when the original associated-resource thread is unmaterialized", async () => {
+    const server = await startSimulatedCodexRuntimeServer(
+      "associated_resource_unmaterialized_thread",
+    );
+
+    try {
+      const activeContext = trace.setSpan(
+        context.active(),
+        trace.wrapSpanContext(ParentSpanContext),
+      );
+
+      const result = await context.with(
+        activeContext,
+        async () =>
+          await submitCodexAssociatedResourceDelivery({
+            deliveryInput: {
+              runtimeId: "codex",
+              connectionUrl: server.url,
+              inputText: "GitHub pull request issue comment created for a new thread.",
+              deliveryId: "prd_associated_resource_unmaterialized",
+              providerResourceAssociationId: "pra_associated_resource_unmaterialized",
+            },
+          }),
+      );
+
+      expect(result).toEqual({
+        providerConversationId: "thread_original",
+        providerExecutionId: "turn_123",
+      });
+      expect(await server.methodSequence).toEqual([
+        "initialize",
+        "initialized",
+        "thread/list",
+        "thread/list",
+        "thread/resume",
+        "thread/read",
         "turn/start",
       ]);
     } finally {
@@ -340,7 +509,9 @@ describe("executeConversationProviderDelivery", () => {
             deliveryInput: input,
             providerConversationId: createdConversation.providerConversationId,
           }),
-        ).rejects.toThrow("Sandbox session transport is not connected.");
+        ).rejects.toThrow(
+          /Sandbox session transport is not connected|simulated connection URL replay/,
+        );
       });
     } finally {
       await server.close();

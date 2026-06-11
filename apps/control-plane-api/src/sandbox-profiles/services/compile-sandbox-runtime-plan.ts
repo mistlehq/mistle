@@ -8,7 +8,11 @@ import {
   DefaultSandboxWorkspaceDir,
   IntegrationCompilerError,
   IntegrationMcpTransports,
+  AssociatedProviderResourceKinds,
+  AssociatedResourceEventTypes,
+  SandboxProfileAssociatedResourceEventRoutingConfigSchema,
   compileRuntimePlan,
+  type AssociatedResourceEventRouting,
   type CompiledRuntimePlan,
   type CompiledRuntimePlanSkills,
   type EgressCredentialRoute,
@@ -30,6 +34,8 @@ const MistleMcpEgressRuleId = "egress_rule_platform_mistle_mcp";
 const MistleMcpBindingId = "platform-mistle-mcp";
 const MistleMcpFamilyId = "mistle";
 const MistleMcpVariantId = "mistle-mcp";
+const GitHubFamilyId = "github";
+const CodexRuntimeId = "codex";
 
 export const SandboxRuntimePlanCompilerErrorCodes = {
   PROFILE_NOT_FOUND: "PROFILE_NOT_FOUND",
@@ -211,6 +217,34 @@ function resolveProfileMistleMcpCredentialResolver(input: {
   return {
     kind: "mistle_mcp_token",
     apiKeyId: input.apiKeyId,
+  };
+}
+
+function resolveAssociatedResourceEventRouting(input: {
+  rawConfig: unknown;
+  agentRuntimeId: SandboxProfileVersionAgentRuntimeId | undefined;
+  compileBindings: Awaited<ReturnType<typeof resolveCompileBindingsForVersion>>;
+}): AssociatedResourceEventRouting {
+  const config = SandboxProfileAssociatedResourceEventRoutingConfigSchema.parse(input.rawConfig);
+  const defaultResources =
+    input.agentRuntimeId === CodexRuntimeId &&
+    input.compileBindings.some((binding) => binding.target.familyId === GitHubFamilyId)
+      ? [
+          {
+            resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+            eventTypes: [
+              AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+              AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+              AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
+            ],
+          },
+        ]
+      : [];
+  const resources = config.resources ?? defaultResources;
+
+  return {
+    enabled: config.enabled ?? resources.length > 0,
+    resources,
   };
 }
 
@@ -418,6 +452,7 @@ export async function compileSandboxRuntimePlan(
       setupScript: true,
       maintenanceScript: true,
       skillsConfig: true,
+      associatedResourceEventRoutingConfig: true,
     },
     where: (table, { and, eq }) =>
       and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),
@@ -445,18 +480,24 @@ export async function compileSandboxRuntimePlan(
       override: input.mistleMcpCredentialResolver,
     });
     const mistleMcpEnabled = mistleMcpCredentialResolver !== null;
+    const agentRuntimeId = input.agentRuntimeId ?? sandboxProfileVersion.agentRuntimeId;
     const runtimePlan = compileRuntimePlan({
       organizationId: input.organizationId,
       sandboxProfileId: input.profileId,
       version: input.profileVersion,
       image: input.image,
-      agentRuntimeId: input.agentRuntimeId ?? sandboxProfileVersion.agentRuntimeId,
+      agentRuntimeId,
       bindings: compileBindings,
       definitions: input.integrationDefinitions,
       egressRoutes: resolveMistleMcpEgressRoutes({
         enabled: mistleMcpEnabled,
         credentialResolver: mistleMcpCredentialResolver,
         url: input.mcpConfig.url,
+      }),
+      associatedResourceEventRouting: resolveAssociatedResourceEventRouting({
+        rawConfig: sandboxProfileVersion.associatedResourceEventRoutingConfig,
+        agentRuntimeId,
+        compileBindings,
       }),
       mcpServers: resolveMistleMcpServers({
         enabled: mistleMcpEnabled,

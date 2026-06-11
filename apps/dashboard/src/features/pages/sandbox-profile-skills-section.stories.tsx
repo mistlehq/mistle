@@ -404,6 +404,7 @@ function createStoryVersion(
     maintenanceScript: null,
     sandboxResources: null,
     skillsConfig,
+    associatedResourceEventRoutingConfig: {},
     isActive: false,
     usable: false,
     refreshSchedule: null,

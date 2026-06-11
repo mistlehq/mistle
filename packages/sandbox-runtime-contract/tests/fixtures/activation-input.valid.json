@@ -12,6 +12,10 @@
     },
     "egressRoutes": [],
     "artifacts": [],
+    "associatedResourceEventRouting": {
+      "enabled": false,
+      "resources": []
+    },
     "runtimeClients": [],
     "workspaceSources": [],
     "agentRuntimes": []

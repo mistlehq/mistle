@@ -739,6 +739,7 @@ function createRuntimeStoryVersion(input: {
     maintenanceScript: null,
     sandboxResources: sandboxConfig.sandboxResources,
     skillsConfig: input.skillsConfig ?? null,
+    associatedResourceEventRoutingConfig: {},
     isActive: false,
     usable: false,
     refreshSchedule: null,

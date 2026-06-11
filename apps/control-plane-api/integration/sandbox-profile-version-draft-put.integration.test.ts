@@ -55,6 +55,7 @@ const itManagedE2BDeployment = createIntegrationTest({
 });
 
 const EmptySandboxRuntimeConfig = {
+  associatedResourceEventRoutingConfig: {},
   gitCommitSigningIntegrationConnectionId: null,
   mistleMcpEnabled: false,
   mistleMcpApiKeyId: null,
