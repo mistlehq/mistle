@@ -4,6 +4,7 @@ import {
   buildCodexReviewStartRequest,
   buildCodexTurnInputItems,
   buildCodexTurnStartRequest,
+  buildCodexTurnSteerRequest,
   parseCodexThreadListResponse,
   parseCodexSkillsListResponse,
   parseCodexThreadSessionResponse,
@@ -481,6 +482,58 @@ describe("buildCodexTurnStartRequest", () => {
           text: "Explain the repo",
         },
       ],
+    });
+  });
+
+  it("includes client user message id when the caller supplies one", () => {
+    expect(
+      buildCodexTurnStartRequest({
+        threadId: "thread_123",
+        clientUserMessageId: "user_client_1",
+        input: [
+          {
+            type: "text",
+            text: "Explain the repo",
+          },
+        ],
+      }),
+    ).toEqual({
+      threadId: "thread_123",
+      clientUserMessageId: "user_client_1",
+      input: [
+        {
+          type: "text",
+          text: "Explain the repo",
+        },
+      ],
+    });
+  });
+});
+
+describe("buildCodexTurnSteerRequest", () => {
+  it("includes the expected turn and client user message id", () => {
+    expect(
+      buildCodexTurnSteerRequest({
+        threadId: "thread_123",
+        turnId: "turn_123",
+        clientUserMessageId: "steer:client_1",
+        input: [
+          {
+            type: "text",
+            text: "Focus on the reducer",
+          },
+        ],
+      }),
+    ).toEqual({
+      threadId: "thread_123",
+      clientUserMessageId: "steer:client_1",
+      input: [
+        {
+          type: "text",
+          text: "Focus on the reducer",
+        },
+      ],
+      expectedTurnId: "turn_123",
     });
   });
 });

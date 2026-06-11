@@ -379,6 +379,7 @@ export function parseCodexThreadSessionResponse(input: {
 
 type CodexTurnStartRequest = {
   threadId: string;
+  clientUserMessageId?: string;
   input: readonly CodexTurnInputItem[];
   cwd?: string;
   collaborationMode?: {
@@ -389,6 +390,13 @@ type CodexTurnStartRequest = {
       developer_instructions: string | null;
     };
   };
+};
+
+type CodexTurnSteerRequest = {
+  threadId: string;
+  clientUserMessageId?: string;
+  input: readonly CodexTurnInputItem[];
+  expectedTurnId: string;
 };
 
 export function buildCodexTurnInputItems(input: {
@@ -531,6 +539,7 @@ function buildCodexSkillMentionBySourcePath(
 
 export function buildCodexTurnStartRequest(input: {
   threadId: string;
+  clientUserMessageId?: string;
   input: readonly CodexTurnInputItem[];
   cwd?: string;
   collaborationMode?: CodexTurnCollaborationModeKind | undefined;
@@ -538,6 +547,9 @@ export function buildCodexTurnStartRequest(input: {
 }): CodexTurnStartRequest {
   return {
     threadId: input.threadId,
+    ...(input.clientUserMessageId === undefined
+      ? {}
+      : { clientUserMessageId: input.clientUserMessageId }),
     input: input.input,
     ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
     ...(input.collaborationModeSettings === undefined
@@ -552,6 +564,22 @@ export function buildCodexTurnStartRequest(input: {
             },
           },
         }),
+  };
+}
+
+export function buildCodexTurnSteerRequest(input: {
+  threadId: string;
+  turnId: string;
+  clientUserMessageId?: string;
+  input: readonly CodexTurnInputItem[];
+}): CodexTurnSteerRequest {
+  return {
+    threadId: input.threadId,
+    ...(input.clientUserMessageId === undefined
+      ? {}
+      : { clientUserMessageId: input.clientUserMessageId }),
+    input: input.input,
+    expectedTurnId: input.turnId,
   };
 }
 
@@ -585,6 +613,7 @@ export async function startCodexThread(input: {
 export async function startCodexTurn(input: {
   rpcClient: CodexJsonRpcClient;
   threadId: string;
+  clientUserMessageId?: string;
   input: readonly CodexTurnInputItem[];
   cwd?: string;
   collaborationMode?: CodexTurnCollaborationModeKind | undefined;
@@ -660,13 +689,10 @@ export async function steerCodexTurn(input: {
   rpcClient: CodexJsonRpcClient;
   threadId: string;
   turnId: string;
+  clientUserMessageId?: string;
   input: readonly CodexTurnInputItem[];
 }): Promise<{ turnId: string; response: unknown }> {
-  const response = await input.rpcClient.call("turn/steer", {
-    threadId: input.threadId,
-    input: input.input,
-    expectedTurnId: input.turnId,
-  });
+  const response = await input.rpcClient.call("turn/steer", buildCodexTurnSteerRequest(input));
 
   const parsedResponse = TurnSteerResponseSchema.safeParse(response);
   if (!parsedResponse.success) {

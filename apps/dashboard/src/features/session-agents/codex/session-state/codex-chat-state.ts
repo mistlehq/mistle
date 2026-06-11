@@ -75,6 +75,7 @@ const ItemLifecycleNotificationSchema = z.object({
 const ThreadReadUserMessageItemSchema = z.object({
   type: z.literal("userMessage"),
   id: z.string().min(1),
+  clientId: z.string().min(1).nullable().optional(),
   content: z.array(
     z.looseObject({
       type: z.string().optional(),
@@ -149,6 +150,7 @@ export type CodexChatAction =
       status: string;
       prompt: string;
       attachments?: readonly ChatAttachment[];
+      entryId?: string;
     }
   | {
       type: "steer_turn_requested";
@@ -744,6 +746,27 @@ function isAfterAssistantTextSteerEntry(
   return steerEntry.anchor.kind === "after-assistant-text";
 }
 
+function chatAttachmentsEqual(
+  left: readonly ChatAttachment[] | undefined,
+  right: readonly ChatAttachment[] | undefined,
+): boolean {
+  const normalizedLeft = left ?? [];
+  const normalizedRight = right ?? [];
+  if (normalizedLeft.length !== normalizedRight.length) {
+    return false;
+  }
+
+  return normalizedLeft.every((leftAttachment, index) => {
+    const rightAttachment = normalizedRight[index];
+    return (
+      rightAttachment !== undefined &&
+      leftAttachment.kind === rightAttachment.kind &&
+      leftAttachment.path === rightAttachment.path &&
+      leftAttachment.name === rightAttachment.name
+    );
+  });
+}
+
 function appendProjectedItems(
   entries: ChatEntry[],
   input: {
@@ -1071,6 +1094,37 @@ function buildUserEntry(
   };
 }
 
+type ParsedUserMessageItem = {
+  id: string;
+  clientId: string | null;
+  text: string;
+  attachments: readonly ChatAttachment[];
+};
+
+function parseUserMessageItem(item: unknown): ParsedUserMessageItem | null {
+  const parsedUserMessage = ThreadReadUserMessageItemSchema.safeParse(item);
+  if (!parsedUserMessage.success) {
+    return null;
+  }
+
+  return {
+    id: parsedUserMessage.data.id,
+    clientId: parsedUserMessage.data.clientId ?? null,
+    text: parsedUserMessage.data.content.map((contentItem) => contentItem.text ?? "").join(""),
+    attachments: parsedUserMessage.data.content.flatMap((contentItem) => {
+      if (contentItem.type !== "localImage" || contentItem.path === undefined) {
+        return [];
+      }
+
+      return [normalizeCodexLocalImageAttachment({ path: contentItem.path })];
+    }),
+  };
+}
+
+function buildUserEntryFromParsedItem(turnId: string, item: ParsedUserMessageItem): ChatUserEntry {
+  return buildUserEntry(turnId, item.text, item.attachments, item.id);
+}
+
 function clearEntrySteerPresentation(entry: ChatUserEntry): ChatUserEntry {
   const { label: _label, labelAction: _labelAction, ...nextEntry } = entry;
   return nextEntry;
@@ -1118,6 +1172,164 @@ function mergeRawItem(existing: unknown, incoming: unknown): unknown {
     ...existing,
     ...incoming,
   };
+}
+
+function isSameUserEntry(entry: ChatUserEntry, candidate: ChatUserEntry): boolean {
+  return (
+    entry.id === candidate.id &&
+    entry.text === candidate.text &&
+    chatAttachmentsEqual(entry.attachments, candidate.attachments)
+  );
+}
+
+function isLocalSteerClientId(clientId: string | null): boolean {
+  return clientId !== null && clientId.startsWith("steer:");
+}
+
+function shouldReplacePrimaryUserEntry(input: {
+  turn: CodexRawTurnState;
+  item: ParsedUserMessageItem;
+}): boolean {
+  if (isLocalSteerClientId(input.item.clientId)) {
+    return false;
+  }
+
+  const userEntry = input.turn.userEntry;
+  if (userEntry === null) {
+    return true;
+  }
+
+  if (userEntry.id === input.item.id) {
+    return true;
+  }
+
+  if (input.item.clientId !== null && userEntry.id === input.item.clientId) {
+    return true;
+  }
+
+  return false;
+}
+
+function upsertServerSteerEntry(input: {
+  turn: CodexRawTurnState;
+  entry: ChatUserEntry;
+  clientId: string | null;
+}): readonly ClientSteerEntry[] {
+  let matchedExistingEntry = false;
+  let changedExistingEntry = false;
+  const nextSteerEntries = input.turn.clientSteerEntries.map((steerEntry) => {
+    if (
+      steerEntry.entry.id !== input.entry.id &&
+      (input.clientId === null || steerEntry.entry.id !== input.clientId)
+    ) {
+      return steerEntry;
+    }
+
+    matchedExistingEntry = true;
+    if (steerEntry.requestState === "accepted" && isSameUserEntry(steerEntry.entry, input.entry)) {
+      return steerEntry;
+    }
+
+    changedExistingEntry = true;
+    const acceptedSteerEntry: ClientSteerEntry = {
+      ...steerEntry,
+      entry: input.entry,
+      requestState: "accepted",
+    };
+    return acceptedSteerEntry;
+  });
+
+  if (matchedExistingEntry) {
+    return changedExistingEntry ? nextSteerEntries : input.turn.clientSteerEntries;
+  }
+
+  return [
+    ...nextSteerEntries,
+    {
+      entry: input.entry,
+      requestState: "accepted",
+      anchor: getCurrentTurnSteerAnchor(input.turn),
+    },
+  ];
+}
+
+function upsertUserMessageLifecycleItem(
+  state: CodexChatState,
+  input: {
+    turnId: string;
+    item: ParsedUserMessageItem;
+  },
+): CodexChatState {
+  const ensured = ensureTurn(state.turnsById, state.turnOrder, input.turnId);
+  const turn = ensured.turnsById[input.turnId] ?? createTurnState(input.turnId);
+  const entry = buildUserEntryFromParsedItem(input.turnId, input.item);
+
+  if (shouldReplacePrimaryUserEntry({ turn, item: input.item })) {
+    if (turn.userEntry !== null && isSameUserEntry(turn.userEntry, entry)) {
+      return state;
+    }
+
+    return buildState({
+      pendingTurnId: state.pendingTurnId,
+      turnOrder: ensured.turnOrder,
+      turnsById: {
+        ...ensured.turnsById,
+        [input.turnId]: {
+          ...turn,
+          userEntry: entry,
+        },
+      },
+    });
+  }
+
+  const nextSteerEntries = upsertServerSteerEntry({
+    turn,
+    entry,
+    clientId: input.item.clientId,
+  });
+  if (nextSteerEntries === turn.clientSteerEntries) {
+    return state;
+  }
+
+  return buildState({
+    pendingTurnId: state.pendingTurnId,
+    turnOrder: ensured.turnOrder,
+    turnsById: {
+      ...ensured.turnsById,
+      [input.turnId]: {
+        ...turn,
+        clientSteerEntries: nextSteerEntries,
+      },
+    },
+  });
+}
+
+type HydratedServerSteerEntry = {
+  clientId: string | null;
+  steerEntry: ClientSteerEntry;
+};
+
+function mergeHydratedSteerEntries(input: {
+  existingSteerEntries: readonly ClientSteerEntry[];
+  serverSteerEntries: readonly HydratedServerSteerEntry[];
+}): readonly ClientSteerEntry[] {
+  const serverEntryIds = new Set(
+    input.serverSteerEntries.map((serverSteerEntry) => serverSteerEntry.steerEntry.entry.id),
+  );
+  const serverClientIds = new Set(
+    input.serverSteerEntries.flatMap((serverSteerEntry) =>
+      serverSteerEntry.clientId === null ? [] : [serverSteerEntry.clientId],
+    ),
+  );
+  const localOnlySteerEntries = input.existingSteerEntries.filter(
+    (steerEntry) =>
+      !serverEntryIds.has(steerEntry.entry.id) && !serverClientIds.has(steerEntry.entry.id),
+  );
+
+  return [
+    ...input.serverSteerEntries.map((serverSteerEntry) => serverSteerEntry.steerEntry),
+    ...localOnlySteerEntries,
+  ];
 }
 
 function updateRawItemTextField(
@@ -1190,12 +1402,20 @@ function upsertLifecycleItem(
     throw new Error(`Lifecycle item is missing id or type. Payload: ${JSON.stringify(input.item)}`);
   }
 
-  const ensured = ensureTurn(state.turnsById, state.turnOrder, input.turnId);
-  const turn = ensured.turnsById[input.turnId] ?? createTurnState(input.turnId);
   if (itemType === "userMessage") {
-    return state;
+    const userMessageItem = parseUserMessageItem(input.item);
+    if (userMessageItem === null) {
+      return state;
+    }
+
+    return upsertUserMessageLifecycleItem(state, {
+      turnId: input.turnId,
+      item: userMessageItem,
+    });
   }
 
+  const ensured = ensureTurn(state.turnsById, state.turnOrder, input.turnId);
+  const turn = ensured.turnsById[input.turnId] ?? createTurnState(input.turnId);
   const lifecycleItem = !("status" in input.item)
     ? {
         ...input.item,
@@ -1234,26 +1454,31 @@ function reconcileHydratedTurns(
 
     const existingTurn = state.turnsById[turn.id] ?? null;
     let serverUserEntry: ChatUserEntry | null = null;
+    const serverSteerEntries: HydratedServerSteerEntry[] = [];
     const serverItemOrder: string[] = [];
     const serverRawItemsById: Record<string, unknown> = {};
+    let previousServerRawItemId: string | null = null;
 
     for (const item of turn.items) {
-      const parsedUserMessage = ThreadReadUserMessageItemSchema.safeParse(item);
-      if (parsedUserMessage.success) {
-        serverUserEntry = buildUserEntry(
-          turn.id,
-          parsedUserMessage.data.content.map((contentItem) => contentItem.text ?? "").join(""),
-          parsedUserMessage.data.content.flatMap((contentItem) => {
-            // Hydration only reconstructs attachments from structured localImage
-            // items. Plain text remains plain text, even if it mentions paths.
-            if (contentItem.type !== "localImage" || contentItem.path === undefined) {
-              return [];
-            }
+      const parsedUserMessage = parseUserMessageItem(item);
+      if (parsedUserMessage !== null) {
+        const userEntry = buildUserEntryFromParsedItem(turn.id, parsedUserMessage);
+        if (serverUserEntry === null && !isLocalSteerClientId(parsedUserMessage.clientId)) {
+          serverUserEntry = userEntry;
+          continue;
+        }
 
-            return [normalizeCodexLocalImageAttachment({ path: contentItem.path })];
-          }),
-          parsedUserMessage.data.id,
-        );
+        serverSteerEntries.push({
+          clientId: parsedUserMessage.clientId,
+          steerEntry: {
+            entry: userEntry,
+            requestState: "accepted",
+            anchor:
+              previousServerRawItemId === null
+                ? { kind: "turn-start" }
+                : { kind: "after-item", itemId: previousServerRawItemId },
+          },
+        });
         continue;
       }
 
@@ -1268,6 +1493,7 @@ function reconcileHydratedTurns(
 
       serverItemOrder.push(itemId);
       serverRawItemsById[itemId] = item;
+      previousServerRawItemId = itemId;
     }
 
     const existingItemOrder = existingTurn?.itemOrder ?? [];
@@ -1295,7 +1521,10 @@ function reconcileHydratedTurns(
       completedErrorMessage: existingTurn?.completedErrorMessage ?? null,
       planSnapshot: existingTurn?.planSnapshot ?? null,
       userEntry: serverUserEntry ?? existingTurn?.userEntry ?? null,
-      clientSteerEntries: existingTurn?.clientSteerEntries ?? [],
+      clientSteerEntries: mergeHydratedSteerEntries({
+        existingSteerEntries: existingTurn?.clientSteerEntries ?? [],
+        serverSteerEntries,
+      }),
       itemOrder: nextItemOrder,
       rawItemsById: nextRawItemsById,
     };
@@ -1347,6 +1576,13 @@ export function reduceCodexChatState(
       }
     }
 
+    const existingUserEntry = existingTurn.userEntry;
+    const nextUserEntry =
+      existingUserEntry !== null &&
+      (action.entryId === undefined || existingUserEntry.id !== action.entryId)
+        ? existingUserEntry
+        : buildUserEntry(action.turnId, action.prompt, action.attachments ?? [], action.entryId);
+
     nextTurnsById[action.turnId] = {
       ...existingTurn,
       id: action.turnId,
@@ -1354,7 +1590,7 @@ export function reduceCodexChatState(
       completedStatus: null,
       completedErrorMessage: null,
       planSnapshot: existingTurn.planSnapshot,
-      userEntry: buildUserEntry(action.turnId, action.prompt, action.attachments ?? []),
+      userEntry: nextUserEntry,
       clientSteerEntries: existingTurn.clientSteerEntries,
       itemOrder: existingTurn.itemOrder,
       rawItemsById: existingTurn.rawItemsById,
