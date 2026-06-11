@@ -16,6 +16,10 @@ export const CodexRuntimeDefinition: AgentRuntimeDefinition<typeof CodexRuntimeC
     associatedResourceDelivery: {
       supported: true,
     },
+    conversationDelivery: {
+      idempotencyFingerprintRuntimeKey: "codex",
+      createConversationRetryPolicy: "idempotent",
+    },
   },
   composerCapabilities: CodexComposerCapabilities,
   compileRuntime: compileCodexRuntime,

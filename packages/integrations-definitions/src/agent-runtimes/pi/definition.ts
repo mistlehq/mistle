@@ -12,6 +12,10 @@ export const PiRuntimeDefinition: AgentRuntimeDefinition<typeof PiRuntimeConfigS
     associatedResourceDelivery: {
       supported: true,
     },
+    conversationDelivery: {
+      idempotencyFingerprintRuntimeKey: "pi",
+      createConversationRetryPolicy: "idempotent",
+    },
   },
   compileRuntime: compilePiRuntime,
 };

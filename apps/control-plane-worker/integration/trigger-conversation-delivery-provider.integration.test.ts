@@ -15,6 +15,7 @@ import {
   TriggerRunStatuses,
   IntegrationConnectionStatuses,
 } from "@mistle/db/control-plane";
+import { createDefinitionsBundle } from "@mistle/integrations-definitions/server";
 import {
   createIntegrationTest,
   TestEnvironmentIdHeader,
@@ -123,6 +124,7 @@ describe.concurrent("control-plane worker conversation delivery provider boundar
         async () =>
           await deliverConversationTriggerPayload(
             {
+              agentRuntimeRegistry: createDefinitionsBundle().agentRuntimeRegistry,
               controlPlaneInternalClient: createControlPlaneInternalClient(env),
               db: env.controlPlaneDb,
               dataPlaneClient: createDataPlaneClient(env),

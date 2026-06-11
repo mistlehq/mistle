@@ -178,8 +178,16 @@ export type AgentRuntimeAssociatedResourceDeliveryCapability = {
   supported: true;
 };
 
+export type AgentRuntimeCreateConversationRetryPolicy = "idempotent" | "single_attempt";
+
+export type AgentRuntimeConversationDeliveryCapability = {
+  idempotencyFingerprintRuntimeKey: string;
+  createConversationRetryPolicy: AgentRuntimeCreateConversationRetryPolicy;
+};
+
 export type AgentRuntimeCapabilities = {
   associatedResourceDelivery?: AgentRuntimeAssociatedResourceDeliveryCapability;
+  conversationDelivery?: AgentRuntimeConversationDeliveryCapability;
 };
 
 export type CompileAgentRuntimeResult =

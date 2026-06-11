@@ -1,3 +1,4 @@
+import type { AgentRuntimeConversationDeliveryCapability } from "@mistle/integrations-core";
 import { HandleTriggerConversationDeliveryWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import { shouldRethrowDurableStepErrorForRetry } from "@mistle/workflow-registry/durable-step-retry.js";
 
@@ -25,6 +26,7 @@ import {
   createConversationIdempotencyMetadata,
   submitPayloadIdempotencyMetadata,
 } from "./delivery-idempotency.js";
+import { resolveAgentRuntimeConversationDeliveryPolicy } from "./delivery-policy.js";
 import { ensureConversationDeliverySandbox } from "./ensure-conversation-delivery-sandbox.js";
 import {
   createConversationProviderDeliveryConversation,
@@ -71,14 +73,12 @@ const IdempotentProviderDeliveryStepRetryPolicy = {
 } as const;
 
 function resolveProviderCreateConversationRetryPolicy(input: {
-  runtimeId: string;
+  conversationDeliveryPolicy: AgentRuntimeConversationDeliveryCapability;
 }): typeof IdempotentProviderDeliveryStepRetryPolicy | typeof SingleAttemptDeliveryStepRetryPolicy {
-  switch (input.runtimeId) {
-    case "codex":
-    case "pi":
-    case "opencode":
+  switch (input.conversationDeliveryPolicy.createConversationRetryPolicy) {
+    case "idempotent":
       return IdempotentProviderDeliveryStepRetryPolicy;
-    default:
+    case "single_attempt":
       return SingleAttemptDeliveryStepRetryPolicy;
   }
 }
@@ -86,7 +86,8 @@ function resolveProviderCreateConversationRetryPolicy(input: {
 export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlaneWorkflow(
   HandleTriggerConversationDeliveryWorkflowSpec,
   async ({ input, run, step }) => {
-    const { controlPlaneInternalClient, dataPlaneClient, db } = await getWorkflowContext();
+    const { agentRuntimeRegistry, controlPlaneInternalClient, dataPlaneClient, db } =
+      await getWorkflowContext();
     const workflowRunId = run.id;
 
     let iteration = 0;
@@ -283,6 +284,14 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
               },
             ),
         );
+        const conversationDeliveryPolicy = resolveAgentRuntimeConversationDeliveryPolicy(
+          {
+            agentRuntimeRegistry,
+          },
+          {
+            runtimeId: resolvedTriggerConversationRoute.runtimeId,
+          },
+        );
 
         const ensuredTriggerSandbox = await step.run(
           {
@@ -366,6 +375,7 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
             taskId: activeTask.taskId,
             preparedTriggerRun,
             resolvedTriggerConversationRoute,
+            conversationDeliveryPolicy,
             ensuredTriggerSandbox,
             acquiredTriggerConnection,
             activeRoute: loadedRoute.activeRoute,
@@ -379,7 +389,7 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
               taskId: activeTask.taskId,
             }),
             retryPolicy: resolveProviderCreateConversationRetryPolicy({
-              runtimeId: resolvedTriggerConversationRoute.runtimeId,
+              conversationDeliveryPolicy,
             }),
           },
           async () =>

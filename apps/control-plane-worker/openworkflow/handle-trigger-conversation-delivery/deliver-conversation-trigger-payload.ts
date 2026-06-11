@@ -4,6 +4,10 @@ import {
   TriggerConversationDeliveryTaskStatuses,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
+import type {
+  AgentRuntimeConversationDeliveryCapability,
+  AgentRuntimeReader,
+} from "@mistle/integrations-core";
 
 import { activateTriggerConversationRoute } from "../shared/activate-conversation-route.js";
 import { createTriggerConversationRoute } from "../shared/create-conversation-route.js";
@@ -18,6 +22,7 @@ import {
   TriggerConversationRouteBindingActions,
   resolveTriggerConversationRouteBindingAction,
 } from "./conversation-delivery-planning.js";
+import { resolveAgentRuntimeConversationDeliveryPolicy } from "./delivery-policy.js";
 import { executeConversationProviderDelivery } from "./execute-conversation-provider-delivery.js";
 import { seedSandboxInstanceTitle } from "./seed-sandbox-instance-title.js";
 import {
@@ -159,6 +164,7 @@ export function createConversationProviderDeliveryInput(input: {
   taskId: string;
   preparedTriggerRun: PreparedTriggerRun;
   resolvedTriggerConversationRoute: ResolvedTriggerConversationDeliveryRoute;
+  conversationDeliveryPolicy: AgentRuntimeConversationDeliveryCapability;
   ensuredTriggerSandbox: EnsuredTriggerSandbox;
   acquiredTriggerConnection: AcquiredTriggerConnection;
   activeRoute: TriggerConversationDeliveryRoute;
@@ -166,6 +172,7 @@ export function createConversationProviderDeliveryInput(input: {
   return {
     conversationId: input.preparedTriggerRun.conversationId,
     runtimeId: input.resolvedTriggerConversationRoute.runtimeId,
+    conversationDeliveryPolicy: input.conversationDeliveryPolicy,
     connectionUrl: input.acquiredTriggerConnection.url,
     inputText: input.preparedTriggerRun.renderedInput,
     workingDirectory: input.preparedTriggerRun.workingDirectory,
@@ -336,6 +343,7 @@ export async function seedDeliveredSandboxInstanceTitle(
 
 export async function deliverConversationTriggerPayload(
   ctx: {
+    agentRuntimeRegistry: AgentRuntimeReader;
     controlPlaneInternalClient: Pick<ControlPlaneInternalClient, "mintSandboxConnectionToken">;
     db: ControlPlaneDatabase;
     dataPlaneClient: Pick<
@@ -353,37 +361,7 @@ export async function deliverConversationTriggerPayload(
     workflowRunId: string;
   },
 ): Promise<void> {
-  const task = await ctx.db.query.triggerConversationDeliveryTasks.findFirst({
-    where: (table, { eq }) => eq(table.id, input.taskId),
-  });
-  if (task === undefined) {
-    throw new TriggerConversationPersistenceError({
-      code: TriggerConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_NOT_FOUND,
-      message: `TriggerConversation delivery task '${input.taskId}' was not found.`,
-    });
-  }
-
-  if (task.processorGeneration !== input.generation) {
-    throw new TriggerConversationPersistenceError({
-      code: TriggerConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_NOT_ACTIVE,
-      message: `TriggerConversation delivery task '${input.taskId}' is not active for generation '${input.generation}'.`,
-    });
-  }
-
-  if (task.status === TriggerConversationDeliveryTaskStatuses.DELIVERING) {
-    throw new Error(
-      `TriggerConversation delivery task '${input.taskId}' resumed after delivery started.`,
-    );
-  }
-
-  if (task.status !== TriggerConversationDeliveryTaskStatuses.CLAIMED) {
-    throw new TriggerConversationPersistenceError({
-      code: TriggerConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_NOT_CLAIMED,
-      message: `TriggerConversation delivery task '${input.taskId}' is not claimed by generation '${input.generation}'.`,
-    });
-  }
-
-  await markTriggerConversationDeliveryTaskDelivering(
+  await beginConversationTriggerPayloadDelivery(
     {
       db: ctx.db,
     },
@@ -393,61 +371,26 @@ export async function deliverConversationTriggerPayload(
     },
   );
 
-  const persistedRouteId = input.resolvedTriggerConversationRoute.routeId;
-  let route: Awaited<ReturnType<typeof createTriggerConversationRoute>> | undefined;
-  if (persistedRouteId === null) {
-    route = await createTriggerConversationRoute(
-      {
-        db: ctx.db,
-      },
-      {
-        conversationId: input.preparedTriggerRun.conversationId,
-        sandboxInstanceId: input.ensuredTriggerSandbox.sandboxInstanceId,
-      },
-    );
-  } else {
-    route = await ctx.db.query.triggerConversationRoutes.findFirst({
-      where: (table, { eq }) => eq(table.id, persistedRouteId),
-    });
-  }
-
-  if (route === undefined) {
-    throw new TriggerConversationPersistenceError({
-      code: TriggerConversationPersistenceErrorCodes.CONVERSATION_ROUTE_NOT_FOUND,
-      message: `TriggerConversation route for conversation '${input.preparedTriggerRun.conversationId}' was not found.`,
-    });
-  }
-  const activeRoute = route;
-
-  const routeBindingAction = resolveTriggerConversationRouteBindingAction({
-    routeId: activeRoute.id,
-    routeSandboxInstanceId: activeRoute.sandboxInstanceId,
-    providerConversationId: activeRoute.providerConversationId,
-    ensuredSandboxInstanceId: input.ensuredTriggerSandbox.sandboxInstanceId,
-  });
-
-  if (routeBindingAction === TriggerConversationRouteBindingActions.FAIL_SANDBOX_MISMATCH) {
-    throw new Error(
-      `TriggerConversation '${input.preparedTriggerRun.conversationId}' is bound to sandbox '${activeRoute.sandboxInstanceId}', but delivery acquired sandbox '${input.ensuredTriggerSandbox.sandboxInstanceId}'.`,
-    );
-  }
-
-  logTriggerConversationDeliveryEvent({
-    eventName: "delivery_task.delivering",
-    message: "Delivering trigger conversation payload",
-    telemetryContext: {
-      triggerRunId: input.preparedTriggerRun.triggerRunId,
-      conversationId: input.preparedTriggerRun.conversationId,
-      deliveryTaskId: input.taskId,
-      routeId: activeRoute.id,
-      sandboxInstanceId: input.ensuredTriggerSandbox.sandboxInstanceId,
-      webhookEventId: input.preparedTriggerRun.webhookEventId,
+  const { activeRoute, routeBindingAction } = await loadOrCreateTriggerConversationDeliveryRoute(
+    {
+      db: ctx.db,
+    },
+    {
+      taskId: input.taskId,
+      preparedTriggerRun: input.preparedTriggerRun,
+      resolvedTriggerConversationRoute: input.resolvedTriggerConversationRoute,
+      ensuredTriggerSandbox: input.ensuredTriggerSandbox,
       workflowRunId: input.workflowRunId,
     },
-    attributes: {
-      "mistle.route.binding_action": routeBindingAction,
+  );
+  const conversationDeliveryPolicy = resolveAgentRuntimeConversationDeliveryPolicy(
+    {
+      agentRuntimeRegistry: ctx.agentRuntimeRegistry,
     },
-  });
+    {
+      runtimeId: input.resolvedTriggerConversationRoute.runtimeId,
+    },
+  );
 
   const deliveryResult = await withTriggerConversationDeliverySpan(
     {
@@ -466,44 +409,17 @@ export async function deliverConversationTriggerPayload(
       span.setAttribute("mistle.route.binding_action", routeBindingAction);
 
       const deliveryStartedAt = Date.now();
-      const result = await executeConversationProviderDelivery({
-        conversationId: input.preparedTriggerRun.conversationId,
-        runtimeId: input.resolvedTriggerConversationRoute.runtimeId,
-        connectionUrl: input.acquiredTriggerConnection.url,
-        inputText: input.preparedTriggerRun.renderedInput,
-        workingDirectory: input.preparedTriggerRun.workingDirectory,
-        deliveryContext: {
-          source: input.preparedTriggerRun.sourceKind,
-          ...(input.preparedTriggerRun.sourceWebhookEventId === undefined
-            ? {}
-            : { webhookEventId: input.preparedTriggerRun.sourceWebhookEventId }),
-          ...(input.preparedTriggerRun.sourceScheduledActionId === undefined
-            ? {}
-            : { scheduledActionId: input.preparedTriggerRun.sourceScheduledActionId }),
-          deliveryTaskId: input.taskId,
-          ...(input.preparedTriggerRun.webhookExternalDeliveryId === null ||
-          input.preparedTriggerRun.webhookExternalDeliveryId === undefined
-            ? {}
-            : {
-                externalDeliveryId: input.preparedTriggerRun.webhookExternalDeliveryId,
-              }),
-          triggerRunId: input.preparedTriggerRun.triggerRunId,
-          conversationId: input.preparedTriggerRun.conversationId,
-          sandboxInstanceId: input.ensuredTriggerSandbox.sandboxInstanceId,
-          routeId: activeRoute.id,
-        },
-        ...(input.preparedTriggerRun.instructions === null ||
-        input.preparedTriggerRun.collaborationModeSettings === null
-          ? {}
-          : {
-              collaborationModeSettings: {
-                developerInstructions:
-                  input.preparedTriggerRun.collaborationModeSettings.developerInstructions,
-              },
-            }),
-        providerConversationId: activeRoute.providerConversationId,
-        providerExecutionId: activeRoute.providerExecutionId,
-      });
+      const result = await executeConversationProviderDelivery(
+        createConversationProviderDeliveryInput({
+          taskId: input.taskId,
+          preparedTriggerRun: input.preparedTriggerRun,
+          resolvedTriggerConversationRoute: input.resolvedTriggerConversationRoute,
+          conversationDeliveryPolicy,
+          ensuredTriggerSandbox: input.ensuredTriggerSandbox,
+          acquiredTriggerConnection: input.acquiredTriggerConnection,
+          activeRoute,
+        }),
+      );
       const deliveryDurationMs = Date.now() - deliveryStartedAt;
 
       span.setAttributes({
@@ -518,97 +434,28 @@ export async function deliverConversationTriggerPayload(
     },
   );
 
-  if (
-    activeRoute.providerConversationId !== null &&
-    deliveryResult.providerConversationId !== activeRoute.providerConversationId
-  ) {
-    throw new Error(
-      `TriggerConversation '${input.preparedTriggerRun.conversationId}' changed provider conversation from '${activeRoute.providerConversationId}' to '${deliveryResult.providerConversationId}' during delivery.`,
-    );
-  }
-
-  if (routeBindingAction !== TriggerConversationRouteBindingActions.REUSE_ACTIVE_ROUTE) {
-    route = await activateTriggerConversationRoute(
-      {
-        db: ctx.db,
-      },
-      {
-        conversationId: input.preparedTriggerRun.conversationId,
-        routeId: activeRoute.id,
-        sandboxInstanceId: input.ensuredTriggerSandbox.sandboxInstanceId,
-        providerConversationId: deliveryResult.providerConversationId,
-        providerState: deliveryResult.providerState,
-      },
-    );
-  }
-
-  await updateTriggerConversationExecution(
+  await persistConversationProviderDeliveryResult(
     {
       db: ctx.db,
     },
     {
-      routeId: activeRoute.id,
-      providerExecutionId: deliveryResult.providerExecutionId,
-      providerState: deliveryResult.providerState,
+      preparedTriggerRun: input.preparedTriggerRun,
+      ensuredTriggerSandbox: input.ensuredTriggerSandbox,
+      activeRoute,
+      routeBindingAction,
+      deliveryResult,
     },
   );
 
-  try {
-    const titleSeedResult = await seedSandboxInstanceTitle(
-      {
-        dataPlaneClient: ctx.dataPlaneClient,
-      },
-      {
-        organizationId: input.preparedTriggerRun.organizationId,
-        sandboxInstanceId: input.ensuredTriggerSandbox.sandboxInstanceId,
-        runtimeId: input.resolvedTriggerConversationRoute.runtimeId,
-        getConnectionUrl: async () =>
-          await mintSandboxTitleConnectionUrl(ctx, {
-            preparedTriggerRun: input.preparedTriggerRun,
-            sandboxInstanceId: input.ensuredTriggerSandbox.sandboxInstanceId,
-            deliveryTaskId: input.taskId,
-            workflowRunId: input.workflowRunId,
-          }),
-        providerConversationId: deliveryResult.providerConversationId,
-        providerState: deliveryResult.providerState,
-        inputText: input.preparedTriggerRun.renderedInput,
-      },
-    );
-    if (titleSeedResult === "unsupported") {
-      logTriggerConversationDeliveryEvent({
-        eventName: "sandbox_title.generation_unsupported",
-        message: "Trigger sandbox title generation skipped because runtime has no title capability",
-        telemetryContext: {
-          triggerRunId: input.preparedTriggerRun.triggerRunId,
-          conversationId: input.preparedTriggerRun.conversationId,
-          deliveryTaskId: input.taskId,
-          routeId: activeRoute.id,
-          sandboxInstanceId: input.ensuredTriggerSandbox.sandboxInstanceId,
-          webhookEventId: input.preparedTriggerRun.webhookEventId,
-          workflowRunId: input.workflowRunId,
-        },
-        attributes: {
-          "mistle.runtime.id": input.resolvedTriggerConversationRoute.runtimeId,
-        },
-      });
-    }
-  } catch (error) {
-    logTriggerConversationDeliveryEvent({
-      eventName: "sandbox_title.seed_failed",
-      message: "Failed to seed trigger sandbox title after delivery",
-      level: "warn",
-      err: error,
-      telemetryContext: {
-        triggerRunId: input.preparedTriggerRun.triggerRunId,
-        conversationId: input.preparedTriggerRun.conversationId,
-        deliveryTaskId: input.taskId,
-        routeId: activeRoute.id,
-        sandboxInstanceId: input.ensuredTriggerSandbox.sandboxInstanceId,
-        webhookEventId: input.preparedTriggerRun.webhookEventId,
-        workflowRunId: input.workflowRunId,
-      },
-    });
-  }
+  await seedDeliveredSandboxInstanceTitle(ctx, {
+    taskId: input.taskId,
+    preparedTriggerRun: input.preparedTriggerRun,
+    resolvedTriggerConversationRoute: input.resolvedTriggerConversationRoute,
+    ensuredTriggerSandbox: input.ensuredTriggerSandbox,
+    activeRoute,
+    deliveryResult,
+    workflowRunId: input.workflowRunId,
+  });
 }
 
 async function mintSandboxTitleConnectionUrl(

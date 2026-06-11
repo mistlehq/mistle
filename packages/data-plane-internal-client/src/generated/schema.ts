@@ -252,6 +252,11 @@ export interface paths {
                     /** @enum {boolean} */
                     supported: true;
                   };
+                  conversationDelivery?: {
+                    /** @enum {string} */
+                    createConversationRetryPolicy: "idempotent" | "single_attempt";
+                    idempotencyFingerprintRuntimeKey: string;
+                  };
                 };
                 clientId: string;
                 endpointKey: string;
@@ -748,6 +753,11 @@ export interface paths {
                     associatedResourceDelivery?: {
                       /** @enum {boolean} */
                       supported: true;
+                    };
+                    conversationDelivery?: {
+                      /** @enum {string} */
+                      createConversationRetryPolicy: "idempotent" | "single_attempt";
+                      idempotencyFingerprintRuntimeKey: string;
                     };
                   };
                   clientId: string;

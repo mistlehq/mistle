@@ -2925,6 +2925,24 @@
                                     },
                                     "required": ["supported"],
                                     "additionalProperties": false
+                                  },
+                                  "conversationDelivery": {
+                                    "type": "object",
+                                    "properties": {
+                                      "idempotencyFingerprintRuntimeKey": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "createConversationRetryPolicy": {
+                                        "type": "string",
+                                        "enum": ["idempotent", "single_attempt"]
+                                      }
+                                    },
+                                    "required": [
+                                      "idempotencyFingerprintRuntimeKey",
+                                      "createConversationRetryPolicy"
+                                    ],
+                                    "additionalProperties": false
                                   }
                                 },
                                 "additionalProperties": false

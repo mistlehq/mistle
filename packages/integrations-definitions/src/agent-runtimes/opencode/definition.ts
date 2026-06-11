@@ -16,6 +16,10 @@ export const OpenCodeRuntimeDefinition: AgentRuntimeDefinition<typeof OpenCodeRu
       associatedResourceDelivery: {
         supported: true,
       },
+      conversationDelivery: {
+        idempotencyFingerprintRuntimeKey: "opencode",
+        createConversationRetryPolicy: "idempotent",
+      },
     },
     compileRuntime: compileOpenCodeRuntime,
     materializeMcpConfig: () => [

@@ -9,6 +9,10 @@ import type { ExecuteConversationProviderDeliveryInput } from "./types.js";
 const DeliveryInput: ExecuteConversationProviderDeliveryInput = {
   conversationId: "conversation_123",
   runtimeId: "codex",
+  conversationDeliveryPolicy: {
+    idempotencyFingerprintRuntimeKey: "codex",
+    createConversationRetryPolicy: "idempotent",
+  },
   connectionUrl: "wss://sandbox.example.test/agent",
   inputText: "Handle this webhook",
   workingDirectory: "/workspace/repo",
