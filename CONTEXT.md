@@ -101,7 +101,7 @@ A provider event that can be selected as the event source for a **Trigger**.
 _Avoid_: Webhook event when naming product-facing trigger-builder concepts
 
 **Associated resource event routing**:
-A snapshot-affecting **Sandbox profile version** behavior that selects which provider events on associated **Routable provider resources** should produce **Association deliveries**.
+A **Sandbox profile version** runtime-plan behavior that selects which provider events on associated **Routable provider resources** should produce **Association deliveries**.
 _Avoid_: Trigger when no Trigger conversation is created, hardcoded association routing
 
 **Trigger event parameter**:

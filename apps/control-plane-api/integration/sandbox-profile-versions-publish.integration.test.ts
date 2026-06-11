@@ -12,6 +12,10 @@ import {
   SandboxProfileVersionStates,
   TriggerKinds,
 } from "@mistle/db/control-plane";
+import {
+  AssociatedProviderResourceKinds,
+  AssociatedResourceEventTypes,
+} from "@mistle/integrations-core";
 import { SandboxProvider } from "@mistle/sandbox";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
@@ -404,6 +408,130 @@ describe.concurrent("sandbox profile versions publish integration", () => {
       snapshotImageId: "sha256:publish-reuse-advance-triggers-v1",
     });
     expect(persistedTriggerTarget?.sandboxProfileVersion).toBe(2);
+    expect(persistedSnapshotJobs).toEqual([]);
+  });
+
+  it("reuses the active snapshot when only associated resource event routing changes", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email:
+        "integration-new-sandbox-profile-version-publish-associated-resource-routing@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_version_publish_associated_resource_routing",
+        organizationId: session.organizationId,
+        displayName: "Publish Associated Resource Routing Profile",
+        activeVersion: 1,
+        createdAt: "2026-06-11T02:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+      {
+        ...sandboxProfileVersionRow({
+          sandboxProfileId: "sbp_version_publish_associated_resource_routing",
+          version: 1,
+          state: SandboxProfileVersionStates.PUBLISHED,
+          sandboxProvider: SandboxProvider.DOCKER,
+          publishedAt: "2026-06-11T02:01:00.000Z",
+          associatedResourceEventRoutingConfig: {
+            enabled: true,
+            resources: [
+              {
+                resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+                eventTypes: [
+                  AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+                ],
+              },
+            ],
+          },
+        }),
+        snapshotImageProvider: "docker",
+        snapshotImageId: "sha256:publish-associated-resource-routing-v1",
+      },
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_version_publish_associated_resource_routing",
+        version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+        associatedResourceEventRoutingConfig: {
+          enabled: true,
+          resources: [
+            {
+              resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+              eventTypes: [
+                AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+                AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
+              ],
+            },
+          ],
+        },
+      }),
+    ]);
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_version_publish_associated_resource_routing/versions/2/publish",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    const reusedSnapshot = expectReusedSnapshotAction(responseBody.snapshotAction);
+    expect(reusedSnapshot).toEqual({
+      snapshotImageProvider: "docker",
+      snapshotImageId: "sha256:publish-associated-resource-routing-v1",
+    });
+    expect(responseBody.version).toMatchObject({
+      sandboxProfileId: "sbp_version_publish_associated_resource_routing",
+      version: 2,
+      isActive: true,
+      usable: true,
+      latestSnapshotJob: null,
+      associatedResourceEventRoutingConfig: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+            eventTypes: [
+              AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+              AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
+            ],
+          },
+        ],
+      },
+    });
+
+    const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        snapshotImageProvider: true,
+        snapshotImageId: true,
+      },
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.sandboxProfileId, "sbp_version_publish_associated_resource_routing"),
+          eq(table.version, 2),
+        ),
+    });
+    const persistedSnapshotJobs =
+      await env.controlPlaneDb.query.sandboxProfileVersionSnapshotJobs.findMany({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.sandboxProfileId, "sbp_version_publish_associated_resource_routing"),
+            eq(table.sandboxProfileVersion, 2),
+          ),
+      });
+
+    expect(persistedVersion).toEqual({
+      snapshotImageProvider: "docker",
+      snapshotImageId: "sha256:publish-associated-resource-routing-v1",
+    });
     expect(persistedSnapshotJobs).toEqual([]);
   });
 

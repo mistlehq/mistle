@@ -35,7 +35,7 @@ type ProfileVersionSnapshotDecisionFields = {
 
 type SnapshotSensitiveRuntimePlan = Omit<
   CompiledRuntimePlan,
-  "egressRoutes" | "setupScript" | "skills" | "version"
+  "associatedResourceEventRouting" | "egressRoutes" | "setupScript" | "skills" | "version"
 > & {
   skillsOriginUrl: string | null;
 };
@@ -91,6 +91,7 @@ function profileVersionsDifferOnSnapshotRequiredFields(input: {
 
 function runtimePlanSnapshotImpact(runtimePlan: CompiledRuntimePlan): SnapshotSensitiveRuntimePlan {
   const {
+    associatedResourceEventRouting: _associatedResourceEventRouting,
     egressRoutes: _egressRoutes,
     setupScript: _setupScript,
     skills,
