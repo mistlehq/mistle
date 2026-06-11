@@ -66,6 +66,7 @@ function createRuntimeConversationNavigator(input: {
 }
 
 function renderConversationNavigation(input: {
+  isSecondaryPanelLayoutAvailable?: boolean;
   requestedRuntimeConversationId?: string | null;
   runtimeConversationNavigator: SessionConversationPaneState["runtimeConversationNavigator"];
   sandboxInstanceId: string;
@@ -77,6 +78,7 @@ function renderConversationNavigation(input: {
         throw new Error("Unexpected diff panel close in conversation navigation visibility test");
       },
       isDiffPanelVisible: false,
+      isSecondaryPanelLayoutAvailable: input.isSecondaryPanelLayoutAvailable ?? true,
       pendingServerRequests: [],
       primaryPanelTransitionState: "stable_chat" satisfies MainPanelTransitionState,
       primaryRepositoryPath: "/workspace/repo",
@@ -137,6 +139,25 @@ describe("useSessionWorkbenchRuntimeConversationNavigation", () => {
 
     expect(result.current.isPanelVisible).toBe(true);
     expect(result.current.secondaryPanelKind).toBe("conversations");
+  });
+
+  it("keeps multiple conversations out of the secondary panel when the layout is unavailable", () => {
+    const sandboxInstanceId = "sbi_conversation_navigation_mobile_panel_closed";
+
+    const { result } = renderConversationNavigation({
+      isSecondaryPanelLayoutAvailable: false,
+      sandboxInstanceId,
+      runtimeConversationNavigator: createRuntimeConversationNavigator({
+        availableConversations: [
+          createConversation({ id: "conversation_one" }),
+          createConversation({ id: "conversation_two" }),
+        ],
+      }),
+    });
+
+    expect(result.current.runtimeConversationNavigatorProps?.rows).toHaveLength(2);
+    expect(result.current.isPanelVisible).toBe(false);
+    expect(result.current.secondaryPanelKind).toBeNull();
   });
 
   it("lets the user close auto-opened runtime conversation navigation in the current workbench", () => {
@@ -283,6 +304,7 @@ describe("useSessionWorkbenchRuntimeConversationNavigation", () => {
             throw new Error("Unexpected diff panel close in refresh loop regression test");
           },
           isDiffPanelVisible: false,
+          isSecondaryPanelLayoutAvailable: true,
           pendingServerRequests: [],
           primaryPanelTransitionState: "stable_chat" satisfies MainPanelTransitionState,
           primaryRepositoryPath: "/workspace/repo",
