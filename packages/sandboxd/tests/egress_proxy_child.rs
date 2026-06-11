@@ -244,7 +244,11 @@ fn startup_input_with_egress_route(tunnel_gateway_ws_url: &str) -> ActivationInp
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
-            "agentRuntimes": []
+            "agentRuntimes": [],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         acting_user_id: None,

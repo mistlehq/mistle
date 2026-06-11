@@ -124,7 +124,11 @@ fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
               "originUrl": clone_source_path.display().to_string()
             }
           ],
-          "agentRuntimes": []
+          "agentRuntimes": [],
+          "associatedResourceEventRouting": {
+            "enabled": false,
+            "resources": []
+          }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -402,7 +406,11 @@ fn merges_runtime_files_without_replacing_existing_runtime_config() {
             }
           ],
           "workspaceSources": [],
-          "agentRuntimes": []
+          "agentRuntimes": [],
+          "associatedResourceEventRouting": {
+            "enabled": false,
+            "resources": []
+          }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -518,7 +526,11 @@ fn fails_skills_reconciliation_when_source_is_not_a_workspace_source() {
               "endpointKey": "app-server",
               "ptyLaunch": {}
             }
-          ]
+          ],
+          "associatedResourceEventRouting": {
+            "enabled": false,
+            "resources": []
+          }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -568,7 +580,11 @@ fn records_skills_runtime_plan_step_when_skills_reconciliation_starts() {
           "endpointKey": "app-server",
           "ptyLaunch": {}
         }
-      ]
+      ],
+      "associatedResourceEventRouting": {
+        "enabled": false,
+        "resources": []
+      }
     }))
     .expect("runtime plan with skills should decode");
     let observer = RecordingRuntimePlanApplyObserver::default();
@@ -710,7 +726,11 @@ fn decodes_typed_artifact_install_steps() {
       ],
       "runtimeClients": [],
       "workspaceSources": [],
-      "agentRuntimes": []
+      "agentRuntimes": [],
+      "associatedResourceEventRouting": {
+        "enabled": false,
+        "resources": []
+      }
     }))
     .expect("runtime plan should decode typed artifact install steps");
 
@@ -765,7 +785,11 @@ fn rejects_invalid_typed_artifact_install_payload_shapes_during_decode() {
           ],
           "runtimeClients": [],
           "workspaceSources": [],
-          "agentRuntimes": []
+          "agentRuntimes": [],
+          "associatedResourceEventRouting": {
+            "enabled": false,
+            "resources": []
+          }
         }));
     assert!(
         invalid_missing_tag.is_err(),
@@ -806,7 +830,11 @@ fn rejects_invalid_typed_artifact_install_payload_shapes_during_decode() {
           ],
           "runtimeClients": [],
           "workspaceSources": [],
-          "agentRuntimes": []
+          "agentRuntimes": [],
+          "associatedResourceEventRouting": {
+            "enabled": false,
+            "resources": []
+          }
         }));
     assert!(
         invalid_missing_extracted_path.is_err(),
@@ -838,7 +866,11 @@ fn rejects_invalid_typed_artifact_install_payload_shapes_during_decode() {
           ],
           "runtimeClients": [],
           "workspaceSources": [],
-          "agentRuntimes": []
+          "agentRuntimes": [],
+          "associatedResourceEventRouting": {
+            "enabled": false,
+            "resources": []
+          }
         }));
     assert!(
         invalid_empty_mise_tools.is_err(),
@@ -880,7 +912,11 @@ fn rejects_invalid_typed_artifact_install_payload_shapes_during_decode() {
           ],
           "runtimeClients": [],
           "workspaceSources": [],
-          "agentRuntimes": []
+          "agentRuntimes": [],
+          "associatedResourceEventRouting": {
+            "enabled": false,
+            "resources": []
+          }
         }));
     assert!(
         invalid_missing_binary_format
@@ -927,7 +963,11 @@ fn applies_typed_exec_artifact_install_steps() {
           ],
           "runtimeClients": [],
           "workspaceSources": [],
-          "agentRuntimes": []
+          "agentRuntimes": [],
+          "associatedResourceEventRouting": {
+            "enabled": false,
+            "resources": []
+          }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -991,7 +1031,11 @@ fn accepts_runtime_plan_egress_routes_with_additional_headers_and_slot_key_crede
           "artifacts": [],
           "runtimeClients": [],
           "workspaceSources": [],
-          "agentRuntimes": []
+          "agentRuntimes": [],
+          "associatedResourceEventRouting": {
+            "enabled": false,
+            "resources": []
+          }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -1043,7 +1087,11 @@ fn create_runtime_plan_apply_input(
               "originUrl": clone_source_path.display().to_string()
             }
           ],
-          "agentRuntimes": []
+          "agentRuntimes": [],
+          "associatedResourceEventRouting": {
+            "enabled": false,
+            "resources": []
+          }
         }),
         git_identity: None,
         transparent_proxy: None,

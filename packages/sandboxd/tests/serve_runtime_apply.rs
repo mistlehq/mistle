@@ -56,7 +56,11 @@ fn daemon_applies_activation_input_after_activation_submission() {
           ],
           "runtimeClients": [],
           "workspaceSources": [],
-          "agentRuntimes": []
+          "agentRuntimes": [],
+          "associatedResourceEventRouting": {
+            "enabled": false,
+            "resources": []
+          }
         }),
         git_identity: None,
         acting_user_id: None,

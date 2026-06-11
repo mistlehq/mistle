@@ -222,7 +222,11 @@ fn runtime_adapter_registry_starts_codex_proxy_adapter() {
                         }
                     }
                 }
-            ]
+            ],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
@@ -426,7 +430,11 @@ fn runtime_adapter_registry_starts_opencode_proxy_adapter() {
                         }
                     }
                 }
-            ]
+            ],
+            "associatedResourceEventRouting": {
+                "enabled": false,
+                "resources": []
+            }
         }),
         git_identity: None,
         transparent_proxy: None,
