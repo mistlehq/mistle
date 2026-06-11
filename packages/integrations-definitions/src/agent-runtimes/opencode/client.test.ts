@@ -400,6 +400,27 @@ describe("createOpenCodeSessionClient", () => {
       path: "/session?directory=%2Fworkspace%2Frepo&limit=1",
     });
 
+    const archivedSessionsPromise = client.listSessions({
+      archived: true,
+      limit: 1,
+      start: 100,
+    });
+    const archivedSessionsRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: archivedSessionsRequest,
+      body: [createSessionResponse("ses_archived", "Archived session")],
+    });
+    await expect(archivedSessionsPromise).resolves.toMatchObject([
+      {
+        id: "ses_archived",
+        title: "Archived session",
+      },
+    ]);
+    expect(archivedSessionsRequest.request).toMatchObject({
+      method: "GET",
+      path: "/experimental/session?archived=true&limit=1&start=100",
+    });
+
     const statusesPromise = client.listSessionStatuses({
       directory: "/workspace/repo",
     });

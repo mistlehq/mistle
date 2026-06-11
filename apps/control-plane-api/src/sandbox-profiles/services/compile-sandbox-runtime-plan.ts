@@ -13,6 +13,7 @@ import {
   AssociatedResourceEventTypes,
   SandboxProfileAssociatedResourceEventRoutingConfigSchema,
   compileRuntimePlan,
+  supportsAssociatedResourceDeliveryRuntime,
   type AssociatedResourceEventRouting,
   type CompiledRuntimePlan,
   type CompiledRuntimePlanSkills,
@@ -36,7 +37,6 @@ const MistleMcpBindingId = "platform-mistle-mcp";
 const MistleMcpFamilyId = "mistle";
 const MistleMcpVariantId = "mistle-mcp";
 const GitHubFamilyId = "github";
-const CodexRuntimeId = "codex";
 
 export const SandboxRuntimePlanCompilerErrorCodes = {
   PROFILE_NOT_FOUND: "PROFILE_NOT_FOUND",
@@ -228,7 +228,8 @@ function resolveAssociatedResourceEventRouting(input: {
 }): AssociatedResourceEventRouting {
   const config = SandboxProfileAssociatedResourceEventRoutingConfigSchema.parse(input.rawConfig);
   const defaultResources =
-    input.agentRuntimeId === CodexRuntimeId &&
+    input.agentRuntimeId !== undefined &&
+    supportsAssociatedResourceDeliveryRuntime(input.agentRuntimeId) &&
     input.compileBindings.some((binding) => binding.target.familyId === GitHubFamilyId)
       ? [
           {

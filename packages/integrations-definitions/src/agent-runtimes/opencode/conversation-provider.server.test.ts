@@ -1,6 +1,39 @@
 import { describe, expect, it } from "vitest";
 
-import { renderOpenCodePromptSystem } from "./conversation-provider.server.js";
+import {
+  renderOpenCodePromptSystem,
+  resolveOriginalOpenCodeSessionId,
+} from "./conversation-provider.server.js";
+
+describe("resolveOriginalOpenCodeSessionId", () => {
+  it("selects the earliest session by created timestamp", () => {
+    expect(
+      resolveOriginalOpenCodeSessionId([
+        { id: "session_recent", time: { created: 1_800 } },
+        { id: "session_original", time: { created: 1_200 } },
+        { id: "session_middle", time: { created: 1_500 } },
+      ]),
+    ).toBe("session_original");
+  });
+
+  it("breaks equal timestamp ties by stable session id ordering", () => {
+    expect(
+      resolveOriginalOpenCodeSessionId([
+        { id: "session_b", time: { created: 1_200 } },
+        { id: "session_a", time: { created: 1_200 } },
+      ]),
+    ).toBe("session_a");
+  });
+
+  it("can select an archived session when it is the earliest candidate", () => {
+    expect(
+      resolveOriginalOpenCodeSessionId([
+        { id: "session_recent_active", time: { created: 1_800 } },
+        { id: "session_original_archived", time: { created: 1_200 } },
+      ]),
+    ).toBe("session_original_archived");
+  });
+});
 
 describe("renderOpenCodePromptSystem", () => {
   it("includes developer instructions and delivery context in the OpenCode system prompt", () => {
@@ -26,7 +59,7 @@ describe("renderOpenCodePromptSystem", () => {
       }),
     ).toBe(`Always include a reproducible next step.
 
-Mistle trigger delivery context:
+Mistle delivery context:
 {
   "source": "webhook",
   "webhookEventId": "evt_123",

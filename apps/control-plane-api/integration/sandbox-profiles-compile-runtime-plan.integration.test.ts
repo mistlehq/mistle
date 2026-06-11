@@ -882,7 +882,7 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
     });
   });
 
-  it("defaults associated resource routing only for Codex profiles with GitHub bindings", async ({
+  it("defaults associated resource routing for Codex profiles with GitHub bindings", async ({
     env,
   }) => {
     const session = await env.auth.createSession({
@@ -912,22 +912,12 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
       profileId: "sbp_compile_associated_resources_codex",
     });
 
-    expect(runtimePlan.associatedResourceEventRouting).toEqual({
-      enabled: true,
-      resources: [
-        {
-          resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
-          eventTypes: [
-            AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
-            AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
-            AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
-          ],
-        },
-      ],
-    });
+    expect(runtimePlan.associatedResourceEventRouting).toEqual(
+      enabledGitHubPullRequestAssociatedResourceRouting(),
+    );
   });
 
-  it("does not default associated resource routing for OpenCode profiles with GitHub bindings", async ({
+  it("defaults associated resource routing for OpenCode profiles with GitHub bindings", async ({
     env,
   }) => {
     const session = await env.auth.createSession({
@@ -939,37 +929,17 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
       profileId: "sbp_compile_associated_resources_opencode",
       agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
     });
-    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values({
+    await seedAgentBinding(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_associated_resources_opencode",
       targetKey: "opencode-compile-associated-resources",
+      connectionId: "icn_compile_associated_resources_opencode_agent",
+      bindingId: "ibd_compile_associated_resources_opencode_agent",
       familyId: "opencode",
       variantId: "opencode-go",
-      enabled: true,
+      displayName: "Compile Associated Resources OpenCode Connection",
       config: {},
     });
-    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
-      integrationConnectionRow({
-        id: "icn_compile_associated_resources_opencode_agent",
-        organizationId: session.organizationId,
-        targetKey: "opencode-compile-associated-resources",
-        displayName: "Compile Associated Resources OpenCode Connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: IntegrationConnectionMethodIds.API_KEY,
-        },
-      }),
-    );
-    await env.controlPlaneDb
-      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
-      .values(
-        sandboxProfileVersionIntegrationBindingRow({
-          id: "ibd_compile_associated_resources_opencode_agent",
-          sandboxProfileId: "sbp_compile_associated_resources_opencode",
-          sandboxProfileVersion: 1,
-          connectionId: "icn_compile_associated_resources_opencode_agent",
-          kind: IntegrationBindingKinds.AGENT,
-          config: {},
-        }),
-      );
     await seedConnectorBindings(env, {
       organizationId: session.organizationId,
       profileId: "sbp_compile_associated_resources_opencode",
@@ -989,10 +959,44 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
       profileId: "sbp_compile_associated_resources_opencode",
     });
 
-    expect(runtimePlan.associatedResourceEventRouting).toEqual({
-      enabled: false,
-      resources: [],
+    expect(runtimePlan.associatedResourceEventRouting).toEqual(
+      enabledGitHubPullRequestAssociatedResourceRouting(),
+    );
+  });
+
+  it("defaults associated resource routing for Pi profiles with GitHub bindings", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-compile-associated-resources-pi@example.com",
     });
+
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_associated_resources_pi",
+      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.PI,
+    });
+    await seedConnectorBindings(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_associated_resources_pi",
+      bindings: [
+        githubBinding({
+          targetKey: "github-cloud-compile-associated-resources-pi",
+          connectionId: "icn_compile_associated_resources_pi_github",
+          bindingId: "ibd_compile_associated_resources_pi_github",
+          tools: [],
+        }),
+      ],
+    });
+
+    const runtimePlan = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_associated_resources_pi",
+    });
+
+    expect(runtimePlan.associatedResourceEventRouting).toEqual(
+      enabledGitHubPullRequestAssociatedResourceRouting(),
+    );
   });
 
   it("returns profile not found when the sandbox profile does not exist", async ({ env }) => {
@@ -1166,6 +1170,22 @@ type ConnectorBindingInput = {
   };
 };
 
+function enabledGitHubPullRequestAssociatedResourceRouting() {
+  return {
+    enabled: true,
+    resources: [
+      {
+        resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+        eventTypes: [
+          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
+        ],
+      },
+    ],
+  };
+}
+
 async function compilePlan(
   env: IntegrationTestEnvironment,
   input: {
@@ -1198,6 +1218,53 @@ async function compilePlan(
       },
     },
   );
+}
+
+async function seedAgentBinding(
+  env: IntegrationTestEnvironment,
+  input: {
+    organizationId: string;
+    profileId: string;
+    targetKey: string;
+    connectionId: string;
+    bindingId: string;
+    familyId: string;
+    variantId: string;
+    displayName: string;
+    config: Record<string, unknown>;
+  },
+): Promise<void> {
+  await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values({
+    targetKey: input.targetKey,
+    familyId: input.familyId,
+    variantId: input.variantId,
+    enabled: true,
+    config: input.config,
+  });
+  await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+    integrationConnectionRow({
+      id: input.connectionId,
+      organizationId: input.organizationId,
+      targetKey: input.targetKey,
+      displayName: input.displayName,
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: IntegrationConnectionMethodIds.API_KEY,
+      },
+    }),
+  );
+  await env.controlPlaneDb
+    .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+    .values(
+      sandboxProfileVersionIntegrationBindingRow({
+        id: input.bindingId,
+        sandboxProfileId: input.profileId,
+        sandboxProfileVersion: 1,
+        connectionId: input.connectionId,
+        kind: IntegrationBindingKinds.AGENT,
+        config: {},
+      }),
+    );
 }
 
 async function createProfileVersion(

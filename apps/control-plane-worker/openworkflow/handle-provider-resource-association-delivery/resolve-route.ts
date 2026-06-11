@@ -4,6 +4,7 @@ import type {
   AssociatedResourceEventRouting,
   CompiledRuntimePlan,
 } from "@mistle/integrations-core";
+import { supportsAssociatedResourceDeliveryRuntime } from "@mistle/integrations-core";
 import {
   GitHubFamilyId,
   observeGitHubAssociatedResourceFromWebhookEvent,
@@ -197,13 +198,22 @@ function resolveAssociationRuntimeContext(runtimePlan: CompiledRuntimePlan): {
   runtimeId: string;
   workingDirectory: string;
 } {
-  const agentRuntime = runtimePlan.agentRuntimes.find(
-    (candidate) => candidate.runtimeId === "codex",
+  const supportedAgentRuntimes = runtimePlan.agentRuntimes.filter((candidate) =>
+    supportsAssociatedResourceDeliveryRuntime(candidate.runtimeId),
   );
+  const agentRuntime = supportedAgentRuntimes[0];
   if (agentRuntime === undefined) {
     throw new ProviderResourceAssociationDeliveryError({
       code: ProviderResourceAssociationDeliveryFailureCodes.RUNTIME_PLAN_AGENT_RUNTIME_NOT_FOUND,
-      message: "Associated sandbox runtime plan does not define a Codex agent runtime.",
+      message:
+        "Associated sandbox runtime plan does not define an agent runtime that supports association delivery.",
+    });
+  }
+  if (supportedAgentRuntimes.length > 1) {
+    throw new ProviderResourceAssociationDeliveryError({
+      code: ProviderResourceAssociationDeliveryFailureCodes.RUNTIME_PLAN_AGENT_RUNTIME_NOT_FOUND,
+      message:
+        "Associated sandbox runtime plan defines multiple agent runtimes that support association delivery.",
     });
   }
 

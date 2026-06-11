@@ -65,6 +65,15 @@ export type AgentConversationGenerateTitleResult = {
   title: string;
 };
 
+export type AgentConversationResolveOriginalInput = {
+  connection: AgentConversationConnection;
+  explicitProviderConversationId?: string | null;
+};
+
+export type AgentConversationResolveOriginalResult = {
+  providerConversationId: string | null;
+};
+
 export type AgentConversationCollaborationModeSettings = {
   developerInstructions: string | null;
 };
@@ -136,6 +145,10 @@ export type AgentConversationProvider = {
     this: void,
     input: AgentConversationGenerateTitleInput,
   ): Promise<AgentConversationGenerateTitleResult>;
+  resolveOriginalConversation?(
+    this: void,
+    input: AgentConversationResolveOriginalInput,
+  ): Promise<AgentConversationResolveOriginalResult>;
   createConversation(
     this: void,
     input: AgentConversationCreateInput,

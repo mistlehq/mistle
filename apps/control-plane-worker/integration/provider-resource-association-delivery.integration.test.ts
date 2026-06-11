@@ -251,6 +251,62 @@ describe.concurrent("provider resource association delivery", () => {
     });
   });
 
+  it("resolves the associated sandbox OpenCode runtime target without a trigger conversation route", async ({
+    env,
+  }) => {
+    const scope = await seedAssociationDeliveryScope({
+      env,
+      suffix: createSuffix("opencode_route"),
+    });
+    await insertSandboxInstance(env, scope, { runtimeId: "opencode" });
+
+    const resolvedTarget = await resolveProviderResourceAssociationDeliveryTarget(
+      {
+        dataPlaneClient: createDataPlaneClient(env),
+        db: env.controlPlaneDb,
+      },
+      {
+        providerResourceAssociationId: scope.providerResourceAssociationId,
+      },
+    );
+
+    expect(resolvedTarget).toMatchObject({
+      organizationId: scope.organizationId,
+      providerResourceAssociationId: scope.providerResourceAssociationId,
+      sandboxInstanceId: scope.sandboxInstanceId,
+      runtimeId: "opencode",
+      workingDirectory: "/root/repo",
+    });
+  });
+
+  it("resolves the associated sandbox Pi runtime target without a trigger conversation route", async ({
+    env,
+  }) => {
+    const scope = await seedAssociationDeliveryScope({
+      env,
+      suffix: createSuffix("pi_route"),
+    });
+    await insertSandboxInstance(env, scope, { runtimeId: "pi" });
+
+    const resolvedTarget = await resolveProviderResourceAssociationDeliveryTarget(
+      {
+        dataPlaneClient: createDataPlaneClient(env),
+        db: env.controlPlaneDb,
+      },
+      {
+        providerResourceAssociationId: scope.providerResourceAssociationId,
+      },
+    );
+
+    expect(resolvedTarget).toMatchObject({
+      organizationId: scope.organizationId,
+      providerResourceAssociationId: scope.providerResourceAssociationId,
+      sandboxInstanceId: scope.sandboxInstanceId,
+      runtimeId: "pi",
+      workingDirectory: "/root/repo",
+    });
+  });
+
   it("fails explicitly when the associated sandbox routing does not enable the delivery event", async ({
     env,
   }) => {
@@ -283,12 +339,14 @@ describe.concurrent("provider resource association delivery", () => {
     });
   });
 
-  it("fails explicitly when the associated sandbox has no Codex runtime", async ({ env }) => {
+  it("fails explicitly when the associated sandbox has no association-delivery runtime", async ({
+    env,
+  }) => {
     const scope = await seedAssociationDeliveryScope({
       env,
       suffix: createSuffix("missing_route"),
     });
-    await insertSandboxInstance(env, scope, { includeCodexRuntime: false });
+    await insertSandboxInstance(env, scope, { runtimeId: "unsupported" });
 
     await expect(
       resolveProviderResourceAssociationDeliveryTarget(
@@ -452,7 +510,7 @@ async function insertSandboxInstance(
   env: IntegrationTestEnvironment,
   input: AssociationDeliveryScope,
   options: {
-    includeCodexRuntime?: boolean;
+    runtimeId?: "codex" | "opencode" | "pi" | "unsupported";
   } = {},
 ): Promise<void> {
   await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
@@ -472,7 +530,7 @@ async function insertSandboxInstance(
     sandboxInstanceId: input.sandboxInstanceId,
     revision: 1,
     compiledRuntimePlan: createRuntimePlan(input, {
-      includeCodexRuntime: options.includeCodexRuntime ?? true,
+      runtimeId: options.runtimeId ?? "codex",
     }),
     compiledFromProfileId: input.sandboxProfileId,
     compiledFromProfileVersion: 1,
@@ -482,9 +540,11 @@ async function insertSandboxInstance(
 function createRuntimePlan(
   input: AssociationDeliveryScope,
   options: {
-    includeCodexRuntime: boolean;
+    runtimeId: "codex" | "opencode" | "pi" | "unsupported";
   },
 ) {
+  const runtimeId = options.runtimeId;
+  const command = runtimeId === "unsupported" ? "unsupported-runtime" : runtimeId;
   return {
     sandboxProfileId: input.sandboxProfileId,
     version: 1,
@@ -499,61 +559,31 @@ function createRuntimePlan(
     workspaceSources: [],
     agentRuntimes: [
       {
-        runtimeId: "opencode",
-        runtimeKey: "opencode-app-server",
-        clientId: "opencode-cli",
+        runtimeId,
+        runtimeKey: `${runtimeId}-app-server`,
+        clientId: `${runtimeId}-cli`,
         endpointKey: "app-server",
         ptyLaunch: {
-          runtimeId: "opencode",
-          displayName: "OpenCode",
+          runtimeId,
+          displayName: runtimeId,
           newLaunch: {
-            ptySessionId: "opencode-cli",
+            ptySessionId: `${runtimeId}-cli`,
             cols: 120,
             rows: 32,
-            cwd: "/root/wrong-runtime",
-            command: "opencode",
+            cwd: "/root/repo",
+            command,
             args: [],
           },
           resumeLaunch: {
-            ptySessionId: "opencode-cli",
+            ptySessionId: `${runtimeId}-cli`,
             cols: 120,
             rows: 32,
-            cwd: "/root/wrong-runtime",
-            command: "opencode",
+            cwd: "/root/repo",
+            command,
             args: [],
           },
         },
       },
-      ...(options.includeCodexRuntime
-        ? [
-            {
-              runtimeId: "codex",
-              runtimeKey: "codex-app-server",
-              clientId: "codex-cli",
-              endpointKey: "app-server",
-              ptyLaunch: {
-                runtimeId: "codex",
-                displayName: "Codex",
-                newLaunch: {
-                  ptySessionId: "cli",
-                  cols: 120,
-                  rows: 32,
-                  cwd: "/root/repo",
-                  command: "codex",
-                  args: [],
-                },
-                resumeLaunch: {
-                  ptySessionId: "cli",
-                  cols: 120,
-                  rows: 32,
-                  cwd: "/root/repo",
-                  command: "codex",
-                  args: [],
-                },
-              },
-            },
-          ]
-        : []),
     ],
   };
 }

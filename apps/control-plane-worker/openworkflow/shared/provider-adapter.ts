@@ -22,6 +22,10 @@ export type ProviderGenerateConversationTitleOutput = {
   title: string;
 };
 
+export type ProviderResolveOriginalConversationOutput = {
+  providerConversationId: string | null;
+};
+
 export type ProviderStartExecutionOutput = {
   providerExecutionId: string | null;
   providerState?: unknown;
@@ -64,6 +68,11 @@ export type ProviderGenerateConversationTitleInput = {
   providerConversationId: string;
   providerState?: unknown;
   inputText: string;
+};
+
+export type ProviderResolveOriginalConversationInput = {
+  connection: ProviderConnection;
+  explicitProviderConversationId?: string | null;
 };
 
 export type ProviderResumeConversationInput = {
@@ -112,6 +121,9 @@ export type ConversationProviderAdapter = {
   generateConversationTitle?: (
     input: ProviderGenerateConversationTitleInput,
   ) => Promise<ProviderGenerateConversationTitleOutput>;
+  resolveOriginalConversation?: (
+    input: ProviderResolveOriginalConversationInput,
+  ) => Promise<ProviderResolveOriginalConversationOutput>;
   resumeTriggerConversation: (input: ProviderResumeConversationInput) => Promise<void>;
   startExecution: (input: ProviderStartExecutionInput) => Promise<ProviderStartExecutionOutput>;
   steerExecution: (input: ProviderSteerExecutionInput) => Promise<ProviderSteerExecutionOutput>;
@@ -130,6 +142,7 @@ function adaptConversationProvider(
 ): ConversationProviderAdapter {
   const recoverLateSteer = provider.recoverLateSteer;
   const generateConversationTitle = provider.generateConversationTitle;
+  const resolveOriginalConversation = provider.resolveOriginalConversation;
 
   return {
     connect: async (input) => await provider.connect(input),
@@ -139,6 +152,11 @@ function adaptConversationProvider(
       ? {}
       : {
           generateConversationTitle: async (input) => await generateConversationTitle(input),
+        }),
+    ...(resolveOriginalConversation === undefined
+      ? {}
+      : {
+          resolveOriginalConversation: async (input) => await resolveOriginalConversation(input),
         }),
     resumeTriggerConversation: async (input) => await provider.resumeConversation(input),
     startExecution: async (input) => await provider.startExecution(input),

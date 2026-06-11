@@ -152,6 +152,10 @@ _Avoid_: Resource claim, ownership claim
 The exact text generated from an **Associated resource event routing** selection and delivered to the agent.
 _Avoid_: Association payload, raw webhook payload
 
+**Association delivery context**:
+Runtime-visible metadata that identifies the **Association delivery** and its source provider event.
+_Avoid_: Trigger delivery context when no Trigger is involved
+
 **Rendered trigger input**:
 The exact text generated from a **Trigger**'s input template and delivered to the agent.
 _Avoid_: Trigger payload, formatted trigger message
@@ -532,6 +536,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Sandbox session** can have many **Provider resource associations**.
 - First-pass provider-event delivery does not fan out one **Association-backed provider event** to multiple **Sandbox sessions**.
 - **Association delivery** resolves its **Routing runtime conversation** from the associated **Sandbox session**.
+- An **Agent runtime** supports **Association delivery** only when Mistle can resolve the **Sandbox session**'s **Original runtime conversation** for that runtime.
 - First-pass **Association delivery** resolves the **Routing runtime conversation** from the **Sandbox session**'s **Original runtime conversation**.
 - **Association delivery** resolves the **Routing runtime conversation** during delivery, not during provider webhook ingress.
 - A **Sandbox session** does not have conflicting **Original runtime conversation** resolution sources; if conflict is detected, the **Trigger conversation** route wins and the conflict is an error.
@@ -545,6 +550,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - An **Association delivery** depends on a **Provider resource association** already recorded when the provider event is handled.
 - An **Association delivery** starts a new turn when the **Routing runtime conversation** is idle, steers an active turn when steering is supported, and queues when the runtime cannot steer.
 - **Association delivery** idempotency is scoped separately from **Trigger** run idempotency.
+- **Association delivery context** is scoped to an **Association delivery**, not to a **Trigger** run.
 - **Associated resource event routing** reuses provider event definitions without creating a **Trigger conversation**.
 - **Associated resource event routing** uses a **Routable provider resource key** where a **Trigger** uses a conversation key.
 - **Associated resource event routing** for an existing **Provider resource association** does not change when a later **Sandbox profile version** is published.
@@ -648,7 +654,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Starting a new **Pi conversation** creates the provider-owned **Runtime conversation** before the **Session workbench** URL changes to its `conversationId`.
 - Starting a new **Codex thread** does not create a new **Active runtime conversation** until Codex confirms the thread exists.
 - The **Original runtime conversation** remains stable when the **Active runtime conversation** changes within a **Session workbench**.
-- The **Original runtime conversation** may be omitted when the current runtime conversation list is incomplete and no explicit provider conversation was supplied.
+- A **Runtime conversation navigator** may omit the **Original runtime conversation** when its current runtime conversation list is incomplete and no explicit provider conversation was supplied.
 - A **Runtime conversation navigator** uses provider-neutral product language while preserving provider-owned object names in source-specific code and metadata.
 - A **Runtime conversation navigator** is labeled as conversations in shared user-facing workbench controls.
 - A **Runtime conversation navigator** may use provider-specific row labels when an **Agent runtime** has precise user-facing lineage language.
