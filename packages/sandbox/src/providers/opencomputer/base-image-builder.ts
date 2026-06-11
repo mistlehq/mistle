@@ -37,9 +37,13 @@ export class OpenComputerBaseImageBuilder implements SandboxBaseImageBuilder {
           imageId: request.source.imageId,
         },
       });
+      const manifest = createOpenComputerImageManifest(image);
       return createOpenComputerDeferredImageHandle({
-        imageName: createOpenComputerBaseImageName(request.source.imageId),
-        manifest: createOpenComputerImageManifest(image),
+        imageName: createOpenComputerBaseImageName({
+          baseImageRef: request.source.imageId,
+          manifest,
+        }),
+        manifest,
       });
     }
 

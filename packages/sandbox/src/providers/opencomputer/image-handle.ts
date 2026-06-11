@@ -17,6 +17,7 @@ import {
 const OpenComputerBaseImageNamePrefix = "mistle";
 const OpenComputerSha256DigestPrefix = "@sha256:";
 const OpenComputerBaseImageDigestLength = 24;
+const OpenComputerBaseImageManifestDigestLength = 12;
 const OpenComputerDeferredImageManifestSeparator = "#";
 
 export function createOpenComputerDeferredImageHandle(input: {
@@ -92,18 +93,31 @@ export function resolveOpenComputerStartImage(handle: SandboxImageHandle): OpenC
     const image = createOpenComputerBaseImage({
       source: { kind: "image", imageId: handle.imageId },
     });
+    const manifest = createOpenComputerImageManifest(image);
     return {
       kind: OpenComputerImageHandleKinds.IMAGE,
-      id: createOpenComputerBaseImageName(handle.imageId),
-      manifest: createOpenComputerImageManifest(image),
+      id: createOpenComputerBaseImageName({
+        baseImageRef: handle.imageId,
+        manifest,
+      }),
+      manifest,
     };
   }
 
   return parseOpenComputerImageHandle(handle);
 }
 
-export function createOpenComputerBaseImageName(baseImageRef: string): string {
-  return `${OpenComputerBaseImageNamePrefix}-${createOpenComputerBaseImageNameDigest(baseImageRef)}`;
+export function createOpenComputerBaseImageName(input: {
+  readonly baseImageRef: string;
+  readonly manifest?: OpenComputerImageManifest;
+}): string {
+  return [
+    OpenComputerBaseImageNamePrefix,
+    createOpenComputerBaseImageNameDigest(input.baseImageRef),
+    ...(input.manifest === undefined
+      ? []
+      : [createOpenComputerImageManifestNameDigest(input.manifest)]),
+  ].join("-");
 }
 
 function createOpenComputerImageHandle(
@@ -184,6 +198,13 @@ function createOpenComputerBaseImageNameDigest(baseImageRef: string): string {
     .slice(0, OpenComputerBaseImageDigestLength);
 }
 
+function createOpenComputerImageManifestNameDigest(manifest: OpenComputerImageManifest): string {
+  return createHash("sha256")
+    .update(stableStringify(OpenComputerImageManifestSchema.parse(manifest)))
+    .digest("hex")
+    .slice(0, OpenComputerBaseImageManifestDigestLength);
+}
+
 function encodeOpenComputerImageManifest(manifest: OpenComputerImageManifest): string {
   return Buffer.from(JSON.stringify(OpenComputerImageManifestSchema.parse(manifest))).toString(
     "base64url",
@@ -199,4 +220,24 @@ function decodeOpenComputerImageManifest(encodedManifest: string): OpenComputerI
   }
 
   return OpenComputerImageManifestSchema.parse(decoded);
+}
+
+function stableStringify(value: unknown): string {
+  return JSON.stringify(sortJsonValue(value));
+}
+
+function sortJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sortJsonValue);
+  }
+
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entryValue]) => [key, sortJsonValue(entryValue)]),
+    );
+  }
+
+  return value;
 }

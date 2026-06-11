@@ -815,7 +815,7 @@ export class OpenComputerApiClient implements OpenComputerClient {
       schema: OpenComputerExecSessionResponseSchema,
       operation: input.operation,
     });
-    const wsUrl = new URL(
+    const wsUrl = createOpenComputerApiUrl(
       `/sandboxes/${encodeURIComponent(input.sandboxId)}/exec/${encodeURIComponent(response.sessionID)}`,
       this.#apiBaseUrl,
     );
@@ -835,7 +835,7 @@ export class OpenComputerApiClient implements OpenComputerClient {
     operation: OpenComputerClientOperation;
     timeoutMs?: number;
   }): Promise<Output> {
-    const response = await fetch(new URL(input.path, this.#apiBaseUrl), {
+    const response = await fetch(createOpenComputerApiUrl(input.path, this.#apiBaseUrl), {
       method: input.method,
       headers: {
         "Content-Type": "application/json",
@@ -1016,6 +1016,11 @@ class OpenComputerStartedExecSession {
 function normalizeOpenComputerApiBaseUrl(url: string): string {
   const normalized = url.replace(/\/+$/u, "");
   return normalized.endsWith("/api") ? normalized : `${normalized}/api`;
+}
+
+function createOpenComputerApiUrl(path: string, apiBaseUrl: string): URL {
+  const normalizedPath = path.replace(/^\/+/u, "");
+  return new URL(normalizedPath, `${apiBaseUrl.replace(/\/+$/u, "")}/`);
 }
 
 function createOpenComputerDaemonEnv(

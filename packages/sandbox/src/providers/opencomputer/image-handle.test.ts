@@ -65,6 +65,11 @@ describe("OpenComputer image handles", () => {
 
   it("resolves OCI base image references to deterministic deferred image starts", () => {
     const baseImageRef = "ghcr.io/mistlehq/sandbox-base:latest";
+    const manifest = createOpenComputerImageManifest(
+      createOpenComputerBaseImage({
+        source: { kind: "image", imageId: baseImageRef },
+      }),
+    );
 
     expect(
       resolveOpenComputerStartImage({
@@ -74,12 +79,8 @@ describe("OpenComputer image handles", () => {
       }),
     ).toEqual({
       kind: "image",
-      id: createOpenComputerBaseImageName(baseImageRef),
-      manifest: createOpenComputerImageManifest(
-        createOpenComputerBaseImage({
-          source: { kind: "image", imageId: baseImageRef },
-        }),
-      ),
+      id: createOpenComputerBaseImageName({ baseImageRef, manifest }),
+      manifest,
     });
   });
 
@@ -92,12 +93,36 @@ describe("OpenComputer image handles", () => {
 
   it("creates deterministic base image names from image references", () => {
     expect(
-      createOpenComputerBaseImageName(
-        "ghcr.io/mistlehq/sandbox-base@sha256:".concat("b".repeat(64)),
-      ),
+      createOpenComputerBaseImageName({
+        baseImageRef: "ghcr.io/mistlehq/sandbox-base@sha256:".concat("b".repeat(64)),
+      }),
     ).toBe(`mistle-${"b".repeat(24)}`);
-    expect(createOpenComputerBaseImageName("ghcr.io/mistlehq/sandbox-base:latest")).toBe(
-      createOpenComputerBaseImageName("ghcr.io/mistlehq/sandbox-base:latest"),
+    expect(
+      createOpenComputerBaseImageName({
+        baseImageRef: "ghcr.io/mistlehq/sandbox-base:latest",
+      }),
+    ).toBe(
+      createOpenComputerBaseImageName({
+        baseImageRef: "ghcr.io/mistlehq/sandbox-base:latest",
+      }),
+    );
+  });
+
+  it("includes manifest content in generated base image names", () => {
+    const baseImageRef = "ghcr.io/mistlehq/sandbox-base:latest";
+    const firstManifest = createOpenComputerImageManifest(
+      createOpenComputerBaseImage({
+        source: { kind: "image", imageId: baseImageRef },
+      }),
+    );
+    const secondManifest = createOpenComputerImageManifest(
+      createOpenComputerBaseImage({
+        source: { kind: "image", imageId: "ghcr.io/mistlehq/sandbox-base:other" },
+      }),
+    );
+
+    expect(createOpenComputerBaseImageName({ baseImageRef, manifest: firstManifest })).not.toBe(
+      createOpenComputerBaseImageName({ baseImageRef, manifest: secondManifest }),
     );
   });
 

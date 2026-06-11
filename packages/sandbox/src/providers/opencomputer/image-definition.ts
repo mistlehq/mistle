@@ -24,7 +24,7 @@ export function createOpenComputerBaseImage(input: {
   readonly source?: OpenComputerBaseImageSourceDescriptor;
 }): Image {
   let image = Image.base()
-    .aptInstall(["dbus", "fd-find", "gawk", "nftables", "ripgrep", "systemd", "systemd-sysv"])
+    .aptInstall(["dbus", "fd-find", "gawk", "nftables", "ripgrep"])
     .runCommands(
       [
         "set -eu",

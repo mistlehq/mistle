@@ -165,6 +165,13 @@ describe("OpenComputer client helpers", () => {
     expect(manifest).toContain("sudo -n tee /etc/profile.d/mistle-path.sh");
   });
 
+  it("does not install systemd packages that interfere with OpenComputer checkpoint boot", () => {
+    const manifest = JSON.stringify(createOpenComputerBaseImage({}).toJSON());
+
+    expect(manifest).not.toContain("systemd-sysv");
+    expect(manifest).not.toContain('"systemd"');
+  });
+
   it("replays deferred image manifests through the OpenComputer image builder", () => {
     const image = createOpenComputerBaseImage({
       source: {
@@ -247,9 +254,40 @@ describe("OpenComputer client helpers", () => {
     }
   });
 
+  it("creates sandboxes under the normalized API base path", async () => {
+    let sandboxCreateBody: unknown;
+    const api = await startSimulatedOpenComputerApi(async (request, response) => {
+      if (request.method === "POST" && request.url === "/api/sandboxes") {
+        sandboxCreateBody = JSON.parse(await readRequestBody(request));
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ sandboxID: "sb-1" }));
+        return;
+      }
+      response.writeHead(404);
+      response.end();
+    });
+    const client = new OpenComputerApiClient({
+      config: { apiKey: "test-key", apiBaseUrl: api.url },
+    });
+
+    try {
+      await expect(
+        client.startSandbox({
+          image: { kind: "snapshot", id: "mistle-base" },
+        }),
+      ).resolves.toEqual({ sandboxId: "sb-1" });
+      expect(sandboxCreateBody).toMatchObject({
+        snapshot: "mistle-base",
+        timeout: 0,
+      });
+    } finally {
+      await api.close();
+    }
+  });
+
   it("captures snapshots when callers provide a provider request timeout", async () => {
     const api = await startSimulatedOpenComputerApi((request, response) => {
-      if (request.method === "POST" && request.url === "/sandboxes/sb-1/checkpoints") {
+      if (request.method === "POST" && request.url === "/api/sandboxes/sb-1/checkpoints") {
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(JSON.stringify({ checkpointId: "checkpoint-1" }));
         return;
@@ -272,7 +310,7 @@ describe("OpenComputer client helpers", () => {
 
   it("fails malformed exec/run responses that omit the exit code", async () => {
     const api = await startSimulatedOpenComputerApi((request, response) => {
-      if (request.method === "POST" && request.url === "/sandboxes/sb-1/exec/run") {
+      if (request.method === "POST" && request.url === "/api/sandboxes/sb-1/exec/run") {
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(JSON.stringify({ stdout: "ready" }));
         return;
