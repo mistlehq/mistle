@@ -80,6 +80,65 @@ describe("reduceOpenCodeChatState", () => {
     ]);
   });
 
+  it("renders runtime-reported user messages from live OpenCode message events", () => {
+    const hydrated = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "hydrate_messages",
+      sessionId: "ses_test",
+      messages: [],
+    });
+    const userMessage = createUserMessage({
+      id: "msg_external",
+      text: "Review the pull request",
+    });
+    const userPart = getOnlyUserMessagePart(userMessage);
+
+    const messageReceived = reduceOpenCodeChatState(hydrated, {
+      type: "event_received",
+      event: createEvent({
+        id: "evt_message_updated",
+        type: "message.updated",
+        properties: {
+          sessionID: "ses_test",
+          info: userMessage.info,
+        },
+      }),
+    });
+    const partReceived = reduceOpenCodeChatState(messageReceived, {
+      type: "event_received",
+      event: createEvent({
+        id: "evt_part_updated",
+        type: "message.part.updated",
+        properties: {
+          sessionID: "ses_test",
+          part: userPart,
+          time: 1,
+        },
+      }),
+    });
+    const repeatedPartReceived = reduceOpenCodeChatState(partReceived, {
+      type: "event_received",
+      event: createEvent({
+        id: "evt_part_updated_repeat",
+        type: "message.part.updated",
+        properties: {
+          sessionID: "ses_test",
+          part: userPart,
+          time: 2,
+        },
+      }),
+    });
+
+    expect(repeatedPartReceived.entries).toEqual([
+      {
+        id: "msg_external",
+        kind: "user-message",
+        text: "Review the pull request",
+        turnId: "msg_external",
+        status: "completed",
+      },
+    ]);
+  });
+
   it("hydrates OpenCode user file parts as display attachments with sandbox paths", () => {
     const state = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
       type: "hydrate_messages",
@@ -989,6 +1048,16 @@ function createUserMessage(input: { id: string; text: string }): OpenCodeMessage
       },
     ],
   };
+}
+
+function getOnlyUserMessagePart(
+  message: OpenCodeMessageWithParts,
+): OpenCodeMessageWithParts["parts"][number] {
+  const [part] = message.parts;
+  if (part === undefined) {
+    throw new Error("Expected OpenCode user message fixture to include a part.");
+  }
+  return part;
 }
 
 function createAssistantMessage(input: {

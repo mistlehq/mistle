@@ -172,6 +172,10 @@ _Avoid_: Session when referring generically across providers
 A **Provider conversation** running within a **Sandbox session**.
 _Avoid_: Bare thread, bare session
 
+**Runtime user message**:
+A user-authored transcript message in a **Runtime conversation**, regardless of whether it originated from the **Session workbench** composer, a **Trigger**, an **Association delivery**, a provider CLI, or another runtime-supported submission path.
+_Avoid_: Runtime queued message, trigger payload, association payload
+
 **Active runtime conversation**:
 The **Runtime conversation** currently selected for the chat pane within a **Sandbox session**.
 _Avoid_: Active thread when speaking across providers
@@ -265,7 +269,7 @@ A typed Codex **Composer command** that starts a Codex code-review turn. Bare `/
 _Avoid_: ordinary prompt text, slash autocomplete
 
 **Codex user message**:
-A user-authored transcript message in a **Codex thread**, including a **Codex turn-start message** or **Codex steer message**.
+A **Runtime user message** in a **Codex thread**, including a **Codex turn-start message** or **Codex steer message**.
 _Avoid_: Runtime queued message, trigger payload
 
 **Codex turn-start message**:
@@ -682,7 +686,10 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A cached **Codex thread** transcript does not become visible as active until Codex confirms the thread is resumable.
 - A **Codex turn-start message** is the primary user message for a **Working agent turn** in a **Codex thread**.
 - A **Codex steer message** belongs to the **Working agent turn** it is accepted into; it is not a **Runtime queued message**.
-- A runtime-reported **Codex user message** belongs in the **Codex thread** transcript even when it was submitted outside the current **Session workbench** view.
+- A runtime-reported **Runtime user message** belongs in the **Runtime conversation** transcript even when it was submitted outside the current **Session workbench** view.
+- A **Runtime queued message** is not a **Runtime user message** until the **Agent runtime** accepts it into the **Runtime conversation** transcript.
+- A supported **Agent runtime** adapter must ingest runtime-reported **Runtime user messages** from that runtime's live event stream and hydration source when the runtime exposes them.
+- Runtime-specific transcript reducers may use provider-specific reconciliation logic for **Runtime user messages**, but tests should protect the shared behavior at the adapter or reducer boundary.
 - **Composer capabilities** may be owned by the **Agent runtime** or by the **Session workbench**.
 - An **Agent runtime** is the source of truth for runtime-owned **Composer capabilities**.
 - A **Session workbench** is the source of truth for sandbox-scoped **Composer capabilities**.
