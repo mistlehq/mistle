@@ -1079,6 +1079,9 @@ importers:
       '@mistle/time':
         specifier: workspace:*
         version: link:../time
+      '@opencomputer/sdk':
+        specifier: 0.6.2
+        version: 0.6.2
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -3302,6 +3305,10 @@ packages:
 
   '@opencode-ai/sdk@1.16.2':
     resolution: {integrity: sha512-Z/xZ7q79dYeE0afqIk/yFEcRNGEQFcE+H8ssYivUiy+xGZ1mGwT72jpaQZKBwPn3JH4sRCu4KA2lcktBQfcOjg==}
+
+  '@opencomputer/sdk@0.6.2':
+    resolution: {integrity: sha512-UfeEf8qfx0wckOWh8i0mIx8QtAZ7gRfKatDyYFNxHwbzFeUyzz1RRZCghoi+NmUiy97T9JDcNeeID4GJ2UR1Ng==}
+    engines: {node: '>=18'}
 
   '@opentelemetry/api-logs@0.208.0':
     resolution: {integrity: sha512-CjruKY9V6NMssL/T1kAFgzosF1v9o6oeN+aX5JB/C/xPNtmgIJqcXHG7fA82Ou1zCpWGl4lROQUKwUNE1pMCyg==}
@@ -15232,6 +15239,8 @@ snapshots:
   '@opencode-ai/sdk@1.16.2':
     dependencies:
       cross-spawn: 7.0.6
+
+  '@opencomputer/sdk@0.6.2': {}
 
   '@opentelemetry/api-logs@0.208.0':
     dependencies:

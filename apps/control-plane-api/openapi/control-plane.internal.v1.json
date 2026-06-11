@@ -3954,7 +3954,7 @@
                   },
                   "provider": {
                     "type": "string",
-                    "enum": ["docker", "e2b", "freestyle", "modal", "tensorlake"]
+                    "enum": ["docker", "e2b", "freestyle", "modal", "opencomputer", "tensorlake"]
                   },
                   "connectionId": {
                     "type": "string",

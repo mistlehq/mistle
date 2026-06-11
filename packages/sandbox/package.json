@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@mistle/time": "workspace:*",
+    "@opencomputer/sdk": "0.6.2",
     "@opentelemetry/api": "^1.9.1",
     "dockerode": "^5.0.0",
     "e2b": "^2.27.0",
