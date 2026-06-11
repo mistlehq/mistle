@@ -3,6 +3,7 @@ import { GitHubAppInstallationCredentialResolver } from "../../shared/credential
 import { AppendSessionLinkToGitHubMarkdownRequestMiddleware } from "../../shared/egress-request-middleware.server.js";
 import { listGitHubConnectionResources } from "../../shared/list-connection-resources.server.js";
 import { GitHubEnterpriseServerProviderAppSetupCapability } from "../../shared/provider-app-setup.server.js";
+import { GitHubAssociatedResourceEventsCapability } from "../../shared/provider-resource-association-webhooks.js";
 import {
   createGitHubResourceDefinitions,
   GitHubResourceSyncTriggers,
@@ -27,6 +28,7 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerBaseIntegra
   },
   webhookHandler: GitHubEnterpriseServerWebhookHandler,
   webhookSource: GitHubWebhookSourceCapability,
+  associatedResourceEvents: GitHubAssociatedResourceEventsCapability,
   resourceDefinitions: createGitHubResourceDefinitions({
     apiKeySlotKey: GitHubCredentialSlotKeys.GITHUB_ENTERPRISE_SERVER_API_KEY,
   }),

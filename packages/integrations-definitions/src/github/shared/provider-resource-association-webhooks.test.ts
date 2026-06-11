@@ -4,7 +4,10 @@ import {
 } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
-import { observeGitHubAssociatedResourceFromWebhookEvent } from "./provider-resource-association-webhooks.js";
+import {
+  isSelfAuthoredGitHubAssociatedResourceEvent,
+  observeGitHubAssociatedResourceFromWebhookEvent,
+} from "./provider-resource-association-webhooks.js";
 
 describe("GitHub associated resource webhook observation", () => {
   it("observes issue comments on pull requests", () => {
@@ -28,6 +31,9 @@ describe("GitHub associated resource webhook observation", () => {
     });
 
     expect(observed).toEqual({
+      actor: {
+        handle: "octocat",
+      },
       resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
       eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
       providerResourceId: "mistlehq/mistle#42",
@@ -89,6 +95,9 @@ describe("GitHub associated resource webhook observation", () => {
         },
       }),
     ).toEqual({
+      actor: {
+        handle: "reviewer",
+      },
       resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
       eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
       providerResourceId: "mistlehq/mistle#43",
@@ -131,6 +140,9 @@ describe("GitHub associated resource webhook observation", () => {
         },
       }),
     ).toEqual({
+      actor: {
+        handle: "octocat",
+      },
       resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
       eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
       providerResourceId: "mistlehq/mistle#44",
@@ -152,5 +164,155 @@ describe("GitHub associated resource webhook observation", () => {
         ].join("\n"),
       },
     });
+  });
+
+  it("identifies GitHub App bot events as self-authored for app installation connections", () => {
+    const observed = observeGitHubAssociatedResourceFromWebhookEvent({
+      eventType: "github.issue_comment.created",
+      payload: {
+        repository: {
+          full_name: "mistlehq/mistle",
+        },
+        issue: {
+          number: 42,
+          pull_request: {},
+        },
+        comment: {
+          body: "comment from the app",
+        },
+        sender: {
+          login: "mistle-github-app[bot]",
+        },
+      },
+    });
+    if (observed === null) {
+      throw new Error("Expected GitHub pull request issue comment to be observed.");
+    }
+
+    expect(
+      isSelfAuthoredGitHubAssociatedResourceEvent({
+        connection: {
+          id: "icn_github_app_bot",
+          config: {
+            connection_method: "github-app-installation",
+            app_id: "12345",
+            app_slug: "mistle-github-app",
+            client_id: "Iv1.example",
+            installation_id: "98765",
+          },
+        },
+        observation: observed,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not treat linked user and unknown actor events as self-authored", () => {
+    const observed = observeGitHubAssociatedResourceFromWebhookEvent({
+      eventType: "github.issue_comment.created",
+      payload: {
+        repository: {
+          full_name: "mistlehq/mistle",
+        },
+        issue: {
+          number: 42,
+          pull_request: {},
+        },
+        comment: {
+          body: "comment from a linked user",
+        },
+        sender: {
+          login: "octocat",
+        },
+      },
+    });
+    if (observed === null) {
+      throw new Error("Expected GitHub pull request issue comment to be observed.");
+    }
+
+    expect(
+      isSelfAuthoredGitHubAssociatedResourceEvent({
+        connection: {
+          id: "icn_github_app_linked_user",
+          config: {
+            connection_method: "github-app-installation",
+            app_id: "12345",
+            app_slug: "mistle-github-app",
+            client_id: "Iv1.example",
+            installation_id: "98765",
+          },
+        },
+        observation: observed,
+      }),
+    ).toBe(false);
+
+    expect(
+      isSelfAuthoredGitHubAssociatedResourceEvent({
+        connection: {
+          id: "icn_github_api_key_unknown_actor",
+          config: {
+            connection_method: "api-key",
+          },
+        },
+        observation: {
+          ...observed,
+          actor: undefined,
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it("does not treat missing app actor or API key bot events as self-authored", () => {
+    const observed = observeGitHubAssociatedResourceFromWebhookEvent({
+      eventType: "github.issue_comment.created",
+      payload: {
+        repository: {
+          full_name: "mistlehq/mistle",
+        },
+        issue: {
+          number: 42,
+          pull_request: {},
+        },
+        comment: {
+          body: "comment from the app",
+        },
+        sender: {
+          login: "mistle-github-app[bot]",
+        },
+      },
+    });
+    if (observed === null) {
+      throw new Error("Expected GitHub pull request issue comment to be observed.");
+    }
+
+    expect(
+      isSelfAuthoredGitHubAssociatedResourceEvent({
+        connection: {
+          id: "icn_github_app_unknown_actor",
+          config: {
+            connection_method: "github-app-installation",
+            app_id: "12345",
+            app_slug: "mistle-github-app",
+            client_id: "Iv1.example",
+            installation_id: "98765",
+          },
+        },
+        observation: {
+          ...observed,
+          actor: undefined,
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      isSelfAuthoredGitHubAssociatedResourceEvent({
+        connection: {
+          id: "icn_github_api_key_bot",
+          config: {
+            connection_method: "api-key",
+          },
+        },
+        observation: observed,
+      }),
+    ).toBe(false);
   });
 });

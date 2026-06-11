@@ -24,6 +24,8 @@ export {
   type GitHubRoutableResourceObservation,
 } from "./shared/provider-resource-associations.js";
 export {
+  GitHubAssociatedResourceEventsCapability,
+  isSelfAuthoredGitHubAssociatedResourceEvent,
   observeGitHubAssociatedResourceFromWebhookEvent,
   type GitHubAssociatedResourceRenderedInput,
   type GitHubAssociatedResourceWebhookObservation,

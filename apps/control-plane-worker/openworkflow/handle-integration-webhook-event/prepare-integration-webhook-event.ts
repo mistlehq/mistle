@@ -171,6 +171,7 @@ export async function prepareIntegrationWebhookEvent(
             {
               controlPlaneInternalClient: ctx.controlPlaneInternalClient,
               db: ctx.db,
+              integrationRegistry: ctx.integrationRegistry,
             },
             {
               webhookEvent,
@@ -248,6 +249,7 @@ export async function prepareIntegrationWebhookEvent(
         {
           controlPlaneInternalClient: ctx.controlPlaneInternalClient,
           db: ctx.db,
+          integrationRegistry: ctx.integrationRegistry,
         },
         {
           webhookEvent,
