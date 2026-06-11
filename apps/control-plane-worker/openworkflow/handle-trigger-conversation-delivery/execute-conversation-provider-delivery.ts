@@ -38,7 +38,7 @@ function readActiveDeliveryTraceCarrier(): DeliveryTraceCarrier {
   const activeTraceCarrier = extractActiveW3cTraceCarrier();
   if (activeTraceCarrier === null) {
     throw new ConversationDeliveryExecutionError(
-      "Trigger conversation delivery requires an active OpenTelemetry trace context before sending delivery context to Codex proxy.",
+      "Trigger conversation delivery requires an active OpenTelemetry trace context before sending delivery context to the runtime provider.",
     );
   }
   return activeTraceCarrier;

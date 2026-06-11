@@ -672,6 +672,7 @@ pub struct CompiledAgentRuntime {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AgentRuntimeCapabilities {
     pub associated_resource_delivery: Option<AgentRuntimeAssociatedResourceDeliveryCapability>,
+    pub conversation_delivery: Option<AgentRuntimeConversationDeliveryCapability>,
 }
 
 /// Capability marker for runtimes that can receive associated resource delivery.
@@ -680,6 +681,22 @@ pub struct AgentRuntimeCapabilities {
 pub struct AgentRuntimeAssociatedResourceDeliveryCapability {
     #[serde(deserialize_with = "deserialize_true_bool")]
     pub supported: bool,
+}
+
+/// Trigger conversation delivery policy for one compiled first-class agent runtime.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AgentRuntimeConversationDeliveryCapability {
+    pub idempotency_fingerprint_runtime_key: String,
+    pub create_conversation_retry_policy: AgentRuntimeCreateConversationRetryPolicy,
+}
+
+/// Retry policy marker for trigger conversation creation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentRuntimeCreateConversationRetryPolicy {
+    Idempotent,
+    SingleAttempt,
 }
 
 fn deserialize_true_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
@@ -737,8 +754,8 @@ pub enum WorkspaceSourceResourceKind {
 #[cfg(test)]
 mod tests {
     use super::{
-        CompiledEgressRoute, CompiledEgressRouteAuthInjectionType,
-        CompiledEgressRouteCredentialResolver,
+        AgentRuntimeCreateConversationRetryPolicy, CompiledEgressRoute,
+        CompiledEgressRouteAuthInjectionType, CompiledEgressRouteCredentialResolver,
         CompiledLinkedPrincipalEgressCredentialResolutionMode, CompiledRuntimePlan,
         RuntimeArtifactGitHubReleaseInstallAsset, RuntimeArtifactGitHubReleaseSelector,
         RuntimeArtifactInstallStep,
@@ -822,6 +839,10 @@ mod tests {
               "capabilities": {
                 "associatedResourceDelivery": {
                   "supported": true
+                },
+                "conversationDelivery": {
+                  "idempotencyFingerprintRuntimeKey": "codex",
+                  "createConversationRetryPolicy": "idempotent"
                 }
               }
             }
@@ -842,6 +863,18 @@ mod tests {
             .as_ref()
             .expect("associated resource delivery capability should be decoded");
         assert!(associated_resource_delivery.supported);
+        let conversation_delivery = capabilities
+            .conversation_delivery
+            .as_ref()
+            .expect("conversation delivery capability should be decoded");
+        assert_eq!(
+            conversation_delivery.idempotency_fingerprint_runtime_key,
+            "codex"
+        );
+        assert_eq!(
+            conversation_delivery.create_conversation_retry_policy,
+            AgentRuntimeCreateConversationRetryPolicy::Idempotent
+        );
     }
 
     #[test]

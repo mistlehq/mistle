@@ -1,4 +1,7 @@
-import type { AgentConversationCollaborationModeSettings } from "@mistle/integrations-core";
+import type {
+  AgentConversationCollaborationModeSettings,
+  AgentRuntimeConversationDeliveryCapability,
+} from "@mistle/integrations-core";
 
 export type ActiveTriggerConversationDeliveryTaskStatus = "claimed" | "delivering";
 
@@ -35,6 +38,7 @@ export type TriggerConversationDeliveryTaskAction = "deliver" | "ignore";
 export type ExecuteConversationProviderDeliveryInput = {
   conversationId: string;
   runtimeId: string;
+  conversationDeliveryPolicy: AgentRuntimeConversationDeliveryCapability;
   connectionUrl: string;
   inputText: string;
   workingDirectory: string;

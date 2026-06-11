@@ -411,6 +411,13 @@ const AgentRuntimeCapabilitiesSchema = z
       })
       .strict()
       .optional(),
+    conversationDelivery: z
+      .object({
+        idempotencyFingerprintRuntimeKey: z.string().min(1),
+        createConversationRetryPolicy: z.enum(["idempotent", "single_attempt"]),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -982,15 +989,24 @@ function normalizeSkills(
 function normalizeAgentRuntimeCapabilities(
   capabilities: z.output<typeof AgentRuntimeCapabilitiesSchema>,
 ): AgentRuntimeCapabilities {
-  if (capabilities.associatedResourceDelivery === undefined) {
-    return {};
+  const normalized: AgentRuntimeCapabilities = {};
+
+  if (capabilities.associatedResourceDelivery !== undefined) {
+    normalized.associatedResourceDelivery = {
+      supported: capabilities.associatedResourceDelivery.supported,
+    };
   }
 
-  return {
-    associatedResourceDelivery: {
-      supported: capabilities.associatedResourceDelivery.supported,
-    },
-  };
+  if (capabilities.conversationDelivery !== undefined) {
+    normalized.conversationDelivery = {
+      idempotencyFingerprintRuntimeKey:
+        capabilities.conversationDelivery.idempotencyFingerprintRuntimeKey,
+      createConversationRetryPolicy:
+        capabilities.conversationDelivery.createConversationRetryPolicy,
+    };
+  }
+
+  return normalized;
 }
 
 function normalizeAgentRuntime(

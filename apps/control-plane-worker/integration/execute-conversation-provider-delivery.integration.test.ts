@@ -1,3 +1,4 @@
+import type { AgentRuntimeConversationDeliveryCapability } from "@mistle/integrations-core";
 import { extractW3cTraceCarrier } from "@mistle/telemetry/trace-context.js";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { TraceFlags, context, trace, type Context } from "@opentelemetry/api";
@@ -20,6 +21,10 @@ const ParentSpanContext = {
   spanId: "0123456789abcdef",
   traceFlags: TraceFlags.SAMPLED,
 };
+const CodexConversationDeliveryPolicy = {
+  idempotencyFingerprintRuntimeKey: "codex",
+  createConversationRetryPolicy: "idempotent",
+} satisfies AgentRuntimeConversationDeliveryCapability;
 
 const contextManager = new AsyncLocalStorageContextManager();
 const it = createIntegrationTest({
@@ -60,6 +65,7 @@ describe("executeConversationProviderDelivery", () => {
           await executeConversationProviderDelivery({
             conversationId: "acv_123",
             runtimeId: "codex",
+            conversationDeliveryPolicy: CodexConversationDeliveryPolicy,
             connectionUrl: server.url,
             inputText: "Handle the webhook payload.",
             workingDirectory: "/root",
@@ -313,6 +319,7 @@ describe("executeConversationProviderDelivery", () => {
           await executeConversationProviderDelivery({
             conversationId: "acv_123",
             runtimeId: "codex",
+            conversationDeliveryPolicy: CodexConversationDeliveryPolicy,
             connectionUrl: server.url,
             inputText: "Handle the webhook payload.",
             workingDirectory: "/root",
@@ -371,6 +378,7 @@ describe("executeConversationProviderDelivery", () => {
           await executeConversationProviderDelivery({
             conversationId: "acv_123",
             runtimeId: "codex",
+            conversationDeliveryPolicy: CodexConversationDeliveryPolicy,
             connectionUrl: server.url,
             inputText: "Handle the webhook payload.",
             workingDirectory: "/root/mistlehq/platform",
@@ -540,6 +548,7 @@ describe("executeConversationProviderDelivery", () => {
           await executeConversationProviderDelivery({
             conversationId: "acv_123",
             runtimeId: "codex",
+            conversationDeliveryPolicy: CodexConversationDeliveryPolicy,
             connectionUrl: server.url,
             inputText: "Handle the webhook payload.",
             workingDirectory: "/root",
@@ -584,6 +593,7 @@ describe("executeConversationProviderDelivery", () => {
           await executeConversationProviderDelivery({
             conversationId: "acv_123",
             runtimeId: "codex",
+            conversationDeliveryPolicy: CodexConversationDeliveryPolicy,
             connectionUrl: server.url,
             inputText: "Handle the webhook payload.",
             workingDirectory: "/root",
@@ -631,7 +641,7 @@ describe("executeConversationProviderDelivery", () => {
         sandboxInstanceId: "sbi_123",
       }),
     ).toThrow(
-      "Trigger conversation delivery requires an active OpenTelemetry trace context before sending delivery context to Codex proxy.",
+      "Trigger conversation delivery requires an active OpenTelemetry trace context before sending delivery context to the runtime provider.",
     );
   });
 });
@@ -648,6 +658,7 @@ function createDeliveryInput(input: {
   return {
     conversationId: "acv_123",
     runtimeId: "codex",
+    conversationDeliveryPolicy: CodexConversationDeliveryPolicy,
     connectionUrl: input.connectionUrl,
     inputText: "Handle the webhook payload.",
     workingDirectory: "/root/mistlehq/platform",

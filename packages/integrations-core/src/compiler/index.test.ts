@@ -135,6 +135,10 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
       associatedResourceDelivery: {
         supported: true,
       },
+      conversationDelivery: {
+        idempotencyFingerprintRuntimeKey: "codex",
+        createConversationRetryPolicy: "idempotent",
+      },
     },
     createConversationProvider: () => NoopConversationProvider,
     materializeMcpConfig: () => [
@@ -960,6 +964,10 @@ describe("compileRuntimePlan", () => {
         capabilities: {
           associatedResourceDelivery: {
             supported: true,
+          },
+          conversationDelivery: {
+            idempotencyFingerprintRuntimeKey: "codex",
+            createConversationRetryPolicy: "idempotent",
           },
         },
         ptyLaunch: {
