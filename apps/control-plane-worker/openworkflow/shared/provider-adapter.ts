@@ -2,6 +2,8 @@ import type {
   AgentConversationCollaborationModeSettings,
   AgentConversationIdempotencyMetadata,
   AgentConversationProvider,
+  AgentConversationSubmitAssociatedResourceDeliveryInput,
+  AgentConversationSubmitAssociatedResourceDeliveryResult,
 } from "@mistle/integrations-core";
 import { resolveAgentConversationProvider } from "@mistle/integrations-definitions/agent-runtimes/server";
 
@@ -130,6 +132,9 @@ export type ConversationProviderAdapter = {
   recoverLateSteer?: (
     input: ProviderRecoverLateSteerInput,
   ) => Promise<ProviderStartExecutionOutput>;
+  submitAssociatedResourceDelivery?: (
+    input: AgentConversationSubmitAssociatedResourceDeliveryInput,
+  ) => Promise<AgentConversationSubmitAssociatedResourceDeliveryResult>;
   interruptExecution: (input: ProviderInterruptExecutionInput) => Promise<void>;
 };
 
@@ -143,6 +148,7 @@ function adaptConversationProvider(
   const recoverLateSteer = provider.recoverLateSteer;
   const generateConversationTitle = provider.generateConversationTitle;
   const resolveOriginalConversation = provider.resolveOriginalConversation;
+  const submitAssociatedResourceDelivery = provider.submitAssociatedResourceDelivery;
 
   return {
     connect: async (input) => await provider.connect(input),
@@ -165,6 +171,12 @@ function adaptConversationProvider(
       ? {}
       : {
           recoverLateSteer: async (input) => await recoverLateSteer(input),
+        }),
+    ...(submitAssociatedResourceDelivery === undefined
+      ? {}
+      : {
+          submitAssociatedResourceDelivery: async (input) =>
+            await submitAssociatedResourceDelivery(input),
         }),
     interruptExecution: async (input) => await provider.interruptExecution(input),
   };

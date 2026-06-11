@@ -125,6 +125,18 @@ export type AgentConversationRecoverLateSteerResult = {
   providerState?: unknown;
 };
 
+export type AgentConversationSubmitAssociatedResourceDeliveryInput = {
+  connection: AgentConversationConnection;
+  providerConversationId: string;
+  inputText: string;
+  idempotency?: AgentConversationIdempotencyMetadata | undefined;
+};
+
+export type AgentConversationSubmitAssociatedResourceDeliveryResult = {
+  providerExecutionId: string | null;
+  providerState?: unknown;
+};
+
 export type AgentConversationInterruptExecutionInput = {
   connection: AgentConversationConnection;
   providerConversationId: string;
@@ -166,5 +178,9 @@ export type AgentConversationProvider = {
     this: void,
     input: AgentConversationRecoverLateSteerInput,
   ): Promise<AgentConversationRecoverLateSteerResult>;
+  submitAssociatedResourceDelivery?(
+    this: void,
+    input: AgentConversationSubmitAssociatedResourceDeliveryInput,
+  ): Promise<AgentConversationSubmitAssociatedResourceDeliveryResult>;
   interruptExecution(this: void, input: AgentConversationInterruptExecutionInput): Promise<void>;
 };
