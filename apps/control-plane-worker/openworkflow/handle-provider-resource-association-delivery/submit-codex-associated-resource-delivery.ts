@@ -312,12 +312,7 @@ function resolveLatestActiveCodexTurnId(response: unknown): string | null {
         message: "Codex associated-resource thread/read turn did not include id.",
       });
     }
-    if (
-      turnStatus === "running" ||
-      turnStatus === "active" ||
-      turnStatus === "inProgress" ||
-      turnStatus === "in_progress"
-    ) {
+    if (turnStatus === "running" || turnStatus === "active" || turnStatus === "inProgress") {
       return turnId;
     }
   }
