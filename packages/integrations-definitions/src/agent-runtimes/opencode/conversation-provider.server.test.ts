@@ -24,6 +24,15 @@ describe("resolveOriginalOpenCodeSessionId", () => {
       ]),
     ).toBe("session_a");
   });
+
+  it("can select an archived session when it is the earliest candidate", () => {
+    expect(
+      resolveOriginalOpenCodeSessionId([
+        { id: "session_recent_active", time: { created: 1_800 } },
+        { id: "session_original_archived", time: { created: 1_200 } },
+      ]),
+    ).toBe("session_original_archived");
+  });
 });
 
 describe("renderOpenCodePromptSystem", () => {

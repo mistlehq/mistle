@@ -162,11 +162,22 @@ export function resolveOriginalOpenCodeSessionId(
 async function listAllOpenCodeSessions(input: {
   client: OpenCodeSessionClient;
 }): Promise<readonly OpenCodeSessionSummary[]> {
+  return [
+    ...(await listOpenCodeSessionPages({ client: input.client })),
+    ...(await listOpenCodeSessionPages({ client: input.client, archived: true })),
+  ];
+}
+
+async function listOpenCodeSessionPages(input: {
+  archived?: boolean;
+  client: OpenCodeSessionClient;
+}): Promise<readonly OpenCodeSessionSummary[]> {
   const sessions: OpenCodeSessionSummary[] = [];
   let start = 0;
 
   while (true) {
     const page = await input.client.listSessions({
+      ...(input.archived === undefined ? {} : { archived: input.archived }),
       limit: OpenCodeOriginalSessionPageSize,
       start,
     });

@@ -306,9 +306,15 @@ export function createOpenCodeSessionClient(
       return result.data;
     },
     async listSessions(listInput = {}) {
-      const result = await sdkClient.session.list(listInput, {
-        throwOnError: true,
-      });
+      const { archived, cursor, ...stableListInput } = listInput;
+      const result =
+        archived === undefined && cursor === undefined
+          ? await sdkClient.session.list(stableListInput, {
+              throwOnError: true,
+            })
+          : await sdkClient.experimental.session.list(listInput, {
+              throwOnError: true,
+            });
       return result.data;
     },
     async listSessionStatuses(statusInput = {}) {
