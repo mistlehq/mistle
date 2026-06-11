@@ -13,8 +13,8 @@ import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
 import {
-  PublishSandboxProfileVersionResponseSchema,
   RefreshSandboxProfileVersionConflictResponseSchema,
+  RefreshSandboxProfileVersionResponseSchema,
 } from "../src/sandbox-profiles/index.js";
 import { waitForQueuedMaterializeWorkflowInput } from "./helpers/data-plane-workflows.js";
 import { sandboxProfileRow, sandboxProfileVersionRow } from "./helpers/sandbox-profiles.js";
@@ -121,7 +121,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
     );
 
     expect(response.status).toBe(200);
-    const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    const responseBody = RefreshSandboxProfileVersionResponseSchema.parse(await response.json());
     const snapshotJob = expectCreatedSnapshotJob(responseBody.snapshotAction);
     expect(responseBody).toEqual({
       version: {
@@ -243,7 +243,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
     );
 
     expect(response.status).toBe(200);
-    const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    const responseBody = RefreshSandboxProfileVersionResponseSchema.parse(await response.json());
     const snapshotJob = expectCreatedSnapshotJob(responseBody.snapshotAction);
     expect(responseBody.version).toMatchObject({
       sandboxProfileId: "sbp_version_maintenance_refresh_001",
@@ -356,7 +356,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
     );
 
     expect(response.status).toBe(200);
-    const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    const responseBody = RefreshSandboxProfileVersionResponseSchema.parse(await response.json());
     const snapshotJob = expectCreatedSnapshotJob(responseBody.snapshotAction);
     expect(responseBody).toEqual({
       version: {
@@ -533,7 +533,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
     );
 
     expect(response.status).toBe(200);
-    const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    const responseBody = RefreshSandboxProfileVersionResponseSchema.parse(await response.json());
     const snapshotJob = expectCreatedSnapshotJob(responseBody.snapshotAction);
     expect(responseBody.version).toMatchObject({
       sandboxProfileId: "sbp_version_retry_publish_snapshot_001",
@@ -657,7 +657,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
     );
 
     expect(response.status).toBe(200);
-    const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    const responseBody = RefreshSandboxProfileVersionResponseSchema.parse(await response.json());
     const snapshotJob = expectCreatedSnapshotJob(responseBody.snapshotAction);
     expect(responseBody.version.latestSnapshotJob).toMatchObject({
       id: expect.any(String),

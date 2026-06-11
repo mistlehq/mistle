@@ -23,9 +23,6 @@ type ProfileVersionSnapshotDecisionFields = {
   version: number;
   setupScript: string | null;
   agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
-  gitCommitSigningIntegrationConnectionId: string | null;
-  mistleMcpEnabled: boolean;
-  mistleMcpApiKeyId: string | null;
   sandboxProvider: string | null;
   sandboxConnectionId: string | null;
   sandboxVcpuCount: number | null;
@@ -117,31 +114,6 @@ function runtimePlanSnapshotImpactMatches(input: {
   );
 }
 
-async function compileRuntimePlanForSnapshotReuseDecision(
-  {
-    db,
-    integrationsConfig,
-    mcpConfig,
-  }: Pick<CreateSandboxProfilesServiceInput, "integrationsConfig" | "mcpConfig"> & {
-    db: ControlPlaneDatabase | ControlPlaneTransaction;
-  },
-  input: {
-    organizationId: string;
-    profileId: string;
-    profileVersion: number;
-    image: ResolvedSandboxImage;
-  },
-): Promise<CompiledRuntimePlan> {
-  return await compileProfileVersionRuntimePlan(
-    {
-      db,
-      integrationsConfig,
-      mcpConfig,
-    },
-    input,
-  );
-}
-
 export async function resolveProfileVersionPublishSnapshotAction(
   {
     db,
@@ -175,7 +147,7 @@ export async function resolveProfileVersionPublishSnapshotAction(
     imageRef: previousActiveVersion.snapshotImageId,
   };
   const [previousRuntimePlan, draftRuntimePlan] = await Promise.all([
-    compileRuntimePlanForSnapshotReuseDecision(
+    compileProfileVersionRuntimePlan(
       {
         db,
         integrationsConfig,
@@ -188,7 +160,7 @@ export async function resolveProfileVersionPublishSnapshotAction(
         image,
       },
     ),
-    compileRuntimePlanForSnapshotReuseDecision(
+    compileProfileVersionRuntimePlan(
       {
         db,
         integrationsConfig,

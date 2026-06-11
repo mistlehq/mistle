@@ -18,8 +18,10 @@ import type {
   PutSandboxProfileVersionDraftInput,
   PutSandboxProfileVersionDraftResult,
   PutSandboxProfileVersionRefreshScheduleInput,
+  RefreshSandboxProfileVersionResult,
   RefreshSandboxProfileVersionSkillsSourceRepoInput,
   RefreshSandboxProfileVersionSkillsSourceRepoResult,
+  RetrySandboxProfileVersionPublishSnapshotResult,
   SandboxProfile,
   SandboxProfileVersion,
   SandboxProfileVersionDraftTriggerImpact,
@@ -601,28 +603,32 @@ const SandboxProfileVersionPublishabilitySchema = z
   })
   .strict();
 
+const SandboxProfileVersionSnapshotJobSummarySchema = z
+  .object({
+    id: z.string().min(1),
+    sandboxInstanceId: z.string().min(1).nullable(),
+    trigger: z.enum(["publish", "manual_refresh", "scheduled_refresh"]),
+    state: z.enum(["queued", "running", "succeeded", "failed"]),
+    errorCode: z.string().min(1).nullable(),
+    errorMessage: z.string().min(1).nullable(),
+    createdAt: z.string().min(1),
+    startedAt: z.string().min(1).nullable(),
+    finishedAt: z.string().min(1).nullable(),
+  })
+  .strict();
+
+const SandboxProfileVersionCreatedSnapshotActionSchema = z
+  .object({
+    kind: z.literal("created"),
+    job: SandboxProfileVersionSnapshotJobSummarySchema,
+  })
+  .strict();
+
 const PublishSandboxProfileVersionResultSchema = z
   .object({
     activeVersion: z.number().int().min(1).nullable(),
     snapshotAction: z.discriminatedUnion("kind", [
-      z
-        .object({
-          kind: z.literal("created"),
-          job: z
-            .object({
-              id: z.string().min(1),
-              sandboxInstanceId: z.string().min(1).nullable(),
-              trigger: z.enum(["publish", "manual_refresh", "scheduled_refresh"]),
-              state: z.enum(["queued", "running", "succeeded", "failed"]),
-              errorCode: z.string().min(1).nullable(),
-              errorMessage: z.string().min(1).nullable(),
-              createdAt: z.string().min(1),
-              startedAt: z.string().min(1).nullable(),
-              finishedAt: z.string().min(1).nullable(),
-            })
-            .strict(),
-        })
-        .strict(),
+      SandboxProfileVersionCreatedSnapshotActionSchema,
       z
         .object({
           kind: z.literal("reused"),
@@ -631,6 +637,14 @@ const PublishSandboxProfileVersionResultSchema = z
         })
         .strict(),
     ]),
+    version: SandboxProfileVersionSchema,
+  })
+  .strict();
+
+const RefreshSandboxProfileVersionResultSchema = z
+  .object({
+    activeVersion: z.number().int().min(1).nullable(),
+    snapshotAction: SandboxProfileVersionCreatedSnapshotActionSchema,
     version: SandboxProfileVersionSchema,
   })
   .strict();
@@ -995,7 +1009,7 @@ export async function refreshSandboxProfileVersion(input: {
   profileId: string;
   version: number;
   refreshKind: "setup" | "maintenance";
-}): Promise<PublishSandboxProfileVersionResult> {
+}): Promise<RefreshSandboxProfileVersionResult> {
   try {
     const response = await requestControlPlane({
       operation: "refreshSandboxProfileVersion",
@@ -1010,7 +1024,7 @@ export async function refreshSandboxProfileVersion(input: {
     });
 
     const responseBody = await response.json();
-    const parsedResponse = PublishSandboxProfileVersionResultSchema.safeParse(responseBody);
+    const parsedResponse = RefreshSandboxProfileVersionResultSchema.safeParse(responseBody);
     if (!parsedResponse.success) {
       throw new SandboxProfilesApiError({
         operation: "refreshSandboxProfileVersion",
@@ -1035,7 +1049,7 @@ export async function refreshSandboxProfileVersion(input: {
 export async function retrySandboxProfileVersionPublishSnapshot(input: {
   profileId: string;
   version: number;
-}): Promise<PublishSandboxProfileVersionResult> {
+}): Promise<RetrySandboxProfileVersionPublishSnapshotResult> {
   try {
     const response = await requestControlPlane({
       operation: "retrySandboxProfileVersionPublishSnapshot",
@@ -1047,7 +1061,7 @@ export async function retrySandboxProfileVersionPublishSnapshot(input: {
     });
 
     const responseBody = await response.json();
-    const parsedResponse = PublishSandboxProfileVersionResultSchema.safeParse(responseBody);
+    const parsedResponse = RefreshSandboxProfileVersionResultSchema.safeParse(responseBody);
     if (!parsedResponse.success) {
       throw new SandboxProfilesApiError({
         operation: "retrySandboxProfileVersionPublishSnapshot",

@@ -98,13 +98,14 @@ const sandboxProfileVersionSnapshotJobSummarySchema = z
     finishedAt: z.string().min(1).nullable(),
   })
   .strict();
+const sandboxProfileVersionCreatedSnapshotActionSchema = z
+  .object({
+    kind: z.literal("created"),
+    job: sandboxProfileVersionSnapshotJobSummarySchema,
+  })
+  .strict();
 const sandboxProfileVersionSnapshotActionSchema = z.discriminatedUnion("kind", [
-  z
-    .object({
-      kind: z.literal("created"),
-      job: sandboxProfileVersionSnapshotJobSummarySchema,
-    })
-    .strict(),
+  sandboxProfileVersionCreatedSnapshotActionSchema,
   z
     .object({
       kind: z.literal("reused"),
@@ -354,6 +355,14 @@ export const publishSandboxProfileVersionResponseSchema = z
     version: sandboxProfileVersionSchema,
     activeVersion: z.number().int().min(1).nullable(),
     snapshotAction: sandboxProfileVersionSnapshotActionSchema,
+  })
+  .strict();
+
+export const refreshSandboxProfileVersionResponseSchema = z
+  .object({
+    version: sandboxProfileVersionSchema,
+    activeVersion: z.number().int().min(1).nullable(),
+    snapshotAction: sandboxProfileVersionCreatedSnapshotActionSchema,
   })
   .strict();
 

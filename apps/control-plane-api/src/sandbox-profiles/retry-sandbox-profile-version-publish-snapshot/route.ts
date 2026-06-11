@@ -6,7 +6,7 @@ import {
 } from "@mistle/http/errors.js";
 
 import {
-  publishSandboxProfileVersionResponseSchema,
+  refreshSandboxProfileVersionResponseSchema,
   sandboxProfileVersionParamsSchema,
 } from "../schemas.js";
 import { conflictResponseSchema, notFoundResponseSchema } from "./schema.js";
@@ -24,7 +24,7 @@ export const route = createRoute({
         "Queue publish snapshot materialization for a published sandbox profile version without a usable snapshot.",
       content: {
         "application/json": {
-          schema: publishSandboxProfileVersionResponseSchema,
+          schema: refreshSandboxProfileVersionResponseSchema,
         },
       },
     },

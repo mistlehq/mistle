@@ -131,6 +131,20 @@ function requireCreatedSnapshotJob(input: {
   return input.snapshotJob;
 }
 
+function requireCreatedSnapshotSandboxInstanceId(input: {
+  sandboxInstanceId: string | null;
+  profileId: string;
+  profileVersion: number;
+}): string {
+  if (input.sandboxInstanceId === null) {
+    throw new Error(
+      `Snapshot sandbox instance ID was not created for sandbox profile '${input.profileId}' version '${String(input.profileVersion)}'.`,
+    );
+  }
+
+  return input.sandboxInstanceId;
+}
+
 async function copyRefreshScheduleToPublishedVersion(
   tx: ControlPlaneTransaction,
   input: {
@@ -323,8 +337,6 @@ export async function publishProfileVersion(
   },
   input: PublishProfileVersionInput,
 ): Promise<PublishProfileVersionOutput> {
-  const sandboxInstanceId = typeid("sbi").toString();
-
   const publishedResult: PublishTransactionResult = await db.transaction(async (tx) => {
     const tables = getControlPlaneDatabaseSchema(tx);
 
@@ -352,9 +364,6 @@ export async function publishProfileVersion(
         setupScript: true,
         maintenanceScript: true,
         agentRuntimeId: true,
-        gitCommitSigningIntegrationConnectionId: true,
-        mistleMcpEnabled: true,
-        mistleMcpApiKeyId: true,
         sandboxProvider: true,
         sandboxConnectionId: true,
         sandboxVcpuCount: true,
@@ -413,9 +422,6 @@ export async function publishProfileVersion(
             setupScript: true,
             maintenanceScript: true,
             agentRuntimeId: true,
-            gitCommitSigningIntegrationConnectionId: true,
-            mistleMcpEnabled: true,
-            mistleMcpApiKeyId: true,
             sandboxProvider: true,
             sandboxConnectionId: true,
             sandboxVcpuCount: true,
@@ -501,13 +507,15 @@ export async function publishProfileVersion(
     }
 
     let snapshotJob: SnapshotJobSummary | null = null;
+    let snapshotSandboxInstanceId: string | null = null;
     if (snapshotAction.kind === "create") {
+      snapshotSandboxInstanceId = typeid("sbi").toString();
       const [createdSnapshotJob] = await tx
         .insert(tables.sandboxProfileVersionSnapshotJobs)
         .values({
           sandboxProfileId: input.profileId,
           sandboxProfileVersion: input.profileVersion,
-          sandboxInstanceId,
+          sandboxInstanceId: snapshotSandboxInstanceId,
           trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
           state: SandboxProfileVersionSnapshotJobStates.QUEUED,
         })
@@ -597,6 +605,11 @@ export async function publishProfileVersion(
       profileId: input.profileId,
       profileVersion: input.profileVersion,
     });
+    const createdSnapshotSandboxInstanceId = requireCreatedSnapshotSandboxInstanceId({
+      sandboxInstanceId: snapshotSandboxInstanceId,
+      profileId: input.profileId,
+      profileVersion: input.profileVersion,
+    });
 
     return {
       version: versionOutput,
@@ -608,7 +621,7 @@ export async function publishProfileVersion(
       snapshotMaterialization: {
         kind: "enqueue",
         snapshotJob: createdSnapshotJob,
-        sandboxInstanceId,
+        sandboxInstanceId: createdSnapshotSandboxInstanceId,
       },
     };
   });

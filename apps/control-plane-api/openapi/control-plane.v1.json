@@ -24989,7 +24989,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Publish the specified sandbox profile draft version and queue snapshot materialization.",
+            "description": "Publish the specified sandbox profile draft version and create or reuse its snapshot.",
             "content": {
               "application/json": {
                 "schema": {
@@ -25761,91 +25761,68 @@
                       "minimum": 1
                     },
                     "snapshotAction": {
-                      "oneOf": [
-                        {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["created"]
-                            },
-                            "job": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "sandboxInstanceId": {
-                                  "type": ["string", "null"],
-                                  "minLength": 1
-                                },
-                                "trigger": {
-                                  "type": "string",
-                                  "enum": ["publish", "manual_refresh", "scheduled_refresh"]
-                                },
-                                "state": {
-                                  "type": "string",
-                                  "enum": ["queued", "running", "succeeded", "failed"]
-                                },
-                                "errorCode": {
-                                  "type": ["string", "null"],
-                                  "minLength": 1
-                                },
-                                "errorMessage": {
-                                  "type": ["string", "null"],
-                                  "minLength": 1
-                                },
-                                "createdAt": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "startedAt": {
-                                  "type": ["string", "null"],
-                                  "minLength": 1
-                                },
-                                "finishedAt": {
-                                  "type": ["string", "null"],
-                                  "minLength": 1
-                                }
-                              },
-                              "required": [
-                                "id",
-                                "sandboxInstanceId",
-                                "trigger",
-                                "state",
-                                "errorCode",
-                                "errorMessage",
-                                "createdAt",
-                                "startedAt",
-                                "finishedAt"
-                              ],
-                              "additionalProperties": false
-                            }
-                          },
-                          "required": ["kind", "job"],
-                          "additionalProperties": false
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["created"]
                         },
-                        {
+                        "job": {
                           "type": "object",
                           "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["reused"]
-                            },
-                            "snapshotImageProvider": {
+                            "id": {
                               "type": "string",
                               "minLength": 1
                             },
-                            "snapshotImageId": {
+                            "sandboxInstanceId": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            },
+                            "trigger": {
                               "type": "string",
+                              "enum": ["publish", "manual_refresh", "scheduled_refresh"]
+                            },
+                            "state": {
+                              "type": "string",
+                              "enum": ["queued", "running", "succeeded", "failed"]
+                            },
+                            "errorCode": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            },
+                            "errorMessage": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "startedAt": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            },
+                            "finishedAt": {
+                              "type": ["string", "null"],
                               "minLength": 1
                             }
                           },
-                          "required": ["kind", "snapshotImageProvider", "snapshotImageId"],
+                          "required": [
+                            "id",
+                            "sandboxInstanceId",
+                            "trigger",
+                            "state",
+                            "errorCode",
+                            "errorMessage",
+                            "createdAt",
+                            "startedAt",
+                            "finishedAt"
+                          ],
                           "additionalProperties": false
                         }
-                      ]
+                      },
+                      "required": ["kind", "job"],
+                      "additionalProperties": false
                     }
                   },
                   "required": ["version", "activeVersion", "snapshotAction"],
@@ -26260,91 +26237,68 @@
                       "minimum": 1
                     },
                     "snapshotAction": {
-                      "oneOf": [
-                        {
-                          "type": "object",
-                          "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["created"]
-                            },
-                            "job": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "sandboxInstanceId": {
-                                  "type": ["string", "null"],
-                                  "minLength": 1
-                                },
-                                "trigger": {
-                                  "type": "string",
-                                  "enum": ["publish", "manual_refresh", "scheduled_refresh"]
-                                },
-                                "state": {
-                                  "type": "string",
-                                  "enum": ["queued", "running", "succeeded", "failed"]
-                                },
-                                "errorCode": {
-                                  "type": ["string", "null"],
-                                  "minLength": 1
-                                },
-                                "errorMessage": {
-                                  "type": ["string", "null"],
-                                  "minLength": 1
-                                },
-                                "createdAt": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "startedAt": {
-                                  "type": ["string", "null"],
-                                  "minLength": 1
-                                },
-                                "finishedAt": {
-                                  "type": ["string", "null"],
-                                  "minLength": 1
-                                }
-                              },
-                              "required": [
-                                "id",
-                                "sandboxInstanceId",
-                                "trigger",
-                                "state",
-                                "errorCode",
-                                "errorMessage",
-                                "createdAt",
-                                "startedAt",
-                                "finishedAt"
-                              ],
-                              "additionalProperties": false
-                            }
-                          },
-                          "required": ["kind", "job"],
-                          "additionalProperties": false
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["created"]
                         },
-                        {
+                        "job": {
                           "type": "object",
                           "properties": {
-                            "kind": {
-                              "type": "string",
-                              "enum": ["reused"]
-                            },
-                            "snapshotImageProvider": {
+                            "id": {
                               "type": "string",
                               "minLength": 1
                             },
-                            "snapshotImageId": {
+                            "sandboxInstanceId": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            },
+                            "trigger": {
                               "type": "string",
+                              "enum": ["publish", "manual_refresh", "scheduled_refresh"]
+                            },
+                            "state": {
+                              "type": "string",
+                              "enum": ["queued", "running", "succeeded", "failed"]
+                            },
+                            "errorCode": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            },
+                            "errorMessage": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "startedAt": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            },
+                            "finishedAt": {
+                              "type": ["string", "null"],
                               "minLength": 1
                             }
                           },
-                          "required": ["kind", "snapshotImageProvider", "snapshotImageId"],
+                          "required": [
+                            "id",
+                            "sandboxInstanceId",
+                            "trigger",
+                            "state",
+                            "errorCode",
+                            "errorMessage",
+                            "createdAt",
+                            "startedAt",
+                            "finishedAt"
+                          ],
                           "additionalProperties": false
                         }
-                      ]
+                      },
+                      "required": ["kind", "job"],
+                      "additionalProperties": false
                     }
                   },
                   "required": ["version", "activeVersion", "snapshotAction"],
