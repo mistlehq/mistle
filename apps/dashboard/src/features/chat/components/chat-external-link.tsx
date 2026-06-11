@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { useState } from "react";
 
 import { ChatExternalLinkDialog } from "./chat-external-link-dialog.js";
+import { isTrustedChatLink } from "./chat-link-safety.js";
 
 type ChatExternalLinkProps = {
   children: ReactNode;
@@ -20,7 +21,16 @@ export function ChatExternalLink({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   function handleConfirm(): void {
-    window.open(href, "_blank", "noopener,noreferrer");
+    openChatLinkInNewTab(href);
+  }
+
+  function handleClick(): void {
+    if (isTrustedChatLink(href)) {
+      openChatLinkInNewTab(href);
+      return;
+    }
+
+    setIsDialogOpen(true);
   }
 
   return (
@@ -31,9 +41,7 @@ export function ChatExternalLink({
           "appearance-none border-0 bg-transparent p-0 text-inherit cursor-pointer",
           className,
         )}
-        onClick={() => {
-          setIsDialogOpen(true);
-        }}
+        onClick={handleClick}
         style={style}
         type="button"
       >
@@ -49,4 +57,8 @@ export function ChatExternalLink({
       />
     </>
   );
+}
+
+function openChatLinkInNewTab(href: string): void {
+  window.open(href, "_blank", "noopener,noreferrer");
 }

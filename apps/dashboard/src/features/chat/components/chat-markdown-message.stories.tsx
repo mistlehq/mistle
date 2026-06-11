@@ -99,7 +99,7 @@ export const ExternalLinkSafety: Story = {
     text: [
       "Open this external link from a normal chat markdown message:",
       "",
-      "[mistlehq/e2e-test-repo pull request #125](https://github.com/mistlehq/e2e-test-repo/pull/125)",
+      "[untrusted example report](https://example.com/mistlehq/e2e-test-repo/pull/125)",
     ].join("\n"),
   },
   parameters: {
@@ -118,7 +118,7 @@ export const ExternalLinkSafetyOpen: Story = {
     text: [
       "Open this external link from a normal chat markdown message:",
       "",
-      "[mistlehq/e2e-test-repo pull request #125](https://github.com/mistlehq/e2e-test-repo/pull/125)",
+      "[untrusted example report](https://example.com/mistlehq/e2e-test-repo/pull/125)",
     ].join("\n"),
   },
   parameters: {
@@ -133,7 +133,7 @@ export const ExternalLinkSafetyOpen: Story = {
     const canvas = within(canvasElement);
     await userEvent.click(
       await canvas.findByRole("button", {
-        name: "mistlehq/e2e-test-repo pull request #125",
+        name: "untrusted example report",
       }),
     );
     await expect(canvas.getByText("Open external link?")).toBeInTheDocument();
