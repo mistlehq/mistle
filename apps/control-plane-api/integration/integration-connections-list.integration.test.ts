@@ -202,6 +202,12 @@ describe.concurrent("integration connections list integration", () => {
             count: 0,
             syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
           },
+          {
+            kind: "bot",
+            selectionMode: "multi",
+            count: 0,
+            syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
+          },
         ],
         supportsWebhookSources: false,
         createdAt: firstConnectionCreatedAt,
@@ -259,6 +265,12 @@ describe.concurrent("integration connections list integration", () => {
           },
           {
             kind: "team",
+            selectionMode: "multi",
+            count: 0,
+            syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
+          },
+          {
+            kind: "bot",
             selectionMode: "multi",
             count: 0,
             syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
