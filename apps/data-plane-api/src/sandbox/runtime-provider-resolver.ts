@@ -47,6 +47,10 @@ export async function resolveSandboxRuntimeAdapter(
     });
   }
 
+  if (input.provider === SandboxProvider.OPENCOMPUTER) {
+    throw new Error("OpenComputer sandbox runtime is not wired in data-plane API yet.");
+  }
+
   const credentials = await ctx.controlPlaneInternalClient.resolveSandboxRuntimeCredentials({
     organizationId: input.organizationId,
     provider: input.provider,

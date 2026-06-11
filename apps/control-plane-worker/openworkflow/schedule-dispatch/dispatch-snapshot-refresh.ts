@@ -46,6 +46,7 @@ function assertScheduledSnapshotSandboxProvider(
     provider === "docker" ||
     provider === "e2b" ||
     provider === "freestyle" ||
+    provider === "opencomputer" ||
     provider === "tensorlake"
   ) {
     return provider;

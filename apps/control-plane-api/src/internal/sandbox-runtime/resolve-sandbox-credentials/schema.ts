@@ -11,6 +11,7 @@ export const InternalSandboxRuntimeResolveCredentialsRequestSchema = z
       SandboxProvider.E2B,
       SandboxProvider.FREESTYLE,
       SandboxProvider.MODAL,
+      SandboxProvider.OPENCOMPUTER,
       SandboxProvider.TENSORLAKE,
     ]),
     connectionId: z.string().min(1).optional(),

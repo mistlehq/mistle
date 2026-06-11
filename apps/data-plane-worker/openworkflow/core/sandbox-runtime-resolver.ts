@@ -173,6 +173,10 @@ export function createSandboxRuntimeProviderResolver(input: {
       throw new Error("Freestyle sandbox runtime is not wired in data-plane worker yet.");
     }
 
+    if (inputRuntime.provider === SandboxProvider.OPENCOMPUTER) {
+      throw new Error("OpenComputer sandbox runtime is not wired in data-plane worker yet.");
+    }
+
     return assertUnreachableSandboxProvider(inputRuntime.provider);
   }
 

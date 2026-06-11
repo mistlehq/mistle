@@ -83,6 +83,7 @@ function assertSnapshotImageProvider(
     provider === SandboxProvider.E2B ||
     provider === SandboxProvider.FREESTYLE ||
     provider === SandboxProvider.MODAL ||
+    provider === SandboxProvider.OPENCOMPUTER ||
     provider === SandboxProvider.TENSORLAKE
   ) {
     return provider;

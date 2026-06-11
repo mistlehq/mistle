@@ -24,6 +24,12 @@ import {
   type ModalSandboxConfig,
 } from "./providers/modal/index.js";
 import {
+  createOpenComputerAdapter,
+  createOpenComputerBaseImageBuilderFromConfig,
+  createOpenComputerRuntimeControl,
+  type OpenComputerSandboxConfig,
+} from "./providers/opencomputer/index.js";
+import {
   createTensorlakeAdapter,
   createTensorlakeBaseImageBuilder,
   createTensorlakeRuntimeControl,
@@ -43,6 +49,7 @@ export type CreateSandboxAdapterInput = {
   e2b?: E2BSandboxConfig;
   freestyle?: FreestyleSandboxConfig;
   modal?: ModalSandboxConfig;
+  opencomputer?: OpenComputerSandboxConfig;
   tensorlake?: TensorlakeSandboxConfig;
 };
 
@@ -99,6 +106,16 @@ export function createSandboxAdapter(input: CreateSandboxAdapterInput): SandboxA
     return createModalAdapter(input.modal);
   }
 
+  if (input.provider === SandboxProvider.OPENCOMPUTER) {
+    if (input.opencomputer === undefined) {
+      throw new SandboxConfigurationError(
+        "OpenComputer config is required when provider is opencomputer.",
+      );
+    }
+
+    return createOpenComputerAdapter(input.opencomputer);
+  }
+
   return assertUnreachable(input.provider);
 }
 
@@ -152,6 +169,16 @@ export function createSandboxBaseImageBuilder(
     return createModalBaseImageBuilderFromConfig(input.modal);
   }
 
+  if (input.provider === SandboxProvider.OPENCOMPUTER) {
+    if (input.opencomputer === undefined) {
+      throw new SandboxConfigurationError(
+        "OpenComputer config is required when provider is opencomputer.",
+      );
+    }
+
+    return createOpenComputerBaseImageBuilderFromConfig(input.opencomputer);
+  }
+
   return assertUnreachable(input.provider);
 }
 
@@ -200,6 +227,16 @@ export function createSandboxRuntimeControl(
     }
 
     return createModalRuntimeControl(input.modal);
+  }
+
+  if (input.provider === SandboxProvider.OPENCOMPUTER) {
+    if (input.opencomputer === undefined) {
+      throw new SandboxConfigurationError(
+        "OpenComputer config is required when provider is opencomputer.",
+      );
+    }
+
+    return createOpenComputerRuntimeControl(input.opencomputer);
   }
 
   return assertUnreachable(input.provider);

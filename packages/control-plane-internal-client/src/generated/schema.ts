@@ -1371,7 +1371,7 @@ export interface paths {
             connectionId?: string;
             organizationId: string;
             /** @enum {string} */
-            provider: "docker" | "e2b" | "freestyle" | "modal" | "tensorlake";
+            provider: "docker" | "e2b" | "freestyle" | "modal" | "opencomputer" | "tensorlake";
           };
         };
       };

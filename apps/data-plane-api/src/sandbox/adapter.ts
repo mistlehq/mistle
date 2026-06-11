@@ -8,6 +8,7 @@ export function assertRuntimeSandboxProvider(
     runtimeProvider === "e2b" ||
     runtimeProvider === "freestyle" ||
     runtimeProvider === "modal" ||
+    runtimeProvider === "opencomputer" ||
     runtimeProvider === "tensorlake"
   ) {
     return;

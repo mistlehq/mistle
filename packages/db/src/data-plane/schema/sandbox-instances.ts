@@ -12,6 +12,7 @@ export const SandboxInstanceProviders = {
   E2B: "e2b",
   FREESTYLE: "freestyle",
   MODAL: "modal",
+  OPENCOMPUTER: "opencomputer",
   TENSORLAKE: "tensorlake",
 } as const;
 

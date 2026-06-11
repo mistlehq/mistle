@@ -35,3 +35,13 @@ export {
   createModalBaseImageBuilderFromConfig,
   type ModalBaseImageBuilderOptions,
 } from "./providers/modal/index.js";
+export {
+  createOpenComputerBaseImageBuilderFromConfig,
+  createOpenComputerBaseImageName,
+  createOpenComputerCheckpointImageHandle,
+  createOpenComputerDeferredImageHandle,
+  createOpenComputerSnapshotImageHandle,
+  createOpenComputerTemplateImageHandle,
+  parseOpenComputerImageHandle,
+  type OpenComputerBaseImageBuilderOptions,
+} from "./providers/opencomputer/index.js";

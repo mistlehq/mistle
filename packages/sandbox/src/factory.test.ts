@@ -165,6 +165,37 @@ describe("createSandboxAdapter", () => {
       }),
     ).toThrow(SandboxConfigurationError);
   });
+
+  it("creates an OpenComputer adapter when OpenComputer config is provided", () => {
+    const adapter = createSandboxAdapter({
+      provider: SandboxProvider.OPENCOMPUTER,
+      opencomputer: {
+        apiKey: "test-api-key",
+      },
+    });
+
+    expect(typeof adapter.prepareImage).toBe("function");
+    expect(typeof adapter.start).toBe("function");
+    expect(typeof adapter.inspect).toBe("function");
+    expect(typeof adapter.resume).toBe("function");
+    expect(typeof adapter.captureSnapshot).toBe("function");
+    expect(typeof adapter.stop).toBe("function");
+    expect(typeof adapter.destroy).toBe("function");
+    expect(adapter.getTransparentProxyConfiguration()).toMatchObject({
+      provider: SandboxProvider.OPENCOMPUTER,
+      passthroughBypass: {
+        kind: SandboxTransparentProxyBypassKinds.SOCKET_MARK,
+      },
+    });
+  });
+
+  it("throws when OpenComputer config is missing", () => {
+    expect(() =>
+      createSandboxAdapter({
+        provider: SandboxProvider.OPENCOMPUTER,
+      }),
+    ).toThrow(SandboxConfigurationError);
+  });
 });
 
 describe("createSandboxRuntimeControl", () => {
@@ -289,6 +320,30 @@ describe("createSandboxRuntimeControl", () => {
       }),
     ).toThrow(SandboxConfigurationError);
   });
+
+  it("creates an OpenComputer runtime control when OpenComputer config is provided", () => {
+    const runtimeControl = createSandboxRuntimeControl({
+      provider: SandboxProvider.OPENCOMPUTER,
+      opencomputer: {
+        apiKey: "test-api-key",
+      },
+    });
+
+    expect(typeof runtimeControl.ensureSandboxd).toBe("function");
+    expect(typeof runtimeControl.readSandboxdVersion).toBe("function");
+    expect(typeof runtimeControl.activate).toBe("function");
+    expect(typeof runtimeControl.shutdown).toBe("function");
+    expect(typeof runtimeControl.readOperationLog).toBe("function");
+    expect(typeof runtimeControl.close).toBe("function");
+  });
+
+  it("throws when OpenComputer runtime control config is missing", () => {
+    expect(() =>
+      createSandboxRuntimeControl({
+        provider: SandboxProvider.OPENCOMPUTER,
+      }),
+    ).toThrow(SandboxConfigurationError);
+  });
 });
 
 describe("createSandboxBaseImageBuilder", () => {
@@ -374,6 +429,25 @@ describe("createSandboxBaseImageBuilder", () => {
     expect(() =>
       createSandboxBaseImageBuilder({
         provider: SandboxProvider.MODAL,
+      }),
+    ).toThrow(SandboxConfigurationError);
+  });
+
+  it("creates an OpenComputer base image builder when OpenComputer config is provided", () => {
+    const builder = createSandboxBaseImageBuilder({
+      provider: SandboxProvider.OPENCOMPUTER,
+      opencomputer: {
+        apiKey: "test-api-key",
+      },
+    });
+
+    expect(typeof builder.ensureBaseImage).toBe("function");
+  });
+
+  it("throws when OpenComputer base image builder config is missing", () => {
+    expect(() =>
+      createSandboxBaseImageBuilder({
+        provider: SandboxProvider.OPENCOMPUTER,
       }),
     ).toThrow(SandboxConfigurationError);
   });

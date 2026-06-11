@@ -60,7 +60,14 @@
                       },
                       "provider": {
                         "type": "string",
-                        "enum": ["docker", "e2b", "freestyle", "modal", "tensorlake"]
+                        "enum": [
+                          "docker",
+                          "e2b",
+                          "freestyle",
+                          "modal",
+                          "opencomputer",
+                          "tensorlake"
+                        ]
                       }
                     },
                     "required": ["imageId", "createdAt", "kind", "provider"],
@@ -71,7 +78,14 @@
                     "properties": {
                       "provider": {
                         "type": "string",
-                        "enum": ["docker", "e2b", "freestyle", "modal", "tensorlake"]
+                        "enum": [
+                          "docker",
+                          "e2b",
+                          "freestyle",
+                          "modal",
+                          "opencomputer",
+                          "tensorlake"
+                        ]
                       },
                       "connectionId": {
                         "type": "string",
@@ -1651,7 +1665,14 @@
                       },
                       "provider": {
                         "type": "string",
-                        "enum": ["docker", "e2b", "freestyle", "modal", "tensorlake"]
+                        "enum": [
+                          "docker",
+                          "e2b",
+                          "freestyle",
+                          "modal",
+                          "opencomputer",
+                          "tensorlake"
+                        ]
                       }
                     },
                     "required": ["imageId", "kind", "provider"],
@@ -1662,7 +1683,14 @@
                     "properties": {
                       "provider": {
                         "type": "string",
-                        "enum": ["docker", "e2b", "freestyle", "modal", "tensorlake"]
+                        "enum": [
+                          "docker",
+                          "e2b",
+                          "freestyle",
+                          "modal",
+                          "opencomputer",
+                          "tensorlake"
+                        ]
                       },
                       "connectionId": {
                         "type": "string",

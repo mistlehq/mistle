@@ -130,6 +130,13 @@ export async function resolveSandboxRuntimeCredentials(
     );
   }
 
+  if (input.provider === SandboxProvider.OPENCOMPUTER) {
+    throw new BadRequestError(
+      "UNSUPPORTED_SANDBOX_PROVIDER",
+      "OpenComputer sandbox runtime credentials are not wired in this deployment yet.",
+    );
+  }
+
   return assertUnreachableSandboxProvider(input.provider);
 }
 
