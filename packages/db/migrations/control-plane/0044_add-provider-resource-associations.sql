@@ -6,6 +6,7 @@ CREATE TABLE "control_plane"."provider_resource_association_deliveries" (
 	"rendered_input" jsonb NOT NULL,
 	"status" text DEFAULT 'queued' NOT NULL,
 	"attempt_count" bigint DEFAULT 0 NOT NULL,
+	"processor_generation" bigint,
 	"failure_code" text,
 	"failure_message" text,
 	"claimed_at" timestamp with time zone,
@@ -43,6 +44,5 @@ CREATE UNIQUE INDEX "provider_resource_association_deliveries_event_uidx" ON "co
 CREATE INDEX "provider_resource_association_deliveries_dequeue_idx" ON "control_plane"."provider_resource_association_deliveries" USING btree ("provider_resource_association_id","status","source_order_key","created_at","id");--> statement-breakpoint
 CREATE INDEX "provider_resource_association_deliveries_webhook_event_id_idx" ON "control_plane"."provider_resource_association_deliveries" USING btree ("source_webhook_event_id");--> statement-breakpoint
 CREATE INDEX "provider_resource_association_deliveries_status_idx" ON "control_plane"."provider_resource_association_deliveries" USING btree ("status");--> statement-breakpoint
-CREATE UNIQUE INDEX "provider_resource_associations_resource_instance_uidx" ON "control_plane"."provider_resource_associations" USING btree ("integration_connection_id","resource_kind","provider_resource_id","sandbox_instance_id");--> statement-breakpoint
-CREATE INDEX "provider_resource_associations_resource_lookup_idx" ON "control_plane"."provider_resource_associations" USING btree ("integration_connection_id","resource_kind","provider_resource_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "provider_resource_associations_resource_uidx" ON "control_plane"."provider_resource_associations" USING btree ("integration_connection_id","resource_kind","provider_resource_id");--> statement-breakpoint
 CREATE INDEX "provider_resource_associations_sandbox_instance_id_idx" ON "control_plane"."provider_resource_associations" USING btree ("sandbox_instance_id");

@@ -4221,6 +4221,12 @@
           "notNull": true,
           "default": 0
         },
+        "processor_generation": {
+          "name": "processor_generation",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
         "failure_code": {
           "name": "failure_code",
           "type": "text",
@@ -4500,8 +4506,8 @@
         }
       },
       "indexes": {
-        "provider_resource_associations_resource_instance_uidx": {
-          "name": "provider_resource_associations_resource_instance_uidx",
+        "provider_resource_associations_resource_uidx": {
+          "name": "provider_resource_associations_resource_uidx",
           "columns": [
             {
               "expression": "integration_connection_id",
@@ -4517,45 +4523,12 @@
             },
             {
               "expression": "provider_resource_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "sandbox_instance_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "provider_resource_associations_resource_lookup_idx": {
-          "name": "provider_resource_associations_resource_lookup_idx",
-          "columns": [
-            {
-              "expression": "integration_connection_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "resource_kind",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "provider_resource_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
