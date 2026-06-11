@@ -1,4 +1,5 @@
 import type { SandboxProfileVersionAgentRuntimeId } from "@mistle/db/control-plane";
+import type { ControlPlaneDatabase, ControlPlaneTransaction } from "@mistle/db/control-plane";
 import type {
   CompiledRuntimePlan,
   EgressCredentialResolverRef,
@@ -82,7 +83,9 @@ export async function compileProfileVersionRuntimePlan(
     db,
     integrationsConfig,
     mcpConfig,
-  }: Pick<CreateSandboxProfilesServiceInput, "db" | "integrationsConfig" | "mcpConfig">,
+  }: Pick<CreateSandboxProfilesServiceInput, "integrationsConfig" | "mcpConfig"> & {
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
+  },
   input: CompileProfileVersionRuntimePlanInput,
 ): Promise<CompiledRuntimePlan> {
   try {

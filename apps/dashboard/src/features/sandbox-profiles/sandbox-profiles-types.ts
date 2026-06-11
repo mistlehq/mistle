@@ -36,6 +36,12 @@ type PutSandboxProfileVersionDraftRequest =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/draft"]["put"]["requestBody"]["content"]["application/json"];
 type PutSandboxProfileVersionDraftResponse =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/draft"]["put"]["responses"][200]["content"]["application/json"];
+type PublishSandboxProfileVersionResponse =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/publish"]["post"]["responses"][200]["content"]["application/json"];
+type RefreshSandboxProfileVersionResponse =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/refresh"]["post"]["responses"][200]["content"]["application/json"];
+type RetrySandboxProfileVersionPublishSnapshotResponse =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/retry-publish-snapshot"]["post"]["responses"][200]["content"]["application/json"];
 type ListSandboxProvidersResponse =
   paths["/v1/sandbox/providers"]["get"]["responses"][200]["content"]["application/json"];
 
@@ -101,21 +107,10 @@ export type SandboxProfileVersionDraftTriggerImpactTrigger =
 export type SandboxProfileVersionDraftTriggerImpactIssue =
   SandboxProfileVersionDraftTriggerImpactTrigger["issues"][number];
 
-export type PublishSandboxProfileVersionResult = {
-  activeVersion: number | null;
-  snapshotJob: {
-    id: string;
-    sandboxInstanceId: string | null;
-    trigger: "publish" | "manual_refresh" | "scheduled_refresh";
-    state: "queued" | "running" | "succeeded" | "failed";
-    errorCode: string | null;
-    errorMessage: string | null;
-    createdAt: string;
-    startedAt: string | null;
-    finishedAt: string | null;
-  };
-  version: SandboxProfileVersion;
-};
+export type PublishSandboxProfileVersionResult = PublishSandboxProfileVersionResponse;
+export type RefreshSandboxProfileVersionResult = RefreshSandboxProfileVersionResponse;
+export type RetrySandboxProfileVersionPublishSnapshotResult =
+  RetrySandboxProfileVersionPublishSnapshotResponse;
 
 export type SandboxProfileVersionIntegrationBinding =
   SandboxProfileVersionIntegrationBindingsResponse["bindings"][number];

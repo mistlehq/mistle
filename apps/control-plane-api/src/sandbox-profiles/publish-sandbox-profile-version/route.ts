@@ -21,7 +21,7 @@ export const route = createRoute({
   responses: {
     200: {
       description:
-        "Publish the specified sandbox profile draft version and queue snapshot materialization.",
+        "Publish the specified sandbox profile draft version and create or reuse its snapshot.",
       content: {
         "application/json": {
           schema: publishSandboxProfileVersionResponseSchema,

@@ -1,5 +1,6 @@
 import type {
   ControlPlaneDatabase,
+  ControlPlaneTransaction,
   SandboxProfileVersionSkillsConfig,
   SandboxProfileVersionAgentRuntimeId,
 } from "@mistle/db/control-plane";
@@ -93,7 +94,7 @@ export type ResolveIntegrationTargetSecrets = (
 ) => Promise<ResolveIntegrationTargetSecretsOutput>;
 
 export type CompileSandboxRuntimePlanInput = {
-  db: ControlPlaneDatabase;
+  db: ControlPlaneDatabase | ControlPlaneTransaction;
   integrationDefinitions: IntegrationDefinitionsBundle;
   resolveTargetSecrets: ResolveIntegrationTargetSecrets;
   mcpConfig: {

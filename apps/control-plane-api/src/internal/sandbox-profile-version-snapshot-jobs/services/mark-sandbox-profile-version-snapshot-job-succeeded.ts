@@ -2,6 +2,7 @@ import {
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionStates,
   type ControlPlaneDatabase,
+  type ControlPlaneTransaction,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
@@ -204,6 +205,7 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
   if (successResult.shouldAdvanceTriggerTargets) {
     await tryAdvanceTriggerTargetsToPublishedProfileVersion(ctx, {
       snapshotJobId: input.snapshotJobId,
+      source: "snapshot-job-succeeded",
       sandboxProfileId: successResult.sandboxProfileId,
       sandboxProfileVersion: successResult.sandboxProfileVersion,
     });
@@ -226,10 +228,11 @@ function shouldAdvanceTriggerTargetsForSnapshot(input: {
 
 export async function tryAdvanceTriggerTargetsToPublishedProfileVersion(
   ctx: {
-    db: ControlPlaneDatabase;
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
   },
   input: {
-    snapshotJobId: string;
+    snapshotJobId?: string;
+    source?: "publish-reuse" | "snapshot-job-succeeded";
     sandboxProfileId: string;
     sandboxProfileVersion: number;
   },
@@ -258,10 +261,11 @@ export async function tryAdvanceTriggerTargetsToPublishedProfileVersion(
       {
         err: error,
         snapshotJobId: input.snapshotJobId,
+        source: input.source,
         sandboxProfileId: input.sandboxProfileId,
         sandboxProfileVersion: input.sandboxProfileVersion,
       },
-      "Failed to advance trigger targets after sandbox profile snapshot succeeded.",
+      "Failed to advance trigger targets to published sandbox profile version.",
     );
   }
 }

@@ -60,6 +60,10 @@ _Avoid_: Auto-refresh, scheduled rebuild
 The script that a snapshot refresh runs while preparing a **Snapshot**.
 _Avoid_: Generic script
 
+**Runtime plan**:
+The compiled sandbox activation configuration for a **Sandbox profile version**.
+_Avoid_: Runtime plane, runtime config when referring to the compiled activation shape
+
 **Mistle resource access**:
 A **Sandbox profile version** setting that lets an agent runtime use Mistle-owned resources through a selected organization API key.
 _Avoid_: Allow agent toggle, Mistle MCP toggle
@@ -97,7 +101,7 @@ A provider event that can be selected as the event source for a **Trigger**.
 _Avoid_: Webhook event when naming product-facing trigger-builder concepts
 
 **Associated resource event routing**:
-A snapshot-affecting **Sandbox profile version** behavior that selects which provider events on associated **Routable provider resources** should produce **Association deliveries**.
+A **Sandbox profile version** runtime-plan behavior that selects which provider events on associated **Routable provider resources** should produce **Association deliveries**.
 _Avoid_: Trigger when no Trigger conversation is created, hardcoded association routing
 
 **Trigger event parameter**:
@@ -407,6 +411,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 ## Relationships
 
 - A **Sandbox profile version** may have one usable **Snapshot**.
+- Snapshot reuse requires an existing usable **Snapshot** from the previous active **Sandbox profile version**.
 - A **Sandbox profile duplicate** requires the copied source configuration to have a usable **Snapshot**.
 - A **Sandbox profile duplicate** may carry active **Automatic snapshot refresh** execution state.
 - A **Sandbox profile duplicate** with copied **Automatic snapshot refresh** uses fresh schedule timing rather than replaying stale source schedule work.
@@ -456,6 +461,10 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Opening **Setup Assistant** does not save, discard, or exit **Automatic snapshot refresh** edits.
 - A manual **Snapshot maintenance script** refresh is available only when **Automatic snapshot refresh** is enabled, a saved **Snapshot maintenance script** is present, and the **Sandbox profile version** has a usable **Snapshot**.
 - A **Snapshot preparation script** is either the **Setup script** or the **Snapshot maintenance script** used by a refresh execution.
+- A **Runtime plan** is applied when preparing a **Snapshot** and when starting a **Sandbox session** from a **Snapshot**.
+- A **Snapshot** proves that its **Sandbox profile version** can be prepared with that version's sandbox resources.
+- Changing a **Sandbox profile version**'s selected **Agent runtime** changes snapshot preparation suitability, not only session launch behavior.
+- Changing an integration binding may affect either snapshot preparation or only session-time access, depending on what the binding contributes to the **Runtime plan**.
 - A **Snapshot maintenance script** test run starts from an existing usable **Snapshot** but does not replace it.
 - When a new **Sandbox profile version** is published, the **Snapshot maintenance script** and **Automatic snapshot refresh** definition should be copied forward from the previous version.
 - A **Collection landing page** may list **Sandbox profile version** families, triggers, sessions, or organization members.
@@ -710,8 +719,12 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Non-empty text after `/review` is custom review instructions, not a structured review-target subcommand.
 - A **Sandbox profile version** may use a **Skills source** from a Git integration binding or a **Public skills source**.
 - A **Public skills source** does not require a Git integration binding.
+- Selected skills change the agent runtime's exposed skills without changing the **Skills source** itself.
+- Changing selected skills requires a new **Snapshot** unless the system can prove the selected skill content is already materialized in the reusable **Snapshot**.
 - **Mistle resource access** is configured when a **Sandbox profile version** has a selected organization API key for that access.
 - **Mistle resource access** is bounded by the selected organization API key's permissions, not by the **Sandbox profile version** that selected the key.
+- Changing **Mistle resource access** enablement changes agent runtime setup files and requires a new **Snapshot**.
+- Changing only the **Mistle resource access** API key selection with unchanged enablement is session-time credential access.
 - The **Mistle sandbox resource baseline** may differ from the underlying provider's own resource defaults.
 
 ## Example Dialogue

@@ -3,13 +3,19 @@
  */
 
 import {
+  ApiKeyActorKinds,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
   SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
+  TriggerKinds,
 } from "@mistle/db/control-plane";
+import {
+  AssociatedProviderResourceKinds,
+  AssociatedResourceEventTypes,
+} from "@mistle/integrations-core";
 import { SandboxProvider } from "@mistle/sandbox";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
@@ -42,6 +48,64 @@ const EmptySandboxRuntimeConfig = {
   sandboxResources: null,
   skillsConfig: null,
 };
+
+type SnapshotJobSummary = {
+  id: string;
+  sandboxInstanceId: string | null;
+  trigger: (typeof SandboxProfileVersionSnapshotJobTriggers)[keyof typeof SandboxProfileVersionSnapshotJobTriggers];
+  state: (typeof SandboxProfileVersionSnapshotJobStates)[keyof typeof SandboxProfileVersionSnapshotJobStates];
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+};
+
+function expectCreatedSnapshotJob(
+  input:
+    | {
+        kind: "created";
+        job: SnapshotJobSummary;
+      }
+    | {
+        kind: "reused";
+        snapshotImageProvider: string;
+        snapshotImageId: string;
+      },
+): SnapshotJobSummary {
+  expect(input.kind).toBe("created");
+  if (input.kind !== "created") {
+    throw new Error("Expected publish response to create a snapshot job.");
+  }
+
+  return input.job;
+}
+
+function expectReusedSnapshotAction(
+  input:
+    | {
+        kind: "created";
+        job: SnapshotJobSummary;
+      }
+    | {
+        kind: "reused";
+        snapshotImageProvider: string;
+        snapshotImageId: string;
+      },
+): {
+  snapshotImageProvider: string;
+  snapshotImageId: string;
+} {
+  expect(input.kind).toBe("reused");
+  if (input.kind !== "reused") {
+    throw new Error("Expected publish response to reuse the active snapshot.");
+  }
+
+  return {
+    snapshotImageProvider: input.snapshotImageProvider,
+    snapshotImageId: input.snapshotImageId,
+  };
+}
 
 describe.concurrent("sandbox profile versions publish integration", () => {
   it("publishes a draft version and queues initial snapshot materialization", async ({ env }) => {
@@ -130,6 +194,7 @@ describe.concurrent("sandbox profile versions publish integration", () => {
 
     expect(response.status).toBe(200);
     const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    const snapshotJob = expectCreatedSnapshotJob(responseBody.snapshotAction);
     expect(responseBody).toEqual({
       version: {
         sandboxProfileId: "sbp_version_publish_001",
@@ -162,16 +227,19 @@ describe.concurrent("sandbox profile versions publish integration", () => {
         },
       },
       activeVersion: 1,
-      snapshotJob: {
-        id: expect.any(String),
-        sandboxInstanceId: expect.any(String),
-        trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
-        state: SandboxProfileVersionSnapshotJobStates.QUEUED,
-        errorCode: null,
-        errorMessage: null,
-        createdAt: expect.any(String),
-        startedAt: null,
-        finishedAt: null,
+      snapshotAction: {
+        kind: "created",
+        job: {
+          id: expect.any(String),
+          sandboxInstanceId: expect.any(String),
+          trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+          state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+          errorCode: null,
+          errorMessage: null,
+          createdAt: expect.any(String),
+          startedAt: null,
+          finishedAt: null,
+        },
       },
     });
 
@@ -196,11 +264,11 @@ describe.concurrent("sandbox profile versions publish integration", () => {
 
     const persistedSnapshotJob =
       await env.controlPlaneDb.query.sandboxProfileVersionSnapshotJobs.findFirst({
-        where: (table, { eq }) => eq(table.id, responseBody.snapshotJob.id),
+        where: (table, { eq }) => eq(table.id, snapshotJob.id),
       });
     expect(persistedSnapshotJob).toMatchObject({
-      id: responseBody.snapshotJob.id,
-      sandboxInstanceId: responseBody.snapshotJob.sandboxInstanceId,
+      id: snapshotJob.id,
+      sandboxInstanceId: snapshotJob.sandboxInstanceId,
       sandboxProfileId: "sbp_version_publish_001",
       sandboxProfileVersion: 2,
       trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
@@ -209,11 +277,11 @@ describe.concurrent("sandbox profile versions publish integration", () => {
 
     const queuedWorkflowInput = await waitForQueuedMaterializeWorkflowInput({
       env,
-      snapshotJobId: responseBody.snapshotJob.id,
+      snapshotJobId: snapshotJob.id,
     });
     expect(queuedWorkflowInput).toMatchObject({
-      snapshotJobId: responseBody.snapshotJob.id,
-      sandboxInstanceId: responseBody.snapshotJob.sandboxInstanceId,
+      snapshotJobId: snapshotJob.id,
+      sandboxInstanceId: snapshotJob.sandboxInstanceId,
       sandboxProfileId: "sbp_version_publish_001",
       sandboxProfileVersion: 2,
       image: {
@@ -221,6 +289,250 @@ describe.concurrent("sandbox profile versions publish integration", () => {
       },
       snapshotPreparationScriptKind: "setup",
     });
+  });
+
+  it("reuses the active snapshot and advances trigger targets when publishing a snapshot-equivalent draft", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publish-reuse-advance-triggers@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_version_publish_reuse_advance_triggers",
+        organizationId: session.organizationId,
+        displayName: "Publish Reuse Advance Triggers Profile",
+        activeVersion: 1,
+        createdAt: "2026-06-11T01:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+      {
+        ...sandboxProfileVersionRow({
+          sandboxProfileId: "sbp_version_publish_reuse_advance_triggers",
+          version: 1,
+          state: SandboxProfileVersionStates.PUBLISHED,
+          sandboxProvider: SandboxProvider.DOCKER,
+          publishedAt: "2026-06-11T01:01:00.000Z",
+        }),
+        snapshotImageProvider: "docker",
+        snapshotImageId: "sha256:publish-reuse-advance-triggers-v1",
+      },
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_version_publish_reuse_advance_triggers",
+        version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    ]);
+    await env.controlPlaneDb.insert(env.controlPlaneTables.triggers).values({
+      id: "aut_version_publish_reuse_advance_triggers",
+      organizationId: session.organizationId,
+      kind: TriggerKinds.SCHEDULE,
+      name: "Publish Reuse Advance Trigger",
+      enabled: true,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.triggerTargets).values({
+      id: "atg_version_publish_reuse_advance_triggers",
+      triggerId: "aut_version_publish_reuse_advance_triggers",
+      sandboxProfileId: "sbp_version_publish_reuse_advance_triggers",
+      sandboxProfileVersion: 1,
+      primaryRepositoryId: null,
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_version_publish_reuse_advance_triggers/versions/2/publish",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    const reusedSnapshot = expectReusedSnapshotAction(responseBody.snapshotAction);
+    expect(reusedSnapshot).toEqual({
+      snapshotImageProvider: "docker",
+      snapshotImageId: "sha256:publish-reuse-advance-triggers-v1",
+    });
+    expect(responseBody.activeVersion).toBe(2);
+    expect(responseBody.version).toMatchObject({
+      sandboxProfileId: "sbp_version_publish_reuse_advance_triggers",
+      version: 2,
+      state: SandboxProfileVersionStates.PUBLISHED,
+      isActive: true,
+      usable: true,
+      latestSnapshotJob: null,
+    });
+
+    const persistedProfile = await env.controlPlaneDb.query.sandboxProfiles.findFirst({
+      columns: {
+        activeVersion: true,
+      },
+      where: (table, { eq }) => eq(table.id, "sbp_version_publish_reuse_advance_triggers"),
+    });
+    const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        state: true,
+        snapshotImageProvider: true,
+        snapshotImageId: true,
+      },
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.sandboxProfileId, "sbp_version_publish_reuse_advance_triggers"),
+          eq(table.version, 2),
+        ),
+    });
+    const persistedTriggerTarget = await env.controlPlaneDb.query.triggerTargets.findFirst({
+      columns: {
+        sandboxProfileVersion: true,
+      },
+      where: (table, { eq }) => eq(table.id, "atg_version_publish_reuse_advance_triggers"),
+    });
+    const persistedSnapshotJobs =
+      await env.controlPlaneDb.query.sandboxProfileVersionSnapshotJobs.findMany({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.sandboxProfileId, "sbp_version_publish_reuse_advance_triggers"),
+            eq(table.sandboxProfileVersion, 2),
+          ),
+      });
+
+    expect(persistedProfile?.activeVersion).toBe(2);
+    expect(persistedVersion).toEqual({
+      state: SandboxProfileVersionStates.PUBLISHED,
+      snapshotImageProvider: "docker",
+      snapshotImageId: "sha256:publish-reuse-advance-triggers-v1",
+    });
+    expect(persistedTriggerTarget?.sandboxProfileVersion).toBe(2);
+    expect(persistedSnapshotJobs).toEqual([]);
+  });
+
+  it("reuses the active snapshot when only associated resource event routing changes", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email:
+        "integration-new-sandbox-profile-version-publish-associated-resource-routing@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_version_publish_associated_resource_routing",
+        organizationId: session.organizationId,
+        displayName: "Publish Associated Resource Routing Profile",
+        activeVersion: 1,
+        createdAt: "2026-06-11T02:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+      {
+        ...sandboxProfileVersionRow({
+          sandboxProfileId: "sbp_version_publish_associated_resource_routing",
+          version: 1,
+          state: SandboxProfileVersionStates.PUBLISHED,
+          sandboxProvider: SandboxProvider.DOCKER,
+          publishedAt: "2026-06-11T02:01:00.000Z",
+          associatedResourceEventRoutingConfig: {
+            enabled: true,
+            resources: [
+              {
+                resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+                eventTypes: [
+                  AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+                ],
+              },
+            ],
+          },
+        }),
+        snapshotImageProvider: "docker",
+        snapshotImageId: "sha256:publish-associated-resource-routing-v1",
+      },
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_version_publish_associated_resource_routing",
+        version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+        associatedResourceEventRoutingConfig: {
+          enabled: true,
+          resources: [
+            {
+              resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+              eventTypes: [
+                AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+                AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
+              ],
+            },
+          ],
+        },
+      }),
+    ]);
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_version_publish_associated_resource_routing/versions/2/publish",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    const reusedSnapshot = expectReusedSnapshotAction(responseBody.snapshotAction);
+    expect(reusedSnapshot).toEqual({
+      snapshotImageProvider: "docker",
+      snapshotImageId: "sha256:publish-associated-resource-routing-v1",
+    });
+    expect(responseBody.version).toMatchObject({
+      sandboxProfileId: "sbp_version_publish_associated_resource_routing",
+      version: 2,
+      isActive: true,
+      usable: true,
+      latestSnapshotJob: null,
+      associatedResourceEventRoutingConfig: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+            eventTypes: [
+              AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+              AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
+            ],
+          },
+        ],
+      },
+    });
+
+    const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        snapshotImageProvider: true,
+        snapshotImageId: true,
+      },
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.sandboxProfileId, "sbp_version_publish_associated_resource_routing"),
+          eq(table.version, 2),
+        ),
+    });
+    const persistedSnapshotJobs =
+      await env.controlPlaneDb.query.sandboxProfileVersionSnapshotJobs.findMany({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.sandboxProfileId, "sbp_version_publish_associated_resource_routing"),
+            eq(table.sandboxProfileVersion, 2),
+          ),
+      });
+
+    expect(persistedVersion).toEqual({
+      snapshotImageProvider: "docker",
+      snapshotImageId: "sha256:publish-associated-resource-routing-v1",
+    });
+    expect(persistedSnapshotJobs).toEqual([]);
   });
 
   it("copies the previous active version maintenance script and refresh schedule when publishing", async ({
@@ -290,6 +602,7 @@ describe.concurrent("sandbox profile versions publish integration", () => {
 
     expect(response.status).toBe(200);
     const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    const snapshotJob = expectCreatedSnapshotJob(responseBody.snapshotAction);
     expect(responseBody.version).toMatchObject({
       sandboxProfileId: "sbp_version_publish_copy_maintenance",
       version: 2,
@@ -330,9 +643,253 @@ describe.concurrent("sandbox profile versions publish integration", () => {
 
     const queuedWorkflowInput = await waitForQueuedMaterializeWorkflowInput({
       env,
-      snapshotJobId: responseBody.snapshotJob.id,
+      snapshotJobId: snapshotJob.id,
     });
     expect(queuedWorkflowInput).toMatchObject({
+      image: {
+        kind: "base",
+      },
+      snapshotPreparationScriptKind: "setup",
+    });
+  });
+
+  it("creates a new snapshot when selected skills change", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publish-selected-skills-change@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_version_publish_reuse_selected_skills",
+        organizationId: session.organizationId,
+        displayName: "Publish Selected Skills Change Profile",
+        activeVersion: 1,
+        createdAt: "2026-06-11T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.skillsSourceRepos).values({
+      id: "skr_version_publish_reuse_selected_skills",
+      organizationId: session.organizationId,
+      originUrl: "https://github.com/acme/reuse-skills.git",
+      commitSha: "dddddddddddddddddddddddddddddddddddddddd",
+      skills: [
+        {
+          name: "reviewer",
+          description: "Review skill.",
+          relativePath: ".agents/skills/reviewer",
+        },
+        {
+          name: "planner",
+          description: "Planning skill.",
+          relativePath: ".agents/skills/planner",
+        },
+      ],
+      lastSyncedAt: "2026-06-11T00:01:00.000Z",
+      createdAt: "2026-06-11T00:01:00.000Z",
+      updatedAt: "2026-06-11T00:01:00.000Z",
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+      {
+        ...sandboxProfileVersionRow({
+          sandboxProfileId: "sbp_version_publish_reuse_selected_skills",
+          version: 1,
+          state: SandboxProfileVersionStates.PUBLISHED,
+          sandboxProvider: SandboxProvider.DOCKER,
+          publishedAt: "2026-06-11T00:02:00.000Z",
+          skillsConfig: {
+            originUrl: "https://github.com/acme/reuse-skills.git",
+            selectedSkills: [
+              {
+                name: "reviewer",
+                relativePath: ".agents/skills/reviewer",
+              },
+            ],
+          },
+        }),
+        snapshotImageProvider: "docker",
+        snapshotImageId: "sha256:reuse-selected-skills-v1",
+      },
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_version_publish_reuse_selected_skills",
+        version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+        skillsConfig: {
+          originUrl: "https://github.com/acme/reuse-skills.git",
+          selectedSkills: [
+            {
+              name: "planner",
+              relativePath: ".agents/skills/planner",
+            },
+          ],
+        },
+      }),
+    ]);
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_version_publish_reuse_selected_skills/versions/2/publish",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    const snapshotJob = expectCreatedSnapshotJob(responseBody.snapshotAction);
+    expect(responseBody.activeVersion).toBe(1);
+    expect(responseBody.version).toMatchObject({
+      sandboxProfileId: "sbp_version_publish_reuse_selected_skills",
+      version: 2,
+      state: SandboxProfileVersionStates.PUBLISHED,
+      isActive: false,
+      usable: false,
+      latestSnapshotJob: {
+        id: snapshotJob.id,
+        sandboxInstanceId: snapshotJob.sandboxInstanceId,
+        trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+        state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+      },
+      skillsConfig: {
+        originUrl: "https://github.com/acme/reuse-skills.git",
+        selectedSkills: [
+          {
+            name: "planner",
+            relativePath: ".agents/skills/planner",
+          },
+        ],
+      },
+    });
+
+    const persistedProfile = await env.controlPlaneDb.query.sandboxProfiles.findFirst({
+      columns: {
+        activeVersion: true,
+      },
+      where: (table, { eq }) => eq(table.id, "sbp_version_publish_reuse_selected_skills"),
+    });
+    expect(persistedProfile?.activeVersion).toBe(1);
+
+    const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        snapshotImageProvider: true,
+        snapshotImageId: true,
+      },
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.sandboxProfileId, "sbp_version_publish_reuse_selected_skills"),
+          eq(table.version, 2),
+        ),
+    });
+    expect(persistedVersion).toEqual({
+      snapshotImageProvider: null,
+      snapshotImageId: null,
+    });
+
+    const queuedWorkflowInput = await waitForQueuedMaterializeWorkflowInput({
+      env,
+      snapshotJobId: snapshotJob.id,
+    });
+    expect(queuedWorkflowInput).toMatchObject({
+      snapshotJobId: snapshotJob.id,
+      sandboxInstanceId: snapshotJob.sandboxInstanceId,
+      sandboxProfileId: "sbp_version_publish_reuse_selected_skills",
+      sandboxProfileVersion: 2,
+      image: {
+        kind: "base",
+      },
+      snapshotPreparationScriptKind: "setup",
+    });
+  });
+
+  it("creates a new snapshot when Mistle MCP enablement changes", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publish-mistle-mcp-toggle@example.com",
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.apiKeys).values({
+      id: "apk_mistle_mcp_toggle",
+      name: "Mistle MCP toggle key",
+      organizationId: session.organizationId,
+      secretPrefix: "prefix_apk_mistle_mcp_toggle",
+      secretHash: "sha256-test-hash",
+      secretHashAlgorithm: "sha256-v1",
+      createdByActorKind: ApiKeyActorKinds.USER,
+      createdByActorId: "usr_mistle_mcp_toggle",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_version_publish_mistle_mcp_toggle",
+        organizationId: session.organizationId,
+        displayName: "Publish Mistle MCP Toggle Profile",
+        activeVersion: 1,
+        createdAt: "2026-06-11T00:20:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+      {
+        ...sandboxProfileVersionRow({
+          sandboxProfileId: "sbp_version_publish_mistle_mcp_toggle",
+          version: 1,
+          state: SandboxProfileVersionStates.PUBLISHED,
+          sandboxProvider: SandboxProvider.DOCKER,
+          publishedAt: "2026-06-11T00:21:00.000Z",
+          mistleMcpEnabled: false,
+          mistleMcpApiKeyId: null,
+        }),
+        snapshotImageProvider: "docker",
+        snapshotImageId: "sha256:mistle-mcp-disabled-v1",
+      },
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_version_publish_mistle_mcp_toggle",
+        version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+        mistleMcpEnabled: true,
+        mistleMcpApiKeyId: "apk_mistle_mcp_toggle",
+      }),
+    ]);
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_version_publish_mistle_mcp_toggle/versions/2/publish",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    const snapshotJob = expectCreatedSnapshotJob(responseBody.snapshotAction);
+    expect(responseBody.activeVersion).toBe(1);
+    expect(responseBody.version).toMatchObject({
+      sandboxProfileId: "sbp_version_publish_mistle_mcp_toggle",
+      version: 2,
+      state: SandboxProfileVersionStates.PUBLISHED,
+      isActive: false,
+      usable: false,
+      mistleMcpEnabled: true,
+      mistleMcpApiKeyId: "apk_mistle_mcp_toggle",
+      latestSnapshotJob: {
+        id: snapshotJob.id,
+        sandboxInstanceId: snapshotJob.sandboxInstanceId,
+        trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+        state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+      },
+    });
+
+    const queuedWorkflowInput = await waitForQueuedMaterializeWorkflowInput({
+      env,
+      snapshotJobId: snapshotJob.id,
+    });
+    expect(queuedWorkflowInput).toMatchObject({
+      snapshotJobId: snapshotJob.id,
+      sandboxInstanceId: snapshotJob.sandboxInstanceId,
+      sandboxProfileId: "sbp_version_publish_mistle_mcp_toggle",
+      sandboxProfileVersion: 2,
       image: {
         kind: "base",
       },
