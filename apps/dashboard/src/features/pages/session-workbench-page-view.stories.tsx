@@ -26,10 +26,14 @@ import {
 } from "../session-agents/codex/fixtures/session-fixtures.js";
 import type { RuntimeConversationNavigatorRow } from "../session-agents/runtime-conversations/runtime-conversation-navigator-model.js";
 import {
+  createRuntimeConversationNavigatorStoryProps,
   RuntimeConversationNavigatorPlanImplementationStoryRows,
   RuntimeConversationNavigatorWorkbenchStoryRows,
 } from "../session-agents/runtime-conversations/runtime-conversation-navigator-story-support.js";
-import { RuntimeConversationNavigatorPanel } from "../session-agents/runtime-conversations/runtime-conversation-navigator.js";
+import {
+  RuntimeConversationNavigatorPanel,
+  RuntimeConversationNavigatorSheet,
+} from "../session-agents/runtime-conversations/runtime-conversation-navigator.js";
 import { ActionTile } from "../shared/action-tile.js";
 import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
 import { AppShellView } from "../shell/app-shell-view.js";
@@ -73,12 +77,9 @@ function RuntimeConversationNavigationPanel(input?: {
 }): React.JSX.Element {
   return (
     <RuntimeConversationNavigatorPanel
-      isConversationListLimited={false}
-      isStartingConversation={false}
-      onRefreshConversations={noop}
-      onSelectConversation={noop}
-      onStartConversation={noop}
-      rows={input?.rows ?? RuntimeConversationNavigatorWorkbenchStoryRows}
+      {...createRuntimeConversationNavigatorStoryProps({
+        rows: input?.rows ?? RuntimeConversationNavigatorWorkbenchStoryRows,
+      })}
     />
   );
 }
@@ -165,12 +166,20 @@ function StoryAppSidebarContent(): React.JSX.Element {
 
 function RuntimeConversationNavigationAppShellStory(input?: {
   defaultConversationNavigatorOpen?: boolean;
+  defaultMobileConversationNavigatorOpen?: boolean;
   navigatorRows?: readonly RuntimeConversationNavigatorRow[];
   primaryBottomPanel?: React.ReactNode;
 }): React.JSX.Element {
   const [isConversationNavigatorOpen, setConversationNavigatorOpen] = useState(
     input?.defaultConversationNavigatorOpen ?? false,
   );
+  const [isMobileConversationNavigatorOpen, setMobileConversationNavigatorOpen] = useState(
+    input?.defaultMobileConversationNavigatorOpen ?? false,
+  );
+  const navigatorRows = input?.navigatorRows ?? RuntimeConversationNavigatorWorkbenchStoryRows;
+  const mobileConversationNavigatorProps = createRuntimeConversationNavigatorStoryProps({
+    rows: navigatorRows,
+  });
 
   return (
     <MemoryRouter initialEntries={["/sessions/sbi_storybook"]}>
@@ -181,6 +190,20 @@ function RuntimeConversationNavigationAppShellStory(input?: {
             actions={
               <SessionWorkbenchStoryHeaderActions
                 isConversationNavigatorVisible={isConversationNavigatorOpen}
+                mobileConversationNavigatorControl={{
+                  disabled: false,
+                  onOpen: () => {
+                    setMobileConversationNavigatorOpen(true);
+                  },
+                  surface: (
+                    <RuntimeConversationNavigatorSheet
+                      isOpen={isMobileConversationNavigatorOpen}
+                      navigator={mobileConversationNavigatorProps}
+                      onOpenChange={setMobileConversationNavigatorOpen}
+                    />
+                  ),
+                  title: "Show conversations",
+                }}
                 onConversationNavigatorToggle={() => {
                   setConversationNavigatorOpen((currentValue) => !currentValue);
                 }}
@@ -200,7 +223,7 @@ function RuntimeConversationNavigationAppShellStory(input?: {
               secondaryPanelDefaultSize="20%"
               secondaryPanelLayoutKey="right-panel"
               secondaryPanelMinSize="16rem"
-              secondaryPanel={<RuntimeConversationNavigationPanel rows={input?.navigatorRows} />}
+              secondaryPanel={<RuntimeConversationNavigationPanel rows={navigatorRows} />}
             />
           </ConversationWorkspaceFrame>
         }
@@ -428,6 +451,30 @@ export const WithRuntimeConversationNavigationAppShellOpen: Story = {
     sessionWorkbenchChrome: false,
   },
   render: () => <RuntimeConversationNavigationAppShellStory defaultConversationNavigatorOpen />,
+};
+
+export const WithRuntimeConversationNavigationMobile: Story = {
+  name: "With runtime conversation navigation on mobile",
+  parameters: {
+    sessionWorkbenchChrome: false,
+    viewport: {
+      defaultViewport: "mobile1",
+    },
+  },
+  render: () => <RuntimeConversationNavigationAppShellStory />,
+};
+
+export const WithRuntimeConversationNavigationMobileSheetOpen: Story = {
+  name: "With runtime conversation navigation mobile sheet open",
+  parameters: {
+    sessionWorkbenchChrome: false,
+    viewport: {
+      defaultViewport: "mobile1",
+    },
+  },
+  render: () => (
+    <RuntimeConversationNavigationAppShellStory defaultMobileConversationNavigatorOpen />
+  ),
 };
 
 export const WithPlanModeComposer: Story = {

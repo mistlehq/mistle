@@ -17,6 +17,7 @@ type SessionWorkbenchRuntimeConversationNavigationInput = {
   runtimeConversationNavigator: SessionConversationPaneState["runtimeConversationNavigator"];
   closeDiffPanel: () => void;
   isDiffPanelVisible: boolean;
+  isSecondaryPanelLayoutAvailable: boolean;
   pendingServerRequests: SessionConversationPaneState["serverRequestsState"]["pendingServerRequests"];
   primaryPanelTransitionState: MainPanelTransitionState;
   primaryRepositoryPath: string | null;
@@ -38,8 +39,13 @@ export type SessionWorkbenchRuntimeConversationNavigationState = {
 export function resolveRuntimeConversationNavigatorPanelVisibility(input: {
   explicitPanelVisibility: boolean | null;
   isDiffPanelVisible: boolean;
+  isSecondaryPanelLayoutAvailable: boolean;
   conversationCount: number;
 }): boolean {
+  if (!input.isSecondaryPanelLayoutAvailable) {
+    return false;
+  }
+
   if (input.explicitPanelVisibility !== null) {
     return input.explicitPanelVisibility;
   }
@@ -346,6 +352,7 @@ export function useSessionWorkbenchRuntimeConversationNavigation(
   const resolvedPanelVisibility = resolveRuntimeConversationNavigatorPanelVisibility({
     explicitPanelVisibility,
     isDiffPanelVisible: input.isDiffPanelVisible,
+    isSecondaryPanelLayoutAvailable: input.isSecondaryPanelLayoutAvailable,
     conversationCount: input.runtimeConversationNavigator?.availableConversations.length ?? 0,
   });
   const isPanelVisible = runtimeConversationNavigatorProps !== null && resolvedPanelVisibility;

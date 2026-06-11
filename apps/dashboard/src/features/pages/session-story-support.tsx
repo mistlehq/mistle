@@ -163,6 +163,9 @@ type SessionWorkbenchStoryHeaderActionsProps = {
   headerStatusUi?: SandboxStatusBadgeUi;
   isCliVisible?: boolean;
   isDiffVisible?: boolean;
+  mobileConversationNavigatorControl?: React.ComponentProps<
+    typeof SessionWorkbenchHeaderActions
+  >["mobileConversationNavigatorControl"];
   showConversationNavigatorControl?: boolean;
   isConversationNavigatorVisible?: boolean;
   isTerminalVisible?: boolean;
@@ -269,6 +272,9 @@ export function SessionWorkbenchStoryHeaderActions(
         surface: <SessionPortAccessSheet state={portAccessState} />,
         title: portAccessState.buttonDisabledReason ?? "Show running processes",
       }}
+      {...(input.mobileConversationNavigatorControl === undefined
+        ? {}
+        : { mobileConversationNavigatorControl: input.mobileConversationNavigatorControl })}
       portAccessControl={<SessionPortAccessPopover state={portAccessState} />}
       repositoryControl={{
         ariaLabel: "Primary repository",

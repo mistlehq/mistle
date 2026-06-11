@@ -1,4 +1,9 @@
-import { SidebarTrigger, useSidebar } from "@mistle/ui";
+import {
+  CssBreakpointVariables,
+  SidebarTrigger,
+  useIsBelowBreakpoint,
+  useSidebar,
+} from "@mistle/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
@@ -82,6 +87,7 @@ function SessionWorkbenchPageContent(input: {
   const previousActiveConversationIdRef = useRef<string | null>(null);
   const [composerDraft, setComposerDraft] = useState(createComposerDraft(""));
   const [isMobileConversationNavigatorOpen, setMobileConversationNavigatorOpen] = useState(false);
+  const isMobileSecondaryPanelLayout = useIsBelowBreakpoint(CssBreakpointVariables.SM);
   const [pendingDiffComments, setPendingDiffComments] = useState<
     readonly PendingSessionDiffComment[]
   >([]);
@@ -149,6 +155,7 @@ function SessionWorkbenchPageContent(input: {
     runtimeConversationNavigator: conversationPane.runtimeConversationNavigator,
     closeDiffPanel: workbench.diffPanelState.closePanel,
     isDiffPanelVisible: workbench.diffPanelState.isVisible,
+    isSecondaryPanelLayoutAvailable: !isMobileSecondaryPanelLayout,
     pendingServerRequests: conversationPane.serverRequestsState.pendingServerRequests,
     primaryPanelTransitionState: workbench.primaryPanelState.transitionState,
     primaryRepositoryPath,

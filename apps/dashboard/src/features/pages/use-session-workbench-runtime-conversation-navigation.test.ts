@@ -49,9 +49,21 @@ describe("resolveRuntimeConversationNavigatorPanelVisibility", () => {
       resolveRuntimeConversationNavigatorPanelVisibility({
         explicitPanelVisibility: null,
         isDiffPanelVisible: false,
+        isSecondaryPanelLayoutAvailable: true,
         conversationCount: 2,
       }),
     ).toBe(true);
+  });
+
+  it("keeps runtime conversation navigation out of the secondary panel when that layout is unavailable", () => {
+    expect(
+      resolveRuntimeConversationNavigatorPanelVisibility({
+        explicitPanelVisibility: null,
+        isDiffPanelVisible: false,
+        isSecondaryPanelLayoutAvailable: false,
+        conversationCount: 2,
+      }),
+    ).toBe(false);
   });
 
   it("keeps runtime conversation navigation closed by default for one unarchived conversation", () => {
@@ -59,6 +71,7 @@ describe("resolveRuntimeConversationNavigatorPanelVisibility", () => {
       resolveRuntimeConversationNavigatorPanelVisibility({
         explicitPanelVisibility: null,
         isDiffPanelVisible: false,
+        isSecondaryPanelLayoutAvailable: true,
         conversationCount: 1,
       }),
     ).toBe(false);
@@ -69,6 +82,7 @@ describe("resolveRuntimeConversationNavigatorPanelVisibility", () => {
       resolveRuntimeConversationNavigatorPanelVisibility({
         explicitPanelVisibility: null,
         isDiffPanelVisible: true,
+        isSecondaryPanelLayoutAvailable: true,
         conversationCount: 2,
       }),
     ).toBe(false);
@@ -79,6 +93,7 @@ describe("resolveRuntimeConversationNavigatorPanelVisibility", () => {
       resolveRuntimeConversationNavigatorPanelVisibility({
         explicitPanelVisibility: false,
         isDiffPanelVisible: false,
+        isSecondaryPanelLayoutAvailable: true,
         conversationCount: 3,
       }),
     ).toBe(false);
@@ -89,6 +104,7 @@ describe("resolveRuntimeConversationNavigatorPanelVisibility", () => {
       resolveRuntimeConversationNavigatorPanelVisibility({
         explicitPanelVisibility: true,
         isDiffPanelVisible: true,
+        isSecondaryPanelLayoutAvailable: true,
         conversationCount: 1,
       }),
     ).toBe(true);
