@@ -104,6 +104,13 @@ export type ProviderRecoverLateSteerInput = {
   idempotency?: AgentConversationIdempotencyMetadata | undefined;
 };
 
+export type ProviderSubmitAssociatedResourceDeliveryInput = {
+  connection: ProviderConnection;
+  providerConversationId: string;
+  inputText: string;
+  idempotency?: AgentConversationIdempotencyMetadata | undefined;
+};
+
 export type ProviderInterruptExecutionInput = {
   connection: ProviderConnection;
   providerConversationId: string;
@@ -130,6 +137,9 @@ export type ConversationProviderAdapter = {
   recoverLateSteer?: (
     input: ProviderRecoverLateSteerInput,
   ) => Promise<ProviderStartExecutionOutput>;
+  submitAssociatedResourceDelivery?: (
+    input: ProviderSubmitAssociatedResourceDeliveryInput,
+  ) => Promise<ProviderStartExecutionOutput>;
   interruptExecution: (input: ProviderInterruptExecutionInput) => Promise<void>;
 };
 
@@ -143,6 +153,7 @@ function adaptConversationProvider(
   const recoverLateSteer = provider.recoverLateSteer;
   const generateConversationTitle = provider.generateConversationTitle;
   const resolveOriginalConversation = provider.resolveOriginalConversation;
+  const submitAssociatedResourceDelivery = provider.submitAssociatedResourceDelivery;
 
   return {
     connect: async (input) => await provider.connect(input),
@@ -165,6 +176,12 @@ function adaptConversationProvider(
       ? {}
       : {
           recoverLateSteer: async (input) => await recoverLateSteer(input),
+        }),
+    ...(submitAssociatedResourceDelivery === undefined
+      ? {}
+      : {
+          submitAssociatedResourceDelivery: async (input) =>
+            await submitAssociatedResourceDelivery(input),
         }),
     interruptExecution: async (input) => await provider.interruptExecution(input),
   };

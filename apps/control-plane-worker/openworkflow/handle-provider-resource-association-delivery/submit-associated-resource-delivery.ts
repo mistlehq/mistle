@@ -17,11 +17,6 @@ import {
 } from "./errors.js";
 
 const DeliveryContextNotificationMethod = "mistle/setDeliveryContext";
-const CodexTurnStartMethod = "turn/start";
-const CodexThreadReadMethod = "thread/read";
-const CodexThreadResumeMethod = "thread/resume";
-const UnmaterializedCodexIncludeTurnsMessage =
-  "includeTurns is unavailable before first user message";
 
 export type ProviderResourceAssociationDeliveryInput = {
   runtimeId: string;
@@ -37,10 +32,6 @@ export type ProviderResourceAssociationDeliveryInput = {
 type ProviderConnection = Awaited<
   ReturnType<ReturnType<typeof getConversationProviderAdapter>["connect"]>
 >;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function resolveDeliveryContextNotificationParams(
   deliveryInput: ProviderResourceAssociationDeliveryInput,
@@ -104,17 +95,28 @@ export async function submitAssociatedResourceDelivery(input: {
     }
 
     const providerConversationId = originalConversation.providerConversationId;
-    if (input.deliveryInput.runtimeId === "codex") {
-      const providerExecutionId = await submitCodexAssociatedResourceDeliveryPayload({
-        adapter,
+    const submitIdempotency = submitPayloadIdempotencyMetadata({
+      deliveryInput: input.deliveryInput,
+      providerConversationId,
+    });
+
+    if (adapter.submitAssociatedResourceDelivery !== undefined) {
+      const result = await adapter.submitAssociatedResourceDelivery({
         connection,
-        deliveryInput: input.deliveryInput,
+        idempotency: submitIdempotency,
+        inputText: input.deliveryInput.inputText,
         providerConversationId,
       });
+      if (result.providerExecutionId === null) {
+        throw new ProviderResourceAssociationDeliveryError({
+          code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
+          message: `Associated-resource delivery runtime '${input.deliveryInput.runtimeId}' did not return a provider execution id.`,
+        });
+      }
 
       return {
         providerConversationId,
-        providerExecutionId,
+        providerExecutionId: result.providerExecutionId,
       };
     }
 
@@ -128,6 +130,7 @@ export async function submitAssociatedResourceDelivery(input: {
       connection,
       deliveryInput: input.deliveryInput,
       inspectResult,
+      submitIdempotency,
       providerConversationId,
     });
 
@@ -150,75 +153,6 @@ export async function submitAssociatedResourceDelivery(input: {
     });
   } finally {
     await connection.close();
-  }
-}
-
-async function submitCodexAssociatedResourceDeliveryPayload(input: {
-  adapter: ReturnType<typeof getConversationProviderAdapter>;
-  connection: ProviderConnection;
-  deliveryInput: ProviderResourceAssociationDeliveryInput;
-  providerConversationId: string;
-}): Promise<string> {
-  await input.connection.request({
-    method: CodexThreadResumeMethod,
-    params: {
-      threadId: input.providerConversationId,
-    },
-  });
-
-  const activeTurnId = await readActiveCodexTurnId({
-    connection: input.connection,
-    providerConversationId: input.providerConversationId,
-  });
-  const submitIdempotency = submitPayloadIdempotencyMetadata({
-    deliveryInput: input.deliveryInput,
-    providerConversationId: input.providerConversationId,
-  });
-
-  if (activeTurnId === null) {
-    return await startCodexAssociatedResourceTurn({
-      connection: input.connection,
-      deliveryInput: input.deliveryInput,
-      idempotency: submitIdempotency,
-      providerConversationId: input.providerConversationId,
-    });
-  }
-
-  try {
-    return await steerAssociatedResourceExecution({
-      adapter: input.adapter,
-      connection: input.connection,
-      deliveryInput: input.deliveryInput,
-      idempotency: submitIdempotency,
-      providerConversationId: input.providerConversationId,
-      providerExecutionId: activeTurnId,
-    });
-  } catch (error) {
-    if (isStaleActiveTurnMismatchError({ error })) {
-      const refreshedActiveTurnId = await readActiveCodexTurnId({
-        connection: input.connection,
-        providerConversationId: input.providerConversationId,
-      });
-      if (refreshedActiveTurnId !== null) {
-        return await steerAssociatedResourceExecution({
-          adapter: input.adapter,
-          connection: input.connection,
-          deliveryInput: input.deliveryInput,
-          idempotency: submitIdempotency,
-          providerConversationId: input.providerConversationId,
-          providerExecutionId: refreshedActiveTurnId,
-        });
-      }
-    } else if (!isRecoverableLateSteerError({ error })) {
-      throw error;
-    }
-
-    return await startCodexAssociatedResourceTurn({
-      connection: input.connection,
-      deliveryInput: input.deliveryInput,
-      idempotency: submitIdempotency,
-      providerConversationId: input.providerConversationId,
-    });
   }
 }
 
@@ -250,6 +184,7 @@ async function submitAssociatedResourceDeliveryPayload(input: {
   connection: ProviderConnection;
   deliveryInput: ProviderResourceAssociationDeliveryInput;
   inspectResult: ProviderInspectConversationOutput;
+  submitIdempotency: AgentConversationIdempotencyMetadata;
   providerConversationId: string;
 }): Promise<string> {
   if (!input.inspectResult.exists) {
@@ -266,17 +201,12 @@ async function submitAssociatedResourceDeliveryPayload(input: {
     });
   }
 
-  const submitIdempotency = submitPayloadIdempotencyMetadata({
-    deliveryInput: input.deliveryInput,
-    providerConversationId: input.providerConversationId,
-  });
-
   if (input.inspectResult.status === "idle") {
     return await startAssociatedResourceExecution({
       adapter: input.adapter,
       connection: input.connection,
       deliveryInput: input.deliveryInput,
-      idempotency: submitIdempotency,
+      idempotency: input.submitIdempotency,
       providerConversationId: input.providerConversationId,
     });
   }
@@ -293,7 +223,7 @@ async function submitAssociatedResourceDeliveryPayload(input: {
       adapter: input.adapter,
       connection: input.connection,
       deliveryInput: input.deliveryInput,
-      idempotency: submitIdempotency,
+      idempotency: input.submitIdempotency,
       providerConversationId: input.providerConversationId,
       providerExecutionId: input.inspectResult.activeExecutionId,
     });
@@ -306,7 +236,7 @@ async function submitAssociatedResourceDeliveryPayload(input: {
       adapter: input.adapter,
       connection: input.connection,
       deliveryInput: input.deliveryInput,
-      idempotency: submitIdempotency,
+      idempotency: input.submitIdempotency,
       providerConversationId: input.providerConversationId,
       providerExecutionId: input.inspectResult.activeExecutionId,
     });
@@ -399,143 +329,6 @@ async function recoverAssociatedResourceLateSteer(input: {
     code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
     message: `Associated-resource delivery could not recover late steer for provider conversation '${input.providerConversationId}'.`,
   });
-}
-
-async function startCodexAssociatedResourceTurn(input: {
-  connection: {
-    request: (input: {
-      method: string;
-      params?: Record<string, unknown>;
-      idempotency?: AgentConversationIdempotencyMetadata | undefined;
-    }) => Promise<unknown>;
-  };
-  deliveryInput: ProviderResourceAssociationDeliveryInput;
-  idempotency: AgentConversationIdempotencyMetadata;
-  providerConversationId: string;
-}): Promise<string> {
-  return parseCodexTurnStartResponse(
-    await input.connection.request({
-      method: CodexTurnStartMethod,
-      params: {
-        threadId: input.providerConversationId,
-        input: [
-          {
-            type: "text",
-            text: input.deliveryInput.inputText,
-          },
-        ],
-      },
-      idempotency: input.idempotency,
-    }),
-  );
-}
-
-function parseCodexTurnStartResponse(response: unknown): string {
-  if (!isRecord(response)) {
-    throw new ProviderResourceAssociationDeliveryError({
-      code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
-      message: "Codex associated-resource turn/start response was not an object.",
-    });
-  }
-
-  const turn = response["turn"];
-  if (!isRecord(turn)) {
-    throw new ProviderResourceAssociationDeliveryError({
-      code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
-      message: "Codex associated-resource turn/start response did not include turn.",
-    });
-  }
-
-  const turnId = turn["id"];
-  if (typeof turnId !== "string" || turnId.length === 0) {
-    throw new ProviderResourceAssociationDeliveryError({
-      code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
-      message: "Codex associated-resource turn/start response did not include turn id.",
-    });
-  }
-
-  return turnId;
-}
-
-async function readActiveCodexTurnId(input: {
-  connection: {
-    request: (input: { method: string; params?: Record<string, unknown> }) => Promise<unknown>;
-  };
-  providerConversationId: string;
-}): Promise<string | null> {
-  let response: unknown;
-  try {
-    response = await input.connection.request({
-      method: CodexThreadReadMethod,
-      params: {
-        threadId: input.providerConversationId,
-        includeTurns: true,
-      },
-    });
-  } catch (error) {
-    if (isUnmaterializedCodexIncludeTurnsError(error)) {
-      return null;
-    }
-    throw error;
-  }
-
-  return resolveLatestActiveCodexTurnId(response);
-}
-
-function isUnmaterializedCodexIncludeTurnsError(error: unknown): boolean {
-  return error instanceof Error && error.message.includes(UnmaterializedCodexIncludeTurnsMessage);
-}
-
-function resolveLatestActiveCodexTurnId(response: unknown): string | null {
-  if (!isRecord(response)) {
-    throw new ProviderResourceAssociationDeliveryError({
-      code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
-      message: "Codex associated-resource thread/read response was not an object.",
-    });
-  }
-
-  const thread = response["thread"];
-  if (!isRecord(thread)) {
-    throw new ProviderResourceAssociationDeliveryError({
-      code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
-      message: "Codex associated-resource thread/read response did not include thread.",
-    });
-  }
-
-  const turns = thread["turns"];
-  if (turns === undefined) {
-    return null;
-  }
-  if (!Array.isArray(turns)) {
-    throw new ProviderResourceAssociationDeliveryError({
-      code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
-      message: "Codex associated-resource thread/read response did not include an array of turns.",
-    });
-  }
-
-  for (let index = turns.length - 1; index >= 0; index -= 1) {
-    const turn = turns[index];
-    if (!isRecord(turn)) {
-      throw new ProviderResourceAssociationDeliveryError({
-        code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
-        message: "Codex associated-resource thread/read turn was not an object.",
-      });
-    }
-
-    const turnId = turn["id"];
-    const turnStatus = turn["status"];
-    if (typeof turnId !== "string" || turnId.length === 0) {
-      throw new ProviderResourceAssociationDeliveryError({
-        code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
-        message: "Codex associated-resource thread/read turn did not include id.",
-      });
-    }
-    if (turnStatus === "running" || turnStatus === "active" || turnStatus === "inProgress") {
-      return turnId;
-    }
-  }
-
-  return null;
 }
 
 function submitPayloadIdempotencyMetadata(input: {

@@ -8,4 +8,10 @@ describe("conversation provider adapter registry", () => {
       "Agent runtime 'unsupported' was not found.",
     );
   });
+
+  it("exposes Codex associated-resource delivery submission through the provider adapter", () => {
+    expect(getConversationProviderAdapter("codex").submitAssociatedResourceDelivery).toBeTypeOf(
+      "function",
+    );
+  });
 });

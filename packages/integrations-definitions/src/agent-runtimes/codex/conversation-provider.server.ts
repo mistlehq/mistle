@@ -5,6 +5,7 @@ import type {
   AgentConversationIdempotencyMetadata,
   AgentConversationInspectResult,
   AgentConversationProvider,
+  AgentConversationSubmitAssociatedResourceDeliveryInput,
 } from "@mistle/integrations-core";
 import { AgentConversationStatuses } from "@mistle/integrations-core";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
@@ -65,6 +66,8 @@ const CodexJsonRpcErrorCodes = {
 
 const CodexJsonRpcRequestTimeoutMs = 60_000;
 const OriginalCodexThreadListPageSize = 100;
+const UnmaterializedCodexIncludeTurnsMessage =
+  "includeTurns is unavailable before first user message";
 
 type CodexStartExecutionInputItem = {
   type: "text";
@@ -175,6 +178,58 @@ function extractTurnSteerExecutionId(result: unknown): string {
   }
 
   return providerExecutionId;
+}
+
+function resolveLatestActiveCodexTurnId(response: unknown): string | null {
+  if (!isRecord(response)) {
+    throw new ConversationProviderError({
+      code: ConversationProviderErrorCodes.PROVIDER_INSPECT_FAILED,
+      message: "Codex associated-resource thread/read response was not an object.",
+    });
+  }
+
+  const thread = response["thread"];
+  if (!isRecord(thread)) {
+    throw new ConversationProviderError({
+      code: ConversationProviderErrorCodes.PROVIDER_INSPECT_FAILED,
+      message: "Codex associated-resource thread/read response did not include thread.",
+    });
+  }
+
+  const turns = thread["turns"];
+  if (turns === undefined) {
+    return null;
+  }
+  if (!Array.isArray(turns)) {
+    throw new ConversationProviderError({
+      code: ConversationProviderErrorCodes.PROVIDER_INSPECT_FAILED,
+      message: "Codex associated-resource thread/read response did not include an array of turns.",
+    });
+  }
+
+  for (let index = turns.length - 1; index >= 0; index -= 1) {
+    const turn = turns[index];
+    if (!isRecord(turn)) {
+      throw new ConversationProviderError({
+        code: ConversationProviderErrorCodes.PROVIDER_INSPECT_FAILED,
+        message: "Codex associated-resource thread/read turn was not an object.",
+      });
+    }
+
+    const turnId = turn["id"];
+    const turnStatus = turn["status"];
+    if (typeof turnId !== "string" || turnId.length === 0) {
+      throw new ConversationProviderError({
+        code: ConversationProviderErrorCodes.PROVIDER_INSPECT_FAILED,
+        message: "Codex associated-resource thread/read turn did not include id.",
+      });
+    }
+    if (turnStatus === "running" || turnStatus === "active" || turnStatus === "inProgress") {
+      return turnId;
+    }
+  }
+
+  return null;
 }
 
 function readCodexRequestFailureCause(error: unknown): CodexRequestFailureCause | null {
@@ -324,6 +379,32 @@ function isProviderExecutionMissingError(error: unknown): boolean {
   return (
     cause.errorMessage === "no active turn to steer" ||
     cause.errorMessage.startsWith("expected active turn id `")
+  );
+}
+
+function isRecoverableLateSteerError(error: unknown): boolean {
+  return (
+    error instanceof ConversationProviderError &&
+    error.code === ConversationProviderErrorCodes.PROVIDER_EXECUTION_MISSING &&
+    error.message.includes("no active turn to steer")
+  );
+}
+
+function isStaleActiveTurnMismatchError(error: unknown): boolean {
+  return (
+    error instanceof ConversationProviderError &&
+    error.code === ConversationProviderErrorCodes.PROVIDER_EXECUTION_MISSING &&
+    error.message.includes("expected active turn id `")
+  );
+}
+
+function isUnmaterializedCodexIncludeTurnsError(error: unknown): boolean {
+  const cause = readCodexRequestFailureCause(error);
+  return (
+    cause !== null &&
+    cause.method === CodexMethodNames.THREAD_READ &&
+    cause.errorCode === CodexJsonRpcErrorCodes.INVALID_REQUEST &&
+    cause.errorMessage.includes(UnmaterializedCodexIncludeTurnsMessage)
   );
 }
 
@@ -500,6 +581,169 @@ export function resolveCodexTurnStartParams(input: {
           },
         }),
   };
+}
+
+async function steerCodexExecution(input: {
+  connection: AgentConversationConnection;
+  providerConversationId: string;
+  providerExecutionId: string;
+  inputText: string;
+  idempotency?: AgentConversationIdempotencyMetadata | undefined;
+}): Promise<{ providerExecutionId: string }> {
+  let steerResult: unknown;
+  try {
+    steerResult = await input.connection.request({
+      method: CodexMethodNames.TURN_STEER,
+      idempotency: input.idempotency,
+      params: {
+        threadId: input.providerConversationId,
+        input: toCodexTextInputItems(input.inputText),
+        expectedTurnId: input.providerExecutionId,
+      },
+    });
+  } catch (error) {
+    if (isProviderConversationMissingError(error)) {
+      throw new ConversationProviderError({
+        code: ConversationProviderErrorCodes.PROVIDER_CONVERSATION_MISSING,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Codex steer execution failed with non-error exception.",
+        cause: error,
+      });
+    }
+    if (isProviderExecutionMissingError(error)) {
+      throw new ConversationProviderError({
+        code: ConversationProviderErrorCodes.PROVIDER_EXECUTION_MISSING,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Codex steer execution failed with non-error exception.",
+        cause: error,
+      });
+    }
+    throw new ConversationProviderError({
+      code: ConversationProviderErrorCodes.PROVIDER_STEER_EXECUTION_FAILED,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Codex steer execution failed with non-error exception.",
+      cause: error,
+    });
+  }
+
+  return {
+    providerExecutionId: extractTurnSteerExecutionId(steerResult),
+  };
+}
+
+async function readActiveCodexTurnId(input: {
+  connection: AgentConversationConnection;
+  providerConversationId: string;
+}): Promise<string | null> {
+  let response: unknown;
+  try {
+    response = await input.connection.request({
+      method: CodexMethodNames.THREAD_READ,
+      params: {
+        threadId: input.providerConversationId,
+        includeTurns: true,
+      },
+    });
+  } catch (error) {
+    if (isUnmaterializedCodexIncludeTurnsError(error)) {
+      return null;
+    }
+    throw error;
+  }
+
+  return resolveLatestActiveCodexTurnId(response);
+}
+
+async function startCodexAssociatedResourceExecution(input: {
+  connection: AgentConversationConnection;
+  providerConversationId: string;
+  inputText: string;
+  idempotency?: AgentConversationIdempotencyMetadata | undefined;
+}): Promise<{ providerExecutionId: string }> {
+  let startResult: unknown;
+  try {
+    startResult = await input.connection.request({
+      method: CodexMethodNames.TURN_START,
+      idempotency: input.idempotency,
+      params: {
+        threadId: input.providerConversationId,
+        input: toCodexTextInputItems(input.inputText),
+      },
+    });
+  } catch (error) {
+    if (isProviderConversationMissingError(error)) {
+      throw new ConversationProviderError({
+        code: ConversationProviderErrorCodes.PROVIDER_CONVERSATION_MISSING,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Codex associated-resource start execution failed with non-error exception.",
+        cause: error,
+      });
+    }
+    throw new ConversationProviderError({
+      code: ConversationProviderErrorCodes.PROVIDER_START_EXECUTION_FAILED,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Codex associated-resource start execution failed with non-error exception.",
+      cause: error,
+    });
+  }
+
+  return {
+    providerExecutionId: extractTurnStartExecutionId(startResult),
+  };
+}
+
+async function submitCodexAssociatedResourceDelivery(
+  input: AgentConversationSubmitAssociatedResourceDeliveryInput,
+): Promise<{ providerExecutionId: string }> {
+  await input.connection.request({
+    method: CodexMethodNames.THREAD_RESUME,
+    params: {
+      threadId: input.providerConversationId,
+    },
+  });
+
+  const activeTurnId = await readActiveCodexTurnId({
+    connection: input.connection,
+    providerConversationId: input.providerConversationId,
+  });
+
+  if (activeTurnId === null) {
+    return await startCodexAssociatedResourceExecution(input);
+  }
+
+  try {
+    return await steerCodexExecution({
+      ...input,
+      providerExecutionId: activeTurnId,
+    });
+  } catch (error) {
+    if (isStaleActiveTurnMismatchError(error)) {
+      const refreshedActiveTurnId = await readActiveCodexTurnId({
+        connection: input.connection,
+        providerConversationId: input.providerConversationId,
+      });
+      if (refreshedActiveTurnId !== null) {
+        return await steerCodexExecution({
+          ...input,
+          providerExecutionId: refreshedActiveTurnId,
+        });
+      }
+    } else if (!isRecoverableLateSteerError(error)) {
+      throw error;
+    }
+
+    return await startCodexAssociatedResourceExecution(input);
+  }
 }
 
 function resolveCodexExplicitModelStartThreadParams(options: Readonly<Record<string, unknown>>): {
@@ -976,53 +1220,9 @@ export function createOpenAiConversationProvider(): AgentConversationProvider {
         providerExecutionId: extractTurnStartExecutionId(startResult),
       };
     },
-    steerExecution: async (input) => {
-      let steerResult: unknown;
-      try {
-        steerResult = await input.connection.request({
-          method: CodexMethodNames.TURN_STEER,
-          idempotency: input.idempotency,
-          params: {
-            threadId: input.providerConversationId,
-            input: toCodexTextInputItems(input.inputText),
-            expectedTurnId: input.providerExecutionId,
-          },
-        });
-      } catch (error) {
-        if (isProviderConversationMissingError(error)) {
-          throw new ConversationProviderError({
-            code: ConversationProviderErrorCodes.PROVIDER_CONVERSATION_MISSING,
-            message:
-              error instanceof Error
-                ? error.message
-                : "Codex steer execution failed with non-error exception.",
-            cause: error,
-          });
-        }
-        if (isProviderExecutionMissingError(error)) {
-          throw new ConversationProviderError({
-            code: ConversationProviderErrorCodes.PROVIDER_EXECUTION_MISSING,
-            message:
-              error instanceof Error
-                ? error.message
-                : "Codex steer execution failed with non-error exception.",
-            cause: error,
-          });
-        }
-        throw new ConversationProviderError({
-          code: ConversationProviderErrorCodes.PROVIDER_STEER_EXECUTION_FAILED,
-          message:
-            error instanceof Error
-              ? error.message
-              : "Codex steer execution failed with non-error exception.",
-          cause: error,
-        });
-      }
-
-      return {
-        providerExecutionId: extractTurnSteerExecutionId(steerResult),
-      };
-    },
+    steerExecution: async (input) => await steerCodexExecution(input),
+    submitAssociatedResourceDelivery: async (input) =>
+      await submitCodexAssociatedResourceDelivery(input),
     interruptExecution: async (input) => {
       try {
         await input.connection.request({
