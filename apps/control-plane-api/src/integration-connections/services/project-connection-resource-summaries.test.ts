@@ -88,4 +88,37 @@ describe("projectConnectionResourceSummaries", () => {
       },
     ]);
   });
+
+  it("projects persisted sync failure details for error states", () => {
+    const result = projectConnectionResourceSummaries({
+      definition: GitHubCloudDefinition,
+      resourceStates: [
+        {
+          connectionId: "icn_123",
+          familyId: "github",
+          kind: "team",
+          syncState: IntegrationConnectionResourceSyncStates.ERROR,
+          totalCount: 0,
+          lastSyncedAt: null,
+          lastSyncStartedAt: "2026-03-09T09:59:00.000Z",
+          lastSyncFinishedAt: "2026-03-09T10:00:00.000Z",
+          lastErrorCode: "resource_sync_failed",
+          lastErrorMessage:
+            "GitHub returned a 403 while syncing teams. Reapprove Members read permission.",
+          createdAt: "2026-03-09T09:59:00.000Z",
+          updatedAt: "2026-03-09T10:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(result).toContainEqual({
+      kind: "team",
+      selectionMode: "multi",
+      count: 0,
+      syncState: IntegrationConnectionResourceSyncStates.ERROR,
+      lastErrorCode: "resource_sync_failed",
+      lastErrorMessage:
+        "GitHub returned a 403 while syncing teams. Reapprove Members read permission.",
+    });
+  });
 });

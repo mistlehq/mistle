@@ -3993,6 +3993,14 @@
                                   "type": "string",
                                   "enum": ["never-synced", "syncing", "ready", "error"]
                                 },
+                                "lastErrorCode": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "lastErrorMessage": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
                                 "lastSyncedAt": {
                                   "type": "string",
                                   "minLength": 1
@@ -6004,6 +6012,14 @@
                             "type": "string",
                             "enum": ["never-synced", "syncing", "ready", "error"]
                           },
+                          "lastErrorCode": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "lastErrorMessage": {
+                            "type": "string",
+                            "minLength": 1
+                          },
                           "lastSyncedAt": {
                             "type": "string",
                             "minLength": 1
@@ -6397,6 +6413,14 @@
                             "type": "string",
                             "enum": ["never-synced", "syncing", "ready", "error"]
                           },
+                          "lastErrorCode": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "lastErrorMessage": {
+                            "type": "string",
+                            "minLength": 1
+                          },
                           "lastSyncedAt": {
                             "type": "string",
                             "minLength": 1
@@ -6750,6 +6774,14 @@
                           "syncState": {
                             "type": "string",
                             "enum": ["never-synced", "syncing", "ready", "error"]
+                          },
+                          "lastErrorCode": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "lastErrorMessage": {
+                            "type": "string",
+                            "minLength": 1
                           },
                           "lastSyncedAt": {
                             "type": "string",
@@ -7289,6 +7321,14 @@
                           "syncState": {
                             "type": "string",
                             "enum": ["never-synced", "syncing", "ready", "error"]
+                          },
+                          "lastErrorCode": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "lastErrorMessage": {
+                            "type": "string",
+                            "minLength": 1
                           },
                           "lastSyncedAt": {
                             "type": "string",

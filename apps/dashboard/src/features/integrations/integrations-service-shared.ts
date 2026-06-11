@@ -331,6 +331,7 @@ const IntegrationConnectionApiSchema = z
             count: z.number().int().min(0),
             syncState: z.enum(["never-synced", "syncing", "ready", "error"]),
             lastSyncedAt: z.string().min(1).optional(),
+            lastErrorCode: z.string().min(1).optional(),
             lastErrorMessage: z.string().min(1).optional(),
           })
           .strict(),
