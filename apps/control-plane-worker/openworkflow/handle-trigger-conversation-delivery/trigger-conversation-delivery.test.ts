@@ -14,7 +14,6 @@ import {
 import {
   TriggerConversationExecutionActions,
   TriggerConversationSteerRecoveryActions,
-  isRecoverableLateSteerError,
   resolveTriggerConversationExecutionAction,
   resolveTriggerConversationSteerRecoveryAction,
 } from "./trigger-conversation-delivery.js";
@@ -246,11 +245,6 @@ describe("conversation delivery plans", () => {
             activeExecutionId: null,
           },
           providerExecutionId: null,
-          adapter: {
-            steerExecution: async () => ({
-              providerExecutionId: "turn_123",
-            }),
-          },
         }),
       ).toBe(TriggerConversationExecutionActions.FAIL_MISSING_CONVERSATION);
     });
@@ -264,11 +258,6 @@ describe("conversation delivery plans", () => {
             activeExecutionId: null,
           },
           providerExecutionId: null,
-          adapter: {
-            steerExecution: async () => ({
-              providerExecutionId: "turn_123",
-            }),
-          },
         }),
       ).toBe(TriggerConversationExecutionActions.FAIL_PROVIDER_ERROR);
     });
@@ -282,11 +271,6 @@ describe("conversation delivery plans", () => {
             activeExecutionId: null,
           },
           providerExecutionId: null,
-          adapter: {
-            steerExecution: async () => ({
-              providerExecutionId: "turn_123",
-            }),
-          },
         }),
       ).toBe(TriggerConversationExecutionActions.FAIL_NOT_LOADED);
     });
@@ -300,11 +284,6 @@ describe("conversation delivery plans", () => {
             activeExecutionId: null,
           },
           providerExecutionId: null,
-          adapter: {
-            steerExecution: async () => ({
-              providerExecutionId: "turn_123",
-            }),
-          },
         }),
       ).toBe(TriggerConversationExecutionActions.START);
     });
@@ -318,11 +297,6 @@ describe("conversation delivery plans", () => {
             activeExecutionId: null,
           },
           providerExecutionId: null,
-          adapter: {
-            steerExecution: async () => ({
-              providerExecutionId: "turn_123",
-            }),
-          },
         }),
       ).toBe(TriggerConversationExecutionActions.FAIL_MISSING_EXECUTION);
     });
@@ -336,50 +310,8 @@ describe("conversation delivery plans", () => {
             activeExecutionId: null,
           },
           providerExecutionId: "turn_123",
-          adapter: {
-            steerExecution: async () => ({
-              providerExecutionId: "turn_123",
-            }),
-          },
         }),
       ).toBe(TriggerConversationExecutionActions.STEER);
-    });
-  });
-
-  describe("isRecoverableLateSteerError", () => {
-    it("recognizes the no-active-turn steer race as recoverable", () => {
-      expect(
-        isRecoverableLateSteerError({
-          error: {
-            code: "provider_execution_missing",
-            message:
-              "Codex app-server request 'turn/steer' failed (-32600): no active turn to steer",
-          },
-        }),
-      ).toBe(true);
-    });
-
-    it("does not recover expected-turn mismatches", () => {
-      expect(
-        isRecoverableLateSteerError({
-          error: {
-            code: "provider_execution_missing",
-            message:
-              "Codex app-server request 'turn/steer' failed (-32600): expected active turn id `turn_expected` but found `turn_actual`",
-          },
-        }),
-      ).toBe(false);
-    });
-
-    it("does not recover unrelated provider errors", () => {
-      expect(
-        isRecoverableLateSteerError({
-          error: {
-            code: "provider_steer_execution_failed",
-            message: "Codex steer execution failed.",
-          },
-        }),
-      ).toBe(false);
     });
   });
 

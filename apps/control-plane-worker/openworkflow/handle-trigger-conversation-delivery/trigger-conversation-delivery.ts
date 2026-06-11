@@ -1,11 +1,4 @@
-import type {
-  ConversationProviderAdapter,
-  ProviderInspectConversationOutput,
-} from "./provider-adapter.js";
-import {
-  type ConversationProviderErrorCode,
-  ConversationProviderErrorCodes,
-} from "./provider-errors.js";
+import type { ProviderInspectConversationOutput } from "../shared/provider-adapter.js";
 
 export const TriggerConversationExecutionActions = {
   START: "start",
@@ -22,7 +15,6 @@ export type ConversationExecutionAction =
 export function resolveTriggerConversationExecutionAction(input: {
   inspectTriggerConversation: ProviderInspectConversationOutput;
   providerExecutionId: string | null;
-  adapter: Pick<ConversationProviderAdapter, "steerExecution">;
 }): ConversationExecutionAction {
   if (!input.inspectTriggerConversation.exists) {
     return TriggerConversationExecutionActions.FAIL_MISSING_CONVERSATION;
@@ -52,29 +44,6 @@ export const TriggerConversationSteerRecoveryActions = {
 
 export type ConversationSteerRecoveryAction =
   (typeof TriggerConversationSteerRecoveryActions)[keyof typeof TriggerConversationSteerRecoveryActions];
-
-function isConversationProviderErrorLike(
-  value: unknown,
-): value is Pick<Error, "message"> & { code?: ConversationProviderErrorCode } {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "message" in value &&
-    typeof value.message === "string" &&
-    (!("code" in value) || typeof value.code === "string")
-  );
-}
-
-export function isRecoverableLateSteerError(input: { error: unknown }): boolean {
-  if (!isConversationProviderErrorLike(input.error)) {
-    return false;
-  }
-
-  return (
-    input.error.code === ConversationProviderErrorCodes.PROVIDER_EXECUTION_MISSING &&
-    input.error.message.includes("no active turn to steer")
-  );
-}
 
 export function resolveTriggerConversationSteerRecoveryAction(input: {
   inspectTriggerConversation: ProviderInspectConversationOutput;

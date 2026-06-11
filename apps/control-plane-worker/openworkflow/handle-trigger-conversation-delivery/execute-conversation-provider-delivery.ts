@@ -2,17 +2,17 @@ import type { AgentConversationIdempotencyMetadata } from "@mistle/integrations-
 import { extractActiveW3cTraceCarrier } from "@mistle/telemetry/trace-context.js";
 
 import {
+  type ProviderInspectConversationOutput,
+  getConversationProviderAdapter,
+} from "../shared/provider-adapter.js";
+import { isRecoverableLateSteerError } from "../shared/provider-errors.js";
+import {
   createConversationIdempotencyMetadata,
   submitPayloadIdempotencyMetadata,
 } from "./delivery-idempotency.js";
 import {
-  type ProviderInspectConversationOutput,
-  getConversationProviderAdapter,
-} from "./provider-adapter.js";
-import {
   TriggerConversationExecutionActions,
   TriggerConversationSteerRecoveryActions,
-  isRecoverableLateSteerError,
   resolveTriggerConversationExecutionAction,
   resolveTriggerConversationSteerRecoveryAction,
 } from "./trigger-conversation-delivery.js";
@@ -87,7 +87,6 @@ async function steerConversationExecution(input: {
   adapter: ReturnType<typeof getConversationProviderAdapter>;
   connection: Awaited<ReturnType<ReturnType<typeof getConversationProviderAdapter>["connect"]>>;
   conversationId: string;
-  runtimeId: string;
   providerConversationId: string | null;
   providerExecutionId: string | null;
   inputText: string;
@@ -236,7 +235,6 @@ export async function submitConversationProviderDeliveryPayload(input: {
       const executionAction = resolveTriggerConversationExecutionAction({
         inspectTriggerConversation: input.inspectTriggerConversation,
         providerExecutionId: input.deliveryInput.providerExecutionId,
-        adapter,
       });
       const submitIdempotency = submitPayloadIdempotencyMetadata({
         deliveryInput: input.deliveryInput,
@@ -264,7 +262,6 @@ export async function submitConversationProviderDeliveryPayload(input: {
               adapter,
               connection,
               conversationId: input.deliveryInput.conversationId,
-              runtimeId: input.deliveryInput.runtimeId,
               providerConversationId: input.providerConversationId,
               providerExecutionId: input.deliveryInput.providerExecutionId,
               inputText: input.deliveryInput.inputText,

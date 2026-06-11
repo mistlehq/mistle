@@ -12,7 +12,11 @@ import {
   IntegrationConnectionStatuses,
 } from "@mistle/db/control-plane";
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
-import { createDisabledAssociatedResourceEventRouting } from "@mistle/integrations-core";
+import {
+  AssociatedProviderResourceKinds,
+  AssociatedResourceEventTypes,
+  createDisabledAssociatedResourceEventRouting,
+} from "@mistle/integrations-core";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
@@ -245,6 +249,34 @@ describe.concurrent("provider resource association delivery", () => {
       sandboxInstanceId: scope.sandboxInstanceId,
       runtimeId: "codex",
       workingDirectory: "/root/repo",
+    });
+  });
+
+  it("fails explicitly when the associated sandbox routing does not enable the delivery event", async ({
+    env,
+  }) => {
+    const scope = await seedAssociationDeliveryScope({
+      env,
+      suffix: createSuffix("event_route_disabled"),
+    });
+    await insertSandboxInstance(env, scope);
+
+    await expect(
+      resolveProviderResourceAssociationDeliveryTarget(
+        {
+          dataPlaneClient: createDataPlaneClient(env),
+          db: env.controlPlaneDb,
+        },
+        {
+          providerResourceAssociationId: scope.providerResourceAssociationId,
+          associatedResourceEvent: {
+            resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+            eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+          },
+        },
+      ),
+    ).rejects.toMatchObject({
+      code: ProviderResourceAssociationDeliveryFailureCodes.ROUTING_EVENT_NOT_ENABLED,
     });
   });
 

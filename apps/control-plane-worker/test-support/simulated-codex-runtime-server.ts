@@ -11,7 +11,10 @@ import { type RawData, type WebSocket, WebSocketServer } from "ws";
 export type SimulatedCodexRuntimeScenario =
   | "existing_conversation"
   | "existing_conversation_with_collaboration_mode"
+  | "associated_resource_active_turn"
   | "associated_resource_direct_turn"
+  | "associated_resource_late_steer"
+  | "associated_resource_unmaterialized_thread"
   | "create_conversation"
   | "resume_not_loaded_conversation"
   | "no_default_model"
@@ -69,6 +72,20 @@ function createDeferred<T>(): Deferred<T> {
       rejectFn(reason);
     },
   };
+}
+
+function isAssociatedResourceActiveScenario(scenario: SimulatedCodexRuntimeScenario): boolean {
+  return (
+    scenario === "associated_resource_active_turn" || scenario === "associated_resource_late_steer"
+  );
+}
+
+function isAssociatedResourceTurnStartScenario(scenario: SimulatedCodexRuntimeScenario): boolean {
+  return (
+    scenario === "associated_resource_direct_turn" ||
+    scenario === "associated_resource_late_steer" ||
+    scenario === "associated_resource_unmaterialized_thread"
+  );
 }
 
 function toText(data: RawData): string {
@@ -276,6 +293,7 @@ export async function startSimulatedCodexRuntimeServer(
 
     let didHandleOpen = false;
     let threadReadCount = 0;
+    let turnSteerCount = 0;
 
     socket.on("message", (message: RawData) => {
       try {
@@ -377,7 +395,11 @@ export async function startSimulatedCodexRuntimeServer(
         }
 
         if (methodPayload.method === "thread/list") {
-          if (scenario !== "associated_resource_direct_turn") {
+          if (
+            scenario !== "associated_resource_direct_turn" &&
+            scenario !== "associated_resource_unmaterialized_thread" &&
+            !isAssociatedResourceActiveScenario(scenario)
+          ) {
             throw new Error("Unexpected thread/list request for this scenario.");
           }
 
@@ -431,10 +453,26 @@ export async function startSimulatedCodexRuntimeServer(
 
         if (methodPayload.method === "thread/read") {
           threadReadCount += 1;
-          const threadStatusType =
-            scenario === "resume_not_loaded_conversation" && threadReadCount === 1
+          const threadStatusType = isAssociatedResourceActiveScenario(scenario)
+            ? "active"
+            : scenario === "resume_not_loaded_conversation" && threadReadCount === 1
               ? "notLoaded"
               : "idle";
+
+          if (scenario === "associated_resource_unmaterialized_thread") {
+            sendAgentPayload(socket, {
+              streamId: activeStreamId,
+              payload: {
+                id: expectJsonRpcId(methodPayload.id),
+                error: {
+                  code: -32600,
+                  message:
+                    "thread thread_original is not materialized yet; includeTurns is unavailable before first user message",
+                },
+              },
+            });
+            return;
+          }
 
           sendAgentPayload(socket, {
             streamId: activeStreamId,
@@ -442,10 +480,27 @@ export async function startSimulatedCodexRuntimeServer(
               id: expectJsonRpcId(methodPayload.id),
               result: {
                 thread: {
-                  id: "thread_123",
+                  id:
+                    isAssociatedResourceActiveScenario(scenario) ||
+                    scenario === "associated_resource_direct_turn"
+                      ? "thread_original"
+                      : "thread_123",
                   status: {
                     type: threadStatusType,
                   },
+                  ...(isAssociatedResourceActiveScenario(scenario)
+                    ? {
+                        turns: [
+                          {
+                            id:
+                              scenario === "associated_resource_late_steer" && threadReadCount > 1
+                                ? "turn_next"
+                                : "turn_active",
+                            status: "inProgress",
+                          },
+                        ],
+                      }
+                    : {}),
                 },
               },
             },
@@ -487,7 +542,9 @@ export async function startSimulatedCodexRuntimeServer(
         if (methodPayload.method === "thread/resume") {
           if (
             scenario !== "resume_not_loaded_conversation" &&
-            scenario !== "associated_resource_direct_turn"
+            scenario !== "associated_resource_direct_turn" &&
+            scenario !== "associated_resource_unmaterialized_thread" &&
+            !isAssociatedResourceActiveScenario(scenario)
           ) {
             throw new Error("Unexpected thread/resume request for this scenario.");
           }
@@ -502,13 +559,75 @@ export async function startSimulatedCodexRuntimeServer(
           return;
         }
 
+        if (methodPayload.method === "turn/steer") {
+          turnSteerCount += 1;
+          if (!isAssociatedResourceActiveScenario(scenario)) {
+            throw new Error("Unexpected turn/steer request for this scenario.");
+          }
+          if (methodPayload.params?.threadId !== "thread_original") {
+            throw new Error(
+              `Expected turn/steer threadId 'thread_original', received '${String(methodPayload.params?.threadId)}'.`,
+            );
+          }
+          const expectedTurnId =
+            scenario === "associated_resource_late_steer" && turnSteerCount > 1
+              ? "turn_next"
+              : "turn_active";
+          if (methodPayload.params?.expectedTurnId !== expectedTurnId) {
+            throw new Error(
+              `Expected turn/steer expectedTurnId '${expectedTurnId}', received '${String(methodPayload.params?.expectedTurnId)}'.`,
+            );
+          }
+
+          if (scenario === "associated_resource_late_steer" && turnSteerCount === 1) {
+            sendAgentPayload(socket, {
+              streamId: activeStreamId,
+              payload: {
+                id: expectJsonRpcId(methodPayload.id),
+                error: {
+                  code: -32600,
+                  message: "expected active turn id `turn_active` but found `turn_next`",
+                },
+              },
+            });
+            return;
+          }
+
+          sendAgentPayload(socket, {
+            streamId: activeStreamId,
+            payload: {
+              id: expectJsonRpcId(methodPayload.id),
+              result: {
+                turnId: expectedTurnId,
+              },
+            },
+          });
+          methodSequenceDeferred.resolve([...methodSequence]);
+          return;
+        }
+
         if (methodPayload.method === "turn/start") {
-          if (scenario === "associated_resource_direct_turn") {
+          if (isAssociatedResourceTurnStartScenario(scenario)) {
             if (methodPayload.params?.model !== undefined) {
-              throw new Error("Expected associated resource turn/start not to include model.");
+              throw new Error("Expected associated-resource turn/start to omit model.");
             }
-            if (methodPayload.params?.effort !== undefined) {
-              throw new Error("Expected associated resource turn/start not to include effort.");
+            if (methodPayload.params?.modelReasoningEffort !== undefined) {
+              throw new Error(
+                "Expected associated-resource turn/start to omit model reasoning effort.",
+              );
+            }
+            if (methodPayload.params?.threadId !== "thread_original") {
+              throw new Error(
+                `Expected associated-resource turn/start threadId 'thread_original', received '${String(methodPayload.params?.threadId)}'.`,
+              );
+            }
+            const inputItems = methodPayload.params?.input;
+            if (!Array.isArray(inputItems) || inputItems.length !== 1) {
+              throw new Error("Expected associated-resource turn/start input item array.");
+            }
+            const inputItem = expectRecord(inputItems[0]);
+            if (inputItem["type"] !== "text" || typeof inputItem["text"] !== "string") {
+              throw new Error("Expected associated-resource turn/start text input item.");
             }
           } else {
             expectRequestModel(

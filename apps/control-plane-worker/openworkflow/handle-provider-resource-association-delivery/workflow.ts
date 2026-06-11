@@ -206,7 +206,12 @@ async function deliverActiveProviderResourceAssociationDelivery(
 
     const target = await resolveProviderResourceAssociationDeliveryTarget(
       { dataPlaneClient: ctx.dataPlaneClient, db: ctx.db },
-      { providerResourceAssociationId: input.delivery.providerResourceAssociationId },
+      {
+        providerResourceAssociationId: input.delivery.providerResourceAssociationId,
+        associatedResourceEvent: resolveProviderResourceAssociationDeliveryEvent(
+          input.delivery.renderedInput,
+        ),
+      },
     );
     const webhookEvent = await ctx.db.query.integrationWebhookEvents.findFirst({
       columns: {
@@ -318,4 +323,24 @@ function renderProviderResourceAssociationDeliveryInput(
     code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
     message: "Provider resource association delivery rendered input is missing text.",
   });
+}
+
+function resolveProviderResourceAssociationDeliveryEvent(renderedInput: Record<string, unknown>): {
+  resourceKind: string;
+  eventType: string;
+} {
+  const resourceKind = renderedInput.resourceKind;
+  const eventType = renderedInput.eventType;
+  if (typeof resourceKind !== "string" || typeof eventType !== "string") {
+    throw new ProviderResourceAssociationDeliveryError({
+      code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
+      message:
+        "Provider resource association delivery input is missing associated-resource routing fields.",
+    });
+  }
+
+  return {
+    resourceKind,
+    eventType,
+  };
 }

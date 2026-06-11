@@ -6,6 +6,7 @@ import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-clien
 import {
   TriggerKinds,
   TriggerRunStatuses,
+  IntegrationConnectionResourceSyncStates,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
   IntegrationWebhookEventStatuses,
@@ -27,6 +28,7 @@ import {
   TestEnvironmentIdHeader,
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
+import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import { prepareIntegrationWebhookEvent } from "../openworkflow/handle-integration-webhook-event/prepare-integration-webhook-event.js";
@@ -169,7 +171,7 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       id: staleAssociationId,
       integrationConnectionId: scope.connectionId,
       resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
-      providerResourceId: "mistlehq/mistle#42",
+      providerResourceId: "mistlehq/mistle#99",
       sandboxInstanceId: "sbi_missing_association_delivery",
     });
 
@@ -229,6 +231,107 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       providerResourceAssociationId: associationId,
       status: ProviderResourceAssociationDeliveryProcessorStatuses.IDLE,
     });
+
+    const retriedPreparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+    expect(retriedPreparedEvent).toMatchObject({
+      webhookEventId: scope.webhookEventId,
+      webhookEventStatus: IntegrationWebhookEventStatuses.PROCESSING,
+      finalized: false,
+    });
+    expect(retriedPreparedEvent.triggerRunIds).toEqual(preparedEvent.triggerRunIds);
+    expect(retriedPreparedEvent.providerResourceAssociationDeliveries).toHaveLength(1);
+    expect(retriedPreparedEvent.providerResourceAssociationDeliveries[0]).toMatchObject({
+      providerResourceAssociationId: associationId,
+    });
+  });
+
+  it("queues provider resource association deliveries when the associated sandbox is missing", async ({
+    env,
+  }) => {
+    const scope = await seedWebhookEventScope({
+      env,
+      suffix: createSuffix("association_missing_sandbox"),
+      familyId: "github",
+      variantId: "github-cloud",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      connectionConfig: {},
+      eventType: "github.issue_comment.created",
+      providerEventType: "issue_comment",
+      createTrigger: false,
+      payload: {
+        repository: {
+          full_name: "mistlehq/mistle",
+        },
+        issue: {
+          number: 43,
+          pull_request: {},
+        },
+        comment: {
+          body: "please run @mistlebot",
+        },
+        sender: {
+          login: "octocat",
+        },
+      },
+      externalEventId: "evt_association_missing_sandbox",
+      externalDeliveryId: "delivery_association_missing_sandbox",
+    });
+    const associationId = "pra_association_missing_sandbox";
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.providerResourceAssociations).values({
+      id: associationId,
+      integrationConnectionId: scope.connectionId,
+      resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+      providerResourceId: "mistlehq/mistle#43",
+      sandboxInstanceId: "sbi_missing_association_delivery",
+    });
+
+    const preparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+
+    expect(preparedEvent).toMatchObject({
+      webhookEventId: scope.webhookEventId,
+      webhookEventStatus: IntegrationWebhookEventStatuses.PROCESSING,
+      finalized: false,
+      triggerRunIds: [],
+    });
+    expect(preparedEvent.providerResourceAssociationDeliveries).toHaveLength(1);
+    expect(preparedEvent.providerResourceAssociationDeliveries[0]).toMatchObject({
+      providerResourceAssociationId: associationId,
+    });
+
+    const queuedDeliveries =
+      await env.controlPlaneDb.query.providerResourceAssociationDeliveries.findMany({
+        where: (table, { eq: whereEq }) =>
+          whereEq(table.sourceWebhookEventId, scope.webhookEventId),
+      });
+    expect(queuedDeliveries).toHaveLength(1);
+    expect(queuedDeliveries[0]).toMatchObject({
+      providerResourceAssociationId: associationId,
+      sourceWebhookEventId: scope.webhookEventId,
+      sourceOrderKey: "2026-03-09T00:00:00Z#0001",
+      status: ProviderResourceAssociationDeliveryStatuses.QUEUED,
+    });
   });
 
   it("marks webhook events ignored when no trigger targets or sync triggers match", async ({
@@ -287,6 +390,76 @@ describe.concurrent("control-plane worker integration webhook event handling", (
 
     const persistedEvent = await env.controlPlaneDb.query.integrationWebhookEvents.findFirst({
       where: (table, { eq }) => eq(table.id, scope.webhookEventId),
+    });
+    expect(persistedEvent).toMatchObject({
+      status: IntegrationWebhookEventStatuses.IGNORED,
+    });
+    expect(persistedEvent?.finalizedAt).not.toBeNull();
+  });
+
+  it("marks retried processing webhook events ignored when no trigger targets or sync triggers match", async ({
+    env,
+  }) => {
+    const scope = await seedWebhookEventScope({
+      env,
+      suffix: createSuffix("ignore_retry"),
+      familyId: "github",
+      variantId: "github-cloud",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      connectionConfig: {},
+      eventType: "github.issue_comment.created",
+      providerEventType: "issue_comment",
+      payloadFilter: {
+        "github.issue_comment.created": {
+          op: "contains_token",
+          path: ["comment", "body"],
+          value: "@mistlebot",
+        },
+      },
+      payload: {
+        comment: {
+          body: "nothing to match",
+        },
+      },
+      externalEventId: "evt_ignore_retry",
+      externalDeliveryId: "delivery_ignore_retry",
+    });
+
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.integrationWebhookEvents)
+      .set({
+        status: IntegrationWebhookEventStatuses.PROCESSING,
+      })
+      .where(eq(env.controlPlaneTables.integrationWebhookEvents.id, scope.webhookEventId));
+
+    const preparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+
+    expect(preparedEvent).toEqual({
+      webhookEventId: scope.webhookEventId,
+      externalDeliveryId: "delivery_ignore_retry",
+      integrationConnectionId: scope.connectionId,
+      targetKey: scope.targetKey,
+      webhookEventStatus: IntegrationWebhookEventStatuses.IGNORED,
+      triggerRunIds: [],
+      providerResourceAssociationDeliveries: [],
+      resourceSyncRequests: [],
+      finalized: true,
+    });
+
+    const persistedEvent = await env.controlPlaneDb.query.integrationWebhookEvents.findFirst({
+      where: (table, { eq: whereEq }) => whereEq(table.id, scope.webhookEventId),
     });
     expect(persistedEvent).toMatchObject({
       status: IntegrationWebhookEventStatuses.IGNORED,
@@ -395,6 +568,73 @@ describe.concurrent("control-plane worker integration webhook event handling", (
         kind: "team",
       },
     ]);
+
+    const retriedPreparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+    expect(retriedPreparedEvent).toMatchObject({
+      webhookEventId: scope.webhookEventId,
+      webhookEventStatus: IntegrationWebhookEventStatuses.PROCESSING,
+      triggerRunIds: [],
+      finalized: false,
+    });
+    expect(retriedPreparedEvent.resourceSyncRequests).toEqual(preparedEvent.resourceSyncRequests);
+
+    const webhookEvent = await env.controlPlaneDb.query.integrationWebhookEvents.findFirst({
+      columns: {
+        sourceOccurredAt: true,
+      },
+      where: (table, { eq }) => eq(table.id, scope.webhookEventId),
+    });
+    if (webhookEvent === undefined) {
+      throw new Error("Expected webhook event to exist after resource sync preparation.");
+    }
+    if (webhookEvent.sourceOccurredAt === null) {
+      throw new Error("Expected webhook event to include sourceOccurredAt.");
+    }
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.integrationConnectionResourceStates)
+      .values([
+        {
+          connectionId: scope.connectionId,
+          familyId: "github",
+          kind: "repository",
+          syncState: IntegrationConnectionResourceSyncStates.SYNCING,
+          lastSyncStartedAt: webhookEvent.sourceOccurredAt,
+        },
+        {
+          connectionId: scope.connectionId,
+          familyId: "github",
+          kind: "team",
+          syncState: IntegrationConnectionResourceSyncStates.SYNCING,
+          lastSyncStartedAt: webhookEvent.sourceOccurredAt,
+        },
+      ]);
+
+    const scheduledRetryPreparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+    expect(scheduledRetryPreparedEvent).toMatchObject({
+      webhookEventId: scope.webhookEventId,
+      webhookEventStatus: IntegrationWebhookEventStatuses.PROCESSING,
+      triggerRunIds: [],
+      finalized: false,
+    });
+    expect(scheduledRetryPreparedEvent.resourceSyncRequests).toEqual([]);
   });
 });
 

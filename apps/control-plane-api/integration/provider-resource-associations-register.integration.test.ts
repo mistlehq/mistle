@@ -87,6 +87,74 @@ describe.concurrent("internal provider resource association registration", () =>
     expect(associations).toHaveLength(1);
   });
 
+  it("keeps the first sandbox owner when another sandbox registers the same provider resource", async ({
+    env,
+  }) => {
+    await seedConnection(env, {
+      connectionId: "icn_provider_resource_owner_001",
+      organizationId: "org_provider_resource_owner",
+    });
+    for (const sandboxInstanceId of [
+      "sbi_provider_resource_owner_first",
+      "sbi_provider_resource_owner_second",
+    ]) {
+      await seedSandboxInstance(env, {
+        sandboxInstanceId,
+        organizationId: "org_provider_resource_owner",
+        associatedResourceEventRouting: {
+          enabled: true,
+          resources: [
+            {
+              resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+              eventTypes: [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED],
+            },
+          ],
+        },
+      });
+    }
+
+    const firstResponse = await registerAssociation(env, {
+      integrationConnectionId: "icn_provider_resource_owner_001",
+      resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+      providerResourceId: "owner/repo#123",
+      sandboxInstanceId: "sbi_provider_resource_owner_first",
+    });
+    expect(firstResponse.status).toBe(200);
+    const firstBody = InternalRegisterProviderResourceAssociationResponseSchema.parse(
+      await firstResponse.json(),
+    );
+    expect(firstBody.status).toBe("created");
+    if (firstBody.status !== "created") {
+      throw new Error("Expected first association registration to create a row.");
+    }
+
+    const secondResponse = await registerAssociation(env, {
+      integrationConnectionId: "icn_provider_resource_owner_001",
+      resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+      providerResourceId: "owner/repo#123",
+      sandboxInstanceId: "sbi_provider_resource_owner_second",
+    });
+    expect(secondResponse.status).toBe(200);
+    await expect(secondResponse.json()).resolves.toEqual({
+      status: "already_exists",
+      associationId: firstBody.associationId,
+    });
+
+    const associations = await env.controlPlaneDb.query.providerResourceAssociations.findMany({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.integrationConnectionId, "icn_provider_resource_owner_001"),
+          eq(table.resourceKind, AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST),
+          eq(table.providerResourceId, "owner/repo#123"),
+        ),
+    });
+    expect(associations).toHaveLength(1);
+    expect(associations[0]).toMatchObject({
+      id: firstBody.associationId,
+      sandboxInstanceId: "sbi_provider_resource_owner_first",
+    });
+  });
+
   it("does not create an association when the captured runtime plan disables the resource kind", async ({
     env,
   }) => {

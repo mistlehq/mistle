@@ -110,7 +110,6 @@ async function createAssociation(
         tables.providerResourceAssociations.integrationConnectionId,
         tables.providerResourceAssociations.resourceKind,
         tables.providerResourceAssociations.providerResourceId,
-        tables.providerResourceAssociations.sandboxInstanceId,
       ],
     })
     .returning({
@@ -134,7 +133,6 @@ async function createAssociation(
         eq(table.integrationConnectionId, input.integrationConnectionId),
         eq(table.resourceKind, input.resourceKind),
         eq(table.providerResourceId, input.providerResourceId),
-        eq(table.sandboxInstanceId, input.sandboxInstanceId),
       ),
   });
   if (existingAssociation === undefined) {

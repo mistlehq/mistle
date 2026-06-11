@@ -11,15 +11,21 @@ import {
   type CodexThreadSummary,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 
-import { getConversationProviderAdapter } from "../handle-trigger-conversation-delivery/provider-adapter.js";
+import { getConversationProviderAdapter } from "../shared/provider-adapter.js";
+import {
+  isRecoverableLateSteerError,
+  isStaleActiveTurnMismatchError,
+} from "../shared/provider-errors.js";
 import {
   ProviderResourceAssociationDeliveryError,
   ProviderResourceAssociationDeliveryFailureCodes,
 } from "./errors.js";
 
 const OriginalCodexThreadListPageSize = 100;
+const ThreadReadMethod = "thread/read";
 const ThreadResumeMethod = "thread/resume";
 const TurnStartMethod = "turn/start";
+const UnmaterializedIncludeTurnsMessage = "includeTurns is unavailable before first user message";
 
 type ProviderResourceAssociationCodexDeliveryInput = {
   runtimeId: string;
@@ -29,45 +35,8 @@ type ProviderResourceAssociationCodexDeliveryInput = {
   providerResourceAssociationId: string;
 };
 
-type CodexTurnStartResponse = {
-  turn: {
-    id: string;
-  };
-};
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function parseCodexTurnStartResponse(response: unknown): CodexTurnStartResponse {
-  if (!isRecord(response)) {
-    throw new ProviderResourceAssociationDeliveryError({
-      code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
-      message: "Codex associated-resource turn/start response was not an object.",
-    });
-  }
-
-  const turn = response["turn"];
-  if (!isRecord(turn)) {
-    throw new ProviderResourceAssociationDeliveryError({
-      code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
-      message: "Codex associated-resource turn/start response did not include turn.",
-    });
-  }
-
-  const turnId = turn["id"];
-  if (typeof turnId !== "string" || turnId.length === 0) {
-    throw new ProviderResourceAssociationDeliveryError({
-      code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
-      message: "Codex associated-resource turn/start response did not include turn.id.",
-    });
-  }
-
-  return {
-    turn: {
-      id: turnId,
-    },
-  };
 }
 
 export async function submitCodexAssociatedResourceDelivery(input: {
@@ -107,27 +76,71 @@ export async function submitCodexAssociatedResourceDelivery(input: {
       },
     });
 
-    const response = await connection.request({
-      method: TurnStartMethod,
-      idempotency: submitPayloadIdempotencyMetadata({
-        deliveryInput: input.deliveryInput,
-        providerConversationId,
-      }),
-      params: {
-        threadId: providerConversationId,
-        input: [
-          {
-            type: "text",
-            text: input.deliveryInput.inputText,
-          },
-        ],
-      },
+    const activeTurnId = await readActiveCodexTurnId({
+      connection,
+      providerConversationId,
     });
-    const parsedResponse = parseCodexTurnStartResponse(response);
+
+    if (activeTurnId !== null) {
+      try {
+        const providerExecutionId = await steerCodexAssociatedResourceTurn({
+          adapter,
+          connection,
+          deliveryInput: input.deliveryInput,
+          providerConversationId,
+          providerExecutionId: activeTurnId,
+        });
+
+        return {
+          providerConversationId,
+          providerExecutionId,
+        };
+      } catch (error) {
+        if (isStaleActiveTurnMismatchError({ error })) {
+          const refreshedActiveTurnId = await readActiveCodexTurnId({
+            connection,
+            providerConversationId,
+          });
+          if (refreshedActiveTurnId !== null) {
+            const providerExecutionId = await steerCodexAssociatedResourceTurn({
+              adapter,
+              connection,
+              deliveryInput: input.deliveryInput,
+              providerConversationId,
+              providerExecutionId: refreshedActiveTurnId,
+            });
+
+            return {
+              providerConversationId,
+              providerExecutionId,
+            };
+          }
+        } else if (!isRecoverableLateSteerError({ error })) {
+          throw error;
+        }
+
+        const providerExecutionId = await startCodexAssociatedResourceTurn({
+          connection,
+          deliveryInput: input.deliveryInput,
+          providerConversationId,
+        });
+
+        return {
+          providerConversationId,
+          providerExecutionId,
+        };
+      }
+    }
+
+    const providerExecutionId = await startCodexAssociatedResourceTurn({
+      connection,
+      deliveryInput: input.deliveryInput,
+      providerConversationId,
+    });
 
     return {
       providerConversationId,
-      providerExecutionId: parsedResponse.turn.id,
+      providerExecutionId,
     };
   } catch (error) {
     if (error instanceof ProviderResourceAssociationDeliveryError) {
@@ -145,6 +158,171 @@ export async function submitCodexAssociatedResourceDelivery(input: {
   } finally {
     await connection.close();
   }
+}
+
+async function steerCodexAssociatedResourceTurn(input: {
+  adapter: ReturnType<typeof getConversationProviderAdapter>;
+  connection: Awaited<ReturnType<ReturnType<typeof getConversationProviderAdapter>["connect"]>>;
+  deliveryInput: ProviderResourceAssociationCodexDeliveryInput;
+  providerConversationId: string;
+  providerExecutionId: string;
+}): Promise<string> {
+  const result = await input.adapter.steerExecution({
+    connection: input.connection,
+    providerConversationId: input.providerConversationId,
+    providerExecutionId: input.providerExecutionId,
+    inputText: input.deliveryInput.inputText,
+    idempotency: submitPayloadIdempotencyMetadata({
+      deliveryInput: input.deliveryInput,
+      providerConversationId: input.providerConversationId,
+    }),
+  });
+
+  return result.providerExecutionId;
+}
+
+async function startCodexAssociatedResourceTurn(input: {
+  connection: {
+    request: (input: {
+      method: string;
+      params?: Record<string, unknown>;
+      idempotency?: AgentConversationIdempotencyMetadata | undefined;
+    }) => Promise<unknown>;
+  };
+  deliveryInput: ProviderResourceAssociationCodexDeliveryInput;
+  providerConversationId: string;
+}): Promise<string> {
+  return parseCodexTurnStartResponse(
+    await input.connection.request({
+      method: TurnStartMethod,
+      params: {
+        threadId: input.providerConversationId,
+        input: [
+          {
+            type: "text",
+            text: input.deliveryInput.inputText,
+          },
+        ],
+      },
+      idempotency: submitPayloadIdempotencyMetadata({
+        deliveryInput: input.deliveryInput,
+        providerConversationId: input.providerConversationId,
+      }),
+    }),
+  );
+}
+
+function parseCodexTurnStartResponse(response: unknown): string {
+  if (!isRecord(response)) {
+    throw new ProviderResourceAssociationDeliveryError({
+      code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
+      message: "Codex associated-resource turn/start response was not an object.",
+    });
+  }
+
+  const turn = response["turn"];
+  if (!isRecord(turn)) {
+    throw new ProviderResourceAssociationDeliveryError({
+      code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
+      message: "Codex associated-resource turn/start response did not include turn.",
+    });
+  }
+
+  const turnId = turn["id"];
+  if (typeof turnId !== "string" || turnId.length === 0) {
+    throw new ProviderResourceAssociationDeliveryError({
+      code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
+      message: "Codex associated-resource turn/start response did not include turn id.",
+    });
+  }
+
+  return turnId;
+}
+
+async function readActiveCodexTurnId(input: {
+  connection: {
+    request: (input: { method: string; params?: Record<string, unknown> }) => Promise<unknown>;
+  };
+  providerConversationId: string;
+}): Promise<string | null> {
+  let response: unknown;
+  try {
+    response = await input.connection.request({
+      method: ThreadReadMethod,
+      params: {
+        threadId: input.providerConversationId,
+        includeTurns: true,
+      },
+    });
+  } catch (error) {
+    if (isUnmaterializedCodexIncludeTurnsError(error)) {
+      return null;
+    }
+    throw error;
+  }
+
+  return resolveLatestActiveCodexTurnId(response);
+}
+
+function isUnmaterializedCodexIncludeTurnsError(error: unknown): boolean {
+  return error instanceof Error && error.message.includes(UnmaterializedIncludeTurnsMessage);
+}
+
+function resolveLatestActiveCodexTurnId(response: unknown): string | null {
+  if (!isRecord(response)) {
+    throw new ProviderResourceAssociationDeliveryError({
+      code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
+      message: "Codex associated-resource thread/read response was not an object.",
+    });
+  }
+
+  const thread = response["thread"];
+  if (!isRecord(thread)) {
+    throw new ProviderResourceAssociationDeliveryError({
+      code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
+      message: "Codex associated-resource thread/read response did not include thread.",
+    });
+  }
+
+  const turns = thread["turns"];
+  if (turns === undefined) {
+    return null;
+  }
+  if (!Array.isArray(turns)) {
+    throw new ProviderResourceAssociationDeliveryError({
+      code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
+      message: "Codex associated-resource thread/read response did not include an array of turns.",
+    });
+  }
+
+  for (let index = turns.length - 1; index >= 0; index -= 1) {
+    const turn = turns[index];
+    if (!isRecord(turn)) {
+      throw new ProviderResourceAssociationDeliveryError({
+        code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
+        message: "Codex associated-resource thread/read turn was not an object.",
+      });
+    }
+
+    const turnId = turn["id"];
+    const turnStatus = turn["status"];
+    if (typeof turnId !== "string" || turnId.length === 0) {
+      throw new ProviderResourceAssociationDeliveryError({
+        code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
+        message: "Codex associated-resource thread/read turn did not include id.",
+      });
+    }
+    if (
+      turnStatus === "running" ||
+      turnStatus === "active" ||
+      turnStatus === "inProgress" ||
+      turnStatus === "in_progress"
+    ) {
+      return turnId;
+    }
+  }
+
+  return null;
 }
 
 async function listOriginalCodexThreadCandidates(input: {

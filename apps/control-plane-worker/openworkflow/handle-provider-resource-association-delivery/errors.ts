@@ -6,6 +6,7 @@ export const ProviderResourceAssociationDeliveryFailureCodes = {
   DELIVERY_STATUS_NOT_TERMINAL: "provider_resource_association_delivery_status_not_terminal",
   ROUTING_CONVERSATION_NOT_FOUND: "provider_resource_association_routing_conversation_not_found",
   ROUTING_CONVERSATION_UNBOUND: "provider_resource_association_routing_conversation_unbound",
+  ROUTING_EVENT_NOT_ENABLED: "provider_resource_association_routing_event_not_enabled",
   SANDBOX_NOT_FOUND: "provider_resource_association_sandbox_not_found",
   RUNTIME_PLAN_NOT_FOUND: "provider_resource_association_runtime_plan_not_found",
   RUNTIME_PLAN_AGENT_RUNTIME_NOT_FOUND:

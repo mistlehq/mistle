@@ -25,13 +25,7 @@ export function defineProviderResourceAssociations(schema: PgSchema) {
         .defaultNow(),
     },
     (table) => [
-      uniqueIndex("provider_resource_associations_resource_instance_uidx").on(
-        table.integrationConnectionId,
-        table.resourceKind,
-        table.providerResourceId,
-        table.sandboxInstanceId,
-      ),
-      index("provider_resource_associations_resource_lookup_idx").on(
+      uniqueIndex("provider_resource_associations_resource_uidx").on(
         table.integrationConnectionId,
         table.resourceKind,
         table.providerResourceId,

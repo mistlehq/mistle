@@ -824,13 +824,11 @@ function createManagedProviderResourceAssociationObserver(input: {
       return;
     }
 
-    const responseBodyText = decodeResponseBodyForLog(decodedResponseBody.body);
     logger.info(
       {
         contentEncoding: decodedResponseBody.contentEncoding,
         decodedResponseBodyBytes: decodedResponseBody.decodedBodyBytes,
         event: "gateway_direct_egress_github_pull_request_creation_response_observed",
-        responseBody: responseBodyText,
         responseBodyBytes: decodedResponseBody.rawBodyBytes,
         routeCredentialConnectionId: integrationConnectionId,
         sandboxInstanceId: input.admission.token.sub,
@@ -903,10 +901,6 @@ function createManagedProviderResourceAssociationObserver(input: {
       );
     }
   };
-}
-
-function decodeResponseBodyForLog(body: Uint8Array): string {
-  return new TextDecoder().decode(body);
 }
 
 function isJsonContentType(headers: Headers): boolean {

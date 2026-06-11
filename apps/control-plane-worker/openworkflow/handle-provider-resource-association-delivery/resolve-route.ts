@@ -1,6 +1,9 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import { type ControlPlaneDatabase } from "@mistle/db/control-plane";
-import type { CompiledRuntimePlan } from "@mistle/integrations-core";
+import type {
+  AssociatedResourceEventRouting,
+  CompiledRuntimePlan,
+} from "@mistle/integrations-core";
 
 import {
   ProviderResourceAssociationDeliveryError,
@@ -22,6 +25,10 @@ export async function resolveProviderResourceAssociationDeliveryTarget(
   },
   input: {
     providerResourceAssociationId: string;
+    associatedResourceEvent?: {
+      resourceKind: string;
+      eventType: string;
+    };
   },
 ): Promise<ResolvedProviderResourceAssociationDeliveryTarget> {
   const association = await ctx.db.query.providerResourceAssociations.findFirst({
@@ -68,6 +75,19 @@ export async function resolveProviderResourceAssociationDeliveryTarget(
       message: `Sandbox instance '${association.sandboxInstanceId}' does not have a persisted runtime plan.`,
     });
   }
+  if (
+    input.associatedResourceEvent !== undefined &&
+    !supportsAssociatedResourceEvent({
+      eventType: input.associatedResourceEvent.eventType,
+      resourceKind: input.associatedResourceEvent.resourceKind,
+      routing: sandboxInstance.runtimePlan.associatedResourceEventRouting,
+    })
+  ) {
+    throw new ProviderResourceAssociationDeliveryError({
+      code: ProviderResourceAssociationDeliveryFailureCodes.ROUTING_EVENT_NOT_ENABLED,
+      message: `Provider resource association '${association.id}' is not configured to receive '${input.associatedResourceEvent.eventType}' events for '${input.associatedResourceEvent.resourceKind}'.`,
+    });
+  }
 
   const runtimeContext = resolveAssociationRuntimeContext(sandboxInstance.runtimePlan);
 
@@ -78,6 +98,22 @@ export async function resolveProviderResourceAssociationDeliveryTarget(
     runtimeId: runtimeContext.runtimeId,
     workingDirectory: runtimeContext.workingDirectory,
   };
+}
+
+function supportsAssociatedResourceEvent(input: {
+  eventType: string;
+  resourceKind: string;
+  routing: AssociatedResourceEventRouting | null;
+}): boolean {
+  if (input.routing === null || !input.routing.enabled) {
+    return false;
+  }
+
+  return input.routing.resources.some(
+    (resource) =>
+      resource.resourceKind === input.resourceKind &&
+      resource.eventTypes.some((eventType) => eventType === input.eventType),
+  );
 }
 
 function resolveAssociationRuntimeContext(runtimePlan: CompiledRuntimePlan): {

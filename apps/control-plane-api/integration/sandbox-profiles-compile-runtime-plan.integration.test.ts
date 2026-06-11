@@ -12,6 +12,8 @@ import {
   type SandboxProfileVersionSkillsConfig,
 } from "@mistle/db/control-plane";
 import {
+  AssociatedProviderResourceKinds,
+  AssociatedResourceEventTypes,
   IntegrationConnectionMethodIds,
   type RuntimeArtifactInstallStep,
 } from "@mistle/integrations-core";
@@ -877,6 +879,119 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
           directTools: false,
         },
       },
+    });
+  });
+
+  it("defaults associated resource routing only for Codex profiles with GitHub bindings", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-compile-associated-resources-codex@example.com",
+    });
+
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_associated_resources_codex",
+      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CODEX,
+    });
+    await seedConnectorBindings(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_associated_resources_codex",
+      bindings: [
+        githubBinding({
+          targetKey: "github-cloud-compile-associated-resources-codex",
+          connectionId: "icn_compile_associated_resources_codex_github",
+          bindingId: "ibd_compile_associated_resources_codex_github",
+          tools: [],
+        }),
+      ],
+    });
+
+    const runtimePlan = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_associated_resources_codex",
+    });
+
+    expect(runtimePlan.associatedResourceEventRouting).toEqual({
+      enabled: true,
+      resources: [
+        {
+          resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+          eventTypes: [
+            AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+            AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+            AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
+          ],
+        },
+      ],
+    });
+  });
+
+  it("does not default associated resource routing for OpenCode profiles with GitHub bindings", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-compile-associated-resources-opencode@example.com",
+    });
+
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_associated_resources_opencode",
+      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values({
+      targetKey: "opencode-compile-associated-resources",
+      familyId: "opencode",
+      variantId: "opencode-go",
+      enabled: true,
+      config: {},
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_compile_associated_resources_opencode_agent",
+        organizationId: session.organizationId,
+        targetKey: "opencode-compile-associated-resources",
+        displayName: "Compile Associated Resources OpenCode Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      }),
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_compile_associated_resources_opencode_agent",
+          sandboxProfileId: "sbp_compile_associated_resources_opencode",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_compile_associated_resources_opencode_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+        }),
+      );
+    await seedConnectorBindings(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_associated_resources_opencode",
+      includeAgent: false,
+      bindings: [
+        githubBinding({
+          targetKey: "github-cloud-compile-associated-resources-opencode",
+          connectionId: "icn_compile_associated_resources_opencode_github",
+          bindingId: "ibd_compile_associated_resources_opencode_github",
+          tools: [],
+        }),
+      ],
+    });
+
+    const runtimePlan = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_associated_resources_opencode",
+    });
+
+    expect(runtimePlan.associatedResourceEventRouting).toEqual({
+      enabled: false,
+      resources: [],
     });
   });
 

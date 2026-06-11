@@ -66,11 +66,8 @@ export async function prepareProviderResourceAssociationDeliveries(
       sandboxInstanceId: association.sandboxInstanceId,
       webhookEvent: input.webhookEvent,
     });
-    if (sandboxInstance === null) {
-      continue;
-    }
-
     if (
+      sandboxInstance !== null &&
       !supportsAssociatedResourceEvent({
         eventType: observedEvent.eventType,
         resourceKind: observedEvent.resourceKind,
@@ -120,7 +117,7 @@ async function resolveAssociationSandboxInstance(
       eventName: "provider_resource_association.sandbox_read_failed",
       level: "warn",
       message:
-        "Skipping provider resource association delivery because the associated sandbox instance could not be read.",
+        "Queuing provider resource association delivery without a sandbox routing check because the associated sandbox instance could not be read.",
       telemetryContext: {
         webhookEventId: input.webhookEvent.id,
         externalDeliveryId: input.webhookEvent.externalDeliveryId ?? undefined,
