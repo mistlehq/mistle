@@ -225,7 +225,7 @@ export class ModalSandboxRuntimeControl implements SandboxRuntimeControl {
       command: "rm -f /run/mistle/sandboxd.log",
       timeoutMs: SandboxdEnsureTimeoutMs,
     });
-    await this.#client.startCommand({
+    const daemonProcess = await this.#client.startCommand({
       sandboxId: input.sandboxId,
       operation: ModalClientOperationIds.ENSURE_SANDBOXD,
       commandDescription: "Start sandboxd daemon",
@@ -236,9 +236,18 @@ export class ModalSandboxRuntimeControl implements SandboxRuntimeControl {
       ...(input.env === undefined ? {} : { env: { ...input.env } }),
       timeoutMs: SandboxdEnsureTimeoutMs,
     });
+    const daemonExitPromise = daemonProcess.wait().then(async (exitCode) => {
+      const log = await this.#readSandboxdDaemonLog(input.sandboxId);
+      throw new Error(
+        `Modal sandboxd daemon exited before exposing the control socket with status ${String(
+          exitCode,
+        )}.${formatOptionalLog(log)}`,
+      );
+    });
+    void daemonExitPromise.catch(() => undefined);
 
     for (let attempt = 0; attempt < ModalSandboxdReadyPollAttempts; attempt += 1) {
-      if (await this.#isSandboxdReady(input)) {
+      if (await Promise.race([this.#isSandboxdReady(input), daemonExitPromise])) {
         return;
       }
       await sleep(ModalSandboxdReadyPollIntervalMs);

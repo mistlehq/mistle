@@ -47,6 +47,9 @@ export type ModalRunCommandResponse = {
   readonly stderr: string;
   readonly statusCode: number;
 };
+export type ModalStartedCommand = {
+  wait(): Promise<number>;
+};
 
 export interface ModalClientApi {
   prepareImage(request: ModalImageRequest): Promise<{ imageId: string }>;
@@ -81,7 +84,7 @@ export interface ModalClientApi {
     stdout?: StdioBehavior;
     stderr?: StdioBehavior;
     timeoutMs?: number;
-  }): Promise<void>;
+  }): Promise<ModalStartedCommand>;
   close(): void;
 }
 
@@ -293,14 +296,14 @@ export class ModalApiClient implements ModalClientApi {
     stdout?: StdioBehavior;
     stderr?: StdioBehavior;
     timeoutMs?: number;
-  }): Promise<void> {
+  }): Promise<ModalStartedCommand> {
     const parsedSandboxId = ModalSandboxIdRequestSchema.parse({
       sandboxId: request.sandboxId,
     }).sandboxId;
 
     try {
       const sandbox = await this.#client.sandboxes.fromId(parsedSandboxId);
-      await sandbox.exec(
+      const process = await sandbox.exec(
         request.args === undefined ? [request.command] : [request.command, ...request.args],
         {
           mode: "text",
@@ -311,6 +314,15 @@ export class ModalApiClient implements ModalClientApi {
           ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
         },
       );
+      return {
+        wait: async () => {
+          try {
+            return await process.wait();
+          } catch (error) {
+            throw mapModalClientError(request.operation, error);
+          }
+        },
+      };
     } catch (error) {
       throw mapModalClientError(request.operation, error);
     }
