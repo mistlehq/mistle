@@ -323,6 +323,9 @@ export class FreestyleApiClient implements FreestyleClient {
           spec: createFreestyleSnapshotSpec(parsedRequest),
         },
         schema: CreateSnapshotResponseSchema,
+        ...(parsedRequest.requestTimeoutMs === undefined
+          ? {}
+          : { timeoutMs: parsedRequest.requestTimeoutMs }),
       });
       return { snapshotId: response.snapshotId };
     } catch (error) {
@@ -608,11 +611,13 @@ export class FreestyleApiClient implements FreestyleClient {
     path: string;
     body?: unknown;
     schema: z.ZodType<Output>;
+    timeoutMs?: number;
   }): Promise<Output> {
     const response = await this.#sdk.fetch(input.path, {
       method: input.method,
       headers: { "Content-Type": "application/json" },
       ...(input.body === undefined ? {} : { body: JSON.stringify(input.body) }),
+      ...(input.timeoutMs === undefined ? {} : { signal: AbortSignal.timeout(input.timeoutMs) }),
     });
 
     if (!response.ok) {

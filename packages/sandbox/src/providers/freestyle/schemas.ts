@@ -82,6 +82,7 @@ export const FreestyleCreateSnapshotImageRequestSchema = z
     imageId: z.string().trim().min(1),
     baseImageRef: z.string().trim().min(1),
     cmddirBase64: z.string().trim().min(1),
+    requestTimeoutMs: z.number().int().positive().optional(),
     sandboxd: z
       .object({
         artifact: z

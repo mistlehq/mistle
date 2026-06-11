@@ -15,6 +15,7 @@ import type { FreestyleClient } from "./client.js";
 import { createFreestyleSnapshotImageHandle } from "./image-handle.js";
 
 const FreestyleCmddirRelativePath = "packages/sandboxd/scripts/cmddir";
+const FreestyleBuildBaseImageRequestTimeoutMs = 15 * 60 * 1000;
 
 export type FreestyleBaseImageBuilderOptions = {
   readonly client: FreestyleClient;
@@ -48,6 +49,7 @@ export class FreestyleBaseImageBuilder implements SandboxBaseImageBuilder {
       imageId: request.source.imageId,
       baseImageRef: request.source.baseImageRef,
       cmddirBase64,
+      requestTimeoutMs: FreestyleBuildBaseImageRequestTimeoutMs,
       ...(request.source.sandboxd?.kind === SandboxSdkImageSandboxdSourceKinds.RELEASE
         ? { sandboxd: { artifact: request.source.sandboxd.artifact } }
         : {}),
