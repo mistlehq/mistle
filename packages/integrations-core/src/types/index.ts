@@ -2099,6 +2099,47 @@ export type AssociatedResourceEventRouting = {
   resources: ReadonlyArray<AssociatedResourceEventRoutingResourceRule>;
 };
 
+export type AssociatedResourceProviderActor = {
+  handle?: string | undefined;
+  providerSubjectId?: string | undefined;
+};
+
+export type AssociatedResourceRenderedInput = {
+  text: string;
+};
+
+export type AssociatedResourceWebhookObservation = {
+  actor?: AssociatedResourceProviderActor | undefined;
+  eventType: AssociatedResourceEventType;
+  providerResourceId: string;
+  renderedInput: AssociatedResourceRenderedInput;
+  resourceKind: AssociatedProviderResourceKind;
+};
+
+export type AssociatedResourceWebhookObservationInput = {
+  eventType: string;
+  payload: Record<string, unknown>;
+};
+
+export type AssociatedResourceSelfAuthorshipInput<TConnectionConfig = Record<string, unknown>> = {
+  connection: {
+    config: TConnectionConfig | null;
+    id: string;
+  };
+  observation: AssociatedResourceWebhookObservation;
+};
+
+export type IntegrationAssociatedResourceEventsCapability<
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  observeWebhookEvent(
+    input: AssociatedResourceWebhookObservationInput,
+  ): MaybePromise<AssociatedResourceWebhookObservation | null>;
+  isSelfAuthoredEvent?(
+    input: AssociatedResourceSelfAuthorshipInput<TConnectionConfig>,
+  ): MaybePromise<boolean>;
+};
+
 export type SandboxProfileAssociatedResourceEventRoutingConfig = {
   enabled?: boolean | undefined;
   resources?: ReadonlyArray<AssociatedResourceEventRoutingResourceRule> | undefined;
@@ -2626,6 +2667,7 @@ export type IntegrationDefinition<
     ParsedSchemaOutput<TTargetSecretsSchema>,
     TConnectionConfig
   >;
+  associatedResourceEvents?: IntegrationAssociatedResourceEventsCapability<TConnectionConfig>;
   webhookTriggerCapabilitiesRefreshUi?: IntegrationWebhookTriggerCapabilitiesRefreshUi | undefined;
   resourceDefinitions?: ReadonlyArray<IntegrationResourceDefinition>;
   resourceSyncTriggers?: ReadonlyArray<IntegrationResourceSyncTrigger>;

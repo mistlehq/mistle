@@ -12,11 +12,10 @@ import {
 import {
   type AssociatedResourceEventRouting,
   type AssociatedResourceEventType,
+  type AssociatedResourceWebhookObservation,
+  type IntegrationAssociatedResourceEventsCapability,
+  type IntegrationRegistry,
 } from "@mistle/integrations-core";
-import {
-  GitHubFamilyId,
-  observeGitHubAssociatedResourceFromWebhookEvent,
-} from "@mistle/integrations-definitions/server";
 import { sql } from "drizzle-orm";
 
 import { logWebhookDeliveryEvent } from "../shared/webhook-delivery-telemetry.js";
@@ -26,16 +25,26 @@ export type QueuedProviderResourceAssociationDelivery = {
   providerResourceAssociationId: string;
 };
 
+type ObservedAssociatedResourceEvent = {
+  capability: IntegrationAssociatedResourceEventsCapability;
+  connection: {
+    config: Record<string, unknown> | null;
+    id: string;
+  };
+  observation: AssociatedResourceWebhookObservation;
+};
+
 export async function prepareProviderResourceAssociationDeliveries(
   ctx: {
     controlPlaneInternalClient: Pick<ControlPlaneInternalClient, "getSandboxInstance">;
     db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
   },
   input: {
     webhookEvent: IntegrationWebhookEvent;
   },
 ): Promise<ReadonlyArray<QueuedProviderResourceAssociationDelivery>> {
-  const observedEvent = await observeAssociatedResourceEvent(ctx.db, input.webhookEvent);
+  const observedEvent = await observeAssociatedResourceEvent(ctx, input.webhookEvent);
   if (observedEvent === null) {
     return [];
   }
@@ -50,8 +59,8 @@ export async function prepareProviderResourceAssociationDeliveries(
     where: (table, { and, eq }) =>
       and(
         eq(table.integrationConnectionId, input.webhookEvent.integrationConnectionId),
-        eq(table.resourceKind, observedEvent.resourceKind),
-        eq(table.providerResourceId, observedEvent.providerResourceId),
+        eq(table.resourceKind, observedEvent.observation.resourceKind),
+        eq(table.providerResourceId, observedEvent.observation.providerResourceId),
       ),
   });
   if (associations.length === 0) {
@@ -69,17 +78,20 @@ export async function prepareProviderResourceAssociationDeliveries(
     if (
       sandboxInstance !== null &&
       !supportsAssociatedResourceEvent({
-        eventType: observedEvent.eventType,
-        resourceKind: observedEvent.resourceKind,
+        eventType: observedEvent.observation.eventType,
+        resourceKind: observedEvent.observation.resourceKind,
         routing: sandboxInstance.associatedResourceEventRouting,
       })
     ) {
       continue;
     }
+    if (await isSelfAuthoredAssociatedResourceEvent(observedEvent)) {
+      continue;
+    }
 
     const deliveryId = await enqueueAssociationDeliveryAndEnsureProcessor(ctx.db, {
       providerResourceAssociationId: association.id,
-      renderedInput: observedEvent.renderedInput.text,
+      renderedInput: observedEvent.observation.renderedInput.text,
       sourceOrderKey: input.webhookEvent.sourceOrderKey,
       sourceWebhookEventId: input.webhookEvent.id,
     });
@@ -136,23 +148,58 @@ async function resolveAssociationSandboxInstance(
 }
 
 async function observeAssociatedResourceEvent(
-  db: ControlPlaneDatabase,
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+  },
   webhookEvent: IntegrationWebhookEvent,
-): Promise<ReturnType<typeof observeGitHubAssociatedResourceFromWebhookEvent>> {
-  const target = await db.query.integrationTargets.findFirst({
+): Promise<ObservedAssociatedResourceEvent | null> {
+  const target = await ctx.db.query.integrationTargets.findFirst({
     columns: {
       familyId: true,
+      variantId: true,
     },
     where: (table, { eq }) => eq(table.targetKey, webhookEvent.targetKey),
   });
-  if (target?.familyId !== GitHubFamilyId) {
+  if (target === undefined) {
     return null;
   }
 
-  return observeGitHubAssociatedResourceFromWebhookEvent({
+  const definition = ctx.integrationRegistry.getDefinition({
+    familyId: target.familyId,
+    variantId: target.variantId,
+  });
+  const capability = definition?.associatedResourceEvents;
+  if (capability === undefined) {
+    return null;
+  }
+
+  const observation = await capability.observeWebhookEvent({
     eventType: webhookEvent.eventType,
     payload: webhookEvent.payload,
   });
+  if (observation === null) {
+    return null;
+  }
+
+  const connection = await ctx.db.query.integrationConnections.findFirst({
+    columns: {
+      config: true,
+      id: true,
+    },
+    where: (table, { eq }) => eq(table.id, webhookEvent.integrationConnectionId),
+  });
+  if (connection === undefined) {
+    throw new Error(
+      `Integration connection '${webhookEvent.integrationConnectionId}' for webhook event '${webhookEvent.id}' was not found.`,
+    );
+  }
+
+  return {
+    capability,
+    connection,
+    observation,
+  };
 }
 
 function supportsAssociatedResourceEvent(input: {
@@ -168,6 +215,20 @@ function supportsAssociatedResourceEvent(input: {
     (resource) =>
       resource.resourceKind === input.resourceKind && resource.eventTypes.includes(input.eventType),
   );
+}
+
+async function isSelfAuthoredAssociatedResourceEvent(
+  observedEvent: ObservedAssociatedResourceEvent,
+): Promise<boolean> {
+  const isSelfAuthoredEvent = observedEvent.capability.isSelfAuthoredEvent;
+  if (isSelfAuthoredEvent === undefined) {
+    return false;
+  }
+
+  return await isSelfAuthoredEvent({
+    connection: observedEvent.connection,
+    observation: observedEvent.observation,
+  });
 }
 
 async function enqueueAssociationDelivery(

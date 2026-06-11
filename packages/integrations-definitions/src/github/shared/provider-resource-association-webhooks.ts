@@ -1,11 +1,16 @@
 import {
   AssociatedProviderResourceKinds,
   AssociatedResourceEventTypes,
+  IntegrationConnectionMethodIds,
   type AssociatedProviderResourceKind,
+  type AssociatedResourceProviderActor,
   type AssociatedResourceEventType,
+  type AssociatedResourceWebhookObservation,
+  type IntegrationAssociatedResourceEventsCapability,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
+import { parseGitHubConnectionConfig, type GitHubConnectionConfig } from "./auth.js";
 import { createGitHubPullRequestProviderResourceId } from "./provider-resource-associations.js";
 
 const GitHubIssueCommentPullRequestPayloadSchema = z.looseObject({
@@ -73,11 +78,18 @@ export type GitHubAssociatedResourceRenderedInput = {
 };
 
 export type GitHubAssociatedResourceWebhookObservation = {
+  actor?: AssociatedResourceProviderActor | undefined;
   eventType: AssociatedResourceEventType;
   providerResourceId: string;
   renderedInput: GitHubAssociatedResourceRenderedInput;
   resourceKind: Extract<AssociatedProviderResourceKind, "github.pull_request">;
 };
+
+export const GitHubAssociatedResourceEventsCapability: IntegrationAssociatedResourceEventsCapability<GitHubConnectionConfig> =
+  {
+    observeWebhookEvent: observeGitHubAssociatedResourceFromWebhookEvent,
+    isSelfAuthoredEvent: isSelfAuthoredGitHubAssociatedResourceEvent,
+  };
 
 export function observeGitHubAssociatedResourceFromWebhookEvent(input: {
   eventType: string;
@@ -105,6 +117,7 @@ function observeIssueCommentCreated(
 
   return createObservation({
     eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+    actor: createActorFromSenderLogin(parsedPayload.data.sender?.login),
     pullRequestNumber: parsedPayload.data.issue.number,
     repositoryFullName: parsedPayload.data.repository.full_name,
     text: renderIssueCommentInput({
@@ -127,6 +140,7 @@ function observePullRequestReviewSubmitted(
 
   return createObservation({
     eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+    actor: createActorFromSenderLogin(parsedPayload.data.sender?.login),
     pullRequestNumber: parsedPayload.data.pull_request.number,
     repositoryFullName: parsedPayload.data.repository.full_name,
     text: renderReviewSubmittedInput({
@@ -150,6 +164,7 @@ function observePullRequestReviewCommentCreated(
 
   return createObservation({
     eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
+    actor: createActorFromSenderLogin(parsedPayload.data.sender?.login),
     pullRequestNumber: parsedPayload.data.pull_request.number,
     repositoryFullName: parsedPayload.data.repository.full_name,
     text: renderReviewCommentInput({
@@ -165,6 +180,7 @@ function observePullRequestReviewCommentCreated(
 }
 
 function createObservation(input: {
+  actor?: AssociatedResourceProviderActor | undefined;
   eventType: AssociatedResourceEventType;
   pullRequestNumber: number;
   repositoryFullName: string;
@@ -177,6 +193,7 @@ function createObservation(input: {
   const resourceKind = AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST;
 
   return {
+    ...(input.actor === undefined ? {} : { actor: input.actor }),
     eventType: input.eventType,
     providerResourceId,
     resourceKind,
@@ -187,6 +204,60 @@ function createObservation(input: {
       resourceKind,
       text: input.text,
     },
+  };
+}
+
+export function isSelfAuthoredGitHubAssociatedResourceEvent(input: {
+  connection: {
+    config: GitHubConnectionConfig | Record<string, unknown> | null;
+  };
+  observation: AssociatedResourceWebhookObservation;
+}): boolean {
+  const parsedConnectionConfig = tryParseGitHubConnectionConfig(input.connection.config);
+  if (
+    parsedConnectionConfig === null ||
+    parsedConnectionConfig.connection_method !==
+      IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
+  ) {
+    return false;
+  }
+
+  const actorHandle = input.observation.actor?.handle;
+  if (actorHandle === undefined) {
+    return false;
+  }
+
+  return (
+    normalizeGitHubLogin(actorHandle) ===
+    normalizeGitHubLogin(`${parsedConnectionConfig.app_slug}[bot]`)
+  );
+}
+
+function tryParseGitHubConnectionConfig(input: unknown): GitHubConnectionConfig | null {
+  try {
+    return parseGitHubConnectionConfig(input);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+function normalizeGitHubLogin(input: string): string {
+  return input.toLowerCase();
+}
+
+function createActorFromSenderLogin(
+  senderLogin: string | undefined,
+): AssociatedResourceProviderActor | undefined {
+  if (senderLogin === undefined) {
+    return undefined;
+  }
+
+  return {
+    handle: senderLogin,
   };
 }
 

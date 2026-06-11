@@ -28,6 +28,30 @@ The data-plane gateway registers observed provider resources through an internal
 
 Webhook ingestion runs association matching as a sibling to Trigger matching after the provider webhook event is normalized and persisted. Association matching finds provider resource associations by integration connection, resource kind, and provider resource id, evaluates the associated resource event routing behavior captured for each associated sandbox session, and inserts delivery rows idempotently.
 
+Association matching rejects self-authored association events before creating association delivery rows. The provider webhook event remains persisted and can still produce Trigger runs or other webhook side effects, but the self-authored association event is not represented as an ignored delivery because no delivery attempt should exist.
+
+First-pass self-authorship suppression does not create a separate user-visible history entry or operator diagnostic record. The persisted webhook event remains the durable record that the provider event was received.
+
+If self-authorship suppression leaves no Trigger runs, resource sync requests, or Association deliveries, webhook processing may finalize the persisted webhook event as ignored. Association preparation does not return a separate matched-but-suppressed result.
+
+Provider definitions own self-authorship evaluation because provider actor identity is provider-specific. The control-plane worker asks the integration definition whether an observed association event is self-authored for the integration connection rather than interpreting provider payload actor fields generically.
+
+First-pass self-authorship is evaluated at the integration connection's provider-actor level, not by correlating an inbound provider event to a specific outbound sandbox action. If the same provider actor Mistle uses for the integration connection authored the event, association matching rejects it even without proving which sandbox session produced the outbound action.
+
+Associated-resource event observation and self-authorship evaluation belong to a dedicated integration definition capability rather than the webhook-source lifecycle capability. Webhook-source hooks answer how Mistle owns provider webhook registrations; associated-resource hooks answer whether a normalized provider event can continue an associated sandbox session.
+
+Associated-resource actor metadata stays identity-oriented in the first pass. The capability may expose provider subject identifiers and provider handles needed for self-authorship checks, but it does not introduce a generic provider actor kind taxonomy until a concrete provider use case needs one.
+
+Actor metadata used for self-authorship does not change first-pass rendered association input. Rendered association input continues to include provider-authored context chosen for the agent prompt, not routing diagnostics or provider actor identifiers that are only needed for suppression.
+
+Self-authorship is a strict suppression decision. If the provider capability cannot prove that an observed association event was authored by Mistle's provider actor for the integration connection, association matching treats the event as not self-authored and continues ordinary routing.
+
+Providers without an associated-resource self-authorship hook deliver observed association events normally. Missing self-authorship support is not a suppression signal.
+
+The GitHub first pass suppresses GitHub App installation actor echoes, not linked-user-authored events. Human linked-user activity can represent real review feedback and should continue through ordinary association routing unless a later provider-specific use case justifies narrower behavior.
+
+Association matching evaluates captured associated resource event routing before self-authorship. Self-authorship is only evaluated for events that would otherwise be eligible for an Association delivery, keeping routing-disabled events distinct from self-authored suppression.
+
 Association matching resolves captured runtime behavior from data-plane sandbox instance runtime-plan state. The association row stores only the sandbox instance id; it does not duplicate sandbox profile id, sandbox profile version, or associated resource event routing configuration. The first-pass implementation extends the existing control-plane internal sandbox read facade to expose the data-plane `sandboxProfileId`, `sandboxProfileVersion`, and the `associatedResourceEventRouting` captured in the persisted `CompiledRuntimePlan`. The routing field is nullable on this status-oriented facade while a newly started sandbox instance exists before its runtime plan has been persisted; association registration treats that state as not applicable rather than failing status polling.
 
 Association registration validates tenant consistency between the integration connection and sandbox instance before recording the association. The integration connection's organization and the data-plane sandbox instance's organization must match.

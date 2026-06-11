@@ -140,6 +140,14 @@ _Avoid_: Conversation key, group key
 A provider event routed through a **Provider resource association** rather than through a **Trigger**.
 _Avoid_: Trigger event when no Trigger is involved, ad hoc trigger
 
+**Provider actor**:
+An external provider identity that authors or performs provider-side actions.
+_Avoid_: User when the actor may be an app, bot, or service account
+
+**Self-authored association event**:
+An **Association-backed provider event** authored by the same **Provider actor** Mistle used to perform the provider-side action for the associated **Sandbox session**.
+_Avoid_: Duplicate webhook, bot event, loop event
+
 **Association delivery**:
 An attempt to deliver an **Association-backed provider event** to its **Routing runtime conversation**.
 _Avoid_: Trigger delivery when no Trigger is involved
@@ -545,6 +553,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Provider resource association** is not a user-managed dashboard resource.
 - **Association registration** does not change whether the provider request that produced the **Routable provider resource** succeeds.
 - An **Association-backed provider event** is not a **Trigger** run.
+- A **Self-authored association event** does not produce an **Association delivery**.
 - A **Provider resource association** can outlive its ability to produce successful **Association deliveries**.
 - An **Association delivery** targets the associated **Routing runtime conversation** and does not reroute to another conversation when that target is unavailable.
 - An **Association delivery** depends on a **Provider resource association** already recorded when the provider event is handled.
@@ -804,3 +813,4 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Switching threads could imply changing the whole workbench — resolved: thread switching changes the **Active Codex thread** without changing the **Sandbox session**.
 - "delete session" could mean hard deletion or user-visible removal — resolved: use **Deleted session** for a session hidden from ordinary lists while retaining its historical record.
 - "GitHub team" could mean either an organization-scoped GitHub team identity or the requested review target value delivered in a pull request webhook — resolved: use **GitHub team review target** for the trigger-filter value, which is the GitHub team slug.
+- "self" in provider-event routing could mean the same Mistle user, same sandbox session, or same provider actor — resolved: use **Self-authored association event** for provider events authored by the same **Provider actor** Mistle used for the associated sandbox action.

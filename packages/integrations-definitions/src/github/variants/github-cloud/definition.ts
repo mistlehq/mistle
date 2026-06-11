@@ -4,6 +4,7 @@ import { AppendSessionLinkToGitHubMarkdownRequestMiddleware } from "../../shared
 import { GitHubIdentityLinkingCapability } from "../../shared/identity-linking.server.js";
 import { listGitHubConnectionResources } from "../../shared/list-connection-resources.server.js";
 import { GitHubCloudProviderAppSetupCapability } from "../../shared/provider-app-setup.server.js";
+import { GitHubAssociatedResourceEventsCapability } from "../../shared/provider-resource-association-webhooks.js";
 import {
   createGitHubResourceDefinitions,
   GitHubResourceSyncTriggers,
@@ -31,6 +32,7 @@ export const GitHubCloudDefinition: GitHubCloudBaseIntegrationDefinition = {
   },
   webhookHandler: GitHubCloudWebhookHandler,
   webhookSource: GitHubWebhookSourceCapability,
+  associatedResourceEvents: GitHubAssociatedResourceEventsCapability,
   resourceDefinitions: createGitHubResourceDefinitions({
     apiKeySlotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_API_KEY,
   }),
