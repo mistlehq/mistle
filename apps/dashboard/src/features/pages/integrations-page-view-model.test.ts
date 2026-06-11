@@ -349,7 +349,6 @@ describe("integrations page view model", () => {
               count: 42,
               syncState: "ready",
               lastSyncedAt: "2026-03-11T04:25:00.000Z",
-              lastErrorMessage: "Resource sync failed.",
             },
           ],
           createdAt: "2026-03-03T00:00:00.000Z",
@@ -392,7 +391,40 @@ describe("integrations page view model", () => {
         "https://control-plane.example.com/p/integration/callbacks/setup/github-app-installation",
     });
     expect(item?.resources[0]?.isRefreshing).toBe(true);
-    expect(item?.resources[0]?.lastErrorMessage).toBe("Resource sync failed.");
+  });
+
+  it("passes persisted resource sync failure messages to detail resource summaries", () => {
+    const [item] = buildIntegrationConnectionDetailItems({
+      connections: [
+        createConnection({
+          id: "icn_resource_failure",
+          status: "active",
+          resources: [
+            {
+              kind: "team",
+              selectionMode: "multi",
+              count: 0,
+              syncState: "error",
+              lastErrorCode: "resource_sync_failed",
+              lastErrorMessage:
+                "GitHub returned a 403 while syncing teams. Reapprove Members read permission.",
+            },
+          ],
+        }),
+      ],
+      refreshingResourceKeys: new Set<string>(),
+    });
+
+    expect(item?.resources).toEqual([
+      {
+        kind: "team",
+        count: 0,
+        syncState: "error",
+        lastErrorMessage:
+          "GitHub returned a 403 while syncing teams. Reapprove Members read permission.",
+        isRefreshing: false,
+      },
+    ]);
   });
 
   it("builds detail items for Slack bot token connections", () => {

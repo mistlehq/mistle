@@ -28,6 +28,8 @@ export const IntegrationConnectionResourceSummarySchema = z
       IntegrationConnectionResourceSyncStates.READY,
       IntegrationConnectionResourceSyncStates.ERROR,
     ]),
+    lastErrorCode: z.string().min(1).optional(),
+    lastErrorMessage: z.string().min(1).optional(),
     lastSyncedAt: z.string().min(1).optional(),
   })
   .strict();

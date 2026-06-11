@@ -1167,6 +1167,8 @@ export interface paths {
                 resources?: {
                   count: number;
                   kind: string;
+                  lastErrorCode?: string;
+                  lastErrorMessage?: string;
                   lastSyncedAt?: string;
                   /** @enum {string} */
                   selectionMode: "single" | "multi";
@@ -1323,6 +1325,8 @@ export interface paths {
               resources?: {
                 count: number;
                 kind: string;
+                lastErrorCode?: string;
+                lastErrorMessage?: string;
                 lastSyncedAt?: string;
                 /** @enum {string} */
                 selectionMode: "single" | "multi";
@@ -1710,6 +1714,8 @@ export interface paths {
               resources?: {
                 count: number;
                 kind: string;
+                lastErrorCode?: string;
+                lastErrorMessage?: string;
                 lastSyncedAt?: string;
                 /** @enum {string} */
                 selectionMode: "single" | "multi";
@@ -3163,6 +3169,8 @@ export interface paths {
               resources?: {
                 count: number;
                 kind: string;
+                lastErrorCode?: string;
+                lastErrorMessage?: string;
                 lastSyncedAt?: string;
                 /** @enum {string} */
                 selectionMode: "single" | "multi";
@@ -3686,6 +3694,8 @@ export interface paths {
               resources?: {
                 count: number;
                 kind: string;
+                lastErrorCode?: string;
+                lastErrorMessage?: string;
                 lastSyncedAt?: string;
                 /** @enum {string} */
                 selectionMode: "single" | "multi";

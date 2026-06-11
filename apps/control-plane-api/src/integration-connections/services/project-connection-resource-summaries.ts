@@ -12,6 +12,8 @@ export type ConnectionResourceSummary = {
   selectionMode: IntegrationResourceDefinition["selectionMode"];
   count: number;
   syncState: IntegrationConnectionResourceState["syncState"];
+  lastErrorCode?: string;
+  lastErrorMessage?: string;
   lastSyncedAt?: string;
 };
 
@@ -41,6 +43,14 @@ export function projectConnectionResourceSummaries(input: {
       ...(state?.lastSyncedAt === null || state?.lastSyncedAt === undefined
         ? {}
         : { lastSyncedAt: normalizeTimestamp(state.lastSyncedAt) }),
+      ...(state?.syncState !== IntegrationConnectionResourceSyncStates.ERROR ||
+      state.lastErrorCode === null
+        ? {}
+        : { lastErrorCode: state.lastErrorCode }),
+      ...(state?.syncState !== IntegrationConnectionResourceSyncStates.ERROR ||
+      state.lastErrorMessage === null
+        ? {}
+        : { lastErrorMessage: state.lastErrorMessage }),
     };
   });
 }
