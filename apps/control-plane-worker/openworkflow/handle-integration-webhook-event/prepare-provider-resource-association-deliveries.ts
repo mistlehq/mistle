@@ -79,7 +79,7 @@ export async function prepareProviderResourceAssociationDeliveries(
 
     const deliveryId = await enqueueAssociationDeliveryAndEnsureProcessor(ctx.db, {
       providerResourceAssociationId: association.id,
-      renderedInput: observedEvent.renderedInput,
+      renderedInput: observedEvent.renderedInput.text,
       sourceOrderKey: input.webhookEvent.sourceOrderKey,
       sourceWebhookEventId: input.webhookEvent.id,
     });
@@ -174,7 +174,7 @@ async function enqueueAssociationDelivery(
   db: ControlPlaneDatabase,
   input: {
     providerResourceAssociationId: string;
-    renderedInput: Record<string, unknown>;
+    renderedInput: string;
     sourceOrderKey: string;
     sourceWebhookEventId: string;
   },
@@ -226,7 +226,7 @@ async function enqueueAssociationDeliveryAndEnsureProcessor(
   db: ControlPlaneDatabase,
   input: {
     providerResourceAssociationId: string;
-    renderedInput: Record<string, unknown>;
+    renderedInput: string;
     sourceOrderKey: string;
     sourceWebhookEventId: string;
   },

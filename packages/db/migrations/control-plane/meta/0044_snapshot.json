@@ -4203,7 +4203,7 @@
         },
         "rendered_input": {
           "name": "rendered_input",
-          "type": "jsonb",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },

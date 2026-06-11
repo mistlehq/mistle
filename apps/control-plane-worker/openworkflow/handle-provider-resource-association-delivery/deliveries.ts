@@ -24,7 +24,7 @@ export type ActiveProviderResourceAssociationDelivery = {
   providerResourceAssociationId: string;
   sourceWebhookEventId: string;
   sourceOrderKey: string;
-  renderedInput: Record<string, unknown>;
+  renderedInput: string;
   status: "claimed" | "delivering";
   attemptCount: number;
   processorGeneration: number;

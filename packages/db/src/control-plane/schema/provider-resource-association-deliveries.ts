@@ -1,12 +1,4 @@
-import {
-  bigint,
-  index,
-  jsonb,
-  text,
-  timestamp,
-  uniqueIndex,
-  type PgSchema,
-} from "drizzle-orm/pg-core";
+import { bigint, index, text, timestamp, uniqueIndex, type PgSchema } from "drizzle-orm/pg-core";
 import { typeid } from "typeid-js";
 
 import { integrationWebhookEvents } from "./integration-webhook-events.js";
@@ -39,7 +31,7 @@ export function defineProviderResourceAssociationDeliveries(schema: PgSchema) {
         .notNull()
         .references(() => integrationWebhookEvents.id, { onDelete: "cascade" }),
       sourceOrderKey: text("source_order_key").notNull(),
-      renderedInput: jsonb("rendered_input").$type<Record<string, unknown>>().notNull(),
+      renderedInput: text("rendered_input").notNull(),
       status: text("status")
         .notNull()
         .$type<ProviderResourceAssociationDeliveryStatus>()

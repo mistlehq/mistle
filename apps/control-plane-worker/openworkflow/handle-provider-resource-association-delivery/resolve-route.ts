@@ -4,6 +4,10 @@ import type {
   AssociatedResourceEventRouting,
   CompiledRuntimePlan,
 } from "@mistle/integrations-core";
+import {
+  GitHubFamilyId,
+  observeGitHubAssociatedResourceFromWebhookEvent,
+} from "@mistle/integrations-definitions/server";
 
 import {
   ProviderResourceAssociationDeliveryError,
@@ -25,16 +29,15 @@ export async function resolveProviderResourceAssociationDeliveryTarget(
   },
   input: {
     providerResourceAssociationId: string;
-    associatedResourceEvent?: {
-      resourceKind: string;
-      eventType: string;
-    };
+    sourceWebhookEventId?: string;
   },
 ): Promise<ResolvedProviderResourceAssociationDeliveryTarget> {
   const association = await ctx.db.query.providerResourceAssociations.findFirst({
     columns: {
       id: true,
       integrationConnectionId: true,
+      providerResourceId: true,
+      resourceKind: true,
       sandboxInstanceId: true,
     },
     where: (table, { eq }) => eq(table.id, input.providerResourceAssociationId),
@@ -49,6 +52,7 @@ export async function resolveProviderResourceAssociationDeliveryTarget(
   const integrationConnection = await ctx.db.query.integrationConnections.findFirst({
     columns: {
       organizationId: true,
+      targetKey: true,
     },
     where: (table, { eq }) => eq(table.id, association.integrationConnectionId),
   });
@@ -75,18 +79,26 @@ export async function resolveProviderResourceAssociationDeliveryTarget(
       message: `Sandbox instance '${association.sandboxInstanceId}' does not have a persisted runtime plan.`,
     });
   }
-  if (
-    input.associatedResourceEvent !== undefined &&
-    !supportsAssociatedResourceEvent({
-      eventType: input.associatedResourceEvent.eventType,
-      resourceKind: input.associatedResourceEvent.resourceKind,
-      routing: sandboxInstance.runtimePlan.associatedResourceEventRouting,
-    })
-  ) {
-    throw new ProviderResourceAssociationDeliveryError({
-      code: ProviderResourceAssociationDeliveryFailureCodes.ROUTING_EVENT_NOT_ENABLED,
-      message: `Provider resource association '${association.id}' is not configured to receive '${input.associatedResourceEvent.eventType}' events for '${input.associatedResourceEvent.resourceKind}'.`,
+
+  if (input.sourceWebhookEventId !== undefined) {
+    const observedEvent = await resolveAssociatedResourceEventFromWebhook(ctx.db, {
+      association,
+      sourceWebhookEventId: input.sourceWebhookEventId,
+      targetKey: integrationConnection.targetKey,
     });
+
+    if (
+      !supportsAssociatedResourceEvent({
+        eventType: observedEvent.eventType,
+        resourceKind: association.resourceKind,
+        routing: sandboxInstance.runtimePlan.associatedResourceEventRouting,
+      })
+    ) {
+      throw new ProviderResourceAssociationDeliveryError({
+        code: ProviderResourceAssociationDeliveryFailureCodes.ROUTING_EVENT_NOT_ENABLED,
+        message: `Provider resource association '${association.id}' is not configured to receive '${observedEvent.eventType}' events for '${association.resourceKind}'.`,
+      });
+    }
   }
 
   const runtimeContext = resolveAssociationRuntimeContext(sandboxInstance.runtimePlan);
@@ -97,6 +109,71 @@ export async function resolveProviderResourceAssociationDeliveryTarget(
     sandboxInstanceId: association.sandboxInstanceId,
     runtimeId: runtimeContext.runtimeId,
     workingDirectory: runtimeContext.workingDirectory,
+  };
+}
+
+async function resolveAssociatedResourceEventFromWebhook(
+  db: ControlPlaneDatabase,
+  input: {
+    association: {
+      id: string;
+      providerResourceId: string;
+      resourceKind: string;
+    };
+    sourceWebhookEventId: string;
+    targetKey: string;
+  },
+): Promise<{
+  eventType: string;
+}> {
+  const webhookEvent = await db.query.integrationWebhookEvents.findFirst({
+    columns: {
+      eventType: true,
+      payload: true,
+      targetKey: true,
+    },
+    where: (table, { eq }) => eq(table.id, input.sourceWebhookEventId),
+  });
+  if (webhookEvent === undefined) {
+    throw new ProviderResourceAssociationDeliveryError({
+      code: ProviderResourceAssociationDeliveryFailureCodes.DELIVERY_NOT_FOUND,
+      message: `Provider resource association '${input.association.id}' references missing webhook event '${input.sourceWebhookEventId}'.`,
+    });
+  }
+  if (webhookEvent.targetKey !== input.targetKey) {
+    throw new ProviderResourceAssociationDeliveryError({
+      code: ProviderResourceAssociationDeliveryFailureCodes.ROUTING_EVENT_NOT_ENABLED,
+      message: `Provider resource association '${input.association.id}' references webhook event '${input.sourceWebhookEventId}' for a different integration target.`,
+    });
+  }
+
+  const target = await db.query.integrationTargets.findFirst({
+    columns: {
+      familyId: true,
+    },
+    where: (table, { eq }) => eq(table.targetKey, webhookEvent.targetKey),
+  });
+  const observedEvent =
+    target?.familyId === GitHubFamilyId
+      ? observeGitHubAssociatedResourceFromWebhookEvent({
+          eventType: webhookEvent.eventType,
+          payload: webhookEvent.payload,
+        })
+      : null;
+
+  if (
+    observedEvent === null ||
+    observedEvent.resourceKind !== input.association.resourceKind ||
+    observedEvent.providerResourceId !== input.association.providerResourceId
+  ) {
+    throw new ProviderResourceAssociationDeliveryError({
+      code: ProviderResourceAssociationDeliveryFailureCodes.ROUTING_EVENT_NOT_ENABLED,
+      message: `Provider resource association '${input.association.id}' references webhook event '${input.sourceWebhookEventId}' that does not match the associated provider resource.`,
+    });
+  }
+
+  return {
+    eventType: observedEvent.eventType,
   };
 }
 

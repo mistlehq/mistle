@@ -3,7 +3,7 @@ CREATE TABLE "control_plane"."provider_resource_association_deliveries" (
 	"provider_resource_association_id" text NOT NULL,
 	"source_webhook_event_id" text NOT NULL,
 	"source_order_key" text NOT NULL,
-	"rendered_input" jsonb NOT NULL,
+	"rendered_input" text NOT NULL,
 	"status" text DEFAULT 'queued' NOT NULL,
 	"attempt_count" bigint DEFAULT 0 NOT NULL,
 	"processor_generation" bigint,

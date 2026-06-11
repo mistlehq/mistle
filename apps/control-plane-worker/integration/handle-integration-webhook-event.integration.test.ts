@@ -207,20 +207,14 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       sourceWebhookEventId: scope.webhookEventId,
       sourceOrderKey: "2026-03-09T00:00:00Z#0001",
       status: ProviderResourceAssociationDeliveryStatuses.QUEUED,
-      renderedInput: {
-        kind: "github.pull_request.associated_resource_event",
-        eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
-        resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
-        providerResourceId: "mistlehq/mistle#42",
-        text: [
-          "GitHub pull request issue comment created",
-          "Repository: mistlehq/mistle",
-          "Pull request: #42",
-          "Author: octocat",
-          "",
-          "please run @mistlebot",
-        ].join("\n"),
-      },
+      renderedInput: [
+        "GitHub pull request issue comment created",
+        "Repository: mistlehq/mistle",
+        "Pull request: #42",
+        "Author: octocat",
+        "",
+        "please run @mistlebot",
+      ].join("\n"),
     });
 
     const processor =

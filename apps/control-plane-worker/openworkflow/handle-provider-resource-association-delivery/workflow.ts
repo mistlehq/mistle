@@ -208,9 +208,7 @@ async function deliverActiveProviderResourceAssociationDelivery(
       { dataPlaneClient: ctx.dataPlaneClient, db: ctx.db },
       {
         providerResourceAssociationId: input.delivery.providerResourceAssociationId,
-        associatedResourceEvent: resolveProviderResourceAssociationDeliveryEvent(
-          input.delivery.renderedInput,
-        ),
+        sourceWebhookEventId: input.delivery.sourceWebhookEventId,
       },
     );
     const webhookEvent = await ctx.db.query.integrationWebhookEvents.findFirst({
@@ -245,7 +243,7 @@ async function deliverActiveProviderResourceAssociationDelivery(
       deliveryInput: {
         runtimeId: target.runtimeId,
         connectionUrl: connection.url,
-        inputText: renderProviderResourceAssociationDeliveryInput(input.delivery.renderedInput),
+        inputText: input.delivery.renderedInput,
         deliveryId: input.delivery.id,
         providerResourceAssociationId: target.providerResourceAssociationId,
       },
@@ -308,39 +306,5 @@ function resolveProviderResourceAssociationDeliveryFailure(error: unknown): {
     code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
     message:
       error instanceof Error ? error.message : "Provider resource association delivery failed.",
-  };
-}
-
-function renderProviderResourceAssociationDeliveryInput(
-  renderedInput: Record<string, unknown>,
-): string {
-  const text = renderedInput.text;
-  if (typeof text === "string" && text.trim().length > 0) {
-    return text;
-  }
-
-  throw new ProviderResourceAssociationDeliveryError({
-    code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
-    message: "Provider resource association delivery rendered input is missing text.",
-  });
-}
-
-function resolveProviderResourceAssociationDeliveryEvent(renderedInput: Record<string, unknown>): {
-  resourceKind: string;
-  eventType: string;
-} {
-  const resourceKind = renderedInput.resourceKind;
-  const eventType = renderedInput.eventType;
-  if (typeof resourceKind !== "string" || typeof eventType !== "string") {
-    throw new ProviderResourceAssociationDeliveryError({
-      code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
-      message:
-        "Provider resource association delivery input is missing associated-resource routing fields.",
-    });
-  }
-
-  return {
-    resourceKind,
-    eventType,
   };
 }

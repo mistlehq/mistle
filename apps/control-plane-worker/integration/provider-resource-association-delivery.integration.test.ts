@@ -14,7 +14,6 @@ import {
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import {
   AssociatedProviderResourceKinds,
-  AssociatedResourceEventTypes,
   createDisabledAssociatedResourceEventRouting,
 } from "@mistle/integrations-core";
 import {
@@ -260,6 +259,13 @@ describe.concurrent("provider resource association delivery", () => {
       suffix: createSuffix("event_route_disabled"),
     });
     await insertSandboxInstance(env, scope);
+    await insertAssociationDelivery({
+      env,
+      scope,
+      deliveryId: "prd_event_route_disabled",
+      webhookEventId: "iwe_event_route_disabled",
+      sourceOrderKey: "2026-03-09T00:00:00Z#0001",
+    });
 
     await expect(
       resolveProviderResourceAssociationDeliveryTarget(
@@ -269,10 +275,7 @@ describe.concurrent("provider resource association delivery", () => {
         },
         {
           providerResourceAssociationId: scope.providerResourceAssociationId,
-          associatedResourceEvent: {
-            resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
-            eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
-          },
+          sourceWebhookEventId: "iwe_event_route_disabled",
         },
       ),
     ).rejects.toMatchObject({
@@ -370,7 +373,7 @@ async function seedAssociationDeliveryScope(input: {
     .values({
       id: providerResourceAssociationId,
       integrationConnectionId,
-      resourceKind: "github_pull_request",
+      resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
       providerResourceId: "mistlehq/mistle#2782",
       sandboxInstanceId,
     });
@@ -414,7 +417,21 @@ async function insertAssociationDelivery(input: {
       externalDeliveryId: `delivery-${input.webhookEventId}`,
       providerEventType: "issue_comment",
       eventType: "github.issue_comment.created",
-      payload: {},
+      payload: {
+        repository: {
+          full_name: "mistlehq/mistle",
+        },
+        issue: {
+          number: 2782,
+          pull_request: {},
+        },
+        comment: {
+          body: `delivery ${input.deliveryId}`,
+        },
+        sender: {
+          login: "octocat",
+        },
+      },
       sourceOccurredAt: "2026-03-09T00:00:00.000Z",
       sourceOrderKey: input.sourceOrderKey,
       status: "processed",
@@ -426,9 +443,7 @@ async function insertAssociationDelivery(input: {
       providerResourceAssociationId: input.scope.providerResourceAssociationId,
       sourceWebhookEventId: input.webhookEventId,
       sourceOrderKey: input.sourceOrderKey,
-      renderedInput: {
-        text: `delivery ${input.deliveryId}`,
-      },
+      renderedInput: `delivery ${input.deliveryId}`,
       status: ProviderResourceAssociationDeliveryStatuses.QUEUED,
     });
 }
