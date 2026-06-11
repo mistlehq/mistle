@@ -7,7 +7,10 @@ import {
   type SandboxImageHandle,
 } from "../../types.js";
 import type { OpenComputerClient } from "./client.js";
-import { createOpenComputerBaseImage, createOpenComputerImageManifest } from "./client.js";
+import {
+  createOpenComputerBaseImage,
+  createOpenComputerImageManifest,
+} from "./image-definition.js";
 import {
   createOpenComputerBaseImageName,
   createOpenComputerDeferredImageHandle,

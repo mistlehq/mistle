@@ -157,6 +157,14 @@ describe("OpenComputer client helpers", () => {
     expect(firstImage.toJSON()).not.toEqual(secondImage.toJSON());
   });
 
+  it("uses sudo for privileged base image setup commands", () => {
+    const manifest = JSON.stringify(createOpenComputerBaseImage({}).toJSON());
+
+    expect(manifest).toContain("sudo -n install -d -m 0755 /opt/mistle/bin");
+    expect(manifest).toContain("sudo -n install -d -m 0700 /run/mistle");
+    expect(manifest).toContain("sudo -n tee /etc/profile.d/mistle-path.sh");
+  });
+
   it("replays deferred image manifests through the OpenComputer image builder", () => {
     const image = createOpenComputerBaseImage({
       source: {

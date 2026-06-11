@@ -24,6 +24,7 @@ export {
   createOpenComputerSnapshotImageHandle,
   createOpenComputerTemplateImageHandle,
   parseOpenComputerImageHandle,
+  resolveOpenComputerStartImage,
 } from "./image-handle.js";
 
 export function createOpenComputerAdapter(

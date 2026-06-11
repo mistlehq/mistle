@@ -10,6 +10,7 @@ import {
   createOpenComputerSnapshotImageHandle,
   createOpenComputerTemplateImageHandle,
   parseOpenComputerImageHandle,
+  resolveOpenComputerStartImage,
 } from "./image-handle.js";
 
 describe("OpenComputer image handles", () => {
@@ -60,6 +61,33 @@ describe("OpenComputer image handles", () => {
         createdAt: "2026-01-01T00:00:00.000Z",
       }),
     ).toThrow(SandboxConfigurationError);
+  });
+
+  it("resolves OCI base image references to deterministic deferred image starts", () => {
+    const baseImageRef = "ghcr.io/mistlehq/sandbox-base:latest";
+
+    expect(
+      resolveOpenComputerStartImage({
+        provider: SandboxProvider.OPENCOMPUTER,
+        imageId: baseImageRef,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }),
+    ).toEqual({
+      kind: "image",
+      id: createOpenComputerBaseImageName(baseImageRef),
+      manifest: createOpenComputerImageManifest(
+        createOpenComputerBaseImage({
+          source: { kind: "image", imageId: baseImageRef },
+        }),
+      ),
+    });
+  });
+
+  it("resolves provider-prefixed image handles through the strict parser", () => {
+    expect(resolveOpenComputerStartImage(createOpenComputerSnapshotImageHandle("base"))).toEqual({
+      kind: "snapshot",
+      id: "base",
+    });
   });
 
   it("creates deterministic base image names from image references", () => {

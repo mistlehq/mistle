@@ -4,6 +4,10 @@ import { createHash } from "node:crypto";
 import { SandboxConfigurationError } from "../../errors.js";
 import { SandboxProvider, type SandboxImageHandle } from "../../types.js";
 import {
+  createOpenComputerBaseImage,
+  createOpenComputerImageManifest,
+} from "./image-definition.js";
+import {
   OpenComputerImageHandleKinds,
   OpenComputerImageManifestSchema,
   type OpenComputerImageManifest,
@@ -73,6 +77,31 @@ export function parseOpenComputerImageHandle(handle: SandboxImageHandle): OpenCo
   throw new SandboxConfigurationError(`Unsupported OpenComputer image handle kind "${kind}".`);
 }
 
+export function resolveOpenComputerStartImage(handle: SandboxImageHandle): OpenComputerStartImage {
+  if (handle.provider !== SandboxProvider.OPENCOMPUTER) {
+    throw new SandboxConfigurationError(
+      `Expected OpenComputer image handle, received provider '${handle.provider}'.`,
+    );
+  }
+
+  if (hasOpenComputerImageKindPrefix(handle.imageId)) {
+    return parseOpenComputerImageHandle(handle);
+  }
+
+  if (isOciImageRef(handle.imageId)) {
+    const image = createOpenComputerBaseImage({
+      source: { kind: "image", imageId: handle.imageId },
+    });
+    return {
+      kind: OpenComputerImageHandleKinds.IMAGE,
+      id: createOpenComputerBaseImageName(handle.imageId),
+      manifest: createOpenComputerImageManifest(image),
+    };
+  }
+
+  return parseOpenComputerImageHandle(handle);
+}
+
 export function createOpenComputerBaseImageName(baseImageRef: string): string {
   return `${OpenComputerBaseImageNamePrefix}-${createOpenComputerBaseImageNameDigest(baseImageRef)}`;
 }
@@ -121,6 +150,20 @@ function requireNonEmptyOpenComputerImageId(imageId: string): string {
     throw new SandboxConfigurationError("OpenComputer image handle id is required.");
   }
   return normalizedImageId;
+}
+
+function isOciImageRef(imageId: string): boolean {
+  return imageId.trim().includes("/");
+}
+
+function hasOpenComputerImageKindPrefix(imageId: string): boolean {
+  const normalizedImageId = imageId.trim();
+  return (
+    normalizedImageId.startsWith(`${OpenComputerImageHandleKinds.IMAGE}:`) ||
+    normalizedImageId.startsWith(`${OpenComputerImageHandleKinds.SNAPSHOT}:`) ||
+    normalizedImageId.startsWith(`${OpenComputerImageHandleKinds.CHECKPOINT}:`) ||
+    normalizedImageId.startsWith(`${OpenComputerImageHandleKinds.TEMPLATE}:`)
+  );
 }
 
 function createOpenComputerBaseImageNameDigest(baseImageRef: string): string {

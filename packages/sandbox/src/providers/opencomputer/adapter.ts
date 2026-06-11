@@ -27,7 +27,7 @@ import type { OpenComputerClient } from "./client.js";
 import {
   createOpenComputerCheckpointImageHandle,
   createOpenComputerSnapshotImageHandle,
-  parseOpenComputerImageHandle,
+  resolveOpenComputerStartImage,
 } from "./image-handle.js";
 import { createOpenComputerTransparentProxyConfiguration } from "./transparent-proxy.js";
 import type { OpenComputerSandboxInspectResult } from "./types.js";
@@ -69,7 +69,7 @@ export class OpenComputerSandboxAdapter implements SandboxAdapter {
   }
 
   async prepareImage(request: SandboxPrepareImageRequest): Promise<SandboxImageHandle> {
-    const image = parseOpenComputerImageHandle(request.image);
+    const image = resolveOpenComputerStartImage(request.image);
     try {
       const response = await this.#client.prepareImage({ image });
       if (response.image.kind === "snapshot") {
@@ -89,7 +89,7 @@ export class OpenComputerSandboxAdapter implements SandboxAdapter {
   }
 
   async start(request: SandboxStartRequest): Promise<SandboxHandle> {
-    const image = parseOpenComputerImageHandle(request.image);
+    const image = resolveOpenComputerStartImage(request.image);
     const response = await this.#client.startSandbox({
       ...(request.sandboxInstanceId === undefined
         ? {}
