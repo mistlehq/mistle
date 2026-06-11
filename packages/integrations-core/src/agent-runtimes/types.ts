@@ -174,6 +174,14 @@ type CompileAgentRuntimeResultBase = {
   }>;
 };
 
+export type AgentRuntimeAssociatedResourceDeliveryCapability = {
+  supported: true;
+};
+
+export type AgentRuntimeCapabilities = {
+  associatedResourceDelivery?: AgentRuntimeAssociatedResourceDeliveryCapability;
+};
+
 export type CompileAgentRuntimeResult =
   | (CompileAgentRuntimeResultBase & {
       runtimeClients: ReadonlyArray<RuntimeClient>;
@@ -201,6 +209,7 @@ export type AgentRuntimeDefinition<
   compileRuntime(
     input: CompileAgentRuntimeInput<z.output<TRuntimeConfigSchema>>,
   ): CompileAgentRuntimeResult;
+  capabilities?: AgentRuntimeCapabilities;
   composerCapabilities?: readonly ComposerCapability[];
   createConversationProvider?(): AgentConversationProvider;
   materializeMcpConfig?(): ReadonlyArray<IntegrationMcpConfig>;

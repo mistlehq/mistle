@@ -1,8 +1,10 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import { type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type {
+  AgentRuntimeReader,
   AssociatedResourceEventRouting,
   AssociatedResourceWebhookObservation,
+  CompiledAgentRuntime,
   CompiledRuntimePlan,
   IntegrationRegistry,
 } from "@mistle/integrations-core";
@@ -23,6 +25,7 @@ export type ResolvedProviderResourceAssociationDeliveryTarget = {
 
 export async function resolveProviderResourceAssociationDeliveryTarget(
   ctx: {
+    agentRuntimeRegistry: AgentRuntimeReader;
     dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "getSandboxInstance">;
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
@@ -102,7 +105,10 @@ export async function resolveProviderResourceAssociationDeliveryTarget(
     }
   }
 
-  const runtimeContext = resolveAssociationRuntimeContext(sandboxInstance.runtimePlan);
+  const runtimeContext = resolveAssociationRuntimeContext({
+    agentRuntimeRegistry: ctx.agentRuntimeRegistry,
+    runtimePlan: sandboxInstance.runtimePlan,
+  });
 
   return {
     organizationId: integrationConnection.organizationId,
@@ -197,12 +203,18 @@ function supportsAssociatedResourceEvent(input: {
   );
 }
 
-function resolveAssociationRuntimeContext(runtimePlan: CompiledRuntimePlan): {
+function resolveAssociationRuntimeContext(input: {
+  agentRuntimeRegistry: AgentRuntimeReader;
+  runtimePlan: CompiledRuntimePlan;
+}): {
   runtimeId: string;
   workingDirectory: string;
 } {
-  const supportedAgentRuntimes = runtimePlan.agentRuntimes.filter((candidate) =>
-    supportsAssociatedResourceDeliveryRuntime(candidate.runtimeId),
+  const supportedAgentRuntimes = input.runtimePlan.agentRuntimes.filter((candidate) =>
+    supportsAssociationDeliveryRuntime({
+      agentRuntime: candidate,
+      agentRuntimeRegistry: input.agentRuntimeRegistry,
+    }),
   );
   const agentRuntime = supportedAgentRuntimes[0];
   if (agentRuntime === undefined) {
@@ -233,4 +245,23 @@ function resolveAssociationRuntimeContext(runtimePlan: CompiledRuntimePlan): {
     runtimeId: agentRuntime.runtimeId,
     workingDirectory,
   };
+}
+
+function supportsAssociationDeliveryRuntime(input: {
+  agentRuntime: CompiledAgentRuntime;
+  agentRuntimeRegistry: AgentRuntimeReader;
+}): boolean {
+  if (supportsAssociatedResourceDeliveryRuntime(input.agentRuntime)) {
+    return true;
+  }
+  if (input.agentRuntime.capabilities !== undefined) {
+    return false;
+  }
+
+  const runtimeDefinition = input.agentRuntimeRegistry.getRuntime({
+    runtimeId: input.agentRuntime.runtimeId,
+  });
+  return runtimeDefinition === undefined
+    ? false
+    : supportsAssociatedResourceDeliveryRuntime(runtimeDefinition);
 }

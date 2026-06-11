@@ -609,7 +609,12 @@ function compileProfileAgentRuntimeFragment(input: {
       mcpServers: input.mcpServers,
     }),
     workspaceSources: compileAgentRuntimeResult.workspaceSources ?? [],
-    agentRuntimes: compileAgentRuntimeResult.agentRuntimes,
+    agentRuntimes: compileAgentRuntimeResult.agentRuntimes.map((agentRuntime) => ({
+      ...agentRuntime,
+      ...(runtimeDefinition.capabilities === undefined
+        ? {}
+        : { capabilities: runtimeDefinition.capabilities }),
+    })),
   };
 }
 

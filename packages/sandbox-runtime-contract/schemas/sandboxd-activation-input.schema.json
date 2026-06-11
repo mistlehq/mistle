@@ -1308,6 +1308,23 @@
                 },
                 "required": ["runtimeId", "displayName", "newLaunch", "resumeLaunch"],
                 "additionalProperties": false
+              },
+              "capabilities": {
+                "type": "object",
+                "properties": {
+                  "associatedResourceDelivery": {
+                    "type": "object",
+                    "properties": {
+                      "supported": {
+                        "type": "boolean",
+                        "const": true
+                      }
+                    },
+                    "required": ["supported"],
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "required": ["runtimeId", "runtimeKey", "clientId", "endpointKey", "ptyLaunch"],

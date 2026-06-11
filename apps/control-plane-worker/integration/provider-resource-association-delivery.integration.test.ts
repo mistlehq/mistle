@@ -16,7 +16,7 @@ import {
   AssociatedProviderResourceKinds,
   createDisabledAssociatedResourceEventRouting,
 } from "@mistle/integrations-core";
-import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
+import { createDefinitionsBundle } from "@mistle/integrations-definitions/server";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
@@ -234,11 +234,7 @@ describe.concurrent("provider resource association delivery", () => {
     await insertSandboxInstance(env, scope);
 
     const resolvedTarget = await resolveProviderResourceAssociationDeliveryTarget(
-      {
-        dataPlaneClient: createDataPlaneClient(env),
-        db: env.controlPlaneDb,
-        integrationRegistry: createIntegrationRegistry(),
-      },
+      createRouteResolverContext(env),
       {
         providerResourceAssociationId: scope.providerResourceAssociationId,
       },
@@ -263,11 +259,7 @@ describe.concurrent("provider resource association delivery", () => {
     await insertSandboxInstance(env, scope, { runtimeId: "opencode" });
 
     const resolvedTarget = await resolveProviderResourceAssociationDeliveryTarget(
-      {
-        dataPlaneClient: createDataPlaneClient(env),
-        db: env.controlPlaneDb,
-        integrationRegistry: createIntegrationRegistry(),
-      },
+      createRouteResolverContext(env),
       {
         providerResourceAssociationId: scope.providerResourceAssociationId,
       },
@@ -292,11 +284,7 @@ describe.concurrent("provider resource association delivery", () => {
     await insertSandboxInstance(env, scope, { runtimeId: "pi" });
 
     const resolvedTarget = await resolveProviderResourceAssociationDeliveryTarget(
-      {
-        dataPlaneClient: createDataPlaneClient(env),
-        db: env.controlPlaneDb,
-        integrationRegistry: createIntegrationRegistry(),
-      },
+      createRouteResolverContext(env),
       {
         providerResourceAssociationId: scope.providerResourceAssociationId,
       },
@@ -308,6 +296,53 @@ describe.concurrent("provider resource association delivery", () => {
       sandboxInstanceId: scope.sandboxInstanceId,
       runtimeId: "pi",
       workingDirectory: "/root/repo",
+    });
+  });
+
+  it("resolves legacy associated sandbox runtime plans through registered runtime capabilities", async ({
+    env,
+  }) => {
+    const scope = await seedAssociationDeliveryScope({
+      env,
+      suffix: createSuffix("legacy_route"),
+    });
+    await insertSandboxInstance(env, scope, {
+      omitCompiledCapabilities: true,
+    });
+
+    const resolvedTarget = await resolveProviderResourceAssociationDeliveryTarget(
+      createRouteResolverContext(env),
+      {
+        providerResourceAssociationId: scope.providerResourceAssociationId,
+      },
+    );
+
+    expect(resolvedTarget).toMatchObject({
+      organizationId: scope.organizationId,
+      providerResourceAssociationId: scope.providerResourceAssociationId,
+      sandboxInstanceId: scope.sandboxInstanceId,
+      runtimeId: "codex",
+      workingDirectory: "/root/repo",
+    });
+  });
+
+  it("does not use registered runtime capabilities when compiled capabilities are explicit", async ({
+    env,
+  }) => {
+    const scope = await seedAssociationDeliveryScope({
+      env,
+      suffix: createSuffix("empty_compiled_capabilities"),
+    });
+    await insertSandboxInstance(env, scope, {
+      emptyCompiledCapabilities: true,
+    });
+
+    await expect(
+      resolveProviderResourceAssociationDeliveryTarget(createRouteResolverContext(env), {
+        providerResourceAssociationId: scope.providerResourceAssociationId,
+      }),
+    ).rejects.toMatchObject({
+      code: ProviderResourceAssociationDeliveryFailureCodes.RUNTIME_PLAN_AGENT_RUNTIME_NOT_FOUND,
     });
   });
 
@@ -328,17 +363,10 @@ describe.concurrent("provider resource association delivery", () => {
     });
 
     await expect(
-      resolveProviderResourceAssociationDeliveryTarget(
-        {
-          dataPlaneClient: createDataPlaneClient(env),
-          db: env.controlPlaneDb,
-          integrationRegistry: createIntegrationRegistry(),
-        },
-        {
-          providerResourceAssociationId: scope.providerResourceAssociationId,
-          sourceWebhookEventId: "iwe_event_route_disabled",
-        },
-      ),
+      resolveProviderResourceAssociationDeliveryTarget(createRouteResolverContext(env), {
+        providerResourceAssociationId: scope.providerResourceAssociationId,
+        sourceWebhookEventId: "iwe_event_route_disabled",
+      }),
     ).rejects.toMatchObject({
       code: ProviderResourceAssociationDeliveryFailureCodes.ROUTING_EVENT_NOT_ENABLED,
     });
@@ -354,16 +382,29 @@ describe.concurrent("provider resource association delivery", () => {
     await insertSandboxInstance(env, scope, { runtimeId: "unsupported" });
 
     await expect(
-      resolveProviderResourceAssociationDeliveryTarget(
-        {
-          dataPlaneClient: createDataPlaneClient(env),
-          db: env.controlPlaneDb,
-          integrationRegistry: createIntegrationRegistry(),
-        },
-        {
-          providerResourceAssociationId: scope.providerResourceAssociationId,
-        },
-      ),
+      resolveProviderResourceAssociationDeliveryTarget(createRouteResolverContext(env), {
+        providerResourceAssociationId: scope.providerResourceAssociationId,
+      }),
+    ).rejects.toMatchObject({
+      code: ProviderResourceAssociationDeliveryFailureCodes.RUNTIME_PLAN_AGENT_RUNTIME_NOT_FOUND,
+    });
+  });
+
+  it("fails explicitly when the associated sandbox has multiple association-delivery runtimes", async ({
+    env,
+  }) => {
+    const scope = await seedAssociationDeliveryScope({
+      env,
+      suffix: createSuffix("multiple_routes"),
+    });
+    await insertSandboxInstance(env, scope, {
+      includeSecondAssociatedResourceRuntime: true,
+    });
+
+    await expect(
+      resolveProviderResourceAssociationDeliveryTarget(createRouteResolverContext(env), {
+        providerResourceAssociationId: scope.providerResourceAssociationId,
+      }),
     ).rejects.toMatchObject({
       code: ProviderResourceAssociationDeliveryFailureCodes.RUNTIME_PLAN_AGENT_RUNTIME_NOT_FOUND,
     });
@@ -390,6 +431,16 @@ function createDataPlaneClient(env: IntegrationTestEnvironment) {
     testEnvironmentId: env.id,
     testEnvironmentIdHeader: TestEnvironmentIdHeader,
   });
+}
+
+function createRouteResolverContext(env: IntegrationTestEnvironment) {
+  const definitions = createDefinitionsBundle();
+  return {
+    agentRuntimeRegistry: definitions.agentRuntimeRegistry,
+    dataPlaneClient: createDataPlaneClient(env),
+    db: env.controlPlaneDb,
+    integrationRegistry: definitions.integrationRegistry,
+  };
 }
 
 async function seedAssociationDeliveryScope(input: {
@@ -516,6 +567,9 @@ async function insertSandboxInstance(
   env: IntegrationTestEnvironment,
   input: AssociationDeliveryScope,
   options: {
+    emptyCompiledCapabilities?: boolean;
+    includeSecondAssociatedResourceRuntime?: boolean;
+    omitCompiledCapabilities?: boolean;
     runtimeId?: "codex" | "opencode" | "pi" | "unsupported";
   } = {},
 ): Promise<void> {
@@ -536,6 +590,10 @@ async function insertSandboxInstance(
     sandboxInstanceId: input.sandboxInstanceId,
     revision: 1,
     compiledRuntimePlan: createRuntimePlan(input, {
+      emptyCompiledCapabilities: options.emptyCompiledCapabilities === true,
+      includeSecondAssociatedResourceRuntime:
+        options.includeSecondAssociatedResourceRuntime === true,
+      omitCompiledCapabilities: options.omitCompiledCapabilities === true,
       runtimeId: options.runtimeId ?? "codex",
     }),
     compiledFromProfileId: input.sandboxProfileId,
@@ -546,11 +604,73 @@ async function insertSandboxInstance(
 function createRuntimePlan(
   input: AssociationDeliveryScope,
   options: {
+    emptyCompiledCapabilities: boolean;
+    includeSecondAssociatedResourceRuntime: boolean;
+    omitCompiledCapabilities: boolean;
     runtimeId: "codex" | "opencode" | "pi" | "unsupported";
   },
 ) {
   const runtimeId = options.runtimeId;
   const command = runtimeId === "unsupported" ? "unsupported-runtime" : runtimeId;
+  const capabilities =
+    runtimeId === "unsupported" || options.omitCompiledCapabilities
+      ? undefined
+      : options.emptyCompiledCapabilities
+        ? {}
+        : {
+            associatedResourceDelivery: {
+              supported: true,
+            },
+          };
+  const agentRuntime = {
+    runtimeId,
+    runtimeKey: `${runtimeId}-app-server`,
+    clientId: `${runtimeId}-cli`,
+    endpointKey: "app-server",
+    ...(capabilities === undefined ? {} : { capabilities }),
+    ptyLaunch: {
+      runtimeId,
+      displayName: runtimeId,
+      newLaunch: {
+        ptySessionId: `${runtimeId}-cli`,
+        cols: 120,
+        rows: 32,
+        cwd: "/root/repo",
+        command,
+        args: [],
+      },
+      resumeLaunch: {
+        ptySessionId: `${runtimeId}-cli`,
+        cols: 120,
+        rows: 32,
+        cwd: "/root/repo",
+        command,
+        args: [],
+      },
+    },
+  };
+  const secondAgentRuntime = {
+    ...agentRuntime,
+    runtimeId: "opencode",
+    runtimeKey: "opencode-app-server",
+    clientId: "opencode-cli",
+    ptyLaunch: {
+      ...agentRuntime.ptyLaunch,
+      runtimeId: "opencode",
+      displayName: "opencode",
+      newLaunch: {
+        ...agentRuntime.ptyLaunch.newLaunch,
+        ptySessionId: "opencode-cli",
+        command: "opencode",
+      },
+      resumeLaunch: {
+        ...agentRuntime.ptyLaunch.resumeLaunch,
+        ptySessionId: "opencode-cli",
+        command: "opencode",
+      },
+    },
+  };
+
   return {
     sandboxProfileId: input.sandboxProfileId,
     version: 1,
@@ -563,33 +683,8 @@ function createRuntimePlan(
     runtimeClients: [],
     associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
     workspaceSources: [],
-    agentRuntimes: [
-      {
-        runtimeId,
-        runtimeKey: `${runtimeId}-app-server`,
-        clientId: `${runtimeId}-cli`,
-        endpointKey: "app-server",
-        ptyLaunch: {
-          runtimeId,
-          displayName: runtimeId,
-          newLaunch: {
-            ptySessionId: `${runtimeId}-cli`,
-            cols: 120,
-            rows: 32,
-            cwd: "/root/repo",
-            command,
-            args: [],
-          },
-          resumeLaunch: {
-            ptySessionId: `${runtimeId}-cli`,
-            cols: 120,
-            rows: 32,
-            cwd: "/root/repo",
-            command,
-            args: [],
-          },
-        },
-      },
-    ],
+    agentRuntimes: options.includeSecondAssociatedResourceRuntime
+      ? [agentRuntime, secondAgentRuntime]
+      : [agentRuntime],
   };
 }

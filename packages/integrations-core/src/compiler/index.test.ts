@@ -131,6 +131,11 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
     displayName: "Codex",
     logoKey: "openai",
     configSchema: z.object({}).strict(),
+    capabilities: {
+      associatedResourceDelivery: {
+        supported: true,
+      },
+    },
     createConversationProvider: () => NoopConversationProvider,
     materializeMcpConfig: () => [
       {
@@ -952,6 +957,11 @@ describe("compileRuntimePlan", () => {
         runtimeKey: "codex-app-server",
         clientId: "codex-cli",
         endpointKey: "app-server",
+        capabilities: {
+          associatedResourceDelivery: {
+            supported: true,
+          },
+        },
         ptyLaunch: {
           runtimeId: "codex",
           displayName: "Codex",

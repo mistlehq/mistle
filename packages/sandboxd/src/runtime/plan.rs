@@ -664,6 +664,33 @@ pub struct CompiledAgentRuntime {
     pub client_id: String,
     pub endpoint_key: String,
     pub pty_launch: serde_json::Value,
+    pub capabilities: Option<AgentRuntimeCapabilities>,
+}
+
+/// Capability metadata for one compiled first-class agent runtime.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AgentRuntimeCapabilities {
+    pub associated_resource_delivery: Option<AgentRuntimeAssociatedResourceDeliveryCapability>,
+}
+
+/// Capability marker for runtimes that can receive associated resource delivery.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AgentRuntimeAssociatedResourceDeliveryCapability {
+    #[serde(deserialize_with = "deserialize_true_bool")]
+    pub supported: bool,
+}
+
+fn deserialize_true_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = bool::deserialize(deserializer)?;
+    if !value {
+        return Err(serde::de::Error::custom("boolean value must be true"));
+    }
+    Ok(value)
 }
 
 /// Selected repository-backed skills to activate for the configured agent runtime.
@@ -768,6 +795,91 @@ mod tests {
             error
                 .to_string()
                 .contains("missing field `associatedResourceEventRouting`"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn decodes_agent_runtime_capabilities() {
+        let runtime_plan = serde_json::from_value::<CompiledRuntimePlan>(serde_json::json!({
+          "sandboxProfileId": "sbp_01k00000000000000000000000",
+          "version": 1,
+          "image": {
+            "source": "base",
+            "imageRef": "registry.example.test/base:latest"
+          },
+          "egressRoutes": [],
+          "artifacts": [],
+          "workspaceSources": [],
+          "runtimeClients": [],
+          "agentRuntimes": [
+            {
+              "runtimeId": "codex",
+              "runtimeKey": "codex",
+              "clientId": "client_codex",
+              "endpointKey": "endpoint_codex",
+              "ptyLaunch": {},
+              "capabilities": {
+                "associatedResourceDelivery": {
+                  "supported": true
+                }
+              }
+            }
+          ],
+          "associatedResourceEventRouting": {
+            "enabled": false,
+            "resources": []
+          }
+        }))
+        .expect("runtime plan decoder should accept agent runtime capabilities");
+
+        let capabilities = runtime_plan.agent_runtimes[0]
+            .capabilities
+            .as_ref()
+            .expect("agent runtime capabilities should be decoded");
+        let associated_resource_delivery = capabilities
+            .associated_resource_delivery
+            .as_ref()
+            .expect("associated resource delivery capability should be decoded");
+        assert!(associated_resource_delivery.supported);
+    }
+
+    #[test]
+    fn rejects_false_agent_runtime_capability_support() {
+        let error = serde_json::from_value::<CompiledRuntimePlan>(serde_json::json!({
+          "sandboxProfileId": "sbp_01k00000000000000000000000",
+          "version": 1,
+          "image": {
+            "source": "base",
+            "imageRef": "registry.example.test/base:latest"
+          },
+          "egressRoutes": [],
+          "artifacts": [],
+          "workspaceSources": [],
+          "runtimeClients": [],
+          "agentRuntimes": [
+            {
+              "runtimeId": "codex",
+              "runtimeKey": "codex",
+              "clientId": "client_codex",
+              "endpointKey": "endpoint_codex",
+              "ptyLaunch": {},
+              "capabilities": {
+                "associatedResourceDelivery": {
+                  "supported": false
+                }
+              }
+            }
+          ],
+          "associatedResourceEventRouting": {
+            "enabled": false,
+            "resources": []
+          }
+        }))
+        .expect_err("runtime plan decoder should reject false capability support");
+
+        assert!(
+            error.to_string().contains("boolean value must be true"),
             "unexpected error: {error}"
         );
     }

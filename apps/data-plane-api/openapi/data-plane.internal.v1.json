@@ -1491,6 +1491,23 @@
                               },
                               "required": ["runtimeId", "displayName", "newLaunch", "resumeLaunch"],
                               "additionalProperties": false
+                            },
+                            "capabilities": {
+                              "type": "object",
+                              "properties": {
+                                "associatedResourceDelivery": {
+                                  "type": "object",
+                                  "properties": {
+                                    "supported": {
+                                      "type": "boolean",
+                                      "enum": [true]
+                                    }
+                                  },
+                                  "required": ["supported"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "additionalProperties": false
                             }
                           },
                           "required": [
@@ -3928,6 +3945,23 @@
                                   "newLaunch",
                                   "resumeLaunch"
                                 ],
+                                "additionalProperties": false
+                              },
+                              "capabilities": {
+                                "type": "object",
+                                "properties": {
+                                  "associatedResourceDelivery": {
+                                    "type": "object",
+                                    "properties": {
+                                      "supported": {
+                                        "type": "boolean",
+                                        "enum": [true]
+                                      }
+                                    },
+                                    "required": ["supported"],
+                                    "additionalProperties": false
+                                  }
+                                },
                                 "additionalProperties": false
                               }
                             },

@@ -12,6 +12,11 @@ export const OpenCodeRuntimeDefinition: AgentRuntimeDefinition<typeof OpenCodeRu
     displayName: "OpenCode",
     logoKey: "opencode",
     configSchema: OpenCodeRuntimeConfigSchema,
+    capabilities: {
+      associatedResourceDelivery: {
+        supported: true,
+      },
+    },
     compileRuntime: compileOpenCodeRuntime,
     materializeMcpConfig: () => [
       {

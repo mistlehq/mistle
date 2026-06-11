@@ -1,7 +1,7 @@
 import type { z } from "zod";
 
 import type { AgentRuntimeRegistry } from "../agent-runtimes/index.js";
-import type { AgentPtyLaunchSpec } from "../agent-runtimes/types.js";
+import type { AgentPtyLaunchSpec, AgentRuntimeCapabilities } from "../agent-runtimes/types.js";
 import type { ConnectionCapabilitySet } from "../capabilities/index.js";
 import type { IntegrationMiddleware } from "../middleware/index.js";
 import type { IntegrationRegistry } from "../registry/index.js";
@@ -2050,6 +2050,7 @@ export type CompiledAgentRuntime = {
   clientId: string;
   endpointKey: string;
   ptyLaunch: AgentPtyLaunchSpec;
+  capabilities?: AgentRuntimeCapabilities;
 };
 
 type GitCloneWorkspaceSourceBase = {
