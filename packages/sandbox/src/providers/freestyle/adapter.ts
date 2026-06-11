@@ -4,6 +4,7 @@ import {
   SandboxResourceNotFoundError,
 } from "../../errors.js";
 import {
+  SandboxBaseImageSourceKinds,
   SandboxProvider,
   type SandboxAdapter,
   type SandboxCaptureSnapshotRequest,
@@ -13,18 +14,25 @@ import {
   type SandboxInspectRequest,
   type SandboxPrepareImageRequest,
   type SandboxResumeRequestV1,
+  type SandboxSdkImageReleaseSandboxdSource,
   type SandboxStartRequest,
   type SandboxStopRequest,
   type SandboxTransparentProxyConfiguration,
 } from "../../types.js";
 import { withSandboxProviderOperationTelemetry } from "../telemetry.js";
+import { createFreestyleBaseImageBuilder } from "./base-image-builder.js";
 import {
   FreestyleClientError,
   FreestyleClientErrorCodes,
   FreestyleClientOperationIds,
 } from "./client-errors.js";
 import type { FreestyleClient } from "./client.js";
-import { createFreestyleSnapshotImageHandle, parseFreestyleImageHandle } from "./image-handle.js";
+import {
+  createFreestyleSnapshotImageHandle,
+  parseFreestyleImageHandle,
+  resolveFreestyleStartImage,
+  type FreestyleStartImage,
+} from "./image-handle.js";
 import { createFreestyleTransparentProxyConfiguration } from "./transparent-proxy.js";
 import type { FreestyleSandboxInspectResult } from "./types.js";
 
@@ -49,10 +57,17 @@ function toSandboxNotFoundError(resourceId: string, error: unknown): SandboxReso
 export class FreestyleSandboxAdapter implements SandboxAdapter {
   readonly #client: FreestyleClient;
   readonly #idleTimeoutSeconds: number | undefined;
+  readonly #sandboxd: SandboxSdkImageReleaseSandboxdSource | undefined;
+  readonly #baseImagePreparationPromises = new Map<string, Promise<SandboxImageHandle>>();
 
-  constructor(input: { client: FreestyleClient; idleTimeoutSeconds?: number }) {
+  constructor(input: {
+    client: FreestyleClient;
+    idleTimeoutSeconds?: number;
+    sandboxd?: SandboxSdkImageReleaseSandboxdSource;
+  }) {
     this.#client = input.client;
     this.#idleTimeoutSeconds = input.idleTimeoutSeconds;
+    this.#sandboxd = input.sandboxd;
   }
 
   getTransparentProxyConfiguration(): SandboxTransparentProxyConfiguration {
@@ -60,8 +75,11 @@ export class FreestyleSandboxAdapter implements SandboxAdapter {
   }
 
   async prepareImage(request: SandboxPrepareImageRequest): Promise<SandboxImageHandle> {
-    const image = parseFreestyleImageHandle(request.image);
-    const response = await this.#client.prepareImage({ snapshotId: image.snapshotId });
+    const image = resolveFreestyleStartImage(request.image);
+    const snapshotImage =
+      image.kind === "base_image" ? await this.#prepareBaseImage(image) : request.image;
+    const snapshot = parseFreestyleImageHandle(snapshotImage);
+    const response = await this.#client.prepareImage({ snapshotId: snapshot.snapshotId });
     return createFreestyleSnapshotImageHandle(response.snapshotId);
   }
 
@@ -133,6 +151,38 @@ export class FreestyleSandboxAdapter implements SandboxAdapter {
     }
   }
 
+  async #prepareBaseImage(image: Extract<FreestyleStartImage, { kind: "base_image" }>) {
+    const existingPromise = this.#baseImagePreparationPromises.get(image.snapshotName);
+    if (existingPromise !== undefined) {
+      return existingPromise;
+    }
+
+    const preparationPromise = this.#createBaseImage(image);
+    this.#baseImagePreparationPromises.set(image.snapshotName, preparationPromise);
+
+    try {
+      return await preparationPromise;
+    } catch (error) {
+      this.#baseImagePreparationPromises.delete(image.snapshotName);
+      throw error;
+    }
+  }
+
+  async #createBaseImage(
+    image: Extract<FreestyleStartImage, { kind: "base_image" }>,
+  ): Promise<SandboxImageHandle> {
+    const baseImageBuilder = createFreestyleBaseImageBuilder({ client: this.#client });
+    return baseImageBuilder.ensureBaseImage({
+      source: {
+        kind: SandboxBaseImageSourceKinds.SDK_IMAGE,
+        baseImageRef: image.sourceBaseImageRef,
+        contextPath: process.cwd(),
+        imageId: image.snapshotName,
+        ...(this.#sandboxd === undefined ? {} : { sandboxd: this.#sandboxd }),
+      },
+    });
+  }
+
   async stop(request: SandboxStopRequest): Promise<void> {
     requireSandboxId(request.id);
 
@@ -163,6 +213,7 @@ export class FreestyleSandboxAdapter implements SandboxAdapter {
 export function createFreestyleSandboxAdapter(input: {
   client: FreestyleClient;
   idleTimeoutSeconds?: number;
+  sandboxd?: SandboxSdkImageReleaseSandboxdSource;
 }): FreestyleSandboxAdapter {
   if (input.client === undefined) {
     throw new SandboxProviderNotImplementedError(

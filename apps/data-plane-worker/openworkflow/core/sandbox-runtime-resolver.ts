@@ -218,8 +218,22 @@ export function createSandboxRuntimeProviderResolver(input: {
         throw new Error("Control-plane returned non-Freestyle credentials for Freestyle runtime.");
       }
 
+      const needsRuntimeImageArtifacts = options.includeImagePreparationArtifacts;
+      const sandboxdArtifact =
+        needsRuntimeImageArtifacts && input.sandboxdArtifactResolver !== undefined
+          ? await input.sandboxdArtifactResolver.resolve()
+          : undefined;
+
       return createFreestyleSandboxRuntime({
         credentials,
+        ...(sandboxdArtifact === undefined
+          ? {}
+          : {
+              sandboxd: {
+                kind: SandboxSdkImageSandboxdSourceKinds.RELEASE,
+                artifact: sandboxdArtifact,
+              },
+            }),
       });
     }
 
@@ -314,6 +328,7 @@ function createTensorlakeSandboxRuntime(input: {
 
 function createFreestyleSandboxRuntime(input: {
   credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "freestyle" }>;
+  sandboxd?: SandboxSdkImageReleaseSandboxdSource;
 }): ResolvedSandboxRuntime {
   const providerConfig = createFreestyleSandboxProviderConfig(input);
 
@@ -326,12 +341,14 @@ function createFreestyleSandboxRuntime(input: {
 
 export function createFreestyleSandboxProviderConfig(input: {
   credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "freestyle" }>;
+  sandboxd?: SandboxSdkImageReleaseSandboxdSource;
 }): CreateSandboxAdapterInput {
   return {
     provider: SandboxProvider.FREESTYLE,
     freestyle: {
       apiKey: input.credentials.apiKey,
       ...(input.credentials.baseUrl === undefined ? {} : { baseUrl: input.credentials.baseUrl }),
+      ...(input.sandboxd === undefined ? {} : { sandboxd: input.sandboxd }),
     },
   };
 }

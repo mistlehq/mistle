@@ -31,4 +31,27 @@ describe("validateFreestyleSandboxConfig", () => {
       }),
     ).toThrow("Invalid URL");
   });
+
+  it("accepts a release sandboxd artifact source for base image preparation", () => {
+    expect(
+      validateFreestyleSandboxConfig({
+        apiKey: "test-api-key",
+        sandboxd: {
+          kind: "release",
+          artifact: {
+            version: "1.2.3",
+            url: "https://github.com/mistlehq/mistle/releases/download/v1.2.3/sandboxd-x86_64-unknown-linux-gnu.tar.gz",
+            sha256: "a".repeat(64),
+          },
+        },
+      }),
+    ).toMatchObject({
+      sandboxd: {
+        kind: "release",
+        artifact: {
+          version: "1.2.3",
+        },
+      },
+    });
+  });
 });
