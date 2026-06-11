@@ -97,7 +97,7 @@ describe("observeGitHubRoutableResourceFromEgressResponse", () => {
           data: {
             createPullRequest: {
               pullRequest: {
-                id: "PR_kwDORPPBa87kpaOR",
+                id: "PR_kwDORPPBy87kpaOR",
                 url: "https://github.com/mistlehq/mistle.dev/pull/20",
               },
             },
