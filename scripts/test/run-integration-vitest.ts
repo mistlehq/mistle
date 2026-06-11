@@ -69,16 +69,31 @@ type IntegrationTimingSummaryRow = {
   status: string;
 };
 
+type VitestJsonAssertionResult = {
+  title?: string;
+  fullName?: string;
+  ancestorTitles?: string[];
+  status?: string;
+  durationMs?: number;
+};
+
 type VitestJsonResult = {
   name?: string;
   status?: string;
   startTime?: number;
   endTime?: number;
-  assertionResults?: unknown[];
+  assertionResults?: VitestJsonAssertionResult[];
 };
 
 type VitestJsonReport = {
   testResults?: VitestJsonResult[];
+};
+
+type IntegrationTimingTestCaseRow = {
+  file: string;
+  testName: string;
+  durationMs: number;
+  status: string;
 };
 
 const IntegrationVitestProjects = [
@@ -345,6 +360,13 @@ function readNumberProperty(input: object, key: string): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+function readStringArrayProperty(input: object, key: string): string[] | undefined {
+  const value = Reflect.get(input, key);
+  return Array.isArray(value) && value.every((item) => typeof item === "string")
+    ? value
+    : undefined;
+}
+
 function parseIntegrationTimingFileRecord(input: unknown): IntegrationTimingFileRecord | undefined {
   if (typeof input !== "object" || input === null) {
     return undefined;
@@ -390,6 +412,47 @@ function parseIntegrationTimingFileRecord(input: unknown): IntegrationTimingFile
   };
 }
 
+function parseVitestJsonAssertionResult(input: unknown): VitestJsonAssertionResult | undefined {
+  if (typeof input !== "object" || input === null) {
+    return undefined;
+  }
+
+  const title = readStringProperty(input, "title");
+  const fullName = readStringProperty(input, "fullName");
+  const ancestorTitles = readStringArrayProperty(input, "ancestorTitles");
+  const status = readStringProperty(input, "status");
+  const durationMs = readNumberProperty(input, "duration");
+
+  if (
+    title === undefined &&
+    fullName === undefined &&
+    ancestorTitles === undefined &&
+    status === undefined &&
+    durationMs === undefined
+  ) {
+    return undefined;
+  }
+
+  const result: VitestJsonAssertionResult = {};
+  if (title !== undefined) {
+    result.title = title;
+  }
+  if (fullName !== undefined) {
+    result.fullName = fullName;
+  }
+  if (ancestorTitles !== undefined) {
+    result.ancestorTitles = ancestorTitles;
+  }
+  if (status !== undefined) {
+    result.status = status;
+  }
+  if (durationMs !== undefined) {
+    result.durationMs = durationMs;
+  }
+
+  return result;
+}
+
 function parseVitestJsonResult(input: unknown): VitestJsonResult | undefined {
   if (typeof input !== "object" || input === null) {
     return undefined;
@@ -415,7 +478,9 @@ function parseVitestJsonResult(input: unknown): VitestJsonResult | undefined {
     result.endTime = endTime;
   }
   if (Array.isArray(assertionResults)) {
-    result.assertionResults = assertionResults;
+    result.assertionResults = assertionResults
+      .map((assertionResult) => parseVitestJsonAssertionResult(assertionResult))
+      .filter((assertionResult) => assertionResult !== undefined);
   }
 
   return result;
@@ -552,6 +617,34 @@ function summarizeIntegrationTiming(input: {
   return [...rows.values()];
 }
 
+function summarizeIntegrationTestCaseTiming(input: {
+  vitestResults: ReadonlyMap<string, VitestJsonResult>;
+}): IntegrationTimingTestCaseRow[] {
+  const rows: IntegrationTimingTestCaseRow[] = [];
+
+  for (const [file, result] of input.vitestResults.entries()) {
+    for (const assertionResult of result.assertionResults ?? []) {
+      if (assertionResult.durationMs === undefined) {
+        continue;
+      }
+
+      const testName =
+        assertionResult.fullName ??
+        [...(assertionResult.ancestorTitles ?? []), assertionResult.title ?? "(unnamed test)"].join(
+          " > ",
+        );
+      rows.push({
+        file,
+        testName,
+        durationMs: assertionResult.durationMs,
+        status: assertionResult.status ?? result.status ?? "unknown",
+      });
+    }
+  }
+
+  return rows;
+}
+
 function truncateMiddle(value: string, width: number): string {
   if (value.length <= width) {
     return value.padEnd(width);
@@ -606,6 +699,26 @@ function writeTimingTable(input: {
   }
 }
 
+function writeTestCaseTimingTable(rows: ReadonlyArray<IntegrationTimingTestCaseRow>): void {
+  const sortedRows = [...rows].sort((left, right) => right.durationMs - left.durationMs);
+  if (sortedRows.length === 0) {
+    return;
+  }
+
+  console.info("\n[integration] slowest integration test cases by wall time");
+  console.info(["file".padEnd(58), "duration".padStart(8), "status".padEnd(7), "test"].join("  "));
+  for (const row of sortedRows.slice(0, 15)) {
+    console.info(
+      [
+        truncateMiddle(row.file, 58),
+        formatDuration(row.durationMs).padStart(8),
+        row.status.padEnd(7),
+        truncateMiddle(row.testName, 100),
+      ].join("  "),
+    );
+  }
+}
+
 async function writeIntegrationTimingSummary(input: {
   eventsFile: string | undefined;
   vitestJsonFile: string | undefined;
@@ -626,8 +739,13 @@ async function writeIntegrationTimingSummary(input: {
     rows,
     sortBy: "totalMs",
   });
+  writeTestCaseTimingTable(
+    summarizeIntegrationTestCaseTiming({
+      vitestResults,
+    }),
+  );
   writeTimingTable({
-    title: "largest integration test body targets",
+    title: "largest aggregate integration body targets",
     rows,
     sortBy: "bodyMs",
   });
