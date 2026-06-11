@@ -11,6 +11,7 @@ import {
   createInitialProviderAppSetupDraft,
   hasProviderAppSetupDraftValues,
   isProviderAppRequiredDraftComplete,
+  updateGitHubProviderAppManifestForSetupStartFormValue,
 } from "./integration-connection-provider-app-setup-model.js";
 
 const ProviderAppSetup = {
@@ -306,6 +307,69 @@ describe("provider app setup model", () => {
       },
       ownerKind: "personal",
     });
+  });
+
+  it("updates GitHub manifest organization permissions when the owner kind changes", () => {
+    const manifestValue = JSON.stringify(
+      {
+        name: "Mistle GitHub App",
+        default_permissions: {
+          checks: "write",
+          contents: "write",
+          members: "read",
+          metadata: "read",
+          organization_administration: "read",
+          pull_requests: "write",
+        },
+        custom_setting: "kept",
+      },
+      null,
+      2,
+    );
+
+    const personalManifest = updateGitHubProviderAppManifestForSetupStartFormValue({
+      fieldName: "ownerKind",
+      manifestValue,
+      value: "personal",
+    });
+    expect(JSON.parse(personalManifest)).toEqual({
+      name: "Mistle GitHub App",
+      default_permissions: {
+        checks: "write",
+        contents: "write",
+        metadata: "read",
+        pull_requests: "write",
+      },
+      custom_setting: "kept",
+    });
+
+    const organizationManifest = updateGitHubProviderAppManifestForSetupStartFormValue({
+      fieldName: "ownerKind",
+      manifestValue: personalManifest,
+      value: "organization",
+    });
+    expect(JSON.parse(organizationManifest)).toEqual({
+      name: "Mistle GitHub App",
+      default_permissions: {
+        checks: "write",
+        contents: "write",
+        metadata: "read",
+        pull_requests: "write",
+        members: "read",
+        organization_administration: "read",
+      },
+      custom_setting: "kept",
+    });
+  });
+
+  it("leaves an invalid GitHub manifest draft unchanged when the owner kind changes", () => {
+    expect(
+      updateGitHubProviderAppManifestForSetupStartFormValue({
+        fieldName: "ownerKind",
+        manifestValue: "{",
+        value: "personal",
+      }),
+    ).toBe("{");
   });
 
   it("builds stable existing app field inputs for the generic pane", () => {

@@ -736,11 +736,6 @@ describe.concurrent("control-plane worker integration webhook event handling", (
         connectionId: scope.connectionId,
         kind: "repository",
       },
-      {
-        organizationId: scope.organizationId,
-        connectionId: scope.connectionId,
-        kind: "team",
-      },
     ]);
 
     const retriedPreparedEvent = await prepareIntegrationWebhookEvent(
@@ -780,13 +775,6 @@ describe.concurrent("control-plane worker integration webhook event handling", (
           connectionId: scope.connectionId,
           familyId: "github",
           kind: "repository",
-          syncState: IntegrationConnectionResourceSyncStates.SYNCING,
-          lastSyncStartedAt: webhookEvent.sourceOccurredAt,
-        },
-        {
-          connectionId: scope.connectionId,
-          familyId: "github",
-          kind: "team",
           syncState: IntegrationConnectionResourceSyncStates.SYNCING,
           lastSyncStartedAt: webhookEvent.sourceOccurredAt,
         },

@@ -49,6 +49,22 @@ const GitHubTeamSchema = z.looseObject({
     .optional(),
 });
 
+const GitHubOrganizationInstallationSchema = z.looseObject({
+  id: z.union([z.string().min(1), z.number().int()]),
+  app_id: z.union([z.string().min(1), z.number().int()]),
+  app_slug: z.string().min(1),
+  account: z
+    .looseObject({
+      login: z.string().min(1),
+      type: z.string().min(1).optional(),
+    })
+    .optional(),
+});
+
+const GitHubOrganizationInstallationsResponseSchema = z.looseObject({
+  installations: z.array(GitHubOrganizationInstallationSchema),
+});
+
 const GitHubInstallationRepositoriesResponseSchema = z.looseObject({
   repositories: z.array(GitHubRepositorySchema),
 });
@@ -59,6 +75,7 @@ type GitHubRepository = z.output<typeof GitHubRepositorySchema>;
 type GitHubBranch = z.output<typeof GitHubBranchSchema>;
 type GitHubContributor = z.output<typeof GitHubContributorSchema>;
 type GitHubTeam = z.output<typeof GitHubTeamSchema>;
+type GitHubOrganizationInstallation = z.output<typeof GitHubOrganizationInstallationSchema>;
 
 type GitHubListConnectionResourcesInput = ListConnectionResourcesInput<
   GitHubTargetConfig,
@@ -70,6 +87,7 @@ const GitHubRepositoryKind = "repository";
 const GitHubBranchKind = "branch";
 const GitHubUserKind = "user";
 const GitHubTeamKind = "team";
+const GitHubBotKind = "bot";
 const GitHubPageSize = 100;
 
 function createGitHubOctokit(input: { apiBaseUrl: string; token: string }): Octokit {
@@ -140,6 +158,26 @@ function toTeamResource(input: {
       organizationLogins: [input.organizationLogin],
       name: input.team.name,
       slug: input.team.slug,
+    },
+  };
+}
+
+function toBotResource(input: {
+  installation: GitHubOrganizationInstallation;
+  organizationLogin: string;
+}): DiscoveredIntegrationResource {
+  const appId = input.installation.app_id.toString();
+  const handle = `${input.installation.app_slug}[bot]`;
+
+  return {
+    externalId: appId,
+    handle,
+    displayName: handle,
+    metadata: {
+      appId,
+      appSlug: input.installation.app_slug,
+      installationIds: [input.installation.id.toString()],
+      organizationLogins: [input.organizationLogin],
     },
   };
 }
@@ -311,6 +349,32 @@ async function listGitHubOrganizationTeams(input: {
   }
 }
 
+async function listGitHubOrganizationInstallations(input: {
+  apiBaseUrl: string;
+  token: string;
+  organizationLogin: string;
+}): Promise<ReadonlyArray<GitHubOrganizationInstallation>> {
+  const octokit = createGitHubOctokit({
+    apiBaseUrl: input.apiBaseUrl,
+    token: input.token,
+  });
+
+  const installations: GitHubOrganizationInstallation[] = [];
+  for (let page = 1; ; page += 1) {
+    const response = await octokit.request("GET /orgs/{org}/installations", {
+      org: input.organizationLogin,
+      per_page: GitHubPageSize,
+      page,
+    });
+    const parsedResponse = GitHubOrganizationInstallationsResponseSchema.parse(response.data);
+    installations.push(...parsedResponse.installations);
+
+    if (parsedResponse.installations.length < GitHubPageSize) {
+      return installations;
+    }
+  }
+}
+
 async function mapRepositoriesWithConcurrency<T>(input: {
   repositories: readonly GitHubRepository[];
   concurrency: number;
@@ -395,6 +459,52 @@ function dedupeTeamResourcesByHandle(
 
   return Array.from(resourcesByHandle.values()).sort((left, right) =>
     left.displayName.localeCompare(right.displayName),
+  );
+}
+
+function dedupeBotResourcesByExternalId(
+  resources: readonly DiscoveredIntegrationResource[],
+): DiscoveredIntegrationResource[] {
+  const resourcesByExternalId = new Map<string, DiscoveredIntegrationResource>();
+
+  for (const resource of resources) {
+    if (resource.externalId === undefined) {
+      throw new Error(`GitHub bot resource '${resource.handle}' is missing an external id.`);
+    }
+
+    const existingResource = resourcesByExternalId.get(resource.externalId);
+    if (existingResource === undefined) {
+      resourcesByExternalId.set(resource.externalId, resource);
+      continue;
+    }
+
+    const organizationLogins = mergeSortedStringArrayMetadata(
+      existingResource.metadata["organizationLogins"],
+      resource.metadata["organizationLogins"],
+    );
+    const installationIds = mergeSortedStringArrayMetadata(
+      existingResource.metadata["installationIds"],
+      resource.metadata["installationIds"],
+    );
+
+    resourcesByExternalId.set(resource.externalId, {
+      ...existingResource,
+      metadata: {
+        ...existingResource.metadata,
+        organizationLogins,
+        installationIds,
+      },
+    });
+  }
+
+  return Array.from(resourcesByExternalId.values()).sort((left, right) =>
+    left.displayName.localeCompare(right.displayName),
+  );
+}
+
+function mergeSortedStringArrayMetadata(left: unknown, right: unknown): string[] {
+  return [...new Set([...parseStringArrayMetadata(left), ...parseStringArrayMetadata(right)])].sort(
+    (leftItem, rightItem) => leftItem.localeCompare(rightItem),
   );
 }
 
@@ -502,6 +612,34 @@ async function listGitHubTeams(input: {
   return dedupeTeamResourcesByHandle(teamResources);
 }
 
+async function listGitHubBots(input: {
+  apiBaseUrl: string;
+  credential: string;
+  repositories: readonly GitHubRepository[];
+}): Promise<ReadonlyArray<DiscoveredIntegrationResource>> {
+  const organizationLogins = listGitHubOrganizationLogins(input.repositories);
+  const botResources: DiscoveredIntegrationResource[] = [];
+
+  for (const organizationLogin of organizationLogins) {
+    const installations = await listGitHubOrganizationInstallations({
+      apiBaseUrl: input.apiBaseUrl,
+      token: input.credential,
+      organizationLogin,
+    });
+
+    botResources.push(
+      ...installations.map((installation) =>
+        toBotResource({
+          installation,
+          organizationLogin,
+        }),
+      ),
+    );
+  }
+
+  return dedupeBotResourcesByExternalId(botResources);
+}
+
 export async function listGitHubConnectionResources(
   input: GitHubListConnectionResourcesInput,
 ): Promise<ListConnectionResourcesResult> {
@@ -551,6 +689,16 @@ export async function listGitHubConnectionResources(
   if (input.kind === GitHubTeamKind) {
     return {
       resources: await listGitHubTeams({
+        apiBaseUrl: input.target.config.apiBaseUrl,
+        credential: input.credential.value,
+        repositories,
+      }),
+    };
+  }
+
+  if (input.kind === GitHubBotKind) {
+    return {
+      resources: await listGitHubBots({
         apiBaseUrl: input.target.config.apiBaseUrl,
         credential: input.credential.value,
         repositories,

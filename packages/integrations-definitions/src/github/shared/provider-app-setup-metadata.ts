@@ -138,6 +138,7 @@ export const GitHubProviderAppSetupStartForm = {
       label: "Which account should the app be created in?",
       inputType: "radio",
       required: true,
+      defaultValue: "organization",
       options: [
         {
           label: "Personal account",

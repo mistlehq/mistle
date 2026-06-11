@@ -249,7 +249,7 @@ function createInitialSetupStartFormValues(
   const values: Record<string, string> = {};
 
   for (const field of form.fields) {
-    values[field.name] = "";
+    values[field.name] = field.defaultValue ?? "";
   }
 
   return values;

@@ -59,6 +59,11 @@ export class GitHubAppManifestConversionMissingClientSecretError extends Error {
   }
 }
 
+export const GitHubOrganizationOnlyAppManifestPermissions = {
+  members: "read",
+  organization_administration: "read",
+} satisfies Record<string, string>;
+
 export const GitHubAppManifestTemplate = {
   name: "Mistle GitHub App",
   url: "https://github.com/mistlehq/mistle",
@@ -85,9 +90,9 @@ export const GitHubAppManifestTemplate = {
     contents: "write",
     emails: "read",
     issues: "write",
-    members: "read",
     metadata: "read",
     pull_requests: "write",
+    ...GitHubOrganizationOnlyAppManifestPermissions,
   },
   request_oauth_on_install: false,
   setup_on_update: true,

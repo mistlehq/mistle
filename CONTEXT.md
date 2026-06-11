@@ -120,6 +120,14 @@ _Avoid_: Exclusion when the rule is one match mode among several
 A GitHub team selected as the requested review target for a provider pull request review-request **Trigger event**.
 _Avoid_: GitHub team identity, organization-qualified team
 
+**GitHub App bot review target**:
+A GitHub App bot selected as the requested review target for a provider pull request review-request **Trigger event**.
+_Avoid_: GitHub App, bot user, service account
+
+**Provider app manifest**:
+A user-visible provider app configuration document that Mistle prepares for creating an integration app in the external provider.
+_Avoid_: Hidden app config, generated permissions
+
 **Trigger conversation**:
 A Mistle-owned **Conversation** created or reused while handling a **Trigger** run.
 _Avoid_: Automation conversation
