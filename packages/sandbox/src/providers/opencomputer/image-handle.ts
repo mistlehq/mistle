@@ -12,6 +12,7 @@ import {
   OpenComputerImageManifestSchema,
   type OpenComputerImageManifest,
   type OpenComputerStartImage,
+  type ValidatedOpenComputerSandboxConfig,
 } from "./schemas.js";
 
 const OpenComputerBaseImageNamePrefix = "mistle";
@@ -78,7 +79,12 @@ export function parseOpenComputerImageHandle(handle: SandboxImageHandle): OpenCo
   throw new SandboxConfigurationError(`Unsupported OpenComputer image handle kind "${kind}".`);
 }
 
-export function resolveOpenComputerStartImage(handle: SandboxImageHandle): OpenComputerStartImage {
+export function resolveOpenComputerStartImage(
+  handle: SandboxImageHandle,
+  input?: {
+    readonly sandboxd?: ValidatedOpenComputerSandboxConfig["sandboxd"];
+  },
+): OpenComputerStartImage {
   if (handle.provider !== SandboxProvider.OPENCOMPUTER) {
     throw new SandboxConfigurationError(
       `Expected OpenComputer image handle, received provider '${handle.provider}'.`,
@@ -92,6 +98,7 @@ export function resolveOpenComputerStartImage(handle: SandboxImageHandle): OpenC
   if (isOciImageRef(handle.imageId)) {
     const image = createOpenComputerBaseImage({
       source: { kind: "image", imageId: handle.imageId },
+      ...(input?.sandboxd === undefined ? {} : { sandboxd: input.sandboxd }),
     });
     const manifest = createOpenComputerImageManifest(image);
     return {

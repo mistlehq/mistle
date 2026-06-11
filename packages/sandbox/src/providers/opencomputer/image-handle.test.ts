@@ -126,6 +126,34 @@ describe("OpenComputer image handles", () => {
     );
   });
 
+  it("adds configured sandboxd release artifacts to OCI base image manifests", () => {
+    const baseImageRef = "ghcr.io/mistlehq/sandbox-base:latest";
+    const startImage = resolveOpenComputerStartImage(
+      {
+        provider: SandboxProvider.OPENCOMPUTER,
+        imageId: baseImageRef,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        sandboxd: {
+          kind: "release",
+          artifact: {
+            version: "0.32.0",
+            url: "https://example.com/sandboxd.tar.gz",
+            sha256: "a".repeat(64),
+          },
+        },
+      },
+    );
+
+    expect(startImage.kind).toBe("image");
+    if (startImage.kind !== "image") {
+      throw new Error("Expected OpenComputer deferred image.");
+    }
+    expect(JSON.stringify(startImage.manifest)).toContain("/opt/mistle/bin/sandboxd");
+    expect(JSON.stringify(startImage.manifest)).toContain("https://example.com/sandboxd.tar.gz");
+  });
+
   it("rejects deferred image handles that do not carry the source manifest", () => {
     expect(() =>
       parseOpenComputerImageHandle({

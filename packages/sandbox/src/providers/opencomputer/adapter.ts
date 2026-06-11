@@ -29,6 +29,7 @@ import {
   createOpenComputerSnapshotImageHandle,
   resolveOpenComputerStartImage,
 } from "./image-handle.js";
+import type { ValidatedOpenComputerSandboxConfig } from "./schemas.js";
 import { createOpenComputerTransparentProxyConfiguration } from "./transparent-proxy.js";
 import type { OpenComputerSandboxInspectResult } from "./types.js";
 
@@ -59,9 +60,14 @@ function isOpenComputerNotFound(error: unknown): boolean {
 
 export class OpenComputerSandboxAdapter implements SandboxAdapter {
   readonly #client: OpenComputerClient;
+  readonly #sandboxd: ValidatedOpenComputerSandboxConfig["sandboxd"] | undefined;
 
-  constructor(client: OpenComputerClient) {
-    this.#client = client;
+  constructor(input: {
+    client: OpenComputerClient;
+    sandboxd?: ValidatedOpenComputerSandboxConfig["sandboxd"];
+  }) {
+    this.#client = input.client;
+    this.#sandboxd = input.sandboxd;
   }
 
   getTransparentProxyConfiguration(): SandboxTransparentProxyConfiguration {
@@ -69,7 +75,7 @@ export class OpenComputerSandboxAdapter implements SandboxAdapter {
   }
 
   async prepareImage(request: SandboxPrepareImageRequest): Promise<SandboxImageHandle> {
-    const image = resolveOpenComputerStartImage(request.image);
+    const image = resolveOpenComputerStartImage(request.image, { sandboxd: this.#sandboxd });
     try {
       const response = await this.#client.prepareImage({ image });
       if (response.image.kind === "snapshot") {
@@ -89,7 +95,7 @@ export class OpenComputerSandboxAdapter implements SandboxAdapter {
   }
 
   async start(request: SandboxStartRequest): Promise<SandboxHandle> {
-    const image = resolveOpenComputerStartImage(request.image);
+    const image = resolveOpenComputerStartImage(request.image, { sandboxd: this.#sandboxd });
     const response = await this.#client.startSandbox({
       ...(request.sandboxInstanceId === undefined
         ? {}
@@ -182,11 +188,15 @@ export class OpenComputerSandboxAdapter implements SandboxAdapter {
 
 export function createOpenComputerSandboxAdapter(input: {
   client: OpenComputerClient;
+  sandboxd?: ValidatedOpenComputerSandboxConfig["sandboxd"];
 }): OpenComputerSandboxAdapter {
   if (input.client === undefined) {
     throw new SandboxProviderNotImplementedError(
       "OpenComputer client is required to construct adapter.",
     );
   }
-  return new OpenComputerSandboxAdapter(input.client);
+  return new OpenComputerSandboxAdapter({
+    client: input.client,
+    ...(input.sandboxd === undefined ? {} : { sandboxd: input.sandboxd }),
+  });
 }

@@ -33,6 +33,7 @@ export function createOpenComputerAdapter(
   const validatedConfig = validateOpenComputerSandboxConfig(config);
   return createOpenComputerSandboxAdapter({
     client: new OpenComputerApiClient({ config: validatedConfig }),
+    ...(validatedConfig.sandboxd === undefined ? {} : { sandboxd: validatedConfig.sandboxd }),
   });
 }
 
