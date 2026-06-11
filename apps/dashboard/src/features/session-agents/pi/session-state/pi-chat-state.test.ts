@@ -108,6 +108,66 @@ describe("reducePiChatState", () => {
     expect(completedState.pendingTurnId).toBeNull();
   });
 
+  it("renders runtime-reported Pi user messages without local prompt submission", () => {
+    const hydratedState = reducePiChatState(createInitialPiChatState(), {
+      type: "hydrate_messages",
+      sessionFile: "/root/.pi/agent/sessions/session.jsonl",
+      messages: [],
+    });
+
+    const userMessageReceived = reducePiChatState(hydratedState, {
+      type: "event_received",
+      event: {
+        type: "message_end",
+        message: {
+          role: "user",
+          content: "Review the pull request",
+          timestamp: 1,
+        },
+      },
+    });
+    const completedState = reducePiChatState(userMessageReceived, {
+      type: "event_received",
+      event: {
+        type: "agent_end",
+        messages: [
+          {
+            role: "user",
+            content: "Review the pull request",
+            timestamp: 1,
+          },
+          {
+            role: "assistant",
+            content: [{ type: "text", text: "I will review it." }],
+            timestamp: 2,
+          },
+        ],
+      },
+    });
+
+    expect(completedState.messages).toEqual([
+      {
+        role: "user",
+        content: "Review the pull request",
+        timestamp: 1,
+      },
+      {
+        role: "assistant",
+        content: [{ type: "text", text: "I will review it." }],
+        timestamp: 2,
+      },
+    ]);
+    expect(completedState.entries).toContainEqual({
+      id: "pi:user:1:0",
+      kind: "user-message",
+      text: "Review the pull request",
+      turnId: "pi:user:1:0",
+      status: "completed",
+    });
+    expect(completedState.status).toBe("idle");
+    expect(completedState.pendingTurnId).toBeNull();
+  });
+
   it("projects live Pi tool execution events into chat semantic groups", () => {
     const submittedState = reducePiChatState(createInitialPiChatState(), {
       type: "prompt_submitted",
