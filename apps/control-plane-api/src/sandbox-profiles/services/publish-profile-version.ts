@@ -12,6 +12,7 @@ import { findNextScheduleOccurrence } from "@mistle/time";
 import { and, eq, sql } from "drizzle-orm";
 import { typeid } from "typeid-js";
 
+import { tryAdvanceTriggerTargetsToPublishedProfileVersion } from "../../internal/sandbox-profile-version-snapshot-jobs/services/mark-sandbox-profile-version-snapshot-job-succeeded.js";
 import {
   SandboxProfilesConflictCodes,
   SandboxProfilesConflictError,
@@ -545,6 +546,16 @@ export async function publishProfileVersion(
           updatedAt: sql`now()`,
         })
         .where(eq(tables.sandboxProfiles.id, input.profileId));
+      await tryAdvanceTriggerTargetsToPublishedProfileVersion(
+        {
+          db: tx,
+        },
+        {
+          source: "publish-reuse",
+          sandboxProfileId: input.profileId,
+          sandboxProfileVersion: input.profileVersion,
+        },
+      );
     }
 
     const refreshSchedulesByVersion = await loadActiveRefreshSchedulesByVersion({
