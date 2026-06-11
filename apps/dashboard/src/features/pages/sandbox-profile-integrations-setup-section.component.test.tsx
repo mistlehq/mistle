@@ -1,12 +1,19 @@
 // @vitest-environment jsdom
 
+import {
+  AssociatedProviderResourceKinds,
+  AssociatedResourceEventTypes,
+} from "@mistle/integrations-core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { type ComponentProps, useState } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type {
+  SandboxIntegrationBindingKind,
+  SandboxProfileVersion,
+} from "../sandbox-profiles/sandbox-profiles-types.js";
 import {
   StoryAnthropicConnection,
   StoryAnthropicTarget,
@@ -21,6 +28,7 @@ import {
   StoryOpenAiTarget,
   StorySlackConnection,
 } from "./integrations-editor-section-story-support.js";
+import type { SandboxProfileAssociatedResourceRoutingDraftState } from "./sandbox-profile-associated-resource-routing-section.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -130,6 +138,137 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     expect(runtime.getByText("Primary OpenAI Workspace")).toBeDefined();
     expect(runtime.getByText("GitHub - GitHub Production")).toBeDefined();
     expect(runtime.getByText("Jira Production")).toBeDefined();
+  });
+
+  it("keeps saved pull request activity routing visible after the GitHub git connection is removed", () => {
+    const draftStates: SandboxProfileAssociatedResourceRoutingDraftState[] = [];
+
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          associatedResourceRouting: {
+            hasUnpersistedChanges: false,
+            isDraft: true,
+            onDraftStateChange: (state) => {
+              draftStates.push(state);
+            },
+            version: createTestSandboxProfileVersion({
+              associatedResourceEventRoutingConfig: {
+                enabled: true,
+                resources: [
+                  {
+                    resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+                    eventTypes: [
+                      AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+                    ],
+                  },
+                ],
+              },
+            }),
+          },
+          integrationRows: [],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("switch", { name: "Agent PR activity" }));
+
+    const latestDraftState = draftStates.at(-1);
+    if (latestDraftState === undefined || latestDraftState.buildDraftChanges === undefined) {
+      throw new Error("Expected associated resource routing draft state.");
+    }
+
+    expect(latestDraftState.buildDraftChanges()).toEqual({
+      enabled: false,
+      resources: [],
+    });
+  });
+
+  it("keeps dirty pull request activity edits visible after the GitHub git connection is removed and the section remounts", async () => {
+    const draftStates: SandboxProfileAssociatedResourceRoutingDraftState[] = [];
+
+    function DirtyRoutingThenRemoveGitConnectionTest(): React.JSX.Element {
+      const [componentKey, setComponentKey] = useState("initial");
+      const [integrationRows, setIntegrationRows] = useState<
+        SandboxProfileIntegrationsSetupSectionProps["integrationRows"]
+      >([
+        {
+          clientId: "git-row",
+          connectionId: StoryGithubConnection.id,
+          kind: "git",
+          config: {},
+        },
+      ]);
+      const latestDraftState = draftStates.at(-1);
+
+      return (
+        <>
+          <button
+            onClick={() => {
+              setComponentKey("remounted");
+            }}
+            type="button"
+          >
+            Remount integrations
+          </button>
+          <TestSandboxProfileIntegrationsSetupSection
+            key={componentKey}
+            overrides={{
+              associatedResourceRouting: {
+                hasUnpersistedChanges: latestDraftState?.hasUnpersistedChanges === true,
+                isDraft: true,
+                onDraftStateChange: (state) => {
+                  draftStates.push(state);
+                },
+                version: createTestSandboxProfileVersion(),
+              },
+              integrationRows,
+              onRemoveIntegrationBindingRow: (clientId) => {
+                setIntegrationRows((rows) => rows.filter((row) => row.clientId !== clientId));
+              },
+            }}
+          />
+        </>
+      );
+    }
+
+    render(<DirtyRoutingThenRemoveGitConnectionTest />);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Review comments" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "git connection" }));
+    const noneOption = screen.getByRole("option", { name: "None" });
+    fireEvent.mouseMove(noneOption);
+    fireEvent.mouseDown(noneOption, { button: 0 });
+    fireEvent.mouseUp(noneOption, { button: 0 });
+    fireEvent.click(noneOption, { button: 0 });
+
+    await waitFor(() => {
+      expect(screen.getByRole("switch", { name: "Agent PR activity" })).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Remount integrations" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("switch", { name: "Agent PR activity" })).toBeDefined();
+    });
+
+    const latestDraftState = draftStates.at(-1);
+    if (latestDraftState === undefined || latestDraftState.buildDraftChanges === undefined) {
+      throw new Error("Expected associated resource routing draft state.");
+    }
+
+    expect(latestDraftState.buildDraftChanges()).toEqual({
+      enabled: true,
+      resources: [
+        {
+          resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+          eventTypes: [
+            AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+            AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+          ],
+        },
+      ],
+    });
   });
 
   it("enables commit signing for the selected identity-linked Git connection", () => {
@@ -825,6 +964,31 @@ const StoryGcpConnection: IntegrationConnectionSummary = {
     client_id: "google-client.apps.googleusercontent.com",
   },
 };
+
+function createTestSandboxProfileVersion(input?: {
+  associatedResourceEventRoutingConfig?: SandboxProfileVersion["associatedResourceEventRoutingConfig"];
+}): SandboxProfileVersion {
+  return {
+    sandboxProfileId: "sbp_integrations_setup_test",
+    version: 1,
+    state: "draft",
+    publishedAt: null,
+    agentRuntimeId: "codex",
+    gitCommitSigningIntegrationConnectionId: null,
+    mistleMcpEnabled: false,
+    mistleMcpApiKeyId: null,
+    sandboxProvider: "docker",
+    sandboxConnectionId: null,
+    maintenanceScript: null,
+    sandboxResources: null,
+    skillsConfig: null,
+    associatedResourceEventRoutingConfig: input?.associatedResourceEventRoutingConfig ?? {},
+    isActive: false,
+    usable: false,
+    latestSnapshotJob: null,
+    refreshSchedule: null,
+  };
+}
 
 function TestSandboxProfileIntegrationsSetupSection(input: {
   overrides: Partial<SandboxProfileIntegrationsSetupSectionProps>;

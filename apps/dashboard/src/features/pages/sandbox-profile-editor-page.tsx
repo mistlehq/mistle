@@ -124,10 +124,7 @@ import {
   SetupScriptTimingDescription,
 } from "./sandbox-base-inventory-copy.js";
 import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
-import {
-  SandboxProfileAssociatedResourceRoutingSection,
-  type SandboxProfileAssociatedResourceRoutingDraftState,
-} from "./sandbox-profile-associated-resource-routing-section.js";
+import type { SandboxProfileAssociatedResourceRoutingDraftState } from "./sandbox-profile-associated-resource-routing-section.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -156,6 +153,7 @@ import {
 import {
   SandboxProfileIntegrationsSetupSection,
   SandboxProfileIntegrationsSetupUnavailableState,
+  type SandboxProfileIntegrationsAssociatedResourceRouting,
 } from "./sandbox-profile-integrations-setup-section.js";
 import {
   useLoadedSandboxProfileIntegrationsState,
@@ -3093,6 +3091,32 @@ function SandboxProfileEditorSectionPanels(input: {
             />
           )
         }
+        {...(input.currentVersion === null
+          ? {}
+          : {
+              associatedResourceRouting: {
+                hasUnpersistedChanges:
+                  input.associatedResourceRoutingDraftState.hasUnpersistedChanges &&
+                  associatedResourceRoutingDraftStateIsCurrent({
+                    currentVersion: input.currentVersion,
+                    draftState: input.associatedResourceRoutingDraftState,
+                  }),
+                isDraft: input.mode.kind === "draft",
+                onDraftStateChange: (state) => {
+                  if (input.currentVersion === null) {
+                    return;
+                  }
+
+                  input.onAssociatedResourceRoutingDraftStateChange({
+                    ...state,
+                    sourceVersionKey: createAssociatedResourceRoutingDraftSourceVersionKey(
+                      input.currentVersion,
+                    ),
+                  });
+                },
+                version: input.currentVersion,
+              },
+            })}
         disabled={input.draftFieldsAreReadOnly}
         readOnly={input.draftFieldsAreReadOnly}
         agentRuntimeConnectionErrorMessage={input.agentRuntimeConnectionErrorMessage}
@@ -3113,31 +3137,6 @@ function SandboxProfileEditorSectionPanels(input: {
             onSaveDraftBeforeSkillsReload={input.onSaveDraftBeforeSkillsReload}
             profileId={input.profileId}
             readOnly={input.draftFieldsAreReadOnly}
-            version={input.currentVersion}
-          />
-        </SandboxProfilePanelSection>
-      )}
-      {input.currentVersion === null || sandboxProfileIntegrationRows === null ? null : (
-        <SandboxProfilePanelSection>
-          <SandboxProfileAssociatedResourceRoutingSection
-            availableConnections={input.integrationsLoader.availableConnections}
-            availableTargets={input.integrationsLoader.availableTargets}
-            disabled={input.draftFieldsAreReadOnly}
-            integrationRows={sandboxProfileIntegrationRows}
-            isDraft={input.mode.kind === "draft"}
-            key={`${input.profileId}:${String(input.mode.version)}:${String(input.draftEditorResetKey)}:associated-resource-routing`}
-            onDraftStateChange={(state) => {
-              if (input.currentVersion === null) {
-                return;
-              }
-
-              input.onAssociatedResourceRoutingDraftStateChange({
-                ...state,
-                sourceVersionKey: createAssociatedResourceRoutingDraftSourceVersionKey(
-                  input.currentVersion,
-                ),
-              });
-            }}
             version={input.currentVersion}
           />
         </SandboxProfilePanelSection>
@@ -3916,6 +3915,7 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
   profileId: string;
   version: number;
   agentRuntimeId: SandboxProfileVersion["agentRuntimeId"];
+  associatedResourceRouting?: SandboxProfileIntegrationsAssociatedResourceRouting;
   disabled: boolean;
   readOnly: boolean;
   loader: ReturnType<typeof useSandboxProfileIntegrationsLoader>;
@@ -3980,6 +3980,9 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
       integrationDirectoryQuery={input.loader.integrationDirectoryQuery}
       runtimeSettings={input.runtimeSettings}
       agentRuntimeConnectionErrorMessage={input.agentRuntimeConnectionErrorMessage}
+      {...(input.associatedResourceRouting === undefined
+        ? {}
+        : { associatedResourceRouting: input.associatedResourceRouting })}
       {...(input.onDraftStateChange === undefined
         ? {}
         : { onDraftStateChange: input.onDraftStateChange })}
@@ -4006,6 +4009,7 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
   initialRows: readonly SandboxProfileBindingEditorRow[];
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
+  associatedResourceRouting?: SandboxProfileIntegrationsAssociatedResourceRouting;
   disabled: boolean;
   readOnly: boolean;
   runtimeSettings: ReactNode | null;
@@ -4080,6 +4084,9 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
         identityLinkedGitConnectionIds={identityLinkedGitConnectionIds}
         runtimeSettings={input.runtimeSettings}
         agentRuntimeConnectionErrorMessage={input.agentRuntimeConnectionErrorMessage}
+        {...(input.associatedResourceRouting === undefined
+          ? {}
+          : { associatedResourceRouting: input.associatedResourceRouting })}
         disabled={input.disabled}
         readOnly={input.readOnly}
         onAddIntegrationBindingRow={integrationsState.onAddIntegrationBindingRow}

@@ -6,26 +6,22 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
 import {
-  SandboxProfileAssociatedResourceRoutingSection,
+  SandboxProfileAssociatedResourceRoutingFieldGroup,
   type SandboxProfileAssociatedResourceRoutingDraftState,
 } from "./sandbox-profile-associated-resource-routing-section.js";
-import type {
-  IntegrationConnectionSummary,
-  IntegrationTargetSummary,
-  SandboxProfileBindingEditorRow,
-} from "./sandbox-profile-binding-config-editor.js";
 
 afterEach(() => {
   cleanup();
 });
 
-describe("SandboxProfileAssociatedResourceRoutingSection", () => {
+describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
   it("shows default GitHub pull request routing when the profile has a GitHub binding", () => {
     renderSection();
 
     expect(
-      screen.getByRole("switch", { name: "GitHub PR routing" }).getAttribute("aria-checked"),
+      screen.getByRole("switch", { name: "Agent PR activity" }).getAttribute("aria-checked"),
     ).toBe("true");
+    expect(screen.getByRole("button", { name: "Explain agent PR activity" })).toBeTruthy();
     expect(screen.getByRole("checkbox", { name: "PR comments" }).getAttribute("aria-checked")).toBe(
       "true",
     );
@@ -35,10 +31,9 @@ describe("SandboxProfileAssociatedResourceRoutingSection", () => {
     expect(
       screen.getByRole("checkbox", { name: "Review comments" }).getAttribute("aria-checked"),
     ).toBe("true");
-    expect(screen.getByText("Delivered message preview")).toBeDefined();
   });
 
-  it("builds an explicit disabled config when GitHub PR routing is turned off", () => {
+  it("builds an explicit disabled config when pull request activity routing is turned off", () => {
     const draftStates: SandboxProfileAssociatedResourceRoutingDraftState[] = [];
     renderSection({
       onDraftStateChange: (state) => {
@@ -46,7 +41,7 @@ describe("SandboxProfileAssociatedResourceRoutingSection", () => {
       },
     });
 
-    fireEvent.click(screen.getByRole("switch", { name: "GitHub PR routing" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Agent PR activity" }));
 
     const latestDraftState = draftStates.at(-1);
     if (latestDraftState === undefined || latestDraftState.buildDraftChanges === undefined) {
@@ -97,7 +92,7 @@ describe("SandboxProfileAssociatedResourceRoutingSection", () => {
       },
     });
 
-    fireEvent.click(screen.getByRole("switch", { name: "GitHub PR routing" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Agent PR activity" }));
     const dirtyDraftState = draftStates.at(-1);
     if (
       dirtyDraftState === undefined ||
@@ -124,11 +119,9 @@ function renderSection(input?: {
   onDraftStateChange?: (state: SandboxProfileAssociatedResourceRoutingDraftState) => void;
 }) {
   return render(
-    <SandboxProfileAssociatedResourceRoutingSection
-      availableConnections={AvailableConnections}
-      availableTargets={AvailableTargets}
+    <SandboxProfileAssociatedResourceRoutingFieldGroup
       disabled={false}
-      integrationRows={IntegrationRows}
+      hasGitHubBinding
       isDraft
       {...(input?.onDraftStateChange === undefined
         ? {}
@@ -160,34 +153,3 @@ function createVersion(): SandboxProfileVersion {
     refreshSchedule: null,
   };
 }
-
-const AvailableTargets: IntegrationTargetSummary[] = [
-  {
-    targetKey: "github-cloud",
-    displayName: "GitHub",
-    familyId: "github",
-    variantId: "github-cloud",
-    config: {},
-    targetHealth: {
-      configStatus: "valid",
-    },
-  },
-];
-
-const AvailableConnections: IntegrationConnectionSummary[] = [
-  {
-    id: "icn_github",
-    displayName: "GitHub",
-    targetKey: "github-cloud",
-    status: "active",
-  },
-];
-
-const IntegrationRows: SandboxProfileBindingEditorRow[] = [
-  {
-    clientId: "row_github",
-    connectionId: "icn_github",
-    kind: "agent",
-    config: {},
-  },
-];
