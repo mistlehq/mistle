@@ -26,6 +26,10 @@ function createSteerEntryId(): string {
   return `steer:${crypto.randomUUID()}`;
 }
 
+function createUserEntryId(): string {
+  return `user:${crypto.randomUUID()}`;
+}
+
 type QueuedSteerRequest = {
   entryId: string;
   threadId: string;
@@ -273,10 +277,12 @@ export function useCodexChatController(input: {
               ...turnInput,
               skills: input.skillMentionsRef.current,
             });
+      const userEntryId = createUserEntryId();
 
       const startedTurn = await startCodexTurn({
         rpcClient,
         threadId,
+        clientUserMessageId: userEntryId,
         input: turnRequest.items,
         ...(turnRequest.cwd === undefined ? {} : { cwd: turnRequest.cwd }),
         ...(turnRequest.collaborationModeSettings === undefined
@@ -292,6 +298,7 @@ export function useCodexChatController(input: {
         status: startedTurn.status,
         prompt: turnRequest.transcriptPrompt,
         attachments: turnRequest.displayAttachments,
+        entryId: userEntryId,
       });
       const turnCwdCommit = resolveTurnCwdCommit({
         threadId,
@@ -395,6 +402,7 @@ export function useCodexChatController(input: {
               rpcClient,
               threadId,
               turnId: queuedRequest.turnId,
+              clientUserMessageId: queuedRequest.entryId,
               input: queuedRequest.request.items,
             });
             dispatchChatAction({

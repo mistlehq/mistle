@@ -264,6 +264,18 @@ _Avoid_: replay prompt, checklist approval, cross-thread implementation prompt
 A typed Codex **Composer command** that starts a Codex code-review turn. Bare `/review` opens a review-target picker; `/review <instructions>` starts a custom review using those instructions.
 _Avoid_: ordinary prompt text, slash autocomplete
 
+**Codex user message**:
+A user-authored transcript message in a **Codex thread**, including a **Codex turn-start message** or **Codex steer message**.
+_Avoid_: Runtime queued message, trigger payload
+
+**Codex turn-start message**:
+A **Codex user message** that begins a new **Working agent turn** in a **Codex thread**.
+_Avoid_: Initial transcript placeholder, starting prompt
+
+**Codex steer message**:
+A **Codex user message** accepted into an existing active **Working agent turn** in a **Codex thread**.
+_Avoid_: Codex queued message, Runtime queued message, Pi follow-up message
+
 **OpenCode session**:
 An OpenCode **Runtime conversation**.
 _Avoid_: OpenCode thread, sandbox session
@@ -668,6 +680,9 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - The Codex session state owns **Active Codex thread** changes for the **Session workbench**.
 - Cached **Codex thread** transcripts are ephemeral **Session workbench** state.
 - A cached **Codex thread** transcript does not become visible as active until Codex confirms the thread is resumable.
+- A **Codex turn-start message** is the primary user message for a **Working agent turn** in a **Codex thread**.
+- A **Codex steer message** belongs to the **Working agent turn** it is accepted into; it is not a **Runtime queued message**.
+- A runtime-reported **Codex user message** belongs in the **Codex thread** transcript even when it was submitted outside the current **Session workbench** view.
 - **Composer capabilities** may be owned by the **Agent runtime** or by the **Session workbench**.
 - An **Agent runtime** is the source of truth for runtime-owned **Composer capabilities**.
 - A **Session workbench** is the source of truth for sandbox-scoped **Composer capabilities**.

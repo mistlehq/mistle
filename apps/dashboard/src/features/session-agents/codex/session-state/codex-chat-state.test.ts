@@ -6,9 +6,22 @@ import {
   type CodexChatState,
 } from "./codex-chat-state.js";
 
+type UserMessageContentFixture =
+  | {
+      type: "text";
+      text: string;
+    }
+  | {
+      type: "localImage";
+      path: string;
+    };
+
+const STEER_CLIENT_ID = "steer:client_1";
+
 function startTurn(
   state: CodexChatState = createInitialCodexChatState(),
   input: {
+    entryId?: string;
     prompt?: string;
     status?: string;
     turnId?: string;
@@ -19,6 +32,40 @@ function startTurn(
     turnId: input.turnId ?? "turn_123",
     status: input.status ?? "inProgress",
     prompt: input.prompt ?? "Test prompt",
+    ...(input.entryId === undefined ? {} : { entryId: input.entryId }),
+  });
+}
+
+function receiveUserMessage(
+  state: CodexChatState = createInitialCodexChatState(),
+  input: {
+    id: string;
+    turnId?: string;
+    clientId?: string;
+    method?: "item/started" | "item/completed";
+    content?: readonly UserMessageContentFixture[];
+    text?: string;
+  },
+): CodexChatState {
+  return reduceCodexChatState(state, {
+    type: "notification_received",
+    notification: {
+      method: input.method ?? "item/started",
+      params: {
+        turnId: input.turnId ?? "turn_123",
+        item: {
+          type: "userMessage",
+          id: input.id,
+          ...(input.clientId === undefined ? {} : { clientId: input.clientId }),
+          content: input.content ?? [
+            {
+              type: "text",
+              text: input.text ?? "what is in the files",
+            },
+          ],
+        },
+      },
+    },
   });
 }
 
@@ -758,6 +805,130 @@ describe("reduceCodexChatState", () => {
           "Attached images:",
           "- /root/.local/attachments/thread_123/screenshot.png",
         ].join("\n"),
+        status: "completed",
+      },
+    ]);
+  });
+
+  it("hydrates later user messages in a turn as accepted steer entries", () => {
+    const hydrated = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "hydrate_from_thread_read",
+      turns: [
+        {
+          id: "turn_123",
+          status: "completed",
+          items: [
+            {
+              type: "userMessage",
+              id: "user_123",
+              content: [
+                {
+                  type: "text",
+                  text: "Start the task",
+                },
+              ],
+            },
+            {
+              type: "agentMessage",
+              id: "assistant_123",
+              text: "I am checking the reducer.",
+              phase: "commentary",
+            },
+            {
+              type: "userMessage",
+              id: "steer_123",
+              content: [
+                {
+                  type: "text",
+                  text: "Focus on the hydration path",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(hydrated.entries).toEqual([
+      {
+        id: "user_123",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Start the task",
+        status: "completed",
+      },
+      {
+        id: "assistant_123",
+        turnId: "turn_123",
+        kind: "assistant-message",
+        text: "I am checking the reducer.",
+        phase: "commentary",
+        status: "completed",
+      },
+      {
+        id: "steer_123",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Focus on the hydration path",
+        status: "completed",
+      },
+    ]);
+  });
+
+  it("replaces a local queued steer when hydration includes the accepted user message", () => {
+    const activeTurn = startTurn();
+    const queued = reduceCodexChatState(activeTurn, {
+      type: "steer_turn_requested",
+      entryId: STEER_CLIENT_ID,
+      turnId: "turn_123",
+      prompt: "Focus on the reducer",
+    });
+    const hydrated = reduceCodexChatState(queued, {
+      type: "hydrate_from_thread_read",
+      turns: [
+        {
+          id: "turn_123",
+          status: "completed",
+          items: [
+            {
+              type: "userMessage",
+              id: "user_123",
+              content: [
+                {
+                  type: "text",
+                  text: "Test prompt",
+                },
+              ],
+            },
+            {
+              type: "userMessage",
+              id: "steer_server_1",
+              clientId: STEER_CLIENT_ID,
+              content: [
+                {
+                  type: "text",
+                  text: "Focus on the reducer",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(hydrated.entries).toEqual([
+      {
+        id: "user_123",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Test prompt",
+        status: "completed",
+      },
+      {
+        id: "steer_server_1",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Focus on the reducer",
         status: "completed",
       },
     ]);
@@ -2354,28 +2525,248 @@ describe("reduceCodexChatState", () => {
     ]);
   });
 
-  it("does not surface raw userMessage items as generic chat entries", () => {
-    const state = reduceCodexChatState(createInitialCodexChatState(), {
+  it("renders a live userMessage lifecycle item as the turn user entry", () => {
+    const state = receiveUserMessage(createInitialCodexChatState(), {
+      id: "user_1",
+    });
+
+    expect(state.entries).toEqual([
+      {
+        id: "user_1",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "what is in the files",
+        status: "completed",
+      },
+    ]);
+  });
+
+  it("deduplicates repeated live userMessage lifecycle notifications", () => {
+    const started = receiveUserMessage(createInitialCodexChatState(), {
+      id: "user_1",
+    });
+    const completed = receiveUserMessage(started, {
+      method: "item/completed",
+      id: "user_1",
+    });
+
+    expect(completed.entries).toEqual([
+      {
+        id: "user_1",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "what is in the files",
+        status: "completed",
+      },
+    ]);
+  });
+
+  it("reconciles a live userMessage with an optimistic dashboard turn entry", () => {
+    const optimistic = startTurn(createInitialCodexChatState(), {
+      entryId: "user_client_1",
+      prompt: "what is in the files",
+    });
+    const state = receiveUserMessage(optimistic, {
+      id: "user_server_1",
+      clientId: "user_client_1",
+    });
+
+    expect(state.entries).toEqual([
+      {
+        id: "user_server_1",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "what is in the files",
+        status: "completed",
+      },
+    ]);
+  });
+
+  it("preserves a server-backed userMessage when turn_started arrives later", () => {
+    const live = receiveUserMessage(createInitialCodexChatState(), {
+      id: "user_server_1",
+      clientId: "user_client_1",
+    });
+    const state = startTurn(live, {
+      entryId: "user_client_1",
+      prompt: "local optimistic text",
+    });
+
+    expect(state.entries).toEqual([
+      {
+        id: "user_server_1",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "what is in the files",
+        status: "completed",
+      },
+    ]);
+  });
+
+  it("builds attachments from live localImage userMessage content", () => {
+    const state = receiveUserMessage(createInitialCodexChatState(), {
+      id: "user_1",
+      content: [
+        {
+          type: "text",
+          text: "inspect this image",
+        },
+        {
+          type: "localImage",
+          path: "/root/.local/attachments/thread_123/screenshot.png",
+        },
+      ],
+    });
+
+    expect(state.entries).toEqual([
+      {
+        id: "user_1",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "inspect this image",
+        attachments: [
+          {
+            kind: "image",
+            path: "/root/.local/attachments/thread_123/screenshot.png",
+            name: "screenshot.png",
+          },
+        ],
+        status: "completed",
+      },
+    ]);
+  });
+
+  it("renders a later live userMessage as an accepted steer entry", () => {
+    const activeTurn = startTurn();
+    const state = receiveUserMessage(activeTurn, {
+      id: "steer_server_1",
+      text: "focus on the reducer",
+    });
+
+    expect(state.entries).toEqual([
+      {
+        id: "user:turn_123",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Test prompt",
+        status: "completed",
+      },
+      {
+        id: "steer_server_1",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "focus on the reducer",
+        status: "completed",
+      },
+    ]);
+  });
+
+  it("reconciles a live steer userMessage with a queued local steer entry", () => {
+    const activeTurn = startTurn();
+    const queued = reduceCodexChatState(activeTurn, {
+      type: "steer_turn_requested",
+      entryId: STEER_CLIENT_ID,
+      turnId: "turn_123",
+      prompt: "focus on the reducer",
+    });
+    const state = receiveUserMessage(queued, {
+      id: "steer_server_1",
+      clientId: STEER_CLIENT_ID,
+      text: "focus on the reducer",
+    });
+
+    expect(state.entries).toEqual([
+      {
+        id: "user:turn_123",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Test prompt",
+        status: "completed",
+      },
+      {
+        id: "steer_server_1",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "focus on the reducer",
+        status: "completed",
+      },
+    ]);
+  });
+
+  it("keeps a local queued steer removable until a live userMessage accepts it", () => {
+    const activeTurn = startTurn();
+    const queued = reduceCodexChatState(activeTurn, {
+      type: "steer_turn_requested",
+      entryId: STEER_CLIENT_ID,
+      turnId: "turn_123",
+      prompt: "focus on the reducer",
+    });
+    const accepted = receiveUserMessage(queued, {
+      id: "steer_server_1",
+      clientId: STEER_CLIENT_ID,
+      text: "focus on the reducer",
+    });
+
+    expect(queued.entries).toContainEqual({
+      id: STEER_CLIENT_ID,
+      turnId: "turn_123",
+      kind: "user-message",
+      label: "Steer",
+      labelAction: {
+        ariaLabel: "Remove steer message",
+        actionId: STEER_CLIENT_ID,
+      },
+      text: "focus on the reducer",
+      status: "completed",
+    });
+    expect(accepted.entries).toContainEqual({
+      id: "steer_server_1",
+      turnId: "turn_123",
+      kind: "user-message",
+      text: "focus on the reducer",
+      status: "completed",
+    });
+  });
+
+  it("keeps a live steer userMessage separate when it arrives before the primary userMessage", () => {
+    const turnStarted = reduceCodexChatState(createInitialCodexChatState(), {
       type: "notification_received",
       notification: {
-        method: "item/completed",
+        method: "turn/started",
         params: {
-          turnId: "turn_123",
-          item: {
-            type: "userMessage",
-            id: "user_1",
-            content: [
-              {
-                type: "text",
-                text: "what is in the files",
-              },
-            ],
+          turn: {
+            id: "turn_123",
+            status: "inProgress",
           },
         },
       },
     });
+    const liveSteer = receiveUserMessage(turnStarted, {
+      id: "steer_server_1",
+      clientId: STEER_CLIENT_ID,
+      text: "focus on the reducer",
+    });
+    const state = receiveUserMessage(liveSteer, {
+      id: "user_server_1",
+      text: "start the task",
+    });
 
-    expect(state.entries).toEqual([]);
+    expect(state.entries).toEqual([
+      {
+        id: "user_server_1",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "start the task",
+        status: "completed",
+      },
+      {
+        id: "steer_server_1",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "focus on the reducer",
+        status: "completed",
+      },
+    ]);
   });
 
   it("omits empty reasoning content arrays from chat-entry state", () => {
