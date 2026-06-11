@@ -163,6 +163,7 @@ export const GitConnectionNone: Story = {
       "None",
     );
     await expect(canvas.queryByRole("switch", { name: "Sign Git commits" })).toBeNull();
+    await expect(canvas.queryByRole("switch", { name: "Agent PR activity" })).toBeNull();
     await expect(canvas.queryByText("Select a Git connection")).toBeNull();
   },
 };

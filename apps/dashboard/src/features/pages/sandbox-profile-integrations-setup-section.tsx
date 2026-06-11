@@ -1,3 +1,4 @@
+import { AssociatedProviderResourceKinds } from "@mistle/integrations-core";
 import {
   agentDefinitionAllowsRuntime,
   createBrowserDefinitionsBundle,
@@ -41,6 +42,10 @@ import {
   type ResponsiveFieldListColumn,
   ResponsiveFieldListRow,
 } from "../shared/responsive-field-list.js";
+import {
+  SandboxProfileAssociatedResourceRoutingFieldGroup,
+  type SandboxProfileAssociatedResourceRoutingDraftState,
+} from "./sandbox-profile-associated-resource-routing-section.js";
 import {
   createDefaultBindingConfig,
   resolveBindingKindFromTarget,
@@ -99,9 +104,17 @@ type SandboxProfileIntegrationsSetupSectionProps = {
   onRemoveIntegrationBindingRow: (clientId: string) => void;
   onIntegrationSaveErrorDismiss: () => void;
   runtimeSettings: React.ReactNode | null;
+  associatedResourceRouting?: SandboxProfileIntegrationsAssociatedResourceRouting;
   disabled?: boolean | undefined;
   readOnly?: boolean | undefined;
   agentRuntimeConnectionErrorMessage?: string | null | undefined;
+};
+
+export type SandboxProfileIntegrationsAssociatedResourceRouting = {
+  hasUnpersistedChanges: boolean;
+  isDraft: boolean;
+  onDraftStateChange?: (state: SandboxProfileAssociatedResourceRoutingDraftState) => void;
+  version: SandboxProfileVersion;
 };
 
 const NoGitConnectionValue = "none";
@@ -158,6 +171,30 @@ function ConnectionNameCell(input: { displayName: string }): React.JSX.Element {
     <div className={`${SandboxProfileIntegrationCellContentClassName} text-sm`}>
       <span className="min-w-0 truncate">{input.displayName}</span>
     </div>
+  );
+}
+
+function bindingRowTargetsFamily(input: {
+  familyId: string;
+  row: SandboxProfileBindingEditorRow;
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+}): boolean {
+  const metadata = resolveRowBindingMetadata({
+    row: input.row,
+    availableConnections: input.availableConnections,
+    availableTargets: input.availableTargets,
+  });
+  return metadata?.target?.familyId === input.familyId;
+}
+
+function associatedResourceRoutingConfigIncludesGitHubPullRequests(
+  version: SandboxProfileVersion,
+): boolean {
+  return (
+    version.associatedResourceEventRoutingConfig.resources?.some(
+      (resource) => resource.resourceKind === AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+    ) === true
   );
 }
 
@@ -738,6 +775,20 @@ export function SandboxProfileIntegrationsSetupSection(
     availableConnections: input.availableConnections,
     availableTargets: input.availableTargets,
   });
+  const gitRowTargetsGitHub =
+    gitRow !== null &&
+    bindingRowTargetsFamily({
+      familyId: "github",
+      row: gitRow,
+      availableConnections: input.availableConnections,
+      availableTargets: input.availableTargets,
+    });
+  const associatedResourceRoutingConfigHasGitHubPullRequests =
+    input.associatedResourceRouting === undefined
+      ? false
+      : associatedResourceRoutingConfigIncludesGitHubPullRequests(
+          input.associatedResourceRouting.version,
+        );
   const selectedGitConnectionIsIdentityLinked =
     gitRow !== null && input.identityLinkedGitConnectionIds?.includes(gitRow.connectionId) === true;
   const gitCommitSigningIsChecked =
@@ -987,6 +1038,21 @@ export function SandboxProfileIntegrationsSetupSection(
                     row={gitRow}
                   />
                 )}
+
+                {input.associatedResourceRouting !== undefined &&
+                (gitRowTargetsGitHub ||
+                  associatedResourceRoutingConfigHasGitHubPullRequests ||
+                  input.associatedResourceRouting.hasUnpersistedChanges) ? (
+                  <SandboxProfileAssociatedResourceRoutingFieldGroup
+                    disabled={controlsAreDisabled}
+                    hasGitHubBinding={gitRowTargetsGitHub}
+                    isDraft={input.associatedResourceRouting.isDraft}
+                    {...(input.associatedResourceRouting.onDraftStateChange === undefined
+                      ? {}
+                      : { onDraftStateChange: input.associatedResourceRouting.onDraftStateChange })}
+                    version={input.associatedResourceRouting.version}
+                  />
+                ) : null}
               </div>
             </SandboxProfileSectionCard>
             <SandboxProfileSectionCard>

@@ -1369,6 +1369,11 @@ function SandboxProfileEditorPageStoryView(
                         version={storyVersion}
                       />
                     }
+                    associatedResourceRouting={{
+                      hasUnpersistedChanges: false,
+                      isDraft: mode.kind === "draft",
+                      version: storyVersion,
+                    }}
                     disabled={!isEditable}
                     readOnly={!isEditable}
                     onAddIntegrationBindingRow={async (nextBinding) => {
