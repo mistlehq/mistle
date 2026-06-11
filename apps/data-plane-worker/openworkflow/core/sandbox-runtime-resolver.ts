@@ -152,13 +152,12 @@ export function createSandboxRuntimeProviderResolver(input: {
     }
 
     if (inputRuntime.provider === SandboxProvider.MODAL) {
-      if (inputRuntime.connectionId !== undefined) {
-        throw new Error("Modal sandbox runtime cannot use a sandbox connection.");
-      }
-
       const credentials = await input.controlPlaneInternalClient.resolveSandboxRuntimeCredentials({
         organizationId: inputRuntime.organizationId,
         provider: SandboxProvider.MODAL,
+        ...(inputRuntime.connectionId === undefined
+          ? {}
+          : { connectionId: inputRuntime.connectionId }),
       });
       if (credentials.provider !== SandboxProvider.MODAL) {
         throw new Error("Control-plane returned non-Modal credentials for Modal runtime.");

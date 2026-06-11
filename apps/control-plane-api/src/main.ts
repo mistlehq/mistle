@@ -12,6 +12,8 @@ import type {
   StartedServer,
 } from "./types.js";
 
+const DataPlaneInternalRequestTimeoutMs = 30_000;
+
 export async function createControlPlaneApiRuntime(
   runtimeConfig: ControlPlaneApiRuntimeConfig,
 ): Promise<ControlPlaneApiRuntime> {
@@ -122,6 +124,7 @@ function createDataPlaneClient(input: {
   return createDataPlaneSandboxInstancesClient({
     baseUrl: input.config.dataPlaneApi.baseUrl,
     serviceToken: input.config.internalAuth.serviceToken,
+    requestTimeoutMs: DataPlaneInternalRequestTimeoutMs,
     ...(input.testEnvironmentId === undefined
       ? {}
       : {

@@ -305,7 +305,27 @@ describe("integrations-definitions index", () => {
         providerId: "modal",
         displayName: "Modal",
       },
-      connectionMethods: [],
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "Token",
+          kind: "form",
+          secretFields: [
+            {
+              name: "tokenId",
+              label: "Token ID",
+              inputType: "password",
+              slotKey: "modal.modal-default.api-key.token-id",
+            },
+            {
+              name: "tokenSecret",
+              label: "Token secret",
+              inputType: "password",
+              slotKey: "modal.modal-default.api-key.token-secret",
+            },
+          ],
+        },
+      ],
     });
     expect(tensorlakeSandboxRuntimeDefinition).toMatchObject({
       familyId: "tensorlake",

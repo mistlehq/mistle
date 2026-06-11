@@ -1277,7 +1277,7 @@ export interface paths {
                   /** @enum {string} */
                   provider: "modal";
                   /** @enum {string} */
-                  source: "managed";
+                  source: "managed" | "connection";
                   tokenId: string;
                   tokenSecret: string;
                 };

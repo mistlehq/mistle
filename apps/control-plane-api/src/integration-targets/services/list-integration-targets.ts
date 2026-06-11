@@ -144,7 +144,8 @@ export async function listIntegrationTargets(
           displayName: resolvedMetadata.displayName,
           description: resolvedMetadata.description,
           ...(resolvedMetadata.logoKey === undefined ? {} : { logoKey: resolvedMetadata.logoKey }),
-          ...(resolvedMetadata.connectionMethods === undefined
+          ...(resolvedMetadata.connectionMethods === undefined ||
+          resolvedMetadata.connectionMethods.length === 0
             ? {}
             : { connectionMethods: resolvedMetadata.connectionMethods }),
           ...(resolvedMetadata.webhookSource === undefined

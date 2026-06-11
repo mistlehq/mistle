@@ -1,4 +1,11 @@
-import { ModalClient, type App, type Image, type Sandbox, type SandboxCreateParams } from "modal";
+import {
+  ModalClient,
+  type App,
+  type Image,
+  type Sandbox,
+  type SandboxCreateParams,
+  type StdioBehavior,
+} from "modal";
 
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
 import { SandboxInspectDispositions, SandboxInspectStates, SandboxProvider } from "../../types.js";
@@ -30,6 +37,7 @@ const ModalDefaultSandboxCommand = ["sleep", "48h"] as const;
 const ModalVmRuntimeExperimentalOptions = { vm_runtime: true } as const;
 const ModalEntrypointResetCommand = "ENTRYPOINT []";
 const ModalInspectProbeCommand = ["true"] as const;
+const ModalNativeImageIdPattern = /^im-[A-Za-z0-9]+$/u;
 export const ModalDefaultSandboxTimeoutMs = 24 * 60 * 60 * 1000;
 
 export type ModalStartSandboxResponse = { sandboxId: string };
@@ -38,6 +46,9 @@ export type ModalRunCommandResponse = {
   readonly stdout: string;
   readonly stderr: string;
   readonly statusCode: number;
+};
+export type ModalStartedCommand = {
+  wait(): Promise<number>;
 };
 
 export interface ModalClientApi {
@@ -58,8 +69,22 @@ export interface ModalClientApi {
     commandDescription: string;
     env?: Record<string, string>;
     workingDir?: string;
+    stdout?: StdioBehavior;
+    stderr?: StdioBehavior;
     timeoutMs?: number;
   }): Promise<ModalRunCommandResponse>;
+  startCommand(request: {
+    sandboxId: string;
+    command: string;
+    args?: readonly string[];
+    operation: ModalClientOperation;
+    commandDescription: string;
+    env?: Record<string, string>;
+    workingDir?: string;
+    stdout?: StdioBehavior;
+    stderr?: StdioBehavior;
+    timeoutMs?: number;
+  }): Promise<ModalStartedCommand>;
   close(): void;
 }
 
@@ -75,6 +100,9 @@ export class ModalApiClient implements ModalClientApi {
 
   async prepareImage(request: ModalImageRequest): Promise<{ imageId: string }> {
     const parsedRequest = ModalImageRequestSchema.parse(request);
+    if (isModalNativeImageId(parsedRequest.imageId)) {
+      return { imageId: parsedRequest.imageId };
+    }
 
     try {
       const image = await this.#buildEntrypointClearedImage(parsedRequest.imageId);
@@ -93,28 +121,18 @@ export class ModalApiClient implements ModalClientApi {
     try {
       const app = await this.#getApp();
       const image = await this.#client.images.fromId(parsedRequest.imageId);
+      const createParams = createModalSandboxCreateParams(parsedRequest, this.#config);
       const sandbox = await this.#client.sandboxes.create(app, image, {
-        command: [...ModalDefaultSandboxCommand],
+        ...createParams,
         experimentalOptions: ModalVmRuntimeExperimentalOptions,
-        timeoutMs: resolveModalSandboxTimeoutMs(this.#config),
         ...(parsedRequest.sandboxInstanceId === undefined
           ? {}
           : {
-              name: parsedRequest.sandboxInstanceId,
               tags: {
                 mistle_sandbox_instance_id: parsedRequest.sandboxInstanceId,
               },
             }),
-        ...(parsedRequest.env === undefined
-          ? {}
-          : { env: withRequiredSandboxRuntimeEnv(parsedRequest.env) }),
-        ...(parsedRequest.resources === undefined
-          ? {}
-          : {
-              cpu: parsedRequest.resources.vcpuCount,
-              memoryMiB: parsedRequest.resources.memoryMb,
-            }),
-      } satisfies SandboxCreateParams);
+      });
       return { sandboxId: sandbox.sandboxId };
     } catch (error) {
       throw mapModalClientError(ModalClientOperationIds.CREATE_SANDBOX, error);
@@ -238,6 +256,8 @@ export class ModalApiClient implements ModalClientApi {
     commandDescription: string;
     env?: Record<string, string>;
     workingDir?: string;
+    stdout?: StdioBehavior;
+    stderr?: StdioBehavior;
     timeoutMs?: number;
   }): Promise<ModalRunCommandResponse> {
     const parsedSandboxId = ModalSandboxIdRequestSchema.parse({
@@ -256,8 +276,53 @@ export class ModalApiClient implements ModalClientApi {
         commandDescription: request.commandDescription,
         ...(request.env === undefined ? {} : { env: request.env }),
         ...(request.workingDir === undefined ? {} : { workingDir: request.workingDir }),
+        ...(request.stdout === undefined ? {} : { stdout: request.stdout }),
+        ...(request.stderr === undefined ? {} : { stderr: request.stderr }),
         ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
       });
+    } catch (error) {
+      throw mapModalClientError(request.operation, error);
+    }
+  }
+
+  async startCommand(request: {
+    sandboxId: string;
+    command: string;
+    args?: readonly string[];
+    operation: ModalClientOperation;
+    commandDescription: string;
+    env?: Record<string, string>;
+    workingDir?: string;
+    stdout?: StdioBehavior;
+    stderr?: StdioBehavior;
+    timeoutMs?: number;
+  }): Promise<ModalStartedCommand> {
+    const parsedSandboxId = ModalSandboxIdRequestSchema.parse({
+      sandboxId: request.sandboxId,
+    }).sandboxId;
+
+    try {
+      const sandbox = await this.#client.sandboxes.fromId(parsedSandboxId);
+      const process = await sandbox.exec(
+        request.args === undefined ? [request.command] : [request.command, ...request.args],
+        {
+          mode: "text",
+          ...(request.env === undefined ? {} : { env: withRequiredSandboxRuntimeEnv(request.env) }),
+          ...(request.workingDir === undefined ? {} : { workdir: request.workingDir }),
+          ...(request.stdout === undefined ? {} : { stdout: request.stdout }),
+          ...(request.stderr === undefined ? {} : { stderr: request.stderr }),
+          ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+        },
+      );
+      return {
+        wait: async () => {
+          try {
+            return await process.wait();
+          } catch (error) {
+            throw mapModalClientError(request.operation, error);
+          }
+        },
+      };
     } catch (error) {
       throw mapModalClientError(request.operation, error);
     }
@@ -294,17 +359,21 @@ export class ModalApiClient implements ModalClientApi {
     commandDescription: string;
     env?: Record<string, string>;
     workingDir?: string;
+    stdout?: StdioBehavior;
+    stderr?: StdioBehavior;
     timeoutMs?: number;
   }): Promise<ModalRunCommandResponse> {
     const process = await input.sandbox.exec([...input.command], {
       mode: "text",
       ...(input.env === undefined ? {} : { env: withRequiredSandboxRuntimeEnv(input.env) }),
       ...(input.workingDir === undefined ? {} : { workdir: input.workingDir }),
+      ...(input.stdout === undefined ? {} : { stdout: input.stdout }),
+      ...(input.stderr === undefined ? {} : { stderr: input.stderr }),
       ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
     });
     const exitCode = await process.wait();
-    const stdout = await process.stdout.readText();
-    const stderr = await process.stderr.readText();
+    const stdout = input.stdout === "ignore" ? "" : await process.stdout.readText();
+    const stderr = input.stderr === "ignore" ? "" : await process.stderr.readText();
     if (exitCode !== 0) {
       throw new ModalCommandExitError({
         operation: input.operation,
@@ -316,6 +385,28 @@ export class ModalApiClient implements ModalClientApi {
     }
     return { stdout, stderr, statusCode: exitCode };
   }
+}
+
+export function isModalNativeImageId(imageId: string): boolean {
+  return ModalNativeImageIdPattern.test(imageId.trim());
+}
+
+function createModalSandboxCreateParams(
+  request: ModalStartSandboxRequest,
+  config: Pick<ValidatedModalSandboxConfig, "defaultTimeoutMs">,
+): SandboxCreateParams {
+  return {
+    command: [...ModalDefaultSandboxCommand],
+    timeoutMs: resolveModalSandboxTimeoutMs(config),
+    ...(request.sandboxInstanceId === undefined ? {} : { name: request.sandboxInstanceId }),
+    ...(request.env === undefined ? {} : { env: withRequiredSandboxRuntimeEnv(request.env) }),
+    ...(request.resources === undefined
+      ? {}
+      : {
+          cpu: request.resources.vcpuCount,
+          memoryMiB: request.resources.memoryMb,
+        }),
+  };
 }
 
 export function createModalSdkClient(config: ModalSandboxConfig): ModalClient {

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { listSandboxProviders } from "./list-sandbox-providers.js";
 
 describe("listSandboxProviders", () => {
-  it("lists Modal as a managed-only sandbox provider when deployment credentials are configured", () => {
+  it("lists Modal as a BYOK-capable managed sandbox provider when deployment credentials are configured", () => {
     const result = listSandboxProviders({
       integrationRegistry: createIntegrationRegistry(),
       sandboxConfig: {
@@ -24,7 +24,7 @@ describe("listSandboxProviders", () => {
       id: SandboxProvider.MODAL,
       displayName: "Modal",
       managed: true,
-      supportsOrganizationConnection: false,
+      supportsOrganizationConnection: true,
       resourceCapabilities: {
         vcpuCount: {
           min: 1,

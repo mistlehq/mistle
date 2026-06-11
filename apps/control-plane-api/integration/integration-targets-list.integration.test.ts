@@ -280,6 +280,13 @@ describe.concurrent("integration targets discovery integration", () => {
       displayNameOverride: "GitHub Dashboard Contract",
       descriptionOverride: "GitHub contract target",
     });
+    await seedTarget(env, {
+      targetKey: "modal_dashboard_contract_integration_new",
+      familyId: "modal",
+      variantId: "modal-default",
+      enabled: true,
+      config: {},
+    });
 
     const session = await env.auth.createSession({
       email: "integration-new-targets-dashboard-contract@example.com",
@@ -337,6 +344,39 @@ describe.concurrent("integration targets discovery integration", () => {
               label: "Webhook secret",
               inputType: "password",
               slotKey: "github.github-cloud.github-app-installation.webhook-secret",
+            },
+          ],
+        },
+      ],
+      targetHealth: {
+        configStatus: "valid",
+      },
+    });
+    expect(findTarget(page, "modal_dashboard_contract_integration_new")).toMatchObject({
+      targetKey: "modal_dashboard_contract_integration_new",
+      familyId: "modal",
+      variantId: "modal-default",
+      kind: "sandbox",
+      enabled: true,
+      displayName: "Modal",
+      description: "Run sandboxes on Modal VM Sandboxes with your organization's token.",
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "Token",
+          kind: "form",
+          secretFields: [
+            {
+              name: "tokenId",
+              label: "Token ID",
+              inputType: "password",
+              slotKey: "modal.modal-default.api-key.token-id",
+            },
+            {
+              name: "tokenSecret",
+              label: "Token secret",
+              inputType: "password",
+              slotKey: "modal.modal-default.api-key.token-secret",
             },
           ],
         },

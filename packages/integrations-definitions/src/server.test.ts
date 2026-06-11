@@ -158,7 +158,13 @@ describe("integrations-definitions server", () => {
       sandboxRuntime: {
         providerId: "modal",
       },
-      connectionMethods: [],
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "Token",
+          kind: "form",
+        },
+      ],
     });
     expect(tensorlakeSandboxRuntimeDefinition).toMatchObject({
       familyId: "tensorlake",

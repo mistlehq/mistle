@@ -136,7 +136,9 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
     let id: string | undefined;
 
     try {
-      const sandbox = await fixture.adapter.start({ image: fixture.baseImage });
+      const sandbox = await fixture.adapter.start({
+        image: fixture.baseImage,
+      });
       id = sandbox.id;
 
       expect(sandbox.provider).toBe(SandboxProvider.DOCKER);
@@ -304,7 +306,9 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
     let id: string | undefined;
 
     try {
-      const sandbox = await fixture.adapter.start({ image: fixture.baseImage });
+      const sandbox = await fixture.adapter.start({
+        image: fixture.baseImage,
+      });
       id = sandbox.id;
 
       await writeSandboxFile({
@@ -346,7 +350,9 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
   }, 300_000);
 
   it("surfaces sandbox not found after destroy", async ({ fixture }) => {
-    const sandbox = await fixture.adapter.start({ image: fixture.baseImage });
+    const sandbox = await fixture.adapter.start({
+      image: fixture.baseImage,
+    });
 
     await fixture.adapter.destroy({ id: sandbox.id });
 

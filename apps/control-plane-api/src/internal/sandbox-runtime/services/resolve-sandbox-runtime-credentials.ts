@@ -6,6 +6,9 @@ import {
   E2BSandboxRuntimeCredentialSecretTypes,
   E2BSandboxRuntimeCredentialSlotKeys,
   E2BSandboxRuntimeTargetConfigSchema,
+  ModalSandboxRuntimeCredentialSecretTypes,
+  ModalSandboxRuntimeCredentialSlotKeys,
+  ModalSandboxRuntimeDefaultAppName,
   TensorlakeSandboxRuntimeCredentialSecretTypes,
   TensorlakeSandboxRuntimeCredentialSlotKeys,
 } from "@mistle/integrations-definitions/sandbox-runtimes";
@@ -45,7 +48,7 @@ type ResolvedSandboxRuntimeCredentials =
     }
   | {
       provider: typeof SandboxProvider.MODAL;
-      source: "managed";
+      source: "managed" | "connection";
       tokenId: string;
       tokenSecret: string;
       appName: string;
@@ -109,14 +112,15 @@ export async function resolveSandboxRuntimeCredentials(
   }
 
   if (input.provider === SandboxProvider.MODAL) {
-    if (input.connectionId !== undefined) {
-      throw new BadRequestError(
-        "INVALID_SANDBOX_CREDENTIAL_REQUEST",
-        "Modal sandbox runtime credentials cannot be resolved from an integration connection.",
-      );
+    if (input.connectionId === undefined) {
+      return resolveManagedModalCredentials(ctx);
     }
 
-    return resolveManagedModalCredentials(ctx);
+    return resolveConnectionModalCredentials(ctx, {
+      organizationId: input.organizationId,
+      provider: SandboxProvider.MODAL,
+      connectionId: input.connectionId,
+    });
   }
 
   if (input.provider === SandboxProvider.FREESTYLE) {
@@ -265,6 +269,100 @@ async function resolveConnectionTensorlakeCredentials(
     provider: SandboxProvider.TENSORLAKE,
     source: "connection",
     apiKey: resolvedCredential.value,
+  };
+}
+
+async function resolveConnectionModalCredentials(
+  ctx: ResolveSandboxRuntimeCredentialsContext,
+  input: ResolveSandboxRuntimeCredentialsInput & {
+    provider: typeof SandboxProvider.MODAL;
+    connectionId: string;
+  },
+): Promise<ResolvedSandboxRuntimeCredentials> {
+  const connection = await readSandboxConnection(ctx, input);
+  const target = await ctx.db.query.integrationTargets.findFirst({
+    columns: {
+      targetKey: true,
+      familyId: true,
+      variantId: true,
+      enabled: true,
+    },
+    where: (table, { eq }) => eq(table.targetKey, connection.targetKey),
+  });
+
+  if (target === undefined) {
+    throw new NotFoundError(
+      "SANDBOX_CONNECTION_TARGET_NOT_FOUND",
+      `Sandbox connection '${connection.id}' target was not found.`,
+    );
+  }
+
+  if (!target.enabled) {
+    throw new BadRequestError(
+      "SANDBOX_CONNECTION_TARGET_DISABLED",
+      `Sandbox connection '${connection.id}' target is disabled.`,
+    );
+  }
+
+  const definition = ctx.integrationRegistry.getDefinition({
+    familyId: target.familyId,
+    variantId: target.variantId,
+  });
+
+  if (definition?.kind !== IntegrationKinds.SANDBOX || definition.sandboxRuntime === undefined) {
+    throw new BadRequestError(
+      "SANDBOX_CONNECTION_KIND_MISMATCH",
+      `Sandbox connection '${connection.id}' does not reference a sandbox integration target.`,
+    );
+  }
+
+  if (definition.sandboxRuntime.providerId !== SandboxProvider.MODAL) {
+    throw new BadRequestError(
+      "SANDBOX_CONNECTION_PROVIDER_MISMATCH",
+      `Sandbox connection '${connection.id}' does not match sandbox provider 'modal'.`,
+    );
+  }
+
+  const tokenIdCredential = await resolveIntegrationCredential(
+    {
+      db: ctx.db,
+      integrationRegistry: ctx.integrationRegistry,
+      integrationsConfig: ctx.integrationsConfig,
+    },
+    {
+      connectionId: connection.id,
+      secretType: ModalSandboxRuntimeCredentialSecretTypes.TOKEN_ID,
+      slotKey: ModalSandboxRuntimeCredentialSlotKeys.TOKEN_ID,
+    },
+  );
+
+  if (tokenIdCredential.kind !== "value") {
+    throw new Error("Modal sandbox runtime token ID must resolve to a string credential.");
+  }
+
+  const tokenSecretCredential = await resolveIntegrationCredential(
+    {
+      db: ctx.db,
+      integrationRegistry: ctx.integrationRegistry,
+      integrationsConfig: ctx.integrationsConfig,
+    },
+    {
+      connectionId: connection.id,
+      secretType: ModalSandboxRuntimeCredentialSecretTypes.TOKEN_SECRET,
+      slotKey: ModalSandboxRuntimeCredentialSlotKeys.TOKEN_SECRET,
+    },
+  );
+
+  if (tokenSecretCredential.kind !== "value") {
+    throw new Error("Modal sandbox runtime token secret must resolve to a string credential.");
+  }
+
+  return {
+    provider: SandboxProvider.MODAL,
+    source: "connection",
+    tokenId: tokenIdCredential.value,
+    tokenSecret: tokenSecretCredential.value,
+    appName: ModalSandboxRuntimeDefaultAppName,
   };
 }
 

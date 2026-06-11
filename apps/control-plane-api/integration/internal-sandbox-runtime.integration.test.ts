@@ -18,6 +18,9 @@ import {
   E2BSandboxRuntimeCredentialSlotKeys,
   E2BSandboxRuntimeFamilyId,
   E2BSandboxRuntimeVariantId,
+  ModalSandboxRuntimeCredentialSlotKeys,
+  ModalSandboxRuntimeFamilyId,
+  ModalSandboxRuntimeVariantId,
   TensorlakeSandboxRuntimeCredentialSlotKeys,
   TensorlakeSandboxRuntimeFamilyId,
   TensorlakeSandboxRuntimeVariantId,
@@ -359,6 +362,73 @@ describe.concurrent("internal sandbox runtime integration", () => {
       provider: "tensorlake",
       source: "connection",
       apiKey: "tensorlake-connection-api-key",
+    });
+  });
+
+  it("resolves Modal sandbox runtime credentials from a sandbox connection", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-internal-sandbox-runtime-modal-credentials@example.com",
+    });
+    await seedIntegrationTarget(env, {
+      targetKey: "modal-internal-runtime-credentials",
+      familyId: ModalSandboxRuntimeFamilyId,
+      variantId: ModalSandboxRuntimeVariantId,
+      config: {},
+    });
+
+    const createResponse = await createFormConnection({
+      env,
+      targetKey: "modal-internal-runtime-credentials",
+      cookie: session.cookie,
+      body: {
+        displayName: "Modal runtime credentials",
+        methodId: IntegrationConnectionMethodIds.API_KEY,
+        config: {},
+        secrets: {
+          tokenId: "ak-connection-token-id",
+          tokenSecret: "as-connection-token-secret",
+        },
+      },
+    });
+
+    expect(createResponse.status).toBe(201);
+    const connection = CreatedFormIntegrationConnectionSchema.parse(await createResponse.json());
+    await expectCredentialSlots({
+      env,
+      connectionId: connection.id,
+      organizationId: session.organizationId,
+      expected: [
+        {
+          slotKey: ModalSandboxRuntimeCredentialSlotKeys.TOKEN_ID,
+          secretKind: IntegrationCredentialSecretKinds.API_KEY,
+          intendedFamilyId: ModalSandboxRuntimeFamilyId,
+          plaintext: "ak-connection-token-id",
+        },
+        {
+          slotKey: ModalSandboxRuntimeCredentialSlotKeys.TOKEN_SECRET,
+          secretKind: IntegrationCredentialSecretKinds.API_KEY,
+          intendedFamilyId: ModalSandboxRuntimeFamilyId,
+          plaintext: "as-connection-token-secret",
+        },
+      ],
+    });
+
+    const response = await internalSandboxRuntimeRequest(env, {
+      path: "/resolve-credentials",
+      body: {
+        organizationId: session.organizationId,
+        provider: "modal",
+        connectionId: connection.id,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      provider: "modal",
+      source: "connection",
+      tokenId: "ak-connection-token-id",
+      tokenSecret: "as-connection-token-secret",
+      appName: "mistle-modal-sandboxes",
     });
   });
 
