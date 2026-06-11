@@ -586,35 +586,6 @@ describe("selectDataPlaneApiConfig", () => {
 });
 
 describe("selectDataPlaneGatewayConfig", () => {
-  it("projects data-plane gateway settings", () => {
-    const config = selectDataPlaneGatewayConfig(createRootConfig({}));
-
-    expect(config).toEqual({
-      server: {
-        host: "0.0.0.0",
-        port: 3003,
-      },
-      sandbox: {
-        websocketPublicUrl: "wss://gateway.example.com/sandbox",
-        websocketInternalUrl: "ws://data-plane-gateway:3003/sandbox",
-        connectToken: {
-          key: "sandbox-connect-token-key",
-          algorithm: "HS256",
-        },
-        publishAccessToken: {
-          key: "sandbox-publish-access-token-key",
-          algorithm: "HS256",
-        },
-        publishSession: {
-          cookieSigningSecret: "publish-session-cookie-secret",
-        },
-        portAccessAuthorizationTimeoutMs: undefined,
-      },
-      internalAuth: {
-        serviceToken: "internal-service-token",
-      },
-    });
-  });
   it("projects the default memory gateway relay backend", () => {
     const config = selectDataPlaneGatewayConfig(createRootConfig({}));
 

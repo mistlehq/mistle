@@ -15,10 +15,10 @@ import {
   Route,
   RouterProvider,
 } from "react-router";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
-import { cleanupTestQueryClients, createTestQueryClient } from "../../test-support/query-client.js";
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import { HttpApiError } from "../api/http-api-error.js";
 import { createStoryWebhookTriggerCapabilitiesProviderMetadata } from "../integrations/integration-story-harness.js";
 import type {
@@ -97,11 +97,6 @@ beforeAll(() => {
 function expectElementToFollow(previous: Element, next: Element): void {
   expect(previous.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
 }
-
-afterEach(() => {
-  cleanup();
-  void cleanupTestQueryClients();
-});
 
 function createSandboxProfileVersionFixture(input: {
   sandboxProfileId: string;
