@@ -9,16 +9,39 @@ import { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { createNodeSandboxSessionRuntime } from "@mistle/sandbox-session-client/node";
 import { z } from "zod";
 
-import { createPiSessionClient, type PiSessionClient, type PiSessionState } from "./client.js";
+import {
+  createPiSessionClient,
+  type PiConversationSummary,
+  type PiSessionClient,
+  type PiSessionState,
+} from "./client.js";
 import { generatePiConversationTitle } from "./title-generation.js";
 
 const DeliveryContextNotificationMethod = "mistle/setDeliveryContext";
 const PiProviderExecutionIdPrefix = "pi-session";
+const PiOriginalConversationInitialLimit = 100;
 
-const PiDeliveryContextNotificationParamsSchema = z
+const PiDeliveryTraceContextSchema = z
   .object({
-    source: z.enum(["webhook", "schedule"]),
+    traceparent: z.string(),
+    tracestate: z.string().optional(),
+    baggage: z.string().optional(),
+  })
+  .loose();
+
+const PiDeliveryContextNotificationParamsSchema = z.discriminatedUnion("source", [
+  PiDeliveryTraceContextSchema.extend({
+    source: z.literal("webhook"),
     webhookEventId: z.string().optional(),
+    deliveryTaskId: z.string(),
+    externalDeliveryId: z.string().optional(),
+    triggerRunId: z.string(),
+    conversationId: z.string(),
+    sandboxInstanceId: z.string(),
+    routeId: z.string().optional(),
+  }),
+  PiDeliveryTraceContextSchema.extend({
+    source: z.literal("schedule"),
     scheduledActionId: z.string().optional(),
     deliveryTaskId: z.string(),
     externalDeliveryId: z.string().optional(),
@@ -26,11 +49,16 @@ const PiDeliveryContextNotificationParamsSchema = z
     conversationId: z.string(),
     sandboxInstanceId: z.string(),
     routeId: z.string().optional(),
-    traceparent: z.string(),
-    tracestate: z.string().optional(),
-    baggage: z.string().optional(),
-  })
-  .loose();
+  }),
+  PiDeliveryTraceContextSchema.extend({
+    source: z.literal("association"),
+    providerResourceAssociationId: z.string(),
+    associationDeliveryId: z.string(),
+    webhookEventId: z.string(),
+    externalDeliveryId: z.string().optional(),
+    sandboxInstanceId: z.string(),
+  }),
+]);
 
 type PiDeliveryContextNotificationParams = z.output<
   typeof PiDeliveryContextNotificationParamsSchema
@@ -82,6 +110,58 @@ function createPiProviderExecutionId(providerConversationId: string): string {
   return `${PiProviderExecutionIdPrefix}:${providerConversationId}`;
 }
 
+function parsePiConversationCreatedAt(conversation: PiConversationSummary): number | null {
+  if (conversation.createdAt === null) {
+    return null;
+  }
+
+  const createdAt = Date.parse(conversation.createdAt);
+  return Number.isNaN(createdAt) ? null : createdAt;
+}
+
+export function resolveOriginalPiConversationId(
+  conversations: readonly PiConversationSummary[],
+): string | null {
+  let originalConversationId: string | null = null;
+  let originalCreatedAt: number | null = null;
+
+  for (const conversation of conversations) {
+    const createdAt = parsePiConversationCreatedAt(conversation);
+    if (createdAt === null) {
+      continue;
+    }
+
+    if (
+      originalCreatedAt === null ||
+      createdAt < originalCreatedAt ||
+      (createdAt === originalCreatedAt &&
+        (originalConversationId === null || conversation.id < originalConversationId))
+    ) {
+      originalConversationId = conversation.id;
+      originalCreatedAt = createdAt;
+    }
+  }
+
+  return originalConversationId;
+}
+
+async function listAllPiConversations(input: {
+  client: PiSessionClient;
+}): Promise<readonly PiConversationSummary[]> {
+  let limit = PiOriginalConversationInitialLimit;
+
+  while (true) {
+    const page = await input.client.listConversations({
+      limit,
+    });
+    if (!page.hasMore) {
+      return page.conversations;
+    }
+
+    limit *= 2;
+  }
+}
+
 function resolvePiConversationStatus(state: PiSessionState): AgentConversationStatus {
   return state.isStreaming || state.isCompacting || state.pendingMessageCount > 0
     ? AgentConversationStatuses.ACTIVE
@@ -101,7 +181,7 @@ function renderPiPromptInput(input: {
   if (input.deliveryContextNotificationParams !== undefined) {
     sections.push(
       [
-        "Mistle trigger delivery context:",
+        "Mistle delivery context:",
         JSON.stringify(input.deliveryContextNotificationParams, null, 2),
       ].join("\n"),
     );
@@ -192,6 +272,25 @@ export function createPiConversationProvider(): AgentConversationProvider {
       });
     },
     generateConversationTitle: generatePiConversationTitle,
+    resolveOriginalConversation: async (input) => {
+      if (
+        input.explicitProviderConversationId !== undefined &&
+        input.explicitProviderConversationId !== null
+      ) {
+        return {
+          providerConversationId: input.explicitProviderConversationId,
+        };
+      }
+
+      const piConnection = getPiConnection(input.connection);
+      return {
+        providerConversationId: resolveOriginalPiConversationId(
+          await listAllPiConversations({
+            client: piConnection.client,
+          }),
+        ),
+      };
+    },
     createConversation: async (input) => {
       const piConnection = getPiConnection(input.connection);
       const createInput =

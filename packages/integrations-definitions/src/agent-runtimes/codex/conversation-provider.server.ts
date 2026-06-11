@@ -10,6 +10,12 @@ import { AgentConversationStatuses } from "@mistle/integrations-core";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 
 import { CodexJsonRpcClient, CodexJsonRpcRequestError } from "./codex-json-rpc.js";
+import {
+  AllCodexThreadSourceKinds,
+  parseCodexThreadListResponse,
+  resolveOriginalCodexThreadId,
+  type CodexThreadSummary,
+} from "./codex-operations.js";
 import { CodexConversationProviderInitializeClientInfo } from "./initialize-client-info.js";
 import {
   connectSandboxAgentConnection,
@@ -58,6 +64,7 @@ const CodexJsonRpcErrorCodes = {
 } as const;
 
 const CodexJsonRpcRequestTimeoutMs = 60_000;
+const OriginalCodexThreadListPageSize = 100;
 
 type CodexStartExecutionInputItem = {
   type: "text";
@@ -274,6 +281,32 @@ function missingInspectConversationOutput(): AgentConversationInspectResult {
     status: AgentConversationStatuses.IDLE,
     activeExecutionId: null,
   };
+}
+
+async function listOriginalCodexThreadCandidates(input: {
+  connection: AgentConversationConnection;
+  archived?: boolean;
+}): Promise<readonly CodexThreadSummary[]> {
+  let cursor: string | null = null;
+  const threads: CodexThreadSummary[] = [];
+
+  do {
+    const response = await input.connection.request({
+      method: "thread/list",
+      params: {
+        cursor,
+        limit: OriginalCodexThreadListPageSize,
+        ...(input.archived === undefined ? {} : { archived: input.archived }),
+        sortKey: "created_at",
+        sourceKinds: AllCodexThreadSourceKinds,
+      },
+    });
+    const parsedResponse = parseCodexThreadListResponse(response);
+    threads.push(...parsedResponse.threads);
+    cursor = parsedResponse.nextCursor;
+  } while (cursor !== null);
+
+  return threads;
 }
 
 function isProviderExecutionMissingError(error: unknown): boolean {
@@ -690,6 +723,28 @@ async function initializeProviderConnection(
 export function createOpenAiConversationProvider(): AgentConversationProvider {
   return {
     connect: createProviderConnection,
+    resolveOriginalConversation: async (input) => {
+      if (
+        input.explicitProviderConversationId !== undefined &&
+        input.explicitProviderConversationId !== null
+      ) {
+        return {
+          providerConversationId: input.explicitProviderConversationId,
+        };
+      }
+
+      const providerConversationId = resolveOriginalCodexThreadId([
+        ...(await listOriginalCodexThreadCandidates({ connection: input.connection })),
+        ...(await listOriginalCodexThreadCandidates({
+          connection: input.connection,
+          archived: true,
+        })),
+      ]);
+
+      return {
+        providerConversationId,
+      };
+    },
     inspectConversation: async (input) => {
       let inspectResult: unknown;
       try {

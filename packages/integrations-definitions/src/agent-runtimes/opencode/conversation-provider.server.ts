@@ -15,12 +15,14 @@ import {
   type OpenCodeCreateSessionInput,
   type OpenCodeSendPromptInput,
   type OpenCodeSessionClient,
+  type OpenCodeSessionSummary,
   type OpenCodeSessionStatus,
 } from "./client.js";
 import { waitForGeneratedOpenCodeConversationTitle } from "./title-generation.js";
 
 const DeliveryContextNotificationMethod = "mistle/setDeliveryContext";
 const OpenCodeProviderExecutionIdPrefix = "opencode-session";
+const OpenCodeOriginalSessionPageSize = 100;
 
 const OpenCodeProviderStateSchema = z.object({
   previousConversationTitle: z.string(),
@@ -28,10 +30,27 @@ const OpenCodeProviderStateSchema = z.object({
 
 type OpenCodeProviderState = z.output<typeof OpenCodeProviderStateSchema>;
 
-const OpenCodeDeliveryContextNotificationParamsSchema = z
+const OpenCodeDeliveryTraceContextSchema = z
   .object({
-    source: z.enum(["webhook", "schedule"]),
+    traceparent: z.string(),
+    tracestate: z.string().optional(),
+    baggage: z.string().optional(),
+  })
+  .loose();
+
+const OpenCodeDeliveryContextNotificationParamsSchema = z.discriminatedUnion("source", [
+  OpenCodeDeliveryTraceContextSchema.extend({
+    source: z.literal("webhook"),
     webhookEventId: z.string().optional(),
+    deliveryTaskId: z.string(),
+    externalDeliveryId: z.string().optional(),
+    triggerRunId: z.string(),
+    conversationId: z.string(),
+    sandboxInstanceId: z.string(),
+    routeId: z.string().optional(),
+  }),
+  OpenCodeDeliveryTraceContextSchema.extend({
+    source: z.literal("schedule"),
     scheduledActionId: z.string().optional(),
     deliveryTaskId: z.string(),
     externalDeliveryId: z.string().optional(),
@@ -39,11 +58,16 @@ const OpenCodeDeliveryContextNotificationParamsSchema = z
     conversationId: z.string(),
     sandboxInstanceId: z.string(),
     routeId: z.string().optional(),
-    traceparent: z.string(),
-    tracestate: z.string().optional(),
-    baggage: z.string().optional(),
-  })
-  .loose();
+  }),
+  OpenCodeDeliveryTraceContextSchema.extend({
+    source: z.literal("association"),
+    providerResourceAssociationId: z.string(),
+    associationDeliveryId: z.string(),
+    webhookEventId: z.string(),
+    externalDeliveryId: z.string().optional(),
+    sandboxInstanceId: z.string(),
+  }),
+]);
 
 type OpenCodeDeliveryContextNotificationParams = z.output<
   typeof OpenCodeDeliveryContextNotificationParamsSchema
@@ -113,6 +137,49 @@ function createOpenCodeProviderExecutionId(providerConversationId: string): stri
   return `${OpenCodeProviderExecutionIdPrefix}:${providerConversationId}`;
 }
 
+export function resolveOriginalOpenCodeSessionId(
+  sessions: readonly { id: string; time: { created: number } }[],
+): string | null {
+  let originalSessionId: string | null = null;
+  let originalCreatedAt: number | null = null;
+
+  for (const session of sessions) {
+    const createdAt = session.time.created;
+    if (
+      originalCreatedAt === null ||
+      createdAt < originalCreatedAt ||
+      (createdAt === originalCreatedAt &&
+        (originalSessionId === null || session.id < originalSessionId))
+    ) {
+      originalSessionId = session.id;
+      originalCreatedAt = createdAt;
+    }
+  }
+
+  return originalSessionId;
+}
+
+async function listAllOpenCodeSessions(input: {
+  client: OpenCodeSessionClient;
+}): Promise<readonly OpenCodeSessionSummary[]> {
+  const sessions: OpenCodeSessionSummary[] = [];
+  let start = 0;
+
+  while (true) {
+    const page = await input.client.listSessions({
+      limit: OpenCodeOriginalSessionPageSize,
+      start,
+    });
+    sessions.push(...page);
+
+    if (page.length < OpenCodeOriginalSessionPageSize) {
+      return sessions;
+    }
+
+    start += page.length;
+  }
+}
+
 function createOpenCodePromptInput(input: {
   collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
   deliveryContextNotificationParams?: OpenCodeDeliveryContextNotificationParams | undefined;
@@ -150,7 +217,7 @@ export function renderOpenCodePromptSystem(input: {
   if (input.deliveryContextNotificationParams !== undefined) {
     sections.push(
       [
-        "Mistle trigger delivery context:",
+        "Mistle delivery context:",
         JSON.stringify(input.deliveryContextNotificationParams, null, 2),
       ].join("\n"),
     );
@@ -274,6 +341,23 @@ export function createOpenCodeConversationProvider(): AgentConversationProvider 
       } finally {
         await connection.close();
       }
+    },
+    resolveOriginalConversation: async (input) => {
+      if (
+        input.explicitProviderConversationId !== undefined &&
+        input.explicitProviderConversationId !== null
+      ) {
+        return {
+          providerConversationId: input.explicitProviderConversationId,
+        };
+      }
+
+      const { client } = getOpenCodeConnection(input.connection);
+      return {
+        providerConversationId: resolveOriginalOpenCodeSessionId(
+          await listAllOpenCodeSessions({ client }),
+        ),
+      };
     },
     createConversation: async (input) => {
       const { client } = getOpenCodeConnection(input.connection);

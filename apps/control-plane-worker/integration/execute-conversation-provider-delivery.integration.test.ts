@@ -4,7 +4,7 @@ import { TraceFlags, context, trace, type Context } from "@opentelemetry/api";
 import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import { afterAll, beforeAll, describe, expect } from "vitest";
 
-import { submitCodexAssociatedResourceDelivery } from "../openworkflow/handle-provider-resource-association-delivery/submit-codex-associated-resource-delivery.js";
+import { submitAssociatedResourceDelivery } from "../openworkflow/handle-provider-resource-association-delivery/submit-associated-resource-delivery.js";
 import {
   createConversationProviderDeliveryConversation,
   executeConversationProviderDelivery,
@@ -116,7 +116,7 @@ describe("executeConversationProviderDelivery", () => {
     }
   });
 
-  it("submits Codex associated-resource delivery directly to the stored thread", async () => {
+  it("submits Codex associated-resource delivery directly to the original thread", async () => {
     const server = await startSimulatedCodexRuntimeServer("associated_resource_direct_turn");
 
     try {
@@ -128,13 +128,15 @@ describe("executeConversationProviderDelivery", () => {
       const result = await context.with(
         activeContext,
         async () =>
-          await submitCodexAssociatedResourceDelivery({
+          await submitAssociatedResourceDelivery({
             deliveryInput: {
               runtimeId: "codex",
               connectionUrl: server.url,
               inputText: "GitHub pull request issue comment created.",
               deliveryId: "prd_associated_resource",
               providerResourceAssociationId: "pra_associated_resource",
+              sandboxInstanceId: "sbi_associated_resource",
+              sourceWebhookEventId: "iwe_associated_resource",
             },
           }),
       );
@@ -146,6 +148,7 @@ describe("executeConversationProviderDelivery", () => {
       expect(await server.methodSequence).toEqual([
         "initialize",
         "initialized",
+        "mistle/setDeliveryContext",
         "thread/list",
         "thread/list",
         "thread/resume",
@@ -169,13 +172,15 @@ describe("executeConversationProviderDelivery", () => {
       const result = await context.with(
         activeContext,
         async () =>
-          await submitCodexAssociatedResourceDelivery({
+          await submitAssociatedResourceDelivery({
             deliveryInput: {
               runtimeId: "codex",
               connectionUrl: server.url,
               inputText: "GitHub pull request issue comment created while active.",
               deliveryId: "prd_associated_resource_active",
               providerResourceAssociationId: "pra_associated_resource_active",
+              sandboxInstanceId: "sbi_associated_resource_active",
+              sourceWebhookEventId: "iwe_associated_resource_active",
             },
           }),
       );
@@ -187,6 +192,7 @@ describe("executeConversationProviderDelivery", () => {
       expect(await server.methodSequence).toEqual([
         "initialize",
         "initialized",
+        "mistle/setDeliveryContext",
         "thread/list",
         "thread/list",
         "thread/resume",
@@ -210,13 +216,15 @@ describe("executeConversationProviderDelivery", () => {
       const result = await context.with(
         activeContext,
         async () =>
-          await submitCodexAssociatedResourceDelivery({
+          await submitAssociatedResourceDelivery({
             deliveryInput: {
               runtimeId: "codex",
               connectionUrl: server.url,
               inputText: "GitHub pull request issue comment created after active turn finished.",
               deliveryId: "prd_associated_resource_late_steer",
               providerResourceAssociationId: "pra_associated_resource_late_steer",
+              sandboxInstanceId: "sbi_associated_resource_late_steer",
+              sourceWebhookEventId: "iwe_associated_resource_late_steer",
             },
           }),
       );
@@ -228,6 +236,7 @@ describe("executeConversationProviderDelivery", () => {
       expect(await server.methodSequence).toEqual([
         "initialize",
         "initialized",
+        "mistle/setDeliveryContext",
         "thread/list",
         "thread/list",
         "thread/resume",
@@ -255,13 +264,15 @@ describe("executeConversationProviderDelivery", () => {
       const result = await context.with(
         activeContext,
         async () =>
-          await submitCodexAssociatedResourceDelivery({
+          await submitAssociatedResourceDelivery({
             deliveryInput: {
               runtimeId: "codex",
               connectionUrl: server.url,
               inputText: "GitHub pull request issue comment created for a new thread.",
               deliveryId: "prd_associated_resource_unmaterialized",
               providerResourceAssociationId: "pra_associated_resource_unmaterialized",
+              sandboxInstanceId: "sbi_associated_resource_unmaterialized",
+              sourceWebhookEventId: "iwe_associated_resource_unmaterialized",
             },
           }),
       );
@@ -273,6 +284,7 @@ describe("executeConversationProviderDelivery", () => {
       expect(await server.methodSequence).toEqual([
         "initialize",
         "initialized",
+        "mistle/setDeliveryContext",
         "thread/list",
         "thread/list",
         "thread/resume",

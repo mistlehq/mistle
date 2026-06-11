@@ -21,7 +21,7 @@ import {
   isProviderResourceAssociationDeliveryProcessorRunning,
 } from "./processor.js";
 import { resolveProviderResourceAssociationDeliveryTarget } from "./resolve-route.js";
-import { submitCodexAssociatedResourceDelivery } from "./submit-codex-associated-resource-delivery.js";
+import { submitAssociatedResourceDelivery } from "./submit-associated-resource-delivery.js";
 
 const SingleAttemptDeliveryStepRetryPolicy = {
   maximumAttempts: 1,
@@ -239,13 +239,20 @@ async function deliverActiveProviderResourceAssociationDelivery(
       },
     );
 
-    const submittedProviderPayload = await submitCodexAssociatedResourceDelivery({
+    // Association delivery resolves the original runtime conversation for the
+    // sandbox session, not the earliest conversation in a working directory.
+    const submittedProviderPayload = await submitAssociatedResourceDelivery({
       deliveryInput: {
         runtimeId: target.runtimeId,
         connectionUrl: connection.url,
         inputText: input.delivery.renderedInput,
         deliveryId: input.delivery.id,
         providerResourceAssociationId: target.providerResourceAssociationId,
+        sandboxInstanceId: target.sandboxInstanceId,
+        sourceWebhookEventId: input.delivery.sourceWebhookEventId,
+        ...(webhookEvent.externalDeliveryId === null
+          ? {}
+          : { externalDeliveryId: webhookEvent.externalDeliveryId }),
       },
     });
 
