@@ -208,12 +208,13 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       sourceOrderKey: "2026-03-09T00:00:00Z#0001",
       status: ProviderResourceAssociationDeliveryStatuses.QUEUED,
       renderedInput: [
-        "GitHub pull request issue comment created",
         "Repository: mistlehq/mistle",
-        "Pull request: #42",
+        "Event type: github.issue_comment.created",
         "Author: octocat",
         "",
-        "please run @mistlebot",
+        "Pull request issue comment:",
+        "PR #42",
+        "Comment body: please run @mistlebot",
       ].join("\n"),
     });
 

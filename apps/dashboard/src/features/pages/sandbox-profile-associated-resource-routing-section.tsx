@@ -235,16 +235,13 @@ function SandboxProfileAssociatedResourceRoutingStatefulSection(input: {
             Delivered message preview
           </p>
           <pre className="text-foreground overflow-x-auto whitespace-pre-wrap text-xs leading-relaxed">
-            {`GitHub pull request comment received.
+            {`Repository: mistlehq/mistle
+Event type: github.issue_comment.created
+Author: reviewer
 
-Repository: mistlehq/mistle
-Pull request: #2783 Add provider resource association delivery
-Comment author: reviewer
-Comment URL: https://github.com/mistlehq/mistle/pull/2783#issuecomment-123
-Comment type: issue_comment
-
-Comment:
-Please route this back to the original session.`}
+Pull request issue comment:
+PR #2783
+Comment body: Please route this back to the original session.`}
           </pre>
         </div>
       </div>

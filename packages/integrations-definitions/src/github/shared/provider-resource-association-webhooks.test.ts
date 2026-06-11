@@ -37,12 +37,13 @@ describe("GitHub associated resource webhook observation", () => {
         eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
         providerResourceId: "mistlehq/mistle#42",
         text: [
-          "GitHub pull request issue comment created",
           "Repository: mistlehq/mistle",
-          "Pull request: #42",
+          "Event type: github.issue_comment.created",
           "Author: octocat",
           "",
-          "please handle this",
+          "Pull request issue comment:",
+          "PR #42",
+          "Comment body: please handle this",
         ].join("\n"),
       },
     });
@@ -80,14 +81,33 @@ describe("GitHub associated resource webhook observation", () => {
           },
           review: {
             state: "approved",
-            body: null,
+            body: "looks good",
+          },
+          sender: {
+            login: "reviewer",
           },
         },
       }),
-    ).toMatchObject({
+    ).toEqual({
       resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
       eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
       providerResourceId: "mistlehq/mistle#43",
+      renderedInput: {
+        kind: "github.pull_request.associated_resource_event",
+        resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+        eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+        providerResourceId: "mistlehq/mistle#43",
+        text: [
+          "Repository: mistlehq/mistle",
+          "Event type: github.pull_request_review.submitted",
+          "Author: reviewer",
+          "",
+          "Pull request review submitted:",
+          "PR #43",
+          "Review state: approved",
+          "Review body: looks good",
+        ].join("\n"),
+      },
     });
 
     expect(
@@ -102,13 +122,35 @@ describe("GitHub associated resource webhook observation", () => {
           },
           comment: {
             body: "review line note",
+            path: "packages/example.ts",
+            line: 12,
+          },
+          sender: {
+            login: "octocat",
           },
         },
       }),
-    ).toMatchObject({
+    ).toEqual({
       resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
       eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
       providerResourceId: "mistlehq/mistle#44",
+      renderedInput: {
+        kind: "github.pull_request.associated_resource_event",
+        resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+        eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
+        providerResourceId: "mistlehq/mistle#44",
+        text: [
+          "Repository: mistlehq/mistle",
+          "Event type: github.pull_request_review_comment.created",
+          "Author: octocat",
+          "",
+          "Pull request review comment:",
+          "PR #44",
+          "File: packages/example.ts",
+          "Line: 12",
+          "Comment body: review line note",
+        ].join("\n"),
+      },
     });
   });
 });

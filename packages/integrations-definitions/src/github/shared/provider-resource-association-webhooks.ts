@@ -53,6 +53,9 @@ const GitHubPullRequestReviewCommentPayloadSchema = z.looseObject({
   }),
   comment: z.looseObject({
     body: z.string(),
+    line: z.number().int().positive().nullable().optional(),
+    original_line: z.number().int().positive().nullable().optional(),
+    path: z.string().min(1).nullable().optional(),
   }),
   sender: z
     .looseObject({
@@ -101,12 +104,16 @@ function observeIssueCommentCreated(
   }
 
   return createObservation({
-    body: parsedPayload.data.comment.body,
-    eventLabel: "GitHub pull request issue comment created",
     eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
     pullRequestNumber: parsedPayload.data.issue.number,
     repositoryFullName: parsedPayload.data.repository.full_name,
-    senderLogin: parsedPayload.data.sender?.login,
+    text: renderIssueCommentInput({
+      author: parsedPayload.data.sender?.login,
+      body: parsedPayload.data.comment.body,
+      eventType: GitHubWebhookEventTypes.ISSUE_COMMENT_CREATED,
+      pullRequestNumber: parsedPayload.data.issue.number,
+      repositoryFullName: parsedPayload.data.repository.full_name,
+    }),
   });
 }
 
@@ -119,12 +126,17 @@ function observePullRequestReviewSubmitted(
   }
 
   return createObservation({
-    body: parsedPayload.data.review.body ?? null,
-    eventLabel: `GitHub pull request review ${parsedPayload.data.review.state}`,
     eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
     pullRequestNumber: parsedPayload.data.pull_request.number,
     repositoryFullName: parsedPayload.data.repository.full_name,
-    senderLogin: parsedPayload.data.sender?.login,
+    text: renderReviewSubmittedInput({
+      author: parsedPayload.data.sender?.login,
+      body: parsedPayload.data.review.body ?? "",
+      eventType: GitHubWebhookEventTypes.PULL_REQUEST_REVIEW_SUBMITTED,
+      pullRequestNumber: parsedPayload.data.pull_request.number,
+      repositoryFullName: parsedPayload.data.repository.full_name,
+      state: parsedPayload.data.review.state,
+    }),
   });
 }
 
@@ -137,37 +149,32 @@ function observePullRequestReviewCommentCreated(
   }
 
   return createObservation({
-    body: parsedPayload.data.comment.body,
-    eventLabel: "GitHub pull request review comment created",
     eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
     pullRequestNumber: parsedPayload.data.pull_request.number,
     repositoryFullName: parsedPayload.data.repository.full_name,
-    senderLogin: parsedPayload.data.sender?.login,
+    text: renderReviewCommentInput({
+      author: parsedPayload.data.sender?.login,
+      body: parsedPayload.data.comment.body,
+      eventType: GitHubWebhookEventTypes.PULL_REQUEST_REVIEW_COMMENT_CREATED,
+      filePath: parsedPayload.data.comment.path ?? "",
+      line: parsedPayload.data.comment.line ?? parsedPayload.data.comment.original_line ?? null,
+      pullRequestNumber: parsedPayload.data.pull_request.number,
+      repositoryFullName: parsedPayload.data.repository.full_name,
+    }),
   });
 }
 
 function createObservation(input: {
-  body: string | null;
-  eventLabel: string;
   eventType: AssociatedResourceEventType;
   pullRequestNumber: number;
   repositoryFullName: string;
-  senderLogin?: string | undefined;
+  text: string;
 }): GitHubAssociatedResourceWebhookObservation {
   const providerResourceId = createGitHubPullRequestProviderResourceId({
     repositoryFullName: input.repositoryFullName,
     pullRequestNumber: input.pullRequestNumber,
   });
   const resourceKind = AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST;
-  const authorLine = input.senderLogin === undefined ? [] : [`Author: ${input.senderLogin}`];
-  const bodyLines = input.body === null || input.body.length === 0 ? [] : ["", input.body];
-  const text = [
-    input.eventLabel,
-    `Repository: ${input.repositoryFullName}`,
-    `Pull request: #${String(input.pullRequestNumber)}`,
-    ...authorLine,
-    ...bodyLines,
-  ].join("\n");
 
   return {
     eventType: input.eventType,
@@ -178,7 +185,83 @@ function createObservation(input: {
       eventType: input.eventType,
       providerResourceId,
       resourceKind,
-      text,
+      text: input.text,
     },
   };
+}
+
+const GitHubWebhookEventTypes = {
+  ISSUE_COMMENT_CREATED: "github.issue_comment.created",
+  PULL_REQUEST_REVIEW_SUBMITTED: "github.pull_request_review.submitted",
+  PULL_REQUEST_REVIEW_COMMENT_CREATED: "github.pull_request_review_comment.created",
+};
+
+function renderIssueCommentInput(input: {
+  author?: string | undefined;
+  body: string;
+  eventType: string;
+  pullRequestNumber: number;
+  repositoryFullName: string;
+}): string {
+  return renderLines([
+    `Repository: ${input.repositoryFullName}`,
+    `Event type: ${input.eventType}`,
+    ...renderOptionalAuthor(input.author),
+    "",
+    "Pull request issue comment:",
+    `PR #${String(input.pullRequestNumber)}`,
+    `Comment body: ${input.body}`,
+  ]);
+}
+
+function renderReviewSubmittedInput(input: {
+  author?: string | undefined;
+  body: string;
+  eventType: string;
+  pullRequestNumber: number;
+  repositoryFullName: string;
+  state: string;
+}): string {
+  return renderLines([
+    `Repository: ${input.repositoryFullName}`,
+    `Event type: ${input.eventType}`,
+    ...renderOptionalAuthor(input.author),
+    "",
+    "Pull request review submitted:",
+    `PR #${String(input.pullRequestNumber)}`,
+    `Review state: ${input.state}`,
+    `Review body: ${input.body}`,
+  ]);
+}
+
+function renderReviewCommentInput(input: {
+  author?: string | undefined;
+  body: string;
+  eventType: string;
+  filePath: string;
+  line: number | null;
+  pullRequestNumber: number;
+  repositoryFullName: string;
+}): string {
+  const line = input.line === null ? "" : String(input.line);
+
+  return renderLines([
+    `Repository: ${input.repositoryFullName}`,
+    `Event type: ${input.eventType}`,
+    ...renderOptionalAuthor(input.author),
+    "",
+    "Pull request review comment:",
+    `PR #${String(input.pullRequestNumber)}`,
+    `File: ${input.filePath}`,
+    `Line: ${line}`,
+    `Comment body: ${input.body}`,
+  ]);
+}
+
+function renderOptionalAuthor(author: string | undefined): readonly string[] {
+  return author === undefined ? [] : [`Author: ${author}`];
+}
+
+function renderLines(lines: readonly string[]): string {
+  return lines.join("\n");
 }
