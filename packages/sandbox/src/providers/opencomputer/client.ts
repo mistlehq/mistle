@@ -1014,13 +1014,29 @@ class OpenComputerStartedExecSession {
 }
 
 function normalizeOpenComputerApiBaseUrl(url: string): string {
-  const normalized = url.replace(/\/+$/u, "");
+  const normalized = trimTrailingSlashes(url);
   return normalized.endsWith("/api") ? normalized : `${normalized}/api`;
 }
 
 function createOpenComputerApiUrl(path: string, apiBaseUrl: string): URL {
-  const normalizedPath = path.replace(/^\/+/u, "");
-  return new URL(normalizedPath, `${apiBaseUrl.replace(/\/+$/u, "")}/`);
+  const normalizedPath = trimLeadingSlashes(path);
+  return new URL(normalizedPath, `${trimTrailingSlashes(apiBaseUrl)}/`);
+}
+
+function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") {
+    end -= 1;
+  }
+  return value.slice(0, end);
+}
+
+function trimLeadingSlashes(value: string): string {
+  let start = 0;
+  while (start < value.length && value[start] === "/") {
+    start += 1;
+  }
+  return value.slice(start);
 }
 
 function createOpenComputerDaemonEnv(
