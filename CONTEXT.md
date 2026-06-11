@@ -116,6 +116,10 @@ _Avoid_: Parameter layout, control group
 A match rule applied to a **Trigger event parameter** when deciding whether a **Trigger event** matches a **Trigger**.
 _Avoid_: Exclusion when the rule is one match mode among several
 
+**GitHub actor filter**:
+A trigger filter that matches the GitHub **Provider actor** that performed a provider event.
+_Avoid_: Author filter, commenter filter when the filter is over the event sender
+
 **GitHub team review target**:
 A GitHub team selected as the requested review target for a provider pull request review-request **Trigger event**.
 _Avoid_: GitHub team identity, organization-qualified team
@@ -151,6 +155,10 @@ _Avoid_: Trigger event when no Trigger is involved, ad hoc trigger
 **Provider actor**:
 An external provider identity that authors or performs provider-side actions.
 _Avoid_: User when the actor may be an app, bot, or service account
+
+**GitHub App bot actor**:
+A GitHub App bot acting as the **Provider actor** for a provider event.
+_Avoid_: GitHub user, reviewer when the bot is the event actor rather than the requested review target
 
 **Self-authored association event**:
 An **Association-backed provider event** authored by the same **Provider actor** Mistle uses for the event's **Integration connection**.
