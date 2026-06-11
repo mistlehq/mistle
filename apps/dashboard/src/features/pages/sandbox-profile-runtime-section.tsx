@@ -27,7 +27,7 @@ import {
   Slider,
   TextLink,
 } from "@mistle/ui";
-import { CheckIcon, EyeIcon, PlusIcon } from "@phosphor-icons/react";
+import { PlusIcon } from "@phosphor-icons/react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link as RouterLink } from "react-router";
 
@@ -37,6 +37,7 @@ import type {
   SandboxProviderSummary,
   SandboxProfileVersion,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { ApiKeyMistleResourceAccessSummary } from "../settings/api-keys/api-key-permissions-summary.js";
 import {
   ApiKeyPermissionOptions,
   DefaultApiKeyPermissions,
@@ -1111,113 +1112,17 @@ function CreateApiKeyDialogTrigger(input: {
   );
 }
 
-const MistleResourcePermissionGroups = [
-  {
-    label: "Sandbox profiles",
-    actions: [
-      { label: "Read sandbox profiles", permission: "sandboxProfile:read" },
-      { label: "Create sandbox profiles", permission: "sandboxProfile:create" },
-      { label: "Update sandbox profiles", permission: "sandboxProfile:update" },
-      { label: "Delete sandbox profiles", permission: "sandboxProfile:delete" },
-    ],
-  },
-  {
-    label: "Sessions",
-    actions: [
-      { label: "Create sessions", permission: "sandboxSession:create" },
-      { label: "Read sessions", permission: "sandboxSession:read" },
-      { label: "Resume sessions", permission: "sandboxSession:resume" },
-      { label: "Connect to sessions", permission: "sandboxSession:connect" },
-    ],
-  },
-  {
-    label: "Triggers",
-    actions: [
-      { label: "Read triggers", permission: "triggerWebhook:read" },
-      { label: "Create triggers", permission: "triggerWebhook:create" },
-      { label: "Update triggers", permission: "triggerWebhook:update" },
-      { label: "Delete triggers", permission: "triggerWebhook:delete" },
-    ],
-  },
-] as const;
-
 function MistleResourceAccessSummary(input: { apiKey: ApiKey }): React.JSX.Element {
-  const [detailsAreOpen, setDetailsAreOpen] = useState(false);
-  const resourceGroups = createAllowedMistleResourceGroups(input.apiKey.permissions);
-  const resourceCount = resourceGroups.length;
-  const resourceCountLabel =
-    resourceCount === 1 ? "1 resource" : `${String(resourceCount)} resources`;
-
   return (
-    <>
-      <Button
-        aria-label={`View allowed Mistle resources: ${resourceCountLabel}`}
-        className="text-muted-foreground"
-        onClick={() => {
-          setDetailsAreOpen(true);
-        }}
-        size="sm"
-        title="View allowed Mistle resources"
-        type="button"
-        variant="ghost"
-      >
-        <span>{resourceCountLabel}</span>
-        <EyeIcon aria-hidden />
-      </Button>
-      <Dialog onOpenChange={setDetailsAreOpen} open={detailsAreOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Allowed Mistle resources</DialogTitle>
-            <DialogDescription>
-              This profile&apos;s agent can use {input.apiKey.name} for these Mistle resources.
-              Access is limited by that API key&apos;s permissions.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4">
-            {resourceGroups.map((group) => (
-              <MistleResourceAccessGroup group={group} key={group.label} />
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
-
-type AllowedMistleResourceGroup = {
-  actions: readonly string[];
-  label: string;
-};
-
-function createAllowedMistleResourceGroups(
-  permissions: readonly string[],
-): readonly AllowedMistleResourceGroup[] {
-  return MistleResourcePermissionGroups.map((group) => ({
-    label: group.label,
-    actions: group.actions
-      .filter((action) => permissions.includes(action.permission))
-      .map((action) => action.label),
-  })).filter((group) => group.actions.length > 0);
-}
-
-function MistleResourceAccessGroup(input: {
-  group: AllowedMistleResourceGroup;
-}): React.JSX.Element {
-  return (
-    <section className="overflow-hidden rounded-md border">
-      <div className="bg-muted/50 border-b px-3 py-2 text-sm font-medium">{input.group.label}</div>
-      <div className="grid gap-2 p-3 sm:grid-cols-2">
-        {input.group.actions.map((action) => (
-          <div
-            className="text-muted-foreground flex min-w-0 items-center gap-2 text-sm"
-            key={action}
-          >
-            <CheckIcon aria-hidden className="text-primary size-4 shrink-0" />
-            {action}
-          </div>
-        ))}
-      </div>
-    </section>
+    <ApiKeyMistleResourceAccessSummary
+      apiKey={input.apiKey}
+      description={
+        <>
+          This profile&apos;s agent can use {input.apiKey.name} for these Mistle resources. Access
+          is limited by that API key&apos;s permissions.
+        </>
+      }
+    />
   );
 }
 

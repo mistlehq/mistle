@@ -4,6 +4,16 @@ export type ApiKeyPermissionOption = {
   description: string;
 };
 
+export type AllowedMistleResourceGroup = {
+  actions: readonly string[];
+  label: string;
+};
+
+export type AllowedMistleResourceAccessSummary = {
+  resourceGroups: readonly AllowedMistleResourceGroup[];
+  ungroupedPermissions: readonly string[];
+};
+
 export const ApiKeyPermissionOptions: readonly ApiKeyPermissionOption[] = [
   {
     value: "sandboxProfile:read",
@@ -73,3 +83,70 @@ export const DefaultApiKeyPermissions: readonly string[] = [
   "sandboxSession:read",
   "sandboxSession:connect",
 ];
+
+const MistleResourcePermissionGroups = [
+  {
+    label: "Sandbox profiles",
+    permissions: [
+      "sandboxProfile:read",
+      "sandboxProfile:create",
+      "sandboxProfile:update",
+      "sandboxProfile:delete",
+    ],
+  },
+  {
+    label: "Sessions",
+    permissions: [
+      "sandboxSession:create",
+      "sandboxSession:read",
+      "sandboxSession:resume",
+      "sandboxSession:connect",
+    ],
+  },
+  {
+    label: "Triggers",
+    permissions: [
+      "triggerWebhook:read",
+      "triggerWebhook:create",
+      "triggerWebhook:update",
+      "triggerWebhook:delete",
+    ],
+  },
+] as const;
+
+const ApiKeyPermissionOptionByValue = new Map(
+  ApiKeyPermissionOptions.map((option) => [option.value, option]),
+);
+
+export function createAllowedMistleResourceAccessSummary(
+  permissions: readonly string[],
+): AllowedMistleResourceAccessSummary {
+  const selectedPermissionValues = new Set(permissions);
+  const groupedPermissionValues = new Set<string>();
+
+  const resourceGroups = MistleResourcePermissionGroups.map((group) => ({
+    label: group.label,
+    actions: group.permissions.flatMap((permission) => {
+      groupedPermissionValues.add(permission);
+
+      if (!selectedPermissionValues.has(permission)) {
+        return [];
+      }
+
+      return [formatApiKeyPermission(permission)];
+    }),
+  })).filter((group) => group.actions.length > 0);
+
+  const ungroupedPermissions = [...selectedPermissionValues]
+    .filter((permission) => !groupedPermissionValues.has(permission))
+    .map(formatApiKeyPermission);
+
+  return {
+    resourceGroups,
+    ungroupedPermissions,
+  };
+}
+
+function formatApiKeyPermission(permission: string): string {
+  return ApiKeyPermissionOptionByValue.get(permission)?.label ?? permission;
+}

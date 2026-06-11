@@ -10,7 +10,7 @@ import { OrganizationApiKeyCreatePageView } from "./organization-api-key-create-
 import { OrganizationApiKeysSettingsPageView } from "./organization-api-keys-settings-page-view.js";
 
 describe("OrganizationApiKeysSettingsPageView", () => {
-  it("renders existing API keys with masked keys and compact raw permission badges", () => {
+  it("renders existing API keys with masked keys and grouped permission details", () => {
     renderPage({
       apiKeys: [
         buildApiKey({
@@ -34,13 +34,37 @@ describe("OrganizationApiKeysSettingsPageView", () => {
     expect(within(table).queryByRole("columnheader", { name: "Prefix" })).toBeNull();
     expect(screen.getByText("Production deploy key")).toBeTruthy();
     expect(within(table).getByText("mst_live_1234...")).toBeTruthy();
-    expect(within(table).getByText("sandboxProfile:read")).toBeTruthy();
-    expect(within(table).getByText("sandboxSession:create")).toBeTruthy();
-    expect(within(table).getByText("sandboxSession:connect")).toBeTruthy();
-    expect(within(table).getByText("+ 2 more")).toBeTruthy();
+    expect(
+      within(table).getByRole("button", {
+        name: "View allowed Mistle resources: 3 resources, 1 other permission",
+      }),
+    ).toBeTruthy();
+    expect(within(table).queryByText("sandboxProfile:read")).toBeNull();
     expect(within(table).queryByText("triggerWebhook:read")).toBeNull();
     expect(within(table).queryByText("unknown:permission")).toBeNull();
     expect(screen.getByRole("button", { name: "Revoke Production deploy key" })).toBeTruthy();
+
+    fireEvent.click(
+      within(table).getByRole("button", {
+        name: "View allowed Mistle resources: 3 resources, 1 other permission",
+      }),
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Allowed Mistle resources" });
+    expect(
+      within(dialog).getByText(
+        "Production deploy key can access these Mistle resources. Access is limited by this API key's permissions.",
+      ),
+    ).toBeTruthy();
+    expect(within(dialog).getByText("Sandbox profiles")).toBeTruthy();
+    expect(within(dialog).getByText("Read sandbox profiles")).toBeTruthy();
+    expect(within(dialog).getByText("Sessions")).toBeTruthy();
+    expect(within(dialog).getByText("Create sessions")).toBeTruthy();
+    expect(within(dialog).getByText("Connect to sessions")).toBeTruthy();
+    expect(within(dialog).getByText("Triggers")).toBeTruthy();
+    expect(within(dialog).getByText("Read triggers")).toBeTruthy();
+    expect(within(dialog).getByText("Other permissions")).toBeTruthy();
+    expect(within(dialog).getByText("unknown:permission")).toBeTruthy();
   });
 
   it("links API key creation to a dedicated page", () => {
