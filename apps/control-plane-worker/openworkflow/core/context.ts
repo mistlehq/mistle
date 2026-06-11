@@ -10,8 +10,8 @@ import {
   type ControlPlaneTables,
 } from "@mistle/db/control-plane";
 import { createControlPlaneTestSchemaName } from "@mistle/db/test-environment";
-import type { IntegrationRegistry } from "@mistle/integrations-core";
-import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
+import type { AgentRuntimeRegistry, IntegrationRegistry } from "@mistle/integrations-core";
+import { createDefinitionsBundle } from "@mistle/integrations-definitions/server";
 import { Pool } from "pg";
 
 import { createControlPlaneOpenWorkflow } from "./client.js";
@@ -30,6 +30,7 @@ export type WorkflowContext = {
   dataPlaneClient: DataPlaneSandboxInstancesClient;
   defaultBaseImage: string;
   emailDelivery: ControlPlaneWorkerEmailDelivery;
+  agentRuntimeRegistry: AgentRuntimeRegistry;
   integrationRegistry: IntegrationRegistry;
   openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>;
 };
@@ -106,10 +107,11 @@ async function createWorkflowContext(input?: {
         name: workerConfig.email.fromName,
       },
     } satisfies ControlPlaneWorkerEmailDelivery;
-    const integrationRegistry = createIntegrationRegistry();
+    const definitions = createDefinitionsBundle();
 
     return {
       context: {
+        agentRuntimeRegistry: definitions.agentRuntimeRegistry,
         billing: workerConfig.billing,
         controlPlaneInternalClient,
         dataPlaneClient,
@@ -118,7 +120,7 @@ async function createWorkflowContext(input?: {
         dbPool,
         defaultBaseImage: workerConfig.sandbox.defaultBaseImage,
         emailDelivery,
-        integrationRegistry,
+        integrationRegistry: definitions.integrationRegistry,
         openWorkflow,
       },
       close: async () => {

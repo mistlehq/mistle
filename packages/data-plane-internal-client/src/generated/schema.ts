@@ -247,6 +247,12 @@ export interface paths {
               | "skills_discovery";
             runtimePlan: {
               agentRuntimes: {
+                capabilities?: {
+                  associatedResourceDelivery?: {
+                    /** @enum {boolean} */
+                    supported: true;
+                  };
+                };
                 clientId: string;
                 endpointKey: string;
                 ptyLaunch: {
@@ -738,6 +744,12 @@ export interface paths {
               id: string;
               runtimePlan: {
                 agentRuntimes: {
+                  capabilities?: {
+                    associatedResourceDelivery?: {
+                      /** @enum {boolean} */
+                      supported: true;
+                    };
+                  };
                   clientId: string;
                   endpointKey: string;
                   ptyLaunch: {

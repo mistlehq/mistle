@@ -1,5 +1,11 @@
-const AssociatedResourceDeliveryRuntimeIds = new Set(["codex", "opencode", "pi"]);
+import type { AgentRuntimeCapabilities } from "./types.js";
 
-export function supportsAssociatedResourceDeliveryRuntime(runtimeId: string): boolean {
-  return AssociatedResourceDeliveryRuntimeIds.has(runtimeId);
+type AgentRuntimeCapabilityDescriptor = {
+  capabilities?: AgentRuntimeCapabilities;
+};
+
+export function supportsAssociatedResourceDeliveryRuntime(
+  agentRuntime: AgentRuntimeCapabilityDescriptor,
+): boolean {
+  return agentRuntime.capabilities?.associatedResourceDelivery?.supported === true;
 }

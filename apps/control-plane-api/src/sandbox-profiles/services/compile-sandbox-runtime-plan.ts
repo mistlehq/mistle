@@ -14,6 +14,7 @@ import {
   SandboxProfileAssociatedResourceEventRoutingConfigSchema,
   compileRuntimePlan,
   supportsAssociatedResourceDeliveryRuntime,
+  type AgentRuntimeReader,
   type AssociatedResourceEventRouting,
   type CompiledRuntimePlan,
   type CompiledRuntimePlanSkills,
@@ -223,13 +224,18 @@ function resolveProfileMistleMcpCredentialResolver(input: {
 
 function resolveAssociatedResourceEventRouting(input: {
   rawConfig: unknown;
+  agentRuntimeRegistry: AgentRuntimeReader;
   agentRuntimeId: SandboxProfileVersionAgentRuntimeId | undefined;
   compileBindings: Awaited<ReturnType<typeof resolveCompileBindingsForVersion>>;
 }): AssociatedResourceEventRouting {
   const config = SandboxProfileAssociatedResourceEventRoutingConfigSchema.parse(input.rawConfig);
+  const agentRuntime =
+    input.agentRuntimeId === undefined
+      ? undefined
+      : input.agentRuntimeRegistry.getRuntime({ runtimeId: input.agentRuntimeId });
   const defaultResources =
-    input.agentRuntimeId !== undefined &&
-    supportsAssociatedResourceDeliveryRuntime(input.agentRuntimeId) &&
+    agentRuntime !== undefined &&
+    supportsAssociatedResourceDeliveryRuntime(agentRuntime) &&
     input.compileBindings.some((binding) => binding.target.familyId === GitHubFamilyId)
       ? [
           {
@@ -498,6 +504,7 @@ export async function compileSandboxRuntimePlan(
       }),
       associatedResourceEventRouting: resolveAssociatedResourceEventRouting({
         rawConfig: sandboxProfileVersion.associatedResourceEventRoutingConfig,
+        agentRuntimeRegistry: input.integrationDefinitions.agentRuntimeRegistry,
         agentRuntimeId,
         compileBindings,
       }),

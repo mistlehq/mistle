@@ -12,6 +12,11 @@ export const CodexRuntimeDefinition: AgentRuntimeDefinition<typeof CodexRuntimeC
   displayName: "Codex",
   logoKey: "openai",
   configSchema: CodexRuntimeConfigSchema,
+  capabilities: {
+    associatedResourceDelivery: {
+      supported: true,
+    },
+  },
   composerCapabilities: CodexComposerCapabilities,
   compileRuntime: compileCodexRuntime,
   materializeMcpConfig: () => [

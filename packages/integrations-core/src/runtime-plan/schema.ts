@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import type { AgentRuntimeCapabilities } from "../agent-runtimes/types.js";
 import {
   AssociatedProviderResourceKinds,
   AssociatedResourceEventTypes,
@@ -402,6 +403,17 @@ const AgentPtyLaunchSpecSchema = z
   })
   .strict();
 
+const AgentRuntimeCapabilitiesSchema = z
+  .object({
+    associatedResourceDelivery: z
+      .object({
+        supported: z.literal(true),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 const CompiledAgentRuntimeSchema = z
   .object({
     runtimeId: z.string().min(1),
@@ -409,6 +421,7 @@ const CompiledAgentRuntimeSchema = z
     clientId: z.string().min(1),
     endpointKey: z.string().min(1),
     ptyLaunch: AgentPtyLaunchSpecSchema,
+    capabilities: AgentRuntimeCapabilitiesSchema.optional(),
   })
   .strict();
 
@@ -966,6 +979,20 @@ function normalizeSkills(
   };
 }
 
+function normalizeAgentRuntimeCapabilities(
+  capabilities: z.output<typeof AgentRuntimeCapabilitiesSchema>,
+): AgentRuntimeCapabilities {
+  if (capabilities.associatedResourceDelivery === undefined) {
+    return {};
+  }
+
+  return {
+    associatedResourceDelivery: {
+      supported: capabilities.associatedResourceDelivery.supported,
+    },
+  };
+}
+
 function normalizeAgentRuntime(
   agentRuntime: z.output<typeof CompiledAgentRuntimeSchema>,
 ): RuntimePlanAgentRuntime {
@@ -998,6 +1025,9 @@ function normalizeAgentRuntime(
         args: agentRuntime.ptyLaunch.resumeLaunch.args,
       },
     },
+    ...(agentRuntime.capabilities === undefined
+      ? {}
+      : { capabilities: normalizeAgentRuntimeCapabilities(agentRuntime.capabilities) }),
   };
 }
 

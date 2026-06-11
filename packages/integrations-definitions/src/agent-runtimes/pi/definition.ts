@@ -8,5 +8,10 @@ export const PiRuntimeDefinition: AgentRuntimeDefinition<typeof PiRuntimeConfigS
   displayName: "Pi",
   logoKey: "pi",
   configSchema: PiRuntimeConfigSchema,
+  capabilities: {
+    associatedResourceDelivery: {
+      supported: true,
+    },
+  },
   compileRuntime: compilePiRuntime,
 };

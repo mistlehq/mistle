@@ -34,8 +34,13 @@ const IdempotentProviderDeliveryStepRetryPolicy = {
 export const HandleProviderResourceAssociationDeliveryWorkflow = defineTracedControlPlaneWorkflow(
   HandleProviderResourceAssociationDeliveryWorkflowSpec,
   async ({ input, run, step }) => {
-    const { controlPlaneInternalClient, dataPlaneClient, db, integrationRegistry } =
-      await getWorkflowContext();
+    const {
+      agentRuntimeRegistry,
+      controlPlaneInternalClient,
+      dataPlaneClient,
+      db,
+      integrationRegistry,
+    } = await getWorkflowContext();
     const workflowRunId = run.id;
     let iteration = 0;
 
@@ -102,6 +107,7 @@ export const HandleProviderResourceAssociationDeliveryWorkflow = defineTracedCon
           async () =>
             deliverActiveProviderResourceAssociationDelivery(
               {
+                agentRuntimeRegistry,
                 controlPlaneInternalClient,
                 dataPlaneClient,
                 db,
@@ -174,7 +180,11 @@ export const HandleProviderResourceAssociationDeliveryWorkflow = defineTracedCon
 async function deliverActiveProviderResourceAssociationDelivery(
   ctx: Pick<
     Awaited<ReturnType<typeof getWorkflowContext>>,
-    "controlPlaneInternalClient" | "dataPlaneClient" | "db" | "integrationRegistry"
+    | "agentRuntimeRegistry"
+    | "controlPlaneInternalClient"
+    | "dataPlaneClient"
+    | "db"
+    | "integrationRegistry"
   >,
   input: {
     delivery: ActiveProviderResourceAssociationDelivery;
@@ -208,6 +218,7 @@ async function deliverActiveProviderResourceAssociationDelivery(
 
     const target = await resolveProviderResourceAssociationDeliveryTarget(
       {
+        agentRuntimeRegistry: ctx.agentRuntimeRegistry,
         dataPlaneClient: ctx.dataPlaneClient,
         db: ctx.db,
         integrationRegistry: ctx.integrationRegistry,

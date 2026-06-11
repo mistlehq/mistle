@@ -664,6 +664,12 @@ export interface paths {
             "application/json": {
               runtimePlan: {
                 agentRuntimes: {
+                  capabilities?: {
+                    associatedResourceDelivery?: {
+                      /** @enum {boolean} */
+                      supported: true;
+                    };
+                  };
                   clientId: string;
                   endpointKey: string;
                   ptyLaunch: {
