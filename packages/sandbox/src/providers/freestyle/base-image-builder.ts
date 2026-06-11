@@ -1,5 +1,5 @@
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { access, readFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 
 import { SandboxConfigurationError } from "../../errors.js";
 import {
@@ -70,8 +70,30 @@ export function createFreestyleBaseImageBuilder(
 export async function readFreestyleCmddirBase64(
   source: SandboxSdkImageBaseImageSource,
 ): Promise<string> {
-  const content = await readFile(resolve(source.contextPath, FreestyleCmddirRelativePath));
+  const contextPath = await resolveFreestyleSdkImageContextPath(source.contextPath);
+  const content = await readFile(resolve(contextPath, FreestyleCmddirRelativePath));
   return content.toString("base64");
+}
+
+export async function resolveFreestyleSdkImageContextPath(startDirectory: string): Promise<string> {
+  let currentDirectory = resolve(startDirectory);
+
+  while (true) {
+    const candidatePath = resolve(currentDirectory, FreestyleCmddirRelativePath);
+    try {
+      await access(candidatePath);
+      return currentDirectory;
+    } catch {
+      const parentDirectory = dirname(currentDirectory);
+      if (parentDirectory === currentDirectory) {
+        throw new SandboxConfigurationError(
+          `Freestyle SDK image context must contain '${FreestyleCmddirRelativePath}' at or above '${startDirectory}'.`,
+        );
+      }
+
+      currentDirectory = parentDirectory;
+    }
+  }
 }
 
 function validateSdkImageSource(request: {
