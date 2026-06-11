@@ -147,11 +147,20 @@ export type SandboxProfilesService = {
       isActive: boolean;
     };
     activeVersion: number | null;
-    snapshotJob: {
-      id: string;
-      trigger: "publish";
-      state: "queued";
-    };
+    snapshotAction:
+      | {
+          kind: "created";
+          job: {
+            id: string;
+            trigger: "publish" | "manual_refresh" | "scheduled_refresh";
+            state: "queued" | "running" | "succeeded" | "failed";
+          };
+        }
+      | {
+          kind: "reused";
+          snapshotImageProvider: string;
+          snapshotImageId: string;
+        };
   }>;
   discardProfileVersionDraft: (input: {
     organizationId: string;

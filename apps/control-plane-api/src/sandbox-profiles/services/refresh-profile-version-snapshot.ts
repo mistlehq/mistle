@@ -90,16 +90,28 @@ type RefreshProfileVersionSnapshotOutput = {
     };
   };
   activeVersion: number | null;
-  snapshotJob: {
-    id: string;
-    sandboxInstanceId: string | null;
-    trigger: (typeof SandboxProfileVersionSnapshotJobTriggers)[keyof typeof SandboxProfileVersionSnapshotJobTriggers];
-    state: (typeof SandboxProfileVersionSnapshotJobStates)[keyof typeof SandboxProfileVersionSnapshotJobStates];
-    errorCode: string | null;
-    errorMessage: string | null;
-    createdAt: string;
-    startedAt: string | null;
-    finishedAt: string | null;
+  snapshotAction: {
+    kind: "created";
+    job: SnapshotJobSummary;
+  };
+};
+
+type SnapshotJobSummary = {
+  id: string;
+  sandboxInstanceId: string | null;
+  trigger: (typeof SandboxProfileVersionSnapshotJobTriggers)[keyof typeof SandboxProfileVersionSnapshotJobTriggers];
+  state: (typeof SandboxProfileVersionSnapshotJobStates)[keyof typeof SandboxProfileVersionSnapshotJobStates];
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+};
+
+type RefreshTransactionResult = RefreshProfileVersionSnapshotOutput & {
+  snapshotImage: {
+    provider: string | null;
+    imageId: string | null;
   };
 };
 
@@ -171,7 +183,7 @@ async function queueProfileVersionSnapshot(
   const sandboxInstanceId = typeid("sbi").toString();
 
   try {
-    const refreshResult = await db.transaction(async (tx) => {
+    const refreshResult: RefreshTransactionResult = await db.transaction(async (tx) => {
       const tables = getControlPlaneDatabaseSchema(tx);
 
       const [sandboxProfileVersion] = await tx
@@ -345,7 +357,10 @@ async function queueProfileVersionSnapshot(
           latestSnapshotJob: snapshotJob,
         },
         activeVersion: sandboxProfileVersion.activeVersion,
-        snapshotJob,
+        snapshotAction: {
+          kind: "created",
+          job: snapshotJob,
+        },
         snapshotImage: {
           provider: sandboxProfileVersion.snapshotImageProvider,
           imageId: sandboxProfileVersion.snapshotImageId,
@@ -382,7 +397,7 @@ async function queueProfileVersionSnapshot(
         dataPlaneClient,
       },
       {
-        snapshotJobId: refreshResult.snapshotJob.id,
+        snapshotJobId: refreshResult.snapshotAction.job.id,
         sandboxInstanceId,
         organizationId: input.organizationId,
         profileId: input.profileId,
@@ -396,7 +411,7 @@ async function queueProfileVersionSnapshot(
     return {
       version: refreshResult.version,
       activeVersion: refreshResult.activeVersion,
-      snapshotJob: refreshResult.snapshotJob,
+      snapshotAction: refreshResult.snapshotAction,
     };
   } catch (error) {
     if (

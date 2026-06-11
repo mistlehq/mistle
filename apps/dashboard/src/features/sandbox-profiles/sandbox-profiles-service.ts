@@ -604,19 +604,33 @@ const SandboxProfileVersionPublishabilitySchema = z
 const PublishSandboxProfileVersionResultSchema = z
   .object({
     activeVersion: z.number().int().min(1).nullable(),
-    snapshotJob: z
-      .object({
-        id: z.string().min(1),
-        sandboxInstanceId: z.string().min(1).nullable(),
-        trigger: z.enum(["publish", "manual_refresh", "scheduled_refresh"]),
-        state: z.enum(["queued", "running", "succeeded", "failed"]),
-        errorCode: z.string().min(1).nullable(),
-        errorMessage: z.string().min(1).nullable(),
-        createdAt: z.string().min(1),
-        startedAt: z.string().min(1).nullable(),
-        finishedAt: z.string().min(1).nullable(),
-      })
-      .strict(),
+    snapshotAction: z.discriminatedUnion("kind", [
+      z
+        .object({
+          kind: z.literal("created"),
+          job: z
+            .object({
+              id: z.string().min(1),
+              sandboxInstanceId: z.string().min(1).nullable(),
+              trigger: z.enum(["publish", "manual_refresh", "scheduled_refresh"]),
+              state: z.enum(["queued", "running", "succeeded", "failed"]),
+              errorCode: z.string().min(1).nullable(),
+              errorMessage: z.string().min(1).nullable(),
+              createdAt: z.string().min(1),
+              startedAt: z.string().min(1).nullable(),
+              finishedAt: z.string().min(1).nullable(),
+            })
+            .strict(),
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal("reused"),
+          snapshotImageProvider: z.string().min(1),
+          snapshotImageId: z.string().min(1),
+        })
+        .strict(),
+    ]),
     version: SandboxProfileVersionSchema,
   })
   .strict();

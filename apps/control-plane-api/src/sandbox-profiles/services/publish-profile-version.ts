@@ -37,6 +37,10 @@ import {
   mapProfileVersionSkillsConfig,
   type SandboxProfileVersionSkillsConfig,
 } from "./profile-version-skills-config.js";
+import {
+  resolveProfileVersionPublishSnapshotAction,
+  type ProfileVersionSnapshotDecisionFields,
+} from "./resolve-profile-version-publish-snapshot-action.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type PublishProfileVersionInput = {
@@ -74,21 +78,58 @@ type PublishProfileVersionOutput = {
       createdAt: string;
       startedAt: string | null;
       finishedAt: string | null;
-    };
+    } | null;
   };
   activeVersion: number | null;
-  snapshotJob: {
-    id: string;
-    sandboxInstanceId: string | null;
-    trigger: (typeof SandboxProfileVersionSnapshotJobTriggers)[keyof typeof SandboxProfileVersionSnapshotJobTriggers];
-    state: (typeof SandboxProfileVersionSnapshotJobStates)[keyof typeof SandboxProfileVersionSnapshotJobStates];
-    errorCode: string | null;
-    errorMessage: string | null;
-    createdAt: string;
-    startedAt: string | null;
-    finishedAt: string | null;
-  };
+  snapshotAction:
+    | {
+        kind: "created";
+        job: SnapshotJobSummary;
+      }
+    | {
+        kind: "reused";
+        snapshotImageProvider: string;
+        snapshotImageId: string;
+      };
 };
+
+type SnapshotJobSummary = {
+  id: string;
+  sandboxInstanceId: string | null;
+  trigger: (typeof SandboxProfileVersionSnapshotJobTriggers)[keyof typeof SandboxProfileVersionSnapshotJobTriggers];
+  state: (typeof SandboxProfileVersionSnapshotJobStates)[keyof typeof SandboxProfileVersionSnapshotJobStates];
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+};
+
+type PublishTransactionResult = PublishProfileVersionOutput & {
+  snapshotMaterialization:
+    | {
+        kind: "enqueue";
+        snapshotJob: SnapshotJobSummary;
+        sandboxInstanceId: string;
+      }
+    | {
+        kind: "none";
+      };
+};
+
+function requireCreatedSnapshotJob(input: {
+  snapshotJob: SnapshotJobSummary | null;
+  profileId: string;
+  profileVersion: number;
+}): SnapshotJobSummary {
+  if (input.snapshotJob === null) {
+    throw new Error(
+      `Snapshot job was not created for sandbox profile '${input.profileId}' version '${String(input.profileVersion)}'.`,
+    );
+  }
+
+  return input.snapshotJob;
+}
 
 async function copyRefreshScheduleToPublishedVersion(
   tx: ControlPlaneTransaction,
@@ -265,11 +306,18 @@ export async function publishProfileVersion(
     db,
     dataPlaneClient,
     defaultBaseImage,
+    integrationsConfig,
     integrationRegistry,
+    mcpConfig,
     sandboxConfig,
   }: Pick<
     CreateSandboxProfilesServiceInput,
-    "db" | "dataPlaneClient" | "integrationRegistry" | "sandboxConfig"
+    | "db"
+    | "dataPlaneClient"
+    | "integrationsConfig"
+    | "integrationRegistry"
+    | "mcpConfig"
+    | "sandboxConfig"
   > & {
     defaultBaseImage: string;
   },
@@ -277,7 +325,7 @@ export async function publishProfileVersion(
 ): Promise<PublishProfileVersionOutput> {
   const sandboxInstanceId = typeid("sbi").toString();
 
-  const publishedResult = await db.transaction(async (tx) => {
+  const publishedResult: PublishTransactionResult = await db.transaction(async (tx) => {
     const tables = getControlPlaneDatabaseSchema(tx);
 
     const sandboxProfile = await tx.query.sandboxProfiles.findFirst({
@@ -301,7 +349,20 @@ export async function publishProfileVersion(
         sandboxProfileId: true,
         version: true,
         state: true,
+        setupScript: true,
         maintenanceScript: true,
+        agentRuntimeId: true,
+        gitCommitSigningIntegrationConnectionId: true,
+        mistleMcpEnabled: true,
+        mistleMcpApiKeyId: true,
+        sandboxProvider: true,
+        sandboxConnectionId: true,
+        sandboxVcpuCount: true,
+        sandboxMemoryMb: true,
+        sandboxDiskMb: true,
+        skillsConfig: true,
+        snapshotImageProvider: true,
+        snapshotImageId: true,
       },
       where: (table, { and, eq }) =>
         and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),
@@ -338,13 +399,31 @@ export async function publishProfileVersion(
     }
 
     const previousActiveVersionNumber = sandboxProfile.activeVersion;
-    let previousActiveVersion: { maintenanceScript: string | null } | null = null;
+    let previousActiveVersion:
+      | (ProfileVersionSnapshotDecisionFields & {
+          maintenanceScript: string | null;
+        })
+      | null = null;
     if (previousActiveVersionNumber !== null) {
       const activeVersion = previousActiveVersionNumber;
       previousActiveVersion =
         (await tx.query.sandboxProfileVersions.findFirst({
           columns: {
+            version: true,
+            setupScript: true,
             maintenanceScript: true,
+            agentRuntimeId: true,
+            gitCommitSigningIntegrationConnectionId: true,
+            mistleMcpEnabled: true,
+            mistleMcpApiKeyId: true,
+            sandboxProvider: true,
+            sandboxConnectionId: true,
+            sandboxVcpuCount: true,
+            sandboxMemoryMb: true,
+            sandboxDiskMb: true,
+            skillsConfig: true,
+            snapshotImageProvider: true,
+            snapshotImageId: true,
           },
           where: (table, { and: whereAnd, eq: whereEq }) =>
             whereAnd(
@@ -354,11 +433,31 @@ export async function publishProfileVersion(
         })) ?? null;
     }
 
+    const snapshotAction = await resolveProfileVersionPublishSnapshotAction(
+      {
+        db: tx,
+        integrationsConfig,
+        mcpConfig,
+      },
+      {
+        organizationId: input.organizationId,
+        profileId: input.profileId,
+        draftVersion: sandboxProfileVersion,
+        previousActiveVersion,
+      },
+    );
+
     const [publishedVersion] = await tx
       .update(tables.sandboxProfileVersions)
       .set({
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: sql`now()`,
+        ...(snapshotAction.kind === "reuse"
+          ? {
+              snapshotImageProvider: snapshotAction.snapshotImageProvider,
+              snapshotImageId: snapshotAction.snapshotImageId,
+            }
+          : {}),
         maintenanceScript:
           previousActiveVersion === null
             ? sandboxProfileVersion.maintenanceScript
@@ -386,6 +485,8 @@ export async function publishProfileVersion(
         sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
         sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
         sandboxDiskMb: tables.sandboxProfileVersions.sandboxDiskMb,
+        snapshotImageProvider: tables.sandboxProfileVersions.snapshotImageProvider,
+        snapshotImageId: tables.sandboxProfileVersions.snapshotImageId,
         maintenanceScript: tables.sandboxProfileVersions.maintenanceScript,
         skillsConfig: tables.sandboxProfileVersions.skillsConfig,
         associatedResourceEventRoutingConfig:
@@ -399,31 +500,43 @@ export async function publishProfileVersion(
       );
     }
 
-    const [snapshotJob] = await tx
-      .insert(tables.sandboxProfileVersionSnapshotJobs)
-      .values({
-        sandboxProfileId: input.profileId,
-        sandboxProfileVersion: input.profileVersion,
-        sandboxInstanceId,
-        trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
-        state: SandboxProfileVersionSnapshotJobStates.QUEUED,
-      })
-      .returning({
-        id: tables.sandboxProfileVersionSnapshotJobs.id,
-        sandboxInstanceId: tables.sandboxProfileVersionSnapshotJobs.sandboxInstanceId,
-        trigger: tables.sandboxProfileVersionSnapshotJobs.trigger,
-        state: tables.sandboxProfileVersionSnapshotJobs.state,
-        errorCode: tables.sandboxProfileVersionSnapshotJobs.errorCode,
-        errorMessage: tables.sandboxProfileVersionSnapshotJobs.errorMessage,
-        createdAt: tables.sandboxProfileVersionSnapshotJobs.createdAt,
-        startedAt: tables.sandboxProfileVersionSnapshotJobs.startedAt,
-        finishedAt: tables.sandboxProfileVersionSnapshotJobs.finishedAt,
-      });
+    let snapshotJob: SnapshotJobSummary | null = null;
+    if (snapshotAction.kind === "create") {
+      const [createdSnapshotJob] = await tx
+        .insert(tables.sandboxProfileVersionSnapshotJobs)
+        .values({
+          sandboxProfileId: input.profileId,
+          sandboxProfileVersion: input.profileVersion,
+          sandboxInstanceId,
+          trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+          state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+        })
+        .returning({
+          id: tables.sandboxProfileVersionSnapshotJobs.id,
+          sandboxInstanceId: tables.sandboxProfileVersionSnapshotJobs.sandboxInstanceId,
+          trigger: tables.sandboxProfileVersionSnapshotJobs.trigger,
+          state: tables.sandboxProfileVersionSnapshotJobs.state,
+          errorCode: tables.sandboxProfileVersionSnapshotJobs.errorCode,
+          errorMessage: tables.sandboxProfileVersionSnapshotJobs.errorMessage,
+          createdAt: tables.sandboxProfileVersionSnapshotJobs.createdAt,
+          startedAt: tables.sandboxProfileVersionSnapshotJobs.startedAt,
+          finishedAt: tables.sandboxProfileVersionSnapshotJobs.finishedAt,
+        });
 
-    if (snapshotJob === undefined) {
-      throw new Error(
-        `Failed to create snapshot job for sandbox profile '${input.profileId}' version '${String(input.profileVersion)}'.`,
-      );
+      if (createdSnapshotJob === undefined) {
+        throw new Error(
+          `Failed to create snapshot job for sandbox profile '${input.profileId}' version '${String(input.profileVersion)}'.`,
+        );
+      }
+      snapshotJob = createdSnapshotJob;
+    } else {
+      await tx
+        .update(tables.sandboxProfiles)
+        .set({
+          activeVersion: input.profileVersion,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(tables.sandboxProfiles.id, input.profileId));
     }
 
     const refreshSchedulesByVersion = await loadActiveRefreshSchedulesByVersion({
@@ -441,33 +554,72 @@ export async function publishProfileVersion(
             now: new Date(),
           });
 
-    return {
-      version: {
-        sandboxProfileId: publishedVersion.sandboxProfileId,
-        version: publishedVersion.version,
-        state: publishedVersion.state,
-        publishedAt: publishedVersion.publishedAt,
-        agentRuntimeId: publishedVersion.agentRuntimeId,
-        gitCommitSigningIntegrationConnectionId:
-          publishedVersion.gitCommitSigningIntegrationConnectionId,
-        mistleMcpEnabled: publishedVersion.mistleMcpEnabled,
-        mistleMcpApiKeyId: publishedVersion.mistleMcpApiKeyId,
-        maintenanceScript: publishedVersion.maintenanceScript,
-        ...mapProfileVersionRuntimeConfig(publishedVersion),
-        skillsConfig: mapProfileVersionSkillsConfig(publishedVersion.skillsConfig),
-        associatedResourceEventRoutingConfig: mapProfileVersionAssociatedResourceEventRoutingConfig(
-          publishedVersion.associatedResourceEventRoutingConfig,
-        ),
-        isActive: false,
-        usable: false,
-        refreshSchedule:
-          copiedRefreshSchedule ?? refreshSchedulesByVersion.get(input.profileVersion) ?? null,
-        latestSnapshotJob: snapshotJob,
-      },
-      activeVersion: sandboxProfile.activeVersion,
+    const versionOutput = {
+      sandboxProfileId: publishedVersion.sandboxProfileId,
+      version: publishedVersion.version,
+      state: publishedVersion.state,
+      publishedAt: publishedVersion.publishedAt,
+      agentRuntimeId: publishedVersion.agentRuntimeId,
+      gitCommitSigningIntegrationConnectionId:
+        publishedVersion.gitCommitSigningIntegrationConnectionId,
+      mistleMcpEnabled: publishedVersion.mistleMcpEnabled,
+      mistleMcpApiKeyId: publishedVersion.mistleMcpApiKeyId,
+      maintenanceScript: publishedVersion.maintenanceScript,
+      ...mapProfileVersionRuntimeConfig(publishedVersion),
+      skillsConfig: mapProfileVersionSkillsConfig(publishedVersion.skillsConfig),
+      associatedResourceEventRoutingConfig: mapProfileVersionAssociatedResourceEventRoutingConfig(
+        publishedVersion.associatedResourceEventRoutingConfig,
+      ),
+      isActive: snapshotAction.kind === "reuse",
+      usable: snapshotAction.kind === "reuse",
+      refreshSchedule:
+        copiedRefreshSchedule ?? refreshSchedulesByVersion.get(input.profileVersion) ?? null,
+      latestSnapshotJob: snapshotJob,
+    };
+
+    if (snapshotAction.kind === "reuse") {
+      return {
+        version: versionOutput,
+        activeVersion: input.profileVersion,
+        snapshotAction: {
+          kind: "reused",
+          snapshotImageProvider: snapshotAction.snapshotImageProvider,
+          snapshotImageId: snapshotAction.snapshotImageId,
+        },
+        snapshotMaterialization: {
+          kind: "none",
+        },
+      };
+    }
+
+    const createdSnapshotJob = requireCreatedSnapshotJob({
       snapshotJob,
+      profileId: input.profileId,
+      profileVersion: input.profileVersion,
+    });
+
+    return {
+      version: versionOutput,
+      activeVersion: sandboxProfile.activeVersion,
+      snapshotAction: {
+        kind: "created",
+        job: createdSnapshotJob,
+      },
+      snapshotMaterialization: {
+        kind: "enqueue",
+        snapshotJob: createdSnapshotJob,
+        sandboxInstanceId,
+      },
     };
   });
+
+  if (publishedResult.snapshotMaterialization.kind === "none") {
+    return {
+      version: publishedResult.version,
+      activeVersion: publishedResult.activeVersion,
+      snapshotAction: publishedResult.snapshotAction,
+    };
+  }
 
   const sandboxRuntime = createWorkflowSandboxRuntime(publishedResult.version);
   await enqueueSnapshotMaterializationJob(
@@ -476,8 +628,8 @@ export async function publishProfileVersion(
       dataPlaneClient,
     },
     {
-      snapshotJobId: publishedResult.snapshotJob.id,
-      sandboxInstanceId,
+      snapshotJobId: publishedResult.snapshotMaterialization.snapshotJob.id,
+      sandboxInstanceId: publishedResult.snapshotMaterialization.sandboxInstanceId,
       organizationId: input.organizationId,
       profileId: input.profileId,
       profileVersion: input.profileVersion,
@@ -492,5 +644,9 @@ export async function publishProfileVersion(
     },
   );
 
-  return publishedResult;
+  return {
+    version: publishedResult.version,
+    activeVersion: publishedResult.activeVersion,
+    snapshotAction: publishedResult.snapshotAction,
+  };
 }

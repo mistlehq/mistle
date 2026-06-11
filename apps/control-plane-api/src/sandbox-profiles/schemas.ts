@@ -98,6 +98,21 @@ const sandboxProfileVersionSnapshotJobSummarySchema = z
     finishedAt: z.string().min(1).nullable(),
   })
   .strict();
+const sandboxProfileVersionSnapshotActionSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("created"),
+      job: sandboxProfileVersionSnapshotJobSummarySchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("reused"),
+      snapshotImageProvider: z.string().min(1),
+      snapshotImageId: z.string().min(1),
+    })
+    .strict(),
+]);
 const sandboxProfileVersionRefreshScheduleSummarySchema = z
   .object({
     scheduleId: z.string().min(1),
@@ -338,19 +353,7 @@ export const publishSandboxProfileVersionResponseSchema = z
   .object({
     version: sandboxProfileVersionSchema,
     activeVersion: z.number().int().min(1).nullable(),
-    snapshotJob: z
-      .object({
-        id: z.string().min(1),
-        sandboxInstanceId: z.string().min(1).nullable(),
-        trigger: sandboxProfileVersionSnapshotJobTriggerSchema,
-        state: sandboxProfileVersionSnapshotJobStateSchema,
-        errorCode: z.string().min(1).nullable(),
-        errorMessage: z.string().min(1).nullable(),
-        createdAt: z.string().min(1),
-        startedAt: z.string().min(1).nullable(),
-        finishedAt: z.string().min(1).nullable(),
-      })
-      .strict(),
+    snapshotAction: sandboxProfileVersionSnapshotActionSchema,
   })
   .strict();
 

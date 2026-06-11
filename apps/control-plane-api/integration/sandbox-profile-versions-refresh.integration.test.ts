@@ -42,6 +42,38 @@ const DockerSandboxRuntimeConfig = {
   skillsConfig: null,
 } as const;
 
+type SnapshotJobSummary = {
+  id: string;
+  sandboxInstanceId: string | null;
+  trigger: (typeof SandboxProfileVersionSnapshotJobTriggers)[keyof typeof SandboxProfileVersionSnapshotJobTriggers];
+  state: (typeof SandboxProfileVersionSnapshotJobStates)[keyof typeof SandboxProfileVersionSnapshotJobStates];
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+};
+
+function expectCreatedSnapshotJob(
+  input:
+    | {
+        kind: "created";
+        job: SnapshotJobSummary;
+      }
+    | {
+        kind: "reused";
+        snapshotImageProvider: string;
+        snapshotImageId: string;
+      },
+): SnapshotJobSummary {
+  expect(input.kind).toBe("created");
+  if (input.kind !== "created") {
+    throw new Error("Expected refresh response to create a snapshot job.");
+  }
+
+  return input.job;
+}
+
 describe.concurrent("sandbox profile versions refresh integration", () => {
   it("queues manual refresh for a usable published version", async ({ env }) => {
     const session = await env.auth.createSession({
@@ -90,6 +122,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
 
     expect(response.status).toBe(200);
     const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    const snapshotJob = expectCreatedSnapshotJob(responseBody.snapshotAction);
     expect(responseBody).toEqual({
       version: {
         sandboxProfileId: "sbp_version_refresh_001",
@@ -115,26 +148,29 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
         },
       },
       activeVersion: 2,
-      snapshotJob: {
-        id: expect.any(String),
-        sandboxInstanceId: expect.any(String),
-        trigger: SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH,
-        state: SandboxProfileVersionSnapshotJobStates.QUEUED,
-        errorCode: null,
-        errorMessage: null,
-        createdAt: expect.any(String),
-        startedAt: null,
-        finishedAt: null,
+      snapshotAction: {
+        kind: "created",
+        job: {
+          id: expect.any(String),
+          sandboxInstanceId: expect.any(String),
+          trigger: SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH,
+          state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+          errorCode: null,
+          errorMessage: null,
+          createdAt: expect.any(String),
+          startedAt: null,
+          finishedAt: null,
+        },
       },
     });
 
     const persistedSnapshotJob =
       await env.controlPlaneDb.query.sandboxProfileVersionSnapshotJobs.findFirst({
-        where: (table, { eq }) => eq(table.id, responseBody.snapshotJob.id),
+        where: (table, { eq }) => eq(table.id, snapshotJob.id),
       });
     expect(persistedSnapshotJob).toMatchObject({
-      id: responseBody.snapshotJob.id,
-      sandboxInstanceId: responseBody.snapshotJob.sandboxInstanceId,
+      id: snapshotJob.id,
+      sandboxInstanceId: snapshotJob.sandboxInstanceId,
       sandboxProfileId: "sbp_version_refresh_001",
       sandboxProfileVersion: 2,
       trigger: SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH,
@@ -151,11 +187,11 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
 
     const queuedWorkflowInput = await waitForQueuedMaterializeWorkflowInput({
       env,
-      snapshotJobId: responseBody.snapshotJob.id,
+      snapshotJobId: snapshotJob.id,
     });
     expect(queuedWorkflowInput).toMatchObject({
-      snapshotJobId: responseBody.snapshotJob.id,
-      sandboxInstanceId: responseBody.snapshotJob.sandboxInstanceId,
+      snapshotJobId: snapshotJob.id,
+      sandboxInstanceId: snapshotJob.sandboxInstanceId,
       sandboxProfileId: "sbp_version_refresh_001",
       sandboxProfileVersion: 2,
       image: {
@@ -208,6 +244,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
 
     expect(response.status).toBe(200);
     const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    const snapshotJob = expectCreatedSnapshotJob(responseBody.snapshotAction);
     expect(responseBody.version).toMatchObject({
       sandboxProfileId: "sbp_version_maintenance_refresh_001",
       version: 1,
@@ -220,10 +257,10 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
 
     const queuedWorkflowInput = await waitForQueuedMaterializeWorkflowInput({
       env,
-      snapshotJobId: responseBody.snapshotJob.id,
+      snapshotJobId: snapshotJob.id,
     });
     expect(queuedWorkflowInput).toMatchObject({
-      snapshotJobId: responseBody.snapshotJob.id,
+      snapshotJobId: snapshotJob.id,
       sandboxProfileId: "sbp_version_maintenance_refresh_001",
       sandboxProfileVersion: 1,
       image: {
@@ -320,6 +357,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
 
     expect(response.status).toBe(200);
     const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    const snapshotJob = expectCreatedSnapshotJob(responseBody.snapshotAction);
     expect(responseBody).toEqual({
       version: {
         sandboxProfileId: "sbp_version_retry_not_usable_001",
@@ -345,26 +383,29 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
         },
       },
       activeVersion: null,
-      snapshotJob: {
-        id: expect.any(String),
-        sandboxInstanceId: expect.any(String),
-        trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
-        state: SandboxProfileVersionSnapshotJobStates.QUEUED,
-        errorCode: null,
-        errorMessage: null,
-        createdAt: expect.any(String),
-        startedAt: null,
-        finishedAt: null,
+      snapshotAction: {
+        kind: "created",
+        job: {
+          id: expect.any(String),
+          sandboxInstanceId: expect.any(String),
+          trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+          state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+          errorCode: null,
+          errorMessage: null,
+          createdAt: expect.any(String),
+          startedAt: null,
+          finishedAt: null,
+        },
       },
     });
 
     const queuedWorkflowInput = await waitForQueuedMaterializeWorkflowInput({
       env,
-      snapshotJobId: responseBody.snapshotJob.id,
+      snapshotJobId: snapshotJob.id,
     });
     expect(queuedWorkflowInput).toMatchObject({
-      snapshotJobId: responseBody.snapshotJob.id,
-      sandboxInstanceId: responseBody.snapshotJob.sandboxInstanceId,
+      snapshotJobId: snapshotJob.id,
+      sandboxInstanceId: snapshotJob.sandboxInstanceId,
       sandboxProfileId: "sbp_version_retry_not_usable_001",
       sandboxProfileVersion: 1,
       image: {
@@ -493,6 +534,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
 
     expect(response.status).toBe(200);
     const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    const snapshotJob = expectCreatedSnapshotJob(responseBody.snapshotAction);
     expect(responseBody.version).toMatchObject({
       sandboxProfileId: "sbp_version_retry_publish_snapshot_001",
       version: 2,
@@ -507,7 +549,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
       },
     });
     expect(responseBody.activeVersion).toBe(1);
-    expect(responseBody.snapshotJob.trigger).toBe(SandboxProfileVersionSnapshotJobTriggers.PUBLISH);
+    expect(snapshotJob.trigger).toBe(SandboxProfileVersionSnapshotJobTriggers.PUBLISH);
 
     const persistedProfile = await env.controlPlaneDb.query.sandboxProfiles.findFirst({
       columns: {
@@ -527,11 +569,11 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
 
     const queuedWorkflowInput = await waitForQueuedMaterializeWorkflowInput({
       env,
-      snapshotJobId: responseBody.snapshotJob.id,
+      snapshotJobId: snapshotJob.id,
     });
     expect(queuedWorkflowInput).toMatchObject({
-      snapshotJobId: responseBody.snapshotJob.id,
-      sandboxInstanceId: responseBody.snapshotJob.sandboxInstanceId,
+      snapshotJobId: snapshotJob.id,
+      sandboxInstanceId: snapshotJob.sandboxInstanceId,
       sandboxProfileId: "sbp_version_retry_publish_snapshot_001",
       sandboxProfileVersion: 2,
       image: {
@@ -616,6 +658,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
 
     expect(response.status).toBe(200);
     const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    const snapshotJob = expectCreatedSnapshotJob(responseBody.snapshotAction);
     expect(responseBody.version.latestSnapshotJob).toMatchObject({
       id: expect.any(String),
       sandboxInstanceId: expect.any(String),
@@ -626,11 +669,11 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
 
     const queuedWorkflowInput = await waitForQueuedMaterializeWorkflowInput({
       env,
-      snapshotJobId: responseBody.snapshotJob.id,
+      snapshotJobId: snapshotJob.id,
     });
     expect(queuedWorkflowInput).toMatchObject({
-      snapshotJobId: responseBody.snapshotJob.id,
-      sandboxInstanceId: responseBody.snapshotJob.sandboxInstanceId,
+      snapshotJobId: snapshotJob.id,
+      sandboxInstanceId: snapshotJob.sandboxInstanceId,
       sandboxProfileId: "sbp_version_retry_after_manual_failure_001",
       sandboxProfileVersion: 2,
       image: {

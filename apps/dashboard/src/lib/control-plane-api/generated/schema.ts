@@ -11334,19 +11334,30 @@ export interface paths {
           content: {
             "application/json": {
               activeVersion: number | null;
-              snapshotJob: {
-                createdAt: string;
-                errorCode: string | null;
-                errorMessage: string | null;
-                finishedAt: string | null;
-                id: string;
-                sandboxInstanceId: string | null;
-                startedAt: string | null;
-                /** @enum {string} */
-                state: "queued" | "running" | "succeeded" | "failed";
-                /** @enum {string} */
-                trigger: "publish" | "manual_refresh" | "scheduled_refresh";
-              };
+              snapshotAction:
+                | {
+                    job: {
+                      createdAt: string;
+                      errorCode: string | null;
+                      errorMessage: string | null;
+                      finishedAt: string | null;
+                      id: string;
+                      sandboxInstanceId: string | null;
+                      startedAt: string | null;
+                      /** @enum {string} */
+                      state: "queued" | "running" | "succeeded" | "failed";
+                      /** @enum {string} */
+                      trigger: "publish" | "manual_refresh" | "scheduled_refresh";
+                    };
+                    /** @enum {string} */
+                    kind: "created";
+                  }
+                | {
+                    /** @enum {string} */
+                    kind: "reused";
+                    snapshotImageId: string;
+                    snapshotImageProvider: string;
+                  };
               version: {
                 /** @enum {string} */
                 agentRuntimeId: "codex" | "opencode" | "pi";
@@ -11656,19 +11667,30 @@ export interface paths {
           content: {
             "application/json": {
               activeVersion: number | null;
-              snapshotJob: {
-                createdAt: string;
-                errorCode: string | null;
-                errorMessage: string | null;
-                finishedAt: string | null;
-                id: string;
-                sandboxInstanceId: string | null;
-                startedAt: string | null;
-                /** @enum {string} */
-                state: "queued" | "running" | "succeeded" | "failed";
-                /** @enum {string} */
-                trigger: "publish" | "manual_refresh" | "scheduled_refresh";
-              };
+              snapshotAction:
+                | {
+                    job: {
+                      createdAt: string;
+                      errorCode: string | null;
+                      errorMessage: string | null;
+                      finishedAt: string | null;
+                      id: string;
+                      sandboxInstanceId: string | null;
+                      startedAt: string | null;
+                      /** @enum {string} */
+                      state: "queued" | "running" | "succeeded" | "failed";
+                      /** @enum {string} */
+                      trigger: "publish" | "manual_refresh" | "scheduled_refresh";
+                    };
+                    /** @enum {string} */
+                    kind: "created";
+                  }
+                | {
+                    /** @enum {string} */
+                    kind: "reused";
+                    snapshotImageId: string;
+                    snapshotImageProvider: string;
+                  };
               version: {
                 /** @enum {string} */
                 agentRuntimeId: "codex" | "opencode" | "pi";
@@ -12056,19 +12078,30 @@ export interface paths {
           content: {
             "application/json": {
               activeVersion: number | null;
-              snapshotJob: {
-                createdAt: string;
-                errorCode: string | null;
-                errorMessage: string | null;
-                finishedAt: string | null;
-                id: string;
-                sandboxInstanceId: string | null;
-                startedAt: string | null;
-                /** @enum {string} */
-                state: "queued" | "running" | "succeeded" | "failed";
-                /** @enum {string} */
-                trigger: "publish" | "manual_refresh" | "scheduled_refresh";
-              };
+              snapshotAction:
+                | {
+                    job: {
+                      createdAt: string;
+                      errorCode: string | null;
+                      errorMessage: string | null;
+                      finishedAt: string | null;
+                      id: string;
+                      sandboxInstanceId: string | null;
+                      startedAt: string | null;
+                      /** @enum {string} */
+                      state: "queued" | "running" | "succeeded" | "failed";
+                      /** @enum {string} */
+                      trigger: "publish" | "manual_refresh" | "scheduled_refresh";
+                    };
+                    /** @enum {string} */
+                    kind: "created";
+                  }
+                | {
+                    /** @enum {string} */
+                    kind: "reused";
+                    snapshotImageId: string;
+                    snapshotImageProvider: string;
+                  };
               version: {
                 /** @enum {string} */
                 agentRuntimeId: "codex" | "opencode" | "pi";

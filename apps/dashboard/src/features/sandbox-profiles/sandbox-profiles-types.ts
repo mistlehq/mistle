@@ -103,17 +103,26 @@ export type SandboxProfileVersionDraftTriggerImpactIssue =
 
 export type PublishSandboxProfileVersionResult = {
   activeVersion: number | null;
-  snapshotJob: {
-    id: string;
-    sandboxInstanceId: string | null;
-    trigger: "publish" | "manual_refresh" | "scheduled_refresh";
-    state: "queued" | "running" | "succeeded" | "failed";
-    errorCode: string | null;
-    errorMessage: string | null;
-    createdAt: string;
-    startedAt: string | null;
-    finishedAt: string | null;
-  };
+  snapshotAction:
+    | {
+        kind: "created";
+        job: {
+          id: string;
+          sandboxInstanceId: string | null;
+          trigger: "publish" | "manual_refresh" | "scheduled_refresh";
+          state: "queued" | "running" | "succeeded" | "failed";
+          errorCode: string | null;
+          errorMessage: string | null;
+          createdAt: string;
+          startedAt: string | null;
+          finishedAt: string | null;
+        };
+      }
+    | {
+        kind: "reused";
+        snapshotImageProvider: string;
+        snapshotImageId: string;
+      };
   version: SandboxProfileVersion;
 };
 
