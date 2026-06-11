@@ -1416,6 +1416,15 @@ export interface paths {
                   source: "managed" | "connection";
                 }
               | {
+                  /** Format: uri */
+                  apiBaseUrl?: string;
+                  apiKey: string;
+                  /** @enum {string} */
+                  provider: "opencomputer";
+                  /** @enum {string} */
+                  source: "managed" | "connection";
+                }
+              | {
                   appName: string;
                   defaultTimeoutMs?: number;
                   environment?: string;

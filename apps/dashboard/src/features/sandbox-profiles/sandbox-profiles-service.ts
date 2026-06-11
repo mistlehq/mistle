@@ -502,12 +502,25 @@ const SandboxRuntimeResourceCapabilitiesSchema = z
   .object({
     memoryMb: SandboxRuntimeMemoryResourceCapabilitySchema,
     diskMb: SandboxRuntimeResourceCapabilitySchema.optional(),
+    validResourcePairs: z
+      .array(
+        z
+          .object({
+            memoryMb: z.number().int().min(1),
+            vcpuCount: z.number().int().min(1),
+          })
+          .strict(),
+      )
+      .optional(),
     vcpuCount: SandboxRuntimeResourceCapabilitySchema,
   })
   .strict()
   .transform((capabilities) => ({
     memoryMb: capabilities.memoryMb,
     ...(capabilities.diskMb === undefined ? {} : { diskMb: capabilities.diskMb }),
+    ...(capabilities.validResourcePairs === undefined
+      ? {}
+      : { validResourcePairs: capabilities.validResourcePairs }),
     vcpuCount: capabilities.vcpuCount,
   }));
 

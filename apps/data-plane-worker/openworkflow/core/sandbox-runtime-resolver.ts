@@ -3,6 +3,7 @@ import type {
   ResolveSandboxRuntimeCredentialsOutput,
 } from "@mistle/control-plane-internal-client";
 import {
+  OpenComputerValidResourceTiers,
   createSandboxAdapter,
   createSandboxRuntimeControl,
   type CreateSandboxAdapterInput,
@@ -169,12 +170,43 @@ export function createSandboxRuntimeProviderResolver(input: {
       });
     }
 
-    if (inputRuntime.provider === SandboxProvider.FREESTYLE) {
-      throw new Error("Freestyle sandbox runtime is not wired in data-plane worker yet.");
+    if (inputRuntime.provider === SandboxProvider.OPENCOMPUTER) {
+      const credentials = await input.controlPlaneInternalClient.resolveSandboxRuntimeCredentials({
+        organizationId: inputRuntime.organizationId,
+        provider: SandboxProvider.OPENCOMPUTER,
+        ...(inputRuntime.connectionId === undefined
+          ? {}
+          : { connectionId: inputRuntime.connectionId }),
+      });
+      if (credentials.provider !== SandboxProvider.OPENCOMPUTER) {
+        throw new Error(
+          "Control-plane returned non-OpenComputer credentials for OpenComputer runtime.",
+        );
+      }
+
+      const needsRuntimeImageArtifacts =
+        options.includeImagePreparationArtifacts && inputRuntime.connectionId !== undefined;
+      const sandboxdArtifact =
+        needsRuntimeImageArtifacts && input.sandboxdArtifactResolver !== undefined
+          ? await input.sandboxdArtifactResolver.resolve()
+          : undefined;
+
+      return createOpenComputerSandboxRuntime({
+        credentials,
+        resources: inputRuntime.resources,
+        ...(sandboxdArtifact === undefined
+          ? {}
+          : {
+              sandboxd: {
+                kind: SandboxSdkImageSandboxdSourceKinds.RELEASE,
+                artifact: sandboxdArtifact,
+              },
+            }),
+      });
     }
 
-    if (inputRuntime.provider === SandboxProvider.OPENCOMPUTER) {
-      throw new Error("OpenComputer sandbox runtime is not wired in data-plane worker yet.");
+    if (inputRuntime.provider === SandboxProvider.FREESTYLE) {
+      throw new Error("Freestyle sandbox runtime is not wired in data-plane worker yet.");
     }
 
     return assertUnreachableSandboxProvider(inputRuntime.provider);
@@ -279,6 +311,20 @@ function createModalSandboxRuntime(input: {
   };
 }
 
+function createOpenComputerSandboxRuntime(input: {
+  credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "opencomputer" }>;
+  resources?: ResolveSandboxRuntimeInput["resources"];
+  sandboxd?: SandboxSdkImageReleaseSandboxdSource;
+}): ResolvedSandboxRuntime {
+  const providerConfig = createOpenComputerSandboxProviderConfig(input);
+
+  return {
+    provider: SandboxProvider.OPENCOMPUTER,
+    sandboxAdapter: createSandboxAdapter(providerConfig),
+    sandboxRuntimeControl: createSandboxRuntimeControl(providerConfig),
+  };
+}
+
 export function createTensorlakeSandboxProviderConfig(input: {
   credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "tensorlake" }>;
   resources?: ResolveSandboxRuntimeInput["resources"];
@@ -315,4 +361,35 @@ export function createModalSandboxProviderConfig(input: {
         : { defaultTimeoutMs: input.credentials.defaultTimeoutMs }),
     },
   };
+}
+
+export function createOpenComputerSandboxProviderConfig(input: {
+  credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "opencomputer" }>;
+  resources?: ResolveSandboxRuntimeInput["resources"];
+  sandboxd?: SandboxSdkImageReleaseSandboxdSource;
+}): CreateSandboxAdapterInput {
+  if (input.resources?.diskMb !== undefined) {
+    throw new Error("OpenComputer sandbox runtime does not support configurable disk.");
+  }
+
+  if (input.resources !== undefined && !isOpenComputerResourceTier(input.resources)) {
+    throw new Error("OpenComputer sandbox runtime resources must match a supported resource tier.");
+  }
+
+  return {
+    provider: SandboxProvider.OPENCOMPUTER,
+    opencomputer: {
+      apiKey: input.credentials.apiKey,
+      ...(input.credentials.apiBaseUrl === undefined
+        ? {}
+        : { apiBaseUrl: input.credentials.apiBaseUrl }),
+      ...(input.sandboxd === undefined ? {} : { sandboxd: input.sandboxd }),
+    },
+  };
+}
+
+function isOpenComputerResourceTier(input: { vcpuCount: number; memoryMb: number }): boolean {
+  return OpenComputerValidResourceTiers.some(
+    (tier) => tier.vcpuCount === input.vcpuCount && tier.memoryMb === input.memoryMb,
+  );
 }

@@ -335,6 +335,16 @@ export function SandboxProfileRuntimeSection(input: {
     setSaveErrorMessage(null);
   }
 
+  function updateResources(
+    resources: NonNullable<SandboxProfileVersion["sandboxResources"]>,
+  ): void {
+    setDraftRuntime((currentRuntime) => ({
+      ...currentRuntime,
+      sandboxResources: resources,
+    }));
+    setSaveErrorMessage(null);
+  }
+
   function updateAgentRuntime(value: string | null): void {
     if (value === null || !isAgentRuntimeId(value)) {
       return;
@@ -508,6 +518,7 @@ export function SandboxProfileRuntimeSection(input: {
       <SandboxProviderResourceFields
         disabled={fieldIsReadOnly}
         onResourceFieldChange={updateResourceField}
+        onResourcesChange={updateResources}
         provider={selectedProvider}
         resources={draftRuntime.sandboxResources}
       />
@@ -611,6 +622,7 @@ function SandboxProviderResourceFields(input: {
     field: keyof NonNullable<SandboxProfileVersion["sandboxResources"]>,
     value: number,
   ) => void;
+  onResourcesChange: (resources: NonNullable<SandboxProfileVersion["sandboxResources"]>) => void;
   provider: SandboxProviderSummary | null;
   resources: SandboxProfileVersion["sandboxResources"];
 }): React.JSX.Element | null {
@@ -623,6 +635,18 @@ function SandboxProviderResourceFields(input: {
   }
 
   const capabilities = input.provider.resourceCapabilities;
+  if (capabilities.validResourcePairs !== undefined) {
+    return (
+      <ResourceTierField
+        disabled={input.disabled}
+        id="sandbox-profile-runtime-resources"
+        onChange={input.onResourcesChange}
+        tiers={capabilities.validResourcePairs}
+        value={input.resources}
+      />
+    );
+  }
+
   const memoryCapability = createMemoryCapabilityForVcpu({
     capability: capabilities.memoryMb,
     vcpuCount: input.resources.vcpuCount,
@@ -664,6 +688,61 @@ function SandboxProviderResourceFields(input: {
         />
       )}
     </>
+  );
+}
+
+function ResourceTierField(input: {
+  disabled: boolean;
+  id: string;
+  onChange: (resources: NonNullable<SandboxProfileVersion["sandboxResources"]>) => void;
+  tiers: NonNullable<
+    NonNullable<SandboxProviderSummary["resourceCapabilities"]>["validResourcePairs"]
+  >;
+  value: NonNullable<SandboxProfileVersion["sandboxResources"]>;
+}): React.JSX.Element {
+  const selectedValue = createResourceTierValue(input.value);
+  const selectedTierIsKnown = input.tiers.some(
+    (tier) => createResourceTierValue(tier) === selectedValue,
+  );
+
+  return (
+    <Field contentWidth="fill" orientation="horizontal">
+      <FieldHeader>
+        <FieldLabel htmlFor={input.id}>Resources</FieldLabel>
+      </FieldHeader>
+      <FieldContent>
+        <Select
+          disabled={input.disabled}
+          onValueChange={(value) => {
+            if (value === null) {
+              return;
+            }
+
+            input.onChange(parseResourceTierValue(value));
+          }}
+          value={selectedValue}
+        >
+          <SelectTrigger id={input.id}>
+            <SelectValue>{formatResourceTierValue(input.value)}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {selectedTierIsKnown ? null : (
+              <SelectItem disabled value={selectedValue}>
+                {formatResourceTierValue(input.value)}
+              </SelectItem>
+            )}
+            {input.tiers.map((tier) => {
+              const value = createResourceTierValue(tier);
+              return (
+                <SelectItem key={value} value={value}>
+                  {formatResourceTierValue(tier)}
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+      </FieldContent>
+    </Field>
   );
 }
 
@@ -729,6 +808,48 @@ function createMemoryCapabilityForVcpu(input: {
 
 function clampResourceValue(value: number, capability: ResourceCapability): number {
   return Math.min(Math.max(value, capability.min), capability.max);
+}
+
+function createResourceTierValue(
+  resources: Pick<NonNullable<SandboxProfileVersion["sandboxResources"]>, "vcpuCount" | "memoryMb">,
+): string {
+  return `${String(resources.vcpuCount)}:${String(resources.memoryMb)}`;
+}
+
+function parseResourceTierValue(
+  value: string,
+): NonNullable<SandboxProfileVersion["sandboxResources"]> {
+  const parts = value.split(":");
+  if (parts.length !== 2) {
+    throw new Error(`Invalid sandbox resource tier value '${value}'.`);
+  }
+
+  const [vcpuCountValue, memoryMbValue] = parts;
+  if (vcpuCountValue === undefined || memoryMbValue === undefined) {
+    throw new Error(`Invalid sandbox resource tier value '${value}'.`);
+  }
+
+  const vcpuCount = Number.parseInt(vcpuCountValue, 10);
+  const memoryMb = Number.parseInt(memoryMbValue, 10);
+  if (
+    !Number.isSafeInteger(vcpuCount) ||
+    !Number.isSafeInteger(memoryMb) ||
+    vcpuCount <= 0 ||
+    memoryMb <= 0
+  ) {
+    throw new Error(`Invalid sandbox resource tier value '${value}'.`);
+  }
+
+  return {
+    vcpuCount,
+    memoryMb,
+  };
+}
+
+function formatResourceTierValue(
+  resources: Pick<NonNullable<SandboxProfileVersion["sandboxResources"]>, "vcpuCount" | "memoryMb">,
+): string {
+  return `${formatCpuResourceValue(resources.vcpuCount)} / ${formatMemoryResourceValue(resources.memoryMb)}`;
 }
 
 function ResourceNumberField(input: {

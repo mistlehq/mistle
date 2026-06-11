@@ -101,6 +101,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "opencomputer-default",
+        familyId: "opencomputer",
+        variantId: "opencomputer-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "planetscale-mcp",
         familyId: "planetscale",
         variantId: "planetscale-mcp",

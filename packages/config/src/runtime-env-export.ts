@@ -231,6 +231,18 @@ const ControlPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
   { path: ["sandbox", "e2b", "domain"], envVar: "MISTLE_SANDBOX_E2B_DOMAIN" },
   { path: ["sandbox", "tensorlake", "enabled"], envVar: "MISTLE_SANDBOX_TENSORLAKE_ENABLED" },
   { path: ["sandbox", "tensorlake", "apiKey"], envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY" },
+  {
+    path: ["sandbox", "opencomputer", "enabled"],
+    envVar: "MISTLE_SANDBOX_OPENCOMPUTER_ENABLED",
+  },
+  {
+    path: ["sandbox", "opencomputer", "apiKey"],
+    envVar: "MISTLE_SANDBOX_OPENCOMPUTER_API_KEY",
+  },
+  {
+    path: ["sandbox", "opencomputer", "apiBaseUrl"],
+    envVar: "MISTLE_SANDBOX_OPENCOMPUTER_API_BASE_URL",
+  },
   { path: ["sandbox", "modal", "enabled"], envVar: "MISTLE_SANDBOX_MODAL_ENABLED" },
   { path: ["sandbox", "modal", "tokenId"], envVar: "MISTLE_SANDBOX_MODAL_TOKEN_ID" },
   { path: ["sandbox", "modal", "tokenSecret"], envVar: "MISTLE_SANDBOX_MODAL_TOKEN_SECRET" },
@@ -295,6 +307,18 @@ const DataPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor
   { path: ["sandbox", "e2b", "domain"], envVar: "MISTLE_SANDBOX_E2B_DOMAIN" },
   { path: ["sandbox", "tensorlake", "enabled"], envVar: "MISTLE_SANDBOX_TENSORLAKE_ENABLED" },
   { path: ["sandbox", "tensorlake", "apiKey"], envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY" },
+  {
+    path: ["sandbox", "opencomputer", "enabled"],
+    envVar: "MISTLE_SANDBOX_OPENCOMPUTER_ENABLED",
+  },
+  {
+    path: ["sandbox", "opencomputer", "apiKey"],
+    envVar: "MISTLE_SANDBOX_OPENCOMPUTER_API_KEY",
+  },
+  {
+    path: ["sandbox", "opencomputer", "apiBaseUrl"],
+    envVar: "MISTLE_SANDBOX_OPENCOMPUTER_API_BASE_URL",
+  },
   { path: ["sandbox", "modal", "enabled"], envVar: "MISTLE_SANDBOX_MODAL_ENABLED" },
   { path: ["sandbox", "modal", "tokenId"], envVar: "MISTLE_SANDBOX_MODAL_TOKEN_ID" },
   { path: ["sandbox", "modal", "tokenSecret"], envVar: "MISTLE_SANDBOX_MODAL_TOKEN_SECRET" },
@@ -416,6 +440,18 @@ const DataPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
   { path: ["sandbox", "e2b", "memoryMb"], envVar: "MISTLE_SANDBOX_E2B_MEMORY_MB" },
   { path: ["sandbox", "tensorlake", "enabled"], envVar: "MISTLE_SANDBOX_TENSORLAKE_ENABLED" },
   { path: ["sandbox", "tensorlake", "apiKey"], envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY" },
+  {
+    path: ["sandbox", "opencomputer", "enabled"],
+    envVar: "MISTLE_SANDBOX_OPENCOMPUTER_ENABLED",
+  },
+  {
+    path: ["sandbox", "opencomputer", "apiKey"],
+    envVar: "MISTLE_SANDBOX_OPENCOMPUTER_API_KEY",
+  },
+  {
+    path: ["sandbox", "opencomputer", "apiBaseUrl"],
+    envVar: "MISTLE_SANDBOX_OPENCOMPUTER_API_BASE_URL",
+  },
   { path: ["sandbox", "modal", "enabled"], envVar: "MISTLE_SANDBOX_MODAL_ENABLED" },
   { path: ["sandbox", "modal", "tokenId"], envVar: "MISTLE_SANDBOX_MODAL_TOKEN_ID" },
   { path: ["sandbox", "modal", "tokenSecret"], envVar: "MISTLE_SANDBOX_MODAL_TOKEN_SECRET" },

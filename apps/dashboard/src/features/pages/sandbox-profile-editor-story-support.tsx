@@ -489,6 +489,17 @@ const StoryE2BSandboxTarget = {
   },
 } satisfies IntegrationTargetSummary;
 
+const StoryOpenComputerSandboxTarget = {
+  targetKey: "opencomputer-default",
+  displayName: "OpenComputer",
+  familyId: "opencomputer",
+  variantId: "opencomputer-default",
+  config: {},
+  targetHealth: {
+    configStatus: "valid",
+  },
+} satisfies IntegrationTargetSummary;
+
 const StoryDockerSandboxProvider = {
   id: "docker",
   displayName: "Docker",
@@ -547,12 +558,42 @@ const StoryTensorlakeSandboxProvider = {
   },
 } satisfies SandboxProviderSummary;
 
+const StoryOpenComputerSandboxProvider = {
+  id: "opencomputer",
+  displayName: "OpenComputer",
+  managed: false,
+  supportsOrganizationConnection: true,
+  resourceCapabilities: {
+    vcpuCount: {
+      min: 1,
+      max: 16,
+      step: 1,
+      default: 1,
+    },
+    memoryMb: {
+      min: 1024,
+      max: 65_536,
+      step: 1024,
+      default: 4096,
+    },
+    validResourcePairs: [
+      { vcpuCount: 1, memoryMb: 1024 },
+      { vcpuCount: 1, memoryMb: 4096 },
+      { vcpuCount: 2, memoryMb: 8192 },
+      { vcpuCount: 4, memoryMb: 16_384 },
+      { vcpuCount: 8, memoryMb: 32_768 },
+      { vcpuCount: 16, memoryMb: 65_536 },
+    ],
+  },
+} satisfies SandboxProviderSummary;
+
 const StorySandboxProviders = [
   StoryDockerSandboxProvider,
   {
     ...StoryE2BSandboxProvider,
     managed: false,
   },
+  StoryOpenComputerSandboxProvider,
 ] satisfies readonly SandboxProviderSummary[];
 
 function createStorySandboxProviders(input: {
@@ -1165,6 +1206,7 @@ function SandboxProfileEditorPageStoryView(
   const storyTargets = [
     ...(input.availableTargets ?? StoryIntegrationTargets),
     StoryE2BSandboxTarget,
+    StoryOpenComputerSandboxTarget,
   ];
   const agentRuntimeId = input.agentRuntimeId ?? "codex";
   const storyVersion = createRuntimeStoryVersion({

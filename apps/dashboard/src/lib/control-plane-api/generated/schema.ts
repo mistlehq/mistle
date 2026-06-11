@@ -13178,6 +13178,10 @@ export interface paths {
                     minPerVcpu?: number;
                     step: number;
                   };
+                  validResourcePairs?: {
+                    memoryMb: number;
+                    vcpuCount: number;
+                  }[];
                   vcpuCount: {
                     default: number;
                     max: number;

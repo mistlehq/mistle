@@ -106,6 +106,33 @@ const TensorlakeProvider = {
   },
 } satisfies SandboxProviderSummary;
 
+const OpenComputerProvider = {
+  id: "opencomputer",
+  displayName: "OpenComputer",
+  managed: false,
+  supportsOrganizationConnection: true,
+  resourceCapabilities: {
+    vcpuCount: {
+      min: 1,
+      max: 16,
+      step: 1,
+      default: 1,
+    },
+    memoryMb: {
+      min: 1024,
+      max: 65_536,
+      step: 1024,
+      default: 4096,
+    },
+    validResourcePairs: [
+      { vcpuCount: 1, memoryMb: 1024 },
+      { vcpuCount: 1, memoryMb: 4096 },
+      { vcpuCount: 2, memoryMb: 8192 },
+      { vcpuCount: 4, memoryMb: 16_384 },
+    ],
+  },
+} satisfies SandboxProviderSummary;
+
 const OrganizationStorageE2BProvider = {
   id: "e2b",
   displayName: "E2B",
@@ -146,6 +173,17 @@ const E2BRuntimeTarget = {
   displayName: "E2B",
   familyId: "e2b",
   variantId: "e2b-default",
+  config: {},
+  targetHealth: {
+    configStatus: "valid",
+  },
+} as const;
+
+const OpenComputerRuntimeTarget = {
+  targetKey: "opencomputer-default",
+  displayName: "OpenComputer",
+  familyId: "opencomputer",
+  variantId: "opencomputer-default",
   config: {},
   targetHealth: {
     configStatus: "valid",
@@ -261,6 +299,29 @@ describe("SandboxProfileRuntimeSection", () => {
 
     expect(screen.getByRole("option", { name: "Mistle" })).toBeTruthy();
     expect(screen.getByRole("option", { name: "Modal" })).toBeTruthy();
+  });
+
+  it("renders OpenComputer as an organization sandbox provider option", () => {
+    render(
+      <SandboxProfileRuntimeSection
+        apiKeys={[]}
+        availableConnections={[]}
+        availableTargets={[OpenComputerRuntimeTarget]}
+        disabled={false}
+        isDraft={true}
+        providers={[DockerProvider, OpenComputerProvider]}
+        version={createVersion({
+          sandboxProvider: "docker",
+          sandboxConnectionId: null,
+          sandboxResources: null,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Sandbox provider" }));
+
+    expect(screen.getByRole("option", { name: "Mistle" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "OpenComputer" })).toBeTruthy();
   });
 
   it("renders OpenCode as the selected profile agent runtime", () => {
@@ -997,6 +1058,56 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(screen.getByText("2 vCPU")).toBeTruthy();
     expect(screen.getByText("4096 MB")).toBeTruthy();
     expect(screen.queryByLabelText("Disk (MB)")).toBeNull();
+  });
+
+  it("renders OpenComputer resource pairs as one selectable tier", async () => {
+    let runtimeDraftState: SandboxProfileRuntimeDraftState | undefined;
+    render(
+      <MemoryRouter>
+        <SandboxProfileRuntimeSection
+          apiKeys={[]}
+          availableConnections={[]}
+          availableTargets={[OpenComputerRuntimeTarget]}
+          disabled={false}
+          isDraft={true}
+          onDraftStateChange={(nextState) => {
+            runtimeDraftState = nextState;
+          }}
+          providers={[OpenComputerProvider]}
+          version={createVersion({
+            sandboxProvider: "opencomputer",
+            sandboxConnectionId: null,
+            sandboxResources: {
+              vcpuCount: 1,
+              memoryMb: 4096,
+            },
+          })}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("combobox", { name: "Resources" })).toBeTruthy();
+    expect(screen.getByText("1 vCPU / 4096 MB")).toBeTruthy();
+    expect(screen.queryByLabelText("CPU")).toBeNull();
+    expect(screen.queryByLabelText("Memory (MB)")).toBeNull();
+
+    selectOptionFromCombobox({ comboboxName: "Resources", optionName: "2 vCPU / 8192 MB" });
+
+    await waitFor(() => {
+      if (runtimeDraftState?.buildDraftChanges === undefined) {
+        throw new Error("Expected runtime draft changes builder to be available.");
+      }
+
+      expect(runtimeDraftState.buildDraftChanges()).toEqual(
+        expect.objectContaining({
+          sandboxProvider: "opencomputer",
+          sandboxResources: {
+            vcpuCount: 2,
+            memoryMb: 8192,
+          },
+        }),
+      );
+    });
   });
 
   it("scales per-vCPU memory controls for providers with ratio-based memory limits", () => {

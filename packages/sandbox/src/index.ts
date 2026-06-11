@@ -42,6 +42,7 @@ export {
   createOpenComputerDeferredImageHandle,
   createOpenComputerSnapshotImageHandle,
   createOpenComputerTemplateImageHandle,
+  OpenComputerValidResourceTiers,
   parseOpenComputerImageHandle,
   type OpenComputerBaseImageBuilderOptions,
 } from "./providers/opencomputer/index.js";

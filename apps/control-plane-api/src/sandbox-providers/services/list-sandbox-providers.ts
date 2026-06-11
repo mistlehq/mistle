@@ -15,6 +15,7 @@ export function listSandboxProviders(ctx: {
   const sandboxRuntimeDefinitions = [
     findSandboxRuntimeDefinition(ctx.integrationRegistry, SandboxProvider.E2B),
     findSandboxRuntimeDefinition(ctx.integrationRegistry, SandboxProvider.MODAL),
+    findSandboxRuntimeDefinition(ctx.integrationRegistry, SandboxProvider.OPENCOMPUTER),
     findSandboxRuntimeDefinition(ctx.integrationRegistry, SandboxProvider.TENSORLAKE),
   ];
 
@@ -35,13 +36,30 @@ export function listSandboxProviders(ctx: {
             ? ctx.sandboxConfig.e2b?.enabled === true
             : definition.sandboxRuntime.providerId === SandboxProvider.MODAL
               ? ctx.sandboxConfig.modal?.enabled === true
-              : definition.sandboxRuntime.providerId === SandboxProvider.TENSORLAKE
-                ? ctx.sandboxConfig.tensorlake?.enabled === true
-                : false,
+              : definition.sandboxRuntime.providerId === SandboxProvider.OPENCOMPUTER
+                ? ctx.sandboxConfig.opencomputer?.enabled === true
+                : definition.sandboxRuntime.providerId === SandboxProvider.TENSORLAKE
+                  ? ctx.sandboxConfig.tensorlake?.enabled === true
+                  : false,
         supportsOrganizationConnection: definition.connectionMethods.length > 0,
-        resourceCapabilities: definition.sandboxRuntime.resourceCapabilities,
+        resourceCapabilities: createResourceCapabilitiesResponse(
+          definition.sandboxRuntime.resourceCapabilities,
+        ),
       })),
     ],
+  };
+}
+
+function createResourceCapabilitiesResponse(
+  capabilities: SandboxRuntimeResourceCapabilities,
+): NonNullable<ListSandboxProvidersResponse["items"][number]["resourceCapabilities"]> {
+  return {
+    vcpuCount: capabilities.vcpuCount,
+    memoryMb: capabilities.memoryMb,
+    ...(capabilities.diskMb === undefined ? {} : { diskMb: capabilities.diskMb }),
+    ...(capabilities.validResourcePairs === undefined
+      ? {}
+      : { validResourcePairs: capabilities.validResourcePairs.map((pair) => ({ ...pair })) }),
   };
 }
 

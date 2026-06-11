@@ -10,6 +10,7 @@ import { createOpenComputerSandboxRuntimeControl } from "./runtime-control.js";
 
 export type { OpenComputerSandboxConfig } from "./config.js";
 export type { OpenComputerSandboxInspectResult } from "./types.js";
+export { OpenComputerValidResourceTiers } from "./schemas.js";
 export { OpenComputerSandboxAdapter } from "./adapter.js";
 export {
   OpenComputerBaseImageBuilder,

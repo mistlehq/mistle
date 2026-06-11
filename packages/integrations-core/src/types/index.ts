@@ -36,6 +36,10 @@ export type SandboxRuntimeResourceCapabilities = {
   vcpuCount: SandboxRuntimeResourceField;
   memoryMb: SandboxRuntimeMemoryResourceField;
   diskMb?: SandboxRuntimeResourceField;
+  validResourcePairs?: ReadonlyArray<{
+    vcpuCount: number;
+    memoryMb: number;
+  }>;
 };
 
 export type IntegrationSandboxRuntimeDefinition = {

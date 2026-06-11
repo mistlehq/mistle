@@ -20242,6 +20242,24 @@
                                 },
                                 "required": ["min", "max", "step", "default"],
                                 "additionalProperties": false
+                              },
+                              "validResourcePairs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "vcpuCount": {
+                                      "type": "integer",
+                                      "minimum": 1
+                                    },
+                                    "memoryMb": {
+                                      "type": "integer",
+                                      "minimum": 1
+                                    }
+                                  },
+                                  "required": ["vcpuCount", "memoryMb"],
+                                  "additionalProperties": false
+                                }
                               }
                             },
                             "required": ["vcpuCount", "memoryMb"],

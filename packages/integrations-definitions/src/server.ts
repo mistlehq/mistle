@@ -24,6 +24,7 @@ import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
 import {
   E2BSandboxRuntimeDefinition,
   ModalSandboxRuntimeDefinition,
+  OpenComputerSandboxRuntimeDefinition,
   TensorlakeSandboxRuntimeDefinition,
 } from "./sandbox-runtimes/index.js";
 import { SentryDefinition } from "./sentry/server.js";
@@ -70,6 +71,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   PlanetScaleDefinition,
   E2BSandboxRuntimeDefinition,
   ModalSandboxRuntimeDefinition,
+  OpenComputerSandboxRuntimeDefinition,
   TensorlakeSandboxRuntimeDefinition,
   SentryDefinition,
   SignozDefinition,
