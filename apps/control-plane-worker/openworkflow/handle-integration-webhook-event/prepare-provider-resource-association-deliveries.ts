@@ -220,12 +220,11 @@ function supportsAssociatedResourceEvent(input: {
 async function isSelfAuthoredAssociatedResourceEvent(
   observedEvent: ObservedAssociatedResourceEvent,
 ): Promise<boolean> {
-  const isSelfAuthoredEvent = observedEvent.capability.isSelfAuthoredEvent;
-  if (isSelfAuthoredEvent === undefined) {
+  if (observedEvent.capability.isSelfAuthoredEvent === undefined) {
     return false;
   }
 
-  return await isSelfAuthoredEvent({
+  return await observedEvent.capability.isSelfAuthoredEvent({
     connection: observedEvent.connection,
     observation: observedEvent.observation,
   });

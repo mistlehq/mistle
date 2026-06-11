@@ -1,17 +1,18 @@
 import {
   AssociatedProviderResourceKinds,
   AssociatedResourceEventTypes,
-  IntegrationConnectionMethodIds,
   type AssociatedProviderResourceKind,
   type AssociatedResourceProviderActor,
   type AssociatedResourceEventType,
-  type AssociatedResourceWebhookObservation,
   type AssociatedResourceSelfAuthorshipInput,
   type IntegrationAssociatedResourceEventsCapability,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
-import { parseGitHubConnectionConfig, type GitHubConnectionConfig } from "./auth.js";
+import {
+  GitHubAppInstallationConnectionConfigSchema,
+  type GitHubConnectionConfig,
+} from "./auth.js";
 import { createGitHubPullRequestProviderResourceId } from "./provider-resource-associations.js";
 
 const GitHubIssueCommentPullRequestPayloadSchema = z.looseObject({
@@ -209,14 +210,12 @@ function createObservation(input: {
 }
 
 export function isSelfAuthoredGitHubAssociatedResourceEvent(
-  input: AssociatedResourceSelfAuthorshipInput<GitHubConnectionConfig | Record<string, unknown>>,
+  input: AssociatedResourceSelfAuthorshipInput<GitHubConnectionConfig>,
 ): boolean {
-  const parsedConnectionConfig = tryParseGitHubConnectionConfig(input.connection.config);
-  if (
-    parsedConnectionConfig === null ||
-    parsedConnectionConfig.connection_method !==
-      IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
-  ) {
+  const parsedConnectionConfig = GitHubAppInstallationConnectionConfigSchema.safeParse(
+    input.connection.config,
+  );
+  if (!parsedConnectionConfig.success) {
     return false;
   }
 
@@ -227,20 +226,8 @@ export function isSelfAuthoredGitHubAssociatedResourceEvent(
 
   return (
     normalizeGitHubLogin(actorHandle) ===
-    normalizeGitHubLogin(`${parsedConnectionConfig.app_slug}[bot]`)
+    normalizeGitHubLogin(`${parsedConnectionConfig.data.app_slug}[bot]`)
   );
-}
-
-function tryParseGitHubConnectionConfig(input: unknown): GitHubConnectionConfig | null {
-  try {
-    return parseGitHubConnectionConfig(input);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return null;
-    }
-
-    throw error;
-  }
 }
 
 function normalizeGitHubLogin(input: string): string {
