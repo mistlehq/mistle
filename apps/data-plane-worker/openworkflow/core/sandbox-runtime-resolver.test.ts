@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createE2BSandboxProviderConfig,
+  createModalSandboxProviderConfig,
   createResolveSandboxRuntimeInput,
   createTensorlakeSandboxProviderConfig,
 } from "./sandbox-runtime-resolver.js";
@@ -69,6 +70,33 @@ describe("createTensorlakeSandboxProviderConfig", () => {
       provider: "tensorlake",
       tensorlake: {
         apiKey: "tensorlake-api-key",
+      },
+    });
+  });
+});
+
+describe("createModalSandboxProviderConfig", () => {
+  it("maps connection-sourced Modal credentials into provider config", () => {
+    expect(
+      createModalSandboxProviderConfig({
+        credentials: {
+          provider: "modal",
+          source: "connection",
+          tokenId: "ak-modal-token-id",
+          tokenSecret: "as-modal-token-secret",
+          appName: "mistle-modal-sandboxes",
+        },
+        resources: {
+          vcpuCount: 4,
+          memoryMb: 16384,
+        },
+      }),
+    ).toEqual({
+      provider: "modal",
+      modal: {
+        tokenId: "ak-modal-token-id",
+        tokenSecret: "as-modal-token-secret",
+        appName: "mistle-modal-sandboxes",
       },
     });
   });

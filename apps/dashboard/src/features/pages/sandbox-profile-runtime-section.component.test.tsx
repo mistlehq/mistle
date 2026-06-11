@@ -56,6 +56,27 @@ const OrganizationE2BProvider = {
   managed: false,
 } satisfies SandboxProviderSummary;
 
+const OrganizationModalProvider = {
+  id: "modal",
+  displayName: "Modal",
+  managed: false,
+  supportsOrganizationConnection: true,
+  resourceCapabilities: {
+    vcpuCount: {
+      min: 1,
+      max: 8,
+      step: 1,
+      default: 1,
+    },
+    memoryMb: {
+      min: 1024,
+      max: 32_768,
+      step: 1024,
+      default: 4096,
+    },
+  },
+} satisfies SandboxProviderSummary;
+
 const TensorlakeProvider = {
   id: "tensorlake",
   displayName: "Tensorlake",
@@ -216,6 +237,29 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(screen.queryByRole("combobox", { name: "Credentials" })).toBeNull();
     expect(screen.queryByRole("combobox", { name: "Connection" })).toBeNull();
     expect(screen.queryByText("E2B (Managed)")).toBeNull();
+  });
+
+  it("renders BYOK-capable Modal as an organization sandbox provider option", () => {
+    render(
+      <SandboxProfileRuntimeSection
+        apiKeys={[]}
+        availableConnections={[]}
+        availableTargets={[]}
+        disabled={false}
+        isDraft={true}
+        providers={[DockerProvider, OrganizationModalProvider]}
+        version={createVersion({
+          sandboxProvider: "docker",
+          sandboxConnectionId: null,
+          sandboxResources: null,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Sandbox provider" }));
+
+    expect(screen.getByRole("option", { name: "Mistle" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Modal" })).toBeTruthy();
   });
 
   it("renders OpenCode as the selected profile agent runtime", () => {

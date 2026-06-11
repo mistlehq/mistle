@@ -60,7 +60,7 @@ describe.concurrent("sandbox providers catalog integration", () => {
         id: "modal",
         displayName: "Modal",
         managed: false,
-        supportsOrganizationConnection: false,
+        supportsOrganizationConnection: true,
         resourceCapabilities: {
           vcpuCount: {
             min: 1,

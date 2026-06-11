@@ -1,3 +1,5 @@
+import { systemSleeper } from "@mistle/time";
+
 import {
   SandboxConfigurationError,
   SandboxProviderNotImplementedError,
@@ -26,6 +28,9 @@ import { isModalNotFound, type ModalClientApi } from "./client.js";
 export { SandboxdOperationLogPaths };
 
 const SandboxdEnsureTimeoutMs = 120_000;
+const ModalSandboxdReadyPollTimeoutMs = 3_000;
+const ModalSandboxdReadyPollIntervalMs = 100;
+const ModalSandboxdReadyPollAttempts = 600;
 export const ModalSandboxdActivateTimeoutMs = 60 * 60 * 1000;
 export const ModalSandboxdStopDaemonTimeoutMs = 30_000;
 export const ModalSandboxdResetTransparentEgressNftablesTimeoutMs = 10_000;
@@ -35,6 +40,10 @@ const ModalEnsureRuntimeDirectoriesCommand = `
 set -eu
 mkdir -p /run/mistle /var/lib/mistle/artifacts
 chmod 0700 /run/mistle
+`.trim();
+
+export const ModalStartSandboxdDaemonCommand = `
+exec /opt/mistle/bin/sandboxd >/run/mistle/sandboxd.log 2>&1
 `.trim();
 
 function requireSandboxId(id: string): void {
@@ -60,6 +69,14 @@ function reportGracefulShutdownFailure(input: { sandboxId: string; error: unknow
 
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\"'\"'")}'`;
+}
+
+async function sleep(ms: number): Promise<void> {
+  await systemSleeper.sleep(ms);
+}
+
+function formatOptionalLog(log: string | null): string {
+  return log === null ? "" : `\n\nsandboxd log:\n${log}`;
 }
 
 export class ModalSandboxRuntimeControl implements SandboxRuntimeControl {
@@ -144,6 +161,10 @@ export class ModalSandboxRuntimeControl implements SandboxRuntimeControl {
             },
             timeoutMs: SandboxdEnsureTimeoutMs,
           });
+          await this.#startSandboxdDaemon({
+            sandboxId: input.id,
+            ...(input.env === undefined ? {} : { env: { ...input.env } }),
+          });
         } catch (error) {
           if (isModalNotFound(error)) {
             throw toSandboxNotFoundError(input.id, error);
@@ -162,6 +183,17 @@ export class ModalSandboxRuntimeControl implements SandboxRuntimeControl {
       operation: ModalClientOperationIds.ACTIVATE,
       fn: async () => {
         try {
+          await this.#client.runCommand({
+            sandboxId: input.id,
+            operation: ModalClientOperationIds.ENSURE_SANDBOXD,
+            commandDescription: "Ensure Modal runtime directories",
+            command: ModalEnsureRuntimeDirectoriesCommand,
+            timeoutMs: SandboxdEnsureTimeoutMs,
+          });
+          await this.#startSandboxdDaemon({
+            sandboxId: input.id,
+            ...(input.env === undefined ? {} : { env: { ...input.env } }),
+          });
           await this.#client.activate({
             sandboxId: input.id,
             payload: input.payload,
@@ -176,6 +208,90 @@ export class ModalSandboxRuntimeControl implements SandboxRuntimeControl {
         }
       },
     });
+  }
+
+  async #startSandboxdDaemon(input: {
+    sandboxId: string;
+    env?: Readonly<Record<string, string>>;
+  }): Promise<void> {
+    if (await this.#isSandboxdReady(input)) {
+      return;
+    }
+
+    await this.#client.runCommand({
+      sandboxId: input.sandboxId,
+      operation: ModalClientOperationIds.ENSURE_SANDBOXD,
+      commandDescription: "Clear sandboxd daemon log",
+      command: "rm -f /run/mistle/sandboxd.log",
+      timeoutMs: SandboxdEnsureTimeoutMs,
+    });
+    await this.#client.startCommand({
+      sandboxId: input.sandboxId,
+      operation: ModalClientOperationIds.ENSURE_SANDBOXD,
+      commandDescription: "Start sandboxd daemon",
+      command: "sh",
+      args: ["-c", ModalStartSandboxdDaemonCommand],
+      stdout: "ignore",
+      stderr: "ignore",
+      ...(input.env === undefined ? {} : { env: { ...input.env } }),
+      timeoutMs: SandboxdEnsureTimeoutMs,
+    });
+
+    for (let attempt = 0; attempt < ModalSandboxdReadyPollAttempts; attempt += 1) {
+      if (await this.#isSandboxdReady(input)) {
+        return;
+      }
+      await sleep(ModalSandboxdReadyPollIntervalMs);
+    }
+
+    const log = await this.#readSandboxdDaemonLog(input.sandboxId);
+    throw new Error(
+      `Modal sandboxd daemon did not expose the control socket before timeout.${formatOptionalLog(
+        log,
+      )}`,
+    );
+  }
+
+  async #isSandboxdReady(input: {
+    sandboxId: string;
+    env?: Readonly<Record<string, string>>;
+  }): Promise<boolean> {
+    try {
+      await this.#client.runCommand({
+        sandboxId: input.sandboxId,
+        operation: ModalClientOperationIds.ENSURE_SANDBOXD,
+        commandDescription: "Check sandboxd daemon readiness",
+        command: "/opt/mistle/bin/sandboxd",
+        args: ["ready"],
+        ...(input.env === undefined ? {} : { env: { ...input.env } }),
+        timeoutMs: ModalSandboxdReadyPollTimeoutMs,
+      });
+      return true;
+    } catch (error) {
+      if (isModalNotFound(error)) {
+        throw error;
+      }
+      return false;
+    }
+  }
+
+  async #readSandboxdDaemonLog(sandboxId: string): Promise<string | null> {
+    try {
+      const result = await this.#client.runCommand({
+        sandboxId,
+        operation: ModalClientOperationIds.ENSURE_SANDBOXD,
+        commandDescription: "Read sandboxd daemon log",
+        command: "cat /run/mistle/sandboxd.log",
+        timeoutMs: ModalSandboxdReadyPollTimeoutMs,
+      });
+      const log = result.stdout.trim();
+      return log.length === 0 ? null : log;
+    } catch (error) {
+      if (isModalNotFound(error)) {
+        throw error;
+      }
+      return null;
+    }
   }
 
   async shutdown(input: { id: string; env?: Readonly<Record<string, string>> }): Promise<void> {

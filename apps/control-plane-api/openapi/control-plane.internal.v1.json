@@ -3759,7 +3759,7 @@
                         },
                         "source": {
                           "type": "string",
-                          "enum": ["managed"]
+                          "enum": ["managed", "connection"]
                         },
                         "tokenId": {
                           "type": "string",
