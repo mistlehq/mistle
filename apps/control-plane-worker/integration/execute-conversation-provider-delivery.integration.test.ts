@@ -130,34 +130,24 @@ describe("executeConversationProviderDelivery", () => {
         async () =>
           await submitCodexAssociatedResourceDelivery({
             deliveryInput: {
-              conversationId: "cnv_associated_resource",
               runtimeId: "codex",
               connectionUrl: server.url,
               inputText: "GitHub pull request issue comment created.",
-              workingDirectory: "/root/mistlehq/mistle.dev",
-              deliveryContext: {
-                source: "provider_resource_association",
-                webhookEventId: "iwe_associated_resource",
-                deliveryTaskId: "prd_associated_resource",
-                externalDeliveryId: "github_delivery_123",
-                providerResourceAssociationId: "pra_associated_resource",
-                conversationId: "cnv_associated_resource",
-                sandboxInstanceId: "sbi_associated_resource",
-                routeId: "cvr_associated_resource",
-              },
-              providerConversationId: "thread_123",
-              providerExecutionId: null,
+              deliveryId: "prd_associated_resource",
+              providerResourceAssociationId: "pra_associated_resource",
             },
-            providerConversationId: "thread_123",
           }),
       );
 
       expect(result).toEqual({
+        providerConversationId: "thread_original",
         providerExecutionId: "turn_123",
       });
       expect(await server.methodSequence).toEqual([
         "initialize",
         "initialized",
+        "thread/list",
+        "thread/list",
         "thread/resume",
         "turn/start",
       ]);

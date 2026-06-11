@@ -376,6 +376,59 @@ export async function startSimulatedCodexRuntimeServer(
           return;
         }
 
+        if (methodPayload.method === "thread/list") {
+          if (scenario !== "associated_resource_direct_turn") {
+            throw new Error("Unexpected thread/list request for this scenario.");
+          }
+
+          sendAgentPayload(socket, {
+            streamId: activeStreamId,
+            payload: {
+              id: expectJsonRpcId(methodPayload.id),
+              result: {
+                data:
+                  methodPayload.params?.archived === true
+                    ? [
+                        {
+                          id: "thread_archived_original",
+                          name: "Archived original",
+                          preview: "",
+                          parentThreadId: null,
+                          threadSource: "cli",
+                          cwd: "/root/mistlehq/mistle.dev",
+                          createdAt: 1_899_345_600,
+                          updatedAt: 1_899_345_600,
+                        },
+                      ]
+                    : [
+                        {
+                          id: "thread_subagent",
+                          name: "Review worker",
+                          preview: "",
+                          parentThreadId: "thread_original",
+                          threadSource: "subAgent",
+                          cwd: "/root/mistlehq/mistle.dev",
+                          createdAt: 1_577_836_800,
+                          updatedAt: 1_577_836_800,
+                        },
+                        {
+                          id: "thread_original",
+                          name: "Original thread",
+                          preview: "",
+                          parentThreadId: null,
+                          threadSource: "cli",
+                          cwd: "/root/mistlehq/mistle.dev",
+                          createdAt: 1_640_995_200,
+                          updatedAt: 1_640_995_200,
+                        },
+                      ],
+                nextCursor: null,
+              },
+            },
+          });
+          return;
+        }
+
         if (methodPayload.method === "thread/read") {
           threadReadCount += 1;
           const threadStatusType =

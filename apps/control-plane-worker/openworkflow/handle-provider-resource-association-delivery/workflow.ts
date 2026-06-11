@@ -5,17 +5,13 @@ import { trace } from "@opentelemetry/api";
 
 import { getWorkflowContext } from "../core/context.js";
 import { defineTracedControlPlaneWorkflow } from "../core/tracing.js";
-import type { ExecuteConversationProviderDeliveryInput } from "../handle-trigger-conversation-delivery/types.js";
-import { updateTriggerConversationExecution } from "../shared/update-conversation-execution.js";
 import { acquireProviderResourceAssociationDeliveryConnection } from "./acquire-connection.js";
 import {
   type ActiveProviderResourceAssociationDelivery,
   claimOrResumeProviderResourceAssociationDelivery,
   finalizeProviderResourceAssociationDelivery,
   markProviderResourceAssociationDeliveryDelivering,
-  releaseProviderResourceAssociationDeliveryForRetry,
 } from "./deliveries.js";
-import { discoverOriginalRuntimeProviderResourceAssociationDeliveryRoute } from "./discover-original-runtime-route.js";
 import {
   ProviderResourceAssociationDeliveryError,
   ProviderResourceAssociationDeliveryFailureCodes,
@@ -24,7 +20,7 @@ import {
   idleProviderResourceAssociationDeliveryProcessorIfEmpty,
   isProviderResourceAssociationDeliveryProcessorRunning,
 } from "./processor.js";
-import { resolveProviderResourceAssociationDeliveryRoute } from "./resolve-route.js";
+import { resolveProviderResourceAssociationDeliveryTarget } from "./resolve-route.js";
 import { submitCodexAssociatedResourceDelivery } from "./submit-codex-associated-resource-delivery.js";
 
 const SingleAttemptDeliveryStepRetryPolicy = {
@@ -148,64 +144,25 @@ export const HandleProviderResourceAssociationDeliveryWorkflow = defineTracedCon
         continue;
       }
 
-      try {
-        await step.run(
-          {
-            name: `persist-provider-resource-association-delivery:${activeDelivery.id}`,
-            retryPolicy: IdempotentProviderDeliveryStepRetryPolicy,
-          },
-          async () =>
-            updateTriggerConversationExecution(
-              {
-                db,
-              },
-              {
-                routeId: deliveryAttempt.routeId,
-                providerExecutionId: deliveryAttempt.providerExecutionId,
-                providerState: deliveryAttempt.providerState,
-              },
-            ),
-        );
-
-        await step.run(
-          {
-            name: `finalize-provider-resource-association-delivery-completed:${activeDelivery.id}`,
-            retryPolicy: IdempotentProviderDeliveryStepRetryPolicy,
-          },
-          async () =>
-            finalizeProviderResourceAssociationDelivery(
-              {
-                db,
-              },
-              {
-                deliveryId: activeDelivery.id,
-                generation: input.generation,
-                status: ProviderResourceAssociationDeliveryStatuses.COMPLETED,
-                failureCode: null,
-                failureMessage: null,
-              },
-            ),
-        );
-      } catch (error) {
-        if (shouldRethrowDurableStepErrorForRetry(error)) {
-          throw error;
-        }
-
-        const failure = resolveProviderResourceAssociationDeliveryFailure(error);
-        await releaseProviderResourceAssociationDeliveryForRetry(
-          {
-            db,
-          },
-          {
-            deliveryId: activeDelivery.id,
-            generation: input.generation,
-            failureCode: failure.code,
-            failureMessage: failure.message,
-          },
-        );
-        iteration += 1;
-        continue;
-      }
+      await step.run(
+        {
+          name: `finalize-provider-resource-association-delivery-completed:${activeDelivery.id}`,
+          retryPolicy: IdempotentProviderDeliveryStepRetryPolicy,
+        },
+        async () =>
+          finalizeProviderResourceAssociationDelivery(
+            {
+              db,
+            },
+            {
+              deliveryId: activeDelivery.id,
+              generation: input.generation,
+              status: ProviderResourceAssociationDeliveryStatuses.COMPLETED,
+              failureCode: null,
+              failureMessage: null,
+            },
+          ),
+      );
 
       iteration += 1;
     }
@@ -225,9 +182,8 @@ async function deliverActiveProviderResourceAssociationDelivery(
 ): Promise<
   | {
       status: "delivered";
-      routeId: string;
-      providerExecutionId: string | null;
-      providerState?: unknown;
+      providerConversationId: string;
+      providerExecutionId: string;
     }
   | {
       status: "terminal_failed";
@@ -248,32 +204,10 @@ async function deliverActiveProviderResourceAssociationDelivery(
       );
     }
 
-    const route = await resolveProviderResourceAssociationDeliveryRoute(
+    const target = await resolveProviderResourceAssociationDeliveryTarget(
       { dataPlaneClient: ctx.dataPlaneClient, db: ctx.db },
       { providerResourceAssociationId: input.delivery.providerResourceAssociationId },
-    ).catch(async (error: unknown) => {
-      if (!shouldDiscoverOriginalRuntimeRoute(error)) {
-        throw error;
-      }
-
-      await discoverOriginalRuntimeProviderResourceAssociationDeliveryRoute(
-        {
-          controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-          dataPlaneClient: ctx.dataPlaneClient,
-          db: ctx.db,
-        },
-        {
-          deliveryId: input.delivery.id,
-          providerResourceAssociationId: input.delivery.providerResourceAssociationId,
-          sourceWebhookEventId: input.delivery.sourceWebhookEventId,
-        },
-      );
-
-      return await resolveProviderResourceAssociationDeliveryRoute(
-        { dataPlaneClient: ctx.dataPlaneClient, db: ctx.db },
-        { providerResourceAssociationId: input.delivery.providerResourceAssociationId },
-      );
-    });
+    );
     const webhookEvent = await ctx.db.query.integrationWebhookEvents.findFirst({
       columns: {
         externalDeliveryId: true,
@@ -287,73 +221,42 @@ async function deliverActiveProviderResourceAssociationDelivery(
       });
     }
 
-    const createProviderDeliveryInput =
-      async (): Promise<ExecuteConversationProviderDeliveryInput> => {
-        const connection = await acquireProviderResourceAssociationDeliveryConnection(
-          {
-            controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-          },
-          {
-            organizationId: route.organizationId,
-            sandboxInstanceId: route.sandboxInstanceId,
-            deliveryId: input.delivery.id,
-            conversationId: route.conversationId,
-            webhookEventId: input.delivery.sourceWebhookEventId,
-            ...(webhookEvent.externalDeliveryId === null
-              ? {}
-              : { externalDeliveryId: webhookEvent.externalDeliveryId }),
-          },
-        );
-
-        return {
-          conversationId: route.conversationId,
-          runtimeId: route.runtimeId,
-          connectionUrl: connection.url,
-          inputText: renderProviderResourceAssociationDeliveryInput(input.delivery.renderedInput),
-          workingDirectory: route.workingDirectory,
-          deliveryContext: {
-            source: "provider_resource_association",
-            webhookEventId: input.delivery.sourceWebhookEventId,
-            deliveryTaskId: input.delivery.id,
-            ...(webhookEvent.externalDeliveryId === null
-              ? {}
-              : { externalDeliveryId: webhookEvent.externalDeliveryId }),
-            providerResourceAssociationId: route.providerResourceAssociationId,
-            conversationId: route.conversationId,
-            sandboxInstanceId: route.sandboxInstanceId,
-            routeId: route.routeId,
-          },
-          providerConversationId: route.providerConversationId,
-          providerExecutionId: route.providerExecutionId,
-        };
-      };
+    const connection = await acquireProviderResourceAssociationDeliveryConnection(
+      {
+        controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+      },
+      {
+        organizationId: target.organizationId,
+        sandboxInstanceId: target.sandboxInstanceId,
+        deliveryId: input.delivery.id,
+        webhookEventId: input.delivery.sourceWebhookEventId,
+        ...(webhookEvent.externalDeliveryId === null
+          ? {}
+          : { externalDeliveryId: webhookEvent.externalDeliveryId }),
+      },
+    );
 
     const submittedProviderPayload = await submitCodexAssociatedResourceDelivery({
-      deliveryInput: await createProviderDeliveryInput(),
-      providerConversationId: route.providerConversationId,
+      deliveryInput: {
+        runtimeId: target.runtimeId,
+        connectionUrl: connection.url,
+        inputText: renderProviderResourceAssociationDeliveryInput(input.delivery.renderedInput),
+        deliveryId: input.delivery.id,
+        providerResourceAssociationId: target.providerResourceAssociationId,
+      },
     });
-
-    const deliveryResult = {
-      providerConversationId: route.providerConversationId,
-      providerExecutionId: submittedProviderPayload.providerExecutionId,
-    };
-
-    if (deliveryResult.providerConversationId !== route.providerConversationId) {
-      throw new ProviderResourceAssociationDeliveryError({
-        code: ProviderResourceAssociationDeliveryFailureCodes.PROVIDER_DELIVERY_FAILED,
-        message: `Provider resource association delivery '${input.delivery.id}' changed provider conversation from '${route.providerConversationId}' to '${deliveryResult.providerConversationId}'.`,
-      });
-    }
 
     stepSpan?.addEvent("provider_resource_association_delivery.completed", {
       "mistle.provider_resource_association.id": input.delivery.providerResourceAssociationId,
       "mistle.provider_resource_association.delivery_id": input.delivery.id,
+      "mistle.provider_conversation.id": submittedProviderPayload.providerConversationId,
+      "mistle.provider_execution.id": submittedProviderPayload.providerExecutionId,
       "mistle.workflow.run_id": input.workflowRunId,
     });
     return {
       status: "delivered",
-      routeId: route.routeId,
-      providerExecutionId: deliveryResult.providerExecutionId,
+      providerConversationId: submittedProviderPayload.providerConversationId,
+      providerExecutionId: submittedProviderPayload.providerExecutionId,
     };
   } catch (error) {
     if (!(error instanceof ProviderResourceAssociationDeliveryError)) {
@@ -383,15 +286,6 @@ async function deliverActiveProviderResourceAssociationDelivery(
       status: "terminal_failed",
     };
   }
-}
-
-function shouldDiscoverOriginalRuntimeRoute(error: unknown): boolean {
-  return (
-    error instanceof ProviderResourceAssociationDeliveryError &&
-    (error.code ===
-      ProviderResourceAssociationDeliveryFailureCodes.ROUTING_CONVERSATION_NOT_FOUND ||
-      error.code === ProviderResourceAssociationDeliveryFailureCodes.ROUTING_CONVERSATION_UNBOUND)
-  );
 }
 
 function resolveProviderResourceAssociationDeliveryFailure(error: unknown): {

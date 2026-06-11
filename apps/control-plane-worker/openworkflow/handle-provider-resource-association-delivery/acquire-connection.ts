@@ -75,7 +75,7 @@ export async function acquireProviderResourceAssociationDeliveryConnection(
     organizationId: string;
     sandboxInstanceId: string;
     deliveryId: string;
-    conversationId: string;
+    conversationId?: string | undefined;
     webhookEventId: string;
     externalDeliveryId?: string | undefined;
     timing?: {
@@ -114,7 +114,7 @@ export async function acquireProviderResourceAssociationDeliveryConnection(
         instanceId: input.sandboxInstanceId,
         webhookEventId: input.webhookEventId,
         deliveryTaskId: input.deliveryId,
-        conversationId: input.conversationId,
+        ...(input.conversationId === undefined ? {} : { conversationId: input.conversationId }),
         ...(input.externalDeliveryId === undefined
           ? {}
           : { externalDeliveryId: input.externalDeliveryId }),

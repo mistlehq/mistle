@@ -9,10 +9,6 @@ import {
   ProviderResourceAssociationDeliveryProcessorStatuses,
   ProviderResourceAssociationDeliveryStatuses,
   SandboxProfileStatuses,
-  TriggerConversationCreatedByKinds,
-  TriggerConversationOwnerKinds,
-  TriggerConversationRouteStatuses,
-  TriggerConversationStatuses,
   IntegrationConnectionStatuses,
 } from "@mistle/db/control-plane";
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
@@ -33,7 +29,7 @@ import {
   ensureProviderResourceAssociationDeliveryProcessor,
   idleProviderResourceAssociationDeliveryProcessorIfEmpty,
 } from "../openworkflow/handle-provider-resource-association-delivery/processor.js";
-import { resolveProviderResourceAssociationDeliveryRoute } from "../openworkflow/handle-provider-resource-association-delivery/resolve-route.js";
+import { resolveProviderResourceAssociationDeliveryTarget } from "../openworkflow/handle-provider-resource-association-delivery/resolve-route.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-worker", "data-plane-api"],
@@ -224,30 +220,16 @@ describe.concurrent("provider resource association delivery", () => {
     );
   });
 
-  it("resolves the earliest active runtime route for the associated sandbox", async ({ env }) => {
+  it("resolves the associated sandbox Codex runtime target without a trigger conversation route", async ({
+    env,
+  }) => {
     const scope = await seedAssociationDeliveryScope({
       env,
       suffix: createSuffix("route"),
     });
     await insertSandboxInstance(env, scope);
-    await insertTriggerConversationRoute({
-      env,
-      scope,
-      conversationId: "cnv_association_route_first",
-      routeId: "cvr_association_route_first",
-      providerConversationId: "thread_first",
-      createdAt: "2026-03-09T00:00:00.000Z",
-    });
-    await insertTriggerConversationRoute({
-      env,
-      scope,
-      conversationId: "cnv_association_route_second",
-      routeId: "cvr_association_route_second",
-      providerConversationId: "thread_second",
-      createdAt: "2026-03-09T00:00:01.000Z",
-    });
 
-    const resolvedRoute = await resolveProviderResourceAssociationDeliveryRoute(
+    const resolvedTarget = await resolveProviderResourceAssociationDeliveryTarget(
       {
         dataPlaneClient: createDataPlaneClient(env),
         db: env.controlPlaneDb,
@@ -257,27 +239,24 @@ describe.concurrent("provider resource association delivery", () => {
       },
     );
 
-    expect(resolvedRoute).toMatchObject({
+    expect(resolvedTarget).toMatchObject({
       organizationId: scope.organizationId,
       providerResourceAssociationId: scope.providerResourceAssociationId,
       sandboxInstanceId: scope.sandboxInstanceId,
-      conversationId: "cnv_association_route_first",
-      routeId: "cvr_association_route_first",
       runtimeId: "codex",
       workingDirectory: "/root/repo",
-      providerConversationId: "thread_first",
     });
   });
 
-  it("fails explicitly when the associated sandbox has no runtime route", async ({ env }) => {
+  it("fails explicitly when the associated sandbox has no Codex runtime", async ({ env }) => {
     const scope = await seedAssociationDeliveryScope({
       env,
       suffix: createSuffix("missing_route"),
     });
-    await insertSandboxInstance(env, scope);
+    await insertSandboxInstance(env, scope, { includeCodexRuntime: false });
 
     await expect(
-      resolveProviderResourceAssociationDeliveryRoute(
+      resolveProviderResourceAssociationDeliveryTarget(
         {
           dataPlaneClient: createDataPlaneClient(env),
           db: env.controlPlaneDb,
@@ -287,7 +266,7 @@ describe.concurrent("provider resource association delivery", () => {
         },
       ),
     ).rejects.toMatchObject({
-      code: ProviderResourceAssociationDeliveryFailureCodes.ROUTING_CONVERSATION_NOT_FOUND,
+      code: ProviderResourceAssociationDeliveryFailureCodes.RUNTIME_PLAN_AGENT_RUNTIME_NOT_FOUND,
     });
   });
 });
@@ -425,6 +404,9 @@ async function insertAssociationDelivery(input: {
 async function insertSandboxInstance(
   env: IntegrationTestEnvironment,
   input: AssociationDeliveryScope,
+  options: {
+    includeCodexRuntime?: boolean;
+  } = {},
 ): Promise<void> {
   await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
     id: input.sandboxInstanceId,
@@ -442,51 +424,20 @@ async function insertSandboxInstance(
   await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstanceRuntimePlans).values({
     sandboxInstanceId: input.sandboxInstanceId,
     revision: 1,
-    compiledRuntimePlan: createRuntimePlan(input),
+    compiledRuntimePlan: createRuntimePlan(input, {
+      includeCodexRuntime: options.includeCodexRuntime ?? true,
+    }),
     compiledFromProfileId: input.sandboxProfileId,
     compiledFromProfileVersion: 1,
   });
 }
 
-async function insertTriggerConversationRoute(input: {
-  env: IntegrationTestEnvironment;
-  scope: AssociationDeliveryScope;
-  conversationId: string;
-  routeId: string;
-  providerConversationId: string | null;
-  createdAt: string;
-}): Promise<void> {
-  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.triggerConversations).values({
-    id: input.conversationId,
-    organizationId: input.scope.organizationId,
-    ownerKind: TriggerConversationOwnerKinds.TRIGGER_TARGET,
-    ownerId: `atg_${input.conversationId}`,
-    createdByKind: TriggerConversationCreatedByKinds.USER,
-    createdById: `usr_${input.conversationId}`,
-    sandboxProfileId: input.scope.sandboxProfileId,
-    integrationFamilyId: "openai",
-    runtimeId: "codex",
-    conversationKey: `conversation-${input.conversationId}`,
-    status: TriggerConversationStatuses.ACTIVE,
-    createdAt: input.createdAt,
-    updatedAt: input.createdAt,
-  });
-  await input.env.controlPlaneDb
-    .insert(input.env.controlPlaneTables.triggerConversationRoutes)
-    .values({
-      id: input.routeId,
-      conversationId: input.conversationId,
-      sandboxInstanceId: input.scope.sandboxInstanceId,
-      providerConversationId: input.providerConversationId,
-      providerExecutionId: null,
-      providerState: null,
-      status: TriggerConversationRouteStatuses.ACTIVE,
-      createdAt: input.createdAt,
-      updatedAt: input.createdAt,
-    });
-}
-
-function createRuntimePlan(input: AssociationDeliveryScope) {
+function createRuntimePlan(
+  input: AssociationDeliveryScope,
+  options: {
+    includeCodexRuntime: boolean;
+  },
+) {
   return {
     sandboxProfileId: input.sandboxProfileId,
     version: 1,
@@ -526,32 +477,36 @@ function createRuntimePlan(input: AssociationDeliveryScope) {
           },
         },
       },
-      {
-        runtimeId: "codex",
-        runtimeKey: "codex-app-server",
-        clientId: "codex-cli",
-        endpointKey: "app-server",
-        ptyLaunch: {
-          runtimeId: "codex",
-          displayName: "Codex",
-          newLaunch: {
-            ptySessionId: "cli",
-            cols: 120,
-            rows: 32,
-            cwd: "/root/repo",
-            command: "codex",
-            args: [],
-          },
-          resumeLaunch: {
-            ptySessionId: "cli",
-            cols: 120,
-            rows: 32,
-            cwd: "/root/repo",
-            command: "codex",
-            args: [],
-          },
-        },
-      },
+      ...(options.includeCodexRuntime
+        ? [
+            {
+              runtimeId: "codex",
+              runtimeKey: "codex-app-server",
+              clientId: "codex-cli",
+              endpointKey: "app-server",
+              ptyLaunch: {
+                runtimeId: "codex",
+                displayName: "Codex",
+                newLaunch: {
+                  ptySessionId: "cli",
+                  cols: 120,
+                  rows: 32,
+                  cwd: "/root/repo",
+                  command: "codex",
+                  args: [],
+                },
+                resumeLaunch: {
+                  ptySessionId: "cli",
+                  cols: 120,
+                  rows: 32,
+                  cwd: "/root/repo",
+                  command: "codex",
+                  args: [],
+                },
+              },
+            },
+          ]
+        : []),
     ],
   };
 }
