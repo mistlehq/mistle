@@ -38,28 +38,17 @@ export type ExecuteConversationProviderDeliveryInput = {
   connectionUrl: string;
   inputText: string;
   workingDirectory: string;
-  deliveryContext:
-    | {
-        source: "webhook" | "schedule";
-        webhookEventId?: string | undefined;
-        scheduledActionId?: string | undefined;
-        deliveryTaskId: string;
-        externalDeliveryId?: string | undefined;
-        triggerRunId: string;
-        conversationId: string;
-        sandboxInstanceId: string;
-        routeId?: string | undefined;
-      }
-    | {
-        source: "provider_resource_association";
-        webhookEventId: string;
-        deliveryTaskId: string;
-        externalDeliveryId?: string | undefined;
-        providerResourceAssociationId: string;
-        conversationId: string;
-        sandboxInstanceId: string;
-        routeId: string;
-      };
+  deliveryContext: {
+    source: "webhook" | "schedule";
+    webhookEventId?: string | undefined;
+    scheduledActionId?: string | undefined;
+    deliveryTaskId: string;
+    externalDeliveryId?: string | undefined;
+    triggerRunId: string;
+    conversationId: string;
+    sandboxInstanceId: string;
+    routeId?: string | undefined;
+  };
   collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
   providerConversationId: string | null;
   providerExecutionId: string | null;
