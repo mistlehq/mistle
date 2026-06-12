@@ -26,7 +26,12 @@ import {
   normalizeOpenComputerInspectState,
   validateOpenComputerSnapshotForImage,
 } from "./client.js";
-import { OpenComputerSnapshotStates, createOpenComputerResourceFields } from "./schemas.js";
+import {
+  OpenComputerSnapshotStates,
+  OpenComputerValidResourceTiers,
+  createOpenComputerCheckpointForkResourceFields,
+  createOpenComputerResourceFields,
+} from "./schemas.js";
 
 describe("OpenComputer client helpers", () => {
   it("maps start resources to OpenComputer field names and validates tier pairs", () => {
@@ -44,6 +49,27 @@ describe("OpenComputer client helpers", () => {
     expect(() => createOpenComputerResourceFields({ vcpuCount: 2, memoryMb: 4096 })).toThrow(
       "OpenComputer resources must match a supported tier",
     );
+  });
+
+  it("maps checkpoint fork resources only to the documented memory field", () => {
+    expect(
+      createOpenComputerCheckpointForkResourceFields({
+        vcpuCount: 4,
+        memoryMb: 16_384,
+        diskMb: 20_480,
+      }),
+    ).toEqual({
+      memoryMB: 16_384,
+    });
+    expect(() =>
+      createOpenComputerCheckpointForkResourceFields({ vcpuCount: 8, memoryMb: 32_768 }),
+    ).toThrow("OpenComputer resources must match a supported tier");
+    expect(OpenComputerValidResourceTiers).toEqual([
+      { vcpuCount: 1, memoryMb: 1024 },
+      { vcpuCount: 1, memoryMb: 4096 },
+      { vcpuCount: 2, memoryMb: 8192 },
+      { vcpuCount: 4, memoryMb: 16_384 },
+    ]);
   });
 
   it("creates start bodies without custom provider ids", () => {
@@ -401,6 +427,83 @@ describe("OpenComputer client helpers", () => {
         }),
       ).resolves.toEqual({ checkpointId: "checkpoint-1" });
       expect(checkpointBody).toEqual({ name: "mistle-sb-1" });
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("starts checkpoint sandboxes with fork-supported resource fields", async () => {
+    let forkBody: unknown;
+    const api = await startSimulatedOpenComputerApi(async (request, response) => {
+      if (
+        request.method === "POST" &&
+        request.url === "/api/sandboxes/from-checkpoint/checkpoint-1"
+      ) {
+        forkBody = JSON.parse(await readRequestBody(request));
+        response.writeHead(201, { "Content-Type": "application/json" });
+        // OpenComputer checkpoint fork documents memoryMB as the only resource field and
+        // returns the effective memoryMB after applying the platform cap.
+        // https://docs.opencomputer.dev/api-reference/checkpoints/fork
+        response.end(JSON.stringify({ sandboxID: "sb-1", memoryMB: 16_384 }));
+        return;
+      }
+      response.writeHead(404);
+      response.end();
+    });
+    const client = new OpenComputerApiClient({
+      config: { apiKey: "test-key", apiBaseUrl: api.url },
+    });
+
+    try {
+      await expect(
+        client.startSandbox({
+          sandboxInstanceId: "sandbox_instance_123",
+          image: { kind: "checkpoint", id: "checkpoint-1" },
+          env: { FOO: "bar" },
+          resources: { vcpuCount: 4, memoryMb: 16_384, diskMb: 20_480 },
+        }),
+      ).resolves.toEqual({ sandboxId: "sb-1" });
+      expect(forkBody).toEqual({
+        timeout: 0,
+        envs: { FOO: "bar" },
+        metadata: {
+          mistleSandboxInstanceId: "sandbox_instance_123",
+          mistleProvider: "opencomputer",
+        },
+        memoryMB: 16_384,
+      });
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("fails checkpoint starts when OpenComputer returns less memory than requested", async () => {
+    const api = await startSimulatedOpenComputerApi((request, response) => {
+      if (
+        request.method === "POST" &&
+        request.url === "/api/sandboxes/from-checkpoint/checkpoint-1"
+      ) {
+        response.writeHead(201, { "Content-Type": "application/json" });
+        // OpenComputer checkpoint fork returns the effective memoryMB after applying
+        // the platform cap.
+        // https://docs.opencomputer.dev/api-reference/checkpoints/fork
+        response.end(JSON.stringify({ sandboxID: "sb-1", memoryMB: 8192 }));
+        return;
+      }
+      response.writeHead(404);
+      response.end();
+    });
+    const client = new OpenComputerApiClient({
+      config: { apiKey: "test-key", apiBaseUrl: api.url },
+    });
+
+    try {
+      await expect(
+        client.startSandbox({
+          image: { kind: "checkpoint", id: "checkpoint-1" },
+          resources: { vcpuCount: 4, memoryMb: 16_384 },
+        }),
+      ).rejects.toThrow("OpenComputer checkpoint fork returned 8192 MB memory");
     } finally {
       await api.close();
     }

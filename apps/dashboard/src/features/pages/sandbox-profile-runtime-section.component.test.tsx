@@ -115,13 +115,13 @@ const OpenComputerProvider = {
   resourceCapabilities: {
     vcpuCount: {
       min: 1,
-      max: 16,
+      max: 4,
       step: 1,
       default: 1,
     },
     memoryMb: {
       min: 1024,
-      max: 65_536,
+      max: 16_384,
       step: 1024,
       default: 4096,
     },

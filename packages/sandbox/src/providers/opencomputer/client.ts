@@ -33,6 +33,7 @@ import {
   OpenComputerSandboxIdRequestSchema,
   OpenComputerStartSandboxRequestSchema,
   OpenComputerVerifyCheckpointStartableRequestSchema,
+  createOpenComputerCheckpointForkResourceFields,
   createOpenComputerResourceFields,
   type OpenComputerCaptureSandboxSnapshotRequest,
   type OpenComputerCreateSnapshotImageRequest,
@@ -87,6 +88,7 @@ const OpenComputerCreateSandboxResponseSchema = z.looseObject({
   sandboxID: z.string().trim().min(1).optional(),
   sandboxId: z.string().trim().min(1).optional(),
   id: z.string().trim().min(1).optional(),
+  memoryMB: z.number().int().positive().optional(),
 });
 
 const OpenComputerSandboxInfoSchema = z.looseObject({
@@ -631,6 +633,7 @@ export class OpenComputerApiClient implements OpenComputerClient {
     }
 
     try {
+      const resourceFields = createOpenComputerCheckpointForkResourceFields(request.resources);
       const response = await this.#jsonRequest({
         method: "POST",
         path: `/sandboxes/from-checkpoint/${encodeURIComponent(request.image.id)}`,
@@ -645,10 +648,14 @@ export class OpenComputerApiClient implements OpenComputerClient {
                   mistleProvider: SandboxProvider.OPENCOMPUTER,
                 },
               }),
-          ...createOpenComputerResourceFields(request.resources),
+          ...resourceFields,
         },
         schema: OpenComputerCreateSandboxResponseSchema,
         operation: OpenComputerClientOperationIds.CREATE_SANDBOX,
+      });
+      validateOpenComputerCheckpointForkResponseResources({
+        requestedMemoryMb: resourceFields.memoryMB,
+        response,
       });
       return { sandboxId: requireResponseSandboxId(response) };
     } catch (error) {
@@ -1225,6 +1232,22 @@ function requireResponseSandboxId(input: {
     throw new Error("OpenComputer sandbox response did not include sandbox id.");
   }
   return id;
+}
+
+function validateOpenComputerCheckpointForkResponseResources(input: {
+  requestedMemoryMb: number | undefined;
+  response: { memoryMB?: number | undefined };
+}): void {
+  if (input.requestedMemoryMb === undefined || input.response.memoryMB === undefined) {
+    return;
+  }
+  if (input.response.memoryMB !== input.requestedMemoryMb) {
+    throw new Error(
+      `OpenComputer checkpoint fork returned ${String(
+        input.response.memoryMB,
+      )} MB memory, expected ${String(input.requestedMemoryMb)} MB.`,
+    );
+  }
 }
 
 function isOpenComputerCheckpointNotFound(error: unknown): error is OpenComputerClientError {

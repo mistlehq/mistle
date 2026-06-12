@@ -383,13 +383,13 @@ describe("integrations-definitions index", () => {
         resourceCapabilities: {
           vcpuCount: {
             min: 1,
-            max: 16,
+            max: 4,
             step: 1,
             default: 1,
           },
           memoryMb: {
             min: 1024,
-            max: 65_536,
+            max: 16_384,
             step: 1024,
             default: 4096,
           },
@@ -398,8 +398,6 @@ describe("integrations-definitions index", () => {
             { vcpuCount: 1, memoryMb: 4096 },
             { vcpuCount: 2, memoryMb: 8192 },
             { vcpuCount: 4, memoryMb: 16_384 },
-            { vcpuCount: 8, memoryMb: 32_768 },
-            { vcpuCount: 16, memoryMb: 65_536 },
           ],
         },
       },
