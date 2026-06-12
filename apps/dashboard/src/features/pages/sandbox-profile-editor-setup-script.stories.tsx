@@ -44,6 +44,15 @@ export const EmptySetupScript: Story = {
   },
 };
 
+export const EmptyPublishedSetupScript: Story = {
+  args: {
+    initialBindings: [StoryBindings[0], StoryBindings[1]],
+    initialSectionId: "sandbox-profile",
+    lifecycleState: "published",
+    setupScript: "",
+  },
+};
+
 export const SetupAssistantEntry: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],
