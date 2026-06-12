@@ -83,6 +83,7 @@ export async function prepareProviderResourceAssociationDeliveries(
         payload: input.webhookEvent.payload,
         resourceKind: observedEvent.observation.resourceKind,
         routing: sandboxInstance.associatedResourceEventRouting,
+        sourceWebhookEventType: input.webhookEvent.eventType,
       })
     ) {
       continue;

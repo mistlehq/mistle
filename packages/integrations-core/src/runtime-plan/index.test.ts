@@ -5,6 +5,7 @@ import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js
 import {
   AssociatedProviderResourceKinds,
   AssociatedResourceEventTypes,
+  SlackThreadMessageModes,
   createDisabledAssociatedResourceEventRouting,
 } from "../types/index.js";
 import { assembleCompiledRuntimePlan, CompiledRuntimePlanSchema } from "./index.js";
@@ -120,6 +121,7 @@ describe("assembleCompiledRuntimePlan", () => {
           {
             resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
             eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+            messageMode: SlackThreadMessageModes.APP_MENTIONS_ONLY,
             payloadFilter: {
               [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED]: {
                 op: "contains_token",
@@ -143,6 +145,7 @@ describe("assembleCompiledRuntimePlan", () => {
         {
           resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
           eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+          messageMode: SlackThreadMessageModes.APP_MENTIONS_ONLY,
           payloadFilter: {
             [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED]: {
               op: "contains_token",

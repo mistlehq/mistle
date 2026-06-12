@@ -59,6 +59,7 @@ import {
 import { resolveRowBindingMetadata } from "./sandbox-profile-binding-shared.js";
 import {
   hasSandboxProfileBindingResourcesAndToolsCellContent,
+  type SandboxProfileBindingResourcesAssociatedResourceRouting,
   SandboxProfileBindingResourcesAndToolsCell,
 } from "./sandbox-profile-resources-and-tools-section.js";
 import { SandboxProfileSectionCard } from "./sandbox-profile-section-card.js";
@@ -154,6 +155,9 @@ const SandboxProfileIntegrationCellContentClassName =
   "flex items-center @3xl/responsive-field-list:min-h-9";
 const SandboxProfileIntegrationActionCellClassName =
   "absolute right-0 top-0 @3xl/responsive-field-list:static @3xl/responsive-field-list:flex @3xl/responsive-field-list:min-h-9 @3xl/responsive-field-list:items-center @3xl/responsive-field-list:justify-end";
+const IdleAssociatedResourceRoutingDraftState: SandboxProfileAssociatedResourceRoutingDraftState = {
+  hasUnpersistedChanges: false,
+};
 
 function IntegrationNameCell(input: {
   logoKey: string | undefined;
@@ -218,6 +222,61 @@ function bindingRowTargetsSlackWithBotIdentity(input: {
 
   const botUserId = metadata.connection.config?.["bot_user_id"];
   return typeof botUserId === "string" && botUserId.trim().length > 0;
+}
+
+function mergeAssociatedResourceRoutingConfigResourceKinds(input: {
+  baseConfig: SandboxProfileVersion["associatedResourceEventRoutingConfig"];
+  resourceKinds: readonly AssociatedProviderResourceKind[];
+  scopedConfig: SandboxProfileVersion["associatedResourceEventRoutingConfig"];
+}): SandboxProfileVersion["associatedResourceEventRoutingConfig"] {
+  const scopedResourceKinds = new Set(input.resourceKinds);
+  const baseResources =
+    input.baseConfig.enabled === false ? [] : (input.baseConfig.resources ?? []);
+  const scopedResources =
+    input.scopedConfig.enabled === false ? [] : (input.scopedConfig.resources ?? []);
+  const nextResources = [
+    ...baseResources.filter((resource) => !scopedResourceKinds.has(resource.resourceKind)),
+    ...scopedResources.filter((resource) => scopedResourceKinds.has(resource.resourceKind)),
+  ];
+
+  return {
+    enabled: nextResources.length > 0,
+    resources: nextResources,
+  };
+}
+
+function buildCombinedAssociatedResourceRoutingConfig(input: {
+  baseConfig: SandboxProfileVersion["associatedResourceEventRoutingConfig"];
+  gitDraftState: SandboxProfileAssociatedResourceRoutingDraftState;
+  slackDraftState: SandboxProfileAssociatedResourceRoutingDraftState;
+}): SandboxProfileVersion["associatedResourceEventRoutingConfig"] {
+  let nextConfig = input.baseConfig;
+
+  if (input.gitDraftState.hasUnpersistedChanges) {
+    const gitConfig = input.gitDraftState.buildDraftChanges?.();
+    if (gitConfig === undefined) {
+      throw new Error("Git associated resource routing draft changes could not be resolved.");
+    }
+    nextConfig = mergeAssociatedResourceRoutingConfigResourceKinds({
+      baseConfig: nextConfig,
+      resourceKinds: [AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST],
+      scopedConfig: gitConfig,
+    });
+  }
+
+  if (input.slackDraftState.hasUnpersistedChanges) {
+    const slackConfig = input.slackDraftState.buildDraftChanges?.();
+    if (slackConfig === undefined) {
+      throw new Error("Slack associated resource routing draft changes could not be resolved.");
+    }
+    nextConfig = mergeAssociatedResourceRoutingConfigResourceKinds({
+      baseConfig: nextConfig,
+      resourceKinds: [AssociatedProviderResourceKinds.SLACK_THREAD],
+      scopedConfig: slackConfig,
+    });
+  }
+
+  return nextConfig;
 }
 
 function ConnectionSelectionCell(input: {
@@ -735,6 +794,14 @@ export function SandboxProfileIntegrationsSetupSection(
   input: SandboxProfileIntegrationsSetupSectionProps,
 ): React.JSX.Element {
   const [isAddConnectorsDialogOpen, setIsAddConnectorsDialogOpen] = useState(false);
+  const [gitAssociatedResourceRoutingDraftState, setGitAssociatedResourceRoutingDraftState] =
+    useState<SandboxProfileAssociatedResourceRoutingDraftState>(
+      IdleAssociatedResourceRoutingDraftState,
+    );
+  const [slackAssociatedResourceRoutingDraftState, setSlackAssociatedResourceRoutingDraftState] =
+    useState<SandboxProfileAssociatedResourceRoutingDraftState>(
+      IdleAssociatedResourceRoutingDraftState,
+    );
   const controlsAreDisabled = input.disabled === true;
   const isReadOnly = input.readOnly === true;
   const agentChoices = resolveKindChoices({
@@ -753,6 +820,66 @@ export function SandboxProfileIntegrationsSetupSection(
     availableTargets: input.availableTargets,
     includeDisconnectedTargets: true,
   });
+
+  function publishAssociatedResourceRoutingDraftState(inputValue: {
+    gitDraftState: SandboxProfileAssociatedResourceRoutingDraftState;
+    slackDraftState: SandboxProfileAssociatedResourceRoutingDraftState;
+  }): void {
+    const associatedResourceRouting = input.associatedResourceRouting;
+    if (associatedResourceRouting?.onDraftStateChange === undefined) {
+      return;
+    }
+
+    const hasUnpersistedChanges =
+      inputValue.gitDraftState.hasUnpersistedChanges ||
+      inputValue.slackDraftState.hasUnpersistedChanges;
+
+    associatedResourceRouting.onDraftStateChange({
+      applyDraftSaveError: (error) => {
+        if (inputValue.gitDraftState.hasUnpersistedChanges) {
+          inputValue.gitDraftState.applyDraftSaveError?.(error);
+        }
+        if (inputValue.slackDraftState.hasUnpersistedChanges) {
+          inputValue.slackDraftState.applyDraftSaveError?.(error);
+        }
+      },
+      applySavedAssociatedResourceEventRoutingConfig: (config) => {
+        inputValue.gitDraftState.applySavedAssociatedResourceEventRoutingConfig?.(config);
+        inputValue.slackDraftState.applySavedAssociatedResourceEventRoutingConfig?.(config);
+      },
+      ...(hasUnpersistedChanges
+        ? {
+            buildDraftChanges: () =>
+              buildCombinedAssociatedResourceRoutingConfig({
+                baseConfig: associatedResourceRouting.version.associatedResourceEventRoutingConfig,
+                gitDraftState: inputValue.gitDraftState,
+                slackDraftState: inputValue.slackDraftState,
+              }),
+          }
+        : {}),
+      hasUnpersistedChanges,
+    });
+  }
+
+  function updateGitAssociatedResourceRoutingDraftState(
+    nextState: SandboxProfileAssociatedResourceRoutingDraftState,
+  ): void {
+    setGitAssociatedResourceRoutingDraftState(nextState);
+    publishAssociatedResourceRoutingDraftState({
+      gitDraftState: nextState,
+      slackDraftState: slackAssociatedResourceRoutingDraftState,
+    });
+  }
+
+  function updateSlackAssociatedResourceRoutingDraftState(
+    nextState: SandboxProfileAssociatedResourceRoutingDraftState,
+  ): void {
+    setSlackAssociatedResourceRoutingDraftState(nextState);
+    publishAssociatedResourceRoutingDraftState({
+      gitDraftState: gitAssociatedResourceRoutingDraftState,
+      slackDraftState: nextState,
+    });
+  }
 
   const agentRows = useMemo(
     () => input.integrationRows.filter((row) => row.kind === "agent"),
@@ -813,29 +940,8 @@ export function SandboxProfileIntegrationsSetupSection(
       availableConnections: input.availableConnections,
       availableTargets: input.availableTargets,
     });
-  const connectorRowsTargetSlackWithBotIdentity = connectorRows.some((row) =>
-    bindingRowTargetsSlackWithBotIdentity({
-      row,
-      availableConnections: input.availableConnections,
-      availableTargets: input.availableTargets,
-    }),
-  );
-  const supportedAssociatedResourceEvents = [
-    ...(gitRowBindingMetadata?.target?.supportedAssociatedResourceEvents ?? []),
-    ...connectorRows.flatMap((row) =>
-      bindingRowTargetsSlackWithBotIdentity({
-        row,
-        availableConnections: input.availableConnections,
-        availableTargets: input.availableTargets,
-      })
-        ? (resolveRowBindingMetadata({
-            row,
-            availableConnections: input.availableConnections,
-            availableTargets: input.availableTargets,
-          })?.target?.supportedAssociatedResourceEvents ?? [])
-        : [],
-    ),
-  ];
+  const supportedGitAssociatedResourceEvents =
+    gitRowBindingMetadata?.target?.supportedAssociatedResourceEvents ?? [];
   const associatedResourceRoutingConfigHasGitHubPullRequests =
     input.associatedResourceRouting === undefined
       ? false
@@ -855,8 +961,6 @@ export function SandboxProfileIntegrationsSetupSection(
     undefined;
   const gitHubBindingDefaultsAssociatedResourceRouting =
     gitRowTargetsGitHub && !associatedResourceRoutingConfigHasExplicitResources;
-  const slackThreadBindingDefaultsAssociatedResourceRouting =
-    connectorRowsTargetSlackWithBotIdentity && !associatedResourceRoutingConfigHasExplicitResources;
   const selectedGitConnectionIsIdentityLinked =
     gitRow !== null && input.identityLinkedGitConnectionIds?.includes(gitRow.connectionId) === true;
   const gitCommitSigningIsChecked =
@@ -1109,20 +1213,20 @@ export function SandboxProfileIntegrationsSetupSection(
 
                 {input.associatedResourceRouting !== undefined &&
                 (gitRowTargetsGitHub ||
-                  connectorRowsTargetSlackWithBotIdentity ||
                   associatedResourceRoutingConfigHasGitHubPullRequests ||
-                  associatedResourceRoutingConfigHasSlackThreads ||
-                  input.associatedResourceRouting.hasUnpersistedChanges) ? (
+                  input.associatedResourceRouting.hasUnpersistedChanges ||
+                  gitAssociatedResourceRoutingDraftState.hasUnpersistedChanges) ? (
                   <SandboxProfileAssociatedResourceRoutingFieldGroup
                     disabled={controlsAreDisabled}
                     hasGitHubBinding={gitHubBindingDefaultsAssociatedResourceRouting}
-                    hasSlackThreadBinding={slackThreadBindingDefaultsAssociatedResourceRouting}
+                    hasSlackThreadBinding={false}
                     isDraft={input.associatedResourceRouting.isDraft}
                     {...(input.associatedResourceRouting.onDraftStateChange === undefined
                       ? {}
-                      : { onDraftStateChange: input.associatedResourceRouting.onDraftStateChange })}
+                      : { onDraftStateChange: updateGitAssociatedResourceRoutingDraftState })}
+                    resourceKinds={[AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST]}
                     selectedConnectionId={gitRow?.connectionId}
-                    supportedAssociatedResourceEvents={supportedAssociatedResourceEvents}
+                    supportedAssociatedResourceEvents={supportedGitAssociatedResourceEvents}
                     version={input.associatedResourceRouting.version}
                   />
                 ) : null}
@@ -1292,11 +1396,38 @@ export function SandboxProfileIntegrationsSetupSection(
                       availableConnections: input.availableConnections,
                       availableTargets: input.availableTargets,
                     });
+                    const rowTargetsSlackWithBotIdentity = bindingRowTargetsSlackWithBotIdentity({
+                      row,
+                      availableConnections: input.availableConnections,
+                      availableTargets: input.availableTargets,
+                    });
+                    const slackAssociatedResourceRouting:
+                      | SandboxProfileBindingResourcesAssociatedResourceRouting
+                      | undefined =
+                      input.associatedResourceRouting === undefined ||
+                      (!rowTargetsSlackWithBotIdentity &&
+                        !associatedResourceRoutingConfigHasSlackThreads &&
+                        !slackAssociatedResourceRoutingDraftState.hasUnpersistedChanges)
+                        ? undefined
+                        : {
+                            hasSlackThreadBinding:
+                              rowTargetsSlackWithBotIdentity &&
+                              !associatedResourceRoutingConfigHasExplicitResources,
+                            isDraft: input.associatedResourceRouting.isDraft,
+                            ...(input.associatedResourceRouting.onDraftStateChange === undefined
+                              ? {}
+                              : {
+                                  onDraftStateChange:
+                                    updateSlackAssociatedResourceRoutingDraftState,
+                                }),
+                            version: input.associatedResourceRouting.version,
+                          };
                     const hasResourcesAndTools =
                       hasSandboxProfileBindingResourcesAndToolsCellContent({
                         row,
                         availableConnections: input.availableConnections,
                         availableTargets: input.availableTargets,
+                        associatedResourceRouting: slackAssociatedResourceRouting,
                       });
 
                     return (
@@ -1353,6 +1484,7 @@ export function SandboxProfileIntegrationsSetupSection(
                           <SandboxProfileBindingResourcesAndToolsCell
                             availableConnections={input.availableConnections}
                             availableTargets={input.availableTargets}
+                            associatedResourceRouting={slackAssociatedResourceRouting}
                             disabled={controlsAreDisabled}
                             readOnly={isReadOnly}
                             onRowChange={input.onIntegrationBindingRowChange}

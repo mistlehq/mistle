@@ -7,6 +7,8 @@ import {
   type AssociatedResourceSelfAuthorshipInput,
   type IntegrationAssociatedResourceEventDefinition,
   type IntegrationAssociatedResourceEventsCapability,
+  type IntegrationWebhookEventDefinition,
+  type IntegrationWebhookEventParameterDefinition,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
@@ -44,26 +46,57 @@ export const SlackAssociatedResourceEventsCapability: IntegrationAssociatedResou
   };
 
 function createSlackAssociatedResourceEventDefinitions(): IntegrationAssociatedResourceEventDefinition[] {
-  const messageEventDefinition = SlackSupportedWebhookEvents.find(
-    (eventDefinition) => eventDefinition.eventType === "slack:message",
-  );
-  if (messageEventDefinition === undefined) {
-    throw new Error("Slack message webhook event definition is required for thread reply filters.");
-  }
+  const messageEventDefinition = findRequiredSlackWebhookEventDefinition("slack:message");
+  const appMentionEventDefinition = findRequiredSlackWebhookEventDefinition("slack:app_mention");
+  const parameters = mergeSlackThreadReplyParameters([
+    messageEventDefinition,
+    appMentionEventDefinition,
+  ]);
 
   return [
     {
       resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
       eventType: AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED,
-      displayName: "Thread replies",
-      ...(messageEventDefinition.parameters === undefined
-        ? {}
-        : { parameters: messageEventDefinition.parameters }),
+      displayName: "Thread messages",
+      ...(parameters.length === 0 ? {} : { parameters }),
       ...(messageEventDefinition.parameterGroups === undefined
         ? {}
         : { parameterGroups: messageEventDefinition.parameterGroups }),
     },
   ];
+}
+
+function findRequiredSlackWebhookEventDefinition(
+  eventType: string,
+): IntegrationWebhookEventDefinition {
+  const eventDefinition = SlackSupportedWebhookEvents.find(
+    (candidate) => candidate.eventType === eventType,
+  );
+  if (eventDefinition === undefined) {
+    throw new Error(
+      `Slack ${eventType} webhook event definition is required for thread message filters.`,
+    );
+  }
+  return eventDefinition;
+}
+
+function mergeSlackThreadReplyParameters(
+  eventDefinitions: readonly IntegrationWebhookEventDefinition[],
+): IntegrationWebhookEventParameterDefinition[] {
+  const parameters: IntegrationWebhookEventParameterDefinition[] = [];
+  const seenParameterIds = new Set<string>();
+
+  for (const eventDefinition of eventDefinitions) {
+    for (const parameter of eventDefinition.parameters ?? []) {
+      if (seenParameterIds.has(parameter.id)) {
+        continue;
+      }
+      seenParameterIds.add(parameter.id);
+      parameters.push(parameter);
+    }
+  }
+
+  return parameters;
 }
 
 export function observeSlackAssociatedResourceFromWebhookEvent(input: {
@@ -76,7 +109,7 @@ export function observeSlackAssociatedResourceFromWebhookEvent(input: {
   renderedInput: SlackThreadAssociatedResourceRenderedInput;
   resourceKind: Extract<AssociatedProviderResourceKind, "slack.thread">;
 } | null {
-  if (input.eventType !== "slack:message") {
+  if (input.eventType !== "slack:message" && input.eventType !== "slack:app_mention") {
     return null;
   }
 

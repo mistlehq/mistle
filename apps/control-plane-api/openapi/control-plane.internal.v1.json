@@ -3032,6 +3032,10 @@
                                         },
                                         "minItems": 1
                                       },
+                                      "messageMode": {
+                                        "type": "string",
+                                        "enum": ["all", "app_mentions_only"]
+                                      },
                                       "payloadFilter": {
                                         "type": "object",
                                         "additionalProperties": {}
@@ -3523,6 +3527,10 @@
                                       "enum": ["slack.thread.message.created"]
                                     },
                                     "minItems": 1
+                                  },
+                                  "messageMode": {
+                                    "type": "string",
+                                    "enum": ["all", "app_mentions_only"]
                                   },
                                   "payloadFilter": {
                                     "type": "object",

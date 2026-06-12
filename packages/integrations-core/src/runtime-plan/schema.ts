@@ -9,6 +9,7 @@ import {
   AssociatedResourceEventTypes,
   RuntimeFileWriteMode,
   SandboxImageSources,
+  SlackThreadMessageModes,
   type CompiledRuntimePlan,
   type SandboxProfileAssociatedResourceEventRoutingConfig,
 } from "../types/index.js";
@@ -512,6 +513,9 @@ const SlackThreadAssociatedResourceEventRoutingResourceRuleSchema = z
       .array(z.enum([AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED]))
       .min(1)
       .readonly(),
+    messageMode: z
+      .enum([SlackThreadMessageModes.ALL, SlackThreadMessageModes.APP_MENTIONS_ONLY])
+      .optional(),
     payloadFilter: z.record(z.string(), z.unknown()).optional(),
   })
   .strict()
@@ -630,6 +634,7 @@ function normalizeAssociatedResourceRule(
       return {
         resourceKind: rule.resourceKind,
         eventTypes: sortSlackThreadAssociatedResourceEventTypes(rule.eventTypes),
+        ...(rule.messageMode === undefined ? {} : { messageMode: rule.messageMode }),
         ...(rule.payloadFilter === undefined
           ? {}
           : { payloadFilter: parseSlackThreadAssociatedResourcePayloadFilter(rule.payloadFilter) }),

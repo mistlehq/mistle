@@ -16,7 +16,7 @@ describe("SlackAssociatedResourceEventsCapability", () => {
       {
         resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
         eventType: AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED,
-        displayName: "Thread replies",
+        displayName: "Thread messages",
         parameters: [
           {
             id: "invocationToken",
@@ -25,6 +25,14 @@ describe("SlackAssociatedResourceEventsCapability", () => {
             payloadPath: ["event", "text"],
             matchMode: "contains_token",
             controlVariant: "invocation-token",
+          },
+          {
+            id: "channel",
+            label: "channel",
+            kind: "resource-select",
+            resourceKind: "channel",
+            payloadPath: ["event", "channel"],
+            prefix: "in",
           },
         ],
       },
@@ -73,7 +81,7 @@ describe("observeSlackAssociatedResourceFromWebhookEvent", () => {
     });
   });
 
-  it("does not observe Slack app mentions as associated resource events", () => {
+  it("observes threaded Slack app mentions as associated resource events", () => {
     expect(
       observeSlackAssociatedResourceFromWebhookEvent({
         eventType: "slack:app_mention",
@@ -85,6 +93,46 @@ describe("observeSlackAssociatedResourceFromWebhookEvent", () => {
             mistle_thread_root_ts: "1710000000.000100",
             user: "U456",
             text: "<@U_BOT> can you re-check this?",
+          },
+        },
+      }),
+    ).toEqual({
+      actor: {
+        providerSubjectId: "U456",
+      },
+      eventType: AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED,
+      providerResourceId: "C123:1710000000.000100",
+      resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+      renderedInput: {
+        kind: "slack.thread.associated_resource_event",
+        eventType: AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED,
+        providerResourceId: "C123:1710000000.000100",
+        resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+        text: [
+          "Slack channel: C123",
+          "Thread root: 1710000000.000100",
+          "Event type: slack.thread.message.created",
+          "Author: U456",
+          "",
+          "Thread reply:",
+          "Message text: <@U_BOT> can you re-check this?",
+        ].join("\n"),
+      },
+    });
+  });
+
+  it("does not observe top-level Slack app mentions as associated resource events", () => {
+    expect(
+      observeSlackAssociatedResourceFromWebhookEvent({
+        eventType: "slack:app_mention",
+        payload: {
+          event: {
+            channel: "C123",
+            ts: "1710000000.000100",
+            thread_ts: "1710000000.000100",
+            mistle_thread_root_ts: "1710000000.000100",
+            user: "U456",
+            text: "<@U_BOT> please start a new thread",
           },
         },
       }),

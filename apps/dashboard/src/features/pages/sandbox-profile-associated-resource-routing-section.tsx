@@ -1,8 +1,10 @@
 import {
   AssociatedProviderResourceKinds,
   AssociatedResourceEventTypes,
+  SlackThreadMessageModes,
   type AssociatedProviderResourceKind,
   type AssociatedResourceEventType,
+  type SlackThreadMessageMode,
 } from "@mistle/integrations-core";
 import {
   Button,
@@ -12,6 +14,11 @@ import {
   FieldHeader,
   FieldLabelWithTooltip,
   Notice,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@mistle/ui";
 import { CaretDownIcon, CaretRightIcon } from "@phosphor-icons/react";
 import { useCallback, useState } from "react";
@@ -60,7 +67,7 @@ const SlackThreadEventOptions: ReadonlyArray<{
 }> = [
   {
     eventType: AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED,
-    label: "Thread replies",
+    label: "Thread messages",
   },
 ];
 
@@ -97,6 +104,7 @@ const AssociatedResourceOptions: ReadonlyArray<{
 
 type AssociatedResourceRoutingConfig =
   SandboxProfileVersion["associatedResourceEventRoutingConfig"];
+type AssociatedResourceRoutingLayout = "horizontal" | "vertical";
 type AssociatedResourceEventDefinition = NonNullable<
   IntegrationTarget["supportedAssociatedResourceEvents"]
 >[number];
@@ -129,6 +137,7 @@ type AssociatedResourceRoutingResourceDraft = {
   resourceKind: AssociatedProviderResourceKind;
   advancedPayloadFilter: Record<string, unknown> | null;
   eventParameterRules: WebhookTriggerEventParameterRuleMap;
+  slackThreadMessageMode: SlackThreadMessageMode;
 };
 
 export type SandboxProfileAssociatedResourceRoutingDraftState = {
@@ -145,7 +154,9 @@ export function SandboxProfileAssociatedResourceRoutingFieldGroup(input: {
   hasGitHubBinding: boolean;
   hasSlackThreadBinding: boolean;
   isDraft: boolean;
+  layout?: AssociatedResourceRoutingLayout | undefined;
   onDraftStateChange?: (state: SandboxProfileAssociatedResourceRoutingDraftState) => void;
+  resourceKinds?: readonly AssociatedProviderResourceKind[] | undefined;
   selectedConnectionId?: string | undefined;
   supportedAssociatedResourceEvents?: readonly AssociatedResourceEventDefinition[] | undefined;
   version: SandboxProfileVersion;
@@ -154,6 +165,7 @@ export function SandboxProfileAssociatedResourceRoutingFieldGroup(input: {
     config: input.version.associatedResourceEventRoutingConfig,
     hasGitHubBinding: input.hasGitHubBinding,
     hasSlackThreadBinding: input.hasSlackThreadBinding,
+    resourceKinds: input.resourceKinds,
     supportedAssociatedResourceEvents: input.supportedAssociatedResourceEvents ?? [],
   });
 
@@ -163,10 +175,12 @@ export function SandboxProfileAssociatedResourceRoutingFieldGroup(input: {
       hasGitHubBinding={input.hasGitHubBinding}
       hasSlackThreadBinding={input.hasSlackThreadBinding}
       isDraft={input.isDraft}
+      layout={input.layout ?? "horizontal"}
       key={remountKey}
       {...(input.onDraftStateChange === undefined
         ? {}
         : { onDraftStateChange: input.onDraftStateChange })}
+      resourceKinds={input.resourceKinds}
       selectedConnectionId={input.selectedConnectionId}
       supportedAssociatedResourceEvents={input.supportedAssociatedResourceEvents}
       version={input.version}
@@ -179,7 +193,9 @@ function SandboxProfileAssociatedResourceRoutingStatefulSection(input: {
   hasGitHubBinding: boolean;
   hasSlackThreadBinding: boolean;
   isDraft: boolean;
+  layout: AssociatedResourceRoutingLayout;
   onDraftStateChange?: (state: SandboxProfileAssociatedResourceRoutingDraftState) => void;
+  resourceKinds?: readonly AssociatedProviderResourceKind[] | undefined;
   selectedConnectionId?: string | undefined;
   supportedAssociatedResourceEvents?: readonly AssociatedResourceEventDefinition[] | undefined;
   version: SandboxProfileVersion;
@@ -270,6 +286,33 @@ function SandboxProfileAssociatedResourceRoutingStatefulSection(input: {
     );
   }
 
+  function updateSlackThreadMessageEnabled(checked: boolean): void {
+    if (fieldIsReadOnly) {
+      return;
+    }
+
+    updateDraft(
+      updateResourceDraft(draft, AssociatedProviderResourceKinds.SLACK_THREAD, (resourceDraft) => ({
+        ...resourceDraft,
+        enabled: checked,
+        eventTypes: checked ? [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED] : [],
+      })),
+    );
+  }
+
+  function updateSlackThreadMessageMode(messageMode: SlackThreadMessageMode): void {
+    if (fieldIsReadOnly) {
+      return;
+    }
+
+    updateDraft(
+      updateResourceDraft(draft, AssociatedProviderResourceKinds.SLACK_THREAD, (resourceDraft) => ({
+        ...resourceDraft,
+        slackThreadMessageMode: messageMode,
+      })),
+    );
+  }
+
   function updateEventParameterRule(input: {
     resourceKind: AssociatedProviderResourceKind;
     triggerId: string;
@@ -323,6 +366,10 @@ function SandboxProfileAssociatedResourceRoutingStatefulSection(input: {
       onEventParameterRulesChange={updateEventParameterRules}
       onEventTypeChange={updateEventType}
       onSettingsExpandedChange={updateSettingsExpanded}
+      onSlackThreadMessageEnabledChange={updateSlackThreadMessageEnabled}
+      onSlackThreadMessageModeChange={updateSlackThreadMessageMode}
+      layout={input.layout}
+      resourceKinds={input.resourceKinds}
       resources={draft.resources}
       saveErrorMessage={saveErrorMessage}
       selectedConnectionId={input.selectedConnectionId}
@@ -370,6 +417,10 @@ function SandboxProfileAssociatedResourceRoutingFields(input: {
     resourceKind: AssociatedProviderResourceKind,
     expanded: boolean,
   ) => void;
+  layout: AssociatedResourceRoutingLayout;
+  onSlackThreadMessageEnabledChange: (checked: boolean) => void;
+  onSlackThreadMessageModeChange: (messageMode: SlackThreadMessageMode) => void;
+  resourceKinds?: readonly AssociatedProviderResourceKind[] | undefined;
   resources: readonly AssociatedResourceRoutingResourceDraft[];
   saveErrorMessage: string | null;
   selectedConnectionId?: string | undefined;
@@ -381,6 +432,13 @@ function SandboxProfileAssociatedResourceRoutingFields(input: {
         <Notice title={input.saveErrorMessage} variant="alert" />
       )}
       {AssociatedResourceOptions.map((option) => {
+        if (
+          input.resourceKinds !== undefined &&
+          !input.resourceKinds.includes(option.resourceKind)
+        ) {
+          return null;
+        }
+
         const resource = input.resources.find(
           (candidate) => candidate.resourceKind === option.resourceKind,
         );
@@ -390,7 +448,7 @@ function SandboxProfileAssociatedResourceRoutingFields(input: {
         const settingsExpanded = input.expandedResourceKinds.includes(option.resourceKind);
         return (
           <div className="grid gap-2" key={option.resourceKind}>
-            <Field contentWidth="fill" orientation="horizontal">
+            <Field contentWidth="fill" orientation={input.layout}>
               <FieldHeader>
                 <FieldLabelWithTooltip
                   htmlFor={getAssociatedResourceSettingsButtonId(option.resourceKind)}
@@ -435,10 +493,10 @@ function SandboxProfileAssociatedResourceRoutingFields(input: {
                 resource={resource}
                 selectedConnectionId={input.selectedConnectionId}
                 settingsExpanded={settingsExpanded}
+                layout={input.layout}
               />
             ) : (
-              <AssociatedResourceEventTypeSettings
-                eventChoices={option.eventOptions}
+              <SlackThreadSettings
                 eventOptions={input.eventOptions}
                 eventParameterRules={resource.eventParameterRules}
                 fieldIsReadOnly={input.fieldIsReadOnly}
@@ -454,12 +512,12 @@ function SandboxProfileAssociatedResourceRoutingFields(input: {
                     ...change,
                   });
                 }}
-                onEventTypeChange={(eventType, checked) => {
-                  input.onEventTypeChange(option.resourceKind, eventType, checked);
-                }}
+                onMessageEnabledChange={input.onSlackThreadMessageEnabledChange}
+                onMessageModeChange={input.onSlackThreadMessageModeChange}
                 resource={resource}
                 selectedConnectionId={input.selectedConnectionId}
                 settingsExpanded={settingsExpanded}
+                layout={input.layout}
               />
             )}
           </div>
@@ -486,9 +544,10 @@ function GitHubPullRequestSettings(input: {
   resource: AssociatedResourceRoutingResourceDraft;
   selectedConnectionId?: string | undefined;
   settingsExpanded: boolean;
+  layout: AssociatedResourceRoutingLayout;
 }): React.JSX.Element {
   return (
-    <div className="grid gap-2 md:ml-44">
+    <div className={input.layout === "horizontal" ? "grid gap-2 md:ml-44" : "grid gap-2"}>
       {input.settingsExpanded ? (
         <div
           className="flex flex-col gap-4"
@@ -523,7 +582,7 @@ function AssociatedResourceSettingsButton(input: {
       aria-controls={getAssociatedResourceSettingsPanelId(input.resource.resourceKind)}
       aria-expanded={input.settingsExpanded}
       aria-label={`Configure ${input.label}`}
-      className="text-foreground hover:text-primary focus-visible:text-primary flex min-h-10 w-fit min-w-0 justify-start gap-2 px-0 text-sm font-medium hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-foreground"
+      className="group/button text-foreground hover:text-primary focus-visible:text-primary flex min-h-10 w-fit min-w-0 justify-start gap-2 px-0 text-sm font-medium hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-foreground"
       disabled={input.fieldIsReadOnly}
       id={getAssociatedResourceSettingsButtonId(input.resource.resourceKind)}
       onClick={() => {
@@ -532,15 +591,13 @@ function AssociatedResourceSettingsButton(input: {
       type="button"
       variant="ghost"
     >
-      <span className="flex min-w-0 items-center gap-2 group-hover/button:underline group-focus-visible/button:underline">
+      <span className="min-w-0 truncate group-hover/button:underline group-focus-visible/button:underline">
         <span className="font-semibold">
           {input.resource.enabled ? input.resource.eventTypes.length : 0}
-        </span>
-        <span className="truncate">
-          {createAssociatedResourceRoutingSummary({
-            selectedEventTypes: input.resource.enabled ? input.resource.eventTypes : [],
-          })}
-        </span>
+        </span>{" "}
+        {createAssociatedResourceRoutingSummary({
+          resource: input.resource,
+        })}
       </span>
       {input.settingsExpanded ? (
         <CaretDownIcon className="shrink-0 transition-transform group-hover/button:scale-110 group-focus-visible/button:scale-110" />
@@ -623,11 +680,7 @@ function AssociatedResourceEventTypeRows(input: {
   );
 }
 
-function AssociatedResourceEventTypeSettings(input: {
-  eventChoices: ReadonlyArray<{
-    eventType: AssociatedResourceEventType;
-    label: string;
-  }>;
+function SlackThreadSettings(input: {
   eventOptions: readonly WebhookTriggerEventOption[];
   eventParameterRules: WebhookTriggerEventParameterRuleMap;
   fieldIsReadOnly: boolean;
@@ -640,32 +693,99 @@ function AssociatedResourceEventTypeSettings(input: {
     triggerId: string;
     rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>;
   }) => void;
-  onEventTypeChange: (eventType: AssociatedResourceEventType, checked: boolean) => void;
+  onMessageEnabledChange: (checked: boolean) => void;
+  onMessageModeChange: (messageMode: SlackThreadMessageMode) => void;
   resource: AssociatedResourceRoutingResourceDraft;
   selectedConnectionId?: string | undefined;
   settingsExpanded: boolean;
+  layout: AssociatedResourceRoutingLayout;
 }): React.JSX.Element {
   if (!input.settingsExpanded) {
     return <></>;
   }
 
+  const eventOption = input.eventOptions.find(
+    (candidate) => candidate.id === AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED,
+  );
+  const selected = input.resource.enabled
+    ? input.resource.eventTypes.includes(AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED)
+    : false;
+
   return (
     <div
-      className="grid gap-2 md:ml-44"
+      className={input.layout === "horizontal" ? "grid gap-2 md:ml-44" : "grid gap-2"}
       id={getAssociatedResourceSettingsPanelId(input.resource.resourceKind)}
     >
-      <AssociatedResourceEventTypeRows
-        eventOptions={input.eventOptions}
-        eventParameterRules={input.eventParameterRules}
-        eventTypeOptions={input.eventChoices}
-        fieldIsReadOnly={input.fieldIsReadOnly}
-        onEventParameterRuleChange={input.onEventParameterRuleChange}
-        onEventParameterRulesChange={input.onEventParameterRulesChange}
-        onEventTypeChange={input.onEventTypeChange}
-        selectedConnectionId={input.selectedConnectionId}
-        selectedEventTypes={input.resource.eventTypes}
-      />
+      <div className="border-border rounded-md border px-3 py-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Checkbox
+            aria-label="Enable thread messages"
+            checked={selected}
+            disabled={input.fieldIsReadOnly}
+            onCheckedChange={(checked) => {
+              input.onMessageEnabledChange(checked === true);
+            }}
+          />
+          <SlackThreadMessageModeField
+            fieldIsReadOnly={input.fieldIsReadOnly}
+            messageMode={input.resource.slackThreadMessageMode}
+            id="slack-thread-message-selection"
+            onMessageModeChange={input.onMessageModeChange}
+          />
+        </div>
+        {selected && eventOption !== undefined ? (
+          <div className="mt-3">
+            <WebhookTriggerEventPicker
+              disabledState={
+                input.fieldIsReadOnly
+                  ? {
+                      reason: "Associated resource routing is read-only.",
+                      variant: "default",
+                    }
+                  : null
+              }
+              error={undefined}
+              eventOptions={[eventOption]}
+              eventParameterRules={input.eventParameterRules}
+              hasConnectedIntegrations={true}
+              onEventParameterRuleChange={input.onEventParameterRuleChange}
+              onEventParameterRulesChange={input.onEventParameterRulesChange}
+              selectedConnectionId={input.selectedConnectionId ?? ""}
+              selectedEventIds={[AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED]}
+              selectedEventPresentation="parameters-only"
+              showAddTriggerControl={false}
+            />
+          </div>
+        ) : null}
+      </div>
     </div>
+  );
+}
+
+function SlackThreadMessageModeField(input: {
+  fieldIsReadOnly: boolean;
+  id: string;
+  messageMode: SlackThreadMessageMode;
+  onMessageModeChange: (messageMode: SlackThreadMessageMode) => void;
+}): React.JSX.Element {
+  return (
+    <Select
+      disabled={input.fieldIsReadOnly}
+      onValueChange={(value) => {
+        if (isSlackThreadMessageMode(value)) {
+          input.onMessageModeChange(value);
+        }
+      }}
+      value={input.messageMode}
+    >
+      <SelectTrigger aria-label="Thread messages" className="h-9 w-48 bg-background" id={input.id}>
+        <SelectValue>{getSlackThreadMessageModeLabel(input.messageMode)}</SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={SlackThreadMessageModes.ALL}>All messages</SelectItem>
+        <SelectItem value={SlackThreadMessageModes.APP_MENTIONS_ONLY}>App mentions only</SelectItem>
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -681,10 +801,26 @@ function getAssociatedResourceSettingsPanelId(
   return `sandbox-profile-associated-resources-${resourceKind}-settings-panel`;
 }
 
+function isSlackThreadMessageMode(value: unknown): value is SlackThreadMessageMode {
+  return (
+    value === SlackThreadMessageModes.ALL || value === SlackThreadMessageModes.APP_MENTIONS_ONLY
+  );
+}
+
+function getSlackThreadMessageModeLabel(messageMode: SlackThreadMessageMode): string {
+  switch (messageMode) {
+    case SlackThreadMessageModes.ALL:
+      return "All messages";
+    case SlackThreadMessageModes.APP_MENTIONS_ONLY:
+      return "App mentions only";
+  }
+}
+
 function createAssociatedResourceRoutingSummary(input: {
-  selectedEventTypes: readonly AssociatedResourceEventType[];
+  resource: AssociatedResourceRoutingResourceDraft;
 }): string {
-  const activityLabel = input.selectedEventTypes.length === 1 ? "activity" : "activities";
+  const selectedEventTypes = input.resource.enabled ? input.resource.eventTypes : [];
+  const activityLabel = selectedEventTypes.length === 1 ? "activity" : "activities";
   return `${activityLabel} selected`;
 }
 
@@ -692,12 +828,14 @@ function createAssociatedResourceRoutingFieldGroupStateKey(input: {
   config: AssociatedResourceRoutingConfig;
   hasGitHubBinding: boolean;
   hasSlackThreadBinding: boolean;
+  resourceKinds?: readonly AssociatedProviderResourceKind[] | undefined;
   supportedAssociatedResourceEvents: readonly AssociatedResourceEventDefinition[];
 }): string {
   return JSON.stringify({
     config: input.config,
     hasGitHubBinding: input.hasGitHubBinding,
     hasSlackThreadBinding: input.hasSlackThreadBinding,
+    resourceKinds: input.resourceKinds,
     supportedAssociatedResourceEvents: input.supportedAssociatedResourceEvents,
   });
 }
@@ -739,6 +877,12 @@ function createAssociatedResourceRoutingResourceDraft(input: {
       : rule !== undefined && (input.config.enabled ?? true) && eventTypes.length > 0;
   const payloadFilter =
     rule !== undefined && "payloadFilter" in rule ? (rule.payloadFilter ?? null) : null;
+  const slackThreadMessageMode =
+    rule !== undefined &&
+    rule.resourceKind === AssociatedProviderResourceKinds.SLACK_THREAD &&
+    rule.messageMode !== undefined
+      ? rule.messageMode
+      : SlackThreadMessageModes.ALL;
   const extractedParameterRules = extractWebhookTriggerEventParameterRules({
     eventOptions: input.eventOptions,
     selectedEventIds: eventTypes,
@@ -751,6 +895,7 @@ function createAssociatedResourceRoutingResourceDraft(input: {
     eventParameterRules: extractedParameterRules.eventParameterRules,
     eventTypes: sortAssociatedResourceEventTypes(eventTypes),
     resourceKind: input.option.resourceKind,
+    slackThreadMessageMode,
   };
 }
 
@@ -794,6 +939,9 @@ function createAssociatedResourceEventRoutingResourceRule(input: {
       return {
         resourceKind: input.resource.resourceKind,
         eventTypes: sortSlackThreadEventTypes(input.resource.eventTypes),
+        ...(input.resource.slackThreadMessageMode === SlackThreadMessageModes.ALL
+          ? {}
+          : { messageMode: input.resource.slackThreadMessageMode }),
         ...createAssociatedResourceRoutingPayloadFilterField({
           draft: input.resource,
           eventOptions: input.eventOptions,
@@ -868,7 +1016,8 @@ function associatedResourceRoutingDraftsAreEqual(
         JSON.stringify(leftResource.eventParameterRules) ===
           JSON.stringify(rightResource.eventParameterRules) &&
         JSON.stringify(leftResource.advancedPayloadFilter) ===
-          JSON.stringify(rightResource.advancedPayloadFilter)
+          JSON.stringify(rightResource.advancedPayloadFilter) &&
+        leftResource.slackThreadMessageMode === rightResource.slackThreadMessageMode
       );
     })
   );

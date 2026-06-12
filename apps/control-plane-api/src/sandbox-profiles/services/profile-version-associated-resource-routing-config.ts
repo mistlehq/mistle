@@ -2,6 +2,7 @@ import {
   AssociatedProviderResourceKinds,
   AssociatedResourceEventTypes,
   SandboxProfileAssociatedResourceEventRoutingConfigSchema,
+  type SlackThreadMessageMode,
   type AssociatedResourceEventRoutingResourceRule,
 } from "@mistle/integrations-core";
 
@@ -22,6 +23,7 @@ type ApiAssociatedResourceEventRoutingResourceRule =
   | {
       resourceKind: typeof AssociatedProviderResourceKinds.SLACK_THREAD;
       eventTypes: SlackThreadAssociatedResourceEventType[];
+      messageMode?: SlackThreadMessageMode;
       payloadFilter?: Record<string, unknown>;
     };
 
@@ -61,6 +63,7 @@ function copyAssociatedResourceEventRoutingResourceRule(
       return {
         resourceKind: resource.resourceKind,
         eventTypes: [...resource.eventTypes],
+        ...(resource.messageMode === undefined ? {} : { messageMode: resource.messageMode }),
         ...(resource.payloadFilter === undefined
           ? {}
           : { payloadFilter: structuredClone(resource.payloadFilter) }),

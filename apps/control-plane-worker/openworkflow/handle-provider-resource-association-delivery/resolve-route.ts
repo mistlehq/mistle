@@ -96,6 +96,7 @@ export async function resolveProviderResourceAssociationDeliveryTarget(
         payload: observedEvent.payload,
         resourceKind: association.resourceKind,
         routing: sandboxInstance.runtimePlan.associatedResourceEventRouting,
+        sourceWebhookEventType: observedEvent.sourceWebhookEventType,
       })
     ) {
       throw new ProviderResourceAssociationDeliveryError({
@@ -130,7 +131,12 @@ async function resolveAssociatedResourceEventFromWebhook(
     sourceWebhookEventId: string;
     targetKey: string;
   },
-): Promise<AssociatedResourceWebhookObservation & { payload: Record<string, unknown> }> {
+): Promise<
+  AssociatedResourceWebhookObservation & {
+    payload: Record<string, unknown>;
+    sourceWebhookEventType: string;
+  }
+> {
   const webhookEvent = await db.query.integrationWebhookEvents.findFirst({
     columns: {
       eventType: true,
@@ -186,6 +192,7 @@ async function resolveAssociatedResourceEventFromWebhook(
   return {
     ...observedEvent,
     payload: webhookEvent.payload,
+    sourceWebhookEventType: webhookEvent.eventType,
   };
 }
 

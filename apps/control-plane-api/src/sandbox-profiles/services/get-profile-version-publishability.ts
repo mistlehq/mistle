@@ -357,6 +357,9 @@ function normalizePublishWorthyAssociatedResourceEventRoutingConfig(
             .map((resource) => ({
               resourceKind: resource.resourceKind,
               eventTypes: [...resource.eventTypes].sort(),
+              ...(!("messageMode" in resource) || resource.messageMode === undefined
+                ? {}
+                : { messageMode: resource.messageMode }),
               ...(!("payloadFilter" in resource) || resource.payloadFilter === undefined
                 ? {}
                 : { payloadFilter: canonicalizeJsonValue(resource.payloadFilter) }),
@@ -367,12 +370,23 @@ function normalizePublishWorthyAssociatedResourceEventRoutingConfig(
 }
 
 function compareAssociatedResourceEventRoutingResources(
-  left: { resourceKind: string; eventTypes: readonly string[]; payloadFilter?: unknown },
-  right: { resourceKind: string; eventTypes: readonly string[]; payloadFilter?: unknown },
+  left: {
+    resourceKind: string;
+    eventTypes: readonly string[];
+    messageMode?: string;
+    payloadFilter?: unknown;
+  },
+  right: {
+    resourceKind: string;
+    eventTypes: readonly string[];
+    messageMode?: string;
+    payloadFilter?: unknown;
+  },
 ): number {
   return (
     left.resourceKind.localeCompare(right.resourceKind) ||
     left.eventTypes.join("\u0000").localeCompare(right.eventTypes.join("\u0000")) ||
+    (left.messageMode ?? "").localeCompare(right.messageMode ?? "") ||
     (JSON.stringify(left.payloadFilter) ?? "").localeCompare(
       JSON.stringify(right.payloadFilter) ?? "",
     )

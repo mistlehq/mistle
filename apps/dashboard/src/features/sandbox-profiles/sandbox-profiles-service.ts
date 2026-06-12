@@ -1,6 +1,7 @@
 import {
   AssociatedProviderResourceKinds,
   AssociatedResourceEventTypes,
+  SlackThreadMessageModes,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
@@ -61,6 +62,9 @@ const SlackThreadAssociatedResourceEventRoutingResourceRuleSchema = z
   .object({
     resourceKind: z.enum([AssociatedProviderResourceKinds.SLACK_THREAD]),
     eventTypes: z.array(z.enum([AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED])).min(1),
+    messageMode: z
+      .enum([SlackThreadMessageModes.ALL, SlackThreadMessageModes.APP_MENTIONS_ONLY])
+      .optional(),
     payloadFilter: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
@@ -103,6 +107,7 @@ function normalizeAssociatedResourceEventRoutingResourceRule(
       return {
         resourceKind: resource.resourceKind,
         eventTypes: resource.eventTypes,
+        ...(resource.messageMode === undefined ? {} : { messageMode: resource.messageMode }),
         ...(resource.payloadFilter === undefined ? {} : { payloadFilter: resource.payloadFilter }),
       };
   }

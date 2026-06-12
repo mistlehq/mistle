@@ -19,6 +19,7 @@ import {
 import {
   AssociatedProviderResourceKinds,
   AssociatedResourceEventTypes,
+  SlackThreadMessageModes,
 } from "@mistle/integrations-core";
 import { parseWebhookPayloadFilter } from "@mistle/webhooks";
 import { createSelectSchema } from "drizzle-zod";
@@ -113,6 +114,9 @@ const slackThreadAssociatedResourceEventRoutingResourceRuleSchema = z
   .object({
     resourceKind: z.enum([AssociatedProviderResourceKinds.SLACK_THREAD]),
     eventTypes: z.array(z.enum([AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED])).min(1),
+    messageMode: z
+      .enum([SlackThreadMessageModes.ALL, SlackThreadMessageModes.APP_MENTIONS_ONLY])
+      .optional(),
     payloadFilter: z.record(z.string(), z.unknown()).optional(),
   })
   .strict()

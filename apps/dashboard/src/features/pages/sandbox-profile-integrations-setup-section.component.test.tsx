@@ -27,6 +27,7 @@ import {
   StoryOpenAiConnection,
   StoryOpenAiTarget,
   StorySlackConnection,
+  StorySlackTarget,
 } from "./integrations-editor-section-story-support.js";
 import type { SandboxProfileAssociatedResourceRoutingDraftState } from "./sandbox-profile-associated-resource-routing-section.js";
 import type {
@@ -550,6 +551,57 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
         mcpServers: ["cloud_logging", "cloud_run", "gke"],
       },
     });
+  });
+
+  it("shows Slack associated resource routing in connector resources and tools", () => {
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [
+            StoryOpenAiConnection,
+            StoryGithubConnection,
+            StorySlackConnection,
+          ],
+          availableTargets: [StoryOpenAiTarget, StoryGithubTarget, StorySlackTarget],
+          associatedResourceRouting: {
+            hasUnpersistedChanges: false,
+            isDraft: true,
+            version: createTestSandboxProfileVersion(),
+          },
+          integrationRows: [
+            {
+              clientId: "git-row",
+              connectionId: StoryGithubConnection.id,
+              kind: "git",
+              config: {},
+            },
+            {
+              clientId: "slack-row",
+              connectionId: StorySlackConnection.id,
+              kind: "connector",
+              config: {},
+            },
+          ],
+        }}
+      />,
+    );
+
+    const gitConnectionLabel = screen.getByText("Git Connection");
+    const gitCard = gitConnectionLabel.closest('[data-slot="sandbox-profile-section-card"]');
+    if (!(gitCard instanceof HTMLElement)) {
+      throw new Error("Expected Git connection card to render.");
+    }
+
+    expect(
+      within(gitCard).queryByRole("button", { name: "Configure Agent-started Slack threads" }),
+    ).toBeNull();
+    const slackRoutingButton = screen.getByRole("button", {
+      name: "Configure Agent-started Slack threads",
+    });
+    expect(slackRoutingButton).toBeDefined();
+    expect(
+      slackRoutingButton.closest('[data-slot="field"]')?.getAttribute("data-orientation"),
+    ).toBe("vertical");
   });
 
   it("limits Codex proxied model providers to OpenAI and removes OpenCode-only agent bindings", async () => {

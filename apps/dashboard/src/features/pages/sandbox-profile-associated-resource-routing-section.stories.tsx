@@ -1,6 +1,7 @@
 import {
   AssociatedProviderResourceKinds,
   AssociatedResourceEventTypes,
+  SlackThreadMessageModes,
 } from "@mistle/integrations-core";
 import { Button } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
@@ -124,7 +125,7 @@ export const SlackThreadRouting: Story = {
     await userEvent.click(
       canvas.getByRole("button", { name: "Configure Agent-started Slack threads" }),
     );
-    await expect(canvas.getByRole("textbox", { name: "invocation token" })).toBeVisible();
+    await expect(canvas.getByRole("combobox", { name: "Thread messages" })).toBeVisible();
   },
 };
 
@@ -142,7 +143,8 @@ export const GitHubAndSlackRouting: Story = {
     await userEvent.click(
       canvas.getByRole("button", { name: "Configure Agent-started Slack threads" }),
     );
-    await expect(canvas.getByRole("checkbox", { name: "Thread replies" })).toBeChecked();
+    await expect(canvas.getByRole("checkbox", { name: "Enable thread messages" })).toBeChecked();
+    await expect(canvas.getByRole("combobox", { name: "Thread messages" })).toBeVisible();
   },
 };
 
@@ -184,6 +186,68 @@ export const SavedSlackThreadRouting: Story = {
   },
 };
 
+export const SlackThreadAppMentionsOnly: Story = {
+  args: {
+    hasGitHubBinding: false,
+    hasSlackThreadBinding: true,
+    supportedAssociatedResourceEvents: StorySlackTarget.supportedAssociatedResourceEvents,
+    version: createStoryVersion({
+      associatedResourceEventRoutingConfig: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+            eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+            messageMode: SlackThreadMessageModes.APP_MENTIONS_ONLY,
+          },
+        ],
+      },
+    }),
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Configure Agent-started Slack threads" }),
+    );
+    await expect(canvas.getByText("App mentions only")).toBeVisible();
+  },
+};
+
+export const FilteredSlackThreadReplies: Story = {
+  args: {
+    hasGitHubBinding: false,
+    hasSlackThreadBinding: true,
+    supportedAssociatedResourceEvents: StorySlackTarget.supportedAssociatedResourceEvents,
+    version: createStoryVersion({
+      associatedResourceEventRoutingConfig: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+            eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+            payloadFilter: {
+              [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED]: {
+                op: "contains_token",
+                path: ["event", "text"],
+                value: "@mistle",
+              },
+            },
+          },
+        ],
+      },
+    }),
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Configure Agent-started Slack threads" }),
+    );
+    await expect(canvas.getByDisplayValue("@mistle")).toBeVisible();
+  },
+};
+
 export const MixedSavedRouting: Story = {
   args: {
     hasGitHubBinding: true,
@@ -207,6 +271,13 @@ export const MixedSavedRouting: Story = {
           {
             resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
             eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+            payloadFilter: {
+              [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED]: {
+                op: "contains_token",
+                path: ["event", "text"],
+                value: "@mistle",
+              },
+            },
           },
         ],
       },
@@ -219,6 +290,10 @@ export const MixedSavedRouting: Story = {
     await expect(canvas.queryByRole("switch", { name: "Agent-started Slack threads" })).toBeNull();
     await userEvent.click(canvas.getByRole("button", { name: "Configure Agent PR activity" }));
     await expect(canvas.getByDisplayValue("@mistle")).toBeVisible();
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Configure Agent-started Slack threads" }),
+    );
+    await expect(canvas.getAllByDisplayValue("@mistle")).toHaveLength(2);
   },
 };
 

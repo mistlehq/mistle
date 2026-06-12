@@ -2129,9 +2129,18 @@ export type GitHubPullRequestAssociatedResourceEventRoutingResourceRule = {
     | undefined;
 };
 
+export const SlackThreadMessageModes = {
+  ALL: "all",
+  APP_MENTIONS_ONLY: "app_mentions_only",
+} as const;
+
+export type SlackThreadMessageMode =
+  (typeof SlackThreadMessageModes)[keyof typeof SlackThreadMessageModes];
+
 export type SlackThreadAssociatedResourceEventRoutingResourceRule = {
   resourceKind: typeof AssociatedProviderResourceKinds.SLACK_THREAD;
   eventTypes: ReadonlyArray<typeof AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED>;
+  messageMode?: SlackThreadMessageMode | undefined;
   payloadFilter?:
     | Readonly<
         Partial<
