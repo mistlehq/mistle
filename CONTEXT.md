@@ -136,6 +136,14 @@ _Avoid_: Parameter layout, control group
 A match rule applied to a **Trigger event parameter** when deciding whether a **Trigger event** matches a **Trigger**.
 _Avoid_: Exclusion when the rule is one match mode among several
 
+**Association event parameter rule**:
+A match rule applied to an **Association-backed provider event** when deciding whether **Associated resource event routing** should produce an **Association delivery**.
+_Avoid_: Trigger event parameter rule when no **Trigger** is involved
+
+**Association event parameter definition**:
+A provider-defined description of an **Association-backed provider event** field that can be used by an **Association event parameter rule**.
+_Avoid_: Trigger event parameter definition when describing association routing
+
 **GitHub actor filter**:
 A trigger filter that matches the GitHub **Provider actor** that performed a provider event.
 _Avoid_: Author filter, commenter filter when the filter is over the event sender

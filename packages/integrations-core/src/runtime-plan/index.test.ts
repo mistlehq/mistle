@@ -68,6 +68,13 @@ describe("assembleCompiledRuntimePlan", () => {
               AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
               AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
             ],
+            payloadFilter: {
+              [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED]: {
+                op: "contains_token",
+                path: ["comment", "body"],
+                value: "@mistle",
+              },
+            },
           },
         ],
       },
@@ -87,9 +94,84 @@ describe("assembleCompiledRuntimePlan", () => {
             AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
             AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
           ],
+          payloadFilter: {
+            [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED]: {
+              op: "contains_token",
+              path: ["comment", "body"],
+              value: "@mistle",
+            },
+          },
         },
       ],
     });
+  });
+
+  it("rejects associated resource payload filters for unselected event types", () => {
+    const parsedPlan = CompiledRuntimePlanSchema.safeParse({
+      sandboxProfileId: "sbp_123",
+      version: 7,
+      image: {
+        source: "base",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
+      },
+      associatedResourceEventRouting: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+            eventTypes: [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED],
+            payloadFilter: {
+              [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED]: {
+                op: "eq",
+                path: ["review", "state"],
+                value: "approved",
+              },
+            },
+          },
+        ],
+      },
+      egressRoutes: [],
+      artifacts: [],
+      workspaceSources: [],
+      runtimeClients: [],
+      agentRuntimes: [],
+    });
+
+    expect(parsedPlan.success).toBe(false);
+  });
+
+  it("returns a safe parse failure for malformed associated resource payload filters", () => {
+    const parsedPlan = CompiledRuntimePlanSchema.safeParse({
+      sandboxProfileId: "sbp_123",
+      version: 7,
+      image: {
+        source: "base",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
+      },
+      associatedResourceEventRouting: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+            eventTypes: [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED],
+            payloadFilter: {
+              [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED]: {
+                op: "contains_token",
+                path: [],
+                value: "@mistle",
+              },
+            },
+          },
+        ],
+      },
+      egressRoutes: [],
+      artifacts: [],
+      workspaceSources: [],
+      runtimeClients: [],
+      agentRuntimes: [],
+    });
+
+    expect(parsedPlan.success).toBe(false);
   });
 
   it("accepts aws sigv4 egress routes in the shared runtime-plan schema", () => {

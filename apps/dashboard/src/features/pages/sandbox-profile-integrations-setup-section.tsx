@@ -775,6 +775,14 @@ export function SandboxProfileIntegrationsSetupSection(
     availableConnections: input.availableConnections,
     availableTargets: input.availableTargets,
   });
+  const gitRowBindingMetadata =
+    gitRow === null
+      ? null
+      : resolveRowBindingMetadata({
+          row: gitRow,
+          availableConnections: input.availableConnections,
+          availableTargets: input.availableTargets,
+        });
   const gitRowTargetsGitHub =
     gitRow !== null &&
     bindingRowTargetsFamily({
@@ -1050,6 +1058,10 @@ export function SandboxProfileIntegrationsSetupSection(
                     {...(input.associatedResourceRouting.onDraftStateChange === undefined
                       ? {}
                       : { onDraftStateChange: input.associatedResourceRouting.onDraftStateChange })}
+                    selectedConnectionId={gitRow?.connectionId}
+                    supportedAssociatedResourceEvents={
+                      gitRowBindingMetadata?.target?.supportedAssociatedResourceEvents
+                    }
                     version={input.associatedResourceRouting.version}
                   />
                 ) : null}

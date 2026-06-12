@@ -54,6 +54,7 @@ const AssociatedResourceEventRoutingResourceRuleSchema = z
         ]),
       )
       .min(1),
+    payloadFilter: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
 const SandboxProfileAssociatedResourceEventRoutingConfigSchema = z
@@ -64,7 +65,17 @@ const SandboxProfileAssociatedResourceEventRoutingConfigSchema = z
   .strict()
   .transform((config) => ({
     ...(config.enabled === undefined ? {} : { enabled: config.enabled }),
-    ...(config.resources === undefined ? {} : { resources: config.resources }),
+    ...(config.resources === undefined
+      ? {}
+      : {
+          resources: config.resources.map((resource) => ({
+            resourceKind: resource.resourceKind,
+            eventTypes: resource.eventTypes,
+            ...(resource.payloadFilter === undefined
+              ? {}
+              : { payloadFilter: resource.payloadFilter }),
+          })),
+        }),
   }));
 
 const LaunchableSandboxProfilesResultSchema = z

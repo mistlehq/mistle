@@ -154,6 +154,12 @@ export async function listIntegrationTargets(
           ...(resolvedMetadata.supportedWebhookEvents === undefined
             ? {}
             : { supportedWebhookEvents: resolvedMetadata.supportedWebhookEvents }),
+          ...(resolvedMetadata.supportedAssociatedResourceEvents === undefined
+            ? {}
+            : {
+                supportedAssociatedResourceEvents:
+                  resolvedMetadata.supportedAssociatedResourceEvents,
+              }),
           targetHealth: projectedTargetUi.targetHealth,
           ...(target.displayNameOverride === null
             ? {}

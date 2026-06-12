@@ -171,7 +171,8 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("switch", { name: "Agent PR activity" }));
+    fireEvent.click(screen.getByRole("button", { name: "Configure Agent PR activity" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "PR comments" }));
 
     const latestDraftState = draftStates.at(-1);
     if (latestDraftState === undefined || latestDraftState.buildDraftChanges === undefined) {
@@ -234,6 +235,7 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
 
     render(<DirtyRoutingThenRemoveGitConnectionTest />);
 
+    fireEvent.click(screen.getByRole("button", { name: "Configure Agent PR activity" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Review comments" }));
     fireEvent.click(screen.getByRole("combobox", { name: "git connection" }));
     const noneOption = screen.getByRole("option", { name: "None" });
@@ -243,13 +245,13 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     fireEvent.click(noneOption, { button: 0 });
 
     await waitFor(() => {
-      expect(screen.getByRole("switch", { name: "Agent PR activity" })).toBeDefined();
+      expect(screen.getByRole("button", { name: "Configure Agent PR activity" })).toBeDefined();
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Remount integrations" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("switch", { name: "Agent PR activity" })).toBeDefined();
+      expect(screen.getByRole("button", { name: "Configure Agent PR activity" })).toBeDefined();
     });
 
     const latestDraftState = draftStates.at(-1);

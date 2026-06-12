@@ -113,6 +113,76 @@ const IntegrationWebhookTriggerRequirementsSchema = z
   })
   .strict();
 
+const IntegrationWebhookEventParameterDefinitionSchema = z.union([
+  z
+    .object({
+      id: z.string().min(1),
+      label: z.string().min(1),
+      kind: z.literal("resource-select"),
+      resourceKind: z.string().min(1),
+      payloadPath: z.array(z.string().min(1)).min(1),
+      negatedMatchRequiresExists: z.boolean().optional(),
+      prefix: z.string().min(1).optional(),
+      placeholder: z.string().min(1).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      id: z.string().min(1),
+      label: z.string().min(1),
+      kind: z.literal("string"),
+      payloadPath: z.array(z.string().min(1)).min(1),
+      matchMode: z.enum(["eq", "contains", "contains_token"]).optional(),
+      defaultValue: z.string().min(1).optional(),
+      defaultEnabled: z.boolean().optional(),
+      controlVariant: z.enum(["invocation-token"]).optional(),
+      negatedMatchRequiresExists: z.boolean().optional(),
+      prefix: z.string().min(1).optional(),
+      placeholder: z.string().min(1).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      id: z.string().min(1),
+      label: z.string().min(1),
+      kind: z.literal("enum-select"),
+      payloadPath: z.array(z.string().min(1)).min(1),
+      matchMode: z.enum(["eq", "exists"]),
+      options: z
+        .array(
+          z
+            .object({
+              value: z.string().min(1),
+              label: z.string().min(1),
+            })
+            .strict(),
+        )
+        .min(1),
+      negatedMatchRequiresExists: z.boolean().optional(),
+      prefix: z.string().min(1).optional(),
+      placeholder: z.string().min(1).optional(),
+    })
+    .strict(),
+]);
+
+const IntegrationWebhookEventParameterGroupDefinitionSchema = z
+  .object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    kind: z.literal("oneOf"),
+    options: z
+      .array(
+        z
+          .object({
+            parameterId: z.string().min(1),
+            label: z.string().min(1),
+          })
+          .strict(),
+      )
+      .min(2),
+  })
+  .strict();
+
 export const IntegrationWebhookEventDefinitionSchema = z
   .object({
     eventType: z.string().min(1),
@@ -142,82 +212,18 @@ export const IntegrationWebhookEventDefinitionSchema = z
           .strict(),
       )
       .optional(),
-    parameters: z
-      .array(
-        z.union([
-          z
-            .object({
-              id: z.string().min(1),
-              label: z.string().min(1),
-              kind: z.literal("resource-select"),
-              resourceKind: z.string().min(1),
-              payloadPath: z.array(z.string().min(1)).min(1),
-              negatedMatchRequiresExists: z.boolean().optional(),
-              prefix: z.string().min(1).optional(),
-              placeholder: z.string().min(1).optional(),
-            })
-            .strict(),
-          z
-            .object({
-              id: z.string().min(1),
-              label: z.string().min(1),
-              kind: z.literal("string"),
-              payloadPath: z.array(z.string().min(1)).min(1),
-              matchMode: z.enum(["eq", "contains", "contains_token"]).optional(),
-              defaultValue: z.string().min(1).optional(),
-              defaultEnabled: z.boolean().optional(),
-              controlVariant: z.enum(["invocation-token"]).optional(),
-              negatedMatchRequiresExists: z.boolean().optional(),
-              prefix: z.string().min(1).optional(),
-              placeholder: z.string().min(1).optional(),
-            })
-            .strict(),
-          z
-            .object({
-              id: z.string().min(1),
-              label: z.string().min(1),
-              kind: z.literal("enum-select"),
-              payloadPath: z.array(z.string().min(1)).min(1),
-              matchMode: z.enum(["eq", "exists"]),
-              options: z
-                .array(
-                  z
-                    .object({
-                      value: z.string().min(1),
-                      label: z.string().min(1),
-                    })
-                    .strict(),
-                )
-                .min(1),
-              negatedMatchRequiresExists: z.boolean().optional(),
-              prefix: z.string().min(1).optional(),
-              placeholder: z.string().min(1).optional(),
-            })
-            .strict(),
-        ]),
-      )
-      .optional(),
-    parameterGroups: z
-      .array(
-        z
-          .object({
-            id: z.string().min(1),
-            label: z.string().min(1),
-            kind: z.literal("oneOf"),
-            options: z
-              .array(
-                z
-                  .object({
-                    parameterId: z.string().min(1),
-                    label: z.string().min(1),
-                  })
-                  .strict(),
-              )
-              .min(2),
-          })
-          .strict(),
-      )
-      .optional(),
+    parameters: z.array(IntegrationWebhookEventParameterDefinitionSchema).optional(),
+    parameterGroups: z.array(IntegrationWebhookEventParameterGroupDefinitionSchema).optional(),
+  })
+  .strict();
+
+export const IntegrationAssociatedResourceEventDefinitionSchema = z
+  .object({
+    resourceKind: z.string().min(1),
+    eventType: z.string().min(1),
+    displayName: z.string().min(1),
+    parameters: z.array(IntegrationWebhookEventParameterDefinitionSchema).optional(),
+    parameterGroups: z.array(IntegrationWebhookEventParameterGroupDefinitionSchema).optional(),
   })
   .strict();
 
@@ -242,6 +248,9 @@ export const IntegrationTargetSchema = z
     connectionMethods: z.array(IntegrationConnectionMethodSchema).min(1).optional(),
     webhookSource: IntegrationWebhookSourceMetadataSchema.optional(),
     supportedWebhookEvents: z.array(IntegrationWebhookEventDefinitionSchema).optional(),
+    supportedAssociatedResourceEvents: z
+      .array(IntegrationAssociatedResourceEventDefinitionSchema)
+      .optional(),
     displayNameOverride: z.string().min(1).optional(),
     descriptionOverride: z.string().min(1).optional(),
     targetHealth: z

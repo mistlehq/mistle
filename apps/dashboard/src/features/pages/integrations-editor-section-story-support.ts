@@ -1,4 +1,11 @@
-import { PlanetScaleToolIds } from "@mistle/integrations-definitions";
+import type {
+  IntegrationWebhookEventParameterDefinition,
+  IntegrationWebhookEventParameterGroupDefinition,
+} from "@mistle/integrations-core";
+import {
+  GitHubAssociatedResourceEventsCapability,
+  PlanetScaleToolIds,
+} from "@mistle/integrations-definitions";
 import { QueryClient } from "@tanstack/react-query";
 
 import { createGithubRepositoryResources } from "../forms/integration-resource-picker-story-support.js";
@@ -7,6 +14,17 @@ import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
 } from "./sandbox-profile-binding-config-editor.js";
+
+type SupportedAssociatedResourceEvents = NonNullable<
+  IntegrationTargetSummary["supportedAssociatedResourceEvents"]
+>;
+type SupportedAssociatedResourceEvent = SupportedAssociatedResourceEvents[number];
+type SupportedAssociatedResourceEventParameter = NonNullable<
+  SupportedAssociatedResourceEvent["parameters"]
+>[number];
+type SupportedAssociatedResourceEventParameterGroup = NonNullable<
+  SupportedAssociatedResourceEvent["parameterGroups"]
+>[number];
 
 export function createIntegrationsEditorSectionStoryQueryClient(): QueryClient {
   return new QueryClient({
@@ -116,6 +134,7 @@ export const StoryGithubTarget: IntegrationTargetSummary = {
   targetHealth: {
     configStatus: "valid",
   },
+  supportedAssociatedResourceEvents: createStoryGithubAssociatedResourceEvents(),
 };
 
 export const StoryGithubConnection: IntegrationConnectionSummary = {
@@ -154,6 +173,7 @@ export const StoryGithubEnterpriseServerTarget: IntegrationTargetSummary = {
   targetHealth: {
     configStatus: "valid",
   },
+  supportedAssociatedResourceEvents: createStoryGithubAssociatedResourceEvents(),
 };
 
 export const StoryGithubEnterpriseServerConnection: IntegrationConnectionSummary = {
@@ -380,6 +400,102 @@ export const StoryGithubResources = createGithubRepositoryResources({
 export const StoryGithubEnterpriseServerResources = createGithubRepositoryResources({
   connectionId: StoryGithubEnterpriseServerConnection.id,
 });
+
+function createStoryGithubAssociatedResourceEvents(): SupportedAssociatedResourceEvents {
+  const supportedEvents = GitHubAssociatedResourceEventsCapability.supportedEvents;
+  if (supportedEvents === undefined) {
+    throw new Error("GitHub story target requires supported associated resource events.");
+  }
+
+  return supportedEvents.map((eventDefinition) => ({
+    resourceKind: eventDefinition.resourceKind,
+    eventType: eventDefinition.eventType,
+    displayName: eventDefinition.displayName,
+    ...(eventDefinition.parameters === undefined
+      ? {}
+      : {
+          parameters: eventDefinition.parameters.map(cloneStoryAssociatedResourceEventParameter),
+        }),
+    ...(eventDefinition.parameterGroups === undefined
+      ? {}
+      : {
+          parameterGroups: eventDefinition.parameterGroups.map(
+            cloneStoryAssociatedResourceEventParameterGroup,
+          ),
+        }),
+  }));
+}
+
+function cloneStoryAssociatedResourceEventParameter(
+  parameter: IntegrationWebhookEventParameterDefinition,
+): SupportedAssociatedResourceEventParameter {
+  switch (parameter.kind) {
+    case "resource-select":
+      return {
+        id: parameter.id,
+        label: parameter.label,
+        kind: parameter.kind,
+        resourceKind: parameter.resourceKind,
+        payloadPath: [...parameter.payloadPath],
+        ...(parameter.negatedMatchRequiresExists === undefined
+          ? {}
+          : { negatedMatchRequiresExists: parameter.negatedMatchRequiresExists }),
+        ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+        ...(parameter.placeholder === undefined ? {} : { placeholder: parameter.placeholder }),
+      };
+    case "string":
+      return {
+        id: parameter.id,
+        label: parameter.label,
+        kind: parameter.kind,
+        payloadPath: [...parameter.payloadPath],
+        ...(parameter.matchMode === undefined ? {} : { matchMode: parameter.matchMode }),
+        ...(parameter.defaultValue === undefined ? {} : { defaultValue: parameter.defaultValue }),
+        ...(parameter.defaultEnabled === undefined
+          ? {}
+          : { defaultEnabled: parameter.defaultEnabled }),
+        ...(parameter.controlVariant === undefined
+          ? {}
+          : { controlVariant: parameter.controlVariant }),
+        ...(parameter.negatedMatchRequiresExists === undefined
+          ? {}
+          : { negatedMatchRequiresExists: parameter.negatedMatchRequiresExists }),
+        ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+        ...(parameter.placeholder === undefined ? {} : { placeholder: parameter.placeholder }),
+      };
+    case "enum-select":
+      return {
+        id: parameter.id,
+        label: parameter.label,
+        kind: parameter.kind,
+        payloadPath: [...parameter.payloadPath],
+        matchMode: parameter.matchMode,
+        options: parameter.options.map((option) => ({
+          value: option.value,
+          label: option.label,
+        })),
+        ...(parameter.negatedMatchRequiresExists === undefined
+          ? {}
+          : { negatedMatchRequiresExists: parameter.negatedMatchRequiresExists }),
+        ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+        ...(parameter.placeholder === undefined ? {} : { placeholder: parameter.placeholder }),
+      };
+  }
+}
+
+function cloneStoryAssociatedResourceEventParameterGroup(
+  parameterGroup: IntegrationWebhookEventParameterGroupDefinition,
+): SupportedAssociatedResourceEventParameterGroup {
+  return {
+    id: parameterGroup.id,
+    label: parameterGroup.label,
+    kind: parameterGroup.kind,
+    options: parameterGroup.options.map((option) => ({
+      parameterId: option.parameterId,
+      label: option.label,
+    })),
+  };
+}
 
 export const StoryIntegrationResources = [
   StoryGithubResources,

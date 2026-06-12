@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { evaluateWebhookPayloadFilter, getWebhookPayloadValueAtPath } from "./evaluator.js";
+import {
+  evaluateWebhookPayloadFilter,
+  getWebhookPayloadValueAtPath,
+} from "./webhook-payload-filter-evaluator.js";
 
 describe("webhook filter evaluator", () => {
   it("resolves nested values by path segments", () => {

@@ -4286,6 +4286,66 @@ export interface paths {
                 /** @enum {string} */
                 kind: "agent" | "git" | "connector" | "sandbox";
                 logoKey?: string;
+                supportedAssociatedResourceEvents?: {
+                  displayName: string;
+                  eventType: string;
+                  parameterGroups?: {
+                    id: string;
+                    /** @enum {string} */
+                    kind: "oneOf";
+                    label: string;
+                    options: {
+                      label: string;
+                      parameterId: string;
+                    }[];
+                  }[];
+                  parameters?: (
+                    | {
+                        id: string;
+                        /** @enum {string} */
+                        kind: "resource-select";
+                        label: string;
+                        negatedMatchRequiresExists?: boolean;
+                        payloadPath: string[];
+                        placeholder?: string;
+                        prefix?: string;
+                        resourceKind: string;
+                      }
+                    | {
+                        /** @enum {string} */
+                        controlVariant?: "invocation-token";
+                        defaultEnabled?: boolean;
+                        defaultValue?: string;
+                        id: string;
+                        /** @enum {string} */
+                        kind: "string";
+                        label: string;
+                        /** @enum {string} */
+                        matchMode?: "eq" | "contains" | "contains_token";
+                        negatedMatchRequiresExists?: boolean;
+                        payloadPath: string[];
+                        placeholder?: string;
+                        prefix?: string;
+                      }
+                    | {
+                        id: string;
+                        /** @enum {string} */
+                        kind: "enum-select";
+                        label: string;
+                        /** @enum {string} */
+                        matchMode: "eq" | "exists";
+                        negatedMatchRequiresExists?: boolean;
+                        options: {
+                          label: string;
+                          value: string;
+                        }[];
+                        payloadPath: string[];
+                        placeholder?: string;
+                        prefix?: string;
+                      }
+                  )[];
+                  resourceKind: string;
+                }[];
                 supportedWebhookEvents?: {
                   category?: string;
                   conversationKeyOptions?: {
@@ -10129,6 +10189,9 @@ export interface paths {
                       | "github.pull_request.review.submitted"
                       | "github.pull_request.review_comment.created"
                     )[];
+                    payloadFilter?: {
+                      [key: string]: unknown;
+                    };
                     /** @enum {string} */
                     resourceKind: "github.pull_request";
                   }[];
@@ -10276,6 +10339,9 @@ export interface paths {
                     | "github.pull_request.review.submitted"
                     | "github.pull_request.review_comment.created"
                   )[];
+                  payloadFilter?: {
+                    [key: string]: unknown;
+                  };
                   /** @enum {string} */
                   resourceKind: "github.pull_request";
                 }[];
@@ -10561,6 +10627,9 @@ export interface paths {
                   | "github.pull_request.review.submitted"
                   | "github.pull_request.review_comment.created"
                 )[];
+                payloadFilter?: {
+                  [key: string]: unknown;
+                };
                 /** @enum {string} */
                 resourceKind: "github.pull_request";
               }[];
@@ -10617,6 +10686,9 @@ export interface paths {
                     | "github.pull_request.review.submitted"
                     | "github.pull_request.review_comment.created"
                   )[];
+                  payloadFilter?: {
+                    [key: string]: unknown;
+                  };
                   /** @enum {string} */
                   resourceKind: "github.pull_request";
                 }[];
@@ -11380,6 +11452,9 @@ export interface paths {
                       | "github.pull_request.review.submitted"
                       | "github.pull_request.review_comment.created"
                     )[];
+                    payloadFilter?: {
+                      [key: string]: unknown;
+                    };
                     /** @enum {string} */
                     resourceKind: "github.pull_request";
                   }[];
@@ -11707,6 +11782,9 @@ export interface paths {
                       | "github.pull_request.review.submitted"
                       | "github.pull_request.review_comment.created"
                     )[];
+                    payloadFilter?: {
+                      [key: string]: unknown;
+                    };
                     /** @enum {string} */
                     resourceKind: "github.pull_request";
                   }[];
@@ -12111,6 +12189,9 @@ export interface paths {
                       | "github.pull_request.review.submitted"
                       | "github.pull_request.review_comment.created"
                     )[];
+                    payloadFilter?: {
+                      [key: string]: unknown;
+                    };
                     /** @enum {string} */
                     resourceKind: "github.pull_request";
                   }[];

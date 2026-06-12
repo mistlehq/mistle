@@ -9,6 +9,7 @@ export type SandboxProfileAssociatedResourceEventRoutingConfig = {
   resources?: Array<{
     resourceKind: AssociatedProviderResourceKind;
     eventTypes: AssociatedResourceEventType[];
+    payloadFilter?: Record<string, unknown>;
   }>;
 };
 
@@ -25,6 +26,9 @@ export function mapProfileVersionAssociatedResourceEventRoutingConfig(
           resources: config.resources.map((resource) => ({
             resourceKind: resource.resourceKind,
             eventTypes: [...resource.eventTypes],
+            ...(resource.payloadFilter === undefined
+              ? {}
+              : { payloadFilter: structuredClone(resource.payloadFilter) }),
           })),
         }),
   };

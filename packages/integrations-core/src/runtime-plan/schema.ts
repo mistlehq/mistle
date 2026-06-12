@@ -1,8 +1,11 @@
+import { parseWebhookPayloadFilter } from "@mistle/webhooks";
+import type { WebhookPayloadFilter } from "@mistle/webhooks";
 import { z } from "zod";
 
 import type { AgentRuntimeCapabilities } from "../agent-runtimes/types.js";
 import {
   AssociatedProviderResourceKinds,
+  type AssociatedResourceEventType,
   AssociatedResourceEventTypes,
   RuntimeFileWriteMode,
   SandboxImageSources,
@@ -470,8 +473,37 @@ const AssociatedResourceEventRoutingResourceRuleSchema = z
       )
       .min(1)
       .readonly(),
+    payloadFilter: z.record(z.string(), z.unknown()).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((rule, ctx) => {
+    if (rule.payloadFilter === undefined) {
+      return;
+    }
+
+    const selectedEventTypes = new Set<string>(rule.eventTypes);
+    for (const [eventType, filter] of Object.entries(rule.payloadFilter)) {
+      if (!selectedEventTypes.has(eventType)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["payloadFilter", eventType],
+          message: `payloadFilter contains an event type that is not selected: ${eventType}`,
+        });
+        continue;
+      }
+
+      try {
+        parseWebhookPayloadFilter(filter);
+      } catch (error) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["payloadFilter", eventType],
+          message:
+            error instanceof Error ? error.message : "Webhook payload filter validation failed.",
+        });
+      }
+    }
+  });
 
 export const SandboxProfileAssociatedResourceEventRoutingConfigSchema = z
   .object({
@@ -512,6 +544,11 @@ type RuntimePlanSkills = NonNullable<CompiledRuntimePlan["skills"]>;
 type RuntimePlanAgentRuntime = CompiledRuntimePlan["agentRuntimes"][number];
 type RuntimePlanAssociatedResourceRule =
   CompiledRuntimePlan["associatedResourceEventRouting"]["resources"][number];
+type RawAssociatedResourceRule = {
+  resourceKind: RuntimePlanAssociatedResourceRule["resourceKind"];
+  eventTypes: RuntimePlanAssociatedResourceRule["eventTypes"];
+  payloadFilter?: Record<string, unknown> | undefined;
+};
 
 function sortRecord(input: Record<string, string>): Record<string, string> {
   return Object.fromEntries(
@@ -520,14 +557,42 @@ function sortRecord(input: Record<string, string>): Record<string, string> {
 }
 
 function normalizeAssociatedResourceRules(
-  rules: ReadonlyArray<RuntimePlanAssociatedResourceRule>,
+  rules: ReadonlyArray<RawAssociatedResourceRule>,
 ): ReadonlyArray<RuntimePlanAssociatedResourceRule> {
   return rules
     .map((rule) => ({
       resourceKind: rule.resourceKind,
       eventTypes: [...new Set(rule.eventTypes)].sort(),
+      ...(rule.payloadFilter === undefined
+        ? {}
+        : { payloadFilter: parseAssociatedResourcePayloadFilter(rule.payloadFilter) }),
     }))
     .sort((left, right) => left.resourceKind.localeCompare(right.resourceKind));
+}
+
+function parseAssociatedResourcePayloadFilter(
+  payloadFilter: Record<string, unknown>,
+): RuntimePlanAssociatedResourceRule["payloadFilter"] {
+  const parsedPayloadFilter: Partial<Record<AssociatedResourceEventType, WebhookPayloadFilter>> =
+    {};
+
+  for (const [eventType, filter] of Object.entries(payloadFilter)) {
+    if (!isAssociatedResourceEventType(eventType)) {
+      throw new Error(`Unsupported associated resource event type '${eventType}'.`);
+    }
+
+    parsedPayloadFilter[eventType] = parseWebhookPayloadFilter(filter);
+  }
+
+  return parsedPayloadFilter;
+}
+
+function isAssociatedResourceEventType(input: string): input is AssociatedResourceEventType {
+  return (
+    input === AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED ||
+    input === AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED ||
+    input === AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED
+  );
 }
 
 const HeaderNamePattern = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;

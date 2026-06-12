@@ -5,11 +5,85 @@ import {
 import { describe, expect, it } from "vitest";
 
 import {
+  GitHubAssociatedResourceEventsCapability,
   isSelfAuthoredGitHubAssociatedResourceEvent,
   observeGitHubAssociatedResourceFromWebhookEvent,
 } from "./provider-resource-association-webhooks.js";
 
 describe("GitHub associated resource webhook observation", () => {
+  it("projects supported association event filters from GitHub webhook definitions", () => {
+    expect(GitHubAssociatedResourceEventsCapability.supportedEvents).toEqual([
+      {
+        resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+        eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+        displayName: "PR comments",
+        parameters: [
+          {
+            id: "invocationToken",
+            label: "invocation token",
+            kind: "string",
+            payloadPath: ["comment", "body"],
+            matchMode: "contains_token",
+            controlVariant: "invocation-token",
+          },
+          {
+            id: "repository",
+            label: "repository",
+            kind: "resource-select",
+            resourceKind: "repository",
+            payloadPath: ["repository", "full_name"],
+            prefix: "in",
+          },
+          {
+            id: "commenter",
+            label: "actor",
+            kind: "resource-select",
+            resourceKind: "user",
+            payloadPath: ["sender", "login"],
+            prefix: "by",
+            placeholder: "Any user",
+          },
+          {
+            id: "botActor",
+            label: "bot",
+            kind: "resource-select",
+            resourceKind: "bot",
+            payloadPath: ["sender", "login"],
+            prefix: "by bot",
+            placeholder: "Any bot",
+          },
+        ],
+        parameterGroups: [
+          {
+            id: "actor",
+            label: "actor",
+            kind: "oneOf",
+            options: [
+              {
+                parameterId: "commenter",
+                label: "by user",
+              },
+              {
+                parameterId: "botActor",
+                label: "by bot",
+              },
+            ],
+          },
+        ],
+      },
+      expect.objectContaining({
+        resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+        eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+        displayName: "PR reviews",
+      }),
+      expect.objectContaining({
+        resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+        eventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
+        displayName: "Review comments",
+      }),
+    ]);
+  });
+
   it("observes issue comments on pull requests", () => {
     const observed = observeGitHubAssociatedResourceFromWebhookEvent({
       eventType: "github.issue_comment.created",

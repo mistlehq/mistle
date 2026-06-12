@@ -38,6 +38,7 @@ export {
   createGitHubResourceDefinitions,
   GitHubResourceSyncTriggers,
 } from "./shared/resource-definitions.js";
+export { GitHubAssociatedResourceEventsCapability } from "./shared/provider-resource-association-webhooks.js";
 export {
   GitHubCloudBaseDefinition,
   GitHubCloudBaseDefinition as GitHubCloudDefinition,

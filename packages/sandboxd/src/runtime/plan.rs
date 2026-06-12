@@ -38,6 +38,8 @@ pub struct AssociatedResourceEventRouting {
 pub struct AssociatedResourceEventRoutingResourceRule {
     pub resource_kind: AssociatedProviderResourceKind,
     pub event_types: Vec<AssociatedResourceEventType>,
+    #[serde(default)]
+    pub payload_filter: Option<BTreeMap<String, serde_json::Value>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -813,6 +815,49 @@ mod tests {
                 .to_string()
                 .contains("missing field `associatedResourceEventRouting`"),
             "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn decodes_associated_resource_payload_filter() {
+        let runtime_plan = serde_json::from_value::<CompiledRuntimePlan>(serde_json::json!({
+          "sandboxProfileId": "sbp_01k00000000000000000000000",
+          "version": 1,
+          "image": {
+            "source": "base",
+            "imageRef": "registry.example.test/base:latest"
+          },
+          "egressRoutes": [],
+          "artifacts": [],
+          "workspaceSources": [],
+          "runtimeClients": [],
+          "agentRuntimes": [],
+          "associatedResourceEventRouting": {
+            "enabled": true,
+            "resources": [
+              {
+                "resourceKind": "github.pull_request",
+                "eventTypes": ["github.pull_request.issue_comment.created"],
+                "payloadFilter": {
+                  "github.pull_request.issue_comment.created": {
+                    "op": "contains_token",
+                    "path": ["comment", "body"],
+                    "value": "@mistle"
+                  }
+                }
+              }
+            ]
+          }
+        }))
+        .expect("runtime plan decoder should accept associated resource payload filters");
+
+        let payload_filter = runtime_plan.associated_resource_event_routing.resources[0]
+            .payload_filter
+            .as_ref()
+            .expect("payload filter should decode");
+        assert_eq!(
+            payload_filter["github.pull_request.issue_comment.created"]["op"],
+            "contains_token"
         );
     }
 

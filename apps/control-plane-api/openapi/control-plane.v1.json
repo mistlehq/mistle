@@ -10921,6 +10921,245 @@
                               "additionalProperties": false
                             }
                           },
+                          "supportedAssociatedResourceEvents": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "resourceKind": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "eventType": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "displayName": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "parameters": {
+                                  "type": "array",
+                                  "items": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "label": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["resource-select"]
+                                          },
+                                          "resourceKind": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "payloadPath": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "minItems": 1
+                                          },
+                                          "negatedMatchRequiresExists": {
+                                            "type": "boolean"
+                                          },
+                                          "prefix": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "placeholder": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "label",
+                                          "kind",
+                                          "resourceKind",
+                                          "payloadPath"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "label": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["string"]
+                                          },
+                                          "payloadPath": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "minItems": 1
+                                          },
+                                          "matchMode": {
+                                            "type": "string",
+                                            "enum": ["eq", "contains", "contains_token"]
+                                          },
+                                          "defaultValue": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "defaultEnabled": {
+                                            "type": "boolean"
+                                          },
+                                          "controlVariant": {
+                                            "type": "string",
+                                            "enum": ["invocation-token"]
+                                          },
+                                          "negatedMatchRequiresExists": {
+                                            "type": "boolean"
+                                          },
+                                          "prefix": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "placeholder": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": ["id", "label", "kind", "payloadPath"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "label": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["enum-select"]
+                                          },
+                                          "payloadPath": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "minItems": 1
+                                          },
+                                          "matchMode": {
+                                            "type": "string",
+                                            "enum": ["eq", "exists"]
+                                          },
+                                          "options": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "value": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "label": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["value", "label"],
+                                              "additionalProperties": false
+                                            },
+                                            "minItems": 1
+                                          },
+                                          "negatedMatchRequiresExists": {
+                                            "type": "boolean"
+                                          },
+                                          "prefix": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "placeholder": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "label",
+                                          "kind",
+                                          "payloadPath",
+                                          "matchMode",
+                                          "options"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  }
+                                },
+                                "parameterGroups": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "label": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["oneOf"]
+                                      },
+                                      "options": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "parameterId": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "label": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "required": ["parameterId", "label"],
+                                          "additionalProperties": false
+                                        },
+                                        "minItems": 2
+                                      }
+                                    },
+                                    "required": ["id", "label", "kind", "options"],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "required": ["resourceKind", "eventType", "displayName"],
+                              "additionalProperties": false
+                            }
+                          },
                           "displayNameOverride": {
                             "type": "string",
                             "minLength": 1
@@ -21286,6 +21525,10 @@
                                   ]
                                 },
                                 "minItems": 1
+                              },
+                              "payloadFilter": {
+                                "type": "object",
+                                "additionalProperties": {}
                               }
                             },
                             "required": ["resourceKind", "eventTypes"],
@@ -21681,6 +21924,10 @@
                                         ]
                                       },
                                       "minItems": 1
+                                    },
+                                    "payloadFilter": {
+                                      "type": "object",
+                                      "additionalProperties": {}
                                     }
                                   },
                                   "required": ["resourceKind", "eventTypes"],
@@ -24008,6 +24255,10 @@
                                 ]
                               },
                               "minItems": 1
+                            },
+                            "payloadFilter": {
+                              "type": "object",
+                              "additionalProperties": {}
                             }
                           },
                           "required": ["resourceKind", "eventTypes"],
@@ -24176,6 +24427,10 @@
                                   ]
                                 },
                                 "minItems": 1
+                              },
+                              "payloadFilter": {
+                                "type": "object",
+                                "additionalProperties": {}
                               }
                             },
                             "required": ["resourceKind", "eventTypes"],
@@ -25157,6 +25412,10 @@
                                       ]
                                     },
                                     "minItems": 1
+                                  },
+                                  "payloadFilter": {
+                                    "type": "object",
+                                    "additionalProperties": {}
                                   }
                                 },
                                 "required": ["resourceKind", "eventTypes"],
@@ -25673,6 +25932,10 @@
                                       ]
                                     },
                                     "minItems": 1
+                                  },
+                                  "payloadFilter": {
+                                    "type": "object",
+                                    "additionalProperties": {}
                                   }
                                 },
                                 "required": ["resourceKind", "eventTypes"],
@@ -26149,6 +26412,10 @@
                                       ]
                                     },
                                     "minItems": 1
+                                  },
+                                  "payloadFilter": {
+                                    "type": "object",
+                                    "additionalProperties": {}
                                   }
                                 },
                                 "required": ["resourceKind", "eventTypes"],
