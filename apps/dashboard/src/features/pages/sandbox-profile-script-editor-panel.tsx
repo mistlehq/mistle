@@ -1,4 +1,4 @@
-import { Field, FieldContent, FieldHeader, FieldLabel, cn } from "@mistle/ui";
+import { Field, FieldContent, FieldHeader, FieldLabel } from "@mistle/ui";
 import type { CSSProperties, ReactNode } from "react";
 
 import {
@@ -30,6 +30,7 @@ export function SandboxProfileScriptEditorField(input: {
   onChange?: ((nextValue: string) => void) | undefined;
   placeholderText: string;
   readOnly?: boolean | undefined;
+  readOnlyEmptyState?: ReactNode | undefined;
   setupAssistant?: SandboxProfileScriptAssistantControl | undefined;
   showFieldHeader?: boolean | undefined;
   testButtonProps?: SetupScriptTestButtonProps | undefined;
@@ -38,6 +39,9 @@ export function SandboxProfileScriptEditorField(input: {
 }): React.JSX.Element {
   const showsEditorControls = input.readOnly !== true;
   const showsFieldHeader = input.showFieldHeader !== false;
+  const scriptHasContent = input.value.trim().length > 0;
+  const shouldShowReadOnlyEmptyState =
+    input.readOnly === true && !scriptHasContent && input.readOnlyEmptyState !== undefined;
   const testControl =
     showsEditorControls && input.testButtonProps !== undefined ? (
       <SandboxProfileSetupScriptTestButton
@@ -78,7 +82,9 @@ export function SandboxProfileScriptEditorField(input: {
         <div className="flex flex-col gap-2">
           {input.notice}
           {showsEditorControls ? input.testPanel : null}
-          {input.readOnly === true ? (
+          {shouldShowReadOnlyEmptyState ? (
+            input.readOnlyEmptyState
+          ) : input.readOnly === true ? (
             <SandboxProfileReadOnlyScriptBlock
               ariaLabelledBy={input.ariaLabelledBy}
               value={input.value}
@@ -117,29 +123,16 @@ const ReadOnlyScriptBlockHeightStyle = {
 
 export function SandboxProfileReadOnlyScriptBlock(input: {
   ariaLabelledBy: string;
-  className?: string | undefined;
-  emptyMessage?: ReactNode | undefined;
   value: string;
 }): React.JSX.Element {
-  const scriptHasContent = input.value.trim().length > 0;
-
   return (
     <pre
       aria-labelledby={input.ariaLabelledBy}
-      className={cn(
-        "whitespace-pre-wrap break-words rounded-sm border border-border bg-background p-3 font-mono text-sm text-muted-foreground",
-        input.className,
-      )}
+      className="whitespace-pre-wrap break-words rounded-sm border border-border bg-background p-3 font-mono text-sm text-muted-foreground"
       data-slot="sandbox-profile-read-only-script-block"
       style={ReadOnlyScriptBlockHeightStyle}
     >
-      {scriptHasContent ? (
-        input.value
-      ) : (
-        <span className="font-sans text-muted-foreground">
-          {input.emptyMessage ?? "Not configured."}
-        </span>
-      )}
+      {input.value}
     </pre>
   );
 }

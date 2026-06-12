@@ -3070,6 +3070,32 @@ describe("SandboxProfileEditorPage", () => {
     expect(editorRoot?.getAttribute("data-editor-state")).toBe("empty");
   });
 
+  it("explains empty published setup scripts as a profile empty state", () => {
+    renderSandboxProfileEditor({
+      routeSection: "sandbox-profile",
+      setupScript: null,
+      versionState: "published",
+    });
+
+    const configurationsPanel = screen.getByRole("tabpanel", {
+      name: "Sandbox Profile",
+      hidden: false,
+    });
+    const emptyState = within(configurationsPanel)
+      .getByText("No setup script configured")
+      .closest("[data-slot='empty']");
+
+    expect(emptyState).not.toBeNull();
+    expect(
+      within(configurationsPanel).getByText(
+        "Setup scripts run when Mistle creates or refreshes this profile's snapshot. Use one to install dependencies, bootstrap local tools, generate files, or validate required configuration so future sessions launch from a prepared image and agents begin from a known working environment.",
+      ),
+    ).toBeTruthy();
+    expect(
+      configurationsPanel.querySelector("[data-slot='sandbox-profile-read-only-script-block']"),
+    ).toBeNull();
+  });
+
   it("allows setup script testing for draft scripts with content", () => {
     renderSandboxProfileEditor({
       bindings: [

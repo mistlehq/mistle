@@ -20,6 +20,10 @@ import {
   DialogHeader,
   DialogTitle,
   DropdownMenuItem,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
   Field,
   FieldContent,
   FieldDescription,
@@ -4321,6 +4325,7 @@ export function SandboxProfileSetupScriptPanel(input: {
           onChange={input.onChange}
           placeholderText={SetupScriptPlaceholder}
           readOnly={input.readOnly}
+          readOnlyEmptyState={<SetupScriptReadOnlyEmptyState />}
           showFieldHeader={false}
           testPanel={input.testPanel}
           value={input.value}
@@ -4330,6 +4335,22 @@ export function SandboxProfileSetupScriptPanel(input: {
         )}
       </div>
     </SectionBlock>
+  );
+}
+
+function SetupScriptReadOnlyEmptyState(): React.JSX.Element {
+  return (
+    <Empty aria-labelledby="sandbox-setup-script-label" className="min-h-40 py-8">
+      <EmptyHeader>
+        <EmptyTitle>No setup script configured</EmptyTitle>
+        <EmptyDescription>
+          Setup scripts run when Mistle creates or refreshes this profile&apos;s snapshot. Use one
+          to install dependencies, bootstrap local tools, generate files, or validate required
+          configuration so future sessions launch from a prepared image and agents begin from a
+          known working environment.
+        </EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   );
 }
 
