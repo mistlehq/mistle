@@ -1,7 +1,7 @@
-import { Button, buttonVariants } from "@mistle/ui";
-import { Link as RouterLink } from "react-router";
+import { Button } from "@mistle/ui";
 
 import { ActionTile } from "../shared/action-tile.js";
+import { RoutedButtonLink } from "../shared/routed-button-link.js";
 import { IntegrationLogo } from "./integration-logo.js";
 
 type IntegrationTileProps = {
@@ -43,12 +43,12 @@ export function IntegrationTile(props: IntegrationTileProps) {
             {props.actionLabel}
           </Button>
         ) : (
-          <RouterLink
-            className={buttonVariants({ variant: props.actionVariant })}
+          <RoutedButtonLink
             to={props.actionHref}
+            {...(props.actionVariant === undefined ? {} : { variant: props.actionVariant })}
           >
             {props.actionLabel}
-          </RouterLink>
+          </RoutedButtonLink>
         )
       }
       actionContainerClassName="gap-2"

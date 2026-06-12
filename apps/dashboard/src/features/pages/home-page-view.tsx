@@ -1,4 +1,4 @@
-import { Button, buttonVariants, cn, TextLink } from "@mistle/ui";
+import { Button, cn, TextLink } from "@mistle/ui";
 import { CheckCircleIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { Link as RouterLink } from "react-router";
@@ -8,6 +8,7 @@ import { resolveSessionTitleLabel } from "../sessions/session-title-presentation
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
 import { ActionTile } from "../shared/action-tile.js";
 import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
+import { RoutedButtonLink } from "../shared/routed-button-link.js";
 import type { HomeChecklistStep, HomeChecklistViewModel } from "./home-page-view-model.js";
 
 type HomePageViewProps = {
@@ -108,12 +109,9 @@ function RecentSessionsList(input: {
 function SetupStepRow(input: { step: HomeChecklistStep }): React.JSX.Element {
   const action =
     input.step.status === "complete" ? null : input.step.status === "current" ? (
-      <RouterLink
-        className={buttonVariants({ className: "my-auto shrink-0" })}
-        to={input.step.href}
-      >
+      <RoutedButtonLink className="my-auto shrink-0" to={input.step.href}>
         {input.step.actionLabel}
-      </RouterLink>
+      </RoutedButtonLink>
     ) : (
       <Button className="my-auto shrink-0" disabled type="button" variant="outline">
         {input.step.actionLabel}

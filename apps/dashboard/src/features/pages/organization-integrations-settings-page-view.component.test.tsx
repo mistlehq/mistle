@@ -58,6 +58,7 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
     const viewAction = screen.getByRole("link", { name: "View" });
     expect(viewAction.tagName).toBe("A");
     expect(viewAction.getAttribute("href")).toBe("/integrations/github");
+    expect(viewAction.getAttribute("role")).toBeNull();
     const addAction = screen.getByRole("link", { name: "Add" });
     expect(addAction.tagName).toBe("A");
     expect(addAction.getAttribute("href")).toBe("/integrations/openai-default/add");

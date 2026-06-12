@@ -1,13 +1,13 @@
-import { buttonVariants } from "@mistle/ui";
 import { PlusIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link as RouterLink, useSearchParams } from "react-router";
+import { useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { CollectionEmptyState } from "../shared/collection-empty-state.js";
 import { PageFrame } from "../shared/page-frame.js";
 import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
+import { RoutedButtonLink } from "../shared/routed-button-link.js";
 import {
   normalizeTriggerListSearch,
   toTriggerListServerFilters,
@@ -89,20 +89,16 @@ export function TriggersPage(): React.JSX.Element {
 
   return (
     <PageFrame
-      headerActions={
-        <RouterLink className={buttonVariants()} to="/triggers/new">
-          Create trigger
-        </RouterLink>
-      }
+      headerActions={<RoutedButtonLink to="/triggers/new">Create trigger</RoutedButtonLink>}
       title="Triggers"
     >
       {isLoadingInitialList ? null : hasNoTriggers && errorMessage === null ? (
         <CollectionEmptyState
           action={
-            <RouterLink className={buttonVariants()} to="/triggers/new">
+            <RoutedButtonLink to="/triggers/new">
               <PlusIcon aria-hidden className="size-4" />
               Create trigger
-            </RouterLink>
+            </RoutedButtonLink>
           }
           description="Triggers run Mistle automatically from webhook events or schedules."
           title="Create your first trigger"

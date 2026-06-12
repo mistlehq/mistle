@@ -70,7 +70,7 @@ describe("OrganizationApiKeysSettingsPageView", () => {
   it("links API key creation to a dedicated page", () => {
     renderPage();
 
-    expect(screen.getByRole("button", { name: "Create API key" }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: "Create API key" }).getAttribute("href")).toBe(
       "/settings/organization/api-keys/new",
     );
   });
