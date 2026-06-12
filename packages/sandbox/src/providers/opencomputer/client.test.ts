@@ -94,6 +94,43 @@ describe("OpenComputer client helpers", () => {
         "id -u",
       ],
     });
+    expect(
+      createOpenComputerRootShellCommand({
+        script: "printf '%s' \"$MISTLE_SANDBOXD_ARTIFACT_VERSION\"",
+        env: {
+          MISTLE_SANDBOXD_ARTIFACT_VERSION: "0.32.0",
+          MISTLE_SANDBOXD_ARTIFACT_URL: "https://example.com/sandboxd.tar.gz",
+        },
+      }),
+    ).toEqual({
+      command: "sudo",
+      args: [
+        "-n",
+        "env",
+        "PATH=/opt/mistle/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "MISTLE_SANDBOXD_ARTIFACT_VERSION=0.32.0",
+        "MISTLE_SANDBOXD_ARTIFACT_URL=https://example.com/sandboxd.tar.gz",
+        "sh",
+        "-euc",
+        "printf '%s' \"$MISTLE_SANDBOXD_ARTIFACT_VERSION\"",
+      ],
+    });
+    expect(
+      createOpenComputerSandboxdCommand({
+        args: ["activate"],
+        env: { MISTLE_SANDBOX_BOOTSTRAP_TOKEN: "bootstrap-token" },
+      }),
+    ).toEqual({
+      command: "sudo",
+      args: [
+        "-n",
+        "env",
+        "PATH=/opt/mistle/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "MISTLE_SANDBOX_BOOTSTRAP_TOKEN=bootstrap-token",
+        "/opt/mistle/bin/sandboxd",
+        "activate",
+      ],
+    });
   });
 
   it("passes activation payload length through --stdin-bytes", () => {

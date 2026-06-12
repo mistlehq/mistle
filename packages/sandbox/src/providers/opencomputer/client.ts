@@ -192,21 +192,72 @@ export function createOpenComputerDaemonCommand(): string {
 export function createOpenComputerRootShellCommand(input: { readonly script: string }): {
   command: string;
   args: readonly string[];
+};
+export function createOpenComputerRootShellCommand(input: {
+  readonly script: string;
+  readonly env: Readonly<Record<string, string>> | undefined;
+}): {
+  command: string;
+  args: readonly string[];
+};
+export function createOpenComputerRootShellCommand(input: {
+  readonly script: string;
+  readonly env?: Readonly<Record<string, string>> | undefined;
+}): {
+  command: string;
+  args: readonly string[];
 } {
   return {
     command: "sudo",
-    args: ["-n", "env", `PATH=${OpenComputerRootPath}`, "sh", "-euc", input.script],
+    args: [
+      "-n",
+      "env",
+      ...createOpenComputerEnvArgs({
+        PATH: OpenComputerRootPath,
+        ...(input.env === undefined ? {} : input.env),
+      }),
+      "sh",
+      "-euc",
+      input.script,
+    ],
   };
 }
 
 export function createOpenComputerSandboxdCommand(input: { readonly args: readonly string[] }): {
   command: string;
   args: readonly string[];
+};
+export function createOpenComputerSandboxdCommand(input: {
+  readonly args: readonly string[];
+  readonly env: Readonly<Record<string, string>> | undefined;
+}): {
+  command: string;
+  args: readonly string[];
+};
+export function createOpenComputerSandboxdCommand(input: {
+  readonly args: readonly string[];
+  readonly env?: Readonly<Record<string, string>> | undefined;
+}): {
+  command: string;
+  args: readonly string[];
 } {
   return {
     command: "sudo",
-    args: ["-n", "env", `PATH=${OpenComputerRootPath}`, SandboxdCommand, ...input.args],
+    args: [
+      "-n",
+      "env",
+      ...createOpenComputerEnvArgs({
+        PATH: OpenComputerRootPath,
+        ...(input.env === undefined ? {} : input.env),
+      }),
+      SandboxdCommand,
+      ...input.args,
+    ],
   };
+}
+
+function createOpenComputerEnvArgs(env: Readonly<Record<string, string>>): readonly string[] {
+  return Object.entries(env).map(([key, value]) => `${key}=${value}`);
 }
 
 export function createOpenComputerActivateCommandArgs(input: {
@@ -465,6 +516,7 @@ export class OpenComputerApiClient implements OpenComputerClient {
       });
       const command = createOpenComputerSandboxdCommand({
         args: createOpenComputerActivateCommandArgs({ payload: parsedRequest.payload }),
+        env: parsedRequest.env,
       });
       await this.#runExecSessionToCompletion({
         sandboxId: parsedRequest.sandboxId,
@@ -657,11 +709,14 @@ export class OpenComputerApiClient implements OpenComputerClient {
       await this.#hardRefreshDaemon(input.sandboxId);
     }
 
+    const daemonCommand = createOpenComputerSandboxdCommand({
+      args: [],
+      env: createOpenComputerDaemonEnv(input.env),
+    });
     const daemonProcess = await this.#startExecSession({
       sandboxId: input.sandboxId,
-      command: "sudo",
-      args: ["-n", "env", `PATH=${OpenComputerRootPath}`, SandboxdCommand],
-      env: createOpenComputerDaemonEnv(input.env),
+      command: daemonCommand.command,
+      args: daemonCommand.args,
       maxRunAfterDisconnectSeconds: 86_400,
       operation: OpenComputerClientOperationIds.ACTIVATE,
     });
