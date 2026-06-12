@@ -6,7 +6,7 @@ import {
 } from "../../shared/endpoint-catalog.js";
 import { AwsToolIds } from "./tool-ids.js";
 
-const AwsBindingToolSchema = z.enum([AwsToolIds.AWS_CLI]);
+const AwsBindingToolSchema = z.enum([AwsToolIds.AWS_CLI, AwsToolIds.AWS_CLOUDWATCH_MCP]);
 
 export const AwsBindingConfigSchema = z
   .object({

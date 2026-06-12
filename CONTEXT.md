@@ -64,6 +64,14 @@ _Avoid_: Generic script
 The compiled sandbox activation configuration for a **Sandbox profile version**.
 _Avoid_: Runtime plane, runtime config when referring to the compiled activation shape
 
+**Provider MCP server**:
+An external-provider capability selected through an integration binding and exposed to an **Agent runtime** as part of the **Runtime plan**.
+_Avoid_: Mistle MCP, agent runtime MCP when the server belongs to a provider integration
+
+**Provider placeholder credential**:
+A non-secret credential value supplied only to satisfy provider client libraries before managed egress applies the real integration credential.
+_Avoid_: Dummy credential when it could be mistaken for real provider access
+
 **Mistle resource access**:
 A **Sandbox profile version** setting that lets an agent runtime use Mistle-owned resources through a selected organization API key.
 _Avoid_: Allow agent toggle, Mistle MCP toggle

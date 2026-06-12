@@ -20,6 +20,22 @@ describe("AwsBindingConfigSchema", () => {
     });
   });
 
+  it("parses aws binding config with optional cloudwatch mcp tool selection", () => {
+    expect(
+      AwsBindingConfigSchema.parse({
+        services: ["secretsmanager"],
+        regions: ["us-east-1"],
+        defaultRegion: "us-east-1",
+        tools: [AwsToolIds.AWS_CLOUDWATCH_MCP],
+      }),
+    ).toEqual({
+      services: ["secretsmanager"],
+      regions: ["us-east-1"],
+      defaultRegion: "us-east-1",
+      tools: [AwsToolIds.AWS_CLOUDWATCH_MCP],
+    });
+  });
+
   it("rejects default regions that are not in the allowed region list", () => {
     expect(() =>
       AwsBindingConfigSchema.parse({

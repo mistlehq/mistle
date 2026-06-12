@@ -1,0 +1,3 @@
+# Run CloudWatch MCP as a pinned provider MCP runtime artifact
+
+CloudWatch MCP is a **Provider MCP server** owned by the AWS integration, so Mistle installs the upstream AWS Labs package as a pinned runtime artifact and exposes it through a stable wrapper command rather than vendoring the source or resolving `@latest` at runtime. The wrapper supplies **Provider placeholder credentials** and clears profile-based AWS credential selection so upstream boto3-based tools can construct requests, while managed egress remains responsible for applying the real AWS SigV4 credentials from the integration connection. If the upstream package proves incompatible with managed egress, Mistle should move to an internal maintained tool instead of silently changing credential behavior.

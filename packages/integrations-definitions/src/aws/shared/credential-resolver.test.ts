@@ -7,6 +7,7 @@ import {
 } from "../variants/aws-cli-default/auth.js";
 import {
   createAssumeRoleCommandInput,
+  createAwsAssumeRolePublicErrorMessage,
   createAwsAssumeRoleSessionName,
   createAwsAssumeRoleTelemetryAttributes,
   resolveAwsAssumeRoleContext,
@@ -137,6 +138,31 @@ describe("aws credential resolver helpers", () => {
       "mistle.aws.external_id_present": true,
       "mistle.aws.duration_seconds": 3600,
     });
+  });
+
+  it("builds public AssumeRole error messages without exposing provider identifiers", () => {
+    const error = new Error(
+      "User arn:aws:iam::123456789012:user/mistle-test is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::123456789012:role/mistle-dev",
+    );
+    error.name = "AccessDenied";
+
+    const message = createAwsAssumeRolePublicErrorMessage(error);
+
+    expect(message).toBe(
+      "AWS AssumeRole credential resolution failed: AWS STS denied the AssumeRole request. Check that the configured access key principal can assume the configured IAM role, the role trust policy allows it, and the external ID matches if one is configured.",
+    );
+    expect(message).not.toContain("123456789012");
+    expect(message).not.toContain("mistle-test");
+    expect(message).not.toContain("mistle-dev");
+  });
+
+  it("builds a public AssumeRole error message for rejected access key credentials", () => {
+    const error = new Error("The security token included in the request is invalid.");
+    error.name = "UnrecognizedClientException";
+
+    expect(createAwsAssumeRolePublicErrorMessage(error)).toBe(
+      "AWS AssumeRole credential resolution failed: AWS STS rejected the configured access key credentials. Check that the access key ID and secret access key are active and belong together.",
+    );
   });
 
   it("fails fast when binding context is missing", () => {

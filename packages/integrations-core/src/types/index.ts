@@ -1145,6 +1145,16 @@ export type IntegrationCredentialResolver = {
   ): MaybePromise<IntegrationCredentialResolverResult>;
 };
 
+export class IntegrationCredentialResolutionError extends Error {
+  readonly publicMessage: string;
+
+  constructor(publicMessage: string, options?: ErrorOptions) {
+    super(publicMessage, options);
+    this.name = "IntegrationCredentialResolutionError";
+    this.publicMessage = publicMessage;
+  }
+}
+
 export type IntegrationCredentialResolvers = {
   default?: IntegrationCredentialResolver;
   custom?: Record<string, IntegrationCredentialResolver>;
