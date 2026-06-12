@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ControlPlaneInternalClient } from "./index.js";
+import { ControlPlaneInternalClient, ControlPlaneInternalClientRequestError } from "./index.js";
 
 const ServiceTokenHeader = "x-mistle-service-token";
 const TestEnvironmentIdHeader = "x-mistle-test-environment-id";
@@ -71,6 +71,47 @@ describe("ControlPlaneInternalClient", () => {
     });
     expect(observedServiceToken).toBe("service-token");
     expect(observedTestEnvironmentId).toBe("test_env_123");
+  });
+
+  it("surfaces credential resolution failure status and code", async () => {
+    const baseUrl = await startServer((_request, response) => {
+      response.writeHead(502, {
+        "content-type": "application/json",
+      });
+      response.end(
+        JSON.stringify({
+          code: "CREDENTIAL_RESOLUTION_FAILED",
+          message: "AWS AssumeRole credential resolution failed: AWS STS denied the request.",
+        }),
+      );
+    });
+    const client = new ControlPlaneInternalClient({
+      baseUrl,
+      internalAuthServiceToken: "service-token",
+    });
+
+    let caughtError: unknown;
+    try {
+      await client.resolveIntegrationCredential({
+        bindingId: "binding_123",
+        connectionId: "conn_123",
+        secretType: "aws_secret_access_key",
+        slotKey: "aws.aws-cli-default.aws-assume-role.secret-access-key",
+        resolverKey: "assume-role-session",
+      });
+    } catch (error: unknown) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toBeInstanceOf(ControlPlaneInternalClientRequestError);
+    if (!(caughtError instanceof ControlPlaneInternalClientRequestError)) {
+      throw new Error("Expected ControlPlaneInternalClientRequestError.");
+    }
+    expect(caughtError.status).toBe(502);
+    expect(caughtError.code).toBe("CREDENTIAL_RESOLUTION_FAILED");
+    expect(caughtError.message).toBe(
+      "Control-plane internal credential resolution failed with status 502: AWS AssumeRole credential resolution failed: AWS STS denied the request.",
+    );
   });
 });
 

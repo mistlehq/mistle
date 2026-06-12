@@ -3,6 +3,8 @@
  */
 
 import { generateKeyPairSync } from "node:crypto";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import type { AddressInfo } from "node:net";
 
 import {
   IntegrationBindingKinds,
@@ -184,6 +186,92 @@ describe.concurrent("internal integration credential resolution", () => {
       kind: "value",
       value: "aws-secret-access-key-value",
     });
+  });
+
+  it("returns safe credential resolution failures from AWS AssumeRole resolver errors", async ({
+    env,
+  }) => {
+    const simulatedSts = await startSimulatedAwsStsAccessDeniedServer();
+    try {
+      const session = await env.auth.createSession({
+        email: "integration-internal-credential-resolve-aws-error@example.com",
+      });
+      await seedIntegrationTarget(env, {
+        targetKey: "aws-internal-credential-resolution-error",
+        familyId: "aws",
+        variantId: "aws-cli-default",
+        config: {
+          sts_endpoint_url: simulatedSts.url,
+        },
+      });
+      await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
+        id: "icn_internal_credential_aws_resolution_error",
+        organizationId: session.organizationId,
+        targetKey: "aws-internal-credential-resolution-error",
+        displayName: "AWS AssumeRole resolution error",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+          accessKeyId: "AKIAEXAMPLE",
+          roleArn: "arn:aws:iam::123456789012:role/mistle-dev",
+        },
+      });
+      await insertEncryptedCredential({
+        env,
+        organizationId: session.organizationId,
+        id: "icr_internal_credential_aws_resolution_error",
+        secretKind: IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
+        plaintext: "aws-secret-access-key-value",
+        intendedFamilyId: "aws",
+        connectionId: "icn_internal_credential_aws_resolution_error",
+        slotKey: "aws.aws-cli-default.aws-assume-role.secret-access-key",
+      });
+      await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values({
+        id: "sbp_internal_credential_aws_resolution_error",
+        organizationId: session.organizationId,
+        displayName: "AWS resolution error profile",
+      });
+      await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values({
+        sandboxProfileId: "sbp_internal_credential_aws_resolution_error",
+        version: 1,
+      });
+      await env.controlPlaneDb
+        .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+        .values({
+          id: "ibd_internal_credential_aws_resolution_error",
+          sandboxProfileId: "sbp_internal_credential_aws_resolution_error",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_internal_credential_aws_resolution_error",
+          kind: IntegrationBindingKinds.CONNECTOR,
+          config: {
+            services: ["cloudwatch"],
+            regions: ["us-east-1"],
+            defaultRegion: "us-east-1",
+            tools: ["aws-cloudwatch-mcp"],
+          },
+        });
+
+      const response = await resolveCredential(env, {
+        connectionId: "icn_internal_credential_aws_resolution_error",
+        bindingId: "ibd_internal_credential_aws_resolution_error",
+        secretType: IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
+        slotKey: "aws.aws-cli-default.aws-assume-role.secret-access-key",
+        resolverKey: "assume-role-session",
+      });
+
+      expect(response.status).toBe(502);
+      const responseBody = await response.json();
+      expect(responseBody).toEqual({
+        code: "CREDENTIAL_RESOLUTION_FAILED",
+        message:
+          "AWS AssumeRole credential resolution failed: AWS STS denied the AssumeRole request. Check that the configured access key principal can assume the configured IAM role, the role trust policy allows it, and the external ID matches if one is configured.",
+      });
+      expect(JSON.stringify(responseBody)).not.toContain("123456789012");
+      expect(JSON.stringify(responseBody)).not.toContain("arn:aws:iam::123456789012:role");
+      expect(simulatedSts.observedRequestCount()).toBe(1);
+    } finally {
+      await simulatedSts.close();
+    }
   });
 
   it("resolves persisted OAuth access tokens with structural expiry", async ({ env }) => {
@@ -436,6 +524,66 @@ async function resolveCredential(
       body: JSON.stringify(body),
     },
   );
+}
+
+async function startSimulatedAwsStsAccessDeniedServer(): Promise<{
+  url: string;
+  close: () => Promise<void>;
+  observedRequestCount: () => number;
+}> {
+  let requestCount = 0;
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    requestCount += 1;
+    request.resume();
+
+    // AWS Query APIs return structured XML error responses with an Error Code,
+    // Message, and RequestId. The STS client parses this into an AccessDenied
+    // service exception before the resolver maps it to the public safe message.
+    // Source: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/errors-overview.html
+    response.writeHead(403, {
+      "content-type": "text/xml",
+    });
+    response.end(`<?xml version="1.0"?>
+<ErrorResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/">
+  <Error>
+    <Type>Sender</Type>
+    <Code>AccessDenied</Code>
+    <Message>User arn:aws:iam::123456789012:user/raw-reviewer is not authorized to perform sts:AssumeRole on role arn:aws:iam::123456789012:role/mistle-dev</Message>
+  </Error>
+  <RequestId>00000000-0000-0000-0000-000000000000</RequestId>
+</ErrorResponse>`);
+  });
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", resolve);
+  });
+
+  const address = server.address();
+  if (!isAddressInfo(address)) {
+    throw new Error("Expected simulated AWS STS server to listen on a TCP port.");
+  }
+
+  return {
+    url: `http://127.0.0.1:${String(address.port)}`,
+    close: () => closeServer(server),
+    observedRequestCount: () => requestCount,
+  };
+}
+
+async function closeServer(server: Server): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => {
+      if (error === undefined) {
+        resolve();
+        return;
+      }
+
+      reject(error);
+    });
+  });
+}
+
+function isAddressInfo(address: string | AddressInfo | null): address is AddressInfo {
+  return address !== null && typeof address !== "string";
 }
 
 async function insertEncryptedCredential(input: {
