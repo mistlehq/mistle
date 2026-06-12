@@ -15,6 +15,7 @@ import {
 } from "./sandbox-profile-runtime-defaults.js";
 import {
   SandboxProfileRuntimeSection,
+  selectNearestResourceTier,
   type SandboxProfileRuntimeDraftState,
 } from "./sandbox-profile-runtime-section.js";
 
@@ -1060,8 +1061,7 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(screen.queryByLabelText("Disk (MB)")).toBeNull();
   });
 
-  it("renders OpenComputer resource pairs as one selectable tier", async () => {
-    let runtimeDraftState: SandboxProfileRuntimeDraftState | undefined;
+  it("renders OpenComputer resource pairs as bound CPU and memory sliders", () => {
     render(
       <MemoryRouter>
         <SandboxProfileRuntimeSection
@@ -1070,9 +1070,6 @@ describe("SandboxProfileRuntimeSection", () => {
           availableTargets={[OpenComputerRuntimeTarget]}
           disabled={false}
           isDraft={true}
-          onDraftStateChange={(nextState) => {
-            runtimeDraftState = nextState;
-          }}
           providers={[OpenComputerProvider]}
           version={createVersion({
             sandboxProvider: "opencomputer",
@@ -1086,27 +1083,57 @@ describe("SandboxProfileRuntimeSection", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("combobox", { name: "Resources" })).toBeTruthy();
-    expect(screen.getByText("1 vCPU / 4096 MB")).toBeTruthy();
-    expect(screen.queryByLabelText("CPU")).toBeNull();
-    expect(screen.queryByLabelText("Memory (MB)")).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Resources" })).toBeNull();
+    expect(screen.getByLabelText("CPU")).toBeTruthy();
+    expect(screen.getByLabelText("Memory (MB)")).toBeTruthy();
+    expect(screen.getByText("1 vCPU")).toBeTruthy();
+    expect(screen.getByText("4096 MB")).toBeTruthy();
+  });
 
-    selectOptionFromCombobox({ comboboxName: "Resources", optionName: "2 vCPU / 8192 MB" });
+  it("binds OpenComputer CPU and memory slider changes to valid resource pairs", () => {
+    expect(
+      selectNearestResourceTier({
+        current: {
+          vcpuCount: 1,
+          memoryMb: 4096,
+        },
+        dimension: "vcpuCount",
+        tiers: OpenComputerProvider.resourceCapabilities.validResourcePairs,
+        value: 2,
+      }),
+    ).toEqual({
+      vcpuCount: 2,
+      memoryMb: 8192,
+    });
 
-    await waitFor(() => {
-      if (runtimeDraftState?.buildDraftChanges === undefined) {
-        throw new Error("Expected runtime draft changes builder to be available.");
-      }
+    expect(
+      selectNearestResourceTier({
+        current: {
+          vcpuCount: 2,
+          memoryMb: 8192,
+        },
+        dimension: "memoryMb",
+        tiers: OpenComputerProvider.resourceCapabilities.validResourcePairs,
+        value: 1024,
+      }),
+    ).toEqual({
+      vcpuCount: 1,
+      memoryMb: 1024,
+    });
 
-      expect(runtimeDraftState.buildDraftChanges()).toEqual(
-        expect.objectContaining({
-          sandboxProvider: "opencomputer",
-          sandboxResources: {
-            vcpuCount: 2,
-            memoryMb: 8192,
-          },
-        }),
-      );
+    expect(
+      selectNearestResourceTier({
+        current: {
+          vcpuCount: 1,
+          memoryMb: 4096,
+        },
+        dimension: "vcpuCount",
+        tiers: OpenComputerProvider.resourceCapabilities.validResourcePairs,
+        value: 1,
+      }),
+    ).toEqual({
+      vcpuCount: 1,
+      memoryMb: 4096,
     });
   });
 
