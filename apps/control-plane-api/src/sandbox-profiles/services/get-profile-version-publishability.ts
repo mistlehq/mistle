@@ -94,6 +94,7 @@ type CanonicalPublishWorthyProfileVersionConfig = {
     resources?: ReadonlyArray<{
       resourceKind: string;
       eventTypes: readonly string[];
+      payloadFilter?: unknown;
     }>;
   };
   integrationBindings: ReadonlyArray<{
@@ -356,6 +357,9 @@ function normalizePublishWorthyAssociatedResourceEventRoutingConfig(
             .map((resource) => ({
               resourceKind: resource.resourceKind,
               eventTypes: [...resource.eventTypes].sort(),
+              ...(resource.payloadFilter === undefined
+                ? {}
+                : { payloadFilter: canonicalizeJsonValue(resource.payloadFilter) }),
             }))
             .sort(compareAssociatedResourceEventRoutingResources),
         }),
@@ -363,12 +367,15 @@ function normalizePublishWorthyAssociatedResourceEventRoutingConfig(
 }
 
 function compareAssociatedResourceEventRoutingResources(
-  left: { resourceKind: string; eventTypes: readonly string[] },
-  right: { resourceKind: string; eventTypes: readonly string[] },
+  left: { resourceKind: string; eventTypes: readonly string[]; payloadFilter?: unknown },
+  right: { resourceKind: string; eventTypes: readonly string[]; payloadFilter?: unknown },
 ): number {
   return (
     left.resourceKind.localeCompare(right.resourceKind) ||
-    left.eventTypes.join("\u0000").localeCompare(right.eventTypes.join("\u0000"))
+    left.eventTypes.join("\u0000").localeCompare(right.eventTypes.join("\u0000")) ||
+    (JSON.stringify(left.payloadFilter) ?? "").localeCompare(
+      JSON.stringify(right.payloadFilter) ?? "",
+    )
   );
 }
 

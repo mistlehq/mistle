@@ -7,7 +7,10 @@ import type { RJSFSchema, UiSchema } from "@rjsf/utils";
 import validator from "@rjsf/validator-ajv8";
 
 import { SchemaFormWithoutSubmit, type SchemaFormContext } from "../forms/schema-form.js";
-import type { IntegrationConnectionResourceSummary } from "../integrations/integrations-service.js";
+import type {
+  IntegrationConnectionResourceSummary,
+  IntegrationTarget,
+} from "../integrations/integrations-service.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { isRecord } from "../shared/is-record.js";
 
@@ -41,6 +44,7 @@ export type IntegrationTargetSummary = {
   familyId: string;
   variantId: string;
   config: Record<string, unknown>;
+  supportedAssociatedResourceEvents?: IntegrationTarget["supportedAssociatedResourceEvents"];
   targetHealth: {
     configStatus: "valid" | "invalid";
   };

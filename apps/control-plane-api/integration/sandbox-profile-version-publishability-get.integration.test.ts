@@ -436,6 +436,89 @@ describe.concurrent("sandbox profile version publishability get integration", ()
     });
   });
 
+  it("returns publishable true when only associated resource payload filters change", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email:
+        "integration-new-sandbox-profile-version-publishability-payload-filter-change@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_publishability_payload_filter_change",
+        organizationId: session.organizationId,
+        displayName: "Payload Filter Change Publishability Profile",
+        activeVersion: 1,
+        createdAt: "2026-06-12T00:15:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_publishability_payload_filter_change",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        sandboxProvider: SandboxProvider.DOCKER,
+        associatedResourceEventRoutingConfig: {
+          enabled: true,
+          resources: [
+            {
+              resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+              eventTypes: [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED],
+              payloadFilter: {
+                [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED]: {
+                  op: "contains_token",
+                  path: ["comment", "body"],
+                  value: "@mistle",
+                },
+              },
+            },
+          ],
+        },
+      }),
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_publishability_payload_filter_change",
+        version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+        associatedResourceEventRoutingConfig: {
+          enabled: true,
+          resources: [
+            {
+              resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+              eventTypes: [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED],
+              payloadFilter: {
+                [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED]: {
+                  op: "contains_token",
+                  path: ["comment", "body"],
+                  value: "@agent",
+                },
+              },
+            },
+          ],
+        },
+      }),
+    ]);
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_publishability_payload_filter_change/versions/2/publishability",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = GetSandboxProfileVersionPublishabilityResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody).toEqual({
+      publishable: true,
+      issues: [],
+    });
+  });
+
   it("compares drafts against the latest earlier published source version", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-version-publishability-pending-source@example.com",

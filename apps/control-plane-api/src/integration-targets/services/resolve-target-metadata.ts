@@ -1,5 +1,6 @@
 import type { IntegrationTarget as PersistedIntegrationTarget } from "@mistle/db/control-plane";
 import type {
+  IntegrationAssociatedResourceEventDefinition,
   IntegrationConnectionMethodDetailFieldSource,
   IntegrationConnectionMethodDetailFieldSourceLeaf,
   IntegrationConnectionMethodDetailMetadata,
@@ -111,6 +112,14 @@ type ResolvedWebhookEvent = {
   parameterGroups?: ResolvedWebhookEventParameterGroup[];
 };
 
+type ResolvedAssociatedResourceEvent = {
+  resourceKind: string;
+  eventType: string;
+  displayName: string;
+  parameters?: ResolvedWebhookEventParameter[];
+  parameterGroups?: ResolvedWebhookEventParameterGroup[];
+};
+
 export type ResolvedIntegrationTargetMetadata = {
   kind: IntegrationKind;
   displayName: string;
@@ -179,6 +188,7 @@ export type ResolvedIntegrationTargetMetadata = {
     requiresSourceSelection: boolean;
   };
   supportedWebhookEvents?: ResolvedWebhookEvent[];
+  supportedAssociatedResourceEvents?: ResolvedAssociatedResourceEvent[];
 };
 
 type ResolvedSetupCompletionRequirement =
@@ -681,6 +691,28 @@ function cloneWebhookEvents(
   }));
 }
 
+function cloneAssociatedResourceEvents(
+  events: readonly IntegrationAssociatedResourceEventDefinition[],
+): ResolvedAssociatedResourceEvent[] {
+  return events.map((eventDefinition) => ({
+    resourceKind: eventDefinition.resourceKind,
+    eventType: eventDefinition.eventType,
+    displayName: eventDefinition.displayName,
+    ...(eventDefinition.parameters === undefined
+      ? {}
+      : {
+          parameters: eventDefinition.parameters.map((parameter) =>
+            cloneWebhookEventParameter(parameter),
+          ),
+        }),
+    ...(eventDefinition.parameterGroups === undefined
+      ? {}
+      : {
+          parameterGroups: cloneWebhookEventParameterGroups(eventDefinition.parameterGroups),
+        }),
+  }));
+}
+
 export function resolveTargetMetadata(input: {
   familyId: string;
   variantId: string;
@@ -744,6 +776,13 @@ function buildResolvedIntegrationTargetMetadata(input: {
       ? {}
       : {
           supportedWebhookEvents: cloneWebhookEvents(input.definition.supportedWebhookEvents),
+        }),
+    ...(input.definition.associatedResourceEvents?.supportedEvents === undefined
+      ? {}
+      : {
+          supportedAssociatedResourceEvents: cloneAssociatedResourceEvents(
+            input.definition.associatedResourceEvents.supportedEvents,
+          ),
         }),
   };
 }

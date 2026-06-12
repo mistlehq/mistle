@@ -1,7 +1,7 @@
 import { TriggerKinds, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { parseWebhookPayloadFilter } from "@mistle/webhooks";
 
-import { evaluateWebhookPayloadFilter } from "./evaluator.js";
+import { evaluateWebhookPayloadFilter } from "../shared/webhook-payload-filter-evaluator.js";
 
 type ResolveWebhookTriggerTargetsInput = {
   organizationId: string;

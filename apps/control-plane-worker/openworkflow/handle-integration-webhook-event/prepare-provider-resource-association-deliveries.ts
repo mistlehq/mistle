@@ -10,14 +10,13 @@ import {
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import {
-  type AssociatedResourceEventRouting,
-  type AssociatedResourceEventType,
   type AssociatedResourceWebhookObservation,
   type IntegrationAssociatedResourceEventsCapability,
   type IntegrationRegistry,
 } from "@mistle/integrations-core";
 import { sql } from "drizzle-orm";
 
+import { supportsAssociatedResourceEvent } from "../shared/associated-resource-routing.js";
 import { logWebhookDeliveryEvent } from "../shared/webhook-delivery-telemetry.js";
 
 export type QueuedProviderResourceAssociationDelivery = {
@@ -80,6 +79,7 @@ export async function prepareProviderResourceAssociationDeliveries(
       sandboxInstance !== null &&
       !supportsAssociatedResourceEvent({
         eventType: observedEvent.observation.eventType,
+        payload: input.webhookEvent.payload,
         resourceKind: observedEvent.observation.resourceKind,
         routing: sandboxInstance.associatedResourceEventRouting,
       })
@@ -202,21 +202,6 @@ async function observeAssociatedResourceEvent(
     connection,
     observation,
   };
-}
-
-function supportsAssociatedResourceEvent(input: {
-  eventType: AssociatedResourceEventType;
-  resourceKind: string;
-  routing: AssociatedResourceEventRouting | null;
-}): boolean {
-  if (input.routing === null || !input.routing.enabled) {
-    return false;
-  }
-
-  return input.routing.resources.some(
-    (resource) =>
-      resource.resourceKind === input.resourceKind && resource.eventTypes.includes(input.eventType),
-  );
 }
 
 async function isSelfAuthoredAssociatedResourceEvent(

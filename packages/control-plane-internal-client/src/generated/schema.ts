@@ -848,6 +848,9 @@ export interface paths {
                       | "github.pull_request.review.submitted"
                       | "github.pull_request.review_comment.created"
                     )[];
+                    payloadFilter?: {
+                      [key: string]: unknown;
+                    };
                     /** @enum {string} */
                     resourceKind: "github.pull_request";
                   }[];
@@ -1169,6 +1172,9 @@ export interface paths {
                     | "github.pull_request.review.submitted"
                     | "github.pull_request.review_comment.created"
                   )[];
+                  payloadFilter?: {
+                    [key: string]: unknown;
+                  };
                   /** @enum {string} */
                   resourceKind: "github.pull_request";
                 }[];

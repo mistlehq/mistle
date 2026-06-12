@@ -5,7 +5,10 @@ import {
   type AssociatedResourceProviderActor,
   type AssociatedResourceEventType,
   type AssociatedResourceSelfAuthorshipInput,
+  type IntegrationAssociatedResourceEventDefinition,
   type IntegrationAssociatedResourceEventsCapability,
+  type IntegrationWebhookEventDefinition,
+  type IntegrationWebhookEventParameterGroupDefinition,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
@@ -14,6 +17,7 @@ import {
   type GitHubConnectionConfig,
 } from "./auth.js";
 import { createGitHubPullRequestProviderResourceId } from "./provider-resource-associations.js";
+import { GitHubSupportedWebhookEvents } from "./supported-webhook-events.js";
 
 const GitHubIssueCommentPullRequestPayloadSchema = z.looseObject({
   issue: z.looseObject({
@@ -89,9 +93,92 @@ export type GitHubAssociatedResourceWebhookObservation = {
 
 export const GitHubAssociatedResourceEventsCapability: IntegrationAssociatedResourceEventsCapability<GitHubConnectionConfig> =
   {
+    supportedEvents: createGitHubAssociatedResourceEventDefinitions(),
     observeWebhookEvent: observeGitHubAssociatedResourceFromWebhookEvent,
     isSelfAuthoredEvent: isSelfAuthoredGitHubAssociatedResourceEvent,
   };
+
+function createGitHubAssociatedResourceEventDefinitions(): IntegrationAssociatedResourceEventDefinition[] {
+  return [
+    createGitHubAssociatedResourceEventDefinition({
+      associationEventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+      displayName: "PR comments",
+      omittedParameterIds: new Set(["target"]),
+      webhookEventType: "github.issue_comment.created",
+    }),
+    createGitHubAssociatedResourceEventDefinition({
+      associationEventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+      displayName: "PR reviews",
+      omittedParameterIds: new Set(),
+      webhookEventType: "github.pull_request_review.submitted",
+    }),
+    createGitHubAssociatedResourceEventDefinition({
+      associationEventType: AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
+      displayName: "Review comments",
+      omittedParameterIds: new Set(),
+      webhookEventType: "github.pull_request_review_comment.created",
+    }),
+  ];
+}
+
+function createGitHubAssociatedResourceEventDefinition(input: {
+  associationEventType: AssociatedResourceEventType;
+  displayName: string;
+  omittedParameterIds: ReadonlySet<string>;
+  webhookEventType: string;
+}): IntegrationAssociatedResourceEventDefinition {
+  const webhookEventDefinition = resolveGitHubWebhookEventDefinition(input.webhookEventType);
+  const parameters = (webhookEventDefinition.parameters ?? []).filter(
+    (parameter) => !input.omittedParameterIds.has(parameter.id),
+  );
+  const parameterIds = new Set(parameters.map((parameter) => parameter.id));
+  const parameterGroups = filterParameterGroupsForParameters({
+    parameterGroups: webhookEventDefinition.parameterGroups ?? [],
+    parameterIds,
+  });
+
+  return {
+    resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+    eventType: input.associationEventType,
+    displayName: input.displayName,
+    ...(parameters.length === 0 ? {} : { parameters }),
+    ...(parameterGroups.length === 0 ? {} : { parameterGroups }),
+  };
+}
+
+function resolveGitHubWebhookEventDefinition(eventType: string): IntegrationWebhookEventDefinition {
+  const eventDefinition = GitHubSupportedWebhookEvents.find(
+    (candidate) => candidate.eventType === eventType,
+  );
+  if (eventDefinition === undefined) {
+    throw new Error(`GitHub webhook event definition '${eventType}' was not found.`);
+  }
+
+  return eventDefinition;
+}
+
+function filterParameterGroupsForParameters(input: {
+  parameterGroups: readonly IntegrationWebhookEventParameterGroupDefinition[];
+  parameterIds: ReadonlySet<string>;
+}): IntegrationWebhookEventParameterGroupDefinition[] {
+  return input.parameterGroups.flatMap((parameterGroup) => {
+    const options = parameterGroup.options.filter((option) =>
+      input.parameterIds.has(option.parameterId),
+    );
+    if (options.length < 2) {
+      return [];
+    }
+
+    return [
+      {
+        id: parameterGroup.id,
+        label: parameterGroup.label,
+        kind: parameterGroup.kind,
+        options,
+      },
+    ];
+  });
+}
 
 export function observeGitHubAssociatedResourceFromWebhookEvent(input: {
   eventType: string;

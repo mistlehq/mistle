@@ -2,7 +2,6 @@ import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-interna
 import { type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type {
   AgentRuntimeReader,
-  AssociatedResourceEventRouting,
   AssociatedResourceWebhookObservation,
   CompiledAgentRuntime,
   CompiledRuntimePlan,
@@ -10,6 +9,7 @@ import type {
 } from "@mistle/integrations-core";
 import { supportsAssociatedResourceDeliveryRuntime } from "@mistle/integrations-core";
 
+import { supportsAssociatedResourceEvent } from "../shared/associated-resource-routing.js";
 import {
   ProviderResourceAssociationDeliveryError,
   ProviderResourceAssociationDeliveryFailureCodes,
@@ -94,6 +94,7 @@ export async function resolveProviderResourceAssociationDeliveryTarget(
     if (
       !supportsAssociatedResourceEvent({
         eventType: observedEvent.eventType,
+        payload: observedEvent.payload,
         resourceKind: association.resourceKind,
         routing: sandboxInstance.runtimePlan.associatedResourceEventRouting,
       })
@@ -131,7 +132,7 @@ async function resolveAssociatedResourceEventFromWebhook(
     sourceWebhookEventId: string;
     targetKey: string;
   },
-): Promise<AssociatedResourceWebhookObservation> {
+): Promise<AssociatedResourceWebhookObservation & { payload: Record<string, unknown> }> {
   const webhookEvent = await db.query.integrationWebhookEvents.findFirst({
     columns: {
       eventType: true,
@@ -184,23 +185,10 @@ async function resolveAssociatedResourceEventFromWebhook(
     });
   }
 
-  return observedEvent;
-}
-
-function supportsAssociatedResourceEvent(input: {
-  eventType: string;
-  resourceKind: string;
-  routing: AssociatedResourceEventRouting | null;
-}): boolean {
-  if (input.routing === null || !input.routing.enabled) {
-    return false;
-  }
-
-  return input.routing.resources.some(
-    (resource) =>
-      resource.resourceKind === input.resourceKind &&
-      resource.eventTypes.some((eventType) => eventType === input.eventType),
-  );
+  return {
+    ...observedEvent,
+    payload: webhookEvent.payload,
+  };
 }
 
 function resolveAssociationRuntimeContext(input: {

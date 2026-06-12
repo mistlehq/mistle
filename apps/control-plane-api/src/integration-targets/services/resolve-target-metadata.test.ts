@@ -77,6 +77,48 @@ describe("resolveTargetMetadata", () => {
     );
   });
 
+  it("preserves associated resource event filter metadata from integration definitions", () => {
+    const metadata = resolveTargetMetadata({
+      familyId: "github",
+      variantId: "github-cloud",
+      displayNameOverride: null,
+      descriptionOverride: null,
+    });
+
+    expect(metadata.supportedAssociatedResourceEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          resourceKind: "github.pull_request",
+          eventType: "github.pull_request.issue_comment.created",
+          displayName: "PR comments",
+          parameters: expect.arrayContaining([
+            expect.objectContaining({
+              id: "repository",
+              payloadPath: ["repository", "full_name"],
+            }),
+            expect.objectContaining({
+              id: "commenter",
+              payloadPath: ["sender", "login"],
+            }),
+            expect.objectContaining({
+              id: "invocationToken",
+              payloadPath: ["comment", "body"],
+              matchMode: "contains_token",
+            }),
+          ]),
+        }),
+      ]),
+    );
+
+    const issueCommentEvent = metadata.supportedAssociatedResourceEvents?.find(
+      (eventDefinition) =>
+        eventDefinition.eventType === "github.pull_request.issue_comment.created",
+    );
+    expect(issueCommentEvent?.parameters?.some((parameter) => parameter.id === "target")).toBe(
+      false,
+    );
+  });
+
   it("preserves setup start form default values from integration definitions", () => {
     const metadata = resolveTargetMetadata({
       familyId: "github",

@@ -14,6 +14,8 @@ import {
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import {
   AssociatedProviderResourceKinds,
+  AssociatedResourceEventTypes,
+  type AssociatedResourceEventRouting,
   createDisabledAssociatedResourceEventRouting,
 } from "@mistle/integrations-core";
 import { createDefinitionsBundle } from "@mistle/integrations-definitions/server";
@@ -372,6 +374,100 @@ describe.concurrent("provider resource association delivery", () => {
     });
   });
 
+  it("fails explicitly when the associated sandbox routing filter excludes the delivery event", async ({
+    env,
+  }) => {
+    const scope = await seedAssociationDeliveryScope({
+      env,
+      suffix: createSuffix("event_route_filter_excluded"),
+    });
+    await insertSandboxInstance(env, scope, {
+      associatedResourceEventRouting: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+            eventTypes: [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED],
+            payloadFilter: {
+              [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED]: {
+                op: "contains_token",
+                path: ["comment", "body"],
+                value: "@mistle",
+              },
+            },
+          },
+        ],
+      },
+    });
+    await insertAssociationDelivery({
+      env,
+      scope,
+      deliveryId: "prd_event_route_filter_excluded",
+      webhookEventId: "iwe_event_route_filter_excluded",
+      sourceOrderKey: "2026-03-09T00:00:00Z#0001",
+    });
+
+    await expect(
+      resolveProviderResourceAssociationDeliveryTarget(createRouteResolverContext(env), {
+        providerResourceAssociationId: scope.providerResourceAssociationId,
+        sourceWebhookEventId: "iwe_event_route_filter_excluded",
+      }),
+    ).rejects.toMatchObject({
+      code: ProviderResourceAssociationDeliveryFailureCodes.ROUTING_EVENT_NOT_ENABLED,
+    });
+  });
+
+  it("resolves the delivery target when any duplicate routing rule allows the event", async ({
+    env,
+  }) => {
+    const scope = await seedAssociationDeliveryScope({
+      env,
+      suffix: createSuffix("event_route_duplicate_rule_allowed"),
+    });
+    await insertSandboxInstance(env, scope, {
+      associatedResourceEventRouting: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+            eventTypes: [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED],
+            payloadFilter: {
+              [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED]: {
+                op: "contains_token",
+                path: ["comment", "body"],
+                value: "@mistle",
+              },
+            },
+          },
+          {
+            resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+            eventTypes: [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED],
+          },
+        ],
+      },
+    });
+    await insertAssociationDelivery({
+      env,
+      scope,
+      deliveryId: "prd_event_route_duplicate_rule_allowed",
+      webhookEventId: "iwe_event_route_duplicate_rule_allowed",
+      sourceOrderKey: "2026-03-09T00:00:00Z#0001",
+    });
+
+    const resolvedTarget = await resolveProviderResourceAssociationDeliveryTarget(
+      createRouteResolverContext(env),
+      {
+        providerResourceAssociationId: scope.providerResourceAssociationId,
+        sourceWebhookEventId: "iwe_event_route_duplicate_rule_allowed",
+      },
+    );
+
+    expect(resolvedTarget).toMatchObject({
+      providerResourceAssociationId: scope.providerResourceAssociationId,
+      sandboxInstanceId: scope.sandboxInstanceId,
+    });
+  });
+
   it("fails explicitly when the associated sandbox has no association-delivery runtime", async ({
     env,
   }) => {
@@ -567,6 +663,7 @@ async function insertSandboxInstance(
   env: IntegrationTestEnvironment,
   input: AssociationDeliveryScope,
   options: {
+    associatedResourceEventRouting?: AssociatedResourceEventRouting;
     emptyCompiledCapabilities?: boolean;
     includeSecondAssociatedResourceRuntime?: boolean;
     omitCompiledCapabilities?: boolean;
@@ -595,6 +692,9 @@ async function insertSandboxInstance(
         options.includeSecondAssociatedResourceRuntime === true,
       omitCompiledCapabilities: options.omitCompiledCapabilities === true,
       runtimeId: options.runtimeId ?? "codex",
+      ...(options.associatedResourceEventRouting === undefined
+        ? {}
+        : { associatedResourceEventRouting: options.associatedResourceEventRouting }),
     }),
     compiledFromProfileId: input.sandboxProfileId,
     compiledFromProfileVersion: 1,
@@ -608,6 +708,7 @@ function createRuntimePlan(
     includeSecondAssociatedResourceRuntime: boolean;
     omitCompiledCapabilities: boolean;
     runtimeId: "codex" | "opencode" | "pi" | "unsupported";
+    associatedResourceEventRouting?: AssociatedResourceEventRouting;
   },
 ) {
   const runtimeId = options.runtimeId;
@@ -681,7 +782,8 @@ function createRuntimePlan(
     egressRoutes: [],
     artifacts: [],
     runtimeClients: [],
-    associatedResourceEventRouting: createDisabledAssociatedResourceEventRouting(),
+    associatedResourceEventRouting:
+      options.associatedResourceEventRouting ?? createDisabledAssociatedResourceEventRouting(),
     workspaceSources: [],
     agentRuntimes: options.includeSecondAssociatedResourceRuntime
       ? [agentRuntime, secondAgentRuntime]

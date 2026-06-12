@@ -1,0 +1,5 @@
+# Associated Resource Event Routing Reuses Webhook Filter Definitions
+
+Associated resource event routing stores association event filters as event-scoped webhook payload filters on the sandbox profile version routing config, using association event type keys rather than trigger event type keys. Provider definitions expose supported association event metadata through a first-class `supportedAssociatedResourceEvents` integration target field, and providers may build that metadata by projecting from existing webhook event definitions when the associated event is filtered against the same raw provider webhook payload. This keeps association routing separate from trigger configuration while reusing the provider-owned parameter definitions and payload-filter semantics that already describe GitHub webhook fields.
+
+Projection may omit webhook parameters that are guaranteed by the associated event itself. For example, GitHub pull request issue-comment association events are already limited to issue comments on pull requests, so the projected association filter controls should not expose a separate issue-vs-pull-request target choice.

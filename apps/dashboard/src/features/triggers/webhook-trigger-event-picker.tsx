@@ -68,7 +68,7 @@ export function WebhookTriggerEventPicker(input: {
   disabledState?: WebhookTriggerEventPickerDisabledState | null;
   eventParameterRules: WebhookTriggerEventParameterRuleMap;
   error: string | undefined;
-  onValueChange: (value: string[]) => void;
+  onValueChange?: (value: string[]) => void;
   onEventParameterRuleChange: (input: {
     triggerId: string;
     parameterId: string;
@@ -78,6 +78,7 @@ export function WebhookTriggerEventPicker(input: {
     triggerId: string;
     rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>;
   }) => void;
+  selectedEventPresentation?: "cards" | "parameters-only";
   showAddTriggerControl?: boolean;
 }): React.JSX.Element {
   const pickerState = resolveWebhookTriggerEventPickerState({
@@ -91,6 +92,22 @@ export function WebhookTriggerEventPicker(input: {
     selectedEventIds: input.selectedEventIds,
   });
   const emptyStateMessage = input.error === undefined ? "No events added yet." : input.error;
+  const selectedEventControlsDisabled =
+    input.disabledState !== undefined && input.disabledState !== null;
+
+  function handleValueChange(value: string[]): void {
+    if (selectedEventControlsDisabled) {
+      return;
+    }
+
+    if (input.onValueChange === undefined) {
+      throw new Error(
+        "Webhook trigger event picker value changes require an onValueChange handler.",
+      );
+    }
+
+    input.onValueChange(value);
+  }
 
   return (
     <div className="space-y-3">
@@ -99,7 +116,7 @@ export function WebhookTriggerEventPicker(input: {
           error={input.error}
           eventOptions={input.eventOptions}
           hasConnectedIntegrations={input.hasConnectedIntegrations}
-          onValueChange={input.onValueChange}
+          onValueChange={handleValueChange}
           selectedEventIds={input.selectedEventIds}
           variant="inline"
         />
@@ -122,6 +139,36 @@ export function WebhookTriggerEventPicker(input: {
             {emptyStateMessage}
           </Notice>
         )
+      ) : input.selectedEventPresentation === "parameters-only" ? (
+        <div className="space-y-3">
+          {selectedEventOptions.map((option) => (
+            <div className="space-y-3" key={option.id}>
+              <EventParameterFields
+                connectionId={input.selectedConnectionId}
+                disabled={selectedEventControlsDisabled}
+                eventOption={option}
+                rules={input.eventParameterRules[option.id] ?? {}}
+                onRuleChange={(parameterId, rule) => {
+                  input.onEventParameterRuleChange({
+                    triggerId: option.id,
+                    parameterId,
+                    rule,
+                  });
+                }}
+                onRulesChange={(rules) => {
+                  input.onEventParameterRulesChange({
+                    triggerId: option.id,
+                    rules,
+                  });
+                }}
+              />
+              {isWebhookTriggerEventOptionUnavailable(option) &&
+              option.description !== undefined ? (
+                <p className="text-destructive text-sm">{option.description}</p>
+              ) : null}
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="space-y-1.5">
           {selectedEventOptions.map((option) => (
@@ -151,8 +198,9 @@ export function WebhookTriggerEventPicker(input: {
                 <Button
                   aria-label={`Remove ${option.label} event`}
                   className="size-7 shrink-0 self-start"
+                  disabled={selectedEventControlsDisabled}
                   onClick={() => {
-                    input.onValueChange(
+                    handleValueChange(
                       input.selectedEventIds.filter(
                         (selectedTriggerId) => selectedTriggerId !== option.id,
                       ),
@@ -167,6 +215,7 @@ export function WebhookTriggerEventPicker(input: {
               </div>
               <EventParameterFields
                 connectionId={input.selectedConnectionId}
+                disabled={selectedEventControlsDisabled}
                 eventOption={option}
                 rules={input.eventParameterRules[option.id] ?? {}}
                 onRuleChange={(parameterId, rule) => {
@@ -238,6 +287,7 @@ function resolveOneOfParameterGroupOptions(input: {
 
 function EventParameterFields(input: {
   connectionId: string;
+  disabled: boolean;
   eventOption: WebhookTriggerEventOption;
   rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>;
   onRuleChange: (parameterId: string, rule: WebhookTriggerEventParameterRule) => void;
@@ -264,6 +314,7 @@ function EventParameterFields(input: {
           return (
             <OneOfParameterGroupField
               connectionId={input.connectionId}
+              disabled={input.disabled}
               eventType={input.eventOption.eventType}
               group={parameterGroup}
               key={`${input.eventOption.id}:group:${parameterGroup.id}`}
@@ -278,6 +329,7 @@ function EventParameterFields(input: {
         return (
           <EventParameterField
             connectionId={input.connectionId}
+            disabled={input.disabled}
             eventType={input.eventOption.eventType}
             key={`${input.eventOption.id}:${parameter.id}`}
             onRuleChange={(rule) => {
@@ -462,6 +514,7 @@ export function resolveOneOfParameterGroupRulesAfterSelection(input: {
 }
 
 function StringEqualityParameterValueField(input: {
+  disabled: boolean;
   parameter: StringWebhookTriggerEventParameter;
   rule: WebhookTriggerEventParameterRule | undefined;
   value: string;
@@ -470,6 +523,7 @@ function StringEqualityParameterValueField(input: {
   return (
     <Input
       className={EventParameterControlClassName}
+      disabled={input.disabled}
       onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
         input.onRuleChange({
           operator: resolveEqualityOperator(input.rule),
@@ -483,6 +537,7 @@ function StringEqualityParameterValueField(input: {
 }
 
 function EnumSelectParameterValueField(input: {
+  disabled: boolean;
   eventType: string;
   parameter: EnumSelectWebhookTriggerEventParameter;
   value: string;
@@ -490,6 +545,7 @@ function EnumSelectParameterValueField(input: {
 }): React.JSX.Element {
   return (
     <Select
+      disabled={input.disabled}
       modal={false}
       onValueChange={(value) => {
         input.onRuleChange(
@@ -501,7 +557,7 @@ function EnumSelectParameterValueField(input: {
       }}
       value={input.value.length === 0 ? null : input.value}
     >
-      <SelectTrigger className={EventParameterControlClassName}>
+      <SelectTrigger className={EventParameterControlClassName} disabled={input.disabled}>
         <SelectValue placeholder={input.parameter.placeholder ?? `Any ${input.parameter.label}`}>
           {input.parameter.options.find((option) => option.value === input.value)?.label}
         </SelectValue>
@@ -522,6 +578,7 @@ function EnumSelectParameterValueField(input: {
 
 function OneOfParameterGroupField(input: {
   connectionId: string;
+  disabled: boolean;
   eventType: string;
   group: WebhookTriggerEventParameterGroup;
   parameters: readonly WebhookTriggerEventParameter[];
@@ -592,6 +649,7 @@ function OneOfParameterGroupField(input: {
   return (
     <div className={EventParameterRowClassName}>
       <Select
+        disabled={input.disabled}
         modal={false}
         onValueChange={(value) => {
           if (value === null) {
@@ -607,7 +665,7 @@ function OneOfParameterGroupField(input: {
         }}
         value={selectedParameter.id}
       >
-        <SelectTrigger className="w-36 shrink-0">
+        <SelectTrigger className="w-36 shrink-0" disabled={input.disabled}>
           <SelectValue>{selectedOption.label}</SelectValue>
         </SelectTrigger>
         <SelectContent>
@@ -622,6 +680,7 @@ function OneOfParameterGroupField(input: {
         </SelectContent>
       </Select>
       <EqualityOperatorSelect
+        disabled={input.disabled}
         includePrefix={false}
         parameter={selectedParameter}
         value={resolveEqualityOperator(selectedRule)}
@@ -639,6 +698,7 @@ function OneOfParameterGroupField(input: {
             inputId={inputId}
             inputLabel={selectedParameter.label}
             inputWrapperClassName="w-full"
+            disabled={input.disabled}
             onChange={(value) => {
               input.onRuleChange(selectedParameter.id, {
                 operator: resolveEqualityOperator(selectedRule),
@@ -670,6 +730,7 @@ function OneOfParameterGroupField(input: {
           parameter={selectedParameter}
           rule={selectedRule}
           value={selectedValue}
+          disabled={input.disabled}
           onRuleChange={(rule) => {
             input.onRuleChange(selectedParameter.id, {
               operator: rule.operator,
@@ -682,6 +743,7 @@ function OneOfParameterGroupField(input: {
           eventType={input.eventType}
           parameter={selectedParameter}
           value={selectedValue}
+          disabled={input.disabled}
           onRuleChange={(rule) => {
             input.onRuleChange(selectedParameter.id, rule);
           }}
@@ -713,6 +775,7 @@ function resolveResourceParameterErrorMessage(input: {
 
 function EventParameterField(input: {
   connectionId: string;
+  disabled: boolean;
   eventType: string;
   parameter: NonNullable<WebhookTriggerEventOption["parameters"]>[number];
   rule: WebhookTriggerEventParameterRule | undefined;
@@ -770,7 +833,9 @@ function EventParameterField(input: {
             </Tooltip>
           </span>
           <Input
+            aria-label={input.parameter.label}
             className={EventParameterControlClassName}
+            disabled={input.disabled}
             onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
               input.onRuleChange({
                 operator: WebhookTriggerEventParameterRuleOperators.CONTAINS_TOKEN,
@@ -788,6 +853,7 @@ function EventParameterField(input: {
       return (
         <span className={EventParameterRowClassName}>
           <EqualityOperatorSelect
+            disabled={input.disabled}
             parameter={input.parameter}
             value={resolveEqualityOperator(input.rule)}
             onValueChange={(operator) => {
@@ -801,6 +867,7 @@ function EventParameterField(input: {
             parameter={input.parameter}
             rule={input.rule}
             value={value}
+            disabled={input.disabled}
             onRuleChange={input.onRuleChange}
           />
         </span>
@@ -814,6 +881,7 @@ function EventParameterField(input: {
         </span>
         <Input
           className={EventParameterControlClassName}
+          disabled={input.disabled}
           onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
             input.onRuleChange({
               operator: WebhookTriggerEventParameterRuleOperators.CONTAINS,
@@ -836,6 +904,7 @@ function EventParameterField(input: {
           eventType={input.eventType}
           parameter={parameter}
           value={value}
+          disabled={input.disabled}
           onRuleChange={input.onRuleChange}
         />
       </span>
@@ -860,6 +929,7 @@ function EventParameterField(input: {
   return (
     <ResourceSelectParameterField
       key={`${input.connectionId}:${value}:${resolvedSelectedResourceOption?.displayName ?? ""}`}
+      disabled={input.disabled}
       onRuleChange={input.onRuleChange}
       parameter={input.parameter}
       placeholder={placeholder}
@@ -927,6 +997,7 @@ function formatEqualityOperatorLabel(input: {
 }
 
 function EqualityOperatorSelect(input: {
+  disabled: boolean;
   parameter: NonNullable<WebhookTriggerEventOption["parameters"]>[number];
   value: "is" | "is_not";
   includePrefix?: boolean;
@@ -936,6 +1007,7 @@ function EqualityOperatorSelect(input: {
 
   return (
     <Select
+      disabled={input.disabled}
       modal={false}
       onValueChange={(value) => {
         if (
@@ -949,7 +1021,7 @@ function EqualityOperatorSelect(input: {
       }}
       value={input.value}
     >
-      <SelectTrigger className="w-24 shrink-0">
+      <SelectTrigger className="w-24 shrink-0" disabled={input.disabled}>
         <SelectValue>
           {formatEqualityOperatorLabel({
             parameter: input.parameter,
@@ -979,6 +1051,7 @@ function EqualityOperatorSelect(input: {
 }
 
 function ResourceSelectParameterField(input: {
+  disabled: boolean;
   parameter: Extract<
     NonNullable<WebhookTriggerEventOption["parameters"]>[number],
     { kind: "resource-select" }
@@ -998,6 +1071,7 @@ function ResourceSelectParameterField(input: {
   return (
     <span className={EventParameterRowClassName}>
       <EqualityOperatorSelect
+        disabled={input.disabled}
         parameter={input.parameter}
         value={resolveEqualityOperator(input.rule)}
         onValueChange={(operator) => {
@@ -1012,6 +1086,7 @@ function ResourceSelectParameterField(input: {
         inputId={inputId}
         inputLabel={input.parameter.label}
         inputWrapperClassName={EventParameterControlClassName}
+        disabled={input.disabled}
         onChange={(value) => {
           input.onRuleChange({
             operator: resolveEqualityOperator(input.rule),

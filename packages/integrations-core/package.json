@@ -40,6 +40,7 @@
   },
   "dependencies": {
     "@mistle/config": "workspace:*",
+    "@mistle/webhooks": "workspace:*",
     "smol-toml": "^1.6.1",
     "zod": "^4.4.3"
   }

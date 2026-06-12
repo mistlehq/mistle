@@ -4,11 +4,19 @@ import {
 } from "@mistle/integrations-core";
 import { Button } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useState } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { type ComponentProps, useState } from "react";
 import { expect, userEvent, within } from "storybook/test";
 
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
+import {
+  createIntegrationsEditorSectionStoryQueryClient,
+  seedStoryIntegrationResources,
+  StoryGithubConnection,
+  StoryGithubResources,
+  StoryGithubTarget,
+} from "./integrations-editor-section-story-support.js";
 import {
   SandboxProfileAssociatedResourceRoutingFieldGroup,
   type SandboxProfileAssociatedResourceRoutingDraftState,
@@ -19,6 +27,10 @@ type AssociatedResourceRoutingStoryArgs = {
   hasGitHubBinding: boolean;
   initialSaveError?: boolean;
   isDraft: boolean;
+  selectedConnectionId?: string | undefined;
+  supportedAssociatedResourceEvents?: ComponentProps<
+    typeof SandboxProfileAssociatedResourceRoutingFieldGroup
+  >["supportedAssociatedResourceEvents"];
   version: SandboxProfileVersion;
 };
 
@@ -37,6 +49,8 @@ const meta = {
     disabled: false,
     hasGitHubBinding: true,
     isDraft: true,
+    selectedConnectionId: StoryGithubConnection.id,
+    supportedAssociatedResourceEvents: StoryGithubTarget.supportedAssociatedResourceEvents,
     version: createStoryVersion({ associatedResourceEventRoutingConfig: {} }),
   },
 } satisfies Meta<AssociatedResourceRoutingStoryArgs>;
@@ -48,6 +62,14 @@ type Story = StoryObj<typeof meta>;
 function AssociatedResourceRoutingStory(
   args: AssociatedResourceRoutingStoryArgs,
 ): React.JSX.Element {
+  const [queryClient] = useState(() => {
+    const nextQueryClient = createIntegrationsEditorSectionStoryQueryClient();
+    seedStoryIntegrationResources({
+      queryClient: nextQueryClient,
+      resources: StoryGithubResources,
+    });
+    return nextQueryClient;
+  });
   const [draftState, setDraftState] =
     useState<SandboxProfileAssociatedResourceRoutingDraftState | null>(null);
 
@@ -56,27 +78,31 @@ function AssociatedResourceRoutingStory(
   }
 
   return (
-    <div className="flex w-full max-w-3xl flex-col gap-3">
-      <SandboxProfileAssociatedResourceRoutingFieldGroup
-        disabled={args.disabled}
-        hasGitHubBinding={args.hasGitHubBinding}
-        isDraft={args.isDraft}
-        onDraftStateChange={setDraftState}
-        version={args.version}
-      />
-      {args.initialSaveError === true ? (
-        <div>
-          <Button
-            disabled={draftState?.applyDraftSaveError === undefined}
-            onClick={handleApplySaveError}
-            type="button"
-            variant="outline"
-          >
-            Apply save error
-          </Button>
-        </div>
-      ) : null}
-    </div>
+    <QueryClientProvider client={queryClient}>
+      <div className="flex w-full max-w-3xl flex-col gap-3">
+        <SandboxProfileAssociatedResourceRoutingFieldGroup
+          disabled={args.disabled}
+          hasGitHubBinding={args.hasGitHubBinding}
+          isDraft={args.isDraft}
+          onDraftStateChange={setDraftState}
+          selectedConnectionId={args.selectedConnectionId}
+          supportedAssociatedResourceEvents={args.supportedAssociatedResourceEvents}
+          version={args.version}
+        />
+        {args.initialSaveError === true ? (
+          <div>
+            <Button
+              disabled={draftState?.applyDraftSaveError === undefined}
+              onClick={handleApplySaveError}
+              type="button"
+              variant="outline"
+            >
+              Apply save error
+            </Button>
+          </div>
+        ) : null}
+      </div>
+    </QueryClientProvider>
   );
 }
 
@@ -98,6 +124,45 @@ export const NarrowedPullRequestEvents: Story = {
         ],
       },
     }),
+  },
+};
+
+export const FilteredPullRequestComments: Story = {
+  args: {
+    version: createStoryVersion({
+      associatedResourceEventRoutingConfig: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+            eventTypes: [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED],
+            payloadFilter: {
+              [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED]: {
+                op: "and",
+                filters: [
+                  {
+                    op: "contains_token",
+                    path: ["comment", "body"],
+                    value: "@mistle",
+                  },
+                  {
+                    op: "eq",
+                    path: ["repository", "full_name"],
+                    value: "mistlehq/platform",
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      },
+    }),
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: "Configure Agent PR activity" }));
+    await expect(canvas.getByRole("checkbox", { name: "PR comments" })).toBeVisible();
   },
 };
 
@@ -145,7 +210,8 @@ export const SaveErrorAfterDraftChange: Story = {
   play: async ({ canvasElement }): Promise<void> => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByRole("switch", { name: "Agent PR activity" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Configure Agent PR activity" }));
+    await userEvent.click(canvas.getByRole("checkbox", { name: "Review comments" }));
     await userEvent.click(canvas.getByRole("button", { name: "Apply save error" }));
 
     await expect(canvas.getByText("Storybook could not save routing changes.")).toBeVisible();

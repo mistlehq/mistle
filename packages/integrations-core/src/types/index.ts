@@ -1,3 +1,4 @@
+import type { WebhookPayloadFilter } from "@mistle/webhooks";
 import type { z } from "zod";
 
 import type { AgentRuntimeRegistry } from "../agent-runtimes/index.js";
@@ -2104,6 +2105,9 @@ export type AssociatedResourceEventType =
 export type AssociatedResourceEventRoutingResourceRule = {
   resourceKind: AssociatedProviderResourceKind;
   eventTypes: ReadonlyArray<AssociatedResourceEventType>;
+  payloadFilter?:
+    | Readonly<Partial<Record<AssociatedResourceEventType, WebhookPayloadFilter>>>
+    | undefined;
 };
 
 export type AssociatedResourceEventRouting = {
@@ -2144,12 +2148,21 @@ export type AssociatedResourceSelfAuthorshipInput<TConnectionConfig = Record<str
 export type IntegrationAssociatedResourceEventsCapability<
   TConnectionConfig = Record<string, unknown>,
 > = {
+  supportedEvents?: ReadonlyArray<IntegrationAssociatedResourceEventDefinition> | undefined;
   observeWebhookEvent(
     input: AssociatedResourceWebhookObservationInput,
   ): MaybePromise<AssociatedResourceWebhookObservation | null>;
   isSelfAuthoredEvent?(
     input: AssociatedResourceSelfAuthorshipInput<TConnectionConfig>,
   ): MaybePromise<boolean>;
+};
+
+export type IntegrationAssociatedResourceEventDefinition = {
+  resourceKind: AssociatedProviderResourceKind;
+  eventType: AssociatedResourceEventType;
+  displayName: string;
+  parameters?: ReadonlyArray<IntegrationWebhookEventParameterDefinition> | undefined;
+  parameterGroups?: ReadonlyArray<IntegrationWebhookEventParameterGroupDefinition> | undefined;
 };
 
 export type SandboxProfileAssociatedResourceEventRoutingConfig = {

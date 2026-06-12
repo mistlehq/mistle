@@ -3006,6 +3006,10 @@
                                       ]
                                     },
                                     "minItems": 1
+                                  },
+                                  "payloadFilter": {
+                                    "type": "object",
+                                    "additionalProperties": {}
                                   }
                                 },
                                 "required": ["resourceKind", "eventTypes"],
@@ -3467,6 +3471,10 @@
                                   ]
                                 },
                                 "minItems": 1
+                              },
+                              "payloadFilter": {
+                                "type": "object",
+                                "additionalProperties": {}
                               }
                             },
                             "required": ["resourceKind", "eventTypes"],

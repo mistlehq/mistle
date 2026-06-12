@@ -1377,6 +1377,13 @@
                         "github.pull_request.review_comment.created"
                       ]
                     }
+                  },
+                  "payloadFilter": {
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {},
+                    "type": "object"
                   }
                 },
                 "required": ["resourceKind", "eventTypes"],
