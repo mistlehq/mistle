@@ -37,6 +37,10 @@ describe("SlackAppManifestTemplate", () => {
           request_url: "https://mistle.example.com/api/integrations/slack/webhook",
           bot_events: [
             "app_mention",
+            "channel_archive",
+            "channel_created",
+            "channel_rename",
+            "group_rename",
             "message.channels",
             "message.groups",
             "reaction_added",
@@ -69,6 +73,18 @@ describe("SlackAppManifestTemplate", () => {
         },
       },
     });
+  });
+
+  it("subscribes to every Events API-compatible Slack event that can trigger resource sync", () => {
+    const botEvents = SlackAppManifestTemplate.settings.event_subscriptions.bot_events;
+    const eventsApiResourceSyncEvents = [
+      "channel_archive",
+      "channel_created",
+      "channel_rename",
+      "group_rename",
+    ];
+
+    expect(botEvents).toEqual(expect.arrayContaining(eventsApiResourceSyncEvents));
   });
 });
 
@@ -103,6 +119,10 @@ describe("buildSlackAppManifest", () => {
             "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_123",
           bot_events: [
             "app_mention",
+            "channel_archive",
+            "channel_created",
+            "channel_rename",
+            "group_rename",
             "message.channels",
             "message.groups",
             "reaction_added",

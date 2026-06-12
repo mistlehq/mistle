@@ -13,6 +13,10 @@ export const SlackAppManifestBotScopes = [
 
 export const SlackAppManifestBotEvents = [
   "app_mention",
+  "channel_archive",
+  "channel_created",
+  "channel_rename",
+  "group_rename",
   "message.channels",
   "message.groups",
   "reaction_added",
