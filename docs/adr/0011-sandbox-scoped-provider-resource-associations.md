@@ -18,7 +18,7 @@ Association-backed delivery preserves ordering per provider resource association
 
 Webhook ingestion synchronously creates durable association delivery rows for accepted association-backed provider events, then hands off processing asynchronously. Agent message delivery is not performed inline with the provider webhook response.
 
-The same provider webhook event can produce both Trigger runs and association deliveries. Trigger delivery and association-backed delivery represent different configured intents and maintain separate idempotency scopes.
+The same provider webhook event can match both Trigger configuration and association-backed routing. Trigger delivery and association-backed delivery represent different configured intents and maintain separate idempotency scopes, but association-backed delivery wins when both matches would submit provider follow-up work into the same sandbox session for the same provider webhook event. In that collision case, the duplicate Trigger match is not materialized as a Trigger run unless product behavior later introduces an explicit "deliver both" configuration.
 
 Association-backed delivery uses association delivery context rather than trigger delivery context. The runtime-visible metadata is anchored to the provider resource association, association delivery, source webhook event, sandbox instance, and trace context; it does not synthesize trigger run or trigger conversation identifiers.
 

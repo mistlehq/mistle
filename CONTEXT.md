@@ -465,6 +465,17 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - First-pass **Association registration** creates **Provider resource associations** only for GitHub pull requests created through managed egress.
 - First-pass **Association registration** is reported directly from the data-plane gateway to the control plane.
 - The control plane owns **Provider resource association** records even when they reference data-plane sandbox instances.
+- A provider webhook event may produce both a **Trigger run** and an **Association delivery**, but it should not produce duplicate **Runtime user messages** in the same **Sandbox session** unless those messages are explicitly configured as distinct.
+- When a provider webhook event would otherwise produce duplicate **Runtime user messages** in the same **Sandbox session**, the **Association delivery** is the preferred delivery because it represents the associated provider-resource loop.
+- When an **Association delivery** is preferred for a provider webhook event, the duplicate **Trigger** match is not represented as a **Trigger run**.
+- Early duplicate **Trigger** suppression depends on an existing **Trigger conversation** route to the same **Sandbox session** as the **Association delivery**; shared **Referenced sandbox profile version** lineage alone does not make two deliveries duplicates.
+- A **Trigger** match without an existing **Trigger conversation** route is not an early duplicate of an **Association delivery**.
+- Early duplicate **Trigger** suppression uses the **Trigger** match's rendered conversation key to identify the existing **Trigger conversation** that would receive the provider webhook event.
+- Duplicate **Trigger** suppression filters matching **Trigger** targets before **Trigger run** creation.
+- First-pass provider webhook delivery creates at most one **Association delivery** for a matched provider resource because **Provider resource associations** are single-owner per integration connection, resource kind, and provider resource id.
+- Duplicate **Trigger** suppression depends on queued **Association deliveries** for the same provider webhook event, not merely on the existence of a **Provider resource association**.
+- Duplicate **Trigger** suppression does not hide malformed **Trigger** conversation routing; if the conversation key cannot be rendered during suppression, the **Trigger** match is not suppressed and any **Trigger** failure remains explicit in the Trigger path.
+- First-pass duplicate **Trigger** suppression does not expose a user-configurable deliver-both mode.
 - A **Setup script** prepares a **Snapshot** from a **Base image**.
 - **Setup Assistant** starts from a **Latest saved draft** unless the user saves current edits first.
 - **Setup Assistant** requires the **Latest saved draft** to have a saved **Agent runtime connection** that is compatible with the selected **Agent runtime**.

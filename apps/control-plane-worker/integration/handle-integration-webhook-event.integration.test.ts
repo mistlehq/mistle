@@ -6,6 +6,10 @@ import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-clien
 import {
   TriggerKinds,
   TriggerRunStatuses,
+  TriggerConversationCreatedByKinds,
+  TriggerConversationOwnerKinds,
+  TriggerConversationRouteStatuses,
+  TriggerConversationStatuses,
   IntegrationConnectionResourceSyncStates,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
@@ -134,6 +138,9 @@ describe.concurrent("control-plane worker integration webhook event handling", (
         },
       },
       payload: {
+        installation: {
+          id: 12345,
+        },
         repository: {
           full_name: "mistlehq/mistle",
         },
@@ -158,6 +165,8 @@ describe.concurrent("control-plane worker integration webhook event handling", (
     await seedSandboxInstance({
       env,
       organizationId: scope.organizationId,
+      sandboxProfileId: scope.sandboxProfileId,
+      sandboxProfileVersion: scope.sandboxProfileVersion,
       sandboxInstanceId,
     });
     await env.controlPlaneDb.insert(env.controlPlaneTables.providerResourceAssociations).values({
@@ -249,6 +258,330 @@ describe.concurrent("control-plane worker integration webhook event handling", (
     });
   });
 
+  it("skips trigger runs when association delivery targets the existing trigger conversation sandbox", async ({
+    env,
+  }) => {
+    const scope = await seedWebhookEventScope({
+      env,
+      suffix: createSuffix("association_suppresses_trigger"),
+      familyId: "github",
+      variantId: "github-cloud",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      connectionConfig: {},
+      eventType: "github.issue_comment.created",
+      providerEventType: "issue_comment",
+      payloadFilter: {
+        "github.issue_comment.created": {
+          op: "contains_token",
+          path: ["comment", "body"],
+          value: "@mistlebot",
+        },
+      },
+      payload: {
+        installation: {
+          id: 12345,
+        },
+        repository: {
+          full_name: "mistlehq/mistle",
+        },
+        issue: {
+          number: 47,
+          pull_request: {},
+        },
+        comment: {
+          body: "please run @mistlebot",
+        },
+        sender: {
+          login: "octocat",
+        },
+      },
+      externalEventId: "evt_association_suppresses_trigger",
+      externalDeliveryId: "delivery_association_suppresses_trigger",
+    });
+    const sandboxInstanceId = "sbi_association_suppresses_trigger";
+    const associationId = "pra_association_suppresses_trigger";
+
+    await seedSandboxInstance({
+      env,
+      organizationId: scope.organizationId,
+      sandboxProfileId: scope.sandboxProfileId,
+      sandboxProfileVersion: scope.sandboxProfileVersion,
+      sandboxInstanceId,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.providerResourceAssociations).values({
+      id: associationId,
+      integrationConnectionId: scope.connectionId,
+      resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+      providerResourceId: "mistlehq/mistle#47",
+      sandboxInstanceId,
+    });
+    await seedTriggerConversationRoute({
+      env,
+      conversationId: "cnv_association_suppresses_trigger",
+      organizationId: scope.organizationId,
+      sandboxInstanceId,
+      sandboxProfileId: scope.sandboxProfileId,
+      triggerTargetId: scope.triggerTargetId,
+      conversationKey: "github/12345",
+    });
+
+    const preparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+
+    expect(preparedEvent).toMatchObject({
+      webhookEventId: scope.webhookEventId,
+      webhookEventStatus: IntegrationWebhookEventStatuses.PROCESSING,
+      finalized: false,
+      triggerRunIds: [],
+    });
+    expect(preparedEvent.providerResourceAssociationDeliveries).toHaveLength(1);
+    expect(preparedEvent.providerResourceAssociationDeliveries[0]).toMatchObject({
+      providerResourceAssociationId: associationId,
+      sandboxInstanceId,
+    });
+
+    const queuedRuns = await env.controlPlaneDb.query.triggerRuns.findMany({
+      where: (table, { eq }) => eq(table.sourceWebhookEventId, scope.webhookEventId),
+    });
+    expect(queuedRuns).toEqual([]);
+
+    const queuedDeliveries =
+      await env.controlPlaneDb.query.providerResourceAssociationDeliveries.findMany({
+        where: (table, { eq }) => eq(table.sourceWebhookEventId, scope.webhookEventId),
+      });
+    expect(queuedDeliveries).toHaveLength(1);
+    expect(queuedDeliveries[0]).toMatchObject({
+      providerResourceAssociationId: associationId,
+      status: ProviderResourceAssociationDeliveryStatuses.QUEUED,
+    });
+  });
+
+  it("marks preexisting queued trigger runs ignored when retry suppression prefers association delivery", async ({
+    env,
+  }) => {
+    const scope = await seedWebhookEventScope({
+      env,
+      suffix: createSuffix("association_suppresses_retry"),
+      familyId: "github",
+      variantId: "github-cloud",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      connectionConfig: {},
+      eventType: "github.issue_comment.created",
+      providerEventType: "issue_comment",
+      payloadFilter: {
+        "github.issue_comment.created": {
+          op: "contains_token",
+          path: ["comment", "body"],
+          value: "@mistlebot",
+        },
+      },
+      payload: {
+        installation: {
+          id: 12345,
+        },
+        repository: {
+          full_name: "mistlehq/mistle",
+        },
+        issue: {
+          number: 49,
+          pull_request: {},
+        },
+        comment: {
+          body: "please run @mistlebot",
+        },
+        sender: {
+          login: "octocat",
+        },
+      },
+      externalEventId: "evt_association_suppresses_retry",
+      externalDeliveryId: "delivery_association_suppresses_retry",
+    });
+    const triggerRunId = "trn_association_suppresses_retry";
+    const sandboxInstanceId = "sbi_association_suppresses_retry";
+    const associationId = "pra_association_suppresses_retry";
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.triggerRuns).values({
+      id: triggerRunId,
+      triggerId: scope.triggerId,
+      triggerTargetId: scope.triggerTargetId,
+      sourceWebhookEventId: scope.webhookEventId,
+      status: TriggerRunStatuses.QUEUED,
+    });
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.integrationWebhookEvents)
+      .set({
+        status: IntegrationWebhookEventStatuses.PROCESSING,
+      })
+      .where(eq(env.controlPlaneTables.integrationWebhookEvents.id, scope.webhookEventId));
+    await seedSandboxInstance({
+      env,
+      organizationId: scope.organizationId,
+      sandboxProfileId: scope.sandboxProfileId,
+      sandboxProfileVersion: scope.sandboxProfileVersion,
+      sandboxInstanceId,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.providerResourceAssociations).values({
+      id: associationId,
+      integrationConnectionId: scope.connectionId,
+      resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+      providerResourceId: "mistlehq/mistle#49",
+      sandboxInstanceId,
+    });
+    await seedTriggerConversationRoute({
+      env,
+      conversationId: "cnv_association_suppresses_retry",
+      organizationId: scope.organizationId,
+      sandboxInstanceId,
+      sandboxProfileId: scope.sandboxProfileId,
+      triggerTargetId: scope.triggerTargetId,
+      conversationKey: "github/12345",
+    });
+
+    const preparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+
+    expect(preparedEvent).toMatchObject({
+      webhookEventId: scope.webhookEventId,
+      webhookEventStatus: IntegrationWebhookEventStatuses.PROCESSING,
+      finalized: false,
+      triggerRunIds: [],
+    });
+    expect(preparedEvent.providerResourceAssociationDeliveries).toHaveLength(1);
+
+    const persistedRun = await env.controlPlaneDb.query.triggerRuns.findFirst({
+      where: (table, { eq }) => eq(table.id, triggerRunId),
+    });
+    expect(persistedRun).toMatchObject({
+      id: triggerRunId,
+      status: TriggerRunStatuses.IGNORED,
+      failureCode: "association_delivery_preferred",
+    });
+    expect(persistedRun?.finishedAt).not.toBeNull();
+  });
+
+  it("queues trigger runs when suppression cannot render the trigger conversation key", async ({
+    env,
+  }) => {
+    const scope = await seedWebhookEventScope({
+      env,
+      suffix: createSuffix("association_malformed_trigger_key"),
+      familyId: "github",
+      variantId: "github-cloud",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      connectionConfig: {},
+      eventType: "github.issue_comment.created",
+      providerEventType: "issue_comment",
+      payloadFilter: {
+        "github.issue_comment.created": {
+          op: "contains_token",
+          path: ["comment", "body"],
+          value: "@mistlebot",
+        },
+      },
+      payload: {
+        installation: {
+          id: 12345,
+        },
+        repository: {
+          full_name: "mistlehq/mistle",
+        },
+        issue: {
+          number: 48,
+          pull_request: {},
+        },
+        comment: {
+          body: "please run @mistlebot",
+        },
+        sender: {
+          login: "octocat",
+        },
+      },
+      externalEventId: "evt_association_malformed_trigger_key",
+      externalDeliveryId: "delivery_association_malformed_trigger_key",
+    });
+    const sandboxInstanceId = "sbi_association_malformed_trigger_key";
+    const associationId = "pra_association_malformed_trigger_key";
+
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.webhookTriggers)
+      .set({
+        conversationKeyTemplate: "github/{{payload.missing.required}}",
+      })
+      .where(eq(env.controlPlaneTables.webhookTriggers.triggerId, scope.triggerId));
+    await seedSandboxInstance({
+      env,
+      organizationId: scope.organizationId,
+      sandboxProfileId: scope.sandboxProfileId,
+      sandboxProfileVersion: scope.sandboxProfileVersion,
+      sandboxInstanceId,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.providerResourceAssociations).values({
+      id: associationId,
+      integrationConnectionId: scope.connectionId,
+      resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+      providerResourceId: "mistlehq/mistle#48",
+      sandboxInstanceId,
+    });
+
+    const preparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+
+    expect(preparedEvent).toMatchObject({
+      webhookEventId: scope.webhookEventId,
+      webhookEventStatus: IntegrationWebhookEventStatuses.PROCESSING,
+      finalized: false,
+    });
+    expect(preparedEvent.providerResourceAssociationDeliveries).toHaveLength(1);
+    expect(preparedEvent.providerResourceAssociationDeliveries[0]).toMatchObject({
+      providerResourceAssociationId: associationId,
+      sandboxInstanceId,
+    });
+    expect(preparedEvent.triggerRunIds).toHaveLength(1);
+
+    const queuedRuns = await env.controlPlaneDb.query.triggerRuns.findMany({
+      where: (table, { eq }) => eq(table.sourceWebhookEventId, scope.webhookEventId),
+    });
+    expect(queuedRuns).toHaveLength(1);
+    expect(queuedRuns[0]).toMatchObject({
+      triggerId: scope.triggerId,
+      triggerTargetId: scope.triggerTargetId,
+      status: TriggerRunStatuses.QUEUED,
+    });
+  });
+
   it("queues trigger runs without provider resource association deliveries for self-authored app events", async ({
     env,
   }) => {
@@ -278,6 +611,9 @@ describe.concurrent("control-plane worker integration webhook event handling", (
         },
       },
       payload: {
+        installation: {
+          id: 12345,
+        },
         repository: {
           full_name: "mistlehq/mistle",
         },
@@ -301,6 +637,8 @@ describe.concurrent("control-plane worker integration webhook event handling", (
     await seedSandboxInstance({
       env,
       organizationId: scope.organizationId,
+      sandboxProfileId: scope.sandboxProfileId,
+      sandboxProfileVersion: scope.sandboxProfileVersion,
       sandboxInstanceId,
     });
     await env.controlPlaneDb.insert(env.controlPlaneTables.providerResourceAssociations).values({
@@ -383,6 +721,8 @@ describe.concurrent("control-plane worker integration webhook event handling", (
     await seedSandboxInstance({
       env,
       organizationId: scope.organizationId,
+      sandboxProfileId: scope.sandboxProfileId,
+      sandboxProfileVersion: scope.sandboxProfileVersion,
       sandboxInstanceId,
     });
     await env.controlPlaneDb.insert(env.controlPlaneTables.providerResourceAssociations).values({
@@ -820,6 +1160,7 @@ type SeedWebhookEventScopeInput = {
 type SeededWebhookEventScope = {
   organizationId: string;
   sandboxProfileId: string;
+  sandboxProfileVersion: number;
   triggerId: string;
   triggerTargetId: string;
   webhookEventId: string;
@@ -833,6 +1174,7 @@ async function seedWebhookEventScope(
 ): Promise<SeededWebhookEventScope> {
   const organizationId = `org_${input.suffix}`;
   const sandboxProfileId = `sbp_${input.suffix}`;
+  const sandboxProfileVersion = 2;
   const triggerId = `atm_${input.suffix}`;
   const triggerTargetId = `atg_${input.suffix}`;
   const webhookEventId = `iwe_${input.suffix}`;
@@ -885,7 +1227,7 @@ async function seedWebhookEventScope(
       env: input.env,
       organizationId,
       sandboxProfileId,
-      sandboxProfileVersion: 2,
+      sandboxProfileVersion,
       suffix: input.suffix,
     });
     await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.triggers).values({
@@ -908,7 +1250,7 @@ async function seedWebhookEventScope(
       id: triggerTargetId,
       triggerId,
       sandboxProfileId,
-      sandboxProfileVersion: 2,
+      sandboxProfileVersion,
     });
   }
 
@@ -933,6 +1275,7 @@ async function seedWebhookEventScope(
   return {
     organizationId,
     sandboxProfileId,
+    sandboxProfileVersion,
     triggerId,
     triggerTargetId,
     webhookEventId,
@@ -994,13 +1337,15 @@ async function seedOpenAiAgentBinding(input: {
 async function seedSandboxInstance(input: {
   env: IntegrationTestEnvironment;
   organizationId: string;
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
   sandboxInstanceId: string;
 }): Promise<void> {
   await input.env.dataPlaneDb.insert(input.env.dataPlaneTables.sandboxInstances).values({
     id: input.sandboxInstanceId,
     organizationId: input.organizationId,
-    sandboxProfileId: "sbp_association_delivery",
-    sandboxProfileVersion: 1,
+    sandboxProfileId: input.sandboxProfileId,
+    sandboxProfileVersion: input.sandboxProfileVersion,
     runtimeProvider: "docker",
     providerSandboxId: `provider-${input.sandboxInstanceId}`,
     status: SandboxInstanceStatuses.STARTING,
@@ -1012,16 +1357,56 @@ async function seedSandboxInstance(input: {
   await input.env.dataPlaneDb.insert(input.env.dataPlaneTables.sandboxInstanceRuntimePlans).values({
     sandboxInstanceId: input.sandboxInstanceId,
     revision: 1,
-    compiledRuntimePlan: createRuntimePlan(),
-    compiledFromProfileId: "sbp_association_delivery",
-    compiledFromProfileVersion: 1,
+    compiledRuntimePlan: createRuntimePlan({
+      sandboxProfileId: input.sandboxProfileId,
+      sandboxProfileVersion: input.sandboxProfileVersion,
+    }),
+    compiledFromProfileId: input.sandboxProfileId,
+    compiledFromProfileVersion: input.sandboxProfileVersion,
   });
 }
 
-function createRuntimePlan(): CompiledRuntimePlan {
+async function seedTriggerConversationRoute(input: {
+  env: IntegrationTestEnvironment;
+  conversationId: string;
+  organizationId: string;
+  sandboxInstanceId: string;
+  sandboxProfileId: string;
+  triggerTargetId: string;
+  conversationKey: string;
+}): Promise<void> {
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.triggerConversations).values({
+    id: input.conversationId,
+    organizationId: input.organizationId,
+    ownerKind: TriggerConversationOwnerKinds.TRIGGER_TARGET,
+    ownerId: input.triggerTargetId,
+    createdByKind: TriggerConversationCreatedByKinds.WEBHOOK,
+    createdById: "iwe_existing_route",
+    sandboxProfileId: input.sandboxProfileId,
+    integrationFamilyId: "github",
+    runtimeId: "codex",
+    conversationKey: input.conversationKey,
+    status: TriggerConversationStatuses.ACTIVE,
+  });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.triggerConversationRoutes)
+    .values({
+      conversationId: input.conversationId,
+      sandboxInstanceId: input.sandboxInstanceId,
+      providerConversationId: "thread_existing_route",
+      providerExecutionId: null,
+      providerState: null,
+      status: TriggerConversationRouteStatuses.ACTIVE,
+    });
+}
+
+function createRuntimePlan(input: {
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+}): CompiledRuntimePlan {
   return {
-    sandboxProfileId: "sbp_association_delivery",
-    version: 1,
+    sandboxProfileId: input.sandboxProfileId,
+    version: input.sandboxProfileVersion,
     image: {
       source: "base",
       imageRef: "sandbox-base",

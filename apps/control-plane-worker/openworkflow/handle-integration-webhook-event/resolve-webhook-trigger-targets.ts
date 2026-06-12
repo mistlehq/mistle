@@ -15,6 +15,7 @@ export type ResolvedWebhookTriggerTarget = {
   triggerTargetId: string;
   sandboxProfileId: string;
   sandboxProfileVersion: number;
+  conversationKeyTemplate: string;
 };
 
 function isWebhookTriggerMatched(input: {
@@ -78,7 +79,7 @@ export async function resolveWebhookTriggerTargets(
   });
   const enabledTriggersById = new Set(enabledTriggers.map((trigger) => trigger.id));
 
-  const eligibleWebhookTriggers: { triggerId: string }[] = [];
+  const eligibleWebhookTriggers: { triggerId: string; conversationKeyTemplate: string }[] = [];
   for (const candidateWebhookTrigger of candidateWebhookTriggers) {
     if (!enabledTriggersById.has(candidateWebhookTrigger.triggerId)) {
       continue;
@@ -96,6 +97,7 @@ export async function resolveWebhookTriggerTargets(
 
     eligibleWebhookTriggers.push({
       triggerId: candidateWebhookTrigger.triggerId,
+      conversationKeyTemplate: candidateWebhookTrigger.conversationKeyTemplate,
     });
   }
 
@@ -131,6 +133,7 @@ export async function resolveWebhookTriggerTargets(
         triggerTargetId: triggerTarget.id,
         sandboxProfileId: triggerTarget.sandboxProfileId,
         sandboxProfileVersion: triggerTarget.sandboxProfileVersion,
+        conversationKeyTemplate: eligibleWebhookTrigger.conversationKeyTemplate,
       });
     }
   }
