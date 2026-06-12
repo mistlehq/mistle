@@ -28,6 +28,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 function InteractiveStory(props: {
+  description?: string;
   initialValue: string;
   options?: readonly { label: string; value: string }[];
   showErrorMessage?: boolean;
@@ -50,6 +51,7 @@ function InteractiveStory(props: {
         }}
         options={props.options ?? DefaultOptions}
         value={value}
+        {...(props.description === undefined ? {} : { description: props.description })}
         {...(props.showErrorMessage === undefined
           ? {}
           : { showErrorMessage: props.showErrorMessage })}
@@ -60,6 +62,16 @@ function InteractiveStory(props: {
 
 export const Default: Story = {
   render: () => <InteractiveStory initialValue="mistle-user@example.com" showErrorMessage={true} />,
+};
+
+export const WithDescription: Story = {
+  render: () => (
+    <InteractiveStory
+      description="Choose a different option to trigger autosave. The spinner and saved check render inside the select trigger."
+      initialValue="mistle-user@example.com"
+      showErrorMessage={true}
+    />
+  ),
 };
 
 export const WithoutOptions: Story = {

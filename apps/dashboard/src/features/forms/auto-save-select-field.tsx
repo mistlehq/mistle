@@ -158,10 +158,7 @@ export function AutoSaveSelectField(input: AutoSaveSelectFieldProps): React.JSX.
 
   const selectedOptionLabel =
     input.options.find((option) => option.value === selectedValue)?.label ?? null;
-  const description =
-    input.description === undefined || input.description.trim().length === 0
-      ? undefined
-      : input.description;
+  const description = input.description;
   const showIndicator = status !== "idle" && errorState === null;
   const saveState = errorState === null ? status : "error";
   const errorMessage = showErrorMessage ? errorState?.message : undefined;
