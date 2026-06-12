@@ -17,6 +17,72 @@ Before creating the connection, make sure:
 3. That role's trust policy allows that principal to assume it.
 4. If you use third-party-style cross-account protection, you have the external ID value ready for the connection.
 
+## Example: CloudWatch Read-Only Role
+
+For CloudWatch and CloudWatch Logs, the connection needs both a source IAM user and a target IAM role:
+
+```text
+IAM user access key
+    -> calls sts:AssumeRole
+IAM role
+    -> grants CloudWatch and CloudWatch Logs permissions
+```
+
+Do not put an IAM user ARN in the **Role ARN** field. Use a role ARN such as:
+
+```text
+arn:aws:iam::123456789012:role/mistle-cloudwatch-role
+```
+
+Do not use a user ARN such as:
+
+```text
+arn:aws:iam::123456789012:user/mistle-cloudwatch-source
+```
+
+One minimal setup is:
+
+1. Create an IAM user for the source access key, for example `mistle-cloudwatch-source`.
+2. Create an access key for that user. Use its access key ID and secret access key in the Mistle connection form.
+3. Create an IAM role for the sandbox permissions, for example `mistle-cloudwatch-role`.
+4. Give the IAM user permission to call `sts:AssumeRole` on that role.
+5. Give the IAM role read-only CloudWatch permissions.
+6. Configure the role trust policy so the role trusts the IAM user.
+
+The IAM user needs permission to assume only the target role:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "sts:AssumeRole",
+      "Resource": "arn:aws:iam::123456789012:role/mistle-cloudwatch-role"
+    }
+  ]
+}
+```
+
+Attach CloudWatch permissions to the role, not to the source user. For broad testing, AWS-managed `ReadOnlyAccess` is usually enough. For a narrower production setup, start with AWS-managed `CloudWatchReadOnlyAccess` and `CloudWatchLogsReadOnlyAccess`, then narrow further if your account policy requires it.
+
+The role trust policy must allow the source user to assume the role:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::123456789012:user/mistle-cloudwatch-source"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+```
+
 ## Connect In Mistle
 
 Open **Integrations** in the dashboard, choose **AWS**, then select **Access key + AssumeRole**.
@@ -30,6 +96,10 @@ Enter:
 | Role ARN          | Role ARN that Mistle should assume                      |
 | External ID       | Optional external ID if your trust policy requires one  |
 | Duration seconds  | Optional STS session duration between `900` and `43200` |
+
+If the connection fails with `AccessDenied` during STS `AssumeRole`, check that the source access key belongs to the intended principal, the source principal can call `sts:AssumeRole` on the role, the role trust policy allows that source principal, and the external ID matches if one is configured.
+
+If CloudWatch or CloudWatch Logs returns `AccessDenied`, Mistle assumed the role, but the role lacks permission for the requested CloudWatch or Logs action.
 
 ## Official References
 
