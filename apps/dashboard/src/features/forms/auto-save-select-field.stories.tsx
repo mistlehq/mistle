@@ -3,7 +3,6 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import type React from "react";
 import { useState } from "react";
 
-import { AutoSaveStoryFrame } from "../../storybook/auto-save-story-support.js";
 import { AutoSaveSelectField, type AutoSaveSelectFieldProps } from "./auto-save-select-field.js";
 
 const DefaultOptions = [
@@ -29,6 +28,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 function InteractiveStory(props: {
+  description?: string;
   initialValue: string;
   options?: readonly { label: string; value: string }[];
   showErrorMessage?: boolean;
@@ -36,7 +36,7 @@ function InteractiveStory(props: {
   const [value, setValue] = useState(props.initialValue);
 
   return (
-    <AutoSaveStoryFrame instructions="Choose a different option to trigger autosave. The spinner and saved check render inside the select trigger.">
+    <div className="w-full max-w-5xl">
       <AutoSaveSelectField
         id="storybook-auto-save-select"
         label="Commit email"
@@ -51,11 +51,12 @@ function InteractiveStory(props: {
         }}
         options={props.options ?? DefaultOptions}
         value={value}
+        {...(props.description === undefined ? {} : { description: props.description })}
         {...(props.showErrorMessage === undefined
           ? {}
           : { showErrorMessage: props.showErrorMessage })}
       />
-    </AutoSaveStoryFrame>
+    </div>
   );
 }
 
@@ -63,9 +64,19 @@ export const Default: Story = {
   render: () => <InteractiveStory initialValue="mistle-user@example.com" showErrorMessage={true} />,
 };
 
+export const WithDescription: Story = {
+  render: () => (
+    <InteractiveStory
+      description="Choose a different option to trigger autosave. The spinner and saved check render inside the select trigger."
+      initialValue="mistle-user@example.com"
+      showErrorMessage={true}
+    />
+  ),
+};
+
 export const WithoutOptions: Story = {
   render: () => (
-    <AutoSaveStoryFrame instructions="When there are no selectable values, the field renders a neutral none state instead of a trigger.">
+    <div className="w-full max-w-5xl">
       <AutoSaveSelectField
         id="storybook-auto-save-select-empty"
         label="Commit email"
@@ -73,6 +84,6 @@ export const WithoutOptions: Story = {
         options={[]}
         value=""
       />
-    </AutoSaveStoryFrame>
+    </div>
   ),
 };
