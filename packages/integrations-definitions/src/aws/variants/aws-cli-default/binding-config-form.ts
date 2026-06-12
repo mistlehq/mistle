@@ -58,7 +58,7 @@ export function resolveAwsBindingConfigForm(input: AwsBindingFormContext): Resol
           default: [AwsToolIds.AWS_CLI],
           items: {
             type: "string",
-            enum: [AwsToolIds.AWS_CLI],
+            enum: [AwsToolIds.AWS_CLI, AwsToolIds.AWS_CLOUDWATCH_MCP],
           },
           type: "array",
           uniqueItems: true,
@@ -93,7 +93,7 @@ export function resolveAwsBindingConfigForm(input: AwsBindingFormContext): Resol
         },
       },
       tools: {
-        "ui:enumNames": ["AWS CLI"],
+        "ui:enumNames": ["AWS CLI", "CloudWatch MCP"],
         "ui:widget": "checkboxes",
         "ui:options": {
           inline: false,

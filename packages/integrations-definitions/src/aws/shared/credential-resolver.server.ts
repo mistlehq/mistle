@@ -1,5 +1,6 @@
 import { AssumeRoleCommand, type AssumeRoleCommandInput, STSClient } from "@aws-sdk/client-sts";
 import {
+  IntegrationCredentialResolutionError,
   type IntegrationCredentialResolver,
   type IntegrationCredentialResolverInput,
 } from "@mistle/integrations-core";
@@ -129,6 +130,35 @@ export function createAwsAssumeRoleTelemetryAttributes(input: {
   };
 }
 
+function resolveErrorName(error: unknown): string | undefined {
+  if (!(error instanceof Error) || error.name.length === 0) {
+    return undefined;
+  }
+
+  return error.name;
+}
+
+export function createAwsAssumeRolePublicErrorMessage(error: unknown): string {
+  const errorName = resolveErrorName(error);
+  if (errorName === "AccessDenied") {
+    return "AWS AssumeRole credential resolution failed: AWS STS denied the AssumeRole request. Check that the configured access key principal can assume the configured IAM role, the role trust policy allows it, and the external ID matches if one is configured.";
+  }
+
+  if (
+    errorName === "InvalidClientTokenId" ||
+    errorName === "UnrecognizedClientException" ||
+    errorName === "SignatureDoesNotMatch"
+  ) {
+    return "AWS AssumeRole credential resolution failed: AWS STS rejected the configured access key credentials. Check that the access key ID and secret access key are active and belong together.";
+  }
+
+  if (errorName === "ExpiredToken") {
+    return "AWS AssumeRole credential resolution failed: AWS STS reported expired source credentials. Update the AWS connection credentials.";
+  }
+
+  return "AWS AssumeRole credential resolution failed: AWS STS could not return temporary credentials. Check the AWS connection access key, role ARN, role trust policy, and external ID.";
+}
+
 async function createAwsSessionCredential(input: {
   defaultRegion: string;
   accessKeyId: string;
@@ -225,7 +255,10 @@ export const AwsAssumeRoleSessionCredentialResolver: IntegrationCredentialResolv
             code: SpanStatusCode.ERROR,
             message: "aws assume role failed",
           });
-          throw error;
+          throw new IntegrationCredentialResolutionError(
+            createAwsAssumeRolePublicErrorMessage(error),
+            { cause: error },
+          );
         } finally {
           span.end();
         }

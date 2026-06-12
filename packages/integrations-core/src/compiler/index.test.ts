@@ -52,6 +52,9 @@ const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandb
 const LinearConnectorBindingConfigSchema = z.object({
   tools: z.array(z.literal("linear-mcp")).default([]),
 });
+const StdioMcpConnectorBindingConfigSchema = z.object({
+  tools: z.array(z.literal("stdio-mcp")).default([]),
+});
 
 const ApiKeyConnectionMethods = [
   {
@@ -516,6 +519,44 @@ function createLinearMcpDefinition(): IntegrationDefinition<
             ]
           : []),
       ],
+      artifacts: [],
+      runtimeClients: [],
+    }),
+  };
+}
+
+function createStdioMcpDefinition(): IntegrationDefinition<
+  typeof OpenAiTargetConfigSchema,
+  typeof EmptyTargetSecretsSchema,
+  typeof StdioMcpConnectorBindingConfigSchema
+> {
+  return {
+    familyId: "stdio-test",
+    variantId: "stdio-mcp",
+    kind: "connector",
+    displayName: "Stdio MCP",
+    logoKey: "terminal",
+    targetConfigSchema: OpenAiTargetConfigSchema,
+    targetSecretSchema: EmptyTargetSecretsSchema,
+    bindingConfigSchema: StdioMcpConnectorBindingConfigSchema,
+    connectionMethods: ApiKeyConnectionMethods,
+    mcp: (input) =>
+      input.binding.config.tools.includes("stdio-mcp")
+        ? [
+            {
+              serverId: "stdio-mcp",
+              serverName: "stdio_tool",
+              transport: "stdio",
+              command: "/usr/local/bin/stdio-mcp",
+              args: ["--stdio"],
+              env: {
+                STDIO_MCP_MODE: "test",
+              },
+            },
+          ]
+        : [],
+    compileBinding: () => ({
+      egressRoutes: [],
       artifacts: [],
       runtimeClients: [],
     }),
@@ -1752,6 +1793,95 @@ describe("compileRuntimePlan", () => {
     );
     expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain(
       'url = "https://linear.app/mcp"',
+    );
+  });
+
+  it("maps stdio MCP server commands into agent runtime files", () => {
+    const registry = new IntegrationRegistry();
+    registry.register(createOpenAiDefinition());
+    registry.register(createStdioMcpDefinition());
+
+    const runtimePlan = compileTestRuntimePlan({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 12,
+      image: {
+        source: "base",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
+      },
+      definitions: createDefinitionsBundle(registry),
+      bindings: [
+        {
+          targetKey: "openai-default",
+          target: {
+            familyId: "openai",
+            variantId: "openai-default",
+            enabled: true,
+            config: {
+              apiBaseUrl: "https://api.openai.com",
+            },
+            secrets: {},
+          },
+          connection: {
+            id: "conn_openai_org_123",
+            status: "active",
+            config: {},
+          },
+          binding: {
+            id: "bind_openai_agent",
+            kind: "agent",
+            connectionId: "conn_openai_org_123",
+            config: {
+              runtime: {
+                runtimeId: "codex",
+                config: {},
+              },
+              model: {
+                defaultModel: "gpt-5.3-codex",
+                options: {},
+              },
+            },
+          },
+        },
+        {
+          targetKey: "stdio-mcp",
+          target: {
+            familyId: "stdio-test",
+            variantId: "stdio-mcp",
+            enabled: true,
+            config: {
+              apiBaseUrl: "https://stdio.example.com",
+            },
+            secrets: {},
+          },
+          connection: {
+            id: "conn_stdio_org_123",
+            status: "active",
+            config: {},
+          },
+          binding: {
+            id: "bind_stdio_connector",
+            kind: "connector",
+            connectionId: "conn_stdio_org_123",
+            config: {
+              tools: ["stdio-mcp"],
+            },
+          },
+        },
+      ],
+    });
+
+    expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain(
+      "[mcp_servers.stdio_tool]",
+    );
+    expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain(
+      'command = "/usr/local/bin/stdio-mcp"',
+    );
+    expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain(
+      'args = [ "--stdio" ]',
+    );
+    expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain(
+      'STDIO_MCP_MODE = "test"',
     );
   });
 

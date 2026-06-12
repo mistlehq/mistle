@@ -1,4 +1,8 @@
-import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
+import {
+  IntegrationKinds,
+  IntegrationMcpTransports,
+  type IntegrationDefinition,
+} from "@mistle/integrations-core";
 
 import {
   AwsAssumeRoleConnectionConfigSchema,
@@ -9,10 +13,11 @@ import {
 } from "./auth.js";
 import { resolveAwsBindingConfigForm } from "./binding-config-form.js";
 import { AwsBindingConfigSchema } from "./binding-config-schema.js";
-import { compileAwsBinding } from "./compile-binding.js";
+import { AwsCloudWatchMcpWrapperPath, compileAwsBinding } from "./compile-binding.js";
 import { AwsAssumeRoleConnectionConfigForm } from "./connection-config-form.js";
 import { AwsTargetConfigSchema } from "./target-config-schema.js";
 import { AwsTargetSecretSchema } from "./target-secret-schema.js";
+import { AwsToolIds } from "./tool-ids.js";
 
 export type AwsBaseIntegrationDefinition = IntegrationDefinition<
   typeof AwsTargetConfigSchema,
@@ -26,7 +31,7 @@ export const AwsBaseDefinition: AwsBaseIntegrationDefinition = {
   variantId: "aws-cli-default",
   kind: IntegrationKinds.CONNECTOR,
   displayName: "AWS",
-  description: "Enable scoped AWS access and optional AWS CLI support in sandbox.",
+  description: "Enable scoped AWS access for selected sandbox tools.",
   logoKey: "aws",
   targetConfigSchema: AwsTargetConfigSchema,
   targetSecretSchema: AwsTargetSecretSchema,
@@ -50,5 +55,17 @@ export const AwsBaseDefinition: AwsBaseIntegrationDefinition = {
       configForm: AwsAssumeRoleConnectionConfigForm,
     },
   ],
+  mcp: (input) =>
+    input.binding.config.tools.includes(AwsToolIds.AWS_CLOUDWATCH_MCP)
+      ? [
+          {
+            serverId: AwsToolIds.AWS_CLOUDWATCH_MCP,
+            serverName: "aws_cloudwatch",
+            transport: IntegrationMcpTransports.STDIO,
+            command: AwsCloudWatchMcpWrapperPath,
+            description: "AWS CloudWatch MCP",
+          },
+        ]
+      : [],
   compileBinding: compileAwsBinding,
 };

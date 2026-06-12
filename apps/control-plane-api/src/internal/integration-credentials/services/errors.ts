@@ -14,12 +14,13 @@ export const InternalIntegrationCredentialsErrorCodes = {
   AMBIGUOUS_CREDENTIAL_MATCH: "AMBIGUOUS_CREDENTIAL_MATCH",
   OAUTH2_REFRESH_FAILED: "OAUTH2_REFRESH_FAILED",
   RESOLVER_NOT_FOUND: "RESOLVER_NOT_FOUND",
+  CREDENTIAL_RESOLUTION_FAILED: "CREDENTIAL_RESOLUTION_FAILED",
 } as const;
 
 export type InternalIntegrationCredentialsErrorCode =
   (typeof InternalIntegrationCredentialsErrorCodes)[keyof typeof InternalIntegrationCredentialsErrorCodes];
 
-type InternalIntegrationCredentialsErrorStatusCode = 400 | 404;
+type InternalIntegrationCredentialsErrorStatusCode = 400 | 404 | 502;
 
 export class InternalIntegrationCredentialsError extends HttpError {
   readonly code: InternalIntegrationCredentialsErrorCode;

@@ -365,6 +365,28 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Credential resolver dependency failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["CREDENTIAL_RESOLUTION_FAILED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
           }
         }
       }

@@ -113,6 +113,101 @@ describe("buildManagedEgressRequest", () => {
     });
     expect(result.request.headers.get("authorization")).toBe("Bearer workspace-b-token");
   });
+
+  it("replaces incoming AWS SigV4 headers with resolved AWS session credentials", async () => {
+    let observedBody: unknown;
+    const controlPlaneBaseUrl = await startRecordingControlPlane((request, response) => {
+      collectRequestBody(request, (body) => {
+        observedBody = JSON.parse(body);
+        response.writeHead(200, {
+          "content-type": "application/json",
+        });
+        response.end(
+          JSON.stringify({
+            kind: "aws_session",
+            accessKeyId: "ASIAMISTLEREAL",
+            secretAccessKey: "mistle-real-secret",
+            sessionToken: "mistle-real-session-token",
+            expiresAt: "2026-01-01T01:00:00.000Z",
+          }),
+        );
+      });
+    });
+    const route: CompiledRuntimePlan["egressRoutes"][number] = {
+      egressRuleId: "egress_rule_aws",
+      bindingId: "bind_aws",
+      familyId: "aws",
+      variantId: "aws-cli-default",
+      match: {
+        hosts: ["monitoring.us-east-1.amazonaws.com"],
+        methods: ["GET"],
+      },
+      upstream: {
+        baseUrl: "https://monitoring.us-east-1.amazonaws.com",
+      },
+      authInjection: {
+        type: "aws_sigv4",
+        service: "monitoring",
+        region: "us-east-1",
+      },
+      credentialResolver: {
+        kind: "integration_connection",
+        connectionId: "icn_aws",
+        secretType: "aws_secret_access_key",
+        slotKey: "secretAccessKey",
+        resolverKey: "assume_role_session",
+      },
+    };
+
+    const result = await buildManagedEgressRequest({
+      body: undefined,
+      controlPlanePublicBaseUrl: "https://control-plane.test",
+      controlPlaneInternalClient: new ControlPlaneInternalClient({
+        baseUrl: controlPlaneBaseUrl,
+        internalAuthServiceToken: "service-token",
+      }),
+      credentialCache: new CredentialCache({
+        cache: new Cache({ adapter: new InMemoryCacheAdapter() }),
+        defaultTtlSeconds: 300,
+        refreshSkewSeconds: 0,
+        now: () => Date.parse("2026-01-01T00:00:00.000Z"),
+      }),
+      mcpTokenConfig: {
+        tokenSecret: "mcp-token-secret",
+        tokenIssuer: "data-plane-gateway",
+        tokenAudience: "mistle-mcp",
+      },
+      organizationId: "org_123",
+      request: {
+        authority: "monitoring.us-east-1.amazonaws.com",
+        headers: {
+          authorization: [
+            "AWS4-HMAC-SHA256 Credential=PLACEHOLDER/20260101/us-east-1/monitoring/aws4_request, SignedHeaders=host;x-amz-date;x-amz-security-token, Signature=placeholder",
+          ],
+          "x-amz-date": ["20260101T000000Z"],
+          "x-amz-security-token": ["placeholder-session-token"],
+        },
+        method: "GET",
+        path: "/api/v1/query",
+        query: "query=up",
+        scheme: "https",
+      },
+      route,
+      sandboxInstanceId: "sbi_123",
+    });
+
+    expect(observedBody).toEqual({
+      bindingId: "bind_aws",
+      connectionId: "icn_aws",
+      secretType: "aws_secret_access_key",
+      slotKey: "secretAccessKey",
+      resolverKey: "assume_role_session",
+    });
+    expect(result.request.headers.get("authorization")).toContain("Credential=ASIAMISTLEREAL/");
+    expect(result.request.headers.get("authorization")).not.toContain("PLACEHOLDER");
+    expect(result.request.headers.get("x-amz-security-token")).toBe("mistle-real-session-token");
+    expect(result.request.headers.get("x-amz-date")).not.toBe("20260101T000000Z");
+  });
 });
 
 async function startRecordingControlPlane(

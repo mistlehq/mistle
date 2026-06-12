@@ -417,6 +417,19 @@ export interface paths {
             "text/plain": string;
           };
         };
+        /** @description Credential resolver dependency failed. */
+        502: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "CREDENTIAL_RESOLUTION_FAILED";
+              message: string;
+            };
+          };
+        };
       };
     };
     delete?: never;

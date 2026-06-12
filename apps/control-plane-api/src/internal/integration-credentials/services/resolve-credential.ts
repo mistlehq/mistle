@@ -11,6 +11,7 @@ import {
 } from "@mistle/db/control-plane";
 import {
   createOAuth2AuthorizationCodeCredentialSlotKeys,
+  IntegrationCredentialResolutionError,
   type IntegrationCredentialResolverResult,
   type IntegrationOAuth2AuthorizationCodeCapability,
   type IntegrationOAuth2ClientCredentialsCapability,
@@ -1619,6 +1620,16 @@ export async function resolveIntegrationCredential(
           code: SpanStatusCode.ERROR,
           message: "integration credential resolution failed",
         });
+        if (error instanceof InternalIntegrationCredentialsError) {
+          throw error;
+        }
+        if (error instanceof IntegrationCredentialResolutionError) {
+          throw new InternalIntegrationCredentialsError(
+            InternalIntegrationCredentialsErrorCodes.CREDENTIAL_RESOLUTION_FAILED,
+            502,
+            error.publicMessage,
+          );
+        }
         throw error;
       } finally {
         span.end();
