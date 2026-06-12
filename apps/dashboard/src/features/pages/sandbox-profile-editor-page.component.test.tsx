@@ -32,6 +32,7 @@ import {
   sandboxProfileIntegrationDirectoryQueryKey,
   sandboxProfileVersionTriggerConfigQueryKey,
   sandboxProfileVersionIntegrationBindingsQueryKey,
+  sandboxProfileVersionPublishabilityQueryKey,
   sandboxProfileVersionSetupScriptQueryKey,
   sandboxProfileVersionsQueryKey,
   sandboxProvidersQueryKey,
@@ -39,6 +40,7 @@ import {
 import type {
   SandboxProfileVersion,
   SandboxProfileVersionDraftTriggerImpactTrigger,
+  SandboxProfileVersionPublishability,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { triggersListQueryKey } from "../triggers/triggers-query-keys.js";
 import type { TriggerSandboxProfileUsage } from "../triggers/triggers-service.js";
@@ -575,6 +577,7 @@ function renderSandboxProfileEditor(input?: {
   profileDetailErrorStatus?: number;
   profileVersionsErrorStatus?: number;
   profileVersionsLoading?: boolean;
+  publishability?: SandboxProfileVersionPublishability;
   routeSearch?: string;
   routeState?: unknown;
   routeSection?: SandboxProfileEditorTestRouteSection;
@@ -805,6 +808,16 @@ function renderSandboxProfileEditor(input?: {
       repositoryOptions: [],
     },
   );
+  queryClient.setQueryData(
+    sandboxProfileVersionPublishabilityQueryKey({
+      profileId,
+      version,
+    }),
+    input?.publishability ?? {
+      publishable: true,
+      issues: [],
+    },
+  );
   queryClient.setQueryData(WEBHOOK_TRIGGER_INTEGRATION_DIRECTORY_QUERY_KEY, {
     connections: input?.triggerConnections ?? [],
     targets: input?.triggerTargets ?? [],
@@ -1004,6 +1017,7 @@ function DraftActionsHarness(input: {
     | null;
   draftTriggerImpactError?: string | null;
   hasUnpersistedIntegrationChanges?: boolean;
+  publishBlockedMessage?: string | null;
   draftSaveError?: string | null;
 }): JSX.Element {
   const [discarded, setDiscarded] = useState(false);
@@ -1026,6 +1040,7 @@ function DraftActionsHarness(input: {
         setDraftTriggerImpactError(null);
       }}
       hasUnpersistedIntegrationChanges={input.hasUnpersistedIntegrationChanges ?? false}
+      publishBlockedMessage={input.publishBlockedMessage ?? null}
       isDeleteProfileDialogOpen={false}
       mode={{
         kind: "draft",
@@ -1100,6 +1115,7 @@ function renderDraftActionsHarness(input?: {
     | null;
   draftTriggerImpactError?: string | null;
   hasUnpersistedIntegrationChanges?: boolean;
+  publishBlockedMessage?: string | null;
   draftSaveError?: string | null;
 }): void {
   const router = createMemoryRouter(
@@ -3873,6 +3889,75 @@ describe("SandboxProfileEditorPage", () => {
       "disabled",
       false,
     );
+  });
+
+  it("shows cancel instead of save draft when the saved draft has no publish-worthy changes", () => {
+    renderSandboxProfileEditor({
+      view: "draft",
+      versionState: "draft-with-published",
+      publishability: {
+        publishable: false,
+        issues: [
+          {
+            code: "NO_PUBLISH_WORTHY_CHANGE",
+            message: "Make a change to the sandbox profile draft before publishing.",
+          },
+        ],
+      },
+    });
+
+    const publishButton = screen.getByRole("button", { name: "Publish" });
+    expect(publishButton).toHaveProperty("disabled", true);
+    expect(publishButton).toHaveProperty(
+      "title",
+      "Make a change to the sandbox profile draft before publishing.",
+    );
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Save draft" })).toBeNull();
+  });
+
+  it("keeps draft publishing available when unsaved edits may become publish-worthy", async () => {
+    renderSandboxProfileEditor({
+      view: "draft",
+      versionState: "draft-with-published",
+      publishability: {
+        publishable: false,
+        issues: [
+          {
+            code: "NO_PUBLISH_WORTHY_CHANGE",
+            message: "Make a change to the sandbox profile draft before publishing.",
+          },
+        ],
+      },
+    });
+
+    const configurationsPanel = screen.getByRole("tabpanel", {
+      name: "Sandbox Profile",
+      hidden: false,
+    });
+    updateSetupScriptEditor({
+      editor: within(configurationsPanel).getByRole("textbox", {
+        name: "Setup script",
+      }),
+      value: "pnpm install\npnpm test",
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Publish" })).toHaveProperty("disabled", false);
+    });
+    expect(screen.getByRole("button", { name: "Save draft" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+  });
+
+  it("uses cancel to discard a saved draft without publish-worthy changes", () => {
+    renderDraftActionsHarness({
+      publishBlockedMessage: "Make a change to the sandbox profile draft before publishing.",
+    });
+
+    expect(screen.queryByRole("button", { name: "Save draft" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.getByText("Discarded")).toBeDefined();
   });
 
   it("surfaces draft save failures inside the sandbox profile tab", () => {

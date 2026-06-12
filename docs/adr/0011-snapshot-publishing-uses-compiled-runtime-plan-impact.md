@@ -4,6 +4,14 @@ When publishing a sandbox profile version, Mistle should decide whether to creat
 
 The reuse decision should compile both the previous active version and the draft version against the previous active version's snapshot image, because the decision asks whether the draft can safely run from that exact image.
 
+Snapshot-neutral is not the same as unchanged. A draft must contain a **Publish-worthy change** relative to its **Source sandbox profile version** before it can be published. Snapshot-neutral changes may publish and reuse the previous **Snapshot**; drafts with no **Publish-worthy change** should be rejected and presented as unavailable in the dashboard.
+
+The publishability contract should represent an unchanged draft as a normal publishability issue rather than a separate top-level change flag, so publish buttons and publish backstops share the same rule.
+
+Publish-worthiness should compare saved **Sandbox profile version configuration**, not compiled **Runtime plans**. Compiled **Runtime plan** impact remains the snapshot-reuse test; publish-worthiness should ignore live external dependency state and lifecycle state that is not versioned by publish.
+
+Publish-worthiness equality should compare canonical domain values rather than raw persistence rows: ignore row identities and lifecycle metadata, normalize absent script text consistently, sort unordered collections, and preserve order only where order affects behavior.
+
 The **Setup script** comparison should use the normalized stored profile-version field directly rather than relying on the compiled **Runtime plan**'s setup script field, because a reuse publish does not run snapshot preparation.
 
 Selected skills are snapshot-required under the current runtime materialization model. Session startup applies workspace sources but does not update an already-materialized skills repository from the reused **Snapshot**, and materialized skills reconciliation does not pull the repository. A newly selected skill that was added after the previous **Snapshot** was created therefore needs a new **Snapshot** to guarantee the skill exists in the sandbox filesystem.

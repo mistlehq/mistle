@@ -324,6 +324,15 @@ describe.concurrent("sandbox profile versions publish integration", () => {
         version: 2,
         state: SandboxProfileVersionStates.DRAFT,
         sandboxProvider: SandboxProvider.DOCKER,
+        associatedResourceEventRoutingConfig: {
+          enabled: true,
+          resources: [
+            {
+              resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+              eventTypes: [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED],
+            },
+          ],
+        },
       }),
     ]);
     await env.controlPlaneDb.insert(env.controlPlaneTables.triggers).values({
@@ -1065,6 +1074,52 @@ describe.concurrent("sandbox profile versions publish integration", () => {
 
     const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_version_publish_not_publishable_001/versions/1/publish",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(409);
+    const responseBody = PublishSandboxProfileVersionConflictResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody.code).toBe("PROFILE_VERSION_NOT_PUBLISHABLE");
+  });
+
+  it("returns 409 when the draft has no publish-worthy changes", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publish-no-change@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_version_publish_no_change",
+        organizationId: session.organizationId,
+        displayName: "Publish No Change Profile",
+        activeVersion: 1,
+        createdAt: "2026-06-12T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_version_publish_no_change",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_version_publish_no_change",
+        version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    ]);
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_version_publish_no_change/versions/2/publish",
       {
         method: "POST",
         headers: {

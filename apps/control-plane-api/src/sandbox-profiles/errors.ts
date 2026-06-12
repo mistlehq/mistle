@@ -155,6 +155,7 @@ export const SandboxProfilePublishabilityIssueCodes = {
   SKILLS_SOURCE_NOT_LOADED: "SKILLS_SOURCE_NOT_LOADED",
   SKILLS_SOURCE_NOT_BOUND: "SKILLS_SOURCE_NOT_BOUND",
   SELECTED_SKILLS_NOT_FOUND: "SELECTED_SKILLS_NOT_FOUND",
+  NO_PUBLISH_WORTHY_CHANGE: "NO_PUBLISH_WORTHY_CHANGE",
 } as const;
 
 export type SandboxProfilePublishabilityIssueCode =

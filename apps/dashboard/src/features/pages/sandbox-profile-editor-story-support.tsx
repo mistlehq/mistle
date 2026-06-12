@@ -130,6 +130,7 @@ export type SandboxProfileEditorPageStoryArgs = {
   duplicateProfileAvailability?: "available" | "unavailable";
   duplicateProfileDialogState?: "closed" | "open" | "error";
   duplicateProfileTriggerState?: "none" | "with-triggers" | "loading" | "error";
+  publishBlockedMessage?: string;
   initialBindings?: readonly {
     id: string;
     connectionId: string;
@@ -1321,6 +1322,7 @@ function SandboxProfileEditorPageStoryView(
       profileName={profileName}
       profileNameFallback={profileName}
       draftSaveError={input.draftSaveErrorMessage ?? null}
+      publishBlockedMessage={input.publishBlockedMessage ?? null}
       versionActionError={null}
       versionActionIsPending={false}
       renderSectionPanel={(sectionId) => {

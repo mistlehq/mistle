@@ -298,6 +298,7 @@ export const getSandboxProfileVersionPublishabilityResponseSchema = z
             SandboxProfilePublishabilityIssueCodes.SKILLS_SOURCE_NOT_LOADED,
             SandboxProfilePublishabilityIssueCodes.SKILLS_SOURCE_NOT_BOUND,
             SandboxProfilePublishabilityIssueCodes.SELECTED_SKILLS_NOT_FOUND,
+            SandboxProfilePublishabilityIssueCodes.NO_PUBLISH_WORTHY_CHANGE,
           ]),
           message: z.string().min(1),
           bindingId: z.string().min(1).optional(),

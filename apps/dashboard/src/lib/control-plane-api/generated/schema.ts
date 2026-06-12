@@ -11562,7 +11562,8 @@ export interface paths {
                   | "INVALID_SANDBOX_RESOURCES"
                   | "SKILLS_SOURCE_NOT_LOADED"
                   | "SKILLS_SOURCE_NOT_BOUND"
-                  | "SELECTED_SKILLS_NOT_FOUND";
+                  | "SELECTED_SKILLS_NOT_FOUND"
+                  | "NO_PUBLISH_WORTHY_CHANGE";
                 connectionId?: string;
                 message: string;
                 targetKey?: string;

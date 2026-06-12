@@ -8,6 +8,10 @@ This context defines the product language used for sandbox profiles, snapshots, 
 A versioned sandbox profile configuration that can be published and used to prepare sandbox sessions.
 _Avoid_: Profile revision
 
+**Sandbox profile version configuration**:
+The saved configuration owned by a **Sandbox profile version**.
+_Avoid_: External dependency state, integration setting when the setting is not saved on the version
+
 **Sandbox profile duplicate**:
 A **Sandbox profile** created as a copy of another **Sandbox profile**'s saved configuration and latest usable **Snapshot**.
 _Avoid_: Profile clone, duplicated snapshot
@@ -15,6 +19,10 @@ _Avoid_: Profile clone, duplicated snapshot
 **Referenced sandbox profile version**:
 The **Sandbox profile version** an object is configured to use or was created from.
 _Avoid_: Current version, latest version
+
+**Source sandbox profile version**:
+The published **Sandbox profile version** whose saved configuration a draft **Sandbox profile version** starts from.
+_Avoid_: Active version, latest version when publish materialization state matters
 
 **Snapshot**:
 A prepared sandbox image for a published **Sandbox profile version**.
@@ -71,6 +79,10 @@ _Avoid_: Mistle MCP, agent runtime MCP when the server belongs to a provider int
 **Provider placeholder credential**:
 A non-secret credential value supplied only to satisfy provider client libraries before managed egress applies the real integration credential.
 _Avoid_: Dummy credential when it could be mistaken for real provider access
+
+**Publish-worthy change**:
+A change to saved **Sandbox profile version configuration** that justifies creating a new published **Sandbox profile version**.
+_Avoid_: No-op publish, external dependency refresh
 
 **Mistle resource access**:
 A **Sandbox profile version** setting that lets an agent runtime use Mistle-owned resources through a selected organization API key.
@@ -463,6 +475,20 @@ _Avoid_: Schema mismatch prompt, refresh modal
 ## Relationships
 
 - A **Sandbox profile version** may have one usable **Snapshot**.
+- A **Publish-worthy change** is evaluated against the draft's **Source sandbox profile version**.
+- **Sandbox profile version configuration** excludes external dependency state, snapshot image state, snapshot job history, and other lifecycle timestamps.
+- **Sandbox profile version configuration** excludes **Sandbox profile** metadata such as the profile display name.
+- A **Snapshot maintenance script** belongs to a **Sandbox profile version** but is not a **Publish-worthy change** by itself.
+- **Automatic snapshot refresh** belongs to a published **Sandbox profile version** but is not a **Publish-worthy change** by itself.
+- A **Sandbox profile version** without a **Publish-worthy change** should not be publishable.
+- A saved draft **Sandbox profile version** without a **Publish-worthy change** may be discarded without preserving the draft.
+- A saved first draft **Sandbox profile version** is not discarded through the no-change draft cancellation flow.
+- Publishing the first **Sandbox profile version** is publish-worthy when no **Source sandbox profile version** exists.
+- Publishing the first **Sandbox profile version** does not require a **Source sandbox profile version**.
+- A snapshot-neutral change can still be a **Publish-worthy change**.
+- Snapshot reuse depends on a usable **Snapshot**, not only on the **Source sandbox profile version**.
+- Unsaved editor changes may become a **Publish-worthy change** after they are saved to the draft **Sandbox profile version**.
+- Unsaved editor changes should preserve the user's ability to save a draft even when the **Latest saved draft** has no **Publish-worthy change**.
 - Snapshot reuse requires an existing usable **Snapshot** from the previous active **Sandbox profile version**.
 - A **Sandbox profile duplicate** requires the copied source configuration to have a usable **Snapshot**.
 - A **Sandbox profile duplicate** may carry active **Automatic snapshot refresh** execution state.

@@ -39,6 +39,9 @@ import {
   ResizablePanelGroup,
   SectionBlock,
   TextLink,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from "@mistle/ui";
 import { SidebarSimpleIcon, TerminalIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
@@ -72,6 +75,7 @@ import {
   sandboxProfileDuplicateTriggerUsagesQueryKey,
   sandboxProfileTriggerUsagesQueryKey,
   sandboxProfileVersionIntegrationBindingsQueryKey,
+  sandboxProfileVersionPublishabilityQueryKey,
   sandboxProfileVersionSetupScriptQueryKey,
   sandboxProfileVersionsQueryKey,
   sandboxProvidersQueryKey,
@@ -1707,9 +1711,24 @@ function ReadySandboxProfileEditorPage(input: {
   invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
   invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
 }): React.JSX.Element {
+  const queryClient = useQueryClient();
   const integrationsLoader = useSandboxProfileIntegrationsLoader({
     profileId: input.profileId,
     version: input.mode.version,
+  });
+  const publishabilityQuery = useQuery({
+    queryKey: sandboxProfileVersionPublishabilityQueryKey({
+      profileId: input.profileId,
+      version: input.mode.version,
+    }),
+    queryFn: async ({ signal }) =>
+      getSandboxProfileVersionPublishability({
+        profileId: input.profileId,
+        version: input.mode.version,
+        signal,
+      }),
+    enabled: input.mode.kind === "draft",
+    retry: false,
   });
   const [integrationDraftState, setIntegrationDraftState] = useState(
     createIdleSandboxProfileDraftSectionState,
@@ -1824,6 +1843,9 @@ function ReadySandboxProfileEditorPage(input: {
     skillsDraftState.hasUnpersistedChanges ||
     setupScriptDraftState.hasUnpersistedChanges ||
     runtimeDraftState.hasUnpersistedChanges;
+  const noPublishWorthyChangeIssue =
+    publishabilityQuery.data?.issues.find((issue) => issue.code === "NO_PUBLISH_WORTHY_CHANGE") ??
+    null;
   useEffect(() => {
     if (setupAssistantLocalDraftHasAgentRuntime) {
       setShowSetupAssistantAgentRuntimeConnectionError(false);
@@ -2340,6 +2362,12 @@ function ReadySandboxProfileEditorPage(input: {
           await input.invalidateProfileVersions(input.profileId);
         }
       }
+      await queryClient.invalidateQueries({
+        queryKey: sandboxProfileVersionPublishabilityQueryKey({
+          profileId: input.profileId,
+          version: input.mode.version,
+        }),
+      });
 
       return true;
     } catch (error: unknown) {
@@ -2428,6 +2456,7 @@ function ReadySandboxProfileEditorPage(input: {
         skillsDraftState.hasUnpersistedChanges
       }
       hasUnpersistedSetupScriptChanges={setupScriptDraftState.hasUnpersistedChanges}
+      publishBlockedMessage={noPublishWorthyChangeIssue?.message ?? null}
       isSavingProfileName={metaState.isUpdating}
       mode={input.mode}
       shouldBlockUnpersistedChangesNavigation={shouldBlockUnpersistedChangesNavigation}
@@ -3580,6 +3609,7 @@ export function SandboxProfileEditorView(input: {
   draftTriggerImpactErrorAutoHideAfterMs?: number | null;
   onDraftTriggerImpactErrorDismiss: () => void;
   publishRequestIsPending?: boolean;
+  publishBlockedMessage?: string | null;
   saveDraftRequestIsPending?: boolean;
   isDeleteProfileDialogOpen: boolean;
   isDuplicateProfileDialogOpen?: boolean;
@@ -3609,6 +3639,7 @@ export function SandboxProfileEditorView(input: {
     ((input.hasUnpersistedRuntimeChanges ?? false) ||
       (input.hasUnpersistedIntegrationChanges ?? false) ||
       (input.hasUnpersistedSetupScriptChanges ?? false));
+  const publishBlockedMessage = input.publishBlockedMessage ?? null;
   const duplicateProfileIsAvailable = input.duplicateProfileIsAvailable ?? false;
   const duplicateProfileIsPending = input.duplicateProfileIsPending ?? false;
   const duplicateProfileTriggerUsagesIsPending =
@@ -3737,6 +3768,7 @@ export function SandboxProfileEditorView(input: {
                   onSaveDraft={input.onSaveDraft}
                   onViewActive={input.onViewActive}
                   onViewDraft={input.onViewDraft}
+                  publishBlockedMessage={publishBlockedMessage}
                   publishRequestIsPending={input.publishRequestIsPending === true}
                   saveDraftRequestIsPending={input.saveDraftRequestIsPending === true}
                   versionActionIsPending={input.versionActionIsPending}
@@ -3804,6 +3836,7 @@ function SandboxProfileVersionStatusBadge(input: {
 function SandboxProfileLifecycleActions(input: {
   mode: SandboxProfileEditorVersionMode;
   hasUnpersistedDraftChanges: boolean;
+  publishBlockedMessage: string | null;
   publishRequestIsPending: boolean;
   saveDraftRequestIsPending: boolean;
   versionActionIsPending: boolean;
@@ -3818,9 +3851,30 @@ function SandboxProfileLifecycleActions(input: {
     input.versionActionIsPending ||
     input.publishRequestIsPending ||
     input.saveDraftRequestIsPending;
+  const effectivePublishBlockedMessage =
+    input.publishBlockedMessage !== null && !input.hasUnpersistedDraftChanges
+      ? input.publishBlockedMessage
+      : null;
+  const publishIsDisabled = versionActionIsDisabled || effectivePublishBlockedMessage !== null;
   const discardChangesInput = resolveDiscardDraftInput(input.mode);
+  const contextualCancelInput =
+    input.mode.kind === "draft" && effectivePublishBlockedMessage !== null
+      ? discardChangesInput
+      : null;
+  const publishButton = (
+    <Button
+      disabled={publishIsDisabled}
+      onClick={() => {
+        input.onPublish(input.mode.version);
+      }}
+      title={effectivePublishBlockedMessage ?? undefined}
+      type="button"
+    >
+      {input.publishRequestIsPending ? "Publishing..." : "Publish"}
+    </Button>
+  );
   const discardChangesMenuItem =
-    discardChangesInput === null ? null : (
+    discardChangesInput === null || contextualCancelInput !== null ? null : (
       <DropdownMenuItem
         disabled={versionActionIsDisabled}
         onClick={() => {
@@ -3835,42 +3889,63 @@ function SandboxProfileLifecycleActions(input: {
       <DropdownMenuItem onClick={input.onViewActive}>View published</DropdownMenuItem>
     );
   const hasDraftMenuItems = viewPublishedMenuItem !== null || discardChangesMenuItem !== null;
+  const draftPrimaryAction =
+    contextualCancelInput === null ? (
+      <Button
+        disabled={!input.hasUnpersistedDraftChanges || versionActionIsDisabled}
+        onClick={input.onSaveDraft}
+        type="button"
+        variant="outline"
+      >
+        {input.saveDraftRequestIsPending ? "Saving..." : "Save draft"}
+      </Button>
+    ) : (
+      <Button
+        disabled={versionActionIsDisabled}
+        onClick={() => {
+          input.onDiscardChangesAndLeaveDraft(contextualCancelInput);
+        }}
+        type="button"
+        variant="outline"
+      >
+        Cancel
+      </Button>
+    );
+  const draftVersionActions = (
+    <>
+      {publishButton}
+      {hasDraftMenuItems ? (
+        <MoreActionsMenu
+          disabled={versionActionIsDisabled}
+          triggerIconVariant="chevron-down"
+          triggerLabel="Sandbox profile actions"
+          triggerVariant="default"
+        >
+          {viewPublishedMenuItem}
+          {discardChangesMenuItem}
+        </MoreActionsMenu>
+      ) : null}
+    </>
+  );
+  const draftVersionActionGroup =
+    effectivePublishBlockedMessage === null ? (
+      <ButtonGroup>{draftVersionActions}</ButtonGroup>
+    ) : (
+      <Tooltip delay={0}>
+        <TooltipTrigger render={<ButtonGroup />}>{draftVersionActions}</TooltipTrigger>
+        <TooltipContent className="max-w-64 text-left" side="top">
+          {effectivePublishBlockedMessage}
+        </TooltipContent>
+      </Tooltip>
+    );
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <SandboxProfileVersionStatusBadge mode={input.mode} />
       {input.mode.kind === "draft" ? (
         <div className="flex items-center gap-2">
-          <Button
-            disabled={!input.hasUnpersistedDraftChanges || versionActionIsDisabled}
-            onClick={input.onSaveDraft}
-            type="button"
-            variant="outline"
-          >
-            {input.saveDraftRequestIsPending ? "Saving..." : "Save draft"}
-          </Button>
-          <ButtonGroup>
-            <Button
-              disabled={versionActionIsDisabled}
-              onClick={() => {
-                input.onPublish(input.mode.version);
-              }}
-              type="button"
-            >
-              {input.publishRequestIsPending ? "Publishing..." : "Publish"}
-            </Button>
-            {hasDraftMenuItems ? (
-              <MoreActionsMenu
-                disabled={versionActionIsDisabled}
-                triggerIconVariant="chevron-down"
-                triggerLabel="Sandbox profile actions"
-                triggerVariant="default"
-              >
-                {viewPublishedMenuItem}
-                {discardChangesMenuItem}
-              </MoreActionsMenu>
-            ) : null}
-          </ButtonGroup>
+          {draftPrimaryAction}
+          {draftVersionActionGroup}
         </div>
       ) : (
         <ButtonGroup>

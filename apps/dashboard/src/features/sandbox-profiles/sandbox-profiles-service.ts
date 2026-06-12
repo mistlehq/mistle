@@ -592,6 +592,7 @@ const SandboxProfileVersionPublishabilitySchema = z
             "SKILLS_SOURCE_NOT_LOADED",
             "SKILLS_SOURCE_NOT_BOUND",
             "SELECTED_SKILLS_NOT_FOUND",
+            "NO_PUBLISH_WORTHY_CHANGE",
           ]),
           message: z.string().min(1),
           bindingId: z.string().min(1).optional(),

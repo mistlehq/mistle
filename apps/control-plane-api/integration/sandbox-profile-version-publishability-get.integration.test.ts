@@ -8,6 +8,10 @@ import {
   SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
+import {
+  AssociatedProviderResourceKinds,
+  AssociatedResourceEventTypes,
+} from "@mistle/integrations-core";
 import { SandboxProvider } from "@mistle/sandbox";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
@@ -316,6 +320,181 @@ describe.concurrent("sandbox profile version publishability get integration", ()
     expect(responseBody).toEqual({
       publishable: true,
       issues: [],
+    });
+  });
+
+  it("returns a no-change issue when a draft matches its source published version", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publishability-no-change@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_publishability_no_change",
+        organizationId: session.organizationId,
+        displayName: "No Change Publishability Profile",
+        activeVersion: 1,
+        createdAt: "2026-06-12T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_publishability_no_change",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_publishability_no_change",
+        version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    ]);
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_publishability_no_change/versions/2/publishability",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = GetSandboxProfileVersionPublishabilityResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody).toEqual({
+      publishable: false,
+      issues: [
+        {
+          code: "NO_PUBLISH_WORTHY_CHANGE",
+          message: "Make a change to the sandbox profile draft before publishing.",
+        },
+      ],
+    });
+  });
+
+  it("returns publishable true for a snapshot-neutral publish-worthy change", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email:
+        "integration-new-sandbox-profile-version-publishability-snapshot-neutral-change@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_publishability_snapshot_neutral_change",
+        organizationId: session.organizationId,
+        displayName: "Snapshot Neutral Publishability Profile",
+        activeVersion: 1,
+        createdAt: "2026-06-12T00:10:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_publishability_snapshot_neutral_change",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_publishability_snapshot_neutral_change",
+        version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+        associatedResourceEventRoutingConfig: {
+          enabled: true,
+          resources: [
+            {
+              resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+              eventTypes: [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED],
+            },
+          ],
+        },
+      }),
+    ]);
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_publishability_snapshot_neutral_change/versions/2/publishability",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = GetSandboxProfileVersionPublishabilityResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody).toEqual({
+      publishable: true,
+      issues: [],
+    });
+  });
+
+  it("compares drafts against the latest earlier published source version", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publishability-pending-source@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_publishability_pending_source",
+        organizationId: session.organizationId,
+        displayName: "Pending Source Publishability Profile",
+        activeVersion: 1,
+        createdAt: "2026-06-12T00:20:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_publishability_pending_source",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        setupScript: "echo source-v1",
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_publishability_pending_source",
+        version: 2,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        setupScript: "echo source-v2",
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_publishability_pending_source",
+        version: 3,
+        state: SandboxProfileVersionStates.DRAFT,
+        setupScript: "echo source-v2",
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    ]);
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_publishability_pending_source/versions/3/publishability",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = GetSandboxProfileVersionPublishabilityResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody).toEqual({
+      publishable: false,
+      issues: [
+        {
+          code: "NO_PUBLISH_WORTHY_CHANGE",
+          message: "Make a change to the sandbox profile draft before publishing.",
+        },
+      ],
     });
   });
 
