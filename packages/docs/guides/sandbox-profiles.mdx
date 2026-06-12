@@ -61,17 +61,22 @@ Model provider connections, Git connection, and connector integrations are saved
 
 ## Setup Scripts
 
-Setup scripts prepare the sandbox environment for the profile. They can install tools, configure agent settings, or prepare dependencies that future sessions need.
+Setup scripts are custom preparation steps that run during snapshot creation. They make the profile's starting environment explicit and repeatable, instead of leaving future sessions to depend on manual setup or agent-discovered setup work.
 
-Setup scripts are important because they make an agent's starting environment explicit and repeatable. Without a setup script, each session depends on whatever the base image already contains and whatever setup the agent discovers during the task. That can waste time and make failures hard to reproduce.
+```text
+Base image
+  ↓
+Mistle prepares the profile-defined environment
+  - agent runtime and configuration
+  - repositories
+  - integration-related MCP tools and configuration
+  ↓
+Setup script runs
+  ↓
+Snapshot captured
+```
 
-Use setup scripts to:
-
-- install required tools and runtimes
-- configure package managers, CLIs, and agent settings
-- prepare repository-specific dependencies
-- warm dependency caches
-- run smoke checks that prove the environment is ready
+Mistle first prepares the profile-defined environment from the sandbox profile. The setup script then runs on top of that environment before the snapshot is captured.
 
 Keep setup scripts deterministic and explicit. A session should not depend on manual setup that is not captured in the profile.
 
