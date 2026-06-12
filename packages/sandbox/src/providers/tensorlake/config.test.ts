@@ -17,7 +17,6 @@ describe("validateTensorlakeSandboxConfig", () => {
           kind: "release",
           artifact: {
             version: "1.2.3",
-            target: "x86_64-unknown-linux-gnu",
             url: "https://github.com/mistlehq/mistle/releases/download/v1.2.3/sandboxd-x86_64-unknown-linux-gnu.tar.gz",
             sha256: "a".repeat(64),
           },

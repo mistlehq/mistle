@@ -10,6 +10,7 @@ import {
   SandboxProvider,
   SandboxSdkImageSandboxdSourceKinds,
   type SandboxAdapter,
+  type SandboxdArtifact,
   type SandboxSdkImageReleaseSandboxdSource,
   type SandboxRuntimeControl,
   type SandboxProvider as SandboxProviderValue,
@@ -334,7 +335,9 @@ export function createTensorlakeSandboxProviderConfig(input: {
     provider: SandboxProvider.TENSORLAKE,
     tensorlake: {
       apiKey: input.credentials.apiKey,
-      ...(input.sandboxd === undefined ? {} : { sandboxd: input.sandboxd }),
+      ...(input.sandboxd === undefined
+        ? {}
+        : { sandboxd: createSandboxProviderSource(input.sandboxd) }),
     },
   };
 }
@@ -383,7 +386,9 @@ export function createOpenComputerSandboxProviderConfig(input: {
       ...(input.credentials.apiBaseUrl === undefined
         ? {}
         : { apiBaseUrl: input.credentials.apiBaseUrl }),
-      ...(input.sandboxd === undefined ? {} : { sandboxd: input.sandboxd }),
+      ...(input.sandboxd === undefined
+        ? {}
+        : { sandboxd: createSandboxProviderSource(input.sandboxd) }),
     },
   };
 }
@@ -392,4 +397,23 @@ function isOpenComputerResourceTier(input: { vcpuCount: number; memoryMb: number
   return OpenComputerValidResourceTiers.some(
     (tier) => tier.vcpuCount === input.vcpuCount && tier.memoryMb === input.memoryMb,
   );
+}
+
+function createSandboxProviderSource(
+  source: SandboxSdkImageReleaseSandboxdSource,
+): SandboxSdkImageReleaseSandboxdSource {
+  return {
+    kind: SandboxSdkImageSandboxdSourceKinds.RELEASE,
+    artifact: createSandboxProviderArtifact(source.artifact),
+  };
+}
+
+function createSandboxProviderArtifact(
+  artifact: SandboxdArtifact,
+): SandboxSdkImageReleaseSandboxdSource["artifact"] {
+  return {
+    version: artifact.version,
+    url: artifact.url,
+    sha256: artifact.sha256,
+  };
 }
