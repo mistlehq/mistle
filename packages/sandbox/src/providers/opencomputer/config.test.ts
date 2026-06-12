@@ -18,6 +18,7 @@ describe("validateOpenComputerSandboxConfig", () => {
           kind: "release",
           artifact: {
             version: "0.32.0",
+            target: "x86_64-unknown-linux-gnu",
             url: "https://example.com/sandboxd.tar.gz",
             sha256: "a".repeat(64),
           },

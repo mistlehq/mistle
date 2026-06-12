@@ -13,6 +13,7 @@ export const TensorlakeSandboxConfigSchema = z
         artifact: z
           .object({
             version: z.string().trim().min(1),
+            target: z.literal("x86_64-unknown-linux-gnu").optional(),
             url: z.url(),
             sha256: z.string().regex(/^[a-f0-9]{64}$/u),
           })
