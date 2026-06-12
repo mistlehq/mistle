@@ -1,5 +1,5 @@
 [default]
-extend-ignore-re = ["IIFEs", "\\[Ll\\]ocation:"]
+extend-ignore-re = ["IIFEs", "\\[Ll\\]ocation:", "U\\+[0-9A-F]{4}(?:-[0-9A-F]{4})?"]
 extend-ignore-identifiers-re = ["\\bthr_[A-Za-z0-9_]+\\b"]
 
 [default.extend-words]
