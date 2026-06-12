@@ -1328,12 +1328,6 @@ importers:
       '@base-ui/react':
         specifier: ^1.5.0
         version: 1.5.0(@date-fns/tz@1.5.0)(@types/react@19.2.17)(date-fns@4.3.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@fontsource-variable/jetbrains-mono':
-        specifier: ^5.2.8
-        version: 5.2.8
-      '@fontsource-variable/quicksand':
-        specifier: ^5.2.10
-        version: 5.2.10
       '@mistle/time':
         specifier: workspace:*
         version: link:../time
@@ -2425,12 +2419,6 @@ packages:
 
   '@floating-ui/utils@0.2.11':
     resolution: {integrity: sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==}
-
-  '@fontsource-variable/jetbrains-mono@5.2.8':
-    resolution: {integrity: sha512-WBA9elru6Jdp5df2mES55wuOO0WIrn3kpXnI4+W2ek5u3ZgLS9XS4gmIlcQhiZOWEKl95meYdvK7xI+ETLCq/Q==}
-
-  '@fontsource-variable/quicksand@5.2.10':
-    resolution: {integrity: sha512-1uzkzGDwWgtFnxquAXuD7fZV9wHkALb49UPzRXxGTVeeLsNrGnIU0O/pcz6m1U7RDtpHz2qx77JhCpKaq7FrUg==}
 
   '@grpc/grpc-js@1.14.3':
     resolution: {integrity: sha512-Iq8QQQ/7X3Sac15oB6p0FmUg/klxQvXLeileoqrTRGJYLV+/9tubbr9ipz0GKHjmXVsgFPo/+W+2cA8eNcR+XA==}
@@ -13813,10 +13801,6 @@ snapshots:
       react-dom: 19.2.7(react@19.2.7)
 
   '@floating-ui/utils@0.2.11': {}
-
-  '@fontsource-variable/jetbrains-mono@5.2.8': {}
-
-  '@fontsource-variable/quicksand@5.2.10': {}
 
   '@grpc/grpc-js@1.14.3':
     dependencies:
