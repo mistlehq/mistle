@@ -459,6 +459,7 @@ export class OpenComputerApiClient implements OpenComputerClient {
       const response = await this.#jsonRequest({
         method: "POST",
         path: `/sandboxes/${encodeURIComponent(parsedRequest.sandboxId)}/checkpoints`,
+        body: { name: parsedRequest.name },
         schema: OpenComputerCheckpointResponseSchema,
         operation: OpenComputerClientOperationIds.CREATE_CHECKPOINT,
         ...(parsedRequest.requestTimeoutMs === undefined

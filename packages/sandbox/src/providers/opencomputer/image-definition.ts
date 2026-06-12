@@ -1,4 +1,7 @@
 import { Buffer } from "node:buffer";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { Image } from "@opencomputer/sdk/node";
 
@@ -72,17 +75,17 @@ export function createOpenComputerImageFromManifest(manifest: OpenComputerImageM
         image = image.workdir(step.args.path);
         break;
       case "add_file":
-        image = image.addFile(
-          step.args.path,
-          Buffer.from(step.args.content, "base64").toString("utf8"),
-        );
+        image = addBase64FileToOpenComputerImage(image, {
+          content: step.args.content,
+          path: step.args.path,
+        });
         break;
       case "add_dir":
         for (const file of step.args.files) {
-          image = image.addFile(
-            `${step.args.path.replace(/\/+$/u, "")}/${file.relativePath}`,
-            Buffer.from(file.content, "base64").toString("utf8"),
-          );
+          image = addBase64FileToOpenComputerImage(image, {
+            content: file.content,
+            path: `${step.args.path.replace(/\/+$/u, "")}/${file.relativePath}`,
+          });
         }
         break;
     }
@@ -129,6 +132,20 @@ function createOpenComputerSandboxdInstallImageCommand(input: {
     `test "$(/opt/mistle/bin/sandboxd version)" = ${shellQuote(input.version)}`,
     "sudo -n ln -sf sandboxd /opt/mistle/bin/mistle-ssh-sign",
   ].join("\n");
+}
+
+function addBase64FileToOpenComputerImage(
+  image: Image,
+  input: { readonly path: string; readonly content: string },
+): Image {
+  const temporaryDirectory = mkdtempSync(join(tmpdir(), "mistle-opencomputer-image-"));
+  const temporaryFile = join(temporaryDirectory, "file");
+  try {
+    writeFileSync(temporaryFile, Buffer.from(input.content, "base64"));
+    return image.addLocalFile(temporaryFile, input.path);
+  } finally {
+    rmSync(temporaryDirectory, { force: true, recursive: true });
+  }
 }
 
 function shellQuote(value: string): string {

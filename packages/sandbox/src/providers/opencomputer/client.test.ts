@@ -1,5 +1,9 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
+import { Image } from "@opencomputer/sdk/node";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -222,6 +226,20 @@ describe("OpenComputer client helpers", () => {
     expect(createOpenComputerImageFromManifest(manifest).toJSON()).toEqual(image.toJSON());
   });
 
+  it("preserves binary add_file content when replaying deferred image manifests", () => {
+    const temporaryDirectory = mkdtempSync(join(tmpdir(), "mistle-opencomputer-test-"));
+    const binaryPath = join(temporaryDirectory, "sandboxd.gz");
+    try {
+      writeFileSync(binaryPath, new Uint8Array([0, 159, 146, 150, 255]));
+      const image = Image.base().addLocalFile(binaryPath, "/tmp/sandboxd.gz");
+      const manifest = createOpenComputerImageManifest(image);
+
+      expect(createOpenComputerImageFromManifest(manifest).toJSON()).toEqual(image.toJSON());
+    } finally {
+      rmSync(temporaryDirectory, { force: true, recursive: true });
+    }
+  });
+
   it("revalidates same-name snapshot prepares when deferred manifests differ", async () => {
     const firstManifest = createOpenComputerImageManifest(
       createOpenComputerBaseImage({
@@ -323,8 +341,10 @@ describe("OpenComputer client helpers", () => {
   });
 
   it("captures snapshots when callers provide a provider request timeout", async () => {
-    const api = await startSimulatedOpenComputerApi((request, response) => {
+    let checkpointBody: unknown;
+    const api = await startSimulatedOpenComputerApi(async (request, response) => {
       if (request.method === "POST" && request.url === "/api/sandboxes/sb-1/checkpoints") {
+        checkpointBody = JSON.parse(await readRequestBody(request));
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(JSON.stringify({ checkpointId: "checkpoint-1" }));
         return;
@@ -338,8 +358,13 @@ describe("OpenComputer client helpers", () => {
 
     try {
       await expect(
-        client.captureSandboxSnapshot({ sandboxId: "sb-1", requestTimeoutMs: 1_000 }),
+        client.captureSandboxSnapshot({
+          sandboxId: "sb-1",
+          name: "mistle-sb-1",
+          requestTimeoutMs: 1_000,
+        }),
       ).resolves.toEqual({ checkpointId: "checkpoint-1" });
+      expect(checkpointBody).toEqual({ name: "mistle-sb-1" });
     } finally {
       await api.close();
     }

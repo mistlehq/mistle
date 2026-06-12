@@ -215,6 +215,7 @@ export type OpenComputerStartSandboxRequest = z.output<
 
 export const OpenComputerCaptureSandboxSnapshotRequestSchema =
   OpenComputerSandboxIdRequestSchema.extend({
+    name: z.string().trim().min(1),
     requestTimeoutMs: z.number().int().positive().optional(),
   }).strict();
 export type OpenComputerCaptureSandboxSnapshotRequest = z.output<

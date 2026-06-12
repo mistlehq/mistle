@@ -146,6 +146,7 @@ export class OpenComputerSandboxAdapter implements SandboxAdapter {
     try {
       const response = await this.#client.captureSandboxSnapshot({
         sandboxId: request.id,
+        name: createOpenComputerCheckpointName(request.id),
         ...(request.providerRequestTimeoutMs === undefined
           ? {}
           : { requestTimeoutMs: request.providerRequestTimeoutMs }),
@@ -184,6 +185,10 @@ export class OpenComputerSandboxAdapter implements SandboxAdapter {
       throw error;
     }
   }
+}
+
+function createOpenComputerCheckpointName(sandboxId: string): string {
+  return `mistle-${sandboxId}`;
 }
 
 export function createOpenComputerSandboxAdapter(input: {
