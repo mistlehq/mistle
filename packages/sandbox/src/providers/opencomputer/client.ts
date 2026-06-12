@@ -53,6 +53,7 @@ export {
 } from "./image-definition.js";
 
 const SandboxdCommand = "/opt/mistle/bin/sandboxd";
+const OpenComputerDefaultCwd = "/root";
 const OpenComputerRootPath =
   "/opt/mistle/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 const DaemonReadinessPollIntervalMs = 100;
@@ -762,6 +763,7 @@ export class OpenComputerApiClient implements OpenComputerClient {
       sandboxId: input.sandboxId,
       command: daemonCommand.command,
       args: daemonCommand.args,
+      cwd: OpenComputerDefaultCwd,
       maxRunAfterDisconnectSeconds: 86_400,
       operation: OpenComputerClientOperationIds.ACTIVATE,
     });
@@ -864,6 +866,7 @@ export class OpenComputerApiClient implements OpenComputerClient {
     sandboxId: string;
     command: string;
     args?: readonly string[];
+    cwd?: string;
     env?: Readonly<Record<string, string>>;
     maxRunAfterDisconnectSeconds?: number;
     operation: OpenComputerClientOperation;
@@ -897,6 +900,7 @@ export class OpenComputerApiClient implements OpenComputerClient {
     sandboxId: string;
     command: string;
     args?: readonly string[];
+    cwd?: string;
     env?: Readonly<Record<string, string>>;
     maxRunAfterDisconnectSeconds?: number;
     operation: OpenComputerClientOperation;
@@ -904,14 +908,7 @@ export class OpenComputerApiClient implements OpenComputerClient {
     const response = await this.#jsonRequest({
       method: "POST",
       path: `/sandboxes/${encodeURIComponent(input.sandboxId)}/exec`,
-      body: {
-        cmd: input.command,
-        ...(input.args === undefined ? {} : { args: [...input.args] }),
-        ...(input.env === undefined ? {} : { envs: { ...input.env } }),
-        ...(input.maxRunAfterDisconnectSeconds === undefined
-          ? {}
-          : { maxRunAfterDisconnect: input.maxRunAfterDisconnectSeconds }),
-      },
+      body: createOpenComputerExecSessionBody(input),
       schema: OpenComputerExecSessionResponseSchema,
       operation: input.operation,
     });
@@ -1161,6 +1158,30 @@ function createOpenComputerRunCommandBody(request: OpenComputerRunCommandRequest
     ...(request.env === undefined ? {} : { envs: { ...request.env } }),
     ...(request.cwd === undefined ? {} : { cwd: request.cwd }),
     ...(request.timeoutMs === undefined ? {} : { timeout: request.timeoutMs / 1000 }),
+  };
+}
+
+export function createOpenComputerExecSessionBody(input: {
+  readonly command: string;
+  readonly args?: readonly string[];
+  readonly cwd?: string;
+  readonly env?: Readonly<Record<string, string>>;
+  readonly maxRunAfterDisconnectSeconds?: number;
+}): {
+  cmd: string;
+  args?: readonly string[];
+  cwd?: string;
+  envs?: Record<string, string>;
+  maxRunAfterDisconnect?: number;
+} {
+  return {
+    cmd: input.command,
+    ...(input.args === undefined ? {} : { args: [...input.args] }),
+    ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
+    ...(input.env === undefined ? {} : { envs: { ...input.env } }),
+    ...(input.maxRunAfterDisconnectSeconds === undefined
+      ? {}
+      : { maxRunAfterDisconnect: input.maxRunAfterDisconnectSeconds }),
   };
 }
 

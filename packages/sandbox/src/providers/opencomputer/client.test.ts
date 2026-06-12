@@ -16,6 +16,7 @@ import {
   createOpenComputerActivateCommandArgs,
   createOpenComputerBaseImage,
   createOpenComputerDaemonCommand,
+  createOpenComputerExecSessionBody,
   createOpenComputerImageManifest,
   createOpenComputerImageFromManifest,
   createOpenComputerRootShellCommand,
@@ -143,6 +144,24 @@ describe("OpenComputer client helpers", () => {
       "--stdin-bytes",
       "3",
     ]);
+  });
+
+  it("passes cwd through OpenComputer exec session requests", () => {
+    expect(
+      createOpenComputerExecSessionBody({
+        command: "sudo",
+        args: ["-n", "env", "/opt/mistle/bin/sandboxd"],
+        cwd: "/root",
+        env: { FOO: "bar" },
+        maxRunAfterDisconnectSeconds: 86_400,
+      }),
+    ).toEqual({
+      cmd: "sudo",
+      args: ["-n", "env", "/opt/mistle/bin/sandboxd"],
+      cwd: "/root",
+      envs: { FOO: "bar" },
+      maxRunAfterDisconnect: 86_400,
+    });
   });
 
   it("sets the OpenComputer base image home and working directory to root", () => {
