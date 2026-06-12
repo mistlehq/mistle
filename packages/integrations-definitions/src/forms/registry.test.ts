@@ -1,6 +1,6 @@
 import {
-  AgentConversationStatuses,
   AgentRuntimeRegistry,
+  type AnyAgentRuntimeMetadata,
   IntegrationKinds,
   IntegrationRegistry,
   type IntegrationDefinition,
@@ -67,7 +67,7 @@ function createAgentDefinition(): IntegrationDefinition<
 }
 
 function registerRuntime(
-  registry: AgentRuntimeRegistry,
+  registry: AgentRuntimeRegistry<AnyAgentRuntimeMetadata>,
   input: {
     runtimeId: string;
     displayName: string;
@@ -79,32 +79,6 @@ function registerRuntime(
     displayName: input.displayName,
     logoKey: input.logoKey ?? input.runtimeId,
     configSchema: z.object({}),
-    compileRuntime: () => ({
-      runtimeClients: [],
-      agentRuntimes: [],
-    }),
-    createConversationProvider: () => ({
-      connect: async () => ({
-        request: async () => ({ ok: true }),
-        close: async () => {},
-      }),
-      inspectConversation: async () => ({
-        exists: true,
-        status: AgentConversationStatuses.IDLE,
-        activeExecutionId: null,
-      }),
-      createConversation: async () => ({
-        providerConversationId: "thread_123",
-      }),
-      resumeConversation: async () => {},
-      startExecution: async () => ({
-        providerExecutionId: null,
-      }),
-      steerExecution: async () => ({
-        providerExecutionId: "turn_123",
-      }),
-      interruptExecution: async () => {},
-    }),
   });
 }
 
@@ -113,7 +87,7 @@ describe("integration form registry", () => {
     const integrationRegistry = new IntegrationRegistry();
     integrationRegistry.register(createAgentDefinition());
 
-    const agentRuntimeRegistry = new AgentRuntimeRegistry();
+    const agentRuntimeRegistry = new AgentRuntimeRegistry<AnyAgentRuntimeMetadata>();
     registerRuntime(agentRuntimeRegistry, {
       runtimeId: "codex",
       displayName: "Codex",
@@ -189,7 +163,7 @@ describe("integration form registry", () => {
       ],
     });
 
-    const agentRuntimeRegistry = new AgentRuntimeRegistry();
+    const agentRuntimeRegistry = new AgentRuntimeRegistry<AnyAgentRuntimeMetadata>();
     registerRuntime(agentRuntimeRegistry, {
       runtimeId: "codex",
       displayName: "Codex",

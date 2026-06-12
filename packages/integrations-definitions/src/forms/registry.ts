@@ -1,5 +1,6 @@
 import type {
   AnyIntegrationDefinition,
+  AnyAgentRuntimeMetadata,
   IntegrationBrowserSafeConnectionMethodDefinition,
   IntegrationDefinitionsBundle,
   IntegrationFormDefinition,
@@ -55,7 +56,7 @@ function toBrowserSafeConnectionMethod(
 
 function resolveAgentRuntimeOptions(input: {
   definition: AnyIntegrationDefinition;
-  definitions: IntegrationDefinitionsBundle;
+  definitions: IntegrationDefinitionsBundle<AnyAgentRuntimeMetadata>;
 }): readonly AgentRuntimeOption[] | undefined {
   if (input.definition.kind !== "agent") {
     return undefined;
@@ -78,7 +79,7 @@ function resolveAgentRuntimeOptions(input: {
 
 function toFormDefinitionRecord(input: {
   definition: AnyIntegrationDefinition;
-  definitions: IntegrationDefinitionsBundle;
+  definitions: IntegrationDefinitionsBundle<AnyAgentRuntimeMetadata>;
 }): IntegrationFormDefinitionRecord {
   const agentRuntimeOptions = resolveAgentRuntimeOptions(input);
 
@@ -97,7 +98,7 @@ function toFormDefinitionRecord(input: {
 }
 
 export function listIntegrationFormDefinitions(
-  definitions: IntegrationDefinitionsBundle,
+  definitions: IntegrationDefinitionsBundle<AnyAgentRuntimeMetadata>,
 ): readonly IntegrationFormDefinitionRecord[] {
   return definitions.integrationRegistry.listDefinitions().map((definition) =>
     toFormDefinitionRecord({
@@ -107,7 +108,9 @@ export function listIntegrationFormDefinitions(
   );
 }
 
-export function createIntegrationFormRegistry(definitions: IntegrationDefinitionsBundle): {
+export function createIntegrationFormRegistry(
+  definitions: IntegrationDefinitionsBundle<AnyAgentRuntimeMetadata>,
+): {
   getDefinition(input: {
     familyId: string;
     variantId: string;

@@ -20,7 +20,7 @@ import { LinearDefinition } from "./linear/index.js";
 import { OpenAiApiKeyDefinition } from "./openai/index.js";
 import { OpenCodeGoDefinition } from "./opencode/index.js";
 import { PlanetScaleDefinition } from "./planetscale/server.js";
-import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
+import { createAgentRuntimeServerRegistry } from "./registry/agent-runtimes.server.js";
 import {
   E2BSandboxRuntimeDefinition,
   ModalSandboxRuntimeDefinition,
@@ -52,6 +52,7 @@ export * from "./slack/index.js";
 export * from "./forms/index.js";
 export * from "./agent-runtimes/provider-selection.js";
 export * from "./registry/agent-runtimes.js";
+export * from "./registry/agent-runtimes.server.js";
 export * from "./shared/remote-mcp-server-catalog/index.js";
 export * from "./shared/webhook-callback-url.server.js";
 
@@ -89,7 +90,7 @@ export function createIntegrationRegistry(): IntegrationRegistry {
 export function createDefinitionsBundle(): IntegrationDefinitionsBundle {
   return {
     integrationRegistry: createIntegrationRegistry(),
-    agentRuntimeRegistry: createAgentRuntimeRegistry(),
+    agentRuntimeRegistry: createAgentRuntimeServerRegistry(),
   };
 }
 

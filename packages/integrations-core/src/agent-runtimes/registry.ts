@@ -5,6 +5,7 @@ import {
 import type {
   AgentRuntimeLocator,
   AgentRuntimeResolver,
+  AnyAgentRuntimeMetadata,
   AnyAgentRuntimeDefinition,
 } from "./types.js";
 
@@ -15,7 +16,7 @@ type ComposerCommandRegistryState = {
   commandNames: Set<string>;
 };
 
-function validateRuntimeDefinition(input: AnyAgentRuntimeDefinition): void {
+function validateRuntimeMetadata(input: AnyAgentRuntimeMetadata): void {
   if (input.runtimeId.trim().length === 0) {
     throw new IntegrationDefinitionRegistryError(
       DefinitionRegistryErrorCodes.INVALID_DEFINITION,
@@ -272,47 +273,49 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-export class AgentRuntimeRegistry implements AgentRuntimeResolver {
-  readonly #definitionsByKey = new Map<string, AnyAgentRuntimeDefinition>();
+export class AgentRuntimeRegistry<
+  TEntry extends AnyAgentRuntimeMetadata = AnyAgentRuntimeDefinition,
+> implements AgentRuntimeResolver<TEntry> {
+  readonly #entriesByRuntimeId = new Map<string, TEntry>();
 
-  register(input: AnyAgentRuntimeDefinition): void {
-    validateRuntimeDefinition(input);
+  register(input: TEntry): void {
+    validateRuntimeMetadata(input);
 
-    if (this.#definitionsByKey.has(input.runtimeId)) {
+    if (this.#entriesByRuntimeId.has(input.runtimeId)) {
       throw new IntegrationDefinitionRegistryError(
         DefinitionRegistryErrorCodes.DUPLICATE_DEFINITION,
         `Agent runtime '${input.runtimeId}' is already registered.`,
       );
     }
 
-    this.#definitionsByKey.set(input.runtimeId, input);
+    this.#entriesByRuntimeId.set(input.runtimeId, input);
   }
 
-  registerMany(input: ReadonlyArray<AnyAgentRuntimeDefinition>): void {
-    for (const definition of input) {
-      this.register(definition);
+  registerMany(input: ReadonlyArray<TEntry>): void {
+    for (const entry of input) {
+      this.register(entry);
     }
   }
 
-  getRuntime(input: AgentRuntimeLocator): AnyAgentRuntimeDefinition | undefined {
-    return this.#definitionsByKey.get(input.runtimeId);
+  getRuntime(input: AgentRuntimeLocator): TEntry | undefined {
+    return this.#entriesByRuntimeId.get(input.runtimeId);
   }
 
-  getRuntimeOrThrow(input: AgentRuntimeLocator): AnyAgentRuntimeDefinition {
-    const definition = this.getRuntime(input);
+  getRuntimeOrThrow(input: AgentRuntimeLocator): TEntry {
+    const entry = this.getRuntime(input);
 
-    if (definition === undefined) {
+    if (entry === undefined) {
       throw new IntegrationDefinitionRegistryError(
         DefinitionRegistryErrorCodes.DEFINITION_NOT_FOUND,
         `Agent runtime '${input.runtimeId}' was not found.`,
       );
     }
 
-    return definition;
+    return entry;
   }
 
-  listRuntimes(): ReadonlyArray<AnyAgentRuntimeDefinition> {
-    return [...this.#definitionsByKey.values()].sort((left, right) =>
+  listRuntimes(): ReadonlyArray<TEntry> {
+    return [...this.#entriesByRuntimeId.values()].sort((left, right) =>
       left.runtimeId.localeCompare(right.runtimeId),
     );
   }

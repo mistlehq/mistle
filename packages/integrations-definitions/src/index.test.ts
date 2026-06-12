@@ -864,5 +864,8 @@ describe("integrations-definitions index", () => {
         displayName: "Pi",
       },
     ]);
+    for (const runtime of definitions.agentRuntimeRegistry.listRuntimes()) {
+      expect(Object.hasOwn(runtime, "compileRuntime")).toBe(false);
+    }
   });
 });

@@ -5,7 +5,7 @@
 import { getLocalPreparedRuntimeSandboxBaseImageRef } from "@mistle/config";
 import { IntegrationBindingKinds, IntegrationConnectionStatuses } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { createDefinitionsBundle } from "@mistle/integrations-definitions";
+import { createDefinitionsBundle } from "@mistle/integrations-definitions/server";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 

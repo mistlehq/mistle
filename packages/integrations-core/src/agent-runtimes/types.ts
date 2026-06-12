@@ -204,7 +204,7 @@ export type CompileAgentRuntimeResult =
       ) => ReadonlyArray<RuntimeClient>;
     });
 
-export type AgentRuntimeDefinition<
+export type AgentRuntimeMetadata<
   TRuntimeConfigSchema extends IntegrationConfigSchema<unknown> = IntegrationConfigSchema<
     Record<string, unknown>
   >,
@@ -214,25 +214,37 @@ export type AgentRuntimeDefinition<
   logoKey: string;
   configSchema: TRuntimeConfigSchema;
   configForm?: IntegrationFormDefinition;
-  compileRuntime(
-    input: CompileAgentRuntimeInput<z.output<TRuntimeConfigSchema>>,
-  ): CompileAgentRuntimeResult;
   capabilities?: AgentRuntimeCapabilities;
   composerCapabilities?: readonly ComposerCapability[];
-  createConversationProvider?(): AgentConversationProvider;
   materializeMcpConfig?(): ReadonlyArray<IntegrationMcpConfig>;
 };
 
+export type AgentRuntimeDefinition<
+  TRuntimeConfigSchema extends IntegrationConfigSchema<unknown> = IntegrationConfigSchema<
+    Record<string, unknown>
+  >,
+> = AgentRuntimeMetadata<TRuntimeConfigSchema> & {
+  compileRuntime(
+    input: CompileAgentRuntimeInput<z.output<TRuntimeConfigSchema>>,
+  ): CompileAgentRuntimeResult;
+  createConversationProvider?(): AgentConversationProvider;
+};
+
+export type AnyAgentRuntimeMetadata = AgentRuntimeMetadata<IntegrationConfigSchema<unknown>>;
 export type AnyAgentRuntimeDefinition = AgentRuntimeDefinition<IntegrationConfigSchema<unknown>>;
 
 export type AgentRuntimeLocator = {
   runtimeId: string;
 };
 
-export interface AgentRuntimeReader {
-  getRuntime(input: AgentRuntimeLocator): AnyAgentRuntimeDefinition | undefined;
+export interface AgentRuntimeReader<
+  TEntry extends AnyAgentRuntimeMetadata = AnyAgentRuntimeDefinition,
+> {
+  getRuntime(input: AgentRuntimeLocator): TEntry | undefined;
 }
 
-export interface AgentRuntimeResolver extends AgentRuntimeReader {
-  getRuntimeOrThrow(input: AgentRuntimeLocator): AnyAgentRuntimeDefinition;
+export interface AgentRuntimeResolver<
+  TEntry extends AnyAgentRuntimeMetadata = AnyAgentRuntimeDefinition,
+> extends AgentRuntimeReader<TEntry> {
+  getRuntimeOrThrow(input: AgentRuntimeLocator): TEntry;
 }
