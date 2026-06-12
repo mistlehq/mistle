@@ -185,7 +185,7 @@ describe("SessionsPage", () => {
       expect(screen.queryByRole("combobox", { name: "Sandbox profile" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Start session" })).toBeNull();
 
-      fireEvent.click(screen.getByRole("button", { name: "New session" }));
+      fireEvent.click(screen.getByRole("link", { name: "New session" }));
 
       expect(screen.getByText(SessionsRoutes.NEW)).toBeDefined();
     } finally {
@@ -280,7 +280,7 @@ describe("SessionsPage", () => {
     expect(headerNewSessionButton.getAttribute("title")).toBe(
       "Publish a sandbox profile before starting a session.",
     );
-    expect(screen.getByRole("button", { name: "Open sandbox profiles" }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: "Open sandbox profiles" }).getAttribute("href")).toBe(
       "/sandbox-profiles",
     );
     expect(screen.queryByRole("table")).toBeNull();
@@ -306,7 +306,7 @@ describe("SessionsPage", () => {
     });
 
     expect(screen.getByRole("heading", { name: "Start your first session" })).toBeDefined();
-    expect(screen.getAllByRole("button", { name: "New session" })).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "New session" })).toHaveLength(2);
     expect(screen.queryByRole("table")).toBeNull();
   });
 

@@ -40,6 +40,7 @@ import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
 import { NoLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
 import { PageFrame } from "../shared/page-frame.js";
 import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
+import { RoutedButtonLink } from "../shared/routed-button-link.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 import { ToolbarSearchInput } from "../shared/toolbar-search-input.js";
@@ -288,10 +289,10 @@ function SessionsEmptyState(input: {
     return (
       <CollectionEmptyState
         action={
-          <Button nativeButton={false} render={<RouterLink to={SessionsRoutes.NEW} />}>
+          <RoutedButtonLink to={SessionsRoutes.NEW}>
             <PlusIcon aria-hidden className="size-4" />
             New session
-          </Button>
+          </RoutedButtonLink>
         }
         description="Starting a session creates a sandbox based on one of your published sandbox profiles."
         title="Start your first session"
@@ -302,10 +303,10 @@ function SessionsEmptyState(input: {
   return (
     <CollectionEmptyState
       action={
-        <Button nativeButton={false} render={<RouterLink to="/sandbox-profiles" />}>
+        <RoutedButtonLink to="/sandbox-profiles">
           <PlusIcon aria-hidden className="size-4" />
           Open sandbox profiles
-        </Button>
+        </RoutedButtonLink>
       }
       description="Sessions need a launchable sandbox profile. Create or publish a sandbox profile before starting one."
       title="Publish a sandbox profile to start sessions"
@@ -733,10 +734,10 @@ export function SessionsPage(): React.JSX.Element {
             New session
           </Button>
         ) : (
-          <Button nativeButton={false} render={<RouterLink to={SessionsRoutes.NEW} />}>
+          <RoutedButtonLink to={SessionsRoutes.NEW}>
             <PlusIcon aria-hidden className="size-4" />
             New session
-          </Button>
+          </RoutedButtonLink>
         )
       }
       title="Sessions"

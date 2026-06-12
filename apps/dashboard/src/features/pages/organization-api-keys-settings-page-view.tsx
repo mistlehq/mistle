@@ -23,11 +23,11 @@ import {
 } from "@mistle/ui";
 import { KeyIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
-import { Link as RouterLink } from "react-router";
 
 import { ApiKeyMistleResourceAccessSummary } from "../settings/api-keys/api-key-permissions-summary.js";
 import type { ApiKey } from "../settings/api-keys/api-keys-service.js";
 import { formatDateTime } from "../shared/date-formatters.js";
+import { RoutedButtonLink } from "../shared/routed-button-link.js";
 
 export type OrganizationApiKeysSettingsPageViewProps = {
   apiKeys: readonly ApiKey[];
@@ -51,13 +51,10 @@ export function OrganizationApiKeysSettingsPageView(
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-end gap-3">
-        <Button
-          nativeButton={false}
-          render={<RouterLink to="/settings/organization/api-keys/new" />}
-        >
+        <RoutedButtonLink to="/settings/organization/api-keys/new">
           <PlusIcon aria-hidden />
           Create API key
-        </Button>
+        </RoutedButtonLink>
       </div>
 
       {props.revokeErrorMessage === null ? null : (

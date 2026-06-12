@@ -46,6 +46,7 @@ describe("HomePageView", () => {
 
     expect(actionButton.tagName).toBe("A");
     expect(actionButton.getAttribute("href")).toBe("/integrations");
+    expect(actionButton.getAttribute("role")).toBeNull();
   });
 
   it("renders completed home content top-aligned with page-scale section headings", () => {

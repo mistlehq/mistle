@@ -135,6 +135,7 @@ describe("TriggersPage", () => {
     for (const createAction of createActions) {
       expect(createAction.tagName).toBe("A");
       expect(createAction.getAttribute("href")).toBe("/triggers/new");
+      expect(createAction.getAttribute("role")).toBeNull();
     }
     expect(screen.queryByRole("table")).toBeNull();
   });
