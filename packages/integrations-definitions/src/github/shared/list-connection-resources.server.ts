@@ -314,6 +314,10 @@ async function listGitHubRepositoryContributors(input: {
       per_page: GitHubPageSize,
       page,
     });
+    if (Object.is(response.status, 204)) {
+      return contributors;
+    }
+
     const parsedResponse = z.array(GitHubContributorSchema).parse(response.data);
     contributors.push(...parsedResponse);
 
