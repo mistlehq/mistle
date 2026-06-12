@@ -99,6 +99,22 @@ describe("detectActiveComposerTrigger", () => {
     });
   });
 
+  it("keeps Pi skill command queries active after the skill namespace separator", () => {
+    expect(
+      detect({
+        composerText: "/skill:front",
+      }),
+    ).toEqual({
+      capabilityKind: "composerCommand",
+      trigger: "/",
+      query: "skill:front",
+      range: {
+        start: 0,
+        end: 12,
+      },
+    });
+  });
+
   it("detects an empty slash command query", () => {
     expect(
       detect({

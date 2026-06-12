@@ -102,6 +102,7 @@ describe("Pi workbench composer adapter", () => {
             reasoning: true,
           },
         ],
+        commands: [],
         thinkingLevel: "high",
       }),
     ).toEqual({
@@ -131,6 +132,40 @@ describe("Pi workbench composer adapter", () => {
         },
       },
     });
+  });
+
+  it("builds composer command capabilities from Pi runtime commands", () => {
+    expect(
+      buildReadyPiComposerBootstrap({
+        activeModel: null,
+        availableModels: [],
+        commands: [
+          {
+            name: "skill:frontend",
+            description: "Use the frontend skill",
+            source: "skill",
+          },
+        ],
+        thinkingLevel: "high",
+      }).composerCapabilities,
+    ).toEqual([
+      {
+        kind: "composerCommand",
+        trigger: "/",
+        source: "runtimeCommand",
+        commands: [
+          {
+            id: "pi.skill.skill:frontend",
+            name: "skill:frontend",
+            description: "Use the frontend skill",
+            availability: {
+              duringActiveTurn: "enabled",
+            },
+            submitAs: "typedRuntimeCommand",
+          },
+        ],
+      },
+    ]);
   });
 
   it("uses every standard Pi thinking level when the model does not provide a level map", () => {

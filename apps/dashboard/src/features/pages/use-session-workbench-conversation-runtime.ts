@@ -550,6 +550,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
       input.piSessionState.chat.isStartingTurn,
       input.piSessionState.chat.isSteeringTurn,
       input.piSessionState.chat.followUpTurn,
+      input.piSessionState.chat.sendPrompt,
       input.piSessionState.lifecycle.sessionSnapshot,
       input.piSessionState.sessionMessage.clearSessionErrorMessage,
       input.piSessionState.sessionMessage.reportSessionErrorMessage,

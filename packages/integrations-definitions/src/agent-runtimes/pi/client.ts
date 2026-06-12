@@ -75,6 +75,18 @@ const PiReadMetadataResultSchema = z.object({
   preview: z.string().nullable(),
 });
 
+const PiCommandSourceSchema = z.enum(["extension", "prompt", "skill"]);
+
+const PiCommandSummarySchema = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  source: PiCommandSourceSchema,
+});
+
+const PiCommandsResultSchema = z.object({
+  commands: z.array(PiCommandSummarySchema),
+});
+
 export type PiSessionState = z.output<typeof PiSessionStateSchema>;
 export type PiModel = z.output<typeof PiModelSchema>;
 export type PiThinkingLevel = z.output<typeof PiThinkingLevelSchema>;
@@ -82,6 +94,8 @@ export type PiAgentMessage = z.output<typeof PiAgentMessageSchema>;
 export type PiEvent = z.output<typeof PiEventSchema>;
 export type PiConversationSummary = z.output<typeof PiConversationSummarySchema>;
 export type PiListConversationsResult = z.output<typeof PiListConversationsResultSchema>;
+export type PiCommandSource = z.output<typeof PiCommandSourceSchema>;
+export type PiCommandSummary = z.output<typeof PiCommandSummarySchema>;
 
 export function parsePiSessionState(input: unknown): PiSessionState {
   return PiSessionStateSchema.parse(input);
@@ -109,6 +123,7 @@ export type PiSessionClient = {
     limit: number;
   }): Promise<PiListConversationsResult>;
   getAvailableModels(input: { sessionFile: string }): Promise<readonly PiModel[]>;
+  getCommands(input: { sessionFile: string }): Promise<readonly PiCommandSummary[]>;
   getState(input?: { sessionFile?: string }): Promise<PiSessionState>;
   getMessages(input: { sessionFile: string }): Promise<readonly PiAgentMessage[]>;
   readMetadata(input: {
@@ -289,6 +304,13 @@ export function createPiSessionClient(input: PiSessionClientInput): PiSessionCli
         params: getAvailableModelsInput,
       });
       return PiAvailableModelsResultSchema.parse(result).models;
+    },
+    async getCommands(getCommandsInput) {
+      const result = await request({
+        method: "pi/getCommands",
+        params: getCommandsInput,
+      });
+      return PiCommandsResultSchema.parse(result).commands;
     },
     async getMessages(getMessagesInput) {
       const result = await request({

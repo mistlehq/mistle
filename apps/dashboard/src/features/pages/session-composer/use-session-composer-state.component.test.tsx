@@ -653,6 +653,54 @@ describe("useSessionComposerState", () => {
     expect(screen.getByTestId("composer-text").textContent).toBe("");
   });
 
+  it("submits non-Codex plan commands through the runtime command executor", () => {
+    let switchedToPlan = false;
+    const submittedRuntimeCommands: { commandId: string; text: string }[] = [];
+
+    render(
+      <SessionComposerStateHarness
+        composerCapabilities={[
+          {
+            kind: "composerCommand",
+            trigger: "/",
+            source: "runtimeCommand",
+            commands: [
+              {
+                id: "pi.prompt.plan",
+                name: "plan",
+                availability: {
+                  duringActiveTurn: "enabled",
+                },
+                submitAs: "typedRuntimeCommand",
+              },
+            ],
+          },
+        ]}
+        composerText="/plan"
+        executeTypedRuntimeCommand={(command) => {
+          submittedRuntimeCommands.push(command);
+          return true;
+        }}
+        onSwitchToPlan={() => {
+          switchedToPlan = true;
+        }}
+        pendingDiffComments={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(switchedToPlan).toBe(false);
+    expect(submittedRuntimeCommands).toEqual([
+      {
+        commandId: "pi.prompt.plan",
+        text: "/plan",
+      },
+    ]);
+    expect(screen.getByTestId("submitted-prompt").textContent).toBe("");
+    expect(screen.getByTestId("composer-text").textContent).toBe("");
+  });
+
   it("submits plan command text in Plan mode", async () => {
     render(
       <SessionComposerStateHarness

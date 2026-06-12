@@ -1226,7 +1226,7 @@ mod tests {
     }
 
     #[test]
-    fn forwards_pi_model_catalog_and_selection_for_session() {
+    fn forwards_pi_model_command_catalogs_and_selection_for_session() {
         let simulated_pi = SimulatedPiRpcProcess::start_without_initial_session();
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
         let state = Arc::new(PiProxyState {
@@ -1266,6 +1266,42 @@ mod tests {
         assert_eq!(
             catalog_response["result"]["models"][0]["id"],
             json!("gpt-5")
+        );
+
+        let command_responses = handle_json_rpc_request(
+            &state,
+            &json!({
+                "jsonrpc": "2.0",
+                "id": "commands",
+                "method": "pi/getCommands",
+                "params": {
+                    "sessionFile": simulated_pi.session_file()
+                }
+            })
+            .to_string(),
+        );
+        let command_response = parse_json_rpc_message(
+            command_responses
+                .last()
+                .expect("command catalog request should produce a response"),
+        );
+        assert_eq!(
+            command_response["result"]["commands"],
+            json!([
+                {
+                    "name": "review",
+                    "description": "Review current changes",
+                    "source": "prompt"
+                },
+                {
+                    "name": "skill:frontend",
+                    "source": "skill"
+                },
+                {
+                    "name": "sync-linear",
+                    "source": "extension"
+                }
+            ])
         );
 
         let set_model_responses = handle_json_rpc_request(
@@ -1588,6 +1624,9 @@ while IFS= read -r line; do
       ;;
     *'"type":"get_available_models"'*)
       printf '{{"type":"response","command":"get_available_models","id":"%s","success":true,"data":{{"models":[{{"provider":"openai","id":"gpt-5","name":"GPT-5","reasoning":true,"input":["text","image"]}}]}}}}\n' "$id"
+      ;;
+    *'"type":"get_commands"'*)
+      printf '{{"type":"response","command":"get_commands","id":"%s","success":true,"data":{{"commands":[{{"name":"review","description":"Review current changes","source":"prompt"}},{{"name":"skill:frontend","source":"skill"}},{{"name":"sync-linear","source":"extension"}}]}}}}\n' "$id"
       ;;
     *'"type":"set_model"'*)
       case "$line" in

@@ -1,6 +1,7 @@
 import {
   createPiSessionClient,
   type PiAgentMessage,
+  type PiCommandSummary,
   type PiConversationSummary,
   type PiEvent,
   type PiEventSubscription,
@@ -262,17 +263,25 @@ async function loadConnectedPiComposerBootstrap(input: {
 }): Promise<{
   availableModels: readonly PiModel[];
   bootstrap: SessionComposerBootstrapResult;
+  commands: readonly PiCommandSummary[];
 }> {
-  const availableModels = await input.client.getAvailableModels({
-    sessionFile: input.sessionFile,
-  });
+  const [availableModels, commands] = await Promise.all([
+    input.client.getAvailableModels({
+      sessionFile: input.sessionFile,
+    }),
+    input.client.getCommands({
+      sessionFile: input.sessionFile,
+    }),
+  ]);
   return {
     availableModels,
     bootstrap: buildReadyPiComposerBootstrap({
       activeModel: input.activeSessionState.model,
       availableModels,
+      commands,
       thinkingLevel: input.activeSessionState.thinkingLevel,
     }),
+    commands,
   };
 }
 
@@ -289,6 +298,7 @@ export function usePiSessionState(input: {
   const ensureTransportConnected = input.ensureTransportConnected;
   const clientRef = useRef<PiSessionClient | null>(null);
   const eventSubscriptionRef = useRef<PiEventSubscription | null>(null);
+  const availablePiCommandsRef = useRef<readonly PiCommandSummary[]>([]);
   const availablePiModelsRef = useRef<readonly PiModel[]>([]);
   const generationRef = useRef(0);
   const previousChatStatusRef = useRef<PiChatState["status"]>(null);
@@ -345,6 +355,7 @@ export function usePiSessionState(input: {
     clearEventSubscription();
     clientRef.current?.close();
     clientRef.current = null;
+    availablePiCommandsRef.current = [];
     availablePiModelsRef.current = [];
     setBootstrap(buildUnavailablePiComposerBootstrap({ status: "unavailable" }));
     setSessionSnapshot(null);
@@ -491,6 +502,7 @@ export function usePiSessionState(input: {
       clearEventSubscription();
       clientRef.current?.close();
       clientRef.current = null;
+      availablePiCommandsRef.current = [];
       availablePiModelsRef.current = [];
       setBootstrap(buildUnavailablePiComposerBootstrap({ status: "bootstrapping" }));
       setStep("securing");
@@ -578,6 +590,7 @@ export function usePiSessionState(input: {
             client.close();
             return;
           }
+          availablePiCommandsRef.current = composerBootstrap.commands;
           availablePiModelsRef.current = composerBootstrap.availableModels;
           await hydrateConnectedPiChat({
             bufferedEvents,
@@ -642,6 +655,7 @@ export function usePiSessionState(input: {
           clientRef.current = null;
           const message =
             error instanceof Error ? error.message : "Could not connect Pi conversation.";
+          availablePiCommandsRef.current = [];
           availablePiModelsRef.current = [];
           setBootstrap(buildUnavailablePiComposerBootstrap({ status: "failed", message }));
           setSessionSnapshot(null);
@@ -795,6 +809,7 @@ export function usePiSessionState(input: {
         buildReadyPiComposerBootstrap({
           activeModel: activeSessionState.model,
           availableModels: availablePiModelsRef.current,
+          commands: availablePiCommandsRef.current,
           thinkingLevel: activeSessionState.thinkingLevel,
         }),
       );
@@ -870,6 +885,7 @@ export function usePiSessionState(input: {
         sessionFile: input.sessionFile,
       });
       availablePiModelsRef.current = composerBootstrap.availableModels;
+      availablePiCommandsRef.current = composerBootstrap.commands;
       await hydrateConnectedPiChat({
         client: input.client,
         dispatchChatAction,
