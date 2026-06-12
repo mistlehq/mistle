@@ -140,6 +140,29 @@ export const HorizontalWithDescription = {
   },
 };
 
+export const HorizontalWithTooltip = {
+  render: function Render() {
+    return (
+      <div className="w-[40rem]">
+        <Field contentWidth="fill" orientation="horizontal">
+          <FieldHeader>
+            <FieldLabelWithTooltip
+              htmlFor="connection-display-name"
+              tooltip="Displayed to operators when selecting this connection in the dashboard."
+              tooltipLabel="Explain workspace name"
+            >
+              Workspace name
+            </FieldLabelWithTooltip>
+          </FieldHeader>
+          <FieldContent>
+            <Input defaultValue="GitHub production" id="connection-display-name" />
+          </FieldContent>
+        </Field>
+      </div>
+    );
+  },
+};
+
 export const RequiredLabel = {
   render: function Render() {
     return (
