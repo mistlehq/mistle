@@ -10,15 +10,23 @@ export const AwsAssumeRoleConnectionConfigForm: ResolvedIntegrationForm = {
       },
       accessKeyId: {
         title: "Access key ID",
+        description:
+          "Source IAM access key used to request temporary credentials with STS AssumeRole. The assumed role controls sandbox permissions.",
       },
       roleArn: {
         title: "Role ARN",
+        description:
+          "IAM role that Mistle should assume for sandbox AWS access. Its trust policy must allow the source access key principal.",
       },
       externalId: {
         title: "External ID",
+        description:
+          "Optional value required by some IAM role trust policies. Leave blank unless the role checks sts:ExternalId.",
       },
       durationSeconds: {
         title: "Duration seconds",
+        description:
+          "Optional STS session lifetime in seconds. Leave blank to use the AWS default; set 900-43200 only if the role allows it.",
       },
     },
   },
@@ -36,7 +44,7 @@ export const AwsAssumeRoleConnectionConfigForm: ResolvedIntegrationForm = {
       "ui:placeholder": "Optional external ID",
     },
     durationSeconds: {
-      "ui:placeholder": "3600",
+      "ui:placeholder": "Optional AWS default",
     },
   },
 };

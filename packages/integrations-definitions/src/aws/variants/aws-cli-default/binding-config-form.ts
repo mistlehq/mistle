@@ -30,6 +30,8 @@ export function resolveAwsBindingConfigForm(input: AwsBindingFormContext): Resol
       properties: {
         services: {
           title: "Services",
+          description:
+            "AWS services allowed through managed egress. Selecting CloudWatch MCP also allows CloudWatch and CloudWatch Logs.",
           type: "array",
           items: {
             type: "string",
@@ -39,6 +41,7 @@ export function resolveAwsBindingConfigForm(input: AwsBindingFormContext): Resol
         },
         regions: {
           title: "Regions",
+          description: "AWS regions where the selected services may be reached from the sandbox.",
           type: "array",
           items: {
             type: "string",
@@ -48,6 +51,8 @@ export function resolveAwsBindingConfigForm(input: AwsBindingFormContext): Resol
         },
         defaultRegion: {
           title: "Default region",
+          description:
+            "Region injected into AWS tools when a command or MCP tool call does not specify one. It must be one of the selected regions.",
           oneOf: defaultRegionOptions.map((region) => ({
             const: region,
             title: region,
@@ -55,6 +60,8 @@ export function resolveAwsBindingConfigForm(input: AwsBindingFormContext): Resol
         },
         tools: {
           title: "Tools",
+          description:
+            "Sandbox tools to install. AWS CLI provides the aws command; CloudWatch MCP exposes CloudWatch and Logs MCP tools to agents.",
           default: [AwsToolIds.AWS_CLI],
           items: {
             type: "string",

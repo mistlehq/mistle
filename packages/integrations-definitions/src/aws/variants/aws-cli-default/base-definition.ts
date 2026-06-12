@@ -31,7 +31,7 @@ export const AwsBaseDefinition: AwsBaseIntegrationDefinition = {
   variantId: "aws-cli-default",
   kind: IntegrationKinds.CONNECTOR,
   displayName: "AWS",
-  description: "Enable scoped AWS access for selected sandbox tools.",
+  description: "Enable scoped AWS access for selected sandbox tools and MCP servers.",
   logoKey: "aws",
   targetConfigSchema: AwsTargetConfigSchema,
   targetSecretSchema: AwsTargetSecretSchema,
@@ -46,6 +46,8 @@ export const AwsBaseDefinition: AwsBaseIntegrationDefinition = {
         {
           name: "secretAccessKey",
           label: "Secret access key",
+          description:
+            "Secret for the source access key. Mistle stores it encrypted and uses it only to request temporary role credentials.",
           inputType: "password",
           secretType: AwsCredentialSecretTypes.AWS_SECRET_ACCESS_KEY,
           slotKey: AwsCredentialSlotKeys.SECRET_ACCESS_KEY,
@@ -63,7 +65,7 @@ export const AwsBaseDefinition: AwsBaseIntegrationDefinition = {
             serverName: "aws_cloudwatch",
             transport: IntegrationMcpTransports.STDIO,
             command: AwsCloudWatchMcpWrapperPath,
-            description: "AWS CloudWatch MCP",
+            description: "CloudWatch and CloudWatch Logs MCP tools backed by the AWS connection.",
           },
         ]
       : [],

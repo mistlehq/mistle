@@ -1,4 +1,7 @@
-import { JiraConnectionMethodIds } from "@mistle/integrations-definitions/browser";
+import {
+  AwsBrowserDefinition,
+  JiraConnectionMethodIds,
+} from "@mistle/integrations-definitions/browser";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import type React from "react";
@@ -9,6 +12,7 @@ import {
   IntegrationConnectionEditorPage,
   IntegrationConnectionMethodIds,
   type IntegrationConnectionMethod,
+  type IntegrationConnectionMethodId,
   type IntegrationConnectionEditorState,
 } from "./integration-connection-editor.js";
 
@@ -85,6 +89,46 @@ const JiraCreateEditorState: Extract<IntegrationConnectionEditorState, { mode: "
   targetFamilyId: "jira",
   targetKey: "jira-default",
   targetVariantId: "jira-default",
+};
+
+function resolveAwsAssumeRoleMethod(): IntegrationConnectionMethod {
+  const method = AwsBrowserDefinition.connectionMethods.find(
+    (candidate) => candidate.id === IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+  );
+  if (method === undefined) {
+    throw new Error("Missing AWS AssumeRole connection method for Storybook.");
+  }
+
+  if (method.kind !== "form") {
+    throw new Error("Expected AWS AssumeRole connection method to use a form.");
+  }
+
+  return {
+    id: method.id,
+    label: method.label,
+    kind: method.kind,
+    secretFields: method.secretFields.map((field) => ({
+      name: field.name,
+      label: field.label,
+      inputType: field.inputType,
+      ...(field.placeholder === undefined ? {} : { placeholder: field.placeholder }),
+      ...(field.description === undefined ? {} : { description: field.description }),
+      ...(field.optional === undefined ? {} : { optional: field.optional }),
+      ...(field.slotKey === undefined ? {} : { slotKey: field.slotKey }),
+    })),
+  };
+}
+
+const AwsAssumeRoleMethod = resolveAwsAssumeRoleMethod();
+
+const AwsCreateEditorState: Extract<IntegrationConnectionEditorState, { mode: "create" }> = {
+  methods: [AwsAssumeRoleMethod],
+  mode: "create",
+  targetConfig: {},
+  targetDisplayName: AwsBrowserDefinition.displayName,
+  targetFamilyId: AwsBrowserDefinition.familyId,
+  targetKey: AwsBrowserDefinition.variantId,
+  targetVariantId: AwsBrowserDefinition.variantId,
 };
 
 const ChatGptDeviceAuthorizationMethod: Extract<
@@ -187,16 +231,19 @@ function IntegrationConnectionEditorStory(input: {
   );
 }
 
-function JiraPersonalApiTokenEditorStory(): React.JSX.Element {
-  const [configValue, setConfigValue] = useState<Record<string, unknown>>({
-    connection_method: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
-  });
+function CreateFormConnectionEditorStory(input: {
+  connectionDisplayNamePlaceholder: string;
+  editor: Extract<IntegrationConnectionEditorState, { mode: "create" }>;
+  initialConfigValue: Record<string, unknown>;
+  methodId: IntegrationConnectionMethodId;
+}): React.JSX.Element {
+  const [configValue, setConfigValue] = useState<Record<string, unknown>>(input.initialConfigValue);
   const [connectionDisplayName, setConnectionDisplayName] = useState("");
   const [secrets, setSecrets] = useState<Record<string, string>>({});
   const [changedSecretNames, setChangedSecretNames] = useState<readonly string[]>([]);
   const configForm = resolveConnectionMethodFormUiModel({
-    editor: JiraCreateEditorState,
-    methodId: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
+    editor: input.editor,
+    methodId: input.methodId,
     currentValue: configValue,
   });
 
@@ -208,12 +255,12 @@ function JiraPersonalApiTokenEditorStory(): React.JSX.Element {
         configForm={configForm}
         configValue={configValue}
         connectError={null}
-        connectionDisplayNamePlaceholder="Jira connection"
+        connectionDisplayNamePlaceholder={input.connectionDisplayNamePlaceholder}
         connectionDisplayNameValue={connectionDisplayName}
-        editor={JiraCreateEditorState}
+        editor={input.editor}
         hasChanges={true}
         isConnectionDisplayNameChanged={connectionDisplayName.trim().length > 0}
-        methodId={JiraConnectionMethodIds.PERSONAL_API_TOKEN}
+        methodId={input.methodId}
         onClose={() => {}}
         onConfigChange={setConfigValue}
         onConnectionDisplayNameChange={setConnectionDisplayName}
@@ -234,6 +281,32 @@ function JiraPersonalApiTokenEditorStory(): React.JSX.Element {
         secrets={secrets}
       />
     </div>
+  );
+}
+
+function JiraPersonalApiTokenEditorStory(): React.JSX.Element {
+  return (
+    <CreateFormConnectionEditorStory
+      connectionDisplayNamePlaceholder="Jira connection"
+      editor={JiraCreateEditorState}
+      initialConfigValue={{
+        connection_method: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
+      }}
+      methodId={JiraConnectionMethodIds.PERSONAL_API_TOKEN}
+    />
+  );
+}
+
+function AwsAssumeRoleEditorStory(): React.JSX.Element {
+  return (
+    <CreateFormConnectionEditorStory
+      connectionDisplayNamePlaceholder="AWS production"
+      editor={AwsCreateEditorState}
+      initialConfigValue={{
+        connection_method: AwsAssumeRoleMethod.id,
+      }}
+      methodId={AwsAssumeRoleMethod.id}
+    />
   );
 }
 
@@ -297,6 +370,13 @@ export const ConfiguredSecrets: Story = {
 export const JiraPersonalApiToken: Story = {
   render: function RenderStory() {
     return <JiraPersonalApiTokenEditorStory />;
+  },
+};
+
+export const AwsAssumeRole: Story = {
+  name: "AWS Assume Role",
+  render: function RenderStory() {
+    return <AwsAssumeRoleEditorStory />;
   },
 };
 

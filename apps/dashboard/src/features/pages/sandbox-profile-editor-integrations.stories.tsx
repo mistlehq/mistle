@@ -1,3 +1,4 @@
+import { AwsToolIds } from "@mistle/integrations-definitions";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within } from "storybook/test";
 
@@ -33,6 +34,25 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 export const CombinedIntegrationsConnectionsAndTools: Story = {};
+
+export const AwsCloudWatchMcpBinding: Story = {
+  name: "AWS CloudWatch MCP Binding",
+  args: {
+    initialBindings: StoryBindings.map((binding) =>
+      binding.connectionId === StoryAwsConnection.id
+        ? {
+            ...binding,
+            config: {
+              services: ["logs"],
+              regions: ["us-east-1"],
+              defaultRegion: "us-east-1",
+              tools: [AwsToolIds.AWS_CLI, AwsToolIds.AWS_CLOUDWATCH_MCP],
+            },
+          }
+        : binding,
+    ),
+  },
+};
 
 export const AddConnectorsDialog: Story = {
   args: {
