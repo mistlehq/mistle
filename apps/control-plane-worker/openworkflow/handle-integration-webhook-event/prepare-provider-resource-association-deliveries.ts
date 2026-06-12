@@ -23,6 +23,7 @@ import { logWebhookDeliveryEvent } from "../shared/webhook-delivery-telemetry.js
 export type QueuedProviderResourceAssociationDelivery = {
   deliveryId: string;
   providerResourceAssociationId: string;
+  sandboxInstanceId: string;
 };
 
 type ObservedAssociatedResourceEvent = {
@@ -98,6 +99,7 @@ export async function prepareProviderResourceAssociationDeliveries(
     queuedDeliveries.push({
       deliveryId,
       providerResourceAssociationId: association.id,
+      sandboxInstanceId: association.sandboxInstanceId,
     });
   }
 
