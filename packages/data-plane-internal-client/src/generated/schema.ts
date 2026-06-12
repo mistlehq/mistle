@@ -427,6 +427,8 @@ export interface paths {
                     }
                   | {
                       eventTypes: "slack.thread.message.created"[];
+                      /** @enum {string} */
+                      messageMode?: "all" | "app_mentions_only";
                       payloadFilter?: {
                         [key: string]: unknown;
                       };
@@ -942,6 +944,8 @@ export interface paths {
                       }
                     | {
                         eventTypes: "slack.thread.message.created"[];
+                        /** @enum {string} */
+                        messageMode?: "all" | "app_mentions_only";
                         payloadFilter?: {
                           [key: string]: unknown;
                         };
