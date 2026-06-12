@@ -74,6 +74,13 @@ export function sandboxProfileVersionSetupScriptQueryKey(input: {
   return [SANDBOX_PROFILES_QUERY_KEY_PREFIX[0], "setup-script", input.profileId, input.version];
 }
 
+export function sandboxProfileVersionPublishabilityQueryKey(input: {
+  profileId: string;
+  version: number;
+}): readonly ["sandbox-profiles", "publishability", string, number] {
+  return [SANDBOX_PROFILES_QUERY_KEY_PREFIX[0], "publishability", input.profileId, input.version];
+}
+
 export function sandboxProfileVersionSkillsSourceReposQueryKey(input: {
   profileId: string;
   version: number;

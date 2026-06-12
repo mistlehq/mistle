@@ -26,6 +26,32 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+export const SavedDraftWithoutPublishWorthyChanges: Story = {
+  args: {
+    lifecycleState: "draft-with-published",
+    publishBlockedMessage: "Make a change to the sandbox profile draft before publishing.",
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+
+    const publishButton = canvas.getByRole("button", { name: "Publish" });
+    const publishButtonTooltipTrigger = publishButton.parentElement;
+
+    if (publishButtonTooltipTrigger === null) {
+      throw new Error("Publish button tooltip trigger was not rendered.");
+    }
+
+    await expect(canvas.getByRole("button", { name: "Cancel" })).toBeEnabled();
+    await expect(canvas.queryByRole("button", { name: "Save draft" })).toBeNull();
+    await expect(publishButton).toBeDisabled();
+    await userEvent.hover(publishButtonTooltipTrigger);
+    await expect(
+      await body.findByText("Make a change to the sandbox profile draft before publishing."),
+    ).toBeVisible();
+  },
+};
+
 export const Published: Story = {
   args: {
     lifecycleState: "published",

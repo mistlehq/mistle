@@ -1,6 +1,10 @@
+import { isDeepStrictEqual } from "node:util";
+
 import type {
   ControlPlaneDatabase,
   ControlPlaneTransaction,
+  IntegrationBindingKind,
+  SandboxProfileVersionAgentRuntimeId,
   SandboxProfileVersionSkillsConfig,
 } from "@mistle/db/control-plane";
 import { SandboxProfileVersionStates } from "@mistle/db/control-plane";
@@ -11,6 +15,10 @@ import {
   SandboxProfilesNotFoundError,
   type SandboxProfilePublishabilityIssueCode,
 } from "../errors.js";
+import {
+  mapProfileVersionAssociatedResourceEventRoutingConfig,
+  type SandboxProfileAssociatedResourceEventRoutingConfig,
+} from "./profile-version-associated-resource-routing-config.js";
 import {
   mapProfileVersionRuntimeConfig,
   validateSandboxProfileVersionRuntimeConfig,
@@ -41,6 +49,76 @@ type GetProfileVersionPublishabilityOutput = {
   issues: SandboxProfilePublishabilityIssue[];
 };
 
+type PublishWorthyProfileVersionFields = {
+  version: number;
+  setupScript: string | null;
+  agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+  gitCommitSigningIntegrationConnectionId: string | null;
+  mistleMcpEnabled: boolean;
+  mistleMcpApiKeyId: string | null;
+  sandboxProvider: string | null;
+  sandboxConnectionId: string | null;
+  sandboxVcpuCount: number | null;
+  sandboxMemoryMb: number | null;
+  sandboxDiskMb: number | null;
+  skillsConfig: SandboxProfileVersionSkillsConfig | null;
+  associatedResourceEventRoutingConfig: SandboxProfileAssociatedResourceEventRoutingConfig;
+};
+
+type PublishWorthyIntegrationBindingFields = {
+  connectionId: string;
+  kind: IntegrationBindingKind;
+  config: Record<string, unknown>;
+};
+
+type CanonicalPublishWorthyProfileVersionConfig = {
+  setupScript: string | null;
+  agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+  gitCommitSigningIntegrationConnectionId: string | null;
+  mistleMcpEnabled: boolean;
+  mistleMcpApiKeyId: string | null;
+  sandboxProvider: string | null;
+  sandboxConnectionId: string | null;
+  sandboxVcpuCount: number | null;
+  sandboxMemoryMb: number | null;
+  sandboxDiskMb: number | null;
+  skillsConfig: {
+    originUrl: string;
+    selectedSkills: ReadonlyArray<{
+      name: string;
+      relativePath: string;
+    }>;
+  } | null;
+  associatedResourceEventRoutingConfig: {
+    enabled?: boolean;
+    resources?: ReadonlyArray<{
+      resourceKind: string;
+      eventTypes: readonly string[];
+    }>;
+  };
+  integrationBindings: ReadonlyArray<{
+    connectionId: string;
+    kind: IntegrationBindingKind;
+    config: unknown;
+  }>;
+};
+
+const PublishWorthyProfileVersionColumns = {
+  version: true,
+  setupScript: true,
+  agentRuntimeId: true,
+  gitCommitSigningIntegrationConnectionId: true,
+  mistleMcpEnabled: true,
+  mistleMcpApiKeyId: true,
+  sandboxProvider: true,
+  sandboxConnectionId: true,
+  sandboxVcpuCount: true,
+  sandboxMemoryMb: true,
+  sandboxDiskMb: true,
+  skillsConfig: true,
+  associatedResourceEventRoutingConfig: true,
+} satisfies Record<keyof PublishWorthyProfileVersionFields, true>;
+
 export async function getProfileVersionPublishability(
   { db, integrationRegistry, sandboxConfig }: GetProfileVersionPublishabilityContext,
   input: GetProfileVersionPublishabilityInput,
@@ -62,13 +140,8 @@ export async function getProfileVersionPublishability(
 
   const sandboxProfileVersion = await db.query.sandboxProfileVersions.findFirst({
     columns: {
+      ...PublishWorthyProfileVersionColumns,
       state: true,
-      sandboxProvider: true,
-      sandboxConnectionId: true,
-      sandboxVcpuCount: true,
-      sandboxMemoryMb: true,
-      sandboxDiskMb: true,
-      skillsConfig: true,
     },
     where: (table, { and, eq }) =>
       and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),
@@ -112,10 +185,223 @@ export async function getProfileVersionPublishability(
     )),
   ];
 
+  if (issues.length === 0) {
+    issues.push(
+      ...(await validateSandboxProfileVersionHasPublishWorthyChange(
+        { db },
+        {
+          profileId: input.profileId,
+          draftVersion: sandboxProfileVersion,
+        },
+      )),
+    );
+  }
+
   return {
     publishable: issues.length === 0,
     issues,
   };
+}
+
+async function validateSandboxProfileVersionHasPublishWorthyChange(
+  { db }: Pick<GetProfileVersionPublishabilityContext, "db">,
+  input: {
+    profileId: string;
+    draftVersion: PublishWorthyProfileVersionFields;
+  },
+): Promise<SandboxProfilePublishabilityIssue[]> {
+  const sourceVersion = await db.query.sandboxProfileVersions.findFirst({
+    columns: PublishWorthyProfileVersionColumns,
+    where: (table, { and, eq, lt }) =>
+      and(
+        eq(table.sandboxProfileId, input.profileId),
+        eq(table.state, SandboxProfileVersionStates.PUBLISHED),
+        lt(table.version, input.draftVersion.version),
+      ),
+    orderBy: (table, { desc }) => [desc(table.version)],
+  });
+
+  if (sourceVersion === undefined) {
+    if (input.draftVersion.version === 1) {
+      return [];
+    }
+
+    throw new Error(
+      `Draft sandbox profile version '${String(input.draftVersion.version)}' has no source published version.`,
+    );
+  }
+
+  const [sourceBindings, draftBindings] = await Promise.all([
+    loadPublishWorthyIntegrationBindings({
+      db,
+      profileId: input.profileId,
+      profileVersion: sourceVersion.version,
+    }),
+    loadPublishWorthyIntegrationBindings({
+      db,
+      profileId: input.profileId,
+      profileVersion: input.draftVersion.version,
+    }),
+  ]);
+
+  const sourceConfig = createCanonicalPublishWorthyProfileVersionConfig({
+    version: sourceVersion,
+    integrationBindings: sourceBindings,
+  });
+  const draftConfig = createCanonicalPublishWorthyProfileVersionConfig({
+    version: input.draftVersion,
+    integrationBindings: draftBindings,
+  });
+
+  if (!isDeepStrictEqual(sourceConfig, draftConfig)) {
+    return [];
+  }
+
+  return [
+    {
+      code: SandboxProfilePublishabilityIssueCodes.NO_PUBLISH_WORTHY_CHANGE,
+      message: "Make a change to the sandbox profile draft before publishing.",
+    },
+  ];
+}
+
+async function loadPublishWorthyIntegrationBindings(input: {
+  db: ControlPlaneDatabase | ControlPlaneTransaction;
+  profileId: string;
+  profileVersion: number;
+}): Promise<PublishWorthyIntegrationBindingFields[]> {
+  return await input.db.query.sandboxProfileVersionIntegrationBindings.findMany({
+    columns: {
+      connectionId: true,
+      kind: true,
+      config: true,
+    },
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.sandboxProfileId, input.profileId),
+        eq(table.sandboxProfileVersion, input.profileVersion),
+      ),
+  });
+}
+
+function createCanonicalPublishWorthyProfileVersionConfig(input: {
+  version: PublishWorthyProfileVersionFields;
+  integrationBindings: readonly PublishWorthyIntegrationBindingFields[];
+}): CanonicalPublishWorthyProfileVersionConfig {
+  return {
+    setupScript: normalizePublishWorthySetupScript(input.version.setupScript),
+    agentRuntimeId: input.version.agentRuntimeId,
+    gitCommitSigningIntegrationConnectionId: input.version.gitCommitSigningIntegrationConnectionId,
+    mistleMcpEnabled: input.version.mistleMcpEnabled,
+    mistleMcpApiKeyId: input.version.mistleMcpApiKeyId,
+    sandboxProvider: input.version.sandboxProvider,
+    sandboxConnectionId: input.version.sandboxConnectionId,
+    sandboxVcpuCount: input.version.sandboxVcpuCount,
+    sandboxMemoryMb: input.version.sandboxMemoryMb,
+    sandboxDiskMb: input.version.sandboxDiskMb,
+    skillsConfig: normalizePublishWorthySkillsConfig(input.version.skillsConfig),
+    associatedResourceEventRoutingConfig:
+      normalizePublishWorthyAssociatedResourceEventRoutingConfig(
+        input.version.associatedResourceEventRoutingConfig,
+      ),
+    integrationBindings: input.integrationBindings
+      .map((binding) => ({
+        connectionId: binding.connectionId,
+        kind: binding.kind,
+        config: canonicalizeJsonValue(binding.config),
+      }))
+      .sort(compareCanonicalIntegrationBindings),
+  };
+}
+
+function normalizePublishWorthySetupScript(script: string | null): string | null {
+  if (script === null || script.trim().length === 0) {
+    return null;
+  }
+
+  return script;
+}
+
+function normalizePublishWorthySkillsConfig(
+  skillsConfig: SandboxProfileVersionSkillsConfig | null,
+): CanonicalPublishWorthyProfileVersionConfig["skillsConfig"] {
+  if (skillsConfig === null) {
+    return null;
+  }
+
+  return {
+    originUrl: skillsConfig.originUrl,
+    selectedSkills: [...skillsConfig.selectedSkills].sort(compareSelectedSkills),
+  };
+}
+
+function compareSelectedSkills(
+  left: { name: string; relativePath: string },
+  right: { name: string; relativePath: string },
+): number {
+  return left.relativePath.localeCompare(right.relativePath) || left.name.localeCompare(right.name);
+}
+
+function normalizePublishWorthyAssociatedResourceEventRoutingConfig(
+  config: SandboxProfileAssociatedResourceEventRoutingConfig,
+): CanonicalPublishWorthyProfileVersionConfig["associatedResourceEventRoutingConfig"] {
+  const mappedConfig = mapProfileVersionAssociatedResourceEventRoutingConfig(config);
+
+  return {
+    ...(mappedConfig.enabled === undefined ? {} : { enabled: mappedConfig.enabled }),
+    ...(mappedConfig.resources === undefined
+      ? {}
+      : {
+          resources: mappedConfig.resources
+            .map((resource) => ({
+              resourceKind: resource.resourceKind,
+              eventTypes: [...resource.eventTypes].sort(),
+            }))
+            .sort(compareAssociatedResourceEventRoutingResources),
+        }),
+  };
+}
+
+function compareAssociatedResourceEventRoutingResources(
+  left: { resourceKind: string; eventTypes: readonly string[] },
+  right: { resourceKind: string; eventTypes: readonly string[] },
+): number {
+  return (
+    left.resourceKind.localeCompare(right.resourceKind) ||
+    left.eventTypes.join("\u0000").localeCompare(right.eventTypes.join("\u0000"))
+  );
+}
+
+function compareCanonicalIntegrationBindings(
+  left: CanonicalPublishWorthyProfileVersionConfig["integrationBindings"][number],
+  right: CanonicalPublishWorthyProfileVersionConfig["integrationBindings"][number],
+): number {
+  return (
+    left.kind.localeCompare(right.kind) ||
+    left.connectionId.localeCompare(right.connectionId) ||
+    JSON.stringify(left.config).localeCompare(JSON.stringify(right.config))
+  );
+}
+
+function isJsonRecord(input: unknown): input is Record<string, unknown> {
+  return typeof input === "object" && input !== null && !Array.isArray(input);
+}
+
+function canonicalizeJsonValue(input: unknown): unknown {
+  if (Array.isArray(input)) {
+    return input.map(canonicalizeJsonValue);
+  }
+
+  if (!isJsonRecord(input)) {
+    return input;
+  }
+
+  const output: Record<string, unknown> = {};
+  for (const key of Object.keys(input).sort()) {
+    output[key] = canonicalizeJsonValue(input[key]);
+  }
+
+  return output;
 }
 
 async function validateSandboxProfileVersionSkillsConfig(
