@@ -291,6 +291,122 @@ describe("listGitHubConnectionResources", () => {
     }
   });
 
+  it("treats empty GitHub repositories as having no user contributors", async () => {
+    const seenPaths: string[] = [];
+    const server = await startSimulatedGitHubApi({
+      handler(request, response) {
+        if (request.url === undefined) {
+          response.writeHead(500);
+          response.end("Missing request URL.");
+          return;
+        }
+
+        const requestUrl = new URL(request.url, "http://127.0.0.1");
+        seenPaths.push(`${requestUrl.pathname}?${requestUrl.searchParams.toString()}`);
+        response.setHeader("content-type", "application/json");
+
+        // GitHub REST docs: GET /user/repos lists repositories visible to a user token.
+        if (requestUrl.pathname === "/user/repos") {
+          response.end(
+            JSON.stringify([
+              {
+                id: 1001,
+                full_name: "mistle/empty",
+                owner: {
+                  login: "mistle",
+                  type: "Organization",
+                },
+              },
+              {
+                id: 1002,
+                full_name: "mistle/app",
+                owner: {
+                  login: "mistle",
+                  type: "Organization",
+                },
+              },
+            ]),
+          );
+          return;
+        }
+
+        // GitHub REST docs: GET /repos/{owner}/{repo}/contributors returns 204
+        // when the repository is empty.
+        if (requestUrl.pathname === "/repos/mistle/empty/contributors") {
+          response.writeHead(204);
+          response.end();
+          return;
+        }
+
+        if (requestUrl.pathname === "/repos/mistle/app/contributors") {
+          response.end(
+            JSON.stringify([
+              {
+                id: 2001,
+                login: "octocat",
+                type: "User",
+              },
+            ]),
+          );
+          return;
+        }
+
+        response.writeHead(404);
+        response.end(JSON.stringify({ message: "not found" }));
+      },
+    });
+
+    try {
+      const result = await listGitHubConnectionResources({
+        organizationId: "org_test",
+        targetKey: "github-cloud-test",
+        target: {
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {
+            apiBaseUrl: server.baseUrl,
+            webBaseUrl: "https://github.example",
+          },
+          secrets: {},
+        },
+        connection: {
+          id: "icn_github",
+          status: "active",
+          config: {
+            connection_method: "api-key",
+          },
+        },
+        kind: "user",
+        credential: {
+          kind: "value",
+          value: "github-token",
+        },
+      });
+
+      expect(result.resources).toEqual([
+        {
+          externalId: "2001",
+          handle: "octocat",
+          displayName: "octocat",
+          metadata: {
+            repositoryFullName: "mistle/app",
+            type: "User",
+          },
+        },
+      ]);
+      expect(seenPaths[0]).toBe(
+        "/user/repos?affiliation=owner%2Ccollaborator%2Corganization_member&sort=full_name&per_page=100&page=1",
+      );
+      expect(seenPaths.slice(1).sort()).toEqual([
+        "/repos/mistle/app/contributors?per_page=100&page=1",
+        "/repos/mistle/empty/contributors?per_page=100&page=1",
+      ]);
+    } finally {
+      await server.stop();
+    }
+  });
+
   it("lists GitHub App bot resources from app installations in accessible repository organizations", async () => {
     const seenPaths: string[] = [];
     const server = await startSimulatedGitHubApi({
