@@ -513,6 +513,7 @@ export function SandboxProfileBindingResourcesAndToolsCell(input: {
             ? {}
             : { onDraftStateChange: associatedResourceRouting.onDraftStateChange })}
           resourceKinds={[AssociatedProviderResourceKinds.SLACK_THREAD]}
+          selectedConnectionId={input.row.connectionId}
           supportedAssociatedResourceEvents={supportedAssociatedResourceEvents}
           version={associatedResourceRouting.version}
         />
