@@ -7,6 +7,7 @@ import { NoLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
 import {
   buildRepositoryDiscoveryFindArgs,
   parseRepositoryPaths,
+  PrimaryRepositoryWorkspaceRootOptionLabel,
   resolvePrimaryRepositoryPresentation,
   toRepositoryOptions,
 } from "./session-primary-repository-policy.js";
@@ -200,7 +201,7 @@ export function useSessionPrimaryRepositoryState(input: {
     isRefreshing: query.isFetching && query.data !== undefined,
     options: [
       {
-        label: "None",
+        label: PrimaryRepositoryWorkspaceRootOptionLabel,
         value: SessionRepositoryNoneValue,
       },
       ...presentation.options,

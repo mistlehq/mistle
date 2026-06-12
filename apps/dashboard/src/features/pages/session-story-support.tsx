@@ -20,6 +20,7 @@ import {
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
 import { SessionPortAccessPopover, SessionPortAccessSheet } from "./session-port-access-popover.js";
+import { PrimaryRepositoryWorkspaceRootOptionLabel } from "./session-primary-repository-policy.js";
 import { SessionTerminalSurface } from "./session-terminal-surface.js";
 import {
   SessionWorkbenchHeaderActions,
@@ -34,7 +35,7 @@ import type { SessionPortAccessState } from "./use-session-port-access.js";
 export const StorySandboxInstanceId = "sbi_storybook";
 const textEncoder = new TextEncoder();
 const StoryRepositoryOptions = [
-  { value: "__none__", label: "None" },
+  { value: "__none__", label: PrimaryRepositoryWorkspaceRootOptionLabel },
   { value: "/root/mistle", label: "mistle" },
   { value: "/root/mistle-docs", label: "mistle-docs" },
 ] satisfies ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;

@@ -109,7 +109,7 @@ describe("session primary repository policy", () => {
     expect(resolvePrimaryRepositoryTurnStartCwd("/root/acme/repo-2")).toBe("/root/acme/repo-2");
   });
 
-  it("uses the workspace root as the Codex turn cwd when None is selected", () => {
+  it("uses the workspace root as the Codex turn cwd when no primary repository is selected", () => {
     expect(resolvePrimaryRepositoryTurnStartCwd(null)).toBe(DefaultSandboxWorkspaceDir);
   });
 
@@ -158,7 +158,7 @@ describe("session primary repository policy", () => {
     ).toBe("/root/acme/repo-1");
   });
 
-  it("restores None when the active Codex thread cwd is the workspace root and no launch primary repository exists", () => {
+  it("restores no primary repository when the active Codex thread cwd is the workspace root and no launch primary repository exists", () => {
     expect(
       resolveInitialSelectedRepositoryPath({
         activeThreadCwd: DefaultSandboxWorkspaceDir,
@@ -167,7 +167,7 @@ describe("session primary repository policy", () => {
     ).toBeNull();
   });
 
-  it("restores None when the active Codex thread cwd is outside the workspace root despite a launch primary repository", () => {
+  it("restores no primary repository when the active Codex thread cwd is outside the workspace root despite a launch primary repository", () => {
     expect(
       resolveInitialSelectedRepositoryPath({
         activeThreadCwd: "/",
@@ -176,7 +176,7 @@ describe("session primary repository policy", () => {
     ).toBeNull();
   });
 
-  it("restores None when the active Codex thread cwd is outside the workspace root and no launch primary repository exists", () => {
+  it("restores no primary repository when the active Codex thread cwd is outside the workspace root and no launch primary repository exists", () => {
     expect(
       resolveInitialSelectedRepositoryPath({
         activeThreadCwd: "/",
@@ -194,7 +194,7 @@ describe("session primary repository policy", () => {
     ).toBe("/root/acme/repo-1");
   });
 
-  it("restores None when neither active Codex thread cwd nor launch primary repository is available", () => {
+  it("restores no primary repository when neither active Codex thread cwd nor launch primary repository is available", () => {
     expect(
       resolveInitialSelectedRepositoryPath({
         activeThreadCwd: undefined,

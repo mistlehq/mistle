@@ -6,7 +6,10 @@ import { createElement, type PropsWithChildren } from "react";
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
-import { useSessionPrimaryRepositoryState } from "./use-session-primary-repository-state.js";
+import {
+  SessionRepositoryNoneValue,
+  useSessionPrimaryRepositoryState,
+} from "./use-session-primary-repository-state.js";
 
 type HookProps = {
   initialSelectedRepositoryPath?: string | null;
@@ -44,6 +47,18 @@ function renderSessionPrimaryRepositoryState(initialProps: HookProps) {
 }
 
 describe("useSessionPrimaryRepositoryState", () => {
+  it("labels the no primary repository option as Workspace root", () => {
+    const { result } = renderSessionPrimaryRepositoryState({
+      initialSelectedRepositoryPath: null,
+      sandboxInstanceId: "sbi_workspace_root_label",
+    });
+
+    expect(result.current.options[0]).toEqual({
+      label: "Workspace root",
+      value: SessionRepositoryNoneValue,
+    });
+  });
+
   it("exposes the runtime-plan repository on the initial render", () => {
     const sandboxInstanceId = "sbi_initial_runtime_plan";
     const repositoryPath = "/root/acme/repo-1";

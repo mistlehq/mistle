@@ -2,6 +2,8 @@ import { DefaultSandboxWorkspaceDir } from "@mistle/integrations-core";
 
 import type { SessionWorkbenchHeaderRepositoryOption } from "./session-workbench-header-actions.js";
 
+export const PrimaryRepositoryWorkspaceRootOptionLabel = "Workspace root";
+
 type SessionPrimaryRepositorySelection =
   | { kind: "none" }
   | { kind: "available"; path: string }
