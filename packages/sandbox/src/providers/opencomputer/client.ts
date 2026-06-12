@@ -32,6 +32,7 @@ import {
   OpenComputerRuntimeControlRequestSchema,
   OpenComputerSandboxIdRequestSchema,
   OpenComputerStartSandboxRequestSchema,
+  OpenComputerVerifyCheckpointStartableRequestSchema,
   createOpenComputerResourceFields,
   type OpenComputerCaptureSandboxSnapshotRequest,
   type OpenComputerCreateSnapshotImageRequest,
@@ -39,6 +40,7 @@ import {
   type OpenComputerSandboxIdRequest,
   type OpenComputerStartImage,
   type OpenComputerStartSandboxRequest,
+  type OpenComputerVerifyCheckpointStartableRequest,
   type ValidatedOpenComputerSandboxConfig,
 } from "./schemas.js";
 import type { OpenComputerRawSandboxInfo, OpenComputerSandboxInspectResult } from "./types.js";
@@ -59,6 +61,8 @@ const StartupCommandPollIntervalMs = 250;
 export const OpenComputerStartupCommandPollTimeoutMs = 60 * 60 * 1000;
 const StartupCommandPollAttempts =
   OpenComputerStartupCommandPollTimeoutMs / StartupCommandPollIntervalMs;
+const CheckpointStartablePollIntervalMs = 1_000;
+const CheckpointStartableTimeoutMs = 2 * 60 * 1000;
 
 const OpenComputerSnapshotInfoSchema = z.looseObject({
   name: z.string().trim().min(1),
@@ -132,6 +136,7 @@ export interface OpenComputerClient {
   captureSandboxSnapshot(
     request: OpenComputerCaptureSandboxSnapshotRequest,
   ): Promise<OpenComputerCaptureSandboxSnapshotResponse>;
+  verifyCheckpointStartable(request: OpenComputerVerifyCheckpointStartableRequest): Promise<void>;
   stopSandbox(request: OpenComputerSandboxIdRequest): Promise<void>;
   destroySandbox(request: OpenComputerSandboxIdRequest): Promise<void>;
   activate(request: OpenComputerRuntimeControlRequest): Promise<void>;
@@ -474,6 +479,45 @@ export class OpenComputerApiClient implements OpenComputerClient {
     } catch (error) {
       throw mapOpenComputerClientError(OpenComputerClientOperationIds.CREATE_CHECKPOINT, error);
     }
+  }
+
+  async verifyCheckpointStartable(
+    request: OpenComputerVerifyCheckpointStartableRequest,
+  ): Promise<void> {
+    const parsedRequest = OpenComputerVerifyCheckpointStartableRequestSchema.parse(request);
+    const timeoutMs = parsedRequest.requestTimeoutMs ?? CheckpointStartableTimeoutMs;
+    const startedAtMs = systemClock.nowMs();
+    let lastError: OpenComputerClientError | undefined;
+
+    while (systemClock.nowMs() - startedAtMs <= timeoutMs) {
+      let probeSandboxId: string | undefined;
+      try {
+        const response = await this.#startSandboxFromCheckpoint({
+          image: {
+            kind: OpenComputerImageHandleKinds.CHECKPOINT,
+            id: parsedRequest.checkpointId,
+          },
+        });
+        probeSandboxId = response.sandboxId;
+        return;
+      } catch (error) {
+        if (!isOpenComputerCheckpointNotFound(error)) {
+          throw error;
+        }
+        lastError = error;
+      } finally {
+        if (probeSandboxId !== undefined) {
+          await this.destroySandbox({ sandboxId: probeSandboxId });
+        }
+      }
+
+      await systemSleeper.sleep(CheckpointStartablePollIntervalMs);
+    }
+
+    if (lastError !== undefined) {
+      throw lastError;
+    }
+    throw new Error("OpenComputer checkpoint startability check timed out before first attempt.");
   }
 
   async stopSandbox(request: OpenComputerSandboxIdRequest): Promise<void> {
@@ -1162,6 +1206,15 @@ function requireResponseSandboxId(input: {
     throw new Error("OpenComputer sandbox response did not include sandbox id.");
   }
   return id;
+}
+
+function isOpenComputerCheckpointNotFound(error: unknown): error is OpenComputerClientError {
+  return (
+    error instanceof OpenComputerClientError &&
+    error.operation === OpenComputerClientOperationIds.CREATE_SANDBOX &&
+    error.code === OpenComputerClientErrorCodes.NOT_FOUND &&
+    error.message.includes("checkpoint not found")
+  );
 }
 
 function decodeOpenComputerExitCode(payload: Uint8Array): number {

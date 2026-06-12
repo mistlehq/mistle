@@ -38,7 +38,8 @@ export function createOpenComputerBaseImage(input: {
         "sudo -n chmod 0644 /etc/profile.d/mistle-path.sh",
       ].join("\n"),
     )
-    .workdir("/workspace");
+    .env({ HOME: "/root" })
+    .workdir("/root");
 
   if (input.source !== undefined) {
     image = image.env(createOpenComputerBaseImageSourceEnv(input.source));

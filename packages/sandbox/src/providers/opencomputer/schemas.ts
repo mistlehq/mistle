@@ -222,6 +222,16 @@ export type OpenComputerCaptureSandboxSnapshotRequest = z.output<
   typeof OpenComputerCaptureSandboxSnapshotRequestSchema
 >;
 
+export const OpenComputerVerifyCheckpointStartableRequestSchema = z
+  .object({
+    checkpointId: z.string().trim().min(1),
+    requestTimeoutMs: z.number().int().positive().optional(),
+  })
+  .strict();
+export type OpenComputerVerifyCheckpointStartableRequest = z.output<
+  typeof OpenComputerVerifyCheckpointStartableRequestSchema
+>;
+
 export const OpenComputerRuntimeControlRequestSchema = z
   .object({
     sandboxId: z.string().trim().min(1, {

@@ -151,6 +151,12 @@ export class OpenComputerSandboxAdapter implements SandboxAdapter {
           ? {}
           : { requestTimeoutMs: request.providerRequestTimeoutMs }),
       });
+      await this.#client.verifyCheckpointStartable({
+        checkpointId: response.checkpointId,
+        ...(request.providerRequestTimeoutMs === undefined
+          ? {}
+          : { requestTimeoutMs: request.providerRequestTimeoutMs }),
+      });
       return createOpenComputerCheckpointImageHandle(response.checkpointId);
     } catch (error) {
       if (isOpenComputerNotFound(error)) {

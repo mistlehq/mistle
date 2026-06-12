@@ -145,6 +145,21 @@ describe("OpenComputer client helpers", () => {
     ]);
   });
 
+  it("sets the OpenComputer base image home and working directory to root", () => {
+    expect(createOpenComputerImageManifest(createOpenComputerBaseImage({})).steps).toEqual(
+      expect.arrayContaining([
+        {
+          type: "env",
+          args: { vars: { HOME: "/root" } },
+        },
+        {
+          type: "workdir",
+          args: { path: "/root" },
+        },
+      ]),
+    );
+  });
+
   it("validates named snapshot manifests and ready status", () => {
     const image = createOpenComputerBaseImage({});
     const manifest = image.toJSON();
@@ -365,6 +380,88 @@ describe("OpenComputer client helpers", () => {
         }),
       ).resolves.toEqual({ checkpointId: "checkpoint-1" });
       expect(checkpointBody).toEqual({ name: "mistle-sb-1" });
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("verifies checkpoint startability by forking and destroying a probe sandbox", async () => {
+    const requestPaths: string[] = [];
+    const api = await startSimulatedOpenComputerApi((request, response) => {
+      requestPaths.push(`${request.method ?? ""} ${request.url ?? ""}`);
+      if (
+        request.method === "POST" &&
+        request.url === "/api/sandboxes/from-checkpoint/checkpoint-1"
+      ) {
+        response.writeHead(201, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ sandboxID: "sb-probe" }));
+        return;
+      }
+      if (request.method === "DELETE" && request.url === "/api/sandboxes/sb-probe") {
+        response.writeHead(204);
+        response.end();
+        return;
+      }
+      response.writeHead(404);
+      response.end();
+    });
+    const client = new OpenComputerApiClient({
+      config: { apiKey: "test-key", apiBaseUrl: api.url },
+    });
+
+    try {
+      await expect(
+        client.verifyCheckpointStartable({
+          checkpointId: "checkpoint-1",
+          requestTimeoutMs: 1_000,
+        }),
+      ).resolves.toBeUndefined();
+      expect(requestPaths).toEqual([
+        "POST /api/sandboxes/from-checkpoint/checkpoint-1",
+        "DELETE /api/sandboxes/sb-probe",
+      ]);
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("waits for checkpoint fork availability before the probe succeeds", async () => {
+    let forkAttempts = 0;
+    const api = await startSimulatedOpenComputerApi((request, response) => {
+      if (
+        request.method === "POST" &&
+        request.url === "/api/sandboxes/from-checkpoint/checkpoint-1"
+      ) {
+        forkAttempts += 1;
+        if (forkAttempts === 1) {
+          response.writeHead(404, { "Content-Type": "application/json" });
+          response.end(JSON.stringify({ error: "checkpoint not found" }));
+          return;
+        }
+        response.writeHead(201, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ sandboxID: "sb-probe" }));
+        return;
+      }
+      if (request.method === "DELETE" && request.url === "/api/sandboxes/sb-probe") {
+        response.writeHead(204);
+        response.end();
+        return;
+      }
+      response.writeHead(404);
+      response.end();
+    });
+    const client = new OpenComputerApiClient({
+      config: { apiKey: "test-key", apiBaseUrl: api.url },
+    });
+
+    try {
+      await expect(
+        client.verifyCheckpointStartable({
+          checkpointId: "checkpoint-1",
+          requestTimeoutMs: 2_000,
+        }),
+      ).resolves.toBeUndefined();
+      expect(forkAttempts).toBe(2);
     } finally {
       await api.close();
     }
