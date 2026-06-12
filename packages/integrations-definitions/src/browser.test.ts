@@ -42,6 +42,14 @@ describe("browser definitions", () => {
     ).toBe(true);
   });
 
+  it("keeps browser bundle agent runtime entries free of compile functions", () => {
+    const runtimes = createBrowserDefinitionsBundle().agentRuntimeRegistry.listRuntimes();
+
+    for (const runtime of runtimes) {
+      expect(Object.hasOwn(runtime, "compileRuntime")).toBe(false);
+    }
+  });
+
   it("registers aws in the browser-safe definitions bundle", () => {
     const definitions = createBrowserDefinitionsBundle().integrationRegistry.listDefinitions();
 

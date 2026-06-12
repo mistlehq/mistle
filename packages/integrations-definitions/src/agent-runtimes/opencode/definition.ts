@@ -1,33 +1,11 @@
-import {
-  IntegrationMcpConfigFormats,
-  type AgentRuntimeDefinition,
-} from "@mistle/integrations-core";
+import type { AgentRuntimeDefinition } from "@mistle/integrations-core";
 
 import { compileOpenCodeRuntime } from "./compile-runtime.js";
+import { OpenCodeRuntimeMetadata } from "./metadata.js";
 import { OpenCodeRuntimeConfigSchema } from "./runtime-config-schema.js";
 
 export const OpenCodeRuntimeDefinition: AgentRuntimeDefinition<typeof OpenCodeRuntimeConfigSchema> =
   {
-    runtimeId: "opencode",
-    displayName: "OpenCode",
-    logoKey: "opencode",
-    configSchema: OpenCodeRuntimeConfigSchema,
-    capabilities: {
-      associatedResourceDelivery: {
-        supported: true,
-      },
-      conversationDelivery: {
-        idempotencyFingerprintRuntimeKey: "opencode",
-        createConversationRetryPolicy: "idempotent",
-      },
-    },
+    ...OpenCodeRuntimeMetadata,
     compileRuntime: compileOpenCodeRuntime,
-    materializeMcpConfig: () => [
-      {
-        clientId: "opencode-cli",
-        fileId: "opencode_config",
-        format: IntegrationMcpConfigFormats.JSON,
-        path: ["mcp"],
-      },
-    ],
   };

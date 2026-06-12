@@ -1,5 +1,6 @@
 import {
   IntegrationRegistry,
+  type AnyAgentRuntimeMetadata,
   type AnyIntegrationDefinition,
   type IntegrationDefinitionsBundle,
 } from "@mistle/integrations-core";
@@ -74,7 +75,7 @@ export function createBrowserIntegrationRegistry(): IntegrationRegistry {
   return registry;
 }
 
-export function createBrowserDefinitionsBundle(): IntegrationDefinitionsBundle {
+export function createBrowserDefinitionsBundle(): IntegrationDefinitionsBundle<AnyAgentRuntimeMetadata> {
   return {
     integrationRegistry: createBrowserIntegrationRegistry(),
     agentRuntimeRegistry: createAgentRuntimeRegistry(),

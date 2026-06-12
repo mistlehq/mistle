@@ -1,6 +1,7 @@
 import {
   IntegrationRegistry,
   type AnyIntegrationDefinition,
+  type AnyAgentRuntimeMetadata,
   type IntegrationDefinitionsBundle,
 } from "@mistle/integrations-core";
 
@@ -77,7 +78,7 @@ export function createIntegrationRegistry(): IntegrationRegistry {
   return registry;
 }
 
-export function createDefinitionsBundle(): IntegrationDefinitionsBundle {
+export function createDefinitionsBundle(): IntegrationDefinitionsBundle<AnyAgentRuntimeMetadata> {
   return {
     integrationRegistry: createIntegrationRegistry(),
     agentRuntimeRegistry: createAgentRuntimeRegistry(),

@@ -1,34 +1,10 @@
-import {
-  IntegrationMcpConfigFormats,
-  type AgentRuntimeDefinition,
-} from "@mistle/integrations-core";
+import type { AgentRuntimeDefinition } from "@mistle/integrations-core";
 
 import { compileCodexRuntime } from "./compile-runtime.js";
-import { CodexComposerCapabilities } from "./composer-capabilities.js";
+import { CodexRuntimeMetadata } from "./metadata.js";
 import { CodexRuntimeConfigSchema } from "./runtime-config-schema.js";
 
 export const CodexRuntimeDefinition: AgentRuntimeDefinition<typeof CodexRuntimeConfigSchema> = {
-  runtimeId: "codex",
-  displayName: "Codex",
-  logoKey: "openai",
-  configSchema: CodexRuntimeConfigSchema,
-  capabilities: {
-    associatedResourceDelivery: {
-      supported: true,
-    },
-    conversationDelivery: {
-      idempotencyFingerprintRuntimeKey: "codex",
-      createConversationRetryPolicy: "idempotent",
-    },
-  },
-  composerCapabilities: CodexComposerCapabilities,
+  ...CodexRuntimeMetadata,
   compileRuntime: compileCodexRuntime,
-  materializeMcpConfig: () => [
-    {
-      clientId: "codex-cli",
-      fileId: "codex_config",
-      format: IntegrationMcpConfigFormats.TOML,
-      path: ["mcp_servers"],
-    },
-  ],
 };

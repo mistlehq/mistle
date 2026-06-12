@@ -1,7 +1,11 @@
 import type { WebhookPayloadFilter } from "@mistle/webhooks";
 import type { z } from "zod";
 
-import type { AgentRuntimeRegistry } from "../agent-runtimes/index.js";
+import type {
+  AgentRuntimeRegistry,
+  AnyAgentRuntimeDefinition,
+  AnyAgentRuntimeMetadata,
+} from "../agent-runtimes/index.js";
 import type { AgentPtyLaunchSpec, AgentRuntimeCapabilities } from "../agent-runtimes/types.js";
 import type { ConnectionCapabilitySet } from "../capabilities/index.js";
 import type { IntegrationMiddleware } from "../middleware/index.js";
@@ -445,7 +449,7 @@ export type IntegrationFormContext<
   TBindingConfig = Record<string, unknown>,
   TConnectionConfig = Record<string, unknown>,
 > = {
-  definitions?: IntegrationDefinitionsBundle;
+  definitions?: IntegrationDefinitionsBundle<AnyAgentRuntimeMetadata>;
   familyId: string;
   variantId: string;
   kind: IntegrationKind;
@@ -2900,9 +2904,11 @@ export interface IntegrationDefinitionResolver extends IntegrationDefinitionRead
   getDefinitionOrThrow(input: IntegrationDefinitionLocator): AnyIntegrationDefinition;
 }
 
-export type IntegrationDefinitionsBundle = {
+export type IntegrationDefinitionsBundle<
+  TAgentRuntimeEntry extends AnyAgentRuntimeMetadata = AnyAgentRuntimeDefinition,
+> = {
   integrationRegistry: IntegrationRegistry;
-  agentRuntimeRegistry: AgentRuntimeRegistry;
+  agentRuntimeRegistry: AgentRuntimeRegistry<TAgentRuntimeEntry>;
 };
 
 export type CompileRuntimePlanBindingInput = {
