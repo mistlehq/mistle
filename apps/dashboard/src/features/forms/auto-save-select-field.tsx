@@ -158,9 +158,20 @@ export function AutoSaveSelectField(input: AutoSaveSelectFieldProps): React.JSX.
 
   const selectedOptionLabel =
     input.options.find((option) => option.value === selectedValue)?.label ?? null;
+  const description =
+    input.description === undefined || input.description.trim().length === 0
+      ? undefined
+      : input.description;
   const showIndicator = status !== "idle" && errorState === null;
   const saveState = errorState === null ? status : "error";
   const errorMessage = showErrorMessage ? errorState?.message : undefined;
+  const alignLabelWithControl = description === undefined;
+  const labelAlignmentClassName =
+    alignLabelWithControl && input.options.length > 0
+      ? "md:-translate-y-0.5 md:!pt-0"
+      : alignLabelWithControl
+        ? "md:-translate-y-0.5"
+        : undefined;
   const liveMessage =
     errorState !== null
       ? ""
@@ -173,10 +184,10 @@ export function AutoSaveSelectField(input: AutoSaveSelectFieldProps): React.JSX.
   return (
     <Field contentWidth="fill" orientation="horizontal">
       <FieldHeader>
-        <FieldLabel htmlFor={input.id}>{input.label}</FieldLabel>
-        {input.description === undefined ? null : (
-          <FieldDescription>{input.description}</FieldDescription>
-        )}
+        <FieldLabel className={labelAlignmentClassName} htmlFor={input.id}>
+          {input.label}
+        </FieldLabel>
+        {description === undefined ? null : <FieldDescription>{description}</FieldDescription>}
       </FieldHeader>
       <FieldContent>
         <div className="space-y-2" data-save-state={saveState}>
