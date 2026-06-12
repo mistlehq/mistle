@@ -519,6 +519,12 @@ describe("integrations-definitions index", () => {
           category: "Pull requests",
           parameters: expect.arrayContaining([
             expect.objectContaining({
+              id: "botActor",
+              kind: "resource-select",
+              resourceKind: "bot",
+              payloadPath: ["sender", "login"],
+            }),
+            expect.objectContaining({
               id: "requestedReviewer",
               payloadPath: ["requested_reviewer", "login"],
               negatedMatchRequiresExists: true,
@@ -530,8 +536,30 @@ describe("integrations-definitions index", () => {
               payloadPath: ["requested_team", "slug"],
               negatedMatchRequiresExists: true,
             }),
+            expect.objectContaining({
+              id: "requestedBot",
+              kind: "resource-select",
+              resourceKind: "bot",
+              payloadPath: ["requested_reviewer", "login"],
+              negatedMatchRequiresExists: true,
+            }),
           ]),
           parameterGroups: [
+            {
+              id: "actor",
+              label: "actor",
+              kind: "oneOf",
+              options: [
+                {
+                  parameterId: "author",
+                  label: "by user",
+                },
+                {
+                  parameterId: "botActor",
+                  label: "by bot",
+                },
+              ],
+            },
             {
               id: "requestedReviewTarget",
               label: "requested review target",
@@ -544,6 +572,10 @@ describe("integrations-definitions index", () => {
                 {
                   parameterId: "requestedTeam",
                   label: "for team",
+                },
+                {
+                  parameterId: "requestedBot",
+                  label: "for bot",
                 },
               ],
             },
@@ -556,6 +588,12 @@ describe("integrations-definitions index", () => {
           category: "Pull requests",
           parameters: expect.arrayContaining([
             expect.objectContaining({
+              id: "botActor",
+              kind: "resource-select",
+              resourceKind: "bot",
+              payloadPath: ["sender", "login"],
+            }),
+            expect.objectContaining({
               id: "requestedReviewer",
               payloadPath: ["requested_reviewer", "login"],
               negatedMatchRequiresExists: true,
@@ -567,8 +605,30 @@ describe("integrations-definitions index", () => {
               payloadPath: ["requested_team", "slug"],
               negatedMatchRequiresExists: true,
             }),
+            expect.objectContaining({
+              id: "requestedBot",
+              kind: "resource-select",
+              resourceKind: "bot",
+              payloadPath: ["requested_reviewer", "login"],
+              negatedMatchRequiresExists: true,
+            }),
           ]),
           parameterGroups: [
+            {
+              id: "actor",
+              label: "actor",
+              kind: "oneOf",
+              options: [
+                {
+                  parameterId: "author",
+                  label: "by user",
+                },
+                {
+                  parameterId: "botActor",
+                  label: "by bot",
+                },
+              ],
+            },
             {
               id: "requestedReviewTarget",
               label: "requested review target",
@@ -581,6 +641,10 @@ describe("integrations-definitions index", () => {
                 {
                   parameterId: "requestedTeam",
                   label: "for team",
+                },
+                {
+                  parameterId: "requestedBot",
+                  label: "for bot",
                 },
               ],
             },

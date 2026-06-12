@@ -77,7 +77,7 @@ const GitHubPayloadReferences = {
   },
   REQUESTED_REVIEWER_LOGIN: {
     path: ["requested_reviewer", "login"],
-    description: "GitHub username requested for pull request review",
+    description: "GitHub login requested for pull request review",
   },
   REQUESTED_TEAM_SLUG: {
     path: ["requested_team", "slug"],
@@ -93,7 +93,7 @@ const GitHubPayloadReferences = {
   },
   SENDER_LOGIN: {
     path: ["sender", "login"],
-    description: "GitHub username of the sender",
+    description: "GitHub login of the sender",
   },
   REF: {
     path: ["ref"],
@@ -137,22 +137,32 @@ const GitHubRepositoryParameter: IntegrationWebhookEventParameterDefinition = {
 
 const GitHubAuthorParameter: IntegrationWebhookEventParameterDefinition = {
   id: "author",
-  label: "author",
+  label: "actor",
   kind: "resource-select",
   resourceKind: "user",
   payloadPath: ["sender", "login"],
   prefix: "by",
-  placeholder: "Any author",
+  placeholder: "Any user",
 };
 
 const GitHubCommenterParameter: IntegrationWebhookEventParameterDefinition = {
   id: "commenter",
-  label: "commenter",
+  label: "actor",
   kind: "resource-select",
   resourceKind: "user",
   payloadPath: ["sender", "login"],
   prefix: "by",
-  placeholder: "Any commenter",
+  placeholder: "Any user",
+};
+
+const GitHubBotActorParameter: IntegrationWebhookEventParameterDefinition = {
+  id: "botActor",
+  label: "bot",
+  kind: "resource-select",
+  resourceKind: "bot",
+  payloadPath: ["sender", "login"],
+  prefix: "by bot",
+  placeholder: "Any bot",
 };
 
 const GitHubIssueCommentTargetParameter: IntegrationWebhookEventParameterDefinition = {
@@ -217,6 +227,37 @@ const GitHubRequestedTeamParameter: IntegrationWebhookEventParameterDefinition =
   placeholder: "Any GitHub team",
 };
 
+const GitHubRequestedBotParameter: IntegrationWebhookEventParameterDefinition = {
+  id: "requestedBot",
+  label: "requested bot",
+  kind: "resource-select",
+  resourceKind: "bot",
+  payloadPath: ["requested_reviewer", "login"],
+  negatedMatchRequiresExists: true,
+  prefix: "for bot",
+  placeholder: "Any bot",
+};
+
+function createGitHubActorParameterGroup(
+  userParameter: IntegrationWebhookEventParameterDefinition,
+): IntegrationWebhookEventParameterGroupDefinition {
+  return {
+    id: "actor",
+    label: "actor",
+    kind: "oneOf",
+    options: [
+      {
+        parameterId: userParameter.id,
+        label: "by user",
+      },
+      {
+        parameterId: GitHubBotActorParameter.id,
+        label: "by bot",
+      },
+    ],
+  };
+}
+
 const GitHubRequestedReviewTargetParameterGroup: IntegrationWebhookEventParameterGroupDefinition = {
   id: "requestedReviewTarget",
   label: "requested review target",
@@ -229,6 +270,10 @@ const GitHubRequestedReviewTargetParameterGroup: IntegrationWebhookEventParamete
     {
       parameterId: GitHubRequestedTeamParameter.id,
       label: "for team",
+    },
+    {
+      parameterId: GitHubRequestedBotParameter.id,
+      label: "for bot",
     },
   ],
 };
@@ -334,12 +379,17 @@ function createGitHubPullRequestReviewRequestEventDefinition(input: {
     parameters: [
       GitHubRepositoryParameter,
       GitHubAuthorParameter,
+      GitHubBotActorParameter,
       GitHubBaseBranchParameter,
       GitHubHeadBranchParameter,
       GitHubRequestedReviewerParameter,
       GitHubRequestedTeamParameter,
+      GitHubRequestedBotParameter,
     ],
-    parameterGroups: [GitHubRequestedReviewTargetParameterGroup],
+    parameterGroups: [
+      createGitHubActorParameterGroup(GitHubAuthorParameter),
+      GitHubRequestedReviewTargetParameterGroup,
+    ],
   });
 }
 
@@ -362,7 +412,9 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
       createInvocationTokenParameter(["issue", "body"]),
       GitHubRepositoryParameter,
       GitHubAuthorParameter,
+      GitHubBotActorParameter,
     ],
+    parameterGroups: [createGitHubActorParameterGroup(GitHubAuthorParameter)],
   }),
   createGitHubWebhookEventDefinition({
     eventType: "github.issues.closed",
@@ -378,7 +430,8 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
       GitHubIssueConversationKeyOption,
       GitHubRepositoryConversationKeyOption,
     ],
-    parameters: [GitHubRepositoryParameter, GitHubAuthorParameter],
+    parameters: [GitHubRepositoryParameter, GitHubAuthorParameter, GitHubBotActorParameter],
+    parameterGroups: [createGitHubActorParameterGroup(GitHubAuthorParameter)],
   }),
   createGitHubWebhookEventDefinition({
     eventType: "github.issues.reopened",
@@ -394,7 +447,8 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
       GitHubIssueConversationKeyOption,
       GitHubRepositoryConversationKeyOption,
     ],
-    parameters: [GitHubRepositoryParameter, GitHubAuthorParameter],
+    parameters: [GitHubRepositoryParameter, GitHubAuthorParameter, GitHubBotActorParameter],
+    parameterGroups: [createGitHubActorParameterGroup(GitHubAuthorParameter)],
   }),
   createGitHubWebhookEventDefinition({
     eventType: "github.issue_comment.created",
@@ -415,7 +469,9 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
       GitHubIssueCommentTargetParameter,
       GitHubRepositoryParameter,
       GitHubCommenterParameter,
+      GitHubBotActorParameter,
     ],
+    parameterGroups: [createGitHubActorParameterGroup(GitHubCommenterParameter)],
   }),
   createGitHubWebhookEventDefinition({
     eventType: "github.pull_request.opened",
@@ -435,8 +491,10 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
       createInvocationTokenParameter(["pull_request", "body"]),
       GitHubRepositoryParameter,
       GitHubAuthorParameter,
+      GitHubBotActorParameter,
       GitHubBaseBranchParameter,
     ],
+    parameterGroups: [createGitHubActorParameterGroup(GitHubAuthorParameter)],
   }),
   createGitHubWebhookEventDefinition({
     eventType: "github.pull_request.closed",
@@ -452,7 +510,13 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
       GitHubPullRequestConversationKeyOption,
       GitHubRepositoryConversationKeyOption,
     ],
-    parameters: [GitHubRepositoryParameter, GitHubAuthorParameter, GitHubBaseBranchParameter],
+    parameters: [
+      GitHubRepositoryParameter,
+      GitHubAuthorParameter,
+      GitHubBotActorParameter,
+      GitHubBaseBranchParameter,
+    ],
+    parameterGroups: [createGitHubActorParameterGroup(GitHubAuthorParameter)],
   }),
   createGitHubWebhookEventDefinition({
     eventType: "github.pull_request.reopened",
@@ -468,7 +532,13 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
       GitHubPullRequestConversationKeyOption,
       GitHubRepositoryConversationKeyOption,
     ],
-    parameters: [GitHubRepositoryParameter, GitHubAuthorParameter, GitHubBaseBranchParameter],
+    parameters: [
+      GitHubRepositoryParameter,
+      GitHubAuthorParameter,
+      GitHubBotActorParameter,
+      GitHubBaseBranchParameter,
+    ],
+    parameterGroups: [createGitHubActorParameterGroup(GitHubAuthorParameter)],
   }),
   createGitHubWebhookEventDefinition({
     eventType: "github.pull_request.synchronize",
@@ -490,9 +560,11 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     parameters: [
       GitHubRepositoryParameter,
       GitHubAuthorParameter,
+      GitHubBotActorParameter,
       GitHubBaseBranchParameter,
       GitHubHeadBranchParameter,
     ],
+    parameterGroups: [createGitHubActorParameterGroup(GitHubAuthorParameter)],
   }),
   createGitHubWebhookEventDefinition({
     eventType: "github.pull_request.ready_for_review",
@@ -514,9 +586,11 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     parameters: [
       GitHubRepositoryParameter,
       GitHubAuthorParameter,
+      GitHubBotActorParameter,
       GitHubBaseBranchParameter,
       GitHubHeadBranchParameter,
     ],
+    parameterGroups: [createGitHubActorParameterGroup(GitHubAuthorParameter)],
   }),
   createGitHubPullRequestReviewRequestEventDefinition({
     eventType: "github.pull_request.review_requested",
@@ -550,8 +624,10 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
       createInvocationTokenParameter(["review", "body"]),
       GitHubRepositoryParameter,
       GitHubAuthorParameter,
+      GitHubBotActorParameter,
       GitHubBaseBranchParameter,
     ],
+    parameterGroups: [createGitHubActorParameterGroup(GitHubAuthorParameter)],
   }),
   createGitHubWebhookEventDefinition({
     eventType: "github.pull_request_review_comment.created",
@@ -577,8 +653,10 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
       createInvocationTokenParameter(["comment", "body"]),
       GitHubRepositoryParameter,
       GitHubCommenterParameter,
+      GitHubBotActorParameter,
       GitHubBaseBranchParameter,
     ],
+    parameterGroups: [createGitHubActorParameterGroup(GitHubCommenterParameter)],
   }),
   createGitHubWebhookEventDefinition({
     eventType: "github.push.pushed",

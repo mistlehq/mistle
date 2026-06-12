@@ -1,5 +1,6 @@
 import type {
   WebhookTriggerEventOption,
+  WebhookTriggerEventParameterOption,
   WebhookTriggerEventParameterRuleMap,
 } from "./webhook-trigger-event-types.js";
 import { WebhookTriggerEventParameterRuleOperators } from "./webhook-trigger-event-types.js";
@@ -18,6 +19,7 @@ type PayloadFilterNode =
       op: "exists" | "not_exists";
       path: string[];
     };
+type PayloadFilterPathNode = Extract<PayloadFilterNode, { path: string[] }>;
 
 function findEventOptionByTriggerId(input: {
   eventOptions: readonly WebhookTriggerEventOption[];
@@ -191,6 +193,60 @@ function hasNegatedFilterForPath(input: {
       filter.path.length === input.path.length &&
       filter.path.every((segment, index) => segment === input.path[index]),
   );
+}
+
+function payloadPathMatches(input: {
+  parameter: WebhookTriggerEventParameterOption;
+  filter: PayloadFilterPathNode;
+}): boolean {
+  return (
+    input.parameter.payloadPath.length === input.filter.path.length &&
+    input.parameter.payloadPath.every((segment, index) => segment === input.filter.path[index])
+  );
+}
+
+function isGitHubAppBotHandle(value: string): boolean {
+  return value.endsWith("[bot]");
+}
+
+function isBotResourceParameter(parameter: WebhookTriggerEventParameterOption): boolean {
+  return parameter.kind === "resource-select" && parameter.resourceKind === "bot";
+}
+
+function resolvePayloadFilterParameter(input: {
+  parameters: readonly WebhookTriggerEventParameterOption[];
+  filter: PayloadFilterPathNode;
+}): WebhookTriggerEventParameterOption | undefined {
+  const matchingParameters = input.parameters.filter((parameter) =>
+    payloadPathMatches({ parameter, filter: input.filter }),
+  );
+  const firstMatchingParameter = matchingParameters[0];
+  if (matchingParameters.length <= 1 || firstMatchingParameter === undefined) {
+    return firstMatchingParameter;
+  }
+
+  if (
+    input.filter.op === "eq" ||
+    input.filter.op === "neq" ||
+    input.filter.op === "contains" ||
+    input.filter.op === "contains_token"
+  ) {
+    const matchingBotParameter = matchingParameters.find((parameter) =>
+      isBotResourceParameter(parameter),
+    );
+    if (matchingBotParameter !== undefined && isGitHubAppBotHandle(input.filter.value)) {
+      return matchingBotParameter;
+    }
+
+    const matchingNonBotParameter = matchingParameters.find(
+      (parameter) => !isBotResourceParameter(parameter),
+    );
+    if (matchingNonBotParameter !== undefined) {
+      return matchingNonBotParameter;
+    }
+  }
+
+  return firstMatchingParameter;
 }
 
 function mergePayloadFilterNodes(filters: readonly PayloadFilterNode[]): PayloadFilterNode | null {
@@ -481,76 +537,79 @@ export function extractWebhookTriggerEventParameterRules(input: {
           continue;
         }
 
-        for (const parameter of eventOption.parameters ?? []) {
-          if (
-            parameter.payloadPath.length === filter.path.length &&
-            parameter.payloadPath.every((segment, index) => segment === filter.path[index])
-          ) {
-            if (
-              parameter.negatedMatchRequiresExists === true &&
-              filter.op === WebhookTriggerEventParameterRuleOperators.EXISTS &&
-              hasNegatedFilterForPath({
-                filters: rootFilters,
-                path: parameter.payloadPath,
-              })
-            ) {
-              extracted = true;
-              break;
-            }
+        const parameter = resolvePayloadFilterParameter({
+          parameters: eventOption.parameters ?? [],
+          filter,
+        });
+        if (parameter === undefined) {
+          continue;
+        }
 
-            if (parameter.kind === "enum-select" && parameter.matchMode === "exists") {
-              if (filter.op === "exists" || filter.op === "not_exists") {
-                eventParameterRules[triggerId] = {
-                  ...(eventParameterRules[triggerId] ?? {}),
-                  [parameter.id]: {
-                    operator: filter.op,
-                    value: filter.op,
-                  },
-                };
-                extracted = true;
-              }
-              break;
-            }
+        if (
+          parameter.negatedMatchRequiresExists === true &&
+          filter.op === WebhookTriggerEventParameterRuleOperators.EXISTS &&
+          hasNegatedFilterForPath({
+            filters: rootFilters,
+            path: parameter.payloadPath,
+          })
+        ) {
+          extracted = true;
+          break;
+        }
 
-            if (
-              parameter.kind === "string" &&
-              (parameter.matchMode === "contains" || parameter.matchMode === "contains_token")
-            ) {
-              if (filter.op === parameter.matchMode) {
-                eventParameterRules[triggerId] = {
-                  ...(eventParameterRules[triggerId] ?? {}),
-                  [parameter.id]: {
-                    operator: filter.op,
-                    value: filter.value,
-                  },
-                };
-                extracted = true;
-              }
-              break;
-            }
-
-            if (filter.op !== "eq" && filter.op !== "neq") {
-              break;
-            }
-
+        if (parameter.kind === "enum-select" && parameter.matchMode === "exists") {
+          if (filter.op === "exists" || filter.op === "not_exists") {
             eventParameterRules[triggerId] = {
               ...(eventParameterRules[triggerId] ?? {}),
               [parameter.id]: {
-                operator:
-                  filter.op === "neq"
-                    ? WebhookTriggerEventParameterRuleOperators.IS_NOT
-                    : WebhookTriggerEventParameterRuleOperators.IS,
+                operator: filter.op,
+                value: filter.op,
+              },
+            };
+            extracted = true;
+          }
+          if (extracted) {
+            break;
+          }
+          continue;
+        }
+
+        if (
+          parameter.kind === "string" &&
+          (parameter.matchMode === "contains" || parameter.matchMode === "contains_token")
+        ) {
+          if (filter.op === parameter.matchMode) {
+            eventParameterRules[triggerId] = {
+              ...(eventParameterRules[triggerId] ?? {}),
+              [parameter.id]: {
+                operator: filter.op,
                 value: filter.value,
               },
             };
             extracted = true;
+          }
+          if (extracted) {
             break;
           }
+          continue;
         }
 
-        if (extracted) {
-          break;
+        if (filter.op !== "eq" && filter.op !== "neq") {
+          continue;
         }
+
+        eventParameterRules[triggerId] = {
+          ...(eventParameterRules[triggerId] ?? {}),
+          [parameter.id]: {
+            operator:
+              filter.op === "neq"
+                ? WebhookTriggerEventParameterRuleOperators.IS_NOT
+                : WebhookTriggerEventParameterRuleOperators.IS,
+            value: filter.value,
+          },
+        };
+        extracted = true;
+        break;
       }
 
       if (!extracted) {
