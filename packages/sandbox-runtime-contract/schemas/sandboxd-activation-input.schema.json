@@ -1407,6 +1407,10 @@
                           "enum": ["slack.thread.message.created"]
                         }
                       },
+                      "messageMode": {
+                        "type": "string",
+                        "enum": ["all", "app_mentions_only"]
+                      },
                       "payloadFilter": {
                         "type": "object",
                         "propertyNames": {

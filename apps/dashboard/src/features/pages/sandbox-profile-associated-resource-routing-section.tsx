@@ -75,10 +75,6 @@ const AllSlackThreadEventTypes = SlackThreadEventOptions.map((option) => option.
 
 const AssociatedResourceOptions: ReadonlyArray<{
   defaultEventTypes: readonly AssociatedResourceEventType[];
-  eventOptions: ReadonlyArray<{
-    eventType: AssociatedResourceEventType;
-    label: string;
-  }>;
   label: string;
   resourceKind: AssociatedProviderResourceKind;
   tooltip: string;
@@ -86,7 +82,6 @@ const AssociatedResourceOptions: ReadonlyArray<{
 }> = [
   {
     defaultEventTypes: AllGitHubPullRequestEventTypes,
-    eventOptions: GitHubPullRequestEventOptions,
     label: "Agent PR activity",
     resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
     tooltip: "Send selected GitHub activity back to the agent that opened the PR.",
@@ -94,7 +89,6 @@ const AssociatedResourceOptions: ReadonlyArray<{
   },
   {
     defaultEventTypes: AllSlackThreadEventTypes,
-    eventOptions: SlackThreadEventOptions,
     label: "Agent-started Slack threads",
     resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
     tooltip: "Send replies in agent-started Slack threads back to the originating agent.",
@@ -359,7 +353,6 @@ function SandboxProfileAssociatedResourceRoutingStatefulSection(input: {
 
   return (
     <SandboxProfileAssociatedResourceRoutingFields
-      disabled={input.disabled}
       eventOptions={eventOptions}
       fieldIsReadOnly={fieldIsReadOnly}
       onEventParameterRuleChange={updateEventParameterRule}
@@ -394,7 +387,6 @@ function SandboxProfileAssociatedResourceRoutingStatefulSection(input: {
 }
 
 function SandboxProfileAssociatedResourceRoutingFields(input: {
-  disabled: boolean;
   eventOptions: readonly WebhookTriggerEventOption[];
   fieldIsReadOnly: boolean;
   onEventParameterRuleChange: (input: {
@@ -473,7 +465,6 @@ function SandboxProfileAssociatedResourceRoutingFields(input: {
             {option.resourceKind === AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST ? (
               <GitHubPullRequestSettings
                 eventOptions={input.eventOptions}
-                eventParameterRules={resource.eventParameterRules}
                 fieldIsReadOnly={input.fieldIsReadOnly}
                 onEventParameterRuleChange={(change) => {
                   input.onEventParameterRuleChange({
@@ -498,7 +489,6 @@ function SandboxProfileAssociatedResourceRoutingFields(input: {
             ) : (
               <SlackThreadSettings
                 eventOptions={input.eventOptions}
-                eventParameterRules={resource.eventParameterRules}
                 fieldIsReadOnly={input.fieldIsReadOnly}
                 onEventParameterRuleChange={(change) => {
                   input.onEventParameterRuleChange({
@@ -529,7 +519,6 @@ function SandboxProfileAssociatedResourceRoutingFields(input: {
 
 function GitHubPullRequestSettings(input: {
   eventOptions: readonly WebhookTriggerEventOption[];
-  eventParameterRules: WebhookTriggerEventParameterRuleMap;
   fieldIsReadOnly: boolean;
   onEventParameterRuleChange: (input: {
     triggerId: string;
@@ -546,26 +535,28 @@ function GitHubPullRequestSettings(input: {
   settingsExpanded: boolean;
   layout: AssociatedResourceRoutingLayout;
 }): React.JSX.Element {
+  if (!input.settingsExpanded) {
+    return <></>;
+  }
+
   return (
     <div className={input.layout === "horizontal" ? "grid gap-2 md:ml-44" : "grid gap-2"}>
-      {input.settingsExpanded ? (
-        <div
-          className="flex flex-col gap-4"
-          id={getAssociatedResourceSettingsPanelId(input.resource.resourceKind)}
-        >
-          <AssociatedResourceEventTypeRows
-            eventOptions={input.eventOptions}
-            eventParameterRules={input.eventParameterRules}
-            eventTypeOptions={GitHubPullRequestEventOptions}
-            fieldIsReadOnly={input.fieldIsReadOnly}
-            onEventParameterRuleChange={input.onEventParameterRuleChange}
-            onEventParameterRulesChange={input.onEventParameterRulesChange}
-            onEventTypeChange={input.onEventTypeChange}
-            selectedConnectionId={input.selectedConnectionId}
-            selectedEventTypes={input.resource.eventTypes}
-          />
-        </div>
-      ) : null}
+      <div
+        className="flex flex-col gap-4"
+        id={getAssociatedResourceSettingsPanelId(input.resource.resourceKind)}
+      >
+        <AssociatedResourceEventTypeRows
+          eventOptions={input.eventOptions}
+          eventParameterRules={input.resource.eventParameterRules}
+          eventTypeOptions={GitHubPullRequestEventOptions}
+          fieldIsReadOnly={input.fieldIsReadOnly}
+          onEventParameterRuleChange={input.onEventParameterRuleChange}
+          onEventParameterRulesChange={input.onEventParameterRulesChange}
+          onEventTypeChange={input.onEventTypeChange}
+          selectedConnectionId={input.selectedConnectionId}
+          selectedEventTypes={input.resource.eventTypes}
+        />
+      </div>
     </div>
   );
 }
@@ -682,7 +673,6 @@ function AssociatedResourceEventTypeRows(input: {
 
 function SlackThreadSettings(input: {
   eventOptions: readonly WebhookTriggerEventOption[];
-  eventParameterRules: WebhookTriggerEventParameterRuleMap;
   fieldIsReadOnly: boolean;
   onEventParameterRuleChange: (input: {
     triggerId: string;
@@ -746,7 +736,7 @@ function SlackThreadSettings(input: {
               }
               error={undefined}
               eventOptions={[eventOption]}
-              eventParameterRules={input.eventParameterRules}
+              eventParameterRules={input.resource.eventParameterRules}
               hasConnectedIntegrations={true}
               onEventParameterRuleChange={input.onEventParameterRuleChange}
               onEventParameterRulesChange={input.onEventParameterRulesChange}
@@ -1078,7 +1068,6 @@ function updateResourceDraft(
   resourceKind: AssociatedProviderResourceKind,
   update: (
     resourceDraft: AssociatedResourceRoutingResourceDraft,
-    option: (typeof AssociatedResourceOptions)[number],
   ) => AssociatedResourceRoutingResourceDraft,
 ): AssociatedResourceRoutingDraft {
   return {
@@ -1087,14 +1076,7 @@ function updateResourceDraft(
         return resourceDraft;
       }
 
-      const option = AssociatedResourceOptions.find(
-        (candidate) => candidate.resourceKind === resourceKind,
-      );
-      if (option === undefined) {
-        return resourceDraft;
-      }
-
-      return update(resourceDraft, option);
+      return update(resourceDraft);
     }),
   };
 }

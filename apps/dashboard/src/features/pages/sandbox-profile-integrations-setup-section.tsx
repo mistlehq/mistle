@@ -1,5 +1,6 @@
 import {
   AssociatedProviderResourceKinds,
+  AssociatedResourceEventTypes,
   type AssociatedProviderResourceKind,
 } from "@mistle/integrations-core";
 import {
@@ -76,6 +77,12 @@ type GitConnectionChoice = {
   displayName: string;
   logoKey: string | undefined;
 };
+
+type AssociatedResourceRoutingConfig =
+  SandboxProfileVersion["associatedResourceEventRoutingConfig"];
+type AssociatedResourceRoutingResourceRule = NonNullable<
+  AssociatedResourceRoutingConfig["resources"]
+>[number];
 
 type SandboxProfileIntegrationsSetupSectionProps = {
   agentRuntimeId: SandboxProfileVersion["agentRuntimeId"];
@@ -224,11 +231,49 @@ function bindingRowTargetsSlackWithBotIdentity(input: {
   return typeof botUserId === "string" && botUserId.trim().length > 0;
 }
 
+function materializeAssociatedResourceRoutingDefaultResources(input: {
+  config: AssociatedResourceRoutingConfig;
+  hasGitHubBinding: boolean;
+  hasSlackThreadBinding: boolean;
+}): AssociatedResourceRoutingConfig {
+  if (input.config.resources !== undefined) {
+    return input.config;
+  }
+
+  const resources: AssociatedResourceRoutingResourceRule[] = [];
+  const routingEnabled = input.config.enabled ?? true;
+  const githubPullRequestEnabled = routingEnabled && input.hasGitHubBinding;
+  const slackThreadEnabled = routingEnabled && input.hasSlackThreadBinding;
+
+  if (githubPullRequestEnabled) {
+    resources.push({
+      resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+      eventTypes: [
+        AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+        AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+        AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
+      ],
+    });
+  }
+
+  if (slackThreadEnabled) {
+    resources.push({
+      resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+      eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+    });
+  }
+
+  return {
+    enabled: resources.length > 0,
+    resources,
+  };
+}
+
 function mergeAssociatedResourceRoutingConfigResourceKinds(input: {
-  baseConfig: SandboxProfileVersion["associatedResourceEventRoutingConfig"];
+  baseConfig: AssociatedResourceRoutingConfig;
   resourceKinds: readonly AssociatedProviderResourceKind[];
-  scopedConfig: SandboxProfileVersion["associatedResourceEventRoutingConfig"];
-}): SandboxProfileVersion["associatedResourceEventRoutingConfig"] {
+  scopedConfig: AssociatedResourceRoutingConfig;
+}): AssociatedResourceRoutingConfig {
   const scopedResourceKinds = new Set(input.resourceKinds);
   const baseResources =
     input.baseConfig.enabled === false ? [] : (input.baseConfig.resources ?? []);
@@ -246,11 +291,17 @@ function mergeAssociatedResourceRoutingConfigResourceKinds(input: {
 }
 
 function buildCombinedAssociatedResourceRoutingConfig(input: {
-  baseConfig: SandboxProfileVersion["associatedResourceEventRoutingConfig"];
+  baseConfig: AssociatedResourceRoutingConfig;
   gitDraftState: SandboxProfileAssociatedResourceRoutingDraftState;
+  hasGitHubBinding: boolean;
+  hasSlackThreadBinding: boolean;
   slackDraftState: SandboxProfileAssociatedResourceRoutingDraftState;
-}): SandboxProfileVersion["associatedResourceEventRoutingConfig"] {
-  let nextConfig = input.baseConfig;
+}): AssociatedResourceRoutingConfig {
+  let nextConfig = materializeAssociatedResourceRoutingDefaultResources({
+    config: input.baseConfig,
+    hasGitHubBinding: input.hasGitHubBinding,
+    hasSlackThreadBinding: input.hasSlackThreadBinding,
+  });
 
   if (input.gitDraftState.hasUnpersistedChanges) {
     const gitConfig = input.gitDraftState.buildDraftChanges?.();
@@ -846,6 +897,11 @@ export function SandboxProfileIntegrationsSetupSection(
       applySavedAssociatedResourceEventRoutingConfig: (config) => {
         inputValue.gitDraftState.applySavedAssociatedResourceEventRoutingConfig?.(config);
         inputValue.slackDraftState.applySavedAssociatedResourceEventRoutingConfig?.(config);
+        setGitAssociatedResourceRoutingDraftState(IdleAssociatedResourceRoutingDraftState);
+        setSlackAssociatedResourceRoutingDraftState(IdleAssociatedResourceRoutingDraftState);
+        associatedResourceRouting.onDraftStateChange?.({
+          hasUnpersistedChanges: false,
+        });
       },
       ...(hasUnpersistedChanges
         ? {
@@ -853,6 +909,8 @@ export function SandboxProfileIntegrationsSetupSection(
               buildCombinedAssociatedResourceRoutingConfig({
                 baseConfig: associatedResourceRouting.version.associatedResourceEventRoutingConfig,
                 gitDraftState: inputValue.gitDraftState,
+                hasGitHubBinding: gitHubBindingDefaultsAssociatedResourceRouting,
+                hasSlackThreadBinding: slackThreadBindingDefaultsAssociatedResourceRouting,
                 slackDraftState: inputValue.slackDraftState,
               }),
           }
@@ -942,6 +1000,13 @@ export function SandboxProfileIntegrationsSetupSection(
     });
   const supportedGitAssociatedResourceEvents =
     gitRowBindingMetadata?.target?.supportedAssociatedResourceEvents ?? [];
+  const connectorRowsTargetSlackWithBotIdentity = connectorRows.some((row) =>
+    bindingRowTargetsSlackWithBotIdentity({
+      row,
+      availableConnections: input.availableConnections,
+      availableTargets: input.availableTargets,
+    }),
+  );
   const associatedResourceRoutingConfigHasGitHubPullRequests =
     input.associatedResourceRouting === undefined
       ? false
@@ -961,6 +1026,8 @@ export function SandboxProfileIntegrationsSetupSection(
     undefined;
   const gitHubBindingDefaultsAssociatedResourceRouting =
     gitRowTargetsGitHub && !associatedResourceRoutingConfigHasExplicitResources;
+  const slackThreadBindingDefaultsAssociatedResourceRouting =
+    connectorRowsTargetSlackWithBotIdentity && !associatedResourceRoutingConfigHasExplicitResources;
   const selectedGitConnectionIsIdentityLinked =
     gitRow !== null && input.identityLinkedGitConnectionIds?.includes(gitRow.connectionId) === true;
   const gitCommitSigningIsChecked =
