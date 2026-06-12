@@ -53,7 +53,6 @@ export {
 } from "./image-definition.js";
 
 const SandboxdCommand = "/opt/mistle/bin/sandboxd";
-const OpenComputerDefaultCwd = "/root";
 const OpenComputerRootPath =
   "/opt/mistle/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 const DaemonReadinessPollIntervalMs = 100;
@@ -192,7 +191,7 @@ export function createOpenComputerStartImageFields(image: OpenComputerStartImage
 }
 
 export function createOpenComputerDaemonCommand(): string {
-  return `sudo -n env PATH=${shellQuote(OpenComputerRootPath)} ${shellQuote(SandboxdCommand)}`;
+  return `sudo -n env PATH=${shellQuote(OpenComputerRootPath)} sh -euc 'cd /root && exec "$1"' sh ${shellQuote(SandboxdCommand)}`;
 }
 
 export function createOpenComputerRootShellCommand(input: { readonly script: string }): {
@@ -755,15 +754,14 @@ export class OpenComputerApiClient implements OpenComputerClient {
       await this.#hardRefreshDaemon(input.sandboxId);
     }
 
-    const daemonCommand = createOpenComputerSandboxdCommand({
-      args: [],
+    const daemonCommand = createOpenComputerRootShellCommand({
+      script: `cd /root && exec ${shellQuote(SandboxdCommand)}`,
       env: createOpenComputerDaemonEnv(input.env),
     });
     const daemonProcess = await this.#startExecSession({
       sandboxId: input.sandboxId,
       command: daemonCommand.command,
       args: daemonCommand.args,
-      cwd: OpenComputerDefaultCwd,
       maxRunAfterDisconnectSeconds: 86_400,
       operation: OpenComputerClientOperationIds.ACTIVATE,
     });

@@ -77,7 +77,9 @@ describe("OpenComputer client helpers", () => {
   });
 
   it("constructs sudo based sandboxd commands with the required root path", () => {
-    expect(createOpenComputerDaemonCommand()).toContain("/usr/sbin");
+    expect(createOpenComputerDaemonCommand()).toBe(
+      "sudo -n env PATH='/opt/mistle/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' sh -euc 'cd /root && exec \"$1\"' sh '/opt/mistle/bin/sandboxd'",
+    );
     expect(createOpenComputerSandboxdCommand({ args: ["ready"] })).toEqual({
       command: "sudo",
       args: [
