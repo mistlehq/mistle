@@ -3,7 +3,6 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import type React from "react";
 import { useState } from "react";
 
-import { AutoSaveStoryFrame } from "../../storybook/auto-save-story-support.js";
 import { AutoSaveSelectField, type AutoSaveSelectFieldProps } from "./auto-save-select-field.js";
 
 const DefaultOptions = [
@@ -36,7 +35,7 @@ function InteractiveStory(props: {
   const [value, setValue] = useState(props.initialValue);
 
   return (
-    <AutoSaveStoryFrame instructions="Choose a different option to trigger autosave. The spinner and saved check render inside the select trigger.">
+    <div className="w-full max-w-5xl">
       <AutoSaveSelectField
         id="storybook-auto-save-select"
         label="Commit email"
@@ -55,7 +54,7 @@ function InteractiveStory(props: {
           ? {}
           : { showErrorMessage: props.showErrorMessage })}
       />
-    </AutoSaveStoryFrame>
+    </div>
   );
 }
 
@@ -65,7 +64,7 @@ export const Default: Story = {
 
 export const WithoutOptions: Story = {
   render: () => (
-    <AutoSaveStoryFrame instructions="When there are no selectable values, the field renders a neutral none state instead of a trigger.">
+    <div className="w-full max-w-5xl">
       <AutoSaveSelectField
         id="storybook-auto-save-select-empty"
         label="Commit email"
@@ -73,6 +72,6 @@ export const WithoutOptions: Story = {
         options={[]}
         value=""
       />
-    </AutoSaveStoryFrame>
+    </div>
   ),
 };
