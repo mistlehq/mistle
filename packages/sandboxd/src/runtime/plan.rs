@@ -46,6 +46,8 @@ pub struct AssociatedResourceEventRoutingResourceRule {
 pub enum AssociatedProviderResourceKind {
     #[serde(rename = "github.pull_request")]
     GithubPullRequest,
+    #[serde(rename = "slack.thread")]
+    SlackThread,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -56,6 +58,8 @@ pub enum AssociatedResourceEventType {
     ReviewSubmitted,
     #[serde(rename = "github.pull_request.review_comment.created")]
     ReviewCommentCreated,
+    #[serde(rename = "slack.thread.message.created")]
+    SlackThreadMessageCreated,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

@@ -912,7 +912,7 @@
                   },
                   "resourceKind": {
                     "type": "string",
-                    "enum": ["github.pull_request"]
+                    "enum": ["github.pull_request", "slack.thread"]
                   },
                   "providerResourceId": {
                     "type": "string",
@@ -980,7 +980,7 @@
                         },
                         "reason": {
                           "type": "string",
-                          "enum": ["resource_kind_not_enabled"]
+                          "enum": ["provider_actor_not_configured", "resource_kind_not_enabled"]
                         }
                       },
                       "required": ["status", "reason"],
@@ -2989,31 +2989,58 @@
                             "resources": {
                               "type": "array",
                               "items": {
-                                "type": "object",
-                                "properties": {
-                                  "resourceKind": {
-                                    "type": "string",
-                                    "enum": ["github.pull_request"]
-                                  },
-                                  "eventTypes": {
-                                    "type": "array",
-                                    "items": {
-                                      "type": "string",
-                                      "enum": [
-                                        "github.pull_request.issue_comment.created",
-                                        "github.pull_request.review.submitted",
-                                        "github.pull_request.review_comment.created"
-                                      ]
-                                    },
-                                    "minItems": 1
-                                  },
-                                  "payloadFilter": {
+                                "anyOf": [
+                                  {
                                     "type": "object",
-                                    "additionalProperties": {}
+                                    "properties": {
+                                      "resourceKind": {
+                                        "type": "string",
+                                        "enum": ["github.pull_request"]
+                                      },
+                                      "eventTypes": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "enum": [
+                                            "github.pull_request.issue_comment.created",
+                                            "github.pull_request.review.submitted",
+                                            "github.pull_request.review_comment.created"
+                                          ]
+                                        },
+                                        "minItems": 1
+                                      },
+                                      "payloadFilter": {
+                                        "type": "object",
+                                        "additionalProperties": {}
+                                      }
+                                    },
+                                    "required": ["resourceKind", "eventTypes"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "resourceKind": {
+                                        "type": "string",
+                                        "enum": ["slack.thread"]
+                                      },
+                                      "eventTypes": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "enum": ["slack.thread.message.created"]
+                                        },
+                                        "minItems": 1
+                                      },
+                                      "payloadFilter": {
+                                        "type": "object",
+                                        "additionalProperties": {}
+                                      }
+                                    },
+                                    "required": ["resourceKind", "eventTypes"],
+                                    "additionalProperties": false
                                   }
-                                },
-                                "required": ["resourceKind", "eventTypes"],
-                                "additionalProperties": false
+                                ]
                               }
                             }
                           },
@@ -3454,31 +3481,58 @@
                         "resources": {
                           "type": "array",
                           "items": {
-                            "type": "object",
-                            "properties": {
-                              "resourceKind": {
-                                "type": "string",
-                                "enum": ["github.pull_request"]
-                              },
-                              "eventTypes": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string",
-                                  "enum": [
-                                    "github.pull_request.issue_comment.created",
-                                    "github.pull_request.review.submitted",
-                                    "github.pull_request.review_comment.created"
-                                  ]
-                                },
-                                "minItems": 1
-                              },
-                              "payloadFilter": {
+                            "anyOf": [
+                              {
                                 "type": "object",
-                                "additionalProperties": {}
+                                "properties": {
+                                  "resourceKind": {
+                                    "type": "string",
+                                    "enum": ["github.pull_request"]
+                                  },
+                                  "eventTypes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "github.pull_request.issue_comment.created",
+                                        "github.pull_request.review.submitted",
+                                        "github.pull_request.review_comment.created"
+                                      ]
+                                    },
+                                    "minItems": 1
+                                  },
+                                  "payloadFilter": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                "required": ["resourceKind", "eventTypes"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "resourceKind": {
+                                    "type": "string",
+                                    "enum": ["slack.thread"]
+                                  },
+                                  "eventTypes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": ["slack.thread.message.created"]
+                                    },
+                                    "minItems": 1
+                                  },
+                                  "payloadFilter": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                "required": ["resourceKind", "eventTypes"],
+                                "additionalProperties": false
                               }
-                            },
-                            "required": ["resourceKind", "eventTypes"],
-                            "additionalProperties": false
+                            ]
                           }
                         }
                       },

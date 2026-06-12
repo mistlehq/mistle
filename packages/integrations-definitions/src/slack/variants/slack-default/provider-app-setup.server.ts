@@ -212,6 +212,13 @@ export const SlackProviderAppSetupCapability: IntegrationProviderAppSetupCapabil
             notice: "installed",
           },
           connection: {
+            config:
+              slackOAuthAccess.bot_user_id === undefined
+                ? parsedConnectionConfig
+                : {
+                    ...parsedConnectionConfig,
+                    bot_user_id: slackOAuthAccess.bot_user_id,
+                  },
             externalSubjectId: slackOAuthAccess.team?.id ?? slackOAuthAccess.app_id ?? null,
           },
           secrets: buildSlackOAuthAccessConnectionSecrets({

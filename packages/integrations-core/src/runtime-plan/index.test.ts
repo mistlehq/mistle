@@ -106,6 +106,55 @@ describe("assembleCompiledRuntimePlan", () => {
     });
   });
 
+  it("normalizes Slack thread associated resource payload filters", () => {
+    const plan = CompiledRuntimePlanSchema.parse({
+      sandboxProfileId: "sbp_123",
+      version: 7,
+      image: {
+        source: "base",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
+      },
+      associatedResourceEventRouting: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+            eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+            payloadFilter: {
+              [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED]: {
+                op: "contains_token",
+                path: ["event", "text"],
+                value: "@mistle",
+              },
+            },
+          },
+        ],
+      },
+      egressRoutes: [],
+      artifacts: [],
+      workspaceSources: [],
+      runtimeClients: [],
+      agentRuntimes: [],
+    });
+
+    expect(plan.associatedResourceEventRouting).toEqual({
+      enabled: true,
+      resources: [
+        {
+          resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+          eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+          payloadFilter: {
+            [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED]: {
+              op: "contains_token",
+              path: ["event", "text"],
+              value: "@mistle",
+            },
+          },
+        },
+      ],
+    });
+  });
+
   it("rejects associated resource payload filters for unselected event types", () => {
     const parsedPlan = CompiledRuntimePlanSchema.safeParse({
       sandboxProfileId: "sbp_123",

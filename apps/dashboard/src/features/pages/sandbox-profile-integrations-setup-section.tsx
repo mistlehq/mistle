@@ -1,4 +1,7 @@
-import { AssociatedProviderResourceKinds } from "@mistle/integrations-core";
+import {
+  AssociatedProviderResourceKinds,
+  type AssociatedProviderResourceKind,
+} from "@mistle/integrations-core";
 import {
   agentDefinitionAllowsRuntime,
   createBrowserDefinitionsBundle,
@@ -188,14 +191,33 @@ function bindingRowTargetsFamily(input: {
   return metadata?.target?.familyId === input.familyId;
 }
 
-function associatedResourceRoutingConfigIncludesGitHubPullRequests(
+function associatedResourceRoutingConfigIncludesResource(
   version: SandboxProfileVersion,
+  resourceKind: AssociatedProviderResourceKind,
 ): boolean {
   return (
     version.associatedResourceEventRoutingConfig.resources?.some(
-      (resource) => resource.resourceKind === AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+      (resource) => resource.resourceKind === resourceKind,
     ) === true
   );
+}
+
+function bindingRowTargetsSlackWithBotIdentity(input: {
+  row: SandboxProfileBindingEditorRow;
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+}): boolean {
+  const metadata = resolveRowBindingMetadata({
+    row: input.row,
+    availableConnections: input.availableConnections,
+    availableTargets: input.availableTargets,
+  });
+  if (metadata?.target?.familyId !== "slack") {
+    return false;
+  }
+
+  const botUserId = metadata.connection.config?.["bot_user_id"];
+  return typeof botUserId === "string" && botUserId.trim().length > 0;
 }
 
 function ConnectionSelectionCell(input: {
@@ -791,12 +813,50 @@ export function SandboxProfileIntegrationsSetupSection(
       availableConnections: input.availableConnections,
       availableTargets: input.availableTargets,
     });
+  const connectorRowsTargetSlackWithBotIdentity = connectorRows.some((row) =>
+    bindingRowTargetsSlackWithBotIdentity({
+      row,
+      availableConnections: input.availableConnections,
+      availableTargets: input.availableTargets,
+    }),
+  );
+  const supportedAssociatedResourceEvents = [
+    ...(gitRowBindingMetadata?.target?.supportedAssociatedResourceEvents ?? []),
+    ...connectorRows.flatMap((row) =>
+      bindingRowTargetsSlackWithBotIdentity({
+        row,
+        availableConnections: input.availableConnections,
+        availableTargets: input.availableTargets,
+      })
+        ? (resolveRowBindingMetadata({
+            row,
+            availableConnections: input.availableConnections,
+            availableTargets: input.availableTargets,
+          })?.target?.supportedAssociatedResourceEvents ?? [])
+        : [],
+    ),
+  ];
   const associatedResourceRoutingConfigHasGitHubPullRequests =
     input.associatedResourceRouting === undefined
       ? false
-      : associatedResourceRoutingConfigIncludesGitHubPullRequests(
+      : associatedResourceRoutingConfigIncludesResource(
           input.associatedResourceRouting.version,
+          AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
         );
+  const associatedResourceRoutingConfigHasSlackThreads =
+    input.associatedResourceRouting === undefined
+      ? false
+      : associatedResourceRoutingConfigIncludesResource(
+          input.associatedResourceRouting.version,
+          AssociatedProviderResourceKinds.SLACK_THREAD,
+        );
+  const associatedResourceRoutingConfigHasExplicitResources =
+    input.associatedResourceRouting?.version.associatedResourceEventRoutingConfig.resources !==
+    undefined;
+  const gitHubBindingDefaultsAssociatedResourceRouting =
+    gitRowTargetsGitHub && !associatedResourceRoutingConfigHasExplicitResources;
+  const slackThreadBindingDefaultsAssociatedResourceRouting =
+    connectorRowsTargetSlackWithBotIdentity && !associatedResourceRoutingConfigHasExplicitResources;
   const selectedGitConnectionIsIdentityLinked =
     gitRow !== null && input.identityLinkedGitConnectionIds?.includes(gitRow.connectionId) === true;
   const gitCommitSigningIsChecked =
@@ -1049,19 +1109,20 @@ export function SandboxProfileIntegrationsSetupSection(
 
                 {input.associatedResourceRouting !== undefined &&
                 (gitRowTargetsGitHub ||
+                  connectorRowsTargetSlackWithBotIdentity ||
                   associatedResourceRoutingConfigHasGitHubPullRequests ||
+                  associatedResourceRoutingConfigHasSlackThreads ||
                   input.associatedResourceRouting.hasUnpersistedChanges) ? (
                   <SandboxProfileAssociatedResourceRoutingFieldGroup
                     disabled={controlsAreDisabled}
-                    hasGitHubBinding={gitRowTargetsGitHub}
+                    hasGitHubBinding={gitHubBindingDefaultsAssociatedResourceRouting}
+                    hasSlackThreadBinding={slackThreadBindingDefaultsAssociatedResourceRouting}
                     isDraft={input.associatedResourceRouting.isDraft}
                     {...(input.associatedResourceRouting.onDraftStateChange === undefined
                       ? {}
                       : { onDraftStateChange: input.associatedResourceRouting.onDraftStateChange })}
                     selectedConnectionId={gitRow?.connectionId}
-                    supportedAssociatedResourceEvents={
-                      gitRowBindingMetadata?.target?.supportedAssociatedResourceEvents
-                    }
+                    supportedAssociatedResourceEvents={supportedAssociatedResourceEvents}
                     version={input.associatedResourceRouting.version}
                   />
                 ) : null}

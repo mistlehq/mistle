@@ -77,6 +77,7 @@ pub enum ProxyClientKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum DeliveryContextSource {
+    Association,
     Schedule,
     Webhook,
 }
@@ -84,6 +85,7 @@ pub enum DeliveryContextSource {
 impl DeliveryContextSource {
     pub fn as_str(self) -> &'static str {
         match self {
+            Self::Association => "association",
             Self::Schedule => "schedule",
             Self::Webhook => "webhook",
         }
@@ -98,6 +100,7 @@ pub struct DeliveryContext {
     pub source: DeliveryContextSource,
     pub webhook_event_id: Option<String>,
     pub scheduled_action_id: Option<String>,
+    pub association_delivery_id: Option<String>,
     pub delivery_task_id: String,
     pub external_delivery_id: Option<String>,
     pub trigger_run_id: String,
@@ -115,10 +118,11 @@ pub struct DeliveryContextPayload {
     pub source: DeliveryContextSource,
     pub webhook_event_id: Option<String>,
     pub scheduled_action_id: Option<String>,
-    pub delivery_task_id: String,
+    pub association_delivery_id: Option<String>,
+    pub delivery_task_id: Option<String>,
     pub external_delivery_id: Option<String>,
-    pub trigger_run_id: String,
-    pub conversation_id: String,
+    pub trigger_run_id: Option<String>,
+    pub conversation_id: Option<String>,
     pub sandbox_instance_id: String,
     pub route_id: Option<String>,
 }
@@ -128,6 +132,19 @@ impl TryFrom<DeliveryContextPayload> for DeliveryContext {
 
     fn try_from(value: DeliveryContextPayload) -> Result<Self, Self::Error> {
         match value.source {
+            DeliveryContextSource::Association => {
+                if value.association_delivery_id.is_none() {
+                    return Err(
+                        "association delivery context requires associationDeliveryId".to_string(),
+                    );
+                }
+                if value.scheduled_action_id.is_some() {
+                    return Err(
+                        "association delivery context must not include scheduledActionId"
+                            .to_string(),
+                    );
+                }
+            }
             DeliveryContextSource::Schedule => {
                 if value.scheduled_action_id.is_none() {
                     return Err("schedule delivery context requires scheduledActionId".to_string());
@@ -136,6 +153,21 @@ impl TryFrom<DeliveryContextPayload> for DeliveryContext {
                     return Err(
                         "schedule delivery context must not include webhookEventId".to_string()
                     );
+                }
+                if value.association_delivery_id.is_some() {
+                    return Err(
+                        "schedule delivery context must not include associationDeliveryId"
+                            .to_string(),
+                    );
+                }
+                if value.delivery_task_id.is_none() {
+                    return Err("schedule delivery context requires deliveryTaskId".to_string());
+                }
+                if value.trigger_run_id.is_none() {
+                    return Err("schedule delivery context requires triggerRunId".to_string());
+                }
+                if value.conversation_id.is_none() {
+                    return Err("schedule delivery context requires conversationId".to_string());
                 }
             }
             DeliveryContextSource::Webhook => {
@@ -147,8 +179,28 @@ impl TryFrom<DeliveryContextPayload> for DeliveryContext {
                         "webhook delivery context must not include scheduledActionId".to_string(),
                     );
                 }
+                if value.association_delivery_id.is_some() {
+                    return Err(
+                        "webhook delivery context must not include associationDeliveryId"
+                            .to_string(),
+                    );
+                }
+                if value.delivery_task_id.is_none() {
+                    return Err("webhook delivery context requires deliveryTaskId".to_string());
+                }
+                if value.trigger_run_id.is_none() {
+                    return Err("webhook delivery context requires triggerRunId".to_string());
+                }
+                if value.conversation_id.is_none() {
+                    return Err("webhook delivery context requires conversationId".to_string());
+                }
             }
         }
+
+        let delivery_task_id = value
+            .delivery_task_id
+            .or_else(|| value.association_delivery_id.clone())
+            .ok_or_else(|| "delivery context requires deliveryTaskId".to_string())?;
 
         Ok(Self {
             traceparent: value.traceparent,
@@ -157,10 +209,11 @@ impl TryFrom<DeliveryContextPayload> for DeliveryContext {
             source: value.source,
             webhook_event_id: value.webhook_event_id,
             scheduled_action_id: value.scheduled_action_id,
-            delivery_task_id: value.delivery_task_id,
+            association_delivery_id: value.association_delivery_id,
+            delivery_task_id,
             external_delivery_id: value.external_delivery_id,
-            trigger_run_id: value.trigger_run_id,
-            conversation_id: value.conversation_id,
+            trigger_run_id: value.trigger_run_id.unwrap_or_default(),
+            conversation_id: value.conversation_id.unwrap_or_default(),
             sandbox_instance_id: value.sandbox_instance_id,
             route_id: value.route_id,
         })

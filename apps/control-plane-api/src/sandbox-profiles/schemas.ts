@@ -66,7 +66,7 @@ const sandboxProfileVersionResourcesSchema = z
     diskMb: z.number().int().min(1).optional(),
   })
   .strict();
-const associatedResourceEventRoutingResourceRuleSchema = z
+const githubPullRequestAssociatedResourceEventRoutingResourceRuleSchema = z
   .object({
     resourceKind: z.enum([AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST]),
     eventTypes: z
@@ -109,6 +109,45 @@ const associatedResourceEventRoutingResourceRuleSchema = z
       }
     }
   });
+const slackThreadAssociatedResourceEventRoutingResourceRuleSchema = z
+  .object({
+    resourceKind: z.enum([AssociatedProviderResourceKinds.SLACK_THREAD]),
+    eventTypes: z.array(z.enum([AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED])).min(1),
+    payloadFilter: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict()
+  .superRefine((rule, ctx) => {
+    if (rule.payloadFilter === undefined) {
+      return;
+    }
+
+    const selectedEventTypes = new Set<string>(rule.eventTypes);
+    for (const [eventType, filter] of Object.entries(rule.payloadFilter)) {
+      if (!selectedEventTypes.has(eventType)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["payloadFilter", eventType],
+          message: `payloadFilter contains an event type that is not selected: ${eventType}`,
+        });
+        continue;
+      }
+
+      try {
+        parseWebhookPayloadFilter(filter);
+      } catch (error) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["payloadFilter", eventType],
+          message:
+            error instanceof Error ? error.message : "Webhook payload filter validation failed.",
+        });
+      }
+    }
+  });
+const associatedResourceEventRoutingResourceRuleSchema = z.union([
+  githubPullRequestAssociatedResourceEventRoutingResourceRuleSchema,
+  slackThreadAssociatedResourceEventRoutingResourceRuleSchema,
+]);
 const sandboxProfileAssociatedResourceEventRoutingConfigSchema = z
   .object({
     enabled: z.boolean().optional(),

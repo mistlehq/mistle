@@ -208,11 +208,13 @@ export function buildSlackOAuthAccessConnectionSecrets(input: {
 
 export function buildSlackManifestConnectionConfig(input: {
   appId: string;
+  botUserId?: string | undefined;
   clientId: string;
 }): Record<string, string> {
   return {
     connection_method: SlackConnectionMethodId,
     app_id: input.appId,
+    ...(input.botUserId === undefined ? {} : { bot_user_id: input.botUserId }),
     client_id: input.clientId,
   };
 }

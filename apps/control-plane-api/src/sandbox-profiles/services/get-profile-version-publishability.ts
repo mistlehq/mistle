@@ -357,7 +357,7 @@ function normalizePublishWorthyAssociatedResourceEventRoutingConfig(
             .map((resource) => ({
               resourceKind: resource.resourceKind,
               eventTypes: [...resource.eventTypes].sort(),
-              ...(resource.payloadFilter === undefined
+              ...(!("payloadFilter" in resource) || resource.payloadFilter === undefined
                 ? {}
                 : { payloadFilter: canonicalizeJsonValue(resource.payloadFilter) }),
             }))

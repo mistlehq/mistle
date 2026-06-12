@@ -999,6 +999,48 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
     );
   });
 
+  it("defaults associated resource routing for compatible profiles with Slack bindings that have bot identity", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-compile-associated-resources-slack@example.com",
+    });
+
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_associated_resources_slack",
+      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CODEX,
+    });
+    await seedConnectorBindings(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_associated_resources_slack",
+      bindings: [
+        slackBinding({
+          targetKey: "slack-default-compile-associated-resources",
+          connectionId: "icn_compile_associated_resources_slack",
+          bindingId: "ibd_compile_associated_resources_slack",
+          botUserId: "U_BOT_COMPILE_SLACK",
+          tools: [],
+        }),
+      ],
+    });
+
+    const runtimePlan = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_associated_resources_slack",
+    });
+
+    expect(runtimePlan.associatedResourceEventRouting).toEqual({
+      enabled: true,
+      resources: [
+        {
+          resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+          eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+        },
+      ],
+    });
+  });
+
   it("returns profile not found when the sandbox profile does not exist", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-sandbox-profile-compile-missing-profile@example.com",
@@ -1497,6 +1539,7 @@ function slackBinding(input: {
   targetKey: string;
   connectionId: string;
   bindingId: string;
+  botUserId?: string;
   tools: string[];
 }): ConnectorBindingInput {
   return {
@@ -1513,6 +1556,7 @@ function slackBinding(input: {
       displayName: "Compile Runtime Plan Slack Connection",
       config: {
         connection_method: "slack-bot-token",
+        ...(input.botUserId === undefined ? {} : { bot_user_id: input.botUserId }),
       },
     },
     binding: {

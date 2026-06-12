@@ -549,7 +549,7 @@ export interface paths {
             integrationConnectionId: string;
             providerResourceId: string;
             /** @enum {string} */
-            resourceKind: "github.pull_request";
+            resourceKind: "github.pull_request" | "slack.thread";
             sandboxInstanceId: string;
           };
         };
@@ -574,7 +574,7 @@ export interface paths {
                 }
               | {
                   /** @enum {string} */
-                  reason: "resource_kind_not_enabled";
+                  reason: "provider_actor_not_configured" | "resource_kind_not_enabled";
                   /** @enum {string} */
                   status: "not_applicable";
                 };
@@ -842,18 +842,28 @@ export interface paths {
                 }[];
                 associatedResourceEventRouting: {
                   enabled: boolean;
-                  resources: {
-                    eventTypes: (
-                      | "github.pull_request.issue_comment.created"
-                      | "github.pull_request.review.submitted"
-                      | "github.pull_request.review_comment.created"
-                    )[];
-                    payloadFilter?: {
-                      [key: string]: unknown;
-                    };
-                    /** @enum {string} */
-                    resourceKind: "github.pull_request";
-                  }[];
+                  resources: (
+                    | {
+                        eventTypes: (
+                          | "github.pull_request.issue_comment.created"
+                          | "github.pull_request.review.submitted"
+                          | "github.pull_request.review_comment.created"
+                        )[];
+                        payloadFilter?: {
+                          [key: string]: unknown;
+                        };
+                        /** @enum {string} */
+                        resourceKind: "github.pull_request";
+                      }
+                    | {
+                        eventTypes: "slack.thread.message.created"[];
+                        payloadFilter?: {
+                          [key: string]: unknown;
+                        };
+                        /** @enum {string} */
+                        resourceKind: "slack.thread";
+                      }
+                  )[];
                 };
                 egressRoutes: {
                   additionalCredentialHeaders?: {
@@ -1166,18 +1176,28 @@ export interface paths {
             "application/json": {
               associatedResourceEventRouting: {
                 enabled: boolean;
-                resources: {
-                  eventTypes: (
-                    | "github.pull_request.issue_comment.created"
-                    | "github.pull_request.review.submitted"
-                    | "github.pull_request.review_comment.created"
-                  )[];
-                  payloadFilter?: {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {string} */
-                  resourceKind: "github.pull_request";
-                }[];
+                resources: (
+                  | {
+                      eventTypes: (
+                        | "github.pull_request.issue_comment.created"
+                        | "github.pull_request.review.submitted"
+                        | "github.pull_request.review_comment.created"
+                      )[];
+                      payloadFilter?: {
+                        [key: string]: unknown;
+                      };
+                      /** @enum {string} */
+                      resourceKind: "github.pull_request";
+                    }
+                  | {
+                      eventTypes: "slack.thread.message.created"[];
+                      payloadFilter?: {
+                        [key: string]: unknown;
+                      };
+                      /** @enum {string} */
+                      resourceKind: "slack.thread";
+                    }
+                )[];
               } | null;
               failureCode: string | null;
               failureMessage: string | null;

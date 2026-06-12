@@ -10183,18 +10183,28 @@ export interface paths {
                 agentRuntimeId: "codex" | "opencode" | "pi";
                 associatedResourceEventRoutingConfig: {
                   enabled?: boolean;
-                  resources?: {
-                    eventTypes: (
-                      | "github.pull_request.issue_comment.created"
-                      | "github.pull_request.review.submitted"
-                      | "github.pull_request.review_comment.created"
-                    )[];
-                    payloadFilter?: {
-                      [key: string]: unknown;
-                    };
-                    /** @enum {string} */
-                    resourceKind: "github.pull_request";
-                  }[];
+                  resources?: (
+                    | {
+                        eventTypes: (
+                          | "github.pull_request.issue_comment.created"
+                          | "github.pull_request.review.submitted"
+                          | "github.pull_request.review_comment.created"
+                        )[];
+                        payloadFilter?: {
+                          [key: string]: unknown;
+                        };
+                        /** @enum {string} */
+                        resourceKind: "github.pull_request";
+                      }
+                    | {
+                        eventTypes: "slack.thread.message.created"[];
+                        payloadFilter?: {
+                          [key: string]: unknown;
+                        };
+                        /** @enum {string} */
+                        resourceKind: "slack.thread";
+                      }
+                  )[];
                 };
                 gitCommitSigningIntegrationConnectionId: string | null;
                 isActive: boolean;
@@ -10333,18 +10343,28 @@ export interface paths {
               agentRuntimeId: "codex" | "opencode" | "pi";
               associatedResourceEventRoutingConfig: {
                 enabled?: boolean;
-                resources?: {
-                  eventTypes: (
-                    | "github.pull_request.issue_comment.created"
-                    | "github.pull_request.review.submitted"
-                    | "github.pull_request.review_comment.created"
-                  )[];
-                  payloadFilter?: {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {string} */
-                  resourceKind: "github.pull_request";
-                }[];
+                resources?: (
+                  | {
+                      eventTypes: (
+                        | "github.pull_request.issue_comment.created"
+                        | "github.pull_request.review.submitted"
+                        | "github.pull_request.review_comment.created"
+                      )[];
+                      payloadFilter?: {
+                        [key: string]: unknown;
+                      };
+                      /** @enum {string} */
+                      resourceKind: "github.pull_request";
+                    }
+                  | {
+                      eventTypes: "slack.thread.message.created"[];
+                      payloadFilter?: {
+                        [key: string]: unknown;
+                      };
+                      /** @enum {string} */
+                      resourceKind: "slack.thread";
+                    }
+                )[];
               };
               gitCommitSigningIntegrationConnectionId: string | null;
               isActive: boolean;
@@ -10621,18 +10641,28 @@ export interface paths {
             agentRuntimeId?: "codex" | "opencode" | "pi";
             associatedResourceEventRoutingConfig?: {
               enabled?: boolean;
-              resources?: {
-                eventTypes: (
-                  | "github.pull_request.issue_comment.created"
-                  | "github.pull_request.review.submitted"
-                  | "github.pull_request.review_comment.created"
-                )[];
-                payloadFilter?: {
-                  [key: string]: unknown;
-                };
-                /** @enum {string} */
-                resourceKind: "github.pull_request";
-              }[];
+              resources?: (
+                | {
+                    eventTypes: (
+                      | "github.pull_request.issue_comment.created"
+                      | "github.pull_request.review.submitted"
+                      | "github.pull_request.review_comment.created"
+                    )[];
+                    payloadFilter?: {
+                      [key: string]: unknown;
+                    };
+                    /** @enum {string} */
+                    resourceKind: "github.pull_request";
+                  }
+                | {
+                    eventTypes: "slack.thread.message.created"[];
+                    payloadFilter?: {
+                      [key: string]: unknown;
+                    };
+                    /** @enum {string} */
+                    resourceKind: "slack.thread";
+                  }
+              )[];
             };
             gitCommitSigningIntegrationConnectionId?: string | null;
             integrationBindings?: {
@@ -10680,18 +10710,28 @@ export interface paths {
               agentRuntimeId: "codex" | "opencode" | "pi";
               associatedResourceEventRoutingConfig: {
                 enabled?: boolean;
-                resources?: {
-                  eventTypes: (
-                    | "github.pull_request.issue_comment.created"
-                    | "github.pull_request.review.submitted"
-                    | "github.pull_request.review_comment.created"
-                  )[];
-                  payloadFilter?: {
-                    [key: string]: unknown;
-                  };
-                  /** @enum {string} */
-                  resourceKind: "github.pull_request";
-                }[];
+                resources?: (
+                  | {
+                      eventTypes: (
+                        | "github.pull_request.issue_comment.created"
+                        | "github.pull_request.review.submitted"
+                        | "github.pull_request.review_comment.created"
+                      )[];
+                      payloadFilter?: {
+                        [key: string]: unknown;
+                      };
+                      /** @enum {string} */
+                      resourceKind: "github.pull_request";
+                    }
+                  | {
+                      eventTypes: "slack.thread.message.created"[];
+                      payloadFilter?: {
+                        [key: string]: unknown;
+                      };
+                      /** @enum {string} */
+                      resourceKind: "slack.thread";
+                    }
+                )[];
               };
               gitCommitSigningIntegrationConnectionId: string | null;
               integrationBindings: {
@@ -11446,18 +11486,28 @@ export interface paths {
                 agentRuntimeId: "codex" | "opencode" | "pi";
                 associatedResourceEventRoutingConfig: {
                   enabled?: boolean;
-                  resources?: {
-                    eventTypes: (
-                      | "github.pull_request.issue_comment.created"
-                      | "github.pull_request.review.submitted"
-                      | "github.pull_request.review_comment.created"
-                    )[];
-                    payloadFilter?: {
-                      [key: string]: unknown;
-                    };
-                    /** @enum {string} */
-                    resourceKind: "github.pull_request";
-                  }[];
+                  resources?: (
+                    | {
+                        eventTypes: (
+                          | "github.pull_request.issue_comment.created"
+                          | "github.pull_request.review.submitted"
+                          | "github.pull_request.review_comment.created"
+                        )[];
+                        payloadFilter?: {
+                          [key: string]: unknown;
+                        };
+                        /** @enum {string} */
+                        resourceKind: "github.pull_request";
+                      }
+                    | {
+                        eventTypes: "slack.thread.message.created"[];
+                        payloadFilter?: {
+                          [key: string]: unknown;
+                        };
+                        /** @enum {string} */
+                        resourceKind: "slack.thread";
+                      }
+                  )[];
                 };
                 gitCommitSigningIntegrationConnectionId: string | null;
                 isActive: boolean;
@@ -11776,18 +11826,28 @@ export interface paths {
                 agentRuntimeId: "codex" | "opencode" | "pi";
                 associatedResourceEventRoutingConfig: {
                   enabled?: boolean;
-                  resources?: {
-                    eventTypes: (
-                      | "github.pull_request.issue_comment.created"
-                      | "github.pull_request.review.submitted"
-                      | "github.pull_request.review_comment.created"
-                    )[];
-                    payloadFilter?: {
-                      [key: string]: unknown;
-                    };
-                    /** @enum {string} */
-                    resourceKind: "github.pull_request";
-                  }[];
+                  resources?: (
+                    | {
+                        eventTypes: (
+                          | "github.pull_request.issue_comment.created"
+                          | "github.pull_request.review.submitted"
+                          | "github.pull_request.review_comment.created"
+                        )[];
+                        payloadFilter?: {
+                          [key: string]: unknown;
+                        };
+                        /** @enum {string} */
+                        resourceKind: "github.pull_request";
+                      }
+                    | {
+                        eventTypes: "slack.thread.message.created"[];
+                        payloadFilter?: {
+                          [key: string]: unknown;
+                        };
+                        /** @enum {string} */
+                        resourceKind: "slack.thread";
+                      }
+                  )[];
                 };
                 gitCommitSigningIntegrationConnectionId: string | null;
                 isActive: boolean;
@@ -12183,18 +12243,28 @@ export interface paths {
                 agentRuntimeId: "codex" | "opencode" | "pi";
                 associatedResourceEventRoutingConfig: {
                   enabled?: boolean;
-                  resources?: {
-                    eventTypes: (
-                      | "github.pull_request.issue_comment.created"
-                      | "github.pull_request.review.submitted"
-                      | "github.pull_request.review_comment.created"
-                    )[];
-                    payloadFilter?: {
-                      [key: string]: unknown;
-                    };
-                    /** @enum {string} */
-                    resourceKind: "github.pull_request";
-                  }[];
+                  resources?: (
+                    | {
+                        eventTypes: (
+                          | "github.pull_request.issue_comment.created"
+                          | "github.pull_request.review.submitted"
+                          | "github.pull_request.review_comment.created"
+                        )[];
+                        payloadFilter?: {
+                          [key: string]: unknown;
+                        };
+                        /** @enum {string} */
+                        resourceKind: "github.pull_request";
+                      }
+                    | {
+                        eventTypes: "slack.thread.message.created"[];
+                        payloadFilter?: {
+                          [key: string]: unknown;
+                        };
+                        /** @enum {string} */
+                        resourceKind: "slack.thread";
+                      }
+                  )[];
                 };
                 gitCommitSigningIntegrationConnectionId: string | null;
                 isActive: boolean;
