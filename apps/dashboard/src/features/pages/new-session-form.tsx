@@ -19,6 +19,7 @@ import type { LaunchableSandboxProfile } from "../sandbox-profiles/sandbox-profi
 import { useLaunchableSandboxProfiles } from "../sandbox-profiles/use-launchable-sandbox-profiles.js";
 import { startSandboxInstanceFromProfileVersion } from "../sessions/sessions-service.js";
 import { FormPageSection, FormPageStack } from "../shared/form-page.js";
+import { PrimaryRepositoryWorkspaceRootOptionLabel } from "./session-primary-repository-policy.js";
 
 type NewSessionPageRepositoryOption = {
   value: string;
@@ -30,7 +31,7 @@ const WorkspaceRootDescription = "workspace root";
 
 const WorkspaceRootOption: NewSessionPageRepositoryOption = {
   value: "__workspace_root__",
-  label: "None",
+  label: PrimaryRepositoryWorkspaceRootOptionLabel,
   path: WorkspaceRootDescription,
 };
 
@@ -138,7 +139,7 @@ export function NewSessionForm(input?: { initialSelectedProfileId?: string }): R
     !selectableProfilesQuery.isError &&
     selectableProfiles.length === 0;
   const selectedLocationPath = selectedRepositoryOption?.path ?? null;
-  const selectedNoneOption = selectedRepositoryOption?.value === WorkspaceRootOption.value;
+  const selectedWorkspaceRootOption = selectedRepositoryOption?.value === WorkspaceRootOption.value;
 
   useEffect(() => {
     if (
@@ -278,7 +279,7 @@ export function NewSessionForm(input?: { initialSelectedProfileId?: string }): R
                     {selectedLocationPath === null ? null : (
                       <div className="flex flex-col gap-1">
                         <p className="sm:truncate">
-                          {selectedNoneOption ? (
+                          {selectedWorkspaceRootOption ? (
                             "The agent will start its session at the workspace root."
                           ) : (
                             <>
@@ -291,7 +292,7 @@ export function NewSessionForm(input?: { initialSelectedProfileId?: string }): R
                           )}
                         </p>
                         <p className="sm:truncate">
-                          {selectedNoneOption
+                          {selectedWorkspaceRootOption
                             ? "Git, diffs, and repo-local instructions will not be tied to a specific repository by default."
                             : "Git, diffs, and repo-local instructions will use this repository by default."}
                         </p>

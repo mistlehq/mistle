@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
+import { PrimaryRepositoryWorkspaceRootOptionLabel } from "./session-primary-repository-policy.js";
 import type { SessionWorkbenchHeaderRepositoryOption } from "./session-workbench-header-actions.js";
 import { SessionWorkbenchHeaderActions } from "./session-workbench-header-actions.js";
 import {
@@ -8,7 +9,7 @@ import {
 } from "./session-workbench-header-actions.story-harness.js";
 
 const StoryRepositoryOptions = [
-  { value: "__none__", label: "None" },
+  { value: "__none__", label: PrimaryRepositoryWorkspaceRootOptionLabel },
   { value: "/root/mistle", label: "mistle" },
   { value: "/root/mistle-docs", label: "mistle-docs" },
   { value: "/root/platform", label: "platform" },
@@ -114,7 +115,7 @@ export const WithNestedRuntimeCwdUnavailable = createStory({
   repositoryErrorMessage:
     "OpenCode is running in /root/acme/repo-1/packages/app, which is not a selectable repository root.",
   repositoryOptions: [
-    { value: "__none__", label: "None" },
+    { value: "__none__", label: PrimaryRepositoryWorkspaceRootOptionLabel },
     {
       value: "/root/acme/repo-1/packages/app",
       label: "acme/repo-1/packages/app (unavailable)",

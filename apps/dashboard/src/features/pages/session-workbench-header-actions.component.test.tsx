@@ -71,7 +71,7 @@ describe("SessionWorkbenchHeaderActions", () => {
           return;
         },
         options: [
-          { value: "__none__", label: "None" },
+          { value: "__none__", label: "Workspace root" },
           { value: "/root/mistle", label: "mistle" },
         ],
         selectedValue: "/root/mistle",
@@ -89,7 +89,7 @@ describe("SessionWorkbenchHeaderActions", () => {
           return;
         },
         options: [
-          { value: "__none__", label: "None" },
+          { value: "__none__", label: "Workspace root" },
           { value: "/root/pantheon", label: "staffany-eng/pantheon" },
         ],
         selectedValue: "/root/pantheon",
@@ -241,7 +241,7 @@ describe("SessionWorkbenchHeaderActions", () => {
           return;
         },
         options: [
-          { value: "__none__", label: "None" },
+          { value: "__none__", label: "Workspace root" },
           { value: "/root/mistle", label: "mistle" },
         ],
         selectedValue: "/root/mistle",
@@ -260,7 +260,7 @@ describe("SessionWorkbenchHeaderActions", () => {
           return;
         },
         options: [
-          { value: "__none__", label: "None" },
+          { value: "__none__", label: "Workspace root" },
           { value: "/root/mistle", label: "mistle" },
         ],
         selectedValue: "/root/mistle",
@@ -269,6 +269,7 @@ describe("SessionWorkbenchHeaderActions", () => {
 
     fireEvent.click(screen.getByRole("combobox", { name: "Primary repository" }));
 
+    expect(screen.getByRole("option", { name: "Workspace root" })).toBeDefined();
     expect(screen.getByRole("note")).toBeDefined();
   });
 });

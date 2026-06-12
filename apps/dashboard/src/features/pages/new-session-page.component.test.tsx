@@ -187,7 +187,7 @@ describe("NewSessionPage", () => {
     ).toBeDefined();
   });
 
-  it("shows none as the only starting location when the selected profile has no repositories", () => {
+  it("shows the workspace root as the only starting location when the selected profile has no repositories", () => {
     renderNewSessionPage({
       initialSelectedProfileId: "sbp_profile_alpha",
       launchableProfiles: [
@@ -200,7 +200,7 @@ describe("NewSessionPage", () => {
 
     expect(
       (screen.getByRole("combobox", { name: "Primary repository" }) as HTMLInputElement).value,
-    ).toBe("None");
+    ).toBe("Workspace root");
     expect(
       screen.getByText("The agent will start its session at the workspace root."),
     ).toBeDefined();
