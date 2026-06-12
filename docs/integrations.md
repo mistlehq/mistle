@@ -20,6 +20,8 @@ When an official tool is unavailable or not well-suited for agent workflows, Mis
 
 ## Further reading
 
+Refer to [docs/integrations/aws.md](./integrations/aws.md) for AWS, AWS CLI, and CloudWatch MCP setup guidance.
+
 Refer to [docs/architecture.md](./architecture.md) for more details about credentialless sandboxes and caveats.
 
 Refer to [packages/integrations-core/README.md](../packages/integrations-core/README.md) for technical and design details of the integrations API.

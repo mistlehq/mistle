@@ -68,7 +68,7 @@ describe("AwsBaseDefinition", () => {
         serverName: "aws_cloudwatch",
         transport: IntegrationMcpTransports.STDIO,
         command: AwsCloudWatchMcpWrapperPath,
-        description: "AWS CloudWatch MCP",
+        description: "CloudWatch and CloudWatch Logs MCP tools backed by the AWS connection.",
       },
     ]);
     expect(
@@ -83,5 +83,21 @@ describe("AwsBaseDefinition", () => {
         },
       }),
     ).toEqual([]);
+  });
+
+  it("explains the secret access key used by the assume-role connection method", () => {
+    const assumeRoleMethod = AwsBaseDefinition.connectionMethods.find(
+      (method) => method.id === AwsConnectionMethodIds.AWS_ASSUME_ROLE,
+    );
+
+    expect(assumeRoleMethod).toMatchObject({
+      kind: "form",
+      secretFields: [
+        {
+          name: "secretAccessKey",
+          description: expect.stringContaining("temporary role credentials"),
+        },
+      ],
+    });
   });
 });
