@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import type React from "react";
 
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
+import { GitHubUserStoryItems } from "./github-user-resource-story-support.js";
 import { IntegrationResourceList } from "./integration-resource-list.js";
 
 function renderWithinFixedWidth(
@@ -13,6 +14,8 @@ function renderWithinFixedWidth(
     </div>
   );
 }
+
+const ResourceListGitHubUserItems = GitHubUserStoryItems.slice(0, 3);
 
 const allStateArgs: React.ComponentProps<typeof IntegrationResourceList> = {
   connectionId: "icn_story",
@@ -31,9 +34,10 @@ const allStateArgs: React.ComponentProps<typeof IntegrationResourceList> = {
       syncState: "syncing",
     },
     {
-      count: 0,
+      count: ResourceListGitHubUserItems.length,
       kind: "user",
-      syncState: "error",
+      lastSyncedAt: "2026-04-13T15:37:00.000Z",
+      syncState: "ready",
     },
     {
       count: 2,
@@ -84,9 +88,9 @@ const allStateArgs: React.ComponentProps<typeof IntegrationResourceList> = {
       "icn_story:user",
       {
         isLoading: false,
-        items: [],
+        items: ResourceListGitHubUserItems,
         kind: "user",
-        errorMessage: "GitHub returned a 403 while loading user data.",
+        errorMessage: null,
       },
     ],
     [

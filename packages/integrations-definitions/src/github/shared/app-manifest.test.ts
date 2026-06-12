@@ -43,9 +43,13 @@ describe("GitHubAppManifestTemplate", () => {
       default_events: [
         "issues",
         "issue_comment",
+        "member",
+        "membership",
+        "organization",
         "pull_request",
         "pull_request_review",
         "pull_request_review_comment",
+        "team",
         "check_run",
         "check_suite",
       ],

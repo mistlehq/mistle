@@ -14,6 +14,7 @@ import {
 } from "../pages/integrations-page-view-model.js";
 import { resolveVisibleConnectionMethodConfigFields } from "../pages/use-integration-connection-editor-state-helpers.js";
 import type { IntegrationWebhookSourceSectionState } from "../pages/use-integration-webhook-source-state.js";
+import { GitHubUserStoryItems } from "./github-user-resource-story-support.js";
 import type { IntegrationConnectionDetailViewProps } from "./integration-connection-detail-view.js";
 import type { IntegrationConnectionMethod } from "./integrations-service-shared.js";
 import type {
@@ -23,6 +24,7 @@ import type {
 } from "./integrations-service.js";
 
 const IntegrationRegistry = createBrowserIntegrationRegistry();
+const GitHubAppDetailUserItems = GitHubUserStoryItems.slice(0, 3);
 
 type StoryAuthMethodSpec = {
   familyId: string;
@@ -601,9 +603,10 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
             syncState: "error",
           },
           {
-            count: 0,
+            count: GitHubAppDetailUserItems.length,
             kind: "user",
-            syncState: "never-synced",
+            lastSyncedAt: "2026-04-13T15:37:00.000Z",
+            syncState: "ready",
           },
           {
             count: 2,
@@ -729,7 +732,7 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
         connectionId,
         state: {
           isLoading: false,
-          items: [],
+          items: GitHubAppDetailUserItems,
           kind: "user",
           errorMessage: null,
         },

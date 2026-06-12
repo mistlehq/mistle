@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import type React from "react";
 
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
+import { GitHubUserStoryItems } from "../integrations/github-user-resource-story-support.js";
 import type { IntegrationConnectionResource } from "../integrations/integrations-service.js";
 import { useIntegrationResourcePickerStoryState } from "./integration-resource-picker-story-harness.js";
 import { RepositoryItems } from "./integration-resource-picker-story-support.js";
@@ -94,6 +95,21 @@ export const InteractiveSelection: Story = {
         refreshTooltip={storyState.viewModel.refreshTooltip}
       />
     );
+  },
+};
+
+export const GitHubUsers: Story = {
+  name: "GitHub Users",
+  args: {
+    id: "storybook-github-users",
+    label: "GitHub users",
+    searchPlaceholder: `Search ${GitHubUserStoryItems.length.toString()} GitHub users`,
+    refreshLabel: "Refresh GitHub users",
+    refreshTooltip: "Refresh GitHub users\nLast synced Apr 13, 2026, 3:37 PM",
+    selectedHandles: ["jon-low", "octocat"],
+    listState: createReadyState(GitHubUserStoryItems),
+    visibleItems: GitHubUserStoryItems,
+    emptyMessage: "No GitHub users available for this connection.",
   },
 };
 

@@ -140,6 +140,10 @@ _Avoid_: Exclusion when the rule is one match mode among several
 A trigger filter that matches the GitHub **Provider actor** that performed a provider event.
 _Avoid_: Author filter, commenter filter when the filter is over the event sender
 
+**GitHub user**:
+A human GitHub account with access to accessible repositories that can appear as a **Provider actor** or human review target.
+_Avoid_: Contributor when the person is selected because they can act or review, not because they authored commits
+
 **GitHub team review target**:
 A GitHub team selected as the requested review target for a provider pull request review-request **Trigger event**.
 _Avoid_: GitHub team identity, organization-qualified team
@@ -880,3 +884,13 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - "delete session" could mean hard deletion or user-visible removal — resolved: use **Deleted session** for a session hidden from ordinary lists while retaining its historical record.
 - "GitHub team" could mean either an organization-scoped GitHub team identity or the requested review target value delivered in a pull request webhook — resolved: use **GitHub team review target** for the trigger-filter value, which is the GitHub team slug.
 - "self" in provider-event routing could mean the same Mistle user, same sandbox session, or same provider actor — resolved: use **Self-authored association event** for provider events authored by the same **Provider actor** Mistle uses for the event's **Integration connection**.
+- GitHub `user` resources were backed by commit contribution history even though trigger filters used them as actors and review targets — resolved: **GitHub user** resources are access-backed accounts, not contributor-history accounts.
+- **GitHub user** was considered as either a free-form login, observed webhook actor, organization member, or repository collaborator — resolved: first-pass **GitHub user** resources are accounts with access to accessible repositories.
+- Organization membership alone is too broad for **GitHub user** resources used in repository-scoped trigger filters — resolved: first-pass **GitHub user** resources are based on repository access, not organization membership.
+- GitHub App bots can appear alongside human accounts in provider APIs — resolved: keep bots out of **GitHub user** resources and represent them with GitHub App bot terms.
+- Human GitHub actor and requested-reviewer trigger filters were considered as separate resource kinds — resolved: both use **GitHub user** resources.
+- GitHub team identity changes and GitHub team access changes are distinct — resolved: team identity changes refresh **GitHub team review target** resources, while team membership or repository-access changes can refresh access-backed **GitHub user** resources.
+- A GitHub team gaining or losing access to a repository changes repository collaborators, not the integration connection's accessible repository set — resolved: such changes refresh **GitHub user** resources, not repository resources.
+- A **GitHub user** resource uses the provider's stable account id for resource identity and the GitHub login as the trigger-matching handle.
+- A **GitHub user** resource snapshot should represent the complete collaborator-derived user set for the connection; partial provider discovery failures should make the snapshot unavailable rather than silently incomplete.
+- GitHub API-key connections can see repositories that cannot safely enumerate collaborators — resolved: first-pass **GitHub user** resource discovery requires a GitHub App installation connection.

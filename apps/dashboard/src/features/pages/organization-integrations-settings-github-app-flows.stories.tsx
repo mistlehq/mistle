@@ -600,6 +600,7 @@ export const SetupWithManifestPersonalAccount: PageStory = {
     await expect(canvas.queryByText("GitHub organization")).not.toBeInTheDocument();
     await expect(canvas.queryByText("organization_administration")).not.toBeInTheDocument();
     await expect(canvas.queryByText('"members"')).not.toBeInTheDocument();
+    await expect(canvas.queryByText('"organization"')).not.toBeInTheDocument();
     await expect(canvas.getByText('"pull_requests"')).toBeVisible();
   },
 };

@@ -339,12 +339,14 @@ describe("ProviderAppSetupPane", () => {
     expect(screen.getByRole("heading", { level: 3, name: "GitHub App Manifest" })).toBeTruthy();
     await waitFor(() => {
       expect(rendered.container.textContent).toContain("organization_administration");
-      expect(rendered.container.textContent).toContain("members");
+      expect(rendered.container.textContent).toContain('"members"');
+      expect(rendered.container.textContent).toContain('"organization"');
     });
     fireEvent.click(screen.getByRole("radio", { name: "Personal account" }));
     await waitFor(() => {
       expect(rendered.container.textContent).not.toContain("organization_administration");
-      expect(rendered.container.textContent).not.toContain("members");
+      expect(rendered.container.textContent).not.toContain('"members"');
+      expect(rendered.container.textContent).not.toContain('"organization"');
     });
     expect(screen.queryByText("GitHub organization")).toBeNull();
     await waitFor(() => {

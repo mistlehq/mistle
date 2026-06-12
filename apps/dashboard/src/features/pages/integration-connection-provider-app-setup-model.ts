@@ -1,5 +1,8 @@
 import type { IntegrationFormConnectionMethodProviderAppSetup } from "@mistle/integrations-core";
-import { GitHubOrganizationOnlyAppManifestPermissions } from "@mistle/integrations-definitions/browser";
+import {
+  GitHubOrganizationOnlyAppManifestEvents,
+  GitHubOrganizationOnlyAppManifestPermissions,
+} from "@mistle/integrations-definitions/browser";
 
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import {
@@ -186,10 +189,14 @@ export function updateGitHubProviderAppManifestForSetupStartFormValue(input: {
   for (const permission of Object.keys(GitHubOrganizationOnlyAppManifestPermissions)) {
     delete defaultPermissions[permission];
   }
+  const defaultEvents = parseDefaultEvents(manifest.default_events).filter(
+    (event) => !GitHubOrganizationOnlyAppManifestEvents.includes(event),
+  );
 
   if (input.value === GitHubProviderAppManifestOrganizationOwnerKind) {
     return createManifestJsonDraft({
       ...manifest,
+      default_events: [...defaultEvents, ...GitHubOrganizationOnlyAppManifestEvents],
       default_permissions: {
         ...defaultPermissions,
         ...GitHubOrganizationOnlyAppManifestPermissions,
@@ -199,6 +206,7 @@ export function updateGitHubProviderAppManifestForSetupStartFormValue(input: {
 
   return createManifestJsonDraft({
     ...manifest,
+    default_events: defaultEvents,
     default_permissions: defaultPermissions,
   });
 }
@@ -270,4 +278,12 @@ function parseDefaultPermissions(value: unknown): Record<string, unknown> {
   }
 
   return Object.fromEntries(Object.entries(value));
+}
+
+function parseDefaultEvents(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((event) => typeof event === "string");
 }

@@ -72,7 +72,8 @@ export function createGitHubResourceDefinitions(input: {
       bindingField: "users",
       displayNameSingular: "user",
       displayNamePlural: "users",
-      description: "GitHub users discovered from accessible repositories on this connection.",
+      description:
+        "Human GitHub users with collaborator access to repositories on this connection.",
       credential: ({ connection }) =>
         resolveGitHubResourceCredential({
           apiKeyCredential: gitHubRepositoryApiKeyResourceCredential,
@@ -112,10 +113,46 @@ export function createGitHubResourceDefinitions(input: {
 export const GitHubResourceSyncTriggers: ReadonlyArray<IntegrationResourceSyncTrigger> = [
   {
     eventType: "github.installation_repositories.added",
-    resourceKinds: ["repository"],
+    resourceKinds: ["repository", "user"],
   },
   {
     eventType: "github.installation_repositories.removed",
-    resourceKinds: ["repository"],
+    resourceKinds: ["repository", "user"],
+  },
+  {
+    eventType: "github.member.added",
+    resourceKinds: ["user"],
+  },
+  {
+    eventType: "github.member.edited",
+    resourceKinds: ["user"],
+  },
+  {
+    eventType: "github.member.removed",
+    resourceKinds: ["user"],
+  },
+  {
+    eventType: "github.membership.added",
+    resourceKinds: ["user"],
+  },
+  {
+    eventType: "github.membership.removed",
+    resourceKinds: ["user"],
+  },
+  {
+    eventType: "github.organization.member_added",
+    resourceKinds: ["user"],
+  },
+  {
+    eventType: "github.organization.member_removed",
+    resourceKinds: ["user"],
+  },
+  {
+    eventType: "github.team.added_to_repository",
+    resourceKinds: ["user"],
+  },
+  {
+    eventType: "github.team.removed_from_repository",
+    resourceKinds: ["user"],
   },
 ];

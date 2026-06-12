@@ -32,10 +32,10 @@ const GitHubBranchSchema = z.looseObject({
   protected: z.boolean().optional(),
 });
 
-const GitHubContributorSchema = z.looseObject({
+const GitHubCollaboratorSchema = z.looseObject({
   id: z.union([z.string().min(1), z.number().int()]),
   login: z.string().min(1),
-  type: z.string().min(1).optional(),
+  type: z.string().min(1),
 });
 
 const GitHubTeamSchema = z.looseObject({
@@ -73,7 +73,7 @@ const GitHubUserRepositoriesResponseSchema = z.array(GitHubRepositorySchema);
 
 type GitHubRepository = z.output<typeof GitHubRepositorySchema>;
 type GitHubBranch = z.output<typeof GitHubBranchSchema>;
-type GitHubContributor = z.output<typeof GitHubContributorSchema>;
+type GitHubCollaborator = z.output<typeof GitHubCollaboratorSchema>;
 type GitHubTeam = z.output<typeof GitHubTeamSchema>;
 type GitHubOrganizationInstallation = z.output<typeof GitHubOrganizationInstallationSchema>;
 
@@ -132,18 +132,12 @@ function toBranchResource(input: {
   };
 }
 
-function toUserResource(input: {
-  contributor: GitHubContributor;
-  repositoryFullName: string;
-}): DiscoveredIntegrationResource {
+function toUserResource(collaborator: GitHubCollaborator): DiscoveredIntegrationResource {
   return {
-    externalId: input.contributor.id.toString(),
-    handle: input.contributor.login,
-    displayName: input.contributor.login,
-    metadata: {
-      repositoryFullName: input.repositoryFullName,
-      type: input.contributor.type ?? "User",
-    },
+    externalId: collaborator.id.toString(),
+    handle: collaborator.login,
+    displayName: collaborator.login,
+    metadata: {},
   };
 }
 
@@ -292,11 +286,11 @@ async function listGitHubRepositoryBranches(input: {
   }
 }
 
-async function listGitHubRepositoryContributors(input: {
+async function listGitHubRepositoryCollaborators(input: {
   apiBaseUrl: string;
   token: string;
   repository: GitHubRepository;
-}): Promise<ReadonlyArray<GitHubContributor>> {
+}): Promise<ReadonlyArray<GitHubCollaborator>> {
   const octokit = createGitHubOctokit({
     apiBaseUrl: input.apiBaseUrl,
     token: input.token,
@@ -306,23 +300,20 @@ async function listGitHubRepositoryContributors(input: {
     return [];
   }
 
-  const contributors: GitHubContributor[] = [];
+  const collaborators: GitHubCollaborator[] = [];
   for (let page = 1; ; page += 1) {
-    const response = await octokit.rest.repos.listContributors({
+    const response = await octokit.rest.repos.listCollaborators({
       owner,
       repo,
       per_page: GitHubPageSize,
       page,
     });
-    if (Object.is(response.status, 204)) {
-      return contributors;
-    }
 
-    const parsedResponse = z.array(GitHubContributorSchema).parse(response.data);
-    contributors.push(...parsedResponse);
+    const parsedResponse = z.array(GitHubCollaboratorSchema).parse(response.data);
+    collaborators.push(...parsedResponse);
 
     if (parsedResponse.length < GitHubPageSize) {
-      return contributors;
+      return collaborators;
     }
   }
 }
@@ -421,6 +412,27 @@ function dedupeResourcesByHandle(
   }
 
   return Array.from(resourcesByHandle.values()).sort((left, right) =>
+    left.handle.localeCompare(right.handle),
+  );
+}
+
+function dedupeUserResourcesByExternalId(
+  resources: readonly DiscoveredIntegrationResource[],
+): DiscoveredIntegrationResource[] {
+  const resourcesByExternalId = new Map<string, DiscoveredIntegrationResource>();
+
+  for (const resource of resources) {
+    if (resource.externalId === undefined) {
+      throw new Error(`GitHub user resource '${resource.handle}' is missing an external id.`);
+    }
+
+    const existingResource = resourcesByExternalId.get(resource.externalId);
+    if (existingResource === undefined || resource.handle < existingResource.handle) {
+      resourcesByExternalId.set(resource.externalId, resource);
+    }
+  }
+
+  return Array.from(resourcesByExternalId.values()).sort((left, right) =>
     left.handle.localeCompare(right.handle),
   );
 }
@@ -556,20 +568,17 @@ async function listGitHubUsers(input: {
     concurrency: 5,
     mapper: async (repository) =>
       (
-        await listGitHubRepositoryContributors({
+        await listGitHubRepositoryCollaborators({
           apiBaseUrl: input.apiBaseUrl,
           token: input.credential,
           repository,
         })
-      ).map((contributor) =>
-        toUserResource({
-          contributor,
-          repositoryFullName: repository.full_name,
-        }),
-      ),
+      )
+        .filter((collaborator) => collaborator.type === "User")
+        .map((collaborator) => toUserResource(collaborator)),
   });
 
-  return dedupeResourcesByHandle(users);
+  return dedupeUserResourcesByExternalId(users);
 }
 
 function listGitHubOrganizationLogins(
@@ -656,6 +665,14 @@ export async function listGitHubConnectionResources(
   }
 
   const parsedConnectionConfig = GitHubConnectionConfigSchema.parse(input.connection.config);
+  if (
+    input.kind === GitHubUserKind &&
+    parsedConnectionConfig.connection_method !==
+      IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
+  ) {
+    throw new Error("GitHub user resource listing requires a GitHub App installation connection.");
+  }
+
   const repositories = await listGitHubRepositories({
     apiBaseUrl: input.target.config.apiBaseUrl,
     credential: input.credential.value,
