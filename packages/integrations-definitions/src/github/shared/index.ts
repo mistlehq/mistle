@@ -32,6 +32,7 @@ export {
   buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata,
   GitHubAppManifestConversionMissingClientSecretError,
   GitHubAppManifestOwnerSchema,
+  GitHubOrganizationOnlyAppManifestEvents,
   GitHubOrganizationOnlyAppManifestPermissions,
   parseGitHubAppManifestConversionResponse,
   type GitHubAppManifestConversion,

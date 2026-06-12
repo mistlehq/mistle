@@ -15,6 +15,7 @@ export {
   buildGitHubAppManifestDraft,
   GitHubAppManifestOwnerSchema,
   GitHubAppManifestTemplate,
+  GitHubOrganizationOnlyAppManifestEvents,
   GitHubOrganizationOnlyAppManifestPermissions,
   type GitHubAppManifestOwner,
 } from "./shared/app-manifest.js";

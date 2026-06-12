@@ -313,6 +313,7 @@ describe("provider app setup model", () => {
     const manifestValue = JSON.stringify(
       {
         name: "Mistle GitHub App",
+        default_events: ["issues", "member", "membership", "organization", "pull_request", "team"],
         default_permissions: {
           checks: "write",
           contents: "write",
@@ -334,6 +335,7 @@ describe("provider app setup model", () => {
     });
     expect(JSON.parse(personalManifest)).toEqual({
       name: "Mistle GitHub App",
+      default_events: ["issues", "pull_request"],
       default_permissions: {
         checks: "write",
         contents: "write",
@@ -350,6 +352,7 @@ describe("provider app setup model", () => {
     });
     expect(JSON.parse(organizationManifest)).toEqual({
       name: "Mistle GitHub App",
+      default_events: ["issues", "pull_request", "member", "membership", "organization", "team"],
       default_permissions: {
         checks: "write",
         contents: "write",

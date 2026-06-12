@@ -1031,6 +1031,7 @@ describe.concurrent("control-plane worker integration webhook event handling", (
   });
 
   it("returns resource sync requests for webhook-triggered provider resources", async ({ env }) => {
+    const resourceSyncKinds: readonly ["repository", "user"] = ["repository", "user"];
     const scope = await seedWebhookEventScope({
       env,
       suffix: createSuffix("resource_sync"),
@@ -1070,13 +1071,13 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       triggerRunIds: [],
       finalized: false,
     });
-    expect(preparedEvent.resourceSyncRequests).toEqual([
-      {
+    expect(preparedEvent.resourceSyncRequests).toEqual(
+      resourceSyncKinds.map((kind) => ({
         organizationId: scope.organizationId,
         connectionId: scope.connectionId,
-        kind: "repository",
-      },
-    ]);
+        kind,
+      })),
+    );
 
     const retriedPreparedEvent = await prepareIntegrationWebhookEvent(
       {
@@ -1110,15 +1111,15 @@ describe.concurrent("control-plane worker integration webhook event handling", (
     }
     await env.controlPlaneDb
       .insert(env.controlPlaneTables.integrationConnectionResourceStates)
-      .values([
-        {
+      .values(
+        resourceSyncKinds.map((kind) => ({
           connectionId: scope.connectionId,
           familyId: "github",
-          kind: "repository",
+          kind,
           syncState: IntegrationConnectionResourceSyncStates.SYNCING,
           lastSyncStartedAt: webhookEvent.sourceOccurredAt,
-        },
-      ]);
+        })),
+      );
 
     const scheduledRetryPreparedEvent = await prepareIntegrationWebhookEvent(
       {

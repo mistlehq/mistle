@@ -126,11 +126,47 @@ describe("integrations-definitions server", () => {
     expect(githubCloudDefinition?.resourceSyncTriggers).toEqual([
       {
         eventType: "github.installation_repositories.added",
-        resourceKinds: ["repository"],
+        resourceKinds: ["repository", "user"],
       },
       {
         eventType: "github.installation_repositories.removed",
-        resourceKinds: ["repository"],
+        resourceKinds: ["repository", "user"],
+      },
+      {
+        eventType: "github.member.added",
+        resourceKinds: ["user"],
+      },
+      {
+        eventType: "github.member.edited",
+        resourceKinds: ["user"],
+      },
+      {
+        eventType: "github.member.removed",
+        resourceKinds: ["user"],
+      },
+      {
+        eventType: "github.membership.added",
+        resourceKinds: ["user"],
+      },
+      {
+        eventType: "github.membership.removed",
+        resourceKinds: ["user"],
+      },
+      {
+        eventType: "github.organization.member_added",
+        resourceKinds: ["user"],
+      },
+      {
+        eventType: "github.organization.member_removed",
+        resourceKinds: ["user"],
+      },
+      {
+        eventType: "github.team.added_to_repository",
+        resourceKinds: ["user"],
+      },
+      {
+        eventType: "github.team.removed_from_repository",
+        resourceKinds: ["user"],
       },
     ]);
     expect(githubEnterpriseServerDefinition?.webhookHandler).toBeDefined();

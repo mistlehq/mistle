@@ -291,7 +291,7 @@ describe("listGitHubConnectionResources", () => {
     }
   });
 
-  it("treats empty GitHub repositories as having no user contributors", async () => {
+  it("lists human GitHub user resources from repository collaborators and excludes bots", async () => {
     const seenPaths: string[] = [];
     const server = await startSimulatedGitHubApi({
       handler(request, response) {
@@ -305,46 +305,52 @@ describe("listGitHubConnectionResources", () => {
         seenPaths.push(`${requestUrl.pathname}?${requestUrl.searchParams.toString()}`);
         response.setHeader("content-type", "application/json");
 
-        // GitHub REST docs: GET /user/repos lists repositories visible to a user token.
-        if (requestUrl.pathname === "/user/repos") {
+        // GitHub REST docs: GET /installation/repositories lists repositories for an installation token.
+        if (requestUrl.pathname === "/installation/repositories") {
           response.end(
-            JSON.stringify([
-              {
-                id: 1001,
-                full_name: "mistle/empty",
-                owner: {
-                  login: "mistle",
-                  type: "Organization",
+            JSON.stringify({
+              repositories: [
+                {
+                  id: 1001,
+                  full_name: "mistle/empty",
+                  owner: {
+                    login: "mistle",
+                    type: "Organization",
+                  },
                 },
-              },
-              {
-                id: 1002,
-                full_name: "mistle/app",
-                owner: {
-                  login: "mistle",
-                  type: "Organization",
+                {
+                  id: 1002,
+                  full_name: "mistle/app",
+                  owner: {
+                    login: "mistle",
+                    type: "Organization",
+                  },
                 },
-              },
-            ]),
+              ],
+            }),
           );
           return;
         }
 
-        // GitHub REST docs: GET /repos/{owner}/{repo}/contributors returns 204
-        // when the repository is empty.
-        if (requestUrl.pathname === "/repos/mistle/empty/contributors") {
-          response.writeHead(204);
-          response.end();
+        // GitHub REST docs: GET /repos/{owner}/{repo}/collaborators lists users with access
+        // to a repository, including direct, outside, and organization/team-derived access.
+        if (requestUrl.pathname === "/repos/mistle/empty/collaborators") {
+          response.end(JSON.stringify([]));
           return;
         }
 
-        if (requestUrl.pathname === "/repos/mistle/app/contributors") {
+        if (requestUrl.pathname === "/repos/mistle/app/collaborators") {
           response.end(
             JSON.stringify([
               {
                 id: 2001,
                 login: "octocat",
                 type: "User",
+              },
+              {
+                id: 2002,
+                login: "dependabot[bot]",
+                type: "Bot",
               },
             ]),
           );
@@ -374,13 +380,17 @@ describe("listGitHubConnectionResources", () => {
           id: "icn_github",
           status: "active",
           config: {
-            connection_method: "api-key",
+            connection_method: "github-app-installation",
+            app_id: "123",
+            app_slug: "mistle-test",
+            client_id: "Iv1.client",
+            installation_id: "456",
           },
         },
         kind: "user",
         credential: {
           kind: "value",
-          value: "github-token",
+          value: "github-installation-token",
         },
       });
 
@@ -389,19 +399,127 @@ describe("listGitHubConnectionResources", () => {
           externalId: "2001",
           handle: "octocat",
           displayName: "octocat",
-          metadata: {
-            repositoryFullName: "mistle/app",
-            type: "User",
-          },
+          metadata: {},
         },
       ]);
-      expect(seenPaths[0]).toBe(
-        "/user/repos?affiliation=owner%2Ccollaborator%2Corganization_member&sort=full_name&per_page=100&page=1",
-      );
+      expect(seenPaths[0]).toBe("/installation/repositories?per_page=100&page=1");
       expect(seenPaths.slice(1).sort()).toEqual([
-        "/repos/mistle/app/contributors?per_page=100&page=1",
-        "/repos/mistle/empty/contributors?per_page=100&page=1",
+        "/repos/mistle/app/collaborators?per_page=100&page=1",
+        "/repos/mistle/empty/collaborators?per_page=100&page=1",
       ]);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("rejects GitHub user resource listing for API key connections", async () => {
+    await expect(
+      listGitHubConnectionResources({
+        organizationId: "org_test",
+        targetKey: "github-cloud-test",
+        target: {
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {
+            apiBaseUrl: "https://api.github.example",
+            webBaseUrl: "https://github.example",
+          },
+          secrets: {},
+        },
+        connection: {
+          id: "icn_github",
+          status: "active",
+          config: {
+            connection_method: "api-key",
+          },
+        },
+        kind: "user",
+        credential: {
+          kind: "value",
+          value: "github-token",
+        },
+      }),
+    ).rejects.toThrow("GitHub user resource listing requires a GitHub App installation connection");
+  });
+
+  it("fails GitHub user sync when any repository collaborator listing is rejected", async () => {
+    const server = await startSimulatedGitHubApi({
+      handler(request, response) {
+        if (request.url === undefined) {
+          response.writeHead(500);
+          response.end("Missing request URL.");
+          return;
+        }
+
+        const requestUrl = new URL(request.url, "http://127.0.0.1");
+        response.setHeader("content-type", "application/json");
+
+        // GitHub REST docs: GET /installation/repositories lists repositories for an installation token.
+        if (requestUrl.pathname === "/installation/repositories") {
+          response.end(
+            JSON.stringify({
+              repositories: [
+                {
+                  id: 1001,
+                  full_name: "mistle/app",
+                  owner: {
+                    login: "mistle",
+                    type: "Organization",
+                  },
+                },
+              ],
+            }),
+          );
+          return;
+        }
+
+        // GitHub REST docs: GET /repos/{owner}/{repo}/collaborators can return 403
+        // when the token cannot access collaborator information for the repository.
+        if (requestUrl.pathname === "/repos/mistle/app/collaborators") {
+          response.writeHead(403);
+          response.end(JSON.stringify({ message: "Resource not accessible by integration" }));
+          return;
+        }
+
+        response.writeHead(404);
+        response.end(JSON.stringify({ message: "not found" }));
+      },
+    });
+
+    try {
+      await expect(
+        listGitHubConnectionResources({
+          organizationId: "org_test",
+          targetKey: "github-cloud-test",
+          target: {
+            familyId: "github",
+            variantId: "github-cloud",
+            enabled: true,
+            config: {
+              apiBaseUrl: server.baseUrl,
+              webBaseUrl: "https://github.example",
+            },
+            secrets: {},
+          },
+          connection: {
+            id: "icn_github",
+            status: "active",
+            config: {
+              connection_method: "github-app-installation",
+              app_id: "123",
+              app_slug: "mistle-test",
+              client_id: "Iv1.client",
+              installation_id: "456",
+            },
+          },
+          kind: "user",
+          credential: {
+            kind: "value",
+            value: "github-installation-token",
+          },
+        }),
+      ).rejects.toThrow("Resource not accessible by integration");
     } finally {
       await server.stop();
     }
