@@ -231,6 +231,8 @@ function createOpenCodeRuntimeInput(reportedMessages: string[]): OpenCodeRuntime
 }
 
 function createPiRuntimeInput(input: {
+  executedPromptCommands?: string[];
+  isBusy?: boolean;
   queuedPrompts?: string[];
   reportedMessages: string[];
   steeredPrompts: string[];
@@ -258,7 +260,7 @@ function createPiRuntimeInput(input: {
         pendingToolExecutions: [],
         pendingTurnId: "pi:user:1",
         sessionFile: "pi-session.json",
-        status: "busy",
+        status: input.isBusy === false ? null : "busy",
         streamingMessage: null,
       },
       confirmChatRestoredAfterReconnect: async () => {
@@ -267,8 +269,8 @@ function createPiRuntimeInput(input: {
       isInterruptingTurn: false,
       isStartingTurn: false,
       isSteeringTurn: false,
-      sendPrompt: async () => {
-        return;
+      sendPrompt: async (turnInput) => {
+        input.executedPromptCommands?.push(turnInput.submittedPrompt);
       },
       followUpTurn: async (turnInput) => {
         input.queuedPrompts?.push(turnInput.submittedPrompt);
@@ -657,5 +659,85 @@ describe("buildPiConversationRuntime", () => {
     });
 
     expect(queuedPrompts).toEqual(["queued transcript"]);
+  });
+
+  it("queues Pi prompt and skill commands while a task is running", () => {
+    const queuedPrompts: string[] = [];
+    const runtime = buildPiConversationRuntime(
+      createPiRuntimeInput({
+        queuedPrompts,
+        reportedMessages: [],
+        steeredPrompts: [],
+      }),
+    );
+
+    const accepted = runtime.composerRuntimeInput.executeTypedRuntimeCommand?.({
+      commandId: "pi.prompt.review",
+      text: "/review current changes",
+    });
+
+    expect(accepted).toBe(true);
+    expect(queuedPrompts).toEqual(["/review current changes"]);
+  });
+
+  it("rejects Pi extension commands while a task is running", () => {
+    const queuedPrompts: string[] = [];
+    const reportedMessages: string[] = [];
+    const runtime = buildPiConversationRuntime(
+      createPiRuntimeInput({
+        queuedPrompts,
+        reportedMessages,
+        steeredPrompts: [],
+      }),
+    );
+
+    const accepted = runtime.composerRuntimeInput.executeTypedRuntimeCommand?.({
+      commandId: "pi.extension.sync-linear",
+      text: "/sync-linear",
+    });
+
+    expect(accepted).toBe(false);
+    expect(queuedPrompts).toEqual([]);
+    expect(reportedMessages).toEqual([
+      "Pi extension commands are disabled while a task is in progress.",
+    ]);
+  });
+
+  it("executes Pi commands through Pi prompt delivery when idle", () => {
+    const executedPromptCommands: string[] = [];
+    const runtime = buildPiConversationRuntime(
+      createPiRuntimeInput({
+        executedPromptCommands,
+        isBusy: false,
+        reportedMessages: [],
+        steeredPrompts: [],
+      }),
+    );
+
+    const accepted = runtime.composerRuntimeInput.executeTypedRuntimeCommand?.({
+      commandId: "pi.extension.sync-linear",
+      text: "/sync-linear",
+    });
+
+    expect(accepted).toBe(true);
+    expect(executedPromptCommands).toEqual(["/sync-linear"]);
+  });
+
+  it("rejects typed commands outside the Pi command namespace", () => {
+    const reportedMessages: string[] = [];
+    const runtime = buildPiConversationRuntime(
+      createPiRuntimeInput({
+        reportedMessages,
+        steeredPrompts: [],
+      }),
+    );
+
+    const accepted = runtime.composerRuntimeInput.executeTypedRuntimeCommand?.({
+      commandId: "opencode.prompt.review",
+      text: "/review",
+    });
+
+    expect(accepted).toBe(false);
+    expect(reportedMessages).toEqual(["Unsupported Pi runtime command 'opencode.prompt.review'."]);
   });
 });

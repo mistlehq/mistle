@@ -650,6 +650,11 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Pi itself exposes transcript events, message reads, model controls, thinking controls, session stats, image inputs, and runtime commands through its RPC surface.
 - The current Mistle Pi adapter may expose a narrower subset than Pi itself; chat UI behavior should follow the adapter contract it has actually wired rather than assuming every upstream Pi RPC command is available.
 - Pi composer controls should be Pi-owned controls, not Codex-owned **Composer commands** or Codex context controls.
+- Pi **Composer commands** should reflect Pi-owned command sources, including extension commands, prompt template commands, and skill commands.
+- Pi extension **Composer commands** are not active-turn steering or queueing messages unless Mistle explicitly supports that interaction.
+- Pi prompt-template and skill **Composer commands** may become **Runtime queued messages** through Pi follow-up delivery during an active turn.
+- Pi skill **Composer commands** use Pi's `/skill:name` command syntax, not Codex **Codex skill mentions**.
+- OpenCode **Composer commands** follow OpenCode's runtime command contract rather than Pi's prompt-template and skill command expansion model.
 - A **Session workbench** keeps sandbox-scoped tools stable while the **Active runtime conversation** changes.
 - **Pi active model selection** should change Pi runtime state before a prompt is submitted rather than attaching a model override to the prompt.
 - **Pi active model selection** belongs to the active **Pi conversation** in the **Session workbench**.

@@ -1,5 +1,6 @@
 import { CodexComposerCapabilities } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { mapOpenCodePromptCommandsToComposerCapabilities } from "@mistle/integrations-definitions/agent-runtimes/opencode/composer-capabilities";
+import { mapPiCommandsToComposerCapabilities } from "@mistle/integrations-definitions/agent-runtimes/pi/composer-capabilities";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, userEvent, within } from "storybook/test";
@@ -108,6 +109,24 @@ const OpenCodePromptCommandCapabilities = mapOpenCodePromptCommandsToComposerCap
   {
     name: "tests",
     description: "write targeted tests",
+  },
+]);
+
+const PiCommandCapabilities = mapPiCommandsToComposerCapabilities([
+  {
+    name: "review",
+    description: "Review current changes",
+    source: "prompt",
+  },
+  {
+    name: "skill:frontend",
+    description: "Use the frontend skill",
+    source: "skill",
+  },
+  {
+    name: "sync-linear",
+    description: "Sync Linear context",
+    source: "extension",
   },
 ]);
 
@@ -775,6 +794,35 @@ export const OpenCodePromptCommands: Story = {
       canvas.getByRole("option", { name: "/explain explain the selected code" }),
     ).toBeVisible();
     await expect(canvas.getByRole("option", { name: "/tests write targeted tests" })).toBeVisible();
+  },
+};
+
+export const PiRuntimeCommandsDuringActiveTurn: Story = {
+  args: {
+    ...OpenCodeComposerModelArgs,
+    composerCapabilities: PiCommandCapabilities,
+    composerText: "/",
+    submitLabel: "Steer",
+    submitMode: "steer",
+  },
+  render: (args) => (
+    <div className="flex min-h-[420px] items-end">
+      <PlatformAwareChatComposerStory {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByRole("listbox", { name: "Slash commands" })).toBeVisible();
+    await expect(
+      canvas.getByRole("option", { name: "/review Review current changes" }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("option", { name: "/skill:frontend Use the frontend skill" }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("option", { name: "/sync-linear Sync Linear context" }),
+    ).toBeVisible();
   },
 };
 

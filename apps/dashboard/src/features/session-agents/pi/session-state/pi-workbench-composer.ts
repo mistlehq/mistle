@@ -1,7 +1,9 @@
 import type {
+  PiCommandSummary,
   PiModel,
   PiThinkingLevel,
 } from "@mistle/integrations-definitions/agent-runtimes/pi/client";
+import { mapPiCommandsToComposerCapabilities } from "@mistle/integrations-definitions/agent-runtimes/pi/composer-capabilities";
 import { useCallback, useMemo, useState } from "react";
 
 import { buildSessionComposerModelOptions } from "../../../pages/session-composer/session-composer-model-options.js";
@@ -119,11 +121,12 @@ export function mapPiModelsToComposerModels(input: {
 export function buildReadyPiComposerBootstrap(input: {
   activeModel: PiModel | null;
   availableModels: readonly PiModel[];
+  commands: readonly PiCommandSummary[];
   thinkingLevel: PiThinkingLevel;
 }): SessionComposerBootstrapResult {
   return {
     phase: { status: "ready" },
-    composerCapabilities: [],
+    composerCapabilities: mapPiCommandsToComposerCapabilities(input.commands),
     establishedSnapshot: {
       availableModels: mapPiModelsToComposerModels({ availableModels: input.availableModels }),
       configSnapshot: {

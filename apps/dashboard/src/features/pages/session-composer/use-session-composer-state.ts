@@ -61,6 +61,8 @@ type QueuedComposerPrompt = {
   status: "failed" | "queued" | "submitting";
 };
 
+const CodexPlanComposerCommandId = "codex.plan";
+
 type PreparedComposerTurnSubmission = {
   preparedAttachments: PreparedComposerAttachments;
   selectedSkillMentions: readonly SelectedSkillMention[];
@@ -749,7 +751,7 @@ export function useSessionComposerState(input: {
           return;
         }
 
-        if (typedRuntimeCommand.name === "plan") {
+        if (typedRuntimeCommand.id === CodexPlanComposerCommandId) {
           await submitPlanTypedRuntimeCommand(typedRuntimeCommand);
           return;
         }

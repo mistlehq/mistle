@@ -298,6 +298,15 @@ fn handle_pi_method(
                 captured_events,
             )
         }
+        "pi/getCommands" => {
+            let session_file = require_param_string(&request.params, "sessionFile")?;
+            state.ensure_child(None)?;
+            state.switch_session(&session_file, captured_events)?;
+            state.send_pi_command_with_captured_events(
+                json!({ "type": "get_commands" }),
+                captured_events,
+            )
+        }
         "pi/readMetadata" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
             state.ensure_child(None)?;
