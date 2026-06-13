@@ -43,6 +43,20 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
     ).toBe("true");
   });
 
+  it("keeps the resource title independent from the settings disclosure control", () => {
+    renderSection();
+
+    fireEvent.click(screen.getByText("Agent PR activity"));
+
+    expect(screen.queryByRole("checkbox", { name: "PR comments" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Configure Agent PR activity" }));
+
+    expect(screen.getByRole("checkbox", { name: "PR comments" }).getAttribute("aria-checked")).toBe(
+      "true",
+    );
+  });
+
   it("shows default Slack thread reply routing when the profile has a Slack association-capable binding", () => {
     renderSection({ hasGitHubBinding: false, hasSlackThreadBinding: true });
 

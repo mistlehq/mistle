@@ -12,7 +12,7 @@ import {
   Field,
   FieldContent,
   FieldHeader,
-  FieldLabelWithTooltip,
+  FieldTitleWithTooltip,
   Notice,
   Select,
   SelectContent,
@@ -442,13 +442,9 @@ function SandboxProfileAssociatedResourceRoutingFields(input: {
           <div className="grid gap-2" key={option.resourceKind}>
             <Field contentWidth="fill" orientation={input.layout}>
               <FieldHeader>
-                <FieldLabelWithTooltip
-                  htmlFor={getAssociatedResourceSettingsButtonId(option.resourceKind)}
-                  tooltip={option.tooltip}
-                  tooltipLabel={option.tooltipLabel}
-                >
+                <FieldTitleWithTooltip tooltip={option.tooltip} tooltipLabel={option.tooltipLabel}>
                   {option.label}
-                </FieldLabelWithTooltip>
+                </FieldTitleWithTooltip>
               </FieldHeader>
               <FieldContent>
                 <AssociatedResourceSettingsButton
