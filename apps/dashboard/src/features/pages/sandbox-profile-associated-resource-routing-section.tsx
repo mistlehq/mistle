@@ -123,14 +123,6 @@ type AssociatedResourceRoutingResourceRule = NonNullable<
   AssociatedResourceRoutingConfig["resources"]
 >[number];
 
-type GitHubPullRequestAssociatedResourceEventType = Extract<
-  AssociatedResourceRoutingResourceRule,
-  { resourceKind: typeof AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST }
->["eventTypes"][number];
-
-type SlackThreadAssociatedResourceEventType =
-  typeof AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED;
-
 type AssociatedResourceRoutingReadOnlyDetail = {
   id: string;
   label: ReactNode;
