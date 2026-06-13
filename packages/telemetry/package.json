@@ -53,6 +53,6 @@
   },
   "devDependencies": {
     "@opentelemetry/context-async-hooks": "^2.7.1",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.8"
   }
 }
