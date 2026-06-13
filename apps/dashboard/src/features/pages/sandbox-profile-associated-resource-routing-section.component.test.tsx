@@ -43,6 +43,20 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
     ).toBe("true");
   });
 
+  it("keeps the resource title independent from the settings disclosure control", () => {
+    renderSection();
+
+    fireEvent.click(screen.getByText("Agent PR activity"));
+
+    expect(screen.queryByRole("checkbox", { name: "PR comments" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Configure Agent PR activity" }));
+
+    expect(screen.getByRole("checkbox", { name: "PR comments" }).getAttribute("aria-checked")).toBe(
+      "true",
+    );
+  });
+
   it("shows default Slack thread reply routing when the profile has a Slack association-capable binding", () => {
     renderSection({ hasGitHubBinding: false, hasSlackThreadBinding: true });
 
@@ -298,15 +312,82 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
     expect(cleanDraftState.hasUnpersistedChanges).toBe(false);
   });
 
-  it("does not expose activity controls for read-only profile versions", () => {
-    renderSection({ isDraft: false });
+  it("keeps associated resource details inspectable but read-only for published profile versions", () => {
+    renderSection({
+      hasSlackThreadBinding: true,
+      isDraft: false,
+      supportedAssociatedResourceEvents: SupportedAssociatedResourceEvents,
+      version: createVersion({
+        state: "published",
+        associatedResourceEventRoutingConfig: {
+          enabled: true,
+          resources: [
+            {
+              resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+              eventTypes: [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED],
+              payloadFilter: {
+                [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED]: {
+                  op: "contains_token",
+                  path: ["comment", "body"],
+                  value: "@mistle",
+                },
+              },
+            },
+            {
+              resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+              eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+            },
+          ],
+        },
+      }),
+    });
 
-    const configureButton = screen.getByRole("button", { name: "Configure Agent PR activity" });
-    expect(configureButton).toHaveProperty("disabled", true);
+    const configurePullRequestButton = screen.getByRole("button", {
+      name: "Configure Agent PR activity",
+    });
+    expect(configurePullRequestButton).toHaveProperty("disabled", false);
 
-    fireEvent.click(configureButton);
+    fireEvent.click(configurePullRequestButton);
 
     expect(screen.queryByRole("checkbox", { name: "PR comments" })).toBeNull();
+    expect(screen.getByText("PR comments")).toBeTruthy();
+    expect(screen.getByText("includes")).toBeTruthy();
+    expect(screen.getByText("@mistle")).toBeTruthy();
+
+    const configureSlackThreadButton = screen.getByRole("button", {
+      name: "Configure Agent-started Slack threads",
+    });
+    expect(configureSlackThreadButton).toHaveProperty("disabled", false);
+
+    fireEvent.click(configureSlackThreadButton);
+
+    expect(screen.queryByRole("checkbox", { name: "Enable thread messages" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Thread messages" })).toBeNull();
+    expect(screen.queryByText("Thread messages")).toBeNull();
+    expect(screen.queryByText("Message mode")).toBeNull();
+    expect(screen.getByText("All messages")).toBeTruthy();
+    expect(screen.queryByText("Associated resource routing is read-only.")).toBeNull();
+  });
+
+  it("shows disabled published routing as unselected and non-interactive", () => {
+    renderSection({
+      isDraft: false,
+      version: createVersion({
+        state: "published",
+        associatedResourceEventRoutingConfig: {
+          enabled: false,
+          resources: [],
+        },
+      }),
+    });
+
+    expect(screen.queryByRole("button", { name: "Configure Agent PR activity" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Configure Agent-started Slack threads" }),
+    ).toBeNull();
+    expect(screen.getAllByText("activities selected")).toHaveLength(2);
+    expect(screen.queryByRole("checkbox", { name: "PR comments" })).toBeNull();
+    expect(screen.queryByText("No activities selected.")).toBeNull();
   });
 
   it("preserves saved filters when associated resource metadata is unavailable", () => {
@@ -417,7 +498,7 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
     expect(screen.getByDisplayValue("@mistle")).toBeDefined();
   });
 
-  it("keeps expanded filter controls read-only when the section becomes disabled", () => {
+  it("presents expanded filter details as read-only text when the section becomes disabled", () => {
     const draftStates: SandboxProfileAssociatedResourceRoutingDraftState[] = [];
     const version = createVersion({
       associatedResourceEventRoutingConfig: {
@@ -450,6 +531,7 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
     fireEvent.click(screen.getByRole("button", { name: "Configure Agent PR activity" }));
     const filterInput = screen.getByRole("textbox", { name: "includes" });
     expect(filterInput).toHaveProperty("disabled", false);
+    fireEvent.change(filterInput, { target: { value: "@mistle" } });
 
     rendered.rerender(
       <QueryClientProvider client={queryClient}>
@@ -467,11 +549,11 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
       </QueryClientProvider>,
     );
 
-    const disabledFilterInput = screen.getByRole("textbox", { name: "includes" });
-    expect(disabledFilterInput).toHaveProperty("disabled", true);
     const draftStateCount = draftStates.length;
 
-    fireEvent.change(disabledFilterInput, { target: { value: "@mistle" } });
+    expect(screen.queryByRole("textbox", { name: "includes" })).toBeNull();
+    expect(screen.getByText("includes")).toBeTruthy();
+    expect(screen.getByText("@mistle")).toBeTruthy();
 
     expect(draftStates).toHaveLength(draftStateCount);
   });
@@ -508,12 +590,14 @@ function renderSection(input?: {
 
 function createVersion(input?: {
   associatedResourceEventRoutingConfig?: SandboxProfileVersion["associatedResourceEventRoutingConfig"];
+  state?: SandboxProfileVersion["state"];
 }): SandboxProfileVersion {
+  const state = input?.state ?? "draft";
   return {
     sandboxProfileId: "sbp_associated_resource_routing",
     version: 1,
-    state: "draft",
-    publishedAt: null,
+    state,
+    publishedAt: state === "published" ? "2026-01-01T00:00:00.000Z" : null,
     agentRuntimeId: "codex",
     gitCommitSigningIntegrationConnectionId: null,
     mistleMcpEnabled: false,
