@@ -36,7 +36,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1048.0",
+    "@aws-sdk/client-s3": "^3.1063.0",
     "@mistle/config": "workspace:*",
     "@mistle/db": "workspace:*",
     "@mistle/integrations-definitions": "workspace:*",
