@@ -12,16 +12,19 @@ import {
   Field,
   FieldContent,
   FieldHeader,
-  FieldTitleWithTooltip,
+  FieldLabelWithTooltip,
   Notice,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from "@mistle/ui";
-import { CaretDownIcon, CaretRightIcon } from "@phosphor-icons/react";
-import { useCallback, useState } from "react";
+import { CaretDownIcon, CaretRightIcon, InfoIcon } from "@phosphor-icons/react";
+import { useCallback, useState, type ReactNode } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import type { IntegrationTarget } from "../integrations/integrations-service.js";
@@ -37,6 +40,7 @@ import {
   type WebhookTriggerEventParameterOption,
   type WebhookTriggerEventParameterRule,
   type WebhookTriggerEventParameterRuleMap,
+  WebhookTriggerEventParameterRuleOperators,
 } from "../triggers/webhook-trigger-event-types.js";
 
 const GitHubPullRequestEventOptions: ReadonlyArray<{
@@ -120,6 +124,12 @@ type GitHubPullRequestAssociatedResourceEventType = Extract<
 
 type SlackThreadAssociatedResourceEventType =
   typeof AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED;
+
+type AssociatedResourceRoutingReadOnlyDetail = {
+  id: string;
+  label: ReactNode;
+  value: ReactNode;
+};
 
 type AssociatedResourceRoutingDraft = {
   resources: AssociatedResourceRoutingResourceDraft[];
@@ -419,7 +429,7 @@ function SandboxProfileAssociatedResourceRoutingFields(input: {
   expandedResourceKinds: readonly AssociatedProviderResourceKind[];
 }): React.JSX.Element {
   return (
-    <div className="flex flex-col gap-4">
+    <div className={`flex flex-col gap-4 ${input.layout === "vertical" ? "pt-2" : ""}`}>
       {input.saveErrorMessage === null ? null : (
         <Notice title={input.saveErrorMessage} variant="alert" />
       )}
@@ -442,14 +452,15 @@ function SandboxProfileAssociatedResourceRoutingFields(input: {
           <div className="grid gap-2" key={option.resourceKind}>
             <Field contentWidth="fill" orientation={input.layout}>
               <FieldHeader>
-                <FieldTitleWithTooltip tooltip={option.tooltip} tooltipLabel={option.tooltipLabel}>
+                <FieldLabelWithTooltip tooltip={option.tooltip} tooltipLabel={option.tooltipLabel}>
                   {option.label}
-                </FieldTitleWithTooltip>
+                </FieldLabelWithTooltip>
               </FieldHeader>
               <FieldContent>
                 <AssociatedResourceSettingsButton
                   fieldIsReadOnly={input.fieldIsReadOnly}
                   label={option.label}
+                  layout={input.layout}
                   onSettingsExpandedChange={(expanded) => {
                     input.onSettingsExpandedChange(option.resourceKind, expanded);
                   }}
@@ -535,6 +546,21 @@ function GitHubPullRequestSettings(input: {
     return <></>;
   }
 
+  if (input.fieldIsReadOnly) {
+    return (
+      <div className={input.layout === "horizontal" ? "grid gap-2 md:ml-44" : "grid gap-2"}>
+        <AssociatedResourceReadOnlySettings
+          advancedPayloadFilter={input.resource.advancedPayloadFilter}
+          eventOptions={input.eventOptions}
+          eventParameterRules={input.resource.eventParameterRules}
+          eventTypeOptions={GitHubPullRequestEventOptions}
+          selectedEventTypes={input.resource.enabled ? input.resource.eventTypes : []}
+          id={getAssociatedResourceSettingsPanelId(input.resource.resourceKind)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={input.layout === "horizontal" ? "grid gap-2 md:ml-44" : "grid gap-2"}>
       <div
@@ -550,7 +576,7 @@ function GitHubPullRequestSettings(input: {
           onEventParameterRulesChange={input.onEventParameterRulesChange}
           onEventTypeChange={input.onEventTypeChange}
           selectedConnectionId={input.selectedConnectionId}
-          selectedEventTypes={input.resource.eventTypes}
+          selectedEventTypes={input.resource.enabled ? input.resource.eventTypes : []}
         />
       </div>
     </div>
@@ -560,17 +586,36 @@ function GitHubPullRequestSettings(input: {
 function AssociatedResourceSettingsButton(input: {
   fieldIsReadOnly: boolean;
   label: string;
+  layout: AssociatedResourceRoutingLayout;
   onSettingsExpandedChange: (expanded: boolean) => void;
   resource: AssociatedResourceRoutingResourceDraft;
   settingsExpanded: boolean;
 }): React.JSX.Element {
+  const summaryClassName =
+    input.layout === "horizontal" ? "flex min-h-10 items-center" : "flex items-center";
+
+  if (
+    input.fieldIsReadOnly &&
+    (!input.resource.enabled || input.resource.eventTypes.length === 0)
+  ) {
+    return (
+      <span className={`${summaryClassName} text-foreground w-fit min-w-0 text-sm`}>
+        <span className="min-w-0 truncate">
+          <span>0</span>{" "}
+          {createAssociatedResourceRoutingSummary({
+            resource: input.resource,
+          })}
+        </span>
+      </span>
+    );
+  }
+
   return (
     <Button
       aria-controls={getAssociatedResourceSettingsPanelId(input.resource.resourceKind)}
       aria-expanded={input.settingsExpanded}
       aria-label={`Configure ${input.label}`}
-      className="group/button text-foreground hover:text-primary focus-visible:text-primary flex min-h-10 w-fit min-w-0 justify-start gap-2 px-0 text-sm font-medium hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-foreground"
-      disabled={input.fieldIsReadOnly}
+      className={`${summaryClassName} group/button text-foreground hover:text-primary focus-visible:text-primary h-auto w-fit min-w-0 justify-start gap-2 px-0 py-0 text-sm font-normal hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-foreground`}
       id={getAssociatedResourceSettingsButtonId(input.resource.resourceKind)}
       onClick={() => {
         input.onSettingsExpandedChange(!input.settingsExpanded);
@@ -579,9 +624,7 @@ function AssociatedResourceSettingsButton(input: {
       variant="ghost"
     >
       <span className="min-w-0 truncate group-hover/button:underline group-focus-visible/button:underline">
-        <span className="font-semibold">
-          {input.resource.enabled ? input.resource.eventTypes.length : 0}
-        </span>{" "}
+        <span>{input.resource.enabled ? input.resource.eventTypes.length : 0}</span>{" "}
         {createAssociatedResourceRoutingSummary({
           resource: input.resource,
         })}
@@ -639,14 +682,6 @@ function AssociatedResourceEventTypeRows(input: {
             {selected && eventOption !== undefined ? (
               <div className="mt-3 pl-6">
                 <WebhookTriggerEventPicker
-                  disabledState={
-                    input.fieldIsReadOnly
-                      ? {
-                          reason: "Associated resource routing is read-only.",
-                          variant: "default",
-                        }
-                      : null
-                  }
                   error={undefined}
                   eventOptions={[eventOption]}
                   eventParameterRules={input.eventParameterRules}
@@ -664,6 +699,294 @@ function AssociatedResourceEventTypeRows(input: {
         );
       })}
     </div>
+  );
+}
+
+function AssociatedResourceReadOnlySettings(input: {
+  advancedPayloadFilter: Record<string, unknown> | null;
+  eventOptions: readonly WebhookTriggerEventOption[];
+  eventParameterRules: WebhookTriggerEventParameterRuleMap;
+  eventTypeOptions: ReadonlyArray<{
+    eventType: AssociatedResourceEventType;
+    label: string;
+  }>;
+  id?: string | undefined;
+  readOnlyDetailsByEventType?: Partial<
+    Record<AssociatedResourceEventType, readonly AssociatedResourceRoutingReadOnlyDetail[]>
+  >;
+  selectedEventTypes: readonly AssociatedResourceEventType[];
+}): React.JSX.Element {
+  const selectedOptions = input.eventTypeOptions.filter((option) =>
+    input.selectedEventTypes.includes(option.eventType),
+  );
+
+  return (
+    <div
+      className="divide-border border-border divide-y overflow-hidden rounded-md border"
+      {...(input.id === undefined ? {} : { id: input.id })}
+    >
+      {selectedOptions.length === 0 ? (
+        <p className="text-muted-foreground px-3 py-3 text-sm">No activities selected.</p>
+      ) : (
+        selectedOptions.map((option) => {
+          const eventOption = input.eventOptions.find(
+            (candidate) => candidate.id === option.eventType,
+          );
+          const details = [
+            ...(input.readOnlyDetailsByEventType?.[option.eventType] ?? []),
+            ...(eventOption === undefined
+              ? []
+              : createReadOnlyEventParameterDetails({
+                  eventOption,
+                  rules: input.eventParameterRules[option.eventType] ?? {},
+                })),
+            ...createReadOnlyAdvancedFilterDetails({
+              advancedPayloadFilter: input.advancedPayloadFilter,
+              eventType: option.eventType,
+            }),
+          ];
+
+          return (
+            <div className="px-3 py-3" key={option.eventType}>
+              <p className="text-sm font-medium">{option.label}</p>
+              <AssociatedResourceReadOnlyDetailRows className="mt-1.5" details={details} />
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+function AssociatedResourceReadOnlyDetailRows(input: {
+  className?: string | undefined;
+  details: readonly AssociatedResourceRoutingReadOnlyDetail[];
+}): React.JSX.Element | null {
+  if (input.details.length === 0) {
+    return null;
+  }
+
+  return (
+    <dl className={`grid gap-1.5 ${input.className ?? ""}`}>
+      {input.details.map((detail) => (
+        <div className="flex w-full items-center gap-4" key={detail.id}>
+          <dt className="text-muted-foreground shrink-0 text-sm whitespace-nowrap">
+            {detail.label}
+          </dt>
+          <dd className="min-w-0 text-sm break-words">{detail.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function createReadOnlyEventParameterDetails(input: {
+  eventOption: WebhookTriggerEventOption;
+  rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>;
+}): AssociatedResourceRoutingReadOnlyDetail[] {
+  const parameters = input.eventOption.parameters ?? [];
+  const parameterGroups = input.eventOption.parameterGroups ?? [];
+  const renderedGroupIds = new Set<string>();
+
+  return parameters.flatMap((parameter) => {
+    const parameterGroup = findReadOnlyParameterGroupForParameter({
+      groups: parameterGroups,
+      parameterId: parameter.id,
+    });
+
+    if (parameterGroup !== undefined) {
+      if (renderedGroupIds.has(parameterGroup.id)) {
+        return [];
+      }
+
+      renderedGroupIds.add(parameterGroup.id);
+      return createReadOnlyParameterGroupDetails({
+        group: parameterGroup,
+        parameters,
+        rules: input.rules,
+      });
+    }
+
+    const rule = input.rules[parameter.id];
+    if (rule === undefined) {
+      return [];
+    }
+
+    return [
+      {
+        id: parameter.id,
+        label: formatReadOnlyEventParameterLabel({ parameter, rule }),
+        value: formatWebhookTriggerEventParameterRuleValue({ parameter, rule }),
+      },
+    ];
+  });
+}
+
+function findReadOnlyParameterGroupForParameter(input: {
+  groups: readonly WebhookTriggerEventParameterGroup[];
+  parameterId: string;
+}): WebhookTriggerEventParameterGroup | undefined {
+  return input.groups.find((group) =>
+    group.options.some((option) => option.parameterId === input.parameterId),
+  );
+}
+
+function createReadOnlyParameterGroupDetails(input: {
+  group: WebhookTriggerEventParameterGroup;
+  parameters: readonly WebhookTriggerEventParameterOption[];
+  rules: NonNullable<WebhookTriggerEventParameterRuleMap[string]>;
+}): AssociatedResourceRoutingReadOnlyDetail[] {
+  const selectedOption = input.group.options.find((option) => {
+    const rule = input.rules[option.parameterId];
+    return (rule?.value.trim().length ?? 0) > 0;
+  });
+
+  if (selectedOption === undefined) {
+    return [];
+  }
+
+  const parameter = input.parameters.find(
+    (candidate) => candidate.id === selectedOption.parameterId,
+  );
+  const rule = input.rules[selectedOption.parameterId];
+  if (parameter === undefined || rule === undefined) {
+    return [];
+  }
+
+  return [
+    {
+      id: input.group.id,
+      label: `${selectedOption.label} ${formatReadOnlyEqualityOperatorLabel({
+        includePrefix: false,
+        operator: resolveReadOnlyEqualityOperator(rule),
+        parameter,
+      })}`,
+      value: formatWebhookTriggerEventParameterRuleValue({ parameter, rule }),
+    },
+  ];
+}
+
+function createReadOnlyAdvancedFilterDetails(input: {
+  advancedPayloadFilter: Record<string, unknown> | null;
+  eventType: AssociatedResourceEventType;
+}): AssociatedResourceRoutingReadOnlyDetail[] {
+  const filter = input.advancedPayloadFilter?.[input.eventType];
+  if (filter === undefined) {
+    return [];
+  }
+
+  return [
+    {
+      id: "advanced-payload-filter",
+      label: "Additional filter",
+      value: (
+        <code className="bg-muted block rounded px-2 py-1 text-xs whitespace-pre-wrap">
+          {JSON.stringify(filter, null, 2)}
+        </code>
+      ),
+    },
+  ];
+}
+
+function formatReadOnlyEventParameterLabel(input: {
+  parameter: WebhookTriggerEventParameterOption;
+  rule: WebhookTriggerEventParameterRule;
+}): ReactNode {
+  if (
+    input.parameter.kind === "string" &&
+    input.parameter.controlVariant === "invocation-token" &&
+    input.rule.operator === WebhookTriggerEventParameterRuleOperators.CONTAINS_TOKEN
+  ) {
+    return <ReadOnlyInvocationTokenFilterLabel />;
+  }
+
+  if (isReadOnlyEqualityParameter(input.parameter)) {
+    return formatReadOnlyEqualityOperatorLabel({
+      includePrefix: true,
+      operator: resolveReadOnlyEqualityOperator(input.rule),
+      parameter: input.parameter,
+    });
+  }
+
+  switch (input.rule.operator) {
+    case WebhookTriggerEventParameterRuleOperators.CONTAINS:
+      return input.parameter.prefix ?? input.parameter.label;
+    case WebhookTriggerEventParameterRuleOperators.CONTAINS_TOKEN:
+      return "includes";
+    case WebhookTriggerEventParameterRuleOperators.EXISTS:
+      return "exists";
+    case WebhookTriggerEventParameterRuleOperators.NOT_EXISTS:
+      return "does not exist";
+    case WebhookTriggerEventParameterRuleOperators.IS:
+      return input.parameter.prefix ?? "is";
+    case WebhookTriggerEventParameterRuleOperators.IS_NOT:
+      return input.parameter.prefix === undefined ? "is not" : `not ${input.parameter.prefix}`;
+  }
+}
+
+function ReadOnlyInvocationTokenFilterLabel(): React.JSX.Element {
+  return (
+    <span className="flex items-center gap-1">
+      <span>includes</span>
+      <Tooltip delay={0}>
+        <TooltipTrigger
+          aria-label="Explain invocation token filter"
+          render={
+            <button
+              className="text-muted-foreground hover:text-foreground inline-flex size-4 shrink-0 items-center justify-center rounded-sm"
+              type="button"
+            />
+          }
+        >
+          <InfoIcon aria-hidden className="size-3.5" />
+        </TooltipTrigger>
+        <TooltipContent className="max-w-64 text-left" side="top">
+          Example: @mistlebot, mistle, /triage. Leave blank to match all events.
+        </TooltipContent>
+      </Tooltip>
+    </span>
+  );
+}
+
+function isReadOnlyEqualityParameter(parameter: WebhookTriggerEventParameterOption): boolean {
+  return (
+    parameter.kind === "resource-select" ||
+    (parameter.kind === "string" &&
+      (parameter.matchMode === undefined || parameter.matchMode === "eq")) ||
+    (parameter.kind === "enum-select" && parameter.matchMode === "eq")
+  );
+}
+
+function resolveReadOnlyEqualityOperator(rule: WebhookTriggerEventParameterRule): "is" | "is_not" {
+  return rule.operator === WebhookTriggerEventParameterRuleOperators.IS_NOT
+    ? WebhookTriggerEventParameterRuleOperators.IS_NOT
+    : WebhookTriggerEventParameterRuleOperators.IS;
+}
+
+function formatReadOnlyEqualityOperatorLabel(input: {
+  includePrefix: boolean;
+  operator: "is" | "is_not";
+  parameter: WebhookTriggerEventParameterOption;
+}): string {
+  const prefix = input.includePrefix ? input.parameter.prefix : undefined;
+  if (input.operator === WebhookTriggerEventParameterRuleOperators.IS) {
+    return prefix ?? "is";
+  }
+
+  return prefix === undefined ? "is not" : `not ${prefix}`;
+}
+
+function formatWebhookTriggerEventParameterRuleValue(input: {
+  parameter: WebhookTriggerEventParameterOption;
+  rule: WebhookTriggerEventParameterRule;
+}): string {
+  if (input.parameter.kind !== "enum-select") {
+    return input.rule.value;
+  }
+
+  return (
+    input.parameter.options.find((option) => option.value === input.rule.value)?.label ??
+    input.rule.value
   );
 }
 
@@ -697,6 +1020,23 @@ function SlackThreadSettings(input: {
     ? input.resource.eventTypes.includes(AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED)
     : false;
 
+  if (input.fieldIsReadOnly) {
+    return (
+      <div
+        className={input.layout === "horizontal" ? "grid gap-2 md:ml-44" : "grid gap-2"}
+        id={getAssociatedResourceSettingsPanelId(input.resource.resourceKind)}
+      >
+        <SlackThreadReadOnlySettings
+          advancedPayloadFilter={input.resource.advancedPayloadFilter}
+          eventOption={eventOption}
+          eventParameterRules={input.resource.eventParameterRules}
+          messageMode={input.resource.slackThreadMessageMode}
+          selected={selected}
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       className={input.layout === "horizontal" ? "grid gap-2 md:ml-44" : "grid gap-2"}
@@ -722,14 +1062,6 @@ function SlackThreadSettings(input: {
         {selected && eventOption !== undefined ? (
           <div className="mt-3">
             <WebhookTriggerEventPicker
-              disabledState={
-                input.fieldIsReadOnly
-                  ? {
-                      reason: "Associated resource routing is read-only.",
-                      variant: "default",
-                    }
-                  : null
-              }
               error={undefined}
               eventOptions={[eventOption]}
               eventParameterRules={input.resource.eventParameterRules}
@@ -744,6 +1076,43 @@ function SlackThreadSettings(input: {
           </div>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+function SlackThreadReadOnlySettings(input: {
+  advancedPayloadFilter: Record<string, unknown> | null;
+  eventOption: WebhookTriggerEventOption | undefined;
+  eventParameterRules: WebhookTriggerEventParameterRuleMap;
+  messageMode: SlackThreadMessageMode;
+  selected: boolean;
+}): React.JSX.Element {
+  if (!input.selected) {
+    return (
+      <div className="border-border rounded-md border px-3 py-3">
+        <p className="text-muted-foreground text-sm">No activities selected.</p>
+      </div>
+    );
+  }
+
+  const eventType = AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED;
+  const details = [
+    ...(input.eventOption === undefined
+      ? []
+      : createReadOnlyEventParameterDetails({
+          eventOption: input.eventOption,
+          rules: input.eventParameterRules[eventType] ?? {},
+        })),
+    ...createReadOnlyAdvancedFilterDetails({
+      advancedPayloadFilter: input.advancedPayloadFilter,
+      eventType,
+    }),
+  ];
+
+  return (
+    <div className="border-border rounded-md border px-3 py-3">
+      <p className="text-sm font-medium">{getSlackThreadMessageModeLabel(input.messageMode)}</p>
+      <AssociatedResourceReadOnlyDetailRows className="mt-2" details={details} />
     </div>
   );
 }

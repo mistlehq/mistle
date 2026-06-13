@@ -340,6 +340,7 @@ export const PublishedReadOnlyEnabled: Story = {
   args: {
     disabled: true,
     isDraft: false,
+    supportedAssociatedResourceEvents: StoryGithubTarget.supportedAssociatedResourceEvents,
     version: createStoryVersion({
       state: "published",
       associatedResourceEventRoutingConfig: {
@@ -357,6 +358,14 @@ export const PublishedReadOnlyEnabled: Story = {
       },
     }),
   },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: "Configure Agent PR activity" }));
+
+    await expect(canvas.queryByRole("checkbox", { name: "PR comments" })).toBeNull();
+    await expect(canvas.getByText("PR comments")).toBeVisible();
+  },
 };
 
 export const PublishedReadOnlyMixedRouting: Story = {
@@ -365,6 +374,7 @@ export const PublishedReadOnlyMixedRouting: Story = {
     hasGitHubBinding: true,
     hasSlackThreadBinding: true,
     isDraft: false,
+    supportedAssociatedResourceEvents: createMixedSupportedAssociatedResourceEvents(),
     version: createStoryVersion({
       state: "published",
       associatedResourceEventRoutingConfig: {
@@ -376,14 +386,45 @@ export const PublishedReadOnlyMixedRouting: Story = {
               AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
               AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
             ],
+            payloadFilter: {
+              [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED]: {
+                op: "contains_token",
+                path: ["comment", "body"],
+                value: "@mistle",
+              },
+            },
           },
           {
             resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
             eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+            payloadFilter: {
+              [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED]: {
+                op: "contains_token",
+                path: ["event", "text"],
+                value: "@mistle",
+              },
+            },
           },
         ],
       },
     }),
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: "Configure Agent PR activity" }));
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Configure Agent-started Slack threads" }),
+    );
+
+    await expect(canvas.queryByRole("checkbox", { name: "PR comments" })).toBeNull();
+    await expect(canvas.queryByRole("checkbox", { name: "Enable thread messages" })).toBeNull();
+    await expect(canvas.queryByRole("combobox", { name: "Thread messages" })).toBeNull();
+    await expect(canvas.queryByText("Message mode")).toBeNull();
+    await expect(canvas.queryByText("Thread messages")).toBeNull();
+    await expect(canvas.getByText("All messages")).toBeVisible();
+    await expect(canvas.getAllByText("includes")).toHaveLength(2);
+    await expect(canvas.getAllByText("@mistle")).toHaveLength(2);
   },
 };
 
@@ -398,6 +439,14 @@ export const PublishedReadOnlyDisabled: Story = {
         resources: [],
       },
     }),
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.queryByRole("button", { name: "Configure Agent PR activity" })).toBeNull();
+    await expect(canvas.queryByRole("checkbox", { name: "PR comments" })).toBeNull();
+    await expect(canvas.queryByText("No activities selected.")).toBeNull();
+    await expect(canvas.getAllByText("activities selected")).toHaveLength(2);
   },
 };
 

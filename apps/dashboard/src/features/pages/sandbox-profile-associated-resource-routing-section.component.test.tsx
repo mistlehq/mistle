@@ -312,15 +312,49 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
     expect(cleanDraftState.hasUnpersistedChanges).toBe(false);
   });
 
-  it("does not expose activity controls for read-only profile versions", () => {
-    renderSection({ isDraft: false });
+  it("keeps associated resource details inspectable but read-only for published profile versions", () => {
+    renderSection({ hasSlackThreadBinding: true, isDraft: false });
 
-    const configureButton = screen.getByRole("button", { name: "Configure Agent PR activity" });
-    expect(configureButton).toHaveProperty("disabled", true);
+    const configurePullRequestButton = screen.getByRole("button", {
+      name: "Configure Agent PR activity",
+    });
+    expect(configurePullRequestButton).toHaveProperty("disabled", false);
 
-    fireEvent.click(configureButton);
+    fireEvent.click(configurePullRequestButton);
 
     expect(screen.queryByRole("checkbox", { name: "PR comments" })).toBeNull();
+    expect(screen.getByText("PR comments")).toBeTruthy();
+
+    const configureSlackThreadButton = screen.getByRole("button", {
+      name: "Configure Agent-started Slack threads",
+    });
+    expect(configureSlackThreadButton).toHaveProperty("disabled", false);
+
+    fireEvent.click(configureSlackThreadButton);
+
+    expect(screen.queryByRole("checkbox", { name: "Enable thread messages" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Thread messages" })).toBeNull();
+    expect(screen.queryByText("Thread messages")).toBeNull();
+    expect(screen.queryByText("Message mode")).toBeNull();
+    expect(screen.getByText("All messages")).toBeTruthy();
+    expect(screen.queryByText("Associated resource routing is read-only.")).toBeNull();
+  });
+
+  it("shows disabled published pull request routing as unselected when expanded", () => {
+    renderSection({
+      isDraft: false,
+      version: createVersion({
+        associatedResourceEventRoutingConfig: {
+          enabled: false,
+          resources: [],
+        },
+      }),
+    });
+
+    expect(screen.queryByRole("button", { name: "Configure Agent PR activity" })).toBeNull();
+    expect(screen.getAllByText("activities selected")).toHaveLength(2);
+    expect(screen.queryByRole("checkbox", { name: "PR comments" })).toBeNull();
+    expect(screen.queryByText("No activities selected.")).toBeNull();
   });
 
   it("preserves saved filters when associated resource metadata is unavailable", () => {
@@ -431,7 +465,7 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
     expect(screen.getByDisplayValue("@mistle")).toBeDefined();
   });
 
-  it("keeps expanded filter controls read-only when the section becomes disabled", () => {
+  it("presents expanded filter details as read-only text when the section becomes disabled", () => {
     const draftStates: SandboxProfileAssociatedResourceRoutingDraftState[] = [];
     const version = createVersion({
       associatedResourceEventRoutingConfig: {
@@ -464,6 +498,7 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
     fireEvent.click(screen.getByRole("button", { name: "Configure Agent PR activity" }));
     const filterInput = screen.getByRole("textbox", { name: "includes" });
     expect(filterInput).toHaveProperty("disabled", false);
+    fireEvent.change(filterInput, { target: { value: "@mistle" } });
 
     rendered.rerender(
       <QueryClientProvider client={queryClient}>
@@ -481,11 +516,11 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
       </QueryClientProvider>,
     );
 
-    const disabledFilterInput = screen.getByRole("textbox", { name: "includes" });
-    expect(disabledFilterInput).toHaveProperty("disabled", true);
     const draftStateCount = draftStates.length;
 
-    fireEvent.change(disabledFilterInput, { target: { value: "@mistle" } });
+    expect(screen.queryByRole("textbox", { name: "includes" })).toBeNull();
+    expect(screen.getByText("includes")).toBeTruthy();
+    expect(screen.getByText("@mistle")).toBeTruthy();
 
     expect(draftStates).toHaveLength(draftStateCount);
   });
