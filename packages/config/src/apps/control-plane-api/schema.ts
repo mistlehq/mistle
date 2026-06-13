@@ -92,6 +92,23 @@ const ControlPlaneApiSandboxTensorlakeConfigSchema = z.discriminatedUnion("enabl
     .strict(),
 ]);
 
+const ControlPlaneApiSandboxOpenComputerConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      apiKey: z.string().min(1),
+      apiBaseUrl: z.url().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      apiKey: z.string().min(1).optional(),
+      apiBaseUrl: z.url().optional(),
+    })
+    .strict(),
+]);
+
 const ControlPlaneApiSandboxModalConfigSchema = z.discriminatedUnion("enabled", [
   z
     .object({
@@ -260,6 +277,7 @@ export const ControlPlaneApiSandboxRuntimeConfigSchema = z
     docker: ControlPlaneApiSandboxDockerConfigSchema.optional(),
     e2b: ControlPlaneApiSandboxE2BConfigSchema.optional(),
     modal: ControlPlaneApiSandboxModalConfigSchema.optional(),
+    opencomputer: ControlPlaneApiSandboxOpenComputerConfigSchema.optional(),
     tensorlake: ControlPlaneApiSandboxTensorlakeConfigSchema.optional(),
   })
   .strict();

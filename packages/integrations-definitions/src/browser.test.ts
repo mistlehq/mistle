@@ -9,6 +9,7 @@ import {
   GitHubCloudBrowserDefinition,
   JiraBrowserDefinition,
   LinearBrowserDefinition,
+  OpenComputerSandboxRuntimeBrowserDefinition,
   SentryBrowserDefinition,
   SignozBrowserDefinition,
   SlackBrowserDefinition,
@@ -131,6 +132,23 @@ describe("browser definitions", () => {
       kind: "sandbox",
       sandboxRuntime: {
         providerId: "e2b",
+      },
+    });
+  });
+
+  it("registers OpenComputer sandbox runtime in the browser-safe definitions bundle", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: OpenComputerSandboxRuntimeBrowserDefinition.familyId,
+      variantId: OpenComputerSandboxRuntimeBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "opencomputer",
+      variantId: "opencomputer-default",
+      kind: "sandbox",
+      logoKey: "opencomputer",
+      sandboxRuntime: {
+        providerId: "opencomputer",
       },
     });
   });

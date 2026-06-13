@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 
 import { systemClock, systemSleeper } from "@mistle/time";
-import { Image, Snapshots } from "@opencomputer/sdk/node";
+import { Snapshots, type Image } from "@opencomputer/sdk/node";
 import { z } from "zod";
 
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
@@ -17,9 +17,13 @@ import {
   type OpenComputerClientOperation,
 } from "./client-errors.js";
 import {
+  createOpenComputerBaseImage,
+  createOpenComputerImageFromManifest,
+  createOpenComputerImageManifest,
+} from "./image-definition.js";
+import {
   OpenComputerDefaultApiBaseUrl,
   OpenComputerImageHandleKinds,
-  OpenComputerImageManifestSchema,
   OpenComputerSandboxStatuses,
   OpenComputerSandboxTimeoutSeconds,
   OpenComputerSnapshotStates,
@@ -28,17 +32,26 @@ import {
   OpenComputerRuntimeControlRequestSchema,
   OpenComputerSandboxIdRequestSchema,
   OpenComputerStartSandboxRequestSchema,
+  OpenComputerVerifyCheckpointStartableRequestSchema,
+  createOpenComputerCheckpointForkResourceFields,
   createOpenComputerResourceFields,
   type OpenComputerCaptureSandboxSnapshotRequest,
   type OpenComputerCreateSnapshotImageRequest,
-  type OpenComputerImageManifest,
   type OpenComputerRuntimeControlRequest,
   type OpenComputerSandboxIdRequest,
   type OpenComputerStartImage,
   type OpenComputerStartSandboxRequest,
+  type OpenComputerVerifyCheckpointStartableRequest,
   type ValidatedOpenComputerSandboxConfig,
 } from "./schemas.js";
 import type { OpenComputerRawSandboxInfo, OpenComputerSandboxInspectResult } from "./types.js";
+
+export {
+  createOpenComputerBaseImage,
+  createOpenComputerImageFromManifest,
+  createOpenComputerImageManifest,
+  type OpenComputerBaseImageSourceDescriptor,
+} from "./image-definition.js";
 
 const SandboxdCommand = "/opt/mistle/bin/sandboxd";
 const OpenComputerRootPath =
@@ -49,6 +62,8 @@ const StartupCommandPollIntervalMs = 250;
 export const OpenComputerStartupCommandPollTimeoutMs = 60 * 60 * 1000;
 const StartupCommandPollAttempts =
   OpenComputerStartupCommandPollTimeoutMs / StartupCommandPollIntervalMs;
+const CheckpointStartablePollIntervalMs = 1_000;
+const CheckpointStartableTimeoutMs = 2 * 60 * 1000;
 
 const OpenComputerSnapshotInfoSchema = z.looseObject({
   name: z.string().trim().min(1),
@@ -73,6 +88,7 @@ const OpenComputerCreateSandboxResponseSchema = z.looseObject({
   sandboxID: z.string().trim().min(1).optional(),
   sandboxId: z.string().trim().min(1).optional(),
   id: z.string().trim().min(1).optional(),
+  memoryMB: z.number().int().positive().optional(),
 });
 
 const OpenComputerSandboxInfoSchema = z.looseObject({
@@ -95,16 +111,6 @@ const OpenComputerCheckpointResponseSchema = z.looseObject({
 
 type OpenComputerSnapshotInfo = z.output<typeof OpenComputerSnapshotInfoSchema>;
 type OpenComputerRunCommandResponse = z.output<typeof OpenComputerRunCommandResponseSchema>;
-export type OpenComputerBaseImageSourceDescriptor =
-  | {
-      readonly kind: "image";
-      readonly imageId: string;
-    }
-  | {
-      readonly kind: "sdk_image";
-      readonly imageId: string;
-      readonly baseImageRef: string;
-    };
 
 export type OpenComputerStartSandboxResponse = { sandboxId: string };
 export type OpenComputerCaptureSandboxSnapshotResponse = { checkpointId: string };
@@ -132,6 +138,7 @@ export interface OpenComputerClient {
   captureSandboxSnapshot(
     request: OpenComputerCaptureSandboxSnapshotRequest,
   ): Promise<OpenComputerCaptureSandboxSnapshotResponse>;
+  verifyCheckpointStartable(request: OpenComputerVerifyCheckpointStartableRequest): Promise<void>;
   stopSandbox(request: OpenComputerSandboxIdRequest): Promise<void>;
   destroySandbox(request: OpenComputerSandboxIdRequest): Promise<void>;
   activate(request: OpenComputerRuntimeControlRequest): Promise<void>;
@@ -186,27 +193,78 @@ export function createOpenComputerStartImageFields(image: OpenComputerStartImage
 }
 
 export function createOpenComputerDaemonCommand(): string {
-  return `sudo -n env PATH=${shellQuote(OpenComputerRootPath)} ${shellQuote(SandboxdCommand)}`;
+  return `sudo -n env PATH=${shellQuote(OpenComputerRootPath)} sh -euc 'cd /root && exec "$1"' sh ${shellQuote(SandboxdCommand)}`;
 }
 
 export function createOpenComputerRootShellCommand(input: { readonly script: string }): {
   command: string;
   args: readonly string[];
+};
+export function createOpenComputerRootShellCommand(input: {
+  readonly script: string;
+  readonly env: Readonly<Record<string, string>> | undefined;
+}): {
+  command: string;
+  args: readonly string[];
+};
+export function createOpenComputerRootShellCommand(input: {
+  readonly script: string;
+  readonly env?: Readonly<Record<string, string>> | undefined;
+}): {
+  command: string;
+  args: readonly string[];
 } {
   return {
     command: "sudo",
-    args: ["-n", "env", `PATH=${OpenComputerRootPath}`, "sh", "-euc", input.script],
+    args: [
+      "-n",
+      "env",
+      ...createOpenComputerEnvArgs({
+        PATH: OpenComputerRootPath,
+        ...(input.env === undefined ? {} : input.env),
+      }),
+      "sh",
+      "-euc",
+      input.script,
+    ],
   };
 }
 
 export function createOpenComputerSandboxdCommand(input: { readonly args: readonly string[] }): {
   command: string;
   args: readonly string[];
+};
+export function createOpenComputerSandboxdCommand(input: {
+  readonly args: readonly string[];
+  readonly env: Readonly<Record<string, string>> | undefined;
+}): {
+  command: string;
+  args: readonly string[];
+};
+export function createOpenComputerSandboxdCommand(input: {
+  readonly args: readonly string[];
+  readonly env?: Readonly<Record<string, string>> | undefined;
+}): {
+  command: string;
+  args: readonly string[];
 } {
   return {
     command: "sudo",
-    args: ["-n", "env", `PATH=${OpenComputerRootPath}`, SandboxdCommand, ...input.args],
+    args: [
+      "-n",
+      "env",
+      ...createOpenComputerEnvArgs({
+        PATH: OpenComputerRootPath,
+        ...(input.env === undefined ? {} : input.env),
+      }),
+      SandboxdCommand,
+      ...input.args,
+    ],
   };
+}
+
+function createOpenComputerEnvArgs(env: Readonly<Record<string, string>>): readonly string[] {
+  return Object.entries(env).map(([key, value]) => `${key}=${value}`);
 }
 
 export function createOpenComputerActivateCommandArgs(input: {
@@ -253,100 +311,6 @@ export function normalizeOpenComputerInspectDisposition(
     default:
       return SandboxInspectDispositions.TERMINAL_STOPPED;
   }
-}
-
-export function createOpenComputerBaseImage(input: {
-  readonly sandboxd?: ValidatedOpenComputerSandboxConfig["sandboxd"];
-  readonly source?: OpenComputerBaseImageSourceDescriptor;
-}): Image {
-  let image = Image.base()
-    .aptInstall(["dbus", "fd-find", "gawk", "nftables", "ripgrep", "systemd", "systemd-sysv"])
-    .runCommands(
-      [
-        "set -eu",
-        "install -d -m 0755 /opt/mistle/bin",
-        "install -d -m 0700 /run/mistle",
-        "install -d -m 0755 /var/lib/mistle/artifacts",
-        "cat >/etc/profile.d/mistle-path.sh <<'EOF'",
-        "export PATH=/opt/mistle/bin:$PATH",
-        "EOF",
-      ].join("\n"),
-    )
-    .workdir("/workspace");
-
-  if (input.source !== undefined) {
-    image = image.env(createOpenComputerBaseImageSourceEnv(input.source));
-  }
-
-  if (input.sandboxd !== undefined) {
-    image = image.runCommands(
-      createOpenComputerSandboxdInstallImageCommand(input.sandboxd.artifact),
-    );
-  }
-
-  return image;
-}
-
-export function createOpenComputerImageFromManifest(manifest: OpenComputerImageManifest): Image {
-  let image = Image.base();
-  const parsedManifest = OpenComputerImageManifestSchema.parse(manifest);
-
-  for (const step of parsedManifest.steps) {
-    switch (step.type) {
-      case "apt_install":
-        image = image.aptInstall(step.args.packages);
-        break;
-      case "pip_install":
-        image = image.pipInstall(step.args.packages);
-        break;
-      case "run":
-        image = image.runCommands(...step.args.commands);
-        break;
-      case "env":
-        image = image.env(step.args.vars);
-        break;
-      case "workdir":
-        image = image.workdir(step.args.path);
-        break;
-      case "add_file":
-        image = image.addFile(
-          step.args.path,
-          Buffer.from(step.args.content, "base64").toString("utf8"),
-        );
-        break;
-      case "add_dir":
-        for (const file of step.args.files) {
-          image = image.addFile(
-            `${step.args.path.replace(/\/+$/u, "")}/${file.relativePath}`,
-            Buffer.from(file.content, "base64").toString("utf8"),
-          );
-        }
-        break;
-    }
-  }
-
-  return image;
-}
-
-export function createOpenComputerImageManifest(image: Image): OpenComputerImageManifest {
-  return OpenComputerImageManifestSchema.parse(image.toJSON());
-}
-
-function createOpenComputerBaseImageSourceEnv(
-  source: OpenComputerBaseImageSourceDescriptor,
-): Record<string, string> {
-  if (source.kind === "image") {
-    return {
-      MISTLE_OPENCOMPUTER_SOURCE_KIND: source.kind,
-      MISTLE_OPENCOMPUTER_SOURCE_IMAGE_ID: source.imageId,
-    };
-  }
-
-  return {
-    MISTLE_OPENCOMPUTER_SOURCE_KIND: source.kind,
-    MISTLE_OPENCOMPUTER_SOURCE_IMAGE_ID: source.imageId,
-    MISTLE_OPENCOMPUTER_SOURCE_BASE_IMAGE_REF: source.baseImageRef,
-  };
 }
 
 export function validateOpenComputerSnapshotForImage(input: {
@@ -502,6 +466,7 @@ export class OpenComputerApiClient implements OpenComputerClient {
       const response = await this.#jsonRequest({
         method: "POST",
         path: `/sandboxes/${encodeURIComponent(parsedRequest.sandboxId)}/checkpoints`,
+        body: { name: parsedRequest.name },
         schema: OpenComputerCheckpointResponseSchema,
         operation: OpenComputerClientOperationIds.CREATE_CHECKPOINT,
         ...(parsedRequest.requestTimeoutMs === undefined
@@ -516,6 +481,45 @@ export class OpenComputerApiClient implements OpenComputerClient {
     } catch (error) {
       throw mapOpenComputerClientError(OpenComputerClientOperationIds.CREATE_CHECKPOINT, error);
     }
+  }
+
+  async verifyCheckpointStartable(
+    request: OpenComputerVerifyCheckpointStartableRequest,
+  ): Promise<void> {
+    const parsedRequest = OpenComputerVerifyCheckpointStartableRequestSchema.parse(request);
+    const timeoutMs = parsedRequest.requestTimeoutMs ?? CheckpointStartableTimeoutMs;
+    const startedAtMs = systemClock.nowMs();
+    let lastError: OpenComputerClientError | undefined;
+
+    while (systemClock.nowMs() - startedAtMs <= timeoutMs) {
+      let probeSandboxId: string | undefined;
+      try {
+        const response = await this.#startSandboxFromCheckpoint({
+          image: {
+            kind: OpenComputerImageHandleKinds.CHECKPOINT,
+            id: parsedRequest.checkpointId,
+          },
+        });
+        probeSandboxId = response.sandboxId;
+        return;
+      } catch (error) {
+        if (!isOpenComputerCheckpointNotFound(error)) {
+          throw error;
+        }
+        lastError = error;
+      } finally {
+        if (probeSandboxId !== undefined) {
+          await this.destroySandbox({ sandboxId: probeSandboxId });
+        }
+      }
+
+      await systemSleeper.sleep(CheckpointStartablePollIntervalMs);
+    }
+
+    if (lastError !== undefined) {
+      throw lastError;
+    }
+    throw new Error("OpenComputer checkpoint startability check timed out before first attempt.");
   }
 
   async stopSandbox(request: OpenComputerSandboxIdRequest): Promise<void> {
@@ -559,6 +563,7 @@ export class OpenComputerApiClient implements OpenComputerClient {
       });
       const command = createOpenComputerSandboxdCommand({
         args: createOpenComputerActivateCommandArgs({ payload: parsedRequest.payload }),
+        env: parsedRequest.env,
       });
       await this.#runExecSessionToCompletion({
         sandboxId: parsedRequest.sandboxId,
@@ -628,6 +633,7 @@ export class OpenComputerApiClient implements OpenComputerClient {
     }
 
     try {
+      const resourceFields = createOpenComputerCheckpointForkResourceFields(request.resources);
       const response = await this.#jsonRequest({
         method: "POST",
         path: `/sandboxes/from-checkpoint/${encodeURIComponent(request.image.id)}`,
@@ -642,10 +648,14 @@ export class OpenComputerApiClient implements OpenComputerClient {
                   mistleProvider: SandboxProvider.OPENCOMPUTER,
                 },
               }),
-          ...createOpenComputerResourceFields(request.resources),
+          ...resourceFields,
         },
         schema: OpenComputerCreateSandboxResponseSchema,
         operation: OpenComputerClientOperationIds.CREATE_SANDBOX,
+      });
+      validateOpenComputerCheckpointForkResponseResources({
+        requestedMemoryMb: resourceFields.memoryMB,
+        response,
       });
       return { sandboxId: requireResponseSandboxId(response) };
     } catch (error) {
@@ -751,11 +761,14 @@ export class OpenComputerApiClient implements OpenComputerClient {
       await this.#hardRefreshDaemon(input.sandboxId);
     }
 
+    const daemonCommand = createOpenComputerRootShellCommand({
+      script: `cd /root && exec ${shellQuote(SandboxdCommand)}`,
+      env: createOpenComputerDaemonEnv(input.env),
+    });
     const daemonProcess = await this.#startExecSession({
       sandboxId: input.sandboxId,
-      command: "sudo",
-      args: ["-n", "env", `PATH=${OpenComputerRootPath}`, SandboxdCommand],
-      env: createOpenComputerDaemonEnv(input.env),
+      command: daemonCommand.command,
+      args: daemonCommand.args,
       maxRunAfterDisconnectSeconds: 86_400,
       operation: OpenComputerClientOperationIds.ACTIVATE,
     });
@@ -858,6 +871,7 @@ export class OpenComputerApiClient implements OpenComputerClient {
     sandboxId: string;
     command: string;
     args?: readonly string[];
+    cwd?: string;
     env?: Readonly<Record<string, string>>;
     maxRunAfterDisconnectSeconds?: number;
     operation: OpenComputerClientOperation;
@@ -891,6 +905,7 @@ export class OpenComputerApiClient implements OpenComputerClient {
     sandboxId: string;
     command: string;
     args?: readonly string[];
+    cwd?: string;
     env?: Readonly<Record<string, string>>;
     maxRunAfterDisconnectSeconds?: number;
     operation: OpenComputerClientOperation;
@@ -898,18 +913,11 @@ export class OpenComputerApiClient implements OpenComputerClient {
     const response = await this.#jsonRequest({
       method: "POST",
       path: `/sandboxes/${encodeURIComponent(input.sandboxId)}/exec`,
-      body: {
-        cmd: input.command,
-        ...(input.args === undefined ? {} : { args: [...input.args] }),
-        ...(input.env === undefined ? {} : { envs: { ...input.env } }),
-        ...(input.maxRunAfterDisconnectSeconds === undefined
-          ? {}
-          : { maxRunAfterDisconnect: input.maxRunAfterDisconnectSeconds }),
-      },
+      body: createOpenComputerExecSessionBody(input),
       schema: OpenComputerExecSessionResponseSchema,
       operation: input.operation,
     });
-    const wsUrl = new URL(
+    const wsUrl = createOpenComputerApiUrl(
       `/sandboxes/${encodeURIComponent(input.sandboxId)}/exec/${encodeURIComponent(response.sessionID)}`,
       this.#apiBaseUrl,
     );
@@ -929,7 +937,7 @@ export class OpenComputerApiClient implements OpenComputerClient {
     operation: OpenComputerClientOperation;
     timeoutMs?: number;
   }): Promise<Output> {
-    const response = await fetch(new URL(input.path, this.#apiBaseUrl), {
+    const response = await fetch(createOpenComputerApiUrl(input.path, this.#apiBaseUrl), {
       method: input.method,
       headers: {
         "Content-Type": "application/json",
@@ -1108,8 +1116,29 @@ class OpenComputerStartedExecSession {
 }
 
 function normalizeOpenComputerApiBaseUrl(url: string): string {
-  const normalized = url.replace(/\/+$/u, "");
+  const normalized = trimTrailingSlashes(url);
   return normalized.endsWith("/api") ? normalized : `${normalized}/api`;
+}
+
+function createOpenComputerApiUrl(path: string, apiBaseUrl: string): URL {
+  const normalizedPath = trimLeadingSlashes(path);
+  return new URL(normalizedPath, `${trimTrailingSlashes(apiBaseUrl)}/`);
+}
+
+function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") {
+    end -= 1;
+  }
+  return value.slice(0, end);
+}
+
+function trimLeadingSlashes(value: string): string {
+  let start = 0;
+  while (start < value.length && value[start] === "/") {
+    start += 1;
+  }
+  return value.slice(start);
 }
 
 function createOpenComputerDaemonEnv(
@@ -1134,6 +1163,30 @@ function createOpenComputerRunCommandBody(request: OpenComputerRunCommandRequest
     ...(request.env === undefined ? {} : { envs: { ...request.env } }),
     ...(request.cwd === undefined ? {} : { cwd: request.cwd }),
     ...(request.timeoutMs === undefined ? {} : { timeout: request.timeoutMs / 1000 }),
+  };
+}
+
+export function createOpenComputerExecSessionBody(input: {
+  readonly command: string;
+  readonly args?: readonly string[];
+  readonly cwd?: string;
+  readonly env?: Readonly<Record<string, string>>;
+  readonly maxRunAfterDisconnectSeconds?: number;
+}): {
+  cmd: string;
+  args?: readonly string[];
+  cwd?: string;
+  envs?: Record<string, string>;
+  maxRunAfterDisconnect?: number;
+} {
+  return {
+    cmd: input.command,
+    ...(input.args === undefined ? {} : { args: [...input.args] }),
+    ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
+    ...(input.env === undefined ? {} : { envs: { ...input.env } }),
+    ...(input.maxRunAfterDisconnectSeconds === undefined
+      ? {}
+      : { maxRunAfterDisconnect: input.maxRunAfterDisconnectSeconds }),
   };
 }
 
@@ -1181,31 +1234,37 @@ function requireResponseSandboxId(input: {
   return id;
 }
 
+function validateOpenComputerCheckpointForkResponseResources(input: {
+  requestedMemoryMb: number | undefined;
+  response: { memoryMB?: number | undefined };
+}): void {
+  if (input.requestedMemoryMb === undefined || input.response.memoryMB === undefined) {
+    return;
+  }
+  if (input.response.memoryMB !== input.requestedMemoryMb) {
+    throw new Error(
+      `OpenComputer checkpoint fork returned ${String(
+        input.response.memoryMB,
+      )} MB memory, expected ${String(input.requestedMemoryMb)} MB.`,
+    );
+  }
+}
+
+function isOpenComputerCheckpointNotFound(error: unknown): error is OpenComputerClientError {
+  return (
+    error instanceof OpenComputerClientError &&
+    error.operation === OpenComputerClientOperationIds.CREATE_SANDBOX &&
+    error.code === OpenComputerClientErrorCodes.NOT_FOUND &&
+    error.message.includes("checkpoint not found")
+  );
+}
+
 function decodeOpenComputerExitCode(payload: Uint8Array): number {
   if (payload.byteLength < 4) {
     return 0;
   }
   const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
   return view.getInt32(0, false);
-}
-
-function createOpenComputerSandboxdInstallImageCommand(input: {
-  version: string;
-  url: string;
-  sha256: string;
-}): string {
-  return [
-    "set -eu",
-    'tmp_dir="$(mktemp -d /tmp/mistle-sandboxd.XXXXXX)"',
-    "trap 'rm -rf \"$tmp_dir\"' EXIT INT TERM",
-    `curl -fL --retry 3 --retry-delay 1 --connect-timeout 10 --max-time 60 ${shellQuote(input.url)} -o "$tmp_dir/sandboxd.tar.gz"`,
-    'actual_sha="$(sha256sum "$tmp_dir/sandboxd.tar.gz" | awk \'{print $1}\')"',
-    `test "$actual_sha" = ${shellQuote(input.sha256)}`,
-    'tar -xzf "$tmp_dir/sandboxd.tar.gz" -C "$tmp_dir"',
-    'install -m 0755 "$tmp_dir/bin/sandboxd" /opt/mistle/bin/sandboxd',
-    `test "$(/opt/mistle/bin/sandboxd version)" = ${shellQuote(input.version)}`,
-    "ln -sf sandboxd /opt/mistle/bin/mistle-ssh-sign",
-  ].join("\n");
 }
 
 function mapOpenComputerSdkError(error: unknown): unknown {

@@ -135,6 +135,31 @@ export const PartialDataPlaneWorkerSandboxTensorlakeConfigSchema = z
   })
   .strict();
 
+export const DataPlaneWorkerSandboxOpenComputerConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      apiKey: z.string().min(1),
+      apiBaseUrl: z.url().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      apiKey: z.string().min(1).optional(),
+      apiBaseUrl: z.url().optional(),
+    })
+    .strict(),
+]);
+
+export const PartialDataPlaneWorkerSandboxOpenComputerConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    apiKey: z.string().min(1).optional(),
+    apiBaseUrl: z.url().optional(),
+  })
+  .strict();
+
 export const DataPlaneWorkerSandboxModalConfigSchema = z.discriminatedUnion("enabled", [
   z
     .object({
@@ -177,6 +202,7 @@ export const DataPlaneWorkerSandboxConfigSchema = z
     docker: DataPlaneWorkerSandboxDockerConfigSchema.optional(),
     e2b: DataPlaneWorkerSandboxE2BConfigSchema.optional(),
     modal: DataPlaneWorkerSandboxModalConfigSchema.optional(),
+    opencomputer: DataPlaneWorkerSandboxOpenComputerConfigSchema.optional(),
     tensorlake: DataPlaneWorkerSandboxTensorlakeConfigSchema.optional(),
   })
   .strict();
@@ -189,6 +215,7 @@ export const PartialDataPlaneWorkerSandboxConfigSchema = z
     docker: PartialDataPlaneWorkerSandboxDockerConfigSchema.optional(),
     e2b: PartialDataPlaneWorkerSandboxE2BConfigSchema.optional(),
     modal: PartialDataPlaneWorkerSandboxModalConfigSchema.optional(),
+    opencomputer: PartialDataPlaneWorkerSandboxOpenComputerConfigSchema.optional(),
     tensorlake: PartialDataPlaneWorkerSandboxTensorlakeConfigSchema.optional(),
   })
   .strict();

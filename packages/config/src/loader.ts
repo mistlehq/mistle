@@ -589,6 +589,16 @@ const ControlPlaneApiEnvDescriptors = [
   },
   { envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY", path: ["sandbox", "tensorlake", "apiKey"] },
   {
+    envVar: "MISTLE_SANDBOX_OPENCOMPUTER_ENABLED",
+    path: ["sandbox", "opencomputer", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  { envVar: "MISTLE_SANDBOX_OPENCOMPUTER_API_KEY", path: ["sandbox", "opencomputer", "apiKey"] },
+  {
+    envVar: "MISTLE_SANDBOX_OPENCOMPUTER_API_BASE_URL",
+    path: ["sandbox", "opencomputer", "apiBaseUrl"],
+  },
+  {
     envVar: "MISTLE_SANDBOX_MODAL_ENABLED",
     path: ["sandbox", "modal", "enabled"],
     parse: parseStrictBooleanEnv,
@@ -705,6 +715,16 @@ const DataPlaneApiEnvDescriptors = [
     parse: parseStrictBooleanEnv,
   },
   { envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY", path: ["sandbox", "tensorlake", "apiKey"] },
+  {
+    envVar: "MISTLE_SANDBOX_OPENCOMPUTER_ENABLED",
+    path: ["sandbox", "opencomputer", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  { envVar: "MISTLE_SANDBOX_OPENCOMPUTER_API_KEY", path: ["sandbox", "opencomputer", "apiKey"] },
+  {
+    envVar: "MISTLE_SANDBOX_OPENCOMPUTER_API_BASE_URL",
+    path: ["sandbox", "opencomputer", "apiBaseUrl"],
+  },
   {
     envVar: "MISTLE_SANDBOX_MODAL_ENABLED",
     path: ["sandbox", "modal", "enabled"],
@@ -851,6 +871,16 @@ const DataPlaneWorkerEnvDescriptors = [
     parse: parseStrictBooleanEnv,
   },
   { envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY", path: ["sandbox", "tensorlake", "apiKey"] },
+  {
+    envVar: "MISTLE_SANDBOX_OPENCOMPUTER_ENABLED",
+    path: ["sandbox", "opencomputer", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  { envVar: "MISTLE_SANDBOX_OPENCOMPUTER_API_KEY", path: ["sandbox", "opencomputer", "apiKey"] },
+  {
+    envVar: "MISTLE_SANDBOX_OPENCOMPUTER_API_BASE_URL",
+    path: ["sandbox", "opencomputer", "apiBaseUrl"],
+  },
   {
     envVar: "MISTLE_SANDBOX_MODAL_ENABLED",
     path: ["sandbox", "modal", "enabled"],

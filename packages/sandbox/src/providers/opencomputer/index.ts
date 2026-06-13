@@ -10,6 +10,7 @@ import { createOpenComputerSandboxRuntimeControl } from "./runtime-control.js";
 
 export type { OpenComputerSandboxConfig } from "./config.js";
 export type { OpenComputerSandboxInspectResult } from "./types.js";
+export { OpenComputerValidResourceTiers } from "./schemas.js";
 export { OpenComputerSandboxAdapter } from "./adapter.js";
 export {
   OpenComputerBaseImageBuilder,
@@ -23,6 +24,7 @@ export {
   createOpenComputerSnapshotImageHandle,
   createOpenComputerTemplateImageHandle,
   parseOpenComputerImageHandle,
+  resolveOpenComputerStartImage,
 } from "./image-handle.js";
 
 export function createOpenComputerAdapter(
@@ -31,6 +33,7 @@ export function createOpenComputerAdapter(
   const validatedConfig = validateOpenComputerSandboxConfig(config);
   return createOpenComputerSandboxAdapter({
     client: new OpenComputerApiClient({ config: validatedConfig }),
+    ...(validatedConfig.sandboxd === undefined ? {} : { sandboxd: validatedConfig.sandboxd }),
   });
 }
 

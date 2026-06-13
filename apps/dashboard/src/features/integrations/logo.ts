@@ -5,6 +5,7 @@ const IntegrationLogoDarkVariantKeys = {
   e2b: true,
   github: true,
   openai: true,
+  opencomputer: true,
   opencode: true,
   planetscale: true,
 } satisfies Record<string, true>;

@@ -484,6 +484,19 @@ const RootEnvDescriptors = [
     path: ["sandbox", "tensorlake", "api_key"],
   },
   {
+    envVar: "MISTLE_SANDBOX_OPENCOMPUTER_ENABLED",
+    path: ["sandbox", "opencomputer", "enabled"],
+    parse: parseBooleanEnv,
+  },
+  {
+    envVar: "MISTLE_SANDBOX_OPENCOMPUTER_API_KEY",
+    path: ["sandbox", "opencomputer", "api_key"],
+  },
+  {
+    envVar: "MISTLE_SANDBOX_OPENCOMPUTER_API_BASE_URL",
+    path: ["sandbox", "opencomputer", "api_base_url"],
+  },
+  {
     envVar: "MISTLE_SANDBOX_MODAL_ENABLED",
     path: ["sandbox", "modal", "enabled"],
     parse: parseBooleanEnv,

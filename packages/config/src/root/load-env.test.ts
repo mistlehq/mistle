@@ -96,6 +96,9 @@ describe("loadRootConfigFromEnv", () => {
       MISTLE_SANDBOX_E2B_DOMAIN: "e2b.example.com",
       MISTLE_SANDBOX_E2B_CPU_COUNT: "4",
       MISTLE_SANDBOX_E2B_MEMORY_MB: "8192",
+      MISTLE_SANDBOX_OPENCOMPUTER_ENABLED: "true",
+      MISTLE_SANDBOX_OPENCOMPUTER_API_KEY: "opencomputer-api-key",
+      MISTLE_SANDBOX_OPENCOMPUTER_API_BASE_URL: "https://opencomputer.example.com/api",
       MISTLE_SANDBOX_TOKENS_BOOTSTRAP_SECRET: "bootstrap-secret",
       MISTLE_SANDBOX_TOKENS_BOOTSTRAP_ISSUER: "data-plane-worker",
       MISTLE_SANDBOX_TOKENS_BOOTSTRAP_AUDIENCE: "data-plane-gateway",
@@ -288,6 +291,11 @@ describe("loadRootConfigFromEnv", () => {
           domain: "e2b.example.com",
           cpu_count: 4,
           memory_mb: 8192,
+        },
+        opencomputer: {
+          enabled: true,
+          api_key: "opencomputer-api-key",
+          api_base_url: "https://opencomputer.example.com/api",
         },
         tokens: {
           bootstrap: {

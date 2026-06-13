@@ -1,5 +1,9 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
+import { Image } from "@opencomputer/sdk/node";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -12,6 +16,7 @@ import {
   createOpenComputerActivateCommandArgs,
   createOpenComputerBaseImage,
   createOpenComputerDaemonCommand,
+  createOpenComputerExecSessionBody,
   createOpenComputerImageManifest,
   createOpenComputerImageFromManifest,
   createOpenComputerRootShellCommand,
@@ -21,7 +26,12 @@ import {
   normalizeOpenComputerInspectState,
   validateOpenComputerSnapshotForImage,
 } from "./client.js";
-import { OpenComputerSnapshotStates, createOpenComputerResourceFields } from "./schemas.js";
+import {
+  OpenComputerSnapshotStates,
+  OpenComputerValidResourceTiers,
+  createOpenComputerCheckpointForkResourceFields,
+  createOpenComputerResourceFields,
+} from "./schemas.js";
 
 describe("OpenComputer client helpers", () => {
   it("maps start resources to OpenComputer field names and validates tier pairs", () => {
@@ -39,6 +49,27 @@ describe("OpenComputer client helpers", () => {
     expect(() => createOpenComputerResourceFields({ vcpuCount: 2, memoryMb: 4096 })).toThrow(
       "OpenComputer resources must match a supported tier",
     );
+  });
+
+  it("maps checkpoint fork resources only to the documented memory field", () => {
+    expect(
+      createOpenComputerCheckpointForkResourceFields({
+        vcpuCount: 4,
+        memoryMb: 16_384,
+        diskMb: 20_480,
+      }),
+    ).toEqual({
+      memoryMB: 16_384,
+    });
+    expect(() =>
+      createOpenComputerCheckpointForkResourceFields({ vcpuCount: 8, memoryMb: 32_768 }),
+    ).toThrow("OpenComputer resources must match a supported tier");
+    expect(OpenComputerValidResourceTiers).toEqual([
+      { vcpuCount: 1, memoryMb: 1024 },
+      { vcpuCount: 1, memoryMb: 4096 },
+      { vcpuCount: 2, memoryMb: 8192 },
+      { vcpuCount: 4, memoryMb: 16_384 },
+    ]);
   });
 
   it("creates start bodies without custom provider ids", () => {
@@ -72,7 +103,9 @@ describe("OpenComputer client helpers", () => {
   });
 
   it("constructs sudo based sandboxd commands with the required root path", () => {
-    expect(createOpenComputerDaemonCommand()).toContain("/usr/sbin");
+    expect(createOpenComputerDaemonCommand()).toBe(
+      "sudo -n env PATH='/opt/mistle/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' sh -euc 'cd /root && exec \"$1\"' sh '/opt/mistle/bin/sandboxd'",
+    );
     expect(createOpenComputerSandboxdCommand({ args: ["ready"] })).toEqual({
       command: "sudo",
       args: [
@@ -94,6 +127,43 @@ describe("OpenComputer client helpers", () => {
         "id -u",
       ],
     });
+    expect(
+      createOpenComputerRootShellCommand({
+        script: "printf '%s' \"$MISTLE_SANDBOXD_ARTIFACT_VERSION\"",
+        env: {
+          MISTLE_SANDBOXD_ARTIFACT_VERSION: "0.32.0",
+          MISTLE_SANDBOXD_ARTIFACT_URL: "https://example.com/sandboxd.tar.gz",
+        },
+      }),
+    ).toEqual({
+      command: "sudo",
+      args: [
+        "-n",
+        "env",
+        "PATH=/opt/mistle/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "MISTLE_SANDBOXD_ARTIFACT_VERSION=0.32.0",
+        "MISTLE_SANDBOXD_ARTIFACT_URL=https://example.com/sandboxd.tar.gz",
+        "sh",
+        "-euc",
+        "printf '%s' \"$MISTLE_SANDBOXD_ARTIFACT_VERSION\"",
+      ],
+    });
+    expect(
+      createOpenComputerSandboxdCommand({
+        args: ["activate"],
+        env: { MISTLE_SANDBOX_BOOTSTRAP_TOKEN: "bootstrap-token" },
+      }),
+    ).toEqual({
+      command: "sudo",
+      args: [
+        "-n",
+        "env",
+        "PATH=/opt/mistle/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "MISTLE_SANDBOX_BOOTSTRAP_TOKEN=bootstrap-token",
+        "/opt/mistle/bin/sandboxd",
+        "activate",
+      ],
+    });
   });
 
   it("passes activation payload length through --stdin-bytes", () => {
@@ -102,6 +172,39 @@ describe("OpenComputer client helpers", () => {
       "--stdin-bytes",
       "3",
     ]);
+  });
+
+  it("passes cwd through OpenComputer exec session requests", () => {
+    expect(
+      createOpenComputerExecSessionBody({
+        command: "sudo",
+        args: ["-n", "env", "/opt/mistle/bin/sandboxd"],
+        cwd: "/root",
+        env: { FOO: "bar" },
+        maxRunAfterDisconnectSeconds: 86_400,
+      }),
+    ).toEqual({
+      cmd: "sudo",
+      args: ["-n", "env", "/opt/mistle/bin/sandboxd"],
+      cwd: "/root",
+      envs: { FOO: "bar" },
+      maxRunAfterDisconnect: 86_400,
+    });
+  });
+
+  it("sets the OpenComputer base image home and working directory to root", () => {
+    expect(createOpenComputerImageManifest(createOpenComputerBaseImage({})).steps).toEqual(
+      expect.arrayContaining([
+        {
+          type: "env",
+          args: { vars: { HOME: "/root" } },
+        },
+        {
+          type: "workdir",
+          args: { path: "/root" },
+        },
+      ]),
+    );
   });
 
   it("validates named snapshot manifests and ready status", () => {
@@ -157,6 +260,21 @@ describe("OpenComputer client helpers", () => {
     expect(firstImage.toJSON()).not.toEqual(secondImage.toJSON());
   });
 
+  it("uses sudo for privileged base image setup commands", () => {
+    const manifest = JSON.stringify(createOpenComputerBaseImage({}).toJSON());
+
+    expect(manifest).toContain("sudo -n install -d -m 0755 /opt/mistle/bin");
+    expect(manifest).toContain("sudo -n install -d -m 0700 /run/mistle");
+    expect(manifest).toContain("sudo -n tee /etc/profile.d/mistle-path.sh");
+  });
+
+  it("does not install systemd packages that interfere with OpenComputer checkpoint boot", () => {
+    const manifest = JSON.stringify(createOpenComputerBaseImage({}).toJSON());
+
+    expect(manifest).not.toContain("systemd-sysv");
+    expect(manifest).not.toContain('"systemd"');
+  });
+
   it("replays deferred image manifests through the OpenComputer image builder", () => {
     const image = createOpenComputerBaseImage({
       source: {
@@ -168,6 +286,20 @@ describe("OpenComputer client helpers", () => {
 
     const manifest = createOpenComputerImageManifest(image);
     expect(createOpenComputerImageFromManifest(manifest).toJSON()).toEqual(image.toJSON());
+  });
+
+  it("preserves binary add_file content when replaying deferred image manifests", () => {
+    const temporaryDirectory = mkdtempSync(join(tmpdir(), "mistle-opencomputer-test-"));
+    const binaryPath = join(temporaryDirectory, "sandboxd.gz");
+    try {
+      writeFileSync(binaryPath, new Uint8Array([0, 159, 146, 150, 255]));
+      const image = Image.base().addLocalFile(binaryPath, "/tmp/sandboxd.gz");
+      const manifest = createOpenComputerImageManifest(image);
+
+      expect(createOpenComputerImageFromManifest(manifest).toJSON()).toEqual(image.toJSON());
+    } finally {
+      rmSync(temporaryDirectory, { force: true, recursive: true });
+    }
   });
 
   it("revalidates same-name snapshot prepares when deferred manifests differ", async () => {
@@ -239,9 +371,42 @@ describe("OpenComputer client helpers", () => {
     }
   });
 
+  it("creates sandboxes under the normalized API base path", async () => {
+    let sandboxCreateBody: unknown;
+    const api = await startSimulatedOpenComputerApi(async (request, response) => {
+      if (request.method === "POST" && request.url === "/api/sandboxes") {
+        sandboxCreateBody = JSON.parse(await readRequestBody(request));
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ sandboxID: "sb-1" }));
+        return;
+      }
+      response.writeHead(404);
+      response.end();
+    });
+    const client = new OpenComputerApiClient({
+      config: { apiKey: "test-key", apiBaseUrl: api.url },
+    });
+
+    try {
+      await expect(
+        client.startSandbox({
+          image: { kind: "snapshot", id: "mistle-base" },
+        }),
+      ).resolves.toEqual({ sandboxId: "sb-1" });
+      expect(sandboxCreateBody).toMatchObject({
+        snapshot: "mistle-base",
+        timeout: 0,
+      });
+    } finally {
+      await api.close();
+    }
+  });
+
   it("captures snapshots when callers provide a provider request timeout", async () => {
-    const api = await startSimulatedOpenComputerApi((request, response) => {
-      if (request.method === "POST" && request.url === "/sandboxes/sb-1/checkpoints") {
+    let checkpointBody: unknown;
+    const api = await startSimulatedOpenComputerApi(async (request, response) => {
+      if (request.method === "POST" && request.url === "/api/sandboxes/sb-1/checkpoints") {
+        checkpointBody = JSON.parse(await readRequestBody(request));
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(JSON.stringify({ checkpointId: "checkpoint-1" }));
         return;
@@ -255,8 +420,172 @@ describe("OpenComputer client helpers", () => {
 
     try {
       await expect(
-        client.captureSandboxSnapshot({ sandboxId: "sb-1", requestTimeoutMs: 1_000 }),
+        client.captureSandboxSnapshot({
+          sandboxId: "sb-1",
+          name: "mistle-sb-1",
+          requestTimeoutMs: 1_000,
+        }),
       ).resolves.toEqual({ checkpointId: "checkpoint-1" });
+      expect(checkpointBody).toEqual({ name: "mistle-sb-1" });
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("starts checkpoint sandboxes with fork-supported resource fields", async () => {
+    let forkBody: unknown;
+    const api = await startSimulatedOpenComputerApi(async (request, response) => {
+      if (
+        request.method === "POST" &&
+        request.url === "/api/sandboxes/from-checkpoint/checkpoint-1"
+      ) {
+        forkBody = JSON.parse(await readRequestBody(request));
+        response.writeHead(201, { "Content-Type": "application/json" });
+        // OpenComputer checkpoint fork documents memoryMB as the only resource field and
+        // returns the effective memoryMB after applying the platform cap.
+        // https://docs.opencomputer.dev/api-reference/checkpoints/fork
+        response.end(JSON.stringify({ sandboxID: "sb-1", memoryMB: 16_384 }));
+        return;
+      }
+      response.writeHead(404);
+      response.end();
+    });
+    const client = new OpenComputerApiClient({
+      config: { apiKey: "test-key", apiBaseUrl: api.url },
+    });
+
+    try {
+      await expect(
+        client.startSandbox({
+          sandboxInstanceId: "sandbox_instance_123",
+          image: { kind: "checkpoint", id: "checkpoint-1" },
+          env: { FOO: "bar" },
+          resources: { vcpuCount: 4, memoryMb: 16_384, diskMb: 20_480 },
+        }),
+      ).resolves.toEqual({ sandboxId: "sb-1" });
+      expect(forkBody).toEqual({
+        timeout: 0,
+        envs: { FOO: "bar" },
+        metadata: {
+          mistleSandboxInstanceId: "sandbox_instance_123",
+          mistleProvider: "opencomputer",
+        },
+        memoryMB: 16_384,
+      });
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("fails checkpoint starts when OpenComputer returns less memory than requested", async () => {
+    const api = await startSimulatedOpenComputerApi((request, response) => {
+      if (
+        request.method === "POST" &&
+        request.url === "/api/sandboxes/from-checkpoint/checkpoint-1"
+      ) {
+        response.writeHead(201, { "Content-Type": "application/json" });
+        // OpenComputer checkpoint fork returns the effective memoryMB after applying
+        // the platform cap.
+        // https://docs.opencomputer.dev/api-reference/checkpoints/fork
+        response.end(JSON.stringify({ sandboxID: "sb-1", memoryMB: 8192 }));
+        return;
+      }
+      response.writeHead(404);
+      response.end();
+    });
+    const client = new OpenComputerApiClient({
+      config: { apiKey: "test-key", apiBaseUrl: api.url },
+    });
+
+    try {
+      await expect(
+        client.startSandbox({
+          image: { kind: "checkpoint", id: "checkpoint-1" },
+          resources: { vcpuCount: 4, memoryMb: 16_384 },
+        }),
+      ).rejects.toThrow("OpenComputer checkpoint fork returned 8192 MB memory");
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("verifies checkpoint startability by forking and destroying a probe sandbox", async () => {
+    const requestPaths: string[] = [];
+    const api = await startSimulatedOpenComputerApi((request, response) => {
+      requestPaths.push(`${request.method ?? ""} ${request.url ?? ""}`);
+      if (
+        request.method === "POST" &&
+        request.url === "/api/sandboxes/from-checkpoint/checkpoint-1"
+      ) {
+        response.writeHead(201, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ sandboxID: "sb-probe" }));
+        return;
+      }
+      if (request.method === "DELETE" && request.url === "/api/sandboxes/sb-probe") {
+        response.writeHead(204);
+        response.end();
+        return;
+      }
+      response.writeHead(404);
+      response.end();
+    });
+    const client = new OpenComputerApiClient({
+      config: { apiKey: "test-key", apiBaseUrl: api.url },
+    });
+
+    try {
+      await expect(
+        client.verifyCheckpointStartable({
+          checkpointId: "checkpoint-1",
+          requestTimeoutMs: 1_000,
+        }),
+      ).resolves.toBeUndefined();
+      expect(requestPaths).toEqual([
+        "POST /api/sandboxes/from-checkpoint/checkpoint-1",
+        "DELETE /api/sandboxes/sb-probe",
+      ]);
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("waits for checkpoint fork availability before the probe succeeds", async () => {
+    let forkAttempts = 0;
+    const api = await startSimulatedOpenComputerApi((request, response) => {
+      if (
+        request.method === "POST" &&
+        request.url === "/api/sandboxes/from-checkpoint/checkpoint-1"
+      ) {
+        forkAttempts += 1;
+        if (forkAttempts === 1) {
+          response.writeHead(404, { "Content-Type": "application/json" });
+          response.end(JSON.stringify({ error: "checkpoint not found" }));
+          return;
+        }
+        response.writeHead(201, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ sandboxID: "sb-probe" }));
+        return;
+      }
+      if (request.method === "DELETE" && request.url === "/api/sandboxes/sb-probe") {
+        response.writeHead(204);
+        response.end();
+        return;
+      }
+      response.writeHead(404);
+      response.end();
+    });
+    const client = new OpenComputerApiClient({
+      config: { apiKey: "test-key", apiBaseUrl: api.url },
+    });
+
+    try {
+      await expect(
+        client.verifyCheckpointStartable({
+          checkpointId: "checkpoint-1",
+          requestTimeoutMs: 2_000,
+        }),
+      ).resolves.toBeUndefined();
+      expect(forkAttempts).toBe(2);
     } finally {
       await api.close();
     }
@@ -264,7 +593,7 @@ describe("OpenComputer client helpers", () => {
 
   it("fails malformed exec/run responses that omit the exit code", async () => {
     const api = await startSimulatedOpenComputerApi((request, response) => {
-      if (request.method === "POST" && request.url === "/sandboxes/sb-1/exec/run") {
+      if (request.method === "POST" && request.url === "/api/sandboxes/sb-1/exec/run") {
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(JSON.stringify({ stdout: "ready" }));
         return;

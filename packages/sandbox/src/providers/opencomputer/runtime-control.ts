@@ -85,14 +85,16 @@ export class OpenComputerSandboxRuntimeControl implements SandboxRuntimeControl 
       operation: OpenComputerClientOperationIds.READ_SANDBOXD_VERSION,
       fn: async () => {
         try {
-          const command = createOpenComputerSandboxdCommand({ args: ["version"] });
+          const command = createOpenComputerSandboxdCommand({
+            args: ["version"],
+            env: input.env,
+          });
           const result = await this.#client.runCommand({
             sandboxId: input.id,
             operation: OpenComputerClientOperationIds.READ_SANDBOXD_VERSION,
             commandDescription: "Read sandboxd version",
             command: command.command,
             args: command.args,
-            ...(input.env === undefined ? {} : { env: input.env }),
           });
           const version = result.stdout.trim();
           if (version.length === 0) {
@@ -137,12 +139,14 @@ export class OpenComputerSandboxRuntimeControl implements SandboxRuntimeControl 
             sandboxId: input.id,
             operation: OpenComputerClientOperationIds.ENSURE_SANDBOXD,
             commandDescription: "Ensure sandboxd artifact",
-            ...createOpenComputerRootShellCommand({ script: SandboxdInstallCommand }),
-            env: {
-              [SandboxdInstallEnvVars.URL]: input.artifact.url,
-              [SandboxdInstallEnvVars.SHA256]: input.artifact.sha256,
-              [SandboxdInstallEnvVars.VERSION]: input.artifact.version,
-            },
+            ...createOpenComputerRootShellCommand({
+              script: SandboxdInstallCommand,
+              env: {
+                [SandboxdInstallEnvVars.URL]: input.artifact.url,
+                [SandboxdInstallEnvVars.SHA256]: input.artifact.sha256,
+                [SandboxdInstallEnvVars.VERSION]: input.artifact.version,
+              },
+            }),
             timeoutMs: SandboxdEnsureTimeoutMs,
           });
         } catch (error) {
@@ -193,8 +197,10 @@ export class OpenComputerSandboxRuntimeControl implements SandboxRuntimeControl 
               sandboxId: input.id,
               operation: OpenComputerClientOperationIds.SHUTDOWN_SANDBOXD,
               commandDescription: "Gracefully shutdown sandboxd",
-              ...createOpenComputerSandboxdCommand({ args: ["shutdown"] }),
-              ...(input.env === undefined ? {} : { env: input.env }),
+              ...createOpenComputerSandboxdCommand({
+                args: ["shutdown"],
+                env: input.env,
+              }),
               timeoutMs: OpenComputerSandboxdStopDaemonTimeoutMs,
             });
           } catch (error) {

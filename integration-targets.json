@@ -39,6 +39,11 @@
       "config": {}
     },
     {
+      "targetKey": "opencomputer-default",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "gcp-mcp",
       "enabled": true,
       "config": {}

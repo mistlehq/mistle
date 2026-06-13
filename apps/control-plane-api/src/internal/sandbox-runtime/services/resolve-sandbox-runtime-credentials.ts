@@ -9,6 +9,9 @@ import {
   ModalSandboxRuntimeCredentialSecretTypes,
   ModalSandboxRuntimeCredentialSlotKeys,
   ModalSandboxRuntimeDefaultAppName,
+  OpenComputerSandboxRuntimeCredentialSecretTypes,
+  OpenComputerSandboxRuntimeCredentialSlotKeys,
+  OpenComputerSandboxRuntimeTargetConfigSchema,
   TensorlakeSandboxRuntimeCredentialSecretTypes,
   TensorlakeSandboxRuntimeCredentialSlotKeys,
 } from "@mistle/integrations-definitions/sandbox-runtimes";
@@ -45,6 +48,12 @@ type ResolvedSandboxRuntimeCredentials =
       provider: typeof SandboxProvider.TENSORLAKE;
       source: "managed" | "connection";
       apiKey: string;
+    }
+  | {
+      provider: typeof SandboxProvider.OPENCOMPUTER;
+      source: "managed" | "connection";
+      apiKey: string;
+      apiBaseUrl?: string;
     }
   | {
       provider: typeof SandboxProvider.MODAL;
@@ -123,17 +132,22 @@ export async function resolveSandboxRuntimeCredentials(
     });
   }
 
+  if (input.provider === SandboxProvider.OPENCOMPUTER) {
+    if (input.connectionId === undefined) {
+      return resolveManagedOpenComputerCredentials(ctx);
+    }
+
+    return resolveConnectionOpenComputerCredentials(ctx, {
+      organizationId: input.organizationId,
+      provider: SandboxProvider.OPENCOMPUTER,
+      connectionId: input.connectionId,
+    });
+  }
+
   if (input.provider === SandboxProvider.FREESTYLE) {
     throw new BadRequestError(
       "UNSUPPORTED_SANDBOX_PROVIDER",
       "Freestyle sandbox runtime credentials are not wired in this deployment yet.",
-    );
-  }
-
-  if (input.provider === SandboxProvider.OPENCOMPUTER) {
-    throw new BadRequestError(
-      "UNSUPPORTED_SANDBOX_PROVIDER",
-      "OpenComputer sandbox runtime credentials are not wired in this deployment yet.",
     );
   }
 
@@ -186,6 +200,26 @@ function resolveManagedTensorlakeCredentials(
   };
 }
 
+function resolveManagedOpenComputerCredentials(
+  ctx: ResolveSandboxRuntimeCredentialsContext,
+): ResolvedSandboxRuntimeCredentials {
+  if (ctx.sandboxConfig.opencomputer?.enabled !== true) {
+    throw new BadRequestError(
+      "MANAGED_SANDBOX_PROVIDER_UNAVAILABLE",
+      "Managed OpenComputer sandbox runtime is not configured for this deployment.",
+    );
+  }
+
+  return {
+    provider: SandboxProvider.OPENCOMPUTER,
+    source: "managed",
+    apiKey: ctx.sandboxConfig.opencomputer.apiKey,
+    ...(ctx.sandboxConfig.opencomputer.apiBaseUrl === undefined
+      ? {}
+      : { apiBaseUrl: ctx.sandboxConfig.opencomputer.apiBaseUrl }),
+  };
+}
+
 function resolveManagedE2BCredentials(
   ctx: ResolveSandboxRuntimeCredentialsContext,
 ): ResolvedSandboxRuntimeCredentials {
@@ -201,6 +235,85 @@ function resolveManagedE2BCredentials(
     source: "managed",
     apiKey: ctx.sandboxConfig.e2b.apiKey,
     ...(ctx.sandboxConfig.e2b.domain === undefined ? {} : { domain: ctx.sandboxConfig.e2b.domain }),
+  };
+}
+
+async function resolveConnectionOpenComputerCredentials(
+  ctx: ResolveSandboxRuntimeCredentialsContext,
+  input: ResolveSandboxRuntimeCredentialsInput & {
+    provider: typeof SandboxProvider.OPENCOMPUTER;
+    connectionId: string;
+  },
+): Promise<ResolvedSandboxRuntimeCredentials> {
+  const connection = await readSandboxConnection(ctx, input);
+  const target = await ctx.db.query.integrationTargets.findFirst({
+    columns: {
+      targetKey: true,
+      familyId: true,
+      variantId: true,
+      enabled: true,
+      config: true,
+    },
+    where: (table, { eq }) => eq(table.targetKey, connection.targetKey),
+  });
+
+  if (target === undefined) {
+    throw new NotFoundError(
+      "SANDBOX_CONNECTION_TARGET_NOT_FOUND",
+      `Sandbox connection '${connection.id}' target was not found.`,
+    );
+  }
+
+  if (!target.enabled) {
+    throw new BadRequestError(
+      "SANDBOX_CONNECTION_TARGET_DISABLED",
+      `Sandbox connection '${connection.id}' target is disabled.`,
+    );
+  }
+
+  const definition = ctx.integrationRegistry.getDefinition({
+    familyId: target.familyId,
+    variantId: target.variantId,
+  });
+
+  if (definition?.kind !== IntegrationKinds.SANDBOX || definition.sandboxRuntime === undefined) {
+    throw new BadRequestError(
+      "SANDBOX_CONNECTION_KIND_MISMATCH",
+      `Sandbox connection '${connection.id}' does not reference a sandbox integration target.`,
+    );
+  }
+
+  if (definition.sandboxRuntime.providerId !== SandboxProvider.OPENCOMPUTER) {
+    throw new BadRequestError(
+      "SANDBOX_CONNECTION_PROVIDER_MISMATCH",
+      `Sandbox connection '${connection.id}' does not match sandbox provider 'opencomputer'.`,
+    );
+  }
+
+  const resolvedCredential = await resolveIntegrationCredential(
+    {
+      db: ctx.db,
+      integrationRegistry: ctx.integrationRegistry,
+      integrationsConfig: ctx.integrationsConfig,
+    },
+    {
+      connectionId: connection.id,
+      secretType: OpenComputerSandboxRuntimeCredentialSecretTypes.API_KEY,
+      slotKey: OpenComputerSandboxRuntimeCredentialSlotKeys.API_KEY,
+    },
+  );
+
+  if (resolvedCredential.kind !== "value") {
+    throw new Error("OpenComputer sandbox runtime API key must resolve to a string credential.");
+  }
+
+  const targetConfig = OpenComputerSandboxRuntimeTargetConfigSchema.parse(target.config);
+
+  return {
+    provider: SandboxProvider.OPENCOMPUTER,
+    source: "connection",
+    apiKey: resolvedCredential.value,
+    ...(targetConfig.apiBaseUrl === undefined ? {} : { apiBaseUrl: targetConfig.apiBaseUrl }),
   };
 }
 

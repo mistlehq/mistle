@@ -4084,6 +4084,29 @@
                       "properties": {
                         "provider": {
                           "type": "string",
+                          "enum": ["opencomputer"]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": ["managed", "connection"]
+                        },
+                        "apiKey": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "apiBaseUrl": {
+                          "type": "string",
+                          "format": "uri"
+                        }
+                      },
+                      "required": ["provider", "source", "apiKey"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
                           "enum": ["modal"]
                         },
                         "source": {
