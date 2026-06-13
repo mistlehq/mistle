@@ -15,6 +15,7 @@ import {
   StoryMistleApiKey,
   StoryOpenCodeGoConnection,
   StorySlackConnection,
+  StorySlackTarget,
 } from "./sandbox-profile-editor-story-support.js";
 
 const meta = {
@@ -34,6 +35,40 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 export const CombinedIntegrationsConnectionsAndTools: Story = {};
+
+export const SlackConnectorResourcesAndTools: Story = {
+  args: {
+    availableConnections: [
+      ...StoryIntegrationConnections.filter(
+        (connection) => connection.id !== StorySlackConnection.id,
+      ),
+      StorySlackConnection,
+    ],
+    availableTargets: [
+      ...StoryIntegrationTargets.filter(
+        (target) => target.targetKey !== StorySlackTarget.targetKey,
+      ),
+      StorySlackTarget,
+    ],
+    initialBindings: [
+      ...StoryBindings,
+      {
+        id: "binding-slack-connector",
+        connectionId: StorySlackConnection.id,
+        kind: "connector",
+        config: {},
+      },
+    ],
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByText("Slack Workspace")).toBeVisible();
+    await expect(
+      canvas.getByRole("button", { name: "Configure Agent-started Slack threads" }),
+    ).toBeVisible();
+  },
+};
 
 export const AwsCloudWatchMcpBinding: Story = {
   name: "AWS CloudWatch MCP Binding",

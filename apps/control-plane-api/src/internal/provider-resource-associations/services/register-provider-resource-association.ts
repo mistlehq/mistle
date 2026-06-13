@@ -5,6 +5,7 @@ import type {
   AssociatedProviderResourceKind,
   AssociatedResourceEventRouting,
 } from "@mistle/integrations-core";
+import { AssociatedProviderResourceKinds } from "@mistle/integrations-core";
 import { sql } from "drizzle-orm";
 
 import { getSandboxInstance } from "../../sandbox-runtime/services/get-sandbox-instance.js";
@@ -28,7 +29,7 @@ export type RegisterProviderResourceAssociationResult =
     }
   | {
       status: "not_applicable";
-      reason: "resource_kind_not_enabled";
+      reason: "provider_actor_not_configured" | "resource_kind_not_enabled";
     };
 
 export async function registerProviderResourceAssociation(
@@ -40,6 +41,7 @@ export async function registerProviderResourceAssociation(
 ): Promise<RegisterProviderResourceAssociationResult> {
   const connection = await ctx.db.query.integrationConnections.findFirst({
     columns: {
+      config: true,
       id: true,
       organizationId: true,
     },
@@ -75,7 +77,26 @@ export async function registerProviderResourceAssociation(
     };
   }
 
+  if (
+    input.resourceKind === AssociatedProviderResourceKinds.SLACK_THREAD &&
+    !connectionHasSlackBotUserId(connection.config)
+  ) {
+    return {
+      status: "not_applicable",
+      reason: "provider_actor_not_configured",
+    };
+  }
+
   return await createAssociation(ctx.db, input);
+}
+
+function connectionHasSlackBotUserId(config: Record<string, unknown> | null): boolean {
+  if (config === null) {
+    return false;
+  }
+
+  const botUserId = config["bot_user_id"];
+  return typeof botUserId === "string" && botUserId.trim().length > 0;
 }
 
 function supportsResourceKind(input: {

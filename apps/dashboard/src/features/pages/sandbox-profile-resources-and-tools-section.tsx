@@ -1,3 +1,4 @@
+import { AssociatedProviderResourceKinds } from "@mistle/integrations-core";
 import { Checkbox, DetailLabel, Field, FieldContent, FieldHeader, FieldLabel } from "@mistle/ui";
 import { useDebouncedValue } from "@tanstack/react-pacer";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,6 +12,11 @@ import {
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
 import { sandboxProfileIntegrationDirectoryQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
+import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
+import {
+  SandboxProfileAssociatedResourceRoutingFieldGroup,
+  type SandboxProfileAssociatedResourceRoutingDraftState,
+} from "./sandbox-profile-associated-resource-routing-section.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -21,11 +27,19 @@ import {
   resolveBindingToolToggleModel,
   SandboxProfileBindingConfigEditor,
 } from "./sandbox-profile-binding-config-editor.js";
+import { resolveRowBindingMetadata } from "./sandbox-profile-binding-shared.js";
 
 const SearchDebounceMs = 300;
 const SandboxProfileResourcesAndToolsSimpleControlClassName = "flex items-center md:min-h-9";
 const BindingToolsOptionClassName = "flex min-h-7 items-center gap-2 text-sm";
 const BindingToolsTableFirstOptionClassName = `${BindingToolsOptionClassName} md:min-h-9`;
+
+export type SandboxProfileBindingResourcesAssociatedResourceRouting = {
+  hasSlackThreadBinding: boolean;
+  isDraft: boolean;
+  onDraftStateChange?: (state: SandboxProfileAssociatedResourceRoutingDraftState) => void;
+  version: SandboxProfileVersion;
+};
 
 function resolveRepositorySummary(
   connection: IntegrationConnectionSummary | undefined,
@@ -313,6 +327,7 @@ export function hasSandboxProfileBindingResourcesAndToolsCellContent(input: {
   row: SandboxProfileBindingEditorRow;
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
+  associatedResourceRouting?: SandboxProfileBindingResourcesAssociatedResourceRouting | undefined;
 }): boolean {
   const connection = input.availableConnections.find(
     (candidate) => candidate.id === input.row.connectionId,
@@ -342,8 +357,19 @@ export function hasSandboxProfileBindingResourcesAndToolsCellContent(input: {
     connections: input.availableConnections,
     targets: input.availableTargets,
   });
+  const hasSlackAssociatedResourceRouting =
+    input.associatedResourceRouting !== undefined &&
+    rowSupportsSlackThreadAssociatedResourceRouting({
+      row: input.row,
+      availableConnections: input.availableConnections,
+      availableTargets: input.availableTargets,
+    });
 
-  return summaryItems.length > 0 || toolToggleModel.mode === "supported";
+  return (
+    summaryItems.length > 0 ||
+    toolToggleModel.mode === "supported" ||
+    hasSlackAssociatedResourceRouting
+  );
 }
 
 export function SandboxProfileBindingResourcesAndToolsCell(input: {
@@ -357,6 +383,7 @@ export function SandboxProfileBindingResourcesAndToolsCell(input: {
   disabled?: boolean | undefined;
   readOnly?: boolean | undefined;
   showGroupLabels?: boolean | undefined;
+  associatedResourceRouting?: SandboxProfileBindingResourcesAssociatedResourceRouting | undefined;
 }): React.JSX.Element {
   const connection = input.availableConnections.find(
     (candidate) => candidate.id === input.row.connectionId,
@@ -378,6 +405,19 @@ export function SandboxProfileBindingResourcesAndToolsCell(input: {
     excludedPropertyKeys: ["repositories", "tools"],
     maxItems: 3,
   });
+  const supportedAssociatedResourceEvents = resolveRowBindingMetadata({
+    row: input.row,
+    availableConnections: input.availableConnections,
+    availableTargets: input.availableTargets,
+  })?.target?.supportedAssociatedResourceEvents;
+  const showSlackAssociatedResourceRouting =
+    input.associatedResourceRouting !== undefined &&
+    rowSupportsSlackThreadAssociatedResourceRouting({
+      row: input.row,
+      availableConnections: input.availableConnections,
+      availableTargets: input.availableTargets,
+    });
+  const associatedResourceRouting = input.associatedResourceRouting;
 
   if (issue === "missing-connection") {
     return (
@@ -461,6 +501,51 @@ export function SandboxProfileBindingResourcesAndToolsCell(input: {
           row={input.row}
         />
       ) : null}
+
+      {showSlackAssociatedResourceRouting && associatedResourceRouting !== undefined ? (
+        <SandboxProfileAssociatedResourceRoutingFieldGroup
+          disabled={input.disabled === true}
+          hasGitHubBinding={false}
+          hasSlackThreadBinding={associatedResourceRouting.hasSlackThreadBinding}
+          isDraft={associatedResourceRouting.isDraft}
+          layout="vertical"
+          {...(associatedResourceRouting.onDraftStateChange === undefined
+            ? {}
+            : { onDraftStateChange: associatedResourceRouting.onDraftStateChange })}
+          resourceKinds={[AssociatedProviderResourceKinds.SLACK_THREAD]}
+          selectedConnectionId={input.row.connectionId}
+          supportedAssociatedResourceEvents={supportedAssociatedResourceEvents}
+          version={associatedResourceRouting.version}
+        />
+      ) : null}
     </div>
+  );
+}
+
+function rowSupportsSlackThreadAssociatedResourceRouting(input: {
+  row: SandboxProfileBindingEditorRow;
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+}): boolean {
+  if (input.row.kind !== "connector") {
+    return false;
+  }
+
+  const metadata = resolveRowBindingMetadata({
+    row: input.row,
+    availableConnections: input.availableConnections,
+    availableTargets: input.availableTargets,
+  });
+
+  if (metadata?.target === undefined) {
+    return false;
+  }
+
+  const botUserId = metadata.connection.config?.["bot_user_id"];
+  return (
+    metadata.target.familyId === "slack" &&
+    typeof botUserId === "string" &&
+    botUserId.trim().length > 0 &&
+    (metadata.target.supportedAssociatedResourceEvents?.length ?? 0) > 0
   );
 }

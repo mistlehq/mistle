@@ -338,7 +338,7 @@ export async function startSimulatedCodexRuntimeServer(
               id: expectJsonRpcId(methodPayload.id),
               result: {
                 protocolVersion: "2026-03-14",
-                userAgent: "codex-cli/0.137.0",
+                userAgent: "codex-cli/0.139.0",
               },
             },
           });

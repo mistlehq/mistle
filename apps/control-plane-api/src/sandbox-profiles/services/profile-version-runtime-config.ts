@@ -314,6 +314,13 @@ function validateManagedSandboxProviderAvailability(input: {
     return [];
   }
 
+  if (
+    input.providerId === SandboxProvider.OPENCOMPUTER &&
+    input.sandboxConfig.opencomputer?.enabled === true
+  ) {
+    return [];
+  }
+
   if (input.providerId === SandboxProvider.E2B && input.sandboxConfig.e2b?.enabled !== true) {
     return [
       {
@@ -369,6 +376,13 @@ function validateSandboxResources(input: {
     issues.push({
       code: SandboxProfilePublishabilityIssueCodes.INVALID_SANDBOX_RESOURCES,
       message: `Sandbox provider '${input.providerId}' resources are outside supported limits.`,
+    });
+  }
+
+  if (!isValidResourcePair(input.resources, input.resourceCapabilities)) {
+    issues.push({
+      code: SandboxProfilePublishabilityIssueCodes.INVALID_SANDBOX_RESOURCES,
+      message: `Sandbox provider '${input.providerId}' resources do not match a supported resource tier.`,
     });
   }
 
@@ -428,6 +442,19 @@ function isValidMemoryPerVcpuValue(input: {
   }
 
   return true;
+}
+
+function isValidResourcePair(
+  resources: SandboxProfileVersionResources,
+  capability: SandboxRuntimeResourceCapabilities,
+): boolean {
+  if (capability.validResourcePairs === undefined) {
+    return true;
+  }
+
+  return capability.validResourcePairs.some(
+    (pair) => pair.vcpuCount === resources.vcpuCount && pair.memoryMb === resources.memoryMb,
+  );
 }
 
 async function validateSandboxConnection(input: {

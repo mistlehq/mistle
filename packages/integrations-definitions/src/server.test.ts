@@ -64,6 +64,10 @@ describe("integrations-definitions server", () => {
       familyId: "tensorlake",
       variantId: "tensorlake-default",
     });
+    const openComputerSandboxRuntimeDefinition = registry.getDefinition({
+      familyId: "opencomputer",
+      variantId: "opencomputer-default",
+    });
     const githubEnterpriseServerDefinition = registry.getDefinition({
       familyId: "github",
       variantId: "github-enterprise-server",
@@ -214,6 +218,21 @@ describe("integrations-definitions server", () => {
         providerId: "tensorlake",
       },
     });
+    expect(openComputerSandboxRuntimeDefinition).toMatchObject({
+      familyId: "opencomputer",
+      variantId: "opencomputer-default",
+      kind: "sandbox",
+      sandboxRuntime: {
+        providerId: "opencomputer",
+      },
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "API key",
+          kind: "form",
+        },
+      ],
+    });
     expect(awsDefinition?.webhookHandler).toBeUndefined();
     expect(awsDefinition?.webhookSource).toBeUndefined();
     expect(githubEnterpriseServerDefinition?.resourceDefinitions).toEqual(
@@ -296,7 +315,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(18);
+    expect(definitions).toHaveLength(19);
   });
 
   it("builds the server definitions bundle with an agent runtime registry", () => {

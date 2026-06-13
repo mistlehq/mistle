@@ -247,7 +247,6 @@ describe.concurrent("provider resource association delivery", () => {
       providerResourceAssociationId: scope.providerResourceAssociationId,
       sandboxInstanceId: scope.sandboxInstanceId,
       runtimeId: "codex",
-      workingDirectory: "/root/repo",
     });
   });
 
@@ -272,7 +271,6 @@ describe.concurrent("provider resource association delivery", () => {
       providerResourceAssociationId: scope.providerResourceAssociationId,
       sandboxInstanceId: scope.sandboxInstanceId,
       runtimeId: "opencode",
-      workingDirectory: "/root/repo",
     });
   });
 
@@ -297,7 +295,6 @@ describe.concurrent("provider resource association delivery", () => {
       providerResourceAssociationId: scope.providerResourceAssociationId,
       sandboxInstanceId: scope.sandboxInstanceId,
       runtimeId: "pi",
-      workingDirectory: "/root/repo",
     });
   });
 
@@ -324,7 +321,6 @@ describe.concurrent("provider resource association delivery", () => {
       providerResourceAssociationId: scope.providerResourceAssociationId,
       sandboxInstanceId: scope.sandboxInstanceId,
       runtimeId: "codex",
-      workingDirectory: "/root/repo",
     });
   });
 
@@ -736,7 +732,6 @@ function createRuntimePlan(
         ptySessionId: `${runtimeId}-cli`,
         cols: 120,
         rows: 32,
-        cwd: "/root/repo",
         command,
         args: [],
       },
@@ -744,7 +739,6 @@ function createRuntimePlan(
         ptySessionId: `${runtimeId}-cli`,
         cols: 120,
         rows: 32,
-        cwd: "/root/repo",
         command,
         args: [],
       },

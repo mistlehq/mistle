@@ -1,6 +1,7 @@
 import {
   AssociatedProviderResourceKinds,
   AssociatedResourceEventTypes,
+  SlackThreadMessageModes,
 } from "@mistle/integrations-core";
 import { Button } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
@@ -16,6 +17,7 @@ import {
   StoryGithubConnection,
   StoryGithubResources,
   StoryGithubTarget,
+  StorySlackTarget,
 } from "./integrations-editor-section-story-support.js";
 import {
   SandboxProfileAssociatedResourceRoutingFieldGroup,
@@ -25,6 +27,7 @@ import {
 type AssociatedResourceRoutingStoryArgs = {
   disabled: boolean;
   hasGitHubBinding: boolean;
+  hasSlackThreadBinding: boolean;
   initialSaveError?: boolean;
   isDraft: boolean;
   selectedConnectionId?: string | undefined;
@@ -35,11 +38,11 @@ type AssociatedResourceRoutingStoryArgs = {
 };
 
 /**
- * Review the pull request activity sub-block exactly as it appears inside the sandbox profile Git
- * connection card. The full editor story shows the surrounding Sandbox Profile context.
+ * Review the associated resource routing sub-block exactly as it appears inside the sandbox
+ * profile integration card. The full editor story shows the surrounding Sandbox Profile context.
  */
 const meta = {
-  title: "Dashboard/SandboxProfiles/Editor/Pull Request Activity",
+  title: "Dashboard/SandboxProfiles/Editor/Associated Resource Routing",
   component: SandboxProfileAssociatedResourceRoutingFieldGroup,
   decorators: [withDashboardCenteredStory],
   render: function RenderStory(args): React.JSX.Element {
@@ -48,6 +51,7 @@ const meta = {
   args: {
     disabled: false,
     hasGitHubBinding: true,
+    hasSlackThreadBinding: false,
     isDraft: true,
     selectedConnectionId: StoryGithubConnection.id,
     supportedAssociatedResourceEvents: StoryGithubTarget.supportedAssociatedResourceEvents,
@@ -83,6 +87,7 @@ function AssociatedResourceRoutingStory(
         <SandboxProfileAssociatedResourceRoutingFieldGroup
           disabled={args.disabled}
           hasGitHubBinding={args.hasGitHubBinding}
+          hasSlackThreadBinding={args.hasSlackThreadBinding}
           isDraft={args.isDraft}
           onDraftStateChange={setDraftState}
           selectedConnectionId={args.selectedConnectionId}
@@ -108,6 +113,41 @@ function AssociatedResourceRoutingStory(
 
 export const GitHubPullRequestRouting: Story = {};
 
+export const SlackThreadRouting: Story = {
+  args: {
+    hasGitHubBinding: false,
+    hasSlackThreadBinding: true,
+    supportedAssociatedResourceEvents: StorySlackTarget.supportedAssociatedResourceEvents,
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Configure Agent-started Slack threads" }),
+    );
+    await expect(canvas.getByRole("combobox", { name: "Thread messages" })).toBeVisible();
+  },
+};
+
+export const GitHubAndSlackRouting: Story = {
+  args: {
+    hasGitHubBinding: true,
+    hasSlackThreadBinding: true,
+    supportedAssociatedResourceEvents: createMixedSupportedAssociatedResourceEvents(),
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.queryByRole("switch", { name: "Agent PR activity" })).toBeNull();
+    await expect(canvas.queryByRole("switch", { name: "Agent-started Slack threads" })).toBeNull();
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Configure Agent-started Slack threads" }),
+    );
+    await expect(canvas.getByRole("checkbox", { name: "Enable thread messages" })).toBeChecked();
+    await expect(canvas.getByRole("combobox", { name: "Thread messages" })).toBeVisible();
+  },
+};
+
 export const NarrowedPullRequestEvents: Story = {
   args: {
     version: createStoryVersion({
@@ -124,6 +164,136 @@ export const NarrowedPullRequestEvents: Story = {
         ],
       },
     }),
+  },
+};
+
+export const SavedSlackThreadRouting: Story = {
+  args: {
+    hasGitHubBinding: false,
+    hasSlackThreadBinding: true,
+    supportedAssociatedResourceEvents: StorySlackTarget.supportedAssociatedResourceEvents,
+    version: createStoryVersion({
+      associatedResourceEventRoutingConfig: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+            eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+          },
+        ],
+      },
+    }),
+  },
+};
+
+export const SlackThreadAppMentionsOnly: Story = {
+  args: {
+    hasGitHubBinding: false,
+    hasSlackThreadBinding: true,
+    supportedAssociatedResourceEvents: StorySlackTarget.supportedAssociatedResourceEvents,
+    version: createStoryVersion({
+      associatedResourceEventRoutingConfig: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+            eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+            messageMode: SlackThreadMessageModes.APP_MENTIONS_ONLY,
+          },
+        ],
+      },
+    }),
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Configure Agent-started Slack threads" }),
+    );
+    await expect(canvas.getByText("App mentions only")).toBeVisible();
+  },
+};
+
+export const FilteredSlackThreadReplies: Story = {
+  args: {
+    hasGitHubBinding: false,
+    hasSlackThreadBinding: true,
+    supportedAssociatedResourceEvents: StorySlackTarget.supportedAssociatedResourceEvents,
+    version: createStoryVersion({
+      associatedResourceEventRoutingConfig: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+            eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+            payloadFilter: {
+              [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED]: {
+                op: "contains_token",
+                path: ["event", "text"],
+                value: "@mistle",
+              },
+            },
+          },
+        ],
+      },
+    }),
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Configure Agent-started Slack threads" }),
+    );
+    await expect(canvas.getByDisplayValue("@mistle")).toBeVisible();
+  },
+};
+
+export const MixedSavedRouting: Story = {
+  args: {
+    hasGitHubBinding: true,
+    hasSlackThreadBinding: true,
+    supportedAssociatedResourceEvents: createMixedSupportedAssociatedResourceEvents(),
+    version: createStoryVersion({
+      associatedResourceEventRoutingConfig: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+            eventTypes: [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED],
+            payloadFilter: {
+              [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED]: {
+                op: "contains_token",
+                path: ["comment", "body"],
+                value: "@mistle",
+              },
+            },
+          },
+          {
+            resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+            eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+            payloadFilter: {
+              [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED]: {
+                op: "contains_token",
+                path: ["event", "text"],
+                value: "@mistle",
+              },
+            },
+          },
+        ],
+      },
+    }),
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.queryByRole("switch", { name: "Agent PR activity" })).toBeNull();
+    await expect(canvas.queryByRole("switch", { name: "Agent-started Slack threads" })).toBeNull();
+    await userEvent.click(canvas.getByRole("button", { name: "Configure Agent PR activity" }));
+    await expect(canvas.getByDisplayValue("@mistle")).toBeVisible();
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Configure Agent-started Slack threads" }),
+    );
+    await expect(canvas.getAllByDisplayValue("@mistle")).toHaveLength(2);
   },
 };
 
@@ -189,6 +359,34 @@ export const PublishedReadOnlyEnabled: Story = {
   },
 };
 
+export const PublishedReadOnlyMixedRouting: Story = {
+  args: {
+    disabled: true,
+    hasGitHubBinding: true,
+    hasSlackThreadBinding: true,
+    isDraft: false,
+    version: createStoryVersion({
+      state: "published",
+      associatedResourceEventRoutingConfig: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+            eventTypes: [
+              AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+              AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+            ],
+          },
+          {
+            resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+            eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+          },
+        ],
+      },
+    }),
+  },
+};
+
 export const PublishedReadOnlyDisabled: Story = {
   args: {
     disabled: true,
@@ -244,4 +442,13 @@ function createStoryVersion(input?: {
     latestSnapshotJob: null,
     refreshSchedule: null,
   };
+}
+
+function createMixedSupportedAssociatedResourceEvents(): ComponentProps<
+  typeof SandboxProfileAssociatedResourceRoutingFieldGroup
+>["supportedAssociatedResourceEvents"] {
+  return [
+    ...(StoryGithubTarget.supportedAssociatedResourceEvents ?? []),
+    ...(StorySlackTarget.supportedAssociatedResourceEvents ?? []),
+  ];
 }

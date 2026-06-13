@@ -7,6 +7,7 @@ import { SlackBaseDefinition, type SlackBaseIntegrationDefinition } from "./base
 import { AppendSessionLinkToSlackTextRequestMiddleware } from "./egress-request-middleware.server.js";
 import { SlackIdentityLinkingCapability } from "./identity-linking.server.js";
 import { SlackProviderAppSetupCapability } from "./provider-app-setup.server.js";
+import { SlackAssociatedResourceEventsCapability } from "./provider-resource-association-webhooks.js";
 import { SlackWebhookSourceCapability } from "./webhook-source.server.js";
 import { SlackWebhookHandler, SlackWebhookMiddlewares } from "./webhook.server.js";
 
@@ -18,6 +19,7 @@ export const SlackDefinition: SlackBaseIntegrationDefinition = {
   webhookHandler: SlackWebhookHandler,
   webhookMiddleware: SlackWebhookMiddlewares,
   webhookSource: SlackWebhookSourceCapability,
+  associatedResourceEvents: SlackAssociatedResourceEventsCapability,
   resourceDefinitions: createSlackResourceDefinitions(),
   resourceSyncTriggers: SlackResourceSyncTriggers,
   listConnectionResources: listSlackConnectionResources,

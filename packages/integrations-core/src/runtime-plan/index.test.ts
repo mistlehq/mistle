@@ -5,6 +5,7 @@ import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js
 import {
   AssociatedProviderResourceKinds,
   AssociatedResourceEventTypes,
+  SlackThreadMessageModes,
   createDisabledAssociatedResourceEventRouting,
 } from "../types/index.js";
 import { assembleCompiledRuntimePlan, CompiledRuntimePlanSchema } from "./index.js";
@@ -98,6 +99,57 @@ describe("assembleCompiledRuntimePlan", () => {
             [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED]: {
               op: "contains_token",
               path: ["comment", "body"],
+              value: "@mistle",
+            },
+          },
+        },
+      ],
+    });
+  });
+
+  it("normalizes Slack thread associated resource payload filters", () => {
+    const plan = CompiledRuntimePlanSchema.parse({
+      sandboxProfileId: "sbp_123",
+      version: 7,
+      image: {
+        source: "base",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
+      },
+      associatedResourceEventRouting: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+            eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+            messageMode: SlackThreadMessageModes.APP_MENTIONS_ONLY,
+            payloadFilter: {
+              [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED]: {
+                op: "contains_token",
+                path: ["event", "text"],
+                value: "@mistle",
+              },
+            },
+          },
+        ],
+      },
+      egressRoutes: [],
+      artifacts: [],
+      workspaceSources: [],
+      runtimeClients: [],
+      agentRuntimes: [],
+    });
+
+    expect(plan.associatedResourceEventRouting).toEqual({
+      enabled: true,
+      resources: [
+        {
+          resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+          eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+          messageMode: SlackThreadMessageModes.APP_MENTIONS_ONLY,
+          payloadFilter: {
+            [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED]: {
+              op: "contains_token",
+              path: ["event", "text"],
               value: "@mistle",
             },
           },

@@ -88,7 +88,7 @@ async function createWorkflowContext(input?: {
   dbPool?: Pool;
   processEnv?: Readonly<Record<string, string | undefined>>;
 }): Promise<HostedWorkflowContext> {
-  const { environment, workerConfig } = input?.runtime ?? (await getOpenWorkflowRuntime());
+  const { workerConfig } = input?.runtime ?? (await getOpenWorkflowRuntime());
   const config = createDataPlaneWorkerRuntimeConfig({ app: workerConfig });
   const processEnv = input?.processEnv ?? process.env;
   const testIsolation = input?.testIsolation ?? readTestIsolationEnv();
@@ -143,12 +143,9 @@ async function createWorkflowContext(input?: {
             testEnvironmentId: testIsolation.testEnvironmentId,
             testEnvironmentIdHeader: testIsolation.testEnvironmentIdHeader,
           });
-    const sandboxdArtifactResolver =
-      environment === "production"
-        ? createSandboxdArtifactResolver({
-            releaseVersion: readServiceReleaseVersion(),
-          })
-        : undefined;
+    const sandboxdArtifactResolver = createSandboxdArtifactResolver({
+      releaseVersion: readServiceReleaseVersion(),
+    });
 
     return {
       context: {

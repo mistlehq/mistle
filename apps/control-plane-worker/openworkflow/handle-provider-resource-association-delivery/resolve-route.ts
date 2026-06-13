@@ -20,7 +20,6 @@ export type ResolvedProviderResourceAssociationDeliveryTarget = {
   providerResourceAssociationId: string;
   sandboxInstanceId: string;
   runtimeId: string;
-  workingDirectory: string;
 };
 
 export async function resolveProviderResourceAssociationDeliveryTarget(
@@ -97,6 +96,7 @@ export async function resolveProviderResourceAssociationDeliveryTarget(
         payload: observedEvent.payload,
         resourceKind: association.resourceKind,
         routing: sandboxInstance.runtimePlan.associatedResourceEventRouting,
+        sourceWebhookEventType: observedEvent.sourceWebhookEventType,
       })
     ) {
       throw new ProviderResourceAssociationDeliveryError({
@@ -116,7 +116,6 @@ export async function resolveProviderResourceAssociationDeliveryTarget(
     providerResourceAssociationId: association.id,
     sandboxInstanceId: association.sandboxInstanceId,
     runtimeId: runtimeContext.runtimeId,
-    workingDirectory: runtimeContext.workingDirectory,
   };
 }
 
@@ -132,7 +131,12 @@ async function resolveAssociatedResourceEventFromWebhook(
     sourceWebhookEventId: string;
     targetKey: string;
   },
-): Promise<AssociatedResourceWebhookObservation & { payload: Record<string, unknown> }> {
+): Promise<
+  AssociatedResourceWebhookObservation & {
+    payload: Record<string, unknown>;
+    sourceWebhookEventType: string;
+  }
+> {
   const webhookEvent = await db.query.integrationWebhookEvents.findFirst({
     columns: {
       eventType: true,
@@ -188,6 +192,7 @@ async function resolveAssociatedResourceEventFromWebhook(
   return {
     ...observedEvent,
     payload: webhookEvent.payload,
+    sourceWebhookEventType: webhookEvent.eventType,
   };
 }
 
@@ -196,7 +201,6 @@ function resolveAssociationRuntimeContext(input: {
   runtimePlan: CompiledRuntimePlan;
 }): {
   runtimeId: string;
-  workingDirectory: string;
 } {
   const supportedAgentRuntimes = input.runtimePlan.agentRuntimes.filter((candidate) =>
     supportsAssociationDeliveryRuntime({
@@ -220,18 +224,8 @@ function resolveAssociationRuntimeContext(input: {
     });
   }
 
-  const workingDirectory =
-    agentRuntime.ptyLaunch.newLaunch.cwd ?? agentRuntime.ptyLaunch.resumeLaunch.cwd;
-  if (workingDirectory === undefined) {
-    throw new ProviderResourceAssociationDeliveryError({
-      code: ProviderResourceAssociationDeliveryFailureCodes.RUNTIME_PLAN_WORKING_DIRECTORY_NOT_FOUND,
-      message: `Associated sandbox runtime '${agentRuntime.runtimeId}' does not define a working directory.`,
-    });
-  }
-
   return {
     runtimeId: agentRuntime.runtimeId,
-    workingDirectory,
   };
 }
 

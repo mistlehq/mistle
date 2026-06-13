@@ -127,6 +127,31 @@ const PartialDataPlaneApiSandboxTensorlakeConfigSchema = z
   })
   .strict();
 
+export const DataPlaneApiSandboxOpenComputerConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      apiKey: z.string().min(1),
+      apiBaseUrl: z.url().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      apiKey: z.string().min(1).optional(),
+      apiBaseUrl: z.url().optional(),
+    })
+    .strict(),
+]);
+
+const PartialDataPlaneApiSandboxOpenComputerConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    apiKey: z.string().min(1).optional(),
+    apiBaseUrl: z.url().optional(),
+  })
+  .strict();
+
 export const DataPlaneApiSandboxModalConfigSchema = z.discriminatedUnion("enabled", [
   z
     .object({
@@ -166,6 +191,7 @@ export const DataPlaneApiSandboxConfigSchema = z
     docker: DataPlaneApiSandboxDockerConfigSchema.optional(),
     e2b: DataPlaneApiSandboxE2BConfigSchema.optional(),
     modal: DataPlaneApiSandboxModalConfigSchema.optional(),
+    opencomputer: DataPlaneApiSandboxOpenComputerConfigSchema.optional(),
     tensorlake: DataPlaneApiSandboxTensorlakeConfigSchema.optional(),
   })
   .strict();
@@ -175,6 +201,7 @@ export const PartialDataPlaneApiSandboxConfigSchema = z
     docker: PartialDataPlaneApiSandboxDockerConfigSchema.optional(),
     e2b: PartialDataPlaneApiSandboxE2BConfigSchema.optional(),
     modal: PartialDataPlaneApiSandboxModalConfigSchema.optional(),
+    opencomputer: PartialDataPlaneApiSandboxOpenComputerConfigSchema.optional(),
     tensorlake: PartialDataPlaneApiSandboxTensorlakeConfigSchema.optional(),
   })
   .strict();
@@ -210,7 +237,10 @@ export const PartialDataPlaneApiConfigSchema = z
   .strict();
 
 export function getDataPlaneApiSandboxProviderValidationIssue(input: {
-  appSandbox: Pick<DataPlaneApiConfig["sandbox"], "docker" | "e2b" | "modal" | "tensorlake">;
+  appSandbox: Pick<
+    DataPlaneApiConfig["sandbox"],
+    "docker" | "e2b" | "modal" | "opencomputer" | "tensorlake"
+  >;
 }): {
   path: readonly ["sandbox", "docker"];
   message: string;

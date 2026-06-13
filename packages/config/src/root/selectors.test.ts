@@ -401,6 +401,26 @@ describe("selectControlPlaneApiConfig", () => {
       apiKey: "tensorlake-api-key",
     });
   });
+
+  it("projects OpenComputer as an enabled managed sandbox provider", () => {
+    const config = selectControlPlaneApiConfig(
+      createRootConfig({
+        sandbox: {
+          opencomputer: {
+            enabled: true,
+            api_key: "opencomputer-api-key",
+            api_base_url: "https://opencomputer.example.com/api",
+          },
+        },
+      }),
+    );
+
+    expect(config.sandbox.opencomputer).toEqual({
+      enabled: true,
+      apiKey: "opencomputer-api-key",
+      apiBaseUrl: "https://opencomputer.example.com/api",
+    });
+  });
 });
 
 describe("selectControlPlaneWorkerConfig", () => {
@@ -449,6 +469,23 @@ describe("selectDataPlaneApiConfig", () => {
     expect(config.sandbox.tensorlake).toEqual({
       enabled: true,
       apiKey: "tensorlake-api-key",
+    });
+    expect(
+      selectDataPlaneApiConfig(
+        createRootConfig({
+          sandbox: {
+            opencomputer: {
+              enabled: true,
+              api_key: "opencomputer-api-key",
+              api_base_url: "https://opencomputer.example.com/api",
+            },
+          },
+        }),
+      ).sandbox.opencomputer,
+    ).toEqual({
+      enabled: true,
+      apiKey: "opencomputer-api-key",
+      apiBaseUrl: "https://opencomputer.example.com/api",
     });
   });
 });
@@ -556,6 +593,23 @@ describe("selectDataPlaneWorkerConfig", () => {
     expect(config.sandbox.tensorlake).toEqual({
       enabled: true,
       apiKey: "tensorlake-api-key",
+    });
+    expect(
+      selectDataPlaneWorkerConfig(
+        createRootConfig({
+          sandbox: {
+            opencomputer: {
+              enabled: true,
+              api_key: "opencomputer-api-key",
+              api_base_url: "https://opencomputer.example.com/api",
+            },
+          },
+        }),
+      ).sandbox.opencomputer,
+    ).toEqual({
+      enabled: true,
+      apiKey: "opencomputer-api-key",
+      apiBaseUrl: "https://opencomputer.example.com/api",
     });
   });
 });

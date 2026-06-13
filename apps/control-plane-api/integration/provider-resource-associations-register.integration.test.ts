@@ -87,6 +87,90 @@ describe.concurrent("internal provider resource association registration", () =>
     expect(associations).toHaveLength(1);
   });
 
+  it("registers Slack thread associations only when the connection has a bot user identity", async ({
+    env,
+  }) => {
+    await seedConnection(env, {
+      connectionId: "icn_provider_resource_register_slack_001",
+      organizationId: "org_provider_resource_register_slack",
+      familyId: "slack",
+      variantId: "slack-default",
+      targetConfig: {},
+      connectionConfig: {
+        bot_user_id: "U_BOT_REGISTER_SLACK",
+      },
+    });
+    await seedSandboxInstance(env, {
+      sandboxInstanceId: "sbi_provider_resource_register_slack_001",
+      organizationId: "org_provider_resource_register_slack",
+      associatedResourceEventRouting: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+            eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+          },
+        ],
+      },
+    });
+
+    const body = {
+      integrationConnectionId: "icn_provider_resource_register_slack_001",
+      resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+      providerResourceId: "C123:1710000000.000100",
+      sandboxInstanceId: "sbi_provider_resource_register_slack_001",
+    };
+    const response = await registerAssociation(env, body);
+
+    expect(response.status).toBe(200);
+    const responseBody = InternalRegisterProviderResourceAssociationResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody.status).toBe("created");
+    await expect(findAssociations(env, body)).resolves.toHaveLength(1);
+  });
+
+  it("does not register Slack thread associations when the connection has no bot user identity", async ({
+    env,
+  }) => {
+    await seedConnection(env, {
+      connectionId: "icn_provider_resource_register_slack_no_bot_001",
+      organizationId: "org_provider_resource_register_slack_no_bot",
+      familyId: "slack",
+      variantId: "slack-default",
+      targetConfig: {},
+      connectionConfig: {},
+    });
+    await seedSandboxInstance(env, {
+      sandboxInstanceId: "sbi_provider_resource_register_slack_no_bot_001",
+      organizationId: "org_provider_resource_register_slack_no_bot",
+      associatedResourceEventRouting: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+            eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+          },
+        ],
+      },
+    });
+
+    const body = {
+      integrationConnectionId: "icn_provider_resource_register_slack_no_bot_001",
+      resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+      providerResourceId: "C123:1710000000.000100",
+      sandboxInstanceId: "sbi_provider_resource_register_slack_no_bot_001",
+    };
+    const response = await registerAssociation(env, body);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      status: "not_applicable",
+      reason: "provider_actor_not_configured",
+    });
+    await expect(findAssociations(env, body)).resolves.toEqual([]);
+  });
+
   it("keeps the first sandbox owner when another sandbox registers the same provider resource", async ({
     env,
   }) => {
@@ -279,8 +363,12 @@ async function registerAssociation(env: IntegrationTestEnvironment, body: Record
 async function seedConnection(
   env: IntegrationTestEnvironment,
   input: {
+    connectionConfig?: Record<string, unknown>;
     connectionId: string;
+    familyId?: string;
     organizationId: string;
+    targetConfig?: Record<string, unknown>;
+    variantId?: string;
   },
 ): Promise<void> {
   await env.controlPlaneDb.insert(env.controlPlaneTables.organizations).values({
@@ -292,10 +380,10 @@ async function seedConnection(
     .insert(env.controlPlaneTables.integrationTargets)
     .values({
       targetKey: `${input.connectionId}_target`,
-      familyId: "github",
-      variantId: "github-cloud",
+      familyId: input.familyId ?? "github",
+      variantId: input.variantId ?? "github-cloud",
       enabled: true,
-      config: {
+      config: input.targetConfig ?? {
         api_base_url: "https://api.github.com",
         web_base_url: "https://github.com",
       },
@@ -307,6 +395,7 @@ async function seedConnection(
     targetKey: `${input.connectionId}_target`,
     displayName: input.connectionId,
     status: IntegrationConnectionStatuses.ACTIVE,
+    config: input.connectionConfig ?? {},
   });
 }
 

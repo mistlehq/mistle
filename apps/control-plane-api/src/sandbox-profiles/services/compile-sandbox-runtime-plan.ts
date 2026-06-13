@@ -15,6 +15,7 @@ import {
   compileRuntimePlan,
   supportsAssociatedResourceDeliveryRuntime,
   type AgentRuntimeReader,
+  type AssociatedResourceEventRoutingResourceRule,
   type AssociatedResourceEventRouting,
   type CompiledRuntimePlan,
   type CompiledRuntimePlanSkills,
@@ -38,6 +39,7 @@ const MistleMcpBindingId = "platform-mistle-mcp";
 const MistleMcpFamilyId = "mistle";
 const MistleMcpVariantId = "mistle-mcp";
 const GitHubFamilyId = "github";
+const SlackFamilyId = "slack";
 
 export const SandboxRuntimePlanCompilerErrorCodes = {
   PROFILE_NOT_FOUND: "PROFILE_NOT_FOUND",
@@ -234,19 +236,8 @@ function resolveAssociatedResourceEventRouting(input: {
       ? undefined
       : input.agentRuntimeRegistry.getRuntime({ runtimeId: input.agentRuntimeId });
   const defaultResources =
-    agentRuntime !== undefined &&
-    supportsAssociatedResourceDeliveryRuntime(agentRuntime) &&
-    input.compileBindings.some((binding) => binding.target.familyId === GitHubFamilyId)
-      ? [
-          {
-            resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
-            eventTypes: [
-              AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
-              AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
-              AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
-            ],
-          },
-        ]
+    agentRuntime !== undefined && supportsAssociatedResourceDeliveryRuntime(agentRuntime)
+      ? resolveDefaultAssociatedResourceEventRoutingResources(input.compileBindings)
       : [];
   const resources = config.resources ?? defaultResources;
 
@@ -254,6 +245,40 @@ function resolveAssociatedResourceEventRouting(input: {
     enabled: config.enabled ?? resources.length > 0,
     resources,
   };
+}
+
+function resolveDefaultAssociatedResourceEventRoutingResources(
+  compileBindings: Awaited<ReturnType<typeof resolveCompileBindingsForVersion>>,
+): AssociatedResourceEventRouting["resources"] {
+  const resources: AssociatedResourceEventRoutingResourceRule[] = [];
+  if (compileBindings.some((binding) => binding.target.familyId === GitHubFamilyId)) {
+    resources.push({
+      resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+      eventTypes: [
+        AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+        AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+        AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
+      ],
+    });
+  }
+  if (compileBindings.some(bindingHasSlackAssociationIdentity)) {
+    resources.push({
+      resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+      eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+    });
+  }
+  return resources;
+}
+
+function bindingHasSlackAssociationIdentity(
+  binding: Awaited<ReturnType<typeof resolveCompileBindingsForVersion>>[number],
+): boolean {
+  if (binding.target.familyId !== SlackFamilyId) {
+    return false;
+  }
+
+  const botUserId = binding.connection.config["bot_user_id"];
+  return typeof botUserId === "string" && botUserId.trim().length > 0;
 }
 
 function mapCompilerErrorCodeToSandboxRuntimePlanCompilerErrorCode(

@@ -119,9 +119,9 @@ export const OpenComputerValidResourceTiers = [
   { vcpuCount: 1, memoryMb: 4096 },
   { vcpuCount: 2, memoryMb: 8192 },
   { vcpuCount: 4, memoryMb: 16_384 },
-  { vcpuCount: 8, memoryMb: 32_768 },
-  { vcpuCount: 16, memoryMb: 65_536 },
 ] as const satisfies readonly SandboxStartResources[];
+
+export const OpenComputerCheckpointForkMaxMemoryMb = 16_384;
 
 export const OpenComputerSandboxConfigSchema = z
   .object({
@@ -215,10 +215,21 @@ export type OpenComputerStartSandboxRequest = z.output<
 
 export const OpenComputerCaptureSandboxSnapshotRequestSchema =
   OpenComputerSandboxIdRequestSchema.extend({
+    name: z.string().trim().min(1),
     requestTimeoutMs: z.number().int().positive().optional(),
   }).strict();
 export type OpenComputerCaptureSandboxSnapshotRequest = z.output<
   typeof OpenComputerCaptureSandboxSnapshotRequestSchema
+>;
+
+export const OpenComputerVerifyCheckpointStartableRequestSchema = z
+  .object({
+    checkpointId: z.string().trim().min(1),
+    requestTimeoutMs: z.number().int().positive().optional(),
+  })
+  .strict();
+export type OpenComputerVerifyCheckpointStartableRequest = z.output<
+  typeof OpenComputerVerifyCheckpointStartableRequestSchema
 >;
 
 export const OpenComputerRuntimeControlRequestSchema = z
@@ -261,5 +272,24 @@ export function createOpenComputerResourceFields(
     cpuCount: resources.vcpuCount,
     memoryMB: resources.memoryMb,
     ...(resources.diskMb === undefined ? {} : { diskMB: resources.diskMb }),
+  };
+}
+
+export function createOpenComputerCheckpointForkResourceFields(
+  resources: OpenComputerResourceInput | undefined,
+): { memoryMB?: number } {
+  if (resources === undefined) {
+    return {};
+  }
+  validateOpenComputerStartResources(resources);
+  if (resources.memoryMb > OpenComputerCheckpointForkMaxMemoryMb) {
+    throw new Error(
+      `OpenComputer checkpoint starts support at most ${String(
+        OpenComputerCheckpointForkMaxMemoryMb,
+      )} MB memory.`,
+    );
+  }
+  return {
+    memoryMB: resources.memoryMb,
   };
 }

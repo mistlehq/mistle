@@ -176,6 +176,14 @@ _Avoid_: Dynamic resource, resource attachment, conversation mapping
 An external provider resource whose future provider events can continue an agent loop through a **Provider resource association**.
 _Avoid_: Provider object, touched resource
 
+**Agent-started Slack thread**:
+A **Slack thread** whose root message was created by an agent.
+_Avoid_: Slack channel, Slack message, Slack thread when the thread may have been started by a human
+
+**Slack thread**:
+A Slack conversation thread identified by its channel and root message.
+_Avoid_: Slack channel, Slack message when the intended routing scope is the full thread
+
 **Routable provider resource key**:
 The provider-derived identity used to match provider events to a **Routable provider resource**.
 _Avoid_: Conversation key, group key
@@ -191,6 +199,10 @@ _Avoid_: User when the actor may be an app, bot, or service account
 **GitHub App bot actor**:
 A GitHub App bot acting as the **Provider actor** for a provider event.
 _Avoid_: GitHub user, reviewer when the bot is the event actor rather than the requested review target
+
+**Slack app bot actor**:
+A Slack app bot acting as the **Provider actor** for a provider event.
+_Avoid_: Slack user, linked user, bot when the actor must be the integration app's own bot
 
 **Self-authored association event**:
 An **Association-backed provider event** authored by the same **Provider actor** Mistle uses for the event's **Integration connection**.
@@ -613,6 +625,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Provider conversation** is owned by an agent runtime provider.
 - A **Runtime conversation** is a provider-owned conversation visible inside a **Sandbox session**.
 - A **Provider resource association** belongs to a **Routable provider resource**, not every provider object the agent touches.
+- An **Agent-started Slack thread** is a **Routable provider resource**.
 - A **Provider resource association** is matched by a **Routable provider resource key**.
 - A **Sandbox session** can have many **Provider resource associations**.
 - First-pass provider-event delivery does not fan out one **Association-backed provider event** to multiple **Sandbox sessions**.
@@ -627,6 +640,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - **Association registration** does not change whether the provider request that produced the **Routable provider resource** succeeds.
 - An **Association-backed provider event** is not a **Trigger** run.
 - A **Self-authored association event** does not produce an **Association delivery**.
+- A **Slack app bot actor** may author a **Self-authored association event**.
 - A **Provider resource association** can outlive its ability to produce successful **Association deliveries**.
 - An **Association delivery** targets the associated **Routing runtime conversation** and does not reroute to another conversation when that target is unavailable.
 - An **Association delivery** depends on a **Provider resource association** already recorded when the provider event is handled.

@@ -190,6 +190,23 @@ const SandboxTensorlakeProviderConfigSchema = z.discriminatedUnion("enabled", [
     .strict(),
 ]);
 
+const SandboxOpenComputerProviderConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      api_key: z.string().trim().min(1),
+      api_base_url: UrlSchema.optional(),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      api_key: z.string().trim().min(1).optional(),
+      api_base_url: UrlSchema.optional(),
+    })
+    .strict(),
+]);
+
 const SandboxModalProviderConfigSchema = z.discriminatedUnion("enabled", [
   z
     .object({
@@ -446,6 +463,7 @@ export const ConfigSchema = z
         sandboxd_test_faults_enabled: z.boolean().optional(),
         e2b: SandboxE2BProviderConfigSchema.optional(),
         modal: SandboxModalProviderConfigSchema.optional(),
+        opencomputer: SandboxOpenComputerProviderConfigSchema.optional(),
         tensorlake: SandboxTensorlakeProviderConfigSchema.optional(),
       })
       .strict(),

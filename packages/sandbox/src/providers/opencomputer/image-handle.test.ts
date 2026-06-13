@@ -10,6 +10,7 @@ import {
   createOpenComputerSnapshotImageHandle,
   createOpenComputerTemplateImageHandle,
   parseOpenComputerImageHandle,
+  resolveOpenComputerStartImage,
 } from "./image-handle.js";
 
 describe("OpenComputer image handles", () => {
@@ -62,15 +63,95 @@ describe("OpenComputer image handles", () => {
     ).toThrow(SandboxConfigurationError);
   });
 
+  it("resolves OCI base image references to deterministic deferred image starts", () => {
+    const baseImageRef = "ghcr.io/mistlehq/sandbox-base:latest";
+    const manifest = createOpenComputerImageManifest(
+      createOpenComputerBaseImage({
+        source: { kind: "image", imageId: baseImageRef },
+      }),
+    );
+
+    expect(
+      resolveOpenComputerStartImage({
+        provider: SandboxProvider.OPENCOMPUTER,
+        imageId: baseImageRef,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }),
+    ).toEqual({
+      kind: "image",
+      id: createOpenComputerBaseImageName({ baseImageRef, manifest }),
+      manifest,
+    });
+  });
+
+  it("resolves provider-prefixed image handles through the strict parser", () => {
+    expect(resolveOpenComputerStartImage(createOpenComputerSnapshotImageHandle("base"))).toEqual({
+      kind: "snapshot",
+      id: "base",
+    });
+  });
+
   it("creates deterministic base image names from image references", () => {
     expect(
-      createOpenComputerBaseImageName(
-        "ghcr.io/mistlehq/sandbox-base@sha256:".concat("b".repeat(64)),
-      ),
+      createOpenComputerBaseImageName({
+        baseImageRef: "ghcr.io/mistlehq/sandbox-base@sha256:".concat("b".repeat(64)),
+      }),
     ).toBe(`mistle-${"b".repeat(24)}`);
-    expect(createOpenComputerBaseImageName("ghcr.io/mistlehq/sandbox-base:latest")).toBe(
-      createOpenComputerBaseImageName("ghcr.io/mistlehq/sandbox-base:latest"),
+    expect(
+      createOpenComputerBaseImageName({
+        baseImageRef: "ghcr.io/mistlehq/sandbox-base:latest",
+      }),
+    ).toBe(
+      createOpenComputerBaseImageName({
+        baseImageRef: "ghcr.io/mistlehq/sandbox-base:latest",
+      }),
     );
+  });
+
+  it("includes manifest content in generated base image names", () => {
+    const baseImageRef = "ghcr.io/mistlehq/sandbox-base:latest";
+    const firstManifest = createOpenComputerImageManifest(
+      createOpenComputerBaseImage({
+        source: { kind: "image", imageId: baseImageRef },
+      }),
+    );
+    const secondManifest = createOpenComputerImageManifest(
+      createOpenComputerBaseImage({
+        source: { kind: "image", imageId: "ghcr.io/mistlehq/sandbox-base:other" },
+      }),
+    );
+
+    expect(createOpenComputerBaseImageName({ baseImageRef, manifest: firstManifest })).not.toBe(
+      createOpenComputerBaseImageName({ baseImageRef, manifest: secondManifest }),
+    );
+  });
+
+  it("adds configured sandboxd release artifacts to OCI base image manifests", () => {
+    const baseImageRef = "ghcr.io/mistlehq/sandbox-base:latest";
+    const startImage = resolveOpenComputerStartImage(
+      {
+        provider: SandboxProvider.OPENCOMPUTER,
+        imageId: baseImageRef,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        sandboxd: {
+          kind: "release",
+          artifact: {
+            version: "0.32.0",
+            url: "https://example.com/sandboxd.tar.gz",
+            sha256: "a".repeat(64),
+          },
+        },
+      },
+    );
+
+    expect(startImage.kind).toBe("image");
+    if (startImage.kind !== "image") {
+      throw new Error("Expected OpenComputer deferred image.");
+    }
+    expect(JSON.stringify(startImage.manifest)).toContain("/opt/mistle/bin/sandboxd");
+    expect(JSON.stringify(startImage.manifest)).toContain("https://example.com/sandboxd.tar.gz");
   });
 
   it("rejects deferred image handles that do not carry the source manifest", () => {

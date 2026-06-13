@@ -11,8 +11,6 @@ export const ProviderResourceAssociationDeliveryFailureCodes = {
   RUNTIME_PLAN_NOT_FOUND: "provider_resource_association_runtime_plan_not_found",
   RUNTIME_PLAN_AGENT_RUNTIME_NOT_FOUND:
     "provider_resource_association_runtime_plan_agent_runtime_not_found",
-  RUNTIME_PLAN_WORKING_DIRECTORY_NOT_FOUND:
-    "provider_resource_association_runtime_plan_working_directory_not_found",
   PROVIDER_DELIVERY_FAILED: "provider_resource_association_provider_delivery_failed",
 } as const;
 

@@ -335,6 +335,16 @@ export function SandboxProfileRuntimeSection(input: {
     setSaveErrorMessage(null);
   }
 
+  function updateResources(
+    resources: NonNullable<SandboxProfileVersion["sandboxResources"]>,
+  ): void {
+    setDraftRuntime((currentRuntime) => ({
+      ...currentRuntime,
+      sandboxResources: resources,
+    }));
+    setSaveErrorMessage(null);
+  }
+
   function updateAgentRuntime(value: string | null): void {
     if (value === null || !isAgentRuntimeId(value)) {
       return;
@@ -508,6 +518,7 @@ export function SandboxProfileRuntimeSection(input: {
       <SandboxProviderResourceFields
         disabled={fieldIsReadOnly}
         onResourceFieldChange={updateResourceField}
+        onResourcesChange={updateResources}
         provider={selectedProvider}
         resources={draftRuntime.sandboxResources}
       />
@@ -611,6 +622,7 @@ function SandboxProviderResourceFields(input: {
     field: keyof NonNullable<SandboxProfileVersion["sandboxResources"]>,
     value: number,
   ) => void;
+  onResourcesChange: (resources: NonNullable<SandboxProfileVersion["sandboxResources"]>) => void;
   provider: SandboxProviderSummary | null;
   resources: SandboxProfileVersion["sandboxResources"];
 }): React.JSX.Element | null {
@@ -623,6 +635,17 @@ function SandboxProviderResourceFields(input: {
   }
 
   const capabilities = input.provider.resourceCapabilities;
+  if (capabilities.validResourcePairs !== undefined) {
+    return (
+      <BoundResourcePairSliderFields
+        disabled={input.disabled}
+        onChange={input.onResourcesChange}
+        tiers={capabilities.validResourcePairs}
+        value={input.resources}
+      />
+    );
+  }
+
   const memoryCapability = createMemoryCapabilityForVcpu({
     capability: capabilities.memoryMb,
     vcpuCount: input.resources.vcpuCount,
@@ -665,6 +688,132 @@ function SandboxProviderResourceFields(input: {
       )}
     </>
   );
+}
+
+function BoundResourcePairSliderFields(input: {
+  disabled: boolean;
+  onChange: (resources: NonNullable<SandboxProfileVersion["sandboxResources"]>) => void;
+  tiers: NonNullable<
+    NonNullable<SandboxProviderSummary["resourceCapabilities"]>["validResourcePairs"]
+  >;
+  value: NonNullable<SandboxProfileVersion["sandboxResources"]>;
+}): React.JSX.Element {
+  return (
+    <>
+      <ResourceSliderField
+        capability={createResourceCapabilityFromTierValues({
+          defaultValue: input.value.vcpuCount,
+          values: input.tiers.map((tier) => tier.vcpuCount),
+        })}
+        disabled={input.disabled}
+        formatValue={formatCpuResourceValue}
+        id="sandbox-profile-runtime-vcpu"
+        label="CPU"
+        onChange={(value) => {
+          input.onChange(
+            selectNearestResourceTier({
+              current: input.value,
+              dimension: "vcpuCount",
+              tiers: input.tiers,
+              value,
+            }),
+          );
+        }}
+        value={input.value.vcpuCount}
+      />
+      <ResourceSliderField
+        capability={createResourceCapabilityFromTierValues({
+          defaultValue: input.value.memoryMb,
+          values: input.tiers.map((tier) => tier.memoryMb),
+        })}
+        disabled={input.disabled}
+        formatValue={formatMemoryResourceValue}
+        id="sandbox-profile-runtime-memory"
+        label="Memory (MB)"
+        onChange={(value) => {
+          input.onChange(
+            selectNearestResourceTier({
+              current: input.value,
+              dimension: "memoryMb",
+              tiers: input.tiers,
+              value,
+            }),
+          );
+        }}
+        value={input.value.memoryMb}
+      />
+    </>
+  );
+}
+
+function createResourceCapabilityFromTierValues(input: {
+  defaultValue: number;
+  values: readonly number[];
+}): ResourceCapability {
+  const sortedValues = [...new Set(input.values)].sort((left, right) => left - right);
+  const firstValue = sortedValues[0];
+  const lastValue = sortedValues.at(-1);
+  if (firstValue === undefined || lastValue === undefined) {
+    throw new Error("Resource tier sliders require at least one supported resource tier.");
+  }
+
+  return {
+    min: firstValue,
+    max: lastValue,
+    step: resolveResourceTierSliderStep(sortedValues),
+    default: input.defaultValue,
+  };
+}
+
+function resolveResourceTierSliderStep(values: readonly number[]): number {
+  let step = 0;
+  for (let index = 1; index < values.length; index += 1) {
+    const previousValue = values[index - 1];
+    const value = values[index];
+    if (previousValue === undefined || value === undefined) {
+      continue;
+    }
+
+    const difference = value - previousValue;
+    if (difference > 0 && (step === 0 || difference < step)) {
+      step = difference;
+    }
+  }
+
+  return step === 0 ? 1 : step;
+}
+
+export function selectNearestResourceTier(input: {
+  current: Pick<NonNullable<SandboxProfileVersion["sandboxResources"]>, "memoryMb" | "vcpuCount">;
+  dimension: "memoryMb" | "vcpuCount";
+  tiers: NonNullable<
+    NonNullable<SandboxProviderSummary["resourceCapabilities"]>["validResourcePairs"]
+  >;
+  value: number;
+}): NonNullable<SandboxProfileVersion["sandboxResources"]> {
+  const [nearestTier] = [...input.tiers].sort((left, right) => {
+    const changedDifference =
+      Math.abs(left[input.dimension] - input.value) -
+      Math.abs(right[input.dimension] - input.value);
+    if (changedDifference !== 0) {
+      return changedDifference;
+    }
+
+    const pairedDimension = input.dimension === "vcpuCount" ? "memoryMb" : "vcpuCount";
+    return (
+      Math.abs(left[pairedDimension] - input.current[pairedDimension]) -
+      Math.abs(right[pairedDimension] - input.current[pairedDimension])
+    );
+  });
+
+  if (nearestTier === undefined) {
+    throw new Error("Resource tier sliders require at least one supported resource tier.");
+  }
+
+  return {
+    vcpuCount: nearestTier.vcpuCount,
+    memoryMb: nearestTier.memoryMb,
+  };
 }
 
 function createNextResourcesForFieldChange(input: {

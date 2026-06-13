@@ -191,6 +191,11 @@ memory_mb = 8192
 enabled = true
 api_key = "replace-with-tensorlake-api-key"
 
+[sandbox.opencomputer]
+enabled = true
+api_key = "replace-with-opencomputer-api-key"
+#api_base_url = "https://app.opencomputer.dev/api"
+
 #[sandbox.docker]
 #enabled = true
 #socket_path = "/var/run/docker.sock"

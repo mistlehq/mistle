@@ -243,6 +243,17 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
         : config.sandbox.tensorlake?.enabled === false
           ? { tensorlake: { enabled: false } }
           : {}),
+      ...(config.sandbox.opencomputer?.enabled === true
+        ? {
+            opencomputer: {
+              enabled: true,
+              apiKey: config.sandbox.opencomputer.api_key,
+              apiBaseUrl: config.sandbox.opencomputer.api_base_url,
+            },
+          }
+        : config.sandbox.opencomputer?.enabled === false
+          ? { opencomputer: { enabled: false } }
+          : {}),
       ...(config.sandbox.modal?.enabled === true
         ? {
             modal: {
@@ -369,6 +380,16 @@ export function selectDataPlaneApiConfig(config: Config): DataPlaneApiConfig {
               apiKey: config.sandbox.tensorlake.api_key,
             }
           : config.sandbox.tensorlake?.enabled === false
+            ? { enabled: false }
+            : undefined,
+      opencomputer:
+        config.sandbox.opencomputer?.enabled === true
+          ? {
+              enabled: true,
+              apiKey: config.sandbox.opencomputer.api_key,
+              apiBaseUrl: config.sandbox.opencomputer.api_base_url,
+            }
+          : config.sandbox.opencomputer?.enabled === false
             ? { enabled: false }
             : undefined,
       modal:
@@ -507,6 +528,16 @@ export function selectDataPlaneWorkerConfig(config: Config): DataPlaneWorkerConf
               apiKey: config.sandbox.tensorlake.api_key,
             }
           : config.sandbox.tensorlake?.enabled === false
+            ? { enabled: false }
+            : undefined,
+      opencomputer:
+        config.sandbox.opencomputer?.enabled === true
+          ? {
+              enabled: true,
+              apiKey: config.sandbox.opencomputer.api_key,
+              apiBaseUrl: config.sandbox.opencomputer.api_base_url,
+            }
+          : config.sandbox.opencomputer?.enabled === false
             ? { enabled: false }
             : undefined,
       modal:

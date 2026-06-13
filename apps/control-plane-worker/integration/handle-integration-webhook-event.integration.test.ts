@@ -22,6 +22,7 @@ import type { CompiledRuntimePlan } from "@mistle/integrations-core";
 import {
   AssociatedProviderResourceKinds,
   AssociatedResourceEventTypes,
+  SlackThreadMessageModes,
 } from "@mistle/integrations-core";
 import {
   createIntegrationRegistry,
@@ -256,6 +257,269 @@ describe.concurrent("control-plane worker integration webhook event handling", (
     expect(retriedPreparedEvent.providerResourceAssociationDeliveries[0]).toMatchObject({
       providerResourceAssociationId: associationId,
     });
+  });
+
+  it("queues provider resource association deliveries for threaded Slack app mentions", async ({
+    env,
+  }) => {
+    const scope = await seedWebhookEventScope({
+      env,
+      suffix: createSuffix("slack_association_delivery"),
+      familyId: "slack",
+      variantId: "slack-default",
+      targetConfig: {},
+      connectionConfig: {
+        bot_user_id: "U_BOT_SLACK_ASSOCIATION",
+      },
+      eventType: "slack:app_mention",
+      providerEventType: "app_mention",
+      payload: {
+        event: {
+          channel: "C123",
+          mistle_thread_root_ts: "1710000000.000100",
+          text: "Can you follow up here?",
+          thread_ts: "1710000000.000100",
+          ts: "1710000001.000200",
+          user: "U_HUMAN_SLACK_ASSOCIATION",
+        },
+      },
+      externalEventId: "evt_slack_association_delivery",
+      externalDeliveryId: "delivery_slack_association_delivery",
+      createTrigger: false,
+    });
+    const sandboxInstanceId = "sbi_slack_association_delivery";
+    const associationId = "pra_slack_association_delivery";
+
+    await seedSandboxInstance({
+      env,
+      organizationId: scope.organizationId,
+      sandboxProfileId: scope.sandboxProfileId,
+      sandboxProfileVersion: scope.sandboxProfileVersion,
+      sandboxInstanceId,
+      associatedResourceEventRouting: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+            eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+            messageMode: SlackThreadMessageModes.APP_MENTIONS_ONLY,
+          },
+        ],
+      },
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.providerResourceAssociations).values({
+      id: associationId,
+      integrationConnectionId: scope.connectionId,
+      resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+      providerResourceId: "C123:1710000000.000100",
+      sandboxInstanceId,
+    });
+
+    const preparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+
+    expect(preparedEvent).toMatchObject({
+      webhookEventId: scope.webhookEventId,
+      webhookEventStatus: IntegrationWebhookEventStatuses.PROCESSING,
+      finalized: false,
+      triggerRunIds: [],
+    });
+    expect(preparedEvent.providerResourceAssociationDeliveries).toHaveLength(1);
+    expect(preparedEvent.providerResourceAssociationDeliveries[0]).toMatchObject({
+      providerResourceAssociationId: associationId,
+    });
+
+    const queuedDeliveries =
+      await env.controlPlaneDb.query.providerResourceAssociationDeliveries.findMany({
+        where: (table, { eq }) => eq(table.sourceWebhookEventId, scope.webhookEventId),
+      });
+    expect(queuedDeliveries).toHaveLength(1);
+    expect(queuedDeliveries[0]).toMatchObject({
+      providerResourceAssociationId: associationId,
+      sourceWebhookEventId: scope.webhookEventId,
+      sourceOrderKey: "2026-03-09T00:00:00Z#0001",
+      status: ProviderResourceAssociationDeliveryStatuses.QUEUED,
+      renderedInput: [
+        "Slack channel: C123",
+        "Thread root: 1710000000.000100",
+        "Event type: slack.thread.message.created",
+        "Author: U_HUMAN_SLACK_ASSOCIATION",
+        "",
+        "Thread reply:",
+        "Message text: Can you follow up here?",
+      ].join("\n"),
+    });
+  });
+
+  it("does not queue provider resource association deliveries for top-level Slack app mentions", async ({
+    env,
+  }) => {
+    const scope = await seedWebhookEventScope({
+      env,
+      suffix: createSuffix("slack_association_top_level_app_mention"),
+      familyId: "slack",
+      variantId: "slack-default",
+      targetConfig: {},
+      connectionConfig: {
+        bot_user_id: "U_BOT_SLACK_ASSOCIATION_TOP_LEVEL",
+      },
+      eventType: "slack:app_mention",
+      providerEventType: "app_mention",
+      payload: {
+        event: {
+          channel: "C123",
+          mistle_thread_root_ts: "1710000000.000100",
+          text: "Can you start something new?",
+          thread_ts: "1710000000.000100",
+          ts: "1710000000.000100",
+          user: "U_HUMAN_SLACK_ASSOCIATION_TOP_LEVEL",
+        },
+      },
+      externalEventId: "evt_slack_association_top_level_app_mention",
+      externalDeliveryId: "delivery_slack_association_top_level_app_mention",
+      createTrigger: false,
+    });
+    const sandboxInstanceId = "sbi_slack_association_top_level_app_mention";
+    const associationId = "pra_slack_association_top_level_app_mention";
+
+    await seedSandboxInstance({
+      env,
+      organizationId: scope.organizationId,
+      sandboxProfileId: scope.sandboxProfileId,
+      sandboxProfileVersion: scope.sandboxProfileVersion,
+      sandboxInstanceId,
+      associatedResourceEventRouting: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+            eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+          },
+        ],
+      },
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.providerResourceAssociations).values({
+      id: associationId,
+      integrationConnectionId: scope.connectionId,
+      resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+      providerResourceId: "C123:1710000000.000100",
+      sandboxInstanceId,
+    });
+
+    const preparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+
+    expect(preparedEvent).toMatchObject({
+      webhookEventId: scope.webhookEventId,
+      webhookEventStatus: IntegrationWebhookEventStatuses.IGNORED,
+      finalized: true,
+      triggerRunIds: [],
+    });
+    expect(preparedEvent.providerResourceAssociationDeliveries).toEqual([]);
+
+    const queuedDeliveries =
+      await env.controlPlaneDb.query.providerResourceAssociationDeliveries.findMany({
+        where: (table, { eq }) => eq(table.sourceWebhookEventId, scope.webhookEventId),
+      });
+    expect(queuedDeliveries).toEqual([]);
+  });
+
+  it("does not queue ordinary Slack thread messages when Slack routing only receives app mentions", async ({
+    env,
+  }) => {
+    const scope = await seedWebhookEventScope({
+      env,
+      suffix: createSuffix("slack_association_app_mentions_only_excludes_message"),
+      familyId: "slack",
+      variantId: "slack-default",
+      targetConfig: {},
+      connectionConfig: {
+        bot_user_id: "U_BOT_SLACK_ASSOCIATION_APP_MENTIONS_ONLY",
+      },
+      eventType: "slack:message",
+      providerEventType: "message",
+      payload: {
+        event: {
+          channel: "C123",
+          mistle_thread_root_ts: "1710000000.000100",
+          text: "Can you follow up here?",
+          thread_ts: "1710000000.000100",
+          ts: "1710000001.000200",
+          user: "U_HUMAN_SLACK_ASSOCIATION_APP_MENTIONS_ONLY",
+        },
+      },
+      externalEventId: "evt_slack_association_app_mentions_only_excludes_message",
+      externalDeliveryId: "delivery_slack_association_app_mentions_only_excludes_message",
+      createTrigger: false,
+    });
+    const sandboxInstanceId = "sbi_slack_association_app_mentions_only_excludes_message";
+    const associationId = "pra_slack_association_app_mentions_only_excludes_message";
+
+    await seedSandboxInstance({
+      env,
+      organizationId: scope.organizationId,
+      sandboxProfileId: scope.sandboxProfileId,
+      sandboxProfileVersion: scope.sandboxProfileVersion,
+      sandboxInstanceId,
+      associatedResourceEventRouting: {
+        enabled: true,
+        resources: [
+          {
+            resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+            eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+            messageMode: SlackThreadMessageModes.APP_MENTIONS_ONLY,
+          },
+        ],
+      },
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.providerResourceAssociations).values({
+      id: associationId,
+      integrationConnectionId: scope.connectionId,
+      resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+      providerResourceId: "C123:1710000000.000100",
+      sandboxInstanceId,
+    });
+
+    const preparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+
+    expect(preparedEvent).toMatchObject({
+      webhookEventId: scope.webhookEventId,
+      webhookEventStatus: IntegrationWebhookEventStatuses.IGNORED,
+      finalized: true,
+      triggerRunIds: [],
+    });
+    expect(preparedEvent.providerResourceAssociationDeliveries).toEqual([]);
+
+    const queuedDeliveries =
+      await env.controlPlaneDb.query.providerResourceAssociationDeliveries.findMany({
+        where: (table, { eq }) => eq(table.sourceWebhookEventId, scope.webhookEventId),
+      });
+    expect(queuedDeliveries).toEqual([]);
   });
 
   it("skips trigger runs when association delivery targets the existing trigger conversation sandbox", async ({
@@ -1341,6 +1605,7 @@ async function seedSandboxInstance(input: {
   sandboxProfileId: string;
   sandboxProfileVersion: number;
   sandboxInstanceId: string;
+  associatedResourceEventRouting?: CompiledRuntimePlan["associatedResourceEventRouting"];
 }): Promise<void> {
   await input.env.dataPlaneDb.insert(input.env.dataPlaneTables.sandboxInstances).values({
     id: input.sandboxInstanceId,
@@ -1361,6 +1626,9 @@ async function seedSandboxInstance(input: {
     compiledRuntimePlan: createRuntimePlan({
       sandboxProfileId: input.sandboxProfileId,
       sandboxProfileVersion: input.sandboxProfileVersion,
+      ...(input.associatedResourceEventRouting === undefined
+        ? {}
+        : { associatedResourceEventRouting: input.associatedResourceEventRouting }),
     }),
     compiledFromProfileId: input.sandboxProfileId,
     compiledFromProfileVersion: input.sandboxProfileVersion,
@@ -1404,6 +1672,7 @@ async function seedTriggerConversationRoute(input: {
 function createRuntimePlan(input: {
   sandboxProfileId: string;
   sandboxProfileVersion: number;
+  associatedResourceEventRouting?: CompiledRuntimePlan["associatedResourceEventRouting"];
 }): CompiledRuntimePlan {
   return {
     sandboxProfileId: input.sandboxProfileId,
@@ -1415,7 +1684,7 @@ function createRuntimePlan(input: {
     egressRoutes: [],
     artifacts: [],
     workspaceSources: [],
-    associatedResourceEventRouting: {
+    associatedResourceEventRouting: input.associatedResourceEventRouting ?? {
       enabled: true,
       resources: [
         {

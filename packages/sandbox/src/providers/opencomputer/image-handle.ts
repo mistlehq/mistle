@@ -4,15 +4,21 @@ import { createHash } from "node:crypto";
 import { SandboxConfigurationError } from "../../errors.js";
 import { SandboxProvider, type SandboxImageHandle } from "../../types.js";
 import {
+  createOpenComputerBaseImage,
+  createOpenComputerImageManifest,
+} from "./image-definition.js";
+import {
   OpenComputerImageHandleKinds,
   OpenComputerImageManifestSchema,
   type OpenComputerImageManifest,
   type OpenComputerStartImage,
+  type ValidatedOpenComputerSandboxConfig,
 } from "./schemas.js";
 
 const OpenComputerBaseImageNamePrefix = "mistle";
 const OpenComputerSha256DigestPrefix = "@sha256:";
 const OpenComputerBaseImageDigestLength = 24;
+const OpenComputerBaseImageManifestDigestLength = 12;
 const OpenComputerDeferredImageManifestSeparator = "#";
 
 export function createOpenComputerDeferredImageHandle(input: {
@@ -73,8 +79,52 @@ export function parseOpenComputerImageHandle(handle: SandboxImageHandle): OpenCo
   throw new SandboxConfigurationError(`Unsupported OpenComputer image handle kind "${kind}".`);
 }
 
-export function createOpenComputerBaseImageName(baseImageRef: string): string {
-  return `${OpenComputerBaseImageNamePrefix}-${createOpenComputerBaseImageNameDigest(baseImageRef)}`;
+export function resolveOpenComputerStartImage(
+  handle: SandboxImageHandle,
+  input?: {
+    readonly sandboxd?: ValidatedOpenComputerSandboxConfig["sandboxd"];
+  },
+): OpenComputerStartImage {
+  if (handle.provider !== SandboxProvider.OPENCOMPUTER) {
+    throw new SandboxConfigurationError(
+      `Expected OpenComputer image handle, received provider '${handle.provider}'.`,
+    );
+  }
+
+  if (hasOpenComputerImageKindPrefix(handle.imageId)) {
+    return parseOpenComputerImageHandle(handle);
+  }
+
+  if (isOciImageRef(handle.imageId)) {
+    const image = createOpenComputerBaseImage({
+      source: { kind: "image", imageId: handle.imageId },
+      ...(input?.sandboxd === undefined ? {} : { sandboxd: input.sandboxd }),
+    });
+    const manifest = createOpenComputerImageManifest(image);
+    return {
+      kind: OpenComputerImageHandleKinds.IMAGE,
+      id: createOpenComputerBaseImageName({
+        baseImageRef: handle.imageId,
+        manifest,
+      }),
+      manifest,
+    };
+  }
+
+  return parseOpenComputerImageHandle(handle);
+}
+
+export function createOpenComputerBaseImageName(input: {
+  readonly baseImageRef: string;
+  readonly manifest?: OpenComputerImageManifest;
+}): string {
+  return [
+    OpenComputerBaseImageNamePrefix,
+    createOpenComputerBaseImageNameDigest(input.baseImageRef),
+    ...(input.manifest === undefined
+      ? []
+      : [createOpenComputerImageManifestNameDigest(input.manifest)]),
+  ].join("-");
 }
 
 function createOpenComputerImageHandle(
@@ -123,6 +173,20 @@ function requireNonEmptyOpenComputerImageId(imageId: string): string {
   return normalizedImageId;
 }
 
+function isOciImageRef(imageId: string): boolean {
+  return imageId.trim().includes("/");
+}
+
+function hasOpenComputerImageKindPrefix(imageId: string): boolean {
+  const normalizedImageId = imageId.trim();
+  return (
+    normalizedImageId.startsWith(`${OpenComputerImageHandleKinds.IMAGE}:`) ||
+    normalizedImageId.startsWith(`${OpenComputerImageHandleKinds.SNAPSHOT}:`) ||
+    normalizedImageId.startsWith(`${OpenComputerImageHandleKinds.CHECKPOINT}:`) ||
+    normalizedImageId.startsWith(`${OpenComputerImageHandleKinds.TEMPLATE}:`)
+  );
+}
+
 function createOpenComputerBaseImageNameDigest(baseImageRef: string): string {
   const normalizedBaseImageRef = requireNonEmptyOpenComputerImageId(baseImageRef);
   const digestIndex = normalizedBaseImageRef.indexOf(OpenComputerSha256DigestPrefix);
@@ -141,6 +205,13 @@ function createOpenComputerBaseImageNameDigest(baseImageRef: string): string {
     .slice(0, OpenComputerBaseImageDigestLength);
 }
 
+function createOpenComputerImageManifestNameDigest(manifest: OpenComputerImageManifest): string {
+  return createHash("sha256")
+    .update(stableStringify(OpenComputerImageManifestSchema.parse(manifest)))
+    .digest("hex")
+    .slice(0, OpenComputerBaseImageManifestDigestLength);
+}
+
 function encodeOpenComputerImageManifest(manifest: OpenComputerImageManifest): string {
   return Buffer.from(JSON.stringify(OpenComputerImageManifestSchema.parse(manifest))).toString(
     "base64url",
@@ -156,4 +227,24 @@ function decodeOpenComputerImageManifest(encodedManifest: string): OpenComputerI
   }
 
   return OpenComputerImageManifestSchema.parse(decoded);
+}
+
+function stableStringify(value: unknown): string {
+  return JSON.stringify(sortJsonValue(value));
+}
+
+function sortJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sortJsonValue);
+  }
+
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entryValue]) => [key, sortJsonValue(entryValue)]),
+    );
+  }
+
+  return value;
 }

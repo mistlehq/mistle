@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdirSync, readdirSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,8 +11,18 @@ import {
   SandboxProvider,
   createSandboxBaseImageBuilder,
   createFreestyleSnapshotBaseImageName,
+  createOpenComputerBaseImageName,
+  createOpenComputerCheckpointImageHandle,
+  createOpenComputerSnapshotImageHandle,
   createTensorlakeRegisteredBaseImageName,
 } from "../../packages/sandbox/src/index.js";
+import { OpenComputerClientOperationIds } from "../../packages/sandbox/src/providers/opencomputer/client-errors.js";
+import {
+  OpenComputerApiClient,
+  createOpenComputerRootShellCommand,
+  createOpenComputerBaseImage,
+  createOpenComputerImageManifest,
+} from "../../packages/sandbox/src/providers/opencomputer/client.js";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, "..", "..");
@@ -24,10 +34,15 @@ const TENSORLAKE_SANDBOXD_BINARY_PATH = "packages/sandboxd/.generated/tensorlake
 const TENSORLAKE_SANDBOXD_ARCHIVE_PATH = `${TENSORLAKE_SANDBOXD_BINARY_PATH}.gz`;
 const TENSORLAKE_SANDBOXD_ARCHIVE_PARTS_PATH =
   "packages/sandboxd/.generated/tensorlake/sandboxd-parts";
+const OPENCOMPUTER_SANDBOXD_BINARY_PATH = "dev/.generated/sandbox-base/opencomputer/sandboxd";
+const OPENCOMPUTER_SANDBOXD_ARCHIVE_PATH = `${OPENCOMPUTER_SANDBOXD_BINARY_PATH}.gz`;
+const OPENCOMPUTER_SANDBOXD_ARCHIVE_PARTS_PATH =
+  "dev/.generated/sandbox-base/opencomputer/sandboxd-parts";
 const SANDBOX_BASE_TARGET = "sandbox-base";
 const SANDBOX_BASE_SYSTEM_TESTS_TARGET = "sandbox-base-system-tests";
 const SANDBOXD_BUILD_ARTIFACT_PATH = "/app/packages/sandboxd/target/release/sandboxd";
 const TENSORLAKE_COPY_PART_SIZE = "512k";
+const OPENCOMPUTER_COPY_PART_SIZE = "64k";
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
 const SandboxBaseImageRefEnv = "MISTLE_SANDBOX_BASE_IMAGE_REF";
 const E2BApiKeyEnv = "E2B_API_KEY";
@@ -36,13 +51,20 @@ const FreestyleApiKeyEnv = "FREESTYLE_API_KEY";
 const FreestyleConfigApiKeyEnv = "MISTLE_SANDBOX_FREESTYLE_API_KEY";
 const TensorlakeApiKeyEnv = "TENSORLAKE_API_KEY";
 const TensorlakeConfigApiKeyEnv = "MISTLE_SANDBOX_TENSORLAKE_API_KEY";
+const OpenComputerApiKeyEnv = "OPENCOMPUTER_API_KEY";
+const OpenComputerConfigApiKeyEnv = "MISTLE_SANDBOX_OPENCOMPUTER_API_KEY";
+const OpenComputerApiBaseUrlEnv = "OPENCOMPUTER_API_URL";
+const OpenComputerConfigApiBaseUrlEnv = "MISTLE_SANDBOX_OPENCOMPUTER_API_BASE_URL";
 
 const SandboxdSources = {
   LOCAL: "local",
   RELEASE: "release",
 } as const;
 type SandboxdSource = (typeof SandboxdSources)[keyof typeof SandboxdSources];
-type SdkImageProvider = typeof SandboxProvider.FREESTYLE | typeof SandboxProvider.TENSORLAKE;
+type SdkImageProvider =
+  | typeof SandboxProvider.FREESTYLE
+  | typeof SandboxProvider.OPENCOMPUTER
+  | typeof SandboxProvider.TENSORLAKE;
 
 type ParsedCliArguments = {
   additionalOutputImageRefs: string[];
@@ -100,6 +122,22 @@ Tensorlake options:
   --platform <value>                   Linux platform for the sandboxd build artifact (default: ${DEFAULT_PLATFORM})
                                           Uses the Tensorlake SDK image builder
 
+OpenComputer options:
+  --output-image-ref <name>            OpenComputer snapshot name
+                                          Defaults to the deterministic name for --source-image-ref
+                                          Only supported with --sandboxd-source release
+  --source-image-ref <ref>             Source image ref used for deterministic naming and manifest identity
+  --api-key <key>                      OpenComputer API key
+  --domain <domain>                    OpenComputer API base URL
+  --sandboxd-source <local|release>    sandboxd source for the OpenComputer image
+                                          local creates a checkpoint image handle
+                                          release creates a named snapshot image handle
+  --sandboxd-artifact-url <url>        Release sandboxd artifact URL when --sandboxd-source release
+  --sandboxd-artifact-sha256 <sha256>  Release sandboxd artifact SHA256 when --sandboxd-source release
+  --sandboxd-artifact-version <value>  Release sandboxd version when --sandboxd-source release
+  --platform <value>                   Linux platform for the sandboxd build artifact (default: ${DEFAULT_PLATFORM})
+                                          Uses the OpenComputer SDK image builder
+
 Freestyle options:
   --output-image-ref <name>            Freestyle snapshot name
                                           Defaults to the deterministic name for --source-image-ref
@@ -138,13 +176,14 @@ function parseProvider(value: string): SandboxProvider {
     value === SandboxProvider.DOCKER ||
     value === SandboxProvider.E2B ||
     value === SandboxProvider.FREESTYLE ||
+    value === SandboxProvider.OPENCOMPUTER ||
     value === SandboxProvider.TENSORLAKE
   ) {
     return value;
   }
 
   throw new Error(
-    `--provider must be ${SandboxProvider.DOCKER}, ${SandboxProvider.E2B}, ${SandboxProvider.FREESTYLE}, or ${SandboxProvider.TENSORLAKE}.`,
+    `--provider must be ${SandboxProvider.DOCKER}, ${SandboxProvider.E2B}, ${SandboxProvider.FREESTYLE}, ${SandboxProvider.OPENCOMPUTER}, or ${SandboxProvider.TENSORLAKE}.`,
   );
 }
 
@@ -394,20 +433,87 @@ function createDevTag(gitHeadSha: string): string {
 }
 
 function prepareTensorlakeSandboxdBinary(platform: string): void {
-  const imageTag = `mistle-sandboxd-tensorlake-build:${randomUUID()}`;
-  const binaryPath = resolve(REPO_ROOT, TENSORLAKE_SANDBOXD_BINARY_PATH);
-  const archivePath = resolve(REPO_ROOT, TENSORLAKE_SANDBOXD_ARCHIVE_PATH);
   const archivePartsPath = resolve(REPO_ROOT, TENSORLAKE_SANDBOXD_ARCHIVE_PARTS_PATH);
+
+  prepareLocalSandboxdArchive({
+    archivePath: resolve(REPO_ROOT, TENSORLAKE_SANDBOXD_ARCHIVE_PATH),
+    binaryPath: resolve(REPO_ROOT, TENSORLAKE_SANDBOXD_BINARY_PATH),
+    buildImageTag: `mistle-sandboxd-tensorlake-build:${randomUUID()}`,
+    label: "Tensorlake",
+    platform,
+  });
+
+  rmSync(archivePartsPath, { force: true, recursive: true });
+  mkdirSync(archivePartsPath, { recursive: true });
+  execFileSync(
+    "split",
+    [
+      "-b",
+      TENSORLAKE_COPY_PART_SIZE,
+      resolve(REPO_ROOT, TENSORLAKE_SANDBOXD_ARCHIVE_PATH),
+      resolve(archivePartsPath, "part-"),
+    ],
+    {
+      cwd: REPO_ROOT,
+      stdio: "inherit",
+    },
+  );
+
+  console.log(
+    `Prepared ${String(readdirSync(archivePartsPath).length)} Tensorlake sandboxd archive parts.`,
+  );
+}
+
+function prepareOpenComputerSandboxdBinary(platform: string): void {
+  const archivePartsPath = resolve(REPO_ROOT, OPENCOMPUTER_SANDBOXD_ARCHIVE_PARTS_PATH);
+
+  prepareLocalSandboxdArchive({
+    archivePath: resolve(REPO_ROOT, OPENCOMPUTER_SANDBOXD_ARCHIVE_PATH),
+    binaryPath: resolve(REPO_ROOT, OPENCOMPUTER_SANDBOXD_BINARY_PATH),
+    buildImageTag: `mistle-sandboxd-opencomputer-build:${randomUUID()}`,
+    label: "OpenComputer",
+    platform,
+  });
+
+  rmSync(archivePartsPath, { force: true, recursive: true });
+  mkdirSync(archivePartsPath, { recursive: true });
+  execFileSync(
+    "split",
+    [
+      "-b",
+      OPENCOMPUTER_COPY_PART_SIZE,
+      resolve(REPO_ROOT, OPENCOMPUTER_SANDBOXD_ARCHIVE_PATH),
+      resolve(archivePartsPath, "part-"),
+    ],
+    {
+      cwd: REPO_ROOT,
+      stdio: "inherit",
+    },
+  );
+
+  console.log(
+    `Prepared ${String(readdirSync(archivePartsPath).length)} OpenComputer sandboxd archive parts.`,
+  );
+}
+
+function prepareLocalSandboxdArchive(input: {
+  readonly archivePath: string;
+  readonly binaryPath: string;
+  readonly buildImageTag: string;
+  readonly label: string;
+  readonly platform: string;
+}): void {
+  const imageTag = input.buildImageTag;
+  const binaryPath = input.binaryPath;
+  const archivePath = input.archivePath;
   let containerId: string | undefined;
   let imageBuilt = false;
   let primaryError: unknown;
 
-  console.log(`Building Linux sandboxd artifact for Tensorlake (${platform}).`);
+  console.log(`Building Linux sandboxd artifact for ${input.label} (${input.platform}).`);
   mkdirSync(dirname(binaryPath), { recursive: true });
   rmSync(binaryPath, { force: true });
   rmSync(archivePath, { force: true });
-  rmSync(archivePartsPath, { force: true, recursive: true });
-  mkdirSync(archivePartsPath, { recursive: true });
 
   try {
     execFileSync(
@@ -415,7 +521,7 @@ function prepareTensorlakeSandboxdBinary(platform: string): void {
       [
         "build",
         "--platform",
-        platform,
+        input.platform,
         "--target",
         "sandboxd-build",
         "--tag",
@@ -431,7 +537,7 @@ function prepareTensorlakeSandboxdBinary(platform: string): void {
     );
     imageBuilt = true;
 
-    containerId = execFileSync("docker", ["create", "--platform", platform, imageTag], {
+    containerId = execFileSync("docker", ["create", "--platform", input.platform, imageTag], {
       cwd: REPO_ROOT,
       encoding: "utf8",
     }).trim();
@@ -444,18 +550,8 @@ function prepareTensorlakeSandboxdBinary(platform: string): void {
       cwd: REPO_ROOT,
       stdio: "inherit",
     });
-    execFileSync(
-      "split",
-      ["-b", TENSORLAKE_COPY_PART_SIZE, archivePath, resolve(archivePartsPath, "part-")],
-      {
-        cwd: REPO_ROOT,
-        stdio: "inherit",
-      },
-    );
 
-    console.log(
-      `Prepared ${String(readdirSync(archivePartsPath).length)} Tensorlake sandboxd archive parts.`,
-    );
+    console.log(`Prepared ${input.label} sandboxd archive at ${archivePath}.`);
   } catch (error) {
     primaryError = error;
     throw error;
@@ -555,6 +651,32 @@ function createTensorlakeSandboxdSource(argumentsList: ParsedCliArguments):
   }
 
   return createReleaseSandboxdSource(argumentsList, SandboxProvider.TENSORLAKE);
+}
+
+function createOpenComputerSandboxdSource(argumentsList: ParsedCliArguments):
+  | {
+      kind: typeof SandboxSdkImageSandboxdSourceKinds.LOCAL;
+    }
+  | {
+      kind: typeof SandboxSdkImageSandboxdSourceKinds.RELEASE;
+      artifact: {
+        version: string;
+        url: string;
+        sha256: string;
+      };
+    } {
+  const sandboxdSource = argumentsList.sandboxdSource;
+  if (sandboxdSource === undefined) {
+    throw new Error("--sandboxd-source is required when --provider is opencomputer.");
+  }
+
+  if (sandboxdSource === SandboxdSources.LOCAL) {
+    return {
+      kind: SandboxSdkImageSandboxdSourceKinds.LOCAL,
+    };
+  }
+
+  return createReleaseSandboxdSource(argumentsList, SandboxProvider.OPENCOMPUTER);
 }
 
 function createReleaseSandboxdSource(
@@ -762,6 +884,255 @@ async function buildFreestyleBaseImage(argumentsList: ParsedCliArguments): Promi
   console.log(`Freestyle sandbox snapshot is ready: ${image.imageId}.`);
 }
 
+async function buildOpenComputerBaseImage(argumentsList: ParsedCliArguments): Promise<void> {
+  const apiKey =
+    argumentsList.apiKey ??
+    readOptionalEnv(OpenComputerApiKeyEnv) ??
+    readOptionalEnv(OpenComputerConfigApiKeyEnv);
+  const apiBaseUrl =
+    argumentsList.domain ??
+    readOptionalEnv(OpenComputerApiBaseUrlEnv) ??
+    readOptionalEnv(OpenComputerConfigApiBaseUrlEnv);
+
+  if (apiKey === undefined || apiKey.trim() === "") {
+    throw new Error(
+      `--api-key, ${OpenComputerApiKeyEnv}, or ${OpenComputerConfigApiKeyEnv} is required when --provider is opencomputer.`,
+    );
+  }
+
+  if (argumentsList.target !== undefined) {
+    throw new Error(
+      "--target is not supported when --provider is opencomputer. OpenComputer uses the provider SDK image builder.",
+    );
+  }
+
+  if (argumentsList.repositoryProvided) {
+    throw new Error("--repository is not supported when --provider is opencomputer.");
+  }
+
+  if (argumentsList.tag !== undefined) {
+    throw new Error("--tag is not supported when --provider is opencomputer.");
+  }
+
+  if (argumentsList.additionalOutputImageRefs.length > 0) {
+    throw new Error(
+      "--additional-output-image-ref is not supported when --provider is opencomputer.",
+    );
+  }
+
+  if (argumentsList.publishMode !== SandboxBaseImagePublishModes.PUSH) {
+    throw new Error("--publish-mode must be push when --provider is opencomputer.");
+  }
+
+  if (Object.keys(argumentsList.labels).length > 0) {
+    throw new Error("--label is not supported when --provider is opencomputer.");
+  }
+
+  const sourceImageRef = requireSdkSourceImageRef(argumentsList, SandboxProvider.OPENCOMPUTER);
+  const sandboxd = createOpenComputerSandboxdSource(argumentsList);
+  if (sandboxd.kind === SandboxSdkImageSandboxdSourceKinds.LOCAL) {
+    const platform = argumentsList.platform ?? DEFAULT_PLATFORM;
+    prepareOpenComputerSandboxdBinary(platform);
+  } else if (argumentsList.platform !== undefined) {
+    throw new Error("--platform is only supported when --sandboxd-source is local.");
+  }
+
+  if (
+    sandboxd.kind === SandboxSdkImageSandboxdSourceKinds.LOCAL &&
+    argumentsList.outputImageRef !== undefined
+  ) {
+    throw new Error(
+      "--output-image-ref is only supported when --provider is opencomputer and --sandboxd-source is release. Local OpenComputer builds produce checkpoint image handles.",
+    );
+  }
+
+  if (sandboxd.kind === SandboxSdkImageSandboxdSourceKinds.LOCAL) {
+    await buildOpenComputerLocalCheckpointBaseImage({
+      apiKey,
+      sourceImageRef,
+      ...(apiBaseUrl === undefined ? {} : { apiBaseUrl }),
+    });
+    return;
+  }
+
+  const image = createOpenComputerBaseImage({
+    source: {
+      kind: "sdk_image",
+      imageId: argumentsList.outputImageRef ?? sourceImageRef,
+      baseImageRef: sourceImageRef,
+    },
+    sandboxd,
+  });
+
+  const manifest = createOpenComputerImageManifest(image);
+  const outputImageRef =
+    argumentsList.outputImageRef ??
+    createOpenComputerBaseImageName({
+      baseImageRef: sourceImageRef,
+      manifest,
+    });
+  const client = new OpenComputerApiClient({
+    config: {
+      apiKey,
+      ...(apiBaseUrl === undefined ? {} : { apiBaseUrl }),
+    },
+  });
+
+  console.log(`Creating OpenComputer sandbox snapshot ${outputImageRef}.`);
+  await client.prepareImage({
+    image: {
+      kind: "image",
+      id: outputImageRef,
+      manifest,
+    },
+  });
+  const imageHandle = createOpenComputerSnapshotImageHandle(outputImageRef);
+
+  console.log(`OpenComputer sandbox snapshot is ready: ${imageHandle.imageId}.`);
+}
+
+async function buildOpenComputerLocalCheckpointBaseImage(input: {
+  readonly apiBaseUrl?: string;
+  readonly apiKey: string;
+  readonly sourceImageRef: string;
+}): Promise<void> {
+  const client = new OpenComputerApiClient({
+    config: {
+      apiKey: input.apiKey,
+      ...(input.apiBaseUrl === undefined ? {} : { apiBaseUrl: input.apiBaseUrl }),
+    },
+  });
+  const image = createOpenComputerBaseImage({
+    source: {
+      kind: "sdk_image",
+      imageId: input.sourceImageRef,
+      baseImageRef: input.sourceImageRef,
+    },
+  });
+  const manifest = createOpenComputerImageManifest(image);
+  const bootstrapSnapshotName = createOpenComputerBaseImageName({
+    baseImageRef: input.sourceImageRef,
+    manifest,
+  });
+  let sandboxId: string | undefined;
+  let primaryError: unknown;
+
+  try {
+    console.log(`Preparing OpenComputer bootstrap snapshot ${bootstrapSnapshotName}.`);
+    const preparedImage = await client.prepareImage({
+      image: {
+        kind: "image",
+        id: bootstrapSnapshotName,
+        manifest,
+      },
+    });
+
+    console.log("Creating OpenComputer sandbox for local sandboxd installation.");
+    const sandbox = await client.startSandbox({
+      image: preparedImage.image,
+    });
+    sandboxId = sandbox.sandboxId;
+
+    await writeOpenComputerLocalSandboxdFiles({
+      client,
+      sandboxId,
+    });
+    await installOpenComputerLocalSandboxd({
+      client,
+      sandboxId,
+    });
+
+    console.log("Checkpointing OpenComputer sandbox with local sandboxd.");
+    const checkpoint = await client.captureSandboxSnapshot({
+      sandboxId,
+      name: createOpenComputerLocalCheckpointName(input.sourceImageRef),
+      requestTimeoutMs: 5 * 60 * 1000,
+    });
+    const imageHandle = createOpenComputerCheckpointImageHandle(checkpoint.checkpointId);
+
+    console.log(`OpenComputer checkpoint image is ready: ${imageHandle.imageId}.`);
+  } catch (error) {
+    primaryError = error;
+    throw error;
+  } finally {
+    if (sandboxId !== undefined) {
+      try {
+        await client.destroySandbox({ sandboxId });
+      } catch (cleanupError) {
+        if (primaryError === undefined) {
+          throw cleanupError;
+        }
+        console.error(`Failed to destroy temporary OpenComputer sandbox ${sandboxId}.`);
+      }
+    }
+    await client.close();
+  }
+}
+
+function createOpenComputerLocalCheckpointName(sourceImageRef: string): string {
+  return createOpenComputerBaseImageName({
+    baseImageRef: `local-sandboxd:${sourceImageRef}`,
+  });
+}
+
+async function writeOpenComputerLocalSandboxdFiles(input: {
+  readonly client: OpenComputerApiClient;
+  readonly sandboxId: string;
+}): Promise<void> {
+  const archivePartsPath = resolve(REPO_ROOT, OPENCOMPUTER_SANDBOXD_ARCHIVE_PARTS_PATH);
+  const partNames = readdirSync(archivePartsPath).sort();
+
+  console.log(`Writing ${String(partNames.length)} sandboxd archive parts to OpenComputer.`);
+  for (const [index, partName] of partNames.entries()) {
+    await input.client.writeFile({
+      sandboxId: input.sandboxId,
+      path: `/tmp/sandboxd-parts/${partName}`,
+      content: readFileSync(resolve(archivePartsPath, partName)),
+    });
+    if ((index + 1) % 10 === 0 || index + 1 === partNames.length) {
+      console.log(`Wrote ${String(index + 1)} of ${String(partNames.length)} sandboxd parts.`);
+    }
+  }
+
+  await input.client.writeFile({
+    sandboxId: input.sandboxId,
+    path: "/tmp/cmddir",
+    content: readFileSync(resolve(REPO_ROOT, "packages/sandboxd/scripts/cmddir")),
+  });
+}
+
+async function installOpenComputerLocalSandboxd(input: {
+  readonly client: OpenComputerApiClient;
+  readonly sandboxId: string;
+}): Promise<void> {
+  const command = createOpenComputerRootShellCommand({
+    script: [
+      "set -eu",
+      "install -d -m 0755 /opt/mistle/bin",
+      "cat /tmp/sandboxd-parts/part-* > /tmp/sandboxd.gz",
+      "gzip -dc /tmp/sandboxd.gz > /opt/mistle/bin/sandboxd",
+      "install -m 0755 /tmp/cmddir /opt/mistle/bin/cmddir",
+      "chmod 0755 /opt/mistle/bin/sandboxd",
+      "ln -sf sandboxd /opt/mistle/bin/mistle-ssh-sign",
+      "ln -sf sandboxd /usr/local/bin/sandboxd",
+      "ln -sf mistle-ssh-sign /usr/local/bin/mistle-ssh-sign",
+      "ln -sf /opt/mistle/bin/cmddir /usr/local/bin/cmddir",
+      "rm -rf /tmp/sandboxd.gz /tmp/sandboxd-parts /tmp/cmddir",
+      "/opt/mistle/bin/sandboxd version",
+    ].join("\n"),
+  });
+  const result = await input.client.runCommand({
+    sandboxId: input.sandboxId,
+    command: command.command,
+    args: command.args,
+    operation: OpenComputerClientOperationIds.BUILD_BASE_IMAGE,
+    commandDescription: "Install local sandboxd in OpenComputer sandbox",
+    timeoutMs: 60_000,
+  });
+
+  console.log(`Installed sandboxd ${result.stdout.trim()}.`);
+}
+
 async function buildE2BBaseImage(argumentsList: ParsedCliArguments): Promise<void> {
   const sourceImageRef = argumentsList.sourceImageRef ?? readOptionalEnv(SandboxBaseImageRefEnv);
   const apiKey =
@@ -815,6 +1186,11 @@ async function main(): Promise<void> {
 
   if (argumentsList.provider === SandboxProvider.FREESTYLE) {
     await buildFreestyleBaseImage(argumentsList);
+    return;
+  }
+
+  if (argumentsList.provider === SandboxProvider.OPENCOMPUTER) {
+    await buildOpenComputerBaseImage(argumentsList);
     return;
   }
 

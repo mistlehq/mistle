@@ -66,6 +66,32 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
     expect(screen.getByRole("tab", { name: "Git" })).toBeTruthy();
   });
 
+  it("renders OpenComputer in the Sandboxes integration group", () => {
+    render(
+      <MemoryRouter>
+        <OrganizationIntegrationsSettingsPageView
+          availableCards={[
+            createSettingsPageCard({
+              targetKey: "opencomputer-default",
+              integrationKind: "sandbox",
+              displayName: "OpenComputer",
+              description: "Run sandboxes on OpenComputer.",
+              logoKey: "opencomputer",
+            }),
+          ]}
+          connectedCards={[]}
+          loadErrorMessage={null}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("tab", { name: "Sandboxes" })).toBeTruthy();
+    expect(screen.getByText("OpenComputer")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Add" }).getAttribute("href")).toBe(
+      "/integrations/opencomputer-default/add",
+    );
+  });
+
   it("renders load errors without a retry action", () => {
     render(
       <OrganizationIntegrationsSettingsPageView

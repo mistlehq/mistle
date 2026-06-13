@@ -7,7 +7,10 @@ import {
   type SandboxImageHandle,
 } from "../../types.js";
 import type { OpenComputerClient } from "./client.js";
-import { createOpenComputerBaseImage, createOpenComputerImageManifest } from "./client.js";
+import {
+  createOpenComputerBaseImage,
+  createOpenComputerImageManifest,
+} from "./image-definition.js";
 import {
   createOpenComputerBaseImageName,
   createOpenComputerDeferredImageHandle,
@@ -34,9 +37,13 @@ export class OpenComputerBaseImageBuilder implements SandboxBaseImageBuilder {
           imageId: request.source.imageId,
         },
       });
+      const manifest = createOpenComputerImageManifest(image);
       return createOpenComputerDeferredImageHandle({
-        imageName: createOpenComputerBaseImageName(request.source.imageId),
-        manifest: createOpenComputerImageManifest(image),
+        imageName: createOpenComputerBaseImageName({
+          baseImageRef: request.source.imageId,
+          manifest,
+        }),
+        manifest,
       });
     }
 

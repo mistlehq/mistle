@@ -1,6 +1,7 @@
 import {
   AssociatedProviderResourceKinds,
   AssociatedResourceEventTypes,
+  SlackThreadMessageModes,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
@@ -42,7 +43,7 @@ import type {
 } from "./sandbox-profiles-types.js";
 
 const AgentRuntimeIdSchema = z.enum(["codex", "opencode", "pi"]);
-const AssociatedResourceEventRoutingResourceRuleSchema = z
+const GitHubPullRequestAssociatedResourceEventRoutingResourceRuleSchema = z
   .object({
     resourceKind: z.enum([AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST]),
     eventTypes: z
@@ -57,6 +58,26 @@ const AssociatedResourceEventRoutingResourceRuleSchema = z
     payloadFilter: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
+const SlackThreadAssociatedResourceEventRoutingResourceRuleSchema = z
+  .object({
+    resourceKind: z.enum([AssociatedProviderResourceKinds.SLACK_THREAD]),
+    eventTypes: z.array(z.enum([AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED])).min(1),
+    messageMode: z
+      .enum([SlackThreadMessageModes.ALL, SlackThreadMessageModes.APP_MENTIONS_ONLY])
+      .optional(),
+    payloadFilter: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
+const AssociatedResourceEventRoutingResourceRuleSchema = z.union([
+  GitHubPullRequestAssociatedResourceEventRoutingResourceRuleSchema,
+  SlackThreadAssociatedResourceEventRoutingResourceRuleSchema,
+]);
+type AssociatedResourceEventRoutingResourceRuleInput = z.infer<
+  typeof AssociatedResourceEventRoutingResourceRuleSchema
+>;
+type AssociatedResourceEventRoutingResourceRule = NonNullable<
+  SandboxProfileVersion["associatedResourceEventRoutingConfig"]["resources"]
+>[number];
 const SandboxProfileAssociatedResourceEventRoutingConfigSchema = z
   .object({
     enabled: z.boolean().optional(),
@@ -68,15 +89,29 @@ const SandboxProfileAssociatedResourceEventRoutingConfigSchema = z
     ...(config.resources === undefined
       ? {}
       : {
-          resources: config.resources.map((resource) => ({
-            resourceKind: resource.resourceKind,
-            eventTypes: resource.eventTypes,
-            ...(resource.payloadFilter === undefined
-              ? {}
-              : { payloadFilter: resource.payloadFilter }),
-          })),
+          resources: config.resources.map(normalizeAssociatedResourceEventRoutingResourceRule),
         }),
   }));
+
+function normalizeAssociatedResourceEventRoutingResourceRule(
+  resource: AssociatedResourceEventRoutingResourceRuleInput,
+): AssociatedResourceEventRoutingResourceRule {
+  switch (resource.resourceKind) {
+    case AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST:
+      return {
+        resourceKind: resource.resourceKind,
+        eventTypes: resource.eventTypes,
+        ...(resource.payloadFilter === undefined ? {} : { payloadFilter: resource.payloadFilter }),
+      };
+    case AssociatedProviderResourceKinds.SLACK_THREAD:
+      return {
+        resourceKind: resource.resourceKind,
+        eventTypes: resource.eventTypes,
+        ...(resource.messageMode === undefined ? {} : { messageMode: resource.messageMode }),
+        ...(resource.payloadFilter === undefined ? {} : { payloadFilter: resource.payloadFilter }),
+      };
+  }
+}
 
 const LaunchableSandboxProfilesResultSchema = z
   .object({
@@ -513,12 +548,25 @@ const SandboxRuntimeResourceCapabilitiesSchema = z
   .object({
     memoryMb: SandboxRuntimeMemoryResourceCapabilitySchema,
     diskMb: SandboxRuntimeResourceCapabilitySchema.optional(),
+    validResourcePairs: z
+      .array(
+        z
+          .object({
+            memoryMb: z.number().int().min(1),
+            vcpuCount: z.number().int().min(1),
+          })
+          .strict(),
+      )
+      .optional(),
     vcpuCount: SandboxRuntimeResourceCapabilitySchema,
   })
   .strict()
   .transform((capabilities) => ({
     memoryMb: capabilities.memoryMb,
     ...(capabilities.diskMb === undefined ? {} : { diskMb: capabilities.diskMb }),
+    ...(capabilities.validResourcePairs === undefined
+      ? {}
+      : { validResourcePairs: capabilities.validResourcePairs }),
     vcpuCount: capabilities.vcpuCount,
   }));
 

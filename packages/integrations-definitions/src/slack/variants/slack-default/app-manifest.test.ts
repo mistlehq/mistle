@@ -530,11 +530,13 @@ describe("buildSlackManifestConnectionConfig", () => {
     expect(
       buildSlackManifestConnectionConfig({
         appId: "A123",
+        botUserId: "U123",
         clientId: "123.456",
       }),
     ).toEqual({
       connection_method: "slack-bot-token",
       app_id: "A123",
+      bot_user_id: "U123",
       client_id: "123.456",
     });
   });

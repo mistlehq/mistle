@@ -57,6 +57,10 @@ describe("integrations-definitions index", () => {
       familyId: "tensorlake",
       variantId: "tensorlake-default",
     });
+    const openComputerSandboxRuntimeDefinition = registry.getDefinition({
+      familyId: "opencomputer",
+      variantId: "opencomputer-default",
+    });
     const githubEnterpriseServerDefinition = registry.getDefinition({
       familyId: "github",
       variantId: "github-enterprise-server",
@@ -363,6 +367,51 @@ describe("integrations-definitions index", () => {
               label: "API key",
               inputType: "password",
               slotKey: "tensorlake.tensorlake-default.api-key.api-key",
+            },
+          ],
+        },
+      ],
+    });
+    expect(openComputerSandboxRuntimeDefinition).toMatchObject({
+      familyId: "opencomputer",
+      variantId: "opencomputer-default",
+      kind: "sandbox",
+      displayName: "OpenComputer",
+      sandboxRuntime: {
+        providerId: "opencomputer",
+        displayName: "OpenComputer",
+        resourceCapabilities: {
+          vcpuCount: {
+            min: 1,
+            max: 4,
+            step: 1,
+            default: 1,
+          },
+          memoryMb: {
+            min: 1024,
+            max: 16_384,
+            step: 1024,
+            default: 4096,
+          },
+          validResourcePairs: [
+            { vcpuCount: 1, memoryMb: 1024 },
+            { vcpuCount: 1, memoryMb: 4096 },
+            { vcpuCount: 2, memoryMb: 8192 },
+            { vcpuCount: 4, memoryMb: 16_384 },
+          ],
+        },
+      },
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "API key",
+          kind: "form",
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "API key",
+              inputType: "password",
+              slotKey: "opencomputer.opencomputer-default.api-key.api-key",
             },
           ],
         },
@@ -816,7 +865,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(18);
+    expect(definitions).toHaveLength(19);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -834,6 +883,7 @@ describe("integrations-definitions index", () => {
       "planetscale::planetscale-mcp",
       "e2b::e2b-default",
       "modal::modal-default",
+      "opencomputer::opencomputer-default",
       "tensorlake::tensorlake-default",
       "sentry::sentry-mcp",
       "signoz::signoz-mcp",
