@@ -39,6 +39,6 @@
     "@mistle/config": "workspace:*",
     "@types/dockerode": "^4.0.1",
     "testcontainers": "^12.0.1",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.8"
   }
 }
