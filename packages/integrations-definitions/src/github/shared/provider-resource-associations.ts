@@ -1,7 +1,4 @@
-import {
-  AssociatedProviderResourceKinds,
-  type AssociatedProviderResourceKind,
-} from "@mistle/integrations-core";
+import { AssociatedProviderResourceKinds } from "@mistle/integrations-core";
 import { z } from "zod";
 
 const GitHubPullRequestCreationResponseSchema = z.looseObject({
@@ -43,7 +40,7 @@ export type GitHubPullRequestProviderResourceExtractionMethod =
 
 export type GitHubRoutableResourceObservation = {
   extractionMethod: GitHubPullRequestProviderResourceExtractionMethod;
-  resourceKind: Extract<AssociatedProviderResourceKind, "github.pull_request">;
+  resourceKind: "github.pull_request";
   providerResourceId: string;
 };
 

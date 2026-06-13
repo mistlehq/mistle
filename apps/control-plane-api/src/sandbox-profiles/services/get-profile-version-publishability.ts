@@ -363,6 +363,9 @@ function normalizePublishWorthyAssociatedResourceEventRoutingConfig(
               ...(!("payloadFilter" in resource) || resource.payloadFilter === undefined
                 ? {}
                 : { payloadFilter: canonicalizeJsonValue(resource.payloadFilter) }),
+              ...(!("config" in resource) || resource.config === undefined
+                ? {}
+                : { config: canonicalizeJsonValue(resource.config) }),
             }))
             .sort(compareAssociatedResourceEventRoutingResources),
         }),
@@ -373,12 +376,14 @@ function compareAssociatedResourceEventRoutingResources(
   left: {
     resourceKind: string;
     eventTypes: readonly string[];
+    config?: unknown;
     messageMode?: string;
     payloadFilter?: unknown;
   },
   right: {
     resourceKind: string;
     eventTypes: readonly string[];
+    config?: unknown;
     messageMode?: string;
     payloadFilter?: unknown;
   },
@@ -386,6 +391,7 @@ function compareAssociatedResourceEventRoutingResources(
   return (
     left.resourceKind.localeCompare(right.resourceKind) ||
     left.eventTypes.join("\u0000").localeCompare(right.eventTypes.join("\u0000")) ||
+    (JSON.stringify(left.config) ?? "").localeCompare(JSON.stringify(right.config) ?? "") ||
     (left.messageMode ?? "").localeCompare(right.messageMode ?? "") ||
     (JSON.stringify(left.payloadFilter) ?? "").localeCompare(
       JSON.stringify(right.payloadFilter) ?? "",

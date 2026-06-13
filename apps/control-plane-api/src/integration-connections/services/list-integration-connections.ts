@@ -212,6 +212,19 @@ export async function listIntegrationConnections(
                   ui: definition.webhookTriggerCapabilitiesRefreshUi,
                 })
               : undefined;
+          const repairAction =
+            connection.config === null || definition?.connectionRepair === undefined
+              ? null
+              : await definition.connectionRepair.describeRepair({
+                  connection: {
+                    id: connection.id,
+                    status: connection.status,
+                    config: connection.config,
+                    ...(connection.externalSubjectId === null
+                      ? {}
+                      : { externalSubjectId: connection.externalSubjectId }),
+                  },
+                });
 
           return {
             ...buildIntegrationConnectionResponse({
@@ -231,6 +244,7 @@ export async function listIntegrationConnections(
             ...(webhookTriggerCapabilitiesRefreshAction === undefined
               ? {}
               : { webhookTriggerCapabilitiesRefreshAction }),
+            ...(repairAction === null ? {} : { repairAction }),
             createdAt: normalizeTimestamp(connection.createdAt),
             updatedAt: normalizeTimestamp(connection.updatedAt),
           };

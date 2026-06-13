@@ -18,6 +18,7 @@ import * as listIntegrationWebhookSources from "./list-integration-webhook-sourc
 import * as refreshAllIntegrationConnectionResources from "./refresh-all-integration-connection-resources/index.js";
 import * as refreshIntegrationConnectionResources from "./refresh-integration-connection-resources/index.js";
 import * as refreshWebhookTriggerCapabilities from "./refresh-webhook-trigger-capabilities/index.js";
+import * as repairIntegrationConnection from "./repair-integration-connection/index.js";
 import * as selectProviderAppSetupInstallation from "./select-provider-app-setup-installation/index.js";
 import * as startDeviceAuthorizationConnection from "./start-device-authorization-connection/index.js";
 import * as startDeviceAuthorizationReauthorization from "./start-device-authorization-reauthorization/index.js";
@@ -81,6 +82,9 @@ export function createIntegrationConnectionsRoutes(): AppRoutes<
     refreshAllIntegrationConnectionResources.route,
     refreshAllIntegrationConnectionResources.handler,
   );
+
+  routes.use(repairIntegrationConnection.route.path, requireAuthSession);
+  routes.openapi(repairIntegrationConnection.route, repairIntegrationConnection.handler);
 
   routes.use(createFormConnection.route.path, requireAuthSession);
   routes.openapi(createFormConnection.route, createFormConnection.handler);

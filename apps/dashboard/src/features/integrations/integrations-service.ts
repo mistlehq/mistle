@@ -16,6 +16,7 @@ export {
   createApiKeyIntegrationConnection,
   deleteIntegrationConnection,
   getDeviceAuthorizationAttempt,
+  repairIntegrationConnection,
   selectProviderAppSetupInstallation,
   startProviderAppSetup,
   startRedirectProviderAppSetup,

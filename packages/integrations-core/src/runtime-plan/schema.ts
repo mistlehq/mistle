@@ -4,12 +4,9 @@ import { z } from "zod";
 
 import type { AgentRuntimeCapabilities } from "../agent-runtimes/types.js";
 import {
-  AssociatedProviderResourceKinds,
   type AssociatedResourceEventType,
-  AssociatedResourceEventTypes,
   RuntimeFileWriteMode,
   SandboxImageSources,
-  SlackThreadMessageModes,
   type CompiledRuntimePlan,
   type SandboxProfileAssociatedResourceEventRoutingConfig,
 } from "../types/index.js";
@@ -461,20 +458,13 @@ const CompiledRuntimePlanSkillsSchema = z
   })
   .strict();
 
-const GitHubPullRequestAssociatedResourceEventRoutingResourceRuleSchema = z
+const AssociatedResourceEventRoutingResourceRuleSchema = z
   .object({
-    resourceKind: z.enum([AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST]),
-    eventTypes: z
-      .array(
-        z.enum([
-          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
-          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
-          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
-        ]),
-      )
-      .min(1)
-      .readonly(),
+    resourceKind: z.string().min(1),
+    eventTypes: z.array(z.string().min(1)).min(1).readonly(),
+    messageMode: z.enum(["all", "app_mentions_only"]).optional(),
     payloadFilter: z.record(z.string(), z.unknown()).optional(),
+    config: z.record(z.string(), z.unknown()).optional(),
   })
   .strict()
   .superRefine((rule, ctx) => {
@@ -505,53 +495,6 @@ const GitHubPullRequestAssociatedResourceEventRoutingResourceRuleSchema = z
       }
     }
   });
-
-const SlackThreadAssociatedResourceEventRoutingResourceRuleSchema = z
-  .object({
-    resourceKind: z.enum([AssociatedProviderResourceKinds.SLACK_THREAD]),
-    eventTypes: z
-      .array(z.enum([AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED]))
-      .min(1)
-      .readonly(),
-    messageMode: z
-      .enum([SlackThreadMessageModes.ALL, SlackThreadMessageModes.APP_MENTIONS_ONLY])
-      .optional(),
-    payloadFilter: z.record(z.string(), z.unknown()).optional(),
-  })
-  .strict()
-  .superRefine((rule, ctx) => {
-    if (rule.payloadFilter === undefined) {
-      return;
-    }
-
-    const selectedEventTypes = new Set<string>(rule.eventTypes);
-    for (const [eventType, filter] of Object.entries(rule.payloadFilter)) {
-      if (!selectedEventTypes.has(eventType)) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["payloadFilter", eventType],
-          message: `payloadFilter contains an event type that is not selected: ${eventType}`,
-        });
-        continue;
-      }
-
-      try {
-        parseWebhookPayloadFilter(filter);
-      } catch (error) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["payloadFilter", eventType],
-          message:
-            error instanceof Error ? error.message : "Webhook payload filter validation failed.",
-        });
-      }
-    }
-  });
-
-const AssociatedResourceEventRoutingResourceRuleSchema = z.union([
-  GitHubPullRequestAssociatedResourceEventRoutingResourceRuleSchema,
-  SlackThreadAssociatedResourceEventRoutingResourceRuleSchema,
-]);
 
 export const SandboxProfileAssociatedResourceEventRoutingConfigSchema = z
   .object({
@@ -592,14 +535,6 @@ type RuntimePlanSkills = NonNullable<CompiledRuntimePlan["skills"]>;
 type RuntimePlanAgentRuntime = CompiledRuntimePlan["agentRuntimes"][number];
 type RuntimePlanAssociatedResourceRule =
   CompiledRuntimePlan["associatedResourceEventRouting"]["resources"][number];
-type RuntimePlanGitHubPullRequestAssociatedResourceRule = Extract<
-  RuntimePlanAssociatedResourceRule,
-  { resourceKind: typeof AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST }
->;
-type RuntimePlanSlackThreadAssociatedResourceRule = Extract<
-  RuntimePlanAssociatedResourceRule,
-  { resourceKind: typeof AssociatedProviderResourceKinds.SLACK_THREAD }
->;
 type RawAssociatedResourceRule = NonNullable<
   SandboxProfileAssociatedResourceEventRoutingConfig["resources"]
 >[number];
@@ -621,47 +556,25 @@ function normalizeAssociatedResourceRules(
 function normalizeAssociatedResourceRule(
   rule: RawAssociatedResourceRule,
 ): RuntimePlanAssociatedResourceRule {
-  switch (rule.resourceKind) {
-    case AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST:
-      return {
-        resourceKind: rule.resourceKind,
-        eventTypes: sortGitHubPullRequestAssociatedResourceEventTypes(rule.eventTypes),
-        ...(rule.payloadFilter === undefined
-          ? {}
-          : { payloadFilter: parseAssociatedResourcePayloadFilter(rule.payloadFilter) }),
-      };
-    case AssociatedProviderResourceKinds.SLACK_THREAD:
-      return {
-        resourceKind: rule.resourceKind,
-        eventTypes: sortSlackThreadAssociatedResourceEventTypes(rule.eventTypes),
-        ...(rule.messageMode === undefined ? {} : { messageMode: rule.messageMode }),
-        ...(rule.payloadFilter === undefined
-          ? {}
-          : { payloadFilter: parseSlackThreadAssociatedResourcePayloadFilter(rule.payloadFilter) }),
-      };
-  }
-}
-
-function sortGitHubPullRequestAssociatedResourceEventTypes(
-  eventTypes: RuntimePlanGitHubPullRequestAssociatedResourceRule["eventTypes"],
-): RuntimePlanGitHubPullRequestAssociatedResourceRule["eventTypes"] {
-  return [...new Set(eventTypes)].sort();
-}
-
-function sortSlackThreadAssociatedResourceEventTypes(
-  eventTypes: RuntimePlanSlackThreadAssociatedResourceRule["eventTypes"],
-): RuntimePlanSlackThreadAssociatedResourceRule["eventTypes"] {
-  return [...new Set(eventTypes)].sort();
+  return {
+    resourceKind: rule.resourceKind,
+    eventTypes: sortAssociatedResourceEventTypes(rule.eventTypes),
+    ...(rule.messageMode === undefined ? {} : { messageMode: rule.messageMode }),
+    ...(rule.payloadFilter === undefined
+      ? {}
+      : { payloadFilter: parseAssociatedResourcePayloadFilter(rule.payloadFilter) }),
+    ...(rule.config === undefined ? {} : { config: structuredClone(rule.config) }),
+  };
 }
 
 function parseAssociatedResourcePayloadFilter(
   payloadFilter: Record<string, unknown>,
-): RuntimePlanGitHubPullRequestAssociatedResourceRule["payloadFilter"] {
+): RuntimePlanAssociatedResourceRule["payloadFilter"] {
   const parsedPayloadFilter: Partial<Record<AssociatedResourceEventType, WebhookPayloadFilter>> =
     {};
 
   for (const [eventType, filter] of Object.entries(payloadFilter)) {
-    if (!isAssociatedResourceEventType(eventType)) {
+    if (eventType.length === 0) {
       throw new Error(`Unsupported associated resource event type '${eventType}'.`);
     }
 
@@ -671,30 +584,10 @@ function parseAssociatedResourcePayloadFilter(
   return parsedPayloadFilter;
 }
 
-function parseSlackThreadAssociatedResourcePayloadFilter(
-  payloadFilter: Record<string, unknown>,
-): RuntimePlanSlackThreadAssociatedResourceRule["payloadFilter"] {
-  const parsedPayloadFilter: Partial<
-    Record<typeof AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED, WebhookPayloadFilter>
-  > = {};
-
-  for (const [eventType, filter] of Object.entries(payloadFilter)) {
-    if (eventType !== AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED) {
-      throw new Error(`Unsupported associated resource event type '${eventType}'.`);
-    }
-
-    parsedPayloadFilter[eventType] = parseWebhookPayloadFilter(filter);
-  }
-
-  return parsedPayloadFilter;
-}
-
-function isAssociatedResourceEventType(input: string): input is AssociatedResourceEventType {
-  return (
-    input === AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED ||
-    input === AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED ||
-    input === AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED
-  );
+function sortAssociatedResourceEventTypes(
+  eventTypes: ReadonlyArray<AssociatedResourceEventType>,
+): AssociatedResourceEventType[] {
+  return [...new Set(eventTypes)].sort();
 }
 
 const HeaderNamePattern = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;

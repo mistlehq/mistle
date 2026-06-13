@@ -65,6 +65,53 @@ afterEach(() => {
 });
 
 describe("IntegrationConnectionDetailView", () => {
+  it("shows selected connection notices above the connection detail sections", () => {
+    function RepairableConnectionDetail() {
+      const [repairRequested, setRepairRequested] = useState(false);
+
+      return (
+        <div>
+          <IntegrationConnectionDetailView
+            connections={[
+              {
+                id: "icn_slack_primary",
+                bindingCount: 0,
+                canDelete: true,
+                displayName: "Engineering Slack",
+                authMethodLabel: "Slack app",
+                status: "active",
+                resources: [],
+              },
+            ]}
+            selectedConnectionNotice={
+              repairRequested ? undefined : (
+                <div>
+                  <p>Connection notice</p>
+                  <button
+                    onClick={() => {
+                      setRepairRequested(true);
+                    }}
+                    type="button"
+                  >
+                    Resolve notice
+                  </button>
+                </div>
+              )
+            }
+          />
+          {repairRequested ? <p>Repair requested</p> : null}
+        </div>
+      );
+    }
+
+    render(<RepairableConnectionDetail />);
+
+    expect(screen.getByText("Connection notice")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Resolve notice" }));
+    expect(screen.getByText("Repair requested")).toBeTruthy();
+    expect(screen.queryByText("Connection notice")).toBeNull();
+  });
+
   it("shows the identity badge for connections configured for identity linking", () => {
     render(
       <IntegrationConnectionDetailView

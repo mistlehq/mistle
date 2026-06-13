@@ -12,6 +12,7 @@ import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
 import { CreateFormConnectionBodySchema } from "../src/integration-connections/create-form-connection/schema.js";
+import { ListIntegrationConnectionsResponseSchema } from "../src/integration-connections/list-integration-connections/schema.js";
 import {
   RefreshWebhookTriggerCapabilitiesBadRequestResponseSchema,
   RefreshWebhookTriggerCapabilitiesBodySchema,
@@ -258,6 +259,93 @@ describe.concurrent("Slack form integration connections", () => {
     }
   });
 
+  it("repairs a Slack app connection missing its bot user identity", async ({ env }) => {
+    const simulatedSlack = await startSimulatedSlackManifestApi();
+    try {
+      const targetKey = "slack-default-repair-bot-identity";
+      await seedSlackTarget(env, {
+        apiBaseUrl: simulatedSlack.baseUrl,
+        targetKey,
+      });
+      const session = await env.auth.createSession({
+        email: "integration-new-connections-slack-repair-bot-identity@example.com",
+      });
+
+      const createResponse = await createFormConnection({
+        env,
+        targetKey,
+        cookie: session.cookie,
+        body: CreateFormConnectionBodySchema.parse({
+          displayName: "Slack bot token",
+          methodId: SlackConnectionMethodIds.SLACK_APP,
+          config: {
+            connection_method: SlackConnectionMethodIds.SLACK_APP,
+            app_id: SlackAppId,
+          },
+          secrets: {
+            botToken: "xoxb-test-bot-token",
+            signingSecret: "slack-signing-secret",
+          },
+        }),
+      });
+      expect(createResponse.status).toBe(201);
+      const connection = CreatedFormIntegrationConnectionSchema.parse(await createResponse.json());
+
+      const listBeforeResponse = await env.controlPlaneApi.http.fetch(
+        "/v1/integration/connections",
+        {
+          headers: {
+            cookie: session.cookie,
+          },
+        },
+      );
+      expect(listBeforeResponse.status).toBe(200);
+      const listBefore = ListIntegrationConnectionsResponseSchema.parse(
+        await listBeforeResponse.json(),
+      );
+      const listedConnection = listBefore.items.find((candidate) => candidate.id === connection.id);
+      expect(listedConnection?.repairAction).toEqual({
+        id: "slack-bot-identity",
+        title: "Slack bot identity missing",
+        description:
+          "This connection needs its Slack bot identity before Slack thread routing can be enabled.",
+        actionLabel: "Fix Slack bot identity",
+        pendingLabel: "Fixing...",
+      });
+
+      const repairResponse = await env.controlPlaneApi.http.fetch(
+        `/v1/integration/connections/${encodeURIComponent(connection.id)}/repair`,
+        {
+          method: "POST",
+          headers: {
+            cookie: session.cookie,
+          },
+        },
+      );
+
+      expect(repairResponse.status).toBe(200);
+      const repairedConnection = IntegrationConnectionSchema.parse(await repairResponse.json());
+      expect(repairedConnection.config).toEqual({
+        connection_method: SlackConnectionMethodIds.SLACK_APP,
+        app_id: SlackAppId,
+        bot_user_id: "U0123456789",
+      });
+
+      const persistedConnection = await env.controlPlaneDb.query.integrationConnections.findFirst({
+        where: (table, { eq }) => eq(table.id, connection.id),
+      });
+      expect(persistedConnection?.config).toEqual(repairedConnection.config);
+      expect(simulatedSlack.requests).toContainEqual({
+        authorization: "Bearer xoxb-test-bot-token",
+        body: null,
+        method: "POST",
+        pathname: "/auth.test",
+      });
+    } finally {
+      await simulatedSlack.stop();
+    }
+  });
+
   it("rotates both Slack app credentials", async ({ env }) => {
     await seedSlackTarget(env);
     const session = await env.auth.createSession({
@@ -409,6 +497,20 @@ async function startSimulatedSlackManifestApi(input?: {
               },
             },
           },
+        }),
+      );
+      return;
+    }
+
+    // Simulates Slack auth.test for bot tokens. Slack documents auth.test as
+    // requiring no scopes and returning user_id for the authenticated token:
+    // https://docs.slack.dev/reference/methods/auth.test/
+    if (requestUrl.pathname === "/auth.test") {
+      response.end(
+        JSON.stringify({
+          ok: true,
+          user_id: "U0123456789",
+          bot_id: "B0123456789",
         }),
       );
       return;

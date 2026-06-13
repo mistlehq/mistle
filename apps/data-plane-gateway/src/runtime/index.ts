@@ -12,6 +12,7 @@ import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-clien
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { BootstrapTokenConfig, PtyTransportTokenConfig } from "@mistle/gateway-tunnel-auth";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
 import { systemClock, systemScheduler } from "@mistle/time";
 import { connect, type NatsConnection, type Status } from "@nats-io/transport-node";
 import { typeid } from "typeid-js";
@@ -562,6 +563,7 @@ export function createDataPlaneGatewayRuntime(
       tokenIssuer: config.app.sandbox.egress.tokenIssuer,
       tokenAudience: config.app.sandbox.egress.tokenAudience,
     },
+    createIntegrationRegistry(),
     {
       tokenSecret: config.app.controlPlaneApi.mcp.auth.secret,
       tokenIssuer: config.app.controlPlaneApi.mcp.auth.issuer,

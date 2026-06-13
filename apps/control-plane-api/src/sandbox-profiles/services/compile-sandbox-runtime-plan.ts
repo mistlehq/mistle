@@ -9,8 +9,6 @@ import {
   DefaultSandboxWorkspaceDir,
   IntegrationCompilerError,
   IntegrationMcpTransports,
-  AssociatedProviderResourceKinds,
-  AssociatedResourceEventTypes,
   SandboxProfileAssociatedResourceEventRoutingConfigSchema,
   compileRuntimePlan,
   supportsAssociatedResourceDeliveryRuntime,
@@ -38,8 +36,6 @@ const MistleMcpEgressRuleId = "egress_rule_platform_mistle_mcp";
 const MistleMcpBindingId = "platform-mistle-mcp";
 const MistleMcpFamilyId = "mistle";
 const MistleMcpVariantId = "mistle-mcp";
-const GitHubFamilyId = "github";
-const SlackFamilyId = "slack";
 
 export const SandboxRuntimePlanCompilerErrorCodes = {
   PROFILE_NOT_FOUND: "PROFILE_NOT_FOUND",
@@ -224,12 +220,13 @@ function resolveProfileMistleMcpCredentialResolver(input: {
   };
 }
 
-function resolveAssociatedResourceEventRouting(input: {
+async function resolveAssociatedResourceEventRouting(input: {
   rawConfig: unknown;
+  integrationDefinitions: IntegrationDefinitionsBundle;
   agentRuntimeRegistry: AgentRuntimeReader;
   agentRuntimeId: SandboxProfileVersionAgentRuntimeId | undefined;
   compileBindings: Awaited<ReturnType<typeof resolveCompileBindingsForVersion>>;
-}): AssociatedResourceEventRouting {
+}): Promise<AssociatedResourceEventRouting> {
   const config = SandboxProfileAssociatedResourceEventRoutingConfigSchema.parse(input.rawConfig);
   const agentRuntime =
     input.agentRuntimeId === undefined
@@ -237,7 +234,10 @@ function resolveAssociatedResourceEventRouting(input: {
       : input.agentRuntimeRegistry.getRuntime({ runtimeId: input.agentRuntimeId });
   const defaultResources =
     agentRuntime !== undefined && supportsAssociatedResourceDeliveryRuntime(agentRuntime)
-      ? resolveDefaultAssociatedResourceEventRoutingResources(input.compileBindings)
+      ? await resolveDefaultAssociatedResourceEventRoutingResources({
+          compileBindings: input.compileBindings,
+          integrationDefinitions: input.integrationDefinitions,
+        })
       : [];
   const resources = config.resources ?? defaultResources;
 
@@ -247,38 +247,43 @@ function resolveAssociatedResourceEventRouting(input: {
   };
 }
 
-function resolveDefaultAssociatedResourceEventRoutingResources(
-  compileBindings: Awaited<ReturnType<typeof resolveCompileBindingsForVersion>>,
-): AssociatedResourceEventRouting["resources"] {
-  const resources: AssociatedResourceEventRoutingResourceRule[] = [];
-  if (compileBindings.some((binding) => binding.target.familyId === GitHubFamilyId)) {
-    resources.push({
-      resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
-      eventTypes: [
-        AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
-        AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
-        AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
-      ],
+async function resolveDefaultAssociatedResourceEventRoutingResources(input: {
+  compileBindings: Awaited<ReturnType<typeof resolveCompileBindingsForVersion>>;
+  integrationDefinitions: IntegrationDefinitionsBundle;
+}): Promise<AssociatedResourceEventRouting["resources"]> {
+  const resourcesByKind = new Map<string, AssociatedResourceEventRoutingResourceRule>();
+  for (const binding of input.compileBindings) {
+    const definition = input.integrationDefinitions.integrationRegistry.getDefinition({
+      familyId: binding.target.familyId,
+      variantId: binding.target.variantId,
     });
-  }
-  if (compileBindings.some(bindingHasSlackAssociationIdentity)) {
-    resources.push({
-      resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
-      eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
-    });
-  }
-  return resources;
-}
+    const defaultResources =
+      (await definition?.associatedResourceEvents?.defaultRoutingResources?.(binding)) ?? [];
+    for (const resource of defaultResources) {
+      const currentResource = resourcesByKind.get(resource.resourceKind);
+      if (currentResource === undefined) {
+        resourcesByKind.set(resource.resourceKind, resource);
+        continue;
+      }
 
-function bindingHasSlackAssociationIdentity(
-  binding: Awaited<ReturnType<typeof resolveCompileBindingsForVersion>>[number],
-): boolean {
-  if (binding.target.familyId !== SlackFamilyId) {
-    return false;
+      resourcesByKind.set(resource.resourceKind, {
+        ...currentResource,
+        eventTypes: [...new Set([...currentResource.eventTypes, ...resource.eventTypes])].sort(),
+        ...(currentResource.payloadFilter === undefined && resource.payloadFilter === undefined
+          ? {}
+          : {
+              payloadFilter: {
+                ...currentResource.payloadFilter,
+                ...resource.payloadFilter,
+              },
+            }),
+      });
+    }
   }
 
-  const botUserId = binding.connection.config["bot_user_id"];
-  return typeof botUserId === "string" && botUserId.trim().length > 0;
+  return [...resourcesByKind.values()].sort((left, right) =>
+    left.resourceKind.localeCompare(right.resourceKind),
+  );
 }
 
 function mapCompilerErrorCodeToSandboxRuntimePlanCompilerErrorCode(
@@ -527,8 +532,9 @@ export async function compileSandboxRuntimePlan(
         credentialResolver: mistleMcpCredentialResolver,
         url: input.mcpConfig.url,
       }),
-      associatedResourceEventRouting: resolveAssociatedResourceEventRouting({
+      associatedResourceEventRouting: await resolveAssociatedResourceEventRouting({
         rawConfig: sandboxProfileVersion.associatedResourceEventRoutingConfig,
+        integrationDefinitions: input.integrationDefinitions,
         agentRuntimeRegistry: input.integrationDefinitions.agentRuntimeRegistry,
         agentRuntimeId,
         compileBindings,

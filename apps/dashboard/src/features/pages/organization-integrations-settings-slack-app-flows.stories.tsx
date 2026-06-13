@@ -129,6 +129,7 @@ export function createDraftSlackConnection(input?: {
   config?: Record<string, unknown>;
   configuredSecretNames?: readonly string[];
   externalSubjectId?: string;
+  repairAction?: IntegrationConnection["repairAction"];
 }): IntegrationConnection {
   return {
     id: "icn_slack_story_draft",
@@ -147,8 +148,20 @@ export function createDraftSlackConnection(input?: {
     ...(input?.configuredSecretNames === undefined
       ? {}
       : { configuredSecretNames: [...input.configuredSecretNames] }),
+    ...(input?.repairAction === undefined ? {} : { repairAction: input.repairAction }),
     createdAt: "2026-04-26T00:00:00.000Z",
     updatedAt: "2026-04-26T00:00:00.000Z",
+  };
+}
+
+function createSlackBotIdentityRepairAction(): NonNullable<IntegrationConnection["repairAction"]> {
+  return {
+    id: "slack-bot-identity",
+    title: "Slack bot identity missing",
+    description:
+      "This connection needs its Slack bot identity before Slack thread routing can be enabled.",
+    actionLabel: "Fix Slack bot identity",
+    pendingLabel: "Fixing...",
   };
 }
 
@@ -333,6 +346,39 @@ function useSlackStoryControlPlane(input: { queryClient: QueryClient }): void {
               ? undefined
               : [...nextConfiguredSecretNames].sort(),
           updatedAt: "2026-04-26T00:30:00.000Z",
+        };
+
+        input.queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+          targets: directoryData.targets,
+          connections: directoryData.connections.map((connection) =>
+            connection.id === connectionId ? updatedConnection : connection,
+          ),
+        });
+
+        return createJsonResponse(updatedConnection);
+      }
+
+      const repairConnectionMatch = path.match(/^\/v1\/integration\/connections\/([^/]+)\/repair$/);
+      if (method === "POST" && repairConnectionMatch !== null) {
+        const connectionId = decodeURIComponent(repairConnectionMatch[1] ?? "");
+        const currentConnection =
+          directoryData.connections.find((connection) => connection.id === connectionId) ?? null;
+        if (currentConnection === null) {
+          return createJsonResponse(
+            { code: "CONNECTION_NOT_FOUND", message: "Connection not found." },
+            404,
+          );
+        }
+
+        const { repairAction, ...connectionWithoutRepairAction } = currentConnection;
+        void repairAction;
+        const updatedConnection: IntegrationConnection = {
+          ...connectionWithoutRepairAction,
+          config: {
+            ...(currentConnection.config ?? {}),
+            bot_user_id: "U0123456789",
+          },
+          updatedAt: "2026-04-26T00:45:00.000Z",
         };
 
         input.queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
@@ -680,6 +726,49 @@ function SlackInstalledDetailPageStory(): React.JSX.Element {
   );
 }
 
+function SlackMissingBotIdentityRepairStory(): React.JSX.Element {
+  const [queryClient] = useState(() =>
+    createStoryQueryClient({
+      connections: [
+        createDraftSlackConnection({
+          config: {
+            app_id: "A0123456789",
+            client_id: "3555487893074.10993991013813",
+          },
+          configuredSecretNames: ["botToken", "clientSecret", "signingSecret"],
+          externalSubjectId: "T0123456789",
+          repairAction: createSlackBotIdentityRepairAction(),
+        }),
+      ],
+      webhookSources: [createWebhookSourceFixture()],
+    }),
+  );
+  const [router] = useState(() =>
+    createMemoryRouter(
+      createRoutesFromElements(
+        <Route element={<Outlet />}>
+          <Route element={<Outlet />} handle={ROUTE_HANDLES.integrations} path="/integrations">
+            <Route
+              element={<IntegrationsPage />}
+              handle={ROUTE_HANDLES.integrationDetail}
+              path=":targetKey"
+            />
+          </Route>
+        </Route>,
+      ),
+      {
+        initialEntries: ["/integrations/slack-default?connectionId=icn_slack_story_draft"],
+      },
+    ),
+  );
+
+  return (
+    <StoryQueryClientProvider queryClient={queryClient}>
+      <RouterProvider router={router} />
+    </StoryQueryClientProvider>
+  );
+}
+
 const pageMeta = {
   title: "Dashboard/Integrations/Setup/Slack App",
   decorators: [withDashboardPageStory],
@@ -734,6 +823,12 @@ export const ConnectedWebhookSyncMissingAppId: PageStory = {
 export const InstalledRedirect: PageStory = {
   render: function RenderStory() {
     return <SlackInstalledDetailPageStory />;
+  },
+};
+
+export const MissingBotIdentityRepair: PageStory = {
+  render: function RenderStory() {
+    return <SlackMissingBotIdentityRepairStory />;
   },
 };
 

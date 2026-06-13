@@ -1,4 +1,5 @@
-import { Notice, NoticeAutoHideDurationsMs } from "@mistle/ui";
+import { Button, Notice, NoticeAutoHideDurationsMs } from "@mistle/ui";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 
@@ -18,11 +19,16 @@ import {
 import { useIntegrationWebhookSourceActions } from "../integrations/integration-webhook-source-actions.js";
 import {
   ManagedWebhookSetupResultSchema,
+  type IntegrationConnection as IntegrationDirectoryConnection,
   type IntegrationConnectionMethod,
   type IntegrationManagedWebhookSourcePostCreate,
+  type IntegrationTarget,
   type ManagedWebhookSetupResult,
 } from "../integrations/integrations-service-shared.js";
-import type { IntegrationConnection } from "../integrations/integrations-service.js";
+import {
+  repairIntegrationConnection,
+  type IntegrationConnection,
+} from "../integrations/integrations-service.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import { renderIntegrationConnectionSetupPane } from "./integration-connection-setup-pane-registry.js";
 import {
@@ -85,6 +91,96 @@ function buildReauthorizationStateByConnectionId(input: {
       ];
     }),
   );
+}
+
+function replaceDirectoryConnection(input: {
+  currentData:
+    | {
+        targets: readonly IntegrationTarget[];
+        connections: readonly IntegrationDirectoryConnection[];
+      }
+    | undefined;
+  updatedConnection: IntegrationDirectoryConnection;
+}):
+  | {
+      targets: readonly IntegrationTarget[];
+      connections: readonly IntegrationDirectoryConnection[];
+    }
+  | undefined {
+  if (input.currentData === undefined) {
+    return undefined;
+  }
+
+  return {
+    ...input.currentData,
+    connections: input.currentData.connections.map((connection) =>
+      connection.id === input.updatedConnection.id
+        ? {
+            ...connection,
+            ...input.updatedConnection,
+            repairAction: undefined,
+          }
+        : connection,
+    ),
+  };
+}
+
+function renderSelectedConnectionNotice(input: {
+  connection: IntegrationConnection | undefined;
+  connectionNotice: IntegrationConnectionNotice | null;
+  onRepairConnection: (connectionId: string) => void;
+  repairErrorMessage: string | undefined;
+  repairPendingConnectionId: string | null;
+}): React.JSX.Element | undefined {
+  const notices: React.JSX.Element[] = [];
+
+  if (input.connectionNotice !== null) {
+    notices.push(
+      <Notice
+        autoHideAfterMs={NoticeAutoHideDurationsMs.LONG}
+        dismissible
+        key="connection-notice"
+        resetKey={input.connectionNotice.resetKey}
+        title={input.connectionNotice.title}
+        variant={input.connectionNotice.variant}
+      >
+        {input.connectionNotice.message ?? null}
+      </Notice>,
+    );
+  }
+
+  const repairAction = input.connection?.repairAction;
+  if (input.connection !== undefined && repairAction !== undefined) {
+    const connection = input.connection;
+    const isRepairPending = input.repairPendingConnectionId === connection.id;
+    notices.push(
+      <Notice key={repairAction.id} title={repairAction.title} variant="alert">
+        <div className="flex flex-col gap-3">
+          {repairAction.description === undefined ? null : <p>{repairAction.description}</p>}
+          {input.repairErrorMessage === undefined ? null : <p>{input.repairErrorMessage}</p>}
+          <div>
+            <Button
+              disabled={isRepairPending}
+              onClick={() => {
+                input.onRepairConnection(connection.id);
+              }}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {isRepairPending ? repairAction.pendingLabel : repairAction.actionLabel}
+            </Button>
+          </div>
+        </div>
+      </Notice>,
+    );
+  }
+
+  if (notices.length === 0) {
+    return undefined;
+  }
+
+  return <div className="flex flex-col gap-3">{notices}</div>;
 }
 
 function clearUrlConnectionNoticeParams(searchParams: URLSearchParams): URLSearchParams {
@@ -161,11 +257,15 @@ export function IntegrationsPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const params = useParams();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [urlConnectionNotice, setUrlConnectionNotice] =
     useState<IntegrationConnectionNotice | null>(null);
   const [urlProviderAppSetupErrorNotice, setUrlProviderAppSetupErrorNotice] =
     useState<TargetedProviderAppSetupErrorNotice | null>(null);
+  const [repairErrorMessageByConnectionId, setRepairErrorMessageByConnectionId] = useState<
+    Record<string, string | undefined>
+  >({});
   useRequiredOrganizationId();
   const detailTargetKey = params["targetKey"] ?? null;
   const detailConnectionId = searchParams.get("connectionId");
@@ -201,6 +301,40 @@ export function IntegrationsPage() {
     errorMessageByConnectionId: connectionEditors.reauthorization.errorMessageByConnectionId,
     pendingConnectionId: connectionEditors.reauthorization.pendingConnectionId,
   });
+  const repairMutation = useMutation({
+    mutationFn: async (mutationInput: { connectionId: string }) =>
+      repairIntegrationConnection(mutationInput),
+    onMutate: (mutationInput) => {
+      setRepairErrorMessageByConnectionId((current) => ({
+        ...current,
+        [mutationInput.connectionId]: undefined,
+      }));
+    },
+    onError: (error, mutationInput) => {
+      setRepairErrorMessageByConnectionId((current) => ({
+        ...current,
+        [mutationInput.connectionId]: resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not repair integration connection.",
+        }),
+      }));
+    },
+    onSuccess: (updatedConnection) => {
+      queryClient.setQueryData<{
+        targets: readonly IntegrationTarget[];
+        connections: readonly IntegrationDirectoryConnection[];
+      }>(SETTINGS_INTEGRATIONS_QUERY_KEY, (currentData) =>
+        replaceDirectoryConnection({
+          currentData,
+          updatedConnection,
+        }),
+      );
+    },
+  });
+  const repairPendingConnectionId =
+    repairMutation.isPending && repairMutation.variables !== undefined
+      ? repairMutation.variables.connectionId
+      : null;
 
   if (
     detailTargetKey !== null &&
@@ -362,19 +496,18 @@ export function IntegrationsPage() {
           connection: selectedDetailConnection,
           setupFlow: selectedDetailConnectionSetupFlow,
         })}
-        selectedConnectionNotice={
-          connectionNotice !== null ? (
-            <Notice
-              autoHideAfterMs={NoticeAutoHideDurationsMs.LONG}
-              dismissible
-              resetKey={connectionNotice.resetKey}
-              title={connectionNotice.title}
-              variant={connectionNotice.variant}
-            >
-              {connectionNotice.message ?? null}
-            </Notice>
-          ) : undefined
-        }
+        selectedConnectionNotice={renderSelectedConnectionNotice({
+          connection: selectedDetailConnection,
+          connectionNotice,
+          onRepairConnection: (connectionId) => {
+            repairMutation.mutate({ connectionId });
+          },
+          repairErrorMessage:
+            selectedDetailConnection === undefined
+              ? undefined
+              : repairErrorMessageByConnectionId[selectedDetailConnection.id],
+          repairPendingConnectionId,
+        })}
         {...(directoryState.selectedDetailCard?.target.supportedWebhookEvents === undefined
           ? {}
           : {

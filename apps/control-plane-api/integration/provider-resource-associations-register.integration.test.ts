@@ -87,7 +87,7 @@ describe.concurrent("internal provider resource association registration", () =>
     expect(associations).toHaveLength(1);
   });
 
-  it("registers Slack thread associations only when the connection has a bot user identity", async ({
+  it("registers Slack thread associations when the connection has a bot user identity", async ({
     env,
   }) => {
     await seedConnection(env, {
@@ -97,6 +97,7 @@ describe.concurrent("internal provider resource association registration", () =>
       variantId: "slack-default",
       targetConfig: {},
       connectionConfig: {
+        connection_method: "slack-bot-token",
         bot_user_id: "U_BOT_REGISTER_SLACK",
       },
     });
@@ -139,7 +140,9 @@ describe.concurrent("internal provider resource association registration", () =>
       familyId: "slack",
       variantId: "slack-default",
       targetConfig: {},
-      connectionConfig: {},
+      connectionConfig: {
+        connection_method: "slack-bot-token",
+      },
     });
     await seedSandboxInstance(env, {
       sandboxInstanceId: "sbi_provider_resource_register_slack_no_bot_001",
@@ -166,7 +169,7 @@ describe.concurrent("internal provider resource association registration", () =>
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       status: "not_applicable",
-      reason: "provider_actor_not_configured",
+      reason: "resource_registration_not_supported",
     });
     await expect(findAssociations(env, body)).resolves.toEqual([]);
   });

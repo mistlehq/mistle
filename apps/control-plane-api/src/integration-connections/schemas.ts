@@ -72,6 +72,16 @@ export const IntegrationWebhookTriggerCapabilitiesRefreshActionSchema = z
   })
   .strict();
 
+export const IntegrationConnectionRepairActionSchema = z
+  .object({
+    id: z.string().min(1),
+    title: z.string().min(1),
+    description: z.string().min(1).optional(),
+    actionLabel: z.string().min(1),
+    pendingLabel: z.string().min(1),
+  })
+  .strict();
+
 export const IntegrationConnectionSchema = z
   .object({
     id: z.string().min(1),
@@ -89,6 +99,7 @@ export const IntegrationConnectionSchema = z
     configuredSecretNames: z.array(z.string().min(1)).optional(),
     resources: z.array(IntegrationConnectionResourceSummarySchema).optional(),
     supportsWebhookSources: z.boolean().optional(),
+    repairAction: IntegrationConnectionRepairActionSchema.optional(),
     webhookTriggerCapabilitiesRefreshAction:
       IntegrationWebhookTriggerCapabilitiesRefreshActionSchema.optional(),
     createdAt: z.string().min(1),

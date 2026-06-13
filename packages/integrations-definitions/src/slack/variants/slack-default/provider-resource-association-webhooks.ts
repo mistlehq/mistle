@@ -1,7 +1,6 @@
 import {
   AssociatedProviderResourceKinds,
   AssociatedResourceEventTypes,
-  type AssociatedProviderResourceKind,
   type AssociatedResourceEventType,
   type AssociatedResourceProviderActor,
   type AssociatedResourceSelfAuthorshipInput,
@@ -14,7 +13,10 @@ import { z } from "zod";
 
 import { SlackConnectionConfigSchema, type SlackConnectionConfig } from "./auth.js";
 import { SlackThreadRootTimestampField } from "./normalized-event-fields.js";
-import { createSlackThreadProviderResourceId } from "./provider-resource-associations.js";
+import {
+  createSlackThreadProviderResourceId,
+  observeSlackRoutableResourceFromEgressResponse,
+} from "./provider-resource-associations.js";
 import { SlackSupportedWebhookEvents } from "./supported-webhook-events.js";
 
 const SlackThreadMessagePayloadSchema = z.looseObject({
@@ -34,13 +36,44 @@ export type SlackThreadAssociatedResourceRenderedInput = {
   kind: "slack.thread.associated_resource_event";
   eventType: AssociatedResourceEventType;
   providerResourceId: string;
-  resourceKind: Extract<AssociatedProviderResourceKind, "slack.thread">;
+  resourceKind: "slack.thread";
   text: string;
 };
 
 export const SlackAssociatedResourceEventsCapability: IntegrationAssociatedResourceEventsCapability<SlackConnectionConfig> =
   {
     supportedEvents: createSlackAssociatedResourceEventDefinitions(),
+    defaultRoutingResources: (input) => {
+      if (!hasKnownSlackBotUserId(input.connection.config?.bot_user_id)) {
+        return [];
+      }
+
+      return [
+        {
+          resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+          eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+        },
+      ];
+    },
+    supportsResourceRegistration: (input) => {
+      if (input.resourceKind !== AssociatedProviderResourceKinds.SLACK_THREAD) {
+        return true;
+      }
+
+      const parsedConnectionConfig = SlackConnectionConfigSchema.safeParse(input.connection.config);
+      return (
+        parsedConnectionConfig.success &&
+        hasKnownSlackBotUserId(parsedConnectionConfig.data.bot_user_id)
+      );
+    },
+    supportsRoutingEvent: (input) => {
+      if (input.resource.messageMode === "app_mentions_only") {
+        return input.sourceWebhookEventType === "slack:app_mention";
+      }
+
+      return true;
+    },
+    observeEgressResponse: observeSlackRoutableResourceFromEgressResponse,
     observeWebhookEvent: observeSlackAssociatedResourceFromWebhookEvent,
     isSelfAuthoredEvent: isSelfAuthoredSlackAssociatedResourceEvent,
   };
@@ -107,7 +140,7 @@ export function observeSlackAssociatedResourceFromWebhookEvent(input: {
   eventType: AssociatedResourceEventType;
   providerResourceId: string;
   renderedInput: SlackThreadAssociatedResourceRenderedInput;
-  resourceKind: Extract<AssociatedProviderResourceKind, "slack.thread">;
+  resourceKind: "slack.thread";
 } | null {
   if (input.eventType !== "slack:message" && input.eventType !== "slack:app_mention") {
     return null;
@@ -155,11 +188,18 @@ export function isSelfAuthoredSlackAssociatedResourceEvent(
   input: AssociatedResourceSelfAuthorshipInput<SlackConnectionConfig>,
 ): boolean {
   const parsedConnectionConfig = SlackConnectionConfigSchema.safeParse(input.connection.config);
-  if (!parsedConnectionConfig.success || parsedConnectionConfig.data.bot_user_id === undefined) {
+  if (
+    !parsedConnectionConfig.success ||
+    !hasKnownSlackBotUserId(parsedConnectionConfig.data.bot_user_id)
+  ) {
     return false;
   }
 
   return input.observation.actor?.providerSubjectId === parsedConnectionConfig.data.bot_user_id;
+}
+
+function hasKnownSlackBotUserId(botUserId: unknown): botUserId is string {
+  return typeof botUserId === "string" && botUserId.trim().length > 0;
 }
 
 function renderThreadMessageInput(input: {

@@ -1561,62 +1561,35 @@
                           "resources": {
                             "type": "array",
                             "items": {
-                              "anyOf": [
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "resourceKind": {
-                                      "type": "string",
-                                      "enum": ["github.pull_request"]
-                                    },
-                                    "eventTypes": {
-                                      "type": "array",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "github.pull_request.issue_comment.created",
-                                          "github.pull_request.review.submitted",
-                                          "github.pull_request.review_comment.created"
-                                        ]
-                                      },
-                                      "minItems": 1
-                                    },
-                                    "payloadFilter": {
-                                      "type": "object",
-                                      "additionalProperties": {}
-                                    }
-                                  },
-                                  "required": ["resourceKind", "eventTypes"],
-                                  "additionalProperties": false
+                              "type": "object",
+                              "properties": {
+                                "resourceKind": {
+                                  "type": "string",
+                                  "minLength": 1
                                 },
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "resourceKind": {
-                                      "type": "string",
-                                      "enum": ["slack.thread"]
-                                    },
-                                    "eventTypes": {
-                                      "type": "array",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": ["slack.thread.message.created"]
-                                      },
-                                      "minItems": 1
-                                    },
-                                    "messageMode": {
-                                      "type": "string",
-                                      "enum": ["all", "app_mentions_only"]
-                                    },
-                                    "payloadFilter": {
-                                      "type": "object",
-                                      "additionalProperties": {}
-                                    }
+                                "eventTypes": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
                                   },
-                                  "required": ["resourceKind", "eventTypes"],
-                                  "additionalProperties": false
+                                  "minItems": 1
+                                },
+                                "messageMode": {
+                                  "type": "string",
+                                  "enum": ["all", "app_mentions_only"]
+                                },
+                                "payloadFilter": {
+                                  "type": "object",
+                                  "additionalProperties": {}
+                                },
+                                "config": {
+                                  "type": "object",
+                                  "additionalProperties": {}
                                 }
-                              ]
+                              },
+                              "required": ["resourceKind", "eventTypes"],
+                              "additionalProperties": false
                             }
                           }
                         },
@@ -4083,62 +4056,35 @@
                             "resources": {
                               "type": "array",
                               "items": {
-                                "anyOf": [
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "resourceKind": {
-                                        "type": "string",
-                                        "enum": ["github.pull_request"]
-                                      },
-                                      "eventTypes": {
-                                        "type": "array",
-                                        "items": {
-                                          "type": "string",
-                                          "enum": [
-                                            "github.pull_request.issue_comment.created",
-                                            "github.pull_request.review.submitted",
-                                            "github.pull_request.review_comment.created"
-                                          ]
-                                        },
-                                        "minItems": 1
-                                      },
-                                      "payloadFilter": {
-                                        "type": "object",
-                                        "additionalProperties": {}
-                                      }
-                                    },
-                                    "required": ["resourceKind", "eventTypes"],
-                                    "additionalProperties": false
+                                "type": "object",
+                                "properties": {
+                                  "resourceKind": {
+                                    "type": "string",
+                                    "minLength": 1
                                   },
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "resourceKind": {
-                                        "type": "string",
-                                        "enum": ["slack.thread"]
-                                      },
-                                      "eventTypes": {
-                                        "type": "array",
-                                        "items": {
-                                          "type": "string",
-                                          "enum": ["slack.thread.message.created"]
-                                        },
-                                        "minItems": 1
-                                      },
-                                      "messageMode": {
-                                        "type": "string",
-                                        "enum": ["all", "app_mentions_only"]
-                                      },
-                                      "payloadFilter": {
-                                        "type": "object",
-                                        "additionalProperties": {}
-                                      }
+                                  "eventTypes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1
                                     },
-                                    "required": ["resourceKind", "eventTypes"],
-                                    "additionalProperties": false
+                                    "minItems": 1
+                                  },
+                                  "messageMode": {
+                                    "type": "string",
+                                    "enum": ["all", "app_mentions_only"]
+                                  },
+                                  "payloadFilter": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  },
+                                  "config": {
+                                    "type": "object",
+                                    "additionalProperties": {}
                                   }
-                                ]
+                                },
+                                "required": ["resourceKind", "eventTypes"],
+                                "additionalProperties": false
                               }
                             }
                           },

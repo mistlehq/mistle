@@ -76,14 +76,20 @@ const SlackThreadEventOptions: ReadonlyArray<{
 ];
 
 const AllSlackThreadEventTypes = SlackThreadEventOptions.map((option) => option.eventType);
+const KnownAssociatedResourceEventOptions = [
+  ...GitHubPullRequestEventOptions,
+  ...SlackThreadEventOptions,
+];
 
-const AssociatedResourceOptions: ReadonlyArray<{
+type AssociatedResourceOption = {
   defaultEventTypes: readonly AssociatedResourceEventType[];
   label: string;
   resourceKind: AssociatedProviderResourceKind;
   tooltip: string;
   tooltipLabel: string;
-}> = [
+};
+
+const KnownAssociatedResourceOptions: readonly AssociatedResourceOption[] = [
   {
     defaultEventTypes: AllGitHubPullRequestEventTypes,
     label: "Agent PR activity",
@@ -117,14 +123,6 @@ type AssociatedResourceRoutingResourceRule = NonNullable<
   AssociatedResourceRoutingConfig["resources"]
 >[number];
 
-type GitHubPullRequestAssociatedResourceEventType = Extract<
-  AssociatedResourceRoutingResourceRule,
-  { resourceKind: typeof AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST }
->["eventTypes"][number];
-
-type SlackThreadAssociatedResourceEventType =
-  typeof AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED;
-
 type AssociatedResourceRoutingReadOnlyDetail = {
   id: string;
   label: ReactNode;
@@ -140,6 +138,7 @@ type AssociatedResourceRoutingResourceDraft = {
   eventTypes: AssociatedResourceEventType[];
   resourceKind: AssociatedProviderResourceKind;
   advancedPayloadFilter: Record<string, unknown> | null;
+  config?: Record<string, unknown> | undefined;
   eventParameterRules: WebhookTriggerEventParameterRuleMap;
   slackThreadMessageMode: SlackThreadMessageMode;
 };
@@ -207,11 +206,16 @@ function SandboxProfileAssociatedResourceRoutingStatefulSection(input: {
   const eventOptions = createAssociatedResourceEventOptions({
     supportedAssociatedResourceEvents: input.supportedAssociatedResourceEvents ?? [],
   });
+  const resourceOptions = createAssociatedResourceOptionModels({
+    config: input.version.associatedResourceEventRoutingConfig,
+    supportedAssociatedResourceEvents: input.supportedAssociatedResourceEvents ?? [],
+  });
   const initialDraft = createAssociatedResourceRoutingDraft({
     config: input.version.associatedResourceEventRoutingConfig,
     eventOptions,
     hasGitHubBinding: input.hasGitHubBinding,
     hasSlackThreadBinding: input.hasSlackThreadBinding,
+    resourceOptions,
   });
   const [draft, setDraft] = useState<AssociatedResourceRoutingDraft>(initialDraft);
   const [persistedDraft, setPersistedDraft] =
@@ -238,6 +242,7 @@ function SandboxProfileAssociatedResourceRoutingStatefulSection(input: {
         eventOptions,
         hasGitHubBinding: input.hasGitHubBinding,
         hasSlackThreadBinding: input.hasSlackThreadBinding,
+        resourceOptions,
       });
       setDraft(nextDraft);
       setPersistedDraft(nextDraft);
@@ -246,7 +251,13 @@ function SandboxProfileAssociatedResourceRoutingStatefulSection(input: {
         hasUnpersistedChanges: false,
       });
     },
-    [eventOptions, input.hasGitHubBinding, input.hasSlackThreadBinding, input.onDraftStateChange],
+    [
+      eventOptions,
+      input.hasGitHubBinding,
+      input.hasSlackThreadBinding,
+      input.onDraftStateChange,
+      resourceOptions,
+    ],
   );
 
   function publishDraftState(nextDraft: AssociatedResourceRoutingDraft): void {
@@ -373,6 +384,7 @@ function SandboxProfileAssociatedResourceRoutingStatefulSection(input: {
       onSlackThreadMessageModeChange={updateSlackThreadMessageMode}
       layout={input.layout}
       resourceKinds={input.resourceKinds}
+      resourceOptions={resourceOptions}
       resources={draft.resources}
       saveErrorMessage={saveErrorMessage}
       selectedConnectionId={input.selectedConnectionId}
@@ -423,6 +435,7 @@ function SandboxProfileAssociatedResourceRoutingFields(input: {
   onSlackThreadMessageEnabledChange: (checked: boolean) => void;
   onSlackThreadMessageModeChange: (messageMode: SlackThreadMessageMode) => void;
   resourceKinds?: readonly AssociatedProviderResourceKind[] | undefined;
+  resourceOptions: readonly AssociatedResourceOption[];
   resources: readonly AssociatedResourceRoutingResourceDraft[];
   saveErrorMessage: string | null;
   selectedConnectionId?: string | undefined;
@@ -433,7 +446,7 @@ function SandboxProfileAssociatedResourceRoutingFields(input: {
       {input.saveErrorMessage === null ? null : (
         <Notice title={input.saveErrorMessage} variant="alert" />
       )}
-      {AssociatedResourceOptions.map((option) => {
+      {input.resourceOptions.map((option) => {
         if (
           input.resourceKinds !== undefined &&
           !input.resourceKinds.includes(option.resourceKind)
@@ -469,31 +482,7 @@ function SandboxProfileAssociatedResourceRoutingFields(input: {
                 />
               </FieldContent>
             </Field>
-            {option.resourceKind === AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST ? (
-              <GitHubPullRequestSettings
-                eventOptions={input.eventOptions}
-                fieldIsReadOnly={input.fieldIsReadOnly}
-                onEventParameterRuleChange={(change) => {
-                  input.onEventParameterRuleChange({
-                    resourceKind: option.resourceKind,
-                    ...change,
-                  });
-                }}
-                onEventParameterRulesChange={(change) => {
-                  input.onEventParameterRulesChange({
-                    resourceKind: option.resourceKind,
-                    ...change,
-                  });
-                }}
-                onEventTypeChange={(eventType, checked) => {
-                  input.onEventTypeChange(option.resourceKind, eventType, checked);
-                }}
-                resource={resource}
-                selectedConnectionId={input.selectedConnectionId}
-                settingsExpanded={settingsExpanded}
-                layout={input.layout}
-              />
-            ) : (
+            {option.resourceKind === AssociatedProviderResourceKinds.SLACK_THREAD ? (
               <SlackThreadSettings
                 eventOptions={input.eventOptions}
                 fieldIsReadOnly={input.fieldIsReadOnly}
@@ -516,6 +505,34 @@ function SandboxProfileAssociatedResourceRoutingFields(input: {
                 settingsExpanded={settingsExpanded}
                 layout={input.layout}
               />
+            ) : (
+              <AssociatedResourceEventSettings
+                eventOptions={input.eventOptions}
+                eventTypeOptions={createAssociatedResourceEventTypeOptions({
+                  eventOptions: input.eventOptions,
+                  option,
+                })}
+                fieldIsReadOnly={input.fieldIsReadOnly}
+                onEventParameterRuleChange={(change) => {
+                  input.onEventParameterRuleChange({
+                    resourceKind: option.resourceKind,
+                    ...change,
+                  });
+                }}
+                onEventParameterRulesChange={(change) => {
+                  input.onEventParameterRulesChange({
+                    resourceKind: option.resourceKind,
+                    ...change,
+                  });
+                }}
+                onEventTypeChange={(eventType, checked) => {
+                  input.onEventTypeChange(option.resourceKind, eventType, checked);
+                }}
+                resource={resource}
+                selectedConnectionId={input.selectedConnectionId}
+                settingsExpanded={settingsExpanded}
+                layout={input.layout}
+              />
             )}
           </div>
         );
@@ -524,8 +541,12 @@ function SandboxProfileAssociatedResourceRoutingFields(input: {
   );
 }
 
-function GitHubPullRequestSettings(input: {
+function AssociatedResourceEventSettings(input: {
   eventOptions: readonly WebhookTriggerEventOption[];
+  eventTypeOptions: ReadonlyArray<{
+    eventType: AssociatedResourceEventType;
+    label: string;
+  }>;
   fieldIsReadOnly: boolean;
   onEventParameterRuleChange: (input: {
     triggerId: string;
@@ -570,7 +591,8 @@ function GitHubPullRequestSettings(input: {
         <AssociatedResourceEventTypeRows
           eventOptions={input.eventOptions}
           eventParameterRules={input.resource.eventParameterRules}
-          eventTypeOptions={GitHubPullRequestEventOptions}
+          eventTypeOptions={input.eventTypeOptions}
+          fieldIsReadOnly={input.fieldIsReadOnly}
           onEventParameterRuleChange={input.onEventParameterRuleChange}
           onEventParameterRulesChange={input.onEventParameterRulesChange}
           onEventTypeChange={input.onEventTypeChange}
@@ -644,6 +666,7 @@ function AssociatedResourceEventTypeRows(input: {
     eventType: AssociatedResourceEventType;
     label: string;
   }>;
+  fieldIsReadOnly: boolean;
   onEventParameterRuleChange: (input: {
     triggerId: string;
     parameterId: string;
@@ -670,6 +693,7 @@ function AssociatedResourceEventTypeRows(input: {
             <label className="flex min-h-7 items-center gap-2 text-sm font-medium">
               <Checkbox
                 checked={selected}
+                disabled={input.fieldIsReadOnly}
                 onCheckedChange={(checked) => {
                   input.onEventTypeChange(option.eventType, checked === true);
                 }}
@@ -679,6 +703,14 @@ function AssociatedResourceEventTypeRows(input: {
             {selected && eventOption !== undefined ? (
               <div className="mt-3 pl-6">
                 <WebhookTriggerEventPicker
+                  disabledState={
+                    input.fieldIsReadOnly
+                      ? {
+                          reason: "Associated resource routing is read-only.",
+                          variant: "default",
+                        }
+                      : null
+                  }
                   error={undefined}
                   eventOptions={[eventOption]}
                   eventParameterRules={input.eventParameterRules}
@@ -1168,6 +1200,71 @@ function createAssociatedResourceRoutingSummary(input: {
   return `${activityLabel} selected`;
 }
 
+function createAssociatedResourceOptionModels(input: {
+  config: AssociatedResourceRoutingConfig;
+  supportedAssociatedResourceEvents: readonly AssociatedResourceEventDefinition[];
+}): AssociatedResourceOption[] {
+  const eventTypesByResourceKind = new Map<string, AssociatedResourceEventType[]>();
+  for (const option of KnownAssociatedResourceOptions) {
+    eventTypesByResourceKind.set(option.resourceKind, [...option.defaultEventTypes]);
+  }
+
+  for (const event of input.supportedAssociatedResourceEvents) {
+    const currentEventTypes = eventTypesByResourceKind.get(event.resourceKind) ?? [];
+    eventTypesByResourceKind.set(event.resourceKind, [...currentEventTypes, event.eventType]);
+  }
+
+  for (const resource of input.config.resources ?? []) {
+    const currentEventTypes = eventTypesByResourceKind.get(resource.resourceKind) ?? [];
+    eventTypesByResourceKind.set(resource.resourceKind, [
+      ...currentEventTypes,
+      ...resource.eventTypes,
+    ]);
+  }
+
+  return [...eventTypesByResourceKind.entries()]
+    .map(([resourceKind, eventTypes]) => {
+      const knownOption = KnownAssociatedResourceOptions.find(
+        (option) => option.resourceKind === resourceKind,
+      );
+      const defaultEventTypes = sortAssociatedResourceEventTypes(eventTypes);
+
+      return {
+        defaultEventTypes,
+        label: knownOption?.label ?? formatAssociatedResourceKindLabel(resourceKind),
+        resourceKind,
+        tooltip:
+          knownOption?.tooltip ?? "Send selected provider activity back to the originating agent.",
+        tooltipLabel:
+          knownOption?.tooltipLabel ?? `Explain ${formatAssociatedResourceKindLabel(resourceKind)}`,
+      };
+    })
+    .sort((left, right) => left.resourceKind.localeCompare(right.resourceKind));
+}
+
+function formatAssociatedResourceKindLabel(resourceKind: string): string {
+  return resourceKind
+    .split(/[._-]+/u)
+    .filter((part) => part.length > 0)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
+function createAssociatedResourceEventTypeOptions(input: {
+  eventOptions: readonly WebhookTriggerEventOption[];
+  option: AssociatedResourceOption;
+}): ReadonlyArray<{ eventType: AssociatedResourceEventType; label: string }> {
+  return input.option.defaultEventTypes.map((eventType) => {
+    const eventOption =
+      input.eventOptions.find((option) => option.eventType === eventType) ??
+      KnownAssociatedResourceEventOptions.find((option) => option.eventType === eventType);
+    return {
+      eventType,
+      label: eventOption?.label ?? formatAssociatedResourceKindLabel(eventType),
+    };
+  });
+}
+
 function createAssociatedResourceRoutingFieldGroupStateKey(input: {
   config: AssociatedResourceRoutingConfig;
   hasGitHubBinding: boolean;
@@ -1189,9 +1286,10 @@ function createAssociatedResourceRoutingDraft(input: {
   eventOptions: readonly WebhookTriggerEventOption[];
   hasGitHubBinding: boolean;
   hasSlackThreadBinding: boolean;
+  resourceOptions: readonly AssociatedResourceOption[];
 }): AssociatedResourceRoutingDraft {
   return {
-    resources: AssociatedResourceOptions.map((option) =>
+    resources: input.resourceOptions.map((option) =>
       createAssociatedResourceRoutingResourceDraft({
         config: input.config,
         defaultEnabled:
@@ -1209,7 +1307,7 @@ function createAssociatedResourceRoutingResourceDraft(input: {
   config: AssociatedResourceRoutingConfig;
   defaultEnabled: boolean;
   eventOptions: readonly WebhookTriggerEventOption[];
-  option: (typeof AssociatedResourceOptions)[number];
+  option: AssociatedResourceOption;
 }): AssociatedResourceRoutingResourceDraft {
   const rule = input.config.resources?.find(
     (resource) => resource.resourceKind === input.option.resourceKind,
@@ -1235,6 +1333,7 @@ function createAssociatedResourceRoutingResourceDraft(input: {
 
   return {
     advancedPayloadFilter: extractedParameterRules.remainingPayloadFilter,
+    ...(rule?.config === undefined ? {} : { config: structuredClone(rule.config) }),
     enabled,
     eventParameterRules: extractedParameterRules.eventParameterRules,
     eventTypes: sortAssociatedResourceEventTypes(eventTypes),
@@ -1269,29 +1368,20 @@ function createAssociatedResourceEventRoutingResourceRule(input: {
   eventOptions: readonly WebhookTriggerEventOption[];
   resource: AssociatedResourceRoutingResourceDraft;
 }): AssociatedResourceRoutingResourceRule {
-  switch (input.resource.resourceKind) {
-    case AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST:
-      return {
-        resourceKind: input.resource.resourceKind,
-        eventTypes: sortGitHubPullRequestEventTypes(input.resource.eventTypes),
-        ...createAssociatedResourceRoutingPayloadFilterField({
-          draft: input.resource,
-          eventOptions: input.eventOptions,
-        }),
-      };
-    case AssociatedProviderResourceKinds.SLACK_THREAD:
-      return {
-        resourceKind: input.resource.resourceKind,
-        eventTypes: sortSlackThreadEventTypes(input.resource.eventTypes),
-        ...(input.resource.slackThreadMessageMode === SlackThreadMessageModes.ALL
-          ? {}
-          : { messageMode: input.resource.slackThreadMessageMode }),
-        ...createAssociatedResourceRoutingPayloadFilterField({
-          draft: input.resource,
-          eventOptions: input.eventOptions,
-        }),
-      };
-  }
+  return {
+    resourceKind: input.resource.resourceKind,
+    eventTypes: sortAssociatedResourceEventTypes(input.resource.eventTypes),
+    ...(input.resource.slackThreadMessageMode === SlackThreadMessageModes.ALL
+      ? {}
+      : { messageMode: input.resource.slackThreadMessageMode }),
+    ...(input.resource.config === undefined
+      ? {}
+      : { config: structuredClone(input.resource.config) }),
+    ...createAssociatedResourceRoutingPayloadFilterField({
+      draft: input.resource,
+      eventOptions: input.eventOptions,
+    }),
+  };
 }
 
 function createAssociatedResourceRoutingPayloadFilterField(input: {
@@ -1361,6 +1451,7 @@ function associatedResourceRoutingDraftsAreEqual(
           JSON.stringify(rightResource.eventParameterRules) &&
         JSON.stringify(leftResource.advancedPayloadFilter) ===
           JSON.stringify(rightResource.advancedPayloadFilter) &&
+        JSON.stringify(leftResource.config) === JSON.stringify(rightResource.config) &&
         leftResource.slackThreadMessageMode === rightResource.slackThreadMessageMode
       );
     })
@@ -1379,42 +1470,6 @@ function sortAssociatedResourceEventTypes(
   return [...new Set(eventTypes)].sort(
     (left, right) => (order.get(left) ?? 0) - (order.get(right) ?? 0),
   );
-}
-
-function sortGitHubPullRequestEventTypes(
-  eventTypes: readonly AssociatedResourceEventType[],
-): GitHubPullRequestAssociatedResourceEventType[] {
-  const sortedEventTypes: GitHubPullRequestAssociatedResourceEventType[] = [];
-  for (const eventType of sortAssociatedResourceEventTypes(eventTypes)) {
-    switch (eventType) {
-      case AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED:
-      case AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED:
-      case AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED:
-        sortedEventTypes.push(eventType);
-        break;
-      case AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED:
-        break;
-    }
-  }
-  return sortedEventTypes;
-}
-
-function sortSlackThreadEventTypes(
-  eventTypes: readonly AssociatedResourceEventType[],
-): SlackThreadAssociatedResourceEventType[] {
-  const sortedEventTypes: SlackThreadAssociatedResourceEventType[] = [];
-  for (const eventType of sortAssociatedResourceEventTypes(eventTypes)) {
-    switch (eventType) {
-      case AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED:
-        sortedEventTypes.push(eventType);
-        break;
-      case AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED:
-      case AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED:
-      case AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED:
-        break;
-    }
-  }
-  return sortedEventTypes;
 }
 
 function updateResourceDraft(

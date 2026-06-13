@@ -1,4 +1,3 @@
-import type { WebhookPayloadFilter } from "@mistle/webhooks";
 import type { z } from "zod";
 
 import type {
@@ -137,6 +136,52 @@ export type IntegrationConnection = {
   status: IntegrationConnectionStatus;
   externalSubjectId?: string;
   config: Record<string, unknown>;
+};
+
+export type IntegrationConnectionRepairDescriptor = {
+  id: string;
+  title: string;
+  description?: string | undefined;
+  actionLabel: string;
+  pendingLabel: string;
+};
+
+export type IntegrationConnectionRepairSupportInput<TConnectionConfig = Record<string, unknown>> = {
+  connection: IntegrationConnection & {
+    config: TConnectionConfig;
+  };
+};
+
+export type IntegrationConnectionRepairInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  organizationId: string;
+  targetKey: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  connection: IntegrationConnection & {
+    config: TConnectionConfig;
+  };
+  resolveConnectionSecret(input: { slotKey: string; secretType: string }): MaybePromise<string>;
+};
+
+export type IntegrationConnectionRepairResult<TConnectionConfig = Record<string, unknown>> = {
+  config?: TConnectionConfig | undefined;
+  externalSubjectId?: string | null | undefined;
+};
+
+export type IntegrationConnectionRepairCapability<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  describeRepair(
+    input: IntegrationConnectionRepairSupportInput<TConnectionConfig>,
+  ): MaybePromise<IntegrationConnectionRepairDescriptor | null>;
+  repair(
+    input: IntegrationConnectionRepairInput<TTargetConfig, TTargetSecrets, TConnectionConfig>,
+  ): MaybePromise<IntegrationConnectionRepairResult<TConnectionConfig>>;
 };
 
 export type IdentityLinkingPrincipalKey = {
@@ -2099,8 +2144,7 @@ export const AssociatedProviderResourceKinds = {
   SLACK_THREAD: "slack.thread",
 } as const;
 
-export type AssociatedProviderResourceKind =
-  (typeof AssociatedProviderResourceKinds)[keyof typeof AssociatedProviderResourceKinds];
+export type AssociatedProviderResourceKind = string;
 
 export const AssociatedResourceEventTypes = {
   GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED: "github.pull_request.issue_comment.created",
@@ -2109,29 +2153,7 @@ export const AssociatedResourceEventTypes = {
   SLACK_THREAD_MESSAGE_CREATED: "slack.thread.message.created",
 } as const;
 
-export type AssociatedResourceEventType =
-  (typeof AssociatedResourceEventTypes)[keyof typeof AssociatedResourceEventTypes];
-
-export type GitHubPullRequestAssociatedResourceEventRoutingResourceRule = {
-  resourceKind: typeof AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST;
-  eventTypes: ReadonlyArray<
-    | typeof AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED
-    | typeof AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED
-    | typeof AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED
-  >;
-  payloadFilter?:
-    | Readonly<
-        Partial<
-          Record<
-            | typeof AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED
-            | typeof AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED
-            | typeof AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
-            WebhookPayloadFilter
-          >
-        >
-      >
-    | undefined;
-};
+export type AssociatedResourceEventType = string;
 
 export const SlackThreadMessageModes = {
   ALL: "all",
@@ -2141,25 +2163,13 @@ export const SlackThreadMessageModes = {
 export type SlackThreadMessageMode =
   (typeof SlackThreadMessageModes)[keyof typeof SlackThreadMessageModes];
 
-export type SlackThreadAssociatedResourceEventRoutingResourceRule = {
-  resourceKind: typeof AssociatedProviderResourceKinds.SLACK_THREAD;
-  eventTypes: ReadonlyArray<typeof AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED>;
+export type AssociatedResourceEventRoutingResourceRule = {
+  resourceKind: AssociatedProviderResourceKind;
+  eventTypes: ReadonlyArray<AssociatedResourceEventType>;
   messageMode?: SlackThreadMessageMode | undefined;
-  payloadFilter?:
-    | Readonly<
-        Partial<
-          Record<
-            typeof AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED,
-            WebhookPayloadFilter
-          >
-        >
-      >
-    | undefined;
+  payloadFilter?: Readonly<Record<AssociatedResourceEventType, unknown>> | undefined;
+  config?: Readonly<Record<string, unknown>> | undefined;
 };
-
-export type AssociatedResourceEventRoutingResourceRule =
-  | GitHubPullRequestAssociatedResourceEventRoutingResourceRule
-  | SlackThreadAssociatedResourceEventRoutingResourceRule;
 
 export type AssociatedResourceEventRouting = {
   enabled: boolean;
@@ -2196,10 +2206,66 @@ export type AssociatedResourceSelfAuthorshipInput<TConnectionConfig = Record<str
   observation: AssociatedResourceWebhookObservation;
 };
 
-export type IntegrationAssociatedResourceEventsCapability<
+export type AssociatedResourceRoutingDefaultInput<
+  TTargetConfig = Record<string, unknown>,
+  TBindingConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> = {
+  targetKey: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  connection: IntegrationConnection;
+  binding: Pick<IntegrationBinding, "id" | "kind" | "connectionId"> & { config: TBindingConfig };
+};
+
+export type AssociatedResourceRoutingEventSupportInput = {
+  eventType: AssociatedResourceEventType;
+  payload: Record<string, unknown>;
+  resource: AssociatedResourceEventRoutingResourceRule;
+  sourceWebhookEventType: string;
+};
+
+export type AssociatedResourceEgressObservationInput = {
+  method: string;
+  path: string;
+  requestBody?: Uint8Array | undefined;
+  responseBody: unknown;
+  status: number;
+};
+
+export type AssociatedResourceEgressObservation = {
+  extractionMethod: string;
+  resourceKind: AssociatedProviderResourceKind;
+  providerResourceId: string;
+};
+
+export type AssociatedResourceRegistrationSupportInput<
   TConnectionConfig = Record<string, unknown>,
 > = {
+  connection: {
+    config: TConnectionConfig | null;
+    id: string;
+  };
+  providerResourceId: string;
+  resourceKind: AssociatedProviderResourceKind;
+};
+
+export type IntegrationAssociatedResourceEventsCapability<
+  TConnectionConfig = Record<string, unknown>,
+  TTargetConfig = Record<string, unknown>,
+  TBindingConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> = {
   supportedEvents?: ReadonlyArray<IntegrationAssociatedResourceEventDefinition> | undefined;
+  defaultRoutingResources?(
+    input: AssociatedResourceRoutingDefaultInput<TTargetConfig, TBindingConfig, TTargetSecrets>,
+  ): MaybePromise<ReadonlyArray<AssociatedResourceEventRoutingResourceRule>>;
+  supportsResourceRegistration?(
+    input: AssociatedResourceRegistrationSupportInput<TConnectionConfig>,
+  ): MaybePromise<boolean>;
+  supportsRoutingEvent?(input: AssociatedResourceRoutingEventSupportInput): MaybePromise<boolean>;
+  observeEgressResponse?(
+    input: AssociatedResourceEgressObservationInput,
+  ): MaybePromise<AssociatedResourceEgressObservation | null>;
   observeWebhookEvent(
     input: AssociatedResourceWebhookObservationInput,
   ): MaybePromise<AssociatedResourceWebhookObservation | null>;
@@ -2703,6 +2769,11 @@ export type IntegrationDefinition<
     TConnectionConfig
   >;
   deviceAuthorization?: IntegrationDeviceAuthorizationCapability<
+    ParsedSchemaOutput<TTargetConfigSchema>,
+    ParsedSchemaOutput<TTargetSecretsSchema>,
+    TConnectionConfig
+  >;
+  connectionRepair?: IntegrationConnectionRepairCapability<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TTargetSecretsSchema>,
     TConnectionConfig

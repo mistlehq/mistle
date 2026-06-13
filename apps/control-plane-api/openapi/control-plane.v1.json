@@ -4013,6 +4013,33 @@
                           "supportsWebhookSources": {
                             "type": "boolean"
                           },
+                          "repairAction": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "description": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "actionLabel": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "pendingLabel": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": ["id", "title", "actionLabel", "pendingLabel"],
+                            "additionalProperties": false
+                          },
                           "webhookTriggerCapabilitiesRefreshAction": {
                             "type": "object",
                             "properties": {
@@ -5883,6 +5910,370 @@
         }
       }
     },
+    "/v1/integration/connections/:connectionId/repair": {
+      "post": {
+        "tags": ["Integrations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "connectionId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Repair provider-owned metadata for an integration connection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "targetKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "displayName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["active", "error", "revoked"]
+                    },
+                    "bindingCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "triggerCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "isIdentityLinked": {
+                      "type": "boolean"
+                    },
+                    "externalSubjectId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "config": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    },
+                    "targetSnapshotConfig": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    },
+                    "connectionMethodId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "connectionMethodLabel": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "configuredSecretNames": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "resources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "selectionMode": {
+                            "type": "string",
+                            "enum": ["single", "multi"]
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "syncState": {
+                            "type": "string",
+                            "enum": ["never-synced", "syncing", "ready", "error"]
+                          },
+                          "lastErrorCode": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "lastErrorMessage": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "lastSyncedAt": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": ["kind", "selectionMode", "count", "syncState"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "supportsWebhookSources": {
+                      "type": "boolean"
+                    },
+                    "repairAction": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "description": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "actionLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "pendingLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["id", "title", "actionLabel", "pendingLabel"],
+                      "additionalProperties": false
+                    },
+                    "webhookTriggerCapabilitiesRefreshAction": {
+                      "type": "object",
+                      "properties": {
+                        "actionLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "disabledMessage": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "pendingLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "bodyForm": {
+                          "type": "object",
+                          "properties": {
+                            "fields": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "actions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "href": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "opensInNewWindow": {
+                                          "type": "boolean"
+                                        }
+                                      },
+                                      "required": ["href", "label"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "description": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "inputType": {
+                                    "type": "string",
+                                    "enum": ["password", "text", "textarea"]
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "placeholder": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "required": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": ["inputType", "label", "name"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "submitLabel": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "title": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["fields", "submitLabel", "title"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["actionLabel", "pendingLabel"],
+                      "additionalProperties": false
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "targetKey",
+                    "displayName",
+                    "status",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Repair is not supported or failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["CONNECTION_REPAIR_NOT_SUPPORTED", "CONNECTION_REPAIR_FAILED"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Integration connection was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["CONNECTION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/integration/connections/:targetKey/form": {
       "post": {
         "tags": ["Integrations"],
@@ -6031,6 +6422,33 @@
                     },
                     "supportsWebhookSources": {
                       "type": "boolean"
+                    },
+                    "repairAction": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "description": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "actionLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "pendingLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["id", "title", "actionLabel", "pendingLabel"],
+                      "additionalProperties": false
                     },
                     "webhookTriggerCapabilitiesRefreshAction": {
                       "type": "object",
@@ -6433,6 +6851,33 @@
                     "supportsWebhookSources": {
                       "type": "boolean"
                     },
+                    "repairAction": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "description": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "actionLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "pendingLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["id", "title", "actionLabel", "pendingLabel"],
+                      "additionalProperties": false
+                    },
                     "webhookTriggerCapabilitiesRefreshAction": {
                       "type": "object",
                       "properties": {
@@ -6794,6 +7239,33 @@
                     },
                     "supportsWebhookSources": {
                       "type": "boolean"
+                    },
+                    "repairAction": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "description": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "actionLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "pendingLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["id", "title", "actionLabel", "pendingLabel"],
+                      "additionalProperties": false
                     },
                     "webhookTriggerCapabilitiesRefreshAction": {
                       "type": "object",
@@ -7341,6 +7813,33 @@
                     },
                     "supportsWebhookSources": {
                       "type": "boolean"
+                    },
+                    "repairAction": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "title": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "description": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "actionLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "pendingLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["id", "title", "actionLabel", "pendingLabel"],
+                      "additionalProperties": false
                     },
                     "webhookTriggerCapabilitiesRefreshAction": {
                       "type": "object",
@@ -21526,62 +22025,35 @@
                         "resources": {
                           "type": "array",
                           "items": {
-                            "anyOf": [
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "resourceKind": {
-                                    "type": "string",
-                                    "enum": ["github.pull_request"]
-                                  },
-                                  "eventTypes": {
-                                    "type": "array",
-                                    "items": {
-                                      "type": "string",
-                                      "enum": [
-                                        "github.pull_request.issue_comment.created",
-                                        "github.pull_request.review.submitted",
-                                        "github.pull_request.review_comment.created"
-                                      ]
-                                    },
-                                    "minItems": 1
-                                  },
-                                  "payloadFilter": {
-                                    "type": "object",
-                                    "additionalProperties": {}
-                                  }
-                                },
-                                "required": ["resourceKind", "eventTypes"],
-                                "additionalProperties": false
+                            "type": "object",
+                            "properties": {
+                              "resourceKind": {
+                                "type": "string",
+                                "minLength": 1
                               },
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "resourceKind": {
-                                    "type": "string",
-                                    "enum": ["slack.thread"]
-                                  },
-                                  "eventTypes": {
-                                    "type": "array",
-                                    "items": {
-                                      "type": "string",
-                                      "enum": ["slack.thread.message.created"]
-                                    },
-                                    "minItems": 1
-                                  },
-                                  "messageMode": {
-                                    "type": "string",
-                                    "enum": ["all", "app_mentions_only"]
-                                  },
-                                  "payloadFilter": {
-                                    "type": "object",
-                                    "additionalProperties": {}
-                                  }
+                              "eventTypes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
                                 },
-                                "required": ["resourceKind", "eventTypes"],
-                                "additionalProperties": false
+                                "minItems": 1
+                              },
+                              "messageMode": {
+                                "type": "string",
+                                "enum": ["all", "app_mentions_only"]
+                              },
+                              "payloadFilter": {
+                                "type": "object",
+                                "additionalProperties": {}
+                              },
+                              "config": {
+                                "type": "object",
+                                "additionalProperties": {}
                               }
-                            ]
+                            },
+                            "required": ["resourceKind", "eventTypes"],
+                            "additionalProperties": false
                           }
                         }
                       },
@@ -21956,62 +22428,35 @@
                               "resources": {
                                 "type": "array",
                                 "items": {
-                                  "anyOf": [
-                                    {
-                                      "type": "object",
-                                      "properties": {
-                                        "resourceKind": {
-                                          "type": "string",
-                                          "enum": ["github.pull_request"]
-                                        },
-                                        "eventTypes": {
-                                          "type": "array",
-                                          "items": {
-                                            "type": "string",
-                                            "enum": [
-                                              "github.pull_request.issue_comment.created",
-                                              "github.pull_request.review.submitted",
-                                              "github.pull_request.review_comment.created"
-                                            ]
-                                          },
-                                          "minItems": 1
-                                        },
-                                        "payloadFilter": {
-                                          "type": "object",
-                                          "additionalProperties": {}
-                                        }
-                                      },
-                                      "required": ["resourceKind", "eventTypes"],
-                                      "additionalProperties": false
+                                  "type": "object",
+                                  "properties": {
+                                    "resourceKind": {
+                                      "type": "string",
+                                      "minLength": 1
                                     },
-                                    {
-                                      "type": "object",
-                                      "properties": {
-                                        "resourceKind": {
-                                          "type": "string",
-                                          "enum": ["slack.thread"]
-                                        },
-                                        "eventTypes": {
-                                          "type": "array",
-                                          "items": {
-                                            "type": "string",
-                                            "enum": ["slack.thread.message.created"]
-                                          },
-                                          "minItems": 1
-                                        },
-                                        "messageMode": {
-                                          "type": "string",
-                                          "enum": ["all", "app_mentions_only"]
-                                        },
-                                        "payloadFilter": {
-                                          "type": "object",
-                                          "additionalProperties": {}
-                                        }
+                                    "eventTypes": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1
                                       },
-                                      "required": ["resourceKind", "eventTypes"],
-                                      "additionalProperties": false
+                                      "minItems": 1
+                                    },
+                                    "messageMode": {
+                                      "type": "string",
+                                      "enum": ["all", "app_mentions_only"]
+                                    },
+                                    "payloadFilter": {
+                                      "type": "object",
+                                      "additionalProperties": {}
+                                    },
+                                    "config": {
+                                      "type": "object",
+                                      "additionalProperties": {}
                                     }
-                                  ]
+                                  },
+                                  "required": ["resourceKind", "eventTypes"],
+                                  "additionalProperties": false
                                 }
                               }
                             },
@@ -24318,62 +24763,35 @@
                       "resources": {
                         "type": "array",
                         "items": {
-                          "anyOf": [
-                            {
-                              "type": "object",
-                              "properties": {
-                                "resourceKind": {
-                                  "type": "string",
-                                  "enum": ["github.pull_request"]
-                                },
-                                "eventTypes": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string",
-                                    "enum": [
-                                      "github.pull_request.issue_comment.created",
-                                      "github.pull_request.review.submitted",
-                                      "github.pull_request.review_comment.created"
-                                    ]
-                                  },
-                                  "minItems": 1
-                                },
-                                "payloadFilter": {
-                                  "type": "object",
-                                  "additionalProperties": {}
-                                }
-                              },
-                              "required": ["resourceKind", "eventTypes"],
-                              "additionalProperties": false
+                          "type": "object",
+                          "properties": {
+                            "resourceKind": {
+                              "type": "string",
+                              "minLength": 1
                             },
-                            {
-                              "type": "object",
-                              "properties": {
-                                "resourceKind": {
-                                  "type": "string",
-                                  "enum": ["slack.thread"]
-                                },
-                                "eventTypes": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string",
-                                    "enum": ["slack.thread.message.created"]
-                                  },
-                                  "minItems": 1
-                                },
-                                "messageMode": {
-                                  "type": "string",
-                                  "enum": ["all", "app_mentions_only"]
-                                },
-                                "payloadFilter": {
-                                  "type": "object",
-                                  "additionalProperties": {}
-                                }
+                            "eventTypes": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
                               },
-                              "required": ["resourceKind", "eventTypes"],
-                              "additionalProperties": false
+                              "minItems": 1
+                            },
+                            "messageMode": {
+                              "type": "string",
+                              "enum": ["all", "app_mentions_only"]
+                            },
+                            "payloadFilter": {
+                              "type": "object",
+                              "additionalProperties": {}
+                            },
+                            "config": {
+                              "type": "object",
+                              "additionalProperties": {}
                             }
-                          ]
+                          },
+                          "required": ["resourceKind", "eventTypes"],
+                          "additionalProperties": false
                         }
                       }
                     },
@@ -24521,62 +24939,35 @@
                         "resources": {
                           "type": "array",
                           "items": {
-                            "anyOf": [
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "resourceKind": {
-                                    "type": "string",
-                                    "enum": ["github.pull_request"]
-                                  },
-                                  "eventTypes": {
-                                    "type": "array",
-                                    "items": {
-                                      "type": "string",
-                                      "enum": [
-                                        "github.pull_request.issue_comment.created",
-                                        "github.pull_request.review.submitted",
-                                        "github.pull_request.review_comment.created"
-                                      ]
-                                    },
-                                    "minItems": 1
-                                  },
-                                  "payloadFilter": {
-                                    "type": "object",
-                                    "additionalProperties": {}
-                                  }
-                                },
-                                "required": ["resourceKind", "eventTypes"],
-                                "additionalProperties": false
+                            "type": "object",
+                            "properties": {
+                              "resourceKind": {
+                                "type": "string",
+                                "minLength": 1
                               },
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "resourceKind": {
-                                    "type": "string",
-                                    "enum": ["slack.thread"]
-                                  },
-                                  "eventTypes": {
-                                    "type": "array",
-                                    "items": {
-                                      "type": "string",
-                                      "enum": ["slack.thread.message.created"]
-                                    },
-                                    "minItems": 1
-                                  },
-                                  "messageMode": {
-                                    "type": "string",
-                                    "enum": ["all", "app_mentions_only"]
-                                  },
-                                  "payloadFilter": {
-                                    "type": "object",
-                                    "additionalProperties": {}
-                                  }
+                              "eventTypes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
                                 },
-                                "required": ["resourceKind", "eventTypes"],
-                                "additionalProperties": false
+                                "minItems": 1
+                              },
+                              "messageMode": {
+                                "type": "string",
+                                "enum": ["all", "app_mentions_only"]
+                              },
+                              "payloadFilter": {
+                                "type": "object",
+                                "additionalProperties": {}
+                              },
+                              "config": {
+                                "type": "object",
+                                "additionalProperties": {}
                               }
-                            ]
+                            },
+                            "required": ["resourceKind", "eventTypes"],
+                            "additionalProperties": false
                           }
                         }
                       },
@@ -25537,62 +25928,35 @@
                             "resources": {
                               "type": "array",
                               "items": {
-                                "anyOf": [
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "resourceKind": {
-                                        "type": "string",
-                                        "enum": ["github.pull_request"]
-                                      },
-                                      "eventTypes": {
-                                        "type": "array",
-                                        "items": {
-                                          "type": "string",
-                                          "enum": [
-                                            "github.pull_request.issue_comment.created",
-                                            "github.pull_request.review.submitted",
-                                            "github.pull_request.review_comment.created"
-                                          ]
-                                        },
-                                        "minItems": 1
-                                      },
-                                      "payloadFilter": {
-                                        "type": "object",
-                                        "additionalProperties": {}
-                                      }
-                                    },
-                                    "required": ["resourceKind", "eventTypes"],
-                                    "additionalProperties": false
+                                "type": "object",
+                                "properties": {
+                                  "resourceKind": {
+                                    "type": "string",
+                                    "minLength": 1
                                   },
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "resourceKind": {
-                                        "type": "string",
-                                        "enum": ["slack.thread"]
-                                      },
-                                      "eventTypes": {
-                                        "type": "array",
-                                        "items": {
-                                          "type": "string",
-                                          "enum": ["slack.thread.message.created"]
-                                        },
-                                        "minItems": 1
-                                      },
-                                      "messageMode": {
-                                        "type": "string",
-                                        "enum": ["all", "app_mentions_only"]
-                                      },
-                                      "payloadFilter": {
-                                        "type": "object",
-                                        "additionalProperties": {}
-                                      }
+                                  "eventTypes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1
                                     },
-                                    "required": ["resourceKind", "eventTypes"],
-                                    "additionalProperties": false
+                                    "minItems": 1
+                                  },
+                                  "messageMode": {
+                                    "type": "string",
+                                    "enum": ["all", "app_mentions_only"]
+                                  },
+                                  "payloadFilter": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  },
+                                  "config": {
+                                    "type": "object",
+                                    "additionalProperties": {}
                                   }
-                                ]
+                                },
+                                "required": ["resourceKind", "eventTypes"],
+                                "additionalProperties": false
                               }
                             }
                           },
@@ -26088,62 +26452,35 @@
                             "resources": {
                               "type": "array",
                               "items": {
-                                "anyOf": [
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "resourceKind": {
-                                        "type": "string",
-                                        "enum": ["github.pull_request"]
-                                      },
-                                      "eventTypes": {
-                                        "type": "array",
-                                        "items": {
-                                          "type": "string",
-                                          "enum": [
-                                            "github.pull_request.issue_comment.created",
-                                            "github.pull_request.review.submitted",
-                                            "github.pull_request.review_comment.created"
-                                          ]
-                                        },
-                                        "minItems": 1
-                                      },
-                                      "payloadFilter": {
-                                        "type": "object",
-                                        "additionalProperties": {}
-                                      }
-                                    },
-                                    "required": ["resourceKind", "eventTypes"],
-                                    "additionalProperties": false
+                                "type": "object",
+                                "properties": {
+                                  "resourceKind": {
+                                    "type": "string",
+                                    "minLength": 1
                                   },
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "resourceKind": {
-                                        "type": "string",
-                                        "enum": ["slack.thread"]
-                                      },
-                                      "eventTypes": {
-                                        "type": "array",
-                                        "items": {
-                                          "type": "string",
-                                          "enum": ["slack.thread.message.created"]
-                                        },
-                                        "minItems": 1
-                                      },
-                                      "messageMode": {
-                                        "type": "string",
-                                        "enum": ["all", "app_mentions_only"]
-                                      },
-                                      "payloadFilter": {
-                                        "type": "object",
-                                        "additionalProperties": {}
-                                      }
+                                  "eventTypes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1
                                     },
-                                    "required": ["resourceKind", "eventTypes"],
-                                    "additionalProperties": false
+                                    "minItems": 1
+                                  },
+                                  "messageMode": {
+                                    "type": "string",
+                                    "enum": ["all", "app_mentions_only"]
+                                  },
+                                  "payloadFilter": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  },
+                                  "config": {
+                                    "type": "object",
+                                    "additionalProperties": {}
                                   }
-                                ]
+                                },
+                                "required": ["resourceKind", "eventTypes"],
+                                "additionalProperties": false
                               }
                             }
                           },
@@ -26599,62 +26936,35 @@
                             "resources": {
                               "type": "array",
                               "items": {
-                                "anyOf": [
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "resourceKind": {
-                                        "type": "string",
-                                        "enum": ["github.pull_request"]
-                                      },
-                                      "eventTypes": {
-                                        "type": "array",
-                                        "items": {
-                                          "type": "string",
-                                          "enum": [
-                                            "github.pull_request.issue_comment.created",
-                                            "github.pull_request.review.submitted",
-                                            "github.pull_request.review_comment.created"
-                                          ]
-                                        },
-                                        "minItems": 1
-                                      },
-                                      "payloadFilter": {
-                                        "type": "object",
-                                        "additionalProperties": {}
-                                      }
-                                    },
-                                    "required": ["resourceKind", "eventTypes"],
-                                    "additionalProperties": false
+                                "type": "object",
+                                "properties": {
+                                  "resourceKind": {
+                                    "type": "string",
+                                    "minLength": 1
                                   },
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "resourceKind": {
-                                        "type": "string",
-                                        "enum": ["slack.thread"]
-                                      },
-                                      "eventTypes": {
-                                        "type": "array",
-                                        "items": {
-                                          "type": "string",
-                                          "enum": ["slack.thread.message.created"]
-                                        },
-                                        "minItems": 1
-                                      },
-                                      "messageMode": {
-                                        "type": "string",
-                                        "enum": ["all", "app_mentions_only"]
-                                      },
-                                      "payloadFilter": {
-                                        "type": "object",
-                                        "additionalProperties": {}
-                                      }
+                                  "eventTypes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1
                                     },
-                                    "required": ["resourceKind", "eventTypes"],
-                                    "additionalProperties": false
+                                    "minItems": 1
+                                  },
+                                  "messageMode": {
+                                    "type": "string",
+                                    "enum": ["all", "app_mentions_only"]
+                                  },
+                                  "payloadFilter": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  },
+                                  "config": {
+                                    "type": "object",
+                                    "additionalProperties": {}
                                   }
-                                ]
+                                },
+                                "required": ["resourceKind", "eventTypes"],
+                                "additionalProperties": false
                               }
                             }
                           },
