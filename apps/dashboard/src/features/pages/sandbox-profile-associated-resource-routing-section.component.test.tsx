@@ -313,7 +313,34 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
   });
 
   it("keeps associated resource details inspectable but read-only for published profile versions", () => {
-    renderSection({ hasSlackThreadBinding: true, isDraft: false });
+    renderSection({
+      hasSlackThreadBinding: true,
+      isDraft: false,
+      supportedAssociatedResourceEvents: SupportedAssociatedResourceEvents,
+      version: createVersion({
+        state: "published",
+        associatedResourceEventRoutingConfig: {
+          enabled: true,
+          resources: [
+            {
+              resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+              eventTypes: [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED],
+              payloadFilter: {
+                [AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED]: {
+                  op: "contains_token",
+                  path: ["comment", "body"],
+                  value: "@mistle",
+                },
+              },
+            },
+            {
+              resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+              eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+            },
+          ],
+        },
+      }),
+    });
 
     const configurePullRequestButton = screen.getByRole("button", {
       name: "Configure Agent PR activity",
@@ -324,6 +351,8 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
 
     expect(screen.queryByRole("checkbox", { name: "PR comments" })).toBeNull();
     expect(screen.getByText("PR comments")).toBeTruthy();
+    expect(screen.getByText("includes")).toBeTruthy();
+    expect(screen.getByText("@mistle")).toBeTruthy();
 
     const configureSlackThreadButton = screen.getByRole("button", {
       name: "Configure Agent-started Slack threads",
@@ -340,10 +369,11 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
     expect(screen.queryByText("Associated resource routing is read-only.")).toBeNull();
   });
 
-  it("shows disabled published pull request routing as unselected when expanded", () => {
+  it("shows disabled published routing as unselected and non-interactive", () => {
     renderSection({
       isDraft: false,
       version: createVersion({
+        state: "published",
         associatedResourceEventRoutingConfig: {
           enabled: false,
           resources: [],
@@ -352,6 +382,9 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
     });
 
     expect(screen.queryByRole("button", { name: "Configure Agent PR activity" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Configure Agent-started Slack threads" }),
+    ).toBeNull();
     expect(screen.getAllByText("activities selected")).toHaveLength(2);
     expect(screen.queryByRole("checkbox", { name: "PR comments" })).toBeNull();
     expect(screen.queryByText("No activities selected.")).toBeNull();
@@ -557,12 +590,14 @@ function renderSection(input?: {
 
 function createVersion(input?: {
   associatedResourceEventRoutingConfig?: SandboxProfileVersion["associatedResourceEventRoutingConfig"];
+  state?: SandboxProfileVersion["state"];
 }): SandboxProfileVersion {
+  const state = input?.state ?? "draft";
   return {
     sandboxProfileId: "sbp_associated_resource_routing",
     version: 1,
-    state: "draft",
-    publishedAt: null,
+    state,
+    publishedAt: state === "published" ? "2026-01-01T00:00:00.000Z" : null,
     agentRuntimeId: "codex",
     gitCommitSigningIntegrationConnectionId: null,
     mistleMcpEnabled: false,

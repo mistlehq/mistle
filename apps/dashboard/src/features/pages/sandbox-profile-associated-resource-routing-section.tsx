@@ -571,7 +571,6 @@ function GitHubPullRequestSettings(input: {
           eventOptions={input.eventOptions}
           eventParameterRules={input.resource.eventParameterRules}
           eventTypeOptions={GitHubPullRequestEventOptions}
-          fieldIsReadOnly={input.fieldIsReadOnly}
           onEventParameterRuleChange={input.onEventParameterRuleChange}
           onEventParameterRulesChange={input.onEventParameterRulesChange}
           onEventTypeChange={input.onEventTypeChange}
@@ -645,7 +644,6 @@ function AssociatedResourceEventTypeRows(input: {
     eventType: AssociatedResourceEventType;
     label: string;
   }>;
-  fieldIsReadOnly: boolean;
   onEventParameterRuleChange: (input: {
     triggerId: string;
     parameterId: string;
@@ -672,7 +670,6 @@ function AssociatedResourceEventTypeRows(input: {
             <label className="flex min-h-7 items-center gap-2 text-sm font-medium">
               <Checkbox
                 checked={selected}
-                disabled={input.fieldIsReadOnly}
                 onCheckedChange={(checked) => {
                   input.onEventTypeChange(option.eventType, checked === true);
                 }}
@@ -711,9 +708,6 @@ function AssociatedResourceReadOnlySettings(input: {
     label: string;
   }>;
   id?: string | undefined;
-  readOnlyDetailsByEventType?: Partial<
-    Record<AssociatedResourceEventType, readonly AssociatedResourceRoutingReadOnlyDetail[]>
-  >;
   selectedEventTypes: readonly AssociatedResourceEventType[];
 }): React.JSX.Element {
   const selectedOptions = input.eventTypeOptions.filter((option) =>
@@ -733,7 +727,6 @@ function AssociatedResourceReadOnlySettings(input: {
             (candidate) => candidate.id === option.eventType,
           );
           const details = [
-            ...(input.readOnlyDetailsByEventType?.[option.eventType] ?? []),
             ...(eventOption === undefined
               ? []
               : createReadOnlyEventParameterDetails({
@@ -1047,13 +1040,11 @@ function SlackThreadSettings(input: {
           <Checkbox
             aria-label="Enable thread messages"
             checked={selected}
-            disabled={input.fieldIsReadOnly}
             onCheckedChange={(checked) => {
               input.onMessageEnabledChange(checked === true);
             }}
           />
           <SlackThreadMessageModeField
-            fieldIsReadOnly={input.fieldIsReadOnly}
             messageMode={input.resource.slackThreadMessageMode}
             id="slack-thread-message-selection"
             onMessageModeChange={input.onMessageModeChange}
@@ -1118,14 +1109,12 @@ function SlackThreadReadOnlySettings(input: {
 }
 
 function SlackThreadMessageModeField(input: {
-  fieldIsReadOnly: boolean;
   id: string;
   messageMode: SlackThreadMessageMode;
   onMessageModeChange: (messageMode: SlackThreadMessageMode) => void;
 }): React.JSX.Element {
   return (
     <Select
-      disabled={input.fieldIsReadOnly}
       onValueChange={(value) => {
         if (isSlackThreadMessageMode(value)) {
           input.onMessageModeChange(value);

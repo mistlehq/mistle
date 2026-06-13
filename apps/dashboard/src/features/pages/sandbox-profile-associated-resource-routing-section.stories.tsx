@@ -444,6 +444,9 @@ export const PublishedReadOnlyDisabled: Story = {
     const canvas = within(canvasElement);
 
     await expect(canvas.queryByRole("button", { name: "Configure Agent PR activity" })).toBeNull();
+    await expect(
+      canvas.queryByRole("button", { name: "Configure Agent-started Slack threads" }),
+    ).toBeNull();
     await expect(canvas.queryByRole("checkbox", { name: "PR comments" })).toBeNull();
     await expect(canvas.queryByText("No activities selected.")).toBeNull();
     await expect(canvas.getAllByText("activities selected")).toHaveLength(2);
