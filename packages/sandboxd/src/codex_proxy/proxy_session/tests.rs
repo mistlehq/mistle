@@ -112,6 +112,7 @@ fn test_delivery_context() -> DeliveryContext {
         source: DeliveryContextSource::Webhook,
         webhook_event_id: Some("iwe_123".to_string()),
         scheduled_action_id: None,
+        association_delivery_id: None,
         delivery_task_id: "cdt_123".to_string(),
         external_delivery_id: Some("slack_delivery_123".to_string()),
         trigger_run_id: "aru_123".to_string(),
@@ -209,10 +210,70 @@ fn intercepts_delivery_context_notifications_and_stores_context() {
             source: DeliveryContextSource::Webhook,
             webhook_event_id: Some("iwe_123".to_string()),
             scheduled_action_id: None,
+            association_delivery_id: None,
             delivery_task_id: "cdt_123".to_string(),
             external_delivery_id: None,
             trigger_run_id: "aru_123".to_string(),
             conversation_id: "acv_123".to_string(),
+            sandbox_instance_id: "sbi_123".to_string(),
+            route_id: None,
+        })
+    );
+}
+
+#[test]
+fn intercepts_association_delivery_context_notifications_and_stores_context() {
+    let mut client_kind = ProxyClientKind::MistleAgentClient;
+    let mut current_delivery_context = None;
+    let mut pending_compaction_requests = std::collections::BTreeMap::new();
+    let mut pending_requests = std::collections::BTreeMap::new();
+    let mut active_turns = std::collections::BTreeMap::new();
+
+    let should_forward = should_forward_client_message(
+        &Message::Text(
+            json!({
+                "method": "mistle/setDeliveryContext",
+                "params": {
+                    "traceparent": "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01",
+                    "source": "association",
+                    "providerResourceAssociationId": "pra_123",
+                    "associationDeliveryId": "prd_123",
+                    "webhookEventId": "iwe_123",
+                    "externalDeliveryId": "slack_delivery_123",
+                    "sandboxInstanceId": "sbi_123"
+                }
+            })
+            .to_string()
+            .into(),
+        ),
+        &mut client_kind,
+        &mut current_delivery_context,
+        &mut ClientForwardContext {
+            thread_delivery_contexts: &std::collections::BTreeMap::new(),
+            turn_delivery_contexts: &std::collections::BTreeMap::new(),
+            active_turns: &mut active_turns,
+            pending_compaction_requests: &mut pending_compaction_requests,
+            pending_requests: &mut pending_requests,
+        },
+    )
+    .expect("association delivery context notification should parse");
+
+    assert!(!should_forward);
+    assert!(pending_requests.is_empty());
+    assert_eq!(
+        current_delivery_context,
+        Some(DeliveryContext {
+            traceparent: "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01".to_string(),
+            tracestate: None,
+            baggage: None,
+            source: DeliveryContextSource::Association,
+            webhook_event_id: Some("iwe_123".to_string()),
+            scheduled_action_id: None,
+            association_delivery_id: Some("prd_123".to_string()),
+            delivery_task_id: "prd_123".to_string(),
+            external_delivery_id: Some("slack_delivery_123".to_string()),
+            trigger_run_id: String::new(),
+            conversation_id: String::new(),
             sandbox_instance_id: "sbi_123".to_string(),
             route_id: None,
         })
@@ -267,6 +328,7 @@ fn intercepts_schedule_delivery_context_notifications_and_stores_context() {
             source: DeliveryContextSource::Schedule,
             webhook_event_id: None,
             scheduled_action_id: Some("sca_123".to_string()),
+            association_delivery_id: None,
             delivery_task_id: "cdt_123".to_string(),
             external_delivery_id: None,
             trigger_run_id: "aru_123".to_string(),

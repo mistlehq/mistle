@@ -5,6 +5,7 @@ import type {
 import {
   GitHubAssociatedResourceEventsCapability,
   PlanetScaleToolIds,
+  SlackAssociatedResourceEventsCapability,
 } from "@mistle/integrations-definitions";
 import { QueryClient } from "@tanstack/react-query";
 
@@ -352,6 +353,7 @@ export const StorySlackTarget: IntegrationTargetSummary = {
   targetHealth: {
     configStatus: "valid",
   },
+  supportedAssociatedResourceEvents: createStorySlackAssociatedResourceEvents(),
 };
 
 export const StorySlackConnection: IntegrationConnectionSummary = {
@@ -361,6 +363,7 @@ export const StorySlackConnection: IntegrationConnectionSummary = {
   status: "active",
   config: {
     connection_method: "slack-bot-token",
+    bot_user_id: "U_STORY_BOT",
   },
 };
 
@@ -405,6 +408,31 @@ function createStoryGithubAssociatedResourceEvents(): SupportedAssociatedResourc
   const supportedEvents = GitHubAssociatedResourceEventsCapability.supportedEvents;
   if (supportedEvents === undefined) {
     throw new Error("GitHub story target requires supported associated resource events.");
+  }
+
+  return supportedEvents.map((eventDefinition) => ({
+    resourceKind: eventDefinition.resourceKind,
+    eventType: eventDefinition.eventType,
+    displayName: eventDefinition.displayName,
+    ...(eventDefinition.parameters === undefined
+      ? {}
+      : {
+          parameters: eventDefinition.parameters.map(cloneStoryAssociatedResourceEventParameter),
+        }),
+    ...(eventDefinition.parameterGroups === undefined
+      ? {}
+      : {
+          parameterGroups: eventDefinition.parameterGroups.map(
+            cloneStoryAssociatedResourceEventParameterGroup,
+          ),
+        }),
+  }));
+}
+
+function createStorySlackAssociatedResourceEvents(): SupportedAssociatedResourceEvents {
+  const supportedEvents = SlackAssociatedResourceEventsCapability.supportedEvents;
+  if (supportedEvents === undefined) {
+    throw new Error("Slack story target requires supported associated resource events.");
   }
 
   return supportedEvents.map((eventDefinition) => ({

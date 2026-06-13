@@ -26,6 +26,7 @@ export const SlackAppConnectionConfigSchema = z
   .object({
     connection_method: z.literal(SlackConnectionMethodId),
     app_id: z.string().min(1).optional(),
+    bot_user_id: z.string().min(1).optional(),
     client_id: z.string().min(1).optional(),
   })
   .strict();

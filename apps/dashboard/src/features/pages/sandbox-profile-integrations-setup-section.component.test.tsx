@@ -27,6 +27,7 @@ import {
   StoryOpenAiConnection,
   StoryOpenAiTarget,
   StorySlackConnection,
+  StorySlackTarget,
 } from "./integrations-editor-section-story-support.js";
 import type { SandboxProfileAssociatedResourceRoutingDraftState } from "./sandbox-profile-associated-resource-routing-section.js";
 import type {
@@ -552,6 +553,247 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     });
   });
 
+  it("shows Slack associated resource routing in connector resources and tools", () => {
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [
+            StoryOpenAiConnection,
+            StoryGithubConnection,
+            StorySlackConnection,
+          ],
+          availableTargets: [StoryOpenAiTarget, StoryGithubTarget, StorySlackTarget],
+          associatedResourceRouting: {
+            hasUnpersistedChanges: false,
+            isDraft: true,
+            version: createTestSandboxProfileVersion(),
+          },
+          integrationRows: [
+            {
+              clientId: "git-row",
+              connectionId: StoryGithubConnection.id,
+              kind: "git",
+              config: {},
+            },
+            {
+              clientId: "slack-row",
+              connectionId: StorySlackConnection.id,
+              kind: "connector",
+              config: {},
+            },
+          ],
+        }}
+      />,
+    );
+
+    const gitConnectionLabel = screen.getByText("Git Connection");
+    const gitCard = gitConnectionLabel.closest('[data-slot="sandbox-profile-section-card"]');
+    if (!(gitCard instanceof HTMLElement)) {
+      throw new Error("Expected Git connection card to render.");
+    }
+
+    expect(
+      within(gitCard).queryByRole("button", { name: "Configure Agent-started Slack threads" }),
+    ).toBeNull();
+    const slackRoutingButton = screen.getByRole("button", {
+      name: "Configure Agent-started Slack threads",
+    });
+    expect(slackRoutingButton).toBeDefined();
+    expect(
+      slackRoutingButton.closest('[data-slot="field"]')?.getAttribute("data-orientation"),
+    ).toBe("vertical");
+  });
+
+  it("preserves implicit GitHub routing when only Slack routing is edited", () => {
+    const draftStates: SandboxProfileAssociatedResourceRoutingDraftState[] = [];
+
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [
+            StoryOpenAiConnection,
+            StoryGithubConnection,
+            StorySlackConnection,
+          ],
+          availableTargets: [StoryOpenAiTarget, StoryGithubTarget, StorySlackTarget],
+          associatedResourceRouting: {
+            hasUnpersistedChanges: false,
+            isDraft: true,
+            onDraftStateChange: (state) => {
+              draftStates.push(state);
+            },
+            version: createTestSandboxProfileVersion(),
+          },
+          integrationRows: [
+            {
+              clientId: "git-row",
+              connectionId: StoryGithubConnection.id,
+              kind: "git",
+              config: {},
+            },
+            {
+              clientId: "slack-row",
+              connectionId: StorySlackConnection.id,
+              kind: "connector",
+              config: {},
+            },
+          ],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Configure Agent-started Slack threads" }));
+    fireEvent.change(getLastInvocationTokenInput(), {
+      target: { value: "@mistle" },
+    });
+
+    const latestDraftState = draftStates.at(-1);
+    if (latestDraftState === undefined || latestDraftState.buildDraftChanges === undefined) {
+      throw new Error("Expected associated resource routing draft state.");
+    }
+
+    expect(latestDraftState.buildDraftChanges()).toEqual({
+      enabled: true,
+      resources: [
+        {
+          resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+          eventTypes: [
+            AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+            AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+            AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
+          ],
+        },
+        {
+          resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+          eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+          payloadFilter: {
+            [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED]: {
+              op: "contains_token",
+              path: ["event", "text"],
+              value: "@mistle",
+            },
+          },
+        },
+      ],
+    });
+  });
+
+  it("marks combined associated resource routing clean after saving dirty GitHub and Slack edits", () => {
+    const draftStates: SandboxProfileAssociatedResourceRoutingDraftState[] = [];
+
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [
+            StoryOpenAiConnection,
+            StoryGithubConnection,
+            StorySlackConnection,
+          ],
+          availableTargets: [StoryOpenAiTarget, StoryGithubTarget, StorySlackTarget],
+          associatedResourceRouting: {
+            hasUnpersistedChanges: false,
+            isDraft: true,
+            onDraftStateChange: (state) => {
+              draftStates.push(state);
+            },
+            version: createTestSandboxProfileVersion(),
+          },
+          integrationRows: [
+            {
+              clientId: "git-row",
+              connectionId: StoryGithubConnection.id,
+              kind: "git",
+              config: {},
+            },
+            {
+              clientId: "slack-row",
+              connectionId: StorySlackConnection.id,
+              kind: "connector",
+              config: {},
+            },
+          ],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Configure Agent PR activity" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Review comments" }));
+    fireEvent.click(screen.getByRole("button", { name: "Configure Agent-started Slack threads" }));
+    fireEvent.change(getLastInvocationTokenInput(), {
+      target: { value: "@mistle" },
+    });
+
+    const dirtyDraftState = draftStates.at(-1);
+    if (
+      dirtyDraftState === undefined ||
+      dirtyDraftState.applySavedAssociatedResourceEventRoutingConfig === undefined
+    ) {
+      throw new Error("Expected dirty associated resource routing draft state.");
+    }
+
+    expect(dirtyDraftState.hasUnpersistedChanges).toBe(true);
+    dirtyDraftState.applySavedAssociatedResourceEventRoutingConfig({
+      enabled: true,
+      resources: [],
+    });
+
+    expect(draftStates.at(-1)?.hasUnpersistedChanges).toBe(false);
+  });
+
+  it("does not materialize Slack routing for legacy enabled-only configs without Slack bindings", () => {
+    const draftStates: SandboxProfileAssociatedResourceRoutingDraftState[] = [];
+
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [StoryOpenAiConnection, StoryGithubConnection],
+          availableTargets: [StoryOpenAiTarget, StoryGithubTarget],
+          associatedResourceRouting: {
+            hasUnpersistedChanges: false,
+            isDraft: true,
+            onDraftStateChange: (state) => {
+              draftStates.push(state);
+            },
+            version: createTestSandboxProfileVersion({
+              associatedResourceEventRoutingConfig: {
+                enabled: true,
+              },
+            }),
+          },
+          integrationRows: [
+            {
+              clientId: "git-row",
+              connectionId: StoryGithubConnection.id,
+              kind: "git",
+              config: {},
+            },
+          ],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Configure Agent PR activity" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Review comments" }));
+
+    const latestDraftState = draftStates.at(-1);
+    if (latestDraftState === undefined || latestDraftState.buildDraftChanges === undefined) {
+      throw new Error("Expected associated resource routing draft state.");
+    }
+
+    expect(latestDraftState.buildDraftChanges()).toEqual({
+      enabled: true,
+      resources: [
+        {
+          resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+          eventTypes: [
+            AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+            AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+          ],
+        },
+      ],
+    });
+  });
+
   it("limits Codex proxied model providers to OpenAI and removes OpenCode-only agent bindings", async () => {
     const removedRows: string[] = [];
 
@@ -1050,6 +1292,16 @@ function getProxiedConnectionsSection(): HTMLElement {
   }
 
   return proxiedConnectionsSection;
+}
+
+function getLastInvocationTokenInput(): HTMLElement {
+  const inputs = screen.getAllByRole("textbox", { name: "invocation token" });
+  const input = inputs.at(-1);
+  if (input === undefined) {
+    throw new Error("Expected an invocation token input to render.");
+  }
+
+  return input;
 }
 
 function queryEmptySectionCards(container: HTMLElement): Element[] {

@@ -33,6 +33,7 @@ import {
   StoryOpenAiConnection,
   StoryPlanetScaleConnection,
   StorySlackConnection,
+  StorySlackTarget,
 } from "./integrations-editor-section-story-support.js";
 import { resolveSandboxBaseRepositoryHandles } from "./sandbox-base-inventory-copy.js";
 import { SandboxOperationProgressView } from "./sandbox-operation-progress.js";
@@ -83,6 +84,7 @@ export {
   StoryIntegrationTargets,
   StoryOpenCodeGoConnection,
   StorySlackConnection,
+  StorySlackTarget,
 };
 
 export const DefaultSandboxProfileEditorStoryArgs = {

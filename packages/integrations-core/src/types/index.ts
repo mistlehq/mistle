@@ -2096,6 +2096,7 @@ export type CompiledRuntimePlanSkills = {
 
 export const AssociatedProviderResourceKinds = {
   GITHUB_PULL_REQUEST: "github.pull_request",
+  SLACK_THREAD: "slack.thread",
 } as const;
 
 export type AssociatedProviderResourceKind =
@@ -2105,18 +2106,60 @@ export const AssociatedResourceEventTypes = {
   GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED: "github.pull_request.issue_comment.created",
   GITHUB_PULL_REQUEST_REVIEW_SUBMITTED: "github.pull_request.review.submitted",
   GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED: "github.pull_request.review_comment.created",
+  SLACK_THREAD_MESSAGE_CREATED: "slack.thread.message.created",
 } as const;
 
 export type AssociatedResourceEventType =
   (typeof AssociatedResourceEventTypes)[keyof typeof AssociatedResourceEventTypes];
 
-export type AssociatedResourceEventRoutingResourceRule = {
-  resourceKind: AssociatedProviderResourceKind;
-  eventTypes: ReadonlyArray<AssociatedResourceEventType>;
+export type GitHubPullRequestAssociatedResourceEventRoutingResourceRule = {
+  resourceKind: typeof AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST;
+  eventTypes: ReadonlyArray<
+    | typeof AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED
+    | typeof AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED
+    | typeof AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED
+  >;
   payloadFilter?:
-    | Readonly<Partial<Record<AssociatedResourceEventType, WebhookPayloadFilter>>>
+    | Readonly<
+        Partial<
+          Record<
+            | typeof AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED
+            | typeof AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED
+            | typeof AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
+            WebhookPayloadFilter
+          >
+        >
+      >
     | undefined;
 };
+
+export const SlackThreadMessageModes = {
+  ALL: "all",
+  APP_MENTIONS_ONLY: "app_mentions_only",
+} as const;
+
+export type SlackThreadMessageMode =
+  (typeof SlackThreadMessageModes)[keyof typeof SlackThreadMessageModes];
+
+export type SlackThreadAssociatedResourceEventRoutingResourceRule = {
+  resourceKind: typeof AssociatedProviderResourceKinds.SLACK_THREAD;
+  eventTypes: ReadonlyArray<typeof AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED>;
+  messageMode?: SlackThreadMessageMode | undefined;
+  payloadFilter?:
+    | Readonly<
+        Partial<
+          Record<
+            typeof AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED,
+            WebhookPayloadFilter
+          >
+        >
+      >
+    | undefined;
+};
+
+export type AssociatedResourceEventRoutingResourceRule =
+  | GitHubPullRequestAssociatedResourceEventRoutingResourceRule
+  | SlackThreadAssociatedResourceEventRoutingResourceRule;
 
 export type AssociatedResourceEventRouting = {
   enabled: boolean;

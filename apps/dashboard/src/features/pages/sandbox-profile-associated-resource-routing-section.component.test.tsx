@@ -3,6 +3,7 @@
 import {
   AssociatedProviderResourceKinds,
   AssociatedResourceEventTypes,
+  SlackThreadMessageModes,
 } from "@mistle/integrations-core";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -24,8 +25,10 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
   it("shows default GitHub pull request routing when the profile has a GitHub binding", () => {
     renderSection();
 
-    expect(screen.getByText("3")).toBeDefined();
-    expect(screen.getByText("activities selected")).toBeDefined();
+    expect(screen.queryByRole("switch", { name: "Agent PR activity" })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Configure Agent PR activity" }).textContent,
+    ).toContain("3 activities selected");
     expect(screen.getByRole("button", { name: "Explain agent PR activity" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Configure Agent PR activity" }));
 
@@ -38,6 +41,49 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
     expect(
       screen.getByRole("checkbox", { name: "Review comments" }).getAttribute("aria-checked"),
     ).toBe("true");
+  });
+
+  it("shows default Slack thread reply routing when the profile has a Slack association-capable binding", () => {
+    renderSection({ hasGitHubBinding: false, hasSlackThreadBinding: true });
+
+    expect(
+      screen.getByRole("button", { name: "Configure Agent-started Slack threads" }).textContent,
+    ).toContain("1 activity selected");
+    expect(screen.queryByRole("switch", { name: "Agent-started Slack threads" })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Explain agent-started Slack threads" }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Configure Agent-started Slack threads" }));
+    expect(
+      screen.getByRole("checkbox", { name: "Enable thread messages" }).getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(screen.getByRole("combobox", { name: "Thread messages" })).toBeTruthy();
+  });
+
+  it("updates default Slack thread reply routing when a Slack association-capable binding is added", () => {
+    const runtime = renderSection({
+      hasGitHubBinding: true,
+      hasSlackThreadBinding: false,
+    });
+
+    expect(
+      screen.getByRole("button", { name: "Configure Agent-started Slack threads" }).textContent,
+    ).toContain("0 activities selected");
+    expect(screen.queryByRole("switch", { name: "Agent-started Slack threads" })).toBeNull();
+
+    runtime.rerender(
+      <SandboxProfileAssociatedResourceRoutingFieldGroup
+        disabled={false}
+        hasGitHubBinding={true}
+        hasSlackThreadBinding={true}
+        isDraft
+        version={createVersion()}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Configure Agent-started Slack threads" }).textContent,
+    ).toContain("1 activity selected");
   });
 
   it("builds an explicit disabled config when pull request activity routing is turned off", () => {
@@ -90,6 +136,130 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
             AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
             AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
           ],
+        },
+      ],
+    });
+  });
+
+  it("builds Slack thread reply routing after GitHub routing is disabled", () => {
+    const draftStates: SandboxProfileAssociatedResourceRoutingDraftState[] = [];
+    renderSection({
+      hasSlackThreadBinding: true,
+      onDraftStateChange: (state) => {
+        draftStates.push(state);
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Configure Agent PR activity" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "PR comments" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "PR reviews" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Review comments" }));
+
+    const latestDraftState = draftStates.at(-1);
+    if (latestDraftState === undefined || latestDraftState.buildDraftChanges === undefined) {
+      throw new Error("Expected associated resource routing draft state.");
+    }
+
+    expect(latestDraftState.buildDraftChanges()).toEqual({
+      enabled: true,
+      resources: [
+        {
+          resourceKind: "slack.thread",
+          eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+        },
+      ],
+    });
+  });
+
+  it("builds Slack thread reply payload filters", () => {
+    const draftStates: SandboxProfileAssociatedResourceRoutingDraftState[] = [];
+    renderSection({
+      hasGitHubBinding: false,
+      hasSlackThreadBinding: true,
+      onDraftStateChange: (state) => {
+        draftStates.push(state);
+      },
+      supportedAssociatedResourceEvents: SupportedSlackAssociatedResourceEvents,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Configure Agent-started Slack threads" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "includes" }), {
+      target: { value: "@mistle" },
+    });
+
+    const latestDraftState = draftStates.at(-1);
+    if (latestDraftState === undefined || latestDraftState.buildDraftChanges === undefined) {
+      throw new Error("Expected associated resource routing draft state.");
+    }
+
+    expect(latestDraftState.buildDraftChanges()).toEqual({
+      enabled: true,
+      resources: [
+        {
+          resourceKind: "slack.thread",
+          eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+          payloadFilter: {
+            [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED]: {
+              op: "contains_token",
+              path: ["event", "text"],
+              value: "@mistle",
+            },
+          },
+        },
+      ],
+    });
+  });
+
+  it("preserves Slack app mention only thread message routing when building draft changes", () => {
+    const draftStates: SandboxProfileAssociatedResourceRoutingDraftState[] = [];
+    renderSection({
+      hasGitHubBinding: false,
+      hasSlackThreadBinding: true,
+      onDraftStateChange: (state) => {
+        draftStates.push(state);
+      },
+      supportedAssociatedResourceEvents: SupportedSlackAssociatedResourceEvents,
+      version: createVersion({
+        associatedResourceEventRoutingConfig: {
+          enabled: true,
+          resources: [
+            {
+              resourceKind: "slack.thread",
+              eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+              messageMode: SlackThreadMessageModes.APP_MENTIONS_ONLY,
+            },
+          ],
+        },
+      }),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Configure Agent-started Slack threads" }));
+    expect(screen.getByRole("combobox", { name: "Thread messages" }).textContent).toContain(
+      "App mentions only",
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "includes" }), {
+      target: { value: "@mistle" },
+    });
+
+    const latestDraftState = draftStates.at(-1);
+    if (latestDraftState === undefined || latestDraftState.buildDraftChanges === undefined) {
+      throw new Error("Expected associated resource routing draft state.");
+    }
+
+    expect(latestDraftState.buildDraftChanges()).toEqual({
+      enabled: true,
+      resources: [
+        {
+          resourceKind: "slack.thread",
+          eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+          messageMode: SlackThreadMessageModes.APP_MENTIONS_ONLY,
+          payloadFilter: {
+            [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED]: {
+              op: "contains_token",
+              path: ["event", "text"],
+              value: "@mistle",
+            },
+          },
         },
       ],
     });
@@ -219,6 +389,7 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
         <SandboxProfileAssociatedResourceRoutingFieldGroup
           disabled={false}
           hasGitHubBinding
+          hasSlackThreadBinding={false}
           isDraft
           version={version}
         />
@@ -233,6 +404,7 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
         <SandboxProfileAssociatedResourceRoutingFieldGroup
           disabled={false}
           hasGitHubBinding
+          hasSlackThreadBinding={false}
           isDraft
           supportedAssociatedResourceEvents={SupportedAssociatedResourceEvents}
           version={version}
@@ -264,6 +436,7 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
         <SandboxProfileAssociatedResourceRoutingFieldGroup
           disabled={false}
           hasGitHubBinding
+          hasSlackThreadBinding={false}
           isDraft
           onDraftStateChange={(state) => {
             draftStates.push(state);
@@ -283,6 +456,7 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
         <SandboxProfileAssociatedResourceRoutingFieldGroup
           disabled
           hasGitHubBinding
+          hasSlackThreadBinding={false}
           isDraft
           onDraftStateChange={(state) => {
             draftStates.push(state);
@@ -305,20 +479,30 @@ describe("SandboxProfileAssociatedResourceRoutingFieldGroup", () => {
 
 function renderSection(input?: {
   disabled?: boolean;
+  hasGitHubBinding?: boolean;
+  hasSlackThreadBinding?: boolean;
   isDraft?: boolean;
   onDraftStateChange?: (state: SandboxProfileAssociatedResourceRoutingDraftState) => void;
+  supportedAssociatedResourceEvents?: ComponentProps<
+    typeof SandboxProfileAssociatedResourceRoutingFieldGroup
+  >["supportedAssociatedResourceEvents"];
   version?: SandboxProfileVersion;
 }) {
+  const queryClient = createTestQueryClient();
   return render(
-    <SandboxProfileAssociatedResourceRoutingFieldGroup
-      disabled={input?.disabled ?? false}
-      hasGitHubBinding
-      isDraft={input?.isDraft ?? true}
-      {...(input?.onDraftStateChange === undefined
-        ? {}
-        : { onDraftStateChange: input.onDraftStateChange })}
-      version={input?.version ?? createVersion()}
-    />,
+    <QueryClientProvider client={queryClient}>
+      <SandboxProfileAssociatedResourceRoutingFieldGroup
+        disabled={input?.disabled ?? false}
+        hasGitHubBinding={input?.hasGitHubBinding ?? true}
+        hasSlackThreadBinding={input?.hasSlackThreadBinding ?? false}
+        isDraft={input?.isDraft ?? true}
+        {...(input?.onDraftStateChange === undefined
+          ? {}
+          : { onDraftStateChange: input.onDraftStateChange })}
+        supportedAssociatedResourceEvents={input?.supportedAssociatedResourceEvents}
+        version={input?.version ?? createVersion()}
+      />
+    </QueryClientProvider>,
   );
 }
 
@@ -358,6 +542,28 @@ const SupportedAssociatedResourceEvents = [
         label: "includes",
         kind: "string",
         payloadPath: ["comment", "body"],
+        matchMode: "contains_token",
+        controlVariant: "invocation-token",
+      },
+    ],
+  },
+] satisfies NonNullable<
+  ComponentProps<
+    typeof SandboxProfileAssociatedResourceRoutingFieldGroup
+  >["supportedAssociatedResourceEvents"]
+>;
+
+const SupportedSlackAssociatedResourceEvents = [
+  {
+    resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+    eventType: AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED,
+    displayName: "Thread messages",
+    parameters: [
+      {
+        id: "invocationToken",
+        label: "includes",
+        kind: "string",
+        payloadPath: ["event", "text"],
         matchMode: "contains_token",
         controlVariant: "invocation-token",
       },

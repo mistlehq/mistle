@@ -18,7 +18,9 @@ import {
 import {
   GitHubFamilyId,
   isGitHubPullRequestCreationRequest,
+  isSlackTopLevelPostMessageRequest,
   observeGitHubRoutableResourceFromEgressResponse,
+  observeSlackRoutableResourceFromEgressResponse,
 } from "@mistle/integrations-definitions/server";
 
 import { logger } from "../logger.js";
@@ -47,6 +49,7 @@ export const DirectEgressHttpRoutePath = "/_mistle/egress/http";
 export const DirectEgressWebSocketRoutePath = "/_mistle/egress/ws";
 export const DirectEgressTokenHeaderName = "x-mistle-egress-token";
 const ProviderResourceAssociationObservationBodyLimitBytes = 1024 * 1024;
+const SlackFamilyId = "slack";
 
 type ActiveRuntimePlan = NonNullable<Awaited<ReturnType<typeof loadActiveSandboxRuntimePlan>>>;
 type DirectEgressTransport = "http" | "websocket";
@@ -779,16 +782,21 @@ function createManagedProviderResourceAssociationObserver(input: {
   requestBody: Uint8Array | undefined;
   testEnvironmentId?: string;
 }): DirectEgressResponseObserver | undefined {
-  if (input.admission.classification.route.familyId !== GitHubFamilyId) {
-    return undefined;
-  }
-  if (
-    !isGitHubPullRequestCreationRequest({
+  const observesGitHubPullRequest =
+    input.admission.classification.route.familyId === GitHubFamilyId &&
+    isGitHubPullRequestCreationRequest({
       method: input.admission.request.method,
       path: input.admission.request.path,
       requestBody: input.requestBody,
-    })
-  ) {
+    });
+  const observesSlackThread =
+    input.admission.classification.route.familyId === SlackFamilyId &&
+    isSlackTopLevelPostMessageRequest({
+      method: input.admission.request.method,
+      path: input.admission.request.path,
+      requestBody: input.requestBody,
+    });
+  if (!observesGitHubPullRequest && !observesSlackThread) {
     return undefined;
   }
 
@@ -810,7 +818,7 @@ function createManagedProviderResourceAssociationObserver(input: {
     } catch (error) {
       logger.warn(
         {
-          event: "gateway_direct_egress_github_pull_request_creation_response_decode_failed",
+          event: "gateway_direct_egress_provider_resource_response_decode_failed",
           responseBodyBytes: response.body.byteLength,
           routeCredentialConnectionId: integrationConnectionId,
           sandboxInstanceId: input.admission.token.sub,
@@ -828,39 +836,47 @@ function createManagedProviderResourceAssociationObserver(input: {
       {
         contentEncoding: decodedResponseBody.contentEncoding,
         decodedResponseBodyBytes: decodedResponseBody.decodedBodyBytes,
-        event: "gateway_direct_egress_github_pull_request_creation_response_observed",
+        event: "gateway_direct_egress_provider_resource_response_observed",
         responseBodyBytes: decodedResponseBody.rawBodyBytes,
         routeCredentialConnectionId: integrationConnectionId,
         sandboxInstanceId: input.admission.token.sub,
         status: response.status,
       },
-      "Direct gateway egress GitHub pull request creation response observed",
+      "Direct gateway egress provider resource response observed",
     );
 
     if (!isJsonContentType(response.headers)) {
       return;
     }
 
-    const observedResource = observeGitHubRoutableResourceFromEgressResponse({
-      method: input.admission.request.method,
-      path: input.admission.request.path,
-      requestBody: input.requestBody,
-      responseBody: parseJsonResponseBody(decodedResponseBody.body),
-      status: response.status,
-    });
+    const parsedResponseBody = parseJsonResponseBody(decodedResponseBody.body);
+    const observedResource = observesGitHubPullRequest
+      ? observeGitHubRoutableResourceFromEgressResponse({
+          method: input.admission.request.method,
+          path: input.admission.request.path,
+          requestBody: input.requestBody,
+          responseBody: parsedResponseBody,
+          status: response.status,
+        })
+      : observeSlackRoutableResourceFromEgressResponse({
+          method: input.admission.request.method,
+          path: input.admission.request.path,
+          requestBody: input.requestBody,
+          responseBody: parsedResponseBody,
+          status: response.status,
+        });
     if (observedResource === null) {
       logger.warn(
         {
           contentEncoding: decodedResponseBody.contentEncoding,
           decodedResponseBodyBytes: decodedResponseBody.decodedBodyBytes,
-          event:
-            "gateway_direct_egress_github_pull_request_creation_response_resource_not_observed",
+          event: "gateway_direct_egress_provider_resource_response_resource_not_observed",
           responseBodyBytes: decodedResponseBody.rawBodyBytes,
           routeCredentialConnectionId: integrationConnectionId,
           sandboxInstanceId: input.admission.token.sub,
           status: response.status,
         },
-        "Direct gateway egress GitHub pull request creation response did not contain an observable provider resource",
+        "Direct gateway egress provider resource response did not contain an observable provider resource",
       );
       return;
     }

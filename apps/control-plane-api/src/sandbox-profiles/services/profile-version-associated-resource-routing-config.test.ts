@@ -58,4 +58,28 @@ describe("mapProfileVersionAssociatedResourceEventRoutingConfig", () => {
       ],
     });
   });
+
+  it("preserves Slack thread message mode in profile version responses", () => {
+    expect(
+      mapProfileVersionAssociatedResourceEventRoutingConfig({
+        enabled: true,
+        resources: [
+          {
+            resourceKind: "slack.thread",
+            eventTypes: ["slack.thread.message.created"],
+            messageMode: "app_mentions_only",
+          },
+        ],
+      }),
+    ).toEqual({
+      enabled: true,
+      resources: [
+        {
+          resourceKind: "slack.thread",
+          eventTypes: ["slack.thread.message.created"],
+          messageMode: "app_mentions_only",
+        },
+      ],
+    });
+  });
 });

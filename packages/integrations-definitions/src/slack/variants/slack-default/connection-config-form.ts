@@ -24,5 +24,8 @@ export const SlackConnectionConfigForm: ResolvedIntegrationForm = {
     connection_method: {
       "ui:widget": "hidden",
     },
+    bot_user_id: {
+      "ui:widget": "hidden",
+    },
   },
 };

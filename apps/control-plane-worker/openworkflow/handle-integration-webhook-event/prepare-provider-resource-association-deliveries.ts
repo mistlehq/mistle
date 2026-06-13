@@ -68,6 +68,7 @@ export async function prepareProviderResourceAssociationDeliveries(
   }
 
   const queuedDeliveries: QueuedProviderResourceAssociationDelivery[] = [];
+  let selfAuthored: boolean | undefined;
   for (const association of associations) {
     const sandboxInstance = await resolveAssociationSandboxInstance(ctx, {
       associationId: association.id,
@@ -82,11 +83,13 @@ export async function prepareProviderResourceAssociationDeliveries(
         payload: input.webhookEvent.payload,
         resourceKind: observedEvent.observation.resourceKind,
         routing: sandboxInstance.associatedResourceEventRouting,
+        sourceWebhookEventType: input.webhookEvent.eventType,
       })
     ) {
       continue;
     }
-    if (await isSelfAuthoredAssociatedResourceEvent(observedEvent)) {
+    selfAuthored ??= await isSelfAuthoredAssociatedResourceEvent(observedEvent);
+    if (selfAuthored) {
       continue;
     }
 
