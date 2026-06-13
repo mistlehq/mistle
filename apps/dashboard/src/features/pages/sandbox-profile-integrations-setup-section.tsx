@@ -239,22 +239,22 @@ function createDefaultAssociatedResourceRoutingResources(
   );
 }
 
-function bindingRowTargetsSlackWithBotIdentity(input: {
+function resolveSlackBotConnectorBindingMetadata(input: {
   row: SandboxProfileBindingEditorRow;
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
-}): boolean {
+}): ReturnType<typeof resolveRowBindingMetadata> | null {
   const metadata = resolveRowBindingMetadata({
     row: input.row,
     availableConnections: input.availableConnections,
     availableTargets: input.availableTargets,
   });
   if (metadata?.target?.familyId !== "slack") {
-    return false;
+    return null;
   }
 
   const botUserId = metadata.connection.config?.["bot_user_id"];
-  return typeof botUserId === "string" && botUserId.trim().length > 0;
+  return typeof botUserId === "string" && botUserId.trim().length > 0 ? metadata : null;
 }
 
 function materializeAssociatedResourceRoutingDefaultResources(input: {
@@ -1002,12 +1002,13 @@ export function SandboxProfileIntegrationsSetupSection(
     });
   const supportedGitAssociatedResourceEvents =
     gitRowBindingMetadata?.target?.supportedAssociatedResourceEvents ?? [];
-  const connectorRowsTargetSlackWithBotIdentity = connectorRows.some((row) =>
-    bindingRowTargetsSlackWithBotIdentity({
-      row,
-      availableConnections: input.availableConnections,
-      availableTargets: input.availableTargets,
-    }),
+  const connectorRowsTargetSlackWithBotIdentity = connectorRows.some(
+    (row) =>
+      resolveSlackBotConnectorBindingMetadata({
+        row,
+        availableConnections: input.availableConnections,
+        availableTargets: input.availableTargets,
+      }) !== null,
   );
   const associatedResourceRoutingConfigHasGitHubPullRequests =
     input.associatedResourceRouting === undefined
@@ -1038,18 +1039,8 @@ export function SandboxProfileIntegrationsSetupSection(
     slackThreadBindingDefaultsAssociatedResourceRouting
       ? createDefaultAssociatedResourceRoutingResources(
           connectorRows.flatMap((row) => {
-            if (
-              !bindingRowTargetsSlackWithBotIdentity({
-                row,
-                availableConnections: input.availableConnections,
-                availableTargets: input.availableTargets,
-              })
-            ) {
-              return [];
-            }
-
             return (
-              resolveRowBindingMetadata({
+              resolveSlackBotConnectorBindingMetadata({
                 row,
                 availableConnections: input.availableConnections,
                 availableTargets: input.availableTargets,
@@ -1497,11 +1488,14 @@ export function SandboxProfileIntegrationsSetupSection(
                       availableConnections: input.availableConnections,
                       availableTargets: input.availableTargets,
                     });
-                    const rowTargetsSlackWithBotIdentity = bindingRowTargetsSlackWithBotIdentity({
-                      row,
-                      availableConnections: input.availableConnections,
-                      availableTargets: input.availableTargets,
-                    });
+                    const slackBotConnectorBindingMetadata =
+                      resolveSlackBotConnectorBindingMetadata({
+                        row,
+                        availableConnections: input.availableConnections,
+                        availableTargets: input.availableTargets,
+                      });
+                    const rowTargetsSlackWithBotIdentity =
+                      slackBotConnectorBindingMetadata !== null;
                     const slackAssociatedResourceRouting:
                       | SandboxProfileBindingResourcesAssociatedResourceRouting
                       | undefined =

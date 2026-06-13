@@ -27,7 +27,7 @@ export const InternalRegisterProviderResourceAssociationResponseSchema = z.discr
     z
       .object({
         status: z.literal("not_applicable"),
-        reason: z.enum(["provider_actor_not_configured", "resource_kind_not_enabled"]),
+        reason: z.enum(["resource_kind_not_enabled", "resource_registration_not_supported"]),
       })
       .strict(),
   ],

@@ -15,7 +15,6 @@ import {
   type McpTokenConfig,
   type VerifiedEgressToken,
 } from "@mistle/gateway-tunnel-auth";
-import type { createDefinitionsBundle } from "@mistle/integrations-definitions/server";
 
 import { logger } from "../logger.js";
 import type { ActiveSandboxRuntimePlanRepository } from "./active-runtime-plan-cache.js";
@@ -45,9 +44,30 @@ export const DirectEgressTokenHeaderName = "x-mistle-egress-token";
 const ProviderResourceAssociationObservationBodyLimitBytes = 1024 * 1024;
 
 type ActiveRuntimePlan = NonNullable<Awaited<ReturnType<typeof loadActiveSandboxRuntimePlan>>>;
-type DirectEgressIntegrationRegistry = ReturnType<
-  typeof createDefinitionsBundle
->["integrationRegistry"];
+type MaybePromise<T> = T | Promise<T>;
+type DirectEgressIntegrationRegistry = {
+  getDefinition(input: { familyId: string; variantId: string }):
+    | {
+        associatedResourceEvents?:
+          | {
+              observeEgressResponse?:
+                | ((input: {
+                    method: string;
+                    path: string;
+                    requestBody?: Uint8Array | undefined;
+                    responseBody: unknown;
+                    status: number;
+                  }) => MaybePromise<{
+                    extractionMethod: string;
+                    providerResourceId: string;
+                    resourceKind: string;
+                  } | null>)
+                | undefined;
+            }
+          | undefined;
+      }
+    | undefined;
+};
 type DirectEgressTransport = "http" | "websocket";
 type DirectEgressFailureCode =
   | "authentication_failed"

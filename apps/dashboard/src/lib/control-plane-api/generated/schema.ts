@@ -1164,6 +1164,13 @@ export interface paths {
                 externalSubjectId?: string;
                 id: string;
                 isIdentityLinked?: boolean;
+                repairAction?: {
+                  actionLabel: string;
+                  description?: string;
+                  id: string;
+                  pendingLabel: string;
+                  title: string;
+                };
                 resources?: {
                   count: number;
                   kind: string;
@@ -1322,6 +1329,13 @@ export interface paths {
               externalSubjectId?: string;
               id: string;
               isIdentityLinked?: boolean;
+              repairAction?: {
+                actionLabel: string;
+                description?: string;
+                id: string;
+                pendingLabel: string;
+                title: string;
+              };
               resources?: {
                 count: number;
                 kind: string;
@@ -1711,6 +1725,13 @@ export interface paths {
               externalSubjectId?: string;
               id: string;
               isIdentityLinked?: boolean;
+              repairAction?: {
+                actionLabel: string;
+                description?: string;
+                id: string;
+                pendingLabel: string;
+                title: string;
+              };
               resources?: {
                 count: number;
                 kind: string;
@@ -1942,6 +1963,164 @@ export interface paths {
             "application/json": {
               /** @enum {string} */
               code: "CONNECTION_USED_BY_IDENTITY_LINKING";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integration/connections/:connectionId/repair": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          connectionId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Repair provider-owned metadata for an integration connection. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              bindingCount?: number;
+              config?: {
+                [key: string]: unknown;
+              };
+              configuredSecretNames?: string[];
+              connectionMethodId?: string;
+              connectionMethodLabel?: string;
+              createdAt: string;
+              displayName: string;
+              externalSubjectId?: string;
+              id: string;
+              isIdentityLinked?: boolean;
+              repairAction?: {
+                actionLabel: string;
+                description?: string;
+                id: string;
+                pendingLabel: string;
+                title: string;
+              };
+              resources?: {
+                count: number;
+                kind: string;
+                lastErrorCode?: string;
+                lastErrorMessage?: string;
+                lastSyncedAt?: string;
+                /** @enum {string} */
+                selectionMode: "single" | "multi";
+                /** @enum {string} */
+                syncState: "never-synced" | "syncing" | "ready" | "error";
+              }[];
+              /** @enum {string} */
+              status: "active" | "error" | "revoked";
+              supportsWebhookSources?: boolean;
+              targetKey: string;
+              targetSnapshotConfig?: {
+                [key: string]: unknown;
+              };
+              triggerCount?: number;
+              updatedAt: string;
+              webhookTriggerCapabilitiesRefreshAction?: {
+                actionLabel: string;
+                bodyForm?: {
+                  fields: {
+                    actions?: {
+                      href: string;
+                      label: string;
+                      opensInNewWindow?: boolean;
+                    }[];
+                    description?: string;
+                    /** @enum {string} */
+                    inputType: "password" | "text" | "textarea";
+                    label: string;
+                    name: string;
+                    placeholder?: string;
+                    required?: boolean;
+                  }[];
+                  submitLabel: string;
+                  title: string;
+                };
+                disabledMessage?: string;
+                pendingLabel: string;
+              };
+            };
+          };
+        };
+        /** @description Repair is not supported or failed. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "CONNECTION_REPAIR_NOT_SUPPORTED" | "CONNECTION_REPAIR_FAILED";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration connection was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "CONNECTION_NOT_FOUND";
               message: string;
             };
           };
@@ -3166,6 +3345,13 @@ export interface paths {
               externalSubjectId?: string;
               id: string;
               isIdentityLinked?: boolean;
+              repairAction?: {
+                actionLabel: string;
+                description?: string;
+                id: string;
+                pendingLabel: string;
+                title: string;
+              };
               resources?: {
                 count: number;
                 kind: string;
@@ -3691,6 +3877,13 @@ export interface paths {
                     /** @enum {string} */
                     status: "failed";
                   };
+              repairAction?: {
+                actionLabel: string;
+                description?: string;
+                id: string;
+                pendingLabel: string;
+                title: string;
+              };
               resources?: {
                 count: number;
                 kind: string;

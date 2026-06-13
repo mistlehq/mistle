@@ -76,6 +76,10 @@ const SlackThreadEventOptions: ReadonlyArray<{
 ];
 
 const AllSlackThreadEventTypes = SlackThreadEventOptions.map((option) => option.eventType);
+const KnownAssociatedResourceEventOptions = [
+  ...GitHubPullRequestEventOptions,
+  ...SlackThreadEventOptions,
+];
 
 type AssociatedResourceOption = {
   defaultEventTypes: readonly AssociatedResourceEventType[];
@@ -85,16 +89,16 @@ type AssociatedResourceOption = {
   tooltipLabel: string;
 };
 
-const KnownAssociatedResourceOptions: ReadonlyArray<
-  Omit<AssociatedResourceOption, "defaultEventTypes">
-> = [
+const KnownAssociatedResourceOptions: readonly AssociatedResourceOption[] = [
   {
+    defaultEventTypes: AllGitHubPullRequestEventTypes,
     label: "Agent PR activity",
     resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
     tooltip: "Send selected GitHub activity back to the agent that opened the PR.",
     tooltipLabel: "Explain agent PR activity",
   },
   {
+    defaultEventTypes: AllSlackThreadEventTypes,
     label: "Agent-started Slack threads",
     resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
     tooltip: "Send replies in agent-started Slack threads back to the originating agent.",
@@ -142,6 +146,7 @@ type AssociatedResourceRoutingResourceDraft = {
   eventTypes: AssociatedResourceEventType[];
   resourceKind: AssociatedProviderResourceKind;
   advancedPayloadFilter: Record<string, unknown> | null;
+  config?: Record<string, unknown> | undefined;
   eventParameterRules: WebhookTriggerEventParameterRuleMap;
   slackThreadMessageMode: SlackThreadMessageMode;
 };
@@ -485,35 +490,7 @@ function SandboxProfileAssociatedResourceRoutingFields(input: {
                 />
               </FieldContent>
             </Field>
-            {option.resourceKind === AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST ? (
-              <GitHubPullRequestSettings
-                eventOptions={input.eventOptions}
-                eventTypeOptions={createAssociatedResourceEventTypeOptions({
-                  eventOptions: input.eventOptions,
-                  option,
-                })}
-                fieldIsReadOnly={input.fieldIsReadOnly}
-                onEventParameterRuleChange={(change) => {
-                  input.onEventParameterRuleChange({
-                    resourceKind: option.resourceKind,
-                    ...change,
-                  });
-                }}
-                onEventParameterRulesChange={(change) => {
-                  input.onEventParameterRulesChange({
-                    resourceKind: option.resourceKind,
-                    ...change,
-                  });
-                }}
-                onEventTypeChange={(eventType, checked) => {
-                  input.onEventTypeChange(option.resourceKind, eventType, checked);
-                }}
-                resource={resource}
-                selectedConnectionId={input.selectedConnectionId}
-                settingsExpanded={settingsExpanded}
-                layout={input.layout}
-              />
-            ) : option.resourceKind === AssociatedProviderResourceKinds.SLACK_THREAD ? (
+            {option.resourceKind === AssociatedProviderResourceKinds.SLACK_THREAD ? (
               <SlackThreadSettings
                 eventOptions={input.eventOptions}
                 fieldIsReadOnly={input.fieldIsReadOnly}
@@ -537,7 +514,7 @@ function SandboxProfileAssociatedResourceRoutingFields(input: {
                 layout={input.layout}
               />
             ) : (
-              <GitHubPullRequestSettings
+              <AssociatedResourceEventSettings
                 eventOptions={input.eventOptions}
                 eventTypeOptions={createAssociatedResourceEventTypeOptions({
                   eventOptions: input.eventOptions,
@@ -572,7 +549,7 @@ function SandboxProfileAssociatedResourceRoutingFields(input: {
   );
 }
 
-function GitHubPullRequestSettings(input: {
+function AssociatedResourceEventSettings(input: {
   eventOptions: readonly WebhookTriggerEventOption[];
   eventTypeOptions: ReadonlyArray<{
     eventType: AssociatedResourceEventType;
@@ -1236,6 +1213,10 @@ function createAssociatedResourceOptionModels(input: {
   supportedAssociatedResourceEvents: readonly AssociatedResourceEventDefinition[];
 }): AssociatedResourceOption[] {
   const eventTypesByResourceKind = new Map<string, AssociatedResourceEventType[]>();
+  for (const option of KnownAssociatedResourceOptions) {
+    eventTypesByResourceKind.set(option.resourceKind, [...option.defaultEventTypes]);
+  }
+
   for (const event of input.supportedAssociatedResourceEvents) {
     const currentEventTypes = eventTypesByResourceKind.get(event.resourceKind) ?? [];
     eventTypesByResourceKind.set(event.resourceKind, [...currentEventTypes, event.eventType]);
@@ -1282,7 +1263,9 @@ function createAssociatedResourceEventTypeOptions(input: {
   option: AssociatedResourceOption;
 }): ReadonlyArray<{ eventType: AssociatedResourceEventType; label: string }> {
   return input.option.defaultEventTypes.map((eventType) => {
-    const eventOption = input.eventOptions.find((option) => option.eventType === eventType);
+    const eventOption =
+      input.eventOptions.find((option) => option.eventType === eventType) ??
+      KnownAssociatedResourceEventOptions.find((option) => option.eventType === eventType);
     return {
       eventType,
       label: eventOption?.label ?? formatAssociatedResourceKindLabel(eventType),
@@ -1358,6 +1341,7 @@ function createAssociatedResourceRoutingResourceDraft(input: {
 
   return {
     advancedPayloadFilter: extractedParameterRules.remainingPayloadFilter,
+    ...(rule?.config === undefined ? {} : { config: structuredClone(rule.config) }),
     enabled,
     eventParameterRules: extractedParameterRules.eventParameterRules,
     eventTypes: sortAssociatedResourceEventTypes(eventTypes),
@@ -1398,6 +1382,9 @@ function createAssociatedResourceEventRoutingResourceRule(input: {
     ...(input.resource.slackThreadMessageMode === SlackThreadMessageModes.ALL
       ? {}
       : { messageMode: input.resource.slackThreadMessageMode }),
+    ...(input.resource.config === undefined
+      ? {}
+      : { config: structuredClone(input.resource.config) }),
     ...createAssociatedResourceRoutingPayloadFilterField({
       draft: input.resource,
       eventOptions: input.eventOptions,
@@ -1472,6 +1459,7 @@ function associatedResourceRoutingDraftsAreEqual(
           JSON.stringify(rightResource.eventParameterRules) &&
         JSON.stringify(leftResource.advancedPayloadFilter) ===
           JSON.stringify(rightResource.advancedPayloadFilter) &&
+        JSON.stringify(leftResource.config) === JSON.stringify(rightResource.config) &&
         leftResource.slackThreadMessageMode === rightResource.slackThreadMessageMode
       );
     })

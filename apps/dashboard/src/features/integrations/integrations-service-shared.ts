@@ -320,6 +320,16 @@ export const IntegrationWebhookTriggerCapabilitiesRefreshActionSchema = z
   })
   .strict();
 
+export const IntegrationConnectionRepairActionSchema = z
+  .object({
+    id: z.string().min(1),
+    title: z.string().min(1),
+    description: z.string().min(1).optional(),
+    actionLabel: z.string().min(1),
+    pendingLabel: z.string().min(1),
+  })
+  .strict();
+
 const IntegrationConnectionApiSchema = z
   .object({
     id: z.string().min(1),
@@ -351,6 +361,7 @@ const IntegrationConnectionApiSchema = z
       )
       .optional(),
     supportsWebhookSources: z.boolean().optional(),
+    repairAction: IntegrationConnectionRepairActionSchema.optional(),
     webhookTriggerCapabilitiesRefreshAction:
       IntegrationWebhookTriggerCapabilitiesRefreshActionSchema.optional(),
     createdAt: z.string().min(1),

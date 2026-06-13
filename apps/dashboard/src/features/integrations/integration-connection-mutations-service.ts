@@ -170,6 +170,31 @@ export async function updateFormIntegrationConnection(input: {
   }
 }
 
+export async function repairIntegrationConnection(input: {
+  connectionId: string;
+}): Promise<CreatedIntegrationConnection> {
+  try {
+    const response = await requestControlPlane({
+      operation: "repairIntegrationConnection",
+      method: "POST",
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/repair`,
+      fallbackMessage: "Could not repair integration connection.",
+    });
+
+    return readJsonWithSchema({
+      response,
+      schema: IntegrationConnectionSchema,
+      operation: "repairIntegrationConnection",
+    });
+  } catch (error) {
+    throw wrapIntegrationsApiError({
+      operation: "repairIntegrationConnection",
+      error,
+      fallbackMessage: "Could not repair integration connection.",
+    });
+  }
+}
+
 export async function updateApiKeyIntegrationConnection(input: {
   connectionId: string;
   displayName: string;

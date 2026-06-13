@@ -641,6 +641,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - An **Association-backed provider event** is not a **Trigger** run.
 - A **Self-authored association event** does not produce an **Association delivery**.
 - A **Slack app bot actor** may author a **Self-authored association event**.
+- Slack thread **Association registration** requires a known **Slack app bot actor** for the **Integration connection**.
 - A **Provider resource association** can outlive its ability to produce successful **Association deliveries**.
 - An **Association delivery** targets the associated **Routing runtime conversation** and does not reroute to another conversation when that target is unavailable.
 - An **Association delivery** depends on a **Provider resource association** already recorded when the provider event is handled.

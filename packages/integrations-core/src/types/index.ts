@@ -1,4 +1,3 @@
-import type { WebhookPayloadFilter } from "@mistle/webhooks";
 import type { z } from "zod";
 
 import type {
@@ -137,6 +136,52 @@ export type IntegrationConnection = {
   status: IntegrationConnectionStatus;
   externalSubjectId?: string;
   config: Record<string, unknown>;
+};
+
+export type IntegrationConnectionRepairDescriptor = {
+  id: string;
+  title: string;
+  description?: string | undefined;
+  actionLabel: string;
+  pendingLabel: string;
+};
+
+export type IntegrationConnectionRepairSupportInput<TConnectionConfig = Record<string, unknown>> = {
+  connection: IntegrationConnection & {
+    config: TConnectionConfig;
+  };
+};
+
+export type IntegrationConnectionRepairInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  organizationId: string;
+  targetKey: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  connection: IntegrationConnection & {
+    config: TConnectionConfig;
+  };
+  resolveConnectionSecret(input: { slotKey: string; secretType: string }): MaybePromise<string>;
+};
+
+export type IntegrationConnectionRepairResult<TConnectionConfig = Record<string, unknown>> = {
+  config?: TConnectionConfig | undefined;
+  externalSubjectId?: string | null | undefined;
+};
+
+export type IntegrationConnectionRepairCapability<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  describeRepair(
+    input: IntegrationConnectionRepairSupportInput<TConnectionConfig>,
+  ): MaybePromise<IntegrationConnectionRepairDescriptor | null>;
+  repair(
+    input: IntegrationConnectionRepairInput<TTargetConfig, TTargetSecrets, TConnectionConfig>,
+  ): MaybePromise<IntegrationConnectionRepairResult<TConnectionConfig>>;
 };
 
 export type IdentityLinkingPrincipalKey = {
@@ -2193,6 +2238,17 @@ export type AssociatedResourceEgressObservation = {
   providerResourceId: string;
 };
 
+export type AssociatedResourceRegistrationSupportInput<
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  connection: {
+    config: TConnectionConfig | null;
+    id: string;
+  };
+  providerResourceId: string;
+  resourceKind: AssociatedProviderResourceKind;
+};
+
 export type IntegrationAssociatedResourceEventsCapability<
   TConnectionConfig = Record<string, unknown>,
   TTargetConfig = Record<string, unknown>,
@@ -2203,6 +2259,9 @@ export type IntegrationAssociatedResourceEventsCapability<
   defaultRoutingResources?(
     input: AssociatedResourceRoutingDefaultInput<TTargetConfig, TBindingConfig, TTargetSecrets>,
   ): MaybePromise<ReadonlyArray<AssociatedResourceEventRoutingResourceRule>>;
+  supportsResourceRegistration?(
+    input: AssociatedResourceRegistrationSupportInput<TConnectionConfig>,
+  ): MaybePromise<boolean>;
   supportsRoutingEvent?(input: AssociatedResourceRoutingEventSupportInput): MaybePromise<boolean>;
   observeEgressResponse?(
     input: AssociatedResourceEgressObservationInput,
@@ -2710,6 +2769,11 @@ export type IntegrationDefinition<
     TConnectionConfig
   >;
   deviceAuthorization?: IntegrationDeviceAuthorizationCapability<
+    ParsedSchemaOutput<TTargetConfigSchema>,
+    ParsedSchemaOutput<TTargetSecretsSchema>,
+    TConnectionConfig
+  >;
+  connectionRepair?: IntegrationConnectionRepairCapability<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TTargetSecretsSchema>,
     TConnectionConfig

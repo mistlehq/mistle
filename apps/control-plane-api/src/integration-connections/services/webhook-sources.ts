@@ -73,7 +73,7 @@ type ConnectionWithTarget = {
   };
 };
 
-function resolveStringCredentialValueOrThrow(input: {
+export function resolveStringCredentialValueOrThrow(input: {
   credential: Awaited<ReturnType<typeof resolveIntegrationCredential>>;
   context: string;
 }): string {

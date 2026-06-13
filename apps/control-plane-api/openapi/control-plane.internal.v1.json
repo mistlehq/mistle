@@ -980,7 +980,10 @@
                         },
                         "reason": {
                           "type": "string",
-                          "enum": ["provider_actor_not_configured", "resource_kind_not_enabled"]
+                          "enum": [
+                            "resource_kind_not_enabled",
+                            "resource_registration_not_supported"
+                          ]
                         }
                       },
                       "required": ["status", "reason"],

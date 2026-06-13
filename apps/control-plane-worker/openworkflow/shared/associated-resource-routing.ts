@@ -8,7 +8,7 @@ import { parseWebhookPayloadFilter } from "@mistle/webhooks";
 import { evaluateWebhookPayloadFilter } from "./webhook-payload-filter-evaluator.js";
 
 export async function supportsAssociatedResourceEvent(input: {
-  capability: IntegrationAssociatedResourceEventsCapability | undefined;
+  capability: IntegrationAssociatedResourceEventsCapability;
   eventType: AssociatedResourceEventType;
   payload: Record<string, unknown>;
   resourceKind: string;
@@ -25,7 +25,7 @@ export async function supportsAssociatedResourceEvent(input: {
     }
 
     if (
-      input.capability?.supportsRoutingEvent !== undefined &&
+      input.capability.supportsRoutingEvent !== undefined &&
       !(await input.capability.supportsRoutingEvent({
         eventType: input.eventType,
         payload: input.payload,

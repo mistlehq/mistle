@@ -573,7 +573,7 @@ export interface paths {
                 }
               | {
                   /** @enum {string} */
-                  reason: "provider_actor_not_configured" | "resource_kind_not_enabled";
+                  reason: "resource_kind_not_enabled" | "resource_registration_not_supported";
                   /** @enum {string} */
                   status: "not_applicable";
                 };

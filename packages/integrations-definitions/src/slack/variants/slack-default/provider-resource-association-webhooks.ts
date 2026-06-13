@@ -44,8 +44,7 @@ export const SlackAssociatedResourceEventsCapability: IntegrationAssociatedResou
   {
     supportedEvents: createSlackAssociatedResourceEventDefinitions(),
     defaultRoutingResources: (input) => {
-      const botUserId = input.connection.config?.bot_user_id;
-      if (typeof botUserId !== "string" || botUserId.trim().length === 0) {
+      if (!hasKnownSlackBotUserId(input.connection.config?.bot_user_id)) {
         return [];
       }
 
@@ -55,6 +54,17 @@ export const SlackAssociatedResourceEventsCapability: IntegrationAssociatedResou
           eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
         },
       ];
+    },
+    supportsResourceRegistration: (input) => {
+      if (input.resourceKind !== AssociatedProviderResourceKinds.SLACK_THREAD) {
+        return true;
+      }
+
+      const parsedConnectionConfig = SlackConnectionConfigSchema.safeParse(input.connection.config);
+      return (
+        parsedConnectionConfig.success &&
+        hasKnownSlackBotUserId(parsedConnectionConfig.data.bot_user_id)
+      );
     },
     supportsRoutingEvent: (input) => {
       if (input.resource.messageMode === "app_mentions_only") {
@@ -178,11 +188,18 @@ export function isSelfAuthoredSlackAssociatedResourceEvent(
   input: AssociatedResourceSelfAuthorshipInput<SlackConnectionConfig>,
 ): boolean {
   const parsedConnectionConfig = SlackConnectionConfigSchema.safeParse(input.connection.config);
-  if (!parsedConnectionConfig.success || parsedConnectionConfig.data.bot_user_id === undefined) {
+  if (
+    !parsedConnectionConfig.success ||
+    !hasKnownSlackBotUserId(parsedConnectionConfig.data.bot_user_id)
+  ) {
     return false;
   }
 
   return input.observation.actor?.providerSubjectId === parsedConnectionConfig.data.bot_user_id;
+}
+
+function hasKnownSlackBotUserId(botUserId: unknown): botUserId is string {
+  return typeof botUserId === "string" && botUserId.trim().length > 0;
 }
 
 function renderThreadMessageInput(input: {

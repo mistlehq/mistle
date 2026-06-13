@@ -5,6 +5,7 @@ import type {
   AssociatedResourceWebhookObservation,
   CompiledAgentRuntime,
   CompiledRuntimePlan,
+  IntegrationAssociatedResourceEventsCapability,
   IntegrationRegistry,
 } from "@mistle/integrations-core";
 import { supportsAssociatedResourceDeliveryRuntime } from "@mistle/integrations-core";
@@ -134,9 +135,7 @@ async function resolveAssociatedResourceEventFromWebhook(
   },
 ): Promise<
   AssociatedResourceWebhookObservation & {
-    capability: NonNullable<
-      ReturnType<IntegrationRegistry["getDefinition"]>
-    >["associatedResourceEvents"];
+    capability: IntegrationAssociatedResourceEventsCapability;
     payload: Record<string, unknown>;
     sourceWebhookEventType: string;
   }
@@ -176,11 +175,18 @@ async function resolveAssociatedResourceEventFromWebhook(
           familyId: target.familyId,
           variantId: target.variantId,
         });
-  const observedEvent =
-    (await definition?.associatedResourceEvents?.observeWebhookEvent({
-      eventType: webhookEvent.eventType,
-      payload: webhookEvent.payload,
-    })) ?? null;
+  const capability = definition?.associatedResourceEvents;
+  if (capability === undefined) {
+    throw new ProviderResourceAssociationDeliveryError({
+      code: ProviderResourceAssociationDeliveryFailureCodes.ROUTING_EVENT_NOT_ENABLED,
+      message: `Provider resource association '${input.association.id}' references webhook event '${input.sourceWebhookEventId}' without an associated resource event capability.`,
+    });
+  }
+
+  const observedEvent = await capability.observeWebhookEvent({
+    eventType: webhookEvent.eventType,
+    payload: webhookEvent.payload,
+  });
 
   if (
     observedEvent === null ||
@@ -195,7 +201,7 @@ async function resolveAssociatedResourceEventFromWebhook(
 
   return {
     ...observedEvent,
-    capability: definition?.associatedResourceEvents,
+    capability,
     payload: webhookEvent.payload,
     sourceWebhookEventType: webhookEvent.eventType,
   };

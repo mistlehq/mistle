@@ -10,6 +10,7 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
     {
       dataPlaneClient: ctx.get("dataPlaneClient"),
       db: ctx.get("db"),
+      integrationRegistry: ctx.get("integrationRegistry"),
     },
     ctx.req.valid("json"),
   );

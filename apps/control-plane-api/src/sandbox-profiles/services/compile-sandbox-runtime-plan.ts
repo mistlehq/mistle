@@ -273,8 +273,8 @@ async function resolveDefaultAssociatedResourceEventRoutingResources(input: {
           ? {}
           : {
               payloadFilter: {
-                ...(currentResource.payloadFilter ?? {}),
-                ...(resource.payloadFilter ?? {}),
+                ...currentResource.payloadFilter,
+                ...resource.payloadFilter,
               },
             }),
       });
