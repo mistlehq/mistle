@@ -348,7 +348,9 @@ export function createFreestyleSandboxProviderConfig(input: {
     freestyle: {
       apiKey: input.credentials.apiKey,
       ...(input.credentials.baseUrl === undefined ? {} : { baseUrl: input.credentials.baseUrl }),
-      ...(input.sandboxd === undefined ? {} : { sandboxd: input.sandboxd }),
+      ...(input.sandboxd === undefined
+        ? {}
+        : { sandboxd: createSandboxProviderSource(input.sandboxd) }),
     },
   };
 }
