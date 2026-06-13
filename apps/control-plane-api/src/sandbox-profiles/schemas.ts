@@ -16,11 +16,6 @@ import {
   createKeysetPaginationEnvelopeSchema,
   createKeysetPaginationQuerySchema,
 } from "@mistle/http/pagination";
-import {
-  AssociatedProviderResourceKinds,
-  AssociatedResourceEventTypes,
-  SlackThreadMessageModes,
-} from "@mistle/integrations-core";
 import { parseWebhookPayloadFilter } from "@mistle/webhooks";
 import { createSelectSchema } from "drizzle-zod";
 
@@ -67,19 +62,13 @@ const sandboxProfileVersionResourcesSchema = z
     diskMb: z.number().int().min(1).optional(),
   })
   .strict();
-const githubPullRequestAssociatedResourceEventRoutingResourceRuleSchema = z
+const associatedResourceEventRoutingResourceRuleSchema = z
   .object({
-    resourceKind: z.enum([AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST]),
-    eventTypes: z
-      .array(
-        z.enum([
-          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
-          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
-          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
-        ]),
-      )
-      .min(1),
+    resourceKind: z.string().min(1),
+    eventTypes: z.array(z.string().min(1)).min(1),
+    messageMode: z.enum(["all", "app_mentions_only"]).optional(),
     payloadFilter: z.record(z.string(), z.unknown()).optional(),
+    config: z.record(z.string(), z.unknown()).optional(),
   })
   .strict()
   .superRefine((rule, ctx) => {
@@ -110,48 +99,6 @@ const githubPullRequestAssociatedResourceEventRoutingResourceRuleSchema = z
       }
     }
   });
-const slackThreadAssociatedResourceEventRoutingResourceRuleSchema = z
-  .object({
-    resourceKind: z.enum([AssociatedProviderResourceKinds.SLACK_THREAD]),
-    eventTypes: z.array(z.enum([AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED])).min(1),
-    messageMode: z
-      .enum([SlackThreadMessageModes.ALL, SlackThreadMessageModes.APP_MENTIONS_ONLY])
-      .optional(),
-    payloadFilter: z.record(z.string(), z.unknown()).optional(),
-  })
-  .strict()
-  .superRefine((rule, ctx) => {
-    if (rule.payloadFilter === undefined) {
-      return;
-    }
-
-    const selectedEventTypes = new Set<string>(rule.eventTypes);
-    for (const [eventType, filter] of Object.entries(rule.payloadFilter)) {
-      if (!selectedEventTypes.has(eventType)) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["payloadFilter", eventType],
-          message: `payloadFilter contains an event type that is not selected: ${eventType}`,
-        });
-        continue;
-      }
-
-      try {
-        parseWebhookPayloadFilter(filter);
-      } catch (error) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["payloadFilter", eventType],
-          message:
-            error instanceof Error ? error.message : "Webhook payload filter validation failed.",
-        });
-      }
-    }
-  });
-const associatedResourceEventRoutingResourceRuleSchema = z.union([
-  githubPullRequestAssociatedResourceEventRoutingResourceRuleSchema,
-  slackThreadAssociatedResourceEventRoutingResourceRuleSchema,
-]);
 const sandboxProfileAssociatedResourceEventRoutingConfigSchema = z
   .object({
     enabled: z.boolean().optional(),

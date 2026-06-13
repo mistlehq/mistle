@@ -1,7 +1,6 @@
 import {
   AssociatedProviderResourceKinds,
   AssociatedResourceEventTypes,
-  type AssociatedProviderResourceKind,
   type AssociatedResourceEventType,
   type AssociatedResourceProviderActor,
   type AssociatedResourceSelfAuthorshipInput,
@@ -14,7 +13,10 @@ import { z } from "zod";
 
 import { SlackConnectionConfigSchema, type SlackConnectionConfig } from "./auth.js";
 import { SlackThreadRootTimestampField } from "./normalized-event-fields.js";
-import { createSlackThreadProviderResourceId } from "./provider-resource-associations.js";
+import {
+  createSlackThreadProviderResourceId,
+  observeSlackRoutableResourceFromEgressResponse,
+} from "./provider-resource-associations.js";
 import { SlackSupportedWebhookEvents } from "./supported-webhook-events.js";
 
 const SlackThreadMessagePayloadSchema = z.looseObject({
@@ -34,13 +36,34 @@ export type SlackThreadAssociatedResourceRenderedInput = {
   kind: "slack.thread.associated_resource_event";
   eventType: AssociatedResourceEventType;
   providerResourceId: string;
-  resourceKind: Extract<AssociatedProviderResourceKind, "slack.thread">;
+  resourceKind: "slack.thread";
   text: string;
 };
 
 export const SlackAssociatedResourceEventsCapability: IntegrationAssociatedResourceEventsCapability<SlackConnectionConfig> =
   {
     supportedEvents: createSlackAssociatedResourceEventDefinitions(),
+    defaultRoutingResources: (input) => {
+      const botUserId = input.connection.config?.bot_user_id;
+      if (typeof botUserId !== "string" || botUserId.trim().length === 0) {
+        return [];
+      }
+
+      return [
+        {
+          resourceKind: AssociatedProviderResourceKinds.SLACK_THREAD,
+          eventTypes: [AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED],
+        },
+      ];
+    },
+    supportsRoutingEvent: (input) => {
+      if (input.resource.messageMode === "app_mentions_only") {
+        return input.sourceWebhookEventType === "slack:app_mention";
+      }
+
+      return true;
+    },
+    observeEgressResponse: observeSlackRoutableResourceFromEgressResponse,
     observeWebhookEvent: observeSlackAssociatedResourceFromWebhookEvent,
     isSelfAuthoredEvent: isSelfAuthoredSlackAssociatedResourceEvent,
   };
@@ -107,7 +130,7 @@ export function observeSlackAssociatedResourceFromWebhookEvent(input: {
   eventType: AssociatedResourceEventType;
   providerResourceId: string;
   renderedInput: SlackThreadAssociatedResourceRenderedInput;
-  resourceKind: Extract<AssociatedProviderResourceKind, "slack.thread">;
+  resourceKind: "slack.thread";
 } | null {
   if (input.eventType !== "slack:message" && input.eventType !== "slack:app_mention") {
     return null;

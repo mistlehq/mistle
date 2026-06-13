@@ -1,7 +1,4 @@
-import {
-  AssociatedProviderResourceKinds,
-  type AssociatedProviderResourceKind,
-} from "@mistle/integrations-core";
+import { AssociatedProviderResourceKinds } from "@mistle/integrations-core";
 import { z } from "zod";
 
 const SlackPostMessageRequestSchema = z.looseObject({
@@ -19,7 +16,7 @@ export type SlackThreadProviderResourceExtractionMethod = "slack_chat_post_messa
 
 export type SlackRoutableResourceObservation = {
   extractionMethod: SlackThreadProviderResourceExtractionMethod;
-  resourceKind: Extract<AssociatedProviderResourceKind, "slack.thread">;
+  resourceKind: "slack.thread";
   providerResourceId: string;
 };
 

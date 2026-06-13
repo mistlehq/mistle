@@ -15,13 +15,7 @@ import {
   type McpTokenConfig,
   type VerifiedEgressToken,
 } from "@mistle/gateway-tunnel-auth";
-import {
-  GitHubFamilyId,
-  isGitHubPullRequestCreationRequest,
-  isSlackTopLevelPostMessageRequest,
-  observeGitHubRoutableResourceFromEgressResponse,
-  observeSlackRoutableResourceFromEgressResponse,
-} from "@mistle/integrations-definitions/server";
+import type { createDefinitionsBundle } from "@mistle/integrations-definitions/server";
 
 import { logger } from "../logger.js";
 import type { ActiveSandboxRuntimePlanRepository } from "./active-runtime-plan-cache.js";
@@ -49,9 +43,11 @@ export const DirectEgressHttpRoutePath = "/_mistle/egress/http";
 export const DirectEgressWebSocketRoutePath = "/_mistle/egress/ws";
 export const DirectEgressTokenHeaderName = "x-mistle-egress-token";
 const ProviderResourceAssociationObservationBodyLimitBytes = 1024 * 1024;
-const SlackFamilyId = "slack";
 
 type ActiveRuntimePlan = NonNullable<Awaited<ReturnType<typeof loadActiveSandboxRuntimePlan>>>;
+type DirectEgressIntegrationRegistry = ReturnType<
+  typeof createDefinitionsBundle
+>["integrationRegistry"];
 type DirectEgressTransport = "http" | "websocket";
 type DirectEgressFailureCode =
   | "authentication_failed"
@@ -150,6 +146,7 @@ export class DirectEgressProxyService {
     private readonly controlPlaneInternalClient: ControlPlaneInternalClient,
     private readonly credentialCache: CredentialCache,
     private readonly egressTokenConfig: EgressTokenConfig,
+    private readonly integrationRegistry: DirectEgressIntegrationRegistry,
     private readonly mcpTokenConfig: McpTokenConfig,
     private readonly trustedUpstreamCaCertificates: readonly string[] | undefined,
   ) {}
@@ -303,6 +300,7 @@ export class DirectEgressProxyService {
         ? createManagedProviderResourceAssociationObserver({
             admission: input.admission,
             controlPlaneInternalClient: this.controlPlaneInternalClient,
+            integrationRegistry: this.integrationRegistry,
             requestBody: input.body,
             ...(input.testEnvironmentId === undefined
               ? {}
@@ -779,24 +777,16 @@ async function readResponseBody(input: {
 function createManagedProviderResourceAssociationObserver(input: {
   admission: Extract<DirectEgressAdmission, { kind: "managed" }>;
   controlPlaneInternalClient: ControlPlaneInternalClient;
+  integrationRegistry: DirectEgressIntegrationRegistry;
   requestBody: Uint8Array | undefined;
   testEnvironmentId?: string;
 }): DirectEgressResponseObserver | undefined {
-  const observesGitHubPullRequest =
-    input.admission.classification.route.familyId === GitHubFamilyId &&
-    isGitHubPullRequestCreationRequest({
-      method: input.admission.request.method,
-      path: input.admission.request.path,
-      requestBody: input.requestBody,
-    });
-  const observesSlackThread =
-    input.admission.classification.route.familyId === SlackFamilyId &&
-    isSlackTopLevelPostMessageRequest({
-      method: input.admission.request.method,
-      path: input.admission.request.path,
-      requestBody: input.requestBody,
-    });
-  if (!observesGitHubPullRequest && !observesSlackThread) {
+  const definition = input.integrationRegistry.getDefinition({
+    familyId: input.admission.classification.route.familyId,
+    variantId: input.admission.classification.route.variantId,
+  });
+  const observeEgressResponse = definition?.associatedResourceEvents?.observeEgressResponse;
+  if (observeEgressResponse === undefined) {
     return undefined;
   }
 
@@ -850,21 +840,13 @@ function createManagedProviderResourceAssociationObserver(input: {
     }
 
     const parsedResponseBody = parseJsonResponseBody(decodedResponseBody.body);
-    const observedResource = observesGitHubPullRequest
-      ? observeGitHubRoutableResourceFromEgressResponse({
-          method: input.admission.request.method,
-          path: input.admission.request.path,
-          requestBody: input.requestBody,
-          responseBody: parsedResponseBody,
-          status: response.status,
-        })
-      : observeSlackRoutableResourceFromEgressResponse({
-          method: input.admission.request.method,
-          path: input.admission.request.path,
-          requestBody: input.requestBody,
-          responseBody: parsedResponseBody,
-          status: response.status,
-        });
+    const observedResource = await observeEgressResponse({
+      method: input.admission.request.method,
+      path: input.admission.request.path,
+      requestBody: input.requestBody,
+      responseBody: parsedResponseBody,
+      status: response.status,
+    });
     if (observedResource === null) {
       logger.warn(
         {

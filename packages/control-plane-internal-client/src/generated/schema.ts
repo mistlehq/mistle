@@ -548,8 +548,7 @@ export interface paths {
           "application/json": {
             integrationConnectionId: string;
             providerResourceId: string;
-            /** @enum {string} */
-            resourceKind: "github.pull_request" | "slack.thread";
+            resourceKind: string;
             sandboxInstanceId: string;
           };
         };
@@ -842,30 +841,18 @@ export interface paths {
                 }[];
                 associatedResourceEventRouting: {
                   enabled: boolean;
-                  resources: (
-                    | {
-                        eventTypes: (
-                          | "github.pull_request.issue_comment.created"
-                          | "github.pull_request.review.submitted"
-                          | "github.pull_request.review_comment.created"
-                        )[];
-                        payloadFilter?: {
-                          [key: string]: unknown;
-                        };
-                        /** @enum {string} */
-                        resourceKind: "github.pull_request";
-                      }
-                    | {
-                        eventTypes: "slack.thread.message.created"[];
-                        /** @enum {string} */
-                        messageMode?: "all" | "app_mentions_only";
-                        payloadFilter?: {
-                          [key: string]: unknown;
-                        };
-                        /** @enum {string} */
-                        resourceKind: "slack.thread";
-                      }
-                  )[];
+                  resources: {
+                    config?: {
+                      [key: string]: unknown;
+                    };
+                    eventTypes: string[];
+                    /** @enum {string} */
+                    messageMode?: "all" | "app_mentions_only";
+                    payloadFilter?: {
+                      [key: string]: unknown;
+                    };
+                    resourceKind: string;
+                  }[];
                 };
                 egressRoutes: {
                   additionalCredentialHeaders?: {
@@ -1178,30 +1165,18 @@ export interface paths {
             "application/json": {
               associatedResourceEventRouting: {
                 enabled: boolean;
-                resources: (
-                  | {
-                      eventTypes: (
-                        | "github.pull_request.issue_comment.created"
-                        | "github.pull_request.review.submitted"
-                        | "github.pull_request.review_comment.created"
-                      )[];
-                      payloadFilter?: {
-                        [key: string]: unknown;
-                      };
-                      /** @enum {string} */
-                      resourceKind: "github.pull_request";
-                    }
-                  | {
-                      eventTypes: "slack.thread.message.created"[];
-                      /** @enum {string} */
-                      messageMode?: "all" | "app_mentions_only";
-                      payloadFilter?: {
-                        [key: string]: unknown;
-                      };
-                      /** @enum {string} */
-                      resourceKind: "slack.thread";
-                    }
-                )[];
+                resources: {
+                  config?: {
+                    [key: string]: unknown;
+                  };
+                  eventTypes: string[];
+                  /** @enum {string} */
+                  messageMode?: "all" | "app_mentions_only";
+                  payloadFilter?: {
+                    [key: string]: unknown;
+                  };
+                  resourceKind: string;
+                }[];
               } | null;
               failureCode: string | null;
               failureMessage: string | null;

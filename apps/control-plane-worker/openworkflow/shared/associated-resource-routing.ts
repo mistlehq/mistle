@@ -1,99 +1,56 @@
 import type {
   AssociatedResourceEventRouting,
   AssociatedResourceEventType,
-  GitHubPullRequestAssociatedResourceEventRoutingResourceRule,
-  SlackThreadAssociatedResourceEventRoutingResourceRule,
-} from "@mistle/integrations-core";
-import {
-  AssociatedProviderResourceKinds,
-  AssociatedResourceEventTypes,
-  SlackThreadMessageModes,
+  IntegrationAssociatedResourceEventsCapability,
 } from "@mistle/integrations-core";
 import { parseWebhookPayloadFilter } from "@mistle/webhooks";
 
 import { evaluateWebhookPayloadFilter } from "./webhook-payload-filter-evaluator.js";
 
-export function supportsAssociatedResourceEvent(input: {
+export async function supportsAssociatedResourceEvent(input: {
+  capability: IntegrationAssociatedResourceEventsCapability | undefined;
   eventType: AssociatedResourceEventType;
   payload: Record<string, unknown>;
   resourceKind: string;
   routing: AssociatedResourceEventRouting | null;
   sourceWebhookEventType: string;
-}): boolean {
+}): Promise<boolean> {
   if (input.routing === null || !input.routing.enabled) {
     return false;
   }
 
-  return input.routing.resources.some((resource) => {
+  for (const resource of input.routing.resources) {
     if (resource.resourceKind !== input.resourceKind) {
-      return false;
+      continue;
     }
 
-    switch (resource.resourceKind) {
-      case AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST:
-        return githubPullRequestRuleSupportsAssociatedResourceEvent({
-          eventType: input.eventType,
-          payload: input.payload,
-          resource,
-        });
-      case AssociatedProviderResourceKinds.SLACK_THREAD:
-        return slackThreadRuleSupportsAssociatedResourceEvent({
-          eventType: input.eventType,
-          payload: input.payload,
-          resource,
-          sourceWebhookEventType: input.sourceWebhookEventType,
-        });
+    if (
+      input.capability?.supportsRoutingEvent !== undefined &&
+      !(await input.capability.supportsRoutingEvent({
+        eventType: input.eventType,
+        payload: input.payload,
+        resource,
+        sourceWebhookEventType: input.sourceWebhookEventType,
+      }))
+    ) {
+      continue;
     }
-  });
-}
 
-function githubPullRequestRuleSupportsAssociatedResourceEvent(input: {
-  eventType: AssociatedResourceEventType;
-  payload: Record<string, unknown>;
-  resource: GitHubPullRequestAssociatedResourceEventRoutingResourceRule;
-}): boolean {
-  switch (input.eventType) {
-    case AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED:
-    case AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED:
-    case AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED:
-      if (!input.resource.eventTypes.includes(input.eventType)) {
-        return false;
-      }
-      return payloadFilterAllowsAssociatedResourceEvent({
-        payload: input.payload,
-        eventScopedPayloadFilter: input.resource.payloadFilter?.[input.eventType],
-      });
-    case AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED:
-      return false;
-  }
-}
+    if (!resource.eventTypes.includes(input.eventType)) {
+      continue;
+    }
 
-function slackThreadRuleSupportsAssociatedResourceEvent(input: {
-  eventType: AssociatedResourceEventType;
-  payload: Record<string, unknown>;
-  resource: SlackThreadAssociatedResourceEventRoutingResourceRule;
-  sourceWebhookEventType: string;
-}): boolean {
-  switch (input.eventType) {
-    case AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED:
-      if (!input.resource.eventTypes.includes(input.eventType)) {
-        return false;
-      }
-      if (
-        input.resource.messageMode === SlackThreadMessageModes.APP_MENTIONS_ONLY &&
-        input.sourceWebhookEventType !== "slack:app_mention"
-      ) {
-        return false;
-      }
-      return payloadFilterAllowsAssociatedResourceEvent({
+    if (
+      payloadFilterAllowsAssociatedResourceEvent({
         payload: input.payload,
-        eventScopedPayloadFilter: input.resource.payloadFilter?.[input.eventType],
-      });
-    case AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED:
-    case AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED:
-    case AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED:
-      return false;
+        eventScopedPayloadFilter: resource.payloadFilter?.[input.eventType],
+      })
+    ) {
+      return true;
+    }
   }
+
+  return false;
 }
 
 function payloadFilterAllowsAssociatedResourceEvent(input: {

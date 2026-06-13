@@ -33,105 +33,17 @@ pub struct AssociatedResourceEventRouting {
     pub resources: Vec<AssociatedResourceEventRoutingResourceRule>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AssociatedResourceEventRoutingResourceRule {
-    GitHubPullRequest {
-        event_types: Vec<GitHubPullRequestAssociatedResourceEventType>,
-        payload_filter: Option<BTreeMap<String, serde_json::Value>>,
-    },
-    SlackThread {
-        event_types: Vec<SlackThreadAssociatedResourceEventType>,
-        message_mode: Option<SlackThreadMessageMode>,
-        payload_filter: Option<BTreeMap<String, serde_json::Value>>,
-    },
-}
-
-impl<'de> Deserialize<'de> for AssociatedResourceEventRoutingResourceRule {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value = serde_json::Value::deserialize(deserializer)?;
-        let resource_kind = value
-            .get("resourceKind")
-            .and_then(serde_json::Value::as_str)
-            .ok_or_else(|| serde::de::Error::custom("missing field `resourceKind`"))?
-            .to_owned();
-
-        match resource_kind.as_str() {
-            "github.pull_request" => {
-                let rule = GitHubPullRequestAssociatedResourceRule::deserialize(value)
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Self::GitHubPullRequest {
-                    event_types: rule.event_types,
-                    payload_filter: rule.payload_filter,
-                })
-            }
-            "slack.thread" => {
-                let rule = SlackThreadAssociatedResourceRule::deserialize(value)
-                    .map_err(serde::de::Error::custom)?;
-                Ok(Self::SlackThread {
-                    event_types: rule.event_types,
-                    message_mode: rule.message_mode,
-                    payload_filter: rule.payload_filter,
-                })
-            }
-            _ => Err(serde::de::Error::unknown_variant(
-                resource_kind.as_str(),
-                &["github.pull_request", "slack.thread"],
-            )),
-        }
-    }
-}
-
-#[derive(Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct GitHubPullRequestAssociatedResourceRule {
-    #[serde(rename = "resourceKind")]
-    _resource_kind: GitHubPullRequestAssociatedResourceKind,
-    event_types: Vec<GitHubPullRequestAssociatedResourceEventType>,
+pub struct AssociatedResourceEventRoutingResourceRule {
+    pub resource_kind: String,
+    pub event_types: Vec<String>,
     #[serde(default)]
-    payload_filter: Option<BTreeMap<String, serde_json::Value>>,
-}
-
-#[derive(Deserialize)]
-enum GitHubPullRequestAssociatedResourceKind {
-    #[serde(rename = "github.pull_request")]
-    GitHubPullRequest,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct SlackThreadAssociatedResourceRule {
-    #[serde(rename = "resourceKind")]
-    _resource_kind: SlackThreadAssociatedResourceKind,
-    event_types: Vec<SlackThreadAssociatedResourceEventType>,
+    pub message_mode: Option<SlackThreadMessageMode>,
     #[serde(default)]
-    message_mode: Option<SlackThreadMessageMode>,
+    pub payload_filter: Option<BTreeMap<String, serde_json::Value>>,
     #[serde(default)]
-    payload_filter: Option<BTreeMap<String, serde_json::Value>>,
-}
-
-#[derive(Deserialize)]
-enum SlackThreadAssociatedResourceKind {
-    #[serde(rename = "slack.thread")]
-    SlackThread,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-pub enum GitHubPullRequestAssociatedResourceEventType {
-    #[serde(rename = "github.pull_request.issue_comment.created")]
-    IssueCommentCreated,
-    #[serde(rename = "github.pull_request.review.submitted")]
-    ReviewSubmitted,
-    #[serde(rename = "github.pull_request.review_comment.created")]
-    ReviewCommentCreated,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-pub enum SlackThreadAssociatedResourceEventType {
-    #[serde(rename = "slack.thread.message.created")]
-    SlackThreadMessageCreated,
+    pub config: Option<BTreeMap<String, serde_json::Value>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -839,9 +751,8 @@ pub enum WorkspaceSourceResourceKind {
 #[cfg(test)]
 mod tests {
     use super::{
-        AgentRuntimeCreateConversationRetryPolicy, AssociatedResourceEventRoutingResourceRule,
-        CompiledEgressRoute, CompiledEgressRouteAuthInjectionType,
-        CompiledEgressRouteCredentialResolver,
+        AgentRuntimeCreateConversationRetryPolicy, CompiledEgressRoute,
+        CompiledEgressRouteAuthInjectionType, CompiledEgressRouteCredentialResolver,
         CompiledLinkedPrincipalEgressCredentialResolutionMode, CompiledRuntimePlan,
         RuntimeArtifactGitHubReleaseInstallAsset, RuntimeArtifactGitHubReleaseSelector,
         RuntimeArtifactInstallStep,
@@ -935,13 +846,14 @@ mod tests {
         }))
         .expect("runtime plan decoder should accept associated resource payload filters");
 
-        let AssociatedResourceEventRoutingResourceRule::GitHubPullRequest {
-            payload_filter, ..
-        } = &runtime_plan.associated_resource_event_routing.resources[0]
-        else {
-            panic!("expected GitHub pull request resource rule");
-        };
-        let payload_filter = payload_filter
+        let resource = &runtime_plan.associated_resource_event_routing.resources[0];
+        assert_eq!(resource.resource_kind, "github.pull_request");
+        assert_eq!(
+            resource.event_types,
+            vec!["github.pull_request.issue_comment.created".to_string()]
+        );
+        let payload_filter = resource
+            .payload_filter
             .as_ref()
             .expect("payload filter should decode");
         assert_eq!(
@@ -977,20 +889,17 @@ mod tests {
         }))
         .expect("runtime plan decoder should accept Slack thread message modes");
 
-        let AssociatedResourceEventRoutingResourceRule::SlackThread { message_mode, .. } =
-            &runtime_plan.associated_resource_event_routing.resources[0]
-        else {
-            panic!("expected Slack thread resource rule");
-        };
+        let resource = &runtime_plan.associated_resource_event_routing.resources[0];
+        assert_eq!(resource.resource_kind, "slack.thread");
         assert!(matches!(
-            message_mode,
+            resource.message_mode,
             Some(super::SlackThreadMessageMode::AppMentionsOnly)
         ));
     }
 
     #[test]
-    fn rejects_slack_message_mode_on_github_resource_rules() {
-        let error = serde_json::from_value::<CompiledRuntimePlan>(serde_json::json!({
+    fn decodes_provider_specific_resource_config() {
+        let runtime_plan = serde_json::from_value::<CompiledRuntimePlan>(serde_json::json!({
           "sandboxProfileId": "sbp_01k00000000000000000000000",
           "version": 1,
           "image": {
@@ -1006,24 +915,26 @@ mod tests {
             "enabled": true,
             "resources": [
               {
-                "resourceKind": "github.pull_request",
-                "eventTypes": ["github.pull_request.issue_comment.created"],
-                "messageMode": "app_mentions_only"
+                "resourceKind": "linear.issue",
+                "eventTypes": ["linear.issue.comment.created"],
+                "config": {
+                  "mode": "comments"
+                }
               }
             ]
           }
         }))
-        .expect_err("runtime plan decoder should reject Slack fields on GitHub resource rules");
+        .expect("runtime plan decoder should accept provider-specific resource config");
 
-        assert!(
-            error.to_string().contains("messageMode"),
-            "unexpected error: {error}"
-        );
+        let resource = &runtime_plan.associated_resource_event_routing.resources[0];
+        assert_eq!(resource.resource_kind, "linear.issue");
+        let config = resource.config.as_ref().expect("config should decode");
+        assert_eq!(config["mode"], "comments");
     }
 
     #[test]
-    fn rejects_github_events_on_slack_resource_rules() {
-        let error = serde_json::from_value::<CompiledRuntimePlan>(serde_json::json!({
+    fn decodes_arbitrary_provider_event_types() {
+        let runtime_plan = serde_json::from_value::<CompiledRuntimePlan>(serde_json::json!({
           "sandboxProfileId": "sbp_01k00000000000000000000000",
           "version": 1,
           "image": {
@@ -1045,13 +956,12 @@ mod tests {
             ]
           }
         }))
-        .expect_err("runtime plan decoder should reject GitHub events on Slack resource rules");
+        .expect("runtime plan decoder should leave provider event validation to the compiler");
 
-        assert!(
-            error
-                .to_string()
-                .contains("github.pull_request.issue_comment.created"),
-            "unexpected error: {error}"
+        let resource = &runtime_plan.associated_resource_event_routing.resources[0];
+        assert_eq!(
+            resource.event_types,
+            vec!["github.pull_request.issue_comment.created".to_string()]
         );
     }
 

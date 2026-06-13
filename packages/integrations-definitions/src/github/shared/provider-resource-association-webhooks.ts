@@ -1,7 +1,6 @@
 import {
   AssociatedProviderResourceKinds,
   AssociatedResourceEventTypes,
-  type AssociatedProviderResourceKind,
   type AssociatedResourceProviderActor,
   type AssociatedResourceEventType,
   type AssociatedResourceSelfAuthorshipInput,
@@ -16,7 +15,10 @@ import {
   GitHubAppInstallationConnectionConfigSchema,
   type GitHubConnectionConfig,
 } from "./auth.js";
-import { createGitHubPullRequestProviderResourceId } from "./provider-resource-associations.js";
+import {
+  createGitHubPullRequestProviderResourceId,
+  observeGitHubRoutableResourceFromEgressResponse,
+} from "./provider-resource-associations.js";
 import { GitHubSupportedWebhookEvents } from "./supported-webhook-events.js";
 
 const GitHubIssueCommentPullRequestPayloadSchema = z.looseObject({
@@ -79,7 +81,7 @@ export type GitHubAssociatedResourceRenderedInput = {
   kind: "github.pull_request.associated_resource_event";
   eventType: AssociatedResourceEventType;
   providerResourceId: string;
-  resourceKind: Extract<AssociatedProviderResourceKind, "github.pull_request">;
+  resourceKind: "github.pull_request";
   text: string;
 };
 
@@ -88,12 +90,23 @@ export type GitHubAssociatedResourceWebhookObservation = {
   eventType: AssociatedResourceEventType;
   providerResourceId: string;
   renderedInput: GitHubAssociatedResourceRenderedInput;
-  resourceKind: Extract<AssociatedProviderResourceKind, "github.pull_request">;
+  resourceKind: "github.pull_request";
 };
 
 export const GitHubAssociatedResourceEventsCapability: IntegrationAssociatedResourceEventsCapability<GitHubConnectionConfig> =
   {
     supportedEvents: createGitHubAssociatedResourceEventDefinitions(),
+    defaultRoutingResources: () => [
+      {
+        resourceKind: AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
+        eventTypes: [
+          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
+          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
+          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
+        ],
+      },
+    ],
+    observeEgressResponse: observeGitHubRoutableResourceFromEgressResponse,
     observeWebhookEvent: observeGitHubAssociatedResourceFromWebhookEvent,
     isSelfAuthoredEvent: isSelfAuthoredGitHubAssociatedResourceEvent,
   };

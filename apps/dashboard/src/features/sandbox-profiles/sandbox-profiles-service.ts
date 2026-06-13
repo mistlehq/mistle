@@ -1,8 +1,4 @@
-import {
-  AssociatedProviderResourceKinds,
-  AssociatedResourceEventTypes,
-  SlackThreadMessageModes,
-} from "@mistle/integrations-core";
+import { SlackThreadMessageModes } from "@mistle/integrations-core";
 import { z } from "zod";
 
 import { getControlPlaneApiClient } from "../../lib/control-plane-api/client.js";
@@ -43,35 +39,17 @@ import type {
 } from "./sandbox-profiles-types.js";
 
 const AgentRuntimeIdSchema = z.enum(["codex", "opencode", "pi"]);
-const GitHubPullRequestAssociatedResourceEventRoutingResourceRuleSchema = z
+const AssociatedResourceEventRoutingResourceRuleSchema = z
   .object({
-    resourceKind: z.enum([AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST]),
-    eventTypes: z
-      .array(
-        z.enum([
-          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_ISSUE_COMMENT_CREATED,
-          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_SUBMITTED,
-          AssociatedResourceEventTypes.GITHUB_PULL_REQUEST_REVIEW_COMMENT_CREATED,
-        ]),
-      )
-      .min(1),
-    payloadFilter: z.record(z.string(), z.unknown()).optional(),
-  })
-  .strict();
-const SlackThreadAssociatedResourceEventRoutingResourceRuleSchema = z
-  .object({
-    resourceKind: z.enum([AssociatedProviderResourceKinds.SLACK_THREAD]),
-    eventTypes: z.array(z.enum([AssociatedResourceEventTypes.SLACK_THREAD_MESSAGE_CREATED])).min(1),
+    resourceKind: z.string().min(1),
+    eventTypes: z.array(z.string().min(1)).min(1),
     messageMode: z
       .enum([SlackThreadMessageModes.ALL, SlackThreadMessageModes.APP_MENTIONS_ONLY])
       .optional(),
     payloadFilter: z.record(z.string(), z.unknown()).optional(),
+    config: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
-const AssociatedResourceEventRoutingResourceRuleSchema = z.union([
-  GitHubPullRequestAssociatedResourceEventRoutingResourceRuleSchema,
-  SlackThreadAssociatedResourceEventRoutingResourceRuleSchema,
-]);
 type AssociatedResourceEventRoutingResourceRuleInput = z.infer<
   typeof AssociatedResourceEventRoutingResourceRuleSchema
 >;
@@ -96,21 +74,13 @@ const SandboxProfileAssociatedResourceEventRoutingConfigSchema = z
 function normalizeAssociatedResourceEventRoutingResourceRule(
   resource: AssociatedResourceEventRoutingResourceRuleInput,
 ): AssociatedResourceEventRoutingResourceRule {
-  switch (resource.resourceKind) {
-    case AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST:
-      return {
-        resourceKind: resource.resourceKind,
-        eventTypes: resource.eventTypes,
-        ...(resource.payloadFilter === undefined ? {} : { payloadFilter: resource.payloadFilter }),
-      };
-    case AssociatedProviderResourceKinds.SLACK_THREAD:
-      return {
-        resourceKind: resource.resourceKind,
-        eventTypes: resource.eventTypes,
-        ...(resource.messageMode === undefined ? {} : { messageMode: resource.messageMode }),
-        ...(resource.payloadFilter === undefined ? {} : { payloadFilter: resource.payloadFilter }),
-      };
-  }
+  return {
+    resourceKind: resource.resourceKind,
+    eventTypes: resource.eventTypes,
+    ...(resource.messageMode === undefined ? {} : { messageMode: resource.messageMode }),
+    ...(resource.payloadFilter === undefined ? {} : { payloadFilter: resource.payloadFilter }),
+    ...(resource.config === undefined ? {} : { config: resource.config }),
+  };
 }
 
 const LaunchableSandboxProfilesResultSchema = z

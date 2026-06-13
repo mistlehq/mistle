@@ -91,13 +91,14 @@ export async function resolveProviderResourceAssociationDeliveryTarget(
     });
 
     if (
-      !supportsAssociatedResourceEvent({
+      !(await supportsAssociatedResourceEvent({
+        capability: observedEvent.capability,
         eventType: observedEvent.eventType,
         payload: observedEvent.payload,
         resourceKind: association.resourceKind,
         routing: sandboxInstance.runtimePlan.associatedResourceEventRouting,
         sourceWebhookEventType: observedEvent.sourceWebhookEventType,
-      })
+      }))
     ) {
       throw new ProviderResourceAssociationDeliveryError({
         code: ProviderResourceAssociationDeliveryFailureCodes.ROUTING_EVENT_NOT_ENABLED,
@@ -133,6 +134,9 @@ async function resolveAssociatedResourceEventFromWebhook(
   },
 ): Promise<
   AssociatedResourceWebhookObservation & {
+    capability: NonNullable<
+      ReturnType<IntegrationRegistry["getDefinition"]>
+    >["associatedResourceEvents"];
     payload: Record<string, unknown>;
     sourceWebhookEventType: string;
   }
@@ -191,6 +195,7 @@ async function resolveAssociatedResourceEventFromWebhook(
 
   return {
     ...observedEvent,
+    capability: definition?.associatedResourceEvents,
     payload: webhookEvent.payload,
     sourceWebhookEventType: webhookEvent.eventType,
   };

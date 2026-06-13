@@ -1,13 +1,9 @@
 import { z } from "@hono/zod-openapi";
-import { AssociatedProviderResourceKinds } from "@mistle/integrations-core";
 
 export const InternalRegisterProviderResourceAssociationRequestSchema = z
   .object({
     integrationConnectionId: z.string().min(1),
-    resourceKind: z.enum([
-      AssociatedProviderResourceKinds.GITHUB_PULL_REQUEST,
-      AssociatedProviderResourceKinds.SLACK_THREAD,
-    ]),
+    resourceKind: z.string().min(1),
     providerResourceId: z.string().min(1),
     sandboxInstanceId: z.string().min(1),
   })
