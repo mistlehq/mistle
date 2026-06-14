@@ -32,6 +32,7 @@ export const DockerClientOperationIds = {
   SHUTDOWN_SANDBOXD: "shutdown_sandboxd",
   STOP_SANDBOXD_DAEMON: "stop_sandboxd_daemon",
   RESET_TRANSPARENT_EGRESS_NFTABLES: "reset_transparent_egress_nftables",
+  ENSURE_DAEMON_READY: "ensure_daemon_ready",
   ACTIVATE: "activate",
   READ_SANDBOXD_VERSION: "read_sandboxd_version",
   /**
