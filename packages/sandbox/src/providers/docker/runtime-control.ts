@@ -37,7 +37,24 @@ export { SandboxdOperationLogPaths };
 
 export const ActivateCommand = ["/opt/mistle/bin/sandboxd", "activate"] as const;
 export const ShutdownCommand = ["/opt/mistle/bin/sandboxd", "shutdown"] as const;
+export const ReadyCommand = ["/opt/mistle/bin/sandboxd", "ready"] as const;
 const VersionCommand = ["/opt/mistle/bin/sandboxd", "version"];
+export const DockerDaemonSystemdEnvironmentVariables = [
+  "SANDBOX_RUNTIME_LISTEN_ADDR",
+  "SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID",
+  "MISTLE_SANDBOXD_ENABLE_TEST_FAULTS",
+  "MISTLE_SANDBOXD_OPERATION_LOG_DIR",
+] as const;
+export function createDockerStartDaemonShellCommand(): string {
+  return [
+    // Keep this aligned with packages/sandboxd/systemd/sandboxd.service
+    // PassEnvironment and import only the variables sandboxd actually needs.
+    `systemctl import-environment ${DockerDaemonSystemdEnvironmentVariables.join(" ")}`,
+    "systemctl start sandboxd.service",
+  ].join(" && ");
+}
+
+const StartDaemonCommand = ["sh", "-euc", createDockerStartDaemonShellCommand()];
 const StopSandboxdCommand = ["sh", "-euc", SandboxdStopDaemonCommand];
 const ResetTransparentEgressNftablesCommand = [
   "sh",
@@ -50,6 +67,9 @@ export const DockerExecExitTimeoutMs = 120_000;
 export const DockerLongRunningExecExitTimeoutMs = 60 * 60 * 1000;
 export const SandboxdStopDaemonTimeoutMs = 30_000;
 export const SandboxdResetTransparentEgressNftablesTimeoutMs = 10_000;
+const DaemonReadinessPollIntervalMs = 100;
+export const DaemonReadinessPollAttempts = 600;
+export const DaemonReadinessProbeTimeoutMs = 5_000;
 
 function reportGracefulShutdownFailure(input: {
   provider: "docker";
@@ -263,6 +283,11 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
   }
 
   async activate(input: SandboxRuntimeControlRequest): Promise<void> {
+    await this.#ensureDaemonReady({
+      id: input.id,
+      ...(input.env === undefined ? {} : { env: input.env }),
+    });
+
     await this.#runPayloadCommand({
       ...input,
       command: ActivateCommand,
@@ -401,6 +426,69 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
       }
 
       throw error;
+    }
+  }
+
+  async #ensureDaemonReady(input: {
+    id: string;
+    env?: Readonly<Record<string, string>>;
+  }): Promise<void> {
+    if (input.id.trim().length === 0) {
+      throw new SandboxConfigurationError("Sandbox id is required.");
+    }
+
+    try {
+      if (await this.#isDaemonReady(input.id)) {
+        return;
+      }
+
+      await this.#runExecCommand({
+        id: input.id,
+        operation: DockerClientOperationIds.ENSURE_DAEMON_READY,
+        command: StartDaemonCommand,
+        env: withRequiredSandboxRuntimeEnv(input.env),
+        failureDescription: "Docker sandboxd daemon start command",
+        timeoutMs: SandboxdStopDaemonTimeoutMs,
+      });
+
+      for (let attempt = 0; attempt < DaemonReadinessPollAttempts; attempt += 1) {
+        if (await this.#isDaemonReady(input.id)) {
+          return;
+        }
+
+        await sleep(DaemonReadinessPollIntervalMs);
+      }
+
+      throw new Error("Docker sandboxd daemon did not expose the control socket before timeout.");
+    } catch (error) {
+      if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
+        throw new SandboxResourceNotFoundError({
+          resourceType: "sandbox",
+          resourceId: input.id,
+          cause: error,
+        });
+      }
+
+      throw error;
+    }
+  }
+
+  async #isDaemonReady(id: string): Promise<boolean> {
+    try {
+      await this.#runExecCommand({
+        id,
+        operation: DockerClientOperationIds.ENSURE_DAEMON_READY,
+        command: ReadyCommand,
+        failureDescription: "Docker sandboxd ready command",
+        timeoutMs: DaemonReadinessProbeTimeoutMs,
+      });
+      return true;
+    } catch (error) {
+      if (error instanceof DockerClientError) {
+        throw error;
+      }
+
+      return false;
     }
   }
 
