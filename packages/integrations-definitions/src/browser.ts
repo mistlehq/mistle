@@ -10,6 +10,7 @@ import { AwsBaseDefinition } from "./aws/variants/aws-cli-default/base-definitio
 import { BugSnagMcpBaseDefinition } from "./bugsnag/variants/bugsnag-mcp/base-definition.js";
 import { CloudflareDefinition } from "./cloudflare/variants/cloudflare-mcp/definition.js";
 import { DatadogDefinition } from "./datadog/index.js";
+import { DeepSeekDefinition } from "./deepseek/index.js";
 import { GcpMcpBaseDefinition } from "./gcp/variants/gcp-mcp/base-definition.js";
 import { GitHubCloudBaseDefinition } from "./github/variants/github-cloud/base-definition.js";
 import { GitHubEnterpriseServerBaseDefinition } from "./github/variants/github-enterprise-server/base-definition.js";
@@ -35,6 +36,7 @@ export const AwsBrowserDefinition = AwsBaseDefinition;
 export const BugSnagBrowserDefinition = BugSnagMcpBaseDefinition;
 export const CloudflareBrowserDefinition = CloudflareDefinition;
 export const DatadogBrowserDefinition = DatadogDefinition;
+export const DeepSeekBrowserDefinition = DeepSeekDefinition;
 export const GcpBrowserDefinition = GcpMcpBaseDefinition;
 export const GitHubCloudBrowserDefinition = GitHubCloudBaseDefinition;
 export const GitHubEnterpriseServerBrowserDefinition = GitHubEnterpriseServerBaseDefinition;
@@ -58,6 +60,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   BugSnagBrowserDefinition,
   CloudflareBrowserDefinition,
   DatadogBrowserDefinition,
+  DeepSeekBrowserDefinition,
   GcpBrowserDefinition,
   JiraBrowserDefinition,
   GitHubCloudBrowserDefinition,
@@ -99,6 +102,7 @@ export * from "./agent-runtimes/provider-selection.js";
 export * from "./bugsnag/browser.js";
 export * from "./cloudflare/browser.js";
 export * from "./datadog/index.js";
+export * from "./deepseek/index.js";
 export * from "./gcp/browser.js";
 export * from "./github/browser.js";
 export * from "./jira/browser.js";

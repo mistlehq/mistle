@@ -62,6 +62,16 @@ export function isAnthropicApiRoute(route: EgressCredentialRoute): boolean {
   );
 }
 
+export function isDeepSeekApiRoute(route: EgressCredentialRoute): boolean {
+  return (
+    route.familyId === "deepseek" &&
+    routeHasHost({ route, host: "api.deepseek.com" }) &&
+    route.authInjection.type === "bearer" &&
+    isIntegrationConnectionCredentialRoute(route) &&
+    route.credentialResolver.secretType === "api_key"
+  );
+}
+
 export function isOpenCodeGoRoute(route: EgressCredentialRoute): boolean {
   return (
     route.familyId === "opencode" &&

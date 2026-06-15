@@ -45,6 +45,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "deepseek-default",
+        familyId: "deepseek",
+        variantId: "deepseek-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "e2b-default",
         familyId: "e2b",
         variantId: "e2b-default",
