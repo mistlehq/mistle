@@ -360,7 +360,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(26);
+    expect(definitions).toHaveLength(27);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual(
@@ -368,6 +368,7 @@ describe("integrations-definitions server", () => {
         "bugsnag::bugsnag-mcp",
         "deepseek::deepseek-default",
         "expo::expo-mcp",
+        "fireworks::fireworks-default",
         "kimi::kimi-default",
         "minimax::minimax-default",
         "posthog::posthog-mcp",

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   isAnthropicApiRoute,
   isDeepSeekApiRoute,
+  isFireworksApiRoute,
   isIntegrationConnectionCredentialRoute,
   isKimiApiRoute,
   isMiniMaxApiRoute,
@@ -181,6 +182,19 @@ describe("provider egress route helpers", () => {
         createRoute({
           familyId: "deepseek",
           host: "api.deepseek.com",
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("matches Fireworks AI provider routes", () => {
+    expect(
+      isFireworksApiRoute(
+        createRoute({
+          familyId: "fireworks",
+          host: "api.fireworks.ai",
+          baseUrl: "https://api.fireworks.ai/inference/v1",
+          pathPrefixes: ["/inference/v1"],
         }),
       ),
     ).toBe(true);

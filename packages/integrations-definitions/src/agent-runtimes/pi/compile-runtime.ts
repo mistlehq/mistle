@@ -14,6 +14,7 @@ import {
 import {
   isAnthropicApiRoute,
   isDeepSeekApiRoute,
+  isFireworksApiRoute,
   isKimiApiRoute,
   isMiniMaxApiRoute,
   isOpenAiApiRoute,
@@ -198,6 +199,22 @@ function resolvePiProviderConfigs(
           apiKey: MistleManagedApiKey,
           baseUrl: route.upstream.baseUrl,
           models: [{ id: "deepseek-v4-flash" }, { id: "deepseek-v4-pro" }],
+        },
+      });
+    }
+
+    if (isFireworksApiRoute(route)) {
+      insertPiProviderConfig({
+        configsByProvider,
+        config: {
+          provider: "fireworks-ai",
+          api: "openai-completions",
+          apiKey: MistleManagedApiKey,
+          baseUrl: route.upstream.baseUrl,
+          models: [
+            { id: "accounts/fireworks/routers/kimi-k2p7-code-fast" },
+            { id: "accounts/fireworks/models/deepseek-v4-pro" },
+          ],
         },
       });
     }

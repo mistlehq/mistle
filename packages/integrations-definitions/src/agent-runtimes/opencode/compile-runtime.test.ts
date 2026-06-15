@@ -642,6 +642,16 @@ describe("compileOpenCodeRuntime", () => {
           secretType: "api_key",
         }),
         createCompiledRoute({
+          egressRuleId: "egress_rule_bind_fireworks",
+          bindingId: "bind_fireworks",
+          familyId: "fireworks",
+          variantId: "fireworks-default",
+          host: "api.fireworks.ai",
+          pathPrefixes: ["/inference/v1"],
+          baseUrl: "https://api.fireworks.ai/inference/v1",
+          secretType: "api_key",
+        }),
+        createCompiledRoute({
           egressRuleId: "egress_rule_bind_kimi",
           bindingId: "bind_kimi",
           familyId: "kimi",
@@ -679,6 +689,7 @@ describe("compileOpenCodeRuntime", () => {
       enabled_providers: [
         "anthropic",
         "deepseek",
+        "fireworks-ai",
         "minimax-cn",
         "moonshotai",
         "openai",
@@ -785,6 +796,28 @@ describe("compileOpenCodeRuntime", () => {
       ]),
     ).toEqual({
       deepseek: {
+        type: "api",
+        key: "mistle-managed-credential",
+      },
+    });
+  });
+
+  it("renders Fireworks AI API auth file from proxied egress routes", () => {
+    expect(
+      readOpenCodeAuthContent(compileDefaultOpenCodeRuntime(), [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_fireworks",
+          bindingId: "bind_fireworks",
+          familyId: "fireworks",
+          variantId: "fireworks-default",
+          host: "api.fireworks.ai",
+          pathPrefixes: ["/inference/v1"],
+          baseUrl: "https://api.fireworks.ai/inference/v1",
+          secretType: "api_key",
+        }),
+      ]),
+    ).toEqual({
+      "fireworks-ai": {
         type: "api",
         key: "mistle-managed-credential",
       },

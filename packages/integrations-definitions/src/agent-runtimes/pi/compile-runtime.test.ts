@@ -476,6 +476,38 @@ describe("compilePiRuntime", () => {
     });
   });
 
+  it("renders Fireworks AI custom provider config when Fireworks egress is available", () => {
+    const runtimeClients = renderRuntimeClients({
+      compiled: compileDefaultPiRuntime(),
+      egressRoutes: [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_fireworks",
+          bindingId: "bind_fireworks",
+          familyId: "fireworks",
+          variantId: "fireworks-default",
+          host: "api.fireworks.ai",
+          baseUrl: "https://api.fireworks.ai/inference/v1",
+          secretType: "api_key",
+        }),
+      ],
+    });
+
+    expect(JSON.parse(readSetupFile({ runtimeClients, fileId: "pi_models" }))).toEqual({
+      providers: {
+        "fireworks-ai": {
+          api: "openai-completions",
+          apiKey: "mistle-managed-credential",
+          baseUrl: "https://api.fireworks.ai/inference/v1",
+          headers: {},
+          models: [
+            { id: "accounts/fireworks/routers/kimi-k2p7-code-fast" },
+            { id: "accounts/fireworks/models/deepseek-v4-pro" },
+          ],
+        },
+      },
+    });
+  });
+
   it("renders Kimi custom provider config when Kimi egress is available", () => {
     const runtimeClients = renderRuntimeClients({
       compiled: compileDefaultPiRuntime(),
