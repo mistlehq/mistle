@@ -866,7 +866,14 @@ mod tests {
                         {
                             "processKey": "claude-code-runtime-server",
                             "command": {
-                                "args": ["node", "/opt/mistle/claude-code-runtime-server/server.mjs"]
+                                "args": [
+                                    "mise",
+                                    "exec",
+                                    "node@25.0.0",
+                                    "--",
+                                    "node",
+                                    "/opt/mistle/claude-code-runtime-server/server.mjs"
+                                ]
                             },
                             "readiness": {
                                 "type": "http",

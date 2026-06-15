@@ -32,6 +32,7 @@ const RuntimeClientProcessReadinessTimeoutMs = 60_000;
 const RuntimeClientProcessStopTimeoutMs = 10_000;
 const RuntimeClientProcessStopGracePeriodMs = 2_000;
 const ArtifactCommandTimeoutMs = 120_000;
+const ClaudeCodeNodeTool = "node@25.0.0";
 const ClaudeAgentSdkVersion = "0.3.175";
 const MistleManagedApiKey = "mistle-managed-credential";
 const ClaudeCodeMcpConfigPath = "/root/.claude/mcp.json";
@@ -159,6 +160,20 @@ function buildClaudeCodeRuntimeEnvironment(): ClaudeCodeRuntimeEnvironment {
   };
 }
 
+function buildMiseExecArgs(command: string, args: ReadonlyArray<string>): string[] {
+  return ["mise", "exec", ClaudeCodeNodeTool, "--", command, ...args];
+}
+
+function buildClaudeCodeExecutableInstallScript(): string {
+  return [
+    `cat > "$1" <<'EOF'`,
+    "#!/bin/sh",
+    `exec mise exec ${ClaudeCodeNodeTool} -- ${ClaudeCodeRuntimeServerPackageDir}/node_modules/.bin/claude "$@"`,
+    "EOF",
+    `chmod 755 "$1"`,
+  ].join("\n");
+}
+
 function buildClaudeCodeRuntimeClients(input: {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
@@ -178,7 +193,7 @@ function buildClaudeCodeRuntimeClients(input: {
         {
           processKey: ClaudeCodeRuntimeServerProcessKey,
           command: {
-            args: ["node", ClaudeCodeRuntimeServerPath],
+            args: buildMiseExecArgs("node", [ClaudeCodeRuntimeServerPath]),
             cwd: ClaudeCodeRuntimeServerPackageDir,
           },
           readiness: {
@@ -220,7 +235,7 @@ export function compileClaudeCodeRuntime(
         lifecycle: {
           install: ({ refs }) => [
             refs.mise.install({
-              tools: ["node@25.0.0"],
+              tools: [ClaudeCodeNodeTool],
               timeoutMs: ArtifactCommandTimeoutMs,
             }),
           ],
@@ -236,8 +251,7 @@ export function compileClaudeCodeRuntime(
               timeoutMs: ArtifactCommandTimeoutMs,
             }),
             refs.command.exec({
-              args: [
-                "npm",
+              args: buildMiseExecArgs("npm", [
                 "install",
                 "--prefix",
                 ClaudeCodeRuntimeServerPackageDir,
@@ -246,14 +260,15 @@ export function compileClaudeCodeRuntime(
                 "--no-fund",
                 `@anthropic-ai/claude-agent-sdk@${ClaudeAgentSdkVersion}`,
                 "ws@8.21.0",
-              ],
+              ]),
               timeoutMs: ArtifactCommandTimeoutMs,
             }),
             refs.command.exec({
               args: [
-                "ln",
-                "-sf",
-                `${ClaudeCodeRuntimeServerPackageDir}/node_modules/.bin/claude`,
+                "sh",
+                "-c",
+                buildClaudeCodeExecutableInstallScript(),
+                "sh",
                 ClaudeCodeExecutablePath,
               ],
               timeoutMs: ArtifactCommandTimeoutMs,

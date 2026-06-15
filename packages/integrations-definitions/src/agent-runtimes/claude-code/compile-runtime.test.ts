@@ -146,7 +146,7 @@ describe("compileClaudeCodeRuntime", () => {
         {
           processKey: ClaudeCodeRuntimeServerProcessKey,
           command: {
-            args: ["node", ClaudeCodeRuntimeServerPath],
+            args: ["mise", "exec", "node@25.0.0", "--", "node", ClaudeCodeRuntimeServerPath],
             cwd: ClaudeCodeRuntimeServerPackageDir,
           },
           readiness: {
@@ -215,6 +215,10 @@ describe("compileClaudeCodeRuntime", () => {
       op: "exec",
       command: {
         args: [
+          "mise",
+          "exec",
+          "node@25.0.0",
+          "--",
           "npm",
           "install",
           "--prefix",
@@ -224,6 +228,25 @@ describe("compileClaudeCodeRuntime", () => {
           "--no-fund",
           "@anthropic-ai/claude-agent-sdk@0.3.175",
           "ws@8.21.0",
+        ],
+        timeoutMs: 120000,
+      },
+    });
+    expect(installSteps).toContainEqual({
+      op: "exec",
+      command: {
+        args: [
+          "sh",
+          "-c",
+          [
+            `cat > "$1" <<'EOF'`,
+            "#!/bin/sh",
+            `exec mise exec node@25.0.0 -- ${ClaudeCodeRuntimeServerPackageDir}/node_modules/.bin/claude "$@"`,
+            "EOF",
+            `chmod 755 "$1"`,
+          ].join("\n"),
+          "sh",
+          ClaudeCodeExecutablePath,
         ],
         timeoutMs: 120000,
       },
