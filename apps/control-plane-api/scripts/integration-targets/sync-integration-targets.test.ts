@@ -122,6 +122,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "posthog-mcp",
+        familyId: "posthog",
+        variantId: "posthog-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "resend-mcp",
         familyId: "resend",
         variantId: "resend-mcp",
