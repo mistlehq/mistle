@@ -584,7 +584,9 @@ mod tests {
 
         server.close().expect("control server should stop cleanly");
         start_gateway.close().expect("gateway should stop cleanly");
-        refresh_gateway.close().expect("gateway should stop cleanly");
+        refresh_gateway
+            .close()
+            .expect("gateway should stop cleanly");
         std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
 
