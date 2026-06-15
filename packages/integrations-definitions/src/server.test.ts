@@ -40,6 +40,10 @@ describe("integrations-definitions server", () => {
       familyId: "datadog",
       variantId: "datadog-default",
     });
+    const expoDefinition = registry.getDefinition({
+      familyId: "expo",
+      variantId: "expo-mcp",
+    });
     const cloudflareDefinition = registry.getDefinition({
       familyId: "cloudflare",
       variantId: "cloudflare-mcp",
@@ -271,6 +275,9 @@ describe("integrations-definitions server", () => {
     expect(datadogDefinition?.webhookHandler).toBeUndefined();
     expect(datadogDefinition?.webhookSource).toBeUndefined();
     expect(datadogDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(expoDefinition?.oauth2AuthorizationCode).toBeDefined();
+    expect(expoDefinition?.webhookHandler).toBeUndefined();
+    expect(expoDefinition?.webhookSource).toBeUndefined();
     expect(cloudflareDefinition?.oauth2AuthorizationCode).toBeUndefined();
     expect(cloudflareDefinition?.webhookHandler).toBeUndefined();
     expect(cloudflareDefinition?.webhookSource).toBeUndefined();
@@ -353,13 +360,14 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(23);
+    expect(definitions).toHaveLength(24);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual(
       expect.arrayContaining([
         "bugsnag::bugsnag-mcp",
         "deepseek::deepseek-default",
+        "expo::expo-mcp",
         "posthog::posthog-mcp",
         "resend::resend-mcp",
       ]),

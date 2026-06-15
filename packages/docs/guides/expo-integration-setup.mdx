@@ -1,0 +1,28 @@
+---
+title: Expo
+description: Connect Expo to Mistle
+icon: data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjIiIHZpZXdCb3g9IjAgMCAyNCAyMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTEuMzkgOC4yNjljLjE5LS4yNzcuMzk3LS4zMTIuNTY1LS4zMTIuMTY4IDAgLjQ0Ny4wMzUuNjM3LjMxMiAxLjQ5IDIuMDMgMy45NSA2LjA3NSA1Ljc2NSA5LjA2IDEuMTg0IDEuOTQ1IDIuMDkzIDMuNDQgMi4yOCAzLjYzLjcuNzE0IDEuNjYuMjY5IDIuMjE4LS41NDEuNTQ5LS43OTcuNzAxLTEuMzU3LjcwMS0xLjk1NCAwLS40MDctNy45NTgtMTUuMDg3LTguNzU5LTE2LjMwOUMxNC4wMjcuOTggMTMuNzc1LjY4MyAxMi40NTcuNjgzaC0uOTg4Yy0xLjMxNSAwLTEuNTA1LjI5Ny0yLjI3NiAxLjQ3MkM4LjM5MiAzLjM3Ny40MzMgMTguMDU3LjQzMyAxOC40NjNjMCAuNTk4LjE1MyAxLjE1OC43MDMgMS45NTUuNTU4LjgxIDEuNTE4IDEuMjU1IDIuMjE4LjU0LjE4Ni0uMTkgMS4wOTUtMS42ODQgMi4yNzktMy42MyAxLjgxNS0yLjk4NCA0LjI2Ny03LjAyOSA1Ljc1OC05LjA2eiIgZmlsbD0iIzAwMCIvPjwvc3ZnPg==
+---
+
+## Overview
+
+Connect to Expo through the Expo hosted MCP OAuth redirect flow.
+
+The Expo integration exposes server-side Expo MCP capabilities to agent runtimes, including Expo documentation, compatible package installation guidance, EAS builds, EAS workflows, and TestFlight data.
+
+Local simulator and React Native DevTools capabilities are not enabled by this integration.
+
+## Connect In Mistle
+
+Open **Integrations** in the dashboard, choose **Expo**, then select **Expo MCP OAuth**.
+
+The browser redirects to Expo, the user approves access, and the returned OAuth credentials are stored for the connection.
+
+There are no user-entered secret fields for this target.
+
+## Official References
+
+- [Using Model Context Protocol (MCP) with Expo](https://docs.expo.dev/mcp/)
+- [Expo logos](https://github.com/expo/logos)
+
+The exact redirect flow in this guide is based on the current Expo MCP OAuth discovery metadata.

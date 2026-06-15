@@ -11,6 +11,7 @@ import { BugSnagDefinition } from "./bugsnag/browser.js";
 import { CloudflareDefinition } from "./cloudflare/browser.js";
 import { DatadogDefinition } from "./datadog/index.js";
 import { DeepSeekDefinition } from "./deepseek/index.js";
+import { ExpoDefinition } from "./expo/browser.js";
 import { GcpDefinition } from "./gcp/browser.js";
 import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./github/browser.js";
 import { JiraDefinition } from "./jira/browser.js";
@@ -37,6 +38,7 @@ export * from "./bugsnag/browser.js";
 export * from "./cloudflare/browser.js";
 export * from "./datadog/index.js";
 export * from "./deepseek/index.js";
+export * from "./expo/browser.js";
 export * from "./gcp/browser.js";
 export * from "./jira/browser.js";
 export * from "./jira-shared.js";
@@ -63,6 +65,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   CloudflareDefinition,
   DatadogDefinition,
   DeepSeekDefinition,
+  ExpoDefinition,
   GcpDefinition,
   JiraDefinition,
   GitHubCloudDefinition,

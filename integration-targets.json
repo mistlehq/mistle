@@ -39,6 +39,11 @@
       "config": {}
     },
     {
+      "targetKey": "expo-mcp",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "e2b-default",
       "enabled": true,
       "config": {}

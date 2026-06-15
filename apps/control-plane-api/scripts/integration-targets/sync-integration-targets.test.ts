@@ -59,6 +59,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "expo-mcp",
+        familyId: "expo",
+        variantId: "expo-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "gcp-mcp",
         familyId: "gcp",
         variantId: "gcp-mcp",

@@ -15,6 +15,7 @@ import { DatadogDefinition } from "./datadog/index.js";
 import { DeepSeekDefinition } from "./deepseek/index.js";
 import { resolveDefinitionEgressCredentialResolver } from "./egress-credential-resolver.server.js";
 import { resolveDefinitionEgressRequestMiddleware } from "./egress-request-middleware.server.js";
+import { ExpoDefinition } from "./expo/server.js";
 import { GcpDefinition } from "./gcp/server.js";
 import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./github/index.js";
 import { JiraDefinition } from "./jira/index.js";
@@ -44,6 +45,7 @@ export * from "./deepseek/index.js";
 export * from "./egress-credential-resolver.server.js";
 export * from "./egress-request-middleware.server.js";
 export * from "./egress-telemetry.server.js";
+export * from "./expo/server.js";
 export * from "./gcp/server.js";
 export * from "./jira/index.js";
 export * from "./github/index.js";
@@ -72,6 +74,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   CloudflareDefinition,
   DatadogDefinition,
   DeepSeekDefinition,
+  ExpoDefinition,
   GcpDefinition,
   JiraDefinition,
   GitHubCloudDefinition,
