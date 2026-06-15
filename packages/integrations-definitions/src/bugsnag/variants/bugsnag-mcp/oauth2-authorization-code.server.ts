@@ -28,6 +28,7 @@ const StringOrNumberSchema = z.union([z.string(), z.number()]);
 const BugSnagDynamicClientRegistrationResponseSchema = z
   .object({
     client_id: z.string().min(1),
+    client_secret: z.string().min(1),
   })
   .loose();
 
@@ -51,6 +52,7 @@ const BugSnagOAuthErrorBodySchema = z
 const BugSnagProviderStateSchema = z
   .object({
     clientId: z.string().min(1),
+    clientSecret: z.string().min(1),
   })
   .strict();
 
@@ -77,24 +79,26 @@ export function buildBugSnagDynamicClientRegistrationRequestBody(input: { redire
   redirect_uris: string[];
   grant_types: string[];
   response_types: string[];
-  token_endpoint_auth_method: "none";
+  token_endpoint_auth_method: "client_secret_post";
 } {
   return {
     client_name: BugSnagClientName,
     redirect_uris: [input.redirectUrl],
     grant_types: ["authorization_code", "refresh_token"],
     response_types: ["code"],
-    token_endpoint_auth_method: "none",
+    token_endpoint_auth_method: "client_secret_post",
   };
 }
 
 export function parseBugSnagDynamicClientRegistrationResponse(input: unknown): {
   clientId: string;
+  clientSecret: string;
 } {
   const parsed = BugSnagDynamicClientRegistrationResponseSchema.parse(input);
 
   return {
     clientId: parsed.client_id,
+    clientSecret: parsed.client_secret,
   };
 }
 
@@ -131,6 +135,7 @@ export function buildBugSnagAuthorizationCodeExchangeRequestBody(input: {
   code: string;
   redirectUrl: string;
   clientId: string;
+  clientSecret: string;
   pkceVerifier: string;
 }): URLSearchParams {
   const params = new URLSearchParams();
@@ -138,6 +143,7 @@ export function buildBugSnagAuthorizationCodeExchangeRequestBody(input: {
   params.set("code", input.code);
   params.set("redirect_uri", input.redirectUrl);
   params.set("client_id", input.clientId);
+  params.set("client_secret", input.clientSecret);
   params.set("code_verifier", input.pkceVerifier);
   params.set("resource", BugSnagMcpUrl);
   return params;
@@ -146,11 +152,13 @@ export function buildBugSnagAuthorizationCodeExchangeRequestBody(input: {
 export function buildBugSnagRefreshRequestBody(input: {
   refreshToken: string;
   clientId: string;
+  clientSecret: string;
 }): URLSearchParams {
   const params = new URLSearchParams();
   params.set("grant_type", "refresh_token");
   params.set("refresh_token", input.refreshToken);
   params.set("client_id", input.clientId);
+  params.set("client_secret", input.clientSecret);
   params.set("resource", BugSnagMcpUrl);
   return params;
 }
@@ -220,6 +228,7 @@ export function resolveBugSnagCompleteGrantResult(input: {
       response: input.response,
       issuedAt: input.issuedAt,
     }),
+    clientSecret: input.providerState.clientSecret,
   };
 }
 
@@ -346,6 +355,7 @@ export const BugSnagMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2Autho
       }),
       providerState: {
         clientId: registration.clientId,
+        clientSecret: registration.clientSecret,
       },
     };
   },
@@ -366,6 +376,7 @@ export const BugSnagMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2Autho
         code: resolveBugSnagAuthorizationCodeOrThrow(input.query),
         redirectUrl: input.redirectUrl,
         clientId: providerState.clientId,
+        clientSecret: providerState.clientSecret,
         pkceVerifier,
       }),
     });
@@ -385,6 +396,9 @@ export const BugSnagMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2Autho
 
   async refreshAccessToken(input) {
     const connectionConfig = BugSnagConnectionConfigSchema.parse(input.connection.config);
+    if (input.clientSecret === undefined) {
+      throw new Error("BugSnag OAuth refresh requires a client secret.");
+    }
 
     let tokenResponse: Response;
     try {
@@ -396,6 +410,7 @@ export const BugSnagMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2Autho
         body: buildBugSnagRefreshRequestBody({
           refreshToken: input.refreshToken,
           clientId: connectionConfig.client_id,
+          clientSecret: input.clientSecret,
         }),
       });
     } catch (error) {

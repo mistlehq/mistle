@@ -25,7 +25,7 @@ describe("BugSnag OAuth 2.0 authorization code", () => {
       redirect_uris: ["https://mistle.example.com/callback"],
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
-      token_endpoint_auth_method: "none",
+      token_endpoint_auth_method: "client_secret_post",
     });
   });
 
@@ -62,10 +62,11 @@ describe("BugSnag OAuth 2.0 authorization code", () => {
         code: "code_123",
         redirectUrl: "https://mistle.example.com/callback",
         clientId: "bugsnag_client_123",
+        clientSecret: "bugsnag_secret_456",
         pkceVerifier: "verifier_789",
       }).toString(),
     ).toBe(
-      "grant_type=authorization_code&code=code_123&redirect_uri=https%3A%2F%2Fmistle.example.com%2Fcallback&client_id=bugsnag_client_123&code_verifier=verifier_789&resource=https%3A%2F%2Fbugsnag.mcp.smartbear.com%2Fmcp",
+      "grant_type=authorization_code&code=code_123&redirect_uri=https%3A%2F%2Fmistle.example.com%2Fcallback&client_id=bugsnag_client_123&client_secret=bugsnag_secret_456&code_verifier=verifier_789&resource=https%3A%2F%2Fbugsnag.mcp.smartbear.com%2Fmcp",
     );
   });
 
@@ -74,9 +75,10 @@ describe("BugSnag OAuth 2.0 authorization code", () => {
       buildBugSnagRefreshRequestBody({
         refreshToken: "refresh_123",
         clientId: "bugsnag_client_123",
+        clientSecret: "bugsnag_secret_456",
       }).toString(),
     ).toBe(
-      "grant_type=refresh_token&refresh_token=refresh_123&client_id=bugsnag_client_123&resource=https%3A%2F%2Fbugsnag.mcp.smartbear.com%2Fmcp",
+      "grant_type=refresh_token&refresh_token=refresh_123&client_id=bugsnag_client_123&client_secret=bugsnag_secret_456&resource=https%3A%2F%2Fbugsnag.mcp.smartbear.com%2Fmcp",
     );
   });
 
@@ -84,10 +86,12 @@ describe("BugSnag OAuth 2.0 authorization code", () => {
     expect(
       parseBugSnagDynamicClientRegistrationResponse({
         client_id: "bugsnag_client_123",
+        client_secret: "bugsnag_secret_456",
         client_name: "Mistle BugSnag MCP",
       }),
     ).toEqual({
       clientId: "bugsnag_client_123",
+      clientSecret: "bugsnag_secret_456",
     });
   });
 
@@ -134,6 +138,7 @@ describe("BugSnag OAuth 2.0 authorization code", () => {
       resolveBugSnagCompleteGrantResult({
         providerState: {
           clientId: "bugsnag_client_123",
+          clientSecret: "bugsnag_secret_456",
         },
         response: {
           access_token: "access_123",
@@ -151,6 +156,7 @@ describe("BugSnag OAuth 2.0 authorization code", () => {
       accessToken: "access_123",
       accessTokenExpiresAt: "2026-04-11T01:00:00.000Z",
       refreshToken: "refresh_456",
+      clientSecret: "bugsnag_secret_456",
       credentialMetadata: {
         scope: "api openid profile",
       },
