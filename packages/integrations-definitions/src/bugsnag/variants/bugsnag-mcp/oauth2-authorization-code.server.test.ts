@@ -1,0 +1,234 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  assertBugSnagDynamicClientRegistrationSucceeded,
+  buildBugSnagAuthorizationCodeExchangeRequestBody,
+  buildBugSnagAuthorizationUrl,
+  buildBugSnagDynamicClientRegistrationRequestBody,
+  buildBugSnagRefreshRequestBody,
+  classifyBugSnagRefreshFailure,
+  createBugSnagRefreshTransportFailure,
+  parseBugSnagDynamicClientRegistrationResponse,
+  resolveBugSnagAuthorizationCodeOrThrow,
+  resolveBugSnagCompleteGrantResult,
+  resolveBugSnagRefreshResult,
+} from "./oauth2-authorization-code.server.js";
+
+describe("BugSnag OAuth 2.0 authorization code", () => {
+  it("builds the expected dynamic client registration request body", () => {
+    expect(
+      buildBugSnagDynamicClientRegistrationRequestBody({
+        redirectUrl: "https://mistle.example.com/callback",
+      }),
+    ).toEqual({
+      client_name: "Mistle BugSnag MCP",
+      redirect_uris: ["https://mistle.example.com/callback"],
+      grant_types: ["authorization_code", "refresh_token"],
+      response_types: ["code"],
+      token_endpoint_auth_method: "client_secret_post",
+    });
+  });
+
+  it("builds the expected authorization URL for BugSnag hosted MCP", () => {
+    const authorizationUrl = new URL(
+      buildBugSnagAuthorizationUrl({
+        clientId: "bugsnag_client_123",
+        redirectUrl: "https://mistle.example.com/callback",
+        state: "state_123",
+        pkceChallenge: "challenge_123",
+      }),
+    );
+
+    expect(authorizationUrl.origin + authorizationUrl.pathname).toBe(
+      "https://oauth.bugsnag.com/authorize",
+    );
+    expect(authorizationUrl.searchParams.get("response_type")).toBe("code");
+    expect(authorizationUrl.searchParams.get("client_id")).toBe("bugsnag_client_123");
+    expect(authorizationUrl.searchParams.get("redirect_uri")).toBe(
+      "https://mistle.example.com/callback",
+    );
+    expect(authorizationUrl.searchParams.get("state")).toBe("state_123");
+    expect(authorizationUrl.searchParams.get("scope")).toBe("api openid profile");
+    expect(authorizationUrl.searchParams.get("resource")).toBe(
+      "https://bugsnag.mcp.smartbear.com/mcp",
+    );
+    expect(authorizationUrl.searchParams.get("code_challenge")).toBe("challenge_123");
+    expect(authorizationUrl.searchParams.get("code_challenge_method")).toBe("S256");
+  });
+
+  it("builds the expected authorization code exchange body", () => {
+    expect(
+      buildBugSnagAuthorizationCodeExchangeRequestBody({
+        code: "code_123",
+        redirectUrl: "https://mistle.example.com/callback",
+        clientId: "bugsnag_client_123",
+        clientSecret: "bugsnag_secret_456",
+        pkceVerifier: "verifier_789",
+      }).toString(),
+    ).toBe(
+      "grant_type=authorization_code&code=code_123&redirect_uri=https%3A%2F%2Fmistle.example.com%2Fcallback&client_id=bugsnag_client_123&client_secret=bugsnag_secret_456&code_verifier=verifier_789&resource=https%3A%2F%2Fbugsnag.mcp.smartbear.com%2Fmcp",
+    );
+  });
+
+  it("builds the expected refresh body", () => {
+    expect(
+      buildBugSnagRefreshRequestBody({
+        refreshToken: "refresh_123",
+        clientId: "bugsnag_client_123",
+        clientSecret: "bugsnag_secret_456",
+      }).toString(),
+    ).toBe(
+      "grant_type=refresh_token&refresh_token=refresh_123&client_id=bugsnag_client_123&client_secret=bugsnag_secret_456&resource=https%3A%2F%2Fbugsnag.mcp.smartbear.com%2Fmcp",
+    );
+  });
+
+  it("parses the dynamic client registration response", () => {
+    expect(
+      parseBugSnagDynamicClientRegistrationResponse({
+        client_id: "bugsnag_client_123",
+        client_secret: "bugsnag_secret_456",
+        client_name: "Mistle BugSnag MCP",
+      }),
+    ).toEqual({
+      clientId: "bugsnag_client_123",
+      clientSecret: "bugsnag_secret_456",
+    });
+  });
+
+  it("requires an exact 201 status for dynamic client registration", () => {
+    expect(() =>
+      assertBugSnagDynamicClientRegistrationSucceeded({
+        status: 200,
+        body: '{"client_id":"bugsnag_client_123"}',
+      }),
+    ).toThrow(/dynamic client registration failed \(200\)/u);
+
+    expect(() =>
+      assertBugSnagDynamicClientRegistrationSucceeded({
+        status: 201,
+        body: '{"client_id":"bugsnag_client_123"}',
+      }),
+    ).not.toThrow();
+  });
+
+  it("resolves the authorization code and surfaces callback errors", () => {
+    expect(
+      resolveBugSnagAuthorizationCodeOrThrow(
+        new URLSearchParams({
+          code: "code_123",
+          state: "state_123",
+        }),
+      ),
+    ).toBe("code_123");
+
+    expect(() =>
+      resolveBugSnagAuthorizationCodeOrThrow(
+        new URLSearchParams({
+          error: "access_denied",
+          error_description: "user declined access",
+        }),
+      ),
+    ).toThrow(
+      "BugSnag OAuth authorization failed with error 'access_denied': user declined access",
+    );
+  });
+
+  it("derives completion output with the MCP client id and credential metadata", () => {
+    expect(
+      resolveBugSnagCompleteGrantResult({
+        providerState: {
+          clientId: "bugsnag_client_123",
+          clientSecret: "bugsnag_secret_456",
+        },
+        response: {
+          access_token: "access_123",
+          token_type: "Bearer",
+          expires_in: 3600,
+          refresh_token: "refresh_456",
+          scope: "api openid profile",
+        },
+        issuedAt: new Date("2026-04-11T00:00:00.000Z"),
+      }),
+    ).toEqual({
+      connectionConfig: {
+        client_id: "bugsnag_client_123",
+      },
+      accessToken: "access_123",
+      accessTokenExpiresAt: "2026-04-11T01:00:00.000Z",
+      refreshToken: "refresh_456",
+      clientSecret: "bugsnag_secret_456",
+      credentialMetadata: {
+        scope: "api openid profile",
+      },
+    });
+  });
+
+  it("derives refresh output with a rotated refresh token", () => {
+    expect(
+      resolveBugSnagRefreshResult({
+        response: {
+          access_token: "access_789",
+          token_type: "Bearer",
+          expires_in: 1800,
+          refresh_token: "refresh_789",
+        },
+        issuedAt: new Date("2026-04-11T00:00:00.000Z"),
+      }),
+    ).toEqual({
+      accessToken: "access_789",
+      accessTokenExpiresAt: "2026-04-11T00:30:00.000Z",
+      refreshToken: "refresh_789",
+    });
+  });
+
+  it("classifies permanent and temporary refresh failures", () => {
+    expect(
+      classifyBugSnagRefreshFailure({
+        status: 400,
+        body: JSON.stringify({
+          error: "invalid_grant",
+          error_description: "refresh token expired",
+        }),
+      }),
+    ).toEqual({
+      classification: "permanent",
+      code: "invalid_grant",
+      message: "refresh token expired",
+    });
+
+    expect(
+      classifyBugSnagRefreshFailure({
+        status: 503,
+        body: JSON.stringify({
+          error: "server_error",
+          error_description: "temporary outage",
+        }),
+      }),
+    ).toEqual({
+      classification: "temporary",
+      code: "server_error",
+      message: "temporary outage",
+    });
+
+    expect(
+      classifyBugSnagRefreshFailure({
+        status: 502,
+        body: "bad gateway",
+      }),
+    ).toEqual({
+      classification: "temporary",
+      message: "BugSnag OAuth refresh failed with status 502: bad gateway",
+    });
+  });
+
+  it("converts refresh transport failures into temporary classified errors", () => {
+    const error = createBugSnagRefreshTransportFailure({
+      error: new Error("network down"),
+    });
+
+    expect(error.classification).toBe("temporary");
+    expect(error.message).toBe(
+      "BugSnag OAuth refresh request failed before a response was received: network down",
+    );
+  });
+});

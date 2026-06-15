@@ -7,6 +7,7 @@ import {
 
 import { AnthropicDefinition } from "./anthropic/index.js";
 import { AwsBaseDefinition } from "./aws/variants/aws-cli-default/base-definition.js";
+import { BugSnagMcpBaseDefinition } from "./bugsnag/variants/bugsnag-mcp/base-definition.js";
 import { CloudflareDefinition } from "./cloudflare/variants/cloudflare-mcp/definition.js";
 import { DatadogDefinition } from "./datadog/index.js";
 import { GcpMcpBaseDefinition } from "./gcp/variants/gcp-mcp/base-definition.js";
@@ -29,6 +30,7 @@ import { SignozMcpBaseDefinition } from "./signoz/variants/signoz-mcp/base-defin
 import { SlackBaseDefinition } from "./slack/variants/slack-default/base-definition.js";
 export const AnthropicBrowserDefinition = AnthropicDefinition;
 export const AwsBrowserDefinition = AwsBaseDefinition;
+export const BugSnagBrowserDefinition = BugSnagMcpBaseDefinition;
 export const CloudflareBrowserDefinition = CloudflareDefinition;
 export const DatadogBrowserDefinition = DatadogDefinition;
 export const GcpBrowserDefinition = GcpMcpBaseDefinition;
@@ -49,6 +51,7 @@ export const SlackBrowserDefinition = SlackBaseDefinition;
 const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   AnthropicBrowserDefinition,
   AwsBrowserDefinition,
+  BugSnagBrowserDefinition,
   CloudflareBrowserDefinition,
   DatadogBrowserDefinition,
   GcpBrowserDefinition,
@@ -87,6 +90,7 @@ export function createBrowserDefinitionsBundle(): IntegrationDefinitionsBundle<A
 
 export * from "./anthropic/index.js";
 export * from "./agent-runtimes/provider-selection.js";
+export * from "./bugsnag/browser.js";
 export * from "./cloudflare/browser.js";
 export * from "./datadog/index.js";
 export * from "./gcp/browser.js";

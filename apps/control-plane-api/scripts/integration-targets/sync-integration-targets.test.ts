@@ -24,6 +24,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "bugsnag-mcp",
+        familyId: "bugsnag",
+        variantId: "bugsnag-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "cloudflare-mcp",
         familyId: "cloudflare",
         variantId: "cloudflare-mcp",
