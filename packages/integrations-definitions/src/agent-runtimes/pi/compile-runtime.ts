@@ -14,6 +14,7 @@ import {
 import {
   isAnthropicApiRoute,
   isDeepSeekApiRoute,
+  isKimiApiRoute,
   isOpenAiApiRoute,
   isOpenAiChatGptSubscriptionRoute,
 } from "../shared/provider-egress-routes.js";
@@ -196,6 +197,19 @@ function resolvePiProviderConfigs(
           apiKey: MistleManagedApiKey,
           baseUrl: route.upstream.baseUrl,
           models: [{ id: "deepseek-v4-flash" }, { id: "deepseek-v4-pro" }],
+        },
+      });
+    }
+
+    if (isKimiApiRoute(route)) {
+      insertPiProviderConfig({
+        configsByProvider,
+        config: {
+          provider: "kimi",
+          api: "openai-completions",
+          apiKey: MistleManagedApiKey,
+          baseUrl: route.upstream.baseUrl,
+          models: [{ id: "kimi-k2.7-code" }, { id: "kimi-k2.6" }],
         },
       });
     }

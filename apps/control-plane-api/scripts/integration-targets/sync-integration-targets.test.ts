@@ -94,6 +94,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "kimi-default",
+        familyId: "kimi",
+        variantId: "kimi-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "linear-default",
         familyId: "linear",
         variantId: "linear-default",

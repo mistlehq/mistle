@@ -74,6 +74,11 @@
       "config": {}
     },
     {
+      "targetKey": "kimi-default",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "linear-default",
       "enabled": true,
       "config": {}

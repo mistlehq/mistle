@@ -14,6 +14,7 @@ import {
 import {
   isAnthropicApiRoute,
   isDeepSeekApiRoute,
+  isKimiApiRoute,
   isOpenAiApiRoute,
   isOpenAiChatGptSubscriptionRoute,
   isOpenCodeGoRoute,
@@ -101,6 +102,10 @@ function resolveOpenCodeEnabledProviders(
 
     if (isDeepSeekApiRoute(route)) {
       providers.add("deepseek");
+    }
+
+    if (isKimiApiRoute(route)) {
+      providers.add("moonshotai");
     }
 
     if (isOpenCodeGoRoute(route)) {
@@ -209,6 +214,17 @@ function renderOpenCodeAuthContent(
       insertOpenCodeAuth({
         auth,
         providerId: "deepseek",
+        value: {
+          type: "api",
+          key: MistleManagedApiKey,
+        },
+      });
+    }
+
+    if (isKimiApiRoute(route)) {
+      insertOpenCodeAuth({
+        auth,
+        providerId: "moonshotai",
         value: {
           type: "api",
           key: MistleManagedApiKey,
