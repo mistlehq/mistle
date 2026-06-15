@@ -41,7 +41,7 @@ const CodexGitHubAssets = {
   x86_64: {
     fileName: "codex-x86_64-unknown-linux-musl.tar.gz",
     binaryPath: "codex-x86_64-unknown-linux-musl",
-    sha256: "d96e88313b95597e9cbb8704f6db16dbb81c07142b08cfb628479ab433696931",
+    sha256: "12ebf70df41dc831061862912ab5e7eacdd112bb17e8ce9b2098cb3d92180081",
   },
   aarch64: {
     fileName: "codex-aarch64-unknown-linux-musl.tar.gz",
