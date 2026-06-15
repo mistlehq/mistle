@@ -19,6 +19,7 @@ import {
   isMiniMaxApiRoute,
   isOpenAiApiRoute,
   isOpenAiChatGptSubscriptionRoute,
+  isZaiApiRoute,
 } from "../shared/provider-egress-routes.js";
 import { PiMcpAdapterExtensionBundle } from "./pi-mcp-adapter-extension.bundle.js";
 import { PiPtyLaunchSpec } from "./pty-launch.js";
@@ -241,6 +242,19 @@ function resolvePiProviderConfigs(
           apiKey: MistleManagedApiKey,
           baseUrl: route.upstream.baseUrl,
           models: [{ id: "MiniMax-M3" }],
+        },
+      });
+    }
+
+    if (isZaiApiRoute(route)) {
+      insertPiProviderConfig({
+        configsByProvider,
+        config: {
+          provider: "zai-coding-plan",
+          api: "openai-completions",
+          apiKey: MistleManagedApiKey,
+          baseUrl: route.upstream.baseUrl,
+          models: [{ id: "glm-5.2" }, { id: "glm-5.1" }, { id: "glm-4.7" }],
         },
       });
     }

@@ -93,6 +93,17 @@ export function isKimiApiRoute(route: EgressCredentialRoute): boolean {
   );
 }
 
+export function isZaiApiRoute(route: EgressCredentialRoute): boolean {
+  return (
+    route.familyId === "zai" &&
+    routeHasHost({ route, host: "api.z.ai" }) &&
+    routeHasPathPrefix({ route, pathPrefix: "/api/coding/paas/v4" }) &&
+    route.authInjection.type === "bearer" &&
+    isIntegrationConnectionCredentialRoute(route) &&
+    route.credentialResolver.secretType === "api_key"
+  );
+}
+
 export function isMiniMaxApiRoute(route: EgressCredentialRoute): boolean {
   return (
     route.familyId === "minimax" &&

@@ -57,6 +57,10 @@ describe("integrations-definitions index", () => {
       familyId: "minimax",
       variantId: "minimax-default",
     });
+    const zaiDefinition = registry.getDefinition({
+      familyId: "zai",
+      variantId: "zai-coding-plan",
+    });
     const openCodeGoDefinition = registry.getDefinition({
       familyId: "opencode",
       variantId: "opencode-go",
@@ -328,6 +332,13 @@ describe("integrations-definitions index", () => {
       variantId: "minimax-default",
       kind: "agent",
       displayName: "MiniMax",
+      allowedRuntimeIds: ["opencode", "pi"],
+    });
+    expect(zaiDefinition).toMatchObject({
+      familyId: "zai",
+      variantId: "zai-coding-plan",
+      kind: "agent",
+      displayName: "Z.ai Coding Plan",
       allowedRuntimeIds: ["opencode", "pi"],
     });
     expect(openCodeGoDefinition).toMatchObject({
@@ -984,7 +995,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(27);
+    expect(definitions).toHaveLength(28);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -1015,6 +1026,7 @@ describe("integrations-definitions index", () => {
       "sentry::sentry-mcp",
       "signoz::signoz-mcp",
       "slack::slack-default",
+      "zai::zai-coding-plan",
     ]);
   });
 

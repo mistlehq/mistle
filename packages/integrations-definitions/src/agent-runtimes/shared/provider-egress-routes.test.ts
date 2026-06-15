@@ -12,6 +12,7 @@ import {
   isOpenAiApiRoute,
   isOpenAiChatGptSubscriptionRoute,
   isOpenCodeGoRoute,
+  isZaiApiRoute,
   routeHasHost,
   routeHasPathPrefix,
 } from "./provider-egress-routes.js";
@@ -234,6 +235,19 @@ describe("provider egress route helpers", () => {
           pathPrefixes: ["/anthropic/v1"],
           authInjectionType: "header",
           authInjectionTarget: "x-api-key",
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("matches Z.ai API provider routes", () => {
+    expect(
+      isZaiApiRoute(
+        createRoute({
+          familyId: "zai",
+          host: "api.z.ai",
+          baseUrl: "https://api.z.ai/api/coding/paas/v4",
+          pathPrefixes: ["/api/coding/paas/v4"],
         }),
       ),
     ).toBe(true);

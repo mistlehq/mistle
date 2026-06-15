@@ -198,6 +198,13 @@ describe("sync-integration-targets", () => {
         enabled: false,
         config: {},
       },
+      {
+        targetKey: "zai-coding-plan",
+        familyId: "zai",
+        variantId: "zai-coding-plan",
+        enabled: false,
+        config: {},
+      },
     ]);
   });
 });
