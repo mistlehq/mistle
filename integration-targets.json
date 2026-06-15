@@ -79,6 +79,11 @@
       "config": {}
     },
     {
+      "targetKey": "posthog-mcp",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "resend-mcp",
       "enabled": true,
       "config": {}

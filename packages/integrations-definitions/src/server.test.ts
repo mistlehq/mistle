@@ -88,6 +88,10 @@ describe("integrations-definitions server", () => {
       familyId: "planetscale",
       variantId: "planetscale-mcp",
     });
+    const postHogDefinition = registry.getDefinition({
+      familyId: "posthog",
+      variantId: "posthog-mcp",
+    });
     const resendDefinition = registry.getDefinition({
       familyId: "resend",
       variantId: "resend-mcp",
@@ -276,6 +280,9 @@ describe("integrations-definitions server", () => {
     expect(planetscaleDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(planetscaleDefinition?.webhookHandler).toBeUndefined();
     expect(planetscaleDefinition?.webhookSource).toBeUndefined();
+    expect(postHogDefinition?.oauth2AuthorizationCode).toBeDefined();
+    expect(postHogDefinition?.webhookHandler).toBeUndefined();
+    expect(postHogDefinition?.webhookSource).toBeUndefined();
     expect(resendDefinition).toMatchObject({
       familyId: "resend",
       variantId: "resend-mcp",
@@ -346,10 +353,16 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(21);
+    expect(definitions).toHaveLength(22);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
-    ).toEqual(expect.arrayContaining(["bugsnag::bugsnag-mcp", "resend::resend-mcp"]));
+    ).toEqual(
+      expect.arrayContaining([
+        "bugsnag::bugsnag-mcp",
+        "posthog::posthog-mcp",
+        "resend::resend-mcp",
+      ]),
+    );
   });
 
   it("builds the server definitions bundle with an agent runtime registry", () => {

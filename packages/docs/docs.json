@@ -46,6 +46,7 @@
               "guides/opencode-go-integration-setup",
               "guides/openai-integration-setup",
               "guides/planetscale-integration-setup",
+              "guides/posthog-integration-setup",
               "guides/signoz-integration-setup",
               "guides/slack-integration-setup"
             ]

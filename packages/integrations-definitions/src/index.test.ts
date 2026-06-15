@@ -77,6 +77,10 @@ describe("integrations-definitions index", () => {
       familyId: "planetscale",
       variantId: "planetscale-mcp",
     });
+    const postHogDefinition = registry.getDefinition({
+      familyId: "posthog",
+      variantId: "posthog-mcp",
+    });
     const resendDefinition = registry.getDefinition({
       familyId: "resend",
       variantId: "resend-mcp",
@@ -465,6 +469,26 @@ describe("integrations-definitions index", () => {
       ],
     });
     expect(planetscaleDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(postHogDefinition).toMatchObject({
+      familyId: "posthog",
+      variantId: "posthog-mcp",
+      kind: "connector",
+      displayName: "PostHog",
+      connectionMethods: [
+        {
+          id: "oauth2-authorization-code",
+          label: "PostHog OAuth",
+          kind: "redirect",
+          ui: {
+            create: {
+              submitLabel: "Connect PostHog",
+              helperText: "Authorize PostHog hosted MCP access.",
+            },
+          },
+        },
+      ],
+    });
+    expect(postHogDefinition?.oauth2AuthorizationCode).toBeUndefined();
     expect(resendDefinition).toMatchObject({
       familyId: "resend",
       variantId: "resend-mcp",
@@ -916,7 +940,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(21);
+    expect(definitions).toHaveLength(22);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -933,6 +957,7 @@ describe("integrations-definitions index", () => {
       "openai::openai-default",
       "opencode::opencode-go",
       "planetscale::planetscale-mcp",
+      "posthog::posthog-mcp",
       "resend::resend-mcp",
       "e2b::e2b-default",
       "modal::modal-default",

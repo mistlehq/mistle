@@ -21,6 +21,7 @@ import { LinearDefinition } from "./linear/index.js";
 import { OpenAiApiKeyDefinition } from "./openai/index.js";
 import { OpenCodeGoDefinition } from "./opencode/index.js";
 import { PlanetScaleDefinition } from "./planetscale/server.js";
+import { PostHogDefinition } from "./posthog/server.js";
 import { createAgentRuntimeServerRegistry } from "./registry/agent-runtimes.server.js";
 import { ResendDefinition } from "./resend/server.js";
 import {
@@ -49,6 +50,7 @@ export * from "./linear/index.js";
 export * from "./openai/index.js";
 export * from "./opencode/index.js";
 export * from "./planetscale/server.js";
+export * from "./posthog/server.js";
 export * from "./resend/server.js";
 export * from "./sandbox-runtimes/index.js";
 export * from "./sentry/server.js";
@@ -75,6 +77,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   OpenAiApiKeyDefinition,
   OpenCodeGoDefinition,
   PlanetScaleDefinition,
+  PostHogDefinition,
   ResendDefinition,
   E2BSandboxRuntimeDefinition,
   ModalSandboxRuntimeDefinition,

@@ -18,6 +18,7 @@ import { LinearBaseDefinition } from "./linear/variants/linear-default/base-defi
 import { OpenAiApiKeyDefinition } from "./openai/variants/openai-default/definition.js";
 import { OpenCodeGoDefinition } from "./opencode/index.js";
 import { PlanetScaleMcpBaseDefinition } from "./planetscale/variants/planetscale-mcp/base-definition.js";
+import { PostHogMcpBaseDefinition } from "./posthog/variants/posthog-mcp/base-definition.js";
 import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
 import { ResendMcpBaseDefinition } from "./resend/variants/resend-mcp/base-definition.js";
 import {
@@ -41,6 +42,7 @@ export const JiraBrowserDefinition = JiraBaseDefinition;
 export const LinearBrowserDefinition = LinearBaseDefinition;
 export const OpenCodeGoBrowserDefinition = OpenCodeGoDefinition;
 export const PlanetScaleBrowserDefinition = PlanetScaleMcpBaseDefinition;
+export const PostHogBrowserDefinition = PostHogMcpBaseDefinition;
 export const ResendBrowserDefinition = ResendMcpBaseDefinition;
 export const E2BSandboxRuntimeBrowserDefinition = E2BSandboxRuntimeDefinition;
 export const ModalSandboxRuntimeBrowserDefinition = ModalSandboxRuntimeDefinition;
@@ -64,6 +66,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   OpenAiApiKeyDefinition,
   OpenCodeGoBrowserDefinition,
   PlanetScaleBrowserDefinition,
+  PostHogBrowserDefinition,
   ResendBrowserDefinition,
   E2BSandboxRuntimeBrowserDefinition,
   ModalSandboxRuntimeBrowserDefinition,
@@ -101,6 +104,7 @@ export * from "./github/browser.js";
 export * from "./jira/browser.js";
 export * from "./linear/browser.js";
 export * from "./opencode/index.js";
+export * from "./posthog/browser.js";
 export * from "./resend/browser.js";
 export * from "./sandbox-runtimes/index.js";
 export * from "./sentry/browser.js";

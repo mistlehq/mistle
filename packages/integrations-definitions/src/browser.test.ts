@@ -11,6 +11,7 @@ import {
   JiraBrowserDefinition,
   LinearBrowserDefinition,
   OpenComputerSandboxRuntimeBrowserDefinition,
+  PostHogBrowserDefinition,
   ResendBrowserDefinition,
   SentryBrowserDefinition,
   SignozBrowserDefinition,
@@ -84,6 +85,10 @@ describe("browser definitions", () => {
 
   it("keeps GCP browser definitions free of server-only OAuth handlers", () => {
     expect(GcpBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+  });
+
+  it("keeps PostHog browser definitions free of server-only OAuth handlers", () => {
+    expect(PostHogBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
   });
 
   it("keeps slack browser definitions free of server-only webhook hooks", () => {
