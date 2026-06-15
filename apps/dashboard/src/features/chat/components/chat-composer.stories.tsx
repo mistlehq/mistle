@@ -608,8 +608,26 @@ export const WithRepositoryStatusAndContextUsage: Story = {
   args: {
     composerText: "Summarize the remaining implementation risk.",
     contextUsage: {
-      label: "Context 82% left",
-      title: "42,000 used of 200,000 window",
+      label: "82% context left",
+      title: "42,000 tokens used of 200,000 token context window.",
+    },
+    gitBranchLabel: "feature/show-session-branch",
+    pullRequest: {
+      isDraft: false,
+      number: 142,
+      state: "OPEN",
+      title: "Show pull request status in the composer",
+      url: "https://github.com/mistlehq/mistle/pull/142",
+    },
+  },
+};
+
+export const UnknownContextWindowRemaining: Story = {
+  args: {
+    composerText: "Summarize the remaining implementation risk.",
+    contextUsage: {
+      label: "Context left unknown",
+      title: "Context window remaining is unknown until the next response reports token usage.",
     },
     gitBranchLabel: "feature/show-session-branch",
     pullRequest: {
@@ -768,8 +786,8 @@ export const OpenCodeWithContextUsage: Story = {
     composerCapabilities: OpenCodePromptCommandCapabilities,
     composerText: "Summarize the remaining implementation risk.",
     contextUsage: {
-      label: "Context 40% used",
-      title: "400 used of 1,000 window, $1.75 total cost",
+      label: "60% context left",
+      title: "400 tokens used of 1,000 token context window.",
     },
   },
 };

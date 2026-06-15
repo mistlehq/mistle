@@ -692,8 +692,8 @@ describe("useOpenCodeSessionState", () => {
 
     await waitFor(() => {
       expect(result.current.contextUsage).toEqual({
-        label: "Context 40% used",
-        title: "40,000 used of 100,000 window, $1.25 total cost",
+        label: "60% context left",
+        title: "40,000 tokens used of 100,000 token context window.",
       });
     });
   });

@@ -248,6 +248,10 @@ _Avoid_: Bare thread, bare session
 A user-authored transcript message in a **Runtime conversation**, regardless of whether it originated from the **Session workbench** composer, a **Trigger**, an **Association delivery**, a provider CLI, or another runtime-supported submission path.
 _Avoid_: Runtime queued message, trigger payload, association payload
 
+**Runtime context window remaining**:
+The estimated remaining capacity in the active **Runtime conversation**'s current model context window.
+_Avoid_: Context usage, session statistics, total tokens
+
 **Active runtime conversation**:
 The **Runtime conversation** currently selected for the chat pane within a **Sandbox session**.
 _Avoid_: Active thread when speaking across providers
@@ -732,7 +736,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - The **Original Codex thread** remains stable when the **Active Codex thread** changes within a **Session workbench**.
 - An explicit **Active Codex thread** request does not redefine the **Original Codex thread**.
 - Ports, terminal access, runtime status, repository filesystem state, and sandbox-level diffs belong to the **Sandbox session**.
-- Transcript, active turn state, context usage, and Codex thread actions belong to the **Codex thread**.
+- Runtime transcript, active turn state, and **Runtime context window remaining** belong to the **Active runtime conversation**; Codex thread actions belong to the **Codex thread**.
 - Goal status belongs to the **Active Codex thread** and is shown with composer-adjacent thread context, not in **Codex thread** navigation.
 - Opening a different **Codex thread** is a thread-scoped transition; the previous **Active Codex thread** remains authoritative until the next thread is ready.
 - Starting a new **Codex thread** does not create a new **Active Codex thread** until Codex confirms the thread exists.

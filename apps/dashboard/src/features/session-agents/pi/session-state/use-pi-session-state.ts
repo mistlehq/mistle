@@ -12,7 +12,15 @@ import {
 } from "@mistle/integrations-definitions/agent-runtimes/pi/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { systemScheduler } from "@mistle/time";
-import { useCallback, useEffect, useReducer, useRef, useState, type Dispatch } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type Dispatch,
+} from "react";
 
 import type { SessionComposerBootstrapResult } from "../../../pages/session-composer/session-composer-runtime-contracts.js";
 import type { SessionCliLaunchTarget } from "../../session-runtime-cli-launch.js";
@@ -22,6 +30,7 @@ import {
   resolvePiCliLaunchTarget,
   resolveStablePiCliLaunchTarget,
 } from "./pi-cli-launch-authority.js";
+import { formatPiContextUsage, type PiContextUsageViewModel } from "./pi-context-usage.js";
 import {
   buildReadyPiComposerBootstrap,
   buildUnavailablePiComposerBootstrap,
@@ -86,6 +95,7 @@ export type PiConversationSelection =
 
 export type UsePiSessionStateResult = {
   bootstrap: SessionComposerBootstrapResult;
+  contextUsage: PiContextUsageViewModel | null;
   chat: {
     abortConversation: () => Promise<void>;
     canInterruptTurn: boolean;
@@ -312,6 +322,9 @@ export function usePiSessionState(input: {
   const [bootstrap, setBootstrap] = useState<SessionComposerBootstrapResult>(
     buildUnavailablePiComposerBootstrap({ status: "unavailable" }),
   );
+  const [activeContextUsage, setActiveContextUsage] = useState<
+    PiSessionState["contextUsage"] | null
+  >(null);
   const [chatState, dispatchChatAction] = useReducer(
     reducePiChatState,
     undefined,
@@ -340,6 +353,11 @@ export function usePiSessionState(input: {
     setSessionErrorMessage(null);
   }, []);
 
+  const contextUsage = useMemo(
+    () => formatPiContextUsage(activeContextUsage),
+    [activeContextUsage],
+  );
+
   const reportSessionErrorMessage = useCallback((message: string): void => {
     setSessionErrorMessage(message);
   }, []);
@@ -358,6 +376,7 @@ export function usePiSessionState(input: {
     availablePiCommandsRef.current = [];
     availablePiModelsRef.current = [];
     setBootstrap(buildUnavailablePiComposerBootstrap({ status: "unavailable" }));
+    setActiveContextUsage(null);
     setSessionSnapshot(null);
     setAvailableConversations([]);
     setHasMoreAvailableConversations(false);
@@ -508,6 +527,8 @@ export function usePiSessionState(input: {
       setStep("securing");
       setSessionConnectionState("connecting");
       setLifecycleErrorMessage(null);
+      setSessionErrorMessage(null);
+      setActiveContextUsage(null);
       setAvailableConversations([]);
       setHasMoreAvailableConversations(false);
       setOriginalConversationId(null);
@@ -643,6 +664,7 @@ export function usePiSessionState(input: {
             providerConversationId: connectInput.providerConversationId ?? null,
             sandboxInstanceId: connectInput.sandboxInstanceId,
           });
+          setActiveContextUsage(activeSessionState.contextUsage ?? null);
           setBootstrap(composerBootstrap.bootstrap);
           setStep("connected");
           setSessionConnectionState("connected");
@@ -658,6 +680,7 @@ export function usePiSessionState(input: {
           availablePiCommandsRef.current = [];
           availablePiModelsRef.current = [];
           setBootstrap(buildUnavailablePiComposerBootstrap({ status: "failed", message }));
+          setActiveContextUsage(null);
           setSessionSnapshot(null);
           setAvailableConversations([]);
           setHasMoreAvailableConversations(false);
@@ -790,6 +813,60 @@ export function usePiSessionState(input: {
     [],
   );
 
+  const refreshPiContextUsage = useCallback(
+    async (input: {
+      client: PiSessionClient;
+      generation: number;
+      sessionFile: string;
+    }): Promise<boolean> => {
+      if (!isCurrentPiSession(input)) {
+        return false;
+      }
+      const activeSessionState = await input.client.getState({
+        sessionFile: input.sessionFile,
+      });
+      if (!isCurrentPiSession(input)) {
+        return false;
+      }
+      setActiveContextUsage(activeSessionState.contextUsage ?? null);
+      return true;
+    },
+    [isCurrentPiSession],
+  );
+
+  useEffect(() => {
+    // Synchronizes React with Pi RPC session state after a streamed turn
+    // completes; the context-window estimate is only available from get_state.
+    if (chatState.status !== "idle") {
+      return;
+    }
+
+    const client = clientRef.current;
+    const sessionFile = sessionSnapshot?.activeSessionFile ?? null;
+    if (client === null || sessionFile === null) {
+      return;
+    }
+
+    const generation = generationRef.current;
+    void refreshPiContextUsage({
+      client,
+      generation,
+      sessionFile,
+    }).catch((error: unknown) => {
+      if (!isCurrentPiSession({ client, generation, sessionFile })) {
+        return;
+      }
+      setSessionErrorMessage(
+        error instanceof Error ? error.message : "Could not refresh Pi context window remaining.",
+      );
+    });
+  }, [
+    chatState.status,
+    isCurrentPiSession,
+    refreshPiContextUsage,
+    sessionSnapshot?.activeSessionFile,
+  ]);
+
   const refreshPiComposerBootstrapAfterWrite = useCallback(
     async (input: {
       client: PiSessionClient;
@@ -805,6 +882,7 @@ export function usePiSessionState(input: {
       if (!isCurrentPiSession(input)) {
         return false;
       }
+      setActiveContextUsage(activeSessionState.contextUsage ?? null);
       setBootstrap(
         buildReadyPiComposerBootstrap({
           activeModel: activeSessionState.model,
@@ -884,6 +962,7 @@ export function usePiSessionState(input: {
         client: input.client,
         sessionFile: input.sessionFile,
       });
+      setActiveContextUsage(activeSessionState.contextUsage ?? null);
       availablePiModelsRef.current = composerBootstrap.availableModels;
       availablePiCommandsRef.current = composerBootstrap.commands;
       await hydrateConnectedPiChat({
@@ -1013,6 +1092,7 @@ export function usePiSessionState(input: {
 
   return {
     bootstrap,
+    contextUsage,
     lifecycle: {
       clearLifecycleErrorMessage,
       connectSession,

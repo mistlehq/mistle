@@ -1,12 +1,11 @@
+import {
+  formatKnownContextWindowRemaining,
+  type ContextWindowRemainingViewModel,
+} from "../../context-window-remaining.js";
 import type { CodexThreadTokenUsageSnapshot } from "./codex-session-types.js";
 
 const BaselineContextTokens = 12_000;
-const TokenCountFormatter = new Intl.NumberFormat("en-US");
-
-export type CodexContextUsageViewModel = {
-  label: string;
-  title: string;
-};
+export type CodexContextUsageViewModel = ContextWindowRemainingViewModel;
 
 export function formatCodexContextUsage(
   snapshot: CodexThreadTokenUsageSnapshot | null,
@@ -17,12 +16,11 @@ export function formatCodexContextUsage(
 
   const contextWindow = snapshot.tokenUsage.modelContextWindow;
   if (contextWindow <= BaselineContextTokens) {
-    return {
-      label: "Context 0% left",
-      title: `${formatTokenCount(snapshot.tokenUsage.last.totalTokens)} used of ${formatTokenCount(
-        contextWindow,
-      )} window`,
-    };
+    return formatKnownContextWindowRemaining({
+      contextWindow,
+      remainingPercent: 0,
+      usedTokens: snapshot.tokenUsage.last.totalTokens,
+    });
   }
 
   const effectiveWindow = contextWindow - BaselineContextTokens;
@@ -35,14 +33,9 @@ export function formatCodexContextUsage(
     Math.min(Math.max(remainingContextTokens / effectiveWindow, 0), 1) * 100,
   );
 
-  return {
-    label: `Context ${String(remainingPercent)}% left`,
-    title: `${formatTokenCount(snapshot.tokenUsage.last.totalTokens)} used of ${formatTokenCount(
-      contextWindow,
-    )} window`,
-  };
-}
-
-function formatTokenCount(value: number): string {
-  return TokenCountFormatter.format(Math.max(Math.round(value), 0));
+  return formatKnownContextWindowRemaining({
+    contextWindow,
+    remainingPercent,
+    usedTokens: snapshot.tokenUsage.last.totalTokens,
+  });
 }

@@ -133,7 +133,7 @@ export function buildCodexConversationRuntime(input: {
       },
       sessionErrorMessage: input.sessionMessage.sessionErrorMessage,
       clearSessionErrorMessage: input.sessionMessage.clearSessionErrorMessage,
-      contextUsage: capabilities.hasContextUsage ? input.contextUsage : null,
+      contextUsage: input.contextUsage,
       goalStatus: input.goals.activeGoalStatus,
       commandPanel:
         input.reviews.commandPanel ?? input.plans.commandPanel ?? mapCodexGoalPanel(input.goals),
@@ -316,7 +316,7 @@ export function buildOpenCodeConversationRuntime(input: {
       },
       sessionErrorMessage: input.sessionMessage.sessionErrorMessage,
       clearSessionErrorMessage: input.sessionMessage.clearSessionErrorMessage,
-      contextUsage: capabilities.hasContextUsage ? input.contextUsage : null,
+      contextUsage: input.contextUsage,
       executeTypedRuntimeCommand: (commandInput) => {
         if (!isOpenCodePromptCommandId(commandInput.commandId)) {
           input.sessionMessage.reportSessionErrorMessage(
@@ -352,6 +352,7 @@ export function buildPiConversationRuntime(input: {
   bootstrap: SessionComposerRuntimeInput["bootstrap"];
   chat: UsePiSessionStateResult["chat"];
   configControl: SessionComposerRuntimeInput["configControl"];
+  contextUsage: SessionComposerRuntimeInput["contextUsage"];
   sessionMessage: UsePiSessionStateResult["sessionMessage"];
   sessionSnapshot: UsePiSessionStateResult["lifecycle"]["sessionSnapshot"];
   queueTurn: NonNullable<SessionTurnControl["queueTurn"]>;
@@ -392,7 +393,7 @@ export function buildPiConversationRuntime(input: {
       },
       sessionErrorMessage: input.sessionMessage.sessionErrorMessage,
       clearSessionErrorMessage: input.sessionMessage.clearSessionErrorMessage,
-      contextUsage: null,
+      contextUsage: input.contextUsage,
       executeTypedRuntimeCommand: (commandInput) => {
         const commandSource = readPiCommandSourceFromId(commandInput.commandId);
         if (commandSource === null) {

@@ -410,13 +410,13 @@ describe("ChatComposer", () => {
       <ChatComposer
         {...createBaseComposerProps()}
         contextUsage={{
-          label: "Context 82% left",
-          title: "42,000 used of 200,000 window",
+          label: "82% context left",
+          title: "42,000 tokens used of 200,000 token context window.",
         }}
       />,
     );
 
-    expect(screen.getByText("Context 82% left")).toBeTruthy();
+    expect(screen.getByText("82% context left")).toBeTruthy();
   });
 
   it("renders Plan mode status and lets the user switch back to Default", () => {

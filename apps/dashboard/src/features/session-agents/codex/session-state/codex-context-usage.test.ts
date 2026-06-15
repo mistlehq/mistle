@@ -40,8 +40,8 @@ describe("formatCodexContextUsage", () => {
         }),
       ),
     ).toEqual({
-      label: "Context 50% left",
-      title: "106,000 used of 200,000 window",
+      label: "50% context left",
+      title: "106,000 tokens used of 200,000 token context window.",
     });
   });
 

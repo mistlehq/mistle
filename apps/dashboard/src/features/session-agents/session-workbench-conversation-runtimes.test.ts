@@ -231,6 +231,7 @@ function createOpenCodeRuntimeInput(reportedMessages: string[]): OpenCodeRuntime
 }
 
 function createPiRuntimeInput(input: {
+  contextUsage?: PiRuntimeInput["contextUsage"];
   executedPromptCommands?: string[];
   isBusy?: boolean;
   queuedPrompts?: string[];
@@ -280,6 +281,7 @@ function createPiRuntimeInput(input: {
       },
     },
     configControl: ComposerConfigControl,
+    contextUsage: input.contextUsage ?? null,
     sessionMessage: {
       clearSessionErrorMessage: () => {
         return;
@@ -544,14 +546,14 @@ describe("buildOpenCodeConversationRuntime", () => {
   it("exposes OpenCode context usage through the shared composer contract", () => {
     const input = createOpenCodeRuntimeInput([]);
     input.contextUsage = {
-      label: "Context 40% used",
-      title: "400 used of 1,000 window, $1.75 total cost",
+      label: "60% context left",
+      title: "400 tokens used of 1,000 token context window.",
     };
     const runtime = buildOpenCodeConversationRuntime(input);
 
     expect(runtime.composerRuntimeInput.contextUsage).toEqual({
-      label: "Context 40% used",
-      title: "400 used of 1,000 window, $1.75 total cost",
+      label: "60% context left",
+      title: "400 tokens used of 1,000 token context window.",
     });
   });
 
@@ -615,6 +617,24 @@ describe("buildPiConversationRuntime", () => {
     expect(runtime.composerRuntimeInput.modelSelection).toEqual({
       required: false,
       showControls: true,
+    });
+  });
+
+  it("exposes Pi context window remaining through the shared composer contract", () => {
+    const runtime = buildPiConversationRuntime(
+      createPiRuntimeInput({
+        contextUsage: {
+          label: "60% context left",
+          title: "40,000 tokens used of 100,000 token context window.",
+        },
+        reportedMessages: [],
+        steeredPrompts: [],
+      }),
+    );
+
+    expect(runtime.composerRuntimeInput.contextUsage).toEqual({
+      label: "60% context left",
+      title: "40,000 tokens used of 100,000 token context window.",
     });
   });
 

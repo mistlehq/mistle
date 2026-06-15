@@ -18,6 +18,30 @@ describe("Pi session client schemas", () => {
     ).toBeNull();
   });
 
+  it("accepts Pi get_state context window usage when present", () => {
+    expect(
+      parsePiSessionState({
+        isStreaming: false,
+        isCompacting: false,
+        model: null,
+        thinkingLevel: "off",
+        sessionFile: "/tmp/session.jsonl",
+        sessionId: "session_123",
+        messageCount: 1,
+        pendingMessageCount: 0,
+        contextUsage: {
+          tokens: null,
+          contextWindow: 200_000,
+          percent: null,
+        },
+      }).contextUsage,
+    ).toEqual({
+      tokens: null,
+      contextWindow: 200_000,
+      percent: null,
+    });
+  });
+
   it("requires Pi model payloads to include reasoning support metadata", () => {
     expect(() =>
       parsePiSessionState({
