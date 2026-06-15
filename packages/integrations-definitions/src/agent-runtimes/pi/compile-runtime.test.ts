@@ -566,6 +566,35 @@ describe("compilePiRuntime", () => {
     });
   });
 
+  it("renders Z.ai custom provider config when Z.ai egress is available", () => {
+    const runtimeClients = renderRuntimeClients({
+      compiled: compileDefaultPiRuntime(),
+      egressRoutes: [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_zai",
+          bindingId: "bind_zai",
+          familyId: "zai",
+          variantId: "zai-coding-plan",
+          host: "api.z.ai",
+          baseUrl: "https://api.z.ai/api/coding/paas/v4",
+          secretType: "api_key",
+        }),
+      ],
+    });
+
+    expect(JSON.parse(readSetupFile({ runtimeClients, fileId: "pi_models" }))).toEqual({
+      providers: {
+        "zai-coding-plan": {
+          api: "openai-completions",
+          apiKey: "mistle-managed-credential",
+          baseUrl: "https://api.z.ai/api/coding/paas/v4",
+          headers: {},
+          models: [{ id: "glm-5.2" }, { id: "glm-5.1" }, { id: "glm-4.7" }],
+        },
+      },
+    });
+  });
+
   it("uses Pi's OpenAI Codex provider for ChatGPT subscription egress", () => {
     const runtimeClients = renderRuntimeClients({
       compiled: compileDefaultPiRuntime(),

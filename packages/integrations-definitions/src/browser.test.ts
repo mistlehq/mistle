@@ -22,6 +22,7 @@ import {
   SignozBrowserDefinition,
   SlackBrowserDefinition,
   TensorlakeSandboxRuntimeBrowserDefinition,
+  ZaiBrowserDefinition,
 } from "./browser.js";
 
 describe("browser definitions", () => {
@@ -150,6 +151,24 @@ describe("browser definitions", () => {
     expect(FireworksBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
     expect(FireworksBrowserDefinition.webhookHandler).toBeUndefined();
     expect(FireworksBrowserDefinition.webhookSource).toBeUndefined();
+  });
+
+  it("registers Z.ai in the browser-safe definitions bundle", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: ZaiBrowserDefinition.familyId,
+      variantId: ZaiBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "zai",
+      variantId: "zai-coding-plan",
+      kind: "agent",
+      displayName: "Z.ai Coding Plan",
+      logoKey: "zai",
+    });
+    expect(ZaiBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+    expect(ZaiBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(ZaiBrowserDefinition.webhookSource).toBeUndefined();
   });
 
   it("keeps BugSnag browser definitions free of server-only hooks and resources", () => {

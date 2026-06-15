@@ -684,6 +684,16 @@ describe("compileOpenCodeRuntime", () => {
           baseUrl: "https://opencode.ai/zen/go/v1",
           secretType: "api_key",
         }),
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_zai",
+          bindingId: "bind_zai",
+          familyId: "zai",
+          variantId: "zai-coding-plan",
+          host: "api.z.ai",
+          pathPrefixes: ["/api/coding/paas/v4"],
+          baseUrl: "https://api.z.ai/api/coding/paas/v4",
+          secretType: "api_key",
+        }),
       ]),
     ).toEqual({
       enabled_providers: [
@@ -694,6 +704,7 @@ describe("compileOpenCodeRuntime", () => {
         "moonshotai",
         "openai",
         "opencode-go",
+        "zai-coding-plan",
       ],
     });
   });
@@ -866,6 +877,28 @@ describe("compileOpenCodeRuntime", () => {
       ]),
     ).toEqual({
       "minimax-cn": {
+        type: "api",
+        key: "mistle-managed-credential",
+      },
+    });
+  });
+
+  it("renders Z.ai API auth file from proxied egress routes", () => {
+    expect(
+      readOpenCodeAuthContent(compileDefaultOpenCodeRuntime(), [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_zai",
+          bindingId: "bind_zai",
+          familyId: "zai",
+          variantId: "zai-coding-plan",
+          host: "api.z.ai",
+          pathPrefixes: ["/api/coding/paas/v4"],
+          baseUrl: "https://api.z.ai/api/coding/paas/v4",
+          secretType: "api_key",
+        }),
+      ]),
+    ).toEqual({
+      "zai-coding-plan": {
         type: "api",
         key: "mistle-managed-credential",
       },

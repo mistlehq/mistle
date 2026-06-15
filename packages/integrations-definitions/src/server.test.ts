@@ -360,7 +360,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(27);
+    expect(definitions).toHaveLength(28);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual(
@@ -373,6 +373,7 @@ describe("integrations-definitions server", () => {
         "minimax::minimax-default",
         "posthog::posthog-mcp",
         "resend::resend-mcp",
+        "zai::zai-coding-plan",
       ]),
     );
   });

@@ -20,6 +20,7 @@ import {
   isOpenAiApiRoute,
   isOpenAiChatGptSubscriptionRoute,
   isOpenCodeGoRoute,
+  isZaiApiRoute,
 } from "../shared/provider-egress-routes.js";
 import { OpenCodePtyLaunchSpec } from "./pty-launch.js";
 import {
@@ -116,6 +117,10 @@ function resolveOpenCodeEnabledProviders(
 
     if (isMiniMaxOpenCodeApiRoute(route)) {
       providers.add("minimax-cn");
+    }
+
+    if (isZaiApiRoute(route)) {
+      providers.add("zai-coding-plan");
     }
 
     if (isOpenCodeGoRoute(route)) {
@@ -257,6 +262,17 @@ function renderOpenCodeAuthContent(
       insertOpenCodeAuth({
         auth,
         providerId: "minimax-cn",
+        value: {
+          type: "api",
+          key: MistleManagedApiKey,
+        },
+      });
+    }
+
+    if (isZaiApiRoute(route)) {
+      insertOpenCodeAuth({
+        auth,
+        providerId: "zai-coding-plan",
         value: {
           type: "api",
           key: MistleManagedApiKey,
