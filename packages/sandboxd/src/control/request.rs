@@ -402,8 +402,10 @@ fn refresh_activated_activation(
 
     let mut state_guard = lock_control_state(state)?;
     if activate_result.is_ok() {
-        state_guard.activation_input =
-            Some(activation_input_after_refresh(&accepted_session_input, activation_input));
+        state_guard.activation_input = Some(activation_input_after_refresh(
+            &accepted_session_input,
+            activation_input,
+        ));
     }
     state_guard.sandboxd_state = Some(sandboxd_state);
     activate_result

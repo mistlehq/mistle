@@ -609,8 +609,8 @@ mod tests {
         let mut resume_input = valid_activation_input(&resume_gateway.ws_url);
         resume_input.operation_kind = ActivationOperationKind::Resume;
         resume_input.git_identity = Some(GitIdentity {
-            name: "mistle-agent[bot]".to_string(),
-            email: "257897702+mistle-agent[bot]@users.noreply.github.com".to_string(),
+            name: "Mistle User".to_string(),
+            email: "mistle@example.test".to_string(),
             signing: None,
         });
 
