@@ -396,10 +396,37 @@ fn refresh_activated_activation(
 
     let mut state_guard = lock_control_state(state)?;
     if activate_result.is_ok() {
-        state_guard.activation_input = Some(activation_input);
+        state_guard.activation_input = Some(activation_input_after_refresh(
+            accepted_session_input,
+            activation_input,
+        ));
     }
     state_guard.sandboxd_state = Some(sandboxd_state);
     activate_result
+}
+
+fn activation_input_after_refresh(
+    accepted_session_input: SessionRuntimeInput,
+    mut activation_input: ActivationInput,
+) -> ActivationInput {
+    if activation_input.operation_kind != ActivationOperationKind::Resume {
+        return activation_input;
+    }
+
+    let accepted_git_identity = accepted_session_input.git_identity;
+    let candidate_signing = activation_input
+        .git_identity
+        .as_ref()
+        .and_then(|git_identity| git_identity.signing.as_ref());
+    let accepted_signing = accepted_git_identity
+        .as_ref()
+        .and_then(|git_identity| git_identity.signing.as_ref());
+
+    if candidate_signing.is_none() && accepted_signing.is_some() {
+        activation_input.git_identity = accepted_git_identity;
+    }
+
+    activation_input
 }
 
 fn start_activation_init_worker(
