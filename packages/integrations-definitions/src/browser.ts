@@ -20,6 +20,7 @@ import { JiraBaseDefinition } from "./jira/variants/jira-default/base-definition
 import { KimiDefinition } from "./kimi/index.js";
 import { LinearBaseDefinition } from "./linear/variants/linear-default/base-definition.js";
 import { MiniMaxDefinition } from "./minimax/index.js";
+import { NotionMcpBaseDefinition } from "./notion/variants/notion-mcp/base-definition.js";
 import { OpenAiApiKeyDefinition } from "./openai/variants/openai-default/definition.js";
 import { OpenCodeGoDefinition } from "./opencode/index.js";
 import { PlanetScaleMcpBaseDefinition } from "./planetscale/variants/planetscale-mcp/base-definition.js";
@@ -51,6 +52,7 @@ export const JiraBrowserDefinition = JiraBaseDefinition;
 export const KimiBrowserDefinition = KimiDefinition;
 export const LinearBrowserDefinition = LinearBaseDefinition;
 export const MiniMaxBrowserDefinition = MiniMaxDefinition;
+export const NotionBrowserDefinition = NotionMcpBaseDefinition;
 export const OpenCodeGoBrowserDefinition = OpenCodeGoDefinition;
 export const PlanetScaleBrowserDefinition = PlanetScaleMcpBaseDefinition;
 export const PostHogBrowserDefinition = PostHogMcpBaseDefinition;
@@ -80,6 +82,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   GitHubEnterpriseServerBrowserDefinition,
   LinearBrowserDefinition,
   MiniMaxBrowserDefinition,
+  NotionBrowserDefinition,
   OpenAiApiKeyDefinition,
   OpenCodeGoBrowserDefinition,
   PlanetScaleBrowserDefinition,
@@ -126,6 +129,7 @@ export * from "./jira/browser.js";
 export * from "./kimi/index.js";
 export * from "./linear/browser.js";
 export * from "./minimax/index.js";
+export * from "./notion/browser.js";
 export * from "./opencode/index.js";
 export * from "./posthog/browser.js";
 export * from "./resend/browser.js";

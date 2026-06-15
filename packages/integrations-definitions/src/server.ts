@@ -23,6 +23,7 @@ import { JiraDefinition } from "./jira/index.js";
 import { KimiDefinition } from "./kimi/index.js";
 import { LinearDefinition } from "./linear/index.js";
 import { MiniMaxDefinition } from "./minimax/index.js";
+import { NotionDefinition } from "./notion/server.js";
 import { OpenAiApiKeyDefinition } from "./openai/index.js";
 import { OpenCodeGoDefinition } from "./opencode/index.js";
 import { PlanetScaleDefinition } from "./planetscale/server.js";
@@ -58,6 +59,7 @@ export * from "./github/shared/identity-linking.server.js";
 export * from "./kimi/index.js";
 export * from "./linear/index.js";
 export * from "./minimax/index.js";
+export * from "./notion/server.js";
 export * from "./openai/index.js";
 export * from "./opencode/index.js";
 export * from "./planetscale/server.js";
@@ -91,6 +93,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   GitHubEnterpriseServerDefinition,
   LinearDefinition,
   MiniMaxDefinition,
+  NotionDefinition,
   OpenAiApiKeyDefinition,
   OpenCodeGoDefinition,
   PlanetScaleDefinition,

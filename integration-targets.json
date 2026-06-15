@@ -104,6 +104,11 @@
       "config": {}
     },
     {
+      "targetKey": "notion-mcp",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "planetscale-mcp",
       "enabled": true,
       "config": {}

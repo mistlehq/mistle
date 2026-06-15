@@ -129,6 +129,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "notion-mcp",
+        familyId: "notion",
+        variantId: "notion-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "openai-default",
         familyId: "openai",
         variantId: "openai-default",

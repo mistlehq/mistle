@@ -15,6 +15,7 @@ import {
   KimiBrowserDefinition,
   LinearBrowserDefinition,
   MiniMaxBrowserDefinition,
+  NotionBrowserDefinition,
   OpenComputerSandboxRuntimeBrowserDefinition,
   PostHogBrowserDefinition,
   ResendBrowserDefinition,
@@ -217,6 +218,10 @@ describe("browser definitions", () => {
 
   it("keeps sentry browser definitions free of server-only OAuth handlers", () => {
     expect(SentryBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+  });
+
+  it("keeps notion browser definitions free of server-only OAuth handlers", () => {
+    expect(NotionBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
   });
 
   it("registers resend in the browser-safe definitions bundle", () => {
