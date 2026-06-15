@@ -84,6 +84,10 @@ describe("integrations-definitions server", () => {
       familyId: "linear",
       variantId: "linear-default",
     });
+    const notionDefinition = registry.getDefinition({
+      familyId: "notion",
+      variantId: "notion-mcp",
+    });
     const openCodeGoDefinition = registry.getDefinition({
       familyId: "opencode",
       variantId: "opencode-go",
@@ -308,6 +312,9 @@ describe("integrations-definitions server", () => {
     expect(resendDefinition?.oauth2AuthorizationCode).toBeUndefined();
     expect(resendDefinition?.webhookHandler).toBeUndefined();
     expect(resendDefinition?.webhookSource).toBeUndefined();
+    expect(notionDefinition?.oauth2AuthorizationCode).toBeDefined();
+    expect(notionDefinition?.webhookHandler).toBeUndefined();
+    expect(notionDefinition?.webhookSource).toBeUndefined();
     expect(sentryDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(sentryDefinition?.webhookHandler).toBeUndefined();
     expect(sentryDefinition?.webhookSource).toBeUndefined();
@@ -372,6 +379,7 @@ describe("integrations-definitions server", () => {
         "inception::inception-default",
         "kimi::kimi-default",
         "minimax::minimax-default",
+        "notion::notion-mcp",
         "posthog::posthog-mcp",
         "resend::resend-mcp",
         "zai::zai-coding-plan",

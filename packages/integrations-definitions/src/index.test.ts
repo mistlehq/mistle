@@ -97,6 +97,10 @@ describe("integrations-definitions index", () => {
       familyId: "linear",
       variantId: "linear-default",
     });
+    const notionDefinition = registry.getDefinition({
+      familyId: "notion",
+      variantId: "notion-mcp",
+    });
     const planetscaleDefinition = registry.getDefinition({
       familyId: "planetscale",
       variantId: "planetscale-mcp",
@@ -555,6 +559,26 @@ describe("integrations-definitions index", () => {
       ],
     });
     expect(postHogDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(notionDefinition).toMatchObject({
+      familyId: "notion",
+      variantId: "notion-mcp",
+      kind: "connector",
+      displayName: "Notion",
+      connectionMethods: [
+        {
+          id: "oauth2-authorization-code",
+          label: "Notion MCP OAuth",
+          kind: "redirect",
+          ui: {
+            create: {
+              submitLabel: "Connect Notion",
+              helperText: "Authorize Notion hosted MCP access.",
+            },
+          },
+        },
+      ],
+    });
+    expect(notionDefinition?.oauth2AuthorizationCode).toBeUndefined();
     expect(resendDefinition).toMatchObject({
       familyId: "resend",
       variantId: "resend-mcp",
@@ -1026,6 +1050,7 @@ describe("integrations-definitions index", () => {
       "github::github-enterprise-server",
       "linear::linear-default",
       "minimax::minimax-default",
+      "notion::notion-mcp",
       "openai::openai-default",
       "opencode::opencode-go",
       "planetscale::planetscale-mcp",
