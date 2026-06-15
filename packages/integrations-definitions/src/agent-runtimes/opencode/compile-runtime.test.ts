@@ -642,6 +642,16 @@ describe("compileOpenCodeRuntime", () => {
           secretType: "api_key",
         }),
         createCompiledRoute({
+          egressRuleId: "egress_rule_bind_kimi",
+          bindingId: "bind_kimi",
+          familyId: "kimi",
+          variantId: "kimi-default",
+          host: "api.moonshot.ai",
+          pathPrefixes: ["/v1"],
+          baseUrl: "https://api.moonshot.ai/v1",
+          secretType: "api_key",
+        }),
+        createCompiledRoute({
           egressRuleId: "egress_rule_bind_opencode_go",
           bindingId: "bind_opencode_go",
           familyId: "opencode",
@@ -651,7 +661,9 @@ describe("compileOpenCodeRuntime", () => {
           secretType: "api_key",
         }),
       ]),
-    ).toEqual({ enabled_providers: ["anthropic", "deepseek", "openai", "opencode-go"] });
+    ).toEqual({
+      enabled_providers: ["anthropic", "deepseek", "moonshotai", "openai", "opencode-go"],
+    });
   });
 
   it("renders OpenAI API auth file from proxied egress routes", () => {
@@ -752,6 +764,28 @@ describe("compileOpenCodeRuntime", () => {
       ]),
     ).toEqual({
       deepseek: {
+        type: "api",
+        key: "mistle-managed-credential",
+      },
+    });
+  });
+
+  it("renders Kimi API auth file from proxied egress routes", () => {
+    expect(
+      readOpenCodeAuthContent(compileDefaultOpenCodeRuntime(), [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_kimi",
+          bindingId: "bind_kimi",
+          familyId: "kimi",
+          variantId: "kimi-default",
+          host: "api.moonshot.ai",
+          pathPrefixes: ["/v1"],
+          baseUrl: "https://api.moonshot.ai/v1",
+          secretType: "api_key",
+        }),
+      ]),
+    ).toEqual({
+      moonshotai: {
         type: "api",
         key: "mistle-managed-credential",
       },

@@ -19,6 +19,7 @@ import { ExpoDefinition } from "./expo/server.js";
 import { GcpDefinition } from "./gcp/server.js";
 import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./github/index.js";
 import { JiraDefinition } from "./jira/index.js";
+import { KimiDefinition } from "./kimi/index.js";
 import { LinearDefinition } from "./linear/index.js";
 import { OpenAiApiKeyDefinition } from "./openai/index.js";
 import { OpenCodeGoDefinition } from "./opencode/index.js";
@@ -50,6 +51,7 @@ export * from "./gcp/server.js";
 export * from "./jira/index.js";
 export * from "./github/index.js";
 export * from "./github/shared/identity-linking.server.js";
+export * from "./kimi/index.js";
 export * from "./linear/index.js";
 export * from "./openai/index.js";
 export * from "./opencode/index.js";
@@ -77,6 +79,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   ExpoDefinition,
   GcpDefinition,
   JiraDefinition,
+  KimiDefinition,
   GitHubCloudDefinition,
   GitHubEnterpriseServerDefinition,
   LinearDefinition,

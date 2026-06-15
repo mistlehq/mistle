@@ -15,6 +15,7 @@ import { ExpoDefinition } from "./expo/browser.js";
 import { GcpDefinition } from "./gcp/browser.js";
 import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./github/browser.js";
 import { JiraDefinition } from "./jira/browser.js";
+import { KimiDefinition } from "./kimi/index.js";
 import { LinearBaseDefinition } from "./linear/variants/linear-default/base-definition.js";
 import { OpenAiApiKeyDefinition } from "./openai/index.js";
 import { OpenCodeGoDefinition } from "./opencode/index.js";
@@ -43,6 +44,7 @@ export * from "./gcp/browser.js";
 export * from "./jira/browser.js";
 export * from "./jira-shared.js";
 export * from "./github/browser.js";
+export * from "./kimi/index.js";
 export * from "./linear/browser.js";
 export * from "./openai/index.js";
 export * from "./opencode/index.js";
@@ -68,6 +70,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   ExpoDefinition,
   GcpDefinition,
   JiraDefinition,
+  KimiDefinition,
   GitHubCloudDefinition,
   GitHubEnterpriseServerDefinition,
   LinearBaseDefinition,

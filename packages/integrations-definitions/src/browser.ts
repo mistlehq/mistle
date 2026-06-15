@@ -16,6 +16,7 @@ import { GcpMcpBaseDefinition } from "./gcp/variants/gcp-mcp/base-definition.js"
 import { GitHubCloudBaseDefinition } from "./github/variants/github-cloud/base-definition.js";
 import { GitHubEnterpriseServerBaseDefinition } from "./github/variants/github-enterprise-server/base-definition.js";
 import { JiraBaseDefinition } from "./jira/variants/jira-default/base-definition.js";
+import { KimiDefinition } from "./kimi/index.js";
 import { LinearBaseDefinition } from "./linear/variants/linear-default/base-definition.js";
 import { OpenAiApiKeyDefinition } from "./openai/variants/openai-default/definition.js";
 import { OpenCodeGoDefinition } from "./opencode/index.js";
@@ -43,6 +44,7 @@ export const GcpBrowserDefinition = GcpMcpBaseDefinition;
 export const GitHubCloudBrowserDefinition = GitHubCloudBaseDefinition;
 export const GitHubEnterpriseServerBrowserDefinition = GitHubEnterpriseServerBaseDefinition;
 export const JiraBrowserDefinition = JiraBaseDefinition;
+export const KimiBrowserDefinition = KimiDefinition;
 export const LinearBrowserDefinition = LinearBaseDefinition;
 export const OpenCodeGoBrowserDefinition = OpenCodeGoDefinition;
 export const PlanetScaleBrowserDefinition = PlanetScaleMcpBaseDefinition;
@@ -66,6 +68,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   ExpoBrowserDefinition,
   GcpBrowserDefinition,
   JiraBrowserDefinition,
+  KimiBrowserDefinition,
   GitHubCloudBrowserDefinition,
   GitHubEnterpriseServerBrowserDefinition,
   LinearBrowserDefinition,
@@ -110,6 +113,7 @@ export * from "./expo/browser.js";
 export * from "./gcp/browser.js";
 export * from "./github/browser.js";
 export * from "./jira/browser.js";
+export * from "./kimi/index.js";
 export * from "./linear/browser.js";
 export * from "./opencode/index.js";
 export * from "./posthog/browser.js";

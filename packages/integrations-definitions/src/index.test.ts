@@ -41,6 +41,10 @@ describe("integrations-definitions index", () => {
       familyId: "jira",
       variantId: "jira-default",
     });
+    const kimiDefinition = registry.getDefinition({
+      familyId: "kimi",
+      variantId: "kimi-default",
+    });
     const openAiDefinition = registry.getDefinition({
       familyId: "openai",
       variantId: "openai-default",
@@ -295,6 +299,13 @@ describe("integrations-definitions index", () => {
       variantId: "deepseek-default",
       kind: "agent",
       displayName: "DeepSeek",
+      allowedRuntimeIds: ["opencode", "pi"],
+    });
+    expect(kimiDefinition).toMatchObject({
+      familyId: "kimi",
+      variantId: "kimi-default",
+      kind: "agent",
+      displayName: "Kimi",
       allowedRuntimeIds: ["opencode", "pi"],
     });
     expect(openCodeGoDefinition).toMatchObject({
@@ -951,7 +962,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(24);
+    expect(definitions).toHaveLength(25);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -964,6 +975,7 @@ describe("integrations-definitions index", () => {
       "expo::expo-mcp",
       "gcp::gcp-mcp",
       "jira::jira-default",
+      "kimi::kimi-default",
       "github::github-cloud",
       "github::github-enterprise-server",
       "linear::linear-default",

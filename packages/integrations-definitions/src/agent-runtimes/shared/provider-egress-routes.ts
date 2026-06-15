@@ -72,6 +72,16 @@ export function isDeepSeekApiRoute(route: EgressCredentialRoute): boolean {
   );
 }
 
+export function isKimiApiRoute(route: EgressCredentialRoute): boolean {
+  return (
+    route.familyId === "kimi" &&
+    routeHasHost({ route, host: "api.moonshot.ai" }) &&
+    route.authInjection.type === "bearer" &&
+    isIntegrationConnectionCredentialRoute(route) &&
+    route.credentialResolver.secretType === "api_key"
+  );
+}
+
 export function isOpenCodeGoRoute(route: EgressCredentialRoute): boolean {
   return (
     route.familyId === "opencode" &&

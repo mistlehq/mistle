@@ -11,6 +11,7 @@ import {
   GcpBrowserDefinition,
   GitHubCloudBrowserDefinition,
   JiraBrowserDefinition,
+  KimiBrowserDefinition,
   LinearBrowserDefinition,
   OpenComputerSandboxRuntimeBrowserDefinition,
   PostHogBrowserDefinition,
@@ -93,6 +94,24 @@ describe("browser definitions", () => {
     expect(DeepSeekBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
     expect(DeepSeekBrowserDefinition.webhookHandler).toBeUndefined();
     expect(DeepSeekBrowserDefinition.webhookSource).toBeUndefined();
+  });
+
+  it("registers Kimi in the browser-safe definitions bundle", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: KimiBrowserDefinition.familyId,
+      variantId: KimiBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "kimi",
+      variantId: "kimi-default",
+      kind: "agent",
+      displayName: "Kimi",
+      logoKey: "kimi",
+    });
+    expect(KimiBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+    expect(KimiBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(KimiBrowserDefinition.webhookSource).toBeUndefined();
   });
 
   it("keeps BugSnag browser definitions free of server-only hooks and resources", () => {

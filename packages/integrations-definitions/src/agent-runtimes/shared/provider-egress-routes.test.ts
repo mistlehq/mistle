@@ -5,6 +5,7 @@ import {
   isAnthropicApiRoute,
   isDeepSeekApiRoute,
   isIntegrationConnectionCredentialRoute,
+  isKimiApiRoute,
   isOpenAiApiRoute,
   isOpenAiChatGptSubscriptionRoute,
   isOpenCodeGoRoute,
@@ -178,6 +179,19 @@ describe("provider egress route helpers", () => {
         createRoute({
           familyId: "deepseek",
           host: "api.deepseek.com",
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("matches Kimi API provider routes", () => {
+    expect(
+      isKimiApiRoute(
+        createRoute({
+          familyId: "kimi",
+          host: "api.moonshot.ai",
+          baseUrl: "https://api.moonshot.ai/v1",
+          pathPrefixes: ["/v1"],
         }),
       ),
     ).toBe(true);

@@ -476,6 +476,35 @@ describe("compilePiRuntime", () => {
     });
   });
 
+  it("renders Kimi custom provider config when Kimi egress is available", () => {
+    const runtimeClients = renderRuntimeClients({
+      compiled: compileDefaultPiRuntime(),
+      egressRoutes: [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_kimi",
+          bindingId: "bind_kimi",
+          familyId: "kimi",
+          variantId: "kimi-default",
+          host: "api.moonshot.ai",
+          baseUrl: "https://api.moonshot.ai/v1",
+          secretType: "api_key",
+        }),
+      ],
+    });
+
+    expect(JSON.parse(readSetupFile({ runtimeClients, fileId: "pi_models" }))).toEqual({
+      providers: {
+        kimi: {
+          api: "openai-completions",
+          apiKey: "mistle-managed-credential",
+          baseUrl: "https://api.moonshot.ai/v1",
+          headers: {},
+          models: [{ id: "kimi-k2.7-code" }, { id: "kimi-k2.6" }],
+        },
+      },
+    });
+  });
+
   it("uses Pi's OpenAI Codex provider for ChatGPT subscription egress", () => {
     const runtimeClients = renderRuntimeClients({
       compiled: compileDefaultPiRuntime(),
