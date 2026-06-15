@@ -630,6 +630,41 @@ mod tests {
     }
 
     #[test]
+    fn resume_rejects_durable_signing_identity_changes() {
+        let test_dir = create_temp_test_dir("control_resume_reject_signing_change");
+        let socket_path = test_dir.join("control.sock");
+        let start_gateway = start_bootstrap_gateway();
+        let key_ref = format!("key::{TEST_PUBLIC_KEY}");
+        let activation_input = valid_signing_activation_input(&start_gateway.ws_url, key_ref);
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        submit_activate(&socket_path, &activation_input).expect("activation should succeed");
+        wait_for_activation_phase(&server, ActivationPhase::Activated);
+
+        let resume_gateway = start_bootstrap_gateway();
+        let mut resume_input = valid_signing_activation_input(
+            &resume_gateway.ws_url,
+            "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDifferentKey".to_string(),
+        );
+        resume_input.operation_kind = ActivationOperationKind::Resume;
+
+        let error = submit_activate(&socket_path, &resume_input)
+            .expect_err("resume should reject durable signing identity changes");
+
+        assert!(
+            error
+                .to_string()
+                .contains("initialized resume cannot change Git signing identity")
+        );
+        assert_eq!(server.activation_input(), Some(activation_input));
+
+        server.close().expect("control server should stop cleanly");
+        start_gateway.close().expect("gateway should stop cleanly");
+        resume_gateway.close().expect("gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
     fn failed_activation_reports_failure_to_later_activation_attempts() {
         let test_dir = create_temp_test_dir("control_activate_failure");
         let socket_path = test_dir.join("control.sock");
