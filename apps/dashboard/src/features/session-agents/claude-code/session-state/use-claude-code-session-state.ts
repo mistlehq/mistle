@@ -247,7 +247,7 @@ export function useClaudeCodeSessionState(input: {
           });
           setBootstrap(ReadyClaudeCodeBootstrap);
           setSessionSnapshot({
-            activeDirectory: connectInput.initialCwd ?? null,
+            activeDirectory: thread.thread.cwd ?? connectInput.initialCwd ?? null,
             activeThreadId,
             connectedAtIso: new Date().toISOString(),
             providerThreadId: connectInput.providerThreadId ?? null,

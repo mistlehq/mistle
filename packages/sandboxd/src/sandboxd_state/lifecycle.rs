@@ -429,10 +429,10 @@ impl SandboxdState {
             return Err(error);
         }
 
+        let runtime_plan_observer = RuntimePlanTimelineObserver {
+            diagnostics_logger: diagnostics_logger.clone(),
+        };
         if input.should_apply_runtime_plan {
-            let runtime_plan_observer = RuntimePlanTimelineObserver {
-                diagnostics_logger: diagnostics_logger.clone(),
-            };
             match runtime::apply_compiled_runtime_plan_with_output_sink_and_observer(
                 &runtime_plan,
                 Some(&runtime_env),
@@ -451,6 +451,27 @@ impl SandboxdState {
                         &mut egress_proxy,
                         &diagnostics_logger,
                         "stop_egress_proxy_after_runtime_plan_failure",
+                    );
+                    return Err(SandboxdStateError::ApplyRuntimePlan(error.to_string()));
+                }
+            }
+        } else {
+            match runtime::apply_runtime_client_setup_files(
+                &runtime_plan,
+                Some(&runtime_plan_observer),
+            ) {
+                Ok(()) => {}
+                Err(error) => {
+                    record_runtime_plan_apply_failure(&diagnostics_logger, &error);
+                    close_tunnel_session_after_failure(
+                        &mut startup_tunnel_session,
+                        &diagnostics_logger,
+                        "stop_tunnel_session_after_runtime_files_failure",
+                    );
+                    close_egress_proxy_after_failure(
+                        &mut egress_proxy,
+                        &diagnostics_logger,
+                        "stop_egress_proxy_after_runtime_files_failure",
                     );
                     return Err(SandboxdStateError::ApplyRuntimePlan(error.to_string()));
                 }

@@ -13,6 +13,7 @@ export type ClaudeCodeThreadTurn = {
 export type ClaudeCodeThreadReadResult = {
   thread: {
     activeTurnId: string | null;
+    cwd: string | null;
     id: string;
     lastError: string | null;
     status: {
@@ -125,6 +126,7 @@ function parseClaudeCodeThreadReadResult(result: unknown): ClaudeCodeThreadReadR
         ),
       },
       activeTurnId: readNestedString(result, ["thread", "activeTurnId"]),
+      cwd: readNestedString(result, ["thread", "cwd"]),
       turns: rawTurns.map((turn, index) => ({
         executionId: isRecord(turn)
           ? (readNestedString(turn, ["executionId"]) ?? `turn_${String(index)}`)

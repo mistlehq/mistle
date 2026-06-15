@@ -8,6 +8,7 @@ const listenHost = process.env.MISTLE_CLAUDE_CODE_RUNTIME_HOST ?? "127.0.0.1";
 const listenPort = Number.parseInt(process.env.MISTLE_CLAUDE_CODE_RUNTIME_PORT ?? "4521", 10);
 const healthPath = process.env.MISTLE_CLAUDE_CODE_RUNTIME_HEALTH_PATH ?? "/health";
 const websocketPath = process.env.MISTLE_CLAUDE_CODE_RUNTIME_WS_PATH ?? "/agent";
+const defaultWorkspaceRoot = "/root";
 
 if (!Number.isInteger(listenPort) || listenPort <= 0 || listenPort > 65535) {
   throw new Error("MISTLE_CLAUDE_CODE_RUNTIME_PORT must be a valid TCP port.");
@@ -42,9 +43,19 @@ function requireConversation(providerConversationId) {
   return conversation;
 }
 
+function resolveClaudeCodeCwd(cwd) {
+  if (cwd === undefined || cwd === null) {
+    return defaultWorkspaceRoot;
+  }
+  if (typeof cwd !== "string" || cwd.length === 0) {
+    throw new Error("Claude Code cwd must be a non-empty string.");
+  }
+  return cwd;
+}
+
 function createConversation(input) {
   const providerConversationId = input.sessionId ?? randomUUID();
-  const cwd = input.cwd;
+  const cwd = resolveClaudeCodeCwd(input.cwd);
   conversations.set(providerConversationId, {
     providerConversationId,
     cwd,
@@ -100,7 +111,7 @@ function createClaudeQueryOptions(input) {
       ? { sessionId: input.session.sessionId }
       : { resume: input.session.sessionId };
   return {
-    ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
+    cwd: resolveClaudeCodeCwd(input.cwd),
     systemPrompt: { type: "preset", preset: "claude_code" },
     includePartialMessages: true,
     ...sessionOptions,
@@ -202,6 +213,7 @@ async function handleRequest(request) {
       if (!conversations.has(params.threadId)) {
         conversations.set(params.threadId, {
           providerConversationId: params.threadId,
+          cwd: resolveClaudeCodeCwd(params.cwd),
           activeExecutionId: null,
           turns: [],
           sdkSessionId: params.threadId,
@@ -227,6 +239,7 @@ async function handleRequest(request) {
       return {
         thread: {
           id: conversation.providerConversationId,
+          cwd: conversation.cwd,
           status: {
             type: conversation.activeExecutionId === null ? "idle" : "active",
           },

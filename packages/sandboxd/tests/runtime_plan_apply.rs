@@ -195,6 +195,123 @@ fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
 }
 
 #[test]
+fn applies_runtime_client_setup_files_without_materializing_snapshot_runtime_plan() {
+    let test_dir = create_temp_test_dir("runtime_client_files_only");
+    let artifact_output_path = test_dir.join("artifact-output.txt");
+    let runtime_file_path = test_dir.join("runtime-client").join("server.mjs");
+    let clone_source_path = test_dir.join("source-repo");
+    let clone_target_path = test_dir.join("workspace").join("repo");
+    create_git_repository(&clone_source_path);
+    fs::create_dir_all(
+        runtime_file_path
+            .parent()
+            .expect("runtime client file should have a parent"),
+    )
+    .expect("runtime client dir should be creatable");
+    fs::write(&runtime_file_path, "old server").expect("runtime client file should be writable");
+
+    let runtime_plan: runtime::CompiledRuntimePlan = serde_json::from_value(serde_json::json!({
+      "sandboxProfileId": "sbp_123",
+      "version": 1,
+      "image": {
+        "source": "snapshot",
+        "imageRef": "sha256:test"
+      },
+      "egressRoutes": [],
+      "artifacts": [
+        {
+          "artifactKey": "artifact_1",
+          "name": "artifact one",
+          "lifecycle": {
+            "install": [
+              {
+                "op": "exec",
+                "command": {
+                  "args": ["sh", "-c", format!("printf artifact > {}", artifact_output_path.display())],
+                  "cwd": test_dir.display().to_string()
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "runtimeClients": [
+        {
+          "clientId": "runtime_client_1",
+          "setup": {
+            "env": {},
+            "files": [
+              {
+                "fileId": "server",
+                "path": runtime_file_path.display().to_string(),
+                "mode": 493,
+                "content": "new server",
+                "writeMode": "overwrite"
+              }
+            ]
+          },
+          "processes": [],
+          "endpoints": []
+        }
+      ],
+      "workspaceSources": [
+        {
+          "sourceKind": "git-clone",
+          "resourceKind": "repository",
+          "path": clone_target_path.display().to_string(),
+          "originUrl": clone_source_path.display().to_string()
+        }
+      ],
+      "agentRuntimes": [],
+      "associatedResourceEventRouting": {
+        "enabled": false,
+        "resources": []
+      }
+    }))
+    .expect("runtime plan should parse");
+    let observer = RecordingRuntimePlanApplyObserver::default();
+
+    runtime::apply_runtime_client_setup_files(&runtime_plan, Some(&observer))
+        .expect("runtime client files should apply");
+
+    assert_eq!(
+        fs::read_to_string(&runtime_file_path).expect("runtime file should be readable"),
+        "new server",
+    );
+    assert_eq!(
+        fs::metadata(&runtime_file_path)
+            .expect("runtime file should exist")
+            .permissions()
+            .mode()
+            & 0o777,
+        0o755,
+    );
+    assert!(
+        !artifact_output_path.exists(),
+        "artifact install should not run when applying runtime client files only"
+    );
+    assert!(
+        !clone_target_path.exists(),
+        "workspace sources should not be materialized when applying runtime client files only"
+    );
+    assert_eq!(
+        observer.records(),
+        vec![
+            (
+                runtime::RuntimePlanApplyLifecycleStep::RuntimeFiles,
+                "started"
+            ),
+            (
+                runtime::RuntimePlanApplyLifecycleStep::RuntimeFiles,
+                "completed"
+            ),
+        ],
+    );
+
+    fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+}
+
+#[test]
 fn merges_runtime_files_without_replacing_existing_runtime_config() {
     let test_dir = create_temp_test_dir("runtime_plan_merge_runtime_files");
     let codex_config_path = test_dir.join("etc").join("codex").join("config.toml");

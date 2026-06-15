@@ -283,6 +283,20 @@ pub fn apply_compiled_runtime_plan_with_output_sink_and_observer(
         }
     }
 
+    apply_runtime_client_setup_files(runtime_plan, observer)?;
+
+    Ok(())
+}
+
+/// Applies only runtime client setup files from one compiled runtime plan.
+///
+/// Snapshot-backed session starts already contain artifact, workspace, skills, and user setup
+/// state from the snapshot image, but runtime client files are generated Mistle-owned launch
+/// files. Re-applying them keeps runtime servers/config current without re-running setup work.
+pub fn apply_runtime_client_setup_files(
+    runtime_plan: &CompiledRuntimePlan,
+    observer: Option<&dyn RuntimePlanApplyObserver>,
+) -> Result<(), RuntimePlanApplyError> {
     if runtime_plan
         .runtime_clients
         .iter()
@@ -313,7 +327,6 @@ pub fn apply_compiled_runtime_plan_with_output_sink_and_observer(
     {
         observer.record_step_completed(RuntimePlanApplyLifecycleStep::RuntimeFiles);
     }
-
     Ok(())
 }
 
